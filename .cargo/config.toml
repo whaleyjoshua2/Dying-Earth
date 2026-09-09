@@ -1,0 +1,4 @@
+# The shipped .exe must run on a machine without the Visual C++ runtime installed, so the C runtime
+# is linked in statically. This is the one place a build flag lives; never set RUSTFLAGS in a shell.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
