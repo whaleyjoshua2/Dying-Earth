@@ -81,5 +81,31 @@ A person counted in the population of a Colony or Nation State. Colonists are ca
 _Avoid_: settler, crew, worker, population resource
 
 **Nation State**:
-A region of the Earth Map that a Faction can control and build in. The Earth-side counterpart of a Colony.
+One of seven regions of the Earth Map mirroring the continents, Antarctica included, that a Faction can control and build in. Each carries a population, an Industry Level, a Resource Lean and a Baseline Emissions figure.
 _Avoid_: country, nation, territory, region, state
+
+### Earth
+
+**Facility**:
+A building placed in a Nation State. The First Playable has five kinds: Factory, Power Plant, Refinery, Launch Site and Research Lab.
+_Avoid_: item, building, module (that is the Colony word), structure
+
+**Industry Level**:
+How built-up a Nation State is. Together with the state's size it sets how many Facilities fit, and it scales the state's emissions. Raising it is a build action.
+_Avoid_: development, tier, infrastructure
+
+**Resource Lean**:
+The one of Materials, Fuel or Energy a Nation State is naturally good at producing.
+_Avoid_: specialty, bonus, affinity
+
+**Baseline Emissions**:
+How dirty a Nation State's industry is before any Facility is built there.
+_Avoid_: pollution rating, carbon score
+
+**Influence**:
+A Faction's accumulated claim on a neutral Nation State, built by spending resources on it over turns and decaying when neglected. The first Faction past the state's threshold takes control.
+_Avoid_: diplomacy points, favour, reputation
+
+**Research**:
+Points produced by Research Labs and spent only on Techs. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship.
+_Avoid_: science, research points, RP, fourth resource
