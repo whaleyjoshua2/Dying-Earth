@@ -19,6 +19,7 @@ impl Game {
         self.climate.co2 += net;
         self.climate.restoration_next = 0.0;
         self.climate.launches_pending = [0, 0];
+        self.climate.card_emissions_next = 0.0;
         for s in &mut self.states {
             s.wildfire_emissions_next = 0.0;
         }
@@ -38,7 +39,7 @@ impl Game {
         self.climate.temperature = temp.max(c.base_temperature);
         self.climate.last = breakdown.clone();
         self.log(format!(
-            "Climate: emissions {:.1} (industry {:.1}, factories {:.1}, power {:.1}, refineries {:.1}, launches {:.1}, population {:.1}, wildfire {:.1}), sink {:.1}, net {:+.1}; CO2 {:.1} ppm; temperature {:+.2} heading to {:+.2}.",
+            "Climate: emissions {:.1} (industry {:.1}, factories {:.1}, power {:.1}, refineries {:.1}, launches {:.1}, population {:.1}, cards {:.1}), sink {:.1}, net {:+.1}; CO2 {:.1} ppm; temperature {:+.2} heading to {:+.2}.",
             breakdown.total(),
             breakdown.state_industry,
             breakdown.factories,
@@ -46,7 +47,7 @@ impl Game {
             breakdown.refineries,
             breakdown.launches,
             breakdown.population,
-            breakdown.wildfire,
+            breakdown.cards,
             breakdown.total_sink(),
             net,
             self.climate.co2,
@@ -55,7 +56,6 @@ impl Game {
         ));
         self.sea_level_check();
         self.population_change();
-        self.deck_swaps();
     }
 
     pub fn target_temperature(&self) -> f64 {
@@ -77,6 +77,10 @@ impl Game {
             let m = mult(st.control.director());
             b.state_industry += card.baseline_emissions * st.industry_level as f64 * m;
             b.population += c.population_emissions_per_hundred_million * st.population * pop_mult * m;
+            // A Facility nobody directs stands idle: it makes nothing and emits nothing (ticket #24).
+            if st.control.director().is_none() {
+                continue;
+            }
             for f in &st.facilities {
                 if !f.online {
                     continue;
@@ -89,8 +93,9 @@ impl Game {
                     _ => {}
                 }
             }
-            b.wildfire += st.wildfire_emissions_next;
+            b.cards += st.wildfire_emissions_next;
         }
+        b.cards += self.climate.card_emissions_next;
         let per_launch = if self.has_tech(TechId::CleanPropellant) { t.tech(TechId::CleanPropellant).value } else { c.launch_emissions };
         for seat in Seat::ALL {
             b.launches += self.climate.launches_pending[seat.index()] as f64 * per_launch * mult(Some(seat));
@@ -180,25 +185,6 @@ impl Game {
                 continue;
             }
             s.population = (s.population * (1.0 + rate)).max(0.0);
-        }
-    }
-
-    /// Spec 13.1: one Calm Card becomes a Climate card per full 0.2 C above +1.2 not yet counted.
-    fn deck_swaps(&mut self) {
-        let swap_degrees = self.tables.events.climate_swap_degrees;
-        let base = self.tables.climate.base_temperature;
-        let steps = ((self.climate.temperature - base) / swap_degrees + 1e-9).floor().max(0.0) as u32;
-        while self.climate.swaps_counted < steps {
-            self.climate.swaps_counted += 1;
-            if self.swap_one_calm() {
-                let line = format!(
-                    "The Temperature passed {:+.1} C: a Calm Card became a Climate card ({} Climate cards in the deck).",
-                    base + swap_degrees * self.climate.swaps_counted as f64,
-                    self.deck.climate_cards_left()
-                );
-                self.report.lines.push(line.clone());
-                self.log(line);
-            }
         }
     }
 

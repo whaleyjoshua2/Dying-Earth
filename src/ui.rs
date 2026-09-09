@@ -590,6 +590,8 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                     if let Some(e) = &session.last_error {
                         ui.colored_label(Color32::LIGHT_RED, e);
                     }
+                    ui.separator();
+                    roster(ui, session, game, view);
                 }
                 Selection::State(sid) => state_panel(ui, session, game, view, sid, actions),
                 Selection::Colony(cid) => colony_panel(ui, session, game, view, cid, actions),
@@ -617,6 +619,122 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     });
 }
 
+/// The roster (#23): every Ship stack, Army, Colony and Nation State the player directs, each row a
+/// button that selects it and jumps to its view, with a mark on anything that has no order this turn.
+fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
+    ui.label(RichText::new("Your roster").size(18.0).strong());
+    ui.label(RichText::new("Click a row to select it and go there. \"no order\" marks what still waits.").weak());
+    let pending = &session.pending;
+    let mut jump: Option<(View, Selection)> = None;
+    // Ships, one row per stack, then those in transit.
+    ui.label(RichText::new("Ships").strong());
+    let mut any_ship = false;
+    for body in BodyId::ALL {
+        let ships: Vec<&Ship> = game.ships.iter().filter(|s| s.seat == Seat(0) && s.at == ShipAt::Body(body)).collect();
+        if ships.is_empty() {
+            continue;
+        }
+        any_ship = true;
+        let ordered = ships.iter().all(|s| {
+            pending.iter().any(|o| matches!(o, Order::Transit { ship, .. } | Order::Load { ship, .. } | Order::Unload { ship, .. } | Order::Repair { unit: UnitRef::Ship(ship), .. } if *ship == s.id))
+        }) || pending.iter().any(|o| matches!(o, Order::ShipStance { body: b, .. } if *b == body));
+        let mut kinds: Vec<String> = ships.iter().map(|s| s.kind.name().to_string()).collect();
+        kinds.sort();
+        kinds.dedup();
+        let cargo: u32 = ships.iter().map(|s| s.colonists).sum();
+        let armies = ships.iter().filter(|s| s.army.is_some()).count();
+        let mut text = format!("{} at {}: {} (strength {})", ships.len(), game.tables.body(body).name, kinds.join(", "), game.ship_stack_strength(Seat(0), body));
+        if cargo > 0 {
+            text.push_str(&format!(", {cargo} Colonists aboard"));
+        }
+        if armies > 0 {
+            text.push_str(&format!(", {armies} Army aboard"));
+        }
+        if !ordered {
+            text.push_str("  - no order");
+        }
+        if ui.button(text).clicked() {
+            jump = Some((View::Solar, Selection::ShipStack(body, Seat(0))));
+        }
+    }
+    for s in game.ships.iter().filter(|s| s.seat == Seat(0)) {
+        if let ShipAt::Transit { to, turns_left, .. } = s.at {
+            any_ship = true;
+            let text = format!("{} in transit to {}, {} turn(s) left", s.kind.name(), game.tables.body(to).name, turns_left);
+            if ui.button(text).clicked() {
+                jump = Some((View::Solar, Selection::None));
+            }
+        }
+    }
+    if !any_ship {
+        ui.label(RichText::new("  none; a Launch Site builds them").weak());
+    }
+    // Armies.
+    ui.label(RichText::new("Armies").strong());
+    let mut any_army = false;
+    for a in game.armies.iter().filter(|a| game.army_seat(a) == Some(Seat(0)) && !game.army_stands_down(a)) {
+        any_army = true;
+        let ordered = pending.iter().any(|o| match o {
+            Order::MoveArmy { army, .. } | Order::Repair { unit: UnitRef::Army(army), .. } | Order::Load { army: Some(army), .. } => *army == a.id,
+            Order::ArmyStance { place, .. } => a.at == ArmyAt::Place(*place),
+            _ => false,
+        });
+        let (where_, target) = match a.at {
+            ArmyAt::Place(Place::State(s)) => (game.tables.state(s).name.clone(), Some((View::Surface(BodyId::Earth), Selection::State(s)))),
+            ArmyAt::Place(Place::Colony(c)) => (game.place_name(Place::Colony(c)), game.colony(c).map(|col| (View::Surface(col.body), Selection::Colony(c)))),
+            ArmyAt::Aboard(ship) => (format!("aboard {ship}"), game.ship(ship).map(|s| match s.at { ShipAt::Body(b) => (View::Solar, Selection::ShipStack(b, Seat(0))), _ => (View::Solar, Selection::None) })),
+        };
+        let mut text = format!("{} at {}: strength {}, damage {}", if a.standing { "Standing Army" } else { "Army" }, where_, game.army_strength(a), a.damage);
+        if !ordered && !matches!(a.at, ArmyAt::Aboard(_)) {
+            text.push_str("  - no order");
+        }
+        if ui.button(text).clicked() {
+            jump = target;
+        }
+    }
+    if !any_army {
+        ui.label(RichText::new("  none").weak());
+    }
+    // Colonies.
+    ui.label(RichText::new("Colonies").strong());
+    let mut any_colony = false;
+    for c in game.colonies.iter().filter(|c| c.control.director() == Some(Seat(0))) {
+        any_colony = true;
+        let building = c.queue.len();
+        let text = format!("{}: {} Colonists, {} Modules{}", game.place_name(Place::Colony(c.id)), c.colonists, c.modules.len(), if building > 0 { format!(", {building} building") } else { String::new() });
+        if ui.button(text).clicked() {
+            jump = Some((View::Surface(c.body), Selection::Colony(c.id)));
+        }
+    }
+    if !any_colony {
+        ui.label(RichText::new("  none; a Colony Ship founds one").weak());
+    }
+    // Nation States.
+    ui.label(RichText::new("Nation States").strong());
+    for sid in game.directed_states(Seat(0)) {
+        let st = game.state(sid);
+        let building = st.queue.len();
+        let text = format!("{}: {} Facilities, {} free slot(s){}", game.tables.state(sid).name, st.facilities.len(), game.free_slots(sid), if building > 0 { format!(", {building} building") } else { String::new() });
+        if ui.button(text).clicked() {
+            jump = Some((View::Surface(BodyId::Earth), Selection::State(sid)));
+        }
+    }
+    if let Some((v, sel)) = jump {
+        match v {
+            View::Solar => {
+                view.view = View::Solar;
+            }
+            View::Surface(b) => {
+                if view.view != View::Surface(b) {
+                    view.enter_surface(b);
+                }
+            }
+        }
+        view.selection = sel;
+        view.attack_preview = false;
+    }
+}
+
 fn order_text(game: &Game, o: &Order) -> String {
     match o {
         Order::BuildFacility { state, kind } => format!("Build {} in {}", kind.name(), game.tables.state(*state).name),
@@ -640,11 +758,19 @@ fn order_text(game: &Game, o: &Order) -> String {
 }
 
 fn cost_button(ui: &mut Ui, game: &Game, pending: &[Order], order: Order, label: &str, actions: &mut Vec<Action>) {
+    cost_button_with_hover(ui, game, pending, order, label, None, actions);
+}
+
+/// A build button: cost in the label, and on hover what the building would make each turn (#22).
+fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Order, label: &str, hover: Option<String>, actions: &mut Vec<Action>) {
     let cost = game.order_cost(Seat(0), &order);
     let check = game.check_order(Seat(0), pending, &order);
     let text = format!("{} ({})", label, cost.text());
     let button = egui::Button::new(text);
-    let resp = ui.add_enabled(check.is_ok(), button);
+    let mut resp = ui.add_enabled(check.is_ok(), button);
+    if let Some(h) = &hover {
+        resp = resp.on_hover_text(format!("Once it stands: {h}")).on_disabled_hover_text(format!("Once it stands: {h}"));
+    }
     if let Err(e) = &check {
         resp.clone().on_disabled_hover_text(&e.0);
     }
@@ -716,8 +842,13 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         ui.colored_label(Color32::LIGHT_BLUE, format!("{} slot(s) lost to the sea", st.lost_slots));
     }
     ui.label(RichText::new("Facilities").strong());
+    let director = st.control.director();
     for f in &st.facilities {
-        ui.label(format!("  {}{}", f.kind.name(), if f.online { "" } else { " (offline)" }));
+        let figures = match director {
+            Some(d) => game.facility_yield(d, sid, f.kind).text(),
+            None => "idle, nobody directs this state".to_string(),
+        };
+        ui.label(format!("  {}: {}{}", f.kind.name(), figures, if f.online { "" } else { " (offline, making nothing)" }));
     }
     for b in &st.queue {
         ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
@@ -734,9 +865,10 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     ui.separator();
     let mine = st.control.director() == Some(Seat(0));
     if mine {
-        ui.label(RichText::new("Build").strong());
+        ui.label(RichText::new("Build (hover a button for what it makes)").strong());
         for fk in FacilityKind::ALL {
-            cost_button(ui, game, &session.pending, Order::BuildFacility { state: sid, kind: fk }, fk.name(), actions);
+            let hover = game.facility_yield(Seat(0), sid, fk).text();
+            cost_button_with_hover(ui, game, &session.pending, Order::BuildFacility { state: sid, kind: fk }, fk.name(), Some(hover), actions);
         }
         cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
@@ -795,8 +927,13 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     ui.label(owner);
     ui.label(format!("Colonists {} of {} Habitat room", col.colonists, game.habitat_room(col)));
     ui.label(RichText::new("Modules").strong());
+    let director = col.control.director();
     for m in &col.modules {
-        ui.label(format!("  {}{}", m.kind.name(), if m.online { "" } else { " (offline)" }));
+        let figures = match director {
+            Some(d) => game.module_yield(d, cid, m.kind).text(),
+            None => "idle".to_string(),
+        };
+        ui.label(format!("  {}: {}{}", m.kind.name(), figures, if m.online { "" } else { " (offline, making nothing)" }));
     }
     for b in &col.queue {
         ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
@@ -809,9 +946,10 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     ui.separator();
     let mine = col.control.director() == Some(Seat(0));
     if mine {
-        ui.label(RichText::new("Build").strong());
+        ui.label(RichText::new("Build (hover a button for what it makes)").strong());
         for mk in ModuleKind::ALL {
-            cost_button(ui, game, &session.pending, Order::BuildModule { colony: cid, kind: mk }, mk.name(), actions);
+            let hover = game.module_yield(Seat(0), cid, mk).text();
+            cost_button_with_hover(ui, game, &session.pending, Order::BuildModule { colony: cid, kind: mk }, mk.name(), Some(hover), actions);
         }
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::Colony(cid) }, "Build Army (Barracks)", actions);
         if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
@@ -1045,14 +1183,20 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             ui.label(format!("Refineries {:.1}", e.refineries));
             ui.label(format!("Launches {:.1}", e.launches));
             ui.label(format!("Population {:.1}", e.population));
-            if e.wildfire > 0.0 {
-                ui.label(format!("Wildfire {:.1}", e.wildfire));
+            if e.cards > 0.0 {
+                ui.label(format!("Event cards {:.1}", e.cards));
             }
             ui.label(format!("Natural Sink -{:.1}{}", e.sink, if e.restoration > 0.0 { format!(" and Restoration -{:.1}", e.restoration) } else { String::new() }));
             ui.label(RichText::new(format!("Net {:+.1} ppm", e.net())).strong());
             ui.separator();
             let growth = game.population_growth_rate() * 100.0;
-            ui.label(format!("Penalties in force: population growth {:+.2}% per turn, {} Climate cards in the deck ({} Calm left).", growth, game.deck.climate_cards_left(), game.deck.calm_left()));
+            ui.label(format!(
+                "Penalties in force: population growth {:+.2}% per turn; a card comes {:.0}% of turns at this Temperature ({} cards left in the deck, {} of them Climate).",
+                growth,
+                game.draw_chance() * 100.0,
+                game.deck.cards.len(),
+                game.deck.climate_cards_left()
+            ));
             let p = game.projection();
             let line = match p.collapse_turn {
                 Some(t) => format!("At this rate, {:+.1} C by turn {}; Collapse at +{:.1} around turn {}.", p.temperature_at_last_turn, game.tables.victory.turns, game.tables.climate.collapse_line, t),

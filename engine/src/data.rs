@@ -52,6 +52,9 @@ pub struct StateCard {
     pub size: u32,
     pub coastal_exposure: u32,
     pub neighbours: Vec<StateId>,
+    /// What stands when the game begins (ticket #24); comes with the state whoever takes it.
+    #[serde(default)]
+    pub start_facilities: Vec<FacilityKind>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -126,12 +129,29 @@ pub struct EventCard {
     pub effect: String,
     #[serde(default)]
     pub blunted_by: Option<TechId>,
+    /// How many copies sit in the deck (ticket #25).
+    #[serde(default = "one")]
+    pub copies: u32,
+}
+
+fn one() -> u32 {
+    1
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct EventsTable {
-    pub calm_cards: u32,
-    pub climate_swap_degrees: f64,
+    /// Ticket #25: no Calm Cards; each turn a card is drawn with this chance at the base Temperature,
+    /// rising by `draw_chance_per_step` for every full `draw_chance_step_degrees` above it.
+    pub draw_chance_base: f64,
+    pub draw_chance_per_step: f64,
+    pub draw_chance_step_degrees: f64,
+    pub solar_maximum_multiplier: f64,
+    pub solar_maximum_multiplier_with_tech: f64,
+    pub permafrost_emissions: f64,
+    pub meteor_damage: u32,
+    pub unrest_army_damage: u32,
+    pub unrest_influence_loss: i64,
+    pub reactor_leak_energy: i64,
     pub breakthrough_research: i64,
     pub breakthrough_research_public_science: i64,
     pub discovery_multiplier: f64,
@@ -416,6 +436,10 @@ impl Tables {
             if s.population < 0.0 || s.education_level <= 0.0 {
                 return Err(err("nation_states.toml", format!("row {}: population or education out of range", s.name)));
             }
+            // A Launch Site is added for a Faction start state, so leave one slot for it.
+            if s.start_facilities.len() as u32 + 1 > s.size + s.industry_level {
+                return Err(err("nation_states.toml", format!("row {}: {} start_facilities do not fit its {} build slots with a Launch Site", s.name, s.start_facilities.len(), s.size + s.industry_level)));
+            }
         }
         for t in &self.techs {
             for n in &t.needs {
@@ -438,8 +462,11 @@ impl Tables {
         if self.victory.turns == 0 {
             return Err(err("victory.toml", "turns must be positive"));
         }
-        if self.events.calm_cards == 0 {
-            return Err(err("events.toml", "calm_cards must be positive"));
+        if self.events.event.iter().map(|e| e.copies).sum::<u32>() == 0 {
+            return Err(err("events.toml", "the deck has no cards; give some Event a copies count above zero"));
+        }
+        if !(0.0..=1.0).contains(&self.events.draw_chance_base) || self.events.draw_chance_step_degrees <= 0.0 {
+            return Err(err("events.toml", "draw_chance_base must be between 0 and 1 and draw_chance_step_degrees positive"));
         }
         Ok(())
     }

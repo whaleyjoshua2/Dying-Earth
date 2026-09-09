@@ -10,8 +10,18 @@ fn tables() -> Arc<Tables> {
     Arc::new(Tables::load(&default_data_dir()).expect("tables load"))
 }
 
-/// A player Custodian in Asia against an AI Prospector, before the first turn runs.
+/// A player Custodian in Asia against an AI Prospector, before the first turn runs, on a bare board:
+/// the start Facilities of ticket #24 are stripped (Launch Sites stay) so each test places exactly
+/// the buildings it reasons about. `fresh()` keeps the real start.
 fn game() -> Game {
+    let mut g = fresh();
+    for s in &mut g.states {
+        s.facilities.retain(|f| f.kind == FacilityKind::LaunchSite);
+    }
+    g
+}
+
+fn fresh() -> Game {
     Game::new(tables(), NewGame { seed: 7, seats: [(FactionKind::Custodians, false), (FactionKind::Prospectors, true)], player_start: StateId::Asia })
 }
 
@@ -27,7 +37,7 @@ fn colony(g: &mut Game, seat: Seat, body: BodyId, modules: &[ModuleKind], coloni
         body,
         slot,
         control: Control::Controlled(seat),
-        modules: modules.iter().map(|k| Module { kind: *k, online: true }).collect(),
+        modules: modules.iter().map(|k| Module::new(*k)).collect(),
         colonists,
         queue: Vec::new(),
         grid_failed: false,
@@ -75,8 +85,8 @@ fn income_shortfall_stops_once_the_balance_is_met() {
 #[test]
 fn temperature_reaches_within_a_tenth_of_target_in_two_climate_phases() {
     let mut g = game();
-    // One turn of real Emissions: about +10 ppm net moves the target by +0.125.
-    g.climate.co2 = 430.0;
+    // One turn of real Emissions: a quarter of a step moves the target by +0.125.
+    g.climate.co2 = 420.0 + 0.25 * g.tables.climate.ppm_step;
     let target = g.target_temperature();
     assert!((target - 1.325).abs() < 1e-9);
     // Freeze the stock so only the lag acts: no producers, so the phase adds population minus sink.
@@ -100,12 +110,13 @@ fn temperature_halves_the_remaining_distance_each_phase() {
         s.population = 0.0;
         s.industry_level = 0;
     }
-    // Nothing emits, so each phase takes the Sink (6 ppm) off: 506 becomes 500, and the target is 2.2.
-    g.climate.co2 = 506.0;
+    // Nothing emits, so each phase takes the Sink off; the stock lands two steps above 420, target 2.2.
+    let (step, sink) = (g.tables.climate.ppm_step, g.tables.climate.natural_sink);
+    g.climate.co2 = 420.0 + 2.0 * step + sink;
     g.climate_phase();
-    assert!((g.climate.co2 - 500.0).abs() < 1e-9);
+    assert!((g.climate.co2 - (420.0 + 2.0 * step)).abs() < 1e-9);
     assert!((g.climate.temperature - 1.7).abs() < 1e-6, "{}", g.climate.temperature);
-    g.climate.co2 = 506.0;
+    g.climate.co2 = 420.0 + 2.0 * step + sink;
     g.climate_phase();
     assert!((g.climate.temperature - 1.95).abs() < 1e-6, "{}", g.climate.temperature);
 }
@@ -120,7 +131,7 @@ fn sea_level_thresholds_fire_once_per_state() {
         s.industry_level = 3;
     }
     g.climate.temperature = 1.85;
-    g.climate.co2 = 480.0; // keeps the target above 1.8 so the temperature stays there
+    g.climate.co2 = 420.0 + 1.5 * g.tables.climate.ppm_step; // target 1.95 keeps it above 1.8
     let asia_before = g.build_slots(StateId::Asia);
     g.climate_phase();
     assert_eq!(g.build_slots(StateId::Asia), asia_before - 2, "Asia has Coastal Exposure 2");
@@ -140,7 +151,7 @@ fn sea_level_destroys_facilities_beyond_the_slots_highest_upkeep_first() {
     st.control = Control::Controlled(Seat(0));
     st.facilities = vec![facility(FacilityKind::Factory), facility(FacilityKind::Refinery), facility(FacilityKind::PowerPlant), facility(FacilityKind::LaunchSite)];
     g.climate.temperature = 1.85;
-    g.climate.co2 = 480.0;
+    g.climate.co2 = 420.0 + 1.5 * g.tables.climate.ppm_step;
     g.climate_phase();
     let kinds: Vec<FacilityKind> = g.state(StateId::Australia).facilities.iter().map(|f| f.kind).collect();
     assert_eq!(kinds.len(), 2);
@@ -266,7 +277,7 @@ fn influence_threshold_takes_control_and_decay_takes_two_from_untouched_targets(
     g.pending.influence.push((Seat(0), Place::State(StateId::Africa), 1));
     g.resolution_phase();
     assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)));
-    assert!(g.seats[0].influence.get(&Place::State(StateId::Africa)).is_none(), "wiped on transfer");
+    assert!(!g.seats[0].influence.contains_key(&Place::State(StateId::Africa)), "wiped on transfer");
     assert_eq!(g.seats[0].influence[&Place::State(StateId::Europe)], 8);
 }
 
@@ -389,9 +400,9 @@ fn collapse_ends_the_game_with_nobody_winning_when_no_condition_is_met() {
 }
 
 #[test]
-fn turn_twelve_scores_the_lower_fraction_of_the_two_parts() {
+fn the_last_turn_scores_the_lower_fraction_of_the_two_parts() {
     let mut g = game();
-    g.turn = 12;
+    g.turn = g.tables.victory.turns;
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 6); // presence 0.5, run 0 -> score 0
     g.seats[0].stabilization_run = 3;
     colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat], 3); // presence 0.25
@@ -401,32 +412,167 @@ fn turn_twelve_scores_the_lower_fraction_of_the_two_parts() {
 }
 
 #[test]
-fn nothing_ends_before_turn_twelve_without_a_condition_or_collapse() {
+fn nothing_ends_before_the_last_turn_without_a_condition_or_collapse() {
     let mut g = game();
-    g.turn = 5;
+    g.turn = g.tables.victory.turns - 1;
     g.end_phase();
     assert_eq!(g.outcome, None);
 }
 
-// ---------------------------------------------------------------- 13.1 Deck swap rate
+// ---------------------------------------------------------------- 13.1 as amended by #25: the draw chance and the deck
 
 #[test]
-fn one_calm_card_becomes_a_climate_card_per_full_fifth_of_a_degree() {
+fn the_draw_chance_is_half_at_base_and_rises_per_full_fifth_of_a_degree() {
     let mut g = game();
-    for s in &mut g.states {
-        s.population = 0.0;
-        s.industry_level = 0;
+    g.climate.temperature = 1.2;
+    assert!((g.draw_chance() - 0.5).abs() < 1e-12);
+    g.climate.temperature = 1.39;
+    assert!((g.draw_chance() - 0.5).abs() < 1e-12, "a part step counts for nothing");
+    g.climate.temperature = 1.4;
+    assert!((g.draw_chance() - 0.525).abs() < 1e-12);
+    g.climate.temperature = 3.0;
+    assert!((g.draw_chance() - 0.725).abs() < 1e-12);
+}
+
+#[test]
+fn a_card_comes_on_about_half_the_turns_at_the_start_and_more_when_warm() {
+    let mut g = game();
+    g.climate.temperature = 1.2;
+    let draws = (0..4000).filter(|_| g.rolls_a_card()).count();
+    assert!((1800..=2200).contains(&draws), "{draws} of 4000 at +1.2");
+    g.climate.temperature = 3.0;
+    let draws = (0..4000).filter(|_| g.rolls_a_card()).count();
+    assert!((2750..=3050).contains(&draws), "{draws} of 4000 at +3.0");
+}
+
+#[test]
+fn the_deck_is_thirty_cards_originals_twice_new_once_and_no_calm() {
+    let g = game();
+    assert_eq!(g.deck.cards.len(), 30);
+    for e in &g.tables.events.event {
+        let want = if EventId::ALL[..12].contains(&e.id) { 2 } else { 1 };
+        assert_eq!(g.deck.count(e.id), want, "{}", e.name);
     }
-    let calm = g.deck.calm_left();
-    let climate = g.deck.climate_cards_left();
-    g.climate.temperature = 1.65; // two full 0.2 steps above 1.2
-    g.climate.co2 = 460.0; // target 1.7 keeps it there
-    g.climate_phase();
-    assert_eq!(g.deck.calm_left(), calm - 2);
-    assert_eq!(g.deck.climate_cards_left(), climate + 2);
-    assert_eq!(g.deck.cards.len(), 20, "a swap replaces, it does not add");
-    g.climate_phase();
-    assert_eq!(g.deck.calm_left(), calm - 2, "steps already counted do not swap again");
+}
+
+#[test]
+fn no_card_drawn_leaves_the_deck_alone_and_says_so() {
+    let mut g = game();
+    g.climate.temperature = 1.2;
+    // Seed 7's first roll at +1.2 draws nothing; if the generator changes, the assertion says which way.
+    let before = g.deck.cards.len();
+    g.event_phase();
+    match &g.last_event {
+        None => {
+            assert_eq!(g.deck.cards.len(), before);
+            assert!(g.report.event.as_deref().unwrap_or("").starts_with("No Event this turn"));
+        }
+        Some(_) => assert_eq!(g.deck.cards.len(), before - 1),
+    }
+}
+
+// ---------------------------------------------------------------- #25 the six new Events
+
+fn drawn(g: &mut Game, id: EventId, target: EventTarget) {
+    let scale = g.climate_scale();
+    g.last_event = Some(DrawnEvent { card: Card::Event(id), target, scale, text: String::new() });
+}
+
+#[test]
+fn solar_maximum_boosts_power_plants_and_generators_at_the_next_income_once() {
+    let mut g = game();
+    g.state_mut(StateId::Asia).facilities = vec![facility(FacilityKind::PowerPlant)];
+    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator], 0);
+    drawn(&mut g, EventId::SolarMaximum, EventTarget::Everyone);
+    g.apply_event_now();
+    // Power Plant 6 x 1.5 = 9; Generator 5 x 1.25 (Moon) x 1.5 = 9.
+    assert_eq!(income_of(&mut g, Seat(0)).energy, 18);
+    assert_eq!(income_of(&mut g, Seat(0)).energy, 12, "the boost lasts one Income");
+    with_tech(&mut g, TechId::EfficientGrids);
+    drawn(&mut g, EventId::SolarMaximum, EventTarget::Everyone);
+    g.apply_event_now();
+    // Power Plant 6 x 1.5 x 2 = 18; Generator 5 x 1.25 x 1.5 x 2 = 18.
+    assert_eq!(income_of(&mut g, Seat(0)).energy, 36, "Efficient Grids makes it x2");
+}
+
+#[test]
+fn permafrost_thaw_adds_scaled_emissions_next_turn_that_do_not_count_against_stabilization() {
+    let mut g = game();
+    g.climate.temperature = 2.2; // scale 1.5
+    drawn(&mut g, EventId::PermafrostThaw, EventTarget::Everyone);
+    g.apply_event_now();
+    let e = g.emissions_now();
+    assert!((e.cards - 4.5).abs() < 1e-9, "3.0 x 1.5: {}", e.cards);
+    assert!((e.total() - e.counted() - 4.5).abs() < 1e-9);
+    with_tech(&mut g, TechId::GreenConsensus);
+    g.climate.card_emissions_next = 0.0;
+    drawn(&mut g, EventId::PermafrostThaw, EventTarget::Everyone);
+    g.apply_event_now();
+    assert!((g.emissions_now().cards - 2.25).abs() < 1e-9, "halved");
+}
+
+#[test]
+fn meteor_shower_hits_ships_in_orbit_not_in_transit_and_hardened_hulls_shrug() {
+    let mut g = game();
+    let mk = |id: u32, at: ShipAt| Ship { id: ShipId(id), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at, colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 };
+    g.ships.push(mk(1, ShipAt::Body(BodyId::Earth)));
+    g.ships.push(mk(2, ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 2 }));
+    drawn(&mut g, EventId::MeteorShower, EventTarget::Everyone);
+    g.apply_event_now();
+    assert_eq!(g.ship(ShipId(1)).unwrap().damage, 1);
+    assert_eq!(g.ship(ShipId(2)).unwrap().damage, 0);
+    with_tech(&mut g, TechId::HardenedHulls);
+    drawn(&mut g, EventId::MeteorShower, EventTarget::Everyone);
+    g.apply_event_now();
+    assert_eq!(g.ship(ShipId(1)).unwrap().damage, 1);
+}
+
+#[test]
+fn dust_storm_knocks_every_module_on_mars_offline_until_the_next_resolution() {
+    let mut g = game();
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 0);
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 0);
+    drawn(&mut g, EventId::DustStorm, EventTarget::Body(BodyId::Mars));
+    g.apply_event_now();
+    assert!(!g.colony(mars).unwrap().modules[0].online);
+    assert!(g.colony(moon).unwrap().modules[0].online);
+    g.seats[0].stockpile.energy = 100;
+    g.income_phase();
+    assert!(!g.colony(mars).unwrap().modules[0].online, "still off at the next Income");
+    g.last_event = None; // in a real turn a fresh draw precedes Resolution
+    g.resolution_phase();
+    assert!(g.colony(mars).unwrap().modules[0].online, "back on after Resolution");
+}
+
+#[test]
+fn unrest_damages_the_standing_army_and_cuts_every_factions_influence_there() {
+    let mut g = game();
+    g.seats[0].influence.insert(Place::State(StateId::Africa), 12);
+    g.seats[1].influence.insert(Place::State(StateId::Africa), 3);
+    drawn(&mut g, EventId::Unrest, EventTarget::State(StateId::Africa));
+    g.apply_event_now();
+    let army = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(StateId::Africa)).unwrap();
+    assert_eq!(army.damage, 2);
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::Africa)], 7);
+    assert_eq!(g.seats[1].influence[&Place::State(StateId::Africa)], 0);
+}
+
+#[test]
+fn reactor_leak_stops_generators_until_resolution_and_costs_five_energy() {
+    let mut g = game();
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator, ModuleKind::Mine], 0);
+    g.seats[0].stockpile.energy = 20;
+    drawn(&mut g, EventId::ReactorLeak, EventTarget::Colony(c));
+    g.apply_event_now();
+    let col = g.colony(c).unwrap();
+    assert!(!col.modules[0].online, "the Generator is off");
+    assert!(col.modules[1].online, "the Mine is not");
+    assert_eq!(g.seats[0].stockpile.energy, 15);
+    g.income_phase();
+    assert!(!g.colony(c).unwrap().modules[0].online, "still off at Income");
+    g.last_event = None;
+    g.resolution_phase();
+    assert!(g.colony(c).unwrap().modules[0].online);
 }
 
 // ---------------------------------------------------------------- 12.3 Every Tech effect
@@ -645,11 +791,101 @@ fn colony_attack_turns(seed: u64) -> Option<u32> {
     None
 }
 
+// ---------------------------------------------------------------- #22 the card's figures are the Income phase's figures
+
+#[test]
+fn building_yields_on_the_card_equal_what_income_pays() {
+    let mut g = game();
+    g.state_mut(StateId::Asia).facilities = vec![facility(FacilityKind::Factory), facility(FacilityKind::Refinery), facility(FacilityKind::ResearchLab), facility(FacilityKind::PowerPlant)];
+    g.state_mut(StateId::Africa).control = Control::Controlled(Seat(0));
+    g.state_mut(StateId::Africa).facilities = vec![facility(FacilityKind::Factory)];
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Generator, ModuleKind::Refinery], 0);
+    g.research.done.push(TechId::DeepMining);
+    g.research.current = Some(TechId::CleanPower);
+    let mut expect = Stockpile::default();
+    let mut research = 0;
+    for sid in [StateId::Asia, StateId::Africa] {
+        for f in &g.state(sid).facilities {
+            let y = g.facility_yield(Seat(0), sid, f.kind);
+            match y.resource {
+                Some(Resource::Materials) => expect.materials += y.amount,
+                Some(Resource::Fuel) => expect.fuel += y.amount,
+                Some(Resource::Energy) => expect.energy += y.amount,
+                _ => {}
+            }
+            research += y.research;
+            expect.energy -= y.upkeep;
+        }
+    }
+    for m in &g.colony(c).unwrap().modules {
+        let y = g.module_yield(Seat(0), c, m.kind);
+        match y.resource {
+            Some(Resource::Materials) => expect.materials += y.amount,
+            Some(Resource::Fuel) => expect.fuel += y.amount,
+            Some(Resource::Energy) => expect.energy += y.amount,
+            _ => {}
+        }
+        expect.energy -= y.upkeep;
+    }
+    assert!(expect.materials > 0 && expect.fuel > 0 && research > 0, "the scenario produces something: {expect:?} research {research}");
+    let paid = income_of(&mut g, Seat(0));
+    assert_eq!((paid.materials, paid.fuel, paid.energy), (expect.materials, expect.fuel, expect.energy));
+    assert_eq!(g.seats[0].research_last_turn, research);
+    // And the Emissions figure on the card is the Climate phase's figure for that building.
+    let card: f64 = g.state(StateId::Asia).facilities.iter().map(|f| g.facility_yield(Seat(0), StateId::Asia, f.kind).emissions).sum();
+    let e = g.emissions_now();
+    let asia_share = e.factories + e.power_plants + e.refineries - g.facility_yield(Seat(0), StateId::Africa, FacilityKind::Factory).emissions;
+    assert!((card - asia_share).abs() < 1e-9, "card {card} climate {asia_share}");
+}
+
+// ---------------------------------------------------------------- #24 start buildings
+
+#[test]
+fn every_state_starts_with_its_start_facilities_and_the_faction_states_add_a_launch_site() {
+    let g = fresh();
+    for sid in StateId::ALL {
+        let card = g.tables.state(sid);
+        let have: Vec<FacilityKind> = g.state(sid).facilities.iter().map(|f| f.kind).collect();
+        let mut want = card.start_facilities.clone();
+        if g.state(sid).control.controller().is_some() {
+            want.push(FacilityKind::LaunchSite);
+        }
+        assert_eq!(have, want, "{}", card.name);
+        assert_eq!(card.start_facilities.len() as u32, card.industry_level, "{}: as many as the Industry Level", card.name);
+    }
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 80, fuel: 20, energy: 20 });
+}
+
+#[test]
+fn idle_facilities_in_a_neutral_state_make_nothing_and_emit_nothing() {
+    let mut g = fresh();
+    // Africa is neutral and starts with a Factory.
+    assert_eq!(g.state(StateId::Africa).control, Control::Neutral);
+    assert!(g.state(StateId::Africa).facilities.iter().any(|f| f.kind == FacilityKind::Factory));
+    let before = g.emissions_now().factories;
+    g.state_mut(StateId::Africa).control = Control::Controlled(Seat(0));
+    let after = g.emissions_now().factories;
+    assert!(after > before, "the Factory emits once somebody directs it: {before} -> {after}");
+}
+
+#[test]
+fn start_income_flows_from_turn_one() {
+    let mut g = fresh();
+    g.start();
+    let s = g.seat(Seat(0));
+    assert!(s.income_last_turn.materials > 0, "Materials income on turn one: {:?}", s.income_last_turn);
+    assert!(s.income_last_turn.fuel > 0, "Fuel income on turn one: {:?}", s.income_last_turn);
+    // Asia's start (Factory, Power Plant, Refinery and the Launch Site) pays 7 Energy against 6 made.
+    assert_eq!(s.income_last_turn.energy, -1, "{:?}", s.income_last_turn);
+    assert!(s.stockpile.energy >= 15, "no Energy starvation at the start: {:?}", s.stockpile);
+}
+
 // ---------------------------------------------------------------- the whole loop holds together
 
 #[test]
 fn an_ai_versus_ai_game_runs_to_an_outcome() {
-    let r = dying_earth_engine::sim::run(tables(), 3, [FactionKind::Custodians, FactionKind::Prospectors]);
+    let t = tables();
+    let r = dying_earth_engine::sim::run(t.clone(), 3, [FactionKind::Custodians, FactionKind::Prospectors]);
     assert!(r.outcome.is_some());
-    assert!(r.last_turn <= 12);
+    assert!(r.last_turn <= t.victory.turns);
 }

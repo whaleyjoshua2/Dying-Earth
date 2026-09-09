@@ -1,5 +1,10 @@
-# Spec section 4.2. Population in hundreds of millions. Education Level from UN 2023 schooling data.
-# Neighbours are symmetric; each edge is listed on both states.
+# Spec section 4.2, amended by ticket #26 (version 0.02): nine Nation States. Russia is cut out of
+# Europe and the Middle East out of Asia; each parent loses the population that leaves and one Size.
+# Population in hundreds of millions. Education Level from UN 2023 schooling data.
+# Neighbours are symmetric; each edge is listed on both states. Rows stay in the engine's order.
+# start_facilities (ticket #24): what stands when the game begins, as many as the Industry Level,
+# chosen by the Resource Lean. They come with the state whoever takes it. The Faction start states
+# get a Launch Site on top.
 
 [[state]]
 id = "africa"
@@ -11,7 +16,8 @@ baseline_emissions = 0.3
 education_level = 0.8
 size = 3
 coastal_exposure = 1
-neighbours = ["europe", "asia", "antarctica"]
+neighbours = ["europe", "middle_east", "antarctica"]
+start_facilities = ["factory"]
 
 [[state]]
 id = "antarctica"
@@ -24,18 +30,20 @@ education_level = 1.0
 size = 2
 coastal_exposure = 0
 neighbours = ["south_america", "africa", "australia"]
+start_facilities = []
 
 [[state]]
 id = "asia"
 name = "Asia"
-population = 47.0
+population = 43.5
 industry_level = 3
 resource_lean = "materials"
 baseline_emissions = 0.4
 education_level = 0.9
-size = 4
+size = 3
 coastal_exposure = 2
-neighbours = ["north_america", "europe", "africa", "australia"]
+neighbours = ["russia", "middle_east", "australia"]
+start_facilities = ["factory", "power_plant", "refinery"]
 
 [[state]]
 id = "australia"
@@ -48,18 +56,20 @@ education_level = 1.35
 size = 2
 coastal_exposure = 2
 neighbours = ["asia", "antarctica"]
+start_facilities = ["power_plant", "factory"]
 
 [[state]]
 id = "europe"
 name = "Europe"
-population = 7.5
+population = 6.0
 industry_level = 3
 resource_lean = "energy"
 baseline_emissions = 0.3
 education_level = 1.45
-size = 3
+size = 2
 coastal_exposure = 1
-neighbours = ["north_america", "asia", "africa"]
+neighbours = ["north_america", "africa", "russia", "middle_east"]
+start_facilities = ["power_plant", "factory", "refinery"]
 
 [[state]]
 id = "north_america"
@@ -71,7 +81,8 @@ baseline_emissions = 0.4
 education_level = 1.5
 size = 3
 coastal_exposure = 1
-neighbours = ["south_america", "europe", "asia"]
+neighbours = ["south_america", "europe", "russia"]
+start_facilities = ["refinery", "power_plant", "factory"]
 
 [[state]]
 id = "south_america"
@@ -84,3 +95,34 @@ education_level = 1.1
 size = 3
 coastal_exposure = 1
 neighbours = ["north_america", "antarctica"]
+start_facilities = ["refinery"]
+
+# Ticket #26. Russia: 145 million people, industry between Europe's and Africa's, gas and oil, dirty
+# per unit of industry, well schooled, vast and mostly landlocked in the game's sense.
+[[state]]
+id = "russia"
+name = "Russia"
+population = 1.5
+industry_level = 2
+resource_lean = "fuel"
+baseline_emissions = 0.4
+education_level = 1.35
+size = 3
+coastal_exposure = 1
+neighbours = ["europe", "asia", "north_america"]
+start_facilities = ["refinery", "power_plant"]
+
+# The Middle East: Turkey to Iran and the Arabian Peninsula, about 350 million people, oil, the
+# highest Emissions per unit of industry on the map, Gulf coasts exposed.
+[[state]]
+id = "middle_east"
+name = "The Middle East"
+population = 3.5
+industry_level = 2
+resource_lean = "fuel"
+baseline_emissions = 0.5
+education_level = 1.0
+size = 2
+coastal_exposure = 1
+neighbours = ["europe", "asia", "africa"]
+start_facilities = ["refinery", "power_plant"]

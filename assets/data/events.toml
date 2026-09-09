@@ -1,8 +1,19 @@
-# Spec section 13. Twenty cards: one of each Event plus eight Calm Cards.
-# Climate cards scale by 1 + (Temperature - 1.2) / 2. Swap rate: one Calm Card per full 0.2 C above 1.2.
+# Spec section 13, amended by ticket #25 (version 0.02): no Calm Cards. The deck holds thirty cards,
+# the twelve first-playable Events twice and the six new ones once. Each turn a card is drawn with
+# draw_chance_base at +1.2 C, rising by draw_chance_per_step for every full draw_chance_step_degrees
+# above it (50% at +1.2, 72.5% at +3.0). The deck is never reshuffled.
+# Climate cards still scale by 1 + (Temperature - 1.2) / 2.
 
-calm_cards = 8
-climate_swap_degrees = 0.2
+draw_chance_base = 0.5
+draw_chance_per_step = 0.025
+draw_chance_step_degrees = 0.2
+solar_maximum_multiplier = 1.5
+solar_maximum_multiplier_with_tech = 2.0
+permafrost_emissions = 3.0
+meteor_damage = 1
+unrest_army_damage = 2
+unrest_influence_loss = 5
+reactor_leak_energy = 5
 breakthrough_research = 15
 breakthrough_research_public_science = 25
 discovery_multiplier = 2.0
@@ -19,6 +30,7 @@ kind = "solar"
 target = "everyone"
 effect = "No transit advances this turn"
 blunted_by = "efficient_transit"
+copies = 2
 
 [[event]]
 id = "radiation_surge"
@@ -27,6 +39,7 @@ kind = "solar"
 target = "everyone"
 effect = "Every Ship in transit takes 1 damage"
 blunted_by = "hardened_hulls"
+copies = 2
 
 [[event]]
 id = "comms_blackout"
@@ -35,6 +48,7 @@ kind = "solar"
 target = "everyone"
 effect = "Every stack fights as if its Stance were Hold"
 blunted_by = "public_science"
+copies = 2
 
 [[event]]
 id = "equipment_failure"
@@ -42,6 +56,7 @@ name = "Equipment Failure"
 kind = "failure"
 target = "faction"
 effect = "One build due this turn completes next turn instead"
+copies = 2
 
 [[event]]
 id = "launch_failure"
@@ -50,6 +65,7 @@ kind = "failure"
 target = "faction"
 effect = "One Ship due this turn is destroyed, no refund"
 blunted_by = "clean_propellant"
+copies = 2
 
 [[event]]
 id = "grid_failure"
@@ -58,6 +74,7 @@ kind = "failure"
 target = "colony"
 effect = "Its Modules are offline until the next Resolution"
 blunted_by = "closed_loop_colonies"
+copies = 2
 
 [[event]]
 id = "rich_seam"
@@ -66,6 +83,7 @@ kind = "discovery"
 target = "body"
 effect = "Its Mines produce x2 for two turns"
 blunted_by = "deep_mining"
+copies = 2
 
 [[event]]
 id = "ice_deposit"
@@ -74,6 +92,7 @@ kind = "discovery"
 target = "body"
 effect = "Its Refineries produce x2 for two turns"
 blunted_by = "automated_refining"
+copies = 2
 
 [[event]]
 id = "breakthrough"
@@ -82,6 +101,7 @@ kind = "discovery"
 target = "tech"
 effect = "+15 Research to the Tech under research"
 blunted_by = "public_science"
+copies = 2
 
 [[event]]
 id = "heatwave"
@@ -90,6 +110,7 @@ kind = "climate"
 target = "nation_state"
 effect = "Population -5% now"
 blunted_by = "green_consensus"
+copies = 2
 
 [[event]]
 id = "wildfire"
@@ -98,6 +119,7 @@ kind = "climate"
 target = "nation_state"
 effect = "One Facility offline until next Resolution; +2.0 Emissions next turn"
 blunted_by = "clean_manufacturing"
+copies = 2
 
 [[event]]
 id = "storm_surge"
@@ -105,3 +127,59 @@ name = "Storm Surge"
 kind = "climate"
 target = "exposed_nation_state"
 effect = "Its next sea-level threshold applies now"
+copies = 2
+
+# Version 0.02 (ticket #25): the six new Events, once each.
+
+[[event]]
+id = "solar_maximum"
+name = "Solar Maximum"
+kind = "solar"
+target = "everyone"
+effect = "Every Power Plant and Generator makes x1.5 at the next Income"
+blunted_by = "efficient_grids"
+copies = 1
+
+[[event]]
+id = "meteor_shower"
+name = "Meteor Shower"
+kind = "solar"
+target = "everyone"
+effect = "Every Ship in orbit around a Body takes 1 damage"
+blunted_by = "hardened_hulls"
+copies = 1
+
+[[event]]
+id = "dust_storm"
+name = "Dust Storm"
+kind = "failure"
+target = "mars"
+effect = "Every Module on Mars is offline until the next Resolution"
+blunted_by = "closed_loop_colonies"
+copies = 1
+
+[[event]]
+id = "unrest"
+name = "Unrest"
+kind = "failure"
+target = "nation_state"
+effect = "Its Standing Army takes 2 damage and every Faction's Influence there drops by 5"
+copies = 1
+
+[[event]]
+id = "reactor_leak"
+name = "Reactor Leak"
+kind = "failure"
+target = "colony"
+effect = "Its Generators are offline until the next Resolution and its holder loses 5 Energy"
+blunted_by = "closed_loop_colonies"
+copies = 1
+
+[[event]]
+id = "permafrost_thaw"
+name = "Permafrost Thaw"
+kind = "climate"
+target = "everyone"
+effect = "+3.0 Emissions next turn, scaled by the Temperature"
+blunted_by = "green_consensus"
+copies = 1

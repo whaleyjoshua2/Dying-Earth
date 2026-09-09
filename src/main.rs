@@ -39,6 +39,10 @@ fn simulate(seed: u64, args: &[String], tables: Arc<Tables>) -> i32 {
     if kinds.len() == 1 {
         kinds.push(kinds[0].other());
     }
+    if kinds[0] == kinds[1] {
+        eprintln!("Factions must be unique (ticket #27): a game is one Custodian seat against one Prospector seat.");
+        return 2;
+    }
     let result = dying_earth_engine::sim::run(tables, seed, [kinds[0], kinds[1]]);
     let text = result.log.join("\n");
     println!("{text}");

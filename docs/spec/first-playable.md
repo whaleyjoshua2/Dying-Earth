@@ -1,5 +1,7 @@
 # Dying Earth — First Playable specification
 
+**Amended:** version 0.02 changes the turn count, the Nation States, the start position, the Event Deck and two panels; see [`version-0.02.md`](version-0.02.md), which wins where the two disagree.
+
 **Status:** the destination of the wayfinder map [Map: first playable version of the solar system colonization game](https://github.com/whaleyjoshua2/Dying-Earth/issues/1). Every rule here was decided on one of that map's sixteen tickets; each section names its ticket, and the ticket's resolution comment is the authority if this document and it ever disagree. Numbers come from [Costs and build times for everything buildable](https://github.com/whaleyjoshua2/Dying-Earth/issues/18) unless a section says otherwise.
 
 **The bar:** an agent builds this game without asking the designer a single question. Where a detail was never decided, section 20 lists the default this document sets, so nothing is left to invent.

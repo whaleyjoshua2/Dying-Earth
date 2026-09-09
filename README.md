@@ -1,9 +1,10 @@
 # Dying Earth
 
 A single-player, turn-based strategy game about colonizing the solar system before ecological
-collapse overtakes Earth. This repository holds the **First Playable**: twelve turns, the Moon and
-Mars, three resources, two Factions. The rules are written down in
-[`docs/spec/first-playable.md`](docs/spec/first-playable.md) and the words in [`CONTEXT.md`](CONTEXT.md).
+collapse overtakes Earth. This repository holds the **First Playable**: twenty-four turns, nine
+Nation States, the Moon and Mars, three resources, two Factions. The rules are written down in
+[`docs/spec/first-playable.md`](docs/spec/first-playable.md) as amended by
+[`docs/spec/version-0.02.md`](docs/spec/version-0.02.md), and the words in [`CONTEXT.md`](CONTEXT.md).
 
 ## Running it
 
@@ -19,8 +20,10 @@ Other modes (spec sections 2.5, 3 and 19.3):
 dying-earth.exe seed:42                 play a fixed seed, so a game can be replayed
 dying-earth.exe shot:pictures           write pictures-solar.png, -earth, -moon, -mars off-screen and exit
 dying-earth.exe simulate:7              two AIs play a whole game headless; the log goes to simulate-7.log
-dying-earth.exe simulate:7 --prospector-ai --prospector-ai    both AIs as Prospectors
+dying-earth.exe simulate:7 --prospector-ai --custodian-ai     the Prospectors in the player's seat
 ```
+
+Factions must be unique: a game is one Custodian seat against one Prospector seat.
 
 `cargo run -p dying-earth-engine --example sim -- 1 custodians prospectors --count=20` plays twenty
 seeds in a row and prints one summary line each.

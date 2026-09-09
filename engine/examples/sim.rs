@@ -15,6 +15,10 @@ fn main() {
     let b = args.get(2).map(|s| kind(s)).unwrap_or(FactionKind::Prospectors);
     let log = args.iter().any(|a| a == "--log");
     let count: u64 = args.iter().find_map(|a| a.strip_prefix("--count=")).and_then(|v| v.parse().ok()).unwrap_or(1);
+    if a == b {
+        eprintln!("Factions must be unique (ticket #27): one Custodian seat against one Prospector seat.");
+        std::process::exit(2);
+    }
     let tables = Arc::new(Tables::load(&default_data_dir()).expect("tables"));
     for s in seed..seed + count {
         let r = dying_earth_engine::sim::run(tables.clone(), s, [a, b]);

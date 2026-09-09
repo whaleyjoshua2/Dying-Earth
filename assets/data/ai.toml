@@ -46,14 +46,15 @@ opportunity = 2.0
 energy_shortage_bonus = 2
 
 [pace]
+# Stretched to twenty-four turns on ticket #27.
 # Extraction Total the Prospectors should hold by each turn, as [turn, total].
-prospector_extraction = [[3, 40], [6, 150], [9, 320], [12, 500]]
+prospector_extraction = [[6, 40], [12, 150], [18, 320], [24, 500]]
 # Custodians: within this many ppm of the Sink by this turn, and under it by the later turn.
 custodian_within_ppm = 4.0
-custodian_within_by_turn = 6
-custodian_under_sink_by_turn = 9
+custodian_within_by_turn = 12
+custodian_under_sink_by_turn = 18
 # Colonists off Earth both should hold, as [turn, colonists].
-colonists = [[6, 4], [11, 12]]
+colonists = [[12, 4], [22, 12]]
 
 [thresholds]
 attack_odds = 0.6
