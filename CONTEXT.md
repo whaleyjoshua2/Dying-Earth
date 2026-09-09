@@ -20,9 +20,9 @@ _Avoid_: environmentalists, greens, moderates, eco-terrorists
 The faction that maximizes resource extraction without regard for ecological cost.
 _Avoid_: capitalists, industrialists, exploiters
 
-**Warming Track**:
-The measure of global warming on Earth. It advances as a consequence of player and faction choices rather than on a fixed schedule, and losing control of it is how a game is lost.
-_Avoid_: doom clock, countdown, timer, disaster meter
+**Climate Model**:
+The small model of global warming the game runs: Emissions add to the CO2 Stock, the Temperature follows the stock with a lag, and the Temperature acts on population and Events. It moves as a consequence of player and faction choices, never on a fixed schedule.
+_Avoid_: warming track, doom clock, countdown, timer, disaster meter
 
 **Body**:
 A place in the solar system that can hold a Colony. The First Playable has the Moon and Mars.
@@ -33,7 +33,7 @@ A permanent settlement a Faction holds on a Body.
 _Avoid_: base, outpost, settlement
 
 **Earth Map**:
-The 3D view of Earth, divided into Nation States, where Earth-side building, launches and the climate are seen and acted on.
+The 3D view of Earth, divided into Nation States, where Earth-side building, launches and the Climate Panel are seen and acted on.
 _Avoid_: home view, globe view, terrestrial map
 
 **Solar System Map**:
@@ -109,3 +109,29 @@ _Avoid_: diplomacy points, favour, reputation
 **Research**:
 Points produced by Research Labs and spent only on Techs. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship.
 _Avoid_: science, research points, RP, fourth resource
+
+### Climate
+
+**CO2 Stock**:
+The amount of CO2-equivalent in Earth's atmosphere, in parts per million. Emissions add to it each turn; the Natural Sink takes a little away.
+_Avoid_: pollution, carbon level, warming points
+
+**Temperature**:
+Degrees above pre-industrial. It follows the CO2 Stock with a lag of one to two turns and is what actually harms population and drives Events.
+_Avoid_: heat, warming percentage
+
+**Emissions**:
+The CO2-equivalent a source adds to the CO2 Stock in a turn. Every source has its own figure and the Climate Panel shows them one by one before the sum; methane-heavy sources carry a heavier weight.
+_Avoid_: output, carbon, footprint
+
+**Natural Sink**:
+The fixed amount of CO2 the oceans and forests remove from the CO2 Stock every turn. Net emissions below it stabilize the stock.
+_Avoid_: absorption, offset, carbon capture
+
+**Collapse Line**:
+The one Temperature at which the game ends. Every other effect of Temperature is continuous; this is the only line.
+_Avoid_: threshold, tipping point, game over temperature
+
+**Climate Panel**:
+The screen showing the CO2 Stock, the Temperature and where it is heading, this turn's Emissions by source, the sink and the net, the penalties in force, and a projection to turn 10.
+_Avoid_: warming meter, climate HUD
