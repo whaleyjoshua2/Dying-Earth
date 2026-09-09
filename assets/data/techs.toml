@@ -1,0 +1,123 @@
+# Spec section 12.3. One tree shared by every Faction. Costs by rung: 15, 25, 40.
+# The engine reads each effect by the tech id; the numbers here are the values the rules use.
+
+[[tech]]
+id = "efficient_grids"
+name = "Efficient Grids"
+branch = "Industry"
+rung = 1
+cost = 15
+needs = []
+effect = "Power Plant and Generator output x1.5"
+value = 1.5
+
+[[tech]]
+id = "clean_power"
+name = "Clean Power"
+branch = "Industry"
+rung = 2
+cost = 25
+needs = ["efficient_grids"]
+effect = "Power Plant Emissions x0.4"
+value = 0.4
+
+[[tech]]
+id = "clean_manufacturing"
+name = "Clean Manufacturing"
+branch = "Industry"
+rung = 3
+cost = 40
+needs = ["clean_power"]
+effect = "Factory and Refinery Emissions x0.4; Wildfire adds no Emissions"
+value = 0.4
+
+[[tech]]
+id = "clean_propellant"
+name = "Clean Propellant"
+branch = "Propulsion"
+rung = 1
+cost = 15
+needs = []
+effect = "Launch Emissions 0.8; Launch Failure delays instead of destroying"
+value = 0.8
+
+[[tech]]
+id = "efficient_transit"
+name = "Efficient Transit"
+branch = "Propulsion"
+rung = 2
+cost = 25
+needs = ["clean_propellant"]
+effect = "Transit Fuel x0.6; transits advance through Solar Storm"
+value = 0.6
+
+[[tech]]
+id = "hardened_hulls"
+name = "Hardened Hulls"
+branch = "Propulsion"
+rung = 3
+cost = 40
+needs = ["efficient_transit"]
+effect = "Every Ship +2 strength; immune to Radiation Surge"
+value = 2.0
+
+[[tech]]
+id = "expanded_habitats"
+name = "Expanded Habitats"
+branch = "Off-world Living"
+rung = 1
+cost = 15
+needs = []
+effect = "Each Habitat holds +2 Colonists"
+value = 2.0
+
+[[tech]]
+id = "closed_loop_colonies"
+name = "Closed-Loop Colonies"
+branch = "Off-world Living"
+rung = 2
+cost = 25
+needs = ["expanded_habitats", "clean_power"]
+effect = "Module Energy upkeep x0.5; immune to Grid Failure"
+value = 0.5
+
+[[tech]]
+id = "deep_mining"
+name = "Deep Mining"
+branch = "Extraction"
+rung = 1
+cost = 15
+needs = []
+effect = "Mine and Factory output x1.5; Rich Seam gives x3"
+value = 1.5
+
+[[tech]]
+id = "automated_refining"
+name = "Automated Refining"
+branch = "Extraction"
+rung = 2
+cost = 25
+needs = ["deep_mining", "efficient_grids"]
+effect = "Refinery output x1.5; Ice Deposit gives x3"
+value = 1.5
+
+[[tech]]
+id = "public_science"
+name = "Public Science"
+branch = "Society"
+rung = 1
+cost = 15
+needs = []
+effect = "Research Lab output x1.5; Breakthrough gives 25; stances hold through Comms Blackout"
+value = 1.5
+
+[[tech]]
+id = "green_consensus"
+name = "Green Consensus"
+branch = "Society"
+rung = 2
+cost = 25
+needs = ["public_science", "clean_power"]
+effect = "Per-person Emissions x0.5; Influence thresholds x0.75; Heatwave loss halved"
+value = 0.5
+influence_threshold_multiplier = 0.75

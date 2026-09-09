@@ -1,0 +1,227 @@
+//! The Climate phase and the Climate Model (spec 11, 13.1).
+
+use crate::ids::*;
+use crate::state::*;
+
+#[derive(Debug, Clone)]
+pub struct Projection {
+    pub temperature_at_last_turn: f64,
+    pub collapse_turn: Option<u32>,
+}
+
+impl Game {
+    /// Phase 2: Climate.
+    pub fn climate_phase(&mut self) {
+        let t = self.tables.clone();
+        let c = &t.climate;
+        let breakdown = self.emissions_now();
+        let net = breakdown.net();
+        self.climate.co2 += net;
+        self.climate.restoration_next = 0.0;
+        self.climate.launches_pending = [0, 0];
+        for s in &mut self.states {
+            s.wildfire_emissions_next = 0.0;
+        }
+        // Stabilization runs (spec 15): net counted Emissions below the Sink.
+        let stabilized = breakdown.counted() < breakdown.total_sink();
+        for seat in Seat::ALL {
+            let s = self.seat_mut(seat);
+            if stabilized {
+                s.stabilization_run += 1;
+            } else {
+                s.stabilization_run = 0;
+            }
+        }
+        // Temperature follows the stock with a lag.
+        let target = self.target_temperature();
+        let temp = self.climate.temperature + (target - self.climate.temperature) * c.temperature_lag_fraction;
+        self.climate.temperature = temp.max(c.base_temperature);
+        self.climate.last = breakdown.clone();
+        self.log(format!(
+            "Climate: emissions {:.1} (industry {:.1}, factories {:.1}, power {:.1}, refineries {:.1}, launches {:.1}, population {:.1}, wildfire {:.1}), sink {:.1}, net {:+.1}; CO2 {:.1} ppm; temperature {:+.2} heading to {:+.2}.",
+            breakdown.total(),
+            breakdown.state_industry,
+            breakdown.factories,
+            breakdown.power_plants,
+            breakdown.refineries,
+            breakdown.launches,
+            breakdown.population,
+            breakdown.wildfire,
+            breakdown.total_sink(),
+            net,
+            self.climate.co2,
+            self.climate.temperature,
+            target
+        ));
+        self.sea_level_check();
+        self.population_change();
+        self.deck_swaps();
+    }
+
+    pub fn target_temperature(&self) -> f64 {
+        let c = &self.tables.climate;
+        c.base_temperature + c.degrees_per_ppm_step * (self.climate.co2 - c.starting_co2) / c.ppm_step
+    }
+
+    /// Emissions from what stands now, by source (spec 11.2).
+    pub fn emissions_now(&self) -> EmissionsBreakdown {
+        let t = &self.tables;
+        let c = &t.climate;
+        let mut b = EmissionsBreakdown::default();
+        let mult = |seat: Option<Seat>| seat.map(|s| t.faction(self.kind(s)).emissions_multiplier).unwrap_or(1.0);
+        let pop_mult = if self.has_tech(TechId::GreenConsensus) { t.tech(TechId::GreenConsensus).value } else { 1.0 };
+        let pp_mult = if self.has_tech(TechId::CleanPower) { t.tech(TechId::CleanPower).value } else { 1.0 };
+        let fr_mult = if self.has_tech(TechId::CleanManufacturing) { t.tech(TechId::CleanManufacturing).value } else { 1.0 };
+        for st in &self.states {
+            let card = t.state(st.id);
+            let m = mult(st.control.director());
+            b.state_industry += card.baseline_emissions * st.industry_level as f64 * m;
+            b.population += c.population_emissions_per_hundred_million * st.population * pop_mult * m;
+            for f in &st.facilities {
+                if !f.online {
+                    continue;
+                }
+                let e = t.facility(f.kind).emissions;
+                match f.kind {
+                    FacilityKind::Factory => b.factories += e * fr_mult * m,
+                    FacilityKind::PowerPlant => b.power_plants += e * pp_mult * m,
+                    FacilityKind::Refinery => b.refineries += e * fr_mult * m,
+                    _ => {}
+                }
+            }
+            b.wildfire += st.wildfire_emissions_next;
+        }
+        let per_launch = if self.has_tech(TechId::CleanPropellant) { t.tech(TechId::CleanPropellant).value } else { c.launch_emissions };
+        for seat in Seat::ALL {
+            b.launches += self.climate.launches_pending[seat.index()] as f64 * per_launch * mult(Some(seat));
+        }
+        b.sink = c.natural_sink;
+        b.restoration = self.climate.restoration_next;
+        b
+    }
+
+    /// Sea level (spec 11.4): each threshold fires once per state.
+    fn sea_level_check(&mut self) {
+        let thresholds = self.tables.climate.sea_level_thresholds.clone();
+        let temp = self.climate.temperature;
+        for (i, thr) in thresholds.iter().enumerate() {
+            if temp < *thr {
+                continue;
+            }
+            for sid in StateId::ALL {
+                if !self.state(sid).thresholds_fired[i] {
+                    self.apply_sea_threshold(sid, i);
+                }
+            }
+        }
+    }
+
+    /// Apply sea-level threshold `i` to one state now (also used by Storm Surge).
+    pub fn apply_sea_threshold(&mut self, sid: StateId, i: usize) {
+        let exposure = self.tables.state(sid).coastal_exposure;
+        let name = self.tables.state(sid).name.clone();
+        let thr = self.tables.climate.sea_level_thresholds[i];
+        self.state_mut(sid).thresholds_fired[i] = true;
+        if exposure == 0 {
+            return;
+        }
+        self.state_mut(sid).lost_slots += exposure;
+        let slots = self.build_slots(sid);
+        let mut destroyed = Vec::new();
+        loop {
+            let st = self.state(sid);
+            if (st.facilities.len() as u32) <= slots {
+                break;
+            }
+            // Highest upkeep first.
+            let (idx, _) = st
+                .facilities
+                .iter()
+                .enumerate()
+                .max_by_key(|(_, f)| self.tables.facility(f.kind).energy_upkeep)
+                .unwrap();
+            let f = self.state_mut(sid).facilities.remove(idx);
+            destroyed.push(f.kind.name().to_string());
+        }
+        // Queued Facilities beyond the slots are lost too, without refund.
+        loop {
+            if self.slots_used(sid) <= slots {
+                break;
+            }
+            let st = self.state_mut(sid);
+            if let Some(pos) = st.queue.iter().rposition(|b| matches!(b.item, BuildItem::Facility(_))) {
+                let b = st.queue.remove(pos);
+                destroyed.push(format!("{} under construction", b.item.name()));
+            } else {
+                break;
+            }
+        }
+        let line = if destroyed.is_empty() {
+            format!("Sea level at {thr:+.1} C: {name} lost {exposure} build slots.")
+        } else {
+            format!("Sea level at {thr:+.1} C: {name} lost {exposure} build slots; destroyed {}.", destroyed.join(", "))
+        };
+        self.report.lines.push(line.clone());
+        self.log(line);
+    }
+
+    /// Spec 11.3: growth less 0.15% per full 0.1 C above +1.2.
+    pub fn population_growth_rate(&self) -> f64 {
+        let c = &self.tables.climate;
+        let tenths = ((self.climate.temperature - c.base_temperature) / 0.1 + 1e-9).floor().max(0.0);
+        c.population_growth - c.population_loss_per_tenth_degree * tenths
+    }
+
+    fn population_change(&mut self) {
+        let rate = self.population_growth_rate();
+        for s in &mut self.states {
+            if s.id == StateId::Antarctica {
+                s.population = 0.0;
+                continue;
+            }
+            s.population = (s.population * (1.0 + rate)).max(0.0);
+        }
+    }
+
+    /// Spec 13.1: one Calm Card becomes a Climate card per full 0.2 C above +1.2 not yet counted.
+    fn deck_swaps(&mut self) {
+        let swap_degrees = self.tables.events.climate_swap_degrees;
+        let base = self.tables.climate.base_temperature;
+        let steps = ((self.climate.temperature - base) / swap_degrees + 1e-9).floor().max(0.0) as u32;
+        while self.climate.swaps_counted < steps {
+            self.climate.swaps_counted += 1;
+            if self.swap_one_calm() {
+                let line = format!(
+                    "The Temperature passed {:+.1} C: a Calm Card became a Climate card ({} Climate cards in the deck).",
+                    base + swap_degrees * self.climate.swaps_counted as f64,
+                    self.deck.climate_cards_left()
+                );
+                self.report.lines.push(line.clone());
+                self.log(line);
+            }
+        }
+    }
+
+    /// Repeat the current net to the last turn (spec 11.5).
+    pub fn projection(&self) -> Projection {
+        let c = &self.tables.climate;
+        let net = self.climate.last.net();
+        let mut co2 = self.climate.co2;
+        let mut temp = self.climate.temperature;
+        let mut collapse = None;
+        let last = self.tables.victory.turns;
+        if temp >= c.collapse_line {
+            collapse = Some(self.turn);
+        }
+        for turn in (self.turn + 1)..=last {
+            co2 += net;
+            let target = c.base_temperature + c.degrees_per_ppm_step * (co2 - c.starting_co2) / c.ppm_step;
+            temp += (target - temp) * c.temperature_lag_fraction;
+            temp = temp.max(c.base_temperature);
+            if collapse.is_none() && temp >= c.collapse_line {
+                collapse = Some(turn);
+            }
+        }
+        Projection { temperature_at_last_turn: temp, collapse_turn: collapse }
+    }
+}

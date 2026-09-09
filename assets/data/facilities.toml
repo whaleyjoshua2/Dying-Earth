@@ -1,0 +1,51 @@
+# Spec section 5.1. Built in a Nation State; each occupies one build slot.
+# `produces` is per turn before yields and multipliers; a Research Lab uses the formula in 12.1.
+
+[[facility]]
+id = "factory"
+name = "Factory"
+materials = 20
+build_turns = 1
+energy_upkeep = 2
+produces = { resource = "materials", amount = 4 }
+emissions = 1.0
+
+[[facility]]
+id = "power_plant"
+name = "Power Plant"
+materials = 25
+build_turns = 2
+energy_upkeep = 0
+produces = { resource = "energy", amount = 6 }
+emissions = 1.5
+
+[[facility]]
+id = "refinery"
+name = "Refinery"
+materials = 20
+build_turns = 1
+energy_upkeep = 3
+produces = { resource = "fuel", amount = 3 }
+emissions = 1.5
+
+[[facility]]
+id = "research_lab"
+name = "Research Lab"
+materials = 25
+build_turns = 1
+energy_upkeep = 3
+produces = { resource = "research", amount = 2 }
+emissions = 0.0
+
+[[facility]]
+id = "launch_site"
+name = "Launch Site"
+materials = 30
+build_turns = 2
+energy_upkeep = 2
+emissions = 0.0
+
+[industry_level]
+materials = 30
+materials_cheap_industry = 15
+build_turns = 1

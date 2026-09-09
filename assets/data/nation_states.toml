@@ -1,0 +1,86 @@
+# Spec section 4.2. Population in hundreds of millions. Education Level from UN 2023 schooling data.
+# Neighbours are symmetric; each edge is listed on both states.
+
+[[state]]
+id = "africa"
+name = "Africa"
+population = 14.0
+industry_level = 1
+resource_lean = "materials"
+baseline_emissions = 0.3
+education_level = 0.8
+size = 3
+coastal_exposure = 1
+neighbours = ["europe", "asia", "antarctica"]
+
+[[state]]
+id = "antarctica"
+name = "Antarctica"
+population = 0.0
+industry_level = 0
+resource_lean = "fuel"
+baseline_emissions = 0.0
+education_level = 1.0
+size = 2
+coastal_exposure = 0
+neighbours = ["south_america", "africa", "australia"]
+
+[[state]]
+id = "asia"
+name = "Asia"
+population = 47.0
+industry_level = 3
+resource_lean = "materials"
+baseline_emissions = 0.4
+education_level = 0.9
+size = 4
+coastal_exposure = 2
+neighbours = ["north_america", "europe", "africa", "australia"]
+
+[[state]]
+id = "australia"
+name = "Australia and Oceania"
+population = 0.5
+industry_level = 2
+resource_lean = "energy"
+baseline_emissions = 0.2
+education_level = 1.35
+size = 2
+coastal_exposure = 2
+neighbours = ["asia", "antarctica"]
+
+[[state]]
+id = "europe"
+name = "Europe"
+population = 7.5
+industry_level = 3
+resource_lean = "energy"
+baseline_emissions = 0.3
+education_level = 1.45
+size = 3
+coastal_exposure = 1
+neighbours = ["north_america", "asia", "africa"]
+
+[[state]]
+id = "north_america"
+name = "North America"
+population = 6.0
+industry_level = 3
+resource_lean = "fuel"
+baseline_emissions = 0.4
+education_level = 1.5
+size = 3
+coastal_exposure = 1
+neighbours = ["south_america", "europe", "asia"]
+
+[[state]]
+id = "south_america"
+name = "South America"
+population = 4.5
+industry_level = 1
+resource_lean = "fuel"
+baseline_emissions = 0.2
+education_level = 1.1
+size = 3
+coastal_exposure = 1
+neighbours = ["north_america", "antarctica"]

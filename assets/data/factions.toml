@@ -1,0 +1,35 @@
+# Spec section 14. Multipliers, signature rules and the starting position.
+
+[[faction]]
+id = "custodians"
+name = "Custodians"
+blurb = "Colonize the solar system while limiting ecological damage to Earth."
+output_multiplier = 1.0
+emissions_multiplier = 0.75
+research_multiplier = 1.25
+influence_multiplier = 1.3
+signature = "Restoration: in Orders, spend Energy in multiples of 10; each 10 adds 3.0 ppm to the Natural Sink in the next Climate phase only."
+victory = "Stabilization (3 consecutive Climate phases with net Emissions below the Natural Sink) plus 12 Colonists living off Earth."
+colour = [0.15, 0.65, 0.6]
+
+[[faction]]
+id = "prospectors"
+name = "Prospectors"
+blurb = "Maximize extraction regardless of ecological cost."
+output_multiplier = 1.25
+emissions_multiplier = 1.25
+research_multiplier = 0.75
+influence_multiplier = 1.0
+signature = "Cheap Industry: raising Industry Level costs 15 Materials instead of 30."
+victory = "An Extraction Total of 500 Materials plus Fuel produced by Mines, Refineries and Factories, plus 12 Colonists living off Earth."
+colour = [0.85, 0.5, 0.2]
+
+[restoration]
+energy_per_step = 10
+sink_per_step = 3.0
+
+[start]
+materials = 60
+fuel = 20
+energy = 20
+research = 0

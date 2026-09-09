@@ -1,0 +1,308 @@
+//! The Income phase (spec 6 phase 1, 7.1, 7.2, 12.1).
+
+use crate::ids::*;
+use crate::state::*;
+
+/// One producer the shortfall rule can shut down, in the order it shuts them.
+#[derive(Debug, Clone)]
+struct Producer {
+    place: ProducerPlace,
+    name: &'static str,
+    is_module: bool,
+    upkeep: i64,
+    output: Option<(Resource, i64)>,
+    /// Materials or Fuel from a Mine, Refinery or Factory count toward the Extraction Total.
+    extraction: bool,
+    research: i64,
+    online: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ProducerPlace {
+    Facility(StateId, usize),
+    Module(ColonyId, usize),
+}
+
+impl Game {
+    /// Phase 1: Income. Standing Armies replenish, producers produce, upkeep is paid with the shortfall rule.
+    pub fn income_phase(&mut self) {
+        self.replenish_standing_armies();
+        for s in &mut self.ships {
+            s.escaped = false;
+            s.arrived_this_turn = false;
+        }
+        for a in &mut self.armies {
+            a.escaped = false;
+        }
+        for seat in Seat::ALL {
+            self.income_for(seat);
+        }
+        for d in &mut self.discoveries {
+            d.turns_left = d.turns_left.saturating_sub(1);
+        }
+        self.discoveries.retain(|d| d.turns_left > 0);
+        for seat in Seat::ALL {
+            let allot = self.influence_allotment(seat);
+            self.seat_mut(seat).allotment = allot;
+        }
+    }
+
+    fn replenish_standing_armies(&mut self) {
+        for sid in StateId::ALL {
+            let occupied = self.state(sid).control.is_occupied();
+            let has = self.armies.iter().any(|a| a.standing && a.home == ArmyHome::State(sid));
+            if !has {
+                // A destroyed Standing Army is raised again at strength 1 (an assumption, see the ticket).
+                let cap = self.standing_army_cap(sid);
+                let hp = self.tables.unit(UnitKind::Army).hit_points;
+                self.spawn_standing_army(sid);
+                let dmg = cap.saturating_sub(1).min(hp - 1);
+                if let Some(a) = self.armies.iter_mut().find(|a| a.standing && a.home == ArmyHome::State(sid)) {
+                    a.damage = dmg;
+                }
+                continue;
+            }
+            if occupied {
+                continue;
+            }
+            if let Some(a) = self.armies.iter_mut().find(|a| a.standing && a.home == ArmyHome::State(sid)) {
+                a.damage = a.damage.saturating_sub(1);
+            }
+        }
+    }
+
+    fn producers_of(&self, seat: Seat) -> Vec<Producer> {
+        let t = &self.tables;
+        let kind = self.kind(seat);
+        let fac = t.faction(kind);
+        let mut out = Vec::new();
+        for sid in self.directed_states(seat) {
+            let st = self.state(sid);
+            let card = t.state(sid);
+            for (i, f) in st.facilities.iter().enumerate() {
+                let fc = t.facility(f.kind);
+                let mut output = None;
+                let mut research = 0;
+                let mut extraction = false;
+                if let Some(p) = &fc.produces {
+                    match p.resource {
+                        Resource::Research => {
+                            let mut r = p.amount as f64 * self.population_factor(sid) * card.education_level * fac.research_multiplier;
+                            if self.has_tech(TechId::PublicScience) {
+                                r *= t.tech(TechId::PublicScience).value;
+                            }
+                            research = r.floor() as i64;
+                        }
+                        res => {
+                            let mut v = p.amount as f64;
+                            if card.resource_lean == res {
+                                v *= 1.5;
+                            }
+                            v *= fac.output_multiplier;
+                            v *= self.tech_output_multiplier_facility(f.kind);
+                            output = Some((res, v.floor() as i64));
+                            extraction = matches!(f.kind, FacilityKind::Factory | FacilityKind::Refinery);
+                        }
+                    }
+                }
+                out.push(Producer {
+                    place: ProducerPlace::Facility(sid, i),
+                    name: f.kind.name(),
+                    is_module: false,
+                    upkeep: fc.energy_upkeep,
+                    output,
+                    extraction,
+                    research,
+                    online: !f.offline_until_resolution,
+                });
+            }
+        }
+        for cid in self.directed_colonies(seat) {
+            let col = self.colony(cid).unwrap();
+            let body = t.body(col.body);
+            for (i, m) in col.modules.iter().enumerate() {
+                let mc = t.module(m.kind);
+                let mut output = None;
+                let mut extraction = false;
+                if let Some(p) = &mc.produces {
+                    let yield_ = match m.kind {
+                        ModuleKind::Mine => body.mine_yield,
+                        ModuleKind::Generator => body.generator_yield,
+                        ModuleKind::Refinery => body.refinery_yield,
+                        _ => 1.0,
+                    };
+                    let mut v = p.amount as f64 * yield_ * fac.output_multiplier * self.tech_output_multiplier_module(m.kind);
+                    for d in &self.discoveries {
+                        if d.body == col.body && d.kind == m.kind {
+                            v *= d.multiplier;
+                        }
+                    }
+                    output = Some((p.resource, v.floor() as i64));
+                    extraction = matches!(m.kind, ModuleKind::Mine | ModuleKind::Refinery);
+                }
+                let mut upkeep = mc.energy_upkeep;
+                if self.has_tech(TechId::ClosedLoopColonies) {
+                    upkeep = (upkeep as f64 * t.tech(TechId::ClosedLoopColonies).value).floor() as i64;
+                }
+                out.push(Producer {
+                    place: ProducerPlace::Module(cid, i),
+                    name: m.kind.name(),
+                    is_module: true,
+                    upkeep,
+                    output,
+                    extraction,
+                    research: 0,
+                    online: !col.grid_failed,
+                });
+            }
+        }
+        out
+    }
+
+    fn tech_output_multiplier_facility(&self, kind: FacilityKind) -> f64 {
+        let t = &self.tables;
+        let mut m = 1.0;
+        match kind {
+            FacilityKind::PowerPlant if self.has_tech(TechId::EfficientGrids) => m *= t.tech(TechId::EfficientGrids).value,
+            FacilityKind::Factory if self.has_tech(TechId::DeepMining) => m *= t.tech(TechId::DeepMining).value,
+            FacilityKind::Refinery if self.has_tech(TechId::AutomatedRefining) => m *= t.tech(TechId::AutomatedRefining).value,
+            _ => {}
+        }
+        m
+    }
+
+    fn tech_output_multiplier_module(&self, kind: ModuleKind) -> f64 {
+        let t = &self.tables;
+        let mut m = 1.0;
+        match kind {
+            ModuleKind::Generator if self.has_tech(TechId::EfficientGrids) => m *= t.tech(TechId::EfficientGrids).value,
+            ModuleKind::Mine if self.has_tech(TechId::DeepMining) => m *= t.tech(TechId::DeepMining).value,
+            ModuleKind::Refinery if self.has_tech(TechId::AutomatedRefining) => m *= t.tech(TechId::AutomatedRefining).value,
+            _ => {}
+        }
+        m
+    }
+
+    /// Upkeep of every Ship and non-standing Army of a seat; always paid first (spec 7.2).
+    pub fn unit_upkeep(&self, seat: Seat) -> i64 {
+        let ships: i64 = self.ships.iter().filter(|s| s.seat == seat).map(|s| self.tables.unit(s.kind).energy_upkeep).sum();
+        let armies: i64 = self
+            .armies
+            .iter()
+            .filter(|a| !a.standing && self.army_seat(a) == Some(seat))
+            .map(|_| self.tables.unit(UnitKind::Army).energy_upkeep)
+            .sum();
+        ships + armies
+    }
+
+    /// The names of producers shut down by the shortfall rule, in the order they would be shut.
+    pub fn shortfall_order(&self, seat: Seat) -> Vec<String> {
+        let mut producers = self.producers_of(seat);
+        let (_, shut) = self.apply_shortfall(seat, &mut producers);
+        shut
+    }
+
+    /// Runs the shortfall rule over a producer list; returns the final Energy balance and what was shut.
+    fn apply_shortfall(&self, seat: Seat, producers: &mut [Producer]) -> (i64, Vec<String>) {
+        let energy_in: i64 = producers
+            .iter()
+            .filter(|p| p.online)
+            .filter_map(|p| p.output.filter(|(r, _)| *r == Resource::Energy).map(|(_, v)| v))
+            .sum();
+        let upkeep: i64 = producers.iter().filter(|p| p.online).map(|p| p.upkeep).sum();
+        let mut balance = self.seat(seat).stockpile.energy + energy_in - upkeep - self.unit_upkeep(seat);
+        let mut order: Vec<usize> = (0..producers.len()).filter(|i| producers[*i].online && producers[*i].upkeep > 0).collect();
+        order.sort_by(|a, b| {
+            let pa = &producers[*a];
+            let pb = &producers[*b];
+            pb.upkeep
+                .cmp(&pa.upkeep)
+                .then_with(|| pb.is_module.cmp(&pa.is_module))
+                .then_with(|| pa.name.cmp(pb.name))
+        });
+        let mut shut = Vec::new();
+        for i in order {
+            if balance >= 0 {
+                break;
+            }
+            let p = &mut producers[i];
+            p.online = false;
+            balance += p.upkeep;
+            if let Some((Resource::Energy, v)) = p.output {
+                balance -= v;
+            }
+            shut.push(p.name.to_string());
+        }
+        (balance, shut)
+    }
+
+    fn income_for(&mut self, seat: Seat) {
+        let mut producers = self.producers_of(seat);
+        let (balance, shut) = self.apply_shortfall(seat, &mut producers);
+        let mut gained = Stockpile::default();
+        let mut research = 0;
+        let mut extraction = 0;
+        for p in &producers {
+            match p.place {
+                ProducerPlace::Facility(sid, i) => self.state_mut(sid).facilities[i].online = p.online,
+                ProducerPlace::Module(cid, i) => {
+                    if let Some(c) = self.colony_mut(cid) {
+                        c.modules[i].online = p.online;
+                    }
+                }
+            }
+            if !p.online {
+                continue;
+            }
+            research += p.research;
+            if let Some((res, v)) = p.output {
+                match res {
+                    Resource::Materials => gained.materials += v,
+                    Resource::Fuel => gained.fuel += v,
+                    Resource::Energy => gained.energy += v,
+                    Resource::Research => {}
+                }
+                if p.extraction && matches!(res, Resource::Materials | Resource::Fuel) {
+                    extraction += v;
+                }
+            }
+        }
+        let before = self.seat(seat).stockpile;
+        let clamped = balance.max(0);
+        {
+            let s = self.seat_mut(seat);
+            s.stockpile.materials += gained.materials;
+            s.stockpile.fuel += gained.fuel;
+            s.stockpile.energy = clamped;
+            s.income_last_turn = Stockpile {
+                materials: gained.materials,
+                fuel: gained.fuel,
+                energy: clamped - before.energy,
+            };
+            s.research_last_turn = research;
+            if s.kind == FactionKind::Prospectors {
+                s.extraction_total += extraction;
+            }
+        }
+        if !shut.is_empty() {
+            let line = format!("{}: Energy ran short; shut down {}.", self.seat_name(seat), shut.join(", "));
+            self.report.lines.push(line.clone());
+            self.log(line);
+        }
+        if balance < 0 {
+            let line = format!("{}: Energy fell to zero even with every producer off.", self.seat_name(seat));
+            self.report.lines.push(line.clone());
+            self.log(line);
+        }
+        self.accrue_research(seat, research);
+        self.log(format!(
+            "Income {}: +{} Materials, +{} Fuel, Energy {} -> {}, Research {}.",
+            self.seat_name(seat),
+            gained.materials,
+            gained.fuel,
+            before.energy,
+            clamped,
+            research
+        ));
+    }
+}

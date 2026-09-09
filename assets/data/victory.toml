@@ -1,0 +1,5 @@
+# Spec section 15.
+extraction_total = 500
+stabilization_turns = 3
+off_world_presence = 12
+turns = 12

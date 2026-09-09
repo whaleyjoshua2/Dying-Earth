@@ -1,0 +1,69 @@
+# Spec section 16. Base weights per action, then the multipliers, pace schedule, thresholds and Tech picks.
+
+[weights.prospectors]
+build_producer = 8
+raise_industry = 9
+build_research_lab = 3
+build_habitat = 5
+build_launch_site_or_shipyard = 6
+build_colony_ship = 6
+build_warship = 5
+build_army_or_barracks = 5
+influence = 5
+transit = 6
+load_unload = 6
+found_colony = 9
+restoration = 0
+stance_attack = 4
+stance_intercept = 3
+stance_hold = 2
+stance_evade = 1
+
+[weights.custodians]
+build_producer = 6
+raise_industry = 3
+build_research_lab = 8
+build_habitat = 7
+build_launch_site_or_shipyard = 6
+build_colony_ship = 8
+build_warship = 3
+build_army_or_barracks = 4
+influence = 8
+transit = 6
+load_unload = 6
+found_colony = 9
+restoration = 7
+stance_attack = 2
+stance_intercept = 3
+stance_hold = 3
+stance_evade = 1
+
+[multipliers]
+victory_gap_max = 3.0
+denial = 2.5
+threat = 2.0
+opportunity = 2.0
+energy_shortage_bonus = 2
+
+[pace]
+# Extraction Total the Prospectors should hold by each turn, as [turn, total].
+prospector_extraction = [[3, 40], [6, 150], [9, 320], [12, 500]]
+# Custodians: within this many ppm of the Sink by this turn, and under it by the later turn.
+custodian_within_ppm = 4.0
+custodian_within_by_turn = 6
+custodian_under_sink_by_turn = 9
+# Colonists off Earth both should hold, as [turn, colonists].
+colonists = [[6, 4], [11, 12]]
+
+[thresholds]
+attack_odds = 0.6
+attack_odds_versus_near_winner = 0.5
+evade_damage_fraction = 0.6667
+influence_step = 5
+near_win_fraction = 0.8
+
+[tech_picks]
+prospectors = ["deep_mining", "efficient_grids", "automated_refining", "clean_propellant", "efficient_transit"]
+prospectors_last = "clean_power"
+prospectors_never = "green_consensus"
+custodians = ["public_science", "efficient_grids", "clean_power", "green_consensus", "clean_manufacturing"]
