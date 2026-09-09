@@ -33,7 +33,7 @@ A permanent settlement a Faction holds on a Body.
 _Avoid_: base, outpost, settlement
 
 **Earth Map**:
-The 3D view of Earth, where industry, launch sites and the Warming Track are seen and acted on.
+The 3D view of Earth, divided into Nation States, where Earth-side building, launches and the climate are seen and acted on.
 _Avoid_: home view, globe view, terrestrial map
 
 **Solar System Map**:
@@ -65,3 +65,21 @@ _Avoid_: power, electricity
 **Stockpile**:
 The single shared pool holding all Materials, Fuel and Energy. It is not divided by Body, so ore mined on Mars is immediately spendable on Earth.
 _Avoid_: central bank, per-world stocks, inventory
+
+### Pieces
+
+**Module**:
+A building placed inside a Colony. The First Playable has five kinds: Mine, Generator, Refinery, Habitat and Shipyard.
+_Avoid_: building, structure, facility, improvement
+
+**Ship**:
+A persistent piece that travels between Bodies, carries Colonists, and can fight. It is not consumed on arrival.
+_Avoid_: vessel, rocket, fleet, expedition
+
+**Colonist**:
+A person counted in the population of a Colony or Nation State. Colonists are carried by Ships and held by Habitats; they are never spent as a resource.
+_Avoid_: settler, crew, worker, population resource
+
+**Nation State**:
+A region of the Earth Map that a Faction can control and build in. The Earth-side counterpart of a Colony.
+_Avoid_: country, nation, territory, region, state
