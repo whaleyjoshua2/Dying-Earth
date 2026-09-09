@@ -85,8 +85,8 @@ fn income_shortfall_stops_once_the_balance_is_met() {
 #[test]
 fn temperature_reaches_within_a_tenth_of_target_in_two_climate_phases() {
     let mut g = game();
-    // One turn of real Emissions: about +10 ppm net moves the target by +0.125.
-    g.climate.co2 = 430.0;
+    // One turn of real Emissions: a quarter of a step moves the target by +0.125.
+    g.climate.co2 = 420.0 + 0.25 * g.tables.climate.ppm_step;
     let target = g.target_temperature();
     assert!((target - 1.325).abs() < 1e-9);
     // Freeze the stock so only the lag acts: no producers, so the phase adds population minus sink.
@@ -110,12 +110,13 @@ fn temperature_halves_the_remaining_distance_each_phase() {
         s.population = 0.0;
         s.industry_level = 0;
     }
-    // Nothing emits, so each phase takes the Sink (6 ppm) off: 506 becomes 500, and the target is 2.2.
-    g.climate.co2 = 506.0;
+    // Nothing emits, so each phase takes the Sink off; the stock lands two steps above 420, target 2.2.
+    let (step, sink) = (g.tables.climate.ppm_step, g.tables.climate.natural_sink);
+    g.climate.co2 = 420.0 + 2.0 * step + sink;
     g.climate_phase();
-    assert!((g.climate.co2 - 500.0).abs() < 1e-9);
+    assert!((g.climate.co2 - (420.0 + 2.0 * step)).abs() < 1e-9);
     assert!((g.climate.temperature - 1.7).abs() < 1e-6, "{}", g.climate.temperature);
-    g.climate.co2 = 506.0;
+    g.climate.co2 = 420.0 + 2.0 * step + sink;
     g.climate_phase();
     assert!((g.climate.temperature - 1.95).abs() < 1e-6, "{}", g.climate.temperature);
 }
@@ -130,7 +131,7 @@ fn sea_level_thresholds_fire_once_per_state() {
         s.industry_level = 3;
     }
     g.climate.temperature = 1.85;
-    g.climate.co2 = 480.0; // keeps the target above 1.8 so the temperature stays there
+    g.climate.co2 = 420.0 + 1.5 * g.tables.climate.ppm_step; // target 1.95 keeps it above 1.8
     let asia_before = g.build_slots(StateId::Asia);
     g.climate_phase();
     assert_eq!(g.build_slots(StateId::Asia), asia_before - 2, "Asia has Coastal Exposure 2");
@@ -150,7 +151,7 @@ fn sea_level_destroys_facilities_beyond_the_slots_highest_upkeep_first() {
     st.control = Control::Controlled(Seat(0));
     st.facilities = vec![facility(FacilityKind::Factory), facility(FacilityKind::Refinery), facility(FacilityKind::PowerPlant), facility(FacilityKind::LaunchSite)];
     g.climate.temperature = 1.85;
-    g.climate.co2 = 480.0;
+    g.climate.co2 = 420.0 + 1.5 * g.tables.climate.ppm_step;
     g.climate_phase();
     let kinds: Vec<FacilityKind> = g.state(StateId::Australia).facilities.iter().map(|f| f.kind).collect();
     assert_eq!(kinds.len(), 2);
@@ -399,9 +400,9 @@ fn collapse_ends_the_game_with_nobody_winning_when_no_condition_is_met() {
 }
 
 #[test]
-fn turn_twelve_scores_the_lower_fraction_of_the_two_parts() {
+fn the_last_turn_scores_the_lower_fraction_of_the_two_parts() {
     let mut g = game();
-    g.turn = 12;
+    g.turn = g.tables.victory.turns;
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 6); // presence 0.5, run 0 -> score 0
     g.seats[0].stabilization_run = 3;
     colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat], 3); // presence 0.25
@@ -411,9 +412,9 @@ fn turn_twelve_scores_the_lower_fraction_of_the_two_parts() {
 }
 
 #[test]
-fn nothing_ends_before_turn_twelve_without_a_condition_or_collapse() {
+fn nothing_ends_before_the_last_turn_without_a_condition_or_collapse() {
     let mut g = game();
-    g.turn = 5;
+    g.turn = g.tables.victory.turns - 1;
     g.end_phase();
     assert_eq!(g.outcome, None);
 }
@@ -883,7 +884,8 @@ fn start_income_flows_from_turn_one() {
 
 #[test]
 fn an_ai_versus_ai_game_runs_to_an_outcome() {
-    let r = dying_earth_engine::sim::run(tables(), 3, [FactionKind::Custodians, FactionKind::Prospectors]);
+    let t = tables();
+    let r = dying_earth_engine::sim::run(t.clone(), 3, [FactionKind::Custodians, FactionKind::Prospectors]);
     assert!(r.outcome.is_some());
-    assert!(r.last_turn <= 12);
+    assert!(r.last_turn <= t.victory.turns);
 }

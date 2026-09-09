@@ -2,4 +2,5 @@
 extraction_total = 500
 stabilization_turns = 3
 off_world_presence = 12
-turns = 12
+# Ticket #27 (version 0.02): twenty-four turns of one month.
+turns = 24

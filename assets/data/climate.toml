@@ -3,7 +3,10 @@
 starting_co2 = 420.0
 base_temperature = 1.2
 degrees_per_ppm_step = 0.5
-ppm_step = 40.0
+# Ticket #27 (version 0.02): re-paced for twenty-four turns by a sweep of the Sink and this step.
+# At 40 ppm the Custodian-versus-Prospector game collapsed by turn 10; at 80 it collapses in 16 of
+# 20 seeds between turns 16 and 24, median 18. 85 would give a median of 21 with 13 of 20.
+ppm_step = 80.0
 natural_sink = 6.0
 collapse_line = 3.0
 temperature_lag_fraction = 0.5

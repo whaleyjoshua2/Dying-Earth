@@ -70,3 +70,34 @@ All of it is in `events.toml`: each Event row has a `copies` count and the const
 Twenty seeds per pairing afterwards: every pairing still ends in Collapse, and two Prospector AIs now
 collapse on turn 7 or 8 rather than 9 to 11, since the deck no longer carries eight blanks and
 Permafrost Thaw arrives scaled. Reported, not retuned; #27 owns the clock.
+
+## #27: twenty-four turns and the re-paced CO2 clock
+
+Decided by the designer: a turn stays one month and the game runs twenty-four; **Factions must be
+unique**, so the only pairing is one Custodian seat against one Prospector seat (the two-Prospector
+run of the first-playable anchors is retired and `simulate` refuses it); that game should collapse by
+turn 22 for now; the Natural Sink and the ppm step may move, found by a sweep; the AI's pace schedule
+stretches to twenty-four turns and the victory bars stay.
+
+The sweep (`engine/examples/sweep.rs`, twenty seeds per cell, Custodians against Prospectors, both AI):
+
+| Sink | step 40 | 60 | 65 | 70 | 75 | 80 | 85 | 90 | 100 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 6 | 20/20, turn 10 | 20/20, 13 | 20/20, 14 | 20/20, 15 | 19/20, 17 | **16/20, 18 (16..24)** | 13/20, 21 | 7/20, 22 | 2/20, 23 |
+| 7 | | | 20/20, 15 | 18/20, 17 | 14/20, 18 | 13/20, 21 | 5/20, 22 | 3/20, 22 | |
+| 8 | 20/20, 11 | 19/20, 15 | 17/20, 17 | 14/20, 18 | 11/20, 20 | 4/20, 23 | 3/20, 22 | 2/20, 24 | 0/20 |
+
+(collapses out of twenty, and the median collapse turn.) Chosen: the Sink stays 6.0 and the step
+becomes **80 ppm per +0.5 C**, one number in `climate.toml`: most games collapse, the typical one on
+turn 18, the latest on 24. The 85 step, one number away, gives a median of 21 with seven games surviving.
+
+![Turn 17 of 24: +2.8 C heading to +2.8, Collapse projected around turn 21, coasts drowned, every slot lost](turn-17-of-24.png)
+
+Twenty seeds afterwards, Custodians (seat 0) against Prospectors: 16 Collapse between turns 16 and
+24, 4 Custodian wins on score at turn 24. Buildings per Faction reach 18 to 75 for the Custodians and
+0 to 9 for the Prospectors; Colonists off Earth 8 to 28. The first-playable anchors on buildings and
+the first Colony (turn 7 or 8) are now met or passed. Two things the designer should see: **no
+Faction ever meets its Victory Condition** (the Custodians never hold three consecutive turns under
+the Sink; the Prospectors never reach 500 Extraction because they lose their states), and **the
+Custodian AI takes every Nation State by Influence** over twenty-four turns, its 1.3x Allotment and
+weight 8 against 5 compounding. Reported, not retuned.
