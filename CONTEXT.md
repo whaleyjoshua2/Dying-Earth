@@ -47,3 +47,21 @@ _Avoid_: incident, crisis, card
 **Tech**:
 An advance a Faction unlocks to change what it can build or how much ecological damage it does. Techs are arranged in a tech tree.
 _Avoid_: research, upgrade, invention
+
+### Resources
+
+**Materials**:
+Raw metal and ore, spent to build ships, habitats and mines.
+_Avoid_: minerals, supplies, ore
+
+**Fuel**:
+What is burned to move between Bodies. Launches and transits spend it; nothing else does.
+_Avoid_: propellant, rocket fuel
+
+**Energy**:
+What runs a mine, habitat or industry where it stands, drained every turn it operates.
+_Avoid_: power, electricity
+
+**Stockpile**:
+The single shared pool holding all Materials, Fuel and Energy. It is not divided by Body, so ore mined on Mars is immediately spendable on Earth.
+_Avoid_: central bank, per-world stocks, inventory
