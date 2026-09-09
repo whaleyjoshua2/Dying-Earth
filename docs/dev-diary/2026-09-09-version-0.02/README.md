@@ -101,3 +101,28 @@ Faction ever meets its Victory Condition** (the Custodians never hold three cons
 the Sink; the Prospectors never reach 500 Extraction because they lose their states), and **the
 Custodian AI takes every Nation State by Influence** over twenty-four turns, its 1.3x Allotment and
 weight 8 against 5 compounding. Reported, not retuned.
+
+## #26: two more Nation States
+
+Decided by the designer: **Russia**, cut out of Europe, and **the Middle East**, cut out of Asia;
+real-world cards, with each parent losing the population that leaves and one Size; the #24 start
+buildings by the same rule. The cards, in `nation_states.toml`:
+
+| State | Population | Industry | Lean | Baseline Emissions | Education | Size | Coastal Exposure | Neighbours |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Russia | 1.5 | 2 | Fuel | 0.4 | 1.35 | 3 | 1 | Europe, Asia, North America |
+| The Middle East | 3.5 | 2 | Fuel | 0.5 | 1.0 | 2 | 1 | Europe, Asia, Africa |
+| Europe (was 7.5, Size 3) | 6.0 | 3 | Energy | 0.3 | 1.45 | 2 | 1 | North America, Africa, Russia, the Middle East |
+| Asia (was 47.0, Size 4) | 43.5 | 3 | Materials | 0.4 | 0.9 | 3 | 2 | Russia, the Middle East, Australia and Oceania |
+
+The Asia to North America edge moves to Russia (the Bering Strait); Asia to Africa goes through the
+Middle East (Sinai). The mask rules in `examples/prep_assets.rs` draw Russia east of Finland and the
+Baltics above 55N, east of Belarus to 55N, east of Ukraine down to the Caucasus, then Siberia north
+of the Kazakh, Mongolian and Manchurian borders; the Middle East from the Bosporus to Iran's eastern
+border and the Caucasus below 44N, east of the Red Sea line. First try, Europe ran east to 40E and
+swallowed Moscow, and the Middle East ran to 63E and took western Turkmenistan; both seams were moved
+after looking at the preview.
+
+![The nine-state mask](nine-states-mask.png)
+
+![Russia's card at turn 7, the Middle East labelled beside Africa](russia-card.png)

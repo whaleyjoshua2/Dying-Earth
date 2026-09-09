@@ -3,10 +3,12 @@
 //!
 //! `cargo run --example prep_assets -- <dir with earth.jpg moon.jpg mars.jpg> [preview.png]`
 //!
-//! Mask layout (`assets/textures/earth_states.png`, grey 8-bit): 0 = water, 1..7 = the Nation
+//! Mask layout (`assets/textures/earth_states.png`, grey 8-bit): 0 = water, 1..9 = the Nation
 //! State index in the engine's order (Africa, Antarctica, Asia, Australia and Oceania, Europe,
-//! North America, South America). Islands go with the nearest continent, Central America and the
-//! Caribbean with North America, all of Russia with Europe, the Middle East with Asia.
+//! North America, South America, Russia, the Middle East). Islands go with the nearest continent,
+//! Central America and the Caribbean with North America. Since ticket #26 Russia is its own state
+//! (with northern Kazakhstan, as before) and so is the Middle East (Turkey, the Caucasus, the Levant,
+//! Iraq, Iran and the Arabian Peninsula).
 
 use image::{GrayImage, ImageBuffer, Rgb, RgbImage};
 use std::path::Path;
@@ -18,15 +20,17 @@ const AUSTRALIA: u8 = 4;
 const EUROPE: u8 = 5;
 const NORTH_AMERICA: u8 = 6;
 const SOUTH_AMERICA: u8 = 7;
+const RUSSIA: u8 = 8;
+const MIDDLE_EAST: u8 = 9;
 
 /// Which Nation State a land pixel at (longitude, latitude) belongs to.
 pub fn state_for(lon: f64, lat: f64) -> u8 {
     if lat < -60.0 {
         return ANTARCTICA;
     }
-    // Chukotka, across the antimeridian: Russia, so Europe.
+    // Chukotka, across the antimeridian.
     if lon < -169.0 && lat > 64.0 {
-        return EUROPE;
+        return RUSSIA;
     }
     // Polynesia, before the Americas catch everything west of -30.
     if lon < -120.0 && lat < 5.0 && lat > -50.0 {
@@ -48,13 +52,27 @@ pub fn state_for(lon: f64, lat: f64) -> u8 {
     if lat < 37.3 && lon > -1.5 && lon < 12.0 && !arabia {
         return AFRICA;
     }
-    if lon >= -25.0
-        && ((lat > 35.0 && lon < 26.0)
-            || (lat > 42.0 && lon < 60.0)
-            || (lat > 50.0 && lon < 87.0)
-            || (lat > 53.0 && lon < 120.0)
-            || lat > 54.0)
+    // Russia: Karelia and the north east of 31E, the heartland east of 40E above 45N, then Siberia
+    // north of the Kazakh, Mongolian and Manchurian borders, out to the Pacific.
+    // Russia: east of Finland and the Baltics above 55N (St Petersburg at 30E), east of Belarus
+    // between 50 and 55N, east of the Ukrainian border below that down to the Caucasus, then Siberia
+    // north of the Kazakh, Mongolian and Manchurian borders, out to the Pacific.
+    if lon < 180.0
+        && ((lat > 55.0 && lon > 30.0)
+            || (lat > 50.0 && lat <= 55.0 && lon > 33.0)
+            || (lat > 44.0 && lat <= 50.0 && lon > 40.0 && lon < 60.0)
+            || (lat > 50.0 && (60.0..87.0).contains(&lon))
+            || (lat > 53.0 && (87.0..120.0).contains(&lon))
+            || (lat > 54.0 && lon >= 120.0))
     {
+        return RUSSIA;
+    }
+    // The Middle East: from the Bosporus to Iran's eastern border, the Caucasus below 44N, and
+    // everything east of the Red Sea line down to the Arabian Sea.
+    if lat > 12.0 && lat < 44.0 && lon > 26.0 && lon < 61.0 && (lon > red_sea_lon || lat > 30.0) {
+        return MIDDLE_EAST;
+    }
+    if lon >= -25.0 && ((lat > 35.0 && lon < 26.0) || (lat > 42.0 && lon <= 40.0)) {
         return EUROPE;
     }
     ASIA
@@ -79,7 +97,7 @@ fn main() {
     let earth: RgbImage = image::open(out.join("earth.png")).expect("earth.png").to_rgb8();
     let (w, h) = earth.dimensions();
     let mut mask: GrayImage = ImageBuffer::new(w, h);
-    let mut counts = [0u64; 8];
+    let mut counts = [0u64; 10];
     for y in 0..h {
         for x in 0..w {
             let lon = (x as f64 + 0.5) / w as f64 * 360.0 - 180.0;
@@ -90,9 +108,9 @@ fn main() {
         }
     }
     mask.save(out.join("earth_states.png")).expect("save mask");
-    println!("wrote earth_states.png; pixel counts water/AF/AN/AS/AU/EU/NA/SA = {counts:?}");
+    println!("wrote earth_states.png; pixel counts water/AF/AN/AS/AU/EU/NA/SA/RU/ME = {counts:?}");
     if let Some(preview) = args.get(1) {
-        let colours: [[u8; 3]; 8] = [[0, 0, 0], [230, 180, 60], [240, 240, 240], [220, 80, 80], [160, 90, 200], [70, 130, 220], [80, 190, 90], [230, 130, 40]];
+        let colours: [[u8; 3]; 10] = [[0, 0, 0], [230, 180, 60], [240, 240, 240], [220, 80, 80], [160, 90, 200], [70, 130, 220], [80, 190, 90], [230, 130, 40], [200, 200, 90], [60, 200, 200]];
         let mut img: RgbImage = ImageBuffer::new(w, h);
         for y in 0..h {
             for x in 0..w {

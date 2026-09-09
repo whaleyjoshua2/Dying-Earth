@@ -36,10 +36,13 @@ pub enum StateId {
     Europe,
     NorthAmerica,
     SouthAmerica,
+    // Version 0.02 (ticket #26): two more, cut from Europe and Asia.
+    Russia,
+    MiddleEast,
 }
 
 impl StateId {
-    pub const ALL: [StateId; 7] = [
+    pub const ALL: [StateId; 9] = [
         StateId::Africa,
         StateId::Antarctica,
         StateId::Asia,
@@ -47,6 +50,8 @@ impl StateId {
         StateId::Europe,
         StateId::NorthAmerica,
         StateId::SouthAmerica,
+        StateId::Russia,
+        StateId::MiddleEast,
     ];
     pub fn index(self) -> usize {
         self as usize
