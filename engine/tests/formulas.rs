@@ -277,7 +277,7 @@ fn influence_threshold_takes_control_and_decay_takes_two_from_untouched_targets(
     g.pending.influence.push((Seat(0), Place::State(StateId::Africa), 1));
     g.resolution_phase();
     assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)));
-    assert!(g.seats[0].influence.get(&Place::State(StateId::Africa)).is_none(), "wiped on transfer");
+    assert!(!g.seats[0].influence.contains_key(&Place::State(StateId::Africa)), "wiped on transfer");
     assert_eq!(g.seats[0].influence[&Place::State(StateId::Europe)], 8);
 }
 
