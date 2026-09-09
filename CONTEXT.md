@@ -5,7 +5,7 @@ A single-player, turn-based strategy game about colonizing the solar system befo
 ## Language
 
 **First Playable**:
-The ten-turn version of the game covering only the Moon and Mars, with three resources and two factions. The destination of the current effort is a written specification for it.
+The twelve-turn version of the game covering only the Moon and Mars, with three resources and two factions. The destination of the current effort is a written specification for it.
 _Avoid_: slice, MVP, demo, v1, prototype
 
 **Faction**:
@@ -143,12 +143,42 @@ How dirty a Nation State's industry is before any Facility is built there.
 _Avoid_: pollution rating, carbon score
 
 **Influence**:
-A Faction's accumulated claim on a Nation State or an enemy Colony, built by spending resources on it over turns and decaying when neglected. The first Faction past the place's threshold takes control; the owner of a Colony can spend to push a rival's Influence back.
+A Faction's accumulated claim on a Nation State or an enemy Colony, built from a fixed per-turn Allotment and decaying when neglected. The first Faction past the place's threshold takes control; the owner of a Colony can spend to push a rival's Influence back.
 _Avoid_: diplomacy points, favour, reputation
+
+**Allotment**:
+The fixed amount of Influence a Faction receives each turn, split freely across any number of targets during the Orders phase. It grows with the number of Nation States the Faction controls and does not carry over.
+_Avoid_: influence budget, diplomacy pool, action points
 
 **Research**:
 Points produced by Research Labs and spent only on Techs. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship.
 _Avoid_: science, research points, RP, fourth resource
+
+### The turn
+
+**Turn**:
+One month of game time, and the unit the whole game runs in. The First Playable is twelve turns long. Both Factions order simultaneously against the same board, then the turn runs through its phases.
+_Avoid_: round, month, tick, cycle
+
+**Phase**:
+One of the seven stages a turn runs through, always in this order: Income, Climate, Report, Orders, Event, Resolution, End.
+_Avoid_: step, stage, segment
+
+**Orders**:
+The phase in which a Faction commits everything it will do that turn: building, raising Industry Level, allocating the Influence Allotment, launching, setting transits and Stances, and ordering attacks and landings. Any order can be cancelled and fully refunded until End Turn is pressed.
+_Avoid_: commands, moves, actions, player phase
+
+**End Turn**:
+The commitment. Pressing it closes the Orders phase, after which the Event card is drawn and nothing can be taken back.
+_Avoid_: submit, confirm, next turn
+
+**Resolution**:
+The phase in which the turn actually happens: transits advance, arrivals land, Battles resolve, Occupation counts down, control transfers, builds complete, repairs finish, and Colony Ships that unload found Colonies.
+_Avoid_: processing, execution, upkeep phase
+
+**Report**:
+The phase that opens a turn for the player, carrying the Battle Report, last turn's Event, completed builds, arrivals and control changes.
+_Avoid_: summary, news, digest
 
 ### Combat
 
@@ -215,5 +245,5 @@ The one Temperature at which the game ends. Every other effect of Temperature is
 _Avoid_: threshold, tipping point, game over temperature
 
 **Climate Panel**:
-The screen showing the CO2 Stock, the Temperature and where it is heading, this turn's Emissions by source, the sink and the net, the penalties in force, and a projection to turn 10.
+The screen showing the CO2 Stock, the Temperature and where it is heading, this turn's Emissions by source, the sink and the net, the penalties in force, and a projection to the last turn.
 _Avoid_: warming meter, climate HUD
