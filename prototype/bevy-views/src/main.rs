@@ -236,7 +236,8 @@ fn setup(
 
 fn spin_globe(game: Res<Game>, mut q: Query<&mut Transform, With<EarthGlobe>>) {
     for mut t in &mut q {
-        t.rotation = Quat::from_rotation_y(game.yaw);
+        // Bevy's UV sphere has its poles on the Z axis; stand it upright first.
+        t.rotation = Quat::from_rotation_y(game.yaw) * Quat::from_rotation_x(-FRAC_PI_2);
     }
 }
 
@@ -245,6 +246,9 @@ fn place_planets(game: Res<Game>, mut q: Query<(&Planet, &mut Transform)>) {
     for (p, mut t) in &mut q {
         let a = if p.which == 0 { ea } else { ma };
         t.translation = Vec3::new(a.cos() * p.radius, 0.0, a.sin() * p.radius);
+        if p.which == 0 {
+            t.rotation = Quat::from_rotation_x(-FRAC_PI_2); // upright, see spin_globe
+        }
     }
 }
 
