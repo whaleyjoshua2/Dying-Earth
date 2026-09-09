@@ -33,15 +33,19 @@ A permanent settlement a Faction holds on a Body, founded when a Colony Ship unl
 _Avoid_: base, outpost, settlement
 
 **Colony Slot**:
-One of a fixed number of places on a Body where a Colony can be founded, shared by all Factions.
+One of a fixed number of places on a Body where a Colony can be founded, shared by all Factions. Slots are visible places on that Body's Surface Map, and a landing Colony Ship is founded into a chosen one.
 _Avoid_: site, plot, capacity
 
+**Body Surface Map**:
+The 3D view of one Body's surface, entered by clicking that Body on the Solar System Map. Every Body has one.
+_Avoid_: planet view, ground view, zoomed view
+
 **Earth Map**:
-The 3D view of Earth, divided into Nation States, where Earth-side building, launches and the Climate Panel are seen and acted on.
+Earth's Body Surface Map, divided into Nation States, where Earth-side building, Army orders and the Climate Panel are seen and acted on.
 _Avoid_: home view, globe view, terrestrial map
 
 **Solar System Map**:
-The 3D view of the solar system, where Bodies, Colonies and ships in transit are seen and acted on.
+The 3D view of the solar system, where Bodies, Ship stacks, transits and Orbital Control are seen and acted on. Transits, launches, Ship Stances and attacks are ordered here and nowhere else.
 _Avoid_: space view, orbital map, star map
 
 **Event**:
@@ -142,6 +146,10 @@ _Avoid_: specialty, bonus, affinity
 How dirty a Nation State's industry is before any Facility is built there.
 _Avoid_: pollution rating, carbon score
 
+**Coastal Exposure**:
+How much of a Nation State the sea can take. As Sea Level passes its thresholds, an exposed state permanently loses build slots.
+_Avoid_: coastline, vulnerability, flood risk
+
 **Influence**:
 A Faction's accumulated claim on a Nation State or an enemy Colony, built from a fixed per-turn Allotment and decaying when neglected. The first Faction past the place's threshold takes control; the owner of a Colony can spend to push a rival's Influence back.
 _Avoid_: diplomacy points, favour, reputation
@@ -239,6 +247,10 @@ _Avoid_: output, carbon, footprint
 **Natural Sink**:
 The fixed amount of CO2 the oceans and forests remove from the CO2 Stock every turn. Net emissions below it stabilize the stock.
 _Avoid_: absorption, offset, carbon capture
+
+**Sea Level**:
+How far the oceans have risen with the Temperature. It is drawn on the globe as a creeping waterline, and it permanently takes build slots from Nation States according to their Coastal Exposure.
+_Avoid_: flooding, water line, ocean rise
 
 **Collapse Line**:
 The one Temperature at which the game ends. Every other effect of Temperature is continuous; this is the only line.
