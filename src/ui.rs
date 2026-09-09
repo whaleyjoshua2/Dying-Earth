@@ -640,11 +640,19 @@ fn order_text(game: &Game, o: &Order) -> String {
 }
 
 fn cost_button(ui: &mut Ui, game: &Game, pending: &[Order], order: Order, label: &str, actions: &mut Vec<Action>) {
+    cost_button_with_hover(ui, game, pending, order, label, None, actions);
+}
+
+/// A build button: cost in the label, and on hover what the building would make each turn (#22).
+fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Order, label: &str, hover: Option<String>, actions: &mut Vec<Action>) {
     let cost = game.order_cost(Seat(0), &order);
     let check = game.check_order(Seat(0), pending, &order);
     let text = format!("{} ({})", label, cost.text());
     let button = egui::Button::new(text);
-    let resp = ui.add_enabled(check.is_ok(), button);
+    let mut resp = ui.add_enabled(check.is_ok(), button);
+    if let Some(h) = &hover {
+        resp = resp.on_hover_text(format!("Once it stands: {h}")).on_disabled_hover_text(format!("Once it stands: {h}"));
+    }
     if let Err(e) = &check {
         resp.clone().on_disabled_hover_text(&e.0);
     }
@@ -716,8 +724,13 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         ui.colored_label(Color32::LIGHT_BLUE, format!("{} slot(s) lost to the sea", st.lost_slots));
     }
     ui.label(RichText::new("Facilities").strong());
+    let director = st.control.director();
     for f in &st.facilities {
-        ui.label(format!("  {}{}", f.kind.name(), if f.online { "" } else { " (offline)" }));
+        let figures = match director {
+            Some(d) => game.facility_yield(d, sid, f.kind).text(),
+            None => "idle, nobody directs this state".to_string(),
+        };
+        ui.label(format!("  {}: {}{}", f.kind.name(), figures, if f.online { "" } else { " (offline, making nothing)" }));
     }
     for b in &st.queue {
         ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
@@ -734,9 +747,10 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     ui.separator();
     let mine = st.control.director() == Some(Seat(0));
     if mine {
-        ui.label(RichText::new("Build").strong());
+        ui.label(RichText::new("Build (hover a button for what it makes)").strong());
         for fk in FacilityKind::ALL {
-            cost_button(ui, game, &session.pending, Order::BuildFacility { state: sid, kind: fk }, fk.name(), actions);
+            let hover = game.facility_yield(Seat(0), sid, fk).text();
+            cost_button_with_hover(ui, game, &session.pending, Order::BuildFacility { state: sid, kind: fk }, fk.name(), Some(hover), actions);
         }
         cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
@@ -795,8 +809,13 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     ui.label(owner);
     ui.label(format!("Colonists {} of {} Habitat room", col.colonists, game.habitat_room(col)));
     ui.label(RichText::new("Modules").strong());
+    let director = col.control.director();
     for m in &col.modules {
-        ui.label(format!("  {}{}", m.kind.name(), if m.online { "" } else { " (offline)" }));
+        let figures = match director {
+            Some(d) => game.module_yield(d, cid, m.kind).text(),
+            None => "idle".to_string(),
+        };
+        ui.label(format!("  {}: {}{}", m.kind.name(), figures, if m.online { "" } else { " (offline, making nothing)" }));
     }
     for b in &col.queue {
         ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
@@ -809,9 +828,10 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     ui.separator();
     let mine = col.control.director() == Some(Seat(0));
     if mine {
-        ui.label(RichText::new("Build").strong());
+        ui.label(RichText::new("Build (hover a button for what it makes)").strong());
         for mk in ModuleKind::ALL {
-            cost_button(ui, game, &session.pending, Order::BuildModule { colony: cid, kind: mk }, mk.name(), actions);
+            let hover = game.module_yield(Seat(0), cid, mk).text();
+            cost_button_with_hover(ui, game, &session.pending, Order::BuildModule { colony: cid, kind: mk }, mk.name(), Some(hover), actions);
         }
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::Colony(cid) }, "Build Army (Barracks)", actions);
         if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {

@@ -17,6 +17,42 @@ struct Producer {
     online: bool,
 }
 
+/// One building's per-turn figures at today's multipliers, for the cards and the build buttons.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Yield {
+    pub resource: Option<Resource>,
+    pub amount: i64,
+    pub research: i64,
+    pub upkeep: i64,
+    pub emissions: f64,
+}
+
+impl Yield {
+    /// "+6 Materials, 2 Energy upkeep, 1.0 Emissions" in the glossary's words.
+    pub fn text(&self) -> String {
+        let mut parts = Vec::new();
+        match self.resource {
+            Some(Resource::Materials) => parts.push(format!("+{} Materials", self.amount)),
+            Some(Resource::Fuel) => parts.push(format!("+{} Fuel", self.amount)),
+            Some(Resource::Energy) => parts.push(format!("+{} Energy", self.amount)),
+            Some(Resource::Research) | None => {}
+        }
+        if self.research > 0 {
+            parts.push(format!("+{} Research", self.research));
+        }
+        if parts.is_empty() {
+            parts.push("no output".to_string());
+        }
+        if self.upkeep > 0 {
+            parts.push(format!("{} Energy upkeep", self.upkeep));
+        }
+        if self.emissions > 0.0 {
+            parts.push(format!("{:.1} Emissions", self.emissions));
+        }
+        parts.join(", ")
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum ProducerPlace {
     Facility(StateId, usize),
@@ -71,86 +107,106 @@ impl Game {
         }
     }
 
-    fn producers_of(&self, seat: Seat) -> Vec<Producer> {
+    /// What one Facility in a Nation State makes each turn for its director, at today's multipliers:
+    /// the same figures the Income phase pays (spec 7.1, 12.1) and the Climate phase charges (11.2).
+    pub fn facility_yield(&self, seat: Seat, sid: StateId, kind: FacilityKind) -> Yield {
         let t = &self.tables;
-        let kind = self.kind(seat);
-        let fac = t.faction(kind);
+        let fac = t.faction(self.kind(seat));
+        let card = t.state(sid);
+        let fc = t.facility(kind);
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0 };
+        if let Some(p) = &fc.produces {
+            match p.resource {
+                Resource::Research => {
+                    let mut r = p.amount as f64 * self.population_factor(sid) * card.education_level * fac.research_multiplier;
+                    if self.has_tech(TechId::PublicScience) {
+                        r *= t.tech(TechId::PublicScience).value;
+                    }
+                    y.research = r.floor() as i64;
+                }
+                res => {
+                    let mut v = p.amount as f64;
+                    if card.resource_lean == res {
+                        v *= 1.5;
+                    }
+                    v *= fac.output_multiplier;
+                    v *= self.tech_output_multiplier_facility(kind);
+                    y.resource = Some(res);
+                    y.amount = v.floor() as i64;
+                }
+            }
+        }
+        let pp = if self.has_tech(TechId::CleanPower) { t.tech(TechId::CleanPower).value } else { 1.0 };
+        let fr = if self.has_tech(TechId::CleanManufacturing) { t.tech(TechId::CleanManufacturing).value } else { 1.0 };
+        y.emissions = fc.emissions
+            * fac.emissions_multiplier
+            * match kind {
+                FacilityKind::PowerPlant => pp,
+                FacilityKind::Factory | FacilityKind::Refinery => fr,
+                _ => 1.0,
+            };
+        y
+    }
+
+    /// What one Module in a Colony makes each turn for its director. Modules never emit.
+    pub fn module_yield(&self, seat: Seat, cid: ColonyId, kind: ModuleKind) -> Yield {
+        let t = &self.tables;
+        let fac = t.faction(self.kind(seat));
+        let mc = t.module(kind);
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0 };
+        let Some(col) = self.colony(cid) else { return y };
+        let body = t.body(col.body);
+        if let Some(p) = &mc.produces {
+            let yield_ = match kind {
+                ModuleKind::Mine => body.mine_yield,
+                ModuleKind::Generator => body.generator_yield,
+                ModuleKind::Refinery => body.refinery_yield,
+                _ => 1.0,
+            };
+            let mut v = p.amount as f64 * yield_ * fac.output_multiplier * self.tech_output_multiplier_module(kind);
+            for d in &self.discoveries {
+                if d.body == col.body && d.kind == kind {
+                    v *= d.multiplier;
+                }
+            }
+            y.resource = Some(p.resource);
+            y.amount = v.floor() as i64;
+        }
+        if self.has_tech(TechId::ClosedLoopColonies) {
+            y.upkeep = (y.upkeep as f64 * t.tech(TechId::ClosedLoopColonies).value).floor() as i64;
+        }
+        y
+    }
+
+    fn producers_of(&self, seat: Seat) -> Vec<Producer> {
         let mut out = Vec::new();
         for sid in self.directed_states(seat) {
             let st = self.state(sid);
-            let card = t.state(sid);
             for (i, f) in st.facilities.iter().enumerate() {
-                let fc = t.facility(f.kind);
-                let mut output = None;
-                let mut research = 0;
-                let mut extraction = false;
-                if let Some(p) = &fc.produces {
-                    match p.resource {
-                        Resource::Research => {
-                            let mut r = p.amount as f64 * self.population_factor(sid) * card.education_level * fac.research_multiplier;
-                            if self.has_tech(TechId::PublicScience) {
-                                r *= t.tech(TechId::PublicScience).value;
-                            }
-                            research = r.floor() as i64;
-                        }
-                        res => {
-                            let mut v = p.amount as f64;
-                            if card.resource_lean == res {
-                                v *= 1.5;
-                            }
-                            v *= fac.output_multiplier;
-                            v *= self.tech_output_multiplier_facility(f.kind);
-                            output = Some((res, v.floor() as i64));
-                            extraction = matches!(f.kind, FacilityKind::Factory | FacilityKind::Refinery);
-                        }
-                    }
-                }
+                let y = self.facility_yield(seat, sid, f.kind);
                 out.push(Producer {
                     place: ProducerPlace::Facility(sid, i),
                     name: f.kind.name(),
                     is_module: false,
-                    upkeep: fc.energy_upkeep,
-                    output,
-                    extraction,
-                    research,
+                    upkeep: y.upkeep,
+                    output: y.resource.map(|r| (r, y.amount)),
+                    extraction: matches!(f.kind, FacilityKind::Factory | FacilityKind::Refinery),
+                    research: y.research,
                     online: !f.offline_until_resolution,
                 });
             }
         }
         for cid in self.directed_colonies(seat) {
             let col = self.colony(cid).unwrap();
-            let body = t.body(col.body);
             for (i, m) in col.modules.iter().enumerate() {
-                let mc = t.module(m.kind);
-                let mut output = None;
-                let mut extraction = false;
-                if let Some(p) = &mc.produces {
-                    let yield_ = match m.kind {
-                        ModuleKind::Mine => body.mine_yield,
-                        ModuleKind::Generator => body.generator_yield,
-                        ModuleKind::Refinery => body.refinery_yield,
-                        _ => 1.0,
-                    };
-                    let mut v = p.amount as f64 * yield_ * fac.output_multiplier * self.tech_output_multiplier_module(m.kind);
-                    for d in &self.discoveries {
-                        if d.body == col.body && d.kind == m.kind {
-                            v *= d.multiplier;
-                        }
-                    }
-                    output = Some((p.resource, v.floor() as i64));
-                    extraction = matches!(m.kind, ModuleKind::Mine | ModuleKind::Refinery);
-                }
-                let mut upkeep = mc.energy_upkeep;
-                if self.has_tech(TechId::ClosedLoopColonies) {
-                    upkeep = (upkeep as f64 * t.tech(TechId::ClosedLoopColonies).value).floor() as i64;
-                }
+                let y = self.module_yield(seat, cid, m.kind);
                 out.push(Producer {
                     place: ProducerPlace::Module(cid, i),
                     name: m.kind.name(),
                     is_module: true,
-                    upkeep,
-                    output,
-                    extraction,
+                    upkeep: y.upkeep,
+                    output: y.resource.map(|r| (r, y.amount)),
+                    extraction: matches!(m.kind, ModuleKind::Mine | ModuleKind::Refinery),
                     research: 0,
                     online: !col.grid_failed,
                 });

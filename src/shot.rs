@@ -15,6 +15,7 @@ pub struct ShotPlan {
     /// `menus:1` (a building aid): also capture the title, Faction and start screens and the Report.
     pub menus: bool,
     pub menu_step: usize,
+    pub select: Option<String>,
 }
 
 const VIEWS: [(&str, View); 4] = [
@@ -118,6 +119,8 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         view.popup = Popup::None;
         view.tech_prompted = true;
         show_view(&mut view, VIEWS[0].1);
+        // `select:<state id>` (a building aid) opens that Nation State's card in the Earth picture.
+        plan.select = std::env::args().find_map(|a| a.strip_prefix("select:").map(str::to_owned));
         plan.next_at = t + 4.0;
         return;
     }
@@ -146,6 +149,11 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
     } else {
         let (_, v) = VIEWS[plan.step];
         show_view(&mut view, v);
+        let wanted = plan.select.as_ref().filter(|_| v == View::Surface(BodyId::Earth)).and_then(|name| StateId::ALL.into_iter().find(|s| format!("{s:?}").eq_ignore_ascii_case(name)));
+        if let Some(s) = wanted {
+            view.selection = Selection::State(s);
+            view.show_climate = false;
+        }
         plan.next_at = t + 2.5;
     }
 }

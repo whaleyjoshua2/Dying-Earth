@@ -645,6 +645,53 @@ fn colony_attack_turns(seed: u64) -> Option<u32> {
     None
 }
 
+// ---------------------------------------------------------------- #22 the card's figures are the Income phase's figures
+
+#[test]
+fn building_yields_on_the_card_equal_what_income_pays() {
+    let mut g = game();
+    g.state_mut(StateId::Asia).facilities = vec![facility(FacilityKind::Factory), facility(FacilityKind::Refinery), facility(FacilityKind::ResearchLab), facility(FacilityKind::PowerPlant)];
+    g.state_mut(StateId::Africa).control = Control::Controlled(Seat(0));
+    g.state_mut(StateId::Africa).facilities = vec![facility(FacilityKind::Factory)];
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Generator, ModuleKind::Refinery], 0);
+    g.research.done.push(TechId::DeepMining);
+    g.research.current = Some(TechId::CleanPower);
+    let mut expect = Stockpile::default();
+    let mut research = 0;
+    for sid in [StateId::Asia, StateId::Africa] {
+        for f in &g.state(sid).facilities {
+            let y = g.facility_yield(Seat(0), sid, f.kind);
+            match y.resource {
+                Some(Resource::Materials) => expect.materials += y.amount,
+                Some(Resource::Fuel) => expect.fuel += y.amount,
+                Some(Resource::Energy) => expect.energy += y.amount,
+                _ => {}
+            }
+            research += y.research;
+            expect.energy -= y.upkeep;
+        }
+    }
+    for m in &g.colony(c).unwrap().modules {
+        let y = g.module_yield(Seat(0), c, m.kind);
+        match y.resource {
+            Some(Resource::Materials) => expect.materials += y.amount,
+            Some(Resource::Fuel) => expect.fuel += y.amount,
+            Some(Resource::Energy) => expect.energy += y.amount,
+            _ => {}
+        }
+        expect.energy -= y.upkeep;
+    }
+    assert!(expect.materials > 0 && expect.fuel > 0 && research > 0, "the scenario produces something: {expect:?} research {research}");
+    let paid = income_of(&mut g, Seat(0));
+    assert_eq!((paid.materials, paid.fuel, paid.energy), (expect.materials, expect.fuel, expect.energy));
+    assert_eq!(g.seats[0].research_last_turn, research);
+    // And the Emissions figure on the card is the Climate phase's figure for that building.
+    let card: f64 = g.state(StateId::Asia).facilities.iter().map(|f| g.facility_yield(Seat(0), StateId::Asia, f.kind).emissions).sum();
+    let e = g.emissions_now();
+    let asia_share = e.factories + e.power_plants + e.refineries - g.facility_yield(Seat(0), StateId::Africa, FacilityKind::Factory).emissions;
+    assert!((card - asia_share).abs() < 1e-9, "card {card} climate {asia_share}");
+}
+
 // ---------------------------------------------------------------- the whole loop holds together
 
 #[test]
