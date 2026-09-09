@@ -45,8 +45,16 @@ An unplanned occurrence that interrupts a turn — a solar storm, an equipment f
 _Avoid_: incident, crisis, card
 
 **Tech**:
-An advance a Faction unlocks to change what it can build or how much ecological damage it does. Techs are arranged in a tech tree.
+An advance on the Tech Tree that changes an output, a capacity, an upkeep, a Ship strength, an Influence cost or how much a source emits. When a Tech completes, every Faction has it.
 _Avoid_: research, upgrade, invention
+
+**Tech Tree**:
+The single tree of Techs shared by all Factions, in five branches: Industry, Propulsion, Off-world Living, Extraction, Society. One Tech is under research at a time, worldwide.
+_Avoid_: per-faction tree, research tree
+
+**Research Lead**:
+The Faction that contributed the most Research to the Tech that just completed. It chooses the next Tech. Decided afresh for every Tech.
+_Avoid_: science leader, tech leader
 
 ### Resources
 
@@ -93,6 +101,10 @@ _Avoid_: item, building, module (that is the Colony word), structure
 **Industry Level**:
 How built-up a Nation State is. Together with the state's size it sets how many Facilities fit, and it scales the state's emissions. Raising it is a build action.
 _Avoid_: development, tier, infrastructure
+
+**Education Level**:
+A fixed figure on a Nation State's card, taken from real-world values in the First Playable, that multiplies the Research each Lab in that state produces.
+_Avoid_: literacy, science level, schooling
 
 **Resource Lean**:
 The one of Materials, Fuel or Energy a Nation State is naturally good at producing.
