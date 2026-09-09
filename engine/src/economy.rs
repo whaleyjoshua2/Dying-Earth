@@ -35,6 +35,7 @@ impl Yield {
             Some(Resource::Materials) => parts.push(format!("+{} Materials", self.amount)),
             Some(Resource::Fuel) => parts.push(format!("+{} Fuel", self.amount)),
             Some(Resource::Energy) => parts.push(format!("+{} Energy", self.amount)),
+            Some(Resource::Ducats) => parts.push(format!("+{} Ducats", self.amount)),
             Some(Resource::Research) | None => {}
         }
         if self.research > 0 {
@@ -125,6 +126,12 @@ impl Game {
                     }
                     y.research = r.floor() as i64;
                 }
+                Resource::Ducats => {
+                    // A Bank (ticket #35): its amount times the state's gdp / 10.
+                    let v = p.amount as f64 * card.gdp as f64 / 10.0 * fac.output_multiplier;
+                    y.resource = Some(Resource::Ducats);
+                    y.amount = v.floor() as i64;
+                }
                 res => {
                     let mut v = p.amount as f64;
                     if card.resource_lean == res {
@@ -162,6 +169,8 @@ impl Game {
                 ModuleKind::Mine => body.mine_yield,
                 ModuleKind::Generator => body.generator_yield,
                 ModuleKind::Refinery => body.refinery_yield,
+                // A Trade Post (ticket #35) follows the Habitat yield: trade goes where people live.
+                ModuleKind::TradePost => body.habitat_yield,
                 _ => 1.0,
             };
             let mut v = p.amount as f64 * yield_ * fac.output_multiplier * self.tech_output_multiplier_module(kind);
@@ -255,6 +264,11 @@ impl Game {
         m
     }
 
+    /// A controlled state's base Ducats a turn (ticket #35): gdp x Industry Level / 10, rounded down.
+    pub fn state_ducats(&self, sid: StateId) -> i64 {
+        (self.tables.state(sid).gdp * self.state(sid).industry_level as i64) / 10
+    }
+
     /// Upkeep of every Ship and non-standing Army of a seat; always paid first (spec 7.2).
     pub fn unit_upkeep(&self, seat: Seat) -> i64 {
         let ships: i64 = self.ships.iter().filter(|s| s.seat == seat).map(|s| self.tables.unit(s.kind).energy_upkeep).sum();
@@ -340,6 +354,7 @@ impl Game {
                     Resource::Materials => gained.materials += v,
                     Resource::Fuel => gained.fuel += v,
                     Resource::Energy => gained.energy += v,
+                    Resource::Ducats => gained.ducats += v,
                     Resource::Research => {}
                 }
                 sources.push((format!("{} in {}", p.name, where_), res, v));
@@ -355,6 +370,14 @@ impl Game {
         if unit_upkeep > 0 {
             sources.push(("Ships and Armies (upkeep)".to_string(), Resource::Energy, -unit_upkeep));
         }
+        // Ticket #35: every controlled state's economy pays Ducats, gdp x Industry Level / 10.
+        for sid in self.controlled_states(seat) {
+            let v = self.state_ducats(sid);
+            if v > 0 {
+                gained.ducats += v;
+                sources.push((format!("Economy of {}", self.tables.state(sid).name), Resource::Ducats, v));
+            }
+        }
         self.seat_mut(seat).income_sources = sources;
         let before = self.seat(seat).stockpile;
         let clamped = balance.max(0);
@@ -363,10 +386,12 @@ impl Game {
             s.stockpile.materials += gained.materials;
             s.stockpile.fuel += gained.fuel;
             s.stockpile.energy = clamped;
+            s.stockpile.ducats += gained.ducats;
             s.income_last_turn = Stockpile {
                 materials: gained.materials,
                 fuel: gained.fuel,
                 energy: clamped - before.energy,
+                ducats: gained.ducats,
             };
             s.research_last_turn = research;
             if s.kind == FactionKind::Prospectors {

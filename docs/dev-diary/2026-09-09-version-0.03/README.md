@@ -65,3 +65,19 @@ Asia start at 22 Influence a turn, Prospectors in Europe at 15.
 Twenty seeds: 13 Collapse and 7 Custodian wins at turn 24, games running to turns 17 to 24, and
 Influence transfers up to 13 to 16 a game. Larger Allotments, more ping-pong; the options on #33
 still stand.
+
+## #35: Ducats
+
+Decided by the designer: **Ducats**, a fourth resource in the Stockpile. A controlled state pays
+GDP x Industry Level / 10 a turn from a GDP figure on its card; a **Bank** adds 4 x GDP / 10; a
+**Trade Post** in a Colony makes 3 x the Habitat yield. Two Ducats buy one Influence, added to this
+turn's Allotment; Ducats also pay for Restoration (10 a step) and repairs (5 a point), rates the
+builder set at the Energy and Materials numbers and flagged for veto.
+
+![Turn 9: Ducats in the top bar, Asia's card with its GDP line, the Buy Influence button](ducats.png)
+
+Four rules watched red first: the Bank's GDP factor, the state economy's Industry factor, bought
+Influence counting toward the Allotment, and a Ducat repair reaching the repair list.
+
+Twenty seeds: the AI buys Influence with Ducats 42 to 60 times a game and builds no Bank or Trade
+Post, because nothing in its producer weights wants a resource it never lacked. Reported, not retuned.

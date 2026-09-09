@@ -87,13 +87,25 @@ What runs a mine, habitat or industry where it stands, drained every turn it ope
 _Avoid_: power, electricity
 
 **Stockpile**:
-The single shared pool holding all Materials, Fuel and Energy. It is not divided by Body, so ore mined on Mars is immediately spendable on Earth.
+The single shared pool holding all Materials, Fuel, Energy and, since version 0.03, Ducats. It is not divided by Body, so ore mined on Mars is immediately spendable on Earth.
 _Avoid_: central bank, per-world stocks, inventory
+
+**Ducats**:
+Money, the fourth resource since version 0.03. A controlled Nation State pays them from its GDP figure times its Industry Level; a Bank on Earth and a Trade Post in a Colony make more. They buy Influence at two for one, added to this turn's Allotment, and pay for Restoration steps and repair points in place of Energy and Materials.
+_Avoid_: Ducketts, credits, money, gold, cash
+
+**Bank**:
+The Facility that makes Ducats in a Nation State, in proportion to the state's GDP.
+_Avoid_: treasury, mint, exchange
+
+**Trade Post**:
+The Module that makes Ducats in a Colony, in proportion to the Body's Habitat yield: trade goes where people live.
+_Avoid_: market, exchange, shop
 
 ### Pieces
 
 **Module**:
-A building placed inside a Colony. The First Playable has six kinds: Mine, Generator, Refinery, Habitat, Shipyard and Barracks.
+A building placed inside a Colony. Seven kinds since version 0.03: Mine, Generator, Refinery, Habitat, Shipyard, Barracks and Trade Post.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:
@@ -135,7 +147,7 @@ _Avoid_: country, nation, territory, region, state
 ### Earth
 
 **Facility**:
-A building placed in a Nation State. The First Playable has five kinds: Factory, Power Plant, Refinery, Launch Site and Research Lab.
+A building placed in a Nation State. Six kinds since version 0.03: Factory, Power Plant, Refinery, Launch Site, Research Lab and Bank.
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Cheap Industry**:

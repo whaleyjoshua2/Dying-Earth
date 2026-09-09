@@ -7,6 +7,8 @@
 # get a Launch Site on top.
 # influence (ticket #34, version 0.03): what the state adds to its controller's Allotment each turn,
 # from 2023 GDP and military spending shares; plus one for every Industry Level raised above the card.
+# gdp (ticket #35): world GDP share in tenths (2023); a controlled state makes gdp x Industry Level / 10
+# Ducats a turn, and a Bank there adds 4 x gdp / 10.
 
 [[state]]
 id = "africa"
@@ -21,6 +23,7 @@ coastal_exposure = 1
 neighbours = ["europe", "middle_east", "antarctica"]
 start_facilities = ["factory"]
 influence = 2
+gdp = 3
 
 [[state]]
 id = "antarctica"
@@ -35,6 +38,7 @@ coastal_exposure = 0
 neighbours = ["south_america", "africa", "australia"]
 start_facilities = []
 influence = 0
+gdp = 0
 
 [[state]]
 id = "asia"
@@ -49,6 +53,7 @@ coastal_exposure = 2
 neighbours = ["russia", "middle_east", "australia"]
 start_facilities = ["factory", "power_plant", "refinery"]
 influence = 7
+gdp = 30
 
 [[state]]
 id = "australia"
@@ -63,6 +68,7 @@ coastal_exposure = 2
 neighbours = ["asia", "antarctica"]
 start_facilities = ["power_plant", "factory"]
 influence = 2
+gdp = 2
 
 [[state]]
 id = "europe"
@@ -77,6 +83,7 @@ coastal_exposure = 1
 neighbours = ["north_america", "africa", "russia", "middle_east"]
 start_facilities = ["power_plant", "factory", "refinery"]
 influence = 5
+gdp = 20
 
 [[state]]
 id = "north_america"
@@ -91,6 +98,7 @@ coastal_exposure = 1
 neighbours = ["south_america", "europe", "russia"]
 start_facilities = ["refinery", "power_plant", "factory"]
 influence = 8
+gdp = 25
 
 [[state]]
 id = "south_america"
@@ -105,6 +113,7 @@ coastal_exposure = 1
 neighbours = ["north_america", "antarctica"]
 start_facilities = ["refinery"]
 influence = 2
+gdp = 5
 
 # Ticket #26. Russia: 145 million people, industry between Europe's and Africa's, gas and oil, dirty
 # per unit of industry, well schooled, vast and mostly landlocked in the game's sense.
@@ -121,6 +130,7 @@ coastal_exposure = 1
 neighbours = ["europe", "asia", "north_america"]
 start_facilities = ["refinery", "power_plant"]
 influence = 4
+gdp = 3
 
 # The Middle East: Turkey to Iran and the Arabian Peninsula, about 350 million people, oil, the
 # highest Emissions per unit of industry on the map, Gulf coasts exposed.
@@ -137,3 +147,4 @@ coastal_exposure = 1
 neighbours = ["europe", "asia", "africa"]
 start_facilities = ["refinery", "power_plant"]
 influence = 4
+gdp = 5

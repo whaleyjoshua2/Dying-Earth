@@ -45,3 +45,12 @@ name = "Barracks"
 materials = 20
 build_turns = 1
 energy_upkeep = 2
+
+# Ticket #35 (version 0.03). Makes 3 Ducats x the Body's Habitat yield.
+[[module]]
+id = "trade_post"
+name = "Trade Post"
+materials = 25
+build_turns = 1
+energy_upkeep = 2
+produces = { resource = "ducats", amount = 3 }

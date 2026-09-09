@@ -11,6 +11,8 @@ pub struct Stockpile {
     pub materials: i64,
     pub fuel: i64,
     pub energy: i64,
+    /// Version 0.03 (ticket #35).
+    pub ducats: i64,
 }
 
 /// A Nation State is neutral, controlled, or occupied (spec 8.1, 8.5).
@@ -393,7 +395,7 @@ pub struct NewGame {
 impl Game {
     pub fn new(tables: std::sync::Arc<Tables>, setup: NewGame) -> Game {
         let mut rng = ChaCha8Rng::seed_from_u64(setup.seed);
-        let start = Stockpile { materials: tables.start.materials, fuel: tables.start.fuel, energy: tables.start.energy };
+        let start = Stockpile { materials: tables.start.materials, fuel: tables.start.fuel, energy: tables.start.energy, ducats: tables.start.ducats };
         let seat = |kind: FactionKind, ai: bool| SeatState {
             kind,
             ai,

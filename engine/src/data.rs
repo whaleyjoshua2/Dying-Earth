@@ -58,6 +58,10 @@ pub struct StateCard {
     /// What the state adds to its controller's Influence Allotment each turn (ticket #34).
     #[serde(default)]
     pub influence: i64,
+    /// World GDP share in tenths of a percent-ish weight (ticket #35): a controlled state makes
+    /// gdp x Industry Level / 10 Ducats a turn, and a Bank there adds 4 x gdp / 10.
+    #[serde(default)]
+    pub gdp: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -192,6 +196,18 @@ pub struct StartCard {
     pub fuel: i64,
     pub energy: i64,
     pub research: i64,
+    #[serde(default)]
+    pub ducats: i64,
+}
+
+/// Ticket #35: what Ducats buy.
+#[derive(Debug, Clone, Deserialize)]
+pub struct DucatsCard {
+    pub per_influence: i64,
+    pub per_restoration_step: i64,
+    pub per_repair_point: i64,
+    pub bank_per_gdp_tenth: f64,
+    pub trade_post_base: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -333,6 +349,7 @@ struct FactionsFile {
     faction: Vec<FactionCard>,
     restoration: RestorationCard,
     start: StartCard,
+    ducats: DucatsCard,
 }
 
 /// Every table, loaded and checked.
@@ -350,6 +367,7 @@ pub struct Tables {
     pub factions: Vec<FactionCard>,
     pub restoration: RestorationCard,
     pub start: StartCard,
+    pub ducats: DucatsCard,
     pub climate: ClimateTable,
     pub influence: InfluenceTable,
     pub victory: VictoryTable,
@@ -400,6 +418,7 @@ impl Tables {
             factions: factions.faction,
             restoration: factions.restoration,
             start: factions.start,
+            ducats: factions.ducats,
             climate,
             influence,
             victory,

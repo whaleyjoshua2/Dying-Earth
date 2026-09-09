@@ -366,6 +366,74 @@ fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction
     assert_eq!(total, 34, "8 + 7 + 5 + 4 + 4 + 2 + 2 + 2 + 0");
 }
 
+// ---------------------------------------------------------------- #35 Ducats
+
+#[test]
+fn a_controlled_state_pays_ducats_from_gdp_times_industry_and_a_bank_adds_more() {
+    let mut g = game();
+    // Asia: gdp 30 x Industry 3 / 10 = 9 a turn for the Custodians; Europe 20 x 3 / 10 = 6 for the Prospectors.
+    assert_eq!(g.state_ducats(StateId::Asia), 9);
+    assert_eq!(g.state_ducats(StateId::Europe), 6);
+    assert_eq!(g.state_ducats(StateId::Antarctica), 0);
+    let paid = income_of(&mut g, Seat(0));
+    assert_eq!(paid.ducats, 9);
+    // A Bank in Asia adds 4 x 30 / 10 = 12 (Custodian output x1.0); in Africa (gdp 3) it would add 1.
+    g.state_mut(StateId::Asia).facilities.push(facility(FacilityKind::Bank));
+    assert_eq!(g.facility_yield(Seat(0), StateId::Asia, FacilityKind::Bank).amount, 12);
+    assert_eq!(g.facility_yield(Seat(0), StateId::Africa, FacilityKind::Bank).amount, 1);
+    assert_eq!(income_of(&mut g, Seat(0)).ducats, 21);
+    // A Trade Post follows the Habitat yield: 3 on the Moon, 4 on Mars (3 x 1.5 rounded down).
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::TradePost], 0);
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::TradePost], 0);
+    assert_eq!(g.module_yield(Seat(0), moon, ModuleKind::TradePost).amount, 3);
+    assert_eq!(g.module_yield(Seat(0), mars, ModuleKind::TradePost).amount, 4);
+    // Ducats never count toward the Extraction Total.
+    let before = g.seats[1].extraction_total;
+    g.state_mut(StateId::Europe).facilities = vec![facility(FacilityKind::Bank)];
+    income_of(&mut g, Seat(1));
+    assert_eq!(g.seats[1].extraction_total, before);
+}
+
+#[test]
+fn ducats_buy_influence_two_for_one_and_the_bought_influence_is_spendable_at_once() {
+    let mut g = game();
+    g.seats[0].stockpile.ducats = 20;
+    g.seats[0].allotment = 22;
+    let buy = Order::BuyInfluence { amount: 10 };
+    assert_eq!(g.order_cost(Seat(0), &buy).ducats, 20);
+    assert!(g.check_order(Seat(0), &[], &Order::BuyInfluence { amount: 11 }).is_err(), "22 Ducats needed, 20 held");
+    let pending = vec![buy.clone()];
+    let (_, left) = g.remaining(Seat(0), &pending);
+    assert_eq!(left, 32, "the Allotment plus the bought 10");
+    let spend = Order::Influence { target: Place::State(StateId::Africa), amount: 30 };
+    assert!(g.check_order(Seat(0), &pending, &spend).is_ok());
+    g.commit_orders(Seat(0), &[buy, spend]);
+    assert_eq!(g.seats[0].stockpile.ducats, 0);
+    assert_eq!(g.seats[0].allotment, 2);
+}
+
+#[test]
+fn ducats_pay_for_restoration_and_repairs_at_the_table_rates() {
+    let mut g = game();
+    g.seats[0].stockpile.ducats = 25;
+    g.seats[0].stockpile.energy = 0;
+    let r = Order::RestorationWithDucats { steps: 2 };
+    assert_eq!(g.order_cost(Seat(0), &r).ducats, 20);
+    g.commit_orders(Seat(0), &[r]);
+    assert!((g.climate.restoration_next - 6.0).abs() < 1e-9, "two steps of 3.0 ppm");
+    assert_eq!(g.seats[0].stockpile.ducats, 5);
+    // A repair: 5 Ducats a point, same legality as a Materials repair.
+    g.ships.push(Ship { id: ShipId(1), kind: UnitKind::Frigate, seat: Seat(0), damage: 1, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 });
+    let fix = Order::RepairWithDucats { unit: UnitRef::Ship(ShipId(1)), points: 1 };
+    assert_eq!(g.order_cost(Seat(0), &fix).ducats, 5);
+    assert!(g.check_order(Seat(0), &[], &fix).is_ok());
+    g.commit_orders(Seat(0), &[fix]);
+    g.resolution_phase();
+    assert_eq!(g.ship(ShipId(1)).unwrap().damage, 0);
+    assert_eq!(g.seats[0].stockpile.ducats, 0);
+    assert!(g.check_order(Seat(0), &[], &Order::RepairWithDucats { unit: UnitRef::Ship(ShipId(1)), points: 1 }).is_err(), "nothing to repair");
+}
+
 // ---------------------------------------------------------------- 8.5 Occupation
 
 fn occupier_in(g: &mut Game, seat_home: StateId, target: StateId) -> ArmyId {
@@ -704,7 +772,7 @@ fn income_of(g: &mut Game, seat: Seat) -> Stockpile {
     g.seats[seat.index()].stockpile.energy = 1000;
     g.income_phase();
     let after = g.seat(seat).stockpile;
-    Stockpile { materials: after.materials - before.materials, fuel: after.fuel - before.fuel, energy: after.energy - 1000 }
+    Stockpile { materials: after.materials - before.materials, fuel: after.fuel - before.fuel, energy: after.energy - 1000, ducats: after.ducats - before.ducats }
 }
 
 #[test]
@@ -971,7 +1039,7 @@ fn every_state_starts_with_its_start_facilities_and_the_faction_states_add_a_lau
         assert_eq!(have, want, "{}", card.name);
         assert_eq!(card.start_facilities.len() as u32, card.industry_level, "{}: as many as the Industry Level", card.name);
     }
-    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 80, fuel: 20, energy: 20 });
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 80, fuel: 20, energy: 20, ducats: 0 });
 }
 
 #[test]

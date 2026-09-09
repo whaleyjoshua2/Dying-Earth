@@ -45,6 +45,16 @@ build_turns = 2
 energy_upkeep = 2
 emissions = 0.0
 
+# Ticket #35 (version 0.03). Its output is 4 x the state's gdp / 10 Ducats; `amount` here is that 4.
+[[facility]]
+id = "bank"
+name = "Bank"
+materials = 25
+build_turns = 1
+energy_upkeep = 2
+produces = { resource = "ducats", amount = 4 }
+emissions = 0.0
+
 [industry_level]
 materials = 30
 materials_cheap_industry = 15

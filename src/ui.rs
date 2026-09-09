@@ -347,6 +347,8 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             ui.separator();
             ui.label(RichText::new(format!("Energy {} ({})", left.energy, signed(inc.energy))).strong()).on_hover_text(sources(dying_earth_engine::Resource::Energy));
             ui.separator();
+            ui.label(RichText::new(format!("Ducats {} ({})", left.ducats, signed(inc.ducats))).strong()).on_hover_text(sources(dying_earth_engine::Resource::Ducats));
+            ui.separator();
             let research = match game.research.current {
                 Some(t) => format!("Research {} / {} toward {}", game.research.progress, game.tables.tech(t).cost, game.tables.tech(t).name),
                 None => format!("Research: no Tech chosen ({} waiting)", game.research.unallocated),
@@ -797,6 +799,9 @@ fn order_text(game: &Game, o: &Order) -> String {
         },
         Order::Influence { target, amount } => format!("{} Influence on {}", amount, game.place_name(*target)),
         Order::Restoration { steps } => format!("Restoration: {} Energy", steps * 10),
+        Order::BuyInfluence { amount } => format!("Buy {} Influence with Ducats", amount),
+        Order::RestorationWithDucats { steps } => format!("Restoration: {} step(s) paid in Ducats", steps),
+        Order::RepairWithDucats { unit, points } => format!("Repair {} point(s) on {} with Ducats", points, match unit { UnitRef::Ship(s) => s.to_string(), UnitRef::Army(a) => a.to_string() }),
     }
 }
 
@@ -858,6 +863,15 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
             ui.label(RichText::new(e.0).weak());
         }
     });
+    ui.horizontal(|ui| {
+        // Ticket #35: Ducats buy Influence for this turn's Allotment.
+        let buy = Order::BuyInfluence { amount: view.influence_amount };
+        let cost = game.order_cost(Seat(0), &buy).ducats;
+        let ok = game.check_order(Seat(0), &session.pending, &buy);
+        if ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Buy {} Influence for {} Ducats", view.influence_amount, cost))).on_hover_text("Adds to this turn's Allotment, spendable at once on any target").clicked() {
+            actions.push(Action::Place(buy));
+        }
+    });
     let threshold = game.influence_threshold(target);
     for seat in Seat::ALL {
         let _ = seat;
@@ -894,6 +908,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     let fac_em: f64 = st.facilities.iter().filter(|f| f.online).map(|f| game.tables.facility(f.kind).emissions * mult).sum();
     ui.label(format!("Population {:.1} (hundreds of millions), Industry Level {}, leans {:?}", st.population, st.industry_level, card.resource_lean));
     ui.label(format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid)));
+    ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 10); a Bank here would add {}", card.gdp, game.state_ducats(sid), (game.tables.facility(FacilityKind::Bank).produces.as_ref().map(|p| p.amount).unwrap_or(0) * card.gdp) / 10));
     ui.label(format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.tables.climate.population_emissions_per_hundred_million * st.population * mult));
     ui.label(format!("Build slots: {} used of {} ({} free); Education Level {}", game.slots_used(sid), game.build_slots(sid), game.free_slots(sid), card.education_level));
     if st.lost_slots > 0 {
@@ -954,6 +969,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 });
                 if a.damage > 0 {
                     cost_button(ui, game, &session.pending, Order::Repair { unit: UnitRef::Army(a.id), points: a.damage }, "Repair fully", actions);
+                    cost_button(ui, game, &session.pending, Order::RepairWithDucats { unit: UnitRef::Army(a.id), points: a.damage }, "Repair fully with Ducats", actions);
                 }
             }
         }
@@ -964,11 +980,15 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     if game.kind(Seat(0)) == FactionKind::Custodians && mine {
         ui.separator();
         ui.horizontal(|ui| {
-            ui.label("Restoration steps (10 Energy each):");
+            ui.label("Restoration steps:");
             ui.add(egui::DragValue::new(&mut view.restoration_steps).range(1..=20));
             let order = Order::Restoration { steps: view.restoration_steps };
-            if ui.add_enabled(game.check_order(Seat(0), &session.pending, &order).is_ok(), egui::Button::new("Buy")).clicked() {
+            if ui.add_enabled(game.check_order(Seat(0), &session.pending, &order).is_ok(), egui::Button::new(format!("Buy for {} Energy", game.order_cost(Seat(0), &order).energy))).clicked() {
                 actions.push(Action::Place(order));
+            }
+            let with_ducats = Order::RestorationWithDucats { steps: view.restoration_steps };
+            if ui.add_enabled(game.check_order(Seat(0), &session.pending, &with_ducats).is_ok(), egui::Button::new(format!("Buy for {} Ducats", game.order_cost(Seat(0), &with_ducats).ducats))).clicked() {
+                actions.push(Action::Place(with_ducats));
             }
         });
     }
@@ -1023,6 +1043,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         for a in &my_armies {
             if a.damage > 0 {
                 cost_button(ui, game, &session.pending, Order::Repair { unit: UnitRef::Army(a.id), points: a.damage }, "Repair Army fully", actions);
+                cost_button(ui, game, &session.pending, Order::RepairWithDucats { unit: UnitRef::Army(a.id), points: a.damage }, "Repair Army fully with Ducats", actions);
             }
         }
     }
@@ -1172,6 +1193,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         }
         if s.damage > 0 {
             cost_button(ui, game, &session.pending, Order::Repair { unit: UnitRef::Ship(s.id), points: s.damage }, "Repair fully", actions);
+            cost_button(ui, game, &session.pending, Order::RepairWithDucats { unit: UnitRef::Ship(s.id), points: s.damage }, "Repair fully with Ducats", actions);
         }
     }
     if body != BodyId::Earth {

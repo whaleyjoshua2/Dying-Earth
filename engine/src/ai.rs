@@ -320,7 +320,7 @@ impl Game {
             if free > 0 {
                 for fk in FacilityKind::ALL {
                     let (cat, mut base) = match fk {
-                        FacilityKind::Factory | FacilityKind::PowerPlant | FacilityKind::Refinery => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
+                        FacilityKind::Factory | FacilityKind::PowerPlant | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                         FacilityKind::ResearchLab => (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab)),
                         FacilityKind::LaunchSite => {
                             if has_launch {
@@ -374,7 +374,7 @@ impl Game {
             let threat = if self.enemy_present_or_inbound(seat, col.body) || self.enemy_army_near(seat, Place::Colony(cid)) { m.threat } else { 1.0 };
             for mk in ModuleKind::ALL {
                 let (cat, mut base) = match mk {
-                    ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
+                    ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery | ModuleKind::TradePost => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                     ModuleKind::Habitat => (Cat::Habitat, self.base_weight(seat, Cat::Habitat)),
                     ModuleKind::Shipyard => {
                         if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
@@ -450,10 +450,18 @@ impl Game {
             let base = self.base_weight(seat, Cat::Influence) * (1.0 - 0.15 * rank as f64).max(0.3);
             let opp = if needed - have <= step { m.opportunity } else { 1.0 };
             let denial = if kind == FactionKind::Custodians && rival_near && self.place_control(*target).controller() == Some(seat.other()) { m.denial } else { 1.0 };
-            let copies = (allotment / step).max(0);
+            let bought = if self.tables.ducats.per_influence > 0 { self.seat(seat).stockpile.ducats / self.tables.ducats.per_influence } else { 0 };
+            let copies = ((allotment + bought) / step).max(0);
             for _ in 0..copies {
                 push(vec![Order::Influence { target: *target, amount: step }], Cat::Influence, base, 1.0, denial, 1.0, opp, format!("spend {} Influence on {}", step, self.place_name(*target)), None);
             }
+        }
+        // Buy Influence with Ducats (ticket #35), in units of the step, weighted like Influence itself.
+        let ducats = self.seat(seat).stockpile.ducats;
+        let per = self.tables.ducats.per_influence;
+        let buys = if per > 0 { ducats / (per * step) } else { 0 };
+        for _ in 0..buys {
+            push(vec![Order::BuyInfluence { amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence) * 0.9, 1.0, 1.0, 1.0, 1.0, format!("buy {} Influence for {} Ducats", step, per * step), None);
         }
         // Hold own places where a rival's standing approaches yours (ticket #33: spending raises your standing).
         let mut owned: Vec<Place> = self.controlled_states(seat).into_iter().map(Place::State).collect();
