@@ -2,3 +2,4 @@
 /prototype/*/target
 /simulate-*.log
 /.claude/
+/dist/
