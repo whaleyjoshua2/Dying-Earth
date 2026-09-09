@@ -29,3 +29,27 @@ its view; "no order" marked on any Ship stack or Army that has nothing pending t
 clears a selection and brings the roster back.
 
 ![The roster at turn 9: a Colony Ship in transit, three Standing Armies with no order, three states](roster.png)
+
+## #24: start buildings
+
+Decided by the designer: every Nation State starts with as many Facilities as its Industry Level,
+chosen by its Resource Lean (Materials: Factory, Power Plant, Refinery; Energy: Power Plant, Factory,
+Refinery; Fuel: Refinery, Power Plant, Factory); they come with the state whoever takes it; the
+Faction start states add their Launch Site; the Stockpile starts at 80 Materials rather than 60. A
+Facility nobody directs stands idle: it makes nothing and emits nothing. All of it is one row per
+state in `nation_states.toml` and one number in `factions.toml`.
+
+![Asia at turn 1 with its Factory, Power Plant, Refinery and Launch Site](start-buildings.png)
+
+Twenty seeds per pairing afterwards, against the first build's numbers in brackets:
+
+| | Custodians v Prospectors | Prospectors v Prospectors | Prospectors v Custodians |
+| --- | --- | --- | --- |
+| First Colony | turn 7 or 8 (was 10 to 12) | turn 7 or 8 (none) | turn 7 or 8 (10 to 12) |
+| Buildings per Faction | 5 to 8 (5 to 6 v 4) | 3 to 9 (2 to 4) | 3 to 12 (2 to 8) |
+| Colonists off Earth | mostly 4 v 4 (4 v 0) | mostly 4 v 4 (0) | 4 v 4 or 4 v 8 |
+| Outcome | Collapse, turn 10 or 11 (no Collapse) | Collapse, turn 9 to 11 (10 or 11) | Collapse, turn 10 or 11 (4 of 20) |
+
+Two anchors moved toward their marks and one moved away: with three emitting Facilities per Faction
+from turn one, the Temperature crosses +3.0 by turn 10 or 11 in every game. Reported, not retuned:
+the CO2 clock is ticket #27's question, and it now has to allow for this.

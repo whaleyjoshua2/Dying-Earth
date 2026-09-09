@@ -77,6 +77,10 @@ impl Game {
             let m = mult(st.control.director());
             b.state_industry += card.baseline_emissions * st.industry_level as f64 * m;
             b.population += c.population_emissions_per_hundred_million * st.population * pop_mult * m;
+            // A Facility nobody directs stands idle: it makes nothing and emits nothing (ticket #24).
+            if st.control.director().is_none() {
+                continue;
+            }
             for f in &st.facilities {
                 if !f.online {
                     continue;

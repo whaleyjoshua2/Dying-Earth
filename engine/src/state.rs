@@ -400,7 +400,7 @@ impl Game {
                 population: c.population,
                 industry_level: c.industry_level,
                 control: Control::Neutral,
-                facilities: Vec::new(),
+                facilities: c.start_facilities.iter().map(|k| Facility { kind: *k, online: true, offline_until_resolution: false }).collect(),
                 queue: Vec::new(),
                 lost_slots: 0,
                 thresholds_fired: vec![false; tables.climate.sea_level_thresholds.len()],

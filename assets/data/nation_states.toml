@@ -1,5 +1,8 @@
 # Spec section 4.2. Population in hundreds of millions. Education Level from UN 2023 schooling data.
 # Neighbours are symmetric; each edge is listed on both states.
+# start_facilities (version 0.02, ticket #24): what stands when the game begins, as many as the Industry
+# Level, chosen by the Resource Lean. They come with the state whoever takes it. The Faction start states
+# get a Launch Site on top.
 
 [[state]]
 id = "africa"
@@ -12,6 +15,7 @@ education_level = 0.8
 size = 3
 coastal_exposure = 1
 neighbours = ["europe", "asia", "antarctica"]
+start_facilities = ["factory"]
 
 [[state]]
 id = "antarctica"
@@ -24,6 +28,7 @@ education_level = 1.0
 size = 2
 coastal_exposure = 0
 neighbours = ["south_america", "africa", "australia"]
+start_facilities = []
 
 [[state]]
 id = "asia"
@@ -36,6 +41,7 @@ education_level = 0.9
 size = 4
 coastal_exposure = 2
 neighbours = ["north_america", "europe", "africa", "australia"]
+start_facilities = ["factory", "power_plant", "refinery"]
 
 [[state]]
 id = "australia"
@@ -48,6 +54,7 @@ education_level = 1.35
 size = 2
 coastal_exposure = 2
 neighbours = ["asia", "antarctica"]
+start_facilities = ["power_plant", "factory"]
 
 [[state]]
 id = "europe"
@@ -60,6 +67,7 @@ education_level = 1.45
 size = 3
 coastal_exposure = 1
 neighbours = ["north_america", "asia", "africa"]
+start_facilities = ["power_plant", "factory", "refinery"]
 
 [[state]]
 id = "north_america"
@@ -72,6 +80,7 @@ education_level = 1.5
 size = 3
 coastal_exposure = 1
 neighbours = ["south_america", "europe", "asia"]
+start_facilities = ["refinery", "power_plant", "factory"]
 
 [[state]]
 id = "south_america"
@@ -84,3 +93,4 @@ education_level = 1.1
 size = 3
 coastal_exposure = 1
 neighbours = ["north_america", "antarctica"]
+start_facilities = ["refinery"]

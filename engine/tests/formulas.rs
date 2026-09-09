@@ -10,8 +10,18 @@ fn tables() -> Arc<Tables> {
     Arc::new(Tables::load(&default_data_dir()).expect("tables load"))
 }
 
-/// A player Custodian in Asia against an AI Prospector, before the first turn runs.
+/// A player Custodian in Asia against an AI Prospector, before the first turn runs, on a bare board:
+/// the start Facilities of ticket #24 are stripped (Launch Sites stay) so each test places exactly
+/// the buildings it reasons about. `fresh()` keeps the real start.
 fn game() -> Game {
+    let mut g = fresh();
+    for s in &mut g.states {
+        s.facilities.retain(|f| f.kind == FacilityKind::LaunchSite);
+    }
+    g
+}
+
+fn fresh() -> Game {
     Game::new(tables(), NewGame { seed: 7, seats: [(FactionKind::Custodians, false), (FactionKind::Prospectors, true)], player_start: StateId::Asia })
 }
 
@@ -690,6 +700,48 @@ fn building_yields_on_the_card_equal_what_income_pays() {
     let e = g.emissions_now();
     let asia_share = e.factories + e.power_plants + e.refineries - g.facility_yield(Seat(0), StateId::Africa, FacilityKind::Factory).emissions;
     assert!((card - asia_share).abs() < 1e-9, "card {card} climate {asia_share}");
+}
+
+// ---------------------------------------------------------------- #24 start buildings
+
+#[test]
+fn every_state_starts_with_its_start_facilities_and_the_faction_states_add_a_launch_site() {
+    let g = fresh();
+    for sid in StateId::ALL {
+        let card = g.tables.state(sid);
+        let have: Vec<FacilityKind> = g.state(sid).facilities.iter().map(|f| f.kind).collect();
+        let mut want = card.start_facilities.clone();
+        if g.state(sid).control.controller().is_some() {
+            want.push(FacilityKind::LaunchSite);
+        }
+        assert_eq!(have, want, "{}", card.name);
+        assert_eq!(card.start_facilities.len() as u32, card.industry_level, "{}: as many as the Industry Level", card.name);
+    }
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 80, fuel: 20, energy: 20 });
+}
+
+#[test]
+fn idle_facilities_in_a_neutral_state_make_nothing_and_emit_nothing() {
+    let mut g = fresh();
+    // Africa is neutral and starts with a Factory.
+    assert_eq!(g.state(StateId::Africa).control, Control::Neutral);
+    assert!(g.state(StateId::Africa).facilities.iter().any(|f| f.kind == FacilityKind::Factory));
+    let before = g.emissions_now().factories;
+    g.state_mut(StateId::Africa).control = Control::Controlled(Seat(0));
+    let after = g.emissions_now().factories;
+    assert!(after > before, "the Factory emits once somebody directs it: {before} -> {after}");
+}
+
+#[test]
+fn start_income_flows_from_turn_one() {
+    let mut g = fresh();
+    g.start();
+    let s = g.seat(Seat(0));
+    assert!(s.income_last_turn.materials > 0, "Materials income on turn one: {:?}", s.income_last_turn);
+    assert!(s.income_last_turn.fuel > 0, "Fuel income on turn one: {:?}", s.income_last_turn);
+    // Asia's start (Factory, Power Plant, Refinery and the Launch Site) pays 7 Energy against 6 made.
+    assert_eq!(s.income_last_turn.energy, -1, "{:?}", s.income_last_turn);
+    assert!(s.stockpile.energy >= 15, "no Energy starvation at the start: {:?}", s.stockpile);
 }
 
 // ---------------------------------------------------------------- the whole loop holds together

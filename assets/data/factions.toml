@@ -29,7 +29,8 @@ energy_per_step = 10
 sink_per_step = 3.0
 
 [start]
-materials = 60
+# Raised from 60 on ticket #24, since income now flows from turn one.
+materials = 80
 fuel = 20
 energy = 20
 research = 0

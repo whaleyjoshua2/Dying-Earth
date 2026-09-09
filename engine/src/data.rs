@@ -52,6 +52,9 @@ pub struct StateCard {
     pub size: u32,
     pub coastal_exposure: u32,
     pub neighbours: Vec<StateId>,
+    /// What stands when the game begins (ticket #24); comes with the state whoever takes it.
+    #[serde(default)]
+    pub start_facilities: Vec<FacilityKind>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -415,6 +418,10 @@ impl Tables {
             }
             if s.population < 0.0 || s.education_level <= 0.0 {
                 return Err(err("nation_states.toml", format!("row {}: population or education out of range", s.name)));
+            }
+            // A Launch Site is added for a Faction start state, so leave one slot for it.
+            if s.start_facilities.len() as u32 + 1 > s.size + s.industry_level {
+                return Err(err("nation_states.toml", format!("row {}: {} start_facilities do not fit its {} build slots with a Launch Site", s.name, s.start_facilities.len(), s.size + s.industry_level)));
             }
         }
         for t in &self.techs {
