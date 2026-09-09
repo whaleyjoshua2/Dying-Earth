@@ -49,8 +49,16 @@ The 3D view of the solar system, where Bodies, Ship stacks, transits and Orbital
 _Avoid_: space view, orbital map, star map
 
 **Event**:
-An unplanned occurrence that interrupts a turn — a solar storm, an equipment failure, a discovery.
+An unplanned occurrence drawn from the Event Deck after orders are committed and taking effect during Resolution — a solar storm, an equipment failure, a discovery. It can never directly break a Victory Condition.
 _Avoid_: incident, crisis, card
+
+**Event Deck**:
+The deck one card is drawn from each turn, holding Events and Calm Cards. Every tenth of a degree the Temperature rises, a Calm Card is permanently swapped for a Climate Event, so the danger in the deck is countable.
+_Avoid_: event pool, random table, encounter deck
+
+**Calm Card**:
+A card in the Event Deck on which nothing happens. The number remaining is how much quiet is left in the game.
+_Avoid_: blank, null card, nothing card
 
 **Tech**:
 An advance on the Tech Tree that changes an output, a capacity, an upkeep, a Ship strength, an Influence cost or how much a source emits. When a Tech completes, every Faction has it.
