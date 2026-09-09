@@ -19,3 +19,13 @@ Resource Lean inside the shared function stayed green, because card and Income s
 that mutation is caught by the Deep Mining test instead.
 
 The hover text cannot be captured off-screen, so it was checked by reading, not by picture.
+
+## #23: the roster
+
+The designer's "liner for units and ships the player controls", decided on the ticket: the side
+panel's default content when nothing is selected, listing Ship stacks (and Ships in transit), Armies,
+Colonies and Nation States the player directs; each row a button that selects the thing and jumps to
+its view; "no order" marked on any Ship stack or Army that has nothing pending this turn. Escape
+clears a selection and brings the roster back.
+
+![The roster at turn 9: a Colony Ship in transit, three Standing Armies with no order, three states](roster.png)

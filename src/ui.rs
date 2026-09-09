@@ -590,6 +590,8 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                     if let Some(e) = &session.last_error {
                         ui.colored_label(Color32::LIGHT_RED, e);
                     }
+                    ui.separator();
+                    roster(ui, session, game, view);
                 }
                 Selection::State(sid) => state_panel(ui, session, game, view, sid, actions),
                 Selection::Colony(cid) => colony_panel(ui, session, game, view, cid, actions),
@@ -615,6 +617,122 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             }
         });
     });
+}
+
+/// The roster (#23): every Ship stack, Army, Colony and Nation State the player directs, each row a
+/// button that selects it and jumps to its view, with a mark on anything that has no order this turn.
+fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
+    ui.label(RichText::new("Your roster").size(18.0).strong());
+    ui.label(RichText::new("Click a row to select it and go there. \"no order\" marks what still waits.").weak());
+    let pending = &session.pending;
+    let mut jump: Option<(View, Selection)> = None;
+    // Ships, one row per stack, then those in transit.
+    ui.label(RichText::new("Ships").strong());
+    let mut any_ship = false;
+    for body in BodyId::ALL {
+        let ships: Vec<&Ship> = game.ships.iter().filter(|s| s.seat == Seat(0) && s.at == ShipAt::Body(body)).collect();
+        if ships.is_empty() {
+            continue;
+        }
+        any_ship = true;
+        let ordered = ships.iter().all(|s| {
+            pending.iter().any(|o| matches!(o, Order::Transit { ship, .. } | Order::Load { ship, .. } | Order::Unload { ship, .. } | Order::Repair { unit: UnitRef::Ship(ship), .. } if *ship == s.id))
+        }) || pending.iter().any(|o| matches!(o, Order::ShipStance { body: b, .. } if *b == body));
+        let mut kinds: Vec<String> = ships.iter().map(|s| s.kind.name().to_string()).collect();
+        kinds.sort();
+        kinds.dedup();
+        let cargo: u32 = ships.iter().map(|s| s.colonists).sum();
+        let armies = ships.iter().filter(|s| s.army.is_some()).count();
+        let mut text = format!("{} at {}: {} (strength {})", ships.len(), game.tables.body(body).name, kinds.join(", "), game.ship_stack_strength(Seat(0), body));
+        if cargo > 0 {
+            text.push_str(&format!(", {cargo} Colonists aboard"));
+        }
+        if armies > 0 {
+            text.push_str(&format!(", {armies} Army aboard"));
+        }
+        if !ordered {
+            text.push_str("  - no order");
+        }
+        if ui.button(text).clicked() {
+            jump = Some((View::Solar, Selection::ShipStack(body, Seat(0))));
+        }
+    }
+    for s in game.ships.iter().filter(|s| s.seat == Seat(0)) {
+        if let ShipAt::Transit { to, turns_left, .. } = s.at {
+            any_ship = true;
+            let text = format!("{} in transit to {}, {} turn(s) left", s.kind.name(), game.tables.body(to).name, turns_left);
+            if ui.button(text).clicked() {
+                jump = Some((View::Solar, Selection::None));
+            }
+        }
+    }
+    if !any_ship {
+        ui.label(RichText::new("  none; a Launch Site builds them").weak());
+    }
+    // Armies.
+    ui.label(RichText::new("Armies").strong());
+    let mut any_army = false;
+    for a in game.armies.iter().filter(|a| game.army_seat(a) == Some(Seat(0)) && !game.army_stands_down(a)) {
+        any_army = true;
+        let ordered = pending.iter().any(|o| match o {
+            Order::MoveArmy { army, .. } | Order::Repair { unit: UnitRef::Army(army), .. } | Order::Load { army: Some(army), .. } => *army == a.id,
+            Order::ArmyStance { place, .. } => a.at == ArmyAt::Place(*place),
+            _ => false,
+        });
+        let (where_, target) = match a.at {
+            ArmyAt::Place(Place::State(s)) => (game.tables.state(s).name.clone(), Some((View::Surface(BodyId::Earth), Selection::State(s)))),
+            ArmyAt::Place(Place::Colony(c)) => (game.place_name(Place::Colony(c)), game.colony(c).map(|col| (View::Surface(col.body), Selection::Colony(c)))),
+            ArmyAt::Aboard(ship) => (format!("aboard {ship}"), game.ship(ship).map(|s| match s.at { ShipAt::Body(b) => (View::Solar, Selection::ShipStack(b, Seat(0))), _ => (View::Solar, Selection::None) })),
+        };
+        let mut text = format!("{} at {}: strength {}, damage {}", if a.standing { "Standing Army" } else { "Army" }, where_, game.army_strength(a), a.damage);
+        if !ordered && !matches!(a.at, ArmyAt::Aboard(_)) {
+            text.push_str("  - no order");
+        }
+        if ui.button(text).clicked() {
+            jump = target;
+        }
+    }
+    if !any_army {
+        ui.label(RichText::new("  none").weak());
+    }
+    // Colonies.
+    ui.label(RichText::new("Colonies").strong());
+    let mut any_colony = false;
+    for c in game.colonies.iter().filter(|c| c.control.director() == Some(Seat(0))) {
+        any_colony = true;
+        let building = c.queue.len();
+        let text = format!("{}: {} Colonists, {} Modules{}", game.place_name(Place::Colony(c.id)), c.colonists, c.modules.len(), if building > 0 { format!(", {building} building") } else { String::new() });
+        if ui.button(text).clicked() {
+            jump = Some((View::Surface(c.body), Selection::Colony(c.id)));
+        }
+    }
+    if !any_colony {
+        ui.label(RichText::new("  none; a Colony Ship founds one").weak());
+    }
+    // Nation States.
+    ui.label(RichText::new("Nation States").strong());
+    for sid in game.directed_states(Seat(0)) {
+        let st = game.state(sid);
+        let building = st.queue.len();
+        let text = format!("{}: {} Facilities, {} free slot(s){}", game.tables.state(sid).name, st.facilities.len(), game.free_slots(sid), if building > 0 { format!(", {building} building") } else { String::new() });
+        if ui.button(text).clicked() {
+            jump = Some((View::Surface(BodyId::Earth), Selection::State(sid)));
+        }
+    }
+    if let Some((v, sel)) = jump {
+        match v {
+            View::Solar => {
+                view.view = View::Solar;
+            }
+            View::Surface(b) => {
+                if view.view != View::Surface(b) {
+                    view.enter_surface(b);
+                }
+            }
+        }
+        view.selection = sel;
+        view.attack_preview = false;
+    }
 }
 
 fn order_text(game: &Game, o: &Order) -> String {
