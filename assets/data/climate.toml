@@ -1,0 +1,14 @@
+# Spec section 11. The Climate Model's constants.
+
+starting_co2 = 420.0
+base_temperature = 1.2
+degrees_per_ppm_step = 0.5
+ppm_step = 40.0
+natural_sink = 6.0
+collapse_line = 3.0
+temperature_lag_fraction = 0.5
+population_growth = 0.01
+population_loss_per_tenth_degree = 0.0015
+population_emissions_per_hundred_million = 0.1
+launch_emissions = 2.0
+sea_level_thresholds = [1.8, 2.3, 2.8]

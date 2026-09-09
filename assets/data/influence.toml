@@ -1,0 +1,9 @@
+# Spec section 8.3 and 8.5.
+allotment_base = 10
+allotment_per_state = 3
+state_threshold_base = 20
+state_threshold_per_size = 10
+colony_threshold_per_colonist = 10
+decay = 2
+occupation_turns = 3
+destruction_chance = 0.25

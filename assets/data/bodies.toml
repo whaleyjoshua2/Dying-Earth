@@ -1,0 +1,35 @@
+# Spec section 4.1. Yields multiply what a Module produces, never what it costs.
+# Transit and fuel are from Earth; Moon-to-Mars transits use the Mars figures.
+
+[[body]]
+id = "earth"
+name = "Earth"
+colony_slots = 0
+transit_turns = 0
+transit_fuel = 0
+mine_yield = 1.0
+generator_yield = 1.0
+refinery_yield = 1.0
+habitat_yield = 1.0
+
+[[body]]
+id = "moon"
+name = "The Moon"
+colony_slots = 4
+transit_turns = 1
+transit_fuel = 6
+mine_yield = 1.5
+generator_yield = 1.25
+refinery_yield = 0.5
+habitat_yield = 1.0
+
+[[body]]
+id = "mars"
+name = "Mars"
+colony_slots = 6
+transit_turns = 4
+transit_fuel = 20
+mine_yield = 1.25
+generator_yield = 0.75
+refinery_yield = 1.5
+habitat_yield = 1.5

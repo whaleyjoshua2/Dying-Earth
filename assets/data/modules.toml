@@ -1,0 +1,47 @@
+# Spec section 5.2. Built in a Colony; no slot limit; never emit.
+
+[[module]]
+id = "mine"
+name = "Mine"
+materials = 20
+build_turns = 1
+energy_upkeep = 3
+produces = { resource = "materials", amount = 4 }
+
+[[module]]
+id = "generator"
+name = "Generator"
+materials = 25
+build_turns = 2
+energy_upkeep = 0
+produces = { resource = "energy", amount = 5 }
+
+[[module]]
+id = "refinery"
+name = "Refinery"
+materials = 20
+build_turns = 1
+energy_upkeep = 3
+produces = { resource = "fuel", amount = 3 }
+
+[[module]]
+id = "habitat"
+name = "Habitat"
+materials = 25
+build_turns = 1
+energy_upkeep = 2
+holds_colonists = 4
+
+[[module]]
+id = "shipyard"
+name = "Shipyard"
+materials = 35
+build_turns = 2
+energy_upkeep = 4
+
+[[module]]
+id = "barracks"
+name = "Barracks"
+materials = 20
+build_turns = 1
+energy_upkeep = 2

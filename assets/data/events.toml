@@ -1,0 +1,107 @@
+# Spec section 13. Twenty cards: one of each Event plus eight Calm Cards.
+# Climate cards scale by 1 + (Temperature - 1.2) / 2. Swap rate: one Calm Card per full 0.2 C above 1.2.
+
+calm_cards = 8
+climate_swap_degrees = 0.2
+breakthrough_research = 15
+breakthrough_research_public_science = 25
+discovery_multiplier = 2.0
+discovery_multiplier_with_tech = 3.0
+discovery_turns = 2
+heatwave_loss = 0.05
+heatwave_loss_green_consensus = 0.025
+wildfire_emissions = 2.0
+
+[[event]]
+id = "solar_storm"
+name = "Solar Storm"
+kind = "solar"
+target = "everyone"
+effect = "No transit advances this turn"
+blunted_by = "efficient_transit"
+
+[[event]]
+id = "radiation_surge"
+name = "Radiation Surge"
+kind = "solar"
+target = "everyone"
+effect = "Every Ship in transit takes 1 damage"
+blunted_by = "hardened_hulls"
+
+[[event]]
+id = "comms_blackout"
+name = "Comms Blackout"
+kind = "solar"
+target = "everyone"
+effect = "Every stack fights as if its Stance were Hold"
+blunted_by = "public_science"
+
+[[event]]
+id = "equipment_failure"
+name = "Equipment Failure"
+kind = "failure"
+target = "faction"
+effect = "One build due this turn completes next turn instead"
+
+[[event]]
+id = "launch_failure"
+name = "Launch Failure"
+kind = "failure"
+target = "faction"
+effect = "One Ship due this turn is destroyed, no refund"
+blunted_by = "clean_propellant"
+
+[[event]]
+id = "grid_failure"
+name = "Grid Failure"
+kind = "failure"
+target = "colony"
+effect = "Its Modules are offline until the next Resolution"
+blunted_by = "closed_loop_colonies"
+
+[[event]]
+id = "rich_seam"
+name = "Rich Seam"
+kind = "discovery"
+target = "body"
+effect = "Its Mines produce x2 for two turns"
+blunted_by = "deep_mining"
+
+[[event]]
+id = "ice_deposit"
+name = "Ice Deposit"
+kind = "discovery"
+target = "body"
+effect = "Its Refineries produce x2 for two turns"
+blunted_by = "automated_refining"
+
+[[event]]
+id = "breakthrough"
+name = "Breakthrough"
+kind = "discovery"
+target = "tech"
+effect = "+15 Research to the Tech under research"
+blunted_by = "public_science"
+
+[[event]]
+id = "heatwave"
+name = "Heatwave"
+kind = "climate"
+target = "nation_state"
+effect = "Population -5% now"
+blunted_by = "green_consensus"
+
+[[event]]
+id = "wildfire"
+name = "Wildfire"
+kind = "climate"
+target = "nation_state"
+effect = "One Facility offline until next Resolution; +2.0 Emissions next turn"
+blunted_by = "clean_manufacturing"
+
+[[event]]
+id = "storm_surge"
+name = "Storm Surge"
+kind = "climate"
+target = "exposed_nation_state"
+effect = "Its next sea-level threshold applies now"

@@ -1,0 +1,52 @@
+# Spec section 5.3. Ships and Armies share one stat line shape.
+
+[[unit]]
+id = "colony_ship"
+name = "Colony Ship"
+materials = 30
+build_turns = 1
+energy_upkeep = 1
+strength = 0
+hit_points = 3
+pursuit = 0
+carries_colonists = 4
+carries_army = true
+
+[[unit]]
+id = "frigate"
+name = "Frigate"
+materials = 25
+build_turns = 1
+energy_upkeep = 2
+strength = 3
+hit_points = 4
+pursuit = 4
+carries_colonists = 0
+carries_army = false
+
+[[unit]]
+id = "battleship"
+name = "Battleship"
+materials = 50
+build_turns = 2
+energy_upkeep = 4
+strength = 7
+hit_points = 8
+pursuit = 1
+carries_colonists = 0
+carries_army = true
+
+[[unit]]
+id = "army"
+name = "Army"
+materials = 25
+build_turns = 1
+energy_upkeep = 2
+strength = 4
+hit_points = 5
+pursuit = 2
+carries_colonists = 0
+carries_army = false
+
+[repair]
+materials_per_point = 5
