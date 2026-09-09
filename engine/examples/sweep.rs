@@ -10,8 +10,8 @@ fn main() {
     let seeds: u64 = std::env::args().nth(1).and_then(|a| a.parse().ok()).unwrap_or(20);
     let base = Tables::load(&default_data_dir()).expect("tables");
     println!("sink  step | collapses/{} | collapse turns (median, min..max) | temp at end (median)", seeds);
-    for sink in [6.0, 7.0, 8.0] {
-        for step in [65.0, 70.0, 75.0, 80.0, 85.0, 90.0] {
+    for sink in [6.0] {
+        for step in [90.0, 100.0, 110.0, 120.0, 130.0, 140.0] {
             let mut t = base.clone();
             t.climate.natural_sink = sink;
             t.climate.ppm_step = step;

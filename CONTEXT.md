@@ -5,7 +5,7 @@ A single-player, turn-based strategy game about colonizing the solar system befo
 ## Language
 
 **First Playable**:
-The twelve-turn version of the game covering only the Moon and Mars, with three resources and two factions. The destination of the current effort is a written specification for it.
+The small version of the game covering only the Moon and Mars, with three resources and two factions: twelve turns as first built, twenty-four since version 0.02. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`.
 _Avoid_: slice, MVP, demo, v1, prototype
 
 **Faction**:
@@ -129,7 +129,7 @@ A person counted in the population of a Colony or Nation State. Colonists are ca
 _Avoid_: settler, crew, worker, population resource
 
 **Nation State**:
-One of seven regions of the Earth Map mirroring the continents, Antarctica included, that a Faction can control and build in. Each carries a population, an Industry Level, a Resource Lean, a Baseline Emissions figure, an Education Level and a Standing Army. Armies move only between neighbouring continents.
+One of nine regions of the Earth Map (seven continents with Antarctica, plus Russia and the Middle East since version 0.02) that a Faction can control and build in. Each carries a population, an Industry Level, a Resource Lean, a Baseline Emissions figure, an Education Level and a Standing Army. Armies move only between neighbouring continents.
 _Avoid_: country, nation, territory, region, state
 
 ### Earth

@@ -126,3 +126,36 @@ after looking at the preview.
 ![The nine-state mask](nine-states-mask.png)
 
 ![Russia's card at turn 7, the Middle East labelled beside Africa](russia-card.png)
+
+## #28: the amendments written, the clock re-run, the pictures, the pull request
+
+The six decisions are written into [`docs/spec/version-0.02.md`](../../spec/version-0.02.md),
+section by section with the numbers; `first-playable.md` carries a line pointing at it, and
+`CONTEXT.md` now says nine Nation States and twenty-four turns.
+
+**The clock had to be re-run.** #27 tuned the ppm step to 80 with seven Nation States. #26 then added
+Russia and the Middle East, each starting with a Refinery and a Power Plant, and the first
+twenty-seed run of this ticket collapsed every game on turns 13 to 17. The target and the knobs were
+#27's decision, so the sweep was run again with nine states:
+
+| Sink 6.0, step | 90 | 100 | 110 | 120 | 130 | 140 |
+| --- | --- | --- | --- | --- | --- | --- |
+| collapses of 20, median turn | **17, 16 (15..21)** | 10, 19 (17..24) | 7, 21 | 4, 22 | 1, 24 | 0 |
+
+The step is now **90**. Twenty seeds afterwards, Custodians (seat 0) against Prospectors: 17 Collapse
+between turns 15 and 21, 3 Custodian wins at turn 24 by tiebreak; buildings 7 to 57 against 0 to 26;
+Colonists off Earth 4 to 24 against 0 to 8; first Colony on turn 7 or 8. Prospectors in seat 0
+against Custodians: 20 Collapse on turns 14 to 16. Neither Faction meets its Victory Condition in
+any of the forty games.
+
+**The four views from `shot:check` at turn 1**, as spec 19.2 asks, with nine states:
+
+| | |
+| --- | --- |
+| ![Solar System Map](check-solar.png) | ![Earth Map with nine states](check-earth.png) |
+| ![The Moon](check-moon.png) | ![Mars](check-mars.png) |
+
+And turn 13 of a game both AIs played, on the Solar System Map: two Custodian Colonies on Mars, a
+Prospector stack at the Moon, a Colony Ship two turns from Earth.
+
+![Turn 13, Solar System Map](turn-13-solar.png)
