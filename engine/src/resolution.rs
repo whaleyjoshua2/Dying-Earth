@@ -478,9 +478,8 @@ impl Game {
     /// Control passes to `seat` (spec 8.3, 8.5): rivals' Influence wiped, a destruction roll, Armies follow.
     pub fn transfer_control(&mut self, place: Place, seat: Seat, why: &str) {
         self.set_place_control(place, Control::Controlled(seat));
-        for s in Seat::ALL {
-            self.seat_mut(s).influence.remove(&place);
-        }
+        // Standings persist through a transfer (ticket #33): the old controller keeps its own and
+        // can contest the place back.
         let line = format!("{} now belongs to the {} ({}).", self.place_name(place), self.seat_name(seat), why);
         self.log(line.clone());
         self.report.lines.push(line);
@@ -496,48 +495,44 @@ impl Game {
     // ------------------------------------------------------------------ (d)
 
     fn resolve_influence(&mut self) {
+        // Version 0.03 (ticket #33): every Faction keeps a standing on every place; spending on a place
+        // you control raises your own standing there.
         let spent = std::mem::take(&mut self.pending.influence);
         for (seat, target, amount) in spent {
-            let own = self.place_director(target) == Some(seat) || self.place_control(target).controller() == Some(seat);
-            if own {
-                let rival = seat.other();
-                let r = self.seat_mut(rival);
-                if let Some(v) = r.influence.get_mut(&target) {
-                    *v = (*v - amount).max(0);
-                }
-                self.log(format!("{} spent {} Influence defending {}.", self.seat_name(seat), amount, self.place_name(target)));
-            } else {
-                let s = self.seat_mut(seat);
-                *s.influence.entry(target).or_insert(0) += amount;
-                s.influenced_this_turn.push(target);
-                self.log(format!("{} spent {} Influence on {}.", self.seat_name(seat), amount, self.place_name(target)));
-            }
+            let own = self.place_control(target).controller() == Some(seat);
+            let s = self.seat_mut(seat);
+            *s.influence.entry(target).or_insert(0) += amount;
+            s.influenced_this_turn.push(target);
+            self.log(format!("{} spent {} Influence {} {}.", self.seat_name(seat), amount, if own { "holding" } else { "on" }, self.place_name(target)));
         }
-        // Decay on every accumulation that received nothing this turn.
+        // Decay on every standing that received nothing this turn: 1 on a place you control, 2 elsewhere.
         let decay = self.tables.influence.decay;
+        let decay_own = self.tables.influence.decay_controlled;
         for seat in Seat::ALL {
+            let owned: Vec<Place> = self.seat(seat).influence.keys().filter(|t| self.place_control(**t).controller() == Some(seat)).copied().collect();
             let s = self.seat_mut(seat);
             let touched = std::mem::take(&mut s.influenced_this_turn);
             for (t, v) in s.influence.iter_mut() {
                 if !touched.contains(t) {
-                    *v = (*v - decay).max(0);
+                    let d = if owned.contains(t) { decay_own } else { decay };
+                    *v = (*v - d).max(0);
                 }
             }
             s.influence.retain(|_, v| *v > 0);
         }
-        // Thresholds.
+        // Thresholds: a neutral place needs the threshold; a controlled place needs a standing above the
+        // controller's and at least the threshold.
         let mut targets: Vec<Place> = StateId::ALL.into_iter().map(Place::State).collect();
         targets.extend(self.colonies.iter().map(|c| Place::Colony(c.id)));
         for target in targets {
             let threshold = self.influence_threshold(target);
             let controller = self.place_control(target).controller();
-            // Meeting a threshold takes real Influence: a Colony with no Colonists has a threshold of
-            // zero, and zero accumulated Influence must not claim it.
+            let holding = controller.map(|c| self.seat(c).influence.get(&target).copied().unwrap_or(0)).unwrap_or(0);
             let qualifying: Vec<Seat> = Seat::ALL
                 .into_iter()
                 .filter(|s| {
                     let have = self.seat(*s).influence.get(&target).copied().unwrap_or(0);
-                    controller != Some(*s) && have > 0 && have >= threshold
+                    controller != Some(*s) && have > 0 && have >= threshold && have > holding
                 })
                 .collect();
             let winner = match qualifying.len() {

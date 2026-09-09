@@ -860,8 +860,22 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
     });
     let threshold = game.influence_threshold(target);
     for seat in Seat::ALL {
-        let v = game.seat(seat).influence.get(&target).copied().unwrap_or(0);
-        ui.label(format!("{} Influence here: {} of {}", game.seat_name(seat), v, threshold));
+        let _ = seat;
+    }
+    let standing = |s: Seat| game.seat(s).influence.get(&target).copied().unwrap_or(0);
+    ui.label(format!("Standings: {} {}, {} {}; threshold {}", game.seat_name(Seat(0)), standing(Seat(0)), game.seat_name(Seat(1)), standing(Seat(1)), threshold));
+    match game.place_control(target).controller() {
+        Some(c) => {
+            let need = threshold.max(standing(c) + 1);
+            if c == Seat(0) {
+                ui.label(RichText::new(format!("Yours. A rival takes it with a standing above yours and at least the threshold: {need} now. Spending here raises your standing; it decays 1 a turn.")).weak());
+            } else {
+                ui.label(RichText::new(format!("Theirs. You take it with a standing above theirs and at least the threshold: {need} now.")).weak());
+            }
+        }
+        None => {
+            ui.label(RichText::new(format!("Neutral. The first standing at the threshold ({threshold}) takes it; standings decay 2 a turn when nothing is spent.")).weak());
+        }
     }
 }
 

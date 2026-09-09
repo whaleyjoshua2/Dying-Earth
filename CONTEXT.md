@@ -167,8 +167,12 @@ How much of a Nation State the sea can take. As Sea Level passes its thresholds,
 _Avoid_: coastline, vulnerability, flood risk
 
 **Influence**:
-A Faction's accumulated claim on a Nation State or an enemy Colony, built from a fixed per-turn Allotment and decaying when neglected. The first Faction past the place's threshold takes control; the owner of a Colony can spend to push a rival's Influence back.
+A Faction's claim on a Nation State or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold; a controlled place goes to a rival whose Standing is above the controller's and at least the threshold.
 _Avoid_: diplomacy points, favour, reputation
+
+**Standing**:
+How much Influence a Faction has built up on one place. Since version 0.03 it persists: it is never wiped when the place changes hands, it decays 1 a turn on a place the Faction controls and 2 a turn elsewhere when nothing is spent, and spending on a place you hold raises it.
+_Avoid_: accumulation, influence points, loyalty
 
 **Allotment**:
 The fixed amount of Influence a Faction receives each turn, split freely across any number of targets during the Orders phase. It grows with the number of Nation States the Faction controls and does not carry over.

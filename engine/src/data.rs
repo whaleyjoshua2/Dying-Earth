@@ -215,6 +215,8 @@ pub struct InfluenceTable {
     pub state_threshold_per_size: i64,
     pub colony_threshold_per_colonist: i64,
     pub decay: i64,
+    /// Ticket #33: decay on a place the Faction controls.
+    pub decay_controlled: i64,
     pub occupation_turns: u32,
     pub destruction_chance: f64,
 }

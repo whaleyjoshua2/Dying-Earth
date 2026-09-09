@@ -277,19 +277,73 @@ fn influence_threshold_takes_control_and_decay_takes_two_from_untouched_targets(
     g.pending.influence.push((Seat(0), Place::State(StateId::Africa), 1));
     g.resolution_phase();
     assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)));
-    assert!(!g.seats[0].influence.contains_key(&Place::State(StateId::Africa)), "wiped on transfer");
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::Africa)], 50, "the standing persists through the transfer (#33)");
     assert_eq!(g.seats[0].influence[&Place::State(StateId::Europe)], 8);
 }
 
+// ---------------------------------------------------------------- #33 standings that persist
+
 #[test]
-fn influence_on_an_owned_colony_pushes_the_rival_back_one_for_one() {
+fn spending_on_your_own_place_raises_your_standing_and_it_decays_one_a_turn() {
     let mut g = game();
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 4);
     g.seats[1].influence.insert(Place::Colony(c), 30);
     g.seats[1].influenced_this_turn.push(Place::Colony(c));
     g.pending.influence.push((Seat(0), Place::Colony(c), 12));
     g.resolution_phase();
-    assert_eq!(g.seats[1].influence[&Place::Colony(c)], 18);
+    assert_eq!(g.seats[1].influence[&Place::Colony(c)], 30, "the rival's standing is untouched");
+    assert_eq!(g.seats[0].influence[&Place::Colony(c)], 12, "your own standing rose");
+    g.resolution_phase();
+    assert_eq!(g.seats[0].influence[&Place::Colony(c)], 11, "decay 1 on a place you control");
+    assert_eq!(g.seats[1].influence[&Place::Colony(c)], 28, "decay 2 elsewhere");
+}
+
+#[test]
+fn a_challenger_needs_a_standing_above_the_controllers_and_at_least_the_threshold() {
+    let mut g = game();
+    // Africa (threshold 50) is taken by seat 0 with a standing of 60.
+    g.seats[0].influence.insert(Place::State(StateId::Africa), 60);
+    g.seats[0].influenced_this_turn.push(Place::State(StateId::Africa));
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)));
+    // Seat 1 reaches the threshold but not the controller's standing: no change.
+    g.seats[1].influence.insert(Place::State(StateId::Africa), 55);
+    g.seats[1].influenced_this_turn.push(Place::State(StateId::Africa));
+    g.seats[0].influenced_this_turn.push(Place::State(StateId::Africa));
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)), "55 is not above 60");
+    // Above the controller's standing: it flips, and seat 0 keeps its 60 to contest it back.
+    g.seats[1].influence.insert(Place::State(StateId::Africa), 61);
+    g.seats[1].influenced_this_turn.push(Place::State(StateId::Africa));
+    g.seats[0].influenced_this_turn.push(Place::State(StateId::Africa));
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(1)));
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::Africa)], 60);
+    // Above the controller but under the threshold: a Colony with 8 Colonists (threshold 80) held at 20.
+    let c = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 8);
+    g.seats[0].influence.insert(Place::Colony(c), 20);
+    g.seats[1].influence.insert(Place::Colony(c), 40);
+    g.seats[0].influenced_this_turn.push(Place::Colony(c));
+    g.seats[1].influenced_this_turn.push(Place::Colony(c));
+    g.resolution_phase();
+    assert_eq!(g.colony(c).unwrap().control, Control::Controlled(Seat(0)), "40 is above 20 but under the threshold of 80");
+}
+
+#[test]
+fn occupation_transfer_keeps_the_old_controllers_standing() {
+    let mut g = game();
+    // Europe is the AI's; seat 1 holds it at 40. Seat 0 occupies it with its defenders gone.
+    g.seats[1].influence.insert(Place::State(StateId::Europe), 40);
+    g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
+    occupier_in(&mut g, StateId::Asia, StateId::Europe);
+    for _ in 0..3 {
+        g.seats[1].influenced_this_turn.push(Place::State(StateId::Europe));
+        g.resolution_phase();
+    }
+    assert_eq!(g.state(StateId::Europe).control, Control::Controlled(Seat(0)));
+    assert_eq!(g.seats[1].influence[&Place::State(StateId::Europe)], 40, "the old controller keeps its standing");
+    let threshold = g.influence_threshold(Place::State(StateId::Europe));
+    assert!(g.seats[0].influence[&Place::State(StateId::Europe)] >= threshold, "the occupier's gains are its standing");
 }
 
 // ---------------------------------------------------------------- 8.5 Occupation

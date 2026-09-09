@@ -35,3 +35,21 @@ spares all but one) come in, once each. Both hit a place, so whoever holds it ta
 The deck is twenty-eight cards, not the twenty-six the ticket's option named: ten first-playable
 Events twice and eight later ones once. The arithmetic slip is recorded on the ticket for the
 designer to keep or trim. A test now asserts that no card in the table targets a Faction.
+
+## #33: standings that persist
+
+Decided by the designer: every Faction keeps a **standing** on every place, never wiped. A neutral
+place goes to the first standing at the threshold; a controlled place goes to a rival whose standing
+is above the controller's and at least the threshold. Decay is 1 a turn on a place you control and
+2 elsewhere. Spending on a place you hold raises your own standing. When Occupation transfers a
+place, the occupier's gains are its standing and the old controller keeps its own.
+
+![Asia's card with both standings and what a rival needs](standings.png)
+
+Two rules watched red first: dropping the "above the controller" clause let 55 take a state held at
+60; making every place decay 2 broke the decay-of-1 test.
+
+What the twenty-seed batch showed: **10 to 12 Influence transfers per game**, most of them one state
+ping-ponging between the AIs turn by turn, because a rival needs only one point more than the
+controller and both keep spending there. Reported on the ticket with three one-number options;
+not retuned.

@@ -443,22 +443,26 @@ impl Game {
         for (rank, (target, _)) in targets.iter().enumerate() {
             let have = self.seat(seat).influence.get(target).copied().unwrap_or(0);
             let threshold = self.influence_threshold(*target);
+            // Ticket #33: a controlled place needs a standing above the controller's as well.
+            let holding = self.place_control(*target).controller().map(|c| self.seat(c).influence.get(target).copied().unwrap_or(0)).unwrap_or(0);
+            let needed = threshold.max(holding + 1);
             let base = self.base_weight(seat, Cat::Influence) * (1.0 - 0.15 * rank as f64).max(0.3);
-            let opp = if threshold - have <= step { m.opportunity } else { 1.0 };
+            let opp = if needed - have <= step { m.opportunity } else { 1.0 };
             let denial = if kind == FactionKind::Custodians && rival_near && self.place_control(*target).controller() == Some(seat.other()) { m.denial } else { 1.0 };
             let copies = (allotment / step).max(0);
             for _ in 0..copies {
                 push(vec![Order::Influence { target: *target, amount: step }], Cat::Influence, base, 1.0, denial, 1.0, opp, format!("spend {} Influence on {}", step, self.place_name(*target)), None);
             }
         }
-        // Defend own Colonies under rival Influence.
-        for c in &self.colonies {
-            if c.control.controller() == Some(seat) {
-                let rival = self.seat(seat.other()).influence.get(&Place::Colony(c.id)).copied().unwrap_or(0);
-                if rival > 0 {
-                    let opp = if self.influence_threshold(Place::Colony(c.id)) - rival <= step { m.opportunity } else { 1.0 };
-                    push(vec![Order::Influence { target: Place::Colony(c.id), amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, 1.0, m.threat, opp, format!("defend {} with {} Influence", self.place_name(Place::Colony(c.id)), step), None);
-                }
+        // Hold own places where a rival's standing approaches yours (ticket #33: spending raises your standing).
+        let mut owned: Vec<Place> = self.controlled_states(seat).into_iter().map(Place::State).collect();
+        owned.extend(self.colonies.iter().filter(|c| c.control.controller() == Some(seat)).map(|c| Place::Colony(c.id)));
+        for place in owned {
+            let rival = self.seat(seat.other()).influence.get(&place).copied().unwrap_or(0);
+            let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
+            if rival > 0 && rival + 2 * step >= mine {
+                let opp = if rival + step >= mine { m.opportunity } else { 1.0 };
+                push(vec![Order::Influence { target: place, amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, 1.0, m.threat, opp, format!("hold {} with {} Influence", self.place_name(place), step), None);
             }
         }
 
