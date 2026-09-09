@@ -22,11 +22,16 @@ pub struct ShotPlan {
     /// back through `toggle_climate`, the path the button and the C key use.
     pub climate_toggle: bool,
     pub toggled: bool,
+    /// `trade:1` (a building aid): the trading window is open in every picture.
+    pub trade: bool,
 }
 
 fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     if plan.tech {
         view.show_tech = true;
+    }
+    if plan.trade {
+        view.show_trade = true;
     }
     if plan.climate_toggle && view.view == View::Surface(BodyId::Earth) {
         view.show_climate = false;
@@ -138,6 +143,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         // `select:<state id>` (a building aid) opens that Nation State's card in the Earth picture.
         plan.select = std::env::args().find_map(|a| a.strip_prefix("select:").map(str::to_owned));
         plan.tech = std::env::args().any(|a| a == "tech:1");
+        plan.trade = std::env::args().any(|a| a == "trade:1");
         plan.climate_toggle = std::env::args().any(|a| a == "climate:toggle");
         apply_aids(&mut plan, &mut view);
         plan.next_at = t + 4.0;

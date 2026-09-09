@@ -506,6 +506,15 @@ impl Game {
         for _ in 0..buys {
             push(vec![Order::BuyInfluence { amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence) * 0.9, 1.0, 1.0, 1.0, 1.0, format!("buy {} Influence for {} Ducats", step, per * step), None);
         }
+        // Ticket #42: the trading window. While Materials are the scarcest resource (or the bootstrap
+        // need), Ducats buy them in lots of 10 at a producer's weight; the AI does not sell.
+        let per_materials = self.tables.ducats.per_materials;
+        if (scarce == Resource::Materials || needs.contains(&Resource::Materials)) && per_materials > 0 {
+            let lots = self.seat(seat).stockpile.ducats / (per_materials * 10);
+            for _ in 0..lots.min(4) {
+                push(vec![Order::Buy { resource: Resource::Materials, amount: 10 }], Cat::Producer, self.base_weight(seat, Cat::Producer) * 1.5, 1.0, 1.0, 1.0, 1.0, format!("buy 10 Materials for {} Ducats", per_materials * 10), None);
+            }
+        }
         // Hold own places where a rival's standing approaches yours (ticket #33: spending raises your standing).
         let mut owned: Vec<Place> = self.controlled_states(seat).into_iter().map(Place::State).collect();
         owned.extend(self.colonies.iter().filter(|c| c.control.controller() == Some(seat)).map(|c| Place::Colony(c.id)));

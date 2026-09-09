@@ -443,6 +443,77 @@ fn ducats_pay_for_restoration_and_repairs_at_the_table_rates() {
     assert!(g.check_order(Seat(0), &[], &Order::RepairWithDucats { unit: UnitRef::Ship(ShipId(1)), points: 1 }).is_err(), "nothing to repair");
 }
 
+// ---------------------------------------------------------------- #42 the trading window
+
+#[test]
+fn the_trading_window_sells_materials_fuel_and_energy_at_the_table_prices() {
+    let mut g = game();
+    g.seats[0].stockpile = Stockpile { materials: 0, fuel: 0, energy: 0, ducats: 100 };
+    let m = Order::Buy { resource: Resource::Materials, amount: 10 };
+    assert_eq!(g.order_cost(Seat(0), &m).ducats, 20, "Materials are 2 Ducats each");
+    // Bought Materials are spendable at once: a Factory (20 Materials) is affordable with the buy pending.
+    let factory = Order::BuildFacility { state: StateId::Asia, kind: FacilityKind::Factory };
+    assert!(g.check_order(Seat(0), &[], &factory).is_err(), "no Materials yet");
+    let pending = vec![Order::Buy { resource: Resource::Materials, amount: 20 }];
+    let (left, _) = g.remaining(Seat(0), &pending);
+    assert_eq!((left.materials, left.ducats), (20, 60));
+    assert!(g.check_order(Seat(0), &pending, &factory).is_ok());
+    let f = Order::Buy { resource: Resource::Fuel, amount: 2 };
+    assert_eq!(g.order_cost(Seat(0), &f).ducats, 6, "Fuel is 3 Ducats each");
+    let e = Order::Buy { resource: Resource::Energy, amount: 5 };
+    assert_eq!(g.order_cost(Seat(0), &e).ducats, 5, "Energy is 1 Ducat each");
+    assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Materials, amount: 0 }).is_err(), "a positive amount");
+    assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Ducats, amount: 5 }).is_err(), "Ducats are not for sale");
+    assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Materials, amount: 51 }).is_err(), "102 Ducats needed, 100 held");
+    g.commit_orders(Seat(0), &[m, f, e]);
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 10, fuel: 2, energy: 5, ducats: 69 });
+}
+
+#[test]
+fn a_building_bought_for_ducats_costs_twice_its_materials_and_queues_like_a_materials_build() {
+    let mut g = game();
+    g.seats[0].stockpile = Stockpile { materials: 0, fuel: 0, energy: 50, ducats: 40 };
+    let order = Order::BuildFacilityWithDucats { state: StateId::Asia, kind: FacilityKind::Factory };
+    let cost = g.order_cost(Seat(0), &order);
+    assert_eq!((cost.materials, cost.ducats), (0, 40), "a 20-Materials Factory is 40 Ducats");
+    assert!(g.check_order(Seat(0), &[], &order).is_ok());
+    // It takes a build slot like any build: Asia has one free slot on the bare board, so a second is refused.
+    let free = g.free_slots(StateId::Asia);
+    let mut pending = Vec::new();
+    for _ in 0..free {
+        pending.push(order.clone());
+    }
+    assert!(g.check_order_legality(Seat(0), &pending, &Order::BuildFacility { state: StateId::Asia, kind: FacilityKind::Factory }).is_err(), "no free build slot");
+    g.commit_orders(Seat(0), &[order]);
+    assert_eq!(g.seats[0].stockpile.ducats, 0);
+    assert_eq!(g.state(StateId::Asia).queue.len(), 1);
+    assert_eq!(g.state(StateId::Asia).queue[0].item, BuildItem::Facility(FacilityKind::Factory));
+    // A Module too: a Mine on a Colony.
+    let c = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    let mine = Order::BuildModuleWithDucats { colony: c, kind: ModuleKind::Mine };
+    assert_eq!(g.order_cost(Seat(0), &mine).ducats, 2 * g.tables.module(ModuleKind::Mine).materials);
+    assert!(g.check_order(Seat(0), &[], &mine).is_err(), "no Ducats left");
+}
+
+#[test]
+fn selling_materials_or_fuel_returns_half_the_buying_price() {
+    let mut g = game();
+    g.seats[0].stockpile = Stockpile { materials: 10, fuel: 2, energy: 20, ducats: 0 };
+    let m = Order::Sell { resource: Resource::Materials, amount: 10 };
+    assert_eq!(g.order_cost(Seat(0), &m).ducats, -10, "half of 2 Ducats each");
+    let f = Order::Sell { resource: Resource::Fuel, amount: 2 };
+    assert_eq!(g.order_cost(Seat(0), &f).ducats, -3, "half of 3 Ducats each, rounded down over the lot");
+    assert!(g.check_order(Seat(0), &[], &Order::Sell { resource: Resource::Materials, amount: 11 }).is_err(), "10 held");
+    assert!(g.check_order(Seat(0), &[], &Order::Sell { resource: Resource::Energy, amount: 5 }).is_err(), "Energy is not bought back");
+    // The Ducats from a sale are spendable at once.
+    let pending = vec![m.clone()];
+    let (left, _) = g.remaining(Seat(0), &pending);
+    assert_eq!((left.materials, left.ducats), (0, 10));
+    assert!(g.check_order(Seat(0), &pending, &Order::BuyInfluence { amount: 5 }).is_ok());
+    g.commit_orders(Seat(0), &[m, f]);
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 0, fuel: 0, energy: 20, ducats: 13 });
+}
+
 // ---------------------------------------------------------------- #36 Embassies and Relays
 
 #[test]

@@ -61,3 +61,30 @@ end with nothing on Earth; that was true before this ticket.
 and a Factory or Mine at the same weight compounds while Ducats only buy Influence; the AI never
 reaches them. A Relay needs the rival to press the AI's Colony, and the losing Prospectors never do.
 The AI builds Embassies (two a game) where the rival presses a state it holds.
+
+## #42: the trading window
+
+Decided by the designer: the window sells Influence (2 Ducats), Materials (2), Fuel (3) and
+Energy (1); a building can be bought outright for Ducats at twice its Materials cost; the window
+buys Materials and Fuel back at half the buying price; no caps.
+
+- **Four new orders**: Buy, Sell, and a Facility or Module "with Ducats". A purchase is a negative
+  cost in the resource bought, so what is bought is spendable in the same turn's orders with no
+  special case in `remaining`; a sale is the mirror, with a negative Ducat cost, rounded down over
+  the lot (2 Fuel sell for 3 Ducats). A building bought for Ducats has the legality of the Materials
+  form and takes a build slot like it. Five prices in `factions.toml` under `[ducats]`.
+- **The window**: a Trading button in the top bar; one row per line with the price, a quantity, Buy
+  and Sell; the trades pending this turn listed under it. The Buy Influence button left the state
+  card for the window, and the top bar shows "Influence 40 of 32 (22 free + 10 bought)" once any is
+  bought. Every build button on a state or Colony card has an "or (40 Ducats)" beside it.
+- **The AI** buys Materials in lots of ten while Materials are its scarcest resource, at a
+  producer's weight; it does not sell.
+
+Three tests watched red first (they did not compile without the orders): the prices and the
+same-turn spend, the building for Ducats and its build slot, the sale at half.
+
+![The trading window at turn 11 over the Earth Map, Asia's card open with the "or (N Ducats)" buttons beside each building; Fuel unaffordable at 25 Ducats, so its Buy is greyed](trading-window.png)
+
+**Twenty seeds** (Custodians in seat 0): wins 3, transfers 13.2 a game, buildings at the end 60
+(44 on #41): the Custodian AI bought Materials fourteen times in seed 1 and built more. With the
+Prospectors in seat 0: 0 wins, as on #41.

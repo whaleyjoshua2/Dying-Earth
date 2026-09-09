@@ -216,6 +216,12 @@ pub struct DucatsCard {
     pub per_influence: i64,
     pub per_restoration_step: i64,
     pub per_repair_point: i64,
+    /// Version 0.04 (ticket #42): the trading window's prices.
+    pub per_materials: i64,
+    pub per_fuel: i64,
+    pub per_energy: i64,
+    pub sell_divisor: i64,
+    pub per_building_material: i64,
     pub bank_per_gdp_tenth: f64,
     pub trade_post_base: f64,
 }

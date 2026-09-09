@@ -121,6 +121,10 @@ pub struct ViewState {
     /// Ticket #41: the Climate Panel was just reopened; put it back at its home position once.
     pub climate_reopen: bool,
     pub show_victory: bool,
+    /// Ticket #42: the trading window, and the quantity on each of its four lines
+    /// (Influence, Materials, Fuel, Energy).
+    pub show_trade: bool,
+    pub trade_amounts: [i64; 4],
     pub load_state: Option<StateId>,
     pub influence_amount: i64,
     pub restoration_steps: u32,
@@ -144,6 +148,8 @@ impl Default for ViewState {
             show_climate: true,
             climate_reopen: false,
             show_victory: false,
+            show_trade: false,
+            trade_amounts: [5, 10, 10, 10],
             load_state: None,
             influence_amount: 5,
             restoration_steps: 1,

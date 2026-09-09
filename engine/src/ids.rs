@@ -170,6 +170,18 @@ pub enum Resource {
     Ducats,
 }
 
+impl Resource {
+    pub fn name(self) -> &'static str {
+        match self {
+            Resource::Materials => "Materials",
+            Resource::Fuel => "Fuel",
+            Resource::Energy => "Energy",
+            Resource::Research => "Research",
+            Resource::Ducats => "Ducats",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TechId {

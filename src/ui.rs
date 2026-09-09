@@ -366,7 +366,10 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             };
             ui.label(research);
             ui.separator();
-            ui.label(format!("Influence {} of {}", influence_left, s.allotment));
+            // Ticket #42: the turn's Allotment and what the trading window added, shown apart.
+            let bought: i64 = session.pending.iter().map(|o| if let Order::BuyInfluence { amount } = o { *amount } else { 0 }).sum();
+            let influence = if bought > 0 { format!("Influence {} of {} ({} free + {} bought)", influence_left, s.allotment + bought, s.allotment, bought) } else { format!("Influence {} of {}", influence_left, s.allotment) };
+            ui.label(influence).on_hover_text("The Allotment is what your places and buildings give each turn; bought Influence comes from the Trading window at 2 Ducats each.");
             ui.separator();
             ui.label(RichText::new(format!("Turn {} / {}", game.turn, game.tables.victory.turns)).strong());
             ui.separator();
@@ -381,6 +384,9 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             }
             if ui.button("Victory").clicked() {
                 view.show_victory = !view.show_victory;
+            }
+            if ui.button("Trading").clicked() {
+                view.show_trade = !view.show_trade;
             }
             let swap_text = match view.view {
                 View::Solar => format!("To {} (Tab)", game.tables.body(view.last_surface).name),
@@ -813,6 +819,10 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuyInfluence { amount } => format!("Buy {} Influence with Ducats", amount),
         Order::RestorationWithDucats { steps } => format!("Restoration: {} step(s) paid in Ducats", steps),
         Order::RepairWithDucats { unit, points } => format!("Repair {} point(s) on {} with Ducats", points, match unit { UnitRef::Ship(s) => s.to_string(), UnitRef::Army(a) => a.to_string() }),
+        Order::Buy { resource, amount } => format!("Buy {} {} for {} Ducats", amount, resource.name(), game.order_cost(Seat(0), o).ducats),
+        Order::Sell { resource, amount } => format!("Sell {} {} for {} Ducats", amount, resource.name(), -game.order_cost(Seat(0), o).ducats),
+        Order::BuildFacilityWithDucats { state, kind } => format!("Build {} in {} for Ducats", kind.name(), game.tables.state(*state).name),
+        Order::BuildModuleWithDucats { colony, kind } => format!("Build {} at {} for Ducats", kind.name(), game.place_name(Place::Colony(*colony))),
     }
 }
 
@@ -874,15 +884,10 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
             ui.label(RichText::new(e.0).weak());
         }
     });
-    ui.horizontal(|ui| {
-        // Ticket #35: Ducats buy Influence for this turn's Allotment.
-        let buy = Order::BuyInfluence { amount: view.influence_amount };
-        let cost = game.order_cost(Seat(0), &buy).ducats;
-        let ok = game.check_order(Seat(0), &session.pending, &buy);
-        if ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Buy {} Influence for {} Ducats", view.influence_amount, cost))).on_hover_text("Adds to this turn's Allotment, spendable at once on any target").clicked() {
-            actions.push(Action::Place(buy));
-        }
-    });
+    // Ticket #42: buying Influence lives in the Trading window now.
+    if ui.small_button("Buy more Influence in the Trading window").clicked() {
+        view.show_trade = true;
+    }
     let threshold = game.influence_threshold(target);
     for seat in Seat::ALL {
         let _ = seat;
@@ -952,7 +957,11 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         ui.label(RichText::new("Build (hover a button for what it makes)").strong());
         for fk in FacilityKind::ALL {
             let hover = game.facility_yield(Seat(0), sid, fk).text();
-            cost_button_with_hover(ui, game, &session.pending, Order::BuildFacility { state: sid, kind: fk }, fk.name(), Some(hover), actions);
+            ui.horizontal(|ui| {
+                cost_button_with_hover(ui, game, &session.pending, Order::BuildFacility { state: sid, kind: fk }, fk.name(), Some(hover), actions);
+                // Ticket #42: the same building bought outright for Ducats.
+                cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: fk }, "or", actions);
+            });
         }
         cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
@@ -1038,7 +1047,10 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         ui.label(RichText::new("Build (hover a button for what it makes)").strong());
         for mk in ModuleKind::ALL {
             let hover = game.module_yield(Seat(0), cid, mk).text();
-            cost_button_with_hover(ui, game, &session.pending, Order::BuildModule { colony: cid, kind: mk }, mk.name(), Some(hover), actions);
+            ui.horizontal(|ui| {
+                cost_button_with_hover(ui, game, &session.pending, Order::BuildModule { colony: cid, kind: mk }, mk.name(), Some(hover), actions);
+                cost_button(ui, game, &session.pending, Order::BuildModuleWithDucats { colony: cid, kind: mk }, "or", actions);
+            });
         }
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::Colony(cid) }, "Build Army (Barracks)", actions);
         if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
@@ -1218,6 +1230,74 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
 
 // ------------------------------------------------------------------ popups
 
+/// Ticket #42: the trading window. Ducats buy Influence, Materials, Fuel and Energy at the table
+/// prices, spendable in this turn's orders; Materials and Fuel sell back at half; buildings are
+/// bought for Ducats from their own build buttons.
+fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    let (left, _) = game.remaining(Seat(0), &session.pending);
+    ui.label(RichText::new(format!("Ducats {} to spend this turn (+{} last Income).", left.ducats, game.seat(Seat(0)).income_last_turn.ducats)).strong());
+    ui.label("What you buy is yours at once, for this turn's orders. Ducats come from your Nation States' economies, Banks and Trade Posts.");
+    ui.separator();
+    let lines: [(usize, Option<dying_earth_engine::Resource>, &str); 4] = [(0, None, "Influence"), (1, Some(dying_earth_engine::Resource::Materials), "Materials"), (2, Some(dying_earth_engine::Resource::Fuel), "Fuel"), (3, Some(dying_earth_engine::Resource::Energy), "Energy")];
+    egui::Grid::new("trade_grid").num_columns(5).spacing((12.0, 6.0)).show(ui, |ui| {
+        ui.label(RichText::new("Line").strong());
+        ui.label(RichText::new("Price").strong());
+        ui.label(RichText::new("Quantity").strong());
+        ui.label(RichText::new("Buy").strong());
+        ui.label(RichText::new("Sell").strong());
+        ui.end_row();
+        for (i, res, name) in lines {
+            let per = match res {
+                None => game.tables.ducats.per_influence,
+                Some(r) => game.trade_price(r).unwrap_or(0),
+            };
+            ui.label(name);
+            let sells = matches!(res, Some(dying_earth_engine::Resource::Materials) | Some(dying_earth_engine::Resource::Fuel));
+            ui.label(if sells { format!("{per} Ducats each; sells for {:.1}", per as f64 / game.tables.ducats.sell_divisor.max(1) as f64) } else { format!("{per} Ducats each") });
+            ui.add(egui::DragValue::new(&mut view.trade_amounts[i]).range(1..=999).speed(1.0));
+            let n = view.trade_amounts[i].max(1);
+            let buy = match res {
+                None => Order::BuyInfluence { amount: n },
+                Some(r) => Order::Buy { resource: r, amount: n },
+            };
+            let cost = game.order_cost(Seat(0), &buy).ducats;
+            let ok = game.check_order(Seat(0), &session.pending, &buy);
+            let mut resp = ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Buy for {cost} Ducats")));
+            if let Err(e) = &ok {
+                resp = resp.on_disabled_hover_text(&e.0);
+            }
+            if resp.clicked() {
+                actions.push(Action::Place(buy));
+            }
+            if let Some(r) = res.filter(|_| sells) {
+                let sell = Order::Sell { resource: r, amount: n };
+                let gain = -game.order_cost(Seat(0), &sell).ducats;
+                let ok = game.check_order(Seat(0), &session.pending, &sell);
+                let mut resp = ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Sell for {gain} Ducats")));
+                if let Err(e) = &ok {
+                    resp = resp.on_disabled_hover_text(&e.0);
+                }
+                if resp.clicked() {
+                    actions.push(Action::Place(sell));
+                }
+            } else {
+                ui.label(RichText::new("not bought back").weak());
+            }
+            ui.end_row();
+        }
+    });
+    ui.separator();
+    ui.label(format!("Buildings: every build button on a Nation State or Colony card has an \"or\" beside it that buys the building outright for Ducats, at {} times its Materials cost.", game.tables.ducats.per_building_material));
+    let trades: Vec<String> = session.pending.iter().filter(|o| matches!(o, Order::Buy { .. } | Order::Sell { .. } | Order::BuyInfluence { .. } | Order::BuildFacilityWithDucats { .. } | Order::BuildModuleWithDucats { .. })).map(|o| order_text(game, o)).collect();
+    if !trades.is_empty() {
+        ui.separator();
+        ui.label(RichText::new("Trades this turn (undo them in the orders list)").strong());
+        for t in trades {
+            ui.label(t);
+        }
+    }
+}
+
 /// Ticket #41: the Tech Tree drawn as a tree. One column per branch, one row per rung, a line from
 /// every Tech to each Tech that needs it, each box coloured by its state.
 fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, actions: &mut Vec<Action>) {
@@ -1291,6 +1371,11 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
 }
 
 fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    if view.show_trade {
+        let mut open = true;
+        egui::Window::new("Trading").open(&mut open).default_width(470.0).show(ctx, |ui| trading_window(ui, session, game, view, actions));
+        view.show_trade = open;
+    }
     if view.show_tech {
         let mut open = true;
         egui::Window::new("Tech Tree").open(&mut open).resizable(false).show(ctx, |ui| {

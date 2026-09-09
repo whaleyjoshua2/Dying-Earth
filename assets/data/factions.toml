@@ -45,5 +45,13 @@ per_influence = 2
 # Restoration step is 10 Energy, a repair point 5 Materials.
 per_restoration_step = 20
 per_repair_point = 10
+# Version 0.04 (ticket #42): the trading window. Ducats per unit bought; a sale returns the buying
+# price divided by sell_divisor (rounded down over the lot); a building bought for Ducats costs its
+# Materials times per_building_material.
+per_materials = 2
+per_fuel = 3
+per_energy = 1
+sell_divisor = 2
+per_building_material = 2
 bank_per_gdp_tenth = 4.0
 trade_post_base = 3.0
