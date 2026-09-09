@@ -89,6 +89,20 @@ fn seat_colour(session: &Session, seat: Seat) -> Color32 {
     Color32::from_rgb((c[0] * 255.0) as u8, (c[1] * 255.0) as u8, (c[2] * 255.0) as u8)
 }
 
+/// A shield with a number on it: the Army icon of the Earth Map.
+fn shield(painter: &egui::Painter, centre: Pos2, fill: Color32, text: &str) {
+    let (w, h) = (20.0, 24.0);
+    let pts = vec![
+        centre + egui::vec2(-w / 2.0, -h / 2.0),
+        centre + egui::vec2(w / 2.0, -h / 2.0),
+        centre + egui::vec2(w / 2.0, 0.0),
+        centre + egui::vec2(0.0, h / 2.0),
+        centre + egui::vec2(-w / 2.0, 0.0),
+    ];
+    painter.add(egui::Shape::convex_polygon(pts, fill, egui::Stroke::new(1.5, Color32::BLACK)));
+    painter.text(centre + egui::vec2(0.0, -2.0), egui::Align2::CENTER_CENTER, text, FontId::proportional(12.0), Color32::BLACK);
+}
+
 fn label_at(painter: &egui::Painter, pos: Pos2, text: &str, colour: Color32, size: f32) {
     let galley = painter.layout_no_wrap(text.to_string(), FontId::proportional(size), colour);
     let rect = egui::Rect::from_center_size(pos, galley.size() + egui::vec2(8.0, 4.0));
@@ -322,11 +336,16 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             let (left, influence_left) = game.remaining(Seat(0), &session.pending);
             let inc = s.income_last_turn;
             let signed = |v: i64| if v >= 0 { format!("+{v}") } else { format!("{v}") };
-            ui.label(RichText::new(format!("Materials {} ({})", left.materials, signed(inc.materials))).strong());
+            // Hover a resource for last Income by source (ticket #31).
+            let sources = |res: dying_earth_engine::Resource| -> String {
+                let lines: Vec<String> = s.income_sources.iter().filter(|(_, r, _)| *r == res).map(|(name, _, v)| format!("{v:+}  {name}")).collect();
+                if lines.is_empty() { "No income from buildings last turn.".to_string() } else { format!("Last Income:\n{}", lines.join("\n")) }
+            };
+            ui.label(RichText::new(format!("Materials {} ({})", left.materials, signed(inc.materials))).strong()).on_hover_text(sources(dying_earth_engine::Resource::Materials));
             ui.separator();
-            ui.label(RichText::new(format!("Fuel {} ({})", left.fuel, signed(inc.fuel))).strong());
+            ui.label(RichText::new(format!("Fuel {} ({})", left.fuel, signed(inc.fuel))).strong()).on_hover_text(sources(dying_earth_engine::Resource::Fuel));
             ui.separator();
-            ui.label(RichText::new(format!("Energy {} ({})", left.energy, signed(inc.energy))).strong());
+            ui.label(RichText::new(format!("Energy {} ({})", left.energy, signed(inc.energy))).strong()).on_hover_text(sources(dying_earth_engine::Resource::Energy));
             ui.separator();
             let research = match game.research.current {
                 Some(t) => format!("Research {} / {} toward {}", game.research.progress, game.tables.tech(t).cost, game.tables.tech(t).name),
@@ -365,7 +384,12 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 let must_pick = game.research.awaiting_pick == Some(Seat(0)) && !game.available_techs().is_empty();
                 let button = egui::Button::new(RichText::new("End Turn").strong().size(16.0)).fill(Color32::from_rgb(120, 40, 30));
                 if ui.add_enabled(!must_pick && view.popup == Popup::None, button).on_disabled_hover_text("Pick a Tech first").clicked() {
-                    actions.push(Action::EndTurn);
+                    let (_, influence_left) = game.remaining(Seat(0), &session.pending);
+                    if influence_left > 0 && game.seat(Seat(0)).allotment > 0 {
+                        view.popup = Popup::ConfirmEndTurn;
+                    } else {
+                        actions.push(Action::EndTurn);
+                    }
                 }
             }
         });
@@ -444,9 +468,28 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             Some(s) => seat_colour(session, s),
                             None => Color32::LIGHT_GRAY,
                         };
-                        let text = format!("{}\n{}\n{} Facilities, Army {}", game.tables.state(sid).name, owner, st.facilities.len(), armies);
+                        let _ = armies;
+                        let text = format!("{}\n{}\n{} Facilities, {} free slot(s)", game.tables.state(sid).name, owner, st.facilities.len(), game.free_slots(sid));
                         label_at(painter, p, &text, colour, 12.0);
                         hotspots.push(Hotspot { pos: p, radius: 30.0, hit: Hit::Select(Selection::State(sid)) });
+                        // Army shields (ticket #31): one per Faction present, grey for a neutral Standing Army.
+                        let mut shields: Vec<(Option<Seat>, i64)> = Vec::new();
+                        for seat in Seat::ALL {
+                            let s = game.army_stack_strength(seat, Place::State(sid));
+                            if s > 0 || !game.armies_of_seat_at(seat, Place::State(sid)).is_empty() {
+                                shields.push((Some(seat), s));
+                            }
+                        }
+                        let neutral: i64 = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid)) && game.army_seat(a).is_none() && !game.army_stands_down(a)).map(|a| game.army_strength(a)).sum();
+                        if neutral > 0 {
+                            shields.push((None, neutral));
+                        }
+                        for (i, (seat, strength)) in shields.iter().enumerate() {
+                            let centre = p + egui::vec2(-38.0 + 26.0 * i as f32, 36.0);
+                            let fill = seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
+                            shield(painter, centre, fill, &strength.to_string());
+                            hotspots.push(Hotspot { pos: centre, radius: 12.0, hit: Hit::Select(Selection::State(sid)) });
+                        }
                     }
                 }
                 _ => {
@@ -841,7 +884,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     if st.lost_slots > 0 {
         ui.colored_label(Color32::LIGHT_BLUE, format!("{} slot(s) lost to the sea", st.lost_slots));
     }
-    ui.label(RichText::new("Facilities").strong());
+    ui.label(RichText::new(format!("Facilities ({} of {} slots free)", game.free_slots(sid), game.build_slots(sid))).strong());
     let director = st.control.director();
     for f in &st.facilities {
         let figures = match director {
@@ -1231,10 +1274,33 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.set_width(460.0);
                 ui.label(RichText::new("Event drawn").size(20.0).strong());
                 ui.label(text);
-                ui.label(RichText::new(format!("Scale at this Temperature: x{:.2}", game.last_event.as_ref().map(|e| e.scale).unwrap_or(1.0))).weak());
+                // Only Climate cards scale with the Temperature (ticket #31); the rest say so.
+                let climate = game.last_event.as_ref().map(|e| matches!(e.card, Card::Event(id) if game.tables.event(id).kind == EventKind::Climate)).unwrap_or(false);
+                if climate {
+                    ui.label(RichText::new(format!("A Climate card: x{:.2} at this Temperature.", game.last_event.as_ref().map(|e| e.scale).unwrap_or(1.0))).weak());
+                } else {
+                    ui.label(RichText::new("Not a Climate card: the Temperature does not change it.").weak());
+                }
                 if ui.button("Continue").clicked() {
                     advance_popup(view);
                 }
+            });
+        }
+        Popup::ConfirmEndTurn => {
+            let (_, influence_left) = game.remaining(Seat(0), &session.pending);
+            egui::Modal::new("confirm_end".into()).show(ctx, |ui| {
+                ui.set_width(420.0);
+                ui.label(RichText::new("Influence unspent").size(20.0).strong());
+                ui.label(format!("{influence_left} Influence is unspent; it is lost at End Turn. End the turn anyway?"));
+                ui.horizontal(|ui| {
+                    if ui.button("End Turn").clicked() {
+                        view.popup = Popup::None;
+                        actions.push(Action::EndTurn);
+                    }
+                    if ui.button("Back").clicked() {
+                        view.popup = Popup::None;
+                    }
+                });
             });
         }
         Popup::Report => {

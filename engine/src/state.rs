@@ -297,6 +297,8 @@ pub struct SeatState {
     pub allotment: i64,
     pub research_last_turn: i64,
     pub income_last_turn: Stockpile,
+    /// Last Income by source (ticket #31): "Factory in Asia", the resource, the amount; upkeep as negatives.
+    pub income_sources: Vec<(String, Resource, i64)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -403,6 +405,7 @@ impl Game {
             allotment: 0,
             research_last_turn: 0,
             income_last_turn: Stockpile::default(),
+            income_sources: Vec::new(),
         };
         let states: Vec<NationState> = tables
             .states

@@ -314,19 +314,27 @@ impl Game {
         let mut gained = Stockpile::default();
         let mut research = 0;
         let mut extraction = 0;
+        let mut sources: Vec<(String, Resource, i64)> = Vec::new();
         for p in &producers {
-            match p.place {
-                ProducerPlace::Facility(sid, i) => self.state_mut(sid).facilities[i].online = p.online,
+            let where_ = match p.place {
+                ProducerPlace::Facility(sid, i) => {
+                    self.state_mut(sid).facilities[i].online = p.online;
+                    self.tables.state(sid).name.clone()
+                }
                 ProducerPlace::Module(cid, i) => {
                     if let Some(c) = self.colony_mut(cid) {
                         c.modules[i].online = p.online;
                     }
+                    self.place_name(Place::Colony(cid))
                 }
-            }
+            };
             if !p.online {
                 continue;
             }
             research += p.research;
+            if p.research > 0 {
+                sources.push((format!("{} in {}", p.name, where_), Resource::Research, p.research));
+            }
             if let Some((res, v)) = p.output {
                 match res {
                     Resource::Materials => gained.materials += v,
@@ -334,11 +342,20 @@ impl Game {
                     Resource::Energy => gained.energy += v,
                     Resource::Research => {}
                 }
+                sources.push((format!("{} in {}", p.name, where_), res, v));
                 if p.extraction && matches!(res, Resource::Materials | Resource::Fuel) {
                     extraction += v;
                 }
             }
+            if p.upkeep > 0 {
+                sources.push((format!("{} in {} (upkeep)", p.name, where_), Resource::Energy, -p.upkeep));
+            }
         }
+        let unit_upkeep = self.unit_upkeep(seat);
+        if unit_upkeep > 0 {
+            sources.push(("Ships and Armies (upkeep)".to_string(), Resource::Energy, -unit_upkeep));
+        }
+        self.seat_mut(seat).income_sources = sources;
         let before = self.seat(seat).stockpile;
         let clamped = balance.max(0);
         {

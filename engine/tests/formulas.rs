@@ -880,6 +880,56 @@ fn start_income_flows_from_turn_one() {
     assert!(s.stockpile.energy >= 15, "no Energy starvation at the start: {:?}", s.stockpile);
 }
 
+// ---------------------------------------------------------------- #31 housekeeping rules
+
+#[test]
+fn only_climate_cards_scale_with_the_temperature() {
+    let mut g = game();
+    g.climate.temperature = 3.0; // scale 1.9 for a Climate card
+    let mut seen = 0;
+    for id in [EventId::MeteorShower, EventId::SolarMaximum, EventId::RichSeam, EventId::Heatwave] {
+        // Force the next draw to be this card; roll until the Draw Chance lets it through.
+        let mut drawn = None;
+        for _ in 0..50 {
+            g.deck.cards = vec![Card::Event(id)];
+            g.last_event = None;
+            g.event_phase();
+            if let Some(e) = &g.last_event {
+                drawn = Some(e.clone());
+                break;
+            }
+        }
+        let e = drawn.expect("the card came within fifty rolls");
+        let climate = g.tables.event(id).kind == EventKind::Climate;
+        if climate {
+            assert!((e.scale - 1.9).abs() < 1e-9, "{id:?} scale {}", e.scale);
+        } else {
+            assert_eq!(e.scale, 1.0, "{id:?} must not scale");
+        }
+        seen += 1;
+    }
+    assert_eq!(seen, 4);
+    // And a Meteor Shower does one damage at +3.0 as at +1.2.
+    let mk = |id: u32| Ship { id: ShipId(id), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 };
+    g.ships.push(mk(1));
+    drawn(&mut g, EventId::MeteorShower, EventTarget::Everyone);
+    g.apply_event_now();
+    assert_eq!(g.ship(ShipId(1)).unwrap().damage, 1);
+}
+
+#[test]
+fn a_place_taken_by_influence_keeps_every_facility() {
+    for seed in 1..=5u64 {
+        let mut g = Game::new(tables(), NewGame { seed, seats: [(FactionKind::Custodians, false), (FactionKind::Prospectors, true)], player_start: StateId::Asia });
+        g.state_mut(StateId::Africa).facilities = (0..8).map(|_| facility(FacilityKind::Factory)).collect();
+        g.seats[0].influence.insert(Place::State(StateId::Africa), 60);
+        g.seats[0].influenced_this_turn.push(Place::State(StateId::Africa));
+        g.resolution_phase();
+        assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)), "seed {seed}");
+        assert_eq!(g.state(StateId::Africa).facilities.len(), 8, "seed {seed}: nothing destroyed by Influence");
+    }
+}
+
 // ---------------------------------------------------------------- the whole loop holds together
 
 #[test]

@@ -484,7 +484,11 @@ impl Game {
         let line = format!("{} now belongs to the {} ({}).", self.place_name(place), self.seat_name(seat), why);
         self.log(line.clone());
         self.report.lines.push(line);
-        self.destruction_rolls(place, "taken");
+        // Version 0.03 (ticket #31): a place taken by Influence keeps everything; only a place
+        // that Occupation transfers rolls for destruction.
+        if why != "Influence" {
+            self.destruction_rolls(place, "taken");
+        }
         // Armies at the place that fought for the old owner stand for the new one only if they are the place's own.
         // Foreign Armies keep their own home and seat; nothing to do.
     }
