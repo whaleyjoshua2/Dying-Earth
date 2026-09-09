@@ -9,16 +9,16 @@ The twelve-turn version of the game covering only the Moon and Mars, with three 
 _Avoid_: slice, MVP, demo, v1, prototype
 
 **Faction**:
-A competing power with its own goals, costs and rules. The finished game has six; the First Playable has two.
+A competing power with its own multipliers, signature rule and victory condition. The finished game has six; the First Playable has two, the Custodians and the Prospectors, who differ in everything but combat and their starting position.
 _Avoid_: side, team, empire
 
-**Stewards**:
-The faction that colonizes the solar system while limiting ecological damage to Earth.
-_Avoid_: environmentalists, greens, moderates, eco-terrorists
+**Custodians**:
+The Faction that colonizes the solar system while limiting ecological damage to Earth. Their signature rule is Restoration, and they win only if Earth is still habitable.
+_Avoid_: Stewards (the retired name), environmentalists, greens, moderates, eco-terrorists
 
-**Extractors**:
-The faction that maximizes resource extraction without regard for ecological cost.
-_Avoid_: capitalists, industrialists, exploiters
+**Prospectors**:
+The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry, and they win on extraction and expansion.
+_Avoid_: Extractors (the retired name), capitalists, industrialists, exploiters
 
 **Climate Model**:
 The small model of global warming the game runs: Emissions add to the CO2 Stock, the Temperature follows the stock with a lag, and the Temperature acts on population and Events. It moves as a consequence of player and faction choices, never on a fixed schedule.
@@ -129,6 +129,14 @@ _Avoid_: country, nation, territory, region, state
 **Facility**:
 A building placed in a Nation State. The First Playable has five kinds: Factory, Power Plant, Refinery, Launch Site and Research Lab.
 _Avoid_: item, building, module (that is the Colony word), structure
+
+**Cheap Industry**:
+The Prospectors' signature rule: raising a Nation State's Industry Level costs them half.
+_Avoid_: industry discount, cheap building
+
+**Restoration**:
+The Custodians' signature rule: Energy spent in a turn enlarges the Natural Sink for that turn only.
+_Avoid_: carbon capture, cleanup, scrubbing, terraforming
 
 **Industry Level**:
 How built-up a Nation State is. Together with the state's size it sets how many Facilities fit, and it scales the state's emissions. Raising it is a build action.
@@ -245,7 +253,7 @@ The CO2-equivalent a source adds to the CO2 Stock in a turn. Every source has it
 _Avoid_: output, carbon, footprint
 
 **Natural Sink**:
-The fixed amount of CO2 the oceans and forests remove from the CO2 Stock every turn. Net emissions below it stabilize the stock.
+The fixed amount of CO2 the oceans and forests remove from the CO2 Stock every turn. Net emissions below it stabilize the stock. Restoration enlarges it for a single turn.
 _Avoid_: absorption, offset, carbon capture
 
 **Sea Level**:
