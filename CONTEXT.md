@@ -238,6 +238,24 @@ _Avoid_: conquest, annexation, capture
 An occupied population whose occupier's Influence, gained automatically each turn of Occupation, has passed the place's threshold. Control transfers at that moment.
 _Avoid_: subdued, loyal, converted
 
+### Winning
+
+**Victory Condition**:
+What one Faction must achieve to win. Each Faction has its own, and meeting it in an End phase wins the game at once. If neither Faction has met its condition by the end of the last turn, the higher percentage of its own condition wins.
+_Avoid_: win condition, goal, objective, victory points
+
+**Extraction Total**:
+The Prospectors' measure: all the Materials and Fuel their Mines, Refineries and Factories have produced across the whole game. It is counted cumulatively and never spent down.
+_Avoid_: production score, output total, wealth
+
+**Stabilization**:
+The Custodians' measure: net Emissions held under the Natural Sink for a run of consecutive turns. One turn over the Sink resets the run.
+_Avoid_: carbon neutral, balance, equilibrium
+
+**Off-world Presence**:
+The number of Colonists living away from Earth, required by both Factions' Victory Conditions. Neither can win on Earth alone.
+_Avoid_: population off Earth, colony size, settlers
+
 ### Climate
 
 **CO2 Stock**:
@@ -261,7 +279,7 @@ How far the oceans have risen with the Temperature. It is drawn on the globe as 
 _Avoid_: flooding, water line, ocean rise
 
 **Collapse Line**:
-The one Temperature at which the game ends. Every other effect of Temperature is continuous; this is the only line.
+The one Temperature at which the game ends with nobody winning, unless a Faction had already met its Victory Condition in an earlier End phase. Every other effect of Temperature is continuous; this is the only line.
 _Avoid_: threshold, tipping point, game over temperature
 
 **Climate Panel**:
