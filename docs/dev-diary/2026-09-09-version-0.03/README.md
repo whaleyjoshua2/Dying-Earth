@@ -81,3 +81,16 @@ Influence counting toward the Allotment, and a Ducat repair reaching the repair 
 
 Twenty seeds: the AI buys Influence with Ducats 42 to 60 times a game and builds no Bank or Trade
 Post, because nothing in its producer weights wants a resource it never lacked. Reported, not retuned.
+
+## #36: Embassies and Relays
+
+Decided by the designer: an **Embassy** on Earth (30 Materials, 2 Energy upkeep) adds 2 to its
+controller's Allotment and raises its state's standing by 2 a turn; a **Relay** in a Colony (25
+Materials, 2 upkeep) adds 1 and raises its Colony's standing by 2 a turn; any number may stand in
+one place; the AI weighs them 6 for both Factions.
+
+![Turn 11: the Embassy on Asia's build list](embassy.png)
+
+Two rules watched red first: the buildings' share of the Allotment, and the standing rise. The AI
+builds none of them in twenty seeds; its log shows Colony Ships and producers taking the Materials
+first, or the saving rule holding them. Reported, not retuned.

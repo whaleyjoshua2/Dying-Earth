@@ -68,16 +68,19 @@ pub enum FacilityKind {
     LaunchSite,
     /// Version 0.03 (ticket #35): makes Ducats.
     Bank,
+    /// Version 0.03 (ticket #36): raises Influence.
+    Embassy,
 }
 
 impl FacilityKind {
-    pub const ALL: [FacilityKind; 6] = [
+    pub const ALL: [FacilityKind; 7] = [
         FacilityKind::Factory,
         FacilityKind::PowerPlant,
         FacilityKind::Refinery,
         FacilityKind::ResearchLab,
         FacilityKind::LaunchSite,
         FacilityKind::Bank,
+        FacilityKind::Embassy,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -87,6 +90,7 @@ impl FacilityKind {
             FacilityKind::ResearchLab => "Research Lab",
             FacilityKind::LaunchSite => "Launch Site",
             FacilityKind::Bank => "Bank",
+            FacilityKind::Embassy => "Embassy",
         }
     }
 }
@@ -102,10 +106,12 @@ pub enum ModuleKind {
     Barracks,
     /// Version 0.03 (ticket #35): makes Ducats off Earth.
     TradePost,
+    /// Version 0.03 (ticket #36): raises Influence off Earth.
+    Relay,
 }
 
 impl ModuleKind {
-    pub const ALL: [ModuleKind; 7] = [
+    pub const ALL: [ModuleKind; 8] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -113,6 +119,7 @@ impl ModuleKind {
         ModuleKind::Shipyard,
         ModuleKind::Barracks,
         ModuleKind::TradePost,
+        ModuleKind::Relay,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -123,6 +130,7 @@ impl ModuleKind {
             ModuleKind::Shipyard => "Shipyard",
             ModuleKind::Barracks => "Barracks",
             ModuleKind::TradePost => "Trade Post",
+            ModuleKind::Relay => "Relay",
         }
     }
 }

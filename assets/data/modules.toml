@@ -54,3 +54,13 @@ materials = 25
 build_turns = 1
 energy_upkeep = 2
 produces = { resource = "ducats", amount = 3 }
+
+# Ticket #36 (version 0.03). Adds to its holder's Allotment and raises its Colony's standing each turn.
+[[module]]
+id = "relay"
+name = "Relay"
+materials = 25
+build_turns = 1
+energy_upkeep = 2
+influence_allotment = 1
+standing_per_turn = 2

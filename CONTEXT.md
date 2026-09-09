@@ -102,10 +102,18 @@ _Avoid_: treasury, mint, exchange
 The Module that makes Ducats in a Colony, in proportion to the Body's Habitat yield: trade goes where people live.
 _Avoid_: market, exchange, shop
 
+**Embassy**:
+The Facility that raises Influence on Earth: while it stands and is online it adds to its controller's Allotment and raises its state's Standing for its controller each turn. Any number may stand in one state.
+_Avoid_: consulate, ministry, propaganda office
+
+**Relay**:
+The Module that raises Influence off Earth: it adds to its holder's Allotment and raises its Colony's Standing for its holder each turn.
+_Avoid_: antenna, transmitter, beacon
+
 ### Pieces
 
 **Module**:
-A building placed inside a Colony. Seven kinds since version 0.03: Mine, Generator, Refinery, Habitat, Shipyard, Barracks and Trade Post.
+A building placed inside a Colony. Eight kinds since version 0.03: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post and Relay.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:
@@ -147,7 +155,7 @@ _Avoid_: country, nation, territory, region, state
 ### Earth
 
 **Facility**:
-A building placed in a Nation State. Six kinds since version 0.03: Factory, Power Plant, Refinery, Launch Site, Research Lab and Bank.
+A building placed in a Nation State. Seven kinds since version 0.03: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank and Embassy.
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Cheap Industry**:

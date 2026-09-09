@@ -434,6 +434,38 @@ fn ducats_pay_for_restoration_and_repairs_at_the_table_rates() {
     assert!(g.check_order(Seat(0), &[], &Order::RepairWithDucats { unit: UnitRef::Ship(ShipId(1)), points: 1 }).is_err(), "nothing to repair");
 }
 
+// ---------------------------------------------------------------- #36 Embassies and Relays
+
+#[test]
+fn embassies_and_relays_add_to_the_allotment_and_raise_their_places_standing_each_turn() {
+    let mut g = game();
+    // Custodians in Asia: (10 + 7) x 1.3 = 22. Two Embassies (they stack) add 4: (10 + 7 + 4) x 1.3 = 27.
+    assert_eq!(g.influence_allotment(Seat(0)), 22);
+    g.state_mut(StateId::Asia).facilities.push(facility(FacilityKind::Embassy));
+    g.state_mut(StateId::Asia).facilities.push(facility(FacilityKind::Embassy));
+    assert_eq!(g.building_allotment(Seat(0)), 4);
+    assert_eq!(g.influence_allotment(Seat(0)), 27);
+    // A Relay in a Colony adds 1 more.
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Relay], 4);
+    assert_eq!(g.influence_allotment(Seat(0)), 28, "(10 + 7 + 5) x 1.3 = 28.6");
+    // Each Resolution the standing rises by the buildings' figures and does not decay.
+    g.resolution_phase();
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::Asia)], 4, "two Embassies, 2 each");
+    assert_eq!(g.seats[0].influence[&Place::Colony(c)], 2, "one Relay");
+    g.resolution_phase();
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::Asia)], 8);
+    // An offline Embassy adds nothing.
+    for f in g.state_mut(StateId::Asia).facilities.iter_mut().filter(|f| f.kind == FacilityKind::Embassy) {
+        f.online = false;
+    }
+    assert_eq!(g.building_allotment(Seat(0)), 1, "only the Relay");
+    g.resolution_phase();
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::Asia)], 7, "no rise, and decay 1 on your own place");
+    // The card says what they do.
+    let y = g.facility_yield(Seat(0), StateId::Asia, FacilityKind::Embassy);
+    assert_eq!(y.text(), "+2 Influence Allotment, standing here +2 a turn, 2 Energy upkeep");
+}
+
 // ---------------------------------------------------------------- 8.5 Occupation
 
 fn occupier_in(g: &mut Game, seat_home: StateId, target: StateId) -> ArmyId {

@@ -505,6 +505,30 @@ impl Game {
             s.influenced_this_turn.push(target);
             self.log(format!("{} spent {} Influence {} {}.", self.seat_name(seat), amount, if own { "holding" } else { "on" }, self.place_name(target)));
         }
+        // Embassies and Relays (ticket #36) raise their place's standing for its controller each turn,
+        // which counts as Influence received, so the standing does not decay.
+        let mut rises: Vec<(Seat, Place, i64)> = Vec::new();
+        for st in &self.states {
+            if let Some(c) = st.control.controller() {
+                let r: i64 = st.facilities.iter().filter(|f| f.online).map(|f| self.tables.facility(f.kind).standing_per_turn).sum();
+                if r > 0 {
+                    rises.push((c, Place::State(st.id), r));
+                }
+            }
+        }
+        for col in &self.colonies {
+            if let Some(c) = col.control.controller() {
+                let r: i64 = col.modules.iter().filter(|m| m.online).map(|m| self.tables.module(m.kind).standing_per_turn).sum();
+                if r > 0 {
+                    rises.push((c, Place::Colony(col.id), r));
+                }
+            }
+        }
+        for (seat, place, r) in rises {
+            let s = self.seat_mut(seat);
+            *s.influence.entry(place).or_insert(0) += r;
+            s.influenced_this_turn.push(place);
+        }
         // Decay on every standing that received nothing this turn: 1 on a place you control, 2 elsewhere.
         let decay = self.tables.influence.decay;
         let decay_own = self.tables.influence.decay_controlled;

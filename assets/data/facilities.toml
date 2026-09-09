@@ -55,6 +55,18 @@ energy_upkeep = 2
 produces = { resource = "ducats", amount = 4 }
 emissions = 0.0
 
+# Ticket #36 (version 0.03). Adds to its controller's Allotment and raises its state's standing for
+# its controller each turn, while it stands and is online. Any number may stand in one state.
+[[facility]]
+id = "embassy"
+name = "Embassy"
+materials = 30
+build_turns = 1
+energy_upkeep = 2
+emissions = 0.0
+influence_allotment = 2
+standing_per_turn = 2
+
 [industry_level]
 materials = 30
 materials_cheap_industry = 15

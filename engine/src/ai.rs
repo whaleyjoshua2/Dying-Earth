@@ -15,6 +15,8 @@ enum Cat {
     ColonyShip,
     Warship,
     ArmyOrBarracks,
+    /// Ticket #36: an Embassy or a Relay.
+    BuildInfluence,
     Influence,
     Transit,
     LoadUnload,
@@ -65,6 +67,7 @@ impl Game {
             Cat::ColonyShip => w.build_colony_ship,
             Cat::Warship => w.build_warship,
             Cat::ArmyOrBarracks => w.build_army_or_barracks,
+            Cat::BuildInfluence => w.build_influence,
             Cat::Influence => w.influence,
             Cat::Transit => w.transit,
             Cat::LoadUnload => w.load_unload,
@@ -322,6 +325,7 @@ impl Game {
                     let (cat, mut base) = match fk {
                         FacilityKind::Factory | FacilityKind::PowerPlant | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                         FacilityKind::ResearchLab => (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab)),
+                        FacilityKind::Embassy => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
                         FacilityKind::LaunchSite => {
                             if has_launch {
                                 continue;
@@ -375,6 +379,7 @@ impl Game {
             for mk in ModuleKind::ALL {
                 let (cat, mut base) = match mk {
                     ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery | ModuleKind::TradePost => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
+                    ModuleKind::Relay => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
                     ModuleKind::Habitat => (Cat::Habitat, self.base_weight(seat, Cat::Habitat)),
                     ModuleKind::Shipyard => {
                         if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {

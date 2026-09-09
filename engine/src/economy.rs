@@ -25,6 +25,9 @@ pub struct Yield {
     pub research: i64,
     pub upkeep: i64,
     pub emissions: f64,
+    /// Ticket #36: Influence Allotment added while it stands, and standing raised each turn.
+    pub allotment: i64,
+    pub standing: i64,
 }
 
 impl Yield {
@@ -40,6 +43,12 @@ impl Yield {
         }
         if self.research > 0 {
             parts.push(format!("+{} Research", self.research));
+        }
+        if self.allotment > 0 {
+            parts.push(format!("+{} Influence Allotment", self.allotment));
+        }
+        if self.standing > 0 {
+            parts.push(format!("standing here +{} a turn", self.standing));
         }
         if parts.is_empty() {
             parts.push("no output".to_string());
@@ -116,7 +125,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let card = t.state(sid);
         let fc = t.facility(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0 };
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn };
         if let Some(p) = &fc.produces {
             match p.resource {
                 Resource::Research => {
@@ -161,7 +170,7 @@ impl Game {
         let t = &self.tables;
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0 };
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn };
         let Some(col) = self.colony(cid) else { return y };
         let body = t.body(col.body);
         if let Some(p) = &mc.produces {

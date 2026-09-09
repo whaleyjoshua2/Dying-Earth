@@ -73,6 +73,12 @@ pub struct FacilityCard {
     pub energy_upkeep: i64,
     pub produces: Option<Produces>,
     pub emissions: f64,
+    /// Ticket #36: what it adds to its controller's Allotment while it stands and is online.
+    #[serde(default)]
+    pub influence_allotment: i64,
+    /// Ticket #36: how much its place's standing for its controller rises each turn.
+    #[serde(default)]
+    pub standing_per_turn: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -92,6 +98,10 @@ pub struct ModuleCard {
     pub produces: Option<Produces>,
     #[serde(default)]
     pub holds_colonists: u32,
+    #[serde(default)]
+    pub influence_allotment: i64,
+    #[serde(default)]
+    pub standing_per_turn: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -257,6 +267,8 @@ pub struct AiWeights {
     pub build_colony_ship: f64,
     pub build_warship: f64,
     pub build_army_or_barracks: f64,
+    /// Ticket #36: an Embassy or a Relay.
+    pub build_influence: f64,
     pub influence: f64,
     pub transit: f64,
     pub load_unload: f64,

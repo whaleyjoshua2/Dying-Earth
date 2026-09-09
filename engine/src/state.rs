@@ -701,11 +701,31 @@ impl Game {
         card.influence + (self.state(s).industry_level as i64 - card.industry_level as i64).max(0)
     }
 
-    /// The Allotment: the base plus every controlled state's Influence value, times the Faction multiplier.
+    /// What the seat's online Embassies and Relays add to its Allotment (ticket #36).
+    pub fn building_allotment(&self, seat: Seat) -> i64 {
+        let earth: i64 = self
+            .controlled_states(seat)
+            .iter()
+            .flat_map(|s| self.state(*s).facilities.iter())
+            .filter(|f| f.online)
+            .map(|f| self.tables.facility(f.kind).influence_allotment)
+            .sum();
+        let space: i64 = self
+            .owned_colonies(seat)
+            .iter()
+            .flat_map(|c| self.colony(*c).into_iter().flat_map(|c| c.modules.iter()))
+            .filter(|m| m.online)
+            .map(|m| self.tables.module(m.kind).influence_allotment)
+            .sum();
+        earth + space
+    }
+
+    /// The Allotment: the base plus every controlled state's Influence value plus the buildings,
+    /// times the Faction multiplier.
     pub fn influence_allotment(&self, seat: Seat) -> i64 {
         let t = &self.tables.influence;
         let states: i64 = self.controlled_states(seat).iter().map(|s| self.state_influence_value(*s)).sum();
-        let base = t.allotment_base + states;
+        let base = t.allotment_base + states + self.building_allotment(seat);
         let m = self.tables.faction(self.kind(seat)).influence_multiplier;
         (base as f64 * m).floor() as i64
     }
