@@ -26,10 +26,15 @@ neither program needs a folder of assets beside its `.exe`.
   this on-screen capture taken earlier the same evening:
   ![eframe Earth view, captured from the screen](eframe-earth-onscreen.png)
   Bevy's screenshot path converts correctly, so its captures match the screen.
-- **Bevy over-exposed at first.** A 9,000 lux directional light against the
-  default camera exposure washed the globe out to white in the middle; 2,500
-  lux fixed it. Not a library problem, a tuning one, but it is the kind of
-  thing that silently looks wrong.
+- **The Bevy globe first came out with a white disc in the middle**, and it took
+  three guesses to name it. It was not a specular highlight (roughness 1.0 did
+  nothing) and not over-exposure (dropping the light from 9,000 to 2,500 lux
+  barely dimmed it). The graticule lines converged on it like spokes: it was the
+  **ice cap**, because Bevy's UV sphere puts its poles on the Z axis, so the
+  globe was lying on its side facing the camera. One rotation fixed it. The
+  hand-written sphere on the eframe side has its poles on Y and never had the
+  problem. Worth remembering: a library that knows what a sphere is still has
+  opinions about which way up it goes.
 - **Bevy showed a white window for over nine seconds on its first-ever
   launch** while it compiled shaders; every later launch drew within a
   second. eframe drew immediately every time.
