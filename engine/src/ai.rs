@@ -241,6 +241,14 @@ impl Game {
         }
     }
 
+    /// Ticket #41: the rival's standing on a place the seat holds is within the challenge margin of
+    /// the seat's own, so the place could be lost to a short push.
+    fn standing_pressed(&self, seat: Seat, place: Place) -> bool {
+        let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
+        let rival = self.seat(seat.other()).influence.get(&place).copied().unwrap_or(0);
+        rival > 0 && rival + self.tables.influence.challenge_margin >= mine
+    }
+
     /// Spec 16.2: the Energy balance is within one turn's upkeep of zero.
     fn energy_tight(&self, seat: Seat) -> bool {
         let drain = self.total_upkeep(seat) - self.energy_production(seat);
@@ -258,6 +266,7 @@ impl Game {
         let scarce = self.scarcest(seat);
         let tight = self.energy_tight(seat);
         let allotment = self.seat(seat).allotment;
+        let margin = self.tables.influence.challenge_margin;
         let materials_income = self.seat(seat).income_last_turn.materials;
         let no_materials_income = materials_income == 0
             && !self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::Factory))
@@ -275,6 +284,11 @@ impl Game {
         if energy_short {
             needs.push(Resource::Energy);
         }
+        // Ticket #41 tried adding Ducats to this list (a Bank or Trade Post preferred while the seat
+        // cannot afford a step of bought Influence). Measured over twenty seeds it cost the Custodians
+        // every win: a Bank on turn one displaced the Research Lab, and 4 Ducats a turn buys 2
+        // Influence, which never repays 25 Materials the way a Factory does. Banks and Trade Posts
+        // stay plain producers at their base weight.
         let mut cands: Vec<Candidate> = Vec::new();
 
         let mut push = |orders: Vec<Order>, cat: Cat, base: f64, gap: f64, denial: f64, threat: f64, opportunity: f64, note: String, stack: Option<String>| {
@@ -343,7 +357,14 @@ impl Game {
                         }
                     }
                     let name = fk.name();
-                    push(vec![Order::BuildFacility { state: sid, kind: fk }], cat, base, gap_for(cat, Some(name)), denial_for(cat, name), 1.0, 1.0, format!("build {} in {}", name, self.tables.state(sid).name), None);
+                    // Ticket #41: the first Embassy in a state is a threat answer while the rival's
+                    // standing presses on the seat's own there. (An opportunity multiplier on the seat's
+                    // most valuable state was tried too: four Embassies a game, and no wins.)
+                    let first_embassy = fk == FacilityKind::Embassy
+                        && !self.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::Embassy)
+                        && !self.state(sid).queue.iter().any(|b| b.item == BuildItem::Facility(FacilityKind::Embassy));
+                    let sway = if first_embassy && self.standing_pressed(seat, Place::State(sid)) { m.threat } else { 1.0 };
+                    push(vec![Order::BuildFacility { state: sid, kind: fk }], cat, base, gap_for(cat, Some(name)), denial_for(cat, name), sway, 1.0, format!("build {} in {}", name, self.tables.state(sid).name), None);
                 }
             }
             let base = self.base_weight(seat, Cat::RaiseIndustry);
@@ -410,7 +431,21 @@ impl Game {
                         continue;
                     }
                 }
-                let t = if matches!(cat, Cat::ArmyOrBarracks) { threat } else { 1.0 };
+                // Ticket #41: the first Relay at a Colony is a threat answer while the rival's standing
+                // presses on the seat's own there, once the Colony has a producer Module (a Relay before
+                // the first Mine starved the Colony). A second Relay is worth its base weight.
+                let has_producer = col.modules.iter().any(|m| matches!(m.kind, ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery | ModuleKind::TradePost));
+                let first_relay = mk == ModuleKind::Relay
+                    && has_producer
+                    && !col.modules.iter().any(|m| m.kind == ModuleKind::Relay)
+                    && !col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Relay));
+                let t = if matches!(cat, Cat::ArmyOrBarracks) {
+                    threat
+                } else if first_relay && self.standing_pressed(seat, Place::Colony(cid)) {
+                    m.threat
+                } else {
+                    1.0
+                };
                 push(vec![Order::BuildModule { colony: cid, kind: mk }], cat, base, gap_for(cat, Some(mk.name())), 1.0, t, 1.0, format!("build {} at {}", mk.name(), self.place_name(Place::Colony(cid))), None);
             }
             if col.modules.iter().any(|m| m.kind == ModuleKind::Barracks) && !self.armies.iter().any(|a| a.home == ArmyHome::Colony(cid)) {
@@ -449,9 +484,12 @@ impl Game {
         for (rank, (target, _)) in targets.iter().enumerate() {
             let have = self.seat(seat).influence.get(target).copied().unwrap_or(0);
             let threshold = self.influence_threshold(*target);
-            // Ticket #33: a controlled place needs a standing above the controller's as well.
-            let holding = self.place_control(*target).controller().map(|c| self.seat(c).influence.get(target).copied().unwrap_or(0)).unwrap_or(0);
-            let needed = threshold.max(holding + 1);
+            // Ticket #33: a controlled place needs a standing above the controller's as well, by the
+            // challenge margin (ticket #41).
+            let needed = match self.place_control(*target).controller() {
+                Some(c) => threshold.max(self.seat(c).influence.get(target).copied().unwrap_or(0) + margin),
+                None => threshold,
+            };
             let base = self.base_weight(seat, Cat::Influence) * (1.0 - 0.15 * rank as f64).max(0.3);
             let opp = if needed - have <= step { m.opportunity } else { 1.0 };
             let denial = if kind == FactionKind::Custodians && rival_near && self.place_control(*target).controller() == Some(seat.other()) { m.denial } else { 1.0 };

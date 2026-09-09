@@ -544,19 +544,23 @@ impl Game {
             }
             s.influence.retain(|_, v| *v > 0);
         }
-        // Thresholds: a neutral place needs the threshold; a controlled place needs a standing above the
-        // controller's and at least the threshold.
+        // Thresholds: a neutral place needs the threshold; a controlled place needs a standing at least
+        // the controller's plus the challenge margin (version 0.04, ticket #41) and at least the threshold.
+        let margin = self.tables.influence.challenge_margin;
         let mut targets: Vec<Place> = StateId::ALL.into_iter().map(Place::State).collect();
         targets.extend(self.colonies.iter().map(|c| Place::Colony(c.id)));
         for target in targets {
             let threshold = self.influence_threshold(target);
             let controller = self.place_control(target).controller();
-            let holding = controller.map(|c| self.seat(c).influence.get(&target).copied().unwrap_or(0)).unwrap_or(0);
+            let needed = match controller {
+                Some(c) => threshold.max(self.seat(c).influence.get(&target).copied().unwrap_or(0) + margin),
+                None => threshold,
+            };
             let qualifying: Vec<Seat> = Seat::ALL
                 .into_iter()
                 .filter(|s| {
                     let have = self.seat(*s).influence.get(&target).copied().unwrap_or(0);
-                    controller != Some(*s) && have > 0 && have >= threshold && have > holding
+                    controller != Some(*s) && have > 0 && have >= needed
                 })
                 .collect();
             let winner = match qualifying.len() {

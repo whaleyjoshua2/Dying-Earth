@@ -118,6 +118,8 @@ pub struct ViewState {
     /// The Tech Tree opened itself for a pending pick; it does not reopen until the next pick.
     pub tech_prompted: bool,
     pub show_climate: bool,
+    /// Ticket #41: the Climate Panel was just reopened; put it back at its home position once.
+    pub climate_reopen: bool,
     pub show_victory: bool,
     pub load_state: Option<StateId>,
     pub influence_amount: i64,
@@ -140,6 +142,7 @@ impl Default for ViewState {
             show_tech: false,
             tech_prompted: false,
             show_climate: true,
+            climate_reopen: false,
             show_victory: false,
             load_state: None,
             influence_amount: 5,

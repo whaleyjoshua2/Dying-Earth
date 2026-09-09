@@ -245,6 +245,8 @@ pub struct InfluenceTable {
     pub decay: i64,
     /// Ticket #33: decay on a place the Faction controls.
     pub decay_controlled: i64,
+    /// Version 0.04 (ticket #41): a challenger needs the controller's standing plus this.
+    pub challenge_margin: i64,
     pub occupation_turns: u32,
     pub destruction_chance: f64,
 }

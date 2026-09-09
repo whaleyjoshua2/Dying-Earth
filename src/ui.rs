@@ -44,6 +44,10 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, se
     if keys.just_pressed(KeyCode::Tab) {
         view.swap();
     }
+    // Ticket #41: C toggles the Climate Panel, a second way back once it is closed.
+    if keys.just_pressed(KeyCode::KeyC) {
+        toggle_climate(&mut view);
+    }
     if keys.just_pressed(KeyCode::Escape) {
         if view.popup != Popup::None {
             advance_popup(&mut view);
@@ -52,6 +56,13 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, se
             view.selection = Selection::None;
         }
     }
+}
+
+/// Ticket #41: show or hide the Climate Panel; a reopened panel returns to its home position, so a
+/// panel dragged off the picture and closed is not lost.
+pub fn toggle_climate(view: &mut ViewState) {
+    view.show_climate = !view.show_climate;
+    view.climate_reopen = view.show_climate;
 }
 
 fn advance_popup(view: &mut ViewState) {
@@ -365,8 +376,8 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             if ui.button("Tech Tree").clicked() {
                 view.show_tech = !view.show_tech;
             }
-            if ui.button("Climate Panel").clicked() {
-                view.show_climate = !view.show_climate;
+            if ui.button(if view.show_climate { "Hide Climate Panel (C)" } else { "Climate Panel (C)" }).clicked() {
+                toggle_climate(view);
             }
             if ui.button("Victory").clicked() {
                 view.show_victory = !view.show_victory;
@@ -1207,10 +1218,82 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
 
 // ------------------------------------------------------------------ popups
 
+/// Ticket #41: the Tech Tree drawn as a tree. One column per branch, one row per rung, a line from
+/// every Tech to each Tech that needs it, each box coloured by its state.
+fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, actions: &mut Vec<Action>) {
+    const COL: f32 = 156.0;
+    const ROW: f32 = 96.0;
+    const BOX_W: f32 = 140.0;
+    const BOX_H: f32 = 64.0;
+    const HEAD: f32 = 26.0;
+    let mut branches: Vec<String> = Vec::new();
+    for t in TechId::ALL {
+        let b = &game.tables.tech(t).branch;
+        if !branches.contains(b) {
+            branches.push(b.clone());
+        }
+    }
+    let rungs = TechId::ALL.iter().map(|t| game.tables.tech(*t).rung).max().unwrap_or(1).max(1);
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(COL * branches.len() as f32, HEAD + ROW * rungs as f32), egui::Sense::hover());
+    let painter = ui.painter_at(rect);
+    let box_of = |t: TechId| -> egui::Rect {
+        let card = game.tables.tech(t);
+        let c = branches.iter().position(|b| *b == card.branch).unwrap_or(0) as f32;
+        let r = card.rung.max(1) as f32 - 1.0;
+        let min = rect.min + egui::vec2(c * COL + (COL - BOX_W) / 2.0, HEAD + r * ROW + (ROW - BOX_H) / 2.0);
+        egui::Rect::from_min_size(min, egui::vec2(BOX_W, BOX_H))
+    };
+    for (i, b) in branches.iter().enumerate() {
+        painter.text(rect.min + egui::vec2(i as f32 * COL + COL / 2.0, HEAD / 2.0), egui::Align2::CENTER_CENTER, b, FontId::proportional(14.0), Color32::WHITE);
+    }
+    // Lines first, so the boxes sit on top of them. A line is green once the Tech it comes from is done.
+    for t in TechId::ALL {
+        for n in &game.tables.tech(t).needs {
+            let from = box_of(*n).center_bottom();
+            let to = box_of(t).center_top();
+            let colour = if game.research.done.contains(n) { Color32::from_rgb(120, 200, 120) } else { Color32::from_gray(150) };
+            painter.line_segment([from, to], egui::Stroke::new(2.0, colour));
+            painter.circle_filled(to, 3.5, colour);
+        }
+    }
+    for t in TechId::ALL {
+        let card = game.tables.tech(t);
+        let r = box_of(t);
+        let (fill, status) = if game.research.done.contains(&t) {
+            (Color32::from_rgb(50, 120, 60), "done")
+        } else if game.research.current == Some(t) {
+            (Color32::from_rgb(170, 130, 30), "under research")
+        } else if available.contains(&t) {
+            (Color32::from_rgb(40, 90, 160), "available")
+        } else {
+            (Color32::from_gray(60), "locked")
+        };
+        painter.rect(r, 6.0, fill, egui::Stroke::new(1.0, Color32::from_gray(200)), egui::StrokeKind::Inside);
+        painter.text(r.center_top() + egui::vec2(0.0, 14.0), egui::Align2::CENTER_CENTER, &card.name, FontId::proportional(13.0), Color32::WHITE);
+        painter.text(r.center_top() + egui::vec2(0.0, 32.0), egui::Align2::CENTER_CENTER, format!("cost {} - {}", card.cost, status), FontId::proportional(11.0), Color32::from_gray(230));
+        let needs = if card.needs.is_empty() { "nothing".to_string() } else { card.needs.iter().map(|n| game.tables.tech(*n).name.clone()).collect::<Vec<_>>().join(" and ") };
+        ui.interact(r, ui.id().with(format!("tech-{t:?}")), egui::Sense::hover()).on_hover_text(format!("{} (rung {}, cost {} Research)\n{}\nNeeds: {}", card.name, card.rung, card.cost, card.effect, needs));
+        if must_pick && available.contains(&t) {
+            let b = egui::Rect::from_center_size(r.center_bottom() - egui::vec2(0.0, 11.0), egui::vec2(56.0, 18.0));
+            if ui.put(b, egui::Button::new(RichText::new("Pick").size(11.0))).clicked() {
+                actions.push(Action::PickTech(t));
+            }
+        }
+    }
+    ui.horizontal(|ui| {
+        for (colour, label) in [(Color32::from_rgb(50, 120, 60), "done"), (Color32::from_rgb(170, 130, 30), "under research"), (Color32::from_rgb(40, 90, 160), "available"), (Color32::from_gray(60), "locked")] {
+            let (sw, _) = ui.allocate_exact_size(egui::vec2(14.0, 14.0), egui::Sense::hover());
+            ui.painter().rect_filled(sw, 3.0, colour);
+            ui.label(label);
+        }
+        ui.label("Hover a box for its effect.");
+    });
+}
+
 fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
     if view.show_tech {
         let mut open = true;
-        egui::Window::new("Tech Tree").open(&mut open).default_width(560.0).show(ctx, |ui| {
+        egui::Window::new("Tech Tree").open(&mut open).resizable(false).show(ctx, |ui| {
             ui.label(match game.research.current {
                 Some(t) => format!("Under research: {} ({} of {}). {}", game.tables.tech(t).name, game.research.progress, game.tables.tech(t).cost, game.research_lead_text()),
                 None => format!("No Tech under research. {} Research waiting.", game.research.unallocated),
@@ -1220,37 +1303,20 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.colored_label(Color32::YELLOW, "You pick the next Tech: choose one below.");
             }
             let available = game.available_techs();
-            let mut branch = String::new();
-            for t in TechId::ALL {
-                let card = game.tables.tech(t);
-                if card.branch != branch {
-                    branch = card.branch.clone();
-                    ui.separator();
-                    ui.label(RichText::new(&branch).strong());
-                }
-                let status = if game.research.done.contains(&t) {
-                    "done".to_string()
-                } else if game.research.current == Some(t) {
-                    "under research".to_string()
-                } else if available.contains(&t) {
-                    "available".to_string()
-                } else {
-                    format!("needs {}", card.needs.iter().map(|n| game.tables.tech(*n).name.clone()).collect::<Vec<_>>().join(" and "))
-                };
-                ui.horizontal(|ui| {
-                    ui.label(format!("{} (rung {}, cost {}): {} [{}]", card.name, card.rung, card.cost, card.effect, status));
-                    if must_pick && available.contains(&t) && ui.button("Pick").clicked() {
-                        actions.push(Action::PickTech(t));
-                    }
-                });
-            }
+            tech_tree(ui, game, &available, must_pick, actions);
         });
         view.show_tech = open;
     }
     if view.show_climate {
         let mut open = true;
         let bottom = ctx.viewport_rect().max.y;
-        egui::Window::new("Climate Panel").open(&mut open).default_pos((10.0, bottom - 400.0)).default_width(400.0).show(ctx, |ui| {
+        let home = (10.0, bottom - 400.0);
+        let mut window = egui::Window::new("Climate Panel").open(&mut open).default_pos(home).default_width(400.0);
+        if view.climate_reopen {
+            window = window.current_pos(home);
+            view.climate_reopen = false;
+        }
+        window.show(ctx, |ui| {
             let c = &game.climate;
             let e = &c.last;
             ui.label(RichText::new(format!("CO2 Stock {:.1} ppm", c.co2)).strong());

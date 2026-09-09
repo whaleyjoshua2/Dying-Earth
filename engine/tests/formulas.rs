@@ -312,8 +312,15 @@ fn a_challenger_needs_a_standing_above_the_controllers_and_at_least_the_threshol
     g.seats[0].influenced_this_turn.push(Place::State(StateId::Africa));
     g.resolution_phase();
     assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)), "55 is not above 60");
-    // Above the controller's standing: it flips, and seat 0 keeps its 60 to contest it back.
-    g.seats[1].influence.insert(Place::State(StateId::Africa), 61);
+    // Version 0.04 (ticket #41): above the controller's standing but inside the challenge margin
+    // of 10: still no change. That is what stops a place flipping back and forth every turn.
+    g.seats[1].influence.insert(Place::State(StateId::Africa), 69);
+    g.seats[1].influenced_this_turn.push(Place::State(StateId::Africa));
+    g.seats[0].influenced_this_turn.push(Place::State(StateId::Africa));
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)), "69 is not 60 plus the margin of 10");
+    // The controller's standing plus the margin: it flips, and seat 0 keeps its 60 to contest it back.
+    g.seats[1].influence.insert(Place::State(StateId::Africa), 70);
     g.seats[1].influenced_this_turn.push(Place::State(StateId::Africa));
     g.seats[0].influenced_this_turn.push(Place::State(StateId::Africa));
     g.resolution_phase();
@@ -415,17 +422,19 @@ fn ducats_buy_influence_two_for_one_and_the_bought_influence_is_spendable_at_onc
 #[test]
 fn ducats_pay_for_restoration_and_repairs_at_the_table_rates() {
     let mut g = game();
-    g.seats[0].stockpile.ducats = 25;
+    // Version 0.04 (ticket #41): two Ducats for one of the thing bought. A Restoration step is
+    // 10 Energy, so 20 Ducats; a repair point is 5 Materials, so 10 Ducats.
+    g.seats[0].stockpile.ducats = 50;
     g.seats[0].stockpile.energy = 0;
     let r = Order::RestorationWithDucats { steps: 2 };
-    assert_eq!(g.order_cost(Seat(0), &r).ducats, 20);
+    assert_eq!(g.order_cost(Seat(0), &r).ducats, 40);
     g.commit_orders(Seat(0), &[r]);
     assert!((g.climate.restoration_next - 6.0).abs() < 1e-9, "two steps of 3.0 ppm");
-    assert_eq!(g.seats[0].stockpile.ducats, 5);
-    // A repair: 5 Ducats a point, same legality as a Materials repair.
+    assert_eq!(g.seats[0].stockpile.ducats, 10);
+    // A repair: 10 Ducats a point, same legality as a Materials repair.
     g.ships.push(Ship { id: ShipId(1), kind: UnitKind::Frigate, seat: Seat(0), damage: 1, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 });
     let fix = Order::RepairWithDucats { unit: UnitRef::Ship(ShipId(1)), points: 1 };
-    assert_eq!(g.order_cost(Seat(0), &fix).ducats, 5);
+    assert_eq!(g.order_cost(Seat(0), &fix).ducats, 10);
     assert!(g.check_order(Seat(0), &[], &fix).is_ok());
     g.commit_orders(Seat(0), &[fix]);
     g.resolution_phase();

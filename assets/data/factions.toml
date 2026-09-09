@@ -41,7 +41,9 @@ ducats = 0
 # the Body's Habitat yield. Ducats buy Influence, Restoration steps and repair points at these rates.
 [ducats]
 per_influence = 2
-per_restoration_step = 10
-per_repair_point = 5
+# Version 0.04 (ticket #41): two Ducats for one of the thing bought, as with Influence. A
+# Restoration step is 10 Energy, a repair point 5 Materials.
+per_restoration_step = 20
+per_repair_point = 10
 bank_per_gdp_tenth = 4.0
 trade_post_base = 3.0
