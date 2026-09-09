@@ -16,6 +16,7 @@ enum Action {
     Cancel(usize),
     EndTurn,
     PickTech(TechId),
+    ChooseFaction(FactionKind),
     NewGame(FactionKind, StateId),
     ToTitle,
     Quit,
@@ -114,7 +115,7 @@ pub fn draw(
     let _ = window;
     match session.screen.clone() {
         Screen::Title => title_screen(&mut root, &mut session, &mut actions),
-        Screen::ChooseFaction => faction_screen(&mut root, &session, &mut session.screen.clone(), &mut actions),
+        Screen::ChooseFaction => faction_screen(&mut root, &session, &mut actions),
         Screen::ChooseStart { faction } => start_screen(&mut root, &session, faction, &mut actions),
         Screen::Playing | Screen::GameOver => {
             let cam = camera.single().ok();
@@ -147,6 +148,10 @@ pub fn draw(
                 if let Some(Err(e)) = result {
                     session.last_error = Some(e);
                 }
+            }
+            Action::ChooseFaction(f) => {
+                session.screen = Screen::ChooseStart { faction: f };
+                session.earth_dirty = true;
             }
             Action::NewGame(f, s) => {
                 session.new_game(f, s);
@@ -192,9 +197,7 @@ fn title_screen(root: &mut Ui, session: &mut Session, actions: &mut Vec<Action>)
     });
 }
 
-fn faction_screen(root: &mut Ui, session: &Session, screen: &mut Screen, actions: &mut Vec<Action>) {
-    let _ = actions;
-    let mut next: Option<Screen> = None;
+fn faction_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>) {
     egui::CentralPanel::default().show(root, |ui| {
         ui.vertical_centered(|ui| {
             ui.add_space(40.0);
@@ -223,15 +226,12 @@ fn faction_screen(root: &mut Ui, session: &Session, screen: &mut Screen, actions
                     ui.label(&card.victory);
                     ui.add_space(12.0);
                     if ui.add(egui::Button::new(RichText::new(format!("Play the {}", card.name)).size(18.0)).min_size(egui::vec2(200.0, 40.0))).clicked() {
-                        next = Some(Screen::ChooseStart { faction: kind });
+                        actions.push(Action::ChooseFaction(kind));
                     }
                 });
             }
         });
     });
-    if let Some(n) = next {
-        *screen = n;
-    }
 }
 
 fn start_screen(root: &mut Ui, session: &Session, faction: FactionKind, actions: &mut Vec<Action>) {
