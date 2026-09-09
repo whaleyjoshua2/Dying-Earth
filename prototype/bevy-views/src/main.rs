@@ -257,7 +257,8 @@ fn place_moon(game: Res<Game>, mut q: Query<&mut Transform, With<Moon>>) {
     for mut t in &mut q {
         // local to the Earth entity, which is scaled 0.35
         let r = 0.6 / 0.35;
-        t.translation = Vec3::new(mo.cos() * r, 0.0, mo.sin() * r);
+        // the Earth parent is rotated -90 deg about X to stand upright; undo that here
+        t.translation = Quat::from_rotation_x(FRAC_PI_2) * Vec3::new(mo.cos() * r, 0.0, mo.sin() * r);
     }
 }
 
