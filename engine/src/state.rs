@@ -56,6 +56,15 @@ pub struct Facility {
 pub struct Module {
     pub kind: ModuleKind,
     pub online: bool,
+    /// Knocked offline by a card until the next Resolution (Reactor Leak).
+    #[allow(dead_code)]
+    pub offline_until_resolution: bool,
+}
+
+impl Module {
+    pub fn new(kind: ModuleKind) -> Module {
+        Module { kind, online: true, offline_until_resolution: false }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -168,7 +177,8 @@ pub struct EmissionsBreakdown {
     pub refineries: f64,
     pub launches: f64,
     pub population: f64,
-    pub wildfire: f64,
+    /// Emissions added by Event cards (Wildfire, Permafrost Thaw); never counted against Stabilization.
+    pub cards: f64,
     pub sink: f64,
     pub restoration: f64,
 }
@@ -179,7 +189,7 @@ impl EmissionsBreakdown {
         self.state_industry + self.factories + self.power_plants + self.refineries + self.launches + self.population
     }
     pub fn total(&self) -> f64 {
-        self.counted() + self.wildfire
+        self.counted() + self.cards
     }
     pub fn total_sink(&self) -> f64 {
         self.sink + self.restoration
@@ -196,8 +206,8 @@ pub struct Climate {
     pub last: EmissionsBreakdown,
     /// Launches from Earth since the last Climate phase, per seat, charged next time.
     pub launches_pending: [u32; 2],
-    /// How many 0.2 degree steps have already swapped a Calm Card.
-    pub swaps_counted: u32,
+    /// Emissions a card (Permafrost Thaw) adds at the next Climate phase, worldwide.
+    pub card_emissions_next: f64,
     /// Restoration bought in the last Orders phase, in ppm, for the next Climate phase only.
     pub restoration_next: f64,
 }
@@ -221,9 +231,9 @@ impl Research {
     }
 }
 
+/// A card in the deck. Since ticket #25 every card is an Event; there are no Calm Cards.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Card {
-    Calm,
     Event(EventId),
 }
 
@@ -240,8 +250,8 @@ impl Deck {
             .filter(|c| matches!(c, Card::Event(e) if EventId::CLIMATE.contains(e)))
             .count()
     }
-    pub fn calm_left(&self) -> usize {
-        self.cards.iter().filter(|c| **c == Card::Calm).count()
+    pub fn count(&self, id: EventId) -> usize {
+        self.cards.iter().filter(|c| **c == Card::Event(id)).count()
     }
 }
 
@@ -360,6 +370,8 @@ pub struct Game {
     pub research: Research,
     pub deck: Deck,
     pub discoveries: Vec<Discovery>,
+    /// Solar Maximum: every Power Plant and Generator makes more at the next Income.
+    pub solar_maximum_next: bool,
     pub last_event: Option<DrawnEvent>,
     pub report: Report,
     pub outcome: Option<Outcome>,
@@ -422,7 +434,7 @@ impl Game {
                 temperature: tables.climate.base_temperature,
                 last: EmissionsBreakdown::default(),
                 launches_pending: [0, 0],
-                swaps_counted: 0,
+                card_emissions_next: 0.0,
                 restoration_next: 0.0,
             },
             research: Research {
@@ -436,6 +448,7 @@ impl Game {
             },
             deck,
             discoveries: Vec::new(),
+            solar_maximum_next: false,
             last_event: None,
             report: Report::default(),
             outcome: None,

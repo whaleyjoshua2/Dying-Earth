@@ -23,6 +23,10 @@ impl Game {
                     m.online = true;
                 }
             }
+            for m in c.modules.iter_mut().filter(|m| m.offline_until_resolution) {
+                m.offline_until_resolution = false;
+                m.online = true;
+            }
         }
         self.blackout_stances();
         self.resolve_transits(); // (a)
@@ -676,7 +680,7 @@ impl Game {
             }
             (Place::Colony(c), BuildItem::Module(k)) => {
                 if let Some(col) = self.colony_mut(c) {
-                    col.modules.push(Module { kind: k, online: true });
+                    col.modules.push(Module::new(k));
                 }
             }
             (_, BuildItem::Unit(UnitKind::Army)) => {
@@ -831,7 +835,7 @@ impl Game {
                                 body: b,
                                 slot,
                                 control: Control::Controlled(seat),
-                                modules: vec![Module { kind: ModuleKind::Habitat, online: true }],
+                                modules: vec![Module::new(ModuleKind::Habitat)],
                                 colonists: 0,
                                 queue: Vec::new(),
                                 grid_failed: false,

@@ -1183,14 +1183,20 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             ui.label(format!("Refineries {:.1}", e.refineries));
             ui.label(format!("Launches {:.1}", e.launches));
             ui.label(format!("Population {:.1}", e.population));
-            if e.wildfire > 0.0 {
-                ui.label(format!("Wildfire {:.1}", e.wildfire));
+            if e.cards > 0.0 {
+                ui.label(format!("Event cards {:.1}", e.cards));
             }
             ui.label(format!("Natural Sink -{:.1}{}", e.sink, if e.restoration > 0.0 { format!(" and Restoration -{:.1}", e.restoration) } else { String::new() }));
             ui.label(RichText::new(format!("Net {:+.1} ppm", e.net())).strong());
             ui.separator();
             let growth = game.population_growth_rate() * 100.0;
-            ui.label(format!("Penalties in force: population growth {:+.2}% per turn, {} Climate cards in the deck ({} Calm left).", growth, game.deck.climate_cards_left(), game.deck.calm_left()));
+            ui.label(format!(
+                "Penalties in force: population growth {:+.2}% per turn; a card comes {:.0}% of turns at this Temperature ({} cards left in the deck, {} of them Climate).",
+                growth,
+                game.draw_chance() * 100.0,
+                game.deck.cards.len(),
+                game.deck.climate_cards_left()
+            ));
             let p = game.projection();
             let line = match p.collapse_turn {
                 Some(t) => format!("At this rate, {:+.1} C by turn {}; Collapse at +{:.1} around turn {}.", p.temperature_at_last_turn, game.tables.victory.turns, game.tables.climate.collapse_line, t),

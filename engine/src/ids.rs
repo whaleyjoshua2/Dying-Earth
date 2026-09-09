@@ -199,10 +199,17 @@ pub enum EventId {
     Heatwave,
     Wildfire,
     StormSurge,
+    // Version 0.02 (ticket #25): six more.
+    SolarMaximum,
+    MeteorShower,
+    DustStorm,
+    Unrest,
+    ReactorLeak,
+    PermafrostThaw,
 }
 
 impl EventId {
-    pub const ALL: [EventId; 12] = [
+    pub const ALL: [EventId; 18] = [
         EventId::SolarStorm,
         EventId::RadiationSurge,
         EventId::CommsBlackout,
@@ -215,8 +222,14 @@ impl EventId {
         EventId::Heatwave,
         EventId::Wildfire,
         EventId::StormSurge,
+        EventId::SolarMaximum,
+        EventId::MeteorShower,
+        EventId::DustStorm,
+        EventId::Unrest,
+        EventId::ReactorLeak,
+        EventId::PermafrostThaw,
     ];
-    pub const CLIMATE: [EventId; 3] = [EventId::Heatwave, EventId::Wildfire, EventId::StormSurge];
+    pub const CLIMATE: [EventId; 4] = [EventId::Heatwave, EventId::Wildfire, EventId::StormSurge, EventId::PermafrostThaw];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]

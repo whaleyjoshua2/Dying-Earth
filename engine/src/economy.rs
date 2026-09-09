@@ -73,6 +73,7 @@ impl Game {
         for seat in Seat::ALL {
             self.income_for(seat);
         }
+        self.solar_maximum_next = false;
         for d in &mut self.discoveries {
             d.turns_left = d.turns_left.saturating_sub(1);
         }
@@ -208,16 +209,28 @@ impl Game {
                     output: y.resource.map(|r| (r, y.amount)),
                     extraction: matches!(m.kind, ModuleKind::Mine | ModuleKind::Refinery),
                     research: 0,
-                    online: !col.grid_failed,
+                    online: !col.grid_failed && !m.offline_until_resolution,
                 });
             }
         }
         out
     }
 
+    /// Solar Maximum (ticket #25): Power Plants and Generators make more at the next Income.
+    fn solar_maximum_multiplier(&self) -> f64 {
+        if !self.solar_maximum_next {
+            return 1.0;
+        }
+        let e = &self.tables.events;
+        if self.has_tech(TechId::EfficientGrids) { e.solar_maximum_multiplier_with_tech } else { e.solar_maximum_multiplier }
+    }
+
     fn tech_output_multiplier_facility(&self, kind: FacilityKind) -> f64 {
         let t = &self.tables;
         let mut m = 1.0;
+        if kind == FacilityKind::PowerPlant {
+            m *= self.solar_maximum_multiplier();
+        }
         match kind {
             FacilityKind::PowerPlant if self.has_tech(TechId::EfficientGrids) => m *= t.tech(TechId::EfficientGrids).value,
             FacilityKind::Factory if self.has_tech(TechId::DeepMining) => m *= t.tech(TechId::DeepMining).value,
@@ -230,6 +243,9 @@ impl Game {
     fn tech_output_multiplier_module(&self, kind: ModuleKind) -> f64 {
         let t = &self.tables;
         let mut m = 1.0;
+        if kind == ModuleKind::Generator {
+            m *= self.solar_maximum_multiplier();
+        }
         match kind {
             ModuleKind::Generator if self.has_tech(TechId::EfficientGrids) => m *= t.tech(TechId::EfficientGrids).value,
             ModuleKind::Mine if self.has_tech(TechId::DeepMining) => m *= t.tech(TechId::DeepMining).value,

@@ -37,7 +37,7 @@ fn colony(g: &mut Game, seat: Seat, body: BodyId, modules: &[ModuleKind], coloni
         body,
         slot,
         control: Control::Controlled(seat),
-        modules: modules.iter().map(|k| Module { kind: *k, online: true }).collect(),
+        modules: modules.iter().map(|k| Module::new(*k)).collect(),
         colonists,
         queue: Vec::new(),
         grid_failed: false,
@@ -418,25 +418,160 @@ fn nothing_ends_before_turn_twelve_without_a_condition_or_collapse() {
     assert_eq!(g.outcome, None);
 }
 
-// ---------------------------------------------------------------- 13.1 Deck swap rate
+// ---------------------------------------------------------------- 13.1 as amended by #25: the draw chance and the deck
 
 #[test]
-fn one_calm_card_becomes_a_climate_card_per_full_fifth_of_a_degree() {
+fn the_draw_chance_is_half_at_base_and_rises_per_full_fifth_of_a_degree() {
     let mut g = game();
-    for s in &mut g.states {
-        s.population = 0.0;
-        s.industry_level = 0;
+    g.climate.temperature = 1.2;
+    assert!((g.draw_chance() - 0.5).abs() < 1e-12);
+    g.climate.temperature = 1.39;
+    assert!((g.draw_chance() - 0.5).abs() < 1e-12, "a part step counts for nothing");
+    g.climate.temperature = 1.4;
+    assert!((g.draw_chance() - 0.525).abs() < 1e-12);
+    g.climate.temperature = 3.0;
+    assert!((g.draw_chance() - 0.725).abs() < 1e-12);
+}
+
+#[test]
+fn a_card_comes_on_about_half_the_turns_at_the_start_and_more_when_warm() {
+    let mut g = game();
+    g.climate.temperature = 1.2;
+    let draws = (0..4000).filter(|_| g.rolls_a_card()).count();
+    assert!((1800..=2200).contains(&draws), "{draws} of 4000 at +1.2");
+    g.climate.temperature = 3.0;
+    let draws = (0..4000).filter(|_| g.rolls_a_card()).count();
+    assert!((2750..=3050).contains(&draws), "{draws} of 4000 at +3.0");
+}
+
+#[test]
+fn the_deck_is_thirty_cards_originals_twice_new_once_and_no_calm() {
+    let g = game();
+    assert_eq!(g.deck.cards.len(), 30);
+    for e in &g.tables.events.event {
+        let want = if EventId::ALL[..12].contains(&e.id) { 2 } else { 1 };
+        assert_eq!(g.deck.count(e.id), want, "{}", e.name);
     }
-    let calm = g.deck.calm_left();
-    let climate = g.deck.climate_cards_left();
-    g.climate.temperature = 1.65; // two full 0.2 steps above 1.2
-    g.climate.co2 = 460.0; // target 1.7 keeps it there
-    g.climate_phase();
-    assert_eq!(g.deck.calm_left(), calm - 2);
-    assert_eq!(g.deck.climate_cards_left(), climate + 2);
-    assert_eq!(g.deck.cards.len(), 20, "a swap replaces, it does not add");
-    g.climate_phase();
-    assert_eq!(g.deck.calm_left(), calm - 2, "steps already counted do not swap again");
+}
+
+#[test]
+fn no_card_drawn_leaves_the_deck_alone_and_says_so() {
+    let mut g = game();
+    g.climate.temperature = 1.2;
+    // Seed 7's first roll at +1.2 draws nothing; if the generator changes, the assertion says which way.
+    let before = g.deck.cards.len();
+    g.event_phase();
+    match &g.last_event {
+        None => {
+            assert_eq!(g.deck.cards.len(), before);
+            assert!(g.report.event.as_deref().unwrap_or("").starts_with("No Event this turn"));
+        }
+        Some(_) => assert_eq!(g.deck.cards.len(), before - 1),
+    }
+}
+
+// ---------------------------------------------------------------- #25 the six new Events
+
+fn drawn(g: &mut Game, id: EventId, target: EventTarget) {
+    let scale = g.climate_scale();
+    g.last_event = Some(DrawnEvent { card: Card::Event(id), target, scale, text: String::new() });
+}
+
+#[test]
+fn solar_maximum_boosts_power_plants_and_generators_at_the_next_income_once() {
+    let mut g = game();
+    g.state_mut(StateId::Asia).facilities = vec![facility(FacilityKind::PowerPlant)];
+    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator], 0);
+    drawn(&mut g, EventId::SolarMaximum, EventTarget::Everyone);
+    g.apply_event_now();
+    // Power Plant 6 x 1.5 = 9; Generator 5 x 1.25 (Moon) x 1.5 = 9.
+    assert_eq!(income_of(&mut g, Seat(0)).energy, 18);
+    assert_eq!(income_of(&mut g, Seat(0)).energy, 12, "the boost lasts one Income");
+    with_tech(&mut g, TechId::EfficientGrids);
+    drawn(&mut g, EventId::SolarMaximum, EventTarget::Everyone);
+    g.apply_event_now();
+    // Power Plant 6 x 1.5 x 2 = 18; Generator 5 x 1.25 x 1.5 x 2 = 18.
+    assert_eq!(income_of(&mut g, Seat(0)).energy, 36, "Efficient Grids makes it x2");
+}
+
+#[test]
+fn permafrost_thaw_adds_scaled_emissions_next_turn_that_do_not_count_against_stabilization() {
+    let mut g = game();
+    g.climate.temperature = 2.2; // scale 1.5
+    drawn(&mut g, EventId::PermafrostThaw, EventTarget::Everyone);
+    g.apply_event_now();
+    let e = g.emissions_now();
+    assert!((e.cards - 4.5).abs() < 1e-9, "3.0 x 1.5: {}", e.cards);
+    assert!((e.total() - e.counted() - 4.5).abs() < 1e-9);
+    with_tech(&mut g, TechId::GreenConsensus);
+    g.climate.card_emissions_next = 0.0;
+    drawn(&mut g, EventId::PermafrostThaw, EventTarget::Everyone);
+    g.apply_event_now();
+    assert!((g.emissions_now().cards - 2.25).abs() < 1e-9, "halved");
+}
+
+#[test]
+fn meteor_shower_hits_ships_in_orbit_not_in_transit_and_hardened_hulls_shrug() {
+    let mut g = game();
+    let mk = |id: u32, at: ShipAt| Ship { id: ShipId(id), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at, colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 };
+    g.ships.push(mk(1, ShipAt::Body(BodyId::Earth)));
+    g.ships.push(mk(2, ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 2 }));
+    drawn(&mut g, EventId::MeteorShower, EventTarget::Everyone);
+    g.apply_event_now();
+    assert_eq!(g.ship(ShipId(1)).unwrap().damage, 1);
+    assert_eq!(g.ship(ShipId(2)).unwrap().damage, 0);
+    with_tech(&mut g, TechId::HardenedHulls);
+    drawn(&mut g, EventId::MeteorShower, EventTarget::Everyone);
+    g.apply_event_now();
+    assert_eq!(g.ship(ShipId(1)).unwrap().damage, 1);
+}
+
+#[test]
+fn dust_storm_knocks_every_module_on_mars_offline_until_the_next_resolution() {
+    let mut g = game();
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 0);
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 0);
+    drawn(&mut g, EventId::DustStorm, EventTarget::Body(BodyId::Mars));
+    g.apply_event_now();
+    assert!(!g.colony(mars).unwrap().modules[0].online);
+    assert!(g.colony(moon).unwrap().modules[0].online);
+    g.seats[0].stockpile.energy = 100;
+    g.income_phase();
+    assert!(!g.colony(mars).unwrap().modules[0].online, "still off at the next Income");
+    g.last_event = None; // in a real turn a fresh draw precedes Resolution
+    g.resolution_phase();
+    assert!(g.colony(mars).unwrap().modules[0].online, "back on after Resolution");
+}
+
+#[test]
+fn unrest_damages_the_standing_army_and_cuts_every_factions_influence_there() {
+    let mut g = game();
+    g.seats[0].influence.insert(Place::State(StateId::Africa), 12);
+    g.seats[1].influence.insert(Place::State(StateId::Africa), 3);
+    drawn(&mut g, EventId::Unrest, EventTarget::State(StateId::Africa));
+    g.apply_event_now();
+    let army = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(StateId::Africa)).unwrap();
+    assert_eq!(army.damage, 2);
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::Africa)], 7);
+    assert_eq!(g.seats[1].influence[&Place::State(StateId::Africa)], 0);
+}
+
+#[test]
+fn reactor_leak_stops_generators_until_resolution_and_costs_five_energy() {
+    let mut g = game();
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator, ModuleKind::Mine], 0);
+    g.seats[0].stockpile.energy = 20;
+    drawn(&mut g, EventId::ReactorLeak, EventTarget::Colony(c));
+    g.apply_event_now();
+    let col = g.colony(c).unwrap();
+    assert!(!col.modules[0].online, "the Generator is off");
+    assert!(col.modules[1].online, "the Mine is not");
+    assert_eq!(g.seats[0].stockpile.energy, 15);
+    g.income_phase();
+    assert!(!g.colony(c).unwrap().modules[0].online, "still off at Income");
+    g.last_event = None;
+    g.resolution_phase();
+    assert!(g.colony(c).unwrap().modules[0].online);
 }
 
 // ---------------------------------------------------------------- 12.3 Every Tech effect

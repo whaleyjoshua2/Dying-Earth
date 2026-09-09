@@ -53,3 +53,20 @@ Twenty seeds per pairing afterwards, against the first build's numbers in bracke
 Two anchors moved toward their marks and one moved away: with three emitting Facilities per Faction
 from turn one, the Temperature crosses +3.0 by turn 10 or 11 in every game. Reported, not retuned:
 the CO2 clock is ticket #27's question, and it now has to allow for this.
+
+## #25: Events ten percent rarer, and no more Calm Cards
+
+Decided by the designer, in three rounds: ten points, from 60% to 50%; then, instead of more Calm
+Cards, **no Calm Cards at all** and a chance each turn that no card is drawn; the Draw Chance and the
+Climate scaling both rise with the Temperature (50% at +1.2 C, +2.5 points per full 0.2 C, 72.5% at
++3.0); the deck grows to **thirty cards, the twelve first-playable Events twice and six new ones
+once**, chosen from proposals: Solar Maximum, Meteor Shower, Dust Storm, Unrest, Reactor Leak and
+Permafrost Thaw. The deck is still never reshuffled; at these rates twenty-four turns draw about
+fifteen cards.
+
+All of it is in `events.toml`: each Event row has a `copies` count and the constants sit at the top.
+`CONTEXT.md` retires Calm Card and adds Draw Chance. Nine new tests, five watched red first.
+
+Twenty seeds per pairing afterwards: every pairing still ends in Collapse, and two Prospector AIs now
+collapse on turn 7 or 8 rather than 9 to 11, since the deck no longer carries eight blanks and
+Permafrost Thaw arrives scaled. Reported, not retuned; #27 owns the clock.

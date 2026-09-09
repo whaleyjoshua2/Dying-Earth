@@ -53,12 +53,12 @@ An unplanned occurrence drawn from the Event Deck after orders are committed and
 _Avoid_: incident, crisis, card
 
 **Event Deck**:
-The deck one card is drawn from each turn, holding Events and Calm Cards. Every tenth of a degree the Temperature rises, a Calm Card is permanently swapped for a Climate Event, so the danger in the deck is countable.
-_Avoid_: event pool, random table, encounter deck
+The deck a card may be drawn from each turn, holding only Events: thirty cards in version 0.02, the twelve First Playable Events twice and six newer ones once. It is never reshuffled. Whether a card is drawn at all is the Draw Chance.
+_Avoid_: event pool, random table, encounter deck, calm card (retired in version 0.02)
 
-**Calm Card**:
-A card in the Event Deck on which nothing happens. The number remaining is how much quiet is left in the game.
-_Avoid_: blank, null card, nothing card
+**Draw Chance**:
+The chance each turn that a card is drawn from the Event Deck: half at +1.2 C, rising a little for every full fifth of a degree the Temperature stands above it. It replaced the Calm Cards of the First Playable, so the danger in a turn is a percentage rather than a count of blanks.
+_Avoid_: event probability, calm cards, event rate
 
 **Tech**:
 An advance on the Tech Tree that changes an output, a capacity, an upkeep, a Ship strength, an Influence cost or how much a source emits. When a Tech completes, every Faction has it.
