@@ -38,7 +38,7 @@ branch = "Propulsion"
 rung = 1
 cost = 15
 needs = []
-effect = "Launch Emissions 0.8; Launch Failure delays instead of destroying"
+effect = "Launch Emissions 0.8; a Launch Pad Fire delays no Ship"
 value = 0.8
 
 [[tech]]
@@ -108,7 +108,7 @@ branch = "Society"
 rung = 1
 cost = 15
 needs = []
-effect = "Research Lab output x1.5; Breakthrough gives 25; stances hold through Comms Blackout"
+effect = "Research Lab output x1.5; Breakthrough gives 25; stances hold through Comms Blackout; a Labour Dispute idles one Facility only"
 value = 1.5
 
 [[tech]]

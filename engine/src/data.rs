@@ -55,6 +55,13 @@ pub struct StateCard {
     /// What stands when the game begins (ticket #24); comes with the state whoever takes it.
     #[serde(default)]
     pub start_facilities: Vec<FacilityKind>,
+    /// What the state adds to its controller's Influence Allotment each turn (ticket #34).
+    #[serde(default)]
+    pub influence: i64,
+    /// World GDP share in tenths of a percent-ish weight (ticket #35): a controlled state makes
+    /// gdp x Industry Level / 10 Ducats a turn, and a Bank there adds 4 x gdp / 10.
+    #[serde(default)]
+    pub gdp: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -66,6 +73,12 @@ pub struct FacilityCard {
     pub energy_upkeep: i64,
     pub produces: Option<Produces>,
     pub emissions: f64,
+    /// Ticket #36: what it adds to its controller's Allotment while it stands and is online.
+    #[serde(default)]
+    pub influence_allotment: i64,
+    /// Ticket #36: how much its place's standing for its controller rises each turn.
+    #[serde(default)]
+    pub standing_per_turn: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -85,6 +98,10 @@ pub struct ModuleCard {
     pub produces: Option<Produces>,
     #[serde(default)]
     pub holds_colonists: u32,
+    #[serde(default)]
+    pub influence_allotment: i64,
+    #[serde(default)]
+    pub standing_per_turn: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -189,6 +206,18 @@ pub struct StartCard {
     pub fuel: i64,
     pub energy: i64,
     pub research: i64,
+    #[serde(default)]
+    pub ducats: i64,
+}
+
+/// Ticket #35: what Ducats buy.
+#[derive(Debug, Clone, Deserialize)]
+pub struct DucatsCard {
+    pub per_influence: i64,
+    pub per_restoration_step: i64,
+    pub per_repair_point: i64,
+    pub bank_per_gdp_tenth: f64,
+    pub trade_post_base: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -210,11 +239,12 @@ pub struct ClimateTable {
 #[derive(Debug, Clone, Deserialize)]
 pub struct InfluenceTable {
     pub allotment_base: i64,
-    pub allotment_per_state: i64,
     pub state_threshold_base: i64,
     pub state_threshold_per_size: i64,
     pub colony_threshold_per_colonist: i64,
     pub decay: i64,
+    /// Ticket #33: decay on a place the Faction controls.
+    pub decay_controlled: i64,
     pub occupation_turns: u32,
     pub destruction_chance: f64,
 }
@@ -237,6 +267,8 @@ pub struct AiWeights {
     pub build_colony_ship: f64,
     pub build_warship: f64,
     pub build_army_or_barracks: f64,
+    /// Ticket #36: an Embassy or a Relay.
+    pub build_influence: f64,
     pub influence: f64,
     pub transit: f64,
     pub load_unload: f64,
@@ -329,6 +361,7 @@ struct FactionsFile {
     faction: Vec<FactionCard>,
     restoration: RestorationCard,
     start: StartCard,
+    ducats: DucatsCard,
 }
 
 /// Every table, loaded and checked.
@@ -346,6 +379,7 @@ pub struct Tables {
     pub factions: Vec<FactionCard>,
     pub restoration: RestorationCard,
     pub start: StartCard,
+    pub ducats: DucatsCard,
     pub climate: ClimateTable,
     pub influence: InfluenceTable,
     pub victory: VictoryTable,
@@ -396,6 +430,7 @@ impl Tables {
             factions: factions.faction,
             restoration: factions.restoration,
             start: factions.start,
+            ducats: factions.ducats,
             climate,
             influence,
             victory,

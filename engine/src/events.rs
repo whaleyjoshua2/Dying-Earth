@@ -80,23 +80,27 @@ impl Game {
                 let e = if self.has_tech(TechId::GreenConsensus) { t.events.permafrost_emissions / 2.0 } else { t.events.permafrost_emissions } * scale;
                 (EventTarget::Everyone, format!("{}: +{:.1} Emissions next turn (x{:.2} at this Temperature).", card.name, e, scale))
             }
-            EventId::EquipmentFailure => {
-                let seats: Vec<Seat> = Seat::ALL.into_iter().filter(|s| self.builds_due(*s, turn) > 0).collect();
-                match self.pick_uniform(&seats) {
-                    Some(s) => (EventTarget::Seat(s), format!("{} strikes the {}: one build due this turn completes next turn instead.", card.name, self.seat_name(s))),
-                    None => (EventTarget::None, format!("{}: no build was due, so nothing happens.", card.name)),
-                }
-            }
-            EventId::LaunchFailure => {
-                let seats: Vec<Seat> = Seat::ALL.into_iter().filter(|s| self.ships_due(*s, turn) > 0).collect();
-                match self.pick_uniform(&seats) {
+            EventId::LaunchPadFire => {
+                let states: Vec<StateId> = StateId::ALL
+                    .into_iter()
+                    .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite))
+                    .collect();
+                match self.pick_uniform(&states) {
                     Some(s) => {
-                        let what = if self.has_tech(TechId::CleanPropellant) { "delayed one turn (Clean Propellant)" } else { "destroyed, no refund" };
-                        (EventTarget::Seat(s), format!("{} strikes the {}: one Ship due this turn is {what}.", card.name, self.seat_name(s)))
+                        let ships = self.state(s).queue.iter().filter(|b| b.due_turn <= turn && matches!(b.item, BuildItem::Unit(k) if k != UnitKind::Army)).count();
+                        let delay = if self.has_tech(TechId::CleanPropellant) { "no Ship is delayed (Clean Propellant)".to_string() } else if ships > 0 { format!("{ships} Ship(s) due there complete next turn instead") } else { "no Ship was due there".to_string() };
+                        (EventTarget::State(s), format!("{} in {}: its Launch Site is offline until the next Resolution; {}.", card.name, t.state(s).name, delay))
                     }
-                    None => (EventTarget::None, format!("{}: no Ship was due, so nothing happens.", card.name)),
+                    None => (EventTarget::None, format!("{}: no Launch Site stands anywhere, so nothing happens.", card.name)),
                 }
             }
+            EventId::LabourDispute => match self.pick_state_by_population() {
+                Some(s) => {
+                    let what = if self.has_tech(TechId::PublicScience) { "one of its Facilities makes nothing at the next Income (Public Science)" } else { "its Facilities make nothing at the next Income" };
+                    (EventTarget::State(s), format!("{} in {}: {what}.", card.name, t.state(s).name))
+                }
+                None => (EventTarget::None, format!("{}: nobody lives anywhere, so nothing happens.", card.name)),
+            },
             EventId::GridFailure => {
                 let cols: Vec<ColonyId> = self.colonies.iter().filter(|c| !c.modules.is_empty()).map(|c| c.id).collect();
                 match self.pick_uniform(&cols) {
@@ -205,18 +209,6 @@ impl Game {
         self.states.iter().rev().find(|s| s.population > 0.0).map(|s| s.id)
     }
 
-    pub fn builds_due(&self, seat: Seat, turn: u32) -> usize {
-        self.states.iter().flat_map(|s| s.queue.iter()).chain(self.colonies.iter().flat_map(|c| c.queue.iter()))
-            .filter(|b| b.seat == seat && b.due_turn <= turn)
-            .count()
-    }
-
-    pub fn ships_due(&self, seat: Seat, turn: u32) -> usize {
-        self.states.iter().flat_map(|s| s.queue.iter()).chain(self.colonies.iter().flat_map(|c| c.queue.iter()))
-            .filter(|b| b.seat == seat && b.due_turn <= turn && matches!(b.item, BuildItem::Unit(k) if k != UnitKind::Army))
-            .count()
-    }
-
     /// Whether this turn's card is the named Event.
     pub fn event_is(&self, id: EventId) -> bool {
         matches!(&self.last_event, Some(DrawnEvent { card: Card::Event(e), target, .. }) if *e == id && *target != EventTarget::None)
@@ -301,6 +293,30 @@ impl Game {
                 let loss = if self.has_tech(TechId::GreenConsensus) { t.events.heatwave_loss_green_consensus } else { t.events.heatwave_loss };
                 let st = self.state_mut(s);
                 st.population = (st.population * (1.0 - loss * ev.scale)).max(0.0);
+            }
+            (EventId::LaunchPadFire, EventTarget::State(s)) => {
+                let st = self.state_mut(s);
+                for f in st.facilities.iter_mut().filter(|f| f.kind == FacilityKind::LaunchSite) {
+                    f.offline_until_resolution = true;
+                    f.online = false;
+                }
+            }
+            (EventId::LabourDispute, EventTarget::State(s)) => {
+                let n = self.state(s).facilities.len();
+                if n == 0 {
+                    return;
+                }
+                if self.has_tech(TechId::PublicScience) {
+                    let i = self.rng.random_range(0..n);
+                    let st = self.state_mut(s);
+                    st.facilities[i].offline_until_resolution = true;
+                    st.facilities[i].online = false;
+                } else {
+                    for f in &mut self.state_mut(s).facilities {
+                        f.offline_until_resolution = true;
+                        f.online = false;
+                    }
+                }
             }
             (EventId::Wildfire, EventTarget::State(s)) => {
                 let n = self.state(s).facilities.len();

@@ -2,9 +2,10 @@
 
 A single-player, turn-based strategy game about colonizing the solar system before ecological
 collapse overtakes Earth. This repository holds the **First Playable**: twenty-four turns, nine
-Nation States, the Moon and Mars, three resources, two Factions. The rules are written down in
+Nation States, the Moon and Mars, four resources, two Factions. The rules are written down in
 [`docs/spec/first-playable.md`](docs/spec/first-playable.md) as amended by
-[`docs/spec/version-0.02.md`](docs/spec/version-0.02.md), and the words in [`CONTEXT.md`](CONTEXT.md).
+[`docs/spec/version-0.02.md`](docs/spec/version-0.02.md) and
+[`docs/spec/version-0.03.md`](docs/spec/version-0.03.md), and the words in [`CONTEXT.md`](CONTEXT.md).
 
 ## Running it
 

@@ -15,6 +15,8 @@ enum Cat {
     ColonyShip,
     Warship,
     ArmyOrBarracks,
+    /// Ticket #36: an Embassy or a Relay.
+    BuildInfluence,
     Influence,
     Transit,
     LoadUnload,
@@ -65,6 +67,7 @@ impl Game {
             Cat::ColonyShip => w.build_colony_ship,
             Cat::Warship => w.build_warship,
             Cat::ArmyOrBarracks => w.build_army_or_barracks,
+            Cat::BuildInfluence => w.build_influence,
             Cat::Influence => w.influence,
             Cat::Transit => w.transit,
             Cat::LoadUnload => w.load_unload,
@@ -320,8 +323,9 @@ impl Game {
             if free > 0 {
                 for fk in FacilityKind::ALL {
                     let (cat, mut base) = match fk {
-                        FacilityKind::Factory | FacilityKind::PowerPlant | FacilityKind::Refinery => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
+                        FacilityKind::Factory | FacilityKind::PowerPlant | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                         FacilityKind::ResearchLab => (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab)),
+                        FacilityKind::Embassy => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
                         FacilityKind::LaunchSite => {
                             if has_launch {
                                 continue;
@@ -374,7 +378,8 @@ impl Game {
             let threat = if self.enemy_present_or_inbound(seat, col.body) || self.enemy_army_near(seat, Place::Colony(cid)) { m.threat } else { 1.0 };
             for mk in ModuleKind::ALL {
                 let (cat, mut base) = match mk {
-                    ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
+                    ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery | ModuleKind::TradePost => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
+                    ModuleKind::Relay => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
                     ModuleKind::Habitat => (Cat::Habitat, self.base_weight(seat, Cat::Habitat)),
                     ModuleKind::Shipyard => {
                         if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
@@ -430,7 +435,8 @@ impl Game {
             }
             let card = self.tables.state(sid);
             let near = card.neighbours.iter().any(|n| my_states.contains(n));
-            let value = (card.industry_level + card.size) as f64 + if near { 2.0 } else { 0.0 };
+            // Ticket #34: the state's Influence value plus its Industry Level, closest first.
+            let value = (self.state_influence_value(sid) + st.industry_level as i64) as f64 + if near { 2.0 } else { 0.0 };
             let neutral_bonus = if st.control == Control::Neutral { 1.0 } else { 0.6 };
             targets.push((Place::State(sid), value * neutral_bonus));
         }
@@ -443,22 +449,34 @@ impl Game {
         for (rank, (target, _)) in targets.iter().enumerate() {
             let have = self.seat(seat).influence.get(target).copied().unwrap_or(0);
             let threshold = self.influence_threshold(*target);
+            // Ticket #33: a controlled place needs a standing above the controller's as well.
+            let holding = self.place_control(*target).controller().map(|c| self.seat(c).influence.get(target).copied().unwrap_or(0)).unwrap_or(0);
+            let needed = threshold.max(holding + 1);
             let base = self.base_weight(seat, Cat::Influence) * (1.0 - 0.15 * rank as f64).max(0.3);
-            let opp = if threshold - have <= step { m.opportunity } else { 1.0 };
+            let opp = if needed - have <= step { m.opportunity } else { 1.0 };
             let denial = if kind == FactionKind::Custodians && rival_near && self.place_control(*target).controller() == Some(seat.other()) { m.denial } else { 1.0 };
-            let copies = (allotment / step).max(0);
+            let bought = if self.tables.ducats.per_influence > 0 { self.seat(seat).stockpile.ducats / self.tables.ducats.per_influence } else { 0 };
+            let copies = ((allotment + bought) / step).max(0);
             for _ in 0..copies {
                 push(vec![Order::Influence { target: *target, amount: step }], Cat::Influence, base, 1.0, denial, 1.0, opp, format!("spend {} Influence on {}", step, self.place_name(*target)), None);
             }
         }
-        // Defend own Colonies under rival Influence.
-        for c in &self.colonies {
-            if c.control.controller() == Some(seat) {
-                let rival = self.seat(seat.other()).influence.get(&Place::Colony(c.id)).copied().unwrap_or(0);
-                if rival > 0 {
-                    let opp = if self.influence_threshold(Place::Colony(c.id)) - rival <= step { m.opportunity } else { 1.0 };
-                    push(vec![Order::Influence { target: Place::Colony(c.id), amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, 1.0, m.threat, opp, format!("defend {} with {} Influence", self.place_name(Place::Colony(c.id)), step), None);
-                }
+        // Buy Influence with Ducats (ticket #35), in units of the step, weighted like Influence itself.
+        let ducats = self.seat(seat).stockpile.ducats;
+        let per = self.tables.ducats.per_influence;
+        let buys = if per > 0 { ducats / (per * step) } else { 0 };
+        for _ in 0..buys {
+            push(vec![Order::BuyInfluence { amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence) * 0.9, 1.0, 1.0, 1.0, 1.0, format!("buy {} Influence for {} Ducats", step, per * step), None);
+        }
+        // Hold own places where a rival's standing approaches yours (ticket #33: spending raises your standing).
+        let mut owned: Vec<Place> = self.controlled_states(seat).into_iter().map(Place::State).collect();
+        owned.extend(self.colonies.iter().filter(|c| c.control.controller() == Some(seat)).map(|c| Place::Colony(c.id)));
+        for place in owned {
+            let rival = self.seat(seat.other()).influence.get(&place).copied().unwrap_or(0);
+            let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
+            if rival > 0 && rival + 2 * step >= mine {
+                let opp = if rival + step >= mine { m.opportunity } else { 1.0 };
+                push(vec![Order::Influence { target: place, amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, 1.0, m.threat, opp, format!("hold {} with {} Influence", self.place_name(place), step), None);
             }
         }
 

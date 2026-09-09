@@ -39,6 +39,11 @@ pub enum Order {
     Unload { ship: ShipId, colonists: u32, army: bool, into: UnloadTarget },
     Influence { target: Target, amount: i64 },
     Restoration { steps: u32 },
+    /// Version 0.03 (ticket #35): Ducats buy Influence for this turn's Allotment, and pay for
+    /// Restoration and repairs in place of Energy and Materials.
+    BuyInfluence { amount: i64 },
+    RestorationWithDucats { steps: u32 },
+    RepairWithDucats { unit: UnitRef, points: u32 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -47,6 +52,7 @@ pub struct Cost {
     pub fuel: i64,
     pub energy: i64,
     pub influence: i64,
+    pub ducats: i64,
 }
 
 impl Cost {
@@ -55,6 +61,7 @@ impl Cost {
         self.fuel += other.fuel;
         self.energy += other.energy;
         self.influence += other.influence;
+        self.ducats += other.ducats;
     }
     pub fn text(&self) -> String {
         let mut parts = Vec::new();
@@ -69,6 +76,9 @@ impl Cost {
         }
         if self.influence > 0 {
             parts.push(format!("{} Influence", self.influence));
+        }
+        if self.ducats > 0 {
+            parts.push(format!("{} Ducats", self.ducats));
         }
         if parts.is_empty() { "free".to_string() } else { parts.join(", ") }
     }
@@ -121,20 +131,27 @@ impl Game {
             Order::Restoration { steps } => {
                 Cost { energy: t.restoration.energy_per_step * *steps as i64, ..Default::default() }
             }
+            Order::BuyInfluence { amount } => Cost { ducats: t.ducats.per_influence * *amount, ..Default::default() },
+            Order::RestorationWithDucats { steps } => Cost { ducats: t.ducats.per_restoration_step * *steps as i64, ..Default::default() },
+            Order::RepairWithDucats { points, .. } => Cost { ducats: t.ducats.per_repair_point * *points as i64, ..Default::default() },
             _ => Cost::default(),
         }
     }
 
-    /// What the seat still has after its pending orders.
+    /// What the seat still has after its pending orders. Bought Influence counts toward the Allotment.
     pub fn remaining(&self, seat: Seat, pending: &[Order]) -> (Stockpile, i64) {
         let mut cost = Cost::default();
+        let mut bought = 0;
         for o in pending {
             cost.add(self.order_cost(seat, o));
+            if let Order::BuyInfluence { amount } = o {
+                bought += *amount;
+            }
         }
         let s = self.seat(seat).stockpile;
         (
-            Stockpile { materials: s.materials - cost.materials, fuel: s.fuel - cost.fuel, energy: s.energy - cost.energy },
-            self.seat(seat).allotment - cost.influence,
+            Stockpile { materials: s.materials - cost.materials, fuel: s.fuel - cost.fuel, energy: s.energy - cost.energy, ducats: s.ducats - cost.ducats },
+            self.seat(seat).allotment + bought - cost.influence,
         )
     }
 
@@ -164,8 +181,31 @@ impl Game {
             if cost.influence > influence_left {
                 return fail(format!("needs {} Influence, {} left", cost.influence, influence_left));
             }
+            if cost.ducats > left.ducats {
+                return fail(format!("needs {} Ducats, {} left", cost.ducats, left.ducats));
+            }
         }
         match order {
+            Order::BuyInfluence { amount } => {
+                if *amount <= 0 {
+                    return fail("buy a positive amount");
+                }
+                Ok(cost)
+            }
+            Order::RestorationWithDucats { steps } => {
+                if self.kind(seat) != FactionKind::Custodians {
+                    return fail("only the Custodians have Restoration");
+                }
+                if *steps == 0 {
+                    return fail("spend at least one step");
+                }
+                Ok(cost)
+            }
+            Order::RepairWithDucats { unit, points } => {
+                // The same legality as a Materials repair; only the payment differs.
+                let materials_form = Order::Repair { unit: *unit, points: *points };
+                self.check_order_inner(seat, pending, &materials_form, false).map(|_| cost)
+            }
             Order::BuildFacility { state, kind } => {
                 if self.state(*state).control.director() != Some(seat) {
                     return fail("you do not direct this Nation State");
@@ -526,6 +566,7 @@ impl Game {
                 st.materials -= cost.materials;
                 st.fuel -= cost.fuel;
                 st.energy -= cost.energy;
+                st.ducats -= cost.ducats;
             }
             self.seat_mut(seat).allotment -= cost.influence;
             let turn = self.turn;
@@ -605,9 +646,14 @@ impl Game {
                 }
                 Order::Load { .. } | Order::Unload { .. } => self.pending.cargo.push((seat, order.clone())),
                 Order::Influence { target, amount } => self.pending.influence.push((seat, *target, *amount)),
-                Order::Restoration { steps } => {
+                Order::Restoration { steps } | Order::RestorationWithDucats { steps } => {
                     self.climate.restoration_next += self.tables.restoration.sink_per_step * *steps as f64;
                 }
+                Order::BuyInfluence { amount } => {
+                    self.seat_mut(seat).allotment += amount;
+                    self.log(format!("{} bought {} Influence with Ducats.", self.seat_name(seat), amount));
+                }
+                Order::RepairWithDucats { unit, points } => self.pending.repairs.push((seat, *unit, *points)),
             }
         }
     }

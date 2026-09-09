@@ -11,6 +11,8 @@ pub struct Stockpile {
     pub materials: i64,
     pub fuel: i64,
     pub energy: i64,
+    /// Version 0.03 (ticket #35).
+    pub ducats: i64,
 }
 
 /// A Nation State is neutral, controlled, or occupied (spec 8.1, 8.5).
@@ -297,6 +299,8 @@ pub struct SeatState {
     pub allotment: i64,
     pub research_last_turn: i64,
     pub income_last_turn: Stockpile,
+    /// Last Income by source (ticket #31): "Factory in Asia", the resource, the amount; upkeep as negatives.
+    pub income_sources: Vec<(String, Resource, i64)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -391,7 +395,7 @@ pub struct NewGame {
 impl Game {
     pub fn new(tables: std::sync::Arc<Tables>, setup: NewGame) -> Game {
         let mut rng = ChaCha8Rng::seed_from_u64(setup.seed);
-        let start = Stockpile { materials: tables.start.materials, fuel: tables.start.fuel, energy: tables.start.energy };
+        let start = Stockpile { materials: tables.start.materials, fuel: tables.start.fuel, energy: tables.start.energy, ducats: tables.start.ducats };
         let seat = |kind: FactionKind, ai: bool| SeatState {
             kind,
             ai,
@@ -403,6 +407,7 @@ impl Game {
             allotment: 0,
             research_last_turn: 0,
             income_last_turn: Stockpile::default(),
+            income_sources: Vec::new(),
         };
         let states: Vec<NationState> = tables
             .states
@@ -690,10 +695,37 @@ impl Game {
         }
     }
 
+    /// A Nation State's Influence value (ticket #34): its card figure plus one per Industry Level raised.
+    pub fn state_influence_value(&self, s: StateId) -> i64 {
+        let card = self.tables.state(s);
+        card.influence + (self.state(s).industry_level as i64 - card.industry_level as i64).max(0)
+    }
+
+    /// What the seat's online Embassies and Relays add to its Allotment (ticket #36).
+    pub fn building_allotment(&self, seat: Seat) -> i64 {
+        let earth: i64 = self
+            .controlled_states(seat)
+            .iter()
+            .flat_map(|s| self.state(*s).facilities.iter())
+            .filter(|f| f.online)
+            .map(|f| self.tables.facility(f.kind).influence_allotment)
+            .sum();
+        let space: i64 = self
+            .owned_colonies(seat)
+            .iter()
+            .flat_map(|c| self.colony(*c).into_iter().flat_map(|c| c.modules.iter()))
+            .filter(|m| m.online)
+            .map(|m| self.tables.module(m.kind).influence_allotment)
+            .sum();
+        earth + space
+    }
+
+    /// The Allotment: the base plus every controlled state's Influence value plus the buildings,
+    /// times the Faction multiplier.
     pub fn influence_allotment(&self, seat: Seat) -> i64 {
         let t = &self.tables.influence;
-        let n = self.controlled_states(seat).len() as i64;
-        let base = t.allotment_base + t.allotment_per_state * n;
+        let states: i64 = self.controlled_states(seat).iter().map(|s| self.state_influence_value(*s)).sum();
+        let base = t.allotment_base + states + self.building_allotment(seat);
         let m = self.tables.faction(self.kind(seat)).influence_multiplier;
         (base as f64 * m).floor() as i64
     }

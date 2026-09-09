@@ -478,13 +478,16 @@ impl Game {
     /// Control passes to `seat` (spec 8.3, 8.5): rivals' Influence wiped, a destruction roll, Armies follow.
     pub fn transfer_control(&mut self, place: Place, seat: Seat, why: &str) {
         self.set_place_control(place, Control::Controlled(seat));
-        for s in Seat::ALL {
-            self.seat_mut(s).influence.remove(&place);
-        }
+        // Standings persist through a transfer (ticket #33): the old controller keeps its own and
+        // can contest the place back.
         let line = format!("{} now belongs to the {} ({}).", self.place_name(place), self.seat_name(seat), why);
         self.log(line.clone());
         self.report.lines.push(line);
-        self.destruction_rolls(place, "taken");
+        // Version 0.03 (ticket #31): a place taken by Influence keeps everything; only a place
+        // that Occupation transfers rolls for destruction.
+        if why != "Influence" {
+            self.destruction_rolls(place, "taken");
+        }
         // Armies at the place that fought for the old owner stand for the new one only if they are the place's own.
         // Foreign Armies keep their own home and seat; nothing to do.
     }
@@ -492,48 +495,68 @@ impl Game {
     // ------------------------------------------------------------------ (d)
 
     fn resolve_influence(&mut self) {
+        // Version 0.03 (ticket #33): every Faction keeps a standing on every place; spending on a place
+        // you control raises your own standing there.
         let spent = std::mem::take(&mut self.pending.influence);
         for (seat, target, amount) in spent {
-            let own = self.place_director(target) == Some(seat) || self.place_control(target).controller() == Some(seat);
-            if own {
-                let rival = seat.other();
-                let r = self.seat_mut(rival);
-                if let Some(v) = r.influence.get_mut(&target) {
-                    *v = (*v - amount).max(0);
+            let own = self.place_control(target).controller() == Some(seat);
+            let s = self.seat_mut(seat);
+            *s.influence.entry(target).or_insert(0) += amount;
+            s.influenced_this_turn.push(target);
+            self.log(format!("{} spent {} Influence {} {}.", self.seat_name(seat), amount, if own { "holding" } else { "on" }, self.place_name(target)));
+        }
+        // Embassies and Relays (ticket #36) raise their place's standing for its controller each turn,
+        // which counts as Influence received, so the standing does not decay.
+        let mut rises: Vec<(Seat, Place, i64)> = Vec::new();
+        for st in &self.states {
+            if let Some(c) = st.control.controller() {
+                let r: i64 = st.facilities.iter().filter(|f| f.online).map(|f| self.tables.facility(f.kind).standing_per_turn).sum();
+                if r > 0 {
+                    rises.push((c, Place::State(st.id), r));
                 }
-                self.log(format!("{} spent {} Influence defending {}.", self.seat_name(seat), amount, self.place_name(target)));
-            } else {
-                let s = self.seat_mut(seat);
-                *s.influence.entry(target).or_insert(0) += amount;
-                s.influenced_this_turn.push(target);
-                self.log(format!("{} spent {} Influence on {}.", self.seat_name(seat), amount, self.place_name(target)));
             }
         }
-        // Decay on every accumulation that received nothing this turn.
+        for col in &self.colonies {
+            if let Some(c) = col.control.controller() {
+                let r: i64 = col.modules.iter().filter(|m| m.online).map(|m| self.tables.module(m.kind).standing_per_turn).sum();
+                if r > 0 {
+                    rises.push((c, Place::Colony(col.id), r));
+                }
+            }
+        }
+        for (seat, place, r) in rises {
+            let s = self.seat_mut(seat);
+            *s.influence.entry(place).or_insert(0) += r;
+            s.influenced_this_turn.push(place);
+        }
+        // Decay on every standing that received nothing this turn: 1 on a place you control, 2 elsewhere.
         let decay = self.tables.influence.decay;
+        let decay_own = self.tables.influence.decay_controlled;
         for seat in Seat::ALL {
+            let owned: Vec<Place> = self.seat(seat).influence.keys().filter(|t| self.place_control(**t).controller() == Some(seat)).copied().collect();
             let s = self.seat_mut(seat);
             let touched = std::mem::take(&mut s.influenced_this_turn);
             for (t, v) in s.influence.iter_mut() {
                 if !touched.contains(t) {
-                    *v = (*v - decay).max(0);
+                    let d = if owned.contains(t) { decay_own } else { decay };
+                    *v = (*v - d).max(0);
                 }
             }
             s.influence.retain(|_, v| *v > 0);
         }
-        // Thresholds.
+        // Thresholds: a neutral place needs the threshold; a controlled place needs a standing above the
+        // controller's and at least the threshold.
         let mut targets: Vec<Place> = StateId::ALL.into_iter().map(Place::State).collect();
         targets.extend(self.colonies.iter().map(|c| Place::Colony(c.id)));
         for target in targets {
             let threshold = self.influence_threshold(target);
             let controller = self.place_control(target).controller();
-            // Meeting a threshold takes real Influence: a Colony with no Colonists has a threshold of
-            // zero, and zero accumulated Influence must not claim it.
+            let holding = controller.map(|c| self.seat(c).influence.get(&target).copied().unwrap_or(0)).unwrap_or(0);
             let qualifying: Vec<Seat> = Seat::ALL
                 .into_iter()
                 .filter(|s| {
                     let have = self.seat(*s).influence.get(&target).copied().unwrap_or(0);
-                    controller != Some(*s) && have > 0 && have >= threshold
+                    controller != Some(*s) && have > 0 && have >= threshold && have > holding
                 })
                 .collect();
             let winner = match qualifying.len() {
@@ -585,17 +608,15 @@ impl Game {
 
     fn resolve_builds(&mut self) {
         let turn = self.turn;
-        // Equipment Failure and Launch Failure pick one build of the target seat.
-        let mut delay_one: Option<Seat> = None;
-        let mut launch_fail: Option<Seat> = None;
-        if let Some(ev) = &self.last_event {
-            match (ev.card, ev.target) {
-                (Card::Event(EventId::EquipmentFailure), EventTarget::Seat(s)) => delay_one = Some(s),
-                (Card::Event(EventId::LaunchFailure), EventTarget::Seat(s)) => launch_fail = Some(s),
-                _ => {}
-            }
+        // Launch Pad Fire (ticket #32): every Ship due this turn at that state completes next turn instead,
+        // unless Clean Propellant is held.
+        let mut pad_fire: Option<StateId> = self.last_event.as_ref().and_then(|ev| match (ev.card, ev.target) {
+            (Card::Event(EventId::LaunchPadFire), EventTarget::State(s)) => Some(s),
+            _ => None,
+        });
+        if self.has_tech(TechId::CleanPropellant) {
+            pad_fire = None;
         }
-        let clean = self.has_tech(TechId::CleanPropellant);
         let mut completed: Vec<(Place, Build)> = Vec::new();
         for sid in StateId::ALL {
             let st = self.state_mut(sid);
@@ -623,28 +644,13 @@ impl Game {
             }
         }
         for (place, mut b) in completed {
-            if delay_one == Some(b.seat) {
-                delay_one = None;
+            let is_ship = matches!(b.item, BuildItem::Unit(k) if k != UnitKind::Army);
+            if is_ship && pad_fire.map(|s| place == Place::State(s)).unwrap_or(false) {
                 b.due_turn = turn + 1;
                 self.requeue(place, b.clone());
-                let line = format!("Equipment Failure: the {} {} at {} completes next turn instead.", self.seat_name(b.seat), b.item.name(), self.place_name(place));
+                let line = format!("Launch Pad Fire: the {} {} at {} completes next turn instead.", self.seat_name(b.seat), b.item.name(), self.place_name(place));
                 self.log(line.clone());
                 self.report.lines.push(line);
-                continue;
-            }
-            if launch_fail == Some(b.seat) && matches!(b.item, BuildItem::Unit(k) if k != UnitKind::Army) {
-                launch_fail = None;
-                if clean {
-                    b.due_turn = turn + 1;
-                    self.requeue(place, b.clone());
-                    let line = format!("Launch Failure: the {} {} is delayed one turn (Clean Propellant).", self.seat_name(b.seat), b.item.name());
-                    self.log(line.clone());
-                    self.report.lines.push(line);
-                } else {
-                    let line = format!("Launch Failure: the {} {} is destroyed on the pad, no refund.", self.seat_name(b.seat), b.item.name());
-                    self.log(line.clone());
-                    self.report.lines.push(line);
-                }
                 continue;
             }
             self.complete_build(place, b);

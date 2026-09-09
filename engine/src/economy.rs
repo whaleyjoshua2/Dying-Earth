@@ -25,6 +25,9 @@ pub struct Yield {
     pub research: i64,
     pub upkeep: i64,
     pub emissions: f64,
+    /// Ticket #36: Influence Allotment added while it stands, and standing raised each turn.
+    pub allotment: i64,
+    pub standing: i64,
 }
 
 impl Yield {
@@ -35,10 +38,17 @@ impl Yield {
             Some(Resource::Materials) => parts.push(format!("+{} Materials", self.amount)),
             Some(Resource::Fuel) => parts.push(format!("+{} Fuel", self.amount)),
             Some(Resource::Energy) => parts.push(format!("+{} Energy", self.amount)),
+            Some(Resource::Ducats) => parts.push(format!("+{} Ducats", self.amount)),
             Some(Resource::Research) | None => {}
         }
         if self.research > 0 {
             parts.push(format!("+{} Research", self.research));
+        }
+        if self.allotment > 0 {
+            parts.push(format!("+{} Influence Allotment", self.allotment));
+        }
+        if self.standing > 0 {
+            parts.push(format!("standing here +{} a turn", self.standing));
         }
         if parts.is_empty() {
             parts.push("no output".to_string());
@@ -115,7 +125,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let card = t.state(sid);
         let fc = t.facility(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0 };
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn };
         if let Some(p) = &fc.produces {
             match p.resource {
                 Resource::Research => {
@@ -124,6 +134,12 @@ impl Game {
                         r *= t.tech(TechId::PublicScience).value;
                     }
                     y.research = r.floor() as i64;
+                }
+                Resource::Ducats => {
+                    // A Bank (ticket #35): its amount times the state's gdp / 10.
+                    let v = p.amount as f64 * card.gdp as f64 / 10.0 * fac.output_multiplier;
+                    y.resource = Some(Resource::Ducats);
+                    y.amount = v.floor() as i64;
                 }
                 res => {
                     let mut v = p.amount as f64;
@@ -154,7 +170,7 @@ impl Game {
         let t = &self.tables;
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0 };
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn };
         let Some(col) = self.colony(cid) else { return y };
         let body = t.body(col.body);
         if let Some(p) = &mc.produces {
@@ -162,6 +178,8 @@ impl Game {
                 ModuleKind::Mine => body.mine_yield,
                 ModuleKind::Generator => body.generator_yield,
                 ModuleKind::Refinery => body.refinery_yield,
+                // A Trade Post (ticket #35) follows the Habitat yield: trade goes where people live.
+                ModuleKind::TradePost => body.habitat_yield,
                 _ => 1.0,
             };
             let mut v = p.amount as f64 * yield_ * fac.output_multiplier * self.tech_output_multiplier_module(kind);
@@ -255,6 +273,11 @@ impl Game {
         m
     }
 
+    /// A controlled state's base Ducats a turn (ticket #35): gdp x Industry Level / 10, rounded down.
+    pub fn state_ducats(&self, sid: StateId) -> i64 {
+        (self.tables.state(sid).gdp * self.state(sid).industry_level as i64) / 10
+    }
+
     /// Upkeep of every Ship and non-standing Army of a seat; always paid first (spec 7.2).
     pub fn unit_upkeep(&self, seat: Seat) -> i64 {
         let ships: i64 = self.ships.iter().filter(|s| s.seat == seat).map(|s| self.tables.unit(s.kind).energy_upkeep).sum();
@@ -314,31 +337,57 @@ impl Game {
         let mut gained = Stockpile::default();
         let mut research = 0;
         let mut extraction = 0;
+        let mut sources: Vec<(String, Resource, i64)> = Vec::new();
         for p in &producers {
-            match p.place {
-                ProducerPlace::Facility(sid, i) => self.state_mut(sid).facilities[i].online = p.online,
+            let where_ = match p.place {
+                ProducerPlace::Facility(sid, i) => {
+                    self.state_mut(sid).facilities[i].online = p.online;
+                    self.tables.state(sid).name.clone()
+                }
                 ProducerPlace::Module(cid, i) => {
                     if let Some(c) = self.colony_mut(cid) {
                         c.modules[i].online = p.online;
                     }
+                    self.place_name(Place::Colony(cid))
                 }
-            }
+            };
             if !p.online {
                 continue;
             }
             research += p.research;
+            if p.research > 0 {
+                sources.push((format!("{} in {}", p.name, where_), Resource::Research, p.research));
+            }
             if let Some((res, v)) = p.output {
                 match res {
                     Resource::Materials => gained.materials += v,
                     Resource::Fuel => gained.fuel += v,
                     Resource::Energy => gained.energy += v,
+                    Resource::Ducats => gained.ducats += v,
                     Resource::Research => {}
                 }
+                sources.push((format!("{} in {}", p.name, where_), res, v));
                 if p.extraction && matches!(res, Resource::Materials | Resource::Fuel) {
                     extraction += v;
                 }
             }
+            if p.upkeep > 0 {
+                sources.push((format!("{} in {} (upkeep)", p.name, where_), Resource::Energy, -p.upkeep));
+            }
         }
+        let unit_upkeep = self.unit_upkeep(seat);
+        if unit_upkeep > 0 {
+            sources.push(("Ships and Armies (upkeep)".to_string(), Resource::Energy, -unit_upkeep));
+        }
+        // Ticket #35: every controlled state's economy pays Ducats, gdp x Industry Level / 10.
+        for sid in self.controlled_states(seat) {
+            let v = self.state_ducats(sid);
+            if v > 0 {
+                gained.ducats += v;
+                sources.push((format!("Economy of {}", self.tables.state(sid).name), Resource::Ducats, v));
+            }
+        }
+        self.seat_mut(seat).income_sources = sources;
         let before = self.seat(seat).stockpile;
         let clamped = balance.max(0);
         {
@@ -346,10 +395,12 @@ impl Game {
             s.stockpile.materials += gained.materials;
             s.stockpile.fuel += gained.fuel;
             s.stockpile.energy = clamped;
+            s.stockpile.ducats += gained.ducats;
             s.income_last_turn = Stockpile {
                 materials: gained.materials,
                 fuel: gained.fuel,
                 energy: clamped - before.energy,
+                ducats: gained.ducats,
             };
             s.research_last_turn = research;
             if s.kind == FactionKind::Prospectors {

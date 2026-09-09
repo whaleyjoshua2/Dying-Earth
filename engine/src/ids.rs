@@ -66,15 +66,21 @@ pub enum FacilityKind {
     Refinery,
     ResearchLab,
     LaunchSite,
+    /// Version 0.03 (ticket #35): makes Ducats.
+    Bank,
+    /// Version 0.03 (ticket #36): raises Influence.
+    Embassy,
 }
 
 impl FacilityKind {
-    pub const ALL: [FacilityKind; 5] = [
+    pub const ALL: [FacilityKind; 7] = [
         FacilityKind::Factory,
         FacilityKind::PowerPlant,
         FacilityKind::Refinery,
         FacilityKind::ResearchLab,
         FacilityKind::LaunchSite,
+        FacilityKind::Bank,
+        FacilityKind::Embassy,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -83,6 +89,8 @@ impl FacilityKind {
             FacilityKind::Refinery => "Refinery",
             FacilityKind::ResearchLab => "Research Lab",
             FacilityKind::LaunchSite => "Launch Site",
+            FacilityKind::Bank => "Bank",
+            FacilityKind::Embassy => "Embassy",
         }
     }
 }
@@ -96,16 +104,22 @@ pub enum ModuleKind {
     Habitat,
     Shipyard,
     Barracks,
+    /// Version 0.03 (ticket #35): makes Ducats off Earth.
+    TradePost,
+    /// Version 0.03 (ticket #36): raises Influence off Earth.
+    Relay,
 }
 
 impl ModuleKind {
-    pub const ALL: [ModuleKind; 6] = [
+    pub const ALL: [ModuleKind; 8] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
         ModuleKind::Habitat,
         ModuleKind::Shipyard,
         ModuleKind::Barracks,
+        ModuleKind::TradePost,
+        ModuleKind::Relay,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -115,6 +129,8 @@ impl ModuleKind {
             ModuleKind::Habitat => "Habitat",
             ModuleKind::Shipyard => "Shipyard",
             ModuleKind::Barracks => "Barracks",
+            ModuleKind::TradePost => "Trade Post",
+            ModuleKind::Relay => "Relay",
         }
     }
 }
@@ -150,6 +166,8 @@ pub enum Resource {
     Fuel,
     Energy,
     Research,
+    /// Version 0.03 (ticket #35): money, which buys Influence, Restoration and repairs.
+    Ducats,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -195,8 +213,9 @@ pub enum EventId {
     SolarStorm,
     RadiationSurge,
     CommsBlackout,
-    EquipmentFailure,
-    LaunchFailure,
+    /// Version 0.03 (ticket #32): replaced Equipment Failure and Launch Failure, which singled out a Faction.
+    LaunchPadFire,
+    LabourDispute,
     GridFailure,
     RichSeam,
     IceDeposit,
@@ -218,8 +237,8 @@ impl EventId {
         EventId::SolarStorm,
         EventId::RadiationSurge,
         EventId::CommsBlackout,
-        EventId::EquipmentFailure,
-        EventId::LaunchFailure,
+        EventId::LaunchPadFire,
+        EventId::LabourDispute,
         EventId::GridFailure,
         EventId::RichSeam,
         EventId::IceDeposit,

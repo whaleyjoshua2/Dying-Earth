@@ -1,9 +1,12 @@
 # Spec section 8.3 and 8.5.
 allotment_base = 10
-allotment_per_state = 3
+# allotment_per_state (3) was retired on ticket #34: each state carries its own influence figure in nation_states.toml.
 state_threshold_base = 20
 state_threshold_per_size = 10
 colony_threshold_per_colonist = 10
 decay = 2
+# Ticket #33 (version 0.03): standings persist; a place you control decays slower. A challenger
+# needs a standing above the controller's and at least the threshold.
+decay_controlled = 1
 occupation_turns = 3
 destruction_chance = 0.25

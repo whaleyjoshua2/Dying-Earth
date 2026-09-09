@@ -87,13 +87,33 @@ What runs a mine, habitat or industry where it stands, drained every turn it ope
 _Avoid_: power, electricity
 
 **Stockpile**:
-The single shared pool holding all Materials, Fuel and Energy. It is not divided by Body, so ore mined on Mars is immediately spendable on Earth.
+The single shared pool holding all Materials, Fuel, Energy and, since version 0.03, Ducats. It is not divided by Body, so ore mined on Mars is immediately spendable on Earth.
 _Avoid_: central bank, per-world stocks, inventory
+
+**Ducats**:
+Money, the fourth resource since version 0.03. A controlled Nation State pays them from its GDP figure times its Industry Level; a Bank on Earth and a Trade Post in a Colony make more. They buy Influence at two for one, added to this turn's Allotment, and pay for Restoration steps and repair points in place of Energy and Materials.
+_Avoid_: Ducketts, credits, money, gold, cash
+
+**Bank**:
+The Facility that makes Ducats in a Nation State, in proportion to the state's GDP.
+_Avoid_: treasury, mint, exchange
+
+**Trade Post**:
+The Module that makes Ducats in a Colony, in proportion to the Body's Habitat yield: trade goes where people live.
+_Avoid_: market, exchange, shop
+
+**Embassy**:
+The Facility that raises Influence on Earth: while it stands and is online it adds to its controller's Allotment and raises its state's Standing for its controller each turn. Any number may stand in one state.
+_Avoid_: consulate, ministry, propaganda office
+
+**Relay**:
+The Module that raises Influence off Earth: it adds to its holder's Allotment and raises its Colony's Standing for its holder each turn.
+_Avoid_: antenna, transmitter, beacon
 
 ### Pieces
 
 **Module**:
-A building placed inside a Colony. The First Playable has six kinds: Mine, Generator, Refinery, Habitat, Shipyard and Barracks.
+A building placed inside a Colony. Eight kinds since version 0.03: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post and Relay.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:
@@ -135,7 +155,7 @@ _Avoid_: country, nation, territory, region, state
 ### Earth
 
 **Facility**:
-A building placed in a Nation State. The First Playable has five kinds: Factory, Power Plant, Refinery, Launch Site and Research Lab.
+A building placed in a Nation State. Seven kinds since version 0.03: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank and Embassy.
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Cheap Industry**:
@@ -167,11 +187,15 @@ How much of a Nation State the sea can take. As Sea Level passes its thresholds,
 _Avoid_: coastline, vulnerability, flood risk
 
 **Influence**:
-A Faction's accumulated claim on a Nation State or an enemy Colony, built from a fixed per-turn Allotment and decaying when neglected. The first Faction past the place's threshold takes control; the owner of a Colony can spend to push a rival's Influence back.
+A Faction's claim on a Nation State or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold; a controlled place goes to a rival whose Standing is above the controller's and at least the threshold.
 _Avoid_: diplomacy points, favour, reputation
 
+**Standing**:
+How much Influence a Faction has built up on one place. Since version 0.03 it persists: it is never wiped when the place changes hands, it decays 1 a turn on a place the Faction controls and 2 a turn elsewhere when nothing is spent, and spending on a place you hold raises it.
+_Avoid_: accumulation, influence points, loyalty
+
 **Allotment**:
-The fixed amount of Influence a Faction receives each turn, split freely across any number of targets during the Orders phase. It grows with the number of Nation States the Faction controls and does not carry over.
+The amount of Influence a Faction receives each turn, split freely across any number of targets during the Orders phase. It is a base plus the Influence value of every Nation State the Faction controls (since version 0.03 each state carries its own value, from its economic and military weight), and it does not carry over.
 _Avoid_: influence budget, diplomacy pool, action points
 
 **Research**:

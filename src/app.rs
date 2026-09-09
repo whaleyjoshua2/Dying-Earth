@@ -41,6 +41,8 @@ pub enum Popup {
     None,
     Event,
     Report,
+    /// End Turn pressed with Influence unspent (ticket #31): ask once.
+    ConfirmEndTurn,
 }
 
 #[derive(Resource)]

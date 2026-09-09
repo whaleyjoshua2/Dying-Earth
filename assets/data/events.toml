@@ -1,5 +1,5 @@
-# Spec section 13, amended by ticket #25 (version 0.02): no Calm Cards. The deck holds thirty cards,
-# the twelve first-playable Events twice and the six new ones once. Each turn a card is drawn with
+# Spec section 13, amended by ticket #25 (version 0.02) and #32 (0.03): no Calm Cards. The deck holds
+# twenty-eight cards: ten first-playable Events twice, and eight later ones once. Each turn a card is drawn with
 # draw_chance_base at +1.2 C, rising by draw_chance_per_step for every full draw_chance_step_degrees
 # above it (50% at +1.2, 72.5% at +3.0). The deck is never reshuffled.
 # Climate cards still scale by 1 + (Temperature - 1.2) / 2.
@@ -50,22 +50,25 @@ effect = "Every stack fights as if its Stance were Hold"
 blunted_by = "public_science"
 copies = 2
 
+# Version 0.03 (ticket #32): these two replaced Equipment Failure and Launch Failure, which singled
+# out a Faction. They hit a place, so whoever holds it takes the blow. Once each: the deck is 28 cards.
 [[event]]
-id = "equipment_failure"
-name = "Equipment Failure"
+id = "launch_pad_fire"
+name = "Launch Pad Fire"
 kind = "failure"
-target = "faction"
-effect = "One build due this turn completes next turn instead"
-copies = 2
+target = "nation_state_with_launch_site"
+effect = "Its Launch Site is offline until the next Resolution; any Ship due there this turn completes next turn instead"
+blunted_by = "clean_propellant"
+copies = 1
 
 [[event]]
-id = "launch_failure"
-name = "Launch Failure"
+id = "labour_dispute"
+name = "Labour Dispute"
 kind = "failure"
-target = "faction"
-effect = "One Ship due this turn is destroyed, no refund"
-blunted_by = "clean_propellant"
-copies = 2
+target = "nation_state"
+effect = "Its Facilities make nothing at the next Income"
+blunted_by = "public_science"
+copies = 1
 
 [[event]]
 id = "grid_failure"

@@ -277,19 +277,193 @@ fn influence_threshold_takes_control_and_decay_takes_two_from_untouched_targets(
     g.pending.influence.push((Seat(0), Place::State(StateId::Africa), 1));
     g.resolution_phase();
     assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)));
-    assert!(!g.seats[0].influence.contains_key(&Place::State(StateId::Africa)), "wiped on transfer");
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::Africa)], 50, "the standing persists through the transfer (#33)");
     assert_eq!(g.seats[0].influence[&Place::State(StateId::Europe)], 8);
 }
 
+// ---------------------------------------------------------------- #33 standings that persist
+
 #[test]
-fn influence_on_an_owned_colony_pushes_the_rival_back_one_for_one() {
+fn spending_on_your_own_place_raises_your_standing_and_it_decays_one_a_turn() {
     let mut g = game();
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 4);
     g.seats[1].influence.insert(Place::Colony(c), 30);
     g.seats[1].influenced_this_turn.push(Place::Colony(c));
     g.pending.influence.push((Seat(0), Place::Colony(c), 12));
     g.resolution_phase();
-    assert_eq!(g.seats[1].influence[&Place::Colony(c)], 18);
+    assert_eq!(g.seats[1].influence[&Place::Colony(c)], 30, "the rival's standing is untouched");
+    assert_eq!(g.seats[0].influence[&Place::Colony(c)], 12, "your own standing rose");
+    g.resolution_phase();
+    assert_eq!(g.seats[0].influence[&Place::Colony(c)], 11, "decay 1 on a place you control");
+    assert_eq!(g.seats[1].influence[&Place::Colony(c)], 28, "decay 2 elsewhere");
+}
+
+#[test]
+fn a_challenger_needs_a_standing_above_the_controllers_and_at_least_the_threshold() {
+    let mut g = game();
+    // Africa (threshold 50) is taken by seat 0 with a standing of 60.
+    g.seats[0].influence.insert(Place::State(StateId::Africa), 60);
+    g.seats[0].influenced_this_turn.push(Place::State(StateId::Africa));
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)));
+    // Seat 1 reaches the threshold but not the controller's standing: no change.
+    g.seats[1].influence.insert(Place::State(StateId::Africa), 55);
+    g.seats[1].influenced_this_turn.push(Place::State(StateId::Africa));
+    g.seats[0].influenced_this_turn.push(Place::State(StateId::Africa));
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)), "55 is not above 60");
+    // Above the controller's standing: it flips, and seat 0 keeps its 60 to contest it back.
+    g.seats[1].influence.insert(Place::State(StateId::Africa), 61);
+    g.seats[1].influenced_this_turn.push(Place::State(StateId::Africa));
+    g.seats[0].influenced_this_turn.push(Place::State(StateId::Africa));
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(1)));
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::Africa)], 60);
+    // Above the controller but under the threshold: a Colony with 8 Colonists (threshold 80) held at 20.
+    let c = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 8);
+    g.seats[0].influence.insert(Place::Colony(c), 20);
+    g.seats[1].influence.insert(Place::Colony(c), 40);
+    g.seats[0].influenced_this_turn.push(Place::Colony(c));
+    g.seats[1].influenced_this_turn.push(Place::Colony(c));
+    g.resolution_phase();
+    assert_eq!(g.colony(c).unwrap().control, Control::Controlled(Seat(0)), "40 is above 20 but under the threshold of 80");
+}
+
+#[test]
+fn occupation_transfer_keeps_the_old_controllers_standing() {
+    let mut g = game();
+    // Europe is the AI's; seat 1 holds it at 40. Seat 0 occupies it with its defenders gone.
+    g.seats[1].influence.insert(Place::State(StateId::Europe), 40);
+    g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
+    occupier_in(&mut g, StateId::Asia, StateId::Europe);
+    for _ in 0..3 {
+        g.seats[1].influenced_this_turn.push(Place::State(StateId::Europe));
+        g.resolution_phase();
+    }
+    assert_eq!(g.state(StateId::Europe).control, Control::Controlled(Seat(0)));
+    assert_eq!(g.seats[1].influence[&Place::State(StateId::Europe)], 40, "the old controller keeps its standing");
+    let threshold = g.influence_threshold(Place::State(StateId::Europe));
+    assert!(g.seats[0].influence[&Place::State(StateId::Europe)] >= threshold, "the occupier's gains are its standing");
+}
+
+// ---------------------------------------------------------------- #34 per-state Influence values
+
+#[test]
+fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction_multiplier() {
+    let mut g = game();
+    // Custodians hold Asia (7): (10 + 7) x 1.3 = 22.1 -> 22. Prospectors hold Europe (5): 15.
+    assert_eq!(g.influence_allotment(Seat(0)), 22);
+    assert_eq!(g.influence_allotment(Seat(1)), 15);
+    g.state_mut(StateId::NorthAmerica).control = Control::Controlled(Seat(1));
+    assert_eq!(g.influence_allotment(Seat(1)), 23, "North America adds 8");
+    // Raising Asia's Industry Level adds one to its value.
+    g.state_mut(StateId::Asia).industry_level += 1;
+    assert_eq!(g.state_influence_value(StateId::Asia), 8);
+    assert_eq!(g.influence_allotment(Seat(0)), 23, "(10 + 8) x 1.3 = 23.4");
+    // The card figures, as decided: Antarctica counts for nothing.
+    assert_eq!(g.state_influence_value(StateId::Antarctica), 0);
+    let total: i64 = StateId::ALL.iter().map(|s| g.tables.state(*s).influence).sum();
+    assert_eq!(total, 34, "8 + 7 + 5 + 4 + 4 + 2 + 2 + 2 + 0");
+}
+
+// ---------------------------------------------------------------- #35 Ducats
+
+#[test]
+fn a_controlled_state_pays_ducats_from_gdp_times_industry_and_a_bank_adds_more() {
+    let mut g = game();
+    // Asia: gdp 30 x Industry 3 / 10 = 9 a turn for the Custodians; Europe 20 x 3 / 10 = 6 for the Prospectors.
+    assert_eq!(g.state_ducats(StateId::Asia), 9);
+    assert_eq!(g.state_ducats(StateId::Europe), 6);
+    assert_eq!(g.state_ducats(StateId::Antarctica), 0);
+    let paid = income_of(&mut g, Seat(0));
+    assert_eq!(paid.ducats, 9);
+    // A Bank in Asia adds 4 x 30 / 10 = 12 (Custodian output x1.0); in Africa (gdp 3) it would add 1.
+    g.state_mut(StateId::Asia).facilities.push(facility(FacilityKind::Bank));
+    assert_eq!(g.facility_yield(Seat(0), StateId::Asia, FacilityKind::Bank).amount, 12);
+    assert_eq!(g.facility_yield(Seat(0), StateId::Africa, FacilityKind::Bank).amount, 1);
+    assert_eq!(income_of(&mut g, Seat(0)).ducats, 21);
+    // A Trade Post follows the Habitat yield: 3 on the Moon, 4 on Mars (3 x 1.5 rounded down).
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::TradePost], 0);
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::TradePost], 0);
+    assert_eq!(g.module_yield(Seat(0), moon, ModuleKind::TradePost).amount, 3);
+    assert_eq!(g.module_yield(Seat(0), mars, ModuleKind::TradePost).amount, 4);
+    // Ducats never count toward the Extraction Total.
+    let before = g.seats[1].extraction_total;
+    g.state_mut(StateId::Europe).facilities = vec![facility(FacilityKind::Bank)];
+    income_of(&mut g, Seat(1));
+    assert_eq!(g.seats[1].extraction_total, before);
+}
+
+#[test]
+fn ducats_buy_influence_two_for_one_and_the_bought_influence_is_spendable_at_once() {
+    let mut g = game();
+    g.seats[0].stockpile.ducats = 20;
+    g.seats[0].allotment = 22;
+    let buy = Order::BuyInfluence { amount: 10 };
+    assert_eq!(g.order_cost(Seat(0), &buy).ducats, 20);
+    assert!(g.check_order(Seat(0), &[], &Order::BuyInfluence { amount: 11 }).is_err(), "22 Ducats needed, 20 held");
+    let pending = vec![buy.clone()];
+    let (_, left) = g.remaining(Seat(0), &pending);
+    assert_eq!(left, 32, "the Allotment plus the bought 10");
+    let spend = Order::Influence { target: Place::State(StateId::Africa), amount: 30 };
+    assert!(g.check_order(Seat(0), &pending, &spend).is_ok());
+    g.commit_orders(Seat(0), &[buy, spend]);
+    assert_eq!(g.seats[0].stockpile.ducats, 0);
+    assert_eq!(g.seats[0].allotment, 2);
+}
+
+#[test]
+fn ducats_pay_for_restoration_and_repairs_at_the_table_rates() {
+    let mut g = game();
+    g.seats[0].stockpile.ducats = 25;
+    g.seats[0].stockpile.energy = 0;
+    let r = Order::RestorationWithDucats { steps: 2 };
+    assert_eq!(g.order_cost(Seat(0), &r).ducats, 20);
+    g.commit_orders(Seat(0), &[r]);
+    assert!((g.climate.restoration_next - 6.0).abs() < 1e-9, "two steps of 3.0 ppm");
+    assert_eq!(g.seats[0].stockpile.ducats, 5);
+    // A repair: 5 Ducats a point, same legality as a Materials repair.
+    g.ships.push(Ship { id: ShipId(1), kind: UnitKind::Frigate, seat: Seat(0), damage: 1, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 });
+    let fix = Order::RepairWithDucats { unit: UnitRef::Ship(ShipId(1)), points: 1 };
+    assert_eq!(g.order_cost(Seat(0), &fix).ducats, 5);
+    assert!(g.check_order(Seat(0), &[], &fix).is_ok());
+    g.commit_orders(Seat(0), &[fix]);
+    g.resolution_phase();
+    assert_eq!(g.ship(ShipId(1)).unwrap().damage, 0);
+    assert_eq!(g.seats[0].stockpile.ducats, 0);
+    assert!(g.check_order(Seat(0), &[], &Order::RepairWithDucats { unit: UnitRef::Ship(ShipId(1)), points: 1 }).is_err(), "nothing to repair");
+}
+
+// ---------------------------------------------------------------- #36 Embassies and Relays
+
+#[test]
+fn embassies_and_relays_add_to_the_allotment_and_raise_their_places_standing_each_turn() {
+    let mut g = game();
+    // Custodians in Asia: (10 + 7) x 1.3 = 22. Two Embassies (they stack) add 4: (10 + 7 + 4) x 1.3 = 27.
+    assert_eq!(g.influence_allotment(Seat(0)), 22);
+    g.state_mut(StateId::Asia).facilities.push(facility(FacilityKind::Embassy));
+    g.state_mut(StateId::Asia).facilities.push(facility(FacilityKind::Embassy));
+    assert_eq!(g.building_allotment(Seat(0)), 4);
+    assert_eq!(g.influence_allotment(Seat(0)), 27);
+    // A Relay in a Colony adds 1 more.
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Relay], 4);
+    assert_eq!(g.influence_allotment(Seat(0)), 28, "(10 + 7 + 5) x 1.3 = 28.6");
+    // Each Resolution the standing rises by the buildings' figures and does not decay.
+    g.resolution_phase();
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::Asia)], 4, "two Embassies, 2 each");
+    assert_eq!(g.seats[0].influence[&Place::Colony(c)], 2, "one Relay");
+    g.resolution_phase();
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::Asia)], 8);
+    // An offline Embassy adds nothing.
+    for f in g.state_mut(StateId::Asia).facilities.iter_mut().filter(|f| f.kind == FacilityKind::Embassy) {
+        f.online = false;
+    }
+    assert_eq!(g.building_allotment(Seat(0)), 1, "only the Relay");
+    g.resolution_phase();
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::Asia)], 7, "no rise, and decay 1 on your own place");
+    // The card says what they do.
+    let y = g.facility_yield(Seat(0), StateId::Asia, FacilityKind::Embassy);
+    assert_eq!(y.text(), "+2 Influence Allotment, standing here +2 a turn, 2 Energy upkeep");
 }
 
 // ---------------------------------------------------------------- 8.5 Occupation
@@ -446,13 +620,57 @@ fn a_card_comes_on_about_half_the_turns_at_the_start_and_more_when_warm() {
 }
 
 #[test]
-fn the_deck_is_thirty_cards_originals_twice_new_once_and_no_calm() {
+fn the_deck_is_twenty_six_cards_as_the_table_deals_them_and_no_calm() {
     let g = game();
-    assert_eq!(g.deck.cards.len(), 30);
+    assert_eq!(g.deck.cards.len(), 28, "ten first-playable Events twice, eight later ones once (#25, #32)");
     for e in &g.tables.events.event {
-        let want = if EventId::ALL[..12].contains(&e.id) { 2 } else { 1 };
-        assert_eq!(g.deck.count(e.id), want, "{}", e.name);
+        assert_eq!(g.deck.count(e.id), e.copies as usize, "{}", e.name);
     }
+    assert!(!g.tables.events.event.iter().any(|e| e.target == "faction"), "no card singles out a Faction (#32)");
+}
+
+// ---------------------------------------------------------------- #32 the two replacement cards
+
+#[test]
+fn launch_pad_fire_delays_the_ships_due_at_that_state_unless_clean_propellant() {
+    let mut g = game();
+    g.turn = 3;
+    g.state_mut(StateId::Asia).queue.push(Build { item: BuildItem::Unit(UnitKind::Frigate), seat: Seat(0), due_turn: 3 });
+    g.state_mut(StateId::Asia).queue.push(Build { item: BuildItem::Facility(FacilityKind::Factory), seat: Seat(0), due_turn: 3 });
+    drawn(&mut g, EventId::LaunchPadFire, EventTarget::State(StateId::Asia));
+    g.resolution_phase();
+    assert!(g.ships.is_empty(), "the Frigate did not appear");
+    assert_eq!(g.state(StateId::Asia).queue.len(), 1, "it is back in the queue");
+    assert_eq!(g.state(StateId::Asia).queue[0].due_turn, 4);
+    assert!(g.state(StateId::Asia).facilities.iter().any(|f| f.kind == FacilityKind::Factory), "the Factory was not delayed");
+    assert!(!g.state(StateId::Asia).facilities.iter().find(|f| f.kind == FacilityKind::LaunchSite).unwrap().online, "the Launch Site is offline");
+    // With Clean Propellant nothing is delayed.
+    let mut g = game();
+    g.turn = 3;
+    with_tech(&mut g, TechId::CleanPropellant);
+    g.state_mut(StateId::Asia).queue.push(Build { item: BuildItem::Unit(UnitKind::Frigate), seat: Seat(0), due_turn: 3 });
+    drawn(&mut g, EventId::LaunchPadFire, EventTarget::State(StateId::Asia));
+    g.resolution_phase();
+    assert_eq!(g.ships.len(), 1);
+}
+
+#[test]
+fn labour_dispute_idles_a_states_facilities_at_the_next_income_and_public_science_spares_all_but_one() {
+    let mut g = game();
+    g.state_mut(StateId::Asia).facilities = vec![facility(FacilityKind::Factory), facility(FacilityKind::Refinery), facility(FacilityKind::PowerPlant)];
+    drawn(&mut g, EventId::LabourDispute, EventTarget::State(StateId::Asia));
+    g.apply_event_now();
+    let paid = income_of(&mut g, Seat(0));
+    assert_eq!((paid.materials, paid.fuel), (0, 0), "nothing made: {paid:?}");
+    g.last_event = None;
+    g.resolution_phase();
+    let paid = income_of(&mut g, Seat(0));
+    assert!(paid.materials > 0 && paid.fuel > 0, "back at work after Resolution: {paid:?}");
+    with_tech(&mut g, TechId::PublicScience);
+    drawn(&mut g, EventId::LabourDispute, EventTarget::State(StateId::Asia));
+    g.apply_event_now();
+    let idle = g.state(StateId::Asia).facilities.iter().filter(|f| f.offline_until_resolution).count();
+    assert_eq!(idle, 1, "one Facility only");
 }
 
 #[test]
@@ -586,7 +804,7 @@ fn income_of(g: &mut Game, seat: Seat) -> Stockpile {
     g.seats[seat.index()].stockpile.energy = 1000;
     g.income_phase();
     let after = g.seat(seat).stockpile;
-    Stockpile { materials: after.materials - before.materials, fuel: after.fuel - before.fuel, energy: after.energy - 1000 }
+    Stockpile { materials: after.materials - before.materials, fuel: after.fuel - before.fuel, energy: after.energy - 1000, ducats: after.ducats - before.ducats }
 }
 
 #[test]
@@ -853,7 +1071,7 @@ fn every_state_starts_with_its_start_facilities_and_the_faction_states_add_a_lau
         assert_eq!(have, want, "{}", card.name);
         assert_eq!(card.start_facilities.len() as u32, card.industry_level, "{}: as many as the Industry Level", card.name);
     }
-    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 80, fuel: 20, energy: 20 });
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 80, fuel: 20, energy: 20, ducats: 0 });
 }
 
 #[test]
@@ -878,6 +1096,56 @@ fn start_income_flows_from_turn_one() {
     // Asia's start (Factory, Power Plant, Refinery and the Launch Site) pays 7 Energy against 6 made.
     assert_eq!(s.income_last_turn.energy, -1, "{:?}", s.income_last_turn);
     assert!(s.stockpile.energy >= 15, "no Energy starvation at the start: {:?}", s.stockpile);
+}
+
+// ---------------------------------------------------------------- #31 housekeeping rules
+
+#[test]
+fn only_climate_cards_scale_with_the_temperature() {
+    let mut g = game();
+    g.climate.temperature = 3.0; // scale 1.9 for a Climate card
+    let mut seen = 0;
+    for id in [EventId::MeteorShower, EventId::SolarMaximum, EventId::RichSeam, EventId::Heatwave] {
+        // Force the next draw to be this card; roll until the Draw Chance lets it through.
+        let mut drawn = None;
+        for _ in 0..50 {
+            g.deck.cards = vec![Card::Event(id)];
+            g.last_event = None;
+            g.event_phase();
+            if let Some(e) = &g.last_event {
+                drawn = Some(e.clone());
+                break;
+            }
+        }
+        let e = drawn.expect("the card came within fifty rolls");
+        let climate = g.tables.event(id).kind == EventKind::Climate;
+        if climate {
+            assert!((e.scale - 1.9).abs() < 1e-9, "{id:?} scale {}", e.scale);
+        } else {
+            assert_eq!(e.scale, 1.0, "{id:?} must not scale");
+        }
+        seen += 1;
+    }
+    assert_eq!(seen, 4);
+    // And a Meteor Shower does one damage at +3.0 as at +1.2.
+    let mk = |id: u32| Ship { id: ShipId(id), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 };
+    g.ships.push(mk(1));
+    drawn(&mut g, EventId::MeteorShower, EventTarget::Everyone);
+    g.apply_event_now();
+    assert_eq!(g.ship(ShipId(1)).unwrap().damage, 1);
+}
+
+#[test]
+fn a_place_taken_by_influence_keeps_every_facility() {
+    for seed in 1..=5u64 {
+        let mut g = Game::new(tables(), NewGame { seed, seats: [(FactionKind::Custodians, false), (FactionKind::Prospectors, true)], player_start: StateId::Asia });
+        g.state_mut(StateId::Africa).facilities = (0..8).map(|_| facility(FacilityKind::Factory)).collect();
+        g.seats[0].influence.insert(Place::State(StateId::Africa), 60);
+        g.seats[0].influenced_this_turn.push(Place::State(StateId::Africa));
+        g.resolution_phase();
+        assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)), "seed {seed}");
+        assert_eq!(g.state(StateId::Africa).facilities.len(), 8, "seed {seed}: nothing destroyed by Influence");
+    }
 }
 
 // ---------------------------------------------------------------- the whole loop holds together
