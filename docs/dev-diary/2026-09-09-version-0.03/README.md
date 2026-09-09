@@ -94,3 +94,36 @@ one place; the AI weighs them 6 for both Factions.
 Two rules watched red first: the buildings' share of the Allotment, and the standing rise. The AI
 builds none of them in twenty seeds; its log shows Colony Ships and producers taking the Materials
 first, or the saving rule holding them. Reported, not retuned.
+
+## #37: the amendments written, the pictures, the pull request
+
+The six decisions are written into [`docs/spec/version-0.03.md`](../../spec/version-0.03.md),
+section by section with the numbers; the first-playable spec and the README point at it.
+
+**The four views from `shot:check` at turn 1**, with Ducats in the top bar:
+
+| | |
+| --- | --- |
+| ![Solar System Map](check3-solar.png) | ![Earth Map](check3-earth.png) |
+| ![The Moon](check3-moon.png) | ![Mars](check3-mars.png) |
+
+And turn 13 of a game both AIs played, with Europe's card open: its Standings line, its GDP line,
+the Embassy and Bank on its build list, the Army shields on the globe.
+
+![Turn 13, Europe's card](turn-13-europe.png)
+
+**Twenty seeds per seating**, at the close of the map:
+
+| | Custodians in seat 0 | Prospectors in seat 0 |
+| --- | --- | --- |
+| Outcome | 14 Collapse, 6 Custodian wins at turn 24 | 19 Collapse, **1 Prospector win by meeting its Victory Condition** |
+| Last turn | 17 to 24 | 14 to 16 |
+| First Colony | turn 7 | turn 7 |
+| Colonists off Earth | 16 to 24 against 0 | 8 to 12 against 4 to 12 |
+| Influence transfers a game | 13 to 16 | |
+| Influence bought with Ducats a game | 41 to 60 | |
+| Banks, Trade Posts, Embassies, Relays built by the AI | none | none |
+
+The Prospector win is the first time any AI game has ended on a Victory Condition rather than
+Collapse or the last-turn score. The ping-pong of contested states and the AI's neglect of the new
+buildings stand as reported on #33, #35 and #36.
