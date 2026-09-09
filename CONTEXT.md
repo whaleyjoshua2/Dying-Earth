@@ -175,7 +175,7 @@ How much Influence a Faction has built up on one place. Since version 0.03 it pe
 _Avoid_: accumulation, influence points, loyalty
 
 **Allotment**:
-The fixed amount of Influence a Faction receives each turn, split freely across any number of targets during the Orders phase. It grows with the number of Nation States the Faction controls and does not carry over.
+The amount of Influence a Faction receives each turn, split freely across any number of targets during the Orders phase. It is a base plus the Influence value of every Nation State the Faction controls (since version 0.03 each state carries its own value, from its economic and military weight), and it does not carry over.
 _Avoid_: influence budget, diplomacy pool, action points
 
 **Research**:

@@ -430,7 +430,8 @@ impl Game {
             }
             let card = self.tables.state(sid);
             let near = card.neighbours.iter().any(|n| my_states.contains(n));
-            let value = (card.industry_level + card.size) as f64 + if near { 2.0 } else { 0.0 };
+            // Ticket #34: the state's Influence value plus its Industry Level, closest first.
+            let value = (self.state_influence_value(sid) + st.industry_level as i64) as f64 + if near { 2.0 } else { 0.0 };
             let neutral_bonus = if st.control == Control::Neutral { 1.0 } else { 0.6 };
             targets.push((Place::State(sid), value * neutral_bonus));
         }

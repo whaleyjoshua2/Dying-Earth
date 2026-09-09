@@ -1,6 +1,6 @@
 # Spec section 8.3 and 8.5.
 allotment_base = 10
-allotment_per_state = 3
+# allotment_per_state (3) was retired on ticket #34: each state carries its own influence figure in nation_states.toml.
 state_threshold_base = 20
 state_threshold_per_size = 10
 colony_threshold_per_colonist = 10

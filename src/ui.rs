@@ -893,6 +893,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     let industry_em = card.baseline_emissions * st.industry_level as f64 * mult;
     let fac_em: f64 = st.facilities.iter().filter(|f| f.online).map(|f| game.tables.facility(f.kind).emissions * mult).sum();
     ui.label(format!("Population {:.1} (hundreds of millions), Industry Level {}, leans {:?}", st.population, st.industry_level, card.resource_lean));
+    ui.label(format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid)));
     ui.label(format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.tables.climate.population_emissions_per_hundred_million * st.population * mult));
     ui.label(format!("Build slots: {} used of {} ({} free); Education Level {}", game.slots_used(sid), game.build_slots(sid), game.free_slots(sid), card.education_level));
     if st.lost_slots > 0 {

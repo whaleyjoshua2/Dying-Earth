@@ -55,6 +55,9 @@ pub struct StateCard {
     /// What stands when the game begins (ticket #24); comes with the state whoever takes it.
     #[serde(default)]
     pub start_facilities: Vec<FacilityKind>,
+    /// What the state adds to its controller's Influence Allotment each turn (ticket #34).
+    #[serde(default)]
+    pub influence: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -210,7 +213,6 @@ pub struct ClimateTable {
 #[derive(Debug, Clone, Deserialize)]
 pub struct InfluenceTable {
     pub allotment_base: i64,
-    pub allotment_per_state: i64,
     pub state_threshold_base: i64,
     pub state_threshold_per_size: i64,
     pub colony_threshold_per_colonist: i64,

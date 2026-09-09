@@ -53,3 +53,15 @@ What the twenty-seed batch showed: **10 to 12 Influence transfers per game**, mo
 ping-ponging between the AIs turn by turn, because a rival needs only one point more than the
 controller and both keep spending there. Reported on the ticket with three one-number options;
 not retuned.
+
+## #34: each state's Influence value
+
+Decided by the designer: the flat +3 per state gives way to a figure on each card, from 2023 GDP
+and military spending shares (North America 8, Asia 7, Europe 5, the Middle East 4, Russia 4,
+South America 2, Africa 2, Australia and Oceania 2, Antarctica 0), plus one for every Industry Level
+raised above the card; the Faction multiplier still applies to the whole Allotment. Custodians in
+Asia start at 22 Influence a turn, Prospectors in Europe at 15.
+
+Twenty seeds: 13 Collapse and 7 Custodian wins at turn 24, games running to turns 17 to 24, and
+Influence transfers up to 13 to 16 a game. Larger Allotments, more ping-pong; the options on #33
+still stand.

@@ -693,10 +693,17 @@ impl Game {
         }
     }
 
+    /// A Nation State's Influence value (ticket #34): its card figure plus one per Industry Level raised.
+    pub fn state_influence_value(&self, s: StateId) -> i64 {
+        let card = self.tables.state(s);
+        card.influence + (self.state(s).industry_level as i64 - card.industry_level as i64).max(0)
+    }
+
+    /// The Allotment: the base plus every controlled state's Influence value, times the Faction multiplier.
     pub fn influence_allotment(&self, seat: Seat) -> i64 {
         let t = &self.tables.influence;
-        let n = self.controlled_states(seat).len() as i64;
-        let base = t.allotment_base + t.allotment_per_state * n;
+        let states: i64 = self.controlled_states(seat).iter().map(|s| self.state_influence_value(*s)).sum();
+        let base = t.allotment_base + states;
         let m = self.tables.faction(self.kind(seat)).influence_multiplier;
         (base as f64 * m).floor() as i64
     }

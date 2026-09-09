@@ -346,6 +346,26 @@ fn occupation_transfer_keeps_the_old_controllers_standing() {
     assert!(g.seats[0].influence[&Place::State(StateId::Europe)] >= threshold, "the occupier's gains are its standing");
 }
 
+// ---------------------------------------------------------------- #34 per-state Influence values
+
+#[test]
+fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction_multiplier() {
+    let mut g = game();
+    // Custodians hold Asia (7): (10 + 7) x 1.3 = 22.1 -> 22. Prospectors hold Europe (5): 15.
+    assert_eq!(g.influence_allotment(Seat(0)), 22);
+    assert_eq!(g.influence_allotment(Seat(1)), 15);
+    g.state_mut(StateId::NorthAmerica).control = Control::Controlled(Seat(1));
+    assert_eq!(g.influence_allotment(Seat(1)), 23, "North America adds 8");
+    // Raising Asia's Industry Level adds one to its value.
+    g.state_mut(StateId::Asia).industry_level += 1;
+    assert_eq!(g.state_influence_value(StateId::Asia), 8);
+    assert_eq!(g.influence_allotment(Seat(0)), 23, "(10 + 8) x 1.3 = 23.4");
+    // The card figures, as decided: Antarctica counts for nothing.
+    assert_eq!(g.state_influence_value(StateId::Antarctica), 0);
+    let total: i64 = StateId::ALL.iter().map(|s| g.tables.state(*s).influence).sum();
+    assert_eq!(total, 34, "8 + 7 + 5 + 4 + 4 + 2 + 2 + 2 + 0");
+}
+
 // ---------------------------------------------------------------- 8.5 Occupation
 
 fn occupier_in(g: &mut Game, seat_home: StateId, target: StateId) -> ArmyId {
