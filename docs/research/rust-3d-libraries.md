@@ -150,7 +150,7 @@ What ships, verified on docs.rs for 0.36.2 (2026-09-08):
 - `egui::widgets`: Button, Checkbox, DragValue, Hyperlink, Image, Label, Link, **ProgressBar**, RadioButton, Separator, Slider, Spinner.
 - `egui::containers`: Area, Window, Popup, Resize, Sides, Tooltip, ComboBox, plus panels, `ScrollArea` and `CollapsingHeader` re-exported from submodules.
 - `egui::Grid` — "A simple grid layout. The cells are always laid out left to right, top-down" — exactly a resource readout.
-- `egui::containers::Scene` — "A container that allows you to zoom and pan"; like a `ScrollArea` but with zooming and no limits. **This is a tech tree canvas, already written.**
+- `egui::containers::Scene` — "A container that allows you to zoom and pan"; like a `ScrollArea` but with zooming and no limits. This is the *canvas* a tech tree needs, already written — the node placement and the lines between nodes are still yours to write, but they are ordinary arithmetic, not graphics code. No node-graph widget ships with egui; the tech tree is the one UI element here without an off-the-shelf answer.
 - `egui_extras` 0.36.2 (depends on `egui ^0.36.2`) adds a real `Table`.
 - `egui_plot` 0.37.0 (depends on `egui ^0.36.0`) adds charts — a warming track over ten turns.
 
@@ -160,11 +160,19 @@ egui also bundles its own fonts by default (`default_fonts` feature, via `includ
 
 ### wgpu — the strongest reason for caution
 
-`wgpu` 30.0.1, published 2026-08-22. It is extremely healthy (17,965 stars, 549 commits in three months, 34.4 million downloads, and it is the graphics backend inside Firefox). It is also a **raw GPU API**, and it moves fast: 27.0.0 (2025-10-01), 28.0.0 (2025-12-18), 29.0.0 (2026-03-19), 30.0.0 (2026-07-01) — **four breaking major versions in ten months**, with 8 major changes listed in 29.0.0 and 6 in 30.0.0, e.g. "`SurfaceTexture::present()` has been replaced by `Queue::present(surface_texture)`" and "`dispatch` and `dispatch_indirect`... renamed to `dispatch_workgroups`."
+`wgpu` 30.0.1, published 2026-08-22. It is extremely healthy — 17,965 stars, 549 commits in three months, 34.4 million downloads, and its README states it "serves as the core of the WebGPU integration in Firefox, Servo, and Deno."
+
+It is also a **raw GPU API**, and it moves fast *by policy*. The README says so outright: "we release a breaking version every three months." The record bears it out: 27.0.0 (2025-10-01), 28.0.0 (2025-12-18), 29.0.0 (2026-03-19), 30.0.0 (2026-07-01) — **four breaking major versions in ten months**, with 8 major changes listed in 29.0.0 and 6 in 30.0.0. Representative breaks: "`SurfaceTexture::present()` has been replaced by `Queue::present(surface_texture)`"; `dispatch`/`dispatch_indirect` renamed to `dispatch_workgroups`; `Surface::get_current_texture` changed from returning a `Result` to a new `CurrentSurfaceTexture` enum with six variants you must match on. The churn even reaches the shader source: in 30.0.0, "Integer shader I/O no longer defaults to `@interpolate(flat)`" — WGSL that was valid last release must now annotate those fields explicitly.
 
 wgpu has no meshes, no cameras, no lights, no scene graph, no model loading and no maths types. To draw one lit textured sphere by hand you must write: a WGSL shader; vertex and index buffers with generated sphere geometry; a uniform buffer and bind group layout and bind group; a depth texture; a render pipeline; surface configuration and resize handling; and the view/projection matrices yourself with `glam` (0.33.7, 2026-09-07) or `nalgebra`.
 
-For scale: the official example for putting custom wgpu 3D inside an egui app is `crates/egui_demo_app/src/apps/custom3d_wgpu.rs` in `emilk/egui` — roughly **230 lines plus a separate WGSL file to draw a single triangle**. A textured, lit, orbiting sphere is meaningfully more than that.
+For scale, three line counts I measured directly on 2026-09-08:
+
+- `emilk/egui` → `crates/egui_demo_app/src/apps/custom3d_wgpu.rs`, the official "custom wgpu 3D inside an egui app" example: **212 lines**, plus a separate `custom3d_wgpu_shader.wgsl` — **to draw one triangle**.
+- `gfx-rs/wgpu` → `examples/features/src/hello_triangle/mod.rs`: **355 lines** for a single hard-coded triangle with no vertex buffer at all.
+- `gfx-rs/wgpu` → `examples/features/src/cube/mod.rs`: **418 lines** for an indexed, textured, spinning cube with a uniform buffer and no lighting.
+
+A textured, lit, orbiting sphere with a generated mesh is more than the cube. Two such scenes, each wired into an egui callback, is a realistic **400–700 lines of graphics plumbing per scene** before a single pixel of UI.
 
 And these are exactly the errors that fail *silently*: a wrong matrix multiplication order, a bind group index off by one, a mis-declared vertex attribute. The result is a black screen with no error, and no human to notice.
 
@@ -188,7 +196,13 @@ Any agent recalling the old `fn update(&mut self, ctx: &egui::Context, frame: &m
 
 ### Windows `.exe` and build weight
 
-`cargo build --release` produces a single self-contained `.exe`. Fonts are baked in by `default_fonts`; textures can be baked in with `include_bytes!`. Nothing needs to sit beside it. This is the only candidate that gives a genuine one-file, double-clickable result with no extra work. Add `#![windows_subsystem = "windows"]` to suppress the console window (standard Rust, not an eframe feature). The docs note that switching from wgpu to glow "can significantly reduce your binary size" if that matters later.
+`cargo build --release` produces a single self-contained `.exe`. Fonts are baked in by the `default_fonts` feature (the `epaint_default_fonts` crate `include_bytes!`s `Hack-Regular.ttf`, `Ubuntu-Light.ttf` and the emoji/icon fonts), and textures can be baked in with `include_bytes!` the same way the official `eframe_template` embeds its window icon. Nothing needs to sit beside the exe. This is the only candidate that gives a genuine one-file, double-clickable result with no extra work.
+
+The console window is handled by a standard Rust attribute — `#![windows_subsystem = "windows"]`, which the Rust reference describes as running "detached from any existing console... commonly used by GUI applications that do not want to display a console window on startup." The official `eframe_template` already carries it as `#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]`, so it is on by default in release builds and off in debug where you still want to see panics.
+
+The docs note that switching from wgpu to glow "can significantly reduce your binary size" if that matters later.
+
+**One packaging trap to write into the spec:** crates.io currently reports winit's *newest* version as `0.31.0-beta.3` (2026-09-04), while the true stable is `0.30.13` (2026-03-02) — which is what `eframe` 0.36.2 and `egui-wgpu` 0.36.2 actually depend on (`winit ^0.30.13`). Any instruction to "use the latest winit" would land the agent on pre-release code. Pin exact versions of `wgpu`, `egui`, `eframe` and `winit` in `Cargo.toml` rather than leaving loose ranges.
 
 Dependency weight sits between three-d and Bevy — wgpu drags in the `naga` shader translator, but there is no ECS, no asset server, no audio, no physics.
 
@@ -277,7 +291,7 @@ All fetched 2026-09-08 unless noted.
 
 **three-d** — `asny/three-d` README and `Cargo.toml` at tag `0.19.0`; `examples/` directory listing and `examples/texture`, `examples/shapes`, `examples/environment`, `examples/picking` sources; docs.rs `three_d` and `three_d_asset::io`.
 
-**wgpu + egui** — `gfx-rs/wgpu` CHANGELOG on `trunk`; `emilk/egui` CHANGELOG and `crates/eframe/CHANGELOG.md` on `main`; `crates/egui_demo_app/src/apps/custom3d_wgpu.rs`; docs.rs `egui` 0.36.2 (`widgets`, `containers`, `Grid`, `Scene`), `eframe` 0.36.2, `egui-wgpu` 0.36.2 (`CallbackTrait`).
+**wgpu + egui** — `gfx-rs/wgpu` README and CHANGELOG on `trunk`, and `examples/features/src/hello_triangle/mod.rs` and `examples/features/src/cube/mod.rs` (line counts measured directly); `emilk/egui` README, CHANGELOG and `crates/eframe/CHANGELOG.md` on `main`; `crates/egui_demo_app/src/apps/custom3d_wgpu.rs` (212 lines, measured); `emilk/eframe_template` `src/main.rs`; docs.rs `egui` 0.36.2 (`widgets`, `containers`, `Grid`, `Scene`), `eframe` 0.36.2, `egui-wgpu` 0.36.2 (`CallbackTrait`); the Rust Reference, "Runtime", on `windows_subsystem`.
 
 **Others** — `not-fl3/macroquad` README; docs.rs `macroquad` 0.4.16 (`models`, `ui::widgets`); godot-rust book setup page; Godot docs "Exporting projects".
 
