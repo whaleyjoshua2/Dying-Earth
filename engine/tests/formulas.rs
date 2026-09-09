@@ -446,13 +446,57 @@ fn a_card_comes_on_about_half_the_turns_at_the_start_and_more_when_warm() {
 }
 
 #[test]
-fn the_deck_is_thirty_cards_originals_twice_new_once_and_no_calm() {
+fn the_deck_is_twenty_six_cards_as_the_table_deals_them_and_no_calm() {
     let g = game();
-    assert_eq!(g.deck.cards.len(), 30);
+    assert_eq!(g.deck.cards.len(), 28, "ten first-playable Events twice, eight later ones once (#25, #32)");
     for e in &g.tables.events.event {
-        let want = if EventId::ALL[..12].contains(&e.id) { 2 } else { 1 };
-        assert_eq!(g.deck.count(e.id), want, "{}", e.name);
+        assert_eq!(g.deck.count(e.id), e.copies as usize, "{}", e.name);
     }
+    assert!(!g.tables.events.event.iter().any(|e| e.target == "faction"), "no card singles out a Faction (#32)");
+}
+
+// ---------------------------------------------------------------- #32 the two replacement cards
+
+#[test]
+fn launch_pad_fire_delays_the_ships_due_at_that_state_unless_clean_propellant() {
+    let mut g = game();
+    g.turn = 3;
+    g.state_mut(StateId::Asia).queue.push(Build { item: BuildItem::Unit(UnitKind::Frigate), seat: Seat(0), due_turn: 3 });
+    g.state_mut(StateId::Asia).queue.push(Build { item: BuildItem::Facility(FacilityKind::Factory), seat: Seat(0), due_turn: 3 });
+    drawn(&mut g, EventId::LaunchPadFire, EventTarget::State(StateId::Asia));
+    g.resolution_phase();
+    assert!(g.ships.is_empty(), "the Frigate did not appear");
+    assert_eq!(g.state(StateId::Asia).queue.len(), 1, "it is back in the queue");
+    assert_eq!(g.state(StateId::Asia).queue[0].due_turn, 4);
+    assert!(g.state(StateId::Asia).facilities.iter().any(|f| f.kind == FacilityKind::Factory), "the Factory was not delayed");
+    assert!(!g.state(StateId::Asia).facilities.iter().find(|f| f.kind == FacilityKind::LaunchSite).unwrap().online, "the Launch Site is offline");
+    // With Clean Propellant nothing is delayed.
+    let mut g = game();
+    g.turn = 3;
+    with_tech(&mut g, TechId::CleanPropellant);
+    g.state_mut(StateId::Asia).queue.push(Build { item: BuildItem::Unit(UnitKind::Frigate), seat: Seat(0), due_turn: 3 });
+    drawn(&mut g, EventId::LaunchPadFire, EventTarget::State(StateId::Asia));
+    g.resolution_phase();
+    assert_eq!(g.ships.len(), 1);
+}
+
+#[test]
+fn labour_dispute_idles_a_states_facilities_at_the_next_income_and_public_science_spares_all_but_one() {
+    let mut g = game();
+    g.state_mut(StateId::Asia).facilities = vec![facility(FacilityKind::Factory), facility(FacilityKind::Refinery), facility(FacilityKind::PowerPlant)];
+    drawn(&mut g, EventId::LabourDispute, EventTarget::State(StateId::Asia));
+    g.apply_event_now();
+    let paid = income_of(&mut g, Seat(0));
+    assert_eq!((paid.materials, paid.fuel), (0, 0), "nothing made: {paid:?}");
+    g.last_event = None;
+    g.resolution_phase();
+    let paid = income_of(&mut g, Seat(0));
+    assert!(paid.materials > 0 && paid.fuel > 0, "back at work after Resolution: {paid:?}");
+    with_tech(&mut g, TechId::PublicScience);
+    drawn(&mut g, EventId::LabourDispute, EventTarget::State(StateId::Asia));
+    g.apply_event_now();
+    let idle = g.state(StateId::Asia).facilities.iter().filter(|f| f.offline_until_resolution).count();
+    assert_eq!(idle, 1, "one Facility only");
 }
 
 #[test]

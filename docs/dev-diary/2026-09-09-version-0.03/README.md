@@ -23,3 +23,15 @@ Work on map [#30](https://github.com/whaleyjoshua2/Dying-Earth/issues/30), on th
 
 Both rule changes were watched red first: with the destruction roll restored for Influence the
 eight-Factory test failed, and with every card scaled the Meteor Shower test failed.
+
+## #32: the two cards that singled out a Faction
+
+Decided by the designer: Equipment Failure and Launch Failure go; **Launch Pad Fire** (one Nation
+State with a Launch Site: the Launch Site is offline until the next Resolution and every Ship due
+there this turn completes next turn instead; Clean Propellant delays no Ship) and **Labour Dispute**
+(one Nation State by population: its Facilities make nothing at the next Income; Public Science
+spares all but one) come in, once each. Both hit a place, so whoever holds it takes the blow.
+
+The deck is twenty-eight cards, not the twenty-six the ticket's option named: ten first-playable
+Events twice and eight later ones once. The arithmetic slip is recorded on the ticket for the
+designer to keep or trim. A test now asserts that no card in the table targets a Faction.

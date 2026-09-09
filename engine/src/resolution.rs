@@ -589,17 +589,15 @@ impl Game {
 
     fn resolve_builds(&mut self) {
         let turn = self.turn;
-        // Equipment Failure and Launch Failure pick one build of the target seat.
-        let mut delay_one: Option<Seat> = None;
-        let mut launch_fail: Option<Seat> = None;
-        if let Some(ev) = &self.last_event {
-            match (ev.card, ev.target) {
-                (Card::Event(EventId::EquipmentFailure), EventTarget::Seat(s)) => delay_one = Some(s),
-                (Card::Event(EventId::LaunchFailure), EventTarget::Seat(s)) => launch_fail = Some(s),
-                _ => {}
-            }
+        // Launch Pad Fire (ticket #32): every Ship due this turn at that state completes next turn instead,
+        // unless Clean Propellant is held.
+        let mut pad_fire: Option<StateId> = self.last_event.as_ref().and_then(|ev| match (ev.card, ev.target) {
+            (Card::Event(EventId::LaunchPadFire), EventTarget::State(s)) => Some(s),
+            _ => None,
+        });
+        if self.has_tech(TechId::CleanPropellant) {
+            pad_fire = None;
         }
-        let clean = self.has_tech(TechId::CleanPropellant);
         let mut completed: Vec<(Place, Build)> = Vec::new();
         for sid in StateId::ALL {
             let st = self.state_mut(sid);
@@ -627,28 +625,13 @@ impl Game {
             }
         }
         for (place, mut b) in completed {
-            if delay_one == Some(b.seat) {
-                delay_one = None;
+            let is_ship = matches!(b.item, BuildItem::Unit(k) if k != UnitKind::Army);
+            if is_ship && pad_fire.map(|s| place == Place::State(s)).unwrap_or(false) {
                 b.due_turn = turn + 1;
                 self.requeue(place, b.clone());
-                let line = format!("Equipment Failure: the {} {} at {} completes next turn instead.", self.seat_name(b.seat), b.item.name(), self.place_name(place));
+                let line = format!("Launch Pad Fire: the {} {} at {} completes next turn instead.", self.seat_name(b.seat), b.item.name(), self.place_name(place));
                 self.log(line.clone());
                 self.report.lines.push(line);
-                continue;
-            }
-            if launch_fail == Some(b.seat) && matches!(b.item, BuildItem::Unit(k) if k != UnitKind::Army) {
-                launch_fail = None;
-                if clean {
-                    b.due_turn = turn + 1;
-                    self.requeue(place, b.clone());
-                    let line = format!("Launch Failure: the {} {} is delayed one turn (Clean Propellant).", self.seat_name(b.seat), b.item.name());
-                    self.log(line.clone());
-                    self.report.lines.push(line);
-                } else {
-                    let line = format!("Launch Failure: the {} {} is destroyed on the pad, no refund.", self.seat_name(b.seat), b.item.name());
-                    self.log(line.clone());
-                    self.report.lines.push(line);
-                }
                 continue;
             }
             self.complete_build(place, b);
