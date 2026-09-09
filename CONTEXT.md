@@ -29,8 +29,12 @@ A place in the solar system that can hold a Colony. The First Playable has the M
 _Avoid_: planet, world, site, location, node
 
 **Colony**:
-A permanent settlement a Faction holds on a Body.
+A permanent settlement a Faction holds on a Body, founded when a Colony Ship unloads Colonists into a free Colony Slot. None exist when the game starts.
 _Avoid_: base, outpost, settlement
+
+**Colony Slot**:
+One of a fixed number of places on a Body where a Colony can be founded, shared by all Factions.
+_Avoid_: site, plot, capacity
 
 **Earth Map**:
 The 3D view of Earth, divided into Nation States, where Earth-side building, launches and the Climate Panel are seen and acted on.
@@ -77,19 +81,43 @@ _Avoid_: central bank, per-world stocks, inventory
 ### Pieces
 
 **Module**:
-A building placed inside a Colony. The First Playable has five kinds: Mine, Generator, Refinery, Habitat and Shipyard.
+A building placed inside a Colony. The First Playable has six kinds: Mine, Generator, Refinery, Habitat, Shipyard and Barracks.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:
-A persistent piece that travels between Bodies, carries Colonists, and can fight. It is not consumed on arrival.
+A persistent piece that travels between Bodies. It is one of three types: Colony Ship, Frigate or Battleship. It is not consumed on arrival; damage it takes persists until repaired.
 _Avoid_: vessel, rocket, fleet, expedition
+
+**Colony Ship**:
+The Ship type that carries Colonists and Armies. It cannot attack and is weak if caught.
+_Avoid_: transport, colony (that is the settlement), settler ship
+
+**Frigate**:
+The light warship type: cheap, with high Pursuit. It intercepts arriving Ships and runs down units that disengage.
+_Avoid_: escort, corvette, destroyer
+
+**Battleship**:
+The heavy warship type: the most strength and hit points, low Pursuit, dear and slow to build. It carries one Army.
+_Avoid_: capital ship, dreadnought, cruiser
+
+**Army**:
+A ground fighting unit. A Nation State's Armies belong to the state and are directed by the Faction that controls it, following the state if control changes. A Colony's Army belongs to the Colony, exists only where it has a Barracks, and only defends.
+_Avoid_: troops, soldiers, garrison, marines
+
+**Standing Army**:
+The Armies a Nation State keeps on its own, sized by its card and replenished a little each turn, whether or not any Faction controls it.
+_Avoid_: garrison, militia, defence value
+
+**Barracks**:
+The Module that lets a Colony hold and build a defensive Army. A Colony without one has no defenders.
+_Avoid_: fort, garrison, base
 
 **Colonist**:
 A person counted in the population of a Colony or Nation State. Colonists are carried by Ships and held by Habitats; they are never spent as a resource.
 _Avoid_: settler, crew, worker, population resource
 
 **Nation State**:
-One of seven regions of the Earth Map mirroring the continents, Antarctica included, that a Faction can control and build in. Each carries a population, an Industry Level, a Resource Lean and a Baseline Emissions figure.
+One of seven regions of the Earth Map mirroring the continents, Antarctica included, that a Faction can control and build in. Each carries a population, an Industry Level, a Resource Lean, a Baseline Emissions figure, an Education Level and a Standing Army. Armies move only between neighbouring continents.
 _Avoid_: country, nation, territory, region, state
 
 ### Earth
@@ -115,12 +143,54 @@ How dirty a Nation State's industry is before any Facility is built there.
 _Avoid_: pollution rating, carbon score
 
 **Influence**:
-A Faction's accumulated claim on a neutral Nation State, built by spending resources on it over turns and decaying when neglected. The first Faction past the state's threshold takes control.
+A Faction's accumulated claim on a Nation State or an enemy Colony, built by spending resources on it over turns and decaying when neglected. The first Faction past the place's threshold takes control; the owner of a Colony can spend to push a rival's Influence back.
 _Avoid_: diplomacy points, favour, reputation
 
 **Research**:
 Points produced by Research Labs and spent only on Techs. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship.
 _Avoid_: science, research points, RP, fourth resource
+
+### Combat
+
+**Battle**:
+A fight between opposed stacks at one Body, Nation State or Colony, resolved automatically in rounds during end-of-turn processing and always finished inside the turn. Each round each side rolls to land hits, biased by its share of the strength present.
+_Avoid_: fight, engagement, skirmish, encounter
+
+**Stance**:
+The one order a stack carries into end-of-turn processing: Attack, Hold, Intercept (Ships only, engaging arrivals before they unload) or Evade.
+_Avoid_: order, mode, posture, aggression setting
+
+**Strength**:
+How hard a unit hits. A unit's type sets it; Hardened Hulls raises it for every Ship.
+_Avoid_: attack, power, combat value
+
+**Hit Points**:
+How much damage a unit can take before it is destroyed with everything it carries. Damage persists until repaired at a Shipyard or Launch Site (Ships) or in a controlled Nation State or a Colony with a Barracks (Armies).
+_Avoid_: health, HP, hull, morale
+
+**Pursuit**:
+A unit's ability to catch an enemy unit that disengages, forcing it to take one more round of fire. Frigates have the most; Colony Ships none.
+_Avoid_: speed, chase, initiative
+
+**Disengage**:
+A damaged unit's attempt to leave a Battle, more likely the more damage it carries. A unit that disengages and is not caught survives and cannot be attacked again that turn.
+_Avoid_: retreat, rout, flee, break
+
+**Battle Report**:
+The account of every Battle from the last end-of-turn processing, read at the start of the next turn.
+_Avoid_: combat log, after-action report
+
+**Orbital Control**:
+Held at a Body by a Faction that has a Frigate or Battleship there with no enemy warship still engaged. Armies and Colonists can land only where their Faction holds it or nobody contests it.
+_Avoid_: blockade, orbital supremacy, space superiority
+
+**Occupation**:
+The state of a Nation State or Colony whose defenders were beaten by an Army. The occupier chooses build orders but does not direct its Armies; control transfers after the lesser of three turns or the population being Pacified.
+_Avoid_: conquest, annexation, capture
+
+**Pacified**:
+An occupied population whose occupier's Influence, gained automatically each turn of Occupation, has passed the place's threshold. Control transfers at that moment.
+_Avoid_: subdued, loyal, converted
 
 ### Climate
 
