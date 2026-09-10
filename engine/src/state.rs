@@ -63,6 +63,9 @@ pub struct Facility {
     pub online: bool,
     /// Set by a Wildfire: offline until the next Resolution.
     pub offline_until_resolution: bool,
+    /// Ticket #53: a neutral Nation State that developed itself runs this Facility on its own, so it
+    /// emits at x1.0 to nobody's Blame while nobody directs the state. A directed state ignores it.
+    pub self_run: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -504,7 +507,7 @@ impl Game {
         let mut kinds: Vec<FactionKind> = vec![setup.player];
         kinds.extend(FactionKind::ALL.into_iter().filter(|k| *k != setup.player));
         let seats: [SeatState; SEAT_COUNT] = std::array::from_fn(|i| seat(kinds[i], i > 0 || setup.player_is_ai));
-        let states: Vec<NationState> = tables
+        let mut states: Vec<NationState> = tables
             .states
             .iter()
             .map(|c| NationState {
@@ -512,7 +515,7 @@ impl Game {
                 population: c.population,
                 industry_level: c.industry_level,
                 control: Control::Neutral,
-                facilities: c.start_facilities.iter().map(|k| Facility { kind: *k, online: true, offline_until_resolution: false }).collect(),
+                facilities: c.start_facilities.iter().map(|k| Facility { kind: *k, online: true, offline_until_resolution: false, self_run: false }).collect(),
                 queue: Vec::new(),
                 lost_slots: 0,
                 thresholds_fired: vec![false; tables.climate.sea_level_thresholds.len()],
@@ -521,11 +524,20 @@ impl Game {
                 changed_hands: false,
                 refugees_in: 0.0,
                 unrest_reported: c.unrest,
-                // Every state is neutral when the game opens, so every clock starts on turn 1;
+                // Every state is neutral when the game opens; the clocks are staggered below, and
                 // `take_control` clears the four the Factions begin holding.
                 neutral_since: Some(1),
             })
             .collect();
+        // Ticket #53: the opening clocks are staggered by the seed across the first development
+        // period, so the states that start neutral do not all develop on the same turn.
+        {
+            use rand::Rng;
+            let period = tables.development.turns.max(1);
+            for st in states.iter_mut() {
+                st.neutral_since = Some(1 + rng.random_range(0..period));
+            }
+        }
         let deck = crate::events::new_deck(&tables, &mut rng);
         let mut game = Game {
             seed: setup.seed,
@@ -586,7 +598,7 @@ impl Game {
         for (sid, seat) in taken.iter().zip(Seat::ALL) {
             game.take_control(*sid, seat);
             let st = game.state_mut(*sid);
-            st.facilities.push(Facility { kind: FacilityKind::LaunchSite, online: true, offline_until_resolution: false });
+            st.facilities.push(Facility { kind: FacilityKind::LaunchSite, online: true, offline_until_resolution: false, self_run: false });
         }
         let places: Vec<String> = Seat::ALL
             .into_iter()

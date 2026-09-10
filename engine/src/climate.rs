@@ -102,8 +102,11 @@ impl Game {
             self.state_mut(sid).industry_level += 1;
             self.state_mut(sid).neutral_since = Some(turn + 1);
             let level = self.state(sid).industry_level;
-            let woken = self.state_mut(sid).facilities.iter_mut().find(|f| !f.online).map(|f| {
+            // The state takes one of its start Facilities into its own hands: it comes online and
+            // runs itself, emitting at x1.0 to nobody's Blame while the state stays neutral.
+            let woken = self.state_mut(sid).facilities.iter_mut().find(|f| !f.self_run).map(|f| {
                 f.online = true;
+                f.self_run = true;
                 f.kind.name()
             });
             let name = self.tables.state(sid).name.clone();
@@ -141,7 +144,21 @@ impl Game {
             b.state_industry += industry;
             b.population += people;
             let mut worn = industry + people;
-            // A Facility nobody directs stands idle: it makes nothing and emits nothing (ticket #24).
+            // A Facility nobody directs stands idle: it makes nothing and emits nothing (ticket #24),
+            // unless the state developed itself and runs it (ticket #53): then it emits at x1.0, to
+            // nobody's Blame.
+            if director.is_none() {
+                let half = if self.facilities_at_half(st.id) { 0.5 } else { 1.0 };
+                for f in st.facilities.iter().filter(|f| f.self_run && f.online) {
+                    let e = t.facility(f.kind).emissions * half;
+                    match f.kind {
+                        FacilityKind::Factory => b.factories += e * fr_mult,
+                        FacilityKind::Refinery => b.refineries += e * fr_mult,
+                        FacilityKind::PowerPlant => b.power_plants += e * pp_mult,
+                        _ => {}
+                    }
+                }
+            }
             if let Some(d) = director {
                 for f in &st.facilities {
                     if !f.online {

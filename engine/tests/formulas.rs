@@ -33,7 +33,7 @@ fn with_seed(seed: u64) -> Game {
 }
 
 fn facility(kind: FacilityKind) -> Facility {
-    Facility { kind, online: true, offline_until_resolution: false }
+    Facility { kind, online: true, offline_until_resolution: false, self_run: false }
 }
 
 fn colony(g: &mut Game, seat: Seat, body: BodyId, modules: &[ModuleKind], colonists: u32) -> ColonyId {
@@ -2613,8 +2613,9 @@ fn f_a_neutral_state_raises_its_industry_level_every_sixth_turn() {
     let mut g = game();
     calm(&mut g);
     hold_temperature(&mut g, 1.2);
-    g.state_mut(sid).facilities.push(Facility { kind: FacilityKind::Factory, online: false, offline_until_resolution: false });
+    g.state_mut(sid).facilities.push(Facility { kind: FacilityKind::Factory, online: false, offline_until_resolution: false, self_run: false });
     let start = g.state(sid).industry_level;
+    let before = g.emissions_now();
     for turn in 1..=6 {
         g.turn = turn;
         g.neutral_development();
@@ -2624,6 +2625,12 @@ fn f_a_neutral_state_raises_its_industry_level_every_sixth_turn() {
     }
     assert_eq!(g.state(sid).industry_level, start + 1, "the sixth neutral turn raises the Industry Level");
     assert!(g.state(sid).facilities.iter().all(|f| f.online), "and brings the idle Factory online");
+    // The woken Factory is run by the state itself: while nobody directs the state it emits at
+    // x1.0 (a Facility nobody directs otherwise emits nothing), to nobody's Blame.
+    assert!(g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::Factory && f.self_run), "the state runs the Factory itself");
+    let b = g.emissions_now();
+    assert!(b.factories > before.factories, "a self-run Factory in a neutral state emits: {b:?}");
+    assert_eq!(b.by_seat, before.by_seat, "and it is nobody's Blame");
     assert!(
         g.report.lines.iter().any(|l| l.contains("raised its Industry Level to") && l.contains("Factory")),
         "the Report names it: {:?}",
@@ -2708,4 +2715,22 @@ fn g_the_neutrality_clock_restarts_when_a_state_goes_neutral_again() {
     g.turn = 11;
     g.neutral_development();
     assert_eq!(g.state(sid).industry_level, start + 1, "six fresh turns from turn 6");
+}
+
+/// Ticket #53: the states that are neutral when the game opens do not all develop on the same
+/// turn; their clocks are staggered by the seed, so the first developments spread over several turns.
+#[test]
+fn the_opening_neutral_states_do_not_all_develop_on_the_same_turn() {
+    let g = game();
+    let clocks: Vec<u32> = StateId::ALL.into_iter().filter(|s| g.state(*s).control == Control::Neutral).filter_map(|s| g.state(s).neutral_since).collect();
+    assert!(clocks.len() >= 6, "most states are neutral at the start: {clocks:?}");
+    let distinct: std::collections::BTreeSet<u32> = clocks.iter().copied().collect();
+    assert!(distinct.len() >= 3, "the clocks are staggered, not all {:?}", clocks);
+    let turns = g.tables.development.turns;
+    assert!(clocks.iter().all(|c| *c >= 1 && *c < 1 + turns), "each clock starts within the first development period: {clocks:?}");
+    // The same seed gives the same stagger.
+    let h = game();
+    let again: Vec<u32> = StateId::ALL.into_iter().filter_map(|s| h.state(s).neutral_since).collect();
+    let first: Vec<u32> = StateId::ALL.into_iter().filter_map(|s| g.state(s).neutral_since).collect();
+    assert_eq!(first, again, "seed-stable");
 }

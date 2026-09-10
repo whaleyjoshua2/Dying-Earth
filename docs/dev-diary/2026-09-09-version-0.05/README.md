@@ -623,3 +623,24 @@ such a state; no Report line in sixty games named a Facility. If the intent was 
 state's Facilities should stand idle until the state develops itself — which is what the Climate
 phase's own comment says about them — that is a change to how neutral states start, and the
 designer's call.
+
+### After the build: neutral states run what they wake, and the opening clocks are staggered
+
+Two corrections on the same ticket, each seen red first:
+
+- **"Brings one idle start Facility online" could never fire.** A neutral state's start Facilities
+  are `online` from the first turn; they make nothing and emit nothing only because nobody directs
+  them (ticket #24). Development now marks the woken Facility **self-run**: while the state stays
+  neutral it emits at x1.0 (with the worldwide Clean Techs and the Unrest-7 halving applied) to
+  nobody's Blame, and it makes nothing for anyone. Test: the development test asserts the Factory
+  is self-run, that the world's Factory Emissions rise, and that no seat's Blame moves.
+- **Every state neutral at the start shared one clock**, so on turn 6 eight states developed at
+  once (pictured above, the turn-6 Report). The opening clocks are now staggered by the seed across
+  the first development period, so first developments fall between turns 6 and 11. Test:
+  `the_opening_neutral_states_do_not_all_develop_on_the_same_turn`.
+
+Twenty seeds afterwards, seat 0 in East Asia: the Custodian seating collapses 20 of 20 (median
+turn 19, 22 developments a game), the Prospector seating 20 of 20 (median 20, 14 developments).
+Before neutral development the Custodian seating had one Collapse in twenty. Whether the six-turn
+clock, the Industry Level 4 ceiling, or the +2.5 C stop moves is the designer's call, recorded on
+the map.

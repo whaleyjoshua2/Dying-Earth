@@ -752,7 +752,7 @@ impl Game {
                     self.report.lines.push(line);
                     return;
                 }
-                self.state_mut(s).facilities.push(Facility { kind: k, online: true, offline_until_resolution: false });
+                self.state_mut(s).facilities.push(Facility { kind: k, online: true, offline_until_resolution: false, self_run: false });
             }
             (Place::State(s), BuildItem::IndustryLevel) => {
                 self.state_mut(s).industry_level += 1;
