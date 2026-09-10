@@ -60,6 +60,12 @@ pub enum Order {
     /// Version 0.05 (ticket #51): this turn's Research from the Archivists' Labs goes into the
     /// Archive fund instead of the shared Tech, and counts nothing toward the Research Lead.
     FundArchive,
+    /// Version 0.05 (ticket #52): Relief. Ducats spent on a Nation State you direct, lowering its
+    /// Unrest by one. Any number of times a turn, cancellable like any order.
+    Relief { state: StateId },
+    /// Version 0.05 (ticket #52): Resettle. Once a turn per Faction: this turn every refugee flow
+    /// leaving a state you direct goes entirely to the chosen state, and you gain Standing there.
+    Resettle { state: StateId },
 }
 
 impl Order {
@@ -137,6 +143,10 @@ pub struct Pending {
     pub cargo: Vec<(Seat, Order)>,
     /// Ticket #46: stations ordered this turn.
     pub stations: Vec<(Seat, BodyId, u32)>,
+    /// Ticket #52: Relief orders paid this turn, one entry per point.
+    pub relief: Vec<(Seat, StateId)>,
+    /// Ticket #52: Resettle orders paid this turn, one per Faction at most.
+    pub resettle: Vec<(Seat, StateId)>,
     pub influence: Vec<(Seat, Target, i64)>,
     /// Attack orders in the order given, for battle ordering (spec 10.1).
     pub attack_sequence: u32,
@@ -193,6 +203,9 @@ impl Game {
             // Ticket #51: a stage of the Archive costs Materials here and Research from the fund,
             // which is not part of the Stockpile and so is checked in the legality rules below.
             Order::BuildArchiveStage { .. } => Cost { materials: t.module(ModuleKind::Archive).materials, ..Default::default() },
+            // Ticket #52: Relief and Resettle are paid in Ducats.
+            Order::Relief { .. } => Cost { ducats: t.unrest.relief_ducats, ..Default::default() },
+            Order::Resettle { .. } => Cost { ducats: t.unrest.resettle_ducats, ..Default::default() },
             Order::RestorationWithDucats { steps } => Cost { ducats: t.ducats.per_restoration_step * *steps as i64, ..Default::default() },
             Order::RepairWithDucats { points, .. } => Cost { ducats: t.ducats.per_repair_point * *points as i64, ..Default::default() },
             _ => Cost::default(),
@@ -390,7 +403,31 @@ impl Game {
                 if self.free_slots(*state) <= pending_here {
                     return fail("no free build slot");
                 }
-                let _ = kind;
+                // Ticket #52: at most one Constabulary per Nation State.
+                if *kind == FacilityKind::Constabulary
+                    && (self.state(*state).facilities.iter().any(|f| f.kind == FacilityKind::Constabulary)
+                        || self.state(*state).queue.iter().any(|b| b.item == BuildItem::Facility(FacilityKind::Constabulary))
+                        || pending.iter().any(|o| matches!(o.build_state(), Some(s) if s == *state) && matches!(o, Order::BuildFacility { kind: FacilityKind::Constabulary, .. } | Order::BuildFacilityWithDucats { kind: FacilityKind::Constabulary, .. })))
+                {
+                    return fail("this Nation State already has a Constabulary");
+                }
+                Ok(cost)
+            }
+            // Ticket #52: Relief, on a state you direct, any number of times a turn.
+            Order::Relief { state } => {
+                if self.state(*state).control.director() != Some(seat) {
+                    return fail("Relief is paid in a Nation State you direct");
+                }
+                Ok(cost)
+            }
+            // Ticket #52: Resettle, once a turn per Faction, on a state you direct.
+            Order::Resettle { state } => {
+                if self.state(*state).control.director() != Some(seat) {
+                    return fail("Resettle sends the refugees to a Nation State you direct");
+                }
+                if pending.iter().any(|o| matches!(o, Order::Resettle { .. })) {
+                    return fail("one Resettle a turn");
+                }
                 Ok(cost)
             }
             Order::RaiseIndustry { state } => {
@@ -850,6 +887,13 @@ impl Game {
                     self.report.lines.push(line);
                 }
                 Order::FundArchive => self.fund_archive(seat),
+                // Ticket #52: both act at Resolution; Resettle also steers the next Climate phase's
+                // refugee flows, which is the first flow after these orders are given.
+                Order::Relief { state } => self.pending.relief.push((seat, *state)),
+                Order::Resettle { state } => {
+                    self.seat_mut(seat).resettle_to = Some(*state);
+                    self.pending.resettle.push((seat, *state));
+                }
                 Order::Influence { target, amount } => self.pending.influence.push((seat, *target, *amount)),
                 Order::Restoration { steps } | Order::RestorationWithDucats { steps } => {
                     self.climate.restoration_next += self.tables.restoration.sink_per_step * *steps as f64;

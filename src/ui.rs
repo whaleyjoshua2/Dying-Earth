@@ -563,6 +563,13 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         let _ = armies;
                         let text = format!("{}\n{}\n{} Facilities, {} free slot(s)", game.tables.state(sid).name, owner, st.facilities.len(), game.free_slots(sid));
                         label_at(painter, p, &text, colour, 12.0);
+                        // Ticket #52: the Unrest figure once it bites, red once Facilities run at half.
+                        let army_line = game.tables.unrest.army_threshold;
+                        if st.unrest >= army_line {
+                            let hot = st.unrest >= game.tables.unrest.facility_threshold;
+                            let tint = if hot { Color32::from_rgb(255, 90, 80) } else { Color32::from_rgb(255, 190, 90) };
+                            label_at(painter, p - egui::vec2(0.0, 38.0), &format!("Unrest {}", st.unrest), tint, 13.0);
+                        }
                         hotspots.push(Hotspot { pos: p, radius: 30.0, hit: Hit::Select(Selection::State(sid)) });
                         // Army shields (ticket #31): one per Faction present, grey for a neutral Standing Army.
                         let mut shields: Vec<(Option<Seat>, i64)> = Vec::new();
@@ -958,6 +965,9 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildStation { body, slot } => format!("Build {} over {}", game.station_name(*body, *slot), game.tables.body(*body).name),
         Order::BuildArchiveStage { colony } => format!("Raise a stage of the Archive at {}", game.place_name(Place::Colony(*colony))),
         Order::FundArchive => "Fund the Archive with this turn's Research".to_string(),
+        // Ticket #52.
+        Order::Relief { state } => format!("Relief in {}: Unrest -1", game.tables.state(*state).name),
+        Order::Resettle { state } => format!("Resettle this turn's refugees in {}", game.tables.state(*state).name),
     }
 }
 
@@ -1076,6 +1086,22 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 10); a Bank here would add {}", card.gdp, game.state_ducats(sid), (game.tables.facility(FacilityKind::Bank).produces.as_ref().map(|p| p.amount).unwrap_or(0) * card.gdp) / 10));
     ui.label(format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.tables.climate.population_emissions_per_hundred_million * st.population * mult));
     ui.label(format!("Build slots: {} used of {} ({} free); Education Level {}", game.slots_used(sid), game.build_slots(sid), game.free_slots(sid), card.education_level));
+    // Ticket #52: Unrest, and what it is doing here in words.
+    {
+        let u = &game.tables.unrest;
+        let n = st.unrest;
+        let colour = if n >= u.facility_threshold {
+            Color32::from_rgb(255, 90, 80)
+        } else if n >= u.army_threshold {
+            Color32::from_rgb(255, 190, 90)
+        } else {
+            Color32::LIGHT_GREEN
+        };
+        ui.colored_label(colour, format!("Unrest {}: {}", n, game.unrest_note(sid)));
+        if game.constabulary_online(sid) {
+            ui.label(RichText::new("A Constabulary here takes 1 off every turn and damps what the climate and the refugees add.").weak());
+        }
+    }
     if st.lost_slots > 0 {
         ui.colored_label(Color32::LIGHT_BLUE, format!("{} slot(s) lost to the sea", st.lost_slots));
     }
@@ -1114,6 +1140,18 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         }
         cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
+        // Ticket #52: Relief and Resettle, with their prices on the buttons.
+        ui.label(RichText::new("Unrest").strong());
+        ui.horizontal(|ui| {
+            cost_button(ui, game, &session.pending, Order::Relief { state: sid }, "Relief: Unrest -1", actions);
+            cost_button(ui, game, &session.pending, Order::Resettle { state: sid }, "Resettle here", actions);
+        });
+        ui.label(
+            RichText::new(
+                "Relief may be paid any number of times a turn. Resettle sends every refugee leaving your states here this turn, once a turn, and raises your Standing here by 5.",
+            )
+            .weak(),
+        );
         // Ticket #46: Ships come from Shipyards; a Launch Site lifts people to orbit.
         ui.label(
             RichText::new(if st.facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online) {

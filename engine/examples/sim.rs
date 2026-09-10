@@ -36,6 +36,12 @@ fn main() {
     let mut collapses = 0u32;
     let mut collapse_turns: Vec<u32> = Vec::new();
     let mut first_colony: Vec<u32> = Vec::new();
+    // Ticket #52.
+    let mut throw_offs = 0u32;
+    let mut peaks: Vec<u32> = Vec::new();
+    let mut constabularies = 0u32;
+    let mut relief = 0u32;
+    let mut moved = 0.0f64;
     let mut kinds = [FactionKind::Custodians; SEAT_COUNT];
     for s in seed..seed + count {
         let r = dying_earth_engine::sim::run(tables.clone(), s, player);
@@ -57,9 +63,18 @@ fn main() {
         if let Some(t) = r.first_colony_turn {
             first_colony.push(t);
         }
+        throw_offs += r.throw_offs;
+        peaks.push(r.peak_unrest.max(0) as u32);
+        constabularies += r.constabularies;
+        relief += r.relief_orders;
+        moved += r.population_moved;
         println!(
             "seed {:3} | {:?} | turn {:2} | first colony {:?} | buildings {:?} | colonists {:?} | temp {:+.2} | collapse proj {:?} | colony hands {:?} | influence transfers {:2} | bank/post/embassy/relay {:?}",
             r.seed, r.outcome, r.last_turn, r.first_colony_turn, r.buildings, r.colonists_off_earth, r.temperature, r.collapse_projected_turn, r.colony_changed_hands, r.influence_transfers, r.new_buildings
+        );
+        println!(
+            "         | unrest: threw off {} | peak {} | constabularies {} | relief orders {} | population moved {:.1}",
+            r.throw_offs, r.peak_unrest, r.constabularies, r.relief_orders, r.population_moved
         );
     }
     if count > 1 {
@@ -72,5 +87,10 @@ fn main() {
         println!("{:>12}         : {:2}", "collapses", collapses);
         println!("{:>12}         : {}", "median collapse turn", median(&mut collapse_turns));
         println!("{:>12}         : {}", "median turn of first Colony", median(&mut first_colony));
+        println!("{:>12}         : {}", "states that threw off a controller", throw_offs);
+        println!("{:>12}         : {}", "median peak Unrest", median(&mut peaks));
+        println!("{:>12}         : {}", "Constabularies built by the AIs", constabularies);
+        println!("{:>12}         : {}", "Relief orders paid by the AIs", relief);
+        println!("{:>12}         : {:.1}", "population moved by refugees", moved);
     }
 }

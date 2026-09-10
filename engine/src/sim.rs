@@ -23,6 +23,13 @@ pub struct SimResult {
     pub influence_transfers: u32,
     /// Ticket #41: Banks, Trade Posts, Embassies and Relays completed by any seat.
     pub new_buildings: [u32; 4],
+    /// Ticket #52: states that threw off a controller, the highest Unrest any state reached, the
+    /// Constabularies raised, the Relief orders paid, and the population refugees carried.
+    pub throw_offs: u32,
+    pub peak_unrest: i64,
+    pub constabularies: u32,
+    pub relief_orders: u32,
+    pub population_moved: f64,
     pub log: Vec<String>,
 }
 
@@ -48,6 +55,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let mut projected_collapse: Option<u32> = None;
     let mut founded: Vec<(ColonyId, u32, Option<Seat>)> = Vec::new();
     let mut changed: Vec<(u32, u32)> = Vec::new();
+    let mut peak_unrest = 0i64;
     let max_turns = tables.victory.turns;
     let mut guard = 0;
     while !game.is_over() && guard < max_turns + 2 {
@@ -71,6 +79,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         if projected_collapse.is_none() {
             projected_collapse = game.projection().collapse_turn;
         }
+        peak_unrest = peak_unrest.max(game.states.iter().map(|s| s.unrest).max().unwrap_or(0));
     }
     let buildings = Seat::ALL.map(|s| {
         let f: u32 = game.directed_states(s).iter().map(|st| game.state(*st).facilities.len() as u32).sum();
@@ -89,6 +98,17 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         projected_collapse
     ));
     let influence_transfers = game.log.iter().filter(|l| !l.starts_with(' ') && l.ends_with("(Influence).")).count() as u32;
+    // Ticket #52, read off the log the same way: throw-offs, Constabularies, Relief orders and the
+    // population the refugee flows carried (to the tenth the line prints).
+    let throw_offs = game.log.iter().filter(|l| l.contains("threw off the")).count() as u32;
+    let constabularies = game.log.iter().filter(|l| l.contains("completed Constabulary at")).count() as u32;
+    let relief_orders = game.log.iter().filter(|l| l.trim_start().starts_with("take") && l.contains("pay Relief in")).count() as u32;
+    let population_moved: f64 = game
+        .log
+        .iter()
+        .filter(|l| l.contains(" population left "))
+        .filter_map(|l| l.trim_start().split(' ').next().and_then(|n| n.parse::<f64>().ok()))
+        .sum();
     let new_buildings = ["Bank", "Trade Post", "Embassy", "Relay"].map(|b| game.log.iter().filter(|l| l.contains(&format!("completed {b} at"))).count() as u32);
     SimResult {
         seed,
@@ -103,6 +123,11 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         colony_changed_hands: changed,
         influence_transfers,
         new_buildings,
+        throw_offs,
+        peak_unrest,
+        constabularies,
+        relief_orders,
+        population_moved,
         log: game.log,
     }
 }

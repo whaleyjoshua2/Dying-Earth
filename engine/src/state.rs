@@ -45,6 +45,17 @@ impl Control {
     }
 }
 
+/// Ticket #52: where a rise in Unrest comes from, which decides what damps it (rule 4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnrestSource {
+    /// A population fall, build slots lost to Sea Level, or a Heatwave, Wildfire or Storm Surge.
+    Climate,
+    /// Refugees arriving.
+    Refugees,
+    /// Occupation, a mothball, a decommission, the Unrest card: nothing damps these.
+    Plain,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Facility {
     pub kind: FacilityKind,
@@ -110,6 +121,15 @@ pub struct NationState {
     pub thresholds_fired: Vec<bool>,
     /// Extra Emissions charged next Climate phase by a Wildfire.
     pub wildfire_emissions_next: f64,
+    /// Ticket #52: Unrest, 0 to 10 (9 while the state is neutral).
+    pub unrest: i64,
+    /// Something raised Unrest here since the Climate phase, so it does not fall on its own.
+    pub unrest_rose: bool,
+    /// Population that arrived here as refugees this turn; charged as Unrest once, at the end of
+    /// Resolution, so the per-turn cap counts the whole turn's flows together.
+    pub refugees_in: f64,
+    /// The Unrest last named in the Report, so a crossing of 4, 7 or 10 is reported once.
+    pub unrest_reported: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -318,6 +338,9 @@ pub struct SeatState {
     /// Ticket #51: Provisional Findings is in force this turn, because last turn's Research went to
     /// the shared Tech. True at the start of the game.
     pub provisional_findings: bool,
+    /// Ticket #52: the state a Resettle order steers this Faction's refugee flows to, until the
+    /// next Climate phase spends it.
+    pub resettle_to: Option<StateId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -453,6 +476,7 @@ impl Game {
             archive_fund: 0,
             funding_archive: false,
             provisional_findings: true,
+            resettle_to: None,
         };
         // Seat 0 is the player's Faction; the other three follow in enum order (ticket #50).
         let mut kinds: Vec<FactionKind> = vec![setup.player];
@@ -471,6 +495,10 @@ impl Game {
                 lost_slots: 0,
                 thresholds_fired: vec![false; tables.climate.sea_level_thresholds.len()],
                 wildfire_emissions_next: 0.0,
+                unrest: c.unrest,
+                unrest_rose: false,
+                refugees_in: 0.0,
+                unrest_reported: c.unrest,
             })
             .collect();
         let deck = crate::events::new_deck(&tables, &mut rng);
@@ -1102,6 +1130,135 @@ impl Game {
         match self.kind(seat) {
             FactionKind::Prospectors => self.tables.industry_level.materials_cheap_industry,
             _ => self.tables.industry_level.materials,
+        }
+    }
+
+    // ---------------------------------------------------------------- Ticket #52: Unrest
+
+    /// The four green Techs of rule 4.
+    pub const GREEN_TECHS: [TechId; 4] = [TechId::CleanPropellant, TechId::CleanPower, TechId::CleanManufacturing, TechId::GreenConsensus];
+
+    /// A state's Unrest now.
+    pub fn unrest(&self, s: StateId) -> i64 {
+        self.state(s).unrest
+    }
+
+    /// The ceiling on this state's Unrest: 10 where a Faction holds or occupies it, 9 while it is
+    /// neutral, so a neutral state never throws anybody off (rule 5).
+    pub fn unrest_cap(&self, s: StateId) -> i64 {
+        let u = &self.tables.unrest;
+        if self.state(s).control == Control::Neutral { u.neutral_max } else { u.max }
+    }
+
+    /// How many of the four green Techs are complete.
+    pub fn green_techs_done(&self) -> usize {
+        Self::GREEN_TECHS.into_iter().filter(|t| self.has_tech(*t)).count()
+    }
+
+    /// A Constabulary standing and online in the state.
+    pub fn constabulary_online(&self, s: StateId) -> bool {
+        self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Constabulary && f.online)
+    }
+
+    /// How much smaller a rise from `source` is here (rule 4). Never below zero; never a fall.
+    pub fn unrest_damping(&self, s: StateId, source: UnrestSource) -> i64 {
+        let u = &self.tables.unrest;
+        let mut d = 0;
+        if source == UnrestSource::Climate {
+            let done = self.green_techs_done();
+            if done >= 4 {
+                d += u.green_techs_four;
+            } else if done >= 2 {
+                d += u.green_techs_two;
+            }
+        }
+        if matches!(source, UnrestSource::Climate | UnrestSource::Refugees) && self.constabulary_online(s) {
+            d += u.constabulary_damping;
+        }
+        d
+    }
+
+    /// Raise a state's Unrest, damped by rule 4 and capped by `unrest_cap`. Returns what it rose by.
+    /// Damping never lowers Unrest by itself: a rise damped away is no rise at all.
+    pub fn raise_unrest(&mut self, s: StateId, amount: i64, source: UnrestSource) -> i64 {
+        if amount <= 0 {
+            return 0;
+        }
+        let damped = (amount - self.unrest_damping(s, source)).max(0);
+        if damped == 0 {
+            return 0;
+        }
+        let cap = self.unrest_cap(s);
+        let before = self.state(s).unrest;
+        let after = (before + damped).clamp(0, cap.max(before));
+        let st = self.state_mut(s);
+        st.unrest = after;
+        st.unrest_rose = true;
+        after - before
+    }
+
+    /// Lower a state's Unrest, never below zero. Returns what it fell by.
+    pub fn lower_unrest(&mut self, s: StateId, amount: i64) -> i64 {
+        if amount <= 0 {
+            return 0;
+        }
+        let before = self.state(s).unrest;
+        let after = (before - amount).max(0);
+        self.state_mut(s).unrest = after;
+        before - after
+    }
+
+    /// Ticket #52: a Facility mothballed in this state. The Mothball order arrives on a later
+    /// ticket; this is the function it calls.
+    pub fn unrest_from_mothball(&mut self, s: StateId) -> i64 {
+        let n = self.tables.unrest.per_mothball;
+        self.raise_unrest(s, n, UnrestSource::Plain)
+    }
+
+    /// Ticket #52: a Facility decommissioned in this state, the same way.
+    pub fn unrest_from_decommission(&mut self, s: StateId) -> i64 {
+        let n = self.tables.unrest.per_decommission;
+        self.raise_unrest(s, n, UnrestSource::Plain)
+    }
+
+    /// The hook of rule 3 for what lowers Unrest by standing in the state: a Constabulary now, a
+    /// Scrubber when its ticket lands (`unrest.toml`, `scrubber_fall`).
+    pub fn calming_fall(&self, s: StateId) -> i64 {
+        let u = &self.tables.unrest;
+        if self.constabulary_online(s) { u.constabulary_fall } else { 0 }
+    }
+
+    /// Ticket #52, a hook for the neutral-development rule of a later ticket: a state at
+    /// `no_development_at` or more does not develop itself.
+    pub fn may_develop(&self, s: StateId) -> bool {
+        self.state(s).unrest < self.tables.unrest.no_development_at
+    }
+
+    /// The Standing Army replenishes only below the first threshold (rule 5).
+    pub fn army_replenishes(&self, s: StateId) -> bool {
+        self.state(s).unrest < self.tables.unrest.army_threshold
+    }
+
+    /// At the second threshold every Facility in the state produces and emits at half (rule 5).
+    pub fn facilities_at_half(&self, s: StateId) -> bool {
+        self.state(s).unrest >= self.tables.unrest.facility_threshold
+    }
+
+    /// What the state's Unrest does now, in words, for the card and the map.
+    pub fn unrest_note(&self, s: StateId) -> String {
+        let u = &self.tables.unrest;
+        let n = self.state(s).unrest;
+        let held = self.state(s).control != Control::Neutral;
+        if n >= u.throw_off_threshold {
+            "it throws its controller off at this Resolution".to_string()
+        } else if held && n >= u.throw_off_threshold - 1 {
+            "Facilities at half and no replenishment; one more and it throws you off".to_string()
+        } else if n >= u.facility_threshold {
+            "every Facility here produces and emits at half, and the Standing Army does not replenish".to_string()
+        } else if n >= u.army_threshold {
+            "the Standing Army no longer replenishes".to_string()
+        } else {
+            "calm enough: the Standing Army replenishes and Facilities run in full".to_string()
         }
     }
 

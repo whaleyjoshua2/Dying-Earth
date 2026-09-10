@@ -67,6 +67,17 @@ emissions = 0.0
 influence_allotment = 2
 standing_per_turn = 2
 
+# Ticket #52 (version 0.05): the Constabulary. At most one per Nation State, buildable by any
+# Faction. It lowers its state's Unrest by 1 every turn it stands and is online, whatever else
+# happened, and damps every climate-source and refugee rise there by 1 on top of the green Techs.
+[[facility]]
+id = "constabulary"
+name = "Constabulary"
+materials = 25
+build_turns = 1
+energy_upkeep = 2
+emissions = 0.0
+
 [industry_level]
 materials = 30
 materials_cheap_industry = 15

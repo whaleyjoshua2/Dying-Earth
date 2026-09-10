@@ -4,7 +4,16 @@
 # Ticket #50 also removed the denial multiplier: each AI pursues its own Victory Condition and
 # never spends a multiplier on holding a rival back.
 
+# Ticket #52 (version 0.05): `relief` pays Relief on a state the seat directs once its Unrest is 6
+# or more, one point per 10 Ducats it can spare, at the opportunity multiplier from 9;
+# `build_constabulary` raises one where Unrest is 5 or more and a slot is free, at the threat
+# multiplier in a state it has just Occupied; `resettle` steers this turn's refugee flows into a
+# calm state of its own (Unrest under 3) while the world's population is falling.
+
 [weights.prospectors]
+relief = 4
+build_constabulary = 5
+resettle = 2
 fund_archive = 0
 build_archive_stage = 0
 build_producer = 8
@@ -27,6 +36,9 @@ stance_hold = 2
 stance_evade = 1
 
 [weights.custodians]
+relief = 6
+build_constabulary = 6
+resettle = 2
 fund_archive = 0
 build_archive_stage = 0
 build_producer = 6
@@ -51,6 +63,9 @@ stance_evade = 1
 # Ticket #51: the Arkwrights spread. Habitats, Colony Ships, stations and founding are all 9;
 # Influence is 5, since they buy passage rather than allegiance.
 [weights.arkwrights]
+relief = 4
+build_constabulary = 4
+resettle = 2
 fund_archive = 0
 build_archive_stage = 0
 build_producer = 6
@@ -74,6 +89,9 @@ stance_evade = 1
 
 # Ticket #51: the Archivists research and build the Archive.
 [weights.archivists]
+relief = 5
+build_constabulary = 5
+resettle = 2
 fund_archive = 8
 build_archive_stage = 9
 build_producer = 6

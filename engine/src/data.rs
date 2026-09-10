@@ -90,6 +90,9 @@ pub struct StateCard {
     /// gdp x Industry Level / 10 Ducats a turn, and a Bank there adds 4 x gdp / 10.
     #[serde(default)]
     pub gdp: i64,
+    /// Ticket #52 (version 0.05): the Unrest the state starts with, 0 to 10.
+    #[serde(default)]
+    pub unrest: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -197,8 +200,9 @@ pub struct EventsTable {
     pub solar_maximum_multiplier_with_tech: f64,
     pub permafrost_emissions: f64,
     pub meteor_damage: u32,
-    pub unrest_army_damage: u32,
-    pub unrest_influence_loss: i64,
+    /// Ticket #52: the Unrest card is a flat rise in the state's Unrest; the Army damage and the
+    /// Standing loss it carried until version 0.05 are gone.
+    pub unrest_card_unrest: i64,
     pub reactor_leak_energy: i64,
     pub breakthrough_research: i64,
     pub breakthrough_research_public_science: i64,
@@ -390,6 +394,47 @@ pub struct InfluenceTable {
     pub destruction_chance: f64,
 }
 
+/// Ticket #52 (version 0.05): every number that moves a Nation State's Unrest (`unrest.toml`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct UnrestTable {
+    pub max: i64,
+    pub neutral_max: i64,
+    pub population_fall: i64,
+    pub population_fall_big: i64,
+    pub population_fall_big_fraction: f64,
+    pub per_sea_level_slot: i64,
+    pub climate_card: i64,
+    pub per_mothball: i64,
+    pub per_decommission: i64,
+    pub refugees_per: f64,
+    pub refugees_max: i64,
+    pub occupation_start: i64,
+    pub occupation_per_turn: i64,
+    pub unrest_card: i64,
+    pub natural_fall: i64,
+    pub relief_ducats: i64,
+    pub relief_points: i64,
+    pub constabulary_fall: i64,
+    /// The hook a Scrubber joins on its own ticket; nothing reads it yet.
+    pub scrubber_fall: i64,
+    pub green_techs_two: i64,
+    pub green_techs_four: i64,
+    pub constabulary_damping: i64,
+    pub army_threshold: i64,
+    pub facility_threshold: i64,
+    pub throw_off_threshold: i64,
+    pub throw_off_reset: i64,
+    pub no_development_at: i64,
+    pub pacification_divisor: i64,
+    pub pacification_divisor_unrest: i64,
+    pub pacification_unrest: i64,
+    pub heat_share: f64,
+    pub sea_loss_per_exposure: f64,
+    pub sea_share: f64,
+    pub resettle_ducats: i64,
+    pub resettle_standing: i64,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct VictoryTable {
     pub extraction_total: i64,
@@ -414,6 +459,12 @@ pub struct AiWeights {
     pub fund_archive: f64,
     /// Ticket #51: order the next stage of the Archive.
     pub build_archive_stage: f64,
+    /// Ticket #52: pay Relief on a state the seat directs.
+    pub relief: f64,
+    /// Ticket #52: raise a Constabulary in a restive state.
+    pub build_constabulary: f64,
+    /// Ticket #52: steer this turn's refugee flows into one calm state.
+    pub resettle: f64,
     pub influence: f64,
     pub transit: f64,
     pub load_unload: f64,
@@ -560,6 +611,8 @@ pub struct Tables {
     pub ducats: DucatsCard,
     pub climate: ClimateTable,
     pub influence: InfluenceTable,
+    /// Ticket #52: `unrest.toml`.
+    pub unrest: UnrestTable,
     pub victory: VictoryTable,
     pub ai: AiTable,
 }
@@ -593,6 +646,7 @@ impl Tables {
         let factions: FactionsFile = read(dir, "factions.toml")?;
         let climate: ClimateTable = read(dir, "climate.toml")?;
         let influence: InfluenceTable = read(dir, "influence.toml")?;
+        let unrest: UnrestTable = read(dir, "unrest.toml")?;
         let victory: VictoryTable = read(dir, "victory.toml")?;
         let ai: AiTable = read(dir, "ai.toml")?;
         let tables = Tables {
@@ -614,6 +668,7 @@ impl Tables {
             ducats: factions.ducats,
             climate,
             influence,
+            unrest,
             victory,
             ai,
         };
@@ -716,6 +771,19 @@ impl Tables {
         }
         if self.archive.stages == 0 || self.archive.research_per_stage <= 0 {
             return Err(err("modules.toml", "[archive] needs stages and research_per_stage above zero"));
+        }
+        // Ticket #52: the Unrest ladder must be in order and every start value on it.
+        let u = &self.unrest;
+        if !(u.army_threshold < u.facility_threshold && u.facility_threshold < u.throw_off_threshold && u.throw_off_threshold <= u.max) {
+            return Err(err("unrest.toml", "the thresholds must rise: army_threshold < facility_threshold < throw_off_threshold <= max"));
+        }
+        if u.neutral_max > u.max || u.refugees_per <= 0.0 {
+            return Err(err("unrest.toml", "neutral_max must not exceed max, and refugees_per must be positive"));
+        }
+        for s in &self.states {
+            if s.unrest < 0 || s.unrest > u.max {
+                return Err(err("nation_states.toml", format!("row {}: unrest {} is outside 0..={}", s.name, s.unrest, u.max)));
+            }
         }
         if self.victory.turns == 0 {
             return Err(err("victory.toml", "turns must be positive"));

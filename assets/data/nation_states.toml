@@ -10,6 +10,8 @@
 # gdp (ticket #35): world GDP share in tenths (2023); a controlled state makes gdp x Industry Level / 10
 # Ducats a turn, and a Bank there adds 4 x gdp / 10.
 
+# unrest (ticket #52, version 0.05): the Unrest the state starts with, 0 to 10. Every state starts calm.
+
 [[state]]
 id = "africa"
 name = "Africa"
@@ -24,6 +26,7 @@ neighbours = ["europe", "middle_east"]
 start_facilities = ["factory"]
 influence = 2
 gdp = 3
+unrest = 0
 
 [[state]]
 id = "asia"
@@ -39,6 +42,7 @@ neighbours = ["russia", "middle_east", "australia"]
 start_facilities = ["factory", "power_plant", "refinery"]
 influence = 7
 gdp = 30
+unrest = 0
 
 [[state]]
 id = "australia"
@@ -54,6 +58,7 @@ neighbours = ["asia"]
 start_facilities = ["power_plant", "factory"]
 influence = 2
 gdp = 2
+unrest = 0
 
 [[state]]
 id = "europe"
@@ -69,6 +74,7 @@ neighbours = ["north_america", "africa", "russia", "middle_east"]
 start_facilities = ["power_plant", "factory", "refinery"]
 influence = 5
 gdp = 20
+unrest = 0
 
 [[state]]
 id = "north_america"
@@ -84,6 +90,7 @@ neighbours = ["south_america", "europe", "russia"]
 start_facilities = ["refinery", "power_plant", "factory"]
 influence = 8
 gdp = 25
+unrest = 0
 
 [[state]]
 id = "south_america"
@@ -99,6 +106,7 @@ neighbours = ["north_america"]
 start_facilities = ["refinery"]
 influence = 2
 gdp = 5
+unrest = 0
 
 # Ticket #26. Russia: 145 million people, industry between Europe's and Africa's, gas and oil, dirty
 # per unit of industry, well schooled, vast and mostly landlocked in the game's sense.
@@ -116,6 +124,7 @@ neighbours = ["europe", "asia", "north_america"]
 start_facilities = ["refinery", "power_plant"]
 influence = 4
 gdp = 3
+unrest = 0
 
 # The Middle East: Turkey to Iran and the Arabian Peninsula, about 350 million people, oil, the
 # highest Emissions per unit of industry on the map, Gulf coasts exposed.
@@ -133,3 +142,4 @@ neighbours = ["europe", "asia", "africa"]
 start_facilities = ["refinery", "power_plant"]
 influence = 4
 gdp = 5
+unrest = 0

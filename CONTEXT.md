@@ -204,7 +204,7 @@ _Avoid_: country, nation, territory, region, state
 ### Earth
 
 **Facility**:
-A building placed in a Nation State. Seven kinds since version 0.03: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank and Embassy. Since version 0.04 a Launch Site builds no Ship: it lifts Colonists and Armies from its state into orbit, and each lift is a launch.
+A building placed in a Nation State. Eight kinds since version 0.05: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy and Constabulary. Since version 0.04 a Launch Site builds no Ship: it lifts Colonists and Armies from its state into orbit, and each lift is a launch.
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Cheap Industry**:
@@ -232,8 +232,28 @@ How dirty a Nation State's industry is before any Facility is built there.
 _Avoid_: pollution rating, carbon score
 
 **Coastal Exposure**:
-How much of a Nation State the sea can take. As Sea Level passes its thresholds, an exposed state permanently loses build slots.
+How much of a Nation State the sea can take. As Sea Level passes its thresholds, an exposed state permanently loses build slots and drives some of its people out.
 _Avoid_: coastline, vulnerability, flood risk
+
+**Unrest**:
+How restive a Nation State's people are, a figure from 0 to 10 on its card. Heat, the rising sea, the Climate cards, Occupation and arriving Refugees raise it; it falls on its own in a quiet turn, and to Relief and a Constabulary. Past its first threshold the Standing Army stops replenishing, past its second the state's Facilities run at half, and at the top the state throws its controller off and goes neutral.
+_Avoid_: unhappiness, morale, stability, dissent, revolt meter
+
+**Relief**:
+The Orders-phase order that buys a Nation State's calm: Ducats spent on a state you direct to lower its Unrest by one, as many times in a turn as you can pay for.
+_Avoid_: aid, welfare, subsidy, bribe, appeasement
+
+**Constabulary**:
+The Facility that holds a Nation State's Unrest down: while it stands and is online it lowers Unrest every turn whatever else happened that turn, and softens what the climate and arriving Refugees add. At most one stands in a state.
+_Avoid_: police, militia, garrison, barracks (that is the Colony word)
+
+**Refugees**:
+The people who leave a Nation State for its neighbours when the heat or the sea takes their homes, instead of simply being lost. They are added to the state that receives them, and their arrival raises its Unrest.
+_Avoid_: migrants, displaced, evacuees, exodus, immigration
+
+**Resettle**:
+The Orders-phase order that steers Refugees: once a turn, for Ducats, every flow leaving the states a Faction directs goes to one Nation State of its choosing instead of to the neighbours, and its Standing there rises.
+_Avoid_: relocate, evacuate, transfer, deport
 
 **Influence**:
 A Faction's claim on a Nation State or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold; a controlled place goes to a rival whose Standing is at least the controller's plus the challenge margin (10 since version 0.04) and at least the threshold.

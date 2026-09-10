@@ -117,7 +117,8 @@ impl Game {
                 }
                 continue;
             }
-            if occupied {
+            // Ticket #52: at Unrest 4 the Standing Army stops replenishing.
+            if occupied || !self.army_replenishes(sid) {
                 continue;
             }
             if let Some(a) = self.armies.iter_mut().find(|a| a.standing && a.home == ArmyHome::State(sid)) {
@@ -168,6 +169,13 @@ impl Game {
                 FacilityKind::Factory | FacilityKind::Refinery => fr,
                 _ => 1.0,
             };
+        // Ticket #52: at Unrest 7 every Facility in the state produces at half, rounded down, and
+        // emits at half. What it adds to the Allotment and to the standing is untouched.
+        if self.facilities_at_half(sid) {
+            y.amount /= 2;
+            y.research /= 2;
+            y.emissions *= 0.5;
+        }
         y
     }
 

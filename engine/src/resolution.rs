@@ -37,6 +37,7 @@ impl Game {
         self.resolve_repairs(); // (f)
         self.resolve_cargo(); // (g)
         self.apply_event_now(); // (h)
+        self.resolve_unrest(); // (i), ticket #52
         self.pending = Pending::default();
         for a in &mut self.armies {
             a.move_to = None;
@@ -457,6 +458,11 @@ impl Game {
                     }
                     let turns = turns + 1;
                     self.set_place_control(place, Control::Occupied { occupier, previous, turns });
+                    // Ticket #52: every turn of Occupation adds one to the state's Unrest.
+                    if let Place::State(sid) = place {
+                        let n = self.tables.unrest.occupation_per_turn;
+                        self.raise_unrest(sid, n, UnrestSource::Plain);
+                    }
                     self.occupation_gain(place, occupier);
                     let have = self.seat(occupier).influence.get(&place).copied().unwrap_or(0);
                     let pacified = have > 0 && have >= self.influence_threshold(place);
@@ -480,6 +486,11 @@ impl Game {
                         }
                         let previous = control.controller();
                         self.set_place_control(place, Control::Occupied { occupier: seat, previous, turns: 1 });
+                        // Ticket #52: an Occupation begins at +3 Unrest, damped by nothing.
+                        if let Place::State(sid) = place {
+                            let n = self.tables.unrest.occupation_start;
+                            self.raise_unrest(sid, n, UnrestSource::Plain);
+                        }
                         let line = format!("The {} occupy {}.", self.seat_name(seat), self.place_name(place));
                         self.log(line.clone());
                         self.report.lines.push(line);
@@ -497,7 +508,7 @@ impl Game {
     }
 
     fn occupation_gain(&mut self, place: Place, seat: Seat) {
-        let gain = (self.influence_threshold(place) + 2) / 3;
+        let gain = self.pacification_gain(place);
         let s = self.seat_mut(seat);
         *s.influence.entry(place).or_insert(0) += gain;
         s.influenced_this_turn.push(place);
@@ -1003,6 +1014,122 @@ impl Game {
                 _ => {}
             }
         }
+    }
+
+    // ------------------------------------------------------------------ (i), ticket #52
+
+    /// Unrest settles last, once every rise of the turn is in: the refugees the turn's flows
+    /// brought, then the falls (Relief, a Constabulary, and the natural fall in a turn nothing
+    /// raised it), then the throw-off, then the Report lines for crossing a threshold.
+    pub fn resolve_unrest(&mut self) {
+        let u = self.tables.unrest.clone();
+        // The refugees the turn's flows brought, charged once so the per-turn cap counts them all.
+        for sid in StateId::ALL {
+            let arrived = self.state(sid).refugees_in;
+            if arrived <= 0.0 {
+                continue;
+            }
+            let want = ((arrived / u.refugees_per).floor() as i64).min(u.refugees_max);
+            let rose = self.raise_unrest(sid, want, UnrestSource::Refugees);
+            if rose > 0 {
+                let line = format!("{:.1} people arrived in {}; Unrest rose by {} to {}.", arrived, self.tables.state(sid).name, rose, self.state(sid).unrest);
+                self.log(line.clone());
+                self.report.lines.push(line);
+            }
+        }
+        // Resettle (rule 9): the Standing the chosen state gives its Faction.
+        for (seat, sid) in std::mem::take(&mut self.pending.resettle) {
+            let gain = u.resettle_standing;
+            *self.seat_mut(seat).influence.entry(Place::State(sid)).or_insert(0) += gain;
+            let line = format!("The {} resettled this turn's refugees in {} (+{} Standing there).", self.seat_name(seat), self.tables.state(sid).name, gain);
+            self.log(line.clone());
+            self.report.lines.push(line);
+        }
+        // Relief (rule 3): one point per order, paid for in Ducats at the Orders phase.
+        let mut relieved: Vec<(Seat, StateId, i64)> = Vec::new();
+        for (seat, sid) in std::mem::take(&mut self.pending.relief) {
+            let fell = self.lower_unrest(sid, u.relief_points);
+            match relieved.iter_mut().find(|(s, x, _)| *s == seat && *x == sid) {
+                Some((_, _, n)) => *n += fell,
+                None => relieved.push((seat, sid, fell)),
+            }
+        }
+        for (seat, sid, fell) in relieved.into_iter().filter(|(_, _, n)| *n > 0) {
+            let line = format!("The {} paid Relief in {}: Unrest fell by {} to {}.", self.seat_name(seat), self.tables.state(sid).name, fell, self.state(sid).unrest);
+            self.log(line.clone());
+            self.report.lines.push(line);
+        }
+        // What calms a state by standing in it (a Constabulary now, a Scrubber later), then the
+        // natural fall, which lands only in a turn nothing raised it.
+        for sid in StateId::ALL {
+            let calm = self.calming_fall(sid);
+            self.lower_unrest(sid, calm);
+            if !self.state(sid).unrest_rose {
+                self.lower_unrest(sid, u.natural_fall);
+            }
+        }
+        // The throw-off (rule 5), after the falls: a Faction can still buy a state back from the brink.
+        for sid in StateId::ALL {
+            if self.state(sid).unrest < u.throw_off_threshold {
+                continue;
+            }
+            let Control::Controlled(seat) = self.state(sid).control else { continue };
+            self.throw_off(sid, seat);
+        }
+        // The Report lines for crossing 4, 7 and 10, once each way.
+        for sid in StateId::ALL {
+            let now = self.state(sid).unrest;
+            let was = self.state(sid).unrest_reported;
+            for line in [u.army_threshold, u.facility_threshold] {
+                if now >= line && was < line {
+                    let text = format!("{}: Unrest reached {} - {}.", self.tables.state(sid).name, now, self.unrest_note(sid));
+                    self.log(text.clone());
+                    self.report.lines.push(text);
+                    break;
+                }
+            }
+            let st = self.state_mut(sid);
+            st.unrest_reported = now;
+            st.unrest_rose = false;
+            st.refugees_in = 0.0;
+        }
+    }
+
+    /// Ticket #52, rule 5: a controlled state at 10 throws its controller off. It goes neutral,
+    /// every Faction's Standing stays, the Armies standing there become the state's own, its build
+    /// queue is kept, and its Unrest settles back to 5.
+    fn throw_off(&mut self, sid: StateId, seat: Seat) {
+        let u = &self.tables.unrest;
+        let back = u.throw_off_reset;
+        self.state_mut(sid).control = Control::Neutral;
+        self.state_mut(sid).unrest = back;
+        let ids: Vec<ArmyId> = self.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid))).map(|a| a.id).collect();
+        for id in ids {
+            if let Some(a) = self.army_mut(id) {
+                a.home = ArmyHome::State(sid);
+                a.stance = Stance::Hold;
+                a.move_to = None;
+            }
+        }
+        let line = format!(
+            "{} threw off the {}: it is neutral again, its Armies are its own, and its Unrest settles at {}.",
+            self.tables.state(sid).name,
+            self.seat_name(seat),
+            back
+        );
+        self.log(line.clone());
+        self.report.lines.push(line);
+    }
+
+    /// Ticket #52: what one turn of Occupation adds to the occupier's Standing (spec 8.5): the
+    /// place's threshold over three, rounded up, and over six while the state's Unrest is at 4 or
+    /// more, so a restive population is half as easy to Pacify.
+    pub fn pacification_gain(&self, place: Place) -> i64 {
+        let u = &self.tables.unrest;
+        let restive = matches!(place, Place::State(s) if self.state(s).unrest >= u.pacification_unrest);
+        let divisor = if restive { u.pacification_divisor_unrest } else { u.pacification_divisor };
+        let threshold = self.influence_threshold(place);
+        if divisor <= 0 { threshold } else { (threshold + divisor - 1) / divisor }
     }
 
     fn land_army(&mut self, aid: ArmyId, ship: ShipId, place: Place) {

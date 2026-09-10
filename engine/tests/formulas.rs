@@ -353,6 +353,9 @@ fn occupation_transfer_keeps_the_old_controllers_standing() {
     let mut g = game();
     // Europe is the AI's; seat 1 holds it at 40. Seat 0 occupies it with its defenders gone.
     g.seats[1].influence.insert(Place::State(StateId::Europe), 40);
+    // Ticket #52: three turns of Occupation leave the state at Unrest 5, and from 4 the occupier's
+    // Pacification gain is halved, so it needs a standing of its own to end up holding the place.
+    g.seats[0].influence.insert(Place::State(StateId::Europe), 20);
     g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
     occupier_in(&mut g, StateId::Asia, StateId::Europe);
     for _ in 0..3 {
@@ -1020,18 +1023,8 @@ fn dust_storm_knocks_every_module_on_mars_offline_until_the_next_resolution() {
     assert!(g.colony(mars).unwrap().modules[0].online, "back on after Resolution");
 }
 
-#[test]
-fn unrest_damages_the_standing_army_and_cuts_every_factions_influence_there() {
-    let mut g = game();
-    g.seats[0].influence.insert(Place::State(StateId::Africa), 12);
-    g.seats[1].influence.insert(Place::State(StateId::Africa), 3);
-    drawn(&mut g, EventId::Unrest, EventTarget::State(StateId::Africa));
-    g.apply_event_now();
-    let army = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(StateId::Africa)).unwrap();
-    assert_eq!(army.damage, 2);
-    assert_eq!(g.seats[0].influence[&Place::State(StateId::Africa)], 7);
-    assert_eq!(g.seats[1].influence[&Place::State(StateId::Africa)], 0);
-}
+// The Unrest card's Army damage and Standing loss were retired on ticket #52: it is a flat +3
+// Unrest now, pinned by `j_the_unrest_card_adds_three` below.
 
 #[test]
 fn reactor_leak_stops_generators_until_resolution_and_costs_five_energy() {
@@ -1987,4 +1980,395 @@ fn the_archivist_ai_funds_the_archive_before_it_holds_a_colony() {
     g.seats[arc.index()].research_last_turn = 6;
     let orders = g.ai_orders(arc);
     assert!(orders.iter().any(|o| matches!(o, Order::FundArchive)), "no funding order: {orders:?}");
+}
+
+// ---------------------------------------------------------------- Ticket #52: Unrest, Occupation and refugees
+
+/// Every state calm, with every sea-level threshold already fired, so a Climate-phase test sees
+/// only what it set up.
+fn calm(g: &mut Game) {
+    let n = g.tables.climate.sea_level_thresholds.len();
+    for s in &mut g.states {
+        s.unrest = 0;
+        s.unrest_rose = false;
+        s.unrest_reported = 0;
+        s.refugees_in = 0.0;
+        s.thresholds_fired = vec![true; n];
+    }
+}
+
+/// Hold the Temperature still: the CO2 Stock that makes `temp` its own target.
+fn hold_temperature(g: &mut Game, temp: f64) {
+    let c = &g.tables.climate;
+    g.climate.co2 = c.starting_co2 + (temp - c.base_temperature) * c.ppm_step / c.degrees_per_ppm_step;
+    g.climate.temperature = temp;
+}
+
+fn constabulary_in(g: &mut Game, sid: StateId) {
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Constabulary));
+}
+
+/// (a) A Climate phase in which a state's population fell raises its Unrest by 1, and by 2 when it
+/// fell by more than one per cent.
+#[test]
+fn a_population_fall_raises_unrest_by_one_and_a_fall_over_one_percent_by_two() {
+    let mut g = game();
+    calm(&mut g);
+    hold_temperature(&mut g, 2.0);
+    let rate = g.population_growth_rate();
+    assert!(rate < 0.0 && rate > -0.01, "a small fall: {rate}");
+    g.climate_phase();
+    assert_eq!(g.unrest(StateId::Asia), 1, "a fall of less than one per cent raises Unrest by one");
+
+    let mut g = game();
+    calm(&mut g);
+    hold_temperature(&mut g, 2.6);
+    let rate = g.population_growth_rate();
+    assert!(rate < -0.01, "a fall of more than one per cent: {rate}");
+    g.climate_phase();
+    assert_eq!(g.unrest(StateId::Asia), 2, "a fall of more than one per cent raises Unrest by two");
+}
+
+/// (b) A Sea Level threshold raises Unrest by 2 per build slot lost and drives 5% of the people out
+/// per point of Coastal Exposure, half of them to the neighbours in proportion to Industry Level.
+#[test]
+fn b_a_sea_level_threshold_raises_two_a_slot_and_displaces_five_percent_an_exposure() {
+    let mut g = game();
+    calm(&mut g);
+    // Asia: Coastal Exposure 2; neighbours Russia, the Middle East and Australia.
+    let pop = 40.0;
+    g.state_mut(StateId::Asia).population = pop;
+    for s in [StateId::Russia, StateId::MiddleEast, StateId::Australia] {
+        g.state_mut(s).population = 0.0;
+    }
+    g.state_mut(StateId::Russia).industry_level = 3;
+    g.state_mut(StateId::MiddleEast).industry_level = 1;
+    g.state_mut(StateId::Australia).industry_level = 0;
+    g.apply_sea_threshold(StateId::Asia, 0);
+    assert_eq!(g.unrest(StateId::Asia), 4, "two per build slot, and Asia is exposed 2");
+    let displaced = pop * 0.05 * 2.0;
+    assert!((g.state(StateId::Asia).population - (pop - displaced)).abs() < 1e-9, "{}", g.state(StateId::Asia).population);
+    let moved = displaced * 0.5;
+    assert!((g.state(StateId::Russia).population - moved * 0.75).abs() < 1e-9, "Russia {}", g.state(StateId::Russia).population);
+    assert!((g.state(StateId::MiddleEast).population - moved * 0.25).abs() < 1e-9, "the Middle East {}", g.state(StateId::MiddleEast).population);
+    assert_eq!(g.state(StateId::Australia).population, 0.0, "an Industry Level of 0 takes none while another has some");
+    assert!(g.report.lines.iter().any(|l| l.contains("Unrest there rose")), "the Report says so: {:?}", g.report.lines);
+}
+
+/// (c) Heat refugees: half of what a state lost arrives at its neighbours and raises their Unrest
+/// by one per half a person, at most three in a turn.
+#[test]
+fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_half_a_person() {
+    let mut g = game();
+    calm(&mut g);
+    for s in &mut g.states {
+        s.population = 0.0;
+    }
+    let before = 100.0;
+    g.state_mut(StateId::Asia).population = before;
+    // Russia is the only neighbour of Asia's with any Industry Level, so it takes the whole flow.
+    g.state_mut(StateId::Russia).industry_level = 2;
+    g.state_mut(StateId::MiddleEast).industry_level = 0;
+    g.state_mut(StateId::Australia).industry_level = 0;
+    hold_temperature(&mut g, 3.0);
+    assert!(g.population_growth_rate() < 0.0);
+    g.climate_phase();
+    let lost = before - g.state(StateId::Asia).population;
+    let arrived = lost * 0.5;
+    assert!(arrived > 0.5, "the flow is worth a point of Unrest: {arrived}");
+    assert!((g.state(StateId::Russia).population - arrived).abs() < 1e-6, "Russia took the flow: {}", g.state(StateId::Russia).population);
+    assert!(
+        g.report.lines.iter().any(|l| l.contains("left Asia for") && l.contains("Russia")),
+        "a refugee line naming where they went: {:?}",
+        g.report.lines
+    );
+    g.resolve_unrest();
+    let want = (arrived / 0.5).floor() as i64;
+    assert_eq!(g.unrest(StateId::Russia), want.min(3), "one Unrest per half a person arriving");
+
+    // The cap: eight people arriving in a turn is still only three.
+    let mut g = game();
+    calm(&mut g);
+    g.state_mut(StateId::Russia).refugees_in = 8.0;
+    g.resolve_unrest();
+    assert_eq!(g.unrest(StateId::Russia), 3, "at most three from refugees in a turn");
+}
+
+/// (d) Occupation: +3 when it begins and +1 a turn after; the figure carries over when control
+/// transfers by force; Pacification is halved from Unrest 4.
+#[test]
+fn d_occupation_raises_three_then_one_a_turn_carries_over_and_halves_pacification() {
+    let mut g = game();
+    calm(&mut g);
+    g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
+    occupier_in(&mut g, StateId::Asia, StateId::Europe);
+    g.resolution_phase();
+    assert!(g.state(StateId::Europe).control.is_occupied(), "{:?}", g.state(StateId::Europe).control);
+    assert_eq!(g.unrest(StateId::Europe), 3, "Occupation begins at +3");
+    g.resolution_phase();
+    assert_eq!(g.unrest(StateId::Europe), 4, "and each turn it lasts adds one");
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::Europe).control, Control::Controlled(Seat(0)), "the third turn transfers it");
+    assert_eq!(g.unrest(StateId::Europe), 5, "and the figure carries over to the new controller");
+
+    // Pacification: one third of the threshold rounded up while calm, one sixth from Unrest 4.
+    let mut g = game();
+    calm(&mut g);
+    let threshold = g.influence_threshold(Place::State(StateId::Africa));
+    assert_eq!(g.pacification_gain(Place::State(StateId::Africa)), (threshold + 2) / 3, "the calm gain");
+    g.state_mut(StateId::Africa).unrest = 4;
+    assert_eq!(g.pacification_gain(Place::State(StateId::Africa)), (threshold + 5) / 6, "halved from Unrest 4");
+}
+
+/// (e) The thresholds: 4 stops the Standing Army replenishing, 7 halves output and Emissions, 10
+/// throws the controller off with every Standing kept and Unrest back at 5.
+#[test]
+fn e_four_stops_replenishment_seven_halves_output_ten_throws_the_controller_off() {
+    let mut g = game();
+    calm(&mut g);
+    g.take_control(StateId::Africa, Seat(0));
+    let damage = |g: &Game| g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(StateId::Africa)).unwrap().damage;
+    g.armies.iter_mut().find(|a| a.standing && a.home == ArmyHome::State(StateId::Africa)).unwrap().damage = 1;
+    g.state_mut(StateId::Africa).unrest = 3;
+    g.income_phase();
+    assert_eq!(damage(&g), 0, "below Unrest 4 the Standing Army replenishes");
+    g.armies.iter_mut().find(|a| a.standing && a.home == ArmyHome::State(StateId::Africa)).unwrap().damage = 1;
+    g.state_mut(StateId::Africa).unrest = 4;
+    g.income_phase();
+    assert_eq!(damage(&g), 1, "at Unrest 4 it does not");
+
+    // 7: half the output and half the Emissions.
+    let mut g = game();
+    calm(&mut g);
+    g.take_control(StateId::Asia, Seat(0));
+    g.state_mut(StateId::Asia).facilities.push(facility(FacilityKind::Factory));
+    let full = g.facility_yield(Seat(0), StateId::Asia, FacilityKind::Factory);
+    let all_full = g.emissions_now().factories;
+    g.state_mut(StateId::Asia).unrest = 7;
+    let half = g.facility_yield(Seat(0), StateId::Asia, FacilityKind::Factory);
+    assert!(full.amount > 0);
+    assert_eq!(half.amount, full.amount / 2, "output at half, rounded down (full {})", full.amount);
+    assert!((half.emissions - full.emissions / 2.0).abs() < 1e-9, "Emissions at half: {} of {}", half.emissions, full.emissions);
+    assert!((g.emissions_now().factories - all_full / 2.0).abs() < 1e-9, "and the Climate Panel charges the half");
+
+    // 10: the state throws its controller off.
+    let mut g = game();
+    calm(&mut g);
+    g.take_control(StateId::Africa, Seat(0));
+    g.take_control(StateId::Europe, Seat(0));
+    g.seats[0].influence.insert(Place::State(StateId::Africa), 42);
+    g.seats[1].influence.insert(Place::State(StateId::Africa), 17);
+    g.state_mut(StateId::Africa).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(0), due_turn: 99 });
+    let id = ArmyId(g.fresh_id());
+    g.armies.push(Army { id, home: ArmyHome::State(StateId::Europe), at: ArmyAt::Place(Place::State(StateId::Africa)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+    g.raise_unrest(StateId::Africa, 10, UnrestSource::Plain);
+    assert_eq!(g.unrest(StateId::Africa), 10);
+    g.resolve_unrest();
+    assert_eq!(g.state(StateId::Africa).control, Control::Neutral, "it throws its controller off");
+    assert_eq!(g.unrest(StateId::Africa), 5, "and settles back to 5");
+    assert_eq!(g.seats[0].influence.get(&Place::State(StateId::Africa)).copied(), Some(42), "every Faction's Standing stays");
+    assert_eq!(g.seats[1].influence.get(&Place::State(StateId::Africa)).copied(), Some(17));
+    assert_eq!(g.state(StateId::Africa).queue.len(), 1, "the build queue is kept");
+    assert_eq!(g.army(id).unwrap().home, ArmyHome::State(StateId::Africa), "the Armies there become the state's own");
+    assert!(g.army_seat(g.army(id).unwrap()).is_none(), "so they fight for nobody");
+    assert!(g.report.lines.iter().any(|l| l.contains("threw off")), "a Report line names it: {:?}", g.report.lines);
+}
+
+/// (f) A neutral state's Unrest is capped at 9, and a Faction taking it by Influence inherits it.
+#[test]
+fn f_a_neutral_state_caps_at_nine_and_the_faction_that_takes_it_inherits_its_unrest() {
+    let mut g = game();
+    calm(&mut g);
+    assert_eq!(g.state(StateId::Africa).control, Control::Neutral);
+    g.raise_unrest(StateId::Africa, 20, UnrestSource::Plain);
+    assert_eq!(g.unrest(StateId::Africa), 9, "a neutral state stops at 9");
+    g.resolve_unrest();
+    assert_eq!(g.state(StateId::Africa).control, Control::Neutral, "and throws nobody off, since it holds nobody");
+    assert_eq!(g.unrest(StateId::Africa), 9, "something raised it, so nothing falls");
+    g.transfer_control(Place::State(StateId::Africa), Seat(1), "Influence");
+    assert_eq!(g.unrest(StateId::Africa), 9, "the Faction that takes it inherits its Unrest");
+    g.raise_unrest(StateId::Africa, 5, UnrestSource::Plain);
+    assert_eq!(g.unrest(StateId::Africa), 10, "and now the ceiling is 10");
+}
+
+/// (g) Relief costs 10 Ducats a point; a Constabulary lowers Unrest by 1 a turn and damps a
+/// climate rise by 1; at most one Constabulary stands in a state.
+#[test]
+fn g_relief_costs_ten_ducats_a_point_and_a_constabulary_calms_and_damps() {
+    let mut g = game();
+    calm(&mut g);
+    g.take_control(StateId::Africa, Seat(0));
+    g.state_mut(StateId::SouthAmerica).control = Control::Neutral;
+    g.state_mut(StateId::Africa).unrest = 6;
+    g.seats[0].stockpile.ducats = 30;
+    let order = Order::Relief { state: StateId::Africa };
+    assert_eq!(g.order_cost(Seat(0), &order).ducats, 10, "10 Ducats a point");
+    assert!(g.check_order(Seat(0), &[], &order).is_ok());
+    assert!(g.check_order(Seat(0), &[], &Order::Relief { state: StateId::SouthAmerica }).is_err(), "only on a state you direct");
+    g.commit_orders(Seat(0), &[order.clone(), order.clone()]);
+    assert_eq!(g.seats[0].stockpile.ducats, 10, "two orders, twenty Ducats");
+    g.resolve_unrest();
+    // Two points of Relief off six, and the natural fall as well, since nothing raised it.
+    assert_eq!(g.unrest(StateId::Africa), 3, "two points of Relief and the natural fall off six");
+
+    let mut g = game();
+    calm(&mut g);
+    g.take_control(StateId::Asia, Seat(0));
+    constabulary_in(&mut g, StateId::Asia);
+    g.state_mut(StateId::Asia).unrest = 5;
+    assert_eq!(g.unrest_damping(StateId::Asia, UnrestSource::Climate), 1);
+    assert_eq!(g.raise_unrest(StateId::Asia, 2, UnrestSource::Climate), 1, "a climate rise of two arrives as one");
+    assert_eq!(g.raise_unrest(StateId::Asia, 2, UnrestSource::Plain), 2, "nothing damps Occupation, a mothball or the card");
+    let before = g.unrest(StateId::Asia);
+    g.resolve_unrest();
+    assert_eq!(g.unrest(StateId::Asia), before - 1, "the Constabulary takes one off whatever else happened");
+    g.seats[0].stockpile.materials = 200;
+    assert!(
+        g.check_order(Seat(0), &[], &Order::BuildFacility { state: StateId::Asia, kind: FacilityKind::Constabulary }).is_err(),
+        "at most one Constabulary per Nation State"
+    );
+}
+
+/// (h) Two green Techs damp a climate rise by 1, four by 2, and nothing falls below 0. With the
+/// hook the neutral-development rule of a later ticket will read.
+#[test]
+fn h_two_green_techs_damp_a_climate_rise_by_one_and_four_by_two() {
+    let mut g = game();
+    calm(&mut g);
+    assert_eq!(g.raise_unrest(StateId::Africa, 2, UnrestSource::Climate), 2, "no Techs, no damping");
+    g.state_mut(StateId::Africa).unrest = 0;
+    g.research.done.push(TechId::CleanPropellant);
+    g.research.done.push(TechId::CleanPower);
+    assert_eq!(g.green_techs_done(), 2);
+    assert_eq!(g.raise_unrest(StateId::Africa, 2, UnrestSource::Climate), 1, "two green Techs take one off");
+    g.state_mut(StateId::Africa).unrest = 0;
+    g.research.done.push(TechId::CleanManufacturing);
+    g.research.done.push(TechId::GreenConsensus);
+    assert_eq!(g.green_techs_done(), 4);
+    assert_eq!(g.raise_unrest(StateId::Africa, 2, UnrestSource::Climate), 0, "four green Techs take two off");
+    assert_eq!(g.raise_unrest(StateId::Africa, 1, UnrestSource::Climate), 0, "and it never goes below zero");
+    assert_eq!(g.unrest(StateId::Africa), 0, "damping never lowers Unrest by itself");
+    assert_eq!(g.raise_unrest(StateId::Africa, 3, UnrestSource::Refugees), 3, "the Techs do not damp arriving refugees");
+    let mut g = game();
+    calm(&mut g);
+    assert!(g.may_develop(StateId::Africa), "a calm state develops itself");
+    g.state_mut(StateId::Africa).unrest = 7;
+    assert!(!g.may_develop(StateId::Africa), "a state at 7 or more does not");
+}
+
+/// (i) Resettle routes this turn's flows to the chosen state and adds 5 Standing there.
+#[test]
+fn i_resettle_routes_the_flow_and_adds_five_standing() {
+    let mut g = game();
+    calm(&mut g);
+    for s in &mut g.states {
+        s.population = 0.0;
+    }
+    g.take_control(StateId::Asia, Seat(0));
+    g.take_control(StateId::SouthAmerica, Seat(0));
+    let before = 100.0;
+    g.state_mut(StateId::Asia).population = before;
+    g.seats[0].stockpile.ducats = 40;
+    let order = Order::Resettle { state: StateId::SouthAmerica };
+    assert_eq!(g.order_cost(Seat(0), &order).ducats, 20, "20 Ducats");
+    assert!(g.check_order(Seat(0), &[], &order).is_ok());
+    assert!(g.check_order(Seat(0), &[order.clone()], &order).is_err(), "once a turn per Faction");
+    g.commit_orders(Seat(0), &[order]);
+    g.resolve_unrest();
+    assert_eq!(g.seats[0].influence.get(&Place::State(StateId::SouthAmerica)).copied(), Some(5), "+5 Standing on the chosen state");
+    hold_temperature(&mut g, 3.0);
+    g.climate_phase();
+    let arrived = (before - g.state(StateId::Asia).population) * 0.5;
+    assert!(arrived > 0.0);
+    assert!(
+        (g.state(StateId::SouthAmerica).population - arrived).abs() < 1e-6,
+        "South America took the whole flow: {}",
+        g.state(StateId::SouthAmerica).population
+    );
+    assert_eq!(g.state(StateId::Russia).population, 0.0, "and Asia's own neighbours took none");
+}
+
+/// (j) The Unrest card is a flat +3 there, damped by nothing, with no Army damage and no Standing loss.
+#[test]
+fn j_the_unrest_card_adds_three() {
+    let mut g = game();
+    calm(&mut g);
+    g.take_control(StateId::Asia, Seat(0));
+    constabulary_in(&mut g, StateId::Asia);
+    for t in Game::GREEN_TECHS {
+        g.research.done.push(t);
+    }
+    let damage = |g: &Game| g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(StateId::Asia)).unwrap().damage;
+    let before = damage(&g);
+    g.seats[0].influence.insert(Place::State(StateId::Asia), 30);
+    g.last_event = Some(DrawnEvent { card: Card::Event(EventId::Unrest), target: EventTarget::State(StateId::Asia), scale: 1.0, text: String::new() });
+    g.apply_event_now();
+    assert_eq!(g.unrest(StateId::Asia), 3, "a flat three, damped by nothing");
+    assert_eq!(damage(&g), before, "no Army damage any more");
+    assert_eq!(g.seats[0].influence.get(&Place::State(StateId::Asia)).copied(), Some(30), "and no Standing loss");
+    // A Heatwave, by contrast, is one of the three Climate cards, so the Techs and the Constabulary damp it.
+    g.state_mut(StateId::Asia).unrest = 0;
+    g.last_event = Some(DrawnEvent { card: Card::Event(EventId::Heatwave), target: EventTarget::State(StateId::Asia), scale: 1.0, text: String::new() });
+    g.apply_event_now();
+    assert_eq!(g.unrest(StateId::Asia), 0, "a Climate card of two, damped by three, raises nothing");
+    let mut g = game();
+    calm(&mut g);
+    g.last_event = Some(DrawnEvent { card: Card::Event(EventId::Wildfire), target: EventTarget::State(StateId::Africa), scale: 1.0, text: String::new() });
+    g.apply_event_now();
+    assert_eq!(g.unrest(StateId::Africa), 2, "an undamped Climate card is two");
+}
+
+/// (k) Unrest falls by 1 on its own only in a turn nothing raised it.
+#[test]
+fn k_the_natural_fall_lands_only_in_a_turn_nothing_raised_it() {
+    let mut g = game();
+    calm(&mut g);
+    g.take_control(StateId::Africa, Seat(0));
+    g.state_mut(StateId::Africa).unrest = 5;
+    g.resolve_unrest();
+    assert_eq!(g.unrest(StateId::Africa), 4, "nothing raised it, so it falls by one");
+    g.raise_unrest(StateId::Africa, 1, UnrestSource::Plain);
+    assert_eq!(g.unrest(StateId::Africa), 5);
+    g.resolve_unrest();
+    assert_eq!(g.unrest(StateId::Africa), 5, "a turn something raised it has no natural fall");
+    g.resolve_unrest();
+    assert_eq!(g.unrest(StateId::Africa), 4, "and the turn after, it falls again");
+    g.state_mut(StateId::Africa).unrest = 0;
+    g.resolve_unrest();
+    assert_eq!(g.unrest(StateId::Africa), 0, "never below zero");
+}
+
+/// The AI of ticket #52: Relief where Unrest has taken hold, a Constabulary where it is worse, and
+/// Resettle into a calm state of its own.
+#[test]
+fn the_ai_pays_relief_and_raises_a_constabulary_where_unrest_has_taken_hold() {
+    let mut g = game();
+    calm(&mut g);
+    // A state the seat has just Occupied, restive enough that one more turn would throw it off:
+    // Relief takes the opportunity multiplier at 9, a Constabulary the threat multiplier here.
+    g.state_mut(StateId::Africa).control = Control::Occupied { occupier: Seat(1), previous: None, turns: 1 };
+    g.seats[1].stockpile.ducats = 200;
+    g.seats[1].stockpile.materials = 200;
+    // On pace, so the victory gap is not multiplying every producer past everything else.
+    g.seats[1].extraction_total = 1000;
+    g.state_mut(StateId::Africa).unrest = 9;
+    let orders = g.ai_orders(Seat(1));
+    assert!(orders.iter().any(|o| matches!(o, Order::Relief { state: StateId::Africa })), "no Relief: {orders:?}");
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::BuildFacility { state: StateId::Africa, kind: FacilityKind::Constabulary })),
+        "no Constabulary: {orders:?}"
+    );
+    // A calm state gets neither.
+    let mut g = game();
+    calm(&mut g);
+    g.take_control(StateId::Africa, Seat(1));
+    g.seats[1].stockpile.ducats = 200;
+    g.seats[1].stockpile.materials = 200;
+    g.seats[1].extraction_total = 1000;
+    let orders = g.ai_orders(Seat(1));
+    assert!(!orders.iter().any(|o| matches!(o, Order::Relief { .. })), "Relief in a calm state: {orders:?}");
+    assert!(
+        !orders.iter().any(|o| matches!(o, Order::BuildFacility { kind: FacilityKind::Constabulary, .. })),
+        "a Constabulary in a calm state: {orders:?}"
+    );
 }

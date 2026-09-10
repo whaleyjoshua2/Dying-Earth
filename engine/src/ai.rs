@@ -18,6 +18,10 @@ enum Cat {
     ArmyOrBarracks,
     /// Ticket #36: an Embassy or a Relay.
     BuildInfluence,
+    /// Ticket #52: a Constabulary, Relief and Resettle.
+    Constabulary,
+    Relief,
+    Resettle,
     /// Ticket #51: divert this turn's Research into the Archive fund.
     FundArchive,
     /// Ticket #51: order the next stage of the Archive.
@@ -74,6 +78,9 @@ impl Game {
             Cat::Warship => w.build_warship,
             Cat::ArmyOrBarracks => w.build_army_or_barracks,
             Cat::BuildInfluence => w.build_influence,
+            Cat::Constabulary => w.build_constabulary,
+            Cat::Relief => w.relief,
+            Cat::Resettle => w.resettle,
             Cat::FundArchive => w.fund_archive,
             Cat::ArchiveStage => w.build_archive_stage,
             Cat::Influence => w.influence,
@@ -387,6 +394,13 @@ impl Game {
                         FacilityKind::Factory | FacilityKind::PowerPlant | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                         FacilityKind::ResearchLab => (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab)),
                         FacilityKind::Embassy => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
+                        // Ticket #52: a Constabulary is worth raising only where Unrest has taken hold.
+                        FacilityKind::Constabulary => {
+                            if self.state(sid).unrest < 5 {
+                                continue;
+                            }
+                            (Cat::Constabulary, self.base_weight(seat, Cat::Constabulary))
+                        }
                         FacilityKind::LaunchSite => {
                             if has_launch {
                                 continue;
@@ -410,7 +424,10 @@ impl Game {
                     let first_embassy = fk == FacilityKind::Embassy
                         && !self.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::Embassy)
                         && !self.state(sid).queue.iter().any(|b| b.item == BuildItem::Facility(FacilityKind::Embassy));
-                    let sway = if first_embassy && self.standing_pressed(seat, Place::State(sid)) { m.threat } else { 1.0 };
+                    // Ticket #52: a Constabulary in a state the seat has just Occupied is worth more:
+                    // Occupation is what put the Unrest there, and Pacification halves above 4.
+                    let just_occupied = fk == FacilityKind::Constabulary && self.state(sid).control.is_occupied();
+                    let sway = if (first_embassy && self.standing_pressed(seat, Place::State(sid))) || just_occupied { m.threat } else { 1.0 };
                     push(vec![Order::BuildFacility { state: sid, kind: fk }], cat, base, gap_for(cat, Some(name)), sway, 1.0, format!("build {} in {}", name, self.tables.state(sid).name), None);
                 }
             }
@@ -616,6 +633,48 @@ impl Game {
                 let next = self.archive_stages_committed(seat) + 1;
                 push(vec![Order::BuildArchiveStage { colony: cid }], Cat::ArchiveStage, self.base_weight(seat, Cat::ArchiveStage), gap_for(Cat::ArchiveStage, None), 1.0, m.opportunity, format!("raise stage {} of the Archive at {}", next, self.place_name(Place::Colony(cid))), None);
             }
+        }
+
+        // --- Ticket #52: Relief where Unrest has taken hold, and Resettle into a calm state of
+        // the seat's own. Relief is one point per 10 Ducats the seat can spare, from Unrest 6, at
+        // the opportunity multiplier from 9, where one more turn would throw the seat off.
+        let u = self.tables.unrest.clone();
+        let ducats = self.seat(seat).stockpile.ducats;
+        for sid in self.directed_states(seat) {
+            let n = self.state(sid).unrest;
+            if n < 6 {
+                continue;
+            }
+            let points = if u.relief_ducats > 0 { (ducats / u.relief_ducats).min(n) } else { 0 };
+            let opp = if n >= 9 { m.opportunity } else { 1.0 };
+            for _ in 0..points {
+                push(
+                    vec![Order::Relief { state: sid }],
+                    Cat::Relief,
+                    self.base_weight(seat, Cat::Relief),
+                    1.0,
+                    1.0,
+                    opp,
+                    format!("pay Relief in {} (Unrest {})", self.tables.state(sid).name, n),
+                    None,
+                );
+            }
+        }
+        // Resettle: while the world's population is falling there are flows to steer, and the
+        // calmest state the seat directs is the one that can take them.
+        if self.population_growth_rate() < 0.0
+            && let Some(sid) = self.directed_states(seat).into_iter().filter(|s| self.state(*s).unrest < 3).min_by_key(|s| self.state(*s).unrest)
+        {
+            push(
+                vec![Order::Resettle { state: sid }],
+                Cat::Resettle,
+                self.base_weight(seat, Cat::Resettle),
+                1.0,
+                1.0,
+                1.0,
+                format!("resettle this turn's refugees in {}", self.tables.state(sid).name),
+                None,
+            );
         }
 
         // --- Restoration

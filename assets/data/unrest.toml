@@ -1,0 +1,87 @@
+# Version 0.05 (ticket #52): Unrest, an integer 0 to 10 every Nation State carries. Its start value
+# per state is on the state's card in nation_states.toml; every number that moves it lives here.
+#
+# Rises are charged where they happen: population fall and Sea Level in the Climate phase, the
+# Climate cards, Occupation, mothball and decommission in Resolution, refugee arrivals at the end
+# of Resolution once the turn's flows are all in. Falls are applied at the end of Resolution, after
+# every rise, and the natural fall only lands in a turn nothing raised it.
+
+# The ceiling on a state a Faction holds or occupies, and on a neutral state (rule 5).
+max = 10
+neutral_max = 9
+
+# ---- rises
+# The Climate phase in which the state's population fell, and the same when it fell by more than
+# `population_fall_big_fraction` of what stood.
+population_fall = 1
+population_fall_big = 2
+population_fall_big_fraction = 0.01
+# Per build slot lost to Sea Level.
+per_sea_level_slot = 2
+# A Heatwave, Wildfire or Storm Surge landing on the state.
+climate_card = 2
+# A Facility mothballed or decommissioned there (those orders arrive on a later ticket).
+per_mothball = 1
+per_decommission = 2
+# Refugees arriving: one per this much population, at most `refugees_max` in a turn.
+refugees_per = 0.5
+refugees_max = 3
+# Occupation: when it begins, and each turn it lasts.
+occupation_start = 3
+occupation_per_turn = 1
+# The Unrest Event card.
+unrest_card = 3
+
+# ---- falls
+# On its own, in any turn in which nothing raised it.
+natural_fall = 1
+# One Relief order: this many Ducats lowers Unrest by `relief_points`, any number of times a turn.
+relief_ducats = 10
+relief_points = 1
+# A Constabulary standing and online there, every turn, whatever else happened.
+constabulary_fall = 1
+# A Scrubber will do the same when its ticket lands; `calming_fall` is the hook it joins.
+scrubber_fall = 1
+
+# ---- damping (rule 4)
+# While two of the four green Techs are complete every climate-source rise is this much smaller;
+# while all four are, that much. A Constabulary online there damps climate-source AND refugee rises
+# by `constabulary_damping` on top. Nothing falls below zero, and nothing damps Occupation, a
+# mothball, a decommission or the Unrest card.
+green_techs_two = 1
+green_techs_four = 2
+constabulary_damping = 1
+
+# ---- thresholds (rule 5)
+# At `army_threshold` the Standing Army stops replenishing; at `facility_threshold` every Facility
+# there produces and emits at half; at `throw_off_threshold` a controlled state throws off its
+# controller, becomes neutral and settles back to `throw_off_reset`.
+army_threshold = 4
+facility_threshold = 7
+throw_off_threshold = 10
+throw_off_reset = 5
+# A hook for the neutral-development rule of a later ticket: a state at or above this does not
+# develop itself.
+no_development_at = 7
+
+# ---- Occupation (rule 6)
+# The occupier's Pacification gain each turn is the place's threshold over this, rounded up: the
+# calm divisor normally, the unrest one while the state's Unrest is at `pacification_unrest` or more.
+pacification_divisor = 3
+pacification_divisor_unrest = 6
+pacification_unrest = 4
+
+# ---- refugees (rule 8)
+# When a state's population falls to the heat, this share of what it lost moves to its neighbours
+# instead of vanishing, split in proportion to Industry Level (equally if every neighbour is at 0).
+heat_share = 0.5
+# When a Sea Level threshold fires for a state it loses this much population per point of Coastal
+# Exposure, and this share of that moves to the neighbours the same way.
+sea_loss_per_exposure = 0.05
+sea_share = 0.5
+
+# ---- Resettle (rule 9)
+# An Orders-phase order on a state you control, once a turn per Faction: every refugee flow leaving
+# a state you direct goes entirely to the chosen state, and you gain `resettle_standing` Standing there.
+resettle_ducats = 20
+resettle_standing = 5

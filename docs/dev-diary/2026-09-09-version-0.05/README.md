@@ -260,3 +260,100 @@ their one state pays 4 Materials a turn, they lose Asia to Influence around turn
 games no Archive stage was ever raised (the fund fills to 80 with nowhere to spend it). That is the
 card's economy, not the AI, and it is recorded on the map as a balance finding for the designer.
 Starting in Europe the Archivists collapse 6 of 20 games and the Custodians win 14.
+
+
+## #52: Unrest, Occupation and refugees
+
+Every Nation State now carries **Unrest**, an integer 0 to 10 on its card and in `nation_states.toml`
+(every state starts at 0; every number that moves it lives in the new `assets/data/unrest.toml`).
+Heat, the sea, the three Climate cards, Occupation and arriving refugees raise it; it falls one on
+its own in a turn nothing raised it, one per **Relief** order (10 Ducats on a state you direct), and
+one a turn while a **Constabulary** stands there. Two of the four green Techs make every
+climate-source rise one smaller and all four make it two, and a Constabulary damps climate and
+refugee rises by one on top. At **4** the Standing Army stops replenishing, at **7** every Facility
+there produces and emits at half, at **10** a controlled state **throws its controller off** and goes
+neutral at 5 with every Standing kept. Neutral states track Unrest too but cap at 9, and a Faction
+taking one by Influence inherits the figure. Occupation adds 3 when it begins and 1 a turn after, and
+from Unrest 4 the occupier's Pacification gain is halved.
+
+**Refugees.** When the heat takes a state's people, half of what it lost now moves to its neighbours
+in proportion to their Industry Level instead of vanishing; when a Sea Level threshold fires, the
+state loses 5% of its people per point of Coastal Exposure and half of those move the same way. What
+arrives is added to the receiving state, so its Population Emissions and its Research weight follow,
+and it raises that state's Unrest by one per half a person, at most three in a turn. **Resettle** (20
+Ducats, once a turn per Faction) sends every flow leaving that Faction's states to one state of its
+choosing and raises its Standing there by 5.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![The Asia card at Unrest 7: the red Unrest line in words, the Constabulary in the build list, and the Relief and Resettle buttons with their prices](unrest-card.png)
+
+- **unrest-card.png** — `shot:u7 turns:8 unrest:7 select:asia look:95,30`. Asia at Unrest 7, the line
+  on its card in red ("every Facility here produces and emits at half, and the Standing Army does not
+  replenish"), the **Constabulary (25 Materials)** button in the build list beside the other seven
+  Facilities, and an Unrest block with **Relief: Unrest -1 (10 Ducats)** and **Resettle here (20
+  Ducats)**. The globe behind it carries the Unrest labels for five states. (`unrest:<n>` is a new
+  building aid that spreads n, n-1 and n-3 over Asia, Europe and Africa and hands seat 0 room and
+  money, since the AI seldom leaves a state of the player's this restive with slots to spare.)
+
+![The Earth Map at turn 15: Russia Unrest 10 and Asia Unrest 9 in red, Europe and the Middle East 6 in amber, Africa 10 behind the Climate Panel](earth-unrest-labels.png)
+
+- **earth-unrest-labels.png** — `shot:lab turns:14 look:20,25`. The Earth Map label carries "Unrest
+  N" above a state's name once it is 4 or more, amber to 6 and red from 7. Five states are labelled
+  here without any building aid at all: Russia 10, Asia 9 and Africa 10 in red, Europe and the Middle
+  East at 6 in amber. Europe already reads "neutral": it threw its controller off two turns earlier.
+
+![The Report at turn 14: Relief paid, two states crossing Unrest 7, refugee lines naming where the people went, and Sea Level lines saying how far Unrest rose](refugees-report.png)
+
+- **refugees-report.png** — `shot:r13 menus:1 turns:13`. The Report reads the whole system in one
+  screen: "The Custodians paid Relief in Australia and Oceania: Unrest fell by 2 to 7", two states
+  crossing the second threshold ("Asia: Unrest reached 7 - every Facility here produces and emits at
+  half..."), the refugee flows in words ("1.9 population left Asia for Russia, The Middle East and
+  Australia and Oceania (the sea)"), and the Sea Level lines with the Unrest they cost ("Sea level at
+  +2.3 C: Asia lost 2 build slots; destroyed Launch Site, Factory. Unrest there rose by 3 to 10").
+
+### Twenty seeds
+
+`cargo run --release -p dying-earth-engine --example sim -- 1 --count=20`, seat 0 starting in Asia:
+
+| seat 0 | wins | draws | collapses | median collapse turn | median first Colony |
+|---|---|---|---|---|---|
+| Custodians | Arkwrights 20 (seat 2) | 0 | 0/20 | - | 10 |
+| Prospectors | Prospectors 2 | 0 | 18/20 | 24 | 9 |
+
+`cargo run --release -p dying-earth-engine --example sweep -- 20 --player=custodians --start=europe --sinks=6 --steps=120`:
+
+| seat 0 | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|
+| Custodians in Europe | 17/20 | 24 (23..24) | +3.01 | 0 2 1 0 |
+
+The Unrest statistics over the same twenty seeds:
+
+| seating | states that threw off a controller | median peak Unrest | Constabularies built | Relief orders paid | population moved by refugees |
+|---|---|---|---|---|---|
+| Custodians in Asia | 776 | 10 | 0 | 478 | 187.6 |
+| Prospectors in Asia | 810 | 10 | 0 | 566 | 261.5 |
+
+**What the twenty seeds say, as measured, not fixed.** The rules as specified make Unrest a ratchet
+rather than a pressure. From about turn 8 the population is falling worldwide every turn, so every
+state takes +1 or +2 in every Climate phase and another +1 to +3 from the refugees its neighbours
+send it; the falls available are one natural fall (which never lands, because something raised it
+every turn), one per Relief order at 10 Ducats, and one a turn per Constabulary. Every state
+therefore climbs to 10 and stays there: the median peak Unrest is 10 in every seed of both seatings,
+and across twenty games states threw off a controller **776 and 810 times** — about forty a game on
+eight states, so a state is taken by Influence, ratchets back to 10 and throws its Faction off again
+every two or three turns for the second half of the game. The Custodian seating stopped collapsing
+altogether (0 of 20, against 1 of 20 on ticket #51), because a world of neutral states has no
+directed Facilities and so emits far less; the Arkwrights win all twenty on the last-turn score
+instead. Nothing here was re-tuned: these are the ticket's numbers as they came out, and the knobs
+that would settle it (`natural_fall`, `population_fall`, `refugees_per`, `constabulary_fall`,
+`throw_off_reset`) are all one line each in `unrest.toml`.
+
+**The AI built no Constabulary in any of the forty games**, though the rule and the weights are in
+and pinned by a formula test. Two reasons, both measurable in the scored lists: the victory-gap
+multiplier is x3 for most of a game and applies to producers but not to a Constabulary, so at
+build_constabulary 4 to 6 against build_producer 6 to 8 x1.5 x3 it never wins a build slot; and by
+the time Unrest reaches 5 the state usually has no free slot left. **Relief it pays readily** (478
+and 566 orders), but only from Unrest 9, where the opportunity multiplier doubles it: below that it
+loses to buying Influence with the same Ducats (relief 4 to 6 against influence 5 to 8 x0.9).

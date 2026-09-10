@@ -74,10 +74,12 @@ pub enum FacilityKind {
     Bank,
     /// Version 0.03 (ticket #36): raises Influence.
     Embassy,
+    /// Version 0.05 (ticket #52): lowers its state's Unrest and damps what raises it.
+    Constabulary,
 }
 
 impl FacilityKind {
-    pub const ALL: [FacilityKind; 7] = [
+    pub const ALL: [FacilityKind; 8] = [
         FacilityKind::Factory,
         FacilityKind::PowerPlant,
         FacilityKind::Refinery,
@@ -85,6 +87,7 @@ impl FacilityKind {
         FacilityKind::LaunchSite,
         FacilityKind::Bank,
         FacilityKind::Embassy,
+        FacilityKind::Constabulary,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -95,6 +98,7 @@ impl FacilityKind {
             FacilityKind::LaunchSite => "Launch Site",
             FacilityKind::Bank => "Bank",
             FacilityKind::Embassy => "Embassy",
+            FacilityKind::Constabulary => "Constabulary",
         }
     }
 }

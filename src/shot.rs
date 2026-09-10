@@ -164,6 +164,21 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.energy = 60;
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
         }
+        // `unrest:<n>` (a building aid, ticket #52): a spread of Unrest over three states on the
+        // face the Earth picture shows, so one card, the map labels and the thresholds are all
+        // visible at once. The AI seldom leaves a state of the player's this restive.
+        if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("unrest:").and_then(|v| v.parse::<i64>().ok())) {
+            for (sid, off) in [(StateId::Asia, 0), (StateId::Europe, 1), (StateId::Africa, 3)] {
+                let v = (n - off).clamp(0, 10);
+                let st = g.state_mut(sid);
+                st.unrest = v;
+                st.unrest_reported = v;
+            }
+            // Room and money, so the card shows the Constabulary and the Relief buttons live.
+            g.state_mut(StateId::Asia).industry_level += 3;
+            g.seats[0].stockpile.materials = 200;
+            g.seats[0].stockpile.ducats = 200;
+        }
         // `tints:1` (a building aid): one Nation State per seat on the face the Earth picture shows,
         // so all four Faction tints are in one picture. The AI seldom leaves four controllers alive.
         if std::env::args().any(|a| a == "tints:1") {

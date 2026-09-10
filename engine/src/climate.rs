@@ -12,6 +12,12 @@ pub struct Projection {
 impl Game {
     /// Phase 2: Climate.
     pub fn climate_phase(&mut self) {
+        // Ticket #52: the turn's Unrest bookkeeping starts here, since the Climate phase opens the
+        // turn's rises and the falls are settled at the end of its Resolution.
+        for s in &mut self.states {
+            s.unrest_rose = false;
+            s.refugees_in = 0.0;
+        }
         let t = self.tables.clone();
         let c = &t.climate;
         let breakdown = self.emissions_now();
@@ -56,6 +62,10 @@ impl Game {
         ));
         self.sea_level_check();
         self.population_change();
+        // Ticket #52: a Resettle order steers only the flows of the Climate phase that follows it.
+        for seat in Seat::ALL {
+            self.seat_mut(seat).resettle_to = None;
+        }
     }
 
     pub fn target_temperature(&self) -> f64 {
@@ -85,7 +95,8 @@ impl Game {
                 if !f.online {
                     continue;
                 }
-                let e = t.facility(f.kind).emissions;
+                // Ticket #52: at Unrest 7 every Facility in the state emits at half.
+                let e = t.facility(f.kind).emissions * if self.facilities_at_half(st.id) { 0.5 } else { 1.0 };
                 match f.kind {
                     FacilityKind::Factory => b.factories += e * fr_mult * m,
                     FacilityKind::PowerPlant => b.power_plants += e * pp_mult * m,
@@ -145,6 +156,17 @@ impl Game {
             return;
         }
         self.state_mut(sid).lost_slots += exposure;
+        // Ticket #52: two Unrest per build slot the sea took, and 5% of the people per point of
+        // Coastal Exposure driven out, half of them to the neighbours.
+        let u = self.tables.unrest.clone();
+        let per_slot = u.per_sea_level_slot * exposure as i64;
+        let rose = self.raise_unrest(sid, per_slot, UnrestSource::Climate);
+        let displaced = self.state(sid).population * u.sea_loss_per_exposure * exposure as f64;
+        if displaced > 0.0 {
+            let p = &mut self.state_mut(sid).population;
+            *p = (*p - displaced).max(0.0);
+            self.move_refugees(sid, displaced * u.sea_share, "the sea");
+        }
         let slots = self.build_slots(sid);
         let mut destroyed = Vec::new();
         loop {
@@ -175,11 +197,14 @@ impl Game {
                 break;
             }
         }
-        let line = if destroyed.is_empty() {
+        let mut line = if destroyed.is_empty() {
             format!("Sea level at {thr:+.1} C: {name} lost {exposure} build slots.")
         } else {
             format!("Sea level at {thr:+.1} C: {name} lost {exposure} build slots; destroyed {}.", destroyed.join(", "))
         };
+        if rose > 0 {
+            line.push_str(&format!(" Unrest there rose by {} to {}.", rose, self.state(sid).unrest));
+        }
         self.report.lines.push(line.clone());
         self.log(line);
     }
@@ -193,9 +218,89 @@ impl Game {
 
     fn population_change(&mut self) {
         let rate = self.population_growth_rate();
-        for s in &mut self.states {
-            s.population = (s.population * (1.0 + rate)).max(0.0);
+        let u = self.tables.unrest.clone();
+        // Every state's own change first, so what arrives as refugees is not scaled again by the
+        // same turn's growth; then the Unrest and the flow, state by state, so the Report reads
+        // "population fell here, and this many left for there".
+        let mut fell: Vec<(StateId, f64, f64)> = Vec::new();
+        for sid in StateId::ALL {
+            let before = self.state(sid).population;
+            let after = (before * (1.0 + rate)).max(0.0);
+            self.state_mut(sid).population = after;
+            if after < before && before > 0.0 {
+                fell.push((sid, before, after));
+            }
         }
+        for (sid, before, after) in fell {
+            // Ticket #52: a fall raises Unrest by one, by two when it is more than one per cent.
+            let lost = before - after;
+            let big = lost / before > u.population_fall_big_fraction;
+            let n = if big { u.population_fall_big } else { u.population_fall };
+            let rose = self.raise_unrest(sid, n, UnrestSource::Climate);
+            if rose > 0 {
+                let line = format!(
+                    "{}: population fell {:.1}% to {:.1}; Unrest rose by {} to {}.",
+                    self.tables.state(sid).name,
+                    100.0 * lost / before,
+                    after,
+                    rose,
+                    self.state(sid).unrest
+                );
+                self.log(line.clone());
+                self.report.lines.push(line);
+            }
+            // Ticket #52: half of what the heat took moves to the neighbours instead of vanishing.
+            self.move_refugees(sid, lost * u.heat_share, "the heat");
+        }
+    }
+
+    /// Ticket #52: `amount` population leaves `from` for its neighbours, split in proportion to
+    /// Industry Level (equally if every neighbour is at 0), or entirely to the state a Resettle
+    /// order named this turn. Flows go to neutral and controlled neighbours alike; what arrives is
+    /// added to the receiver, so its Population Emissions and Research weight follow it.
+    pub fn move_refugees(&mut self, from: StateId, amount: f64, why: &str) {
+        if amount <= 0.0 {
+            return;
+        }
+        // Resettle (rule 9): whoever directs `from` may have named one state for all its flows.
+        let steered = self
+            .state(from)
+            .control
+            .director()
+            .and_then(|s| self.seat(s).resettle_to)
+            .filter(|t| *t != from);
+        let targets: Vec<StateId> = match steered {
+            Some(t) => vec![t],
+            None => self.tables.state(from).neighbours.clone(),
+        };
+        if targets.is_empty() {
+            return;
+        }
+        let weights: Vec<f64> = targets.iter().map(|t| self.state(*t).industry_level as f64).collect();
+        let total: f64 = weights.iter().sum();
+        let each = 1.0 / targets.len() as f64;
+        let mut names: Vec<String> = Vec::new();
+        for (i, t) in targets.iter().enumerate() {
+            let share = if total > 0.0 { weights[i] / total } else { each };
+            let n = amount * share;
+            if n <= 0.0 {
+                continue;
+            }
+            let st = self.state_mut(*t);
+            st.population += n;
+            st.refugees_in += n;
+            names.push(self.tables.state(*t).name.clone());
+        }
+        if names.is_empty() || amount < 0.05 {
+            return;
+        }
+        let list = match names.len() {
+            1 => names[0].clone(),
+            n => format!("{} and {}", names[..n - 1].join(", "), names[n - 1]),
+        };
+        let line = format!("{:.1} population left {} for {} ({}).", amount, self.tables.state(from).name, list, why);
+        self.log(line.clone());
+        self.report.lines.push(line);
     }
 
     /// Repeat the current net to the last turn (spec 11.5).
