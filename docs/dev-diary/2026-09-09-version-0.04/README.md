@@ -88,3 +88,25 @@ same-turn spend, the building for Ducats and its build slot, the sale at half.
 **Twenty seeds** (Custodians in seat 0): wins 3, transfers 13.2 a game, buildings at the end 60
 (44 on #41): the Custodian AI bought Materials fourteen times in seed 1 and built more. With the
 Prospectors in seat 0: 0 wins, as on #41.
+
+## #43: Colony Ship and Carrier
+
+Decided by the designer: two ships. A Colony Ship carries Colonists only; a new **Carrier**
+(30 Materials, 1 turn, 2 Energy upkeep, strength 0, 4 Hit Points, Pursuit 0) carries one Army and
+nothing else; a Battleship fights and carries no Army, so every landing needs a Carrier.
+
+- `units.toml` gained the Carrier's row and the Colony Ship and Battleship lost `carries_army`; the
+  Load order already refused cargo a card does not carry, so the rules followed the data.
+- The Carrier is in every Ships list, the roster, the stack card and the Solar System Map through
+  the shared unit list.
+- The AI builds a Carrier at Earth when it has a free Army, a rival Colony to land on and no empty
+  Carrier already; an empty Carrier away from Earth goes home; warships no longer offer to load.
+- A test watched red first (it did not compile without the Carrier): a Colony Ship and a Battleship
+  refuse an Army, a Carrier takes one and refuses Colonists, and the card's six numbers. The
+  scripted landing anchor now lands its two Armies from two Carriers and still passes.
+
+![Asia's card at turn 11: the Ships list reads Colony Ship, Carrier, Frigate, Battleship](carrier.png)
+
+**Finding, not retuned:** the Prospector AI has never built an Army in any batch this version or the
+last, so it has never loaded or landed one, with a Battleship before or a Carrier now. Twenty seeds
+in both orders give the same numbers as #42.

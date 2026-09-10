@@ -141,16 +141,19 @@ pub enum UnitKind {
     ColonyShip,
     Frigate,
     Battleship,
+    /// Version 0.04 (ticket #43): the transport for one Army; a Colony Ship carries Colonists only.
+    Carrier,
     Army,
 }
 
 impl UnitKind {
-    pub const SHIPS: [UnitKind; 3] = [UnitKind::ColonyShip, UnitKind::Frigate, UnitKind::Battleship];
+    pub const SHIPS: [UnitKind; 4] = [UnitKind::ColonyShip, UnitKind::Carrier, UnitKind::Frigate, UnitKind::Battleship];
     pub fn name(self) -> &'static str {
         match self {
             UnitKind::ColonyShip => "Colony Ship",
             UnitKind::Frigate => "Frigate",
             UnitKind::Battleship => "Battleship",
+            UnitKind::Carrier => "Carrier",
             UnitKind::Army => "Army",
         }
     }

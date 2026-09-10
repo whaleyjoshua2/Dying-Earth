@@ -456,7 +456,7 @@ impl Tables {
         check_rows("modules.toml", &ModuleKind::ALL, self.modules.iter().map(|m| m.id))?;
         check_rows(
             "units.toml",
-            &[UnitKind::ColonyShip, UnitKind::Frigate, UnitKind::Battleship, UnitKind::Army],
+            &[UnitKind::ColonyShip, UnitKind::Frigate, UnitKind::Battleship, UnitKind::Carrier, UnitKind::Army],
             self.units.iter().map(|u| u.id),
         )?;
         check_rows("techs.toml", &TechId::ALL, self.techs.iter().map(|t| t.id))?;

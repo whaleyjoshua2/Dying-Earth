@@ -241,6 +241,19 @@ impl Game {
         }
     }
 
+    /// Ticket #43: a Carrier is worth building when the seat has a free Army on Earth, a rival Colony
+    /// to land on, and no empty Carrier (or one on the way) already.
+    fn wants_carrier(&self, seat: Seat) -> bool {
+        if self.kind(seat) != FactionKind::Prospectors {
+            return false;
+        }
+        let free_army = self.armies.iter().any(|a| !a.standing && self.army_seat(a) == Some(seat) && matches!(a.at, ArmyAt::Place(Place::State(_))));
+        let enemy_colony = self.colonies.iter().any(|c| c.control.director() == Some(seat.other()));
+        let empty_carrier = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::Carrier && s.army.is_none());
+        let queued = self.states.iter().flat_map(|s| s.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Unit(UnitKind::Carrier));
+        free_army && enemy_colony && !empty_carrier && !queued
+    }
+
     /// Ticket #41: the rival's standing on a place the seat holds is within the challenge margin of
     /// the seat's own, so the place could be lost to a short push.
     fn standing_pressed(&self, seat: Seat, place: Place) -> bool {
@@ -373,6 +386,10 @@ impl Game {
                 for uk in UnitKind::SHIPS {
                     let cat = if uk == UnitKind::ColonyShip { Cat::ColonyShip } else { Cat::Warship };
                     let threat = if cat == Cat::Warship && self.enemy_present_or_inbound(seat, BodyId::Earth) { m.threat } else { 1.0 };
+                    // Ticket #43: a Carrier is built when there is an Army to carry and a Colony to land on.
+                    if uk == UnitKind::Carrier && !self.wants_carrier(seat) {
+                        continue;
+                    }
                     // A Colony Ship is only worth building when there is somewhere to found.
                     if uk == UnitKind::ColonyShip {
                         let colony_ships = self.ships.iter().filter(|s| s.seat == seat && s.kind == UnitKind::ColonyShip).count();
@@ -454,6 +471,10 @@ impl Game {
             if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
                 for uk in UnitKind::SHIPS {
                     let cat = if uk == UnitKind::ColonyShip { Cat::ColonyShip } else { Cat::Warship };
+                    if uk == UnitKind::Carrier {
+                        // Armies board at Earth; a Carrier built off Earth would sail back empty.
+                        continue;
+                    }
                     push(vec![Order::BuildShip { site: Place::Colony(cid), kind: uk }], cat, self.base_weight(seat, cat), gap_for(cat, None), 1.0, if cat == Cat::Warship { threat } else { 1.0 }, 1.0, format!("build {} at {}", uk.name(), self.place_name(Place::Colony(cid))), None);
                 }
             }
@@ -590,7 +611,11 @@ impl Game {
                     push(vec![Order::Transit { ship: s.id, to: BodyId::Earth }], Cat::Transit, self.base_weight(seat, Cat::Transit) * 0.8, gap_for(Cat::Transit, None), 1.0, 1.0, 1.0, format!("send {} back to Earth", ship_name), None);
                 }
             }
-            if s.kind.is_warship() || (s.kind == UnitKind::ColonyShip && s.army.is_some()) {
+            // Ticket #43: an empty Carrier away from Earth goes home for an Army.
+            if s.kind == UnitKind::Carrier && s.army.is_none() && body != BodyId::Earth {
+                push(vec![Order::Transit { ship: s.id, to: BodyId::Earth }], Cat::Transit, self.base_weight(seat, Cat::Transit) * 0.8, 1.0, 1.0, 1.0, 1.0, format!("send {} back to Earth", ship_name), None);
+            }
+            if s.kind.is_warship() || s.army.is_some() {
                 // Warships go where the Faction has or wants Colonies, or where the rival is.
                 let mut dests: Vec<BodyId> = Vec::new();
                 for c in &self.colonies {
@@ -605,7 +630,7 @@ impl Game {
                     let base = self.base_weight(seat, Cat::Transit) * if kind == FactionKind::Prospectors { 0.9 } else { 0.6 };
                     push(vec![Order::Transit { ship: s.id, to: d }], Cat::Transit, base, 1.0, denial, threat, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
                 }
-                // Load an Army aboard a Battleship or Colony Ship at Earth for an attack on a rival Colony.
+                // Load an Army aboard a Carrier at Earth for an attack on a rival Colony (ticket #43).
                 if card.carries_army && s.army.is_none() && body == BodyId::Earth && kind == FactionKind::Prospectors {
                     let army = self.armies.iter().find(|a| !a.standing && self.army_seat(a) == Some(seat) && matches!(a.at, ArmyAt::Place(Place::State(_))));
                     let enemy_colony = self.colonies.iter().any(|c| c.control.director() == Some(seat.other()));
@@ -642,7 +667,7 @@ impl Game {
             let my_str = self.ship_stack_strength(seat, body);
             let enemy_str = self.ship_stack_strength(seat.other(), body);
             let enemy_here = self.ships.iter().any(|s| s.seat != seat && s.at == ShipAt::Body(body));
-            let inbound_target = self.ships.iter().any(|s| s.seat != seat && matches!(s.kind, UnitKind::ColonyShip | UnitKind::Battleship) && matches!(s.at, ShipAt::Transit { to, .. } if to == body));
+            let inbound_target = self.ships.iter().any(|s| s.seat != seat && matches!(s.kind, UnitKind::ColonyShip | UnitKind::Carrier) && matches!(s.at, ShipAt::Transit { to, .. } if to == body));
             let threat = if self.enemy_present_or_inbound(seat, body) { m.threat } else { 1.0 };
             let total_hp: u32 = stack.iter().map(|s| self.tables.unit(s.kind).hit_points).sum();
             let total_dmg: u32 = stack.iter().map(|s| s.damage).sum();

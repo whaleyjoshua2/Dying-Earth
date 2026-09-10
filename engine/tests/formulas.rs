@@ -443,6 +443,31 @@ fn ducats_pay_for_restoration_and_repairs_at_the_table_rates() {
     assert!(g.check_order(Seat(0), &[], &Order::RepairWithDucats { unit: UnitRef::Ship(ShipId(1)), points: 1 }).is_err(), "nothing to repair");
 }
 
+// ---------------------------------------------------------------- #43 Colony Ship and Carrier
+
+#[test]
+fn only_a_carrier_carries_an_army_and_a_colony_ship_carries_only_colonists() {
+    let mut g = game();
+    let army = ArmyId(g.fresh_id());
+    g.armies.push(Army { id: army, home: ArmyHome::State(StateId::Asia), at: ArmyAt::Place(Place::State(StateId::Asia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+    let ship = |id: u32, kind: UnitKind| Ship { id: ShipId(id), kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 };
+    g.ships.extend([ship(101, UnitKind::ColonyShip), ship(102, UnitKind::Battleship), ship(103, UnitKind::Carrier)]);
+    let load_army = |s: u32| Order::Load { ship: ShipId(s), colonists: 0, from: LoadSource::State(StateId::Asia), army: Some(army) };
+    assert!(g.check_order(Seat(0), &[], &load_army(101)).is_err(), "a Colony Ship carries Colonists only");
+    assert!(g.check_order(Seat(0), &[], &load_army(102)).is_err(), "a Battleship fights; it carries no Army");
+    assert!(g.check_order(Seat(0), &[], &load_army(103)).is_ok(), "a Carrier carries one Army");
+    assert!(g.check_order(Seat(0), &[], &Order::Load { ship: ShipId(103), colonists: 1, from: LoadSource::State(StateId::Asia), army: None }).is_err(), "a Carrier carries no Colonists");
+    assert!(g.check_order(Seat(0), &[], &Order::Load { ship: ShipId(101), colonists: 4, from: LoadSource::State(StateId::Asia), army: None }).is_ok());
+    let card = g.tables.unit(UnitKind::Carrier);
+    assert_eq!(card.materials, 30);
+    assert_eq!(card.build_turns, 1);
+    assert_eq!(card.energy_upkeep, 2);
+    assert_eq!(card.strength, 0);
+    assert_eq!(card.hit_points, 4);
+    assert_eq!(card.pursuit, 0);
+    assert!(!UnitKind::Carrier.is_warship());
+}
+
 // ---------------------------------------------------------------- #42 the trading window
 
 #[test]
@@ -1020,7 +1045,7 @@ fn tech_green_consensus_halves_per_person_emissions_and_lowers_thresholds() {
 
 // ---------------------------------------------------------------- 19.3 a defended Colony changes hands
 
-/// The fifth anchor, scripted: a Battleship lands an Army on a rival Colony defended by a Barracks Army.
+/// The fifth anchor, scripted: two Carriers land Armies on a rival Colony defended by a Barracks Army.
 /// Counted from the turn the Army lands: land (turn 1), battle and Occupation (2), Occupation (3), transfer (4).
 #[test]
 fn a_defended_colony_changes_hands_in_about_four_turns() {
@@ -1057,10 +1082,10 @@ fn colony_attack_turns(seed: u64) -> Option<u32> {
     let cid = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Barracks], 4);
     let defender = ArmyId(g.fresh_id());
     g.armies.push(Army { id: defender, home: ArmyHome::Colony(cid), at: ArmyAt::Place(Place::Colony(cid)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
-    // The player's Battleship and a Colony Ship arrive at the Moon, each carrying an Army: strength 8 against 4.
+    // The player's two Carriers arrive at the Moon, each carrying an Army: strength 8 against 4.
     let mut attackers = Vec::new();
     let mut ships = Vec::new();
-    for kind in [UnitKind::Battleship, UnitKind::ColonyShip] {
+    for kind in [UnitKind::Carrier, UnitKind::Carrier] {
         let attacker = ArmyId(g.fresh_id());
         let ship = ShipId(g.fresh_id());
         g.armies.push(Army { id: attacker, home: ArmyHome::State(StateId::Asia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });

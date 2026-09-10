@@ -10,7 +10,8 @@ strength = 0
 hit_points = 3
 pursuit = 0
 carries_colonists = 4
-carries_army = true
+# Version 0.04 (ticket #43): a Colony Ship carries Colonists only; the Carrier carries the Army.
+carries_army = false
 
 [[unit]]
 id = "frigate"
@@ -33,6 +34,21 @@ energy_upkeep = 4
 strength = 7
 hit_points = 8
 pursuit = 1
+carries_colonists = 0
+# Version 0.04 (ticket #43): a Battleship fights; it carries no Army.
+carries_army = false
+
+# Version 0.04 (ticket #43): the transport for one Army and nothing else. Unarmed, so it needs an
+# escort, and a target for Intercept like a Colony Ship.
+[[unit]]
+id = "carrier"
+name = "Carrier"
+materials = 30
+build_turns = 1
+energy_upkeep = 2
+strength = 0
+hit_points = 4
+pursuit = 0
 carries_colonists = 0
 carries_army = true
 
