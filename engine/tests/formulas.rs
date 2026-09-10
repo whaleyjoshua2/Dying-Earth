@@ -1536,9 +1536,10 @@ fn more_than_one_seat_meeting_its_condition_gives_the_game_to_the_larger_margin(
 fn the_last_turn_ranks_every_seat_by_score() {
     let mut g = game();
     g.turn = g.tables.victory.turns;
-    // Presence bar 12. Custodians 6 Colonists but no run: score 0. Prospectors 9 and the full
-    // Extraction Total: score 0.75. Arkwrights 3 Colonists: first 3/24 = 0.125, score 0.125.
-    // Archivists nothing: score 0.
+    // Each seat is scored on its own two parts (ticket #51). Custodians: 6 Colonists off Earth of
+    // 12 but no Stabilization run, score 0. Prospectors: 9 of 12 and the full Extraction Total,
+    // score 0.75. Arkwrights: 3 Colonists of 30 and no Body with 4 on it, score 0. Archivists:
+    // nothing, score 0.
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 6);
     let p = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 9);
     let _ = p;
@@ -1547,11 +1548,15 @@ fn the_last_turn_ranks_every_seat_by_score() {
     assert!((g.progress(Seat(1)).score() - 0.75).abs() < 1e-9, "{:?}", g.progress(Seat(1)).score());
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "the highest score of four: {:?}", g.outcome);
-    // With the leader's score removed, the next seat down takes it.
+    // With the leader's score removed, the next seat down takes it. The Arkwrights hold 4 Colonists
+    // on Phobos: 4 of 30 off Earth and one Body of three, score 4/30. The Archivists hold 4 on the
+    // Moon but have no Archive at all, so their first part is 0 and their score with it.
     let mut g = game();
     g.turn = g.tables.victory.turns;
-    colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat], 3); // 0.125
-    colony(&mut g, Seat(3), BodyId::Moon, &[ModuleKind::Habitat], 4); // presence 4/12, research 0 -> 0
+    colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat, ModuleKind::Habitat], 4);
+    colony(&mut g, Seat(3), BodyId::Moon, &[ModuleKind::Habitat], 4);
+    assert!((g.progress(Seat(2)).score() - 4.0 / 30.0).abs() < 1e-9, "{:?}", g.progress(Seat(2)).score());
+    assert_eq!(g.progress(Seat(3)).score(), 0.0);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(2), .. })), "{:?}", g.outcome);
 }
@@ -1659,4 +1664,299 @@ fn a_tie_between_seats_is_drawn_from_the_seed_and_is_the_same_every_replay() {
     for _ in 0..8 {
         assert_eq!(g.tiebreak_at_body(BodyId::Mars, &[Seat(0), Seat(1)]), Seat(1), "the stronger stack takes it");
     }
+}
+
+// ---------------------------------------------------------------- #51 the Arkwrights and the Archivists
+
+/// A Colony Ship of one seat, sitting at a Body.
+fn a_colony_ship(g: &mut Game, seat: Seat, body: BodyId) -> ShipId {
+    let id = ShipId(g.fresh_id());
+    g.ships.push(Ship {
+        id,
+        kind: UnitKind::ColonyShip,
+        seat,
+        damage: 0,
+        at: ShipAt::Body(body),
+        colonists: 0,
+        army: None,
+        stance: Stance::Hold,
+        escaped: false,
+        arrived_this_turn: false,
+        built_turn: 1,
+    });
+    id
+}
+
+/// A Colony off Earth holding the seat's Archive at `stage`, with Habitats and Colonists.
+fn archive_at(g: &mut Game, seat: Seat, body: BodyId, stage: u32, colonists: u32) -> ColonyId {
+    let cid = colony(g, seat, body, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], colonists);
+    let col = g.colony_mut(cid).unwrap();
+    let mut m = Module::new(ModuleKind::Archive);
+    m.stage = stage;
+    col.modules.push(m);
+    cid
+}
+
+#[test]
+fn steerage_doubles_an_arkwright_colony_ships_load_and_cuts_its_price() {
+    let mut g = game();
+    // Capacity: the card figure for everyone else, twice it for the Arkwrights, and Expanded
+    // Habitats adds its two before the doubling.
+    assert_eq!(g.colony_ship_capacity(Seat(0)), 4);
+    assert_eq!(g.colony_ship_capacity(Seat(2)), 8, "Steerage carries twice");
+    g.research.done.push(TechId::ExpandedHabitats);
+    assert_eq!(g.colony_ship_capacity(Seat(0)), 6);
+    assert_eq!(g.colony_ship_capacity(Seat(2)), 12, "(4 + 2) doubled");
+    // Price: 30 Materials on the units.toml row, 20 on the Arkwrights' card.
+    let build = Order::BuildShip { site: Place::State(StateId::Asia), kind: UnitKind::ColonyShip };
+    assert_eq!(g.order_cost(Seat(0), &build).materials, 30);
+    assert_eq!(g.order_cost(Seat(2), &build).materials, 20);
+    // And the Load order holds them to it.
+    let sid = g.controlled_states(Seat(2))[0];
+    let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
+    let load = |n: u32| Order::Load { ship, colonists: n, from: LoadSource::State(sid), army: None };
+    assert!(g.check_order(Seat(2), &[], &load(12)).is_ok());
+    let err = g.check_order(Seat(2), &[], &load(13)).unwrap_err();
+    assert_eq!(err.0, "this Ship carries at most 12 Colonists");
+}
+
+#[test]
+fn an_arkwright_lift_takes_twice_the_population_out_of_its_state() {
+    let mut g = game();
+    g.state_mut(StateId::Africa).control = Control::Controlled(Seat(2));
+    g.state_mut(StateId::Africa).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
+    g.state_mut(StateId::Africa).facilities.push(facility(FacilityKind::LaunchSite));
+    assert!((g.lift_population(Seat(0), 4) - 0.4).abs() < 1e-9);
+    assert!((g.lift_population(Seat(2), 4) - 0.8).abs() < 1e-9, "Steerage costs the state twice");
+    let before = g.state(StateId::Africa).population;
+    let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
+    g.commit_orders(Seat(2), &[Order::Load { ship, colonists: 4, from: LoadSource::State(StateId::Africa), army: None }]);
+    g.resolution_phase();
+    let taken = before - g.state(StateId::Africa).population;
+    assert!((taken - 0.8).abs() < 1e-9, "the lift took {taken}, not 0.8");
+    assert_eq!(g.ship(ship).unwrap().colonists, 4);
+}
+
+#[test]
+fn an_arkwright_habitat_holds_six() {
+    let mut g = game();
+    // The Moon's Habitat yield is 1.0, so the Faction figure is all that separates them.
+    let theirs = colony(&mut g, Seat(2), BodyId::Moon, &[ModuleKind::Habitat], 0);
+    let mine = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 0);
+    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 4);
+    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 6, "half again for the Arkwrights");
+    g.research.done.push(TechId::ExpandedHabitats);
+    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 6);
+    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 9, "(4 + 2) x 1.5");
+}
+
+#[test]
+fn an_arkwright_pays_half_for_a_station_and_three_quarters_for_a_module() {
+    let mut g = game();
+    let station = Order::BuildStation { body: BodyId::Earth, slot: 3 };
+    assert_eq!(g.order_cost(Seat(0), &station).materials, 40);
+    assert_eq!(g.order_cost(Seat(2), &station).materials, 20, "they start with no station");
+    let cid = colony(&mut g, Seat(2), BodyId::Moon, &[], 0);
+    let mine = colony(&mut g, Seat(0), BodyId::Moon, &[], 0);
+    for (kind, full, theirs) in [(ModuleKind::Habitat, 25, 18), (ModuleKind::Mine, 20, 15), (ModuleKind::Shipyard, 35, 26)] {
+        assert_eq!(g.order_cost(Seat(0), &Order::BuildModule { colony: mine, kind }).materials, full);
+        assert_eq!(g.order_cost(Seat(2), &Order::BuildModule { colony: cid, kind }).materials, theirs, "{} x 0.75 rounded down", kind.name());
+    }
+    // Transit Fuel too: three quarters, then Efficient Transit on top of that.
+    assert_eq!(g.transit_cost_for(Seat(0), BodyId::Earth, BodyId::Mars).1, 20);
+    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 15);
+    g.research.done.push(TechId::EfficientTransit);
+    assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 9, "20 x 0.75 x 0.6");
+}
+
+#[test]
+fn diaspora_wants_three_bodies_with_four_colonists_each_and_counts_no_antarctic_one() {
+    let mut g = game();
+    let p = g.progress(Seat(2));
+    assert_eq!(p.first_bar, 30.0, "30 Colonists off Earth");
+    assert_eq!(p.second_bar, 3.0, "on at least three Bodies");
+    colony(&mut g, Seat(2), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    colony(&mut g, Seat(2), BodyId::Moon, &[ModuleKind::Habitat], 4);
+    // Antarctica is Earth's, so a Colony there settles no Body.
+    colony(&mut g, Seat(2), BodyId::Earth, &[ModuleKind::Habitat], 4);
+    assert_eq!(g.progress(Seat(2)).second_value, 2.0, "Antarctica is not a third Body");
+    // Three Colonists on Phobos are not four.
+    let ph = colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat], 3);
+    assert_eq!(g.progress(Seat(2)).second_value, 2.0);
+    g.colony_mut(ph).unwrap().colonists = 4;
+    assert_eq!(g.progress(Seat(2)).second_value, 3.0);
+    // A station over another Body counts for that Body.
+    let sid = ColonyId(g.fresh_id());
+    g.colonies.push(Colony {
+        id: sid,
+        body: BodyId::Deimos,
+        slot: 0,
+        control: Control::Controlled(Seat(2)),
+        modules: vec![Module::new(ModuleKind::Habitat)],
+        colonists: 4,
+        queue: Vec::new(),
+        grid_failed: false,
+        founded_turn: 1,
+        in_orbit: true,
+    });
+    assert_eq!(g.progress(Seat(2)).second_value, 4.0);
+    // Both parts together: 30 off Earth as well.
+    assert!(!g.progress(Seat(2)).met(), "16 Colonists off Earth is not 30");
+    g.colony_mut(ph).unwrap().colonists = 18;
+    assert_eq!(g.progress(Seat(2)).first_value, 30.0);
+    assert!(g.progress(Seat(2)).met());
+}
+
+#[test]
+fn funding_the_archive_banks_this_turns_research_and_contributes_nothing_to_the_lead() {
+    let mut g = game();
+    g.state_mut(StateId::Europe).control = Control::Controlled(Seat(3));
+    g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+    g.pick_tech(Seat(0), TechId::PublicScience).unwrap();
+    g.income_phase();
+    let made = g.seats[3].research_last_turn;
+    assert!(made > 0 && made < g.tables.tech(TechId::PublicScience).cost, "one Lab makes {made}");
+    assert_eq!(g.research.contributions[3], made, "Income paid it into the shared Tech");
+    let before = g.research.progress;
+    g.commit_orders(Seat(3), &[Order::FundArchive]);
+    assert_eq!(g.seats[3].archive_fund, made, "the whole turn's Research is banked");
+    assert_eq!(g.research.contributions[3], 0, "and counts nothing toward the Research Lead");
+    assert_eq!(g.research.progress, before - made, "the shared Tech gives it back");
+    assert!(g.funding_archive(Seat(3)));
+    assert!(g.report.lines.iter().any(|l| l.contains("Archivists are funding the Archive")), "{:?}", g.report.lines);
+    // Nobody else may.
+    assert_eq!(g.check_order(Seat(0), &[], &Order::FundArchive).unwrap_err().0, "only the Archivists fund the Archive");
+    // The fund never holds more than the remaining stages need.
+    assert_eq!(g.archive_fund_cap(Seat(3)), 80);
+    g.seats[3].archive_fund = 80;
+    g.seats[3].research_last_turn = 40;
+    g.commit_orders(Seat(3), &[Order::FundArchive]);
+    assert_eq!(g.seats[3].archive_fund, 80, "Research past what the stages need is wasted");
+}
+
+#[test]
+fn a_stage_of_the_archive_needs_its_research_banked_and_a_colony_off_earth() {
+    let mut g = game();
+    g.seats[3].stockpile.materials = 200;
+    let mars = colony(&mut g, Seat(3), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    let order = Order::BuildArchiveStage { colony: mars };
+    assert_eq!(g.order_cost(Seat(3), &order).materials, 30);
+    let err = g.check_order(Seat(3), &[], &order).unwrap_err();
+    assert_eq!(err.0, "stage 1 needs 20 Research banked in the Archive fund, 0 there");
+    g.seats[3].archive_fund = 20;
+    assert!(g.check_order(Seat(3), &[], &order).is_ok());
+    // Antarctica will not do, and neither will a station over Earth.
+    let ant = colony(&mut g, Seat(3), BodyId::Earth, &[ModuleKind::Habitat], 4);
+    assert!(g.check_order(Seat(3), &[], &Order::BuildArchiveStage { colony: ant }).unwrap_err().0.contains("off Earth"));
+    let axiom = station_of(&g, Seat(3), BodyId::Earth).unwrap();
+    assert!(g.check_order(Seat(3), &[], &Order::BuildArchiveStage { colony: axiom }).unwrap_err().0.contains("off Earth"));
+    // Nobody else builds one, and the ordinary Module button never places it.
+    let mine = colony(&mut g, Seat(0), BodyId::Mars, &[], 0);
+    assert_eq!(g.check_order(Seat(0), &[], &Order::BuildArchiveStage { colony: mine }).unwrap_err().0, "only the Archivists build the Archive");
+    assert!(g.check_order(Seat(3), &[], &Order::BuildModule { colony: mars, kind: ModuleKind::Archive }).is_err());
+    // Ordering spends the banked Research, and the next stage wants its own twenty.
+    g.commit_orders(Seat(3), &[order.clone()]);
+    assert_eq!(g.seats[3].archive_fund, 0);
+    assert_eq!(g.check_order(Seat(3), &[], &order).unwrap_err().0, "stage 2 needs 20 Research banked in the Archive fund, 0 there");
+    // Two turns later the stage stands.
+    g.resolution_phase();
+    assert_eq!(g.archive_stage(Seat(3)), 0, "two turns to raise");
+    g.turn += 1;
+    g.resolution_phase();
+    assert_eq!(g.archive_stage(Seat(3)), 1);
+    assert_eq!(g.archive_colony(Seat(3)), Some(mars));
+    // At most one per Faction.
+    let deimos = colony(&mut g, Seat(3), BodyId::Deimos, &[], 0);
+    g.seats[3].archive_fund = 20;
+    assert!(g.check_order(Seat(3), &[], &Order::BuildArchiveStage { colony: deimos }).unwrap_err().0.contains("already stands"));
+}
+
+#[test]
+fn provisional_findings_halves_the_tech_under_research_and_goes_off_the_turn_after_funding() {
+    let mut g = game();
+    g.state_mut(StateId::Europe).control = Control::Controlled(Seat(3));
+    g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+    g.pick_tech(Seat(0), TechId::PublicScience).unwrap();
+    // A multiplier of 1.5 reads 1.25; nobody else reads an unfinished Tech at all.
+    assert!(g.provisional_findings(Seat(3)), "on at the start: nobody has funded yet");
+    assert!((g.tech_multiplier(Seat(3), TechId::PublicScience) - 1.25).abs() < 1e-9);
+    assert_eq!(g.tech_multiplier(Seat(0), TechId::PublicScience), 1.0);
+    // An addition of +2 reads +1, and an immunity does not carry at all.
+    assert_eq!(g.tech_addition(Seat(3), TechId::ExpandedHabitats), 0, "only the Tech under research");
+    let with = g.facility_yield(Seat(3), StateId::Europe, FacilityKind::ResearchLab).research;
+    // A turn of funding switches it off for the turn after.
+    g.commit_orders(Seat(3), &[Order::FundArchive]);
+    g.income_phase();
+    assert!(!g.provisional_findings(Seat(3)), "they funded last turn");
+    assert_eq!(g.tech_multiplier(Seat(3), TechId::PublicScience), 1.0);
+    let without = g.facility_yield(Seat(3), StateId::Europe, FacilityKind::ResearchLab).research;
+    assert!(without < with, "the Lab made {with} with Provisional Findings and {without} without");
+    // A turn of contributing switches it back on.
+    g.income_phase();
+    assert!(g.provisional_findings(Seat(3)));
+    // Once the Tech is done everybody reads it whole.
+    g.research.done.push(TechId::ExpandedHabitats);
+    assert_eq!(g.tech_addition(Seat(3), TechId::ExpandedHabitats), 2);
+}
+
+#[test]
+fn a_complete_archive_goes_offline_when_energy_runs_short_and_wins_nothing_that_end_phase() {
+    let mut g = game();
+    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 4, 12);
+    g.seats[3].stockpile.energy = 0;
+    assert_eq!(g.module_yield(Seat(3), cid, ModuleKind::Archive).upkeep, 12, "a complete Archive draws 12");
+    assert_eq!(g.shortfall_order(Seat(3))[0], "The Archive", "the highest upkeep goes first");
+    g.income_phase();
+    assert!(!g.colony(cid).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Archive && m.online), "shut down");
+    assert!(!g.archive_online(Seat(3)));
+    let p = g.progress(Seat(3));
+    assert_eq!(p.first_value, 4.0, "every stage stands");
+    assert_eq!(p.second_value, 12.0, "and the Colonists are there");
+    assert!(p.first_held_back.is_some() && !p.met(), "but it is not running");
+    g.end_phase();
+    assert!(g.outcome.is_none(), "no win with the Archive dark: {:?}", g.outcome);
+}
+
+#[test]
+fn the_archive_is_destroyed_when_its_colony_changes_hands_and_the_fund_is_kept() {
+    let mut g = game();
+    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 3, 6);
+    g.seats[3].archive_fund = 40;
+    assert_eq!(g.archive_colony(Seat(3)), Some(cid));
+    g.transfer_control(Place::Colony(cid), Seat(1), "Influence");
+    assert_eq!(g.archive_colony(Seat(3)), None, "the Archive went with the Colony");
+    assert!(!g.colony(cid).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Archive));
+    assert_eq!(g.seats[3].archive_fund, 40, "the fund is kept");
+    assert!(g.report.lines.iter().any(|l| l.contains("Archive at") && l.contains("destroyed")), "{:?}", g.report.lines);
+    // An Occupied Colony's Archive is dark while the Occupation lasts.
+    let again = archive_at(&mut g, Seat(3), BodyId::Moon, 4, 12);
+    g.income_phase();
+    assert!(g.archive_online(Seat(3)));
+    g.colony_mut(again).unwrap().control = Control::Occupied { occupier: Seat(1), previous: Some(Seat(3)), turns: 1 };
+    g.income_phase();
+    assert!(!g.archive_online(Seat(3)), "an Occupied Colony's Archive is offline");
+}
+
+#[test]
+fn the_archivists_win_with_the_archive_running_and_twelve_colonists_at_its_colony() {
+    let mut g = game();
+    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 4, 12);
+    let _ = cid;
+    g.seats[3].stockpile.energy = 200;
+    g.income_phase();
+    assert!(g.archive_online(Seat(3)));
+    let p = g.progress(Seat(3));
+    assert_eq!((p.first_value, p.first_bar), (4.0, 4.0));
+    assert_eq!((p.second_value, p.second_bar), (12.0, 12.0));
+    assert!(p.met());
+    g.end_phase();
+    assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(3), .. })), "{:?}", g.outcome);
+    // One Colonist short and it is no win.
+    let mut g = game();
+    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 4, 11);
+    let _ = cid;
+    g.seats[3].stockpile.energy = 200;
+    g.income_phase();
+    g.end_phase();
+    assert!(g.outcome.is_none(), "{:?}", g.outcome);
 }

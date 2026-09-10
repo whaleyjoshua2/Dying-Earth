@@ -6,6 +6,11 @@ use bevy::prelude::*;
 use bevy::render::view::screenshot::{save_to_disk, Screenshot};
 use dying_earth_engine::*;
 
+// `build_board` runs before the plan is next borrowed, so the Colony it plants is parked here.
+thread_local! {
+    static ARCHIVE_COLONY: std::cell::Cell<Option<ColonyId>> = const { std::cell::Cell::new(None) };
+}
+
 #[derive(Resource, Default)]
 pub struct ShotPlan {
     pub step: usize,
@@ -33,6 +38,9 @@ pub struct ShotPlan {
     pub look: Option<(f32, f32)>,
     /// Ticket #50: 0 the Faction choice screen is not up yet, 1 it is up, 2 it has been captured.
     pub factions_step: u8,
+    /// Ticket #51: `archive:<stage>` planted an Archive at this Colony, so the Body picture opens
+    /// its card rather than the globe alone.
+    pub archive_colony: Option<ColonyId>,
 }
 
 fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
@@ -47,6 +55,11 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     }
     if plan.stack {
         view.selection = Selection::ShipStack(BodyId::Mars, Seat(0));
+    }
+    // Ticket #51: `archive:<stage>` opens the Archive's Colony card in that Body's picture.
+    if let (Some(cid), View::Surface(_)) = (plan.archive_colony, view.view) {
+        view.selection = Selection::Colony(cid);
+        view.show_climate = false;
     }
     if let (Some((lon, lat)), View::Surface(_)) = (plan.look, view.view) {
         view.yaw = crate::geo::yaw_facing(lon, lat);
@@ -73,7 +86,12 @@ const MENUS: [&str; 4] = ["title", "faction", "start", "report"];
 /// played out, and (ticket #50) a Ship stack for every seat at Mars so the four-angle stack markers
 /// and the four-Faction band are visible. Building aids, not part of the spec.
 fn build_board(session: &mut Session) {
-    session.new_game(FactionKind::Custodians, StateId::Asia);
+    // `player:<faction id>` (a building aid): the Faction in seat 0, so a picture can be taken of a
+    // Faction other than the Custodians' seat.
+    let player = std::env::args()
+        .find_map(|a| a.strip_prefix("player:").and_then(FactionKind::from_id))
+        .unwrap_or(FactionKind::Custodians);
+    session.new_game(player, StateId::Asia);
     let turns: u32 = std::env::args().find_map(|a| a.strip_prefix("turns:").and_then(|v| v.parse().ok())).unwrap_or(0);
     if let Some(g) = &mut session.game {
         if let Some(first) = g.available_techs().first().copied() {
@@ -123,6 +141,28 @@ fn build_board(session: &mut Session) {
             for seat in Seat::ALL.into_iter().skip(1) {
                 g.seats[seat.index()].ai = true;
             }
+        }
+        // `archive:<stage>` (a building aid, ticket #51): seat 0 gets a Colony on Mars with the
+        // Archive at that stage, the next stage building, a part-filled fund and Colonists in its
+        // Habitats, since an AI Archivist rarely has all of that in six turns.
+        if let Some(stage) = std::env::args().find_map(|a| a.strip_prefix("archive:").and_then(|v| v.parse::<u32>().ok())) {
+            let stages = g.tables.archive.stages;
+            let slot = g.free_slots_on(BodyId::Mars).first().copied().unwrap_or(0);
+            let id = ColonyId(g.fresh_id());
+            let mut modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Mine)];
+            let mut archive = Module::new(ModuleKind::Archive);
+            archive.stage = stage.min(stages);
+            modules.push(archive);
+            let turn = g.turn;
+            let mut queue = Vec::new();
+            if stage < stages {
+                queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat: Seat(0), due_turn: turn });
+            }
+            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: 8, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.seats[0].archive_fund = 14;
+            g.seats[0].stockpile.materials = 120;
+            g.seats[0].stockpile.energy = 60;
+            ARCHIVE_COLONY.with(|c| c.set(Some(id)));
         }
         // `tints:1` (a building aid): one Nation State per seat on the face the Earth picture shows,
         // so all four Faction tints are in one picture. The AI seldom leaves four controllers alive.
@@ -188,6 +228,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             }
             3 => {
                 build_board(&mut session);
+                plan.archive_colony = ARCHIVE_COLONY.with(|c| c.get());
                 view.popup = Popup::Report;
                 view.show_climate = false;
             }
@@ -227,6 +268,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         // `turns:<n>` (a building aid, not part of the spec) lets the four AIs play n turns first so
         // the pictures show Colonies, transits and tinted states rather than an empty board.
         build_board(&mut session);
+        plan.archive_colony = ARCHIVE_COLONY.with(|c| c.get());
         view.popup = Popup::None;
         view.tech_prompted = true;
         show_view(&mut view, VIEWS[0].1);

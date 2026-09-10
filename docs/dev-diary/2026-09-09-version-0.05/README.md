@@ -154,3 +154,76 @@ Twenty seeds at the chosen step:
 |---|---|---|---|---|
 | Custodians in Asia | Custodians 20 | 0 | - | 10 |
 | Prospectors in Asia | none | 20 | 17 | 9 |
+
+
+## #51: the Arkwrights and the Archivists
+
+Ticket #50 seated the two new Factions on provisional cards. This ticket gives them real ones. The
+**Arkwrights** get Steerage (a Colony Ship that carries 8, 12 with Expanded Habitats, for 20
+Materials, at twice the population per Colonist lifted), Habitats that hold half again, transits at
+three quarters of the Fuel, half-price Space Stations and three-quarter-price Colony Modules to make
+up for starting with no station, and **Diaspora**: 30 Colonists off Earth spread over at least three
+Bodies with 4 on each. The **Archivists** get **the Archive**, the first **Project**: four stages, each
+30 Materials and 20 Research and two turns, at one Colony off Earth, 12 Energy to run once complete,
+destroyed if its Colony changes hands; **Fund the Archive** diverts a turn's Lab Research out of the
+shared Tech into the Archive fund; and **Provisional Findings** gives them half the effect of the Tech
+under research on every turn after one where they contributed to it.
+
+The second half of a Victory Condition is now a Faction figure like the first (`victory_second` on
+the card): Off-world Presence for the Custodians and the Prospectors, Bodies settled for the
+Arkwrights, Colonists at the Archive for the Archivists.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![The New Game Faction screen, all four cards real: the Arkwrights with Steerage and Diaspora, the Archivists with Provisional Findings and the Archive](factions.png)
+
+- **factions.png** — `shot:f51`. Re-taken with the finished cards. The Arkwrights carry a second
+  multiplier line of their own (Habitat capacity x1.5, transit Fuel x0.75, Colony Ship capacity x2,
+  population per lifted Colonist x2, a Colony Ship 20 Materials, a Space Station x0.5, a Colony
+  Module x0.75), then Steerage, then Diaspora in words. The Archivists carry Provisional Findings and
+  "Complete the Archive and keep it running, with 12 Colonists living at its Colony to be uploaded."
+
+![The Olympus Mons Colony card in an Archivist game: the Archive at stage 2 of 4 building, the Archive fund at 14 of 20, the funding toggle and the greyed-out Build stage 4 button](archive-colony-card.png)
+
+- **archive-colony-card.png** — `shot:arch52 player:archivists archive:2 turns:4`. The Colony card for
+  an Archivist player: the Archive reads as a Project rather than a yield ("The Archive: stage 2 of
+  4, building, 1 turn(s) left"), then its own block with "Archive fund 14 of 20", the "Fund the
+  Archive this turn" toggle, and "Build stage 4 (30 Materials, 20 Research)", greyed because 14
+  banked Research is not the 20 a stage wants. (`player:<faction>` and `archive:<stage>` are new
+  building aids: the AI Archivist has never yet held a Colony off Earth to build one at, see below.)
+
+![The Victory panel in an Arkwright game, four rows: Diaspora's two parts at the top, then Stabilization, Extraction and the Archive](victory-diaspora.png)
+
+- **victory-diaspora.png** — `shot:vic52 player:arkwrights victory:1 turns:16`. The Victory panel now
+  reads both halves off each card. The Arkwrights' row: "Colonists off Earth: 0 of 30" and "Bodies
+  settled: 0 of 3 Bodies with 4 Colonists or more". The Archivists': "The Archive: 0 of 4" and
+  "Colonists at the Archive: 0 of 12". Both at zero here, which is the honest state of the AI at turn
+  17 of this seed rather than a fault in the counters; the counters themselves are pinned by the
+  formula tests.
+
+### Twenty seeds
+
+`cargo run --release -p dying-earth-engine --example sim -- 1 --count=20`, seat 0 starting in Asia:
+
+| seat 0 | wins | draws | collapses | median collapse turn | median first Colony |
+|---|---|---|---|---|---|
+| Arkwrights | none (0 0 0 0) | 0 | 20/20 | 16 | 14 |
+| Archivists | none (0 0 0 0) | 0 | 20/20 | 17 | 13 |
+| Custodians | Custodians 19 | 0 | 1/20 | 24 | 11 |
+
+`cargo run --release -p dying-earth-engine --example sweep -- 20 --start=europe --sinks=6 --steps=120`:
+
+| seat 0 | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|
+| Arkwrights | 0/20 | - | +2.88 | 0 20 0 0 (the Custodians, in Asia) |
+| Archivists | 15/20 | 21 (18..24) | +3.01 | 0 2 3 0 (Custodians 2, Prospectors 3) |
+
+**What the twenty seeds say, as measured, not fixed.** Neither new Faction has won a game and neither
+has completed its Victory Condition. Across all sixty logged games the words "funding the Archive"
+and "stage of the Archive" appear **not once**: the AI Archivist funds only once it holds a Colony
+off Earth (the ticket's rule), and in every seating where it does not own Earth it never gets one, so
+the fund never starts. The Arkwrights end with 0 Colonists off Earth in every Asia seed. The picture
+from #50 has not changed: whoever holds Asia wins, and the other three seats finish with nothing to
+build in (buildings 70, 0, 0, 4 in seed 1 of the Custodian seating). Nothing was re-tuned on this
+ticket; these are the figures as they came out.

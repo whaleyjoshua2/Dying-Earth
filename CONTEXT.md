@@ -9,7 +9,7 @@ The small version of the game covering only the Moon and Mars, with three resour
 _Avoid_: slice, MVP, demo, v1, prototype
 
 **Faction**:
-A competing power with its own multipliers, signature rule and victory condition. The finished game has six; the First Playable has two, the Custodians and the Prospectors, who differ in everything but combat and their starting position.
+A competing power with its own multipliers, signature rule and victory condition. The finished game has six; the First Playable has four since version 0.05, the Custodians, the Prospectors, the Arkwrights and the Archivists, and all four sit at every table.
 _Avoid_: side, team, empire
 
 **Custodians**:
@@ -19,6 +19,38 @@ _Avoid_: Stewards (the retired name), environmentalists, greens, moderates, eco-
 **Prospectors**:
 The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry, and they win on extraction and expansion.
 _Avoid_: Extractors (the retired name), capitalists, industrialists, exploiters
+
+**Arkwrights**:
+The Faction that exists to get people off Earth and spread them as widely as it can. Their signature rule is Steerage, and they win on Diaspora.
+_Avoid_: settlers, arks, exodus, nomads
+
+**Archivists**:
+The Faction that means to save what humanity knows, and as many of its people as it can, in one place off Earth. Their signature rule is Provisional Findings, and they win by completing the Archive.
+_Avoid_: scholars, librarians, scientists, the Academy
+
+**Steerage**:
+The Arkwrights' signature rule: their Colony Ships carry twice the Colonists and cost less to build, but every Colonist lifted from a Launch Site costs their Nation State twice the population.
+_Avoid_: mass transit, cattle class, overcrowding, packing them in
+
+**Diaspora**:
+The Arkwrights' Victory Condition: thirty Colonists living off Earth, spread over at least three Bodies with at least four Colonists on each. Antarctica and the stations over Earth count toward neither part.
+_Avoid_: spread, expansion, exodus, colonization score
+
+**Project**:
+A construction raised in stages, each stage paid in both Research and Materials and taking more than one turn to build once paid. The Archive is the first.
+_Avoid_: megaproject, wonder, great work, campaign
+
+**The Archive**:
+The first Project: a Module only the Archivists build, at one Colony off Earth and at most one per Faction. Complete, it takes a great deal of Energy to keep running, and it is destroyed outright if its Colony changes hands.
+_Avoid_: library, vault, monument, database
+
+**Fund the Archive**:
+The Archivists' Orders-phase order, which sends a turn's Research from their own Labs into their Archive fund instead of the shared Tech, where it counts nothing toward the Research Lead.
+_Avoid_: donate, invest, bank research, save up
+
+**Provisional Findings**:
+The Archivists' signature rule: they already have half the effect of the Tech under research, so long as their Research went to the shared Tech last turn rather than to the Archive.
+_Avoid_: early access, preview, partial tech, head start
 
 **Climate Model**:
 The small model of global warming the game runs: Emissions add to the CO2 Stock, the Temperature follows the stock with a lag, and the Temperature acts on population and Events. It moves as a consequence of player and faction choices, never on a fixed schedule.
@@ -126,7 +158,7 @@ _Avoid_: antenna, transmitter, beacon
 ### Pieces
 
 **Module**:
-A building placed inside a Colony. Eight kinds since version 0.03: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post and Relay.
+A building placed inside a Colony. Nine kinds since version 0.05: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay and the Archive, which only the Archivists raise and only one stage at a time.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:
@@ -302,7 +334,7 @@ The Custodians' measure: net Emissions held under the Natural Sink for a run of 
 _Avoid_: carbon neutral, balance, equilibrium
 
 **Off-world Presence**:
-The number of Colonists living away from Earth, required by both Factions' Victory Conditions. Neither can win on Earth alone. Colonists in Antarctica or on a station over Earth are still on Earth.
+The number of Colonists living away from Earth, required by the Custodians' and the Prospectors' Victory Conditions. No Faction can win on Earth alone. Colonists in Antarctica or on a station over Earth are still on Earth.
 _Avoid_: population off Earth, colony size, settlers
 
 ### Climate

@@ -225,11 +225,40 @@ pub struct FactionCard {
     pub victory: String,
     /// Ticket #50: the first part of the Victory Condition, in figures.
     pub victory_first: VictoryFirstCard,
+    /// Ticket #51: the second part, generalised the way #50 generalised the first.
+    pub victory_second: VictorySecondCard,
     pub colour: [f32; 3],
     /// Ticket #46: the station over Earth the Faction starts with, by name in bodies.toml.
     /// Ticket #50: the Arkwrights start with none, so this is optional.
     #[serde(default)]
     pub start_station: Option<String>,
+    // Ticket #51: the per-Faction figures the Arkwrights' card carries. Every one is neutral by
+    // default, so a card that names none plays exactly as it did before.
+    /// What a Habitat here holds, times this.
+    #[serde(default = "one_f64")]
+    pub habitat_capacity_multiplier: f64,
+    /// Transit Fuel times this, before Efficient Transit.
+    #[serde(default = "one_f64")]
+    pub transit_fuel_multiplier: f64,
+    /// Steerage: what a Colony Ship carries, times this.
+    #[serde(default = "one_f64")]
+    pub colony_ship_capacity_multiplier: f64,
+    /// Steerage: the population a lift from a Launch Site takes, times this.
+    #[serde(default = "one_f64")]
+    pub lift_population_multiplier: f64,
+    /// Steerage: what a Colony Ship costs, in place of the units.toml figure.
+    #[serde(default)]
+    pub colony_ship_materials: Option<i64>,
+    /// A Space Station's Materials, times this.
+    #[serde(default = "one_f64")]
+    pub station_materials_multiplier: f64,
+    /// A Colony Module's Materials, times this.
+    #[serde(default = "one_f64")]
+    pub module_materials_multiplier: f64,
+}
+
+fn one_f64() -> f64 {
+    1.0
 }
 
 /// Ticket #50: which measure a Faction's first Victory part counts.
@@ -240,6 +269,8 @@ pub enum VictoryFirstKind {
     StabilizationRun,
     ColonistsOffEarth,
     ResearchProduced,
+    /// Ticket #51: stages of the Archive complete; complete counts only while it is online.
+    ArchiveStages,
 }
 
 impl VictoryFirstKind {
@@ -249,8 +280,42 @@ impl VictoryFirstKind {
             VictoryFirstKind::StabilizationRun => "Stabilization run",
             VictoryFirstKind::ColonistsOffEarth => "Colonists off Earth",
             VictoryFirstKind::ResearchProduced => "Research produced",
+            VictoryFirstKind::ArchiveStages => "The Archive",
         }
     }
+}
+
+/// Ticket #51: which measure a Faction's second Victory part counts. Off-world Presence was the
+/// only one until now; the Arkwrights count Bodies settled, the Archivists Colonists at the Archive.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VictorySecondKind {
+    OffWorldPresence,
+    ColoniesOnBodies,
+    ColonistsAtArchive,
+}
+
+impl VictorySecondKind {
+    pub fn name(self) -> &'static str {
+        match self {
+            VictorySecondKind::OffWorldPresence => "Off-world Presence",
+            VictorySecondKind::ColoniesOnBodies => "Bodies settled",
+            VictorySecondKind::ColonistsAtArchive => "Colonists at the Archive",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct VictorySecondCard {
+    pub kind: VictorySecondKind,
+    /// For off_world_presence and colonists_at_archive.
+    #[serde(default)]
+    pub bar: f64,
+    /// For colonies_on_bodies: how many Bodies, and how many Colonists on each.
+    #[serde(default)]
+    pub bodies: u32,
+    #[serde(default)]
+    pub colonists_each: u32,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -345,6 +410,10 @@ pub struct AiWeights {
     pub build_army_or_barracks: f64,
     /// Ticket #36: an Embassy or a Relay.
     pub build_influence: f64,
+    /// Ticket #51: divert this turn's Research into the Archive fund.
+    pub fund_archive: f64,
+    /// Ticket #51: order the next stage of the Archive.
+    pub build_archive_stage: f64,
     pub influence: f64,
     pub transit: f64,
     pub load_unload: f64,
@@ -437,9 +506,18 @@ struct FacilitiesFile {
     facility: Vec<FacilityCard>,
     industry_level: IndustryLevelCard,
 }
+/// Ticket #51: the Archive, the first Project. Its Materials, build turns and Energy upkeep sit on
+/// its Module row; how many stages it has and what each costs in Research live here.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ArchiveCard {
+    pub stages: u32,
+    pub research_per_stage: i64,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct ModulesFile {
     module: Vec<ModuleCard>,
+    archive: ArchiveCard,
 }
 #[derive(Debug, Clone, Deserialize)]
 struct UnitsFile {
@@ -470,6 +548,8 @@ pub struct Tables {
     pub facilities: Vec<FacilityCard>,
     pub industry_level: IndustryLevelCard,
     pub modules: Vec<ModuleCard>,
+    /// Ticket #51: the Archive's stages and their Research price.
+    pub archive: ArchiveCard,
     pub units: Vec<UnitCard>,
     pub repair: RepairCard,
     pub techs: Vec<TechCard>,
@@ -522,6 +602,7 @@ impl Tables {
             states: states.state,
             facilities: facilities.facility,
             industry_level: facilities.industry_level,
+            archive: modules.archive,
             modules: modules.module,
             units: units.unit,
             repair: units.repair,
@@ -576,6 +657,26 @@ impl Tables {
             if f.victory_first.bar <= 0.0 {
                 return Err(err("factions.toml", format!("row {}: victory_first.bar must be positive", f.name)));
             }
+            // Ticket #51: whichever second part a card names, its own figures must be positive.
+            let second_ok = match f.victory_second.kind {
+                VictorySecondKind::OffWorldPresence | VictorySecondKind::ColonistsAtArchive => f.victory_second.bar > 0.0,
+                VictorySecondKind::ColoniesOnBodies => f.victory_second.bodies > 0 && f.victory_second.colonists_each > 0,
+            };
+            if !second_ok {
+                return Err(err("factions.toml", format!("row {}: victory_second needs a positive bar, or bodies and colonists_each", f.name)));
+            }
+            for (what, m) in [
+                ("habitat_capacity_multiplier", f.habitat_capacity_multiplier),
+                ("transit_fuel_multiplier", f.transit_fuel_multiplier),
+                ("colony_ship_capacity_multiplier", f.colony_ship_capacity_multiplier),
+                ("lift_population_multiplier", f.lift_population_multiplier),
+                ("station_materials_multiplier", f.station_materials_multiplier),
+                ("module_materials_multiplier", f.module_materials_multiplier),
+            ] {
+                if m <= 0.0 {
+                    return Err(err("factions.toml", format!("row {}: {} must be positive", f.name, what)));
+                }
+            }
         }
         for s in &self.states {
             for n in &s.neighbours {
@@ -612,6 +713,9 @@ impl Tables {
         }
         if self.climate.sea_level_thresholds.is_empty() {
             return Err(err("climate.toml", "sea_level_thresholds is empty"));
+        }
+        if self.archive.stages == 0 || self.archive.research_per_stage <= 0 {
+            return Err(err("modules.toml", "[archive] needs stages and research_per_stage above zero"));
         }
         if self.victory.turns == 0 {
             return Err(err("victory.toml", "turns must be positive"));

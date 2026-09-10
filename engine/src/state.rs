@@ -61,11 +61,13 @@ pub struct Module {
     /// Knocked offline by a card until the next Resolution (Reactor Leak).
     #[allow(dead_code)]
     pub offline_until_resolution: bool,
+    /// Ticket #51: how many stages of the Archive stand here. 0 for every other Module.
+    pub stage: u32,
 }
 
 impl Module {
     pub fn new(kind: ModuleKind) -> Module {
-        Module { kind, online: true, offline_until_resolution: false }
+        Module { kind, online: true, offline_until_resolution: false, stage: 0 }
     }
 }
 
@@ -308,6 +310,14 @@ pub struct SeatState {
     pub income_last_turn: Stockpile,
     /// Last Income by source (ticket #31): "Factory in Asia", the resource, the amount; upkeep as negatives.
     pub income_sources: Vec<(String, Resource, i64)>,
+    /// Ticket #51: Research banked for the Archive, capped at what its remaining stages still need.
+    pub archive_fund: i64,
+    /// Ticket #51: Fund the Archive was ordered this turn, so this turn's Lab Research went to the
+    /// fund and contributed nothing to the Research Lead.
+    pub funding_archive: bool,
+    /// Ticket #51: Provisional Findings is in force this turn, because last turn's Research went to
+    /// the shared Tech. True at the start of the game.
+    pub provisional_findings: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -440,6 +450,9 @@ impl Game {
             research_total: 0,
             income_last_turn: Stockpile::default(),
             income_sources: Vec::new(),
+            archive_fund: 0,
+            funding_archive: false,
+            provisional_findings: true,
         };
         // Seat 0 is the player's Faction; the other three follow in enum order (ticket #50).
         let mut kinds: Vec<FactionKind> = vec![setup.player];
@@ -635,6 +648,144 @@ impl Game {
         self.research.has(t)
     }
 
+    // ---------------------------------------------------------------- Ticket #51: Provisional Findings
+
+    /// Provisional Findings (ticket #51): the Archivists already have half the effect of the Tech
+    /// under research, while last turn's Research went to the shared Tech.
+    pub fn provisional_findings(&self, seat: Seat) -> bool {
+        self.kind(seat) == FactionKind::Archivists && self.seat(seat).provisional_findings
+    }
+
+    /// True while this seat reads the Tech at half strength: it is not done, but it is the one under
+    /// research and Provisional Findings is in force.
+    fn reads_half(&self, seat: Seat, t: TechId) -> bool {
+        !self.has_tech(t) && self.research.current == Some(t) && self.provisional_findings(seat)
+    }
+
+    /// A multiplier Tech read for one seat: its full value once done, `1 + (value - 1) / 2` under
+    /// Provisional Findings, and 1.0 (no effect) otherwise.
+    pub fn tech_multiplier(&self, seat: Seat, t: TechId) -> f64 {
+        let v = self.tables.tech(t).value;
+        if self.has_tech(t) {
+            v
+        } else if self.reads_half(seat, t) {
+            1.0 + (v - 1.0) / 2.0
+        } else {
+            1.0
+        }
+    }
+
+    /// An additive Tech read for one seat: its full value once done, half rounded down under
+    /// Provisional Findings, and 0 otherwise.
+    pub fn tech_addition(&self, seat: Seat, t: TechId) -> i64 {
+        let v = self.tables.tech(t).value as i64;
+        if self.has_tech(t) {
+            v
+        } else if self.reads_half(seat, t) {
+            v / 2
+        } else {
+            0
+        }
+    }
+
+    // ---------------------------------------------------------------- Ticket #51: the Archive
+
+    /// The Colony holding this seat's Archive, at whatever stage.
+    pub fn archive_colony(&self, seat: Seat) -> Option<ColonyId> {
+        self.colonies
+            .iter()
+            .find(|c| c.control.controller() == Some(seat) && c.modules.iter().any(|m| m.kind == ModuleKind::Archive))
+            .map(|c| c.id)
+    }
+
+    /// Stages of this seat's Archive already standing (0 with no Archive).
+    pub fn archive_stage(&self, seat: Seat) -> u32 {
+        self.archive_colony(seat)
+            .and_then(|c| self.colony(c))
+            .and_then(|c| c.modules.iter().find(|m| m.kind == ModuleKind::Archive))
+            .map(|m| m.stage)
+            .unwrap_or(0)
+    }
+
+    /// Stages already standing plus any stage in the Colony's queue: what the next order would raise.
+    pub fn archive_stages_committed(&self, seat: Seat) -> u32 {
+        let queued: u32 = self
+            .colonies
+            .iter()
+            .flat_map(|c| c.queue.iter())
+            .filter(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Archive))
+            .count() as u32;
+        self.archive_stage(seat) + queued
+    }
+
+    /// Research the Archive still wants: the stages neither standing nor ordered, times the price.
+    pub fn archive_fund_cap(&self, seat: Seat) -> i64 {
+        let left = self.tables.archive.stages.saturating_sub(self.archive_stages_committed(seat)) as i64;
+        left * self.tables.archive.research_per_stage
+    }
+
+    /// Every stage is standing.
+    pub fn archive_complete(&self, seat: Seat) -> bool {
+        self.archive_stage(seat) >= self.tables.archive.stages
+    }
+
+    /// The Archive is complete, its Colony is not Occupied, and the Module is online: the state the
+    /// Archivists' Victory Condition asks for.
+    pub fn archive_online(&self, seat: Seat) -> bool {
+        if !self.archive_complete(seat) {
+            return false;
+        }
+        let Some(cid) = self.archive_colony(seat) else { return false };
+        let Some(col) = self.colony(cid) else { return false };
+        !col.control.is_occupied() && col.modules.iter().any(|m| m.kind == ModuleKind::Archive && m.online)
+    }
+
+    /// Colonists living at the Colony that holds this seat's Archive.
+    pub fn colonists_at_archive(&self, seat: Seat) -> u32 {
+        self.archive_colony(seat).and_then(|c| self.colony(c)).map(|c| c.colonists).unwrap_or(0)
+    }
+
+    /// A Colony off Earth may hold the Archive; Antarctica and a station over Earth may not.
+    pub fn may_hold_archive(&self, c: &Colony) -> bool {
+        c.body != BodyId::Earth
+    }
+
+    // ---------------------------------------------------------------- Ticket #51: Steerage and the rest
+
+    /// What one Colony Ship of this seat carries: the card figure, +2 with Expanded Habitats
+    /// (version 0.04 section 4), times the Faction's own multiplier (Steerage doubles it).
+    pub fn colony_ship_capacity(&self, seat: Seat) -> u32 {
+        let base = self.tables.unit(UnitKind::ColonyShip).carries_colonists as i64 + self.tech_addition(seat, TechId::ExpandedHabitats);
+        let m = self.tables.faction(self.kind(seat)).colony_ship_capacity_multiplier;
+        (base.max(0) as f64 * m).floor().max(0.0) as u32
+    }
+
+    /// The population a lift from a Launch Site takes for this many Colonists (Steerage doubles it).
+    pub fn lift_population(&self, seat: Seat, colonists: u32) -> f64 {
+        0.1 * colonists as f64 * self.tables.faction(self.kind(seat)).lift_population_multiplier
+    }
+
+    /// What a Colony Module costs this seat in Materials, rounded down (ticket #51).
+    pub fn module_materials(&self, seat: Seat, kind: ModuleKind) -> i64 {
+        let base = self.tables.module(kind).materials as f64;
+        (base * self.tables.faction(self.kind(seat)).module_materials_multiplier).floor() as i64
+    }
+
+    /// What a Space Station costs this seat in Materials, rounded down (ticket #51).
+    pub fn station_materials(&self, seat: Seat) -> i64 {
+        let base = self.tables.station_materials as f64;
+        (base * self.tables.faction(self.kind(seat)).station_materials_multiplier).floor() as i64
+    }
+
+    /// What a Ship costs this seat: the units.toml figure, or the Faction's own Colony Ship price.
+    pub fn ship_materials(&self, seat: Seat, kind: UnitKind) -> i64 {
+        let card = self.tables.faction(self.kind(seat));
+        match (kind, card.colony_ship_materials) {
+            (UnitKind::ColonyShip, Some(m)) => m,
+            _ => self.tables.unit(kind).materials,
+        }
+    }
+
     /// Which seat an Army fights for, if any: it follows its home (spec 8.4).
     pub fn army_seat(&self, a: &Army) -> Option<Seat> {
         match a.home {
@@ -675,7 +826,7 @@ impl Game {
         if base == 0 {
             return 0;
         }
-        base + if self.has_tech(TechId::HardenedHulls) { self.tables.tech(TechId::HardenedHulls).value as i64 } else { 0 }
+        base + self.tech_addition(s.seat, TechId::HardenedHulls)
     }
 
     pub fn spawn_standing_army(&mut self, s: StateId) {
@@ -734,12 +885,30 @@ impl Game {
     }
 
     pub fn habitat_room(&self, c: &Colony) -> u32 {
-        let per = self.tables.module(ModuleKind::Habitat).holds_colonists
-            + if self.has_tech(TechId::ExpandedHabitats) { self.tables.tech(TechId::ExpandedHabitats).value as u32 } else { 0 };
+        // Ticket #51: Expanded Habitats and the Faction's own Habitat capacity are read for whoever
+        // holds the Colony, since Provisional Findings gives the Archivists half the Tech early.
+        let seat = c.control.controller();
+        let per = self.tables.module(ModuleKind::Habitat).holds_colonists as i64
+            + seat.map(|s| self.tech_addition(s, TechId::ExpandedHabitats)).unwrap_or(0);
+        let faction = seat.map(|s| self.tables.faction(self.kind(s)).habitat_capacity_multiplier).unwrap_or(1.0);
         // A station's Habitats are built for orbit: no Body yield applies (ticket #46).
         let yield_ = if c.in_orbit { 1.0 } else { self.tables.body(c.body).habitat_yield };
         let habitats = c.modules.iter().filter(|m| m.kind == ModuleKind::Habitat).count() as f64;
-        (habitats * per as f64 * yield_).floor() as u32
+        (habitats * per.max(0) as f64 * yield_ * faction).floor() as u32
+    }
+
+    /// Ticket #51: the seat's Colonists at one Body, counting a station over it as being there.
+    pub fn colonists_at_body(&self, seat: Seat, body: BodyId) -> u32 {
+        self.colonies.iter().filter(|c| c.control.controller() == Some(seat) && c.body == body).map(|c| c.colonists).sum()
+    }
+
+    /// Ticket #51: the Bodies off Earth where this seat holds at least `each` Colonists. Antarctica
+    /// and the stations over Earth are not Bodies for this: Earth is left out.
+    pub fn bodies_settled(&self, seat: Seat, each: u32) -> u32 {
+        BodyId::ALL
+            .into_iter()
+            .filter(|b| *b != BodyId::Earth && self.colonists_at_body(seat, *b) >= each)
+            .count() as u32
     }
 
     /// Colonists living in Habitats off Earth, for one seat (spec 15).
@@ -749,6 +918,28 @@ impl Game {
     }
 
     pub fn influence_threshold(&self, target: Target) -> i64 {
+        self.threshold_with(target, if self.has_tech(TechId::GreenConsensus) { self.green_consensus_multiplier() } else { 1.0 })
+    }
+
+    /// The threshold as one seat reads it (ticket #51): Provisional Findings gives the Archivists
+    /// half of Green Consensus while it is under research.
+    pub fn influence_threshold_for(&self, seat: Seat, target: Target) -> i64 {
+        let full = self.green_consensus_multiplier();
+        let m = if self.has_tech(TechId::GreenConsensus) {
+            full
+        } else if self.research.current == Some(TechId::GreenConsensus) && self.provisional_findings(seat) {
+            1.0 + (full - 1.0) / 2.0
+        } else {
+            1.0
+        };
+        self.threshold_with(target, m)
+    }
+
+    fn green_consensus_multiplier(&self) -> f64 {
+        self.tables.tech(TechId::GreenConsensus).influence_threshold_multiplier.unwrap_or(0.75)
+    }
+
+    fn threshold_with(&self, target: Target, multiplier: f64) -> i64 {
         let t = &self.tables.influence;
         let raw = match target {
             Place::State(s) => t.state_threshold_base + t.state_threshold_per_size * self.tables.state(s).size as i64,
@@ -757,12 +948,7 @@ impl Game {
                 .map(|c| t.colony_threshold_per_colonist * c.colonists as i64 + if c.in_orbit { t.station_threshold_base } else { 0 })
                 .unwrap_or(i64::MAX / 4),
         };
-        if self.has_tech(TechId::GreenConsensus) {
-            let m = self.tables.tech(TechId::GreenConsensus).influence_threshold_multiplier.unwrap_or(0.75);
-            (raw as f64 * m).floor() as i64
-        } else {
-            raw
-        }
+        if multiplier < 1.0 { (raw as f64 * multiplier).floor() as i64 } else { raw }
     }
 
     /// A Nation State's Influence value (ticket #34): its card figure plus one per Industry Level raised.
@@ -879,6 +1065,17 @@ impl Game {
     /// sibling hop; Earth and the Moon reach anything else at that Body's card figures; anything else
     /// (a moon of Mars to the Moon, say) is the farther card.
     pub fn transit_cost(&self, from: BodyId, to: BodyId) -> (u32, i64) {
+        self.transit_cost_with(from, to, 1.0, if self.has_tech(TechId::EfficientTransit) { self.tables.tech(TechId::EfficientTransit).value } else { 1.0 })
+    }
+
+    /// The transit as one seat pays it (ticket #51): the Faction's own Fuel multiplier first, then
+    /// Efficient Transit, multiplicative, rounded down once at the end.
+    pub fn transit_cost_for(&self, seat: Seat, from: BodyId, to: BodyId) -> (u32, i64) {
+        let faction = self.tables.faction(self.kind(seat)).transit_fuel_multiplier;
+        self.transit_cost_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit))
+    }
+
+    fn transit_cost_with(&self, from: BodyId, to: BodyId, faction: f64, tech: f64) -> (u32, i64) {
         let t = &self.tables;
         let parent = |b: BodyId| t.body(b).parent;
         let near_earth = |b: BodyId| b == BodyId::Earth || parent(b) == Some(BodyId::Earth);
@@ -896,7 +1093,7 @@ impl Game {
         } else {
             far(to)
         };
-        let fuel = if self.has_tech(TechId::EfficientTransit) { (fuel as f64 * t.tech(TechId::EfficientTransit).value).floor() as i64 } else { fuel };
+        let fuel = (fuel as f64 * faction * tech).floor() as i64;
         (turns.max(1), fuel)
     }
 

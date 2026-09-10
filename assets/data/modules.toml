@@ -68,3 +68,18 @@ build_turns = 1
 energy_upkeep = 2
 influence_allotment = 1
 standing_per_turn = 2
+
+# Ticket #51 (version 0.05): the Archive, the first Project. It is never placed by an ordinary build
+# order: the Archivists order one stage at a time, each stage `materials` Materials and
+# `[archive] research_per_stage` Research from the Archive fund, `build_turns` turns to raise. Its
+# Energy upkeep is charged only once every stage is done.
+[[module]]
+id = "archive"
+name = "The Archive"
+materials = 30
+build_turns = 2
+energy_upkeep = 12
+
+[archive]
+stages = 4
+research_per_stage = 20

@@ -142,12 +142,54 @@ impl Game {
         available[0]
     }
 
+    // ---------------------------------------------------------------- Ticket #51: the Archive fund
+
+    /// Fund the Archive (ticket #51). This turn's Research from the seat's own Labs was paid into
+    /// the shared Tech at Income; funding takes it back out and banks it, so it contributes nothing
+    /// to the Research Lead for the turn. Research past what the remaining stages need is wasted.
+    pub fn fund_archive(&mut self, seat: Seat) {
+        let amount = self.seat(seat).research_last_turn.max(0);
+        // Take it back out of wherever Income put it.
+        let moved = if self.research.current.is_some() {
+            let have = self.research.contributions[seat.index()].min(amount);
+            self.research.contributions[seat.index()] -= have;
+            self.research.progress -= have;
+            have
+        } else {
+            let have = self.research.unallocated.min(amount);
+            self.research.unallocated -= have;
+            have
+        };
+        let cap = self.archive_fund_cap(seat);
+        let before = self.seat(seat).archive_fund;
+        let after = (before + moved).min(cap).max(0);
+        {
+            let s = self.seat_mut(seat);
+            s.archive_fund = after;
+            s.funding_archive = true;
+        }
+        let wasted = before + moved - after;
+        let line = if wasted > 0 {
+            format!("The {} are funding the Archive: {} Research banked, {} of it wasted, {} of {} in the fund.", self.seat_name(seat), moved, wasted, after, cap)
+        } else {
+            format!("The {} are funding the Archive: {} Research banked, {} of {} in the fund.", self.seat_name(seat), moved, after, cap)
+        };
+        self.log(line.clone());
+        self.report.lines.push(line);
+    }
+
+    /// Ticket #51: whether the Archivists diverted this turn's Research, for the tech panel.
+    pub fn funding_archive(&self, seat: Seat) -> bool {
+        self.seat(seat).funding_archive
+    }
+
     /// The tech panel line: every seat's share of the Tech under research, and who picks next.
     pub fn research_lead_text(&self) -> String {
         let c = self.research.contributions;
         let total: i64 = c.iter().sum();
         let pct = |v: i64| if total == 0 { 100 / SEAT_COUNT as i64 } else { v * 100 / total };
         let shares: Vec<String> = Seat::ALL.into_iter().map(|s| format!("{} {}%", self.seat_name(s), pct(c[s.index()]))).collect();
+        let funders: Vec<String> = Seat::ALL.into_iter().filter(|s| self.funding_archive(*s)).map(|s| self.seat_name(s)).collect();
         let tied = self.research_lead_candidates();
         let next = if tied.len() == 1 {
             format!("{} pick next", self.seat_name(tied[0]))
@@ -155,6 +197,7 @@ impl Game {
             let names: Vec<String> = tied.iter().map(|s| self.seat_name(*s)).collect();
             format!("{} are tied; the next pick is drawn at random", names.join(" and "))
         };
-        format!("{} - {}.", shares.join(", "), next)
+        let funding = if funders.is_empty() { String::new() } else { format!(" The {} are funding the Archive this turn.", funders.join(" and ")) };
+        format!("{} - {}.{}", shares.join(", "), next, funding)
     }
 }

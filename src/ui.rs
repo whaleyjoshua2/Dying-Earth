@@ -281,6 +281,32 @@ fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut
             "Facility and Module output x{}; Emissions from Earth sources it controls x{}; Research x{}; Influence Allotment x{}",
             card.output_multiplier, card.emissions_multiplier, card.research_multiplier, card.influence_multiplier
         ));
+        // Ticket #51: a card may carry figures of its own beyond the four; list only the ones it moved.
+        let mut extras: Vec<String> = Vec::new();
+        if card.habitat_capacity_multiplier != 1.0 {
+            extras.push(format!("Habitat capacity x{}", card.habitat_capacity_multiplier));
+        }
+        if card.transit_fuel_multiplier != 1.0 {
+            extras.push(format!("transit Fuel x{}", card.transit_fuel_multiplier));
+        }
+        if card.colony_ship_capacity_multiplier != 1.0 {
+            extras.push(format!("Colony Ship capacity x{}", card.colony_ship_capacity_multiplier));
+        }
+        if card.lift_population_multiplier != 1.0 {
+            extras.push(format!("population per lifted Colonist x{}", card.lift_population_multiplier));
+        }
+        if let Some(m) = card.colony_ship_materials {
+            extras.push(format!("a Colony Ship {m} Materials"));
+        }
+        if card.station_materials_multiplier != 1.0 {
+            extras.push(format!("a Space Station x{} Materials", card.station_materials_multiplier));
+        }
+        if card.module_materials_multiplier != 1.0 {
+            extras.push(format!("a Colony Module x{} Materials", card.module_materials_multiplier));
+        }
+        if !extras.is_empty() {
+            ui.label(extras.join("; "));
+        }
         ui.add_space(6.0);
         ui.label(RichText::new("Signature rule").strong());
         ui.label(&card.signature);
@@ -930,6 +956,8 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildFacilityWithDucats { state, kind } => format!("Build {} in {} for Ducats", kind.name(), game.tables.state(*state).name),
         Order::BuildModuleWithDucats { colony, kind } => format!("Build {} at {} for Ducats", kind.name(), game.place_name(Place::Colony(*colony))),
         Order::BuildStation { body, slot } => format!("Build {} over {}", game.station_name(*body, *slot), game.tables.body(*body).name),
+        Order::BuildArchiveStage { colony } => format!("Raise a stage of the Archive at {}", game.place_name(Place::Colony(*colony))),
+        Order::FundArchive => "Fund the Archive with this turn's Research".to_string(),
     }
 }
 
@@ -1150,14 +1178,35 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     ui.label(format!("Colonists {} of {} Habitat room", col.colonists, game.habitat_room(col)));
     ui.label(RichText::new("Modules").strong());
     let director = col.control.director();
+    let stages = game.tables.archive.stages;
     for m in &col.modules {
+        // Ticket #51: the Archive reads as a Project, by stage, not as a yield.
+        if m.kind == ModuleKind::Archive {
+            let building = col.queue.iter().find(|b| b.item == BuildItem::Module(ModuleKind::Archive));
+            let state = if let Some(b) = building {
+                format!("building, {} turn(s) left", (b.due_turn + 1).saturating_sub(game.turn))
+            } else if m.stage >= stages {
+                let running = m.online && !col.control.is_occupied();
+                format!("complete, {}", if running { "online" } else { "offline" })
+            } else {
+                "waiting for its next stage".to_string()
+            };
+            ui.label(format!("  The Archive: stage {} of {}, {}", m.stage, stages, state));
+            continue;
+        }
         let figures = match director {
             Some(d) => game.module_yield(d, cid, m.kind).text(),
             None => "idle".to_string(),
         };
         ui.label(format!("  {}: {}{}", m.kind.name(), figures, if m.online { "" } else { " (offline, making nothing)" }));
     }
-    for b in &col.queue {
+    // Ticket #51: a stage on order shows before its Module does.
+    if !col.modules.iter().any(|m| m.kind == ModuleKind::Archive)
+        && let Some(b) = col.queue.iter().find(|b| b.item == BuildItem::Module(ModuleKind::Archive))
+    {
+        ui.label(format!("  The Archive: stage 1 of {}, building, {} turn(s) left", stages, (b.due_turn + 1).saturating_sub(game.turn)));
+    }
+    for b in col.queue.iter().filter(|b| b.item != BuildItem::Module(ModuleKind::Archive)) {
         ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
     }
     let armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(cid))).collect();
@@ -1168,8 +1217,42 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     ui.separator();
     let mine = col.control.director() == Some(Seat(0));
     if mine {
+        // Ticket #51: the Archive, the first Project, has its own orders on an Archivist's card.
+        if game.kind(Seat(0)) == FactionKind::Archivists {
+            let per = game.tables.archive.research_per_stage;
+            let fund = game.seat(Seat(0)).archive_fund;
+            let next = game.archive_stages_committed(Seat(0)) + 1;
+            ui.separator();
+            ui.label(RichText::new("The Archive").strong());
+            ui.label(format!("Archive fund {} of {}", fund, per));
+            let funding = game.seat(Seat(0)).funding_archive || session.pending.iter().any(|o| matches!(o, Order::FundArchive));
+            let mut on = funding;
+            if ui.checkbox(&mut on, "Fund the Archive this turn (your Labs' Research goes to the fund, not the shared Tech)").changed() {
+                if on {
+                    actions.push(Action::Place(Order::FundArchive));
+                } else if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::FundArchive)) {
+                    actions.push(Action::Cancel(i));
+                }
+            }
+            if next <= stages {
+                let order = Order::BuildArchiveStage { colony: cid };
+                let materials = game.order_cost(Seat(0), &order).materials;
+                let check = game.check_order(Seat(0), &session.pending, &order);
+                let label = format!("Build stage {next} ({materials} Materials, {per} Research)");
+                let resp = ui
+                    .add_enabled(check.is_ok(), egui::Button::new(label))
+                    .on_hover_text(format!("{} turn(s) to raise once paid", game.tables.module(ModuleKind::Archive).build_turns));
+                if let Err(e) = &check {
+                    resp.clone().on_disabled_hover_text(&e.0);
+                }
+                if resp.clicked() {
+                    actions.push(Action::Place(order));
+                }
+            }
+            ui.separator();
+        }
         ui.label(RichText::new("Build (hover a button for what it makes)").strong());
-        for mk in ModuleKind::ALL {
+        for mk in ModuleKind::BUILDABLE {
             if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Habitat) {
                 continue;
             }
@@ -1282,12 +1365,13 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     ui.label(RichText::new("Load and unload").strong());
     for s in &ships {
         let card = game.tables.unit(s.kind);
-        if card.carries_colonists == 0 && !card.carries_army {
+        let capacity = if s.kind == UnitKind::ColonyShip { game.colony_ship_capacity(Seat(0)) } else { card.carries_colonists };
+        if capacity == 0 && !card.carries_army {
             continue;
         }
         ui.label(format!("{} {}:", s.kind.name(), s.id.0));
-        if card.carries_colonists > s.colonists {
-            let n = card.carries_colonists - s.colonists;
+        if capacity > s.colonists {
+            let n = capacity - s.colonists;
             match body {
                 BodyId::Earth => {
                     let states = game.directed_states(Seat(0));
@@ -1523,6 +1607,25 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 Some(t) => format!("Under research: {} ({} of {}). {}", game.tables.tech(t).name, game.research.progress, game.tables.tech(t).cost, game.research_lead_text()),
                 None => format!("No Tech under research. {} Research waiting.", game.research.unallocated),
             });
+            // Ticket #51: an Archivist player is told whether Provisional Findings is in force.
+            if game.kind(Seat(0)) == FactionKind::Archivists {
+                let on = game.provisional_findings(Seat(0));
+                ui.colored_label(
+                    if on { Color32::LIGHT_GREEN } else { Color32::GRAY },
+                    format!(
+                        "Provisional Findings: {}. {}",
+                        if on { "on" } else { "off" },
+                        if on {
+                            "You already have half the effect of the Tech under research."
+                        } else {
+                            "You funded the Archive last turn, so this turn you have none of it."
+                        }
+                    ),
+                );
+                if session.pending.iter().any(|o| matches!(o, Order::FundArchive)) {
+                    ui.colored_label(Color32::YELLOW, "You are funding the Archive this turn: Provisional Findings is off next turn.");
+                }
+            }
             let must_pick = game.research.awaiting_pick == Some(Seat(0)) && game.research.current.is_none();
             if must_pick {
                 ui.colored_label(Color32::YELLOW, "You pick the next Tech: choose one below.");
@@ -1581,16 +1684,20 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
     }
     if view.show_victory {
         let mut open = true;
-        egui::Window::new("Victory").open(&mut open).default_width(420.0).show(ctx, |ui| {
+        egui::Window::new("Victory").open(&mut open).default_width(470.0).show(ctx, |ui| {
             // Ticket #50: a row per seat, in seat order, each headed by its Faction in its colour.
             for seat in Seat::ALL {
                 let p = game.progress(seat);
                 ui.label(RichText::new(format!("{} - {:.0}% of the way there", game.seat_name(seat), p.score() * 100.0)).strong().color(seat_colour(session, seat)));
                 ui.label(RichText::new(&game.tables.faction(game.kind(seat)).victory).weak());
-                ui.label(format!("{}: {:.0} of {:.0}", p.first_name, p.first_value, p.first_bar));
+                ui.label(match &p.first_held_back {
+                    Some(why) => format!("{}: {:.0} of {:.0} - {}", p.first_name, p.first_value, p.first_bar, why),
+                    None => format!("{}: {:.0} of {:.0}", p.first_name, p.first_value, p.first_bar),
+                });
                 ui.add(egui::ProgressBar::new(p.first_fraction() as f32));
-                ui.label(format!("Off-world Presence: {} of {} Colonists", p.presence, p.presence_bar));
-                ui.add(egui::ProgressBar::new(p.presence_fraction() as f32));
+                // Ticket #51: the second part in the words its own card uses.
+                ui.label(format!("{}: {}", p.second_name, p.second_text));
+                ui.add(egui::ProgressBar::new(p.second_fraction() as f32));
                 ui.add_space(8.0);
             }
             ui.label(format!("Collapse Line +{:.1} C; the Temperature is {:+.1}.", game.tables.climate.collapse_line, game.climate.temperature));
@@ -1713,13 +1820,12 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 let p = game.progress(seat);
                 ui.label(
                     RichText::new(format!(
-                        "{}: {} {:.0} of {:.0}; {} of {} Colonists off Earth ({:.0}% of its Victory Condition).",
+                        "{}: {} {:.0} of {:.0}; {} ({:.0}% of its Victory Condition).",
                         game.seat_name(seat),
                         p.first_name,
                         p.first_value,
                         p.first_bar,
-                        p.presence,
-                        p.presence_bar,
+                        p.second_text,
                         p.score() * 100.0
                     ))
                     .color(seat_colour(session, seat)),

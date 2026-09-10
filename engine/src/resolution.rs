@@ -523,6 +523,21 @@ impl Game {
 
     /// Control passes to `seat` (spec 8.3, 8.5): rivals' Influence wiped, a destruction roll, Armies follow.
     pub fn transfer_control(&mut self, place: Place, seat: Seat, why: &str) {
+        // Ticket #51: an Archive is destroyed when its Colony changes hands, whether by Occupation
+        // or by Influence. The Archive fund is kept, so the Archivists can start again.
+        if let Place::Colony(c) = place
+            && self.place_control(place).controller() != Some(seat)
+            && self.colony(c).map(|col| col.modules.iter().any(|m| m.kind == ModuleKind::Archive)).unwrap_or(false)
+        {
+            let owner = self.place_control(place).controller();
+            if let Some(col) = self.colony_mut(c) {
+                col.modules.retain(|m| m.kind != ModuleKind::Archive);
+            }
+            let whose = owner.map(|o| self.seat_name(o)).unwrap_or_else(|| "nobody".to_string());
+            let line = format!("The Archive at {} was destroyed when the Colony passed out of the {}' hands; their Archive fund is kept.", self.place_name(place), whose);
+            self.log(line.clone());
+            self.report.lines.push(line);
+        }
         self.set_place_control(place, Control::Controlled(seat));
         // Standings persist through a transfer (ticket #33): the old controller keeps its own and
         // can contest the place back.
@@ -720,6 +735,34 @@ impl Game {
             (Place::State(s), BuildItem::IndustryLevel) => {
                 self.state_mut(s).industry_level += 1;
             }
+            // Ticket #51: a stage of the Archive raises the one that stands rather than adding another.
+            (Place::Colony(c), BuildItem::Module(ModuleKind::Archive)) => {
+                let stages = self.tables.archive.stages;
+                let stage = if let Some(col) = self.colony_mut(c) {
+                    match col.modules.iter_mut().find(|m| m.kind == ModuleKind::Archive) {
+                        Some(m) => {
+                            m.stage += 1;
+                            m.stage
+                        }
+                        None => {
+                            let mut m = Module::new(ModuleKind::Archive);
+                            m.stage = 1;
+                            col.modules.push(m);
+                            1
+                        }
+                    }
+                } else {
+                    0
+                };
+                let line = if stage >= stages {
+                    format!("The {} completed the Archive at {}: every stage stands.", self.seat_name(b.seat), self.place_name(place))
+                } else {
+                    format!("The {} completed stage {} of {} of the Archive at {}.", self.seat_name(b.seat), stage, stages, self.place_name(place))
+                };
+                self.log(line.clone());
+                self.report.lines.push(line);
+                return;
+            }
             (Place::Colony(c), BuildItem::Module(k)) => {
                 if let Some(col) = self.colony_mut(c) {
                     col.modules.push(Module::new(k));
@@ -849,8 +892,10 @@ impl Game {
                                 if self.state(st).control.director() != Some(seat) {
                                     continue;
                                 }
+                                // Ticket #51, Steerage: the population a lift takes is a Faction figure.
+                                let cost = self.lift_population(seat, colonists);
                                 let p = &mut self.state_mut(st).population;
-                                *p = (*p - 0.1 * colonists as f64).max(0.0);
+                                *p = (*p - cost).max(0.0);
                             }
                             LoadSource::Colony(c) => {
                                 let Some(col) = self.colony_mut(c) else { continue };

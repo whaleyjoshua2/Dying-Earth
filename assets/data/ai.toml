@@ -5,6 +5,8 @@
 # never spends a multiplier on holding a rival back.
 
 [weights.prospectors]
+fund_archive = 0
+build_archive_stage = 0
 build_producer = 8
 raise_industry = 9
 build_research_lab = 3
@@ -25,6 +27,8 @@ stance_hold = 2
 stance_evade = 1
 
 [weights.custodians]
+fund_archive = 0
+build_archive_stage = 0
 build_producer = 6
 raise_industry = 3
 build_research_lab = 8
@@ -44,29 +48,34 @@ stance_intercept = 3
 stance_hold = 3
 stance_evade = 1
 
-# provisional, decided on ticket #51: the Custodians' weights, with Habitats and Colony Ships at 9.
+# Ticket #51: the Arkwrights spread. Habitats, Colony Ships, stations and founding are all 9;
+# Influence is 5, since they buy passage rather than allegiance.
 [weights.arkwrights]
+fund_archive = 0
+build_archive_stage = 0
 build_producer = 6
 raise_industry = 3
-build_research_lab = 8
+build_research_lab = 6
 build_habitat = 9
-build_launch_site_or_shipyard = 6
+build_launch_site_or_shipyard = 9
 build_colony_ship = 9
 build_warship = 3
 build_army_or_barracks = 4
 build_influence = 6
-influence = 8
+influence = 5
 transit = 6
 load_unload = 6
 found_colony = 9
-restoration = 7
+restoration = 0
 stance_attack = 2
 stance_intercept = 3
 stance_hold = 3
 stance_evade = 1
 
-# provisional, decided on ticket #51: the Custodians' weights, with the Research Lab at 9.
+# Ticket #51: the Archivists research and build the Archive.
 [weights.archivists]
+fund_archive = 8
+build_archive_stage = 9
 build_producer = 6
 raise_industry = 3
 build_research_lab = 9
@@ -80,7 +89,7 @@ influence = 8
 transit = 6
 load_unload = 6
 found_colony = 9
-restoration = 7
+restoration = 0
 stance_attack = 2
 stance_intercept = 3
 stance_hold = 3
@@ -108,14 +117,14 @@ within_by_turn = 12
 under_sink_by_turn = 18
 colonists = [[12, 4], [22, 12]]
 
-# provisional, decided on ticket #51
+# Ticket #51: Diaspora is 30 Colonists off Earth, so the pace runs to 30.
 [pace.arkwrights]
-first = [[6, 4], [12, 10], [18, 17], [24, 24]]
+first = [[6, 4], [12, 12], [18, 22], [24, 30]]
 colonists = [[12, 4], [22, 12]]
 
-# provisional, decided on ticket #51
+# Ticket #51: the Archive is four stages, and the pace is in stages complete.
 [pace.archivists]
-first = [[6, 25], [12, 60], [18, 105], [24, 150]]
+first = [[8, 1], [13, 2], [18, 3], [22, 4]]
 colonists = [[12, 4], [22, 12]]
 
 [thresholds]
@@ -134,10 +143,10 @@ never = "green_consensus"
 [tech_picks.custodians]
 order = ["public_science", "efficient_grids", "clean_power", "green_consensus", "clean_manufacturing"]
 
-# provisional, decided on ticket #51
+# Ticket #51: the Arkwrights want room, cheap upkeep and cheap transits.
 [tech_picks.arkwrights]
 order = ["expanded_habitats", "closed_loop_colonies", "efficient_transit"]
 
-# provisional, decided on ticket #51
+# Ticket #51: the Archivists want Research and a quiet world.
 [tech_picks.archivists]
 order = ["public_science", "efficient_grids", "green_consensus"]

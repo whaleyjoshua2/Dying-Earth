@@ -18,6 +18,10 @@ enum Cat {
     ArmyOrBarracks,
     /// Ticket #36: an Embassy or a Relay.
     BuildInfluence,
+    /// Ticket #51: divert this turn's Research into the Archive fund.
+    FundArchive,
+    /// Ticket #51: order the next stage of the Archive.
+    ArchiveStage,
     Influence,
     Transit,
     LoadUnload,
@@ -70,6 +74,8 @@ impl Game {
             Cat::Warship => w.build_warship,
             Cat::ArmyOrBarracks => w.build_army_or_barracks,
             Cat::BuildInfluence => w.build_influence,
+            Cat::FundArchive => w.fund_archive,
+            Cat::ArchiveStage => w.build_archive_stage,
             Cat::Influence => w.influence,
             Cat::Transit => w.transit,
             Cat::LoadUnload => w.load_unload,
@@ -170,16 +176,24 @@ impl Game {
         if bodies.is_empty() {
             return BodyId::Moon;
         }
+        // Ticket #51, the Arkwrights' spread rule: once one Body of theirs holds the 4 Colonists
+        // Diaspora asks of each, the next Colony goes to a Body they are not on yet.
+        let each = t.faction(self.kind(seat)).victory_second.colonists_each;
+        let spreading = each > 0 && BodyId::ALL.into_iter().any(|b| b != BodyId::Earth && self.colonists_at_body(seat, b) >= each);
         let key = |b: &BodyId| -> f64 {
             let c = t.body(*b);
-            match behind {
+            let yields = match behind {
                 Behind::Presence => c.habitat_yield,
                 Behind::First => match self.first_kind(seat) {
                     VictoryFirstKind::ExtractionTotal => c.mine_yield + c.refinery_yield,
                     VictoryFirstKind::ColonistsOffEarth => c.habitat_yield,
-                    VictoryFirstKind::StabilizationRun | VictoryFirstKind::ResearchProduced => c.generator_yield + c.habitat_yield,
+                    VictoryFirstKind::StabilizationRun | VictoryFirstKind::ResearchProduced | VictoryFirstKind::ArchiveStages => {
+                        c.generator_yield + c.habitat_yield
+                    }
                 },
-            }
+            };
+            let fresh = if spreading && self.colonists_at_body(seat, *b) == 0 { 10.0 } else { 0.0 };
+            yields + fresh
         };
         bodies.sort_by(|a, b| key(b).partial_cmp(&key(a)).unwrap());
         bodies[0]
@@ -333,6 +347,11 @@ impl Game {
                 VictoryFirstKind::StabilizationRun => cat == Cat::Restoration || cat == Cat::ResearchLab,
                 VictoryFirstKind::ColonistsOffEarth => matches!(cat, Cat::Habitat | Cat::ColonyShip | Cat::FoundColony | Cat::LoadUnload | Cat::Transit),
                 VictoryFirstKind::ResearchProduced => cat == Cat::ResearchLab,
+                // Ticket #51: the Archive wants Research, a fund and stages, and a Colony off Earth
+                // to stand at, which the Colony Ship, the transit and the founding provide.
+                VictoryFirstKind::ArchiveStages => {
+                    matches!(cat, Cat::ArchiveStage | Cat::FundArchive | Cat::ResearchLab | Cat::ColonyShip | Cat::FoundColony | Cat::Transit | Cat::LoadUnload)
+                }
             }
         };
         let advances_presence = |cat: Cat| matches!(cat, Cat::Habitat | Cat::ColonyShip | Cat::FoundColony | Cat::LoadUnload | Cat::Transit);
@@ -411,7 +430,7 @@ impl Game {
         for cid in self.directed_colonies(seat) {
             let col = self.colony(cid).unwrap().clone();
             let threat = if self.enemy_present_or_inbound(seat, col.body) || self.enemy_army_near(seat, Place::Colony(cid)) { m.threat } else { 1.0 };
-            for mk in ModuleKind::ALL {
+            for mk in ModuleKind::BUILDABLE {
                 // Ticket #46: a station holds only a Shipyard and Habitats, and a Habitat over Earth
                 // houses nobody who counts as off Earth, so the AI builds none there.
                 if col.in_orbit && (mk != ModuleKind::Shipyard && (mk != ModuleKind::Habitat || col.body == BodyId::Earth)) {
@@ -420,6 +439,8 @@ impl Game {
                 let (cat, mut base) = match mk {
                     ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery | ModuleKind::TradePost => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                     ModuleKind::Relay => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
+                    // Ticket #51: the Archive is never an ordinary Module build; it has its own order.
+                    ModuleKind::Archive => continue,
                     ModuleKind::Habitat => (Cat::Habitat, self.base_weight(seat, Cat::Habitat)),
                     ModuleKind::Shipyard => {
                         if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
@@ -507,7 +528,7 @@ impl Game {
         targets.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         for (rank, (target, _)) in targets.iter().enumerate() {
             let have = self.seat(seat).influence.get(target).copied().unwrap_or(0);
-            let threshold = self.influence_threshold(*target);
+            let threshold = self.influence_threshold_for(seat, *target);
             // Ticket #33: a controlled place needs a standing above the controller's as well, by the
             // challenge margin (ticket #41).
             let needed = match self.place_control(*target).controller() {
@@ -562,6 +583,32 @@ impl Game {
             }
         }
 
+        // --- The Archive (ticket #51). The Archivist AI funds it whenever the next stage still
+        // wants Research and it holds a Colony off Earth to build at, and otherwise contributes to
+        // the shared Tech; it raises the Archive at the first such Colony it took.
+        if kind == FactionKind::Archivists {
+            let home = self.archive_colony(seat).or_else(|| {
+                self.colonies
+                    .iter()
+                    .filter(|c| c.control.director() == Some(seat) && self.may_hold_archive(c))
+                    .min_by_key(|c| (c.founded_turn, c.id.0))
+                    .map(|c| c.id)
+            });
+            if let Some(cid) = home {
+                let per = self.tables.archive.research_per_stage;
+                let fund = self.seat(seat).archive_fund;
+                let left = self.archive_fund_cap(seat);
+                if left > 0 && fund < left && self.seat(seat).research_last_turn > 0 {
+                    let opp = if fund + self.seat(seat).research_last_turn >= per { m.opportunity } else { 1.0 };
+                    push(vec![Order::FundArchive], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, opp, format!("fund the Archive with this turn's {} Research", self.seat(seat).research_last_turn), None);
+                }
+                if fund >= per {
+                    let next = self.archive_stages_committed(seat) + 1;
+                    push(vec![Order::BuildArchiveStage { colony: cid }], Cat::ArchiveStage, self.base_weight(seat, Cat::ArchiveStage), gap_for(Cat::ArchiveStage, None), 1.0, m.opportunity, format!("raise stage {} of the Archive at {}", next, self.place_name(Place::Colony(cid))), None);
+                }
+            }
+        }
+
         // --- Restoration
         if kind == FactionKind::Custodians {
             let energy = self.seat(seat).stockpile.energy;
@@ -582,7 +629,8 @@ impl Game {
             let card = self.tables.unit(s.kind);
             let ship_name = format!("{} {}", s.kind.name(), s.id.0);
             if s.kind == UnitKind::ColonyShip {
-                if body == BodyId::Earth && s.colonists < card.carries_colonists {
+                let capacity = self.colony_ship_capacity(seat);
+                if body == BodyId::Earth && s.colonists < capacity {
                     // Load from the most populous directed state.
                     // Ticket #46: only a state with a working Launch Site lifts them.
                     let from = self
@@ -591,7 +639,7 @@ impl Game {
                         .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online))
                         .max_by(|a, b| self.state(*a).population.partial_cmp(&self.state(*b).population).unwrap());
                     if let Some(st) = from {
-                        let n = card.carries_colonists - s.colonists;
+                        let n = capacity - s.colonists;
                         let opp = if presence_needed <= n { m.opportunity } else { 1.0 };
                         push(vec![Order::Load { ship: s.id, colonists: n, from: LoadSource::State(st), army: None }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("load {} Colonists onto {}", n, ship_name), None);
                     }
@@ -651,7 +699,7 @@ impl Game {
                         dests.push(c.body);
                     }
                 }
-                dests.sort_by_key(|d| self.transit_cost(body, *d).0);
+                dests.sort_by_key(|d| self.transit_cost_for(seat, body, *d).0);
                 for d in dests {
                     let threat = if self.enemy_present_or_inbound(seat, d) { m.threat } else { 1.0 };
                     let base = self.base_weight(seat, Cat::Transit) * if kind == FactionKind::Prospectors { 0.9 } else { 0.6 };

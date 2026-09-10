@@ -1,6 +1,6 @@
 //! Victory and defeat (spec 15), for four seats since ticket #50.
 
-use crate::data::VictoryFirstKind;
+use crate::data::{VictoryFirstKind, VictorySecondKind};
 use crate::ids::*;
 use crate::state::*;
 
@@ -9,27 +9,34 @@ pub struct Progress {
     pub first_name: String,
     pub first_value: f64,
     pub first_bar: f64,
-    pub presence: u32,
-    pub presence_bar: u32,
+    /// Ticket #51: the second part is a Faction figure too, not Off-world Presence for everyone.
+    pub second_name: String,
+    pub second_value: f64,
+    pub second_bar: f64,
+    /// The second part in the words of the Faction's card, for the panel.
+    pub second_text: String,
+    /// Ticket #51: the first part is at its bar but something else denies it (the Archive is
+    /// complete and offline). Set with the reason.
+    pub first_held_back: Option<String>,
 }
 
 impl Progress {
     pub fn first_fraction(&self) -> f64 {
         (self.first_value / self.first_bar).clamp(0.0, 1.0)
     }
-    pub fn presence_fraction(&self) -> f64 {
-        (self.presence as f64 / self.presence_bar as f64).clamp(0.0, 1.0)
+    pub fn second_fraction(&self) -> f64 {
+        (self.second_value / self.second_bar).clamp(0.0, 1.0)
     }
     /// The lower fraction of the two parts.
     pub fn score(&self) -> f64 {
-        self.first_fraction().min(self.presence_fraction())
+        self.first_fraction().min(self.second_fraction())
     }
     pub fn met(&self) -> bool {
-        self.first_value >= self.first_bar && self.presence >= self.presence_bar
+        self.first_value >= self.first_bar && self.second_value >= self.second_bar && self.first_held_back.is_none()
     }
     /// How far past the bar, for the both-met tiebreak: the lower of the two parts' fractions, unclamped.
     pub fn margin(&self) -> f64 {
-        (self.first_value / self.first_bar).min(self.presence as f64 / self.presence_bar as f64)
+        (self.first_value / self.first_bar).min(self.second_value / self.second_bar)
     }
 }
 
@@ -43,13 +50,43 @@ impl Game {
             VictoryFirstKind::StabilizationRun => s.stabilization_run as f64,
             VictoryFirstKind::ColonistsOffEarth => self.off_world_colonists(seat) as f64,
             VictoryFirstKind::ResearchProduced => s.research_total as f64,
+            // Ticket #51: stages standing, and stage 4 only tells while the Archive is running.
+            VictoryFirstKind::ArchiveStages => self.archive_stage(seat) as f64,
+        };
+        // Ticket #51: the second part is whatever the card names, at the card's own figures.
+        let second = self.tables.faction(s.kind).victory_second;
+        let (second_value, second_bar, second_text) = match second.kind {
+            VictorySecondKind::OffWorldPresence => (
+                self.off_world_colonists(seat) as f64,
+                second.bar,
+                format!("{} of {:.0} Colonists living off Earth", self.off_world_colonists(seat), second.bar),
+            ),
+            VictorySecondKind::ColoniesOnBodies => (
+                self.bodies_settled(seat, second.colonists_each) as f64,
+                second.bodies as f64,
+                format!("{} of {} Bodies with {} Colonists or more", self.bodies_settled(seat, second.colonists_each), second.bodies, second.colonists_each),
+            ),
+            VictorySecondKind::ColonistsAtArchive => (
+                self.colonists_at_archive(seat) as f64,
+                second.bar,
+                format!("{} of {:.0} Colonists living at the Archive's Colony", self.colonists_at_archive(seat), second.bar),
+            ),
+        };
+        let first_held_back = match card.kind {
+            VictoryFirstKind::ArchiveStages if self.archive_complete(seat) && !self.archive_online(seat) => {
+                Some("the Archive is complete but not running".to_string())
+            }
+            _ => None,
         };
         Progress {
             first_name: card.kind.name().to_string(),
             first_value,
             first_bar: card.bar,
-            presence: self.off_world_colonists(seat),
-            presence_bar: self.tables.victory.off_world_presence,
+            second_name: second.kind.name().to_string(),
+            second_value,
+            second_bar,
+            second_text,
+            first_held_back,
         }
     }
 

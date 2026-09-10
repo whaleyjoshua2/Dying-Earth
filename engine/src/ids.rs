@@ -112,10 +112,25 @@ pub enum ModuleKind {
     TradePost,
     /// Version 0.03 (ticket #36): raises Influence off Earth.
     Relay,
+    /// Version 0.05 (ticket #51): the Archive, the first Project. Only the Archivists build it, one
+    /// stage at a time, and never through the ordinary Module build order.
+    Archive,
 }
 
 impl ModuleKind {
-    pub const ALL: [ModuleKind; 8] = [
+    pub const ALL: [ModuleKind; 9] = [
+        ModuleKind::Mine,
+        ModuleKind::Generator,
+        ModuleKind::Refinery,
+        ModuleKind::Habitat,
+        ModuleKind::Shipyard,
+        ModuleKind::Barracks,
+        ModuleKind::TradePost,
+        ModuleKind::Relay,
+        ModuleKind::Archive,
+    ];
+    /// The Modules an ordinary build order may place (ticket #51: the Archive is not one of them).
+    pub const BUILDABLE: [ModuleKind; 8] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -135,6 +150,7 @@ impl ModuleKind {
             ModuleKind::Barracks => "Barracks",
             ModuleKind::TradePost => "Trade Post",
             ModuleKind::Relay => "Relay",
+            ModuleKind::Archive => "The Archive",
         }
     }
 }
