@@ -65,7 +65,7 @@ A permanent settlement a Faction holds on a Body, founded when a Colony Ship unl
 _Avoid_: base, outpost, settlement
 
 **Colony Slot**:
-One of a fixed number of places on a Body where a Colony can be founded, shared by all Factions. Since version 0.04 each is a real geological place, drawn at its position on the Surface Map and giving its Colony its name. A landing Colony Ship is founded into a chosen one. Earth's three, in Antarctica, are shut under the ice until the Temperature has stood at +1.6 C in a Climate phase; once open they stay open.
+One of a fixed number of places on a Body where a Colony can be founded, shared by all Factions. Since version 0.04 each is a real geological place, drawn at its position on the Surface Map and giving its Colony its name. Since version 0.05 each also has its own four yields, drawn when the game starts and never far from its Body's, so no two places on a world are equally worth settling; a free slot shows what a Colony there would get. A landing Colony Ship is founded into a chosen one. Earth's three, in Antarctica, are shut under the ice until the Temperature has stood at +1.6 C in a Climate phase; once open they stay open.
 _Avoid_: site, plot, capacity
 
 **Orbital Slot**:
@@ -90,8 +90,12 @@ Earth's Body Surface Map, divided into Nation States, where Earth-side building,
 _Avoid_: home view, globe view, terrestrial map
 
 **Solar System Map**:
-The 3D view of the solar system, where Bodies, Ship stacks, transits and Orbital Control are seen and acted on. Transits, launches, Ship Stances and attacks are ordered here and nowhere else.
+The 3D view of the solar system, where Bodies, Ship stacks, transits and Orbital Control are seen and acted on. Transits, launches, Ship Stances and attacks are ordered here and nowhere else. Since version 0.05 the sky it draws is the real one: Earth and Mars stand on their rings where they truly stand in the month the turn is, so the distance between them, and the Launch Window, are things the player can see.
 _Avoid_: space view, orbital map, star map
+
+**Launch Window**:
+The months in which the flight between the Earth system and the Mars system is cheap, because the two worlds stand where a minimum-energy transfer wants them. On the window a crossing takes the shortest flight there is and costs the Fuel on the card; away from it it takes longer and costs more, the further off the dearer, up to a limit. There is one window in the game. A hop inside the Earth system or inside the Mars system does not have one.
+_Avoid_: transfer window, launch period, alignment, conjunction
 
 **Event**:
 An unplanned occurrence drawn from the Event Deck after orders are committed and taking effect during Resolution — a solar storm, an equipment failure, a discovery. It can never directly break a Victory Condition.
@@ -322,7 +326,7 @@ _Avoid_: science, research points, RP, fourth resource
 ### The turn
 
 **Turn**:
-One month of game time, and the unit the whole game runs in. The First Playable is twelve turns long. Both Factions order simultaneously against the same board, then the turn runs through its phases.
+One calendar month of game time, and the unit the whole game runs in. The game begins in January 2030, so turn 1 is January 2030 and the twenty-fourth is December 2031, and the top bar names the month. Both Factions order simultaneously against the same board, then the turn runs through its phases.
 _Avoid_: round, month, tick, cycle
 
 **Phase**:

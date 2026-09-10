@@ -36,9 +36,29 @@ fn facility(kind: FacilityKind) -> Facility {
     Facility::new(kind)
 }
 
+/// Ticket #57: stand the game on the turn the Mars launch window falls on, where a crossing costs
+/// the Hohmann flight and the card's Fuel. Off the window both rise, so a test about anything else
+/// -- Efficient Transit, the Arkwrights' Fuel multiplier -- reads the card figures here.
+fn at_window(g: &mut Game) {
+    g.turn = g.next_window_turn(1);
+}
+
+/// The same for the flight home, which wants a different phase angle and so falls on a different
+/// turn: the turn in the game's span whose return offset is smallest.
+fn at_return_window(g: &mut Game) {
+    g.turn = (1..=g.tables.victory.turns)
+        .min_by(|a, b| g.return_window_offset(*a).abs().partial_cmp(&g.return_window_offset(*b).abs()).unwrap())
+        .unwrap();
+}
+
+/// Ticket #57: every Colony Slot draws its own four yields at the start, so a test that reasons
+/// about a Faction or a Tech would otherwise be reading a random draw. This helper founds into the
+/// first free slot and pins that slot's yields back to its Body's card figures; the tests that are
+/// ABOUT the per-slot draw read the drawn figures instead.
 fn colony(g: &mut Game, seat: Seat, body: BodyId, modules: &[ModuleKind], colonists: u32) -> ColonyId {
     let id = ColonyId(g.fresh_id());
     let slot = g.free_slots_on(body)[0];
+    g.slot_yields.insert((body, slot), SlotYields::of_body(g.tables.body(body)));
     g.colonies.push(Colony {
         id,
         body,
@@ -527,19 +547,28 @@ fn phobos_and_deimos_are_small_different_bodies_one_hop_past_mars() {
     assert_eq!((ph.colony_slots(), de.colony_slots()), (2, 1));
     assert_eq!((ph.mine_yield, ph.generator_yield, ph.refinery_yield, ph.habitat_yield), (1.75, 0.75, 0.5, 0.5));
     assert_eq!((de.mine_yield, de.generator_yield, de.refinery_yield, de.habitat_yield), (1.0, 1.0, 0.25, 0.5));
-    // Reach: five turns and 24 Fuel from Earth (and from the Moon, which counts as Earth), one turn
-    // and 2 Fuel from Mars, one turn and 1 Fuel between the two moons; Earth to Mars stays 4 and 20.
-    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Phobos), (5, 24));
-    assert_eq!(g.transit_cost(BodyId::Deimos, BodyId::Earth), (5, 24));
-    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Deimos), (5, 24));
+    // Reach. Ticket #57 replaced the fixed card turns for a crossing between the Earth system and
+    // the Mars system with the real flight: at the window it is the Hohmann 259 days, nine turns,
+    // for the card's Fuel. The hops inside a system are untouched by it.
+    let mut g = g;
+    at_window(&mut g);
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Phobos), (9, 24));
+    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Deimos), (9, 24));
     assert_eq!(g.transit_cost(BodyId::Mars, BodyId::Phobos), (1, 2));
     assert_eq!(g.transit_cost(BodyId::Deimos, BodyId::Mars), (1, 2));
     assert_eq!(g.transit_cost(BodyId::Phobos, BodyId::Deimos), (1, 1));
-    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars), (4, 20));
-    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Mars), (4, 20));
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars), (9, 20));
+    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Mars), (9, 20));
     assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Moon), (1, 6));
+    // The flight home reads the same cards, at its own window, which is not the same turn: the
+    // moons' 24 against Mars's 20, both stretched by however far off that window the best turn in
+    // the game's span falls. The window arithmetic itself is pinned by the ticket #57 tests.
+    at_return_window(&mut g);
+    let (moon_turns, from_deimos) = g.transit_cost(BodyId::Deimos, BodyId::Earth);
+    let (mars_turns, from_mars) = g.transit_cost(BodyId::Mars, BodyId::Moon);
+    assert_eq!(moon_turns, mars_turns, "one flight home, whichever rock it leaves from");
+    assert!(from_deimos > from_mars, "Deimos reads the dearer card: {from_deimos} Fuel against {from_mars}");
     // Their Colonists are off Earth.
-    let mut g = g;
     colony(&mut g, Seat(0), BodyId::Phobos, &[ModuleKind::Habitat], 4);
     assert_eq!(g.off_world_colonists(Seat(0)), 4);
 }
@@ -1095,6 +1124,8 @@ fn tech_clean_propellant_makes_a_launch_emit_less() {
 #[test]
 fn tech_efficient_transit_cuts_fuel() {
     let mut g = game();
+    // Ticket #57: on the window a crossing pays the card's Fuel, and Efficient Transit comes after.
+    at_window(&mut g);
     assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars).1, 20);
     with_tech(&mut g, TechId::EfficientTransit);
     assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars).1, 12);
@@ -1753,7 +1784,9 @@ fn an_arkwright_pays_half_for_a_station_and_three_quarters_for_a_module() {
         assert_eq!(g.order_cost(Seat(0), &Order::BuildModule { colony: mine, kind }).materials, full);
         assert_eq!(g.order_cost(Seat(2), &Order::BuildModule { colony: cid, kind }).materials, theirs, "{} x 0.75 rounded down", kind.name());
     }
-    // Transit Fuel too: three quarters, then Efficient Transit on top of that.
+    // Transit Fuel too: three quarters, then Efficient Transit on top of that. Ticket #57: on the
+    // window the crossing pays the card's Fuel, and both multipliers apply after the window factor.
+    at_window(&mut g);
     assert_eq!(g.transit_cost_for(Seat(0), BodyId::Earth, BodyId::Mars).1, 20);
     assert_eq!(g.transit_cost_for(Seat(2), BodyId::Earth, BodyId::Mars).1, 15);
     g.research.done.push(TechId::EfficientTransit);
@@ -3737,4 +3770,278 @@ fn the_ai_never_mothballs_a_shipyard_or_a_launch_site() {
         .collect();
     assert!(!mothballed.is_empty(), "with Energy a turn from short the AI mothballs something: {orders:?}");
     assert!(!mothballed.iter().any(|m| m.contains("Shipyard") || m.contains("LaunchSite")), "never the Shipyard or the Launch Site: {mothballed:?}");
+}
+
+// ---------------------------------------------------------------- #57 real yields, a real sky
+
+/// Ticket #57 (a): every Colony Slot draws its own four yields when the game starts, never more
+/// than a quarter either side of its Body's, no two slots on a Body alike, and the same seed always
+/// deals the same board.
+#[test]
+fn every_colony_slot_draws_its_own_four_yields_within_a_quarter_of_its_bodys() {
+    let g = with_seed(11);
+    let spread = g.tables.slot_yield_spread;
+    assert_eq!(spread, 0.25, "bodies.toml sets the spread");
+    for body in BodyId::ALL {
+        let card = g.tables.body(body).clone();
+        for slot in 0..card.colony_slots() {
+            let y = g.slot_yields(body, slot);
+            for (what, drawn, base) in [
+                ("Mine", y.mine, card.mine_yield),
+                ("Generator", y.generator, card.generator_yield),
+                ("Refinery", y.refinery, card.refinery_yield),
+                ("Habitat", y.habitat, card.habitat_yield),
+            ] {
+                let factor = drawn / base;
+                assert!(
+                    factor >= 1.0 - spread - 1e-9 && factor <= 1.0 + spread + 1e-9,
+                    "{} slot {} {what}: {drawn} is x{factor:.3} of the Body's {base}, outside +/-{spread}",
+                    card.name,
+                    slot
+                );
+                assert_eq!(drawn, (drawn * 100.0).round() / 100.0, "{} slot {slot} {what} is rounded to two decimals", card.name);
+            }
+        }
+        // No two slots on a Body carry the same four figures.
+        let all: Vec<String> = (0..card.colony_slots()).map(|s| g.slot_yields(body, s).text()).collect();
+        let mut unique = all.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(unique.len(), all.len(), "{} deals every slot its own figures: {all:?}", card.name);
+    }
+    // Seed-stable, and a different seed deals a different board.
+    let again = with_seed(11);
+    let other = with_seed(12);
+    for body in BodyId::ALL {
+        for slot in 0..g.tables.body(body).colony_slots() {
+            assert_eq!(g.slot_yields(body, slot), again.slot_yields(body, slot), "seed 11 deals {body:?} slot {slot} the same twice");
+        }
+    }
+    let same: bool = BodyId::ALL
+        .into_iter()
+        .all(|b| (0..g.tables.body(b).colony_slots()).all(|s| g.slot_yields(b, s) == other.slot_yields(b, s)));
+    assert!(!same, "another seed deals another board");
+}
+
+/// Ticket #57 (b): a Module's output is its Colony Slot's yield, not its Body's average. A station
+/// in orbit, which stands in no Colony Slot, keeps the Body's figures.
+#[test]
+fn a_modules_output_uses_its_own_slots_yield() {
+    let mut g = with_seed(11);
+    let card = g.tables.body(BodyId::Mars).clone();
+    // Two Colonies on Mars, in the two slots whose Mine yields are furthest apart.
+    let mut slots: Vec<u32> = (0..card.colony_slots()).collect();
+    slots.sort_by(|a, b| g.slot_yields(BodyId::Mars, *a).mine.partial_cmp(&g.slot_yields(BodyId::Mars, *b).mine).unwrap());
+    let (poor, rich) = (slots[0], *slots.last().unwrap());
+    let mine_amount = g.tables.module(ModuleKind::Mine).produces.as_ref().unwrap().amount as f64;
+    for slot in [poor, rich] {
+        let id = ColonyId(g.fresh_id());
+        g.colonies.push(Colony {
+            id,
+            body: BodyId::Mars,
+            slot,
+            control: Control::Controlled(Seat(0)),
+            modules: vec![Module::new(ModuleKind::Mine)],
+            colonists: 0,
+            queue: Vec::new(),
+            grid_failed: false,
+            founded_turn: 1,
+            in_orbit: false,
+        });
+        let want = (mine_amount * g.slot_yields(BodyId::Mars, slot).mine).floor() as i64;
+        assert_eq!(
+            g.module_yield(Seat(0), id, ModuleKind::Mine).amount,
+            want,
+            "the Mine at {} makes what its slot's Mine yield x{} says, not the Body's x{}",
+            card.slots[slot as usize].name,
+            g.slot_yields(BodyId::Mars, slot).mine,
+            card.mine_yield
+        );
+    }
+    let by_body = (mine_amount * card.mine_yield).floor() as i64;
+    let poor_id = g.colonies[g.colonies.len() - 2].id;
+    let rich_id = g.colonies[g.colonies.len() - 1].id;
+    let poor_out = g.module_yield(Seat(0), poor_id, ModuleKind::Mine).amount;
+    let rich_out = g.module_yield(Seat(0), rich_id, ModuleKind::Mine).amount;
+    assert!(poor_out != rich_out || by_body != poor_out, "the two slots do not both read the Body's {by_body}: {poor_out} and {rich_out}");
+    // A Habitat's room follows the slot too, and a station over Earth still takes no Body yield.
+    g.colony_mut(rich_id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    let per = g.tables.module(ModuleKind::Habitat).holds_colonists as f64;
+    let want = (per * g.slot_yields(BodyId::Mars, rich).habitat).floor() as u32;
+    assert_eq!(g.habitat_room(g.colony(rich_id).unwrap()), want, "the Habitat holds what its slot's Habitat yield says");
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), per as u32, "a station's Habitats take no Body yield and no slot's either");
+}
+
+/// Ticket #57 (c): the game begins on 1 January 2030 and a Turn is a calendar month.
+#[test]
+fn a_turn_is_a_calendar_month_from_january_2030() {
+    let g = game();
+    assert_eq!(g.date(1), Date { year: 2030, month: 1 });
+    assert_eq!(g.date(1).text(), "January 2030");
+    assert_eq!(g.date(7).text(), "July 2030");
+    assert_eq!(g.date(12).text(), "December 2030");
+    assert_eq!(g.date(13).text(), "January 2031");
+    assert_eq!(g.date(24), Date { year: 2031, month: 12 }, "the last turn is December 2031");
+    assert_eq!(g.date(24).text(), "December 2031");
+    // Turn 1 is exactly 2030-01-01 00:00 UTC, the moment the game begins.
+    assert_eq!(g.julian_day(1), 2462502.5);
+}
+
+/// Ticket #57 (d): the sky the game draws is the real one. Earth's and Mars's heliocentric ecliptic
+/// longitudes on 2030-01-01 against JPL Horizons (DE441, heliocentric J2000 ecliptic), recorded in
+/// `docs/research/earth-mars-ephemeris.md` section 2.3.
+#[test]
+fn earth_and_mars_stand_where_jpl_horizons_puts_them_on_the_first_of_january_2030() {
+    let g = game();
+    // Horizons, 2030-01-01 00:00:00 TDB = JD 2462502.5.
+    const EARTH: f64 = 100.1845;
+    const MARS: f64 = 337.8203;
+    let earth = g.heliocentric_longitude(BodyId::Earth, 1);
+    let mars = g.heliocentric_longitude(BodyId::Mars, 1);
+    assert!((earth - EARTH).abs() < 1.0, "Earth at {earth:.4} against Horizons' {EARTH}");
+    assert!((mars - MARS).abs() < 1.0, "Mars at {mars:.4} against Horizons' {MARS}");
+    // The phase angle the whole launch-window rule reads: Mars trails Earth by about 122 degrees.
+    let phase = g.phase_angle(1);
+    assert!((phase + 122.36).abs() < 1.0, "the phase angle at the start is {phase:.4}, not about -122.36");
+    // The Moon stands where Earth stands and the moons of Mars where Mars stands.
+    assert_eq!(g.heliocentric_longitude(BodyId::Moon, 1), earth);
+    assert_eq!(g.heliocentric_longitude(BodyId::Phobos, 1), mars);
+}
+
+/// Ticket #57 (e): the first Mars launch window after January 2030 falls where the real one does.
+/// The research file (section 3.3) puts the 2031 Type I optimum departure at 28 January 2031, which
+/// is turn 13; the game's own window turn must be within one turn of it.
+#[test]
+fn the_first_mars_window_falls_where_the_real_one_of_early_2031_does() {
+    let g = game();
+    let window = g.next_window_turn(1);
+    assert!((12..=14).contains(&window), "the window is turn {window} ({}), not within one turn of January 2031", g.date(window).text());
+    assert_eq!(g.date(window).year, 2031, "and it is in 2031");
+    // It really is the smallest offset in the span, and no other turn is nearer.
+    let offset = g.window_offset(window).abs();
+    assert!(offset < 15.0, "the window turn stands {offset:.1} degrees off the Hohmann angle");
+    for t in 1..=g.tables.victory.turns {
+        if t != window {
+            assert!(g.window_offset(t).abs() >= offset, "turn {t} is no nearer the window than turn {window}");
+        }
+    }
+    // One window in the whole game: the next is a synodic period away, past the last turn.
+    let after = g.next_window_turn(window + 1);
+    assert!(after > g.tables.victory.turns, "the second window is turn {after}, inside the game's {} turns", g.tables.victory.turns);
+}
+
+/// Ticket #57 (f): what a crossing between the Earth system and the Mars system costs. At the
+/// window it is the Hohmann flight and the card's Fuel; away from it both rise; the flight is never
+/// longer than the cap; and Efficient Transit applies after the window factor, not before.
+#[test]
+fn a_crossing_costs_the_hohmann_flight_at_the_window_and_more_away_from_it() {
+    let mut g = game();
+    let tr = g.tables.transit.clone();
+    let card_fuel = g.tables.body(BodyId::Mars).transit_fuel;
+    let window = g.next_window_turn(1);
+    let hohmann = (tr.days_at_window / tr.days_per_turn).ceil() as u32;
+    assert_eq!(hohmann, 9, "259 days is nine turns of thirty");
+    assert_eq!(
+        g.transit_cost_at(BodyId::Earth, BodyId::Mars, window),
+        (hohmann, card_fuel),
+        "at the window: the Hohmann flight for the card's Fuel"
+    );
+    // Far from it, dearer in both.
+    let cycle = (tr.synodic_days / tr.days_per_turn).ceil() as u32 + 1;
+    let far = (1..=cycle).max_by(|a, b| g.window_offset(*a).abs().partial_cmp(&g.window_offset(*b).abs()).unwrap()).unwrap();
+    let (far_turns, far_fuel) = g.transit_cost_at(BodyId::Earth, BodyId::Mars, far);
+    assert!(far_turns > hohmann, "the worst turn takes {far_turns} turns, no more than the window's {hohmann}");
+    assert!(far_fuel > card_fuel, "and costs {far_fuel} Fuel, no more than the card's {card_fuel}");
+    assert_eq!(far_turns, tr.max_turns, "the worst turn reaches the cap of {} turns", tr.max_turns);
+    // The cap holds over a whole synodic cycle, and nothing ever falls under the card's Fuel.
+    for t in 1..=cycle {
+        let (turns, fuel) = g.transit_cost_at(BodyId::Earth, BodyId::Mars, t);
+        assert!(turns <= tr.max_turns, "turn {t} takes {turns} turns, past the cap of {}", tr.max_turns);
+        assert!(fuel >= card_fuel, "turn {t} costs {fuel} Fuel, under the card's {card_fuel}");
+    }
+    // Efficient Transit multiplies what the window has already made of the Fuel, not the card.
+    g.turn = far;
+    let plain = g.transit_cost(BodyId::Earth, BodyId::Mars).1;
+    with_tech(&mut g, TechId::EfficientTransit);
+    let cut = g.transit_cost(BodyId::Earth, BodyId::Mars).1;
+    let value = g.tables.tech(TechId::EfficientTransit).value;
+    assert_eq!(cut, (plain as f64 * value).floor() as i64, "{plain} x {value} rounded down, not the card's {card_fuel} x {value}");
+    assert!(cut > (card_fuel as f64 * value).floor() as i64, "the window factor came first: {cut}");
+}
+
+/// Ticket #57 (g): the launch window touches only a crossing between the two systems. A hop inside
+/// the Earth system or inside the Mars system costs what its card always said, on every turn.
+#[test]
+fn earth_moon_and_mars_system_hops_are_untouched_by_the_window() {
+    let mut g = game();
+    let cycle = (g.tables.transit.synodic_days / g.tables.transit.days_per_turn).ceil() as u32 + 1;
+    let hops = [
+        ((BodyId::Earth, BodyId::Moon), (1u32, 6i64)),
+        ((BodyId::Moon, BodyId::Earth), (1, 6)),
+        ((BodyId::Mars, BodyId::Phobos), (1, 2)),
+        ((BodyId::Phobos, BodyId::Mars), (1, 2)),
+        ((BodyId::Phobos, BodyId::Deimos), (1, 1)),
+        ((BodyId::Deimos, BodyId::Phobos), (1, 1)),
+    ];
+    for t in 1..=cycle {
+        g.turn = t;
+        for ((from, to), want) in hops {
+            assert!(g.crossing_offset(from, to, t).is_none(), "{from:?} to {to:?} crosses nothing");
+            assert_eq!(g.transit_cost(from, to), want, "{from:?} to {to:?} on turn {t}");
+        }
+    }
+}
+
+/// Ticket #57 (h): with the Mars launch window two turns away or less, the AI banks Fuel for the
+/// crossing it wants and spends none on anything else, as it banks Materials for a build.
+#[test]
+fn the_ai_banks_fuel_when_the_mars_window_is_within_two_turns() {
+    // A Colony Ship loaded at Earth wanting Mars, and a Frigate at Earth that would otherwise hop
+    // to the Moon: only one of the two may burn Fuel while the window is near.
+    let board = |turn: u32| {
+        let mut g = game();
+        g.turn = turn;
+        let seat = Seat(0);
+        colony(&mut g, seat, BodyId::Moon, &[ModuleKind::Habitat], 2);
+        g.seats[seat.index()].stockpile.fuel = 200;
+        g.seats[seat.index()].stockpile.materials = 0;
+        g.seats[seat.index()].stockpile.energy = 200;
+        for kind in [UnitKind::ColonyShip, UnitKind::Frigate] {
+            let id = ShipId(g.fresh_id());
+            let colonists = if kind == UnitKind::ColonyShip { 4 } else { 0 };
+            g.ships.push(Ship {
+                id,
+                kind,
+                seat,
+                damage: 0,
+                at: ShipAt::Body(BodyId::Earth),
+                colonists,
+                army: None,
+                stance: Stance::Hold,
+                escaped: false,
+                arrived_this_turn: false,
+                built_turn: 1,
+            });
+        }
+        g
+    };
+    let window = game().next_window_turn(1);
+    // Two turns out: the bank is on.
+    let mut near = board(window - 2);
+    let orders = near.ai_orders(Seat(0));
+    let lines: Vec<String> = near.report.ai_lines.iter().flat_map(|r| r.lines.iter().cloned()).collect();
+    assert!(lines.iter().any(|l| l.contains("banking Fuel for")), "the window is two turns off, so Fuel is banked: {lines:#?}");
+    let crossings = orders
+        .iter()
+        .filter(|o| matches!(o, Order::Transit { to, .. } if near.crossing_offset(BodyId::Earth, *to, near.turn).is_some()))
+        .count();
+    let spends: Vec<&Order> = orders.iter().filter(|o| near.order_cost(Seat(0), o).fuel > 0).collect();
+    assert_eq!(spends.len(), crossings, "nothing but the crossing it is banking for burns Fuel: {spends:?}");
+    // Three turns out, and the AI spends Fuel as it always did.
+    let mut off = board(window - 3);
+    off.ai_orders(Seat(0));
+    let lines: Vec<String> = off.report.ai_lines.iter().flat_map(|r| r.lines.iter().cloned()).collect();
+    assert!(!lines.iter().any(|l| l.contains("banking Fuel for")), "three turns out the bank is off: {lines:#?}");
 }

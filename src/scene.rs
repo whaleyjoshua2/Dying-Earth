@@ -182,6 +182,12 @@ pub fn sync_scene(
         *vis = if show { Visibility::Inherited } else { Visibility::Hidden };
     }
     let turn = session.game.as_ref().map(|g| g.turn).unwrap_or(1);
+    // Ticket #57: every Body stands at its true heliocentric longitude for the turn. Before a game
+    // is made there is no sky to read, so the title screen's system stands at longitude zero.
+    let place = |body: BodyId| match session.game.as_ref() {
+        Some(g) => geo::solar_place(g, body),
+        None => geo::solar_position(body, turn, 0.0),
+    };
     // Globes turn under the pointer; the start-screen Earth spins on its own.
     for (globe, mut t) in &mut globes {
         let yaw = if matches!(session.screen, Screen::ChooseStart { .. }) { view.spin } else { view.yaw };
@@ -189,7 +195,7 @@ pub fn sync_scene(
         let _ = globe;
     }
     for (body, mut t) in &mut bodies {
-        t.translation = geo::solar_position(body.0, turn);
+        t.translation = place(body.0);
         t.rotation = Quat::from_rotation_y(turn as f32 * 0.3) * geo::upright();
     }
     let Some(game) = session.game.as_ref() else {
@@ -211,7 +217,7 @@ pub fn sync_scene(
             let n = game.tables.body(m.body).colony_slots().max(1) as f32;
             let a = m.slot as f32 / n * std::f32::consts::TAU;
             let r = geo::solar_radius(m.body) * 1.35;
-            t.translation = geo::solar_position(m.body, turn) + Vec3::new(a.cos() * r, 0.0, a.sin() * r);
+            t.translation = place(m.body) + Vec3::new(a.cos() * r, 0.0, a.sin() * r);
             t.scale = Vec3::splat(if owner.is_some() { 0.07 } else { 0.045 });
         } else {
             t.scale = Vec3::splat(if owner.is_some() { 0.065 } else { 0.045 });
@@ -225,10 +231,10 @@ pub fn sync_scene(
         }
         *vis = Visibility::Inherited;
         // Ticket #50: one of four fixed angles round the Body, by seat.
-        t.translation = geo::solar_position(m.body, turn) + geo::stack_offset(m.seat, geo::solar_radius(m.body));
+        t.translation = place(m.body) + geo::stack_offset(m.seat, geo::solar_radius(m.body));
     }
     for (r, mut t, mut vis, mut mat) in &mut rings {
-        t.translation = geo::solar_position(r.0, turn);
+        t.translation = place(r.0);
         match game.orbital_control(r.0) {
             Some(s) => {
                 *vis = Visibility::Inherited;
@@ -244,8 +250,8 @@ pub fn sync_scene(
     if current == View::Solar && showing_3d {
         for s in &game.ships {
             if let ShipAt::Transit { from, to, turns_left } = s.at {
-                let a = geo::solar_position(from, turn);
-                let b = geo::solar_position(to, turn);
+                let a = place(from);
+                let b = place(to);
                 let colour = session.colours()[s.seat.index()];
                 let c = Color::srgb(colour[0], colour[1], colour[2]);
                 gizmos.line(a, b, c);

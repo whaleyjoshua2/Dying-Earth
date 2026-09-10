@@ -538,6 +538,64 @@ pub struct VictoryTable {
     pub stabilization_turns: u32,
     pub off_world_presence: u32,
     pub turns: u32,
+    /// Ticket #57: the game begins on the first of this month, and a Turn is a calendar month.
+    #[serde(default = "twenty_thirty")]
+    pub start_year: i64,
+    #[serde(default = "january")]
+    pub start_month: i64,
+}
+
+fn twenty_thirty() -> i64 {
+    2030
+}
+fn january() -> i64 {
+    1
+}
+
+/// Ticket #57: one planet's Keplerian elements at J2000 and their rates per Julian century, as
+/// JPL's approximate-positions table prints them (`ephemeris.toml`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct PlanetElements {
+    pub id: BodyId,
+    pub a: f64,
+    pub a_rate: f64,
+    pub e: f64,
+    pub e_rate: f64,
+    pub inclination: f64,
+    pub inclination_rate: f64,
+    pub mean_longitude: f64,
+    pub mean_longitude_rate: f64,
+    pub perihelion_longitude: f64,
+    pub perihelion_longitude_rate: f64,
+    pub node_longitude: f64,
+    pub node_longitude_rate: f64,
+}
+
+/// Ticket #57: what a transit between the Earth system and the Mars system costs, by how far the
+/// phase angle stands from the Hohmann departure angle (`ephemeris.toml`, `[transit]`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct TransitTable {
+    /// The minimum-energy flight, in days: what a transit takes at the window.
+    pub days_at_window: f64,
+    /// The departure phase angle (Mars's heliocentric longitude less Earth's) that flight wants.
+    pub hohmann_angle: f64,
+    /// The same for the flight home, Earth leading.
+    pub return_hohmann_angle: f64,
+    /// Days added to the flight, and the fraction of the card's Fuel added, per degree off it.
+    pub days_per_degree: f64,
+    pub fuel_per_degree: f64,
+    /// The days in a Turn.
+    pub days_per_turn: f64,
+    /// However far from the window, a transit is never longer than this.
+    pub max_turns: u32,
+    /// How often the phase angle comes round again: the cycle a window is looked for in.
+    pub synodic_days: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct EphemerisFile {
+    planet: Vec<PlanetElements>,
+    transit: TransitTable,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -645,9 +703,15 @@ struct BodiesFile {
     sibling_fuel: i64,
     #[serde(default = "forty")]
     station_materials: i64,
+    /// Ticket #57: how far a Colony Slot's own yields may fall either side of its Body's.
+    #[serde(default = "quarter")]
+    slot_yield_spread: f64,
 }
 fn forty() -> i64 {
     40
+}
+fn quarter() -> f64 {
+    0.25
 }
 fn one_u32() -> u32 {
     1
@@ -744,6 +808,11 @@ pub struct Tables {
     pub sibling_transit: (u32, i64),
     /// Ticket #46: what a station costs.
     pub station_materials: i64,
+    /// Ticket #57: how far a Colony Slot's own four yields may fall either side of its Body's.
+    pub slot_yield_spread: f64,
+    /// Ticket #57: the Keplerian elements of Earth and Mars, and the transit table (`ephemeris.toml`).
+    pub planets: Vec<PlanetElements>,
+    pub transit: TransitTable,
     pub states: Vec<StateCard>,
     /// Ticket #53: how a neutral Nation State develops itself (`nation_states.toml`).
     pub development: DevelopmentTable,
@@ -808,9 +877,13 @@ impl Tables {
         let unrest: UnrestTable = read(dir, "unrest.toml")?;
         let victory: VictoryTable = read(dir, "victory.toml")?;
         let ai: AiTable = read(dir, "ai.toml")?;
+        let ephemeris: EphemerisFile = read(dir, "ephemeris.toml")?;
         let tables = Tables {
             sibling_transit: (bodies.sibling_turns, bodies.sibling_fuel),
             station_materials: bodies.station_materials,
+            slot_yield_spread: bodies.slot_yield_spread,
+            planets: ephemeris.planet,
+            transit: ephemeris.transit,
             bodies: bodies.body,
             states: states.state,
             development: states.development,
@@ -987,6 +1060,30 @@ impl Tables {
         if self.victory.turns == 0 {
             return Err(err("victory.toml", "turns must be positive"));
         }
+        // Ticket #57: the game's first date, and the sky it opens on.
+        if !(1..=12).contains(&self.victory.start_month) {
+            return Err(err("victory.toml", format!("start_month {} is no month", self.victory.start_month)));
+        }
+        if !(0.0..1.0).contains(&self.slot_yield_spread) {
+            return Err(err("bodies.toml", format!("slot_yield_spread {} must be at least 0 and under 1", self.slot_yield_spread)));
+        }
+        for id in [BodyId::Earth, BodyId::Mars] {
+            if !self.planets.iter().any(|p| p.id == id) {
+                return Err(err("ephemeris.toml", format!("no [[planet]] row for {}: the sky needs Earth's elements and Mars's", id.name())));
+            }
+        }
+        for p in &self.planets {
+            if p.a <= 0.0 || !(0.0..1.0).contains(&p.e) {
+                return Err(err("ephemeris.toml", format!("row {}: a must be positive and e between 0 and 1", p.id.name())));
+            }
+        }
+        let tr = &self.transit;
+        if tr.days_at_window <= 0.0 || tr.days_per_turn <= 0.0 || tr.max_turns == 0 || tr.synodic_days <= 0.0 {
+            return Err(err("ephemeris.toml", "[transit] needs days_at_window, days_per_turn, max_turns and synodic_days above zero"));
+        }
+        if tr.days_per_degree < 0.0 || tr.fuel_per_degree < 0.0 {
+            return Err(err("ephemeris.toml", "[transit] days_per_degree and fuel_per_degree cannot be negative"));
+        }
         if self.events.event.iter().map(|e| e.copies).sum::<u32>() == 0 {
             return Err(err("events.toml", "the deck has no cards; give some Event a copies count above zero"));
         }
@@ -998,6 +1095,16 @@ impl Tables {
 
     pub fn body(&self, id: BodyId) -> &BodyCard {
         &self.bodies[id.index()]
+    }
+    /// Ticket #57: the elements a Body reads its place in the sky from. A satellite reads its
+    /// parent's row: at this scale the Moon stands where Earth stands, and Phobos where Mars does.
+    pub fn planet(&self, id: BodyId) -> &PlanetElements {
+        let want = match id {
+            BodyId::Moon => BodyId::Earth,
+            BodyId::Phobos | BodyId::Deimos => BodyId::Mars,
+            other => other,
+        };
+        self.planets.iter().find(|p| p.id == want).expect("validate() checked Earth and Mars have rows")
     }
     pub fn state(&self, id: StateId) -> &StateCard {
         &self.states[id.index()]

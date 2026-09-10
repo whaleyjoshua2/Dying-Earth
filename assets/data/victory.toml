@@ -8,3 +8,7 @@ stabilization_turns = 3
 off_world_presence = 12
 # Ticket #27 (version 0.02): twenty-four turns of one month.
 turns = 24
+# Ticket #57 (version 0.05): the game begins on 1 January 2030 and a Turn is a calendar month, so
+# turn 1 is January 2030 and turn 24 December 2031.
+start_year = 2030
+start_month = 1

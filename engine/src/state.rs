@@ -223,6 +223,73 @@ pub struct NationState {
     pub strip_permit_ends: Option<u32>,
 }
 
+/// Ticket #57: a calendar month of game time. Turn 1 is January 2030.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Date {
+    pub year: i64,
+    pub month: u32,
+}
+
+impl Date {
+    pub const MONTHS: [&'static str; 12] =
+        ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+    pub fn month_name(&self) -> &'static str {
+        Date::MONTHS[(self.month.clamp(1, 12) - 1) as usize]
+    }
+
+    /// "July 2030".
+    pub fn text(&self) -> String {
+        format!("{} {}", self.month_name(), self.year)
+    }
+}
+
+/// Ticket #57: a draw from a triangular distribution centred on 1.0 with `spread` either side, from
+/// a uniform draw in 0..1. The distribution is symmetric, so its median is its mode and half the
+/// draws fall each side; nothing ever falls outside 1 +/- spread.
+pub fn triangular(u: f64, spread: f64) -> f64 {
+    let u = u.clamp(0.0, 1.0);
+    if u < 0.5 {
+        1.0 - spread * (1.0 - (2.0 * u).sqrt())
+    } else {
+        1.0 + spread * (1.0 - (2.0 * (1.0 - u)).sqrt())
+    }
+}
+
+/// Ticket #57: one Colony Slot's own four yields, drawn when the game starts as its Body's figures
+/// times a factor from a triangular distribution centred on 1.0. Every yield a Module in a Colony
+/// reads is the slot's, not the Body's; the Body's figures are what the slot drew from.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SlotYields {
+    pub mine: f64,
+    pub generator: f64,
+    pub refinery: f64,
+    pub habitat: f64,
+}
+
+impl SlotYields {
+    /// The Body's own figures, which a station in orbit and any slot off the table read.
+    pub fn of_body(card: &crate::data::BodyCard) -> SlotYields {
+        SlotYields { mine: card.mine_yield, generator: card.generator_yield, refinery: card.refinery_yield, habitat: card.habitat_yield }
+    }
+
+    pub fn of_module(&self, kind: ModuleKind) -> f64 {
+        match kind {
+            ModuleKind::Mine => self.mine,
+            ModuleKind::Generator => self.generator,
+            ModuleKind::Refinery => self.refinery,
+            // A Trade Post (ticket #35) follows the Habitat yield: trade goes where people live.
+            ModuleKind::Habitat | ModuleKind::TradePost => self.habitat,
+            _ => 1.0,
+        }
+    }
+
+    /// "M 1.31 G 0.68 R 1.52 H 1.44", the figures the Surface Map writes under a slot's name.
+    pub fn text(&self) -> String {
+        format!("M {:.2} G {:.2} R {:.2} H {:.2}", self.mine, self.generator, self.refinery, self.habitat)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Colony {
     pub id: ColonyId,
@@ -557,6 +624,10 @@ pub struct Game {
     /// Temperature has stood at or above `antarctica_opens_at` in a Climate phase. Once open they
     /// stay open, however far the Temperature comes back down.
     pub antarctica_open: bool,
+    /// Ticket #57: every Colony Slot's own four yields, drawn from the seeded generator when the
+    /// game starts, keyed by Body and slot. A free slot has them too: they are what a Colony
+    /// founded there would get.
+    pub slot_yields: BTreeMap<(BodyId, u32), SlotYields>,
     /// Lines for the simulate log and the dev diary; the interface ignores them.
     pub log: Vec<String>,
 }
@@ -691,9 +762,13 @@ impl Game {
             next_id: 1,
             pending: crate::orders::Pending::default(),
             antarctica_open: false,
+            slot_yields: BTreeMap::new(),
             log: Vec::new(),
             tables,
         };
+        // Ticket #57: every Colony Slot on every Body draws its own four yields, in Body order then
+        // slot order, so a seed always deals the same board.
+        game.draw_slot_yields();
         // Standing Armies for every state.
         for id in StateId::ALL {
             game.spawn_standing_army(id);
@@ -1168,8 +1243,9 @@ impl Game {
         let per = self.tables.module(ModuleKind::Habitat).holds_colonists as i64
             + seat.map(|s| self.tech_addition(s, TechId::ExpandedHabitats)).unwrap_or(0);
         let faction = seat.map(|s| self.tables.faction(self.kind(s)).habitat_capacity_multiplier).unwrap_or(1.0);
-        // A station's Habitats are built for orbit: no Body yield applies (ticket #46).
-        let yield_ = if c.in_orbit { 1.0 } else { self.tables.body(c.body).habitat_yield };
+        // A station's Habitats are built for orbit: no Body yield applies (ticket #46). On a surface
+        // it is the slot's own Habitat yield, not the Body's (ticket #57).
+        let yield_ = if c.in_orbit { 1.0 } else { self.slot_yields(c.body, c.slot).habitat };
         let habitats = c.modules.iter().filter(|m| m.kind == ModuleKind::Habitat).count() as f64;
         (habitats * per.max(0) as f64 * yield_ * faction).floor() as u32
     }
@@ -1343,6 +1419,48 @@ impl Game {
         self.colonies.iter().find(|c| !c.in_orbit && c.body == body && c.slot == slot)
     }
 
+    // ------------------------------------------- Ticket #57: a Colony Slot's own four yields
+
+    /// Draw every Colony Slot's four yields from the game's own generator: the parent Body's figure
+    /// times a factor from a triangular distribution centred on 1.0 with `slot_yield_spread` either
+    /// side, rounded to two decimals. Called once, when the game is made.
+    fn draw_slot_yields(&mut self) {
+        use rand::Rng;
+        let spread = self.tables.slot_yield_spread;
+        for body in BodyId::ALL {
+            let card = self.tables.body(body).clone();
+            for slot in 0..card.colony_slots() {
+                let mut draw = |base: f64| {
+                    let u: f64 = self.rng.random_range(0.0..1.0);
+                    (base * triangular(u, spread) * 100.0).round() / 100.0
+                };
+                let y = SlotYields {
+                    mine: draw(card.mine_yield),
+                    generator: draw(card.generator_yield),
+                    refinery: draw(card.refinery_yield),
+                    habitat: draw(card.habitat_yield),
+                };
+                self.slot_yields.insert((body, slot), y);
+            }
+        }
+    }
+
+    /// One Colony Slot's four yields. A slot the table does not know (a station's orbital slot) reads
+    /// its Body's own figures, so nothing off the surface changes.
+    pub fn slot_yields(&self, body: BodyId, slot: u32) -> SlotYields {
+        self.slot_yields.get(&(body, slot)).copied().unwrap_or_else(|| SlotYields::of_body(self.tables.body(body)))
+    }
+
+    /// The four yields a Colony reads: its slot's on a surface, its Body's in orbit, where a
+    /// station's Habitats take no Body yield at all (ticket #46).
+    pub fn colony_yields(&self, c: &Colony) -> SlotYields {
+        if c.in_orbit {
+            SlotYields::of_body(self.tables.body(c.body))
+        } else {
+            self.slot_yields(c.body, c.slot)
+        }
+    }
+
     /// Ticket #46: the orbital slots with no station yet.
     pub fn free_orbital_slots(&self, body: BodyId) -> Vec<u32> {
         let total = self.tables.body(body).orbital_slots;
@@ -1383,19 +1501,30 @@ impl Game {
 
     /// Ticket #45: a satellite and its parent are a local hop apart; two satellites of one parent a
     /// sibling hop; Earth and the Moon reach anything else at that Body's card figures; anything else
-    /// (a moon of Mars to the Moon, say) is the farther card.
+    /// (a moon of Mars to the Moon, say) is the farther card. Ticket #57: a crossing between the
+    /// Earth system and the Mars system pays what the phase angle this turn makes it pay instead.
     pub fn transit_cost(&self, from: BodyId, to: BodyId) -> (u32, i64) {
-        self.transit_cost_with(from, to, 1.0, if self.has_tech(TechId::EfficientTransit) { self.tables.tech(TechId::EfficientTransit).value } else { 1.0 })
+        self.transit_cost_at(from, to, self.turn)
+    }
+
+    /// The same at any turn, for the window tooltip and the AI's planning.
+    pub fn transit_cost_at(&self, from: BodyId, to: BodyId, turn: u32) -> (u32, i64) {
+        let tech = if self.has_tech(TechId::EfficientTransit) { self.tables.tech(TechId::EfficientTransit).value } else { 1.0 };
+        self.transit_cost_with(from, to, 1.0, tech, turn)
     }
 
     /// The transit as one seat pays it (ticket #51): the Faction's own Fuel multiplier first, then
     /// Efficient Transit, multiplicative, rounded down once at the end.
     pub fn transit_cost_for(&self, seat: Seat, from: BodyId, to: BodyId) -> (u32, i64) {
-        let faction = self.tables.faction(self.kind(seat)).transit_fuel_multiplier;
-        self.transit_cost_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit))
+        self.transit_cost_for_at(seat, from, to, self.turn)
     }
 
-    fn transit_cost_with(&self, from: BodyId, to: BodyId, faction: f64, tech: f64) -> (u32, i64) {
+    pub fn transit_cost_for_at(&self, seat: Seat, from: BodyId, to: BodyId, turn: u32) -> (u32, i64) {
+        let faction = self.tables.faction(self.kind(seat)).transit_fuel_multiplier;
+        self.transit_cost_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit), turn)
+    }
+
+    fn transit_cost_with(&self, from: BodyId, to: BodyId, faction: f64, tech: f64, turn: u32) -> (u32, i64) {
         let t = &self.tables;
         let parent = |b: BodyId| t.body(b).parent;
         let near_earth = |b: BodyId| b == BodyId::Earth || parent(b) == Some(BodyId::Earth);
@@ -1413,8 +1542,112 @@ impl Game {
         } else {
             far(to)
         };
-        let fuel = (fuel as f64 * faction * tech).floor() as i64;
+        // Ticket #57: a crossing between the two systems is not a fixed card any more. It costs the
+        // Hohmann flight and the card's Fuel at the window, and more of both the further the phase
+        // angle stands from it; the Faction multiplier and Efficient Transit apply after.
+        let (turns, fuel) = match self.crossing_offset(from, to, turn) {
+            None => (turns, fuel as f64),
+            Some(offset) => {
+                let tr = &t.transit;
+                let days = tr.days_at_window + tr.days_per_degree * offset.abs();
+                let turns = ((days / tr.days_per_turn).ceil() as u32).clamp(1, tr.max_turns);
+                (turns, fuel as f64 * (1.0 + tr.fuel_per_degree * offset.abs()))
+            }
+        };
+        let fuel = (fuel * faction * tech).floor() as i64;
         (turns.max(1), fuel)
+    }
+
+    // ---------------------------------------------- Ticket #57: the calendar and the real sky
+
+    /// The year and month of a turn. Turn 1 is the game's start month, January 2030 (`victory.toml`),
+    /// and a Turn is one calendar month after it.
+    pub fn date(&self, turn: u32) -> Date {
+        let v = &self.tables.victory;
+        let months = v.start_month - 1 + (turn.max(1) - 1) as i64;
+        Date { year: v.start_year + months.div_euclid(12), month: (months.rem_euclid(12) + 1) as u32 }
+    }
+
+    /// "July 2030" for the turn the game stands on.
+    pub fn date_text(&self) -> String {
+        self.date(self.turn).text()
+    }
+
+    /// The instant a turn's sky is read at: the first of its month, 00:00 UTC, so turn 1 is exactly
+    /// 2030-01-01 00:00 UTC, the moment the game begins.
+    pub fn julian_day(&self, turn: u32) -> f64 {
+        let d = self.date(turn);
+        crate::ephemeris::julian_day(d.year, d.month as i64, 1)
+    }
+
+    /// Where a Body stands in the real sky at a turn: its heliocentric ecliptic longitude in degrees
+    /// (0..360, J2000 frame). The Moon reads Earth's, Phobos and Deimos read Mars's.
+    pub fn heliocentric_longitude(&self, body: BodyId, turn: u32) -> f64 {
+        crate::ephemeris::position(self.tables.planet(body), self.julian_day(turn)).longitude
+    }
+
+    /// The phase angle at a turn: Mars's heliocentric longitude less Earth's, folded to -180..180.
+    pub fn phase_angle(&self, turn: u32) -> f64 {
+        crate::ephemeris::wrap_180(self.heliocentric_longitude(BodyId::Mars, turn) - self.heliocentric_longitude(BodyId::Earth, turn))
+    }
+
+    /// The window offset for a departure at a turn: the signed difference in degrees between the
+    /// phase angle and the Hohmann departure angle. Zero is the launch window.
+    pub fn window_offset(&self, turn: u32) -> f64 {
+        crate::ephemeris::wrap_180(self.phase_angle(turn) - self.tables.transit.hohmann_angle)
+    }
+
+    /// The same for the flight home, which wants Earth ahead of Mars instead.
+    pub fn return_window_offset(&self, turn: u32) -> f64 {
+        crate::ephemeris::wrap_180(self.phase_angle(turn) - self.tables.transit.return_hohmann_angle)
+    }
+
+    /// Which two systems a transit crosses, if it crosses at all, and the offset it pays. `None` for
+    /// a hop inside the Earth system or inside the Mars system: those are unchanged.
+    pub fn crossing_offset(&self, from: BodyId, to: BodyId, turn: u32) -> Option<f64> {
+        let system = |b: BodyId| match b {
+            BodyId::Earth | BodyId::Moon => 0,
+            BodyId::Mars | BodyId::Phobos | BodyId::Deimos => 1,
+        };
+        match (system(from), system(to)) {
+            (0, 1) => Some(self.window_offset(turn)),
+            (1, 0) => Some(self.return_window_offset(turn)),
+            _ => None,
+        }
+    }
+
+    /// The turn the Mars window falls on, looked for from `from` forward over one synodic cycle:
+    /// the turn whose window offset is smallest in magnitude.
+    pub fn next_window_turn(&self, from: u32) -> u32 {
+        let tr = &self.tables.transit;
+        let cycle = (tr.synodic_days / tr.days_per_turn).ceil() as u32;
+        let from = from.max(1);
+        (from..=from + cycle)
+            .min_by(|a, b| self.window_offset(*a).abs().partial_cmp(&self.window_offset(*b).abs()).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap_or(from)
+    }
+
+    /// The tooltip the Solar System Map shows over Mars, Phobos or Deimos (ticket #57).
+    pub fn window_text(&self, body: BodyId) -> String {
+        let name = self.tables.body(body).name.clone();
+        let window = self.next_window_turn(self.turn);
+        let (now_turns, now_fuel) = self.transit_cost_at(BodyId::Earth, body, self.turn);
+        let (win_turns, win_fuel) = self.transit_cost_at(BodyId::Earth, body, window);
+        let when = match window.saturating_sub(self.turn) {
+            0 => "this turn".to_string(),
+            1 => "next turn".to_string(),
+            n => format!("in {n} turns"),
+        };
+        format!(
+            "{} window: {} ({}). Flight now: {} turns, {} Fuel. At the window: {} turns, {} Fuel.",
+            name,
+            when,
+            self.date(window).text(),
+            now_turns,
+            now_fuel,
+            win_turns,
+            win_fuel
+        )
     }
 
     // ---------------------------------------------------------------- Ticket #54: the Scrubber

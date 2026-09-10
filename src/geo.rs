@@ -97,23 +97,29 @@ pub fn state_lonlat(state: StateId) -> (f32, f32) {
     }
 }
 
-/// Where each Body sits on the Solar System Map, drawn to be legible rather than to scale.
-pub fn solar_position(body: BodyId, turn: u32) -> Vec3 {
+/// Where each Body sits on the Solar System Map: on its own ring, at its true heliocentric ecliptic
+/// longitude for the turn (ticket #57). The rings are drawn to be legible rather than to scale, so
+/// only the angle is real; the map is the XZ plane seen from the north, where longitude runs
+/// anticlockwise. `lon` is the longitude of the Body itself, which for a satellite is its parent's.
+pub fn solar_position(body: BodyId, turn: u32, lon: f32) -> Vec3 {
     let t = turn as f32;
+    let on_ring = |radius: f32| {
+        let a = -lon.to_radians();
+        Vec3::new(a.cos() * radius, 0.0, a.sin() * radius)
+    };
     match body {
-        BodyId::Earth => {
-            let a = 0.6 + t * 0.12;
-            Vec3::new(a.cos() * 3.4, 0.0, a.sin() * 3.4)
-        }
-        BodyId::Moon => solar_position(BodyId::Earth, turn) + Vec3::new(1.0 * (t * 0.9).cos(), 0.0, 1.0 * (t * 0.9).sin()),
-        BodyId::Mars => {
-            let a = 2.4 + t * 0.07;
-            Vec3::new(a.cos() * 6.0, 0.0, a.sin() * 6.0)
-        }
+        BodyId::Earth => on_ring(3.4),
+        BodyId::Moon => solar_position(BodyId::Earth, turn, lon) + Vec3::new((t * 0.9).cos(), 0.0, (t * 0.9).sin()),
+        BodyId::Mars => on_ring(6.0),
         // Ticket #45: the moons of Mars, close in, drawn far larger than life to be clickable.
-        BodyId::Phobos => solar_position(BodyId::Mars, turn) + Vec3::new(0.7 * (t * 1.3).cos(), 0.0, 0.7 * (t * 1.3).sin()),
-        BodyId::Deimos => solar_position(BodyId::Mars, turn) + Vec3::new(1.05 * (t * 0.7 + 2.0).cos(), 0.0, 1.05 * (t * 0.7 + 2.0).sin()),
+        BodyId::Phobos => solar_position(BodyId::Mars, turn, lon) + Vec3::new(0.7 * (t * 1.3).cos(), 0.0, 0.7 * (t * 1.3).sin()),
+        BodyId::Deimos => solar_position(BodyId::Mars, turn, lon) + Vec3::new(1.05 * (t * 0.7 + 2.0).cos(), 0.0, 1.05 * (t * 0.7 + 2.0).sin()),
     }
+}
+
+/// The same, reading the turn and the longitude off a game in play.
+pub fn solar_place(game: &dying_earth_engine::Game, body: BodyId) -> Vec3 {
+    solar_position(body, game.turn, game.heliocentric_longitude(body, game.turn) as f32)
 }
 
 pub fn solar_radius(body: BodyId) -> f32 {

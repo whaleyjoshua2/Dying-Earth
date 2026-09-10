@@ -64,6 +64,10 @@ pub struct SimResult {
     pub facilities_drowned: u32,
     pub antarctica_turn: Option<u32>,
     pub antarctic_colonies: u32,
+    /// Ticket #57: the turn the first Colony in the Mars system was founded, and the turn the Mars
+    /// launch window falls on, which the ephemeris fixes and no seed moves.
+    pub first_mars_colony_turn: Option<u32>,
+    pub window_turn: u32,
     pub log: Vec<String>,
 }
 
@@ -108,6 +112,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     // Ticket #56: the turn the ice opened, and the most Antarctic Colonies standing at once.
     let mut antarctica_turn: Option<u32> = None;
     let mut antarctic_colonies = 0u32;
+    // Ticket #57: the first Colony anywhere in the Mars system, and the turn the window falls on.
+    let mut first_mars_colony_turn: Option<u32> = None;
+    let window_turn = game.next_window_turn(1);
     let max_turns = tables.victory.turns;
     let mut guard = 0;
     while !game.is_over() && guard < max_turns + 2 {
@@ -144,6 +151,14 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
             antarctica_turn = Some(game.turn);
         }
         antarctic_colonies = antarctic_colonies.max(game.colonies.iter().filter(|c| c.body == BodyId::Earth && !c.in_orbit).count() as u32);
+        if first_mars_colony_turn.is_none() {
+            first_mars_colony_turn = game
+                .colonies
+                .iter()
+                .filter(|c| !c.in_orbit && matches!(c.body, BodyId::Mars | BodyId::Phobos | BodyId::Deimos))
+                .map(|c| c.founded_turn)
+                .min();
+        }
     }
     let buildings = Seat::ALL.map(|s| {
         let f: u32 = game.directed_states(s).iter().map(|st| game.state(*st).facilities.len() as u32).sum();
@@ -241,6 +256,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         facilities_drowned,
         antarctica_turn,
         antarctic_colonies,
+        first_mars_colony_turn,
+        window_turn,
         log: game.log,
     }
 }

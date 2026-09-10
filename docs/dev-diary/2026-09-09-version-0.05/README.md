@@ -1049,3 +1049,170 @@ AI changes, each seen red first:
 
 Twenty seeds afterwards, Custodians in East Asia: first Colony at median turn 12 (was none), 20 of
 20 Collapses at median turn 17; Prospectors in East Asia: first Colony at 10, 20 of 20 at median 19.
+
+## #57: named sites with real yields, and real launch windows
+
+Two changes, one about the ground and one about the sky.
+
+**Every Colony Slot draws its own four yields when the game starts.** A Body's card figures stop
+being what a Colony there gets and become what its slots draw from: each slot takes the Body's Mine,
+Generator, Refinery and Habitat yields times a factor from a **triangular distribution centred on
+1.0 with limits 0.75 and 1.25** (`slot_yield_spread = 0.25` in `bodies.toml`), rounded to two
+decimals, drawn from the game's own seeded generator in Body order then slot order, so a seed always
+deals the same board. Nothing ever falls outside a quarter either side, the middle is much the
+likelier, and the four are drawn separately, so Isidis Planitia can be the best Habitat site on Mars
+and a middling Mine. Every yield a Module in a Colony reads is now its slot's -- what a Mine makes, a
+Trade Post's Ducats, and the Colonists a Habitat holds. A Space Station's Habitats still take no
+Body yield and no slot's either; a station stands in an Orbital Slot, which draws nothing.
+
+The AI reads the slot figures now, not the Body's average: it picks the free slot on a Body whose own
+yields best serve the part of its Victory Condition it is furthest behind on, and it ranks the Bodies
+themselves by their best free slot rather than by the card.
+
+**NOTE, to be revisited when board lenses arrive.** The Surface Map writes the four figures under
+every slot's name, filled or free, always. That is the right thing while there is no other way to see
+them, and the wrong thing the moment the board grows lenses the player can turn on and off: four
+numbers under sixteen labels is a lot of ink to carry permanently. The same note is on the code, in
+`slot_labels`.
+
+**The game begins at 2030-01-01 00:00:00 UTC and a Turn is a calendar month.** `start_year = 2030`
+and `start_month = 1` sit in `victory.toml` beside `turns`; turn 1 is January 2030 and turn 24 is
+December 2031, and the top bar reads "Turn 7 / 24, July 2030". Every turn is sampled at the first
+instant of its month, so turn 1 is exactly the moment the game begins.
+
+**The sky is the real one.** `assets/data/ephemeris.toml` carries the Keplerian elements of Earth
+(strictly the Earth-Moon barycentre) and Mars at J2000 with their rates per Julian century, copied
+from JPL's "Keplerian Elements for Approximate Positions of the Major Planets", the table valid 1800
+to 2050. The engine propagates them to the turn's date, solves Kepler's equation and takes the
+heliocentric ecliptic longitude, which is all a game played on a plane needs. On 2030-01-01 it puts
+**Earth at 100.182 degrees and Mars at 337.831**, against JPL Horizons' 100.1845 and 337.8203 --
+0.003 and 0.011 degrees out, a hundred times inside the tolerance the test asks for. The Solar System
+Map draws each Body on its existing ring at that longitude; the Moon still sits beside Earth and
+Phobos and Deimos beside Mars. The workings, the sources and the reference positions are in
+[`docs/research/earth-mars-ephemeris.md`](../../research/earth-mars-ephemeris.md).
+
+**And so the launch windows are real.** The **phase angle** is Mars's heliocentric longitude less
+Earth's; the **window offset** is the signed difference between it and the Hohmann departure angle of
+**+44 degrees**. A transit between the Earth system (Earth, the Moon) and the Mars system (Mars,
+Phobos, Deimos) no longer pays the fixed 4 turns and 20 Fuel on the card. It pays
+
+    turns = ceil((259 + 1.5 x |offset|) / 30)      Fuel = card Fuel x (1 + |offset| / 120)
+
+capped at 18 turns, with everything in a `[transit]` table in `ephemeris.toml`. At the window that is
+**9 turns for the card's Fuel**; at the far side of the cycle it is 18 turns and two and a half times
+the Fuel. Efficient Transit and the Arkwrights' Steerage multiplier both apply **after** the window
+factor, so they cut a bill the sky has already set. A Solar Storm still stops every transit that
+turn, with no special case. Hops inside the Earth system and inside the Mars system are untouched:
+the Moon is still 1 turn and 6 Fuel, Phobos to Deimos still 1 and 1, on every turn of the game.
+
+**One correction to the ticket, flagged rather than made quietly.** The ticket gave the return
+Hohmann angle as "about -75 degrees, Earth leading". Worked out from the ephemeris (research file,
+section 4.3), under the ticket's own convention that the phase angle is Mars's longitude minus
+Earth's, the return angle is **+75 degrees**, with Earth 75 degrees *behind* Mars at the moment of
+departure and overtaking during the cruise; the magnitude is right and only the direction is turned
+round. Both legs must read the phase angle the same way or the return window lands two years out, so
+`return_hohmann_angle = 75.0` went into `ephemeris.toml`, where it is one line to change back. Every
+other figure the ticket gave was confirmed: 259 days (computed 258.87), +44 degrees (44.35), the
+direction of both penalties, and a real fast Type I transfer of 178 to 228 days.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![Mars's Surface Map: Olympus Mons, Valles Marineris and Chryse Planitia each labelled "empty" with a line of four small yield figures under the name](slot-yields-mars.png)
+
+- **slot-yields-mars.png** -- `shot:sy turns:0 look:-124,40`. Three of Mars's six Colony Slots, each
+  with its own four figures under its name: **Olympus Mons M 1.27 G 0.60 R 1.39 H 1.43**, **Valles
+  Marineris M 1.07 G 0.79 R 1.81 H 1.51**, **Chryse Planitia M 1.14 G 0.64 R 1.60 H 1.40**, against
+  the Body's 1.25 / 0.75 / 1.50 / 1.50. No two are alike, none is more than a quarter out, and
+  Valles Marineris is plainly the Refinery site while Olympus Mons is the Mine. Three, not six,
+  because a globe has a far side: Mars's six slots are spread over 269 degrees of longitude and the
+  most that ever face the camera at once is three. The top bar reads **"Turn 1 / 24, January 2030"**.
+
+![The Solar System Map in April 2030: Earth on the inner ring at the left of the Sun, Mars on the outer ring above and to the right, and a yellow line of text giving the Mars window](solar-real-sky.png)
+
+- **solar-real-sky.png** -- `shot:srs turns:3 hover:mars`. Turn 4, April 2030, with Earth at
+  heliocentric longitude 190.9 and Mars at 33.4 -- Earth left of the Sun on the inner ring, Mars up
+  and to the right on the outer one, near enough opposite. Hovering Mars gives **"Mars window: in 10
+  turns (February 2031). Flight now: 17 turns, 46 Fuel. At the window: 9 turns, 20 Fuel."** The
+  seventeen turns is the point: a Ship that leaves in April 2030 is still in flight when the game
+  ends. (`hover:<body id>` is a new building aid: nothing hovers in a headless capture, so the aid
+  draws the tooltip as though the pointer were on that Body.)
+
+![The same map on turn 14: Earth and Mars both left of the Sun and about fifty degrees apart, a Colony Ship on the line between them, and the tooltip reading "this turn"](solar-window-turn.png)
+
+- **solar-window-turn.png** -- `shot:swt turns:13 hover:mars`. Turn 14, **February 2031**, the window
+  turn. Earth stands at 131.5 and Mars at 180.4, forty-nine degrees apart with Mars ahead -- the
+  geometry a minimum-energy departure wants. The tooltip reads **"Mars window: this turn (February
+  2031). Flight now: 9 turns, 20 Fuel. At the window: 9 turns, 20 Fuel."**, and an AI Colony Ship is
+  already on the line between the two worlds with eight turns left to run.
+
+**NOTE, on what the tooltip is not saying.** These are transits **from Earth**. Once a Faction can
+launch from the Moon, or start home from Mars, one line about one departure point is no longer the
+whole truth -- the return window is a different turn from the outbound one, and inside the game's
+twenty-four turns it never quite arrives. How that is presented has to be settled again before
+launches from other Bodies go in. The same note is on the code, over the tooltip.
+
+### What this does to the pace, plainly
+
+**There is exactly one Mars launch window in the game, turn 14 (February 2031), and the shortest
+flight there is is nine turns.** The real 2031 opportunity departs 28 January 2031 (research file,
+section 3.3), which is turn 13, so the game's own window turn is one turn late -- close enough that
+the test pins it to within one turn. The next window is a synodic period away, 26 turns, well past
+the last turn. What follows from those two numbers:
+
+- A Colony Ship that launches on the window lands on **turn 23**, with one turn left to build a
+  Habitat and none to fill it.
+- A Colony Ship that launches on turn 1 pays 17 turns and 47 Fuel and lands on turn 18.
+- Off the window a crossing costs 21 to 49 Fuel where it used to cost 20, which is more than a turn's
+  Fuel income for most of the game.
+
+Measured over twenty seeds a seating, that is not a tax on Mars. It closes Mars.
+
+| twenty seeds, seat 0 | first Mars-system Colony | Colonists off Earth at the end | Antarctic Colonies |
+|---|---|---|---|
+| Custodians, window rule **off** | median turn 12, 20 of 20 seeds | median 8 | 21 |
+| Custodians, window rule **on** | **none in any seed** | **0** | 60 |
+| Arkwrights, window rule **off** | median turn 10, 20 of 20 seeds | median 20 | 29 |
+| Arkwrights, window rule **on** | **none in any seed** | **0** | 43 |
+
+(The "off" rows were measured by switching `crossing_offset` to `None` and re-running the same twenty
+seeds; nothing else was changed and nothing was re-tuned.) The AI still orders the crossing -- the
+log shows "take 18.0 send Colony Ship 18 to Mars" and then a run of "skip ... send Colony Ship 21 to
+Mars (needs 27 Fuel, 19 left)" -- and the Ships that do leave are still in flight when the world
+collapses. The Colonists go to Antarctica instead, and **not one Colony was founded on the Moon in
+any of the forty games**: the destination list a loaded Colony Ship is offered is the single best
+Body plus any Body the Faction already holds room on (ticket #51), and Mars's Habitat slots are the
+best, so when the crossing is unaffordable the Ship is never offered the Moon at all -- it is offered
+Antarctica, which needs no flight. That is an older rule the window has just made visible.
+
+**This is a decision for the build ticket, not a bug.** The three knobs are all in
+`ephemeris.toml`: `days_at_window = 259` (the real minimum-energy flight; the real *fast* Type I
+transfer in 2031 is 190 days, which would be 7 turns), `days_per_degree = 1.5` and
+`fuel_per_degree = 1/120`. The fourth is upstream and larger: a game whose median collapse is turn
+17 has no room for a nine-turn flight to a window on turn 14, whatever the sky does. Either the
+window has to be earlier, or the flight shorter, or the game longer, or Mars stops being where the
+Colonists go.
+
+### Twenty seeds
+
+`cargo run --release -p dying-earth-engine --example sim -- 1 --count=20`, and the same with
+`--player=arkwrights`. Nothing was re-tuned; these are measurements.
+
+| seat 0 | wins | collapses | median collapse turn | median first Colony | median first Mars Colony | Colonists off Earth at the end |
+|---|---|---|---|---|---|---|
+| Custodians in East Asia | none | 20/20 | 17 | 13 | none in 20 seeds | 0 |
+| Arkwrights in East Asia | none | 20/20 | 17 | 6 | none in 20 seeds | 0 |
+
+The Mars launch window is **turn 14** in every seed of both seatings: the sky is not seeded, so no
+seed moves it.
+
+Every first Colony in both tables is an Antarctic one. The Custodian seating's median of 13 and the
+Arkwright seating's of 6 are the turn a loaded Colony Ship gave up on the crossing, not the turn it
+reached another world -- the ice opens on turn 6 in every seed, and the Arkwrights, who carry twice
+the Colonists, go straight there. Against #56's last measurement (Custodians first Colony at median
+turn 12, off-world Colonists reached) the whole off-Earth game has moved to the one place that needs
+no flight.
+
+Everything else the sea and the ice do is unchanged from #56: 49 coastal slots lost a game, 27
+Facilities drowned, no Sea Wall built in forty games, all five Breaks in all forty, and the ice open
+by turn 6.

@@ -193,16 +193,10 @@ impl Game {
         let mc = t.module(kind);
         let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn };
         let Some(col) = self.colony(cid) else { return y };
-        let body = t.body(col.body);
+        // Ticket #57: the yield is the Colony Slot's own, not its Body's. The Body's figures are
+        // what the slot drew from when the game started; a station in orbit keeps the Body's.
         if let Some(p) = &mc.produces {
-            let yield_ = match kind {
-                ModuleKind::Mine => body.mine_yield,
-                ModuleKind::Generator => body.generator_yield,
-                ModuleKind::Refinery => body.refinery_yield,
-                // A Trade Post (ticket #35) follows the Habitat yield: trade goes where people live.
-                ModuleKind::TradePost => body.habitat_yield,
-                _ => 1.0,
-            };
+            let yield_ = self.colony_yields(col).of_module(kind);
             let mut v = p.amount as f64 * yield_ * fac.output_multiplier * self.tech_output_multiplier_module(seat, kind);
             for d in &self.discoveries {
                 if d.body == col.body && d.kind == kind {

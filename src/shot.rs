@@ -37,6 +37,9 @@ pub struct ShotPlan {
     /// `stack:1` (a building aid): the player's Ship stack at Mars is selected, so its card and the
     /// attack odds preview are in the picture.
     pub stack: bool,
+    /// `hover:<body id>` (a building aid, ticket #57): the Solar System Map draws that Body's launch
+    /// window tooltip as though the pointer were on it. Nothing hovers in a headless capture.
+    pub hover: Option<BodyId>,
     /// `look:<lon>,<lat>` (a building aid): every surface picture faces that point.
     pub look: Option<(f32, f32)>,
     /// Ticket #50: 0 the Faction choice screen is not up yet, 1 it is up, 2 it has been captured.
@@ -59,6 +62,7 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     if plan.stack {
         view.selection = Selection::ShipStack(BodyId::Mars, Seat(0));
     }
+    view.force_hover = plan.hover.filter(|_| view.view == View::Solar);
     // Ticket #51: `archive:<stage>` opens the Archive's Colony card in that Body's picture.
     if let (Some(cid), View::Surface(_)) = (plan.archive_colony, view.view) {
         view.selection = Selection::Colony(cid);
@@ -87,6 +91,11 @@ const VIEWS: [(&str, View); 6] = [
 ];
 
 const MENUS: [&str; 4] = ["title", "faction", "start", "report"];
+
+/// Ticket #57: the Body a `hover:` aid names, by the id its data row carries.
+fn body_from_id(name: &str) -> Option<BodyId> {
+    BodyId::ALL.into_iter().find(|b| format!("{b:?}").eq_ignore_ascii_case(name))
+}
 
 /// The board every picture is taken of: a new game, the first Tech picked, the `turns:<n>` aid
 /// played out, and (ticket #50) a Ship stack for every seat at Mars so the four-angle stack markers
@@ -416,6 +425,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         plan.trade = std::env::args().any(|a| a == "trade:1");
         plan.victory = std::env::args().any(|a| a == "victory:1");
         plan.stack = std::env::args().any(|a| a == "stack:1");
+        plan.hover = std::env::args().find_map(|a| a.strip_prefix("hover:").and_then(body_from_id));
         plan.look = std::env::args().find_map(|a| {
             let (lon, lat) = a.strip_prefix("look:")?.split_once(',')?;
             Some((lon.parse().ok()?, lat.parse().ok()?))

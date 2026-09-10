@@ -80,6 +80,11 @@ fn main() {
     let mut drowned: Vec<u32> = Vec::new();
     let mut ice_turns: Vec<u32> = Vec::new();
     let mut antarctic_colonies = 0u32;
+    // Ticket #57: the first Colony in the Mars system, the Colonists off Earth at the end, and the
+    // turn the Mars launch window falls on.
+    let mut first_mars: Vec<u32> = Vec::new();
+    let mut off_earth_at_end: Vec<u32> = Vec::new();
+    let mut window_turn = 0u32;
     let mut kinds = [FactionKind::Custodians; SEAT_COUNT];
     for s in seed..seed + count {
         let r = dying_earth_engine::sim::run(tables.clone(), s, player);
@@ -133,6 +138,11 @@ fn main() {
             ice_turns.push(t);
         }
         antarctic_colonies += r.antarctic_colonies;
+        if let Some(t) = r.first_mars_colony_turn {
+            first_mars.push(t);
+        }
+        off_earth_at_end.push(r.colonists_off_earth.iter().sum());
+        window_turn = r.window_turn;
         for (i, t) in r.break_turns.iter().enumerate() {
             if let Some(t) = t {
                 break_turns[i].push(*t);
@@ -258,6 +268,16 @@ fn main() {
             count
         );
         println!("{:>12}         : {}", "Antarctic Colonies founded", antarctic_colonies);
+        // Ticket #57.
+        println!(
+            "{:>12}         : median {} ({} of {} seeds founded one)",
+            "turn of the first Mars-system Colony",
+            median(&mut first_mars),
+            first_mars.len(),
+            count
+        );
+        println!("{:>12}         : median {}", "Colonists off Earth at the end, all seats", median(&mut off_earth_at_end));
+        println!("{:>12}         : turn {}", "the Mars launch window", window_turn);
         println!(
             "{:>12}         : median {} ({} seeds), cuts gone in {}, no Collapse on the path in {}",
             "Last Turn at turn 12",

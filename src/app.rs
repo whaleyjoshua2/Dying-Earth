@@ -131,6 +131,9 @@ pub struct ViewState {
     pub load_state: Option<StateId>,
     pub influence_amount: i64,
     pub attack_preview: bool,
+    /// Ticket #57, a building aid (`hover:<body id>`): the Solar System Map draws that Body's launch
+    /// window tooltip as though the pointer were on it, so a picture can be taken of it.
+    pub force_hover: Option<BodyId>,
 }
 
 impl Default for ViewState {
@@ -155,6 +158,7 @@ impl Default for ViewState {
             load_state: None,
             influence_amount: 5,
             attack_preview: false,
+            force_hover: None,
         }
     }
 }

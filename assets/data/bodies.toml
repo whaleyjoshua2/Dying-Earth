@@ -14,6 +14,9 @@ sibling_fuel = 1
 # ISS, the Prospectors with Tiangong and the Archivists with Axiom; the Arkwrights start with none,
 # and two slots stand free.
 station_materials = 40
+# Ticket #57 (version 0.05): every Colony Slot draws its own four yields when the game starts, its
+# Body's figures times a factor from a triangular distribution centred on 1.0 with these limits.
+slot_yield_spread = 0.25
 
 [[body]]
 id = "earth"

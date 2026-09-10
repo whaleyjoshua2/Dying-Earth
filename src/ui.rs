@@ -242,6 +242,16 @@ fn label_at(painter: &egui::Painter, pos: Pos2, text: &str, colour: Color32, siz
     painter.galley(rect.min + egui::vec2(4.0, 2.0), galley, colour);
 }
 
+/// The same, slid sideways so a long line stays on screen (ticket #57: the launch-window tooltip is
+/// wider than a Body's other labels, and Mars can stand at the edge of its ring).
+fn label_on_screen(painter: &egui::Painter, pos: Pos2, text: &str, colour: Color32, size: f32) {
+    let galley = painter.layout_no_wrap(text.to_string(), FontId::proportional(size), colour);
+    let half = galley.size().x / 2.0 + 6.0;
+    let clip = painter.clip_rect();
+    let x = pos.x.clamp(clip.left() + half, (clip.right() - half).max(clip.left() + half));
+    label_at(painter, Pos2::new(x, pos.y), text, colour, size);
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn draw(
     mut contexts: EguiContexts,
@@ -539,7 +549,8 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             let influence = if bought > 0 { format!("Influence {} of {} ({} free + {} bought)", influence_left, s.allotment + bought, s.allotment, bought) } else { format!("Influence {} of {}", influence_left, s.allotment) };
             ui.label(influence).on_hover_text("The Allotment is what your places and buildings give each turn; bought Influence comes from the Trading window at 2 Ducats each.");
             ui.separator();
-            ui.label(RichText::new(format!("Turn {} / {}", game.turn, game.tables.victory.turns)).strong());
+            // Ticket #57: a Turn is a calendar month from January 2030, so the bar names the month.
+            ui.label(RichText::new(format!("Turn {} / {}, {}", game.turn, game.tables.victory.turns, game.date_text())).strong());
             ui.separator();
             ui.label(format!("{:+.1} C, heading to {:+.1}", game.climate.temperature, game.target_temperature()));
         });
@@ -592,7 +603,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
     match view.view {
         View::Solar => {
             for body in BodyId::ALL {
-                let pos = geo::solar_position(body, game.turn);
+                let pos = geo::solar_place(game, body);
                 let head = project(pos + Vec3::Y * (geo::solar_radius(body) + 0.05));
                 if let Some(p) = head {
                     let name = game.tables.body(body).name.clone();
@@ -607,6 +618,17 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     }
                     label_at(painter, p - egui::vec2(0.0, 22.0), &text, Color32::WHITE, 13.0);
                     hotspots.push(Hotspot { pos: p, radius: 40.0, hit: Hit::Enter(body) });
+                    // Ticket #57: hovering a Body across the gulf says when its launch window is and
+                    // what the flight costs now against what it costs then. TO BE REVISITED: these
+                    // are transits FROM EARTH. Once a Faction can launch from the Moon, or home from
+                    // Mars, one line for one departure point will no longer be the whole truth, and
+                    // how this is presented has to be settled again.
+                    let far = game.crossing_offset(BodyId::Earth, body, game.turn).is_some();
+                    let hovering = view.force_hover == Some(body)
+                        || painter.ctx().pointer_latest_pos().map(|q| (q - p).length() < 40.0).unwrap_or(false);
+                    if far && hovering {
+                        label_on_screen(painter, p + egui::vec2(0.0, 96.0), &game.window_text(body), Color32::from_rgb(255, 220, 140), 13.0);
+                    }
                     // The Orbital Control flag in the holder's Faction colour.
                     if let Some(s) = game.orbital_control(body) {
                         label_at(painter, p - egui::vec2(0.0, 40.0), &format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s), 12.0);
@@ -631,8 +653,8 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
             }
             for s in &game.ships {
                 if let ShipAt::Transit { from, to, turns_left } = s.at {
-                    let a = geo::solar_position(from, game.turn);
-                    let b = geo::solar_position(to, game.turn);
+                    let a = geo::solar_place(game, from);
+                    let b = geo::solar_place(game, to);
                     if let Some(p) = project(a.lerp(b, 0.5) + Vec3::Y * 0.2) {
                         label_at(painter, p, &format!("{} {}: {} turn(s)", game.seat_name(s.seat), s.kind.name(), turns_left), seat_colour(session, s.seat), 12.0);
                     }
@@ -758,6 +780,20 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                     None => (format!("{name}: empty"), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot))),
                 };
                 label_at(painter, p + egui::vec2(0.0, 24.0), &text, colour, 12.0);
+                // Ticket #57: every slot carries its own four yields under its name, filled or free;
+                // a free slot's figures are what a Colony founded there would get. TO BE REVISITED
+                // WHEN BOARD LENSES ARRIVE: this is on the map always, and once the player can turn
+                // a yield lens on and off it should live there instead of over every label at once.
+                // `label_at` centres its block on the point, so the figures clear half the name
+                // block above them and half their own line.
+                let lines = text.lines().count() as f32;
+                label_at(
+                    painter,
+                    p + egui::vec2(0.0, 24.0 + lines * 7.0 + 8.0),
+                    &game.slot_yields(body, slot).text(),
+                    Color32::from_gray(170),
+                    11.0,
+                );
                 hotspots.push(Hotspot { pos: p, radius: 22.0, hit });
             }
 }
@@ -824,7 +860,7 @@ fn pick(pos: Pos2, session: &Session, game: &Game, view: &mut ViewState, camera:
         View::Solar => {
             let mut nearest: Option<(f32, BodyId)> = None;
             for body in BodyId::ALL {
-                let hit = geo::ray_sphere(origin, dir, geo::solar_position(body, game.turn), geo::solar_radius(body) * 1.5);
+                let hit = geo::ray_sphere(origin, dir, geo::solar_place(game, body), geo::solar_radius(body) * 1.5);
                 if let Some(t) = hit.filter(|t| nearest.map(|(n, _)| *t < n).unwrap_or(true)) {
                     nearest = Some((t, body));
                 }
@@ -1645,8 +1681,17 @@ fn slot_panel(ui: &mut Ui, game: &Game, body: BodyId, slot: u32, actions: &mut V
         );
     }
     ui.label("Empty. A Colony Ship carrying Colonists founds a Colony here; a Habitat comes with it.");
+    // Ticket #57: the slot's own four yields, drawn when the game started, beside its Body's.
     let card = game.tables.body(body);
-    ui.label(format!("Yields here: Mine x{}, Generator x{}, Refinery x{}, Habitat x{}", card.mine_yield, card.generator_yield, card.refinery_yield, card.habitat_yield));
+    let y = game.slot_yields(body, slot);
+    ui.label(format!("Yields here: Mine x{:.2}, Generator x{:.2}, Refinery x{:.2}, Habitat x{:.2}", y.mine, y.generator, y.refinery, y.habitat));
+    ui.label(
+        RichText::new(format!(
+            "{} as a whole: Mine x{}, Generator x{}, Refinery x{}, Habitat x{}",
+            card.name, card.mine_yield, card.generator_yield, card.refinery_yield, card.habitat_yield
+        ))
+        .weak(),
+    );
     for s in game.ships.iter().filter(|s| s.seat == Seat(0) && s.at == ShipAt::Body(body) && s.kind == UnitKind::ColonyShip && s.colonists > 0) {
         let order = Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) };
         if ui.button(format!("Found a Colony here with the {} Colonists aboard {}", s.colonists, s.id)).clicked() {

@@ -70,7 +70,7 @@ impl Candidate {
 
 /// Which part of its Victory Condition a seat is furthest behind on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Behind {
+pub enum Behind {
     First,
     Presence,
 }
@@ -224,7 +224,29 @@ impl Game {
         c.control.director().map(|d| d != seat).unwrap_or(false)
     }
 
-    /// The Body whose yields best serve the part the AI is furthest behind on (spec 16.4).
+    /// Ticket #57: what one Colony Slot's own yields are worth to the part the AI is furthest
+    /// behind on. Every slot has its own four figures now, so the AI reads the slot, not the Body.
+    fn slot_worth(&self, seat: Seat, y: SlotYields, behind: Behind) -> f64 {
+        match behind {
+            Behind::Presence => y.habitat,
+            Behind::First => match self.first_kind(seat) {
+                VictoryFirstKind::ExtractionTotal => y.mine + y.refinery,
+                VictoryFirstKind::ColonistsOffEarth => y.habitat,
+                VictoryFirstKind::StabilizationRun | VictoryFirstKind::ResearchProduced | VictoryFirstKind::ArchiveStages => y.generator + y.habitat,
+            },
+        }
+    }
+
+    /// Spec 16.4, as ticket #57 leaves it: the free Colony Slot on a Body whose own yields best
+    /// serve the part the AI is furthest behind on.
+    pub fn best_slot_for(&self, seat: Seat, body: BodyId, behind: Behind) -> Option<u32> {
+        self.free_slots_on(body).into_iter().max_by(|a, b| {
+            let (wa, wb) = (self.slot_worth(seat, self.slot_yields(body, *a), behind), self.slot_worth(seat, self.slot_yields(body, *b), behind));
+            wa.partial_cmp(&wb).unwrap_or(std::cmp::Ordering::Equal)
+        })
+    }
+
+    /// The Body whose best free slot serves that part best (spec 16.4, ticket #57).
     fn best_body_for(&self, seat: Seat, behind: Behind) -> BodyId {
         let t = &self.tables;
         let mut bodies: Vec<BodyId> = BodyId::ALL.into_iter().filter(|b| *b != BodyId::Earth && !self.free_slots_on(*b).is_empty()).collect();
@@ -236,22 +258,31 @@ impl Game {
         let each = t.faction(self.kind(seat)).victory_second.colonists_each;
         let spreading = each > 0 && BodyId::ALL.into_iter().any(|b| b != BodyId::Earth && self.colonists_at_body(seat, b) >= each);
         let key = |b: &BodyId| -> f64 {
-            let c = t.body(*b);
-            let yields = match behind {
-                Behind::Presence => c.habitat_yield,
-                Behind::First => match self.first_kind(seat) {
-                    VictoryFirstKind::ExtractionTotal => c.mine_yield + c.refinery_yield,
-                    VictoryFirstKind::ColonistsOffEarth => c.habitat_yield,
-                    VictoryFirstKind::StabilizationRun | VictoryFirstKind::ResearchProduced | VictoryFirstKind::ArchiveStages => {
-                        c.generator_yield + c.habitat_yield
-                    }
-                },
-            };
+            let yields = self.best_slot_for(seat, *b, behind).map(|s| self.slot_worth(seat, self.slot_yields(*b, s), behind)).unwrap_or(0.0);
             let fresh = if spreading && self.colonists_at_body(seat, *b) == 0 { 10.0 } else { 0.0 };
             yields + fresh
         };
         bodies.sort_by(|a, b| key(b).partial_cmp(&key(a)).unwrap());
         bodies[0]
+    }
+
+    /// Ticket #57: how much the AI wants a crossing into the Mars system this turn rather than at
+    /// the window. On the window turn it wants it fully; off the window it wants it less, in
+    /// proportion to how far off it is -- but a seat behind on its pace goes anyway, so the
+    /// discount is lifted once the victory gap has opened.
+    fn window_preference(&self, seat: Seat, from: BodyId, to: BodyId) -> f64 {
+        let Some(offset) = self.crossing_offset(from, to, self.turn) else { return 1.0 };
+        let (gap, _) = self.victory_gap(seat);
+        if gap > 1.0 {
+            return 1.0;
+        }
+        // A quarter of the weight at the far side of the cycle, all of it at the window.
+        1.0 - 0.75 * (offset.abs() / 180.0).clamp(0.0, 1.0)
+    }
+
+    /// Ticket #57: whether the Mars window is close enough that Fuel is worth holding for it.
+    fn window_within(&self, turns: u32) -> bool {
+        self.next_window_turn(self.turn).saturating_sub(self.turn) <= turns
     }
 
     /// Every Energy upkeep the seat pays now: Facilities, Modules, Ships and Armies.
@@ -279,7 +310,8 @@ impl Game {
             let col = self.colony(cid).unwrap();
             for m in col.modules.iter().filter(|m| !m.mothballed) {
                 if m.kind == ModuleKind::Generator {
-                    e += (5.0 * self.tables.body(col.body).generator_yield * fac * grids).floor();
+                    // Ticket #57: the Colony's slot makes the Energy, not the Body's average.
+                    e += (5.0 * self.colony_yields(col).generator * fac * grids).floor();
                 }
             }
         }
@@ -964,17 +996,19 @@ impl Game {
                 }
                 if s.colonists > 0 && body != BodyId::Earth {
                     let free = self.free_slots_on(body);
-                    if let Some(slot) = free.first() {
+                    // Ticket #57: every slot has its own four yields, so the AI picks the free slot
+                    // whose figures best serve the part it is furthest behind on, not the first one.
+                    if let Some(slot) = self.best_slot_for(seat, body, behind) {
                         let opp = if free.len() == 1 || presence_needed <= s.colonists { m.opportunity } else { 1.0 };
-                        push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, *slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony), gap_for(Cat::FoundColony, None), 1.0, opp, format!("found a Colony at {} on {}", self.tables.body(body).slots[*slot as usize].name, self.tables.body(body).name), None);
+                        push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony), gap_for(Cat::FoundColony, None), 1.0, opp, format!("found a Colony at {} on {}", self.tables.body(body).slots[slot as usize].name, self.tables.body(body).name), None);
                     }
                 }
                 // Ticket #44: Antarctica, Earth's slots. A foothold, not Presence: half weight and no gap,
                 // so it is taken when the Ship cannot go anywhere better.
                 if s.colonists > 0 && body == BodyId::Earth {
                     // Ticket #56: Antarctica is shut until the ice opens; a loaded Ship goes elsewhere.
-                    if let Some(slot) = self.free_slots_on(BodyId::Earth).first().filter(|_| self.antarctica_open) {
-                        push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, *slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, format!("found a Colony at {}", self.tables.body(BodyId::Earth).slots[*slot as usize].name), None);
+                    if let Some(slot) = self.best_slot_for(seat, BodyId::Earth, behind).filter(|_| self.antarctica_open) {
+                        push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, format!("found a Colony at {}", self.tables.body(BodyId::Earth).slots[slot as usize].name), None);
                     }
                     // Ticket #46: Colonists on a station over Earth are still on Earth for Presence; never park them there.
                     for c in self.colonies.iter().filter(|c| c.body == body && c.body != BodyId::Earth && c.control.director() == Some(seat)) {
@@ -998,7 +1032,11 @@ impl Game {
                         }
                     }
                     for d in dests {
-                        push(vec![Order::Transit { ship: s.id, to: d }], Cat::Transit, self.base_weight(seat, Cat::Transit), gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
+                        // Ticket #57: a crossing into the Mars system prefers the launch window. Off
+                        // it the flight is longer and dearer, so the candidate is worth less --
+                        // unless the seat is behind on its pace, where the gap multiplier says go.
+                        let window = self.window_preference(seat, body, d);
+                        push(vec![Order::Transit { ship: s.id, to: d }], Cat::Transit, self.base_weight(seat, Cat::Transit) * window, gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
                     }
                 }
                 if s.colonists == 0 && body != BodyId::Earth {
@@ -1174,6 +1212,28 @@ impl Game {
         // three turns of Ducat income would bring within reach.
         let ducat_income = self.seat(seat).income_last_turn.ducats;
         let mut ducat_reserve: Option<String> = None;
+        // Ticket #57: with the Mars window two turns away or less, Fuel is banked for the crossing
+        // the seat most wants, exactly as Materials are banked for a build: nothing else burns Fuel
+        // meanwhile. Away from the window it spends Fuel as it always did.
+        let fuel_held_for: Option<String> = if self.window_within(2) {
+            cands
+                .iter()
+                .find(|c| {
+                    c.orders.iter().any(|o| match o {
+                        Order::Transit { ship, to } => {
+                            let from = self.ships.iter().find(|s| s.id == *ship).and_then(|s| match s.at {
+                                ShipAt::Body(b) => Some(b),
+                                _ => None,
+                            });
+                            from.map(|f| self.crossing_offset(f, *to, self.turn).is_some()).unwrap_or(false)
+                        }
+                        _ => false,
+                    })
+                })
+                .map(|c| c.note.clone())
+        } else {
+            None
+        };
         for c in cands.iter().filter(|c| c.stack.is_none()) {
             let mut ok = true;
             let mut trial = chosen.clone();
@@ -1192,6 +1252,14 @@ impl Game {
                     lines.push(format!("  wait  {:6.1}  {} (affordable within three turns)", c.score(), c.note));
                     continue;
                 }
+            }
+            // Ticket #57: the Fuel bank. Only the crossing it is held for may spend Fuel.
+            if let Some(note) = &fuel_held_for
+                && *note != c.note
+                && c.orders.iter().map(|o| self.order_cost(seat, o).fuel).sum::<i64>() > 0
+            {
+                lines.push(format!("  save  {:6.1}  {} (banking Fuel for {})", c.score(), c.note, note));
+                continue;
             }
             let materials_cost: i64 = c.orders.iter().map(|o| self.order_cost(seat, o).materials).sum();
             if materials_cost > 0 {
