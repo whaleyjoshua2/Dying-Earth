@@ -246,10 +246,18 @@ impl Game {
         })
     }
 
-    /// The Body whose best free slot serves that part best (spec 16.4, ticket #57).
+    /// The Body whose best free slot serves that part best (spec 16.4, ticket #57), weighed by the
+    /// share of the game left that the flight from Earth would eat: a Mars seventeen turns away is
+    /// worth little next to a Moon one turn away, and a Body the Ship cannot reach before the last
+    /// turn is not offered at all.
     fn best_body_for(&self, seat: Seat, behind: Behind) -> BodyId {
         let t = &self.tables;
-        let mut bodies: Vec<BodyId> = BodyId::ALL.into_iter().filter(|b| *b != BodyId::Earth && !self.free_slots_on(*b).is_empty()).collect();
+        let turns_left = t.victory.turns.saturating_sub(self.turn).max(1) as f64;
+        let flight = |b: BodyId| self.transit_cost_for(seat, BodyId::Earth, b).0 as f64;
+        let mut bodies: Vec<BodyId> = BodyId::ALL
+            .into_iter()
+            .filter(|b| *b != BodyId::Earth && !self.free_slots_on(*b).is_empty() && flight(*b) < turns_left)
+            .collect();
         if bodies.is_empty() {
             return BodyId::Moon;
         }
@@ -260,7 +268,7 @@ impl Game {
         let key = |b: &BodyId| -> f64 {
             let yields = self.best_slot_for(seat, *b, behind).map(|s| self.slot_worth(seat, self.slot_yields(*b, s), behind)).unwrap_or(0.0);
             let fresh = if spreading && self.colonists_at_body(seat, *b) == 0 { 10.0 } else { 0.0 };
-            yields + fresh
+            (yields + fresh) * (1.0 - flight(*b) / turns_left)
         };
         bodies.sort_by(|a, b| key(b).partial_cmp(&key(a)).unwrap());
         bodies[0]

@@ -3998,13 +3998,16 @@ fn earth_moon_and_mars_system_hops_are_untouched_by_the_window() {
 /// crossing it wants and spends none on anything else, as it banks Materials for a build.
 #[test]
 fn the_ai_banks_fuel_when_the_mars_window_is_within_two_turns() {
-    // A Colony Ship loaded at Earth wanting Mars, and a Frigate at Earth that would otherwise hop
-    // to the Moon: only one of the two may burn Fuel while the window is near.
+    // A Colony Ship loaded at Earth wanting Mars (every Moon slot is taken, so Mars is the only
+    // Body with room), and a Frigate at Earth that would otherwise hop to the Moon: only one of
+    // the two may burn Fuel while the window is near.
     let board = |turn: u32| {
         let mut g = game();
         g.turn = turn;
         let seat = Seat(0);
-        colony(&mut g, seat, BodyId::Moon, &[ModuleKind::Habitat], 2);
+        while !g.free_slots_on(BodyId::Moon).is_empty() {
+            colony(&mut g, seat, BodyId::Moon, &[ModuleKind::Habitat], 2);
+        }
         g.seats[seat.index()].stockpile.fuel = 200;
         g.seats[seat.index()].stockpile.materials = 0;
         g.seats[seat.index()].stockpile.energy = 200;
@@ -4044,4 +4047,26 @@ fn the_ai_banks_fuel_when_the_mars_window_is_within_two_turns() {
     off.ai_orders(Seat(0));
     let lines: Vec<String> = off.report.ai_lines.iter().flat_map(|r| r.lines.iter().cloned()).collect();
     assert!(!lines.iter().any(|l| l.contains("banking Fuel for")), "three turns out the bank is off: {lines:#?}");
+}
+
+/// Ticket #57: a loaded Colony Ship weighs a Body by what its slot is worth less the share of the
+/// game the flight would eat, so off the window the Moon, one turn away, beats a Mars that is
+/// seventeen turns away; before this the AI was only ever offered the single best Body.
+#[test]
+fn a_loaded_colony_ship_goes_to_the_moon_when_mars_is_a_year_away() {
+    let mut g = game();
+    let cust = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    g.turn = 4; // ten turns short of the window: the Mars flight is seventeen turns
+    let (mars_turns, _) = g.transit_cost_for(cust, BodyId::Earth, BodyId::Mars);
+    assert!(mars_turns >= 12, "off the window Mars is far: {mars_turns} turns");
+    let ship = ShipId(900);
+    g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: cust, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 });
+    g.seats[cust.index()].stockpile.fuel = 100;
+    g.seats[cust.index()].stockpile.energy = 200;
+    let orders = g.ai_orders(cust);
+    let dest = orders.iter().find_map(|o| match o {
+        Order::Transit { ship: s, to } if *s == ship => Some(*to),
+        _ => None,
+    });
+    assert_eq!(dest, Some(BodyId::Moon), "the Moon, not a year-long flight: {orders:?}");
 }

@@ -1216,3 +1216,21 @@ no flight.
 Everything else the sea and the ice do is unchanged from #56: 49 coastal slots lost a game, 27
 Facilities drowned, no Sea Wall built in forty games, all five Breaks in all forty, and the ice open
 by turn 6.
+
+### After the build: a loaded Ship weighs the flight
+
+The first twenty seeds founded every Colony in Antarctica and none on the Moon: a loaded Colony
+Ship was only ever offered the single best Body by yield, Mars, and with the window at turn 14 and
+a nine-turn flight the AI waited for a Mars it could never reach. Now `best_body_for` weighs each
+Body's best slot by the share of the game left that the flight from Earth would eat, and drops any
+Body the Ship cannot reach before the last turn, so off the window the Moon (one turn) beats Mars
+(seventeen). Seen red first: `a_loaded_colony_ship_goes_to_the_moon_when_mars_is_a_year_away`
+failed on "left: Some(Mars), right: Some(Moon)". The Fuel-banking test now fills the Moon so Mars is
+the only destination on its board.
+
+Twenty seeds afterwards, seat 0 in East Asia:
+
+| seat 0 | wins | collapses | median collapse turn | first Colony | Colonists off Earth at the end (all seats, median) |
+|---|---|---|---|---|---|
+| Custodians | Prospectors 3 | 17 | 17 | 9 | 11 (was 0) |
+| Arkwrights | none | 20 | 17 | 7 | 16 (was 0) |
