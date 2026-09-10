@@ -387,7 +387,7 @@ impl Game {
                         || cat == Cat::StripPermit
                 }
                 // Ticket #54: a Scrubber is what a Custodian buys Stabilization with now.
-                VictoryFirstKind::StabilizationRun => cat == Cat::Scrubber || cat == Cat::ResearchLab,
+                VictoryFirstKind::StabilizationRun => cat == Cat::Scrubber || cat == Cat::Leapfrog || cat == Cat::ResearchLab,
                 VictoryFirstKind::ColonistsOffEarth => matches!(cat, Cat::Habitat | Cat::ColonyShip | Cat::FoundColony | Cat::LoadUnload | Cat::Transit),
                 VictoryFirstKind::ResearchProduced => cat == Cat::ResearchLab,
                 // Ticket #51: the Archive wants Research, a fund and stages, and a Colony off Earth
@@ -494,7 +494,7 @@ impl Game {
             // Ticket #54: Leapfrog, the Custodians' other clause, on the most populous state they
             // hold once they have Ducats to spare.
             if kind == FactionKind::Custodians
-                && self.seat(seat).stockpile.ducats > 60
+                && self.seat(seat).stockpile.ducats + 3 * self.seat(seat).income_last_turn.ducats >= self.tables.ducats.per_leapfrog
                 && self.state(sid).control == Control::Controlled(seat)
                 && self.leapfrog_would_bite(sid)
                 && most_populous == Some(sid)
@@ -503,7 +503,7 @@ impl Game {
                     vec![Order::Leapfrog { state: sid }],
                     Cat::Leapfrog,
                     self.base_weight(seat, Cat::Leapfrog),
-                    1.0,
+                    gap_for(Cat::Leapfrog, None),
                     1.0,
                     1.0,
                     format!("Leapfrog {} ({:.2} per hundred million now)", self.tables.state(sid).name, self.population_coefficient(sid)),
@@ -1112,9 +1112,29 @@ impl Game {
         // Saving: once a legal, higher-scored action is out of reach now but within one more turn of
         // Materials income, Materials are held for it rather than spent on lower-scored actions.
         let mut reserve: Option<String> = None;
+        // Ticket #54: the same for Ducats, held for a higher-scored Ducat action (a Leapfrog) that
+        // three turns of Ducat income would bring within reach.
+        let ducat_income = self.seat(seat).income_last_turn.ducats;
+        let mut ducat_reserve: Option<String> = None;
         for c in cands.iter().filter(|c| c.stack.is_none()) {
             let mut ok = true;
             let mut trial = chosen.clone();
+            let ducats_cost: i64 = c.orders.iter().map(|o| self.order_cost(seat, o).ducats).sum();
+            if ducats_cost > 0 {
+                if let Some(note) = &ducat_reserve {
+                    lines.push(format!("  save  {:6.1}  {} (holding Ducats for {})", c.score(), c.note, note));
+                    continue;
+                }
+                let (left, _) = self.remaining(seat, &chosen);
+                if ducats_cost > left.ducats
+                    && ducats_cost <= left.ducats + 3 * ducat_income
+                    && c.orders.iter().all(|o| self.check_order_legality(seat, &chosen, o).is_ok())
+                {
+                    ducat_reserve = Some(c.note.clone());
+                    lines.push(format!("  wait  {:6.1}  {} (affordable within three turns)", c.score(), c.note));
+                    continue;
+                }
+            }
             let materials_cost: i64 = c.orders.iter().map(|o| self.order_cost(seat, o).materials).sum();
             if materials_cost > 0 {
                 if let Some(note) = &reserve {

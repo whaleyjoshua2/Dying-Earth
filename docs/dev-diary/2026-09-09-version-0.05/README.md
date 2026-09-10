@@ -770,3 +770,14 @@ mothballs it again a turn or two later, which is visible in the log as a build-a
 Each mothball costs the state 1 Unrest, which is part of why Relief orders are up at 258 to 311 a
 batch. Whether the trigger should be tighter than "within one turn" is the designer's call.
 
+
+### After the build: the Custodian AI learns to Leapfrog
+
+The first twenty seeds had **no Leapfrog in sixty games**: it was scored at its bare weight of 5,
+under buying Materials (9) and Influence (7.2), which took every Ducat the turn it arrived, and
+the AI saved Materials for a dearer action but never Ducats. Two changes, the new rule seen red
+first (`a_custodian_ai_behind_on_stabilization_leapfrogs_when_it_has_the_ducats`): Leapfrog counts
+as a Stabilization action for the victory-gap multiplier, the Custodians' `leapfrog` weight is 10,
+and the greedy spend now holds Ducats for a higher-scored Ducat action that three turns of Ducat
+income would bring within reach, as it holds Materials. Twenty seeds afterwards, Custodians in East
+Asia: 6 to 8 Leapfrogs a game, 19 of 20 Collapses at median turn 21, one Prospector win.

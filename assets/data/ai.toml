@@ -56,7 +56,8 @@ build_scrubber = 8
 mothball = 3
 restart = 4
 decommission = 1
-leapfrog = 5
+leapfrog = 10
+# Ticket #54: above buying Materials (9) and Influence (7.2), or the Ducats are gone before a Leapfrog is affordable.
 strip_permit = 0
 relief = 6
 build_constabulary = 6

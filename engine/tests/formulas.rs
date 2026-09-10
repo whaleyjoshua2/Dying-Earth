@@ -3038,3 +3038,20 @@ per_restoration_step ="), "and so is its Ducat price");
     let prospectors = &g.tables.faction(FactionKind::Prospectors).signature;
     assert!(prospectors.contains("Cheap Industry") && prospectors.contains("Strip Permit"), "the Prospector card names both: {prospectors}");
 }
+
+/// Ticket #54: Leapfrog lowers Emissions, so a Custodian AI behind on Stabilization reaches for it
+/// as it reaches for a Scrubber, instead of spending every Ducat on Influence first.
+#[test]
+fn a_custodian_ai_behind_on_stabilization_leapfrogs_when_it_has_the_ducats() {
+    let mut g = game();
+    let cust = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    g.turn = 14; // well past the pace at which the Custodians should be under the Sink
+    g.seats[cust.index()].stockpile.ducats = 120;
+    g.seats[cust.index()].stockpile.materials = 0;
+    let orders = g.ai_orders(cust);
+    let scored: Vec<String> = g.report.ai_lines.iter().flat_map(|r| r.lines.iter().cloned()).filter(|l| l.contains("Leapfrog") || l.contains("Scrubber") || l.contains("Ducats")).collect();
+    let probe = (g.controlled_states(cust), g.leapfrog_would_bite(StateId::EastAsia), g.population_coefficient(StateId::EastAsia), g.seats[cust.index()].stockpile.ducats, g.kind(cust));
+    assert!(orders.iter().any(|o| matches!(o, Order::Leapfrog { .. })), "no Leapfrog among: {orders:?}
+scored: {scored:#?}
+probe: {probe:?}");
+}
