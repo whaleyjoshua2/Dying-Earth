@@ -8,5 +8,10 @@ decay = 2
 # Ticket #33 (version 0.03): standings persist; a place you control decays slower. A challenger
 # needs a standing above the controller's and at least the threshold.
 decay_controlled = 1
+# Version 0.04 (ticket #41): a challenger needs the controller's standing plus this margin, so a
+# contested place changes hands after a push of a few turns rather than every turn.
+challenge_margin = 10
+# Version 0.04 (ticket #46): a station's threshold starts here, plus the per-Colonist figure.
+station_threshold_base = 20
 occupation_turns = 3
 destruction_chance = 0.25

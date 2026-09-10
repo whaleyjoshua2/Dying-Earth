@@ -161,7 +161,7 @@ impl Game {
     /// The Body whose yields best serve the part the AI is furthest behind on (spec 16.4).
     fn best_body_for(&self, seat: Seat, behind: Behind) -> BodyId {
         let t = &self.tables;
-        let mut bodies: Vec<BodyId> = [BodyId::Moon, BodyId::Mars].into_iter().filter(|b| !self.free_slots_on(*b).is_empty()).collect();
+        let mut bodies: Vec<BodyId> = BodyId::ALL.into_iter().filter(|b| *b != BodyId::Earth && !self.free_slots_on(*b).is_empty()).collect();
         if bodies.is_empty() {
             return BodyId::Moon;
         }
@@ -241,6 +241,27 @@ impl Game {
         }
     }
 
+    /// Ticket #43: a Carrier is worth building when the seat has a free Army on Earth, a rival Colony
+    /// to land on, and no empty Carrier (or one on the way) already.
+    fn wants_carrier(&self, seat: Seat) -> bool {
+        if self.kind(seat) != FactionKind::Prospectors {
+            return false;
+        }
+        let free_army = self.armies.iter().any(|a| !a.standing && self.army_seat(a) == Some(seat) && matches!(a.at, ArmyAt::Place(Place::State(_))));
+        let enemy_colony = self.colonies.iter().any(|c| c.control.director() == Some(seat.other()));
+        let empty_carrier = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::Carrier && s.army.is_none());
+        let queued = self.states.iter().flat_map(|s| s.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Unit(UnitKind::Carrier));
+        free_army && enemy_colony && !empty_carrier && !queued
+    }
+
+    /// Ticket #41: the rival's standing on a place the seat holds is within the challenge margin of
+    /// the seat's own, so the place could be lost to a short push.
+    fn standing_pressed(&self, seat: Seat, place: Place) -> bool {
+        let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
+        let rival = self.seat(seat.other()).influence.get(&place).copied().unwrap_or(0);
+        rival > 0 && rival + self.tables.influence.challenge_margin >= mine
+    }
+
     /// Spec 16.2: the Energy balance is within one turn's upkeep of zero.
     fn energy_tight(&self, seat: Seat) -> bool {
         let drain = self.total_upkeep(seat) - self.energy_production(seat);
@@ -258,11 +279,17 @@ impl Game {
         let scarce = self.scarcest(seat);
         let tight = self.energy_tight(seat);
         let allotment = self.seat(seat).allotment;
+        let margin = self.tables.influence.challenge_margin;
         let materials_income = self.seat(seat).income_last_turn.materials;
         let no_materials_income = materials_income == 0
             && !self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::Factory))
             && !self.directed_colonies(seat).iter().any(|c| self.colony(*c).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Mine))
             && !self.states.iter().flat_map(|s| s.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Facility(FacilityKind::Factory));
+        // Ticket #46: until the seat has a Shipyard anywhere, one counts as advancing whatever it is behind on.
+        let no_shipyard = !self.directed_colonies(seat).iter().any(|c| {
+            let col = self.colony(*c).unwrap();
+            col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) || col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Shipyard))
+        });
         let queued_power: i64 = self.states.iter().flat_map(|s| s.queue.iter()).filter(|b| b.seat == seat && b.item == BuildItem::Facility(FacilityKind::PowerPlant)).count() as i64 * 6
             + self.colonies.iter().flat_map(|c| c.queue.iter()).filter(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Generator)).count() as i64 * 5;
         let energy_short = self.energy_production(seat) + queued_power < self.total_upkeep(seat) + 2;
@@ -275,6 +302,11 @@ impl Game {
         if energy_short {
             needs.push(Resource::Energy);
         }
+        // Ticket #41 tried adding Ducats to this list (a Bank or Trade Post preferred while the seat
+        // cannot afford a step of bought Influence). Measured over twenty seeds it cost the Custodians
+        // every win: a Bank on turn one displaced the Research Lab, and 4 Ducats a turn buys 2
+        // Influence, which never repays 25 Materials the way a Factory does. Banks and Trade Posts
+        // stay plain producers at their base weight.
         let mut cands: Vec<Candidate> = Vec::new();
 
         let mut push = |orders: Vec<Order>, cat: Cat, base: f64, gap: f64, denial: f64, threat: f64, opportunity: f64, note: String, stack: Option<String>| {
@@ -299,6 +331,9 @@ impl Game {
             // a Materials producer counts as advancing the part it is behind on.
             let materials_producer = cat == Cat::Producer && matches!(item, Some("Factory") | Some("Mine"));
             if materials_producer && needs.contains(&Resource::Materials) {
+                return gap;
+            }
+            if cat == Cat::LaunchSiteOrShipyard && item == Some("Shipyard") && no_shipyard {
                 return gap;
             }
             match behind {
@@ -343,26 +378,19 @@ impl Game {
                         }
                     }
                     let name = fk.name();
-                    push(vec![Order::BuildFacility { state: sid, kind: fk }], cat, base, gap_for(cat, Some(name)), denial_for(cat, name), 1.0, 1.0, format!("build {} in {}", name, self.tables.state(sid).name), None);
+                    // Ticket #41: the first Embassy in a state is a threat answer while the rival's
+                    // standing presses on the seat's own there. (An opportunity multiplier on the seat's
+                    // most valuable state was tried too: four Embassies a game, and no wins.)
+                    let first_embassy = fk == FacilityKind::Embassy
+                        && !self.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::Embassy)
+                        && !self.state(sid).queue.iter().any(|b| b.item == BuildItem::Facility(FacilityKind::Embassy));
+                    let sway = if first_embassy && self.standing_pressed(seat, Place::State(sid)) { m.threat } else { 1.0 };
+                    push(vec![Order::BuildFacility { state: sid, kind: fk }], cat, base, gap_for(cat, Some(name)), denial_for(cat, name), sway, 1.0, format!("build {} in {}", name, self.tables.state(sid).name), None);
                 }
             }
             let base = self.base_weight(seat, Cat::RaiseIndustry);
             push(vec![Order::RaiseIndustry { state: sid }], Cat::RaiseIndustry, base, gap_for(Cat::RaiseIndustry, Some("Industry Level")), denial_for(Cat::RaiseIndustry, "Industry Level"), 1.0, 1.0, format!("raise Industry Level in {}", self.tables.state(sid).name), None);
-            if has_launch {
-                for uk in UnitKind::SHIPS {
-                    let cat = if uk == UnitKind::ColonyShip { Cat::ColonyShip } else { Cat::Warship };
-                    let threat = if cat == Cat::Warship && self.enemy_present_or_inbound(seat, BodyId::Earth) { m.threat } else { 1.0 };
-                    // A Colony Ship is only worth building when there is somewhere to found.
-                    if uk == UnitKind::ColonyShip {
-                        let colony_ships = self.ships.iter().filter(|s| s.seat == seat && s.kind == UnitKind::ColonyShip).count();
-                        let queued = self.states.iter().flat_map(|s| s.queue.iter()).chain(self.colonies.iter().flat_map(|c| c.queue.iter())).filter(|b| b.seat == seat && b.item == BuildItem::Unit(UnitKind::ColonyShip)).count();
-                        if colony_ships + queued >= 2 {
-                            continue;
-                        }
-                    }
-                    push(vec![Order::BuildShip { site: Place::State(sid), kind: uk }], cat, self.base_weight(seat, cat), gap_for(cat, None), 1.0, threat, 1.0, format!("build {} at {}", uk.name(), self.tables.state(sid).name), None);
-                }
-            }
+            // Ticket #46: no Ship is built at a Launch Site; Shipyards on stations and Colonies build them.
             if self.state(sid).control == Control::Controlled(seat) {
                 let threat = if self.enemy_army_near(seat, Place::State(sid)) { m.threat } else { 1.0 };
                 let armies = self.armies.iter().filter(|a| !a.standing && self.army_seat(a) == Some(seat)).count();
@@ -377,6 +405,11 @@ impl Game {
             let col = self.colony(cid).unwrap().clone();
             let threat = if self.enemy_present_or_inbound(seat, col.body) || self.enemy_army_near(seat, Place::Colony(cid)) { m.threat } else { 1.0 };
             for mk in ModuleKind::ALL {
+                // Ticket #46: a station holds only a Shipyard and Habitats, and a Habitat over Earth
+                // houses nobody who counts as off Earth, so the AI builds none there.
+                if col.in_orbit && (mk != ModuleKind::Shipyard && (mk != ModuleKind::Habitat || col.body == BodyId::Earth)) {
+                    continue;
+                }
                 let (cat, mut base) = match mk {
                     ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery | ModuleKind::TradePost => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                     ModuleKind::Relay => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
@@ -410,7 +443,21 @@ impl Game {
                         continue;
                     }
                 }
-                let t = if matches!(cat, Cat::ArmyOrBarracks) { threat } else { 1.0 };
+                // Ticket #41: the first Relay at a Colony is a threat answer while the rival's standing
+                // presses on the seat's own there, once the Colony has a producer Module (a Relay before
+                // the first Mine starved the Colony). A second Relay is worth its base weight.
+                let has_producer = col.modules.iter().any(|m| matches!(m.kind, ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery | ModuleKind::TradePost));
+                let first_relay = mk == ModuleKind::Relay
+                    && has_producer
+                    && !col.modules.iter().any(|m| m.kind == ModuleKind::Relay)
+                    && !col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Relay));
+                let t = if matches!(cat, Cat::ArmyOrBarracks) {
+                    threat
+                } else if first_relay && self.standing_pressed(seat, Place::Colony(cid)) {
+                    m.threat
+                } else {
+                    1.0
+                };
                 push(vec![Order::BuildModule { colony: cid, kind: mk }], cat, base, gap_for(cat, Some(mk.name())), 1.0, t, 1.0, format!("build {} at {}", mk.name(), self.place_name(Place::Colony(cid))), None);
             }
             if col.modules.iter().any(|m| m.kind == ModuleKind::Barracks) && !self.armies.iter().any(|a| a.home == ArmyHome::Colony(cid)) {
@@ -419,6 +466,10 @@ impl Game {
             if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
                 for uk in UnitKind::SHIPS {
                     let cat = if uk == UnitKind::ColonyShip { Cat::ColonyShip } else { Cat::Warship };
+                    // Ticket #43: a Carrier is built over Earth, where Armies board, and only when one wants carrying.
+                    if uk == UnitKind::Carrier && (col.body != BodyId::Earth || !self.wants_carrier(seat)) {
+                        continue;
+                    }
                     push(vec![Order::BuildShip { site: Place::Colony(cid), kind: uk }], cat, self.base_weight(seat, cat), gap_for(cat, None), 1.0, if cat == Cat::Warship { threat } else { 1.0 }, 1.0, format!("build {} at {}", uk.name(), self.place_name(Place::Colony(cid))), None);
                 }
             }
@@ -430,7 +481,7 @@ impl Game {
         let my_states = self.controlled_states(seat);
         for sid in StateId::ALL {
             let st = self.state(sid);
-            if st.control.controller() == Some(seat) || sid == StateId::Antarctica {
+            if st.control.controller() == Some(seat) {
                 continue;
             }
             let card = self.tables.state(sid);
@@ -449,9 +500,12 @@ impl Game {
         for (rank, (target, _)) in targets.iter().enumerate() {
             let have = self.seat(seat).influence.get(target).copied().unwrap_or(0);
             let threshold = self.influence_threshold(*target);
-            // Ticket #33: a controlled place needs a standing above the controller's as well.
-            let holding = self.place_control(*target).controller().map(|c| self.seat(c).influence.get(target).copied().unwrap_or(0)).unwrap_or(0);
-            let needed = threshold.max(holding + 1);
+            // Ticket #33: a controlled place needs a standing above the controller's as well, by the
+            // challenge margin (ticket #41).
+            let needed = match self.place_control(*target).controller() {
+                Some(c) => threshold.max(self.seat(c).influence.get(target).copied().unwrap_or(0) + margin),
+                None => threshold,
+            };
             let base = self.base_weight(seat, Cat::Influence) * (1.0 - 0.15 * rank as f64).max(0.3);
             let opp = if needed - have <= step { m.opportunity } else { 1.0 };
             let denial = if kind == FactionKind::Custodians && rival_near && self.place_control(*target).controller() == Some(seat.other()) { m.denial } else { 1.0 };
@@ -468,6 +522,15 @@ impl Game {
         for _ in 0..buys {
             push(vec![Order::BuyInfluence { amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence) * 0.9, 1.0, 1.0, 1.0, 1.0, format!("buy {} Influence for {} Ducats", step, per * step), None);
         }
+        // Ticket #42: the trading window. While Materials are the scarcest resource (or the bootstrap
+        // need), Ducats buy them in lots of 10 at a producer's weight; the AI does not sell.
+        let per_materials = self.tables.ducats.per_materials;
+        if (scarce == Resource::Materials || needs.contains(&Resource::Materials)) && per_materials > 0 {
+            let lots = self.seat(seat).stockpile.ducats / (per_materials * 10);
+            for _ in 0..lots.min(4) {
+                push(vec![Order::Buy { resource: Resource::Materials, amount: 10 }], Cat::Producer, self.base_weight(seat, Cat::Producer) * 1.5, 1.0, 1.0, 1.0, 1.0, format!("buy 10 Materials for {} Ducats", per_materials * 10), None);
+            }
+        }
         // Hold own places where a rival's standing approaches yours (ticket #33: spending raises your standing).
         let mut owned: Vec<Place> = self.controlled_states(seat).into_iter().map(Place::State).collect();
         owned.extend(self.colonies.iter().filter(|c| c.control.controller() == Some(seat)).map(|c| Place::Colony(c.id)));
@@ -477,6 +540,18 @@ impl Game {
             if rival > 0 && rival + 2 * step >= mine {
                 let opp = if rival + step >= mine { m.opportunity } else { 1.0 };
                 push(vec![Order::Influence { target: place, amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, 1.0, m.threat, opp, format!("hold {} with {} Influence", self.place_name(place), step), None);
+            }
+        }
+
+        // --- Stations (ticket #46): one over each Body where the seat has a producing Colony and none yet.
+        for body in BodyId::ALL {
+            let has_station = self.colonies.iter().any(|c| c.in_orbit && c.body == body && c.control.director() == Some(seat));
+            let foothold = self.colonies.iter().any(|c| !c.in_orbit && c.body == body && c.control.director() == Some(seat) && c.modules.iter().any(|m| matches!(m.kind, ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery)));
+            if has_station || !foothold {
+                continue;
+            }
+            if let Some(slot) = self.free_orbital_slots(body).first() {
+                push(vec![Order::BuildStation { body, slot: *slot }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard), 1.0, 1.0, 1.0, 1.0, format!("build {} over {}", self.station_name(body, *slot), self.tables.body(body).name), None);
             }
         }
 
@@ -502,7 +577,12 @@ impl Game {
             if s.kind == UnitKind::ColonyShip {
                 if body == BodyId::Earth && s.colonists < card.carries_colonists {
                     // Load from the most populous directed state.
-                    let from = self.directed_states(seat).into_iter().max_by(|a, b| self.state(*a).population.partial_cmp(&self.state(*b).population).unwrap());
+                    // Ticket #46: only a state with a working Launch Site lifts them.
+                    let from = self
+                        .directed_states(seat)
+                        .into_iter()
+                        .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online))
+                        .max_by(|a, b| self.state(*a).population.partial_cmp(&self.state(*b).population).unwrap());
                     if let Some(st) = from {
                         let n = card.carries_colonists - s.colonists;
                         let opp = if presence_needed <= n { m.opportunity } else { 1.0 };
@@ -513,9 +593,17 @@ impl Game {
                     let free = self.free_slots_on(body);
                     if let Some(slot) = free.first() {
                         let opp = if free.len() == 1 || presence_needed <= s.colonists { m.opportunity } else { 1.0 };
-                        push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, *slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony), gap_for(Cat::FoundColony, None), 1.0, 1.0, opp, format!("found a Colony in slot {} on {}", slot + 1, self.tables.body(body).name), None);
+                        push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, *slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony), gap_for(Cat::FoundColony, None), 1.0, 1.0, opp, format!("found a Colony at {} on {}", self.tables.body(body).slots[*slot as usize].name, self.tables.body(body).name), None);
                     }
-                    for c in self.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(seat)) {
+                }
+                // Ticket #44: Antarctica, Earth's slots. A foothold, not Presence: half weight and no gap,
+                // so it is taken when the Ship cannot go anywhere better.
+                if s.colonists > 0 && body == BodyId::Earth {
+                    if let Some(slot) = self.free_slots_on(BodyId::Earth).first() {
+                        push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, *slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, 1.0, format!("found a Colony at {}", self.tables.body(BodyId::Earth).slots[*slot as usize].name), None);
+                    }
+                    // Ticket #46: Colonists on a station over Earth are still on Earth for Presence; never park them there.
+                    for c in self.colonies.iter().filter(|c| c.body == body && c.body != BodyId::Earth && c.control.director() == Some(seat)) {
                         let room = self.habitat_room(c).saturating_sub(c.colonists);
                         if room > 0 {
                             let n = room.min(s.colonists);
@@ -543,7 +631,11 @@ impl Game {
                     push(vec![Order::Transit { ship: s.id, to: BodyId::Earth }], Cat::Transit, self.base_weight(seat, Cat::Transit) * 0.8, gap_for(Cat::Transit, None), 1.0, 1.0, 1.0, format!("send {} back to Earth", ship_name), None);
                 }
             }
-            if s.kind.is_warship() || (s.kind == UnitKind::ColonyShip && s.army.is_some()) {
+            // Ticket #43: an empty Carrier away from Earth goes home for an Army.
+            if s.kind == UnitKind::Carrier && s.army.is_none() && body != BodyId::Earth {
+                push(vec![Order::Transit { ship: s.id, to: BodyId::Earth }], Cat::Transit, self.base_weight(seat, Cat::Transit) * 0.8, 1.0, 1.0, 1.0, 1.0, format!("send {} back to Earth", ship_name), None);
+            }
+            if s.kind.is_warship() || s.army.is_some() {
                 // Warships go where the Faction has or wants Colonies, or where the rival is.
                 let mut dests: Vec<BodyId> = Vec::new();
                 for c in &self.colonies {
@@ -558,12 +650,23 @@ impl Game {
                     let base = self.base_weight(seat, Cat::Transit) * if kind == FactionKind::Prospectors { 0.9 } else { 0.6 };
                     push(vec![Order::Transit { ship: s.id, to: d }], Cat::Transit, base, 1.0, denial, threat, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
                 }
-                // Load an Army aboard a Battleship or Colony Ship at Earth for an attack on a rival Colony.
+                // Load an Army aboard a Carrier at Earth for an attack on a rival Colony (ticket #43).
                 if card.carries_army && s.army.is_none() && body == BodyId::Earth && kind == FactionKind::Prospectors {
-                    let army = self.armies.iter().find(|a| !a.standing && self.army_seat(a) == Some(seat) && matches!(a.at, ArmyAt::Place(Place::State(_))));
+                    // Ticket #46: the Army lifts from its own state, which needs a working Launch Site.
+                    let army = self.armies.iter().find_map(|a| match a.at {
+                        ArmyAt::Place(Place::State(st))
+                            if !a.standing
+                                && self.army_seat(a) == Some(seat)
+                                && self.state(st).control.director() == Some(seat)
+                                && self.state(st).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online) =>
+                        {
+                            Some((a.id, st))
+                        }
+                        _ => None,
+                    });
                     let enemy_colony = self.colonies.iter().any(|c| c.control.director() == Some(seat.other()));
-                    if let (Some(a), true) = (army, enemy_colony) {
-                        push(vec![Order::Load { ship: s.id, colonists: 0, from: LoadSource::State(StateId::Asia), army: Some(a.id) }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload) * 0.8, 1.0, 1.0, 1.0, 1.0, format!("load an Army onto {}", ship_name), None);
+                    if let (Some((aid, st)), true) = (army, enemy_colony) {
+                        push(vec![Order::Load { ship: s.id, colonists: 0, from: LoadSource::State(st), army: Some(aid) }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload) * 0.8, 1.0, 1.0, 1.0, 1.0, format!("load an Army onto {}", ship_name), None);
                     }
                 }
                 if let Some(aid) = s.army.filter(|_| body != BodyId::Earth) {
@@ -595,7 +698,7 @@ impl Game {
             let my_str = self.ship_stack_strength(seat, body);
             let enemy_str = self.ship_stack_strength(seat.other(), body);
             let enemy_here = self.ships.iter().any(|s| s.seat != seat && s.at == ShipAt::Body(body));
-            let inbound_target = self.ships.iter().any(|s| s.seat != seat && matches!(s.kind, UnitKind::ColonyShip | UnitKind::Battleship) && matches!(s.at, ShipAt::Transit { to, .. } if to == body));
+            let inbound_target = self.ships.iter().any(|s| s.seat != seat && matches!(s.kind, UnitKind::ColonyShip | UnitKind::Carrier) && matches!(s.at, ShipAt::Transit { to, .. } if to == body));
             let threat = if self.enemy_present_or_inbound(seat, body) { m.threat } else { 1.0 };
             let total_hp: u32 = stack.iter().map(|s| self.tables.unit(s.kind).hit_points).sum();
             let total_dmg: u32 = stack.iter().map(|s| s.damage).sum();
@@ -659,7 +762,7 @@ impl Game {
                     }
                     for n in &self.tables.state(sid).neighbours {
                         let ctrl = self.state(*n).control;
-                        if ctrl == Control::Controlled(seat) || *n == StateId::Antarctica {
+                        if ctrl == Control::Controlled(seat) {
                             continue;
                         }
                         let def: i64 = self.defenders_at(Place::State(*n), seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_strength(a)).sum();

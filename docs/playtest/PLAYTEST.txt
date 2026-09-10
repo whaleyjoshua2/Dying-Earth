@@ -1,0 +1,57 @@
+DYING EARTH - playtest build, version 0.04
+==========================================
+
+Thanks for playing. This is an early build of a turn-based strategy game about colonizing
+the solar system before global warming wrecks Earth. It is unfinished and unbalanced on
+purpose: the point of this playtest is to find out what is confusing, what is boring,
+and what breaks.
+
+HOW TO RUN
+----------
+1. Unzip the whole folder somewhere (Desktop is fine). Keep dying-earth.exe and the
+   "assets" folder together; the game reads its rules and pictures from there.
+2. Double-click dying-earth.exe.
+3. Windows may show a blue "Windows protected your PC" box because the program is not
+   signed. Click "More info", then "Run anyway".
+4. The very first launch shows a blank dark window for up to ten seconds while it
+   compiles graphics. Later launches are quick.
+5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
+
+HOW TO PLAY, IN ONE MINUTE
+--------------------------
+- New Game > pick a Faction > pick a starting continent. Read the first Report.
+- You are looking at the Earth Map. Click a country for its card and orders on the right.
+  Drag to turn the globe, mouse wheel to zoom. Tab switches to the Solar System Map;
+  Esc goes back.
+- Build things with the buttons on a card. Hover a build button to see what it makes.
+- Spend Influence on other countries to win them over.
+- You start with a space station over Earth (the ISS or Tiangong). Build a Shipyard on it
+  first: Ships are built only at a Shipyard. Click the station in the panel on the right of
+  the Earth Map. Ships are ordered on the Solar System Map (click the label next to Earth).
+- A Colony Ship carries Colonists, a Carrier carries an Army. A Launch Site is what lifts
+  them into orbit. Antarctica has three Colony Slots on Earth; Mars has two small moons.
+- The Trading button buys resources and Influence with Ducats, and sells spare Materials
+  and Fuel.
+- End Turn (top left, red). Twenty-four turns. Watch the temperature in the top bar:
+  at +3.0 C the world collapses and nobody wins.
+- The Tech Tree, Climate Panel and Victory buttons open panels that explain the rest.
+
+WHAT WE WANT TO KNOW
+--------------------
+Write down anything, however small. Especially:
+- The moment you were not sure what to do next.
+- Anything you clicked that did nothing, or did something you did not expect.
+- A rule you could not find explained anywhere.
+- The turn the game got boring, if it did.
+- The turn you felt you had lost, and why.
+- Crashes: what you were doing, and the "Seed" number shown on the title screen and
+  the game-over screen. With the seed the game can be replayed exactly.
+
+Screenshots help. Print Screen, then paste into a message.
+
+KNOWN ROUGH EDGES
+-----------------
+- No saving. A game is one sitting.
+- The computer opponent is simple and does not build some of the newer buildings.
+- Contested countries can flip back and forth between you and the opponent every turn.
+- No sound, no tutorial beyond the first Report.

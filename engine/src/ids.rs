@@ -10,10 +10,13 @@ pub enum BodyId {
     Earth,
     Moon,
     Mars,
+    /// Version 0.04 (ticket #45): the moons of Mars.
+    Phobos,
+    Deimos,
 }
 
 impl BodyId {
-    pub const ALL: [BodyId; 3] = [BodyId::Earth, BodyId::Moon, BodyId::Mars];
+    pub const ALL: [BodyId; 5] = [BodyId::Earth, BodyId::Moon, BodyId::Mars, BodyId::Phobos, BodyId::Deimos];
     pub fn index(self) -> usize {
         self as usize
     }
@@ -22,6 +25,8 @@ impl BodyId {
             BodyId::Earth => "Earth",
             BodyId::Moon => "the Moon",
             BodyId::Mars => "Mars",
+            BodyId::Phobos => "Phobos",
+            BodyId::Deimos => "Deimos",
         }
     }
 }
@@ -30,7 +35,7 @@ impl BodyId {
 #[serde(rename_all = "snake_case")]
 pub enum StateId {
     Africa,
-    Antarctica,
+    // Antarctica left the list in version 0.04 (ticket #44): it is Earth's three Colony Slots.
     Asia,
     Australia,
     Europe,
@@ -42,9 +47,8 @@ pub enum StateId {
 }
 
 impl StateId {
-    pub const ALL: [StateId; 9] = [
+    pub const ALL: [StateId; 8] = [
         StateId::Africa,
-        StateId::Antarctica,
         StateId::Asia,
         StateId::Australia,
         StateId::Europe,
@@ -141,16 +145,19 @@ pub enum UnitKind {
     ColonyShip,
     Frigate,
     Battleship,
+    /// Version 0.04 (ticket #43): the transport for one Army; a Colony Ship carries Colonists only.
+    Carrier,
     Army,
 }
 
 impl UnitKind {
-    pub const SHIPS: [UnitKind; 3] = [UnitKind::ColonyShip, UnitKind::Frigate, UnitKind::Battleship];
+    pub const SHIPS: [UnitKind; 4] = [UnitKind::ColonyShip, UnitKind::Carrier, UnitKind::Frigate, UnitKind::Battleship];
     pub fn name(self) -> &'static str {
         match self {
             UnitKind::ColonyShip => "Colony Ship",
             UnitKind::Frigate => "Frigate",
             UnitKind::Battleship => "Battleship",
+            UnitKind::Carrier => "Carrier",
             UnitKind::Army => "Army",
         }
     }
@@ -168,6 +175,18 @@ pub enum Resource {
     Research,
     /// Version 0.03 (ticket #35): money, which buys Influence, Restoration and repairs.
     Ducats,
+}
+
+impl Resource {
+    pub fn name(self) -> &'static str {
+        match self {
+            Resource::Materials => "Materials",
+            Resource::Fuel => "Fuel",
+            Resource::Energy => "Energy",
+            Resource::Research => "Research",
+            Resource::Ducats => "Ducats",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]

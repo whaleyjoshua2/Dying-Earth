@@ -544,19 +544,23 @@ impl Game {
             }
             s.influence.retain(|_, v| *v > 0);
         }
-        // Thresholds: a neutral place needs the threshold; a controlled place needs a standing above the
-        // controller's and at least the threshold.
+        // Thresholds: a neutral place needs the threshold; a controlled place needs a standing at least
+        // the controller's plus the challenge margin (version 0.04, ticket #41) and at least the threshold.
+        let margin = self.tables.influence.challenge_margin;
         let mut targets: Vec<Place> = StateId::ALL.into_iter().map(Place::State).collect();
         targets.extend(self.colonies.iter().map(|c| Place::Colony(c.id)));
         for target in targets {
             let threshold = self.influence_threshold(target);
             let controller = self.place_control(target).controller();
-            let holding = controller.map(|c| self.seat(c).influence.get(&target).copied().unwrap_or(0)).unwrap_or(0);
+            let needed = match controller {
+                Some(c) => threshold.max(self.seat(c).influence.get(&target).copied().unwrap_or(0) + margin),
+                None => threshold,
+            };
             let qualifying: Vec<Seat> = Seat::ALL
                 .into_iter()
                 .filter(|s| {
                     let have = self.seat(*s).influence.get(&target).copied().unwrap_or(0);
-                    controller != Some(*s) && have > 0 && have >= threshold && have > holding
+                    controller != Some(*s) && have > 0 && have >= needed
                 })
                 .collect();
             let winner = match qualifying.len() {
@@ -749,6 +753,22 @@ impl Game {
 
     fn resolve_cargo(&mut self) {
         let cargo = std::mem::take(&mut self.pending.cargo);
+        // Ticket #46: stations ordered this turn, one per orbital slot; two seats for one slot go to the tiebreak.
+        let stations = std::mem::take(&mut self.pending.stations);
+        for (i, (seat, body, slot)) in stations.iter().enumerate() {
+            if self.station_at(*body, *slot).is_some() {
+                continue;
+            }
+            let rival = stations.iter().enumerate().any(|(j, (s2, b2, sl2))| j != i && s2 != seat && b2 == body && sl2 == slot);
+            if rival && self.tiebreak_at_body(*body) != *seat {
+                continue;
+            }
+            let id = ColonyId(self.fresh_id());
+            self.colonies.push(Colony { id, body: *body, slot: *slot, control: Control::Controlled(*seat), modules: Vec::new(), colonists: 0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: true });
+            let line = format!("{} built {}.", self.seat_name(*seat), self.place_name(Place::Colony(id)));
+            self.log(line.clone());
+            self.report.lines.push(line);
+        }
         // Founding orders into the same slot from both seats are decided by the tiebreak.
         let mut founding: Vec<(Seat, ShipId, u32, BodyId, u32)> = Vec::new();
         for (seat, order) in &cargo {
@@ -846,6 +866,7 @@ impl Game {
                                 queue: Vec::new(),
                                 grid_failed: false,
                                 founded_turn: self.turn,
+                                in_orbit: false,
                             });
                             let room = self.habitat_room(self.colony(id).unwrap());
                             let moved = n.min(room);

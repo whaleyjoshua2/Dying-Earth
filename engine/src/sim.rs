@@ -16,6 +16,10 @@ pub struct SimResult {
     pub temperature: f64,
     pub collapse_projected_turn: Option<u32>,
     pub colony_changed_hands: Vec<(u32, u32)>,
+    /// Ticket #41: places that changed hands by Influence over the game.
+    pub influence_transfers: u32,
+    /// Ticket #41: Banks, Trade Posts, Embassies and Relays completed by either seat.
+    pub new_buildings: [u32; 4],
     pub log: Vec<String>,
 }
 
@@ -32,8 +36,8 @@ pub fn run(tables: Arc<Tables>, seed: u64, kinds: [FactionKind; 2]) -> SimResult
     while !game.is_over() && guard < max_turns + 2 {
         guard += 1;
         game.end_turn([Vec::new(), Vec::new()]);
-        if first_colony_turn.is_none() && !game.colonies.is_empty() {
-            first_colony_turn = Some(game.colonies.iter().map(|c| c.founded_turn).min().unwrap());
+        if first_colony_turn.is_none() && game.colonies.iter().any(|c| !c.in_orbit) {
+            first_colony_turn = game.colonies.iter().filter(|c| !c.in_orbit).map(|c| c.founded_turn).min();
         }
         for c in &game.colonies {
             match founded.iter_mut().find(|(id, _, _)| *id == c.id) {
@@ -67,6 +71,8 @@ pub fn run(tables: Arc<Tables>, seed: u64, kinds: [FactionKind; 2]) -> SimResult
         game.climate.temperature,
         projected_collapse
     ));
+    let influence_transfers = game.log.iter().filter(|l| !l.starts_with(' ') && l.ends_with("(Influence).")).count() as u32;
+    let new_buildings = ["Bank", "Trade Post", "Embassy", "Relay"].map(|b| game.log.iter().filter(|l| l.contains(&format!("completed {b} at"))).count() as u32);
     SimResult {
         seed,
         outcome: game.outcome.clone(),
@@ -77,6 +83,8 @@ pub fn run(tables: Arc<Tables>, seed: u64, kinds: [FactionKind; 2]) -> SimResult
         temperature: game.climate.temperature,
         collapse_projected_turn: projected_collapse,
         colony_changed_hands: changed,
+        influence_transfers,
+        new_buildings,
         log: game.log,
     }
 }

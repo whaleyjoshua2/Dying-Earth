@@ -1,35 +1,115 @@
 # Spec section 4.1. Yields multiply what a Module produces, never what it costs.
-# Transit and fuel are from Earth; Moon-to-Mars transits use the Mars figures.
+# transit_turns and transit_fuel are from Earth (the Moon counts as Earth for reach). A Body with a
+# parent is that parent's satellite: local_turns and local_fuel are the hop between them, and two
+# satellites of the same parent are sibling_turns and sibling_fuel apart (ticket #45).
+# Every Colony Slot is a real place on its Body, at its approximate longitude and latitude (east
+# positive), and a Colony there takes its name (ticket #45).
+
+sibling_turns = 1
+sibling_fuel = 1
+# Version 0.04 (ticket #46): a Space Station is built for this many Materials into a free orbital
+# slot, from a Nation State with a Launch Site (over Earth) or a Colony (elsewhere); no crew needed.
+# It holds only a Shipyard and Habitats. Ships are built only at Shipyards. Each Body names its
+# orbital slots in `stations`, in order; the two Factions start with the first two over Earth.
+station_materials = 40
 
 [[body]]
 id = "earth"
 name = "Earth"
-colony_slots = 0
+# Version 0.04 (ticket #44): Antarctica is Earth's three Colony Slots, founded by a Colony Ship at
+# Earth with no transit. Cold and Fuel-leaning: good for Refineries, poor for Habitats and Generators.
+# Its Colonists live on Earth (no Off-world Presence) and its Modules emit like Facilities.
 transit_turns = 0
 transit_fuel = 0
 mine_yield = 1.0
-generator_yield = 1.0
-refinery_yield = 1.0
-habitat_yield = 1.0
+generator_yield = 0.75
+refinery_yield = 1.5
+habitat_yield = 0.75
+orbital_slots = 4
+stations = ["ISS", "Tiangong", "Skylab", "Mir"]
+slots = [
+    { name = "Antarctic Peninsula", lon = -63.0, lat = -69.0 },
+    { name = "Lake Vostok", lon = 105.0, lat = -77.5 },
+    { name = "Ross Ice Shelf", lon = -178.0, lat = -81.0 },
+]
 
 [[body]]
 id = "moon"
-name = "The Moon"
-colony_slots = 4
+name = "the Moon"
+parent = "earth"
+local_turns = 1
+local_fuel = 6
 transit_turns = 1
 transit_fuel = 6
 mine_yield = 1.5
 generator_yield = 1.25
 refinery_yield = 0.5
 habitat_yield = 1.0
+orbital_slots = 2
+stations = ["Gateway", "Selene"]
+slots = [
+    { name = "Mare Tranquillitatis", lon = 31.4, lat = 8.5 },
+    { name = "Mare Imbrium", lon = -15.6, lat = 32.8 },
+    { name = "Tycho", lon = -11.4, lat = -43.3 },
+    { name = "South Pole-Aitken Basin", lon = -171.0, lat = -53.0 },
+]
 
 [[body]]
 id = "mars"
 name = "Mars"
-colony_slots = 6
 transit_turns = 4
 transit_fuel = 20
 mine_yield = 1.25
 generator_yield = 0.75
 refinery_yield = 1.5
 habitat_yield = 1.5
+orbital_slots = 3
+stations = ["Mars Base Camp", "Ares", "Hermes"]
+slots = [
+    { name = "Olympus Mons", lon = -133.8, lat = 18.7 },
+    { name = "Valles Marineris", lon = -70.0, lat = -14.0 },
+    { name = "Chryse Planitia", lon = -30.0, lat = 28.0 },
+    { name = "Hellas Planitia", lon = 70.0, lat = -42.4 },
+    { name = "Isidis Planitia", lon = 88.0, lat = 12.9 },
+    { name = "Elysium Planitia", lon = 135.0, lat = 3.0 },
+]
+
+# Version 0.04 (ticket #45): the moons of Mars, one hop past it. Phobos the mining rock, Deimos
+# the quiet site. Five turns and 24 Fuel from Earth; one turn and 2 Fuel from Mars; one turn and
+# 1 Fuel between them.
+[[body]]
+id = "phobos"
+name = "Phobos"
+parent = "mars"
+local_turns = 1
+local_fuel = 2
+transit_turns = 5
+transit_fuel = 24
+mine_yield = 1.75
+generator_yield = 0.75
+refinery_yield = 0.5
+habitat_yield = 0.5
+orbital_slots = 1
+stations = ["Phobos Gateway"]
+slots = [
+    { name = "Stickney", lon = -50.0, lat = 1.0 },
+    { name = "Roche", lon = 177.0, lat = 53.0 },
+]
+
+[[body]]
+id = "deimos"
+name = "Deimos"
+parent = "mars"
+local_turns = 1
+local_fuel = 2
+transit_turns = 5
+transit_fuel = 24
+mine_yield = 1.0
+generator_yield = 1.0
+refinery_yield = 0.25
+habitat_yield = 0.5
+orbital_slots = 1
+stations = ["Deimos Gateway"]
+slots = [
+    { name = "Swift", lon = -2.0, lat = 12.5 },
+]

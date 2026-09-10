@@ -44,6 +44,33 @@ pub enum Order {
     BuyInfluence { amount: i64 },
     RestorationWithDucats { steps: u32 },
     RepairWithDucats { unit: UnitRef, points: u32 },
+    /// Version 0.04 (ticket #42): the trading window. Buy Materials, Fuel or Energy for Ducats;
+    /// sell Materials or Fuel for half the buying price; buy a building outright for Ducats at
+    /// twice its Materials cost. What is bought is spendable in the same turn's orders.
+    Buy { resource: Resource, amount: i64 },
+    Sell { resource: Resource, amount: i64 },
+    BuildFacilityWithDucats { state: StateId, kind: FacilityKind },
+    BuildModuleWithDucats { colony: ColonyId, kind: ModuleKind },
+    /// Version 0.04 (ticket #46): a Space Station in an orbital slot, built for Materials from a
+    /// Nation State with a Launch Site (over Earth) or a Colony of the seat's (elsewhere).
+    BuildStation { body: BodyId, slot: u32 },
+}
+
+impl Order {
+    /// The Nation State a build order takes a slot in, whichever way it is paid.
+    pub fn build_state(&self) -> Option<StateId> {
+        match self {
+            Order::BuildFacility { state, .. } | Order::BuildFacilityWithDucats { state, .. } => Some(*state),
+            _ => None,
+        }
+    }
+    /// The Colony and Module a build order queues, whichever way it is paid.
+    pub fn build_module(&self) -> Option<(ColonyId, ModuleKind)> {
+        match self {
+            Order::BuildModule { colony, kind } | Order::BuildModuleWithDucats { colony, kind } => Some((*colony, *kind)),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -102,6 +129,8 @@ fn fail<T>(msg: impl Into<String>) -> Result<T, OrderError> {
 pub struct Pending {
     pub repairs: Vec<(Seat, UnitRef, u32)>,
     pub cargo: Vec<(Seat, Order)>,
+    /// Ticket #46: stations ordered this turn.
+    pub stations: Vec<(Seat, BodyId, u32)>,
     pub influence: Vec<(Seat, Target, i64)>,
     /// Attack orders in the order given, for battle ordering (spec 10.1).
     pub attack_sequence: u32,
@@ -132,6 +161,28 @@ impl Game {
                 Cost { energy: t.restoration.energy_per_step * *steps as i64, ..Default::default() }
             }
             Order::BuyInfluence { amount } => Cost { ducats: t.ducats.per_influence * *amount, ..Default::default() },
+            // A purchase is a negative cost in the resource bought, so `remaining` and `commit_orders`
+            // add it without a special case; a sale is the mirror, with a negative Ducat cost.
+            Order::Buy { resource, amount } => {
+                let ducats = self.trade_price(*resource).unwrap_or(0) * *amount;
+                match resource {
+                    Resource::Materials => Cost { materials: -*amount, ducats, ..Default::default() },
+                    Resource::Fuel => Cost { fuel: -*amount, ducats, ..Default::default() },
+                    Resource::Energy => Cost { energy: -*amount, ducats, ..Default::default() },
+                    _ => Cost::default(),
+                }
+            }
+            Order::Sell { resource, amount } => {
+                let ducats = -self.sale_price(*resource, *amount);
+                match resource {
+                    Resource::Materials => Cost { materials: *amount, ducats, ..Default::default() },
+                    Resource::Fuel => Cost { fuel: *amount, ducats, ..Default::default() },
+                    _ => Cost::default(),
+                }
+            }
+            Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: t.facility(*kind).materials * t.ducats.per_building_material, ..Default::default() },
+            Order::BuildStation { .. } => Cost { materials: t.station_materials, ..Default::default() },
+            Order::BuildModuleWithDucats { kind, .. } => Cost { ducats: t.module(*kind).materials * t.ducats.per_building_material, ..Default::default() },
             Order::RestorationWithDucats { steps } => Cost { ducats: t.ducats.per_restoration_step * *steps as i64, ..Default::default() },
             Order::RepairWithDucats { points, .. } => Cost { ducats: t.ducats.per_repair_point * *points as i64, ..Default::default() },
             _ => Cost::default(),
@@ -139,6 +190,30 @@ impl Game {
     }
 
     /// What the seat still has after its pending orders. Bought Influence counts toward the Allotment.
+    /// Ticket #42: Ducats per unit in the trading window, or None for what it does not sell.
+    pub fn trade_price(&self, resource: Resource) -> Option<i64> {
+        let d = &self.tables.ducats;
+        match resource {
+            Resource::Materials => Some(d.per_materials),
+            Resource::Fuel => Some(d.per_fuel),
+            Resource::Energy => Some(d.per_energy),
+            _ => None,
+        }
+    }
+
+    /// Ticket #42: what the window pays for a lot, or None for what it does not buy back.
+    pub fn sale_price(&self, resource: Resource, amount: i64) -> i64 {
+        if !matches!(resource, Resource::Materials | Resource::Fuel) {
+            return 0;
+        }
+        let d = &self.tables.ducats;
+        let per = self.trade_price(resource).unwrap_or(0);
+        if d.sell_divisor <= 0 {
+            return 0;
+        }
+        per * amount / d.sell_divisor
+    }
+
     pub fn remaining(&self, seat: Seat, pending: &[Order]) -> (Stockpile, i64) {
         let mut cost = Cost::default();
         let mut bought = 0;
@@ -206,14 +281,54 @@ impl Game {
                 let materials_form = Order::Repair { unit: *unit, points: *points };
                 self.check_order_inner(seat, pending, &materials_form, false).map(|_| cost)
             }
+            Order::Buy { resource, amount } => {
+                if *amount <= 0 {
+                    return fail("buy a positive amount");
+                }
+                if self.trade_price(*resource).is_none() {
+                    return fail("not for sale");
+                }
+                Ok(cost)
+            }
+            Order::Sell { resource, amount } => {
+                if *amount <= 0 {
+                    return fail("sell a positive amount");
+                }
+                if !matches!(resource, Resource::Materials | Resource::Fuel) {
+                    return fail("the window buys only Materials and Fuel");
+                }
+                // The affordability check above already refused a lot larger than what is left.
+                Ok(cost)
+            }
+            Order::BuildFacilityWithDucats { state, kind } => {
+                let materials_form = Order::BuildFacility { state: *state, kind: *kind };
+                self.check_order_inner(seat, pending, &materials_form, false).map(|_| cost)
+            }
+            Order::BuildModuleWithDucats { colony, kind } => {
+                let materials_form = Order::BuildModule { colony: *colony, kind: *kind };
+                self.check_order_inner(seat, pending, &materials_form, false).map(|_| cost)
+            }
+            Order::BuildStation { body, slot } => {
+                if !self.free_orbital_slots(*body).contains(slot) {
+                    return fail("that orbital slot is taken, or there is no such slot");
+                }
+                if pending.iter().any(|o| matches!(o, Order::BuildStation { body: b, slot: s } if b == body && s == slot)) {
+                    return fail("a station is already ordered there");
+                }
+                let foothold = match body {
+                    BodyId::Earth => self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online)),
+                    b => self.colonies.iter().any(|c| !c.in_orbit && c.body == *b && c.control.director() == Some(seat)),
+                };
+                if !foothold {
+                    return fail(if *body == BodyId::Earth { "needs a Nation State of yours with a Launch Site" } else { "needs a Colony of yours on this Body" });
+                }
+                Ok(cost)
+            }
             Order::BuildFacility { state, kind } => {
                 if self.state(*state).control.director() != Some(seat) {
                     return fail("you do not direct this Nation State");
                 }
-                let pending_here = pending
-                    .iter()
-                    .filter(|o| matches!(o, Order::BuildFacility { state: s, .. } if s == state))
-                    .count() as u32;
+                let pending_here = pending.iter().filter(|o| o.build_state() == Some(*state)).count() as u32;
                 if self.free_slots(*state) <= pending_here {
                     return fail("no free build slot");
                 }
@@ -236,10 +351,14 @@ impl Game {
                 if col.control.director() != Some(seat) {
                     return fail("you do not direct this Colony");
                 }
+                // Ticket #46: a station holds only a Shipyard and Habitats.
+                if col.in_orbit && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat) {
+                    return fail("a station holds only a Shipyard and Habitats");
+                }
                 if matches!(kind, ModuleKind::Shipyard | ModuleKind::Barracks) {
                     let has = col.modules.iter().any(|m| m.kind == *kind)
                         || col.queue.iter().any(|b| b.item == BuildItem::Module(*kind))
-                        || pending.iter().any(|o| matches!(o, Order::BuildModule { colony: c, kind: k } if c == colony && k == kind));
+                        || pending.iter().any(|o| o.build_module() == Some((*colony, *kind)));
                     if has {
                         return fail(format!("this Colony already has a {}", kind.name()));
                     }
@@ -251,14 +370,8 @@ impl Game {
                     return fail("not a Ship");
                 }
                 match site {
-                    Place::State(s) => {
-                        if self.state(*s).control.director() != Some(seat) {
-                            return fail("you do not direct this Nation State");
-                        }
-                        if !self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite) {
-                            return fail("no Launch Site here");
-                        }
-                    }
+                    // Ticket #46: Ships are built only at Shipyards, on a station or a Colony.
+                    Place::State(_) => return fail("Ships are built at a Shipyard, on a station or a Colony"),
                     Place::Colony(c) => {
                         let Some(col) = self.colony(*c) else { return fail("no such Colony") };
                         if col.control.director() != Some(seat) {
@@ -423,6 +536,10 @@ impl Game {
                             if self.state(*st).control.director() != Some(seat) {
                                 return fail("you do not direct that Nation State");
                             }
+                            // Ticket #46: a lift to orbit needs a Launch Site there.
+                            if !self.state(*st).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online) {
+                                return fail("a lift to orbit needs a working Launch Site there");
+                            }
                             if self.state(*st).population < 0.1 * *colonists as f64 {
                                 return fail("not enough people there");
                             }
@@ -448,6 +565,9 @@ impl Game {
                     let Some(a) = self.army(*aid) else { return fail("no such Army") };
                     if self.army_seat(a) != Some(seat) || a.standing && self.army_stands_down(a) {
                         return fail("not your Army");
+                    }
+                    if matches!(a.at, ArmyAt::Place(Place::State(st)) if !self.state(st).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online)) {
+                        return fail("a lift to orbit needs a working Launch Site there");
                     }
                     if matches!(a.home, ArmyHome::Colony(_)) {
                         return fail("a Colony's Army never leaves");
@@ -571,7 +691,7 @@ impl Game {
             self.seat_mut(seat).allotment -= cost.influence;
             let turn = self.turn;
             match order {
-                Order::BuildFacility { state, kind } => {
+                Order::BuildFacility { state, kind } | Order::BuildFacilityWithDucats { state, kind } => {
                     let due = turn + self.tables.facility(*kind).build_turns - 1;
                     self.state_mut(*state).queue.push(Build { item: BuildItem::Facility(*kind), seat, due_turn: due });
                 }
@@ -579,7 +699,7 @@ impl Game {
                     let due = turn + self.tables.industry_level.build_turns - 1;
                     self.state_mut(*state).queue.push(Build { item: BuildItem::IndustryLevel, seat, due_turn: due });
                 }
-                Order::BuildModule { colony, kind } => {
+                Order::BuildModule { colony, kind } | Order::BuildModuleWithDucats { colony, kind } => {
                     let due = turn + self.tables.module(*kind).build_turns - 1;
                     if let Some(c) = self.colony_mut(*colony) {
                         c.queue.push(Build { item: BuildItem::Module(*kind), seat, due_turn: due });
@@ -616,9 +736,6 @@ impl Game {
                         _ => continue,
                     };
                     let (turns, _) = self.transit_cost(from, *to);
-                    if from == BodyId::Earth {
-                        self.climate.launches_pending[seat.index()] += 1;
-                    }
                     let name = self.tables.body(*to).name.clone();
                     if let Some(s) = self.ship_mut(*ship) {
                         s.at = ShipAt::Transit { from, to: *to, turns_left: turns };
@@ -644,7 +761,13 @@ impl Game {
                         a.move_to = Some(*to);
                     }
                 }
+                Order::Load { from: LoadSource::State(_), .. } => {
+                    // Ticket #46: a lift from a Nation State is a launch.
+                    self.climate.launches_pending[seat.index()] += 1;
+                    self.pending.cargo.push((seat, order.clone()));
+                }
                 Order::Load { .. } | Order::Unload { .. } => self.pending.cargo.push((seat, order.clone())),
+                Order::BuildStation { body, slot } => self.pending.stations.push((seat, *body, *slot)),
                 Order::Influence { target, amount } => self.pending.influence.push((seat, *target, *amount)),
                 Order::Restoration { steps } | Order::RestorationWithDucats { steps } => {
                     self.climate.restoration_next += self.tables.restoration.sink_per_step * *steps as f64;
@@ -654,6 +777,12 @@ impl Game {
                     self.log(format!("{} bought {} Influence with Ducats.", self.seat_name(seat), amount));
                 }
                 Order::RepairWithDucats { unit, points } => self.pending.repairs.push((seat, *unit, *points)),
+                Order::Buy { resource, amount } => {
+                    self.log(format!("{} bought {} {} for {} Ducats.", self.seat_name(seat), amount, resource.name(), cost.ducats));
+                }
+                Order::Sell { resource, amount } => {
+                    self.log(format!("{} sold {} {} for {} Ducats.", self.seat_name(seat), amount, resource.name(), -cost.ducats));
+                }
             }
         }
     }

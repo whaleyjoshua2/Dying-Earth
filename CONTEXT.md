@@ -25,15 +25,28 @@ The small model of global warming the game runs: Emissions add to the CO2 Stock,
 _Avoid_: warming track, doom clock, countdown, timer, disaster meter
 
 **Body**:
-A place in the solar system that can hold a Colony. The First Playable has the Moon and Mars.
+A place in the solar system that can hold a Colony or a Space Station. Five since version 0.04: Earth (its Colony Slots are Antarctica's), the Moon, Mars, Phobos and Deimos. A Body may be another's satellite, which sets how far apart they are.
 _Avoid_: planet, world, site, location, node
 
 **Colony**:
-A permanent settlement a Faction holds on a Body, founded when a Colony Ship unloads Colonists into a free Colony Slot. None exist when the game starts.
+A permanent settlement a Faction holds on a Body, founded when a Colony Ship unloads Colonists into a free Colony Slot. It takes the name of its slot ("Tycho on the Moon"). None exist when the game starts.
 _Avoid_: base, outpost, settlement
 
 **Colony Slot**:
-One of a fixed number of places on a Body where a Colony can be founded, shared by all Factions. Slots are visible places on that Body's Surface Map, and a landing Colony Ship is founded into a chosen one.
+One of a fixed number of places on a Body where a Colony can be founded, shared by all Factions. Since version 0.04 each is a real geological place, drawn at its position on the Surface Map and giving its Colony its name. A landing Colony Ship is founded into a chosen one.
+_Avoid_: site, plot, capacity
+
+**Orbital Slot**:
+One of a fixed number of places in orbit around a Body where a Space Station can be built, shared by all Factions, each with a station's name ready for it.
+_Avoid_: dock, berth, orbit
+
+**Space Station**:
+A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard and Habitats. Influence, Occupation and Battles work on it as on a Colony. Each Faction starts with one over Earth (the Custodians the ISS, the Prospectors Tiangong), bare. Colonists on a station over Earth are still on Earth for Off-world Presence.
+_Avoid_: base, platform, orbital, outpost
+
+**Trading window**:
+Where Ducats buy Influence, Materials, Fuel and Energy at table prices, spendable in the same turn's orders, and where Materials and Fuel sell back at half. A building can also be bought outright for Ducats from its own build button, at twice its Materials cost.
+_Avoid_: market, shop, exchange, store
 _Avoid_: site, plot, capacity
 
 **Body Surface Map**:
@@ -117,19 +130,23 @@ A building placed inside a Colony. Eight kinds since version 0.03: Mine, Generat
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:
-A persistent piece that travels between Bodies. It is one of three types: Colony Ship, Frigate or Battleship. It is not consumed on arrival; damage it takes persists until repaired.
+A persistent piece that travels between Bodies. It is one of four types since version 0.04: Colony Ship, Carrier, Frigate or Battleship. It is built only at a Shipyard, on a Space Station or a Colony. It is not consumed on arrival; damage it takes persists until repaired.
 _Avoid_: vessel, rocket, fleet, expedition
 
 **Colony Ship**:
-The Ship type that carries Colonists and Armies. It cannot attack and is weak if caught.
+The Ship type that carries Colonists, and nothing else since version 0.04. It cannot attack and is weak if caught.
 _Avoid_: transport, colony (that is the settlement), settler ship
+
+**Carrier**:
+The Ship type that carries one Army and nothing else, since version 0.04. Unarmed, it needs an escort and is a target for Intercept like a Colony Ship. Every landing needs one.
+_Avoid_: troopship, transport, landing ship
 
 **Frigate**:
 The light warship type: cheap, with high Pursuit. It intercepts arriving Ships and runs down units that disengage.
 _Avoid_: escort, corvette, destroyer
 
 **Battleship**:
-The heavy warship type: the most strength and hit points, low Pursuit, dear and slow to build. It carries one Army.
+The heavy warship type: the most strength and hit points, low Pursuit, dear and slow to build. Since version 0.04 it carries no Army.
 _Avoid_: capital ship, dreadnought, cruiser
 
 **Army**:
@@ -149,13 +166,13 @@ A person counted in the population of a Colony or Nation State. Colonists are ca
 _Avoid_: settler, crew, worker, population resource
 
 **Nation State**:
-One of nine regions of the Earth Map (seven continents with Antarctica, plus Russia and the Middle East since version 0.02) that a Faction can control and build in. Each carries a population, an Industry Level, a Resource Lean, a Baseline Emissions figure, an Education Level and a Standing Army. Armies move only between neighbouring continents.
+One of eight regions of the Earth Map (six continents, plus Russia and the Middle East since version 0.02; Antarctica left the list in version 0.04 to become Earth's Colony Slots) that a Faction can control and build in. Each carries a population, an Industry Level, a Resource Lean, a Baseline Emissions figure, an Education Level and a Standing Army. Armies move only between neighbouring continents.
 _Avoid_: country, nation, territory, region, state
 
 ### Earth
 
 **Facility**:
-A building placed in a Nation State. Seven kinds since version 0.03: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank and Embassy.
+A building placed in a Nation State. Seven kinds since version 0.03: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank and Embassy. Since version 0.04 a Launch Site builds no Ship: it lifts Colonists and Armies from its state into orbit, and each lift is a launch.
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Cheap Industry**:
@@ -187,7 +204,7 @@ How much of a Nation State the sea can take. As Sea Level passes its thresholds,
 _Avoid_: coastline, vulnerability, flood risk
 
 **Influence**:
-A Faction's claim on a Nation State or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold; a controlled place goes to a rival whose Standing is above the controller's and at least the threshold.
+A Faction's claim on a Nation State or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold; a controlled place goes to a rival whose Standing is at least the controller's plus the challenge margin (10 since version 0.04) and at least the threshold.
 _Avoid_: diplomacy points, favour, reputation
 
 **Standing**:
@@ -285,7 +302,7 @@ The Custodians' measure: net Emissions held under the Natural Sink for a run of 
 _Avoid_: carbon neutral, balance, equilibrium
 
 **Off-world Presence**:
-The number of Colonists living away from Earth, required by both Factions' Victory Conditions. Neither can win on Earth alone.
+The number of Colonists living away from Earth, required by both Factions' Victory Conditions. Neither can win on Earth alone. Colonists in Antarctica or on a station over Earth are still on Earth.
 _Avoid_: population off Earth, colony size, settlers
 
 ### Climate

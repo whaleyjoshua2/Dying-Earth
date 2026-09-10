@@ -36,9 +36,26 @@ pub struct Textures {
     pub earth: Rgba,
     pub moon: Rgba,
     pub mars: Rgba,
+    /// Ticket #45: the moons of Mars, USGS and Stooke maps on spheres (`examples/prep_moons.rs`).
+    pub phobos: Rgba,
+    pub deimos: Rgba,
     /// 0 = water, 1..7 = Nation State index + 1 (see `examples/prep_assets.rs`).
     pub mask: Vec<u8>,
 }
+
+/// The mask's values, 1 to 9, in the order the file was painted (`examples/prep_assets.rs`).
+/// Antarctica keeps its value though it is no longer a Nation State (ticket #44).
+const MASK_STATES: [Option<StateId>; 9] = [
+    Some(StateId::Africa),
+    None,
+    Some(StateId::Asia),
+    Some(StateId::Australia),
+    Some(StateId::Europe),
+    Some(StateId::NorthAmerica),
+    Some(StateId::SouthAmerica),
+    Some(StateId::Russia),
+    Some(StateId::MiddleEast),
+];
 
 impl Textures {
     pub fn load(dir: &Path) -> Result<Textures, String> {
@@ -49,12 +66,14 @@ impl Textures {
         if mask_img.dimensions() != (earth.w, earth.h) {
             return Err("earth_states.png must match earth.png in size".into());
         }
-        Ok(Textures { earth, moon, mars, mask: mask_img.into_raw() })
+        let phobos = Rgba::load(&dir.join("phobos.png"))?;
+        let deimos = Rgba::load(&dir.join("deimos.png"))?;
+        Ok(Textures { earth, moon, mars, phobos, deimos, mask: mask_img.into_raw() })
     }
 
     pub fn state_at(&self, x: u32, y: u32) -> Option<StateId> {
         let v = self.mask[(y * self.earth.w + x) as usize];
-        if v == 0 { None } else { StateId::ALL.get(v as usize - 1).copied() }
+        if v == 0 { None } else { MASK_STATES.get(v as usize - 1).copied().flatten() }
     }
 
     /// The Earth Map for the current board (spec 17.1, 11.4).
@@ -71,7 +90,8 @@ impl Textures {
                 if v == 0 {
                     continue;
                 }
-                let sid = StateId::ALL[v as usize - 1];
+                // Antarctica (mask value 2) is no state since ticket #44: its ice stays as painted.
+                let Some(sid) = MASK_STATES.get(v as usize - 1).copied().flatten() else { continue };
                 let st = game.state(sid);
                 let p = i * 4;
                 let mut r = out[p] as f32 / 255.0;
@@ -86,7 +106,7 @@ impl Textures {
                     continue;
                 }
                 // The globe browns as it warms.
-                if warm > 0.0 && sid != StateId::Antarctica {
+                if warm > 0.0 {
                     let k = warm * 0.35;
                     r = r * (1.0 - k) + 0.55 * k;
                     g = g * (1.0 - k) + 0.42 * k;

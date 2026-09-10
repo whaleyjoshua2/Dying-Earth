@@ -44,6 +44,10 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, se
     if keys.just_pressed(KeyCode::Tab) {
         view.swap();
     }
+    // Ticket #41: C toggles the Climate Panel, a second way back once it is closed.
+    if keys.just_pressed(KeyCode::KeyC) {
+        toggle_climate(&mut view);
+    }
     if keys.just_pressed(KeyCode::Escape) {
         if view.popup != Popup::None {
             advance_popup(&mut view);
@@ -52,6 +56,13 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, se
             view.selection = Selection::None;
         }
     }
+}
+
+/// Ticket #41: show or hide the Climate Panel; a reopened panel returns to its home position, so a
+/// panel dragged off the picture and closed is not lost.
+pub fn toggle_climate(view: &mut ViewState) {
+    view.show_climate = !view.show_climate;
+    view.climate_reopen = view.show_climate;
 }
 
 fn advance_popup(view: &mut ViewState) {
@@ -255,9 +266,6 @@ fn start_screen(root: &mut Ui, session: &Session, faction: FactionKind, actions:
         ui.label(format!("You play the {}. The AI takes the uncontrolled continent with the highest Industry Level.", faction.name()));
         ui.add_space(10.0);
         for sid in StateId::ALL {
-            if sid == StateId::Antarctica {
-                continue;
-            }
             let c = session.tables.state(sid);
             let text = format!("{}  (population {:.1}, Industry {}, leans {:?}, education {})", c.name, c.population, c.industry_level, c.resource_lean, c.education_level);
             if ui.add(egui::Button::new(text).min_size(egui::vec2(300.0, 32.0))).clicked() {
@@ -265,7 +273,7 @@ fn start_screen(root: &mut Ui, session: &Session, faction: FactionKind, actions:
             }
         }
         ui.add_space(20.0);
-        ui.label(RichText::new("Antarctica is not offered.").weak());
+        ui.label(RichText::new("Antarctica has no people to govern: it is three Colony Slots, founded from a Colony Ship at Earth.").weak());
     });
     egui::CentralPanel::default().frame(egui::Frame::NONE).show(root, |ui| {
         ui.allocate_exact_size(ui.available_size(), egui::Sense::hover());
@@ -355,7 +363,10 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             };
             ui.label(research);
             ui.separator();
-            ui.label(format!("Influence {} of {}", influence_left, s.allotment));
+            // Ticket #42: the turn's Allotment and what the trading window added, shown apart.
+            let bought: i64 = session.pending.iter().map(|o| if let Order::BuyInfluence { amount } = o { *amount } else { 0 }).sum();
+            let influence = if bought > 0 { format!("Influence {} of {} ({} free + {} bought)", influence_left, s.allotment + bought, s.allotment, bought) } else { format!("Influence {} of {}", influence_left, s.allotment) };
+            ui.label(influence).on_hover_text("The Allotment is what your places and buildings give each turn; bought Influence comes from the Trading window at 2 Ducats each.");
             ui.separator();
             ui.label(RichText::new(format!("Turn {} / {}", game.turn, game.tables.victory.turns)).strong());
             ui.separator();
@@ -365,11 +376,14 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             if ui.button("Tech Tree").clicked() {
                 view.show_tech = !view.show_tech;
             }
-            if ui.button("Climate Panel").clicked() {
-                view.show_climate = !view.show_climate;
+            if ui.button(if view.show_climate { "Hide Climate Panel (C)" } else { "Climate Panel (C)" }).clicked() {
+                toggle_climate(view);
             }
             if ui.button("Victory").clicked() {
                 view.show_victory = !view.show_victory;
+            }
+            if ui.button("Trading").clicked() {
+                view.show_trade = !view.show_trade;
             }
             let swap_text = match view.view {
                 View::Solar => format!("To {} (Tab)", game.tables.body(view.last_surface).name),
@@ -410,9 +424,11 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                 let pos = geo::solar_position(body, game.turn);
                 if let Some(p) = project(pos + Vec3::Y * (geo::solar_radius(body) + 0.05)) {
                     let name = game.tables.body(body).name.clone();
-                    let slots = game.tables.body(body).colony_slots;
-                    let filled = game.colonies.iter().filter(|c| c.body == body).count();
-                    let text = if slots > 0 { format!("{name}  {filled}/{slots} slots") } else { name };
+                    let slots = game.tables.body(body).colony_slots();
+                    let filled = game.colonies.iter().filter(|c| c.body == body && !c.in_orbit).count();
+                    let orbital = game.tables.body(body).orbital_slots;
+                    let stations = game.colonies.iter().filter(|c| c.body == body && c.in_orbit).count();
+                    let text = format!("{name}  {filled}/{slots} slots, {stations}/{orbital} stations");
                     label_at(painter, p - egui::vec2(0.0, 22.0), &text, Color32::WHITE, 13.0);
                     hotspots.push(Hotspot { pos: p, radius: 40.0, hit: Hit::Enter(body) });
                     if let Some(s) = game.orbital_control(body) {
@@ -493,27 +509,11 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             hotspots.push(Hotspot { pos: centre, radius: 12.0, hit: Hit::Select(Selection::State(sid)) });
                         }
                     }
+                    // Ticket #44: Antarctica's Colony Slots.
+                    slot_labels(painter, session, game, body, &visible, hotspots);
                 }
                 _ => {
-                    for slot in 0..game.tables.body(body).colony_slots {
-                        let (lon, lat) = geo::slot_lonlat(body, slot);
-                        let Some(p) = visible(geo::local_from_lonlat(lon, lat) * 1.03) else { continue };
-                        let (text, colour, hit) = match game.colony_at(body, slot) {
-                            Some(c) => {
-                                let mods: Vec<String> = c.modules.iter().map(|m| format!("{}{}", m.kind.name(), if m.online { "" } else { " (offline)" })).collect();
-                                let army = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(c.id))).count();
-                                let owner = c.control.director().map(|s| game.seat_name(s)).unwrap_or_default();
-                                (
-                                    format!("Slot {}: {}\n{} Colonists\n{}{}", slot + 1, owner, c.colonists, mods.join(", "), if army > 0 { format!("\nArmies: {army}") } else { String::new() }),
-                                    c.control.director().map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY),
-                                    Hit::Select(Selection::Colony(c.id)),
-                                )
-                            }
-                            None => (format!("Slot {}: empty", slot + 1), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot))),
-                        };
-                        label_at(painter, p + egui::vec2(0.0, 24.0), &text, colour, 12.0);
-                        hotspots.push(Hotspot { pos: p, radius: 22.0, hit });
-                    }
+                    slot_labels(painter, session, game, body, &visible, hotspots);
                     // The band along the top: Ship stacks in orbit and Orbital Control.
                     let mut band = Vec::new();
                     for seat in Seat::ALL {
@@ -521,6 +521,10 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         if n > 0 {
                             band.push(format!("{}: {} Ship(s), strength {}", game.seat_name(seat), n, game.ship_stack_strength(seat, body)));
                         }
+                    }
+                    for c in game.colonies.iter().filter(|c| c.in_orbit && c.body == body) {
+                        let who = c.control.director().map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".into());
+                        band.push(format!("{} ({})", game.station_name(body, c.slot), who));
                     }
                     band.push(match game.orbital_control(body) {
                         Some(s) => format!("Orbital Control: {}", game.seat_name(s)),
@@ -532,6 +536,72 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
             }
         }
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+/// Colony Slot labels on a Body's surface: Antarctica's on Earth since ticket #44.
+fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: BodyId, visible: &dyn Fn(Vec3) -> Option<Pos2>, hotspots: &mut Vec<Hotspot>) {
+            for slot in 0..game.tables.body(body).colony_slots() {
+                let (lon, lat) = geo::slot_lonlat(game.tables.body(body), slot);
+        let name = &game.tables.body(body).slots[slot as usize].name;
+                let Some(p) = visible(geo::local_from_lonlat(lon, lat) * 1.03) else { continue };
+                let (text, colour, hit) = match game.colony_at(body, slot) {
+                    Some(c) => {
+                        let mods: Vec<String> = c.modules.iter().map(|m| format!("{}{}", m.kind.name(), if m.online { "" } else { " (offline)" })).collect();
+                        let army = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(c.id))).count();
+                        let owner = c.control.director().map(|s| game.seat_name(s)).unwrap_or_default();
+                        (
+                            format!("{}: {}\n{} Colonists\n{}{}", name, owner, c.colonists, mods.join(", "), if army > 0 { format!("\nArmies: {army}") } else { String::new() }),
+                            c.control.director().map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY),
+                            Hit::Select(Selection::Colony(c.id)),
+                        )
+                    }
+                    None => (format!("{name}: empty"), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot))),
+                };
+                label_at(painter, p + egui::vec2(0.0, 24.0), &text, colour, 12.0);
+                hotspots.push(Hotspot { pos: p, radius: 22.0, hit });
+            }
+}
+
+/// Ticket #46: the stations over the Body on screen, and the orbital slots still free.
+fn stations_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    let View::Surface(body) = view.view else { return };
+    let card = game.tables.body(body);
+    if card.orbital_slots == 0 {
+        return;
+    }
+    ui.separator();
+    let count = game.colonies.iter().filter(|c| c.in_orbit && c.body == body).count();
+    ui.label(RichText::new(format!("In orbit: {} of {} station slots", count, card.orbital_slots)).strong());
+    for c in game.colonies.iter().filter(|c| c.in_orbit && c.body == body) {
+        let owner = match c.control {
+            Control::Neutral => "nobody's".to_string(),
+            Control::Controlled(s) => game.seat_name(s),
+            Control::Occupied { occupier, .. } => format!("occupied by the {}", game.seat_name(occupier)),
+        };
+        let mods: Vec<&str> = c.modules.iter().map(|m| m.kind.name()).collect();
+        let text = format!("{}: {}, {} Colonists, {}", game.station_name(body, c.slot), owner, c.colonists, if mods.is_empty() { "a bare core module".to_string() } else { mods.join(", ") });
+        if ui.button(text).clicked() {
+            view.selection = Selection::Colony(c.id);
+        }
+    }
+    for slot in game.free_orbital_slots(body) {
+        cost_button(ui, game, &session.pending, Order::BuildStation { body, slot }, &format!("Build {} here", game.station_name(body, slot)), actions);
+    }
+    ui.label(RichText::new("A station holds a Shipyard and Habitats. Ships are built only at a Shipyard.").weak());
+}
+
+/// The Colony Slot within fourteen degrees of a point on a Body, nearest first.
+fn nearest_slot(game: &Game, body: BodyId, lon: f32, lat: f32) -> Option<u32> {
+    let mut best: Option<(f32, u32)> = None;
+    for slot in 0..game.tables.body(body).colony_slots() {
+        let (slon, slat) = geo::slot_lonlat(game.tables.body(body), slot);
+        let d = geo::local_from_lonlat(slon, slat).angle_between(geo::local_from_lonlat(lon, lat)).to_degrees();
+        if d < 14.0 && best.map(|(bd, _)| d < bd).unwrap_or(true) {
+            best = Some((d, slot));
+        }
+    }
+    best.map(|(_, slot)| slot)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -576,23 +646,21 @@ fn pick(pos: Pos2, session: &Session, game: &Game, view: &mut ViewState, camera:
             let (lon, lat) = geo::lonlat_from_local(local);
             match body {
                 BodyId::Earth => {
-                    let (x, y) = geo::pixel_for(lon, lat, textures.earth.w, textures.earth.h);
-                    view.selection = match textures.state_at(x, y) {
-                        Some(s) => Selection::State(s),
-                        None => Selection::None,
+                    // Ticket #44: a Colony Slot in Antarctica first, else the Nation State under the click.
+                    view.selection = match nearest_slot(game, body, lon, lat) {
+                        Some(slot) => match game.colony_at(body, slot) {
+                            Some(c) => Selection::Colony(c.id),
+                            None => Selection::Slot(body, slot),
+                        },
+                        None => {
+                            let (x, y) = geo::pixel_for(lon, lat, textures.earth.w, textures.earth.h);
+                            textures.state_at(x, y).map(Selection::State).unwrap_or(Selection::None)
+                        }
                     };
                 }
                 _ => {
-                    let mut best: Option<(f32, u32)> = None;
-                    for slot in 0..game.tables.body(body).colony_slots {
-                        let (slon, slat) = geo::slot_lonlat(body, slot);
-                        let d = geo::local_from_lonlat(slon, slat).angle_between(geo::local_from_lonlat(lon, lat)).to_degrees();
-                        if d < 14.0 && best.map(|(bd, _)| d < bd).unwrap_or(true) {
-                            best = Some((d, slot));
-                        }
-                    }
-                    view.selection = match best {
-                        Some((_, slot)) => match game.colony_at(body, slot) {
+                    view.selection = match nearest_slot(game, body, lon, lat) {
+                        Some(slot) => match game.colony_at(body, slot) {
                             Some(c) => Selection::Colony(c.id),
                             None => Selection::Slot(body, slot),
                         },
@@ -625,7 +693,7 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                     ui.label(RichText::new(match view.view {
                         View::Solar => "Solar System Map",
                         View::Surface(BodyId::Earth) => "Earth Map",
-                        View::Surface(b) => if b == BodyId::Moon { "The Moon" } else { "Mars" },
+                        View::Surface(b) => game.tables.body(b).name.as_str(),
                     }).size(20.0).strong());
                     ui.label(match view.view {
                         View::Solar => "Click a Body to enter its surface. Click a Ship stack for orders.",
@@ -635,6 +703,7 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                     if let Some(e) = &session.last_error {
                         ui.colored_label(Color32::LIGHT_RED, e);
                     }
+                    stations_panel(ui, session, game, view, actions);
                     ui.separator();
                     roster(ui, session, game, view);
                 }
@@ -712,7 +781,7 @@ fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
         }
     }
     if !any_ship {
-        ui.label(RichText::new("  none; a Launch Site builds them").weak());
+        ui.label(RichText::new("  none; a Shipyard on a station or Colony builds them").weak());
     }
     // Armies.
     ui.label(RichText::new("Armies").strong());
@@ -741,7 +810,7 @@ fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
         ui.label(RichText::new("  none").weak());
     }
     // Colonies.
-    ui.label(RichText::new("Colonies").strong());
+    ui.label(RichText::new("Colonies and stations").strong());
     let mut any_colony = false;
     for c in game.colonies.iter().filter(|c| c.control.director() == Some(Seat(0))) {
         any_colony = true;
@@ -794,7 +863,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::MoveArmy { army, to } => format!("{} to {}", army, game.tables.state(*to).name),
         Order::Load { ship, colonists, army, .. } => format!("Load {} onto {}", if *colonists > 0 { format!("{colonists} Colonists") } else { format!("{}", army.unwrap_or(ArmyId(0))) }, ship),
         Order::Unload { ship, colonists, army, into } => match into {
-            UnloadTarget::Slot(b, s) => format!("Found a Colony in slot {} on {} from {}", s + 1, game.tables.body(*b).name, ship),
+            UnloadTarget::Slot(b, s) => format!("Found a Colony at {} on {} from {}", game.tables.body(*b).slots[*s as usize].name, game.tables.body(*b).name, ship),
             UnloadTarget::Colony(c) => format!("Unload {} from {} into {}", if *colonists > 0 { format!("{colonists} Colonists") } else if *army { "the Army".into() } else { "nothing".into() }, ship, game.place_name(Place::Colony(*c))),
         },
         Order::Influence { target, amount } => format!("{} Influence on {}", amount, game.place_name(*target)),
@@ -802,6 +871,11 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuyInfluence { amount } => format!("Buy {} Influence with Ducats", amount),
         Order::RestorationWithDucats { steps } => format!("Restoration: {} step(s) paid in Ducats", steps),
         Order::RepairWithDucats { unit, points } => format!("Repair {} point(s) on {} with Ducats", points, match unit { UnitRef::Ship(s) => s.to_string(), UnitRef::Army(a) => a.to_string() }),
+        Order::Buy { resource, amount } => format!("Buy {} {} for {} Ducats", amount, resource.name(), game.order_cost(Seat(0), o).ducats),
+        Order::Sell { resource, amount } => format!("Sell {} {} for {} Ducats", amount, resource.name(), -game.order_cost(Seat(0), o).ducats),
+        Order::BuildFacilityWithDucats { state, kind } => format!("Build {} in {} for Ducats", kind.name(), game.tables.state(*state).name),
+        Order::BuildModuleWithDucats { colony, kind } => format!("Build {} at {} for Ducats", kind.name(), game.place_name(Place::Colony(*colony))),
+        Order::BuildStation { body, slot } => format!("Build {} over {}", game.station_name(*body, *slot), game.tables.body(*body).name),
     }
 }
 
@@ -863,15 +937,10 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
             ui.label(RichText::new(e.0).weak());
         }
     });
-    ui.horizontal(|ui| {
-        // Ticket #35: Ducats buy Influence for this turn's Allotment.
-        let buy = Order::BuyInfluence { amount: view.influence_amount };
-        let cost = game.order_cost(Seat(0), &buy).ducats;
-        let ok = game.check_order(Seat(0), &session.pending, &buy);
-        if ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Buy {} Influence for {} Ducats", view.influence_amount, cost))).on_hover_text("Adds to this turn's Allotment, spendable at once on any target").clicked() {
-            actions.push(Action::Place(buy));
-        }
-    });
+    // Ticket #42: buying Influence lives in the Trading window now.
+    if ui.small_button("Buy more Influence in the Trading window").clicked() {
+        view.show_trade = true;
+    }
     let threshold = game.influence_threshold(target);
     for seat in Seat::ALL {
         let _ = seat;
@@ -941,16 +1010,23 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         ui.label(RichText::new("Build (hover a button for what it makes)").strong());
         for fk in FacilityKind::ALL {
             let hover = game.facility_yield(Seat(0), sid, fk).text();
-            cost_button_with_hover(ui, game, &session.pending, Order::BuildFacility { state: sid, kind: fk }, fk.name(), Some(hover), actions);
+            ui.horizontal(|ui| {
+                cost_button_with_hover(ui, game, &session.pending, Order::BuildFacility { state: sid, kind: fk }, fk.name(), Some(hover), actions);
+                // Ticket #42: the same building bought outright for Ducats.
+                cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: fk }, "or", actions);
+            });
         }
         cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
-        if st.facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite) {
-            ui.label(RichText::new("Ships (Launch Site)").strong());
-            for uk in UnitKind::SHIPS {
-                cost_button(ui, game, &session.pending, Order::BuildShip { site: Place::State(sid), kind: uk }, uk.name(), actions);
-            }
-        }
+        // Ticket #46: Ships come from Shipyards; a Launch Site lifts people to orbit.
+        ui.label(
+            RichText::new(if st.facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online) {
+                "Launch Site: Colonists and Armies lift to orbit from here. Ships are built at a Shipyard on a station or Colony."
+            } else {
+                "No working Launch Site: nothing lifts to orbit from here."
+            })
+            .weak(),
+        );
         let my_armies: Vec<&Army> = armies.iter().copied().filter(|a| game.army_seat(a) == Some(Seat(0)) && !game.army_stands_down(a)).collect();
         if !my_armies.is_empty() {
             ui.label(RichText::new("Army orders").strong());
@@ -1026,10 +1102,18 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     if mine {
         ui.label(RichText::new("Build (hover a button for what it makes)").strong());
         for mk in ModuleKind::ALL {
+            if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Habitat) {
+                continue;
+            }
             let hover = game.module_yield(Seat(0), cid, mk).text();
-            cost_button_with_hover(ui, game, &session.pending, Order::BuildModule { colony: cid, kind: mk }, mk.name(), Some(hover), actions);
+            ui.horizontal(|ui| {
+                cost_button_with_hover(ui, game, &session.pending, Order::BuildModule { colony: cid, kind: mk }, mk.name(), Some(hover), actions);
+                cost_button(ui, game, &session.pending, Order::BuildModuleWithDucats { colony: cid, kind: mk }, "or", actions);
+            });
         }
-        cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::Colony(cid) }, "Build Army (Barracks)", actions);
+        if !col.in_orbit {
+            cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::Colony(cid) }, "Build Army (Barracks)", actions);
+        }
         if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
             ui.label(RichText::new("Ships (Shipyard)").strong());
             for uk in UnitKind::SHIPS {
@@ -1051,7 +1135,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
 }
 
 fn slot_panel(ui: &mut Ui, game: &Game, body: BodyId, slot: u32, actions: &mut Vec<Action>) {
-    ui.label(RichText::new(format!("Colony Slot {} on {}", slot + 1, game.tables.body(body).name)).size(22.0).strong());
+    ui.label(RichText::new(format!("{}, Colony Slot {} on {}", game.tables.body(body).slots[slot as usize].name, slot + 1, game.tables.body(body).name)).size(22.0).strong());
     ui.label("Empty. A Colony Ship carrying Colonists founds a Colony here; a Habitat comes with it.");
     let card = game.tables.body(body);
     ui.label(format!("Yields here: Mine x{}, Generator x{}, Refinery x{}, Habitat x{}", card.mine_yield, card.generator_yield, card.refinery_yield, card.habitat_yield));
@@ -1146,7 +1230,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 _ => {
                     for c in game.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(Seat(0)) && c.colonists > 0) {
                         let k = n.min(c.colonists);
-                        cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: k, from: LoadSource::Colony(c.id), army: None }, &format!("Load {} Colonists from slot {}", k, c.slot + 1), actions);
+                        cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: k, from: LoadSource::Colony(c.id), army: None }, &format!("Load {} Colonists from {}", k, game.tables.body(c.body).slots[c.slot as usize].name), actions);
                     }
                 }
             }
@@ -1177,17 +1261,17 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     let room = game.habitat_room(c).saturating_sub(c.colonists);
                     let k = s.colonists.min(room);
                     if k > 0 {
-                        cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: k, army: false, into: UnloadTarget::Colony(c.id) }, &format!("Unload {} Colonists into slot {}", k, c.slot + 1), actions);
+                        cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: k, army: false, into: UnloadTarget::Colony(c.id) }, &format!("Unload {} Colonists into {}", k, game.tables.body(c.body).slots[c.slot as usize].name), actions);
                     }
                 }
                 if s.army.is_some() {
-                    let label = if own { format!("Land the Army at slot {}", c.slot + 1) } else { format!("Land the Army to attack slot {}", c.slot + 1) };
+                    let label = if own { format!("Land the Army at {}", game.tables.body(c.body).slots[c.slot as usize].name) } else { format!("Land the Army to attack {}", game.tables.body(c.body).slots[c.slot as usize].name) };
                     cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: 0, army: true, into: UnloadTarget::Colony(c.id) }, &label, actions);
                 }
             }
             if s.kind == UnitKind::ColonyShip && s.colonists > 0 && body != BodyId::Earth {
                 for slot in game.free_slots_on(body) {
-                    cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) }, &format!("Found a Colony in slot {}", slot + 1), actions);
+                    cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) }, &format!("Found a Colony at {}", game.tables.body(body).slots[slot as usize].name), actions);
                 }
             }
         }
@@ -1207,10 +1291,155 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
 
 // ------------------------------------------------------------------ popups
 
+/// Ticket #42: the trading window. Ducats buy Influence, Materials, Fuel and Energy at the table
+/// prices, spendable in this turn's orders; Materials and Fuel sell back at half; buildings are
+/// bought for Ducats from their own build buttons.
+fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    let (left, _) = game.remaining(Seat(0), &session.pending);
+    ui.label(RichText::new(format!("Ducats {} to spend this turn (+{} last Income).", left.ducats, game.seat(Seat(0)).income_last_turn.ducats)).strong());
+    ui.label("What you buy is yours at once, for this turn's orders. Ducats come from your Nation States' economies, Banks and Trade Posts.");
+    ui.separator();
+    let lines: [(usize, Option<dying_earth_engine::Resource>, &str); 4] = [(0, None, "Influence"), (1, Some(dying_earth_engine::Resource::Materials), "Materials"), (2, Some(dying_earth_engine::Resource::Fuel), "Fuel"), (3, Some(dying_earth_engine::Resource::Energy), "Energy")];
+    egui::Grid::new("trade_grid").num_columns(5).spacing((12.0, 6.0)).show(ui, |ui| {
+        ui.label(RichText::new("Line").strong());
+        ui.label(RichText::new("Price").strong());
+        ui.label(RichText::new("Quantity").strong());
+        ui.label(RichText::new("Buy").strong());
+        ui.label(RichText::new("Sell").strong());
+        ui.end_row();
+        for (i, res, name) in lines {
+            let per = match res {
+                None => game.tables.ducats.per_influence,
+                Some(r) => game.trade_price(r).unwrap_or(0),
+            };
+            ui.label(name);
+            let sells = matches!(res, Some(dying_earth_engine::Resource::Materials) | Some(dying_earth_engine::Resource::Fuel));
+            ui.label(if sells { format!("{per} Ducats each; sells for {:.1}", per as f64 / game.tables.ducats.sell_divisor.max(1) as f64) } else { format!("{per} Ducats each") });
+            ui.add(egui::DragValue::new(&mut view.trade_amounts[i]).range(1..=999).speed(1.0));
+            let n = view.trade_amounts[i].max(1);
+            let buy = match res {
+                None => Order::BuyInfluence { amount: n },
+                Some(r) => Order::Buy { resource: r, amount: n },
+            };
+            let cost = game.order_cost(Seat(0), &buy).ducats;
+            let ok = game.check_order(Seat(0), &session.pending, &buy);
+            let mut resp = ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Buy for {cost} Ducats")));
+            if let Err(e) = &ok {
+                resp = resp.on_disabled_hover_text(&e.0);
+            }
+            if resp.clicked() {
+                actions.push(Action::Place(buy));
+            }
+            if let Some(r) = res.filter(|_| sells) {
+                let sell = Order::Sell { resource: r, amount: n };
+                let gain = -game.order_cost(Seat(0), &sell).ducats;
+                let ok = game.check_order(Seat(0), &session.pending, &sell);
+                let mut resp = ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Sell for {gain} Ducats")));
+                if let Err(e) = &ok {
+                    resp = resp.on_disabled_hover_text(&e.0);
+                }
+                if resp.clicked() {
+                    actions.push(Action::Place(sell));
+                }
+            } else {
+                ui.label(RichText::new("not bought back").weak());
+            }
+            ui.end_row();
+        }
+    });
+    ui.separator();
+    ui.label(format!("Buildings: every build button on a Nation State or Colony card has an \"or\" beside it that buys the building outright for Ducats, at {} times its Materials cost.", game.tables.ducats.per_building_material));
+    let trades: Vec<String> = session.pending.iter().filter(|o| matches!(o, Order::Buy { .. } | Order::Sell { .. } | Order::BuyInfluence { .. } | Order::BuildFacilityWithDucats { .. } | Order::BuildModuleWithDucats { .. })).map(|o| order_text(game, o)).collect();
+    if !trades.is_empty() {
+        ui.separator();
+        ui.label(RichText::new("Trades this turn (undo them in the orders list)").strong());
+        for t in trades {
+            ui.label(t);
+        }
+    }
+}
+
+/// Ticket #41: the Tech Tree drawn as a tree. One column per branch, one row per rung, a line from
+/// every Tech to each Tech that needs it, each box coloured by its state.
+fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, actions: &mut Vec<Action>) {
+    const COL: f32 = 156.0;
+    const ROW: f32 = 96.0;
+    const BOX_W: f32 = 140.0;
+    const BOX_H: f32 = 64.0;
+    const HEAD: f32 = 26.0;
+    let mut branches: Vec<String> = Vec::new();
+    for t in TechId::ALL {
+        let b = &game.tables.tech(t).branch;
+        if !branches.contains(b) {
+            branches.push(b.clone());
+        }
+    }
+    let rungs = TechId::ALL.iter().map(|t| game.tables.tech(*t).rung).max().unwrap_or(1).max(1);
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(COL * branches.len() as f32, HEAD + ROW * rungs as f32), egui::Sense::hover());
+    let painter = ui.painter_at(rect);
+    let box_of = |t: TechId| -> egui::Rect {
+        let card = game.tables.tech(t);
+        let c = branches.iter().position(|b| *b == card.branch).unwrap_or(0) as f32;
+        let r = card.rung.max(1) as f32 - 1.0;
+        let min = rect.min + egui::vec2(c * COL + (COL - BOX_W) / 2.0, HEAD + r * ROW + (ROW - BOX_H) / 2.0);
+        egui::Rect::from_min_size(min, egui::vec2(BOX_W, BOX_H))
+    };
+    for (i, b) in branches.iter().enumerate() {
+        painter.text(rect.min + egui::vec2(i as f32 * COL + COL / 2.0, HEAD / 2.0), egui::Align2::CENTER_CENTER, b, FontId::proportional(14.0), Color32::WHITE);
+    }
+    // Lines first, so the boxes sit on top of them. A line is green once the Tech it comes from is done.
+    for t in TechId::ALL {
+        for n in &game.tables.tech(t).needs {
+            let from = box_of(*n).center_bottom();
+            let to = box_of(t).center_top();
+            let colour = if game.research.done.contains(n) { Color32::from_rgb(120, 200, 120) } else { Color32::from_gray(150) };
+            painter.line_segment([from, to], egui::Stroke::new(2.0, colour));
+            painter.circle_filled(to, 3.5, colour);
+        }
+    }
+    for t in TechId::ALL {
+        let card = game.tables.tech(t);
+        let r = box_of(t);
+        let (fill, status) = if game.research.done.contains(&t) {
+            (Color32::from_rgb(50, 120, 60), "done")
+        } else if game.research.current == Some(t) {
+            (Color32::from_rgb(170, 130, 30), "under research")
+        } else if available.contains(&t) {
+            (Color32::from_rgb(40, 90, 160), "available")
+        } else {
+            (Color32::from_gray(60), "locked")
+        };
+        painter.rect(r, 6.0, fill, egui::Stroke::new(1.0, Color32::from_gray(200)), egui::StrokeKind::Inside);
+        painter.text(r.center_top() + egui::vec2(0.0, 14.0), egui::Align2::CENTER_CENTER, &card.name, FontId::proportional(13.0), Color32::WHITE);
+        painter.text(r.center_top() + egui::vec2(0.0, 32.0), egui::Align2::CENTER_CENTER, format!("cost {} - {}", card.cost, status), FontId::proportional(11.0), Color32::from_gray(230));
+        let needs = if card.needs.is_empty() { "nothing".to_string() } else { card.needs.iter().map(|n| game.tables.tech(*n).name.clone()).collect::<Vec<_>>().join(" and ") };
+        ui.interact(r, ui.id().with(format!("tech-{t:?}")), egui::Sense::hover()).on_hover_text(format!("{} (rung {}, cost {} Research)\n{}\nNeeds: {}", card.name, card.rung, card.cost, card.effect, needs));
+        if must_pick && available.contains(&t) {
+            let b = egui::Rect::from_center_size(r.center_bottom() - egui::vec2(0.0, 11.0), egui::vec2(56.0, 18.0));
+            if ui.put(b, egui::Button::new(RichText::new("Pick").size(11.0))).clicked() {
+                actions.push(Action::PickTech(t));
+            }
+        }
+    }
+    ui.horizontal(|ui| {
+        for (colour, label) in [(Color32::from_rgb(50, 120, 60), "done"), (Color32::from_rgb(170, 130, 30), "under research"), (Color32::from_rgb(40, 90, 160), "available"), (Color32::from_gray(60), "locked")] {
+            let (sw, _) = ui.allocate_exact_size(egui::vec2(14.0, 14.0), egui::Sense::hover());
+            ui.painter().rect_filled(sw, 3.0, colour);
+            ui.label(label);
+        }
+        ui.label("Hover a box for its effect.");
+    });
+}
+
 fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    if view.show_trade {
+        let mut open = true;
+        egui::Window::new("Trading").open(&mut open).default_width(470.0).show(ctx, |ui| trading_window(ui, session, game, view, actions));
+        view.show_trade = open;
+    }
     if view.show_tech {
         let mut open = true;
-        egui::Window::new("Tech Tree").open(&mut open).default_width(560.0).show(ctx, |ui| {
+        egui::Window::new("Tech Tree").open(&mut open).resizable(false).show(ctx, |ui| {
             ui.label(match game.research.current {
                 Some(t) => format!("Under research: {} ({} of {}). {}", game.tables.tech(t).name, game.research.progress, game.tables.tech(t).cost, game.research_lead_text()),
                 None => format!("No Tech under research. {} Research waiting.", game.research.unallocated),
@@ -1220,37 +1449,20 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.colored_label(Color32::YELLOW, "You pick the next Tech: choose one below.");
             }
             let available = game.available_techs();
-            let mut branch = String::new();
-            for t in TechId::ALL {
-                let card = game.tables.tech(t);
-                if card.branch != branch {
-                    branch = card.branch.clone();
-                    ui.separator();
-                    ui.label(RichText::new(&branch).strong());
-                }
-                let status = if game.research.done.contains(&t) {
-                    "done".to_string()
-                } else if game.research.current == Some(t) {
-                    "under research".to_string()
-                } else if available.contains(&t) {
-                    "available".to_string()
-                } else {
-                    format!("needs {}", card.needs.iter().map(|n| game.tables.tech(*n).name.clone()).collect::<Vec<_>>().join(" and "))
-                };
-                ui.horizontal(|ui| {
-                    ui.label(format!("{} (rung {}, cost {}): {} [{}]", card.name, card.rung, card.cost, card.effect, status));
-                    if must_pick && available.contains(&t) && ui.button("Pick").clicked() {
-                        actions.push(Action::PickTech(t));
-                    }
-                });
-            }
+            tech_tree(ui, game, &available, must_pick, actions);
         });
         view.show_tech = open;
     }
     if view.show_climate {
         let mut open = true;
         let bottom = ctx.viewport_rect().max.y;
-        egui::Window::new("Climate Panel").open(&mut open).default_pos((10.0, bottom - 400.0)).default_width(400.0).show(ctx, |ui| {
+        let home = (10.0, bottom - 400.0);
+        let mut window = egui::Window::new("Climate Panel").open(&mut open).default_pos(home).default_width(400.0);
+        if view.climate_reopen {
+            window = window.current_pos(home);
+            view.climate_reopen = false;
+        }
+        window.show(ctx, |ui| {
             let c = &game.climate;
             let e = &c.last;
             ui.label(RichText::new(format!("CO2 Stock {:.1} ppm", c.co2)).strong());

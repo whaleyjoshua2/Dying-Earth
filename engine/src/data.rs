@@ -27,17 +27,44 @@ pub struct Produces {
     pub amount: i64,
 }
 
+/// A Colony Slot: a real place on its Body, at its approximate longitude and latitude (ticket #45).
+#[derive(Debug, Clone, Deserialize)]
+pub struct SlotCard {
+    pub name: String,
+    pub lon: f32,
+    pub lat: f32,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct BodyCard {
     pub id: BodyId,
     pub name: String,
-    pub colony_slots: u32,
+    #[serde(default)]
+    pub slots: Vec<SlotCard>,
+    /// Ticket #46: orbital slots for stations, and the station names by slot.
+    #[serde(default)]
+    pub orbital_slots: u32,
+    #[serde(default)]
+    pub stations: Vec<String>,
+    /// Ticket #45: the Body this one orbits, and the hop between them.
+    #[serde(default)]
+    pub parent: Option<BodyId>,
+    #[serde(default)]
+    pub local_turns: u32,
+    #[serde(default)]
+    pub local_fuel: i64,
     pub transit_turns: u32,
     pub transit_fuel: i64,
     pub mine_yield: f64,
     pub generator_yield: f64,
     pub refinery_yield: f64,
     pub habitat_yield: f64,
+}
+
+impl BodyCard {
+    pub fn colony_slots(&self) -> u32 {
+        self.slots.len() as u32
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -102,6 +129,9 @@ pub struct ModuleCard {
     pub influence_allotment: i64,
     #[serde(default)]
     pub standing_per_turn: i64,
+    /// Version 0.04 (ticket #44): what the Module emits on Earth, as its counterpart Facility does.
+    #[serde(default)]
+    pub earth_emissions: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -192,6 +222,9 @@ pub struct FactionCard {
     pub signature: String,
     pub victory: String,
     pub colour: [f32; 3],
+    /// Ticket #46: the station over Earth the Faction starts with, by name in bodies.toml.
+    #[serde(default)]
+    pub start_station: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -216,6 +249,12 @@ pub struct DucatsCard {
     pub per_influence: i64,
     pub per_restoration_step: i64,
     pub per_repair_point: i64,
+    /// Version 0.04 (ticket #42): the trading window's prices.
+    pub per_materials: i64,
+    pub per_fuel: i64,
+    pub per_energy: i64,
+    pub sell_divisor: i64,
+    pub per_building_material: i64,
     pub bank_per_gdp_tenth: f64,
     pub trade_post_base: f64,
 }
@@ -245,6 +284,11 @@ pub struct InfluenceTable {
     pub decay: i64,
     /// Ticket #33: decay on a place the Faction controls.
     pub decay_controlled: i64,
+    /// Version 0.04 (ticket #41): a challenger needs the controller's standing plus this.
+    pub challenge_margin: i64,
+    /// Ticket #46: a station's threshold starts here.
+    #[serde(default)]
+    pub station_threshold_base: i64,
     pub occupation_turns: u32,
     pub destruction_chance: f64,
 }
@@ -333,6 +377,21 @@ pub struct AiTable {
 #[derive(Debug, Clone, Deserialize)]
 struct BodiesFile {
     body: Vec<BodyCard>,
+    #[serde(default = "one_u32")]
+    sibling_turns: u32,
+    #[serde(default = "one_i64")]
+    sibling_fuel: i64,
+    #[serde(default = "forty")]
+    station_materials: i64,
+}
+fn forty() -> i64 {
+    40
+}
+fn one_u32() -> u32 {
+    1
+}
+fn one_i64() -> i64 {
+    1
 }
 #[derive(Debug, Clone, Deserialize)]
 struct StatesFile {
@@ -368,6 +427,10 @@ struct FactionsFile {
 #[derive(Debug, Clone)]
 pub struct Tables {
     pub bodies: Vec<BodyCard>,
+    /// Ticket #45: the hop between two satellites of the same Body.
+    pub sibling_transit: (u32, i64),
+    /// Ticket #46: what a station costs.
+    pub station_materials: i64,
     pub states: Vec<StateCard>,
     pub facilities: Vec<FacilityCard>,
     pub industry_level: IndustryLevelCard,
@@ -418,6 +481,8 @@ impl Tables {
         let victory: VictoryTable = read(dir, "victory.toml")?;
         let ai: AiTable = read(dir, "ai.toml")?;
         let tables = Tables {
+            sibling_transit: (bodies.sibling_turns, bodies.sibling_fuel),
+            station_materials: bodies.station_materials,
             bodies: bodies.body,
             states: states.state,
             facilities: facilities.facility,
@@ -448,7 +513,7 @@ impl Tables {
         check_rows("modules.toml", &ModuleKind::ALL, self.modules.iter().map(|m| m.id))?;
         check_rows(
             "units.toml",
-            &[UnitKind::ColonyShip, UnitKind::Frigate, UnitKind::Battleship, UnitKind::Army],
+            &[UnitKind::ColonyShip, UnitKind::Frigate, UnitKind::Battleship, UnitKind::Carrier, UnitKind::Army],
             self.units.iter().map(|u| u.id),
         )?;
         check_rows("techs.toml", &TechId::ALL, self.techs.iter().map(|t| t.id))?;

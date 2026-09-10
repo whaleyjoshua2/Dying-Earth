@@ -7,6 +7,8 @@ materials = 20
 build_turns = 1
 energy_upkeep = 3
 produces = { resource = "materials", amount = 4 }
+# Version 0.04 (ticket #44): on Earth (Antarctica) a Module emits as its counterpart Facility does.
+earth_emissions = 1.0
 
 [[module]]
 id = "generator"
@@ -15,6 +17,7 @@ materials = 25
 build_turns = 2
 energy_upkeep = 0
 produces = { resource = "energy", amount = 5 }
+earth_emissions = 1.5
 
 [[module]]
 id = "refinery"
@@ -23,6 +26,7 @@ materials = 20
 build_turns = 1
 energy_upkeep = 3
 produces = { resource = "fuel", amount = 3 }
+earth_emissions = 1.5
 
 [[module]]
 id = "habitat"

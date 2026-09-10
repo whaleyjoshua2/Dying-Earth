@@ -16,13 +16,42 @@ pub struct ShotPlan {
     pub menus: bool,
     pub menu_step: usize,
     pub select: Option<String>,
+    /// `tech:1` (a building aid): the Tech Tree window is open in every picture.
+    pub tech: bool,
+    /// `climate:toggle` (a building aid): the Earth picture closes the Climate Panel and brings it
+    /// back through `toggle_climate`, the path the button and the C key use.
+    pub climate_toggle: bool,
+    pub toggled: bool,
+    /// `trade:1` (a building aid): the trading window is open in every picture.
+    pub trade: bool,
+    /// `look:<lon>,<lat>` (a building aid): every surface picture faces that point.
+    pub look: Option<(f32, f32)>,
 }
 
-const VIEWS: [(&str, View); 4] = [
+fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
+    if plan.tech {
+        view.show_tech = true;
+    }
+    if plan.trade {
+        view.show_trade = true;
+    }
+    if let (Some((lon, lat)), View::Surface(_)) = (plan.look, view.view) {
+        view.yaw = crate::geo::yaw_facing(lon, lat);
+        view.pitch = lat.to_radians().clamp(-1.3, 1.3);
+    }
+    if plan.climate_toggle && view.view == View::Surface(BodyId::Earth) {
+        view.show_climate = false;
+        plan.toggled = false;
+    }
+}
+
+const VIEWS: [(&str, View); 6] = [
     ("solar", View::Solar),
     ("earth", View::Surface(BodyId::Earth)),
     ("moon", View::Surface(BodyId::Moon)),
     ("mars", View::Surface(BodyId::Mars)),
+    ("phobos", View::Surface(BodyId::Phobos)),
+    ("deimos", View::Surface(BodyId::Deimos)),
 ];
 
 const MENUS: [&str; 4] = ["title", "faction", "start", "report"];
@@ -121,6 +150,14 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         show_view(&mut view, VIEWS[0].1);
         // `select:<state id>` (a building aid) opens that Nation State's card in the Earth picture.
         plan.select = std::env::args().find_map(|a| a.strip_prefix("select:").map(str::to_owned));
+        plan.tech = std::env::args().any(|a| a == "tech:1");
+        plan.trade = std::env::args().any(|a| a == "trade:1");
+        plan.look = std::env::args().find_map(|a| {
+            let (lon, lat) = a.strip_prefix("look:")?.split_once(',')?;
+            Some((lon.parse().ok()?, lat.parse().ok()?))
+        });
+        plan.climate_toggle = std::env::args().any(|a| a == "climate:toggle");
+        apply_aids(&mut plan, &mut view);
         plan.next_at = t + 4.0;
         return;
     }
@@ -134,6 +171,12 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         return;
     }
     if !plan.captured {
+        if plan.climate_toggle && !plan.toggled && view.view == View::Surface(BodyId::Earth) {
+            plan.toggled = true;
+            crate::ui::toggle_climate(&mut view);
+            plan.next_at = t + 1.0;
+            return;
+        }
         let (name, _) = VIEWS[plan.step];
         let path = format!("{}-{}.png", session.shot_prefix, name);
         commands.spawn(Screenshot::primary_window()).observe(save_to_disk(path));
@@ -149,6 +192,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
     } else {
         let (_, v) = VIEWS[plan.step];
         show_view(&mut view, v);
+        apply_aids(&mut plan, &mut view);
         let wanted = plan.select.as_ref().filter(|_| v == View::Surface(BodyId::Earth)).and_then(|name| StateId::ALL.into_iter().find(|s| format!("{s:?}").eq_ignore_ascii_case(name)));
         if let Some(s) = wanted {
             view.selection = Selection::State(s);
