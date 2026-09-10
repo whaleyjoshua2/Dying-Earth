@@ -848,6 +848,10 @@ impl Game {
             let mut standing: Vec<(BuildingRef, &'static str, bool, bool, f64)> = Vec::new();
             for sid in self.directed_states(seat) {
                 for (i, f) in self.state(sid).facilities.iter().enumerate() {
+                    // Ticket #56: never the Launch Site; it is the only way to lift anything.
+                    if f.kind == FacilityKind::LaunchSite {
+                        continue;
+                    }
                     let produces = self.tables.facility(f.kind).produces.is_some();
                     standing.push((BuildingRef::Facility(sid, i), f.kind.name(), f.mothballed, produces, self.facility_yield(seat, sid, f.kind).emissions));
                 }
@@ -855,7 +859,9 @@ impl Game {
             for cid in self.directed_colonies(seat) {
                 let col = self.colony(cid).unwrap();
                 for (i, md) in col.modules.iter().enumerate() {
-                    if md.kind == ModuleKind::Archive {
+                    // Ticket #56: never the Shipyard either; a mothballed one starved the
+                    // Custodian AI of every Colony Ship while its Scrubbers ate the Energy.
+                    if md.kind == ModuleKind::Archive || md.kind == ModuleKind::Shipyard {
                         continue;
                     }
                     let produces = self.tables.module(md.kind).produces.is_some();
@@ -1160,8 +1166,9 @@ impl Game {
         let mut chosen: Vec<Order> = Vec::new();
         let mut stacks_done: Vec<String> = Vec::new();
         let mut lines: Vec<String> = Vec::new();
-        // Saving: once a legal, higher-scored action is out of reach now but within one more turn of
-        // Materials income, Materials are held for it rather than spent on lower-scored actions.
+        // Saving: once a legal, higher-scored action is out of reach now but within four more turns
+        // of Materials income, Materials are held for it rather than spent on lower-scored actions
+        // (ticket #56: one turn let a Factory bought every turn starve the Colony Ship for good).
         let mut reserve: Option<String> = None;
         // Ticket #54: the same for Ducats, held for a higher-scored Ducat action (a Leapfrog) that
         // three turns of Ducat income would bring within reach.
@@ -1194,11 +1201,11 @@ impl Game {
                 }
                 let (left, _) = self.remaining(seat, &chosen);
                 if materials_cost > left.materials
-                    && materials_cost <= left.materials + materials_income
+                    && materials_cost <= left.materials + 4 * materials_income
                     && c.orders.iter().all(|o| self.check_order_legality(seat, &chosen, o).is_ok())
                 {
                     reserve = Some(c.note.clone());
-                    lines.push(format!("  wait  {:6.1}  {} (affordable next turn)", c.score(), c.note));
+                    lines.push(format!("  wait  {:6.1}  {} (affordable within four turns)", c.score(), c.note));
                     continue;
                 }
             }

@@ -3682,3 +3682,59 @@ fn h_the_ai_raises_a_sea_wall_when_the_sea_is_close() {
         "no Coastal Engineering, no Sea Wall: {orders:?}"
     );
 }
+
+/// Ticket #56: the AI holds Materials for a dearer, higher-scored build within four turns of
+/// income, so a Colony Ship is not starved by a Factory bought every turn once the states have
+/// slots to spare.
+#[test]
+fn the_ai_holds_materials_four_turns_for_a_colony_ship_it_wants_more_than_a_factory() {
+    let mut g = game();
+    let cust = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    let iss = station_of(&g, cust, BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    g.turn = 8;
+    // Every build slot in its state is full, so the only Materials sinks are Ships: the Colony
+    // Ship it wants (30) and a Frigate it wants less (25), which it must not buy meanwhile.
+    for sid in g.controlled_states(cust) {
+        while g.free_slots(sid) > 0 {
+            g.state_mut(sid).facilities.push(facility(FacilityKind::Bank));
+        }
+    }
+    g.seats[cust.index()].stockpile.materials = 8;
+    g.seats[cust.index()].stockpile.energy = 200;
+    g.seats[cust.index()].income_last_turn.materials = 8;
+    g.seats[cust.index()].income_last_turn.energy = 20;
+    let orders = g.ai_orders(cust);
+    let spent: Vec<&Order> = orders.iter().filter(|o| g.order_cost(cust, o).materials > 0).collect();
+    let lines: Vec<String> = g.report.ai_lines.iter().flat_map(|r| r.lines.iter().cloned()).filter(|l| l.contains("Colony Ship") || l.starts_with("  take")).collect();
+    assert!(lines.iter().any(|l| l.contains("wait") && l.contains("Colony Ship")), "the Colony Ship is waited for: {lines:#?}");
+    assert!(spent.is_empty(), "and nothing cheaper takes the Materials meanwhile: {spent:?}");
+}
+
+/// Ticket #56: whatever the Energy, the AI never mothballs a Shipyard or a Launch Site: they are
+/// the only way off Earth, and a mothballed Shipyard starved the Custodian AI of every Colony Ship.
+#[test]
+fn the_ai_never_mothballs_a_shipyard_or_a_launch_site() {
+    let mut g = game();
+    let cust = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    let iss = station_of(&g, cust, BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    // An Embassy (2 Energy, makes no resource) is the thing it should mothball instead.
+    let home = g.controlled_states(cust)[0];
+    g.state_mut(home).facilities.push(facility(FacilityKind::Embassy));
+    g.turn = 6;
+    g.seats[cust.index()].stockpile.energy = 1;
+    g.seats[cust.index()].stockpile.materials = 0;
+    g.seats[cust.index()].income_last_turn.energy = -6;
+    let orders = g.ai_orders(cust);
+    let mothballed: Vec<String> = orders
+        .iter()
+        .filter_map(|o| match o {
+            Order::Change { building: BuildingRef::Facility(sid, i), .. } => Some(format!("{:?}", g.state(*sid).facilities[*i].kind)),
+            Order::Change { building: BuildingRef::Module(cid, i), .. } => Some(format!("{:?}", g.colony(*cid).unwrap().modules[*i].kind)),
+            _ => None,
+        })
+        .collect();
+    assert!(!mothballed.is_empty(), "with Energy a turn from short the AI mothballs something: {orders:?}");
+    assert!(!mothballed.iter().any(|m| m.contains("Shipyard") || m.contains("LaunchSite")), "never the Shipyard or the Launch Site: {mothballed:?}");
+}

@@ -1031,3 +1031,21 @@ that would settle it are `base_slots` in `nation_states.toml` and `build_produce
 Colonies were founded across the forty games. It stays what #44 made it: a foothold the AI takes only
 when a loaded Colony Ship has nowhere better to be, and now with abundant ore and Fuel under it for a
 player who wants them.
+
+### After the build: the AI keeps its Shipyard and saves for the Ship
+
+The twenty seeds with three more slots per state showed the Custodian AI founding **no Colony in any
+seed**. The log showed the loop: its Scrubbers (4 Energy each) pushed Energy a turn from short, the
+Mothball rule shut the dearest non-producer, which was the Shipyard, so no Colony Ship could be
+built, and the Materials went to a Power Plant and another Scrubber, and round again; and the
+Colony Ship, scoring highest, was only ever "skipped" because the AI saved Materials only for an
+action affordable within one turn's income, so a cheaper Factory took the reserve every turn. Two
+AI changes, each seen red first:
+
+- **The AI never mothballs a Shipyard or a Launch Site** (`the_ai_never_mothballs_a_shipyard_or_a_launch_site`,
+  red on "never the Shipyard or the Launch Site: [Shipyard]" with the rule stashed).
+- **The Materials reserve reaches four turns of income**, as the Ducat reserve reaches three
+  (`the_ai_holds_materials_four_turns_for_a_colony_ship_it_wants_more_than_a_factory`).
+
+Twenty seeds afterwards, Custodians in East Asia: first Colony at median turn 12 (was none), 20 of
+20 Collapses at median turn 17; Prospectors in East Asia: first Colony at 10, 20 of 20 at median 19.
