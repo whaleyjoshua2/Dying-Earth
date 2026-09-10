@@ -954,9 +954,7 @@ fn order_text(game: &Game, o: &Order) -> String {
             UnloadTarget::Colony(c) => format!("Unload {} from {} into {}", if *colonists > 0 { format!("{colonists} Colonists") } else if *army { "the Army".into() } else { "nothing".into() }, ship, game.place_name(Place::Colony(*c))),
         },
         Order::Influence { target, amount } => format!("{} Influence on {}", amount, game.place_name(*target)),
-        Order::Restoration { steps } => format!("Restoration: {} Energy", steps * 10),
         Order::BuyInfluence { amount } => format!("Buy {} Influence with Ducats", amount),
-        Order::RestorationWithDucats { steps } => format!("Restoration: {} step(s) paid in Ducats", steps),
         Order::RepairWithDucats { unit, points } => format!("Repair {} point(s) on {} with Ducats", points, match unit { UnitRef::Ship(s) => s.to_string(), UnitRef::Army(a) => a.to_string() }),
         Order::Buy { resource, amount } => format!("Buy {} {} for {} Ducats", amount, resource.name(), game.order_cost(Seat(0), o).ducats),
         Order::Sell { resource, amount } => format!("Sell {} {} for {} Ducats", amount, resource.name(), -game.order_cost(Seat(0), o).ducats),
@@ -968,7 +966,38 @@ fn order_text(game: &Game, o: &Order) -> String {
         // Ticket #52.
         Order::Relief { state } => format!("Relief in {}: Unrest -1", game.tables.state(*state).name),
         Order::Resettle { state } => format!("Resettle this turn's refugees in {}", game.tables.state(*state).name),
+        // Ticket #54.
+        Order::Change { building, what } => format!("{} the {} at {}", what.name(), building_name(game, *building), game.place_name(building.place())),
+        Order::Leapfrog { state } => format!("Leapfrog {}: its people emit 0.03 less per hundred million", game.tables.state(*state).name),
+        Order::StripPermit { state } => format!("Strip Permit in {}: three turns of double output", game.tables.state(*state).name),
     }
+}
+
+/// Ticket #54: what a Mothball, Restart or Decommission order is aimed at, by name.
+fn building_name(game: &Game, b: BuildingRef) -> String {
+    match b {
+        BuildingRef::Facility(sid, i) => game.state(sid).facilities.get(i).map(|f| f.kind.name().to_string()).unwrap_or_else(|| "building".into()),
+        BuildingRef::Module(cid, i) => game
+            .colony(cid)
+            .and_then(|c| c.modules.get(i))
+            .map(|m| m.kind.name().to_string())
+            .unwrap_or_else(|| "building".into()),
+    }
+}
+
+/// Ticket #54: the Mothball / Restart / Decommission row under one standing building.
+fn change_row(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, mothballed: bool, change: Option<PendingChange>, actions: &mut Vec<Action>) {
+    if let Some(c) = change {
+        ui.label(RichText::new(format!("    {} ordered, lands at turn {}'s Resolution", c.what.name(), c.due_turn)).weak());
+        return;
+    }
+    ui.horizontal(|ui| {
+        ui.add_space(16.0);
+        let wanted = if mothballed { BuildingChange::Restart } else { BuildingChange::Mothball };
+        for what in [wanted, BuildingChange::Decommission] {
+            cost_button(ui, game, pending, Order::Change { building: b, what }, what.name(), actions);
+        }
+    });
 }
 
 fn cost_button(ui: &mut Ui, game: &Game, pending: &[Order], order: Order, label: &str, actions: &mut Vec<Action>) {
@@ -1095,11 +1124,50 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     ui.label(owner);
     let mult = st.control.director().map(|s| game.tables.faction(game.kind(s)).emissions_multiplier).unwrap_or(1.0);
     let industry_em = card.baseline_emissions * st.industry_level as f64 * mult;
-    let fac_em: f64 = st.facilities.iter().filter(|f| f.online).map(|f| game.tables.facility(f.kind).emissions * mult).sum();
+    let fac_em: f64 = st.facilities.iter().filter(|f| f.working()).map(|f| game.tables.facility(f.kind).emissions * mult).sum();
     ui.label(format!("Population {:.1} (hundreds of millions), Industry Level {}, leans {:?}", st.population, st.industry_level, card.resource_lean));
     ui.label(format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid)));
     ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 10); a Bank here would add {}", card.gdp, game.state_ducats(sid), (game.tables.facility(FacilityKind::Bank).produces.as_ref().map(|p| p.amount).unwrap_or(0) * card.gdp) / 10));
-    ui.label(format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.tables.climate.population_emissions_per_hundred_million * st.population * mult));
+    ui.label(format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult));
+    // Ticket #54: the per-person line, its formula, and what Leapfrog has taken off it.
+    {
+        let c = &game.tables.climate;
+        let n = game.leapfrogs(sid);
+        let leaps = match n {
+            0 => String::new(),
+            1 => ", Leapfrogged once".to_string(),
+            2 => ", Leapfrogged twice".to_string(),
+            n => format!(", Leapfrogged {n} times"),
+        };
+        ui.label(
+            RichText::new(format!(
+                "Its people emit {:.2} per hundred million ({:.2} base + {:.2} x Industry Level {}{})",
+                game.population_coefficient(sid),
+                c.population_emissions_base,
+                c.population_emissions_per_level,
+                st.industry_level,
+                leaps
+            ))
+            .weak(),
+        );
+    }
+    // Ticket #54: a Strip Permit running here, and what it will cost when it ends.
+    if game.strip_permit_running(sid) {
+        let left = game.strip_permit_turns_left(sid);
+        let t = &game.tables.strip_permit;
+        ui.colored_label(
+            Color32::from_rgb(255, 170, 120),
+            match left {
+                0 => format!(
+                    "Strip Permit: the last doubled turn. At this Resolution its Baseline Emissions rise {:.1} for good and its Unrest by {}.",
+                    t.baseline_rise, Game::unrest_figure(t.unrest)
+                ),
+                n => format!("Strip Permit: {} turn(s) left of double output, then +{:.1} Baseline Emissions for good and +{} Unrest.", n, t.baseline_rise, Game::unrest_figure(t.unrest)),
+            },
+        );
+    } else if st.baseline_rise > 0.0 {
+        ui.label(RichText::new(format!("A spent Strip Permit left its Baseline Emissions {:.1} higher, for good.", st.baseline_rise)).weak());
+    }
     ui.label(format!("Build slots: {} used of {} ({} free); Education Level {}", game.slots_used(sid), game.build_slots(sid), game.free_slots(sid), card.education_level));
     // Ticket #52: Unrest, and what it is doing here in words.
     {
@@ -1116,18 +1184,40 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         if game.constabulary_online(sid) {
             ui.label(RichText::new("A Constabulary here takes 1 off every turn and damps what the climate and the refugees add.").weak());
         }
+        // Ticket #54: a Scrubber calms its state as well as the air.
+        if game.scrubbers_online(sid) > 0 {
+            ui.label(
+                RichText::new(format!(
+                    "{} Scrubber(s) here take {} off the Sink and {} off the Unrest every turn.",
+                    game.scrubbers_online(sid),
+                    format_args!("{:.1} ppm", game.tables.facility(FacilityKind::Scrubber).sink_per_turn * game.scrubbers_online(sid) as f64),
+                    Game::unrest_figure(game.tables.unrest.scrubber_fall)
+                ))
+                .weak(),
+            );
+        }
     }
     if st.lost_slots > 0 {
         ui.colored_label(Color32::LIGHT_BLUE, format!("{} slot(s) lost to the sea", st.lost_slots));
     }
     ui.label(RichText::new(format!("Facilities ({} of {} slots free)", game.free_slots(sid), game.build_slots(sid))).strong());
     let director = st.control.director();
-    for f in &st.facilities {
-        let figures = match director {
-            Some(d) => game.facility_yield(d, sid, f.kind).text(),
-            None => "idle, nobody directs this state".to_string(),
+    let mine = st.control.director() == Some(Seat(0));
+    for (i, f) in st.facilities.iter().enumerate() {
+        // Ticket #54: a mothballed Facility says so rather than showing figures it is not making.
+        let figures = if f.mothballed {
+            "mothballed: making nothing, paying no upkeep, emitting nothing, keeping its slot".to_string()
+        } else {
+            match director {
+                Some(d) => game.facility_yield(d, sid, f.kind).text(),
+                None => "idle, nobody directs this state".to_string(),
+            }
         };
-        ui.label(format!("  {}: {}{}", f.kind.name(), figures, if f.online { "" } else { " (offline, making nothing)" }));
+        let colour = if f.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
+        ui.colored_label(colour, format!("  {}: {}{}", f.kind.name(), figures, if f.online || f.mothballed { "" } else { " (offline, making nothing)" }));
+        if mine {
+            change_row(ui, game, &session.pending, BuildingRef::Facility(sid, i), f.mothballed, f.change, actions);
+        }
     }
     for b in &st.queue {
         ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
@@ -1142,10 +1232,42 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         ui.label(format!("  {} {} strength {}, damage {}/{}", who, if a.standing { "Standing Army" } else { "Army" }, game.army_strength(a), a.damage, game.tables.unit(UnitKind::Army).hit_points));
     }
     ui.separator();
-    let mine = st.control.director() == Some(Seat(0));
     if mine {
         ui.label(RichText::new("Build (hover a button for what it makes)").strong());
+        // Ticket #54: the Custodians' Scrubber and Leapfrog, and the Prospectors' Strip Permit.
+        if game.kind(Seat(0)) == FactionKind::Custodians {
+            ui.label(RichText::new(format!("Scrubbers {} of {}", game.scrubbers_committed(sid), game.scrubber_cap(sid))).strong());
+            let sink = game.tables.facility(FacilityKind::Scrubber).sink_per_turn;
+            ui.horizontal(|ui| {
+                cost_button_with_hover(
+                    ui,
+                    game,
+                    &session.pending,
+                    Order::BuildFacility { state: sid, kind: FacilityKind::Scrubber },
+                    "Scrubber",
+                    Some(format!("+{sink:.1} ppm on the Natural Sink and 1 off this state's Unrest a turn, no build slot, 4 Energy upkeep")),
+                    actions,
+                );
+                cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::Scrubber }, "or", actions);
+            });
+            ui.label(RichText::new("A Scrubber takes no build slot and is destroyed if this state changes hands.").weak());
+            ui.horizontal(|ui| {
+                cost_button(ui, game, &session.pending, Order::Leapfrog { state: sid }, "Leapfrog", actions);
+                ui.label(RichText::new(format!("lowers its people to {:.2} per hundred million, for good", (game.population_coefficient(sid) - game.tables.climate.population_emissions_per_level).max(game.tables.climate.population_emissions_base))).weak());
+            });
+        }
+        if game.kind(Seat(0)) == FactionKind::Prospectors && !st.strip_permit_used {
+            let t = &game.tables.strip_permit;
+            ui.horizontal(|ui| {
+                cost_button(ui, game, &session.pending, Order::StripPermit { state: sid }, "Strip Permit", actions);
+                ui.label(RichText::new(format!("{} turns of double output here, then +{:.1} Baseline Emissions and +{} Unrest, for good", t.turns, t.baseline_rise, Game::unrest_figure(t.unrest))).weak());
+            });
+        }
         for fk in FacilityKind::ALL {
+            // Ticket #54: the Scrubber has its own button, with the state's cap on it.
+            if fk == FacilityKind::Scrubber {
+                continue;
+            }
             let hover = game.facility_yield(Seat(0), sid, fk).text();
             ui.horizontal(|ui| {
                 cost_button_with_hover(ui, game, &session.pending, Order::BuildFacility { state: sid, kind: fk }, fk.name(), Some(hover), actions);
@@ -1169,7 +1291,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         );
         // Ticket #46: Ships come from Shipyards; a Launch Site lifts people to orbit.
         ui.label(
-            RichText::new(if st.facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online) {
+            RichText::new(if st.facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()) {
                 "Launch Site: Colonists and Armies lift to orbit from here. Ships are built at a Shipyard on a station or Colony."
             } else {
                 "No working Launch Site: nothing lifts to orbit from here."
@@ -1202,21 +1324,6 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         ui.label(RichText::new("Influence").strong());
     }
     influence_row(ui, game, session, view, Place::State(sid), actions);
-    if game.kind(Seat(0)) == FactionKind::Custodians && mine {
-        ui.separator();
-        ui.horizontal(|ui| {
-            ui.label("Restoration steps:");
-            ui.add(egui::DragValue::new(&mut view.restoration_steps).range(1..=20));
-            let order = Order::Restoration { steps: view.restoration_steps };
-            if ui.add_enabled(game.check_order(Seat(0), &session.pending, &order).is_ok(), egui::Button::new(format!("Buy for {} Energy", game.order_cost(Seat(0), &order).energy))).clicked() {
-                actions.push(Action::Place(order));
-            }
-            let with_ducats = Order::RestorationWithDucats { steps: view.restoration_steps };
-            if ui.add_enabled(game.check_order(Seat(0), &session.pending, &with_ducats).is_ok(), egui::Button::new(format!("Buy for {} Ducats", game.order_cost(Seat(0), &with_ducats).ducats))).clicked() {
-                actions.push(Action::Place(with_ducats));
-            }
-        });
-    }
 }
 
 fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, cid: ColonyId, actions: &mut Vec<Action>) {
@@ -1231,8 +1338,9 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     ui.label(format!("Colonists {} of {} Habitat room", col.colonists, game.habitat_room(col)));
     ui.label(RichText::new("Modules").strong());
     let director = col.control.director();
+    let colony_mine = col.control.director() == Some(Seat(0));
     let stages = game.tables.archive.stages;
-    for m in &col.modules {
+    for (mi, m) in col.modules.iter().enumerate() {
         // Ticket #51: the Archive reads as a Project, by stage, not as a yield.
         if m.kind == ModuleKind::Archive {
             let building = col.queue.iter().find(|b| b.item == BuildItem::Module(ModuleKind::Archive));
@@ -1247,11 +1355,20 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             ui.label(format!("  The Archive: stage {} of {}, {}", m.stage, stages, state));
             continue;
         }
-        let figures = match director {
-            Some(d) => game.module_yield(d, cid, m.kind).text(),
-            None => "idle".to_string(),
+        // Ticket #54: a mothballed Module says so, and carries the same three buttons.
+        let figures = if m.mothballed {
+            "mothballed: making nothing and paying no upkeep".to_string()
+        } else {
+            match director {
+                Some(d) => game.module_yield(d, cid, m.kind).text(),
+                None => "idle".to_string(),
+            }
         };
-        ui.label(format!("  {}: {}{}", m.kind.name(), figures, if m.online { "" } else { " (offline, making nothing)" }));
+        let colour = if m.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
+        ui.colored_label(colour, format!("  {}: {}{}", m.kind.name(), figures, if m.online || m.mothballed { "" } else { " (offline, making nothing)" }));
+        if colony_mine {
+            change_row(ui, game, &session.pending, BuildingRef::Module(cid, mi), m.mothballed, m.change, actions);
+        }
     }
     // Ticket #51: a stage on order shows before its Module does.
     if !col.modules.iter().any(|m| m.kind == ModuleKind::Archive)
@@ -1709,11 +1826,18 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             ui.label(format!("Power Plants {:.1}", e.power_plants));
             ui.label(format!("Refineries {:.1}", e.refineries));
             ui.label(format!("Launches {:.1}", e.launches));
-            ui.label(format!("Population {:.1}", e.population));
+            {
+                let c = &game.tables.climate;
+                ui.label(format!("Population {:.1}", e.population)).on_hover_text(format!(
+                    "Each state's people emit {:.2} + {:.2} x its Industry Level per hundred million, halved by Green Consensus, times its controller's Emissions multiplier. The Custodians' Leapfrog lowers a state's own figure by {:.2} for good, never below {:.2}.",
+                    c.population_emissions_base, c.population_emissions_per_level, c.population_emissions_per_level, c.population_emissions_base
+                ));
+            }
             if e.cards > 0.0 {
                 ui.label(format!("Event cards {:.1}", e.cards));
             }
-            ui.label(format!("Natural Sink -{:.1}{}", e.sink, if e.restoration > 0.0 { format!(" and Restoration -{:.1}", e.restoration) } else { String::new() }));
+            // Ticket #54: the Scrubbers stand beside the Natural Sink in the same line.
+            ui.label(format!("Natural Sink -{:.1}{}", e.sink, if e.scrubbers > 0.0 { format!(" and Scrubbers -{:.1}", e.scrubbers) } else { String::new() }));
             ui.label(RichText::new(format!("Net {:+.1} ppm", e.net())).strong());
             ui.separator();
             let growth = game.population_growth_rate() * 100.0;

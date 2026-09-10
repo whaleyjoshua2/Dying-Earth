@@ -169,6 +169,13 @@ impl Game {
                 FacilityKind::Factory | FacilityKind::Refinery => fr,
                 _ => 1.0,
             };
+        // Ticket #54: while a Strip Permit runs, every Facility in the state produces double. It
+        // multiplies the output, never the Emissions: the price is paid once, when the permit ends.
+        if self.strip_permit_running(sid) {
+            let m = self.tables.strip_permit.multiplier;
+            y.amount = (y.amount as f64 * m).floor() as i64;
+            y.research = (y.research as f64 * m).floor() as i64;
+        }
         // Ticket #52: at Unrest 7 every Facility in the state produces at half, rounded down, and
         // emits at half. What it adds to the Allotment and to the standing is untouched.
         if self.facilities_at_half(sid) {
@@ -220,6 +227,11 @@ impl Game {
         for sid in self.directed_states(seat) {
             let st = self.state(sid);
             for (i, f) in st.facilities.iter().enumerate() {
+                // Ticket #54: a mothballed Facility makes nothing and pays no Energy upkeep, so it
+                // is not on the shortfall list at all and Income never turns it back on.
+                if f.mothballed {
+                    continue;
+                }
                 let y = self.facility_yield(seat, sid, f.kind);
                 out.push(Producer {
                     place: ProducerPlace::Facility(sid, i),
@@ -238,6 +250,10 @@ impl Game {
             // Ticket #51: an Occupied Colony's Archive is offline, whoever is directing the Colony.
             let occupied = col.control.is_occupied();
             for (i, m) in col.modules.iter().enumerate() {
+                // Ticket #54: a mothballed Module, the same way.
+                if m.mothballed {
+                    continue;
+                }
                 let y = self.module_yield(seat, cid, m.kind);
                 out.push(Producer {
                     place: ProducerPlace::Module(cid, i),

@@ -130,7 +130,6 @@ pub struct ViewState {
     pub trade_amounts: [i64; 4],
     pub load_state: Option<StateId>,
     pub influence_amount: i64,
-    pub restoration_steps: u32,
     pub attack_preview: bool,
 }
 
@@ -155,7 +154,6 @@ impl Default for ViewState {
             trade_amounts: [5, 10, 10, 10],
             load_state: None,
             influence_amount: 5,
-            restoration_steps: 1,
             attack_preview: false,
         }
     }

@@ -33,7 +33,7 @@ fn with_seed(seed: u64) -> Game {
 }
 
 fn facility(kind: FacilityKind) -> Facility {
-    Facility { kind, online: true, offline_until_resolution: false, self_run: false }
+    Facility::new(kind)
 }
 
 fn colony(g: &mut Game, seat: Seat, body: BodyId, modules: &[ModuleKind], colonists: u32) -> ColonyId {
@@ -373,15 +373,17 @@ fn occupation_transfer_keeps_the_old_controllers_standing() {
 #[test]
 fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction_multiplier() {
     let mut g = game();
-    // Ticket #53: Custodians hold East Asia (4): (10 + 4) x 1.3 = 18.2 -> 18. Europe is still 5.
-    assert_eq!(g.influence_allotment(Seat(0)), 18);
+    // Ticket #54 (g): the Custodians' multiplier is 1.25, not 1.3. They hold East Asia (4):
+    // (10 + 4) x 1.25 = 17.5 -> 17. Europe is still 5, and the Prospectors are still x1.0.
+    assert_eq!(g.tables.faction(FactionKind::Custodians).influence_multiplier, 1.25);
+    assert_eq!(g.influence_allotment(Seat(0)), 17);
     assert_eq!(g.influence_allotment(Seat(1)), 15);
     g.state_mut(StateId::NorthAmerica).control = Control::Controlled(Seat(1));
     assert_eq!(g.influence_allotment(Seat(1)), 22, "North America adds 7");
     // Raising East Asia's Industry Level adds one to its value.
     g.state_mut(StateId::EastAsia).industry_level += 1;
     assert_eq!(g.state_influence_value(StateId::EastAsia), 5);
-    assert_eq!(g.influence_allotment(Seat(0)), 19, "(10 + 5) x 1.3 = 19.5");
+    assert_eq!(g.influence_allotment(Seat(0)), 18, "(10 + 5) x 1.25 = 18.75");
     // Ticket #53: twelve states share out the eight states' figures exactly, so the total stands.
     let total: i64 = StateId::ALL.iter().map(|s| g.tables.state(*s).influence).sum();
     assert_eq!(total, 34, "7 + 5 + 4 + 4 + 4 + 2 + 2 + 2 + 1 + 1 + 1 + 1, as the eight totalled 34");
@@ -432,17 +434,18 @@ fn ducats_buy_influence_two_for_one_and_the_bought_influence_is_spendable_at_onc
     assert_eq!(g.seats[0].allotment, 2);
 }
 
+/// Ticket #54 (h) adjusted this test: Restoration and its Ducat price are retired, so what the
+/// window used to buy in Restoration steps it now buys in Leapfrogs, and the repair rate stands.
 #[test]
-fn ducats_pay_for_restoration_and_repairs_at_the_table_rates() {
+fn ducats_pay_for_a_leapfrog_and_repairs_at_the_table_rates() {
     let mut g = game();
-    // Version 0.04 (ticket #41): two Ducats for one of the thing bought. A Restoration step is
-    // 10 Energy, so 20 Ducats; a repair point is 5 Materials, so 10 Ducats.
-    g.seats[0].stockpile.ducats = 50;
+    // Version 0.04 (ticket #41): two Ducats for one of the thing bought; a repair point is 5
+    // Materials, so 10 Ducats. Ticket #54: a Leapfrog is 50 Ducats.
+    g.seats[0].stockpile.ducats = 60;
     g.seats[0].stockpile.energy = 0;
-    let r = Order::RestorationWithDucats { steps: 2 };
-    assert_eq!(g.order_cost(Seat(0), &r).ducats, 40);
+    let r = Order::Leapfrog { state: StateId::EastAsia };
+    assert_eq!(g.order_cost(Seat(0), &r).ducats, 50);
     g.commit_orders(Seat(0), &[r]);
-    assert!((g.climate.removal_total() - 6.0).abs() < 1e-9, "two steps of 3.0 ppm");
     assert_eq!(g.seats[0].stockpile.ducats, 10);
     // A repair: 10 Ducats a point, same legality as a Materials repair.
     g.ships.push(Ship { id: ShipId(1), kind: UnitKind::Frigate, seat: Seat(0), damage: 1, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 });
@@ -702,15 +705,16 @@ fn selling_materials_or_fuel_returns_half_the_buying_price() {
 #[test]
 fn embassies_and_relays_add_to_the_allotment_and_raise_their_places_standing_each_turn() {
     let mut g = game();
-    // Custodians in East Asia: (10 + 4) x 1.3 = 18. Two Embassies (they stack) add 4: (10 + 4 + 4) x 1.3 = 23.
-    assert_eq!(g.influence_allotment(Seat(0)), 18);
+    // Ticket #54: the Custodians' multiplier is 1.25. In East Asia: (10 + 4) x 1.25 = 17. Two
+    // Embassies (they stack) add 4: (10 + 4 + 4) x 1.25 = 22.
+    assert_eq!(g.influence_allotment(Seat(0)), 17);
     g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Embassy));
     g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Embassy));
     assert_eq!(g.building_allotment(Seat(0)), 4);
-    assert_eq!(g.influence_allotment(Seat(0)), 23);
+    assert_eq!(g.influence_allotment(Seat(0)), 22);
     // A Relay in a Colony adds 1 more.
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Relay], 4);
-    assert_eq!(g.influence_allotment(Seat(0)), 24, "(10 + 4 + 5) x 1.3 = 24.7");
+    assert_eq!(g.influence_allotment(Seat(0)), 23, "(10 + 4 + 5) x 1.25 = 23.75");
     // Each Resolution the standing rises by the buildings' figures and does not decay.
     g.resolution_phase();
     assert_eq!(g.seats[0].influence[&Place::State(StateId::EastAsia)], 4, "two Embassies, 2 each");
@@ -2472,7 +2476,8 @@ fn a_blame_follows_control_and_a_neutral_state_belongs_to_nobody() {
     g.state_mut(StateId::SubSaharanAfrica).population = 3.0;
     let card = g.tables.state(StateId::NorthAfrica).baseline_emissions;
     let mult = g.tables.faction(FactionKind::Prospectors).emissions_multiplier;
-    let per_hundred = g.tables.climate.population_emissions_per_hundred_million;
+    // Ticket #54: the per-person figure follows the state's Industry Level, which is 2 here.
+    let per_hundred = g.population_coefficient(StateId::NorthAfrica);
     let expected = card * 2.0 * mult + per_hundred * 3.0 * mult;
     g.climate_phase();
     assert!(
@@ -2486,18 +2491,20 @@ fn a_blame_follows_control_and_a_neutral_state_belongs_to_nobody() {
     assert_eq!(g.blame(Seat(1)), g.seats[1].blame_emitted, "nothing removed, so Blame is what was emitted");
 }
 
-/// (b) Restoration adds to the remover's removed total, and Blame floors at zero: a Faction that
-/// takes back more than it put out shows Blame 0 and a credit.
+/// (b) A Scrubber's removal is added to its controller's removed total, and Blame floors at zero: a
+/// Faction that takes back more than it put out shows Blame 0 and a credit. Ticket #54 rewrote this
+/// test, which ran on Restoration until the Scrubber replaced it.
 #[test]
-fn b_restoration_is_removed_and_blame_floors_at_zero() {
+fn b_a_scrubbers_removal_is_credited_and_blame_floors_at_zero() {
     let mut g = game();
     quiet_world(&mut g);
     g.take_control(StateId::EastAsia, Seat(0));
     g.state_mut(StateId::EastAsia).industry_level = 1;
-    g.seats[0].stockpile.energy = 200;
-    g.commit_orders(Seat(0), &[Order::Restoration { steps: 4 }]);
-    let removed = g.tables.restoration.sink_per_step * 4.0;
-    assert_eq!(g.climate.removal_next[0], removed, "the Custodians' Restoration is theirs, not the table's");
+    for _ in 0..4 {
+        g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Scrubber));
+    }
+    let removed = g.tables.facility(FacilityKind::Scrubber).sink_per_turn * 4.0;
+    assert_eq!(g.scrubber_removal_by_seat()[0], removed, "the Custodians' Scrubbers are theirs, not the table's");
     g.climate_phase();
     assert_eq!(g.seats[0].blame_removed, removed, "the Climate phase banks what was removed");
     assert!(g.seats[0].blame_emitted > 0.0, "East Asia's industry is still theirs");
@@ -2613,7 +2620,7 @@ fn f_a_neutral_state_raises_its_industry_level_every_sixth_turn() {
     let mut g = game();
     calm(&mut g);
     hold_temperature(&mut g, 1.2);
-    g.state_mut(sid).facilities.push(Facility { kind: FacilityKind::Factory, online: false, offline_until_resolution: false, self_run: false });
+    g.state_mut(sid).facilities.push(Facility { online: false, ..Facility::new(FacilityKind::Factory) });
     let start = g.state(sid).industry_level;
     let before = g.emissions_now();
     let n = g.tables.development.turns;
@@ -2739,4 +2746,295 @@ fn the_opening_neutral_states_do_not_all_develop_on_the_same_turn() {
     let again: Vec<u32> = StateId::ALL.into_iter().filter_map(|s| h.state(s).neutral_since).collect();
     let first: Vec<u32> = StateId::ALL.into_iter().filter_map(|s| g.state(s).neutral_since).collect();
     assert_eq!(first, again, "seed-stable");
+}
+
+
+// ================================================================ #54 Emissions you can lower
+
+/// The position of the first Facility of this kind in the state's list.
+fn facility_at(g: &Game, sid: StateId, kind: FacilityKind) -> usize {
+    g.state(sid).facilities.iter().position(|f| f.kind == kind).expect("that Facility stands there")
+}
+
+/// Order one Mothball, Restart or Decommission and let this turn's Resolution land it.
+fn change_now(g: &mut Game, seat: Seat, b: BuildingRef, what: BuildingChange) {
+    let o = Order::Change { building: b, what };
+    g.check_order(seat, &[], &o).unwrap_or_else(|e| panic!("{what:?} refused: {e}"));
+    g.commit_orders(seat, &[o]);
+    g.resolution_phase();
+}
+
+/// (a) A mothballed Facility makes nothing, pays no Energy upkeep, emits nothing and keeps its
+/// slot; a Restart costs 5 Materials and a turn; and a mothballed Launch Site lifts nobody.
+#[test]
+fn a_a_mothballed_facility_makes_nothing_costs_nothing_and_keeps_its_slot() {
+    let mut g = game();
+    calm(&mut g);
+    let sid = StateId::EastAsia;
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Factory));
+    let idx = facility_at(&g, sid, FacilityKind::Factory);
+    let slots = g.slots_used(sid);
+    let emissions_before = g.emissions_now().factories;
+    assert!(emissions_before > 0.0, "the Factory emits while it works");
+
+    // What it makes and what it costs to run, before and after.
+    g.seats[0].stockpile.energy = 20;
+    let before = g.seats[0].stockpile;
+    g.income_phase();
+    let made = g.seats[0].stockpile.materials - before.materials;
+    let spent = 20 - g.seats[0].stockpile.energy;
+    assert!(made > 0, "a working Factory makes Materials");
+
+    let o = Order::Change { building: BuildingRef::Facility(sid, idx), what: BuildingChange::Mothball };
+    assert_eq!(g.order_cost(Seat(0), &o), Cost::default(), "a Mothball is free");
+    change_now(&mut g, Seat(0), BuildingRef::Facility(sid, idx), BuildingChange::Mothball);
+    assert!(g.state(sid).facilities[idx].mothballed, "it is mothballed at the Resolution");
+    assert_eq!(g.slots_used(sid), slots, "a mothballed Facility keeps its slot");
+    assert_eq!(g.emissions_now().factories, emissions_before - g.facility_yield(Seat(0), sid, FacilityKind::Factory).emissions, "it emits nothing");
+
+    g.seats[0].stockpile.energy = 20;
+    let before = g.seats[0].stockpile;
+    g.income_phase();
+    assert_eq!(g.seats[0].stockpile.materials - before.materials, 0, "a mothballed Factory makes nothing");
+    let spent_now = 20 - g.seats[0].stockpile.energy;
+    assert_eq!(spent_now, spent - g.tables.facility(FacilityKind::Factory).energy_upkeep, "it pays no Energy upkeep");
+
+    // A Restart: 5 Materials and a turn.
+    let r = Order::Change { building: BuildingRef::Facility(sid, idx), what: BuildingChange::Restart };
+    assert_eq!(g.order_cost(Seat(0), &r).materials, 5, "a Restart is 5 Materials");
+    g.seats[0].stockpile.materials = 50;
+    g.commit_orders(Seat(0), &[r]);
+    assert_eq!(g.seats[0].stockpile.materials, 45, "paid at once");
+    assert!(g.state(sid).facilities[idx].mothballed, "still mothballed until its turn lands");
+    g.resolution_phase();
+    assert!(!g.state(sid).facilities[idx].mothballed, "one turn, and it works again");
+
+    // A mothballed Launch Site lifts nobody.
+    let ship = a_colony_ship(&mut g, Seat(0), BodyId::Earth);
+    let lift = Order::Load { ship, colonists: 1, from: LoadSource::State(sid), army: None };
+    assert!(g.check_order(Seat(0), &[], &lift).is_ok(), "a working Launch Site lifts");
+    let ls = facility_at(&g, sid, FacilityKind::LaunchSite);
+    change_now(&mut g, Seat(0), BuildingRef::Facility(sid, ls), BuildingChange::Mothball);
+    assert!(g.check_order(Seat(0), &[], &lift).is_err(), "a mothballed Launch Site lifts nobody");
+}
+
+/// (b) A Decommission refunds half the building's Materials rounded down, frees its slot, and adds
+/// 2 Unrest to a Nation State (nothing to a Colony).
+#[test]
+fn b_decommission_refunds_half_frees_the_slot_and_adds_two_unrest() {
+    let mut g = game();
+    calm(&mut g);
+    let sid = StateId::EastAsia;
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Factory));
+    let idx = facility_at(&g, sid, FacilityKind::Factory);
+    let slots = g.slots_used(sid);
+    g.seats[0].stockpile.materials = 0;
+    g.state_mut(sid).unrest = 3.0;
+    g.state_mut(sid).unrest_reported = 3.0;
+    let o = Order::Change { building: BuildingRef::Facility(sid, idx), what: BuildingChange::Decommission };
+    assert_eq!(g.order_cost(Seat(0), &o), Cost::default(), "a Decommission is paid in the refund");
+    g.commit_orders(Seat(0), &[o]);
+    assert!(g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::Factory), "it takes a turn");
+    g.resolution_phase();
+    assert!(!g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::Factory), "and then it is gone");
+    assert_eq!(g.slots_used(sid), slots - 1, "its slot is free");
+    assert_eq!(g.seats[0].stockpile.materials, g.tables.facility(FacilityKind::Factory).materials / 2, "half its Materials, rounded down");
+    // The rise is 2; the turn's own fall of 1.5 comes off it in the same Resolution.
+    assert_eq!(g.tables.unrest.per_decommission, 2.0);
+    let expected = 3.0 + 2.0 - g.tables.unrest.natural_fall;
+    assert!((g.unrest(sid) - expected).abs() < 1e-9, "Unrest {} where {expected} was wanted", g.unrest(sid));
+
+    // A Module in a Colony: the refund and the freeing, and no Unrest anywhere.
+    let cid = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 0);
+    g.seats[0].stockpile.materials = 0;
+    change_now(&mut g, Seat(0), BuildingRef::Module(cid, 0), BuildingChange::Decommission);
+    assert!(g.colony(cid).unwrap().modules.is_empty(), "the Mine is gone");
+    assert_eq!(g.seats[0].stockpile.materials, g.tables.module(ModuleKind::Mine).materials / 2);
+}
+
+/// (c) Population Emissions are `base + per_level x Industry Level` per hundred million, and the
+/// world's opening total is within a tenth of the old flat 0.1.
+#[test]
+fn c_population_emissions_follow_the_industry_level() {
+    let g = game();
+    let c = &g.tables.climate;
+    assert_eq!(c.population_emissions_base, 0.04);
+    assert_eq!(c.population_emissions_per_level, 0.03);
+    for sid in StateId::ALL {
+        let want = c.population_emissions_base + c.population_emissions_per_level * g.state(sid).industry_level as f64;
+        assert!((g.population_coefficient(sid) - want).abs() < 1e-9, "{sid:?}: {} where {want} was wanted", g.population_coefficient(sid));
+    }
+    // Sub-Saharan Africa at Industry Level 1 emits 0.07; East Asia at 3 emits 0.13.
+    assert!((g.population_coefficient(StateId::SubSaharanAfrica) - 0.07).abs() < 1e-9);
+    assert!((g.population_coefficient(StateId::EastAsia) - 0.13).abs() < 1e-9);
+    let new: f64 = StateId::ALL.iter().map(|s| g.population_coefficient(*s) * g.state(*s).population).sum();
+    let old: f64 = StateId::ALL.iter().map(|s| 0.1 * g.state(*s).population).sum();
+    assert!((new - old).abs() / old < 0.10, "the world's people emit {new:.2} where the flat 0.1 gave {old:.2}");
+    // And the Climate phase reads it: one more Industry Level in East Asia is 0.03 x 16.4 more.
+    let mut g = g;
+    let before = g.emissions_now().population;
+    let mult = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
+    g.state_mut(StateId::EastAsia).industry_level += 1;
+    let rise = g.emissions_now().population - before;
+    assert!((rise - 0.03 * 16.4 * mult).abs() < 1e-9, "the population line rose {rise:.3}");
+}
+
+/// (d) Leapfrog is the Custodians' alone, costs 50 Ducats, takes one level's worth off the state's
+/// per-person coefficient, and never takes it below the base.
+#[test]
+fn d_leapfrog_is_custodian_only_and_never_goes_below_the_base() {
+    let mut g = game();
+    let sid = StateId::EastAsia;
+    let base = g.tables.climate.population_emissions_base;
+    let per = g.tables.climate.population_emissions_per_level;
+    g.seats[0].stockpile.ducats = 500;
+    g.seats[1].stockpile.ducats = 500;
+    // The Prospectors have no Leapfrog, on their own state or anyone's.
+    g.take_control(StateId::SouthAmerica, Seat(1));
+    assert!(g.check_order(Seat(1), &[], &Order::Leapfrog { state: StateId::SouthAmerica }).is_err(), "only the Custodians Leapfrog");
+    // And the Custodians need to control the state.
+    assert!(g.check_order(Seat(0), &[], &Order::Leapfrog { state: StateId::SouthAmerica }).is_err(), "and only on a state they control");
+    let o = Order::Leapfrog { state: sid };
+    assert_eq!(g.order_cost(Seat(0), &o).ducats, 50, "50 Ducats a Leapfrog");
+    let before = g.population_coefficient(sid);
+    g.commit_orders(Seat(0), &[o.clone()]);
+    assert_eq!(g.seats[0].stockpile.ducats, 450);
+    assert!((g.population_coefficient(sid) - (before - per)).abs() < 1e-9, "one level's worth off");
+    assert_eq!(g.leapfrogs(sid), 1, "Leapfrogged once");
+    // East Asia at Industry Level 3 starts at 0.13, so three Leapfrogs reach the base and a fourth
+    // is refused rather than taking 50 Ducats for nothing.
+    g.commit_orders(Seat(0), &[o.clone()]);
+    g.commit_orders(Seat(0), &[o.clone()]);
+    assert!((g.population_coefficient(sid) - base).abs() < 1e-9, "the base, and no lower");
+    assert!(g.check_order(Seat(0), &[], &o).is_err(), "a fourth Leapfrog buys nothing and is refused");
+}
+
+/// (e) A Scrubber takes no build slot, adds 3.0 ppm to the Sink while it is online, is capped by
+/// its state's population, is destroyed when the state changes hands, counts as removal for its
+/// controller's Blame, and takes 1 off its state's Unrest a turn.
+#[test]
+fn e_a_scrubber_enlarges_the_sink_and_is_capped_destroyed_and_calming() {
+    let mut g = game();
+    calm(&mut g);
+    let sid = StateId::EastAsia;
+    let card = g.tables.facility(FacilityKind::Scrubber);
+    assert_eq!((card.materials, card.build_turns, card.energy_upkeep, card.emissions), (30, 2, 4, 0.0));
+    assert!(card.no_slot, "a Scrubber takes no build slot");
+    // The cap: half the population in hundreds of millions, between 2 and 10.
+    assert_eq!(g.scrubber_cap(StateId::Russia), 2, "Russia at 1.5 takes the floor");
+    assert_eq!(g.scrubber_cap(StateId::SouthAsia), 10, "South Asia at 19.4 takes the ceiling");
+    // Only the Custodians, and only on a state they control.
+    g.take_control(StateId::SouthAmerica, Seat(1));
+    g.seats[1].stockpile.materials = 300;
+    assert!(
+        g.check_order(Seat(1), &[], &Order::BuildFacility { state: StateId::SouthAmerica, kind: FacilityKind::Scrubber }).is_err(),
+        "only the Custodians build a Scrubber"
+    );
+    // It is built without a slot: fill the state and build one anyway.
+    g.seats[0].stockpile.materials = 900;
+    while g.free_slots(sid) > 0 {
+        g.state_mut(sid).facilities.push(facility(FacilityKind::Bank));
+    }
+    let slots = g.slots_used(sid);
+    let o = Order::BuildFacility { state: sid, kind: FacilityKind::Scrubber };
+    g.check_order(Seat(0), &[], &o).expect("a Scrubber needs no free slot");
+    g.commit_orders(Seat(0), &[o]);
+    assert_eq!(g.slots_used(sid), slots, "and it uses none either");
+    g.resolution_phase();
+    assert_eq!(g.scrubbers_online(sid), 0, "two turns to build");
+    g.turn += 1;
+    g.resolution_phase();
+    assert_eq!(g.scrubbers_online(sid), 1, "and then it stands");
+
+    // The Sink.
+    let e = g.emissions_now();
+    assert!((e.scrubbers - 3.0).abs() < 1e-9, "one Scrubber is 3.0 ppm");
+    assert!((e.total_sink() - (g.tables.climate.natural_sink + 3.0)).abs() < 1e-9, "beside the Natural Sink");
+
+    // The cap, read against what stands and what is on order.
+    let cap = g.scrubber_cap(sid);
+    while g.scrubbers_committed(sid) < cap {
+        g.state_mut(sid).facilities.push(facility(FacilityKind::Scrubber));
+    }
+    assert!(g.check_order(Seat(0), &[], &Order::BuildFacility { state: sid, kind: FacilityKind::Scrubber }).is_err(), "the cap holds at {cap}");
+
+    // Removal for Blame, and the Unrest it takes off.
+    g.state_mut(sid).unrest = 5.0;
+    let removed = g.scrubber_removal_by_seat()[0];
+    assert!((removed - 3.0 * cap as f64).abs() < 1e-9);
+    let before = g.seats[0].blame_removed;
+    g.climate_phase();
+    assert!((g.seats[0].blame_removed - before - removed).abs() < 1e-9, "the Climate phase credits it as removal");
+    assert!((g.calming_fall(sid) - g.tables.unrest.scrubber_fall).abs() < 1e-9, "a Scrubber calms its state by 1 a turn");
+
+    // Destroyed when the state changes hands.
+    g.transfer_control(Place::State(sid), Seat(1), "Influence");
+    assert_eq!(g.scrubbers_online(sid), 0, "the Scrubbers do not pass to whoever takes the state");
+    assert!(g.report.lines.iter().any(|l| l.contains("Scrubber(s) in East Asia were destroyed")), "and the Report says so");
+}
+
+/// (f) A Strip Permit doubles a state's Facility output for three turns, then raises its Baseline
+/// Emissions by 0.2 and its Unrest by 3, for good. Once per state, ever, and the Prospectors only.
+#[test]
+fn f_a_strip_permit_doubles_output_for_three_turns_then_charges_its_price() {
+    let mut g = game();
+    calm(&mut g);
+    let sid = StateId::SouthAmerica;
+    g.take_control(sid, Seat(1));
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Factory));
+    let t = g.tables.strip_permit.clone();
+    assert_eq!((t.turns, t.multiplier, t.baseline_rise, t.unrest), (3, 2.0, 0.2, 3.0));
+    // The Custodians have no Strip Permit.
+    assert!(g.check_order(Seat(0), &[], &Order::StripPermit { state: StateId::EastAsia }).is_err(), "only the Prospectors issue one");
+    let o = Order::StripPermit { state: sid };
+    assert_eq!(g.order_cost(Seat(1), &o), Cost::default(), "a Strip Permit is free");
+    let normal = g.facility_yield(Seat(1), sid, FacilityKind::Factory).amount;
+    assert!(normal > 0);
+    let baseline = g.baseline_emissions(sid);
+    g.state_mut(sid).unrest = 2.0;
+    g.state_mut(sid).unrest_reported = 2.0;
+    g.commit_orders(Seat(1), &[o.clone()]);
+    assert!(g.state(sid).strip_permit_used, "one per state, ever");
+    assert!(g.check_order(Seat(1), &[], &o).is_err(), "and never a second");
+    // Three turns of Income at double output, then the price.
+    for turn in 1..=3 {
+        g.turn += 1;
+        assert_eq!(g.facility_yield(Seat(1), sid, FacilityKind::Factory).amount, normal * 2, "doubled on turn {turn} of the permit");
+        // The Unrest is set afresh before the last Resolution, since every Resolution takes the
+        // turn's own fall off whatever stands.
+        if turn == 3 {
+            g.state_mut(sid).unrest = 2.0;
+        }
+        g.resolution_phase();
+    }
+    assert_eq!(g.facility_yield(Seat(1), sid, FacilityKind::Factory).amount, normal, "and back to normal afterwards");
+    assert!((g.baseline_emissions(sid) - (baseline + 0.2)).abs() < 1e-9, "its Baseline Emissions rose 0.2 for good");
+    // The rise is 3; the turn's own fall of 1.5 comes off it in the same Resolution.
+    let expected = 2.0 + 3.0 - g.tables.unrest.natural_fall;
+    assert!((g.unrest(sid) - expected).abs() < 1e-9, "Unrest {} where {expected} was wanted", g.unrest(sid));
+}
+
+/// (h) Restoration is retired: its table, its Ducat price and its AI weight are gone, and the
+/// Custodians' card names the Scrubber and Leapfrog instead. The two orders themselves no longer
+/// exist in `Order`, so no test can name them; the two tests that did were rewritten above
+/// (`ducats_pay_for_a_leapfrog_and_repairs_at_the_table_rates` and
+/// `b_a_scrubbers_removal_is_credited_and_blame_floors_at_zero`).
+#[test]
+fn h_restoration_is_retired_for_the_scrubber() {
+    let g = game();
+    let text = std::fs::read_to_string(default_data_dir().join("factions.toml")).expect("factions.toml");
+    assert!(!text.contains("\n[restoration]"), "the [restoration] table is gone");
+    assert!(!text.contains("
+per_restoration_step ="), "and so is its Ducat price");
+    assert_eq!(g.tables.ducats.per_leapfrog, 50, "a Leapfrog took its place in [ducats]");
+    let ai = std::fs::read_to_string(default_data_dir().join("ai.toml")).expect("ai.toml");
+    assert!(!ai.contains("\nrestoration ="), "and its AI weight is gone");
+    for k in FactionKind::ALL {
+        assert_eq!(g.tables.ai_weights(k).build_scrubber, if k == FactionKind::Custodians { 8.0 } else { 0.0 });
+    }
+    let custodians = &g.tables.faction(FactionKind::Custodians).signature;
+    assert!(custodians.contains("Scrubber") && custodians.contains("Leapfrog"), "the Custodian card names them: {custodians}");
+    assert!(!custodians.contains("Restoration"), "and no longer names Restoration");
+    let prospectors = &g.tables.faction(FactionKind::Prospectors).signature;
+    assert!(prospectors.contains("Cheap Industry") && prospectors.contains("Strip Permit"), "the Prospector card names both: {prospectors}");
 }

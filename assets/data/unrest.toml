@@ -23,7 +23,8 @@ population_fall_big_fraction = 0.01
 per_sea_level_slot = 1.0
 # A Heatwave, Wildfire or Storm Surge landing on the state.
 climate_card = 1.5
-# A Facility mothballed or decommissioned there (those orders arrive on a later ticket).
+# A Facility mothballed or decommissioned there (ticket #54). Nothing damps either, and a Module
+# mothballed or decommissioned in a Colony adds nothing at all.
 per_mothball = 1.0
 per_decommission = 2.0
 # Refugees arriving: one per this much population, at most `refugees_max` in a turn. #53 doubled
@@ -45,7 +46,8 @@ relief_ducats = 10
 relief_points = 1.0
 # A Constabulary standing and online there, every turn, on top of the natural fall.
 constabulary_fall = 1.0
-# A Scrubber will do the same when its ticket lands; `calming_fall` is the hook it joins.
+# A Scrubber standing and online there, every turn, on top of the natural fall (ticket #54); it
+# joins the Constabulary in `calming_fall`, and a state with both gets both.
 scrubber_fall = 1.0
 
 # ---- damping (rule 4 of #52, widened on #53)

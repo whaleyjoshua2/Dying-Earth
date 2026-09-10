@@ -179,17 +179,53 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.materials = 200;
             g.seats[0].stockpile.ducats = 200;
         }
-        // `blame:1` (a building aid, ticket #53): the Custodian in seat 0 buys, in one turn, enough
-        // Restoration to take back more CO2 than it has emitted all game, so the Climate Panel's
-        // Blame section shows a removal credit as well as three Factions carrying Blame. The AI
-        // Custodian buys Restoration a few steps at a time and never gets ahead of its own industry.
+        // `blame:1` (a building aid, ticket #53, rebuilt on #54 now Restoration is retired): the
+        // Custodian in seat 0 takes every Nation State and fills each with its cap of Scrubbers, so
+        // one Climate phase takes back more CO2 than it has emitted all game and the Climate Panel's
+        // Blame section shows a removal credit beside three Factions carrying Blame.
         if std::env::args().any(|a| a == "blame:1") && g.kind(Seat(0)) == FactionKind::Custodians {
-            let per_step = g.tables.restoration.sink_per_step;
-            let steps = (g.seats[0].blame_emitted / per_step).ceil() as u32 + 6;
-            g.seats[0].stockpile.energy = g.tables.restoration.energy_per_step * steps as i64 + 40;
+            for sid in StateId::ALL {
+                g.take_control(sid, Seat(0));
+                fill_with_scrubbers(g, sid);
+            }
+            g.seats[0].stockpile.energy = 4000;
+            run_one_quiet_turn(g);
+        }
+        // `scrub:<n>` (a building aid, ticket #54): the Custodian in seat 0 holds East Asia with n
+        // Scrubbers standing (up to its cap), one Facility mothballed, two Leapfrogs bought and
+        // Ducats left to buy a third, and a turn is run so the Climate Panel's Sink line carries
+        // the Scrubbers. An AI Custodian builds one at a time and mothballs it again for Energy.
+        if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("scrub:").and_then(|v| v.parse::<u32>().ok()))
+            && g.kind(Seat(0)) == FactionKind::Custodians
+        {
+            let sid = StateId::EastAsia;
+            g.take_control(sid, Seat(0));
+            while g.scrubbers_committed(sid) < n.min(g.scrubber_cap(sid)) {
+                g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Scrubber));
+            }
+            let per = g.tables.climate.population_emissions_per_level;
+            g.state_mut(sid).leapfrog += per * 2.0;
+            // A Factory stood down: the card shows what a mothballed Facility reads like.
+            if let Some(f) = g.state_mut(sid).facilities.iter_mut().find(|f| f.kind == FacilityKind::Factory) {
+                f.mothballed = true;
+                f.online = false;
+            }
+            g.seats[0].stockpile.energy = 400;
+            g.seats[0].stockpile.materials = 300;
+            g.seats[0].stockpile.ducats = 300;
+            run_one_quiet_turn(g);
+            g.seats[0].stockpile.ducats = 300;
+        }
+        // `strip:1` (a building aid, ticket #54): the Prospector in seat 0 holds East Asia under a
+        // Strip Permit with a turn already run, so the card reads "2 turns left". The AI Prospector
+        // is never behind its Extraction pace, so it never issues one.
+        if std::env::args().any(|a| a == "strip:1") && g.kind(Seat(0)) == FactionKind::Prospectors {
+            let sid = StateId::EastAsia;
+            g.take_control(sid, Seat(0));
+            g.seats[0].stockpile.energy = 400;
             g.seats[0].ai = false;
             let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
-            orders[0] = vec![Order::Restoration { steps }];
+            orders[0] = vec![Order::StripPermit { state: sid }];
             g.end_turn(orders);
             g.seats[0].ai = true;
         }
@@ -206,6 +242,22 @@ fn build_board(session: &mut Session) {
         session.screen = Screen::GameOver;
     }
     session.earth_dirty = true;
+}
+
+/// A building aid (ticket #54): as many Scrubbers as the state's cap allows, standing and online.
+fn fill_with_scrubbers(g: &mut Game, sid: StateId) {
+    let cap = g.scrubber_cap(sid);
+    while g.scrubbers_committed(sid) < cap {
+        g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Scrubber));
+    }
+}
+
+/// A building aid: run one turn with seat 0 giving no orders, so Income and the Climate phase read
+/// the board the aid just built.
+fn run_one_quiet_turn(g: &mut Game) {
+    g.seats[0].ai = false;
+    g.end_turn(std::array::from_fn(|_| Vec::new()));
+    g.seats[0].ai = true;
 }
 
 fn show_view(view: &mut ViewState, v: View) {

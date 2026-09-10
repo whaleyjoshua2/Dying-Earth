@@ -23,6 +23,23 @@ pub enum UnloadTarget {
     Colony(ColonyId),
 }
 
+/// Ticket #54 (version 0.05): one standing building, by its place and its position in that place's
+/// list. Orders are given and resolved inside one turn, so the position cannot move under them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuildingRef {
+    Facility(StateId, usize),
+    Module(ColonyId, usize),
+}
+
+impl BuildingRef {
+    pub fn place(self) -> Place {
+        match self {
+            BuildingRef::Facility(s, _) => Place::State(s),
+            BuildingRef::Module(c, _) => Place::Colony(c),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Order {
     BuildFacility { state: StateId, kind: FacilityKind },
@@ -38,11 +55,9 @@ pub enum Order {
     Load { ship: ShipId, colonists: u32, from: LoadSource, army: Option<ArmyId> },
     Unload { ship: ShipId, colonists: u32, army: bool, into: UnloadTarget },
     Influence { target: Target, amount: i64 },
-    Restoration { steps: u32 },
     /// Version 0.03 (ticket #35): Ducats buy Influence for this turn's Allotment, and pay for
-    /// Restoration and repairs in place of Energy and Materials.
+    /// repairs in place of Materials. Ticket #54 retired Restoration and both its orders.
     BuyInfluence { amount: i64 },
-    RestorationWithDucats { steps: u32 },
     RepairWithDucats { unit: UnitRef, points: u32 },
     /// Version 0.04 (ticket #42): the trading window. Buy Materials, Fuel or Energy for Ducats;
     /// sell Materials or Fuel for half the buying price; buy a building outright for Ducats at
@@ -66,6 +81,16 @@ pub enum Order {
     /// Version 0.05 (ticket #52): Resettle. Once a turn per Faction: this turn every refugee flow
     /// leaving a state you direct goes entirely to the chosen state, and you gain Standing there.
     Resettle { state: StateId },
+    /// Version 0.05 (ticket #54): Mothball, Restart or Decommission one standing Facility in a
+    /// Nation State you direct, or one Module in a Colony you direct.
+    Change { building: BuildingRef, what: BuildingChange },
+    /// Version 0.05 (ticket #54): Leapfrog. The Custodians only, on a Nation State they control:
+    /// 50 Ducats lowers its people's Emissions coefficient by one Industry Level's worth, for good.
+    Leapfrog { state: StateId },
+    /// Version 0.05 (ticket #54): the Strip Permit. The Prospectors only, free, once per Nation
+    /// State ever: three turns of doubled Facility output, then a permanent price in Baseline
+    /// Emissions and Unrest.
+    StripPermit { state: StateId },
 }
 
 impl Order {
@@ -73,6 +98,13 @@ impl Order {
     pub fn build_state(&self) -> Option<StateId> {
         match self {
             Order::BuildFacility { state, .. } | Order::BuildFacilityWithDucats { state, .. } => Some(*state),
+            _ => None,
+        }
+    }
+    /// The Facility a build order raises, whichever way it is paid (ticket #54).
+    pub fn build_facility(&self) -> Option<FacilityKind> {
+        match self {
+            Order::BuildFacility { kind, .. } | Order::BuildFacilityWithDucats { kind, .. } => Some(*kind),
             _ => None,
         }
     }
@@ -174,9 +206,10 @@ impl Game {
                 Cost { fuel: self.transit_cost_for(seat, from, *to).1, ..Default::default() }
             }
             Order::Influence { amount, .. } => Cost { influence: *amount, ..Default::default() },
-            Order::Restoration { steps } => {
-                Cost { energy: t.restoration.energy_per_step * *steps as i64, ..Default::default() }
-            }
+            // Ticket #54: a Mothball and a Strip Permit are free; a Restart costs Materials and a
+            // Leapfrog Ducats; a Decommission pays Materials back, which arrive at its Resolution.
+            Order::Change { what: BuildingChange::Restart, .. } => Cost { materials: t.mothball.restart_materials, ..Default::default() },
+            Order::Leapfrog { .. } => Cost { ducats: t.ducats.per_leapfrog, ..Default::default() },
             Order::BuyInfluence { amount } => Cost { ducats: t.ducats.per_influence * *amount, ..Default::default() },
             // A purchase is a negative cost in the resource bought, so `remaining` and `commit_orders`
             // add it without a special case; a sale is the mirror, with a negative Ducat cost.
@@ -206,7 +239,6 @@ impl Game {
             // Ticket #52: Relief and Resettle are paid in Ducats.
             Order::Relief { .. } => Cost { ducats: t.unrest.relief_ducats, ..Default::default() },
             Order::Resettle { .. } => Cost { ducats: t.unrest.resettle_ducats, ..Default::default() },
-            Order::RestorationWithDucats { steps } => Cost { ducats: t.ducats.per_restoration_step * *steps as i64, ..Default::default() },
             Order::RepairWithDucats { points, .. } => Cost { ducats: t.ducats.per_repair_point * *points as i64, ..Default::default() },
             _ => Cost::default(),
         }
@@ -287,15 +319,6 @@ impl Game {
             Order::BuyInfluence { amount } => {
                 if *amount <= 0 {
                     return fail("buy a positive amount");
-                }
-                Ok(cost)
-            }
-            Order::RestorationWithDucats { steps } => {
-                if self.kind(seat) != FactionKind::Custodians {
-                    return fail("only the Custodians have Restoration");
-                }
-                if *steps == 0 {
-                    return fail("spend at least one step");
                 }
                 Ok(cost)
             }
@@ -387,7 +410,7 @@ impl Game {
                     return fail("a station is already ordered there");
                 }
                 let foothold = match body {
-                    BodyId::Earth => self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online)),
+                    BodyId::Earth => self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working())),
                     b => self.colonies.iter().any(|c| !c.in_orbit && c.body == *b && c.control.director() == Some(seat)),
                 };
                 if !foothold {
@@ -399,9 +422,32 @@ impl Game {
                 if self.state(*state).control.director() != Some(seat) {
                     return fail("you do not direct this Nation State");
                 }
-                let pending_here = pending.iter().filter(|o| o.build_state() == Some(*state)).count() as u32;
-                if self.free_slots(*state) <= pending_here {
-                    return fail("no free build slot");
+                // Ticket #54: a Scrubber takes no build slot, so it neither needs one nor uses one.
+                if self.takes_slot(*kind) {
+                    let pending_here = pending
+                        .iter()
+                        .filter(|o| o.build_state() == Some(*state) && o.build_facility().map(|k| self.takes_slot(k)).unwrap_or(false))
+                        .count() as u32;
+                    if self.free_slots(*state) <= pending_here {
+                        return fail("no free build slot");
+                    }
+                }
+                // Ticket #54: the Scrubber, the Custodians' signature Facility.
+                if *kind == FacilityKind::Scrubber {
+                    if self.kind(seat) != FactionKind::Custodians {
+                        return fail("only the Custodians build a Scrubber");
+                    }
+                    if self.state(*state).control != Control::Controlled(seat) {
+                        return fail("a Scrubber needs a Nation State you control");
+                    }
+                    let ordered = pending
+                        .iter()
+                        .filter(|o| o.build_state() == Some(*state) && o.build_facility() == Some(FacilityKind::Scrubber))
+                        .count() as u32;
+                    let cap = self.scrubber_cap(*state);
+                    if self.scrubbers_committed(*state) + ordered >= cap {
+                        return fail(format!("this Nation State holds its {cap} Scrubbers already"));
+                    }
                 }
                 // Ticket #52: at most one Constabulary per Nation State.
                 if *kind == FacilityKind::Constabulary
@@ -476,7 +522,7 @@ impl Game {
                         if col.control.director() != Some(seat) {
                             return fail("you do not direct this Colony");
                         }
-                        if !col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
+                        if !col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard && m.working()) {
                             return fail("no Shipyard here");
                         }
                     }
@@ -639,7 +685,7 @@ impl Game {
                                 return fail("you do not direct that Nation State");
                             }
                             // Ticket #46: a lift to orbit needs a Launch Site there.
-                            if !self.state(*st).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online) {
+                            if !self.state(*st).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()) {
                                 return fail("a lift to orbit needs a working Launch Site there");
                             }
                             // Ticket #51, Steerage: a lift may cost the state more than one tenth
@@ -670,7 +716,7 @@ impl Game {
                     if self.army_seat(a) != Some(seat) || a.standing && self.army_stands_down(a) {
                         return fail("not your Army");
                     }
-                    if matches!(a.at, ArmyAt::Place(Place::State(st)) if !self.state(st).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online)) {
+                    if matches!(a.at, ArmyAt::Place(Place::State(st)) if !self.state(st).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working())) {
                         return fail("a lift to orbit needs a working Launch Site there");
                     }
                     if matches!(a.home, ArmyHome::Colony(_)) {
@@ -748,15 +794,74 @@ impl Game {
                 }
                 Ok(cost)
             }
-            Order::Restoration { steps } => {
+            // Ticket #54: Mothball, Restart and Decommission.
+            Order::Change { building, what } => self.check_change(seat, pending, *building, *what).map(|_| cost),
+            // Ticket #54: Leapfrog, the Custodians only, on a state they control.
+            Order::Leapfrog { state } => {
                 if self.kind(seat) != FactionKind::Custodians {
-                    return fail("only the Custodians have Restoration");
+                    return fail("only the Custodians Leapfrog");
                 }
-                if *steps == 0 {
-                    return fail("spend at least one step");
+                if self.state(*state).control != Control::Controlled(seat) {
+                    return fail("Leapfrog needs a Nation State you control");
+                }
+                // Every Leapfrog already pending this turn has to come off before the next one bites.
+                let per = self.tables.climate.population_emissions_per_level;
+                let queued = pending.iter().filter(|o| matches!(o, Order::Leapfrog { state: s } if s == state)).count() as f64;
+                let base = self.tables.climate.population_emissions_base;
+                if self.population_coefficient(*state) - queued * per <= base + 1e-9 {
+                    return fail("its people already emit the base figure; a Leapfrog here would buy nothing");
                 }
                 Ok(cost)
             }
+            // Ticket #54: the Strip Permit, the Prospectors only, once per state ever.
+            Order::StripPermit { state } => {
+                if self.kind(seat) != FactionKind::Prospectors {
+                    return fail("only the Prospectors issue a Strip Permit");
+                }
+                if self.state(*state).control != Control::Controlled(seat) {
+                    return fail("a Strip Permit needs a Nation State you control");
+                }
+                if self.state(*state).strip_permit_used {
+                    return fail("this Nation State has had its Strip Permit");
+                }
+                if pending.iter().any(|o| matches!(o, Order::StripPermit { state: s } if s == state)) {
+                    return fail("a Strip Permit is already ordered here");
+                }
+                Ok(cost)
+            }
+        }
+    }
+
+    /// Ticket #54: is this Mothball, Restart or Decommission legal? Named so the Ducat-paid and
+    /// Materials-paid forms and the interface can all ask the same question.
+    fn check_change(&self, seat: Seat, pending: &[Order], building: BuildingRef, what: BuildingChange) -> Result<(), OrderError> {
+        let place = building.place();
+        if self.place_control(place).director() != Some(seat) {
+            return fail("you do not direct this place");
+        }
+        if pending.iter().any(|o| matches!(o, Order::Change { building: b, .. } if *b == building)) {
+            return fail("this building already has an order this turn");
+        }
+        let (mothballed, changing, is_archive) = match building {
+            BuildingRef::Facility(sid, i) => match self.state(sid).facilities.get(i) {
+                Some(f) => (f.mothballed, f.change.is_some(), false),
+                None => return fail("no such Facility"),
+            },
+            BuildingRef::Module(cid, i) => match self.colony(cid).and_then(|c| c.modules.get(i)) {
+                Some(m) => (m.mothballed, m.change.is_some(), m.kind == ModuleKind::Archive),
+                None => return fail("no such Module"),
+            },
+        };
+        if is_archive {
+            return fail("the Archive is raised and lost by its own rules; it is not mothballed");
+        }
+        if changing {
+            return fail("this building is already being mothballed, restarted or decommissioned");
+        }
+        match what {
+            BuildingChange::Mothball if mothballed => fail("it is already mothballed"),
+            BuildingChange::Restart if !mothballed => fail("it is not mothballed"),
+            _ => Ok(()),
         }
     }
 
@@ -765,11 +870,11 @@ impl Game {
             BodyId::Earth => self
                 .directed_states(seat)
                 .iter()
-                .any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite)),
+                .any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working())),
             b => self
                 .colonies
                 .iter()
-                .any(|c| c.body == b && c.control.director() == Some(seat) && c.modules.iter().any(|m| m.kind == ModuleKind::Shipyard)),
+                .any(|c| c.body == b && c.control.director() == Some(seat) && c.modules.iter().any(|m| m.kind == ModuleKind::Shipyard && m.working())),
         }
     }
 
@@ -895,9 +1000,59 @@ impl Game {
                     self.pending.resettle.push((seat, *state));
                 }
                 Order::Influence { target, amount } => self.pending.influence.push((seat, *target, *amount)),
-                Order::Restoration { steps } | Order::RestorationWithDucats { steps } => {
-                    // Ticket #53: the removal is the seat's, so its Blame can be credited with it.
-                    self.climate.removal_next[seat.index()] += self.tables.restoration.sink_per_step * *steps as f64;
+                // Ticket #54: the change is written on the building itself and lands at the
+                // Resolution of its due turn, so nothing has to track a position between turns.
+                Order::Change { building, what } => {
+                    let turns = match what {
+                        BuildingChange::Mothball => 1,
+                        BuildingChange::Restart => self.tables.mothball.restart_turns.max(1),
+                        BuildingChange::Decommission => self.tables.mothball.decommission_turns.max(1),
+                    };
+                    let due = turn + turns - 1;
+                    let change = PendingChange { what: *what, due_turn: due, seat };
+                    match building {
+                        BuildingRef::Facility(sid, i) => {
+                            if let Some(f) = self.state_mut(*sid).facilities.get_mut(*i) {
+                                f.change = Some(change);
+                            }
+                        }
+                        BuildingRef::Module(cid, i) => {
+                            if let Some(m) = self.colony_mut(*cid).and_then(|c| c.modules.get_mut(*i)) {
+                                m.change = Some(change);
+                            }
+                        }
+                    }
+                }
+                // Ticket #54: Leapfrog is permanent and takes hold at once, before the next Climate
+                // phase reads the state's coefficient.
+                Order::Leapfrog { state } => {
+                    let per = self.tables.climate.population_emissions_per_level;
+                    self.state_mut(*state).leapfrog += per;
+                    let line = format!(
+                        "The {} Leapfrogged {}: its people now emit {:.2} per hundred million.",
+                        self.seat_name(seat),
+                        self.tables.state(*state).name,
+                        self.population_coefficient(*state)
+                    );
+                    self.log(line.clone());
+                    self.report.lines.push(line);
+                }
+                // Ticket #54: the Strip Permit runs from the next Income for `turns` turns.
+                Order::StripPermit { state } => {
+                    let turns = self.tables.strip_permit.turns;
+                    {
+                        let st = self.state_mut(*state);
+                        st.strip_permit_used = true;
+                        st.strip_permit_ends = Some(turn + turns);
+                    }
+                    let line = format!(
+                        "The {} issued a Strip Permit in {}: every Facility there produces double for {} turns.",
+                        self.seat_name(seat),
+                        self.tables.state(*state).name,
+                        turns
+                    );
+                    self.log(line.clone());
+                    self.report.lines.push(line);
                 }
                 Order::BuyInfluence { amount } => {
                     self.seat_mut(seat).allotment += amount;

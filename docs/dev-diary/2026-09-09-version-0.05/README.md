@@ -650,3 +650,123 @@ ceiling 4, stop at +2.5 C, so a state steps at most twice a game. Twenty seeds a
 in East Asia: the Custodian seating collapses 20 of 20 at a median turn 22 with 14 developments a
 game; the Prospector seating 20 of 20 at a median 21 with 6. The step is re-swept on the build
 ticket with every climate rule in.
+
+## #54: Emissions you can lower
+
+Every Emissions line in the game was, until now, something you could only add to. This ticket gives
+the player three ways to take one down and one way to buy a burst of output at a permanent price.
+
+**Mothball, Restart and Decommission** work on any Facility in a Nation State you direct and any
+Module in a Colony you direct. A Mothball is free and lands at the Resolution: the building makes
+nothing, pays no Energy upkeep, emits nothing, counts as online for no rule — no lift from a
+mothballed Launch Site, no Ship from a mothballed Shipyard, no Allotment from a mothballed Embassy,
+no calm from a mothballed Constabulary — and keeps its slot. A **Restart** is 5 Materials and a
+turn; a **Decommission** is a turn, half the building's Materials back, and the slot free. In a
+Nation State a mothball adds 1 Unrest and a decommission 2 (`unrest.toml`, the hooks #52 left); in
+a Colony neither adds anything.
+
+**Population Emissions follow the Industry Level.** A state's people emit
+`0.04 + 0.03 x Industry Level` per hundred million (`climate.toml`), in place of the flat 0.1 every
+state used to pay: 0.07 in Sub-Saharan Africa, 0.13 in East Asia, and 8.03 for the world against the
+old 7.86. Green Consensus still halves the whole line and the Faction multiplier still applies.
+
+**Restoration is retired.** The order, its Ducat price, the `[restoration]` table, its AI weight and
+the Custodian card's text are gone. The Custodians' signature rule is now the **Scrubber**: a
+Facility only they build, only in a state they control, **taking no build slot** — 30 Materials, two
+turns, 4 Energy upkeep, no Emissions. While it is online it enlarges the Natural Sink by 3.0 ppm,
+takes 1 off its state's Unrest, and counts as removal for its controller's Blame. A state holds
+`clamp(round(population / 2), 2, 10)` of them, so Russia gets 2 and South Asia 10, and they are
+destroyed outright if the state changes hands. Their other clause is **Leapfrog**: 50 Ducats on a
+state they control lowers that state's per-person coefficient by 0.03 for good, any number of times,
+never below the 0.04 base. Their Allotment multiplier comes down from 1.3 to **1.25** to pay for it.
+
+**The Prospectors gain the Strip Permit** beside Cheap Industry: free, once per Nation State ever,
+three turns in which every Facility there produces double, and then that state's Baseline Emissions
+rise 0.2 and its Unrest 3, for good.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![A Custodian Nation State card for East Asia with three Scrubbers standing, two mothballed Facilities greyed out with Restart and Decommission buttons, the per-person Emissions line, and the Scrubber and Leapfrog buttons under "Scrubbers 3 of 9"](scrubbers-card.png)
+
+- **scrubbers-card.png** — `shot:s4 scrub:3 turns:4 select:eastasia look:110,30`. East Asia in
+  Custodian hands: three Scrubbers on the Facilities list at 4 Energy upkeep and no output, a
+  mothballed Factory and a mothballed Power Plant greyed and reading "making nothing, paying no
+  upkeep, emitting nothing, keeping its slot" with Restart (5 Materials) and Decommission (free)
+  under each, the line "3 Scrubber(s) here take 9.0 ppm off the Sink and 1 off the Unrest every
+  turn", the per-person line "Its people emit 0.07 per hundred million (0.04 base + 0.03 x Industry
+  Level 3, Leapfrogged twice)", and the Build section headed "Scrubbers 3 of 9" with the Scrubber
+  and Leapfrog buttons. (`scrub:<n>` is a building aid: an AI Custodian builds one Scrubber at a
+  time and mothballs it again the moment Energy runs close.)
+
+![The Climate Panel with the Sink line reading "Natural Sink -6.0 and Scrubbers -9.0", and the Blame section showing the Custodians with 15 ppm removed](climate-panel-scrubbers.png)
+
+- **climate-panel-scrubbers.png** — `shot:cp scrub:3 turns:4 look:110,30`. The Sink line now carries
+  the Scrubbers beside the Natural Sink: "Natural Sink -6.0 and Scrubbers -9.0", with the population
+  line above it (7.6) carrying its formula in the hover. Underneath, the Blame section credits the
+  Custodians with the 15 ppm their Scrubbers have taken back so far, which is what Restoration used
+  to fill.
+
+![A Prospector Nation State card for East Asia under a Strip Permit, with an orange line reading "Strip Permit: 2 turn(s) left of double output" and every Factory reading +14 Materials](strip-permit-card.png)
+
+- **strip-permit-card.png** — `shot:sp player:prospectors strip:1 turns:4 select:eastasia
+  look:110,30`. East Asia under a Prospector Strip Permit with one of its three turns spent: the
+  orange line reads "Strip Permit: 2 turn(s) left of double output, then +0.2 Baseline Emissions for
+  good and +3 Unrest", each Factory reads +14 Materials where it would read +7, and the top bar
+  shows Materials +28 a turn. (`strip:1` is a building aid: the AI Prospector is never behind its
+  Extraction pace in its own seat, so it never issues one there.)
+
+### Twenty seeds
+
+`cargo run --release -p dying-earth-engine --example sim -- 1 --count=20`, three seatings, plus
+`sweep -- 20 --player=custodians --start=europe --sinks=6 --steps=150`. Nothing was re-tuned; these
+are measurements.
+
+| seat 0 | wins | collapses | median collapse turn | median first Colony | net at turn 12 | net at the end |
+|---|---|---|---|---|---|---|
+| Custodians in East Asia | Prospectors 1 | 19/20 | 21 | 10 | +36.1 | +16.5 |
+| Prospectors in East Asia | Prospectors 19 | 1/20 | 24 | 10 | +30.5 | +8.2 |
+| Arkwrights in East Asia | Arkwrights 4 | 16/20 | 22 | 10 | +30.5 | +11.8 |
+| Custodians in Europe (sweep) | Prospectors 18 | 2/20 | 24 (24..24) | - | - | end temp +2.91 |
+
+What the new orders did over each batch of twenty:
+
+| seat 0 | Scrubbers built | Mothballs | Restarts | Decommissions | Leapfrogs | Strip Permits |
+|---|---|---|---|---|---|---|
+| Custodians in East Asia | 288 | 834 | 241 | 245 | 0 | 27 |
+| Prospectors in East Asia | 430 | 1114 | 174 | 420 | 0 | 64 |
+| Arkwrights in East Asia | 267 | 868 | 193 | 290 | 0 | 64 |
+
+The Custodians' longest Stabilization run, median and max over the twenty seeds: **0 and 0** in the
+Custodian and Arkwright seatings, **0 and 6** in the Prospector seating. (A note on that figure: the
+Stabilization test is a world test — net counted Emissions under the Sink — so every seat's run moves
+together. It is one number about the board, not four about the Factions.)
+
+**The Scrubber cools the world, and by a lot.** Against #53's twenty seeds the Prospector-in-East-Asia
+seating collapsed 20 of 20 at a median turn 21 with nobody winning; it now collapses **1 of 20**, ends
+at a net of +8.2 ppm, and the Prospectors win 19 of 20. The Europe sweep went the same way: 20 of 20
+collapses before, **2 of 20** now, and 18 Prospector wins. The Custodian-in-East-Asia seating moved
+from 20 of 20 to 19 of 20 — that board still burns, because the seat that holds most of Earth is the
+one that keeps building, and the Custodian AI's own Scrubbers cannot outrun twelve states of industry.
+
+**Two of the six new AI weights never fire, at the numbers the designer set, and that is a finding
+rather than a bug.**
+
+- **`leapfrog` (Custodians 5, when Ducats exceed 60) fired 0 times in 60 games.** A Custodian AI
+  never holds 60 Ducats at an Orders phase: bought Influence scores 7.2 against Leapfrog's 5, and
+  the greedy spend turns every Ducat into Influence the turn it arrives. Either the weight has to
+  beat bought Influence or the trigger has to be lower than 60.
+- **`strip_permit` (Prospectors 7, when behind on Extraction pace) fired 0 times in the seating where
+  the Prospectors sit in seat 0**, and 27 to 64 times over twenty seeds in the other two. The seat-0
+  Prospector runs 20 to 50 per cent **ahead** of its Extraction schedule all game (turn 6: 93 against
+  a pace of 40; turn 12: 201 against 150), so it is never behind and never asks. A Prospector in a
+  worse seat is behind often enough to use it.
+
+**The Energy clause makes the AI mothball a great deal.** "Mothball the highest-upkeep non-producer
+when an Energy shortfall is within one turn" fires most turns for most seats, because the shortfall
+rule leaves the Energy balance hovering near zero by design: 834 to 1114 mothballs a batch, against
+174 to 241 restarts. It also means a Custodian AI builds a Scrubber (4 Energy upkeep, no output) and
+mothballs it again a turn or two later, which is visible in the log as a build-and-stand-down cycle.
+Each mothball costs the state 1 Unrest, which is part of why Relief orders are up at 258 to 311 a
+batch. Whether the trigger should be tighter than "within one turn" is the designer's call.
+

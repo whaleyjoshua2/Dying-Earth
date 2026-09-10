@@ -86,10 +86,13 @@ pub enum FacilityKind {
     Embassy,
     /// Version 0.05 (ticket #52): lowers its state's Unrest and damps what raises it.
     Constabulary,
+    /// Version 0.05 (ticket #54): the Custodians' signature Facility. Takes no build slot, enlarges
+    /// the Natural Sink while it is online, and is destroyed if its state changes hands.
+    Scrubber,
 }
 
 impl FacilityKind {
-    pub const ALL: [FacilityKind; 8] = [
+    pub const ALL: [FacilityKind; 9] = [
         FacilityKind::Factory,
         FacilityKind::PowerPlant,
         FacilityKind::Refinery,
@@ -98,6 +101,7 @@ impl FacilityKind {
         FacilityKind::Bank,
         FacilityKind::Embassy,
         FacilityKind::Constabulary,
+        FacilityKind::Scrubber,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -109,6 +113,7 @@ impl FacilityKind {
             FacilityKind::Bank => "Bank",
             FacilityKind::Embassy => "Embassy",
             FacilityKind::Constabulary => "Constabulary",
+            FacilityKind::Scrubber => "Scrubber",
         }
     }
 }

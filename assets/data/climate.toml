@@ -25,6 +25,14 @@ collapse_line = 3.0
 temperature_lag_fraction = 0.5
 population_growth = 0.01
 population_loss_per_tenth_degree = 0.0015
-population_emissions_per_hundred_million = 0.1
+# Ticket #54 (version 0.05): Population Emissions follow the Industry Level of the state the people
+# live in, in place of the flat 0.1 a hundred million every state paid: a state emits
+# `population_emissions_base + population_emissions_per_level x Industry Level` per hundred million.
+# At the opening board that is 0.07 in Sub-Saharan Africa and 0.13 in East Asia, and the world's
+# total is 8.03 against the old 7.86, within a fiftieth. Green Consensus halves the whole line as
+# before, the Faction Emissions multiplier applies as before, and the Custodians' Leapfrog lowers a
+# state's own coefficient by one level's worth at a time, never below the base.
+population_emissions_base = 0.04
+population_emissions_per_level = 0.03
 launch_emissions = 2.0
 sea_level_thresholds = [1.8, 2.3, 2.8]

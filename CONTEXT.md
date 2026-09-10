@@ -13,11 +13,11 @@ A competing power with its own multipliers, signature rule and victory condition
 _Avoid_: side, team, empire
 
 **Custodians**:
-The Faction that colonizes the solar system while limiting ecological damage to Earth. Their signature rule is Restoration, and they win only if Earth is still habitable.
+The Faction that colonizes the solar system while limiting ecological damage to Earth. Their signature rule is the Scrubber and Leapfrog, and they win only if Earth is still habitable.
 _Avoid_: Stewards (the retired name), environmentalists, greens, moderates, eco-terrorists
 
 **Prospectors**:
-The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry, and they win on extraction and expansion.
+The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry and the Strip Permit, and they win on extraction and expansion.
 _Avoid_: Extractors (the retired name), capitalists, industrialists, exploiters
 
 **Arkwrights**:
@@ -136,7 +136,7 @@ The single shared pool holding all Materials, Fuel, Energy and, since version 0.
 _Avoid_: central bank, per-world stocks, inventory
 
 **Ducats**:
-Money, the fourth resource since version 0.03. A controlled Nation State pays them from its GDP figure times its Industry Level; a Bank on Earth and a Trade Post in a Colony make more. They buy Influence at two for one, added to this turn's Allotment, and pay for Restoration steps and repair points in place of Energy and Materials.
+Money, the fourth resource since version 0.03. A controlled Nation State pays them from its GDP figure times its Industry Level; a Bank on Earth and a Trade Post in a Colony make more. They buy Influence at two for one, added to this turn's Allotment, and pay for a Leapfrog and for repair points in place of Materials.
 _Avoid_: Ducketts, credits, money, gold, cash
 
 **Bank**:
@@ -204,16 +204,36 @@ _Avoid_: country, nation, territory, region, state, continent (some are, some ar
 ### Earth
 
 **Facility**:
-A building placed in a Nation State. Eight kinds since version 0.05: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy and Constabulary. Since version 0.04 a Launch Site builds no Ship: it lifts Colonists and Armies from its state into orbit, and each lift is a launch.
+A building placed in a Nation State. Nine kinds since version 0.05: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary and the Scrubber, which alone takes no build slot. Since version 0.04 a Launch Site builds no Ship: it lifts Colonists and Armies from its state into orbit, and each lift is a launch.
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Cheap Industry**:
-The Prospectors' signature rule: raising a Nation State's Industry Level costs them half.
+The first clause of the Prospectors' signature rule: raising a Nation State's Industry Level costs them half. The second is the Strip Permit.
 _Avoid_: industry discount, cheap building
 
 **Restoration**:
-The Custodians' signature rule: Energy spent in a turn enlarges the Natural Sink for that turn only.
-_Avoid_: carbon capture, cleanup, scrubbing, terraforming
+Retired in version 0.05; see Scrubber. It was the Custodians' signature rule: Energy spent in a turn enlarged the Natural Sink for that turn only.
+_Avoid_: using it for anything the Scrubber now does
+
+**Scrubber**:
+The Custodians' signature Facility, which only they build and only in a Nation State they control. It takes no build slot, draws Energy, emits nothing, and while it is online it enlarges the Natural Sink and lowers its state's Unrest every turn. How many one state may hold follows its population, and they are destroyed outright if the state changes hands.
+_Avoid_: carbon capture, cleanup, restoration (the retired rule), terraforming, filter
+
+**Leapfrog**:
+The Custodians' other signature clause: an Orders-phase order paid in Ducats on a Nation State they control, which lowers that state's per-person Emissions coefficient by one Industry Level's worth, for good. It may be bought any number of times, and never takes the figure below the base every state pays.
+_Avoid_: clean development, technology transfer, offset, upgrade
+
+**Strip Permit**:
+The Prospectors' other signature clause: an Orders-phase order, free, that may be taken once in a Nation State's whole life. For three turns every Facility there produces double; when it ends, that state's Baseline Emissions and its Unrest rise for good.
+_Avoid_: licence, boom, overdrive, exploitation
+
+**Mothball**:
+The Orders-phase order that stands a Facility or a Module down. A mothballed building produces nothing, pays no Energy upkeep, emits nothing, is online for no rule, and keeps its slot. It is free, it takes effect at the Resolution, it raises the Unrest of a Nation State it happens in, and only a Restart brings the building back, for Materials and a turn.
+_Avoid_: pause, disable, switch off, idle, shut down (that is the Energy shortfall rule)
+
+**Decommission**:
+The Orders-phase order that takes a Facility or a Module down for good: a turn later half its Materials come back, its slot is free, and it is gone. In a Nation State it raises Unrest more than a Mothball does; in a Colony it raises none.
+_Avoid_: demolish, scrap, sell, destroy
 
 **Industry Level**:
 How built-up a Nation State is. Together with the state's size it sets how many Facilities fit, and it scales the state's emissions. Raising it is a build action.
@@ -358,7 +378,7 @@ The Prospectors' measure: all the Materials and Fuel their Mines, Refineries and
 _Avoid_: production score, output total, wealth
 
 **Stabilization**:
-The Custodians' measure: net Emissions held under the Natural Sink for a run of consecutive turns. One turn over the Sink resets the run.
+The Custodians' measure: net Emissions held under the Natural Sink, counting every Scrubber, for a run of consecutive turns. One turn over the Sink resets the run.
 _Avoid_: carbon neutral, balance, equilibrium
 
 **Off-world Presence**:
@@ -376,11 +396,11 @@ Degrees above pre-industrial. It follows the CO2 Stock with a lag of one to two 
 _Avoid_: heat, warming percentage
 
 **Emissions**:
-The CO2-equivalent a source adds to the CO2 Stock in a turn. Every source has its own figure and the Climate Panel shows them one by one before the sum; methane-heavy sources carry a heavier weight.
+The CO2-equivalent a source adds to the CO2 Stock in a turn. Every source has its own figure and the Climate Panel shows them one by one before the sum; methane-heavy sources carry a heavier weight. Since version 0.05 a Nation State's people emit more the more built-up the state is, and a Leapfrog lowers that state's figure for good.
 _Avoid_: output, carbon, footprint
 
 **Natural Sink**:
-The fixed amount of CO2 the oceans and forests remove from the CO2 Stock every turn. Net emissions below it stabilize the stock. Restoration enlarges it for a single turn.
+The fixed amount of CO2 the oceans and forests remove from the CO2 Stock every turn. Net emissions below it stabilize the stock. Every Scrubber standing and online enlarges it while it stands.
 _Avoid_: absorption, offset, carbon capture
 
 **Sea Level**:

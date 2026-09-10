@@ -56,6 +56,16 @@ fn main() {
     let mut shares: [Vec<f64>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
     let mut mults: [Vec<f64>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
     let mut developments: Vec<u32> = Vec::new();
+    // Ticket #54.
+    let mut scrubbers = 0u32;
+    let mut mothballs = 0u32;
+    let mut restarts = 0u32;
+    let mut decommissions = 0u32;
+    let mut leapfrogs = 0u32;
+    let mut strip_permits = 0u32;
+    let mut runs: [Vec<u32>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+    let mut net_twelve: Vec<f64> = Vec::new();
+    let mut net_end: Vec<f64> = Vec::new();
     let mut kinds = [FactionKind::Custodians; SEAT_COUNT];
     for s in seed..seed + count {
         let r = dying_earth_engine::sim::run(tables.clone(), s, player);
@@ -88,6 +98,19 @@ fn main() {
             mults[seat.index()].push(r.threshold_multiplier[seat.index()]);
         }
         developments.push(r.developments);
+        scrubbers += r.scrubbers;
+        mothballs += r.mothballs;
+        restarts += r.restarts;
+        decommissions += r.decommissions;
+        leapfrogs += r.leapfrogs;
+        strip_permits += r.strip_permits;
+        for seat in Seat::ALL {
+            runs[seat.index()].push(r.longest_stabilization[seat.index()]);
+        }
+        if let Some(n) = r.net_at_twelve {
+            net_twelve.push(n);
+        }
+        net_end.push(r.net_at_end);
         println!(
             "seed {:3} | {:?} | turn {:2} | first colony {:?} | buildings {:?} | colonists {:?} | temp {:+.2} | collapse proj {:?} | colony hands {:?} | influence transfers {:2} | bank/post/embassy/relay {:?}",
             r.seed, r.outcome, r.last_turn, r.first_colony_turn, r.buildings, r.colonists_off_earth, r.temperature, r.collapse_projected_turn, r.colony_changed_hands, r.influence_transfers, r.new_buildings
@@ -102,6 +125,18 @@ fn main() {
             r.blame_share.map(|b| format!("{b:.2}")),
             r.threshold_multiplier.map(|b| format!("x{b:.2}")),
             r.developments
+        );
+        println!(
+            "         | scrubbers {} | mothballs {} | restarts {} | decommissions {} | leapfrogs {} | strip permits {} | longest stabilization {:?} | net at 12 {:?} | net at end {:+.1}",
+            r.scrubbers,
+            r.mothballs,
+            r.restarts,
+            r.decommissions,
+            r.leapfrogs,
+            r.strip_permits,
+            r.longest_stabilization,
+            r.net_at_twelve.map(|n| format!("{n:+.1}")),
+            r.net_at_end
         );
     }
     if count > 1 {
@@ -135,5 +170,21 @@ fn main() {
             );
         }
         println!("{:>12}         : {}", "median neutral developments a game", median(&mut developments));
+        // Ticket #54: what the new orders did over the batch.
+        println!();
+        println!("{:>12}         : {}", "Scrubbers built", scrubbers);
+        println!("{:>12}         : {}", "Mothballs", mothballs);
+        println!("{:>12}         : {}", "Restarts", restarts);
+        println!("{:>12}         : {}", "Decommissions", decommissions);
+        println!("{:>12}         : {}", "Leapfrogs", leapfrogs);
+        println!("{:>12}         : {}", "Strip Permits", strip_permits);
+        for seat in Seat::ALL {
+            let i = seat.index();
+            let max = runs[i].iter().copied().max().unwrap_or(0);
+            let label = format!("{} longest Stabilization run", kinds[i].name());
+            println!("{:>12}         : median {}, max {}", label, median(&mut runs[i]), max);
+        }
+        println!("{:>12}         : {:+.1}", "median world net Emissions at turn 12", median_f(&mut net_twelve));
+        println!("{:>12}         : {:+.1}", "median world net Emissions at the end", median_f(&mut net_end));
     }
 }

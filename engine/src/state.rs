@@ -56,6 +56,44 @@ pub enum UnrestSource {
     Plain,
 }
 
+/// Ticket #54 (version 0.05): what a Mothball, Restart or Decommission order does to a building.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuildingChange {
+    /// Free, lands at this Resolution: the building produces nothing, pays no Energy upkeep and
+    /// emits nothing, and keeps its slot.
+    Mothball,
+    /// Materials and a turn: it works again.
+    Restart,
+    /// A turn: half its Materials come back, its slot is freed and it is gone.
+    Decommission,
+}
+
+impl BuildingChange {
+    pub fn name(self) -> &'static str {
+        match self {
+            BuildingChange::Mothball => "Mothball",
+            BuildingChange::Restart => "Restart",
+            BuildingChange::Decommission => "Decommission",
+        }
+    }
+    /// The past tense the Report uses when the change lands.
+    pub fn done(self) -> &'static str {
+        match self {
+            BuildingChange::Mothball => "mothballed",
+            BuildingChange::Restart => "restarted",
+            BuildingChange::Decommission => "decommissioned",
+        }
+    }
+}
+
+/// Ticket #54: a change ordered on one building and the turn its Resolution lands it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PendingChange {
+    pub what: BuildingChange,
+    pub due_turn: u32,
+    pub seat: Seat,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Facility {
     pub kind: FacilityKind,
@@ -66,6 +104,21 @@ pub struct Facility {
     /// Ticket #53: a neutral Nation State that developed itself runs this Facility on its own, so it
     /// emits at x1.0 to nobody's Blame while nobody directs the state. A directed state ignores it.
     pub self_run: bool,
+    /// Ticket #54: mothballed. It makes nothing, pays no upkeep, emits nothing, counts as online for
+    /// no rule, and keeps its build slot until it is decommissioned.
+    pub mothballed: bool,
+    /// Ticket #54: a Mothball, Restart or Decommission ordered and not yet landed.
+    pub change: Option<PendingChange>,
+}
+
+impl Facility {
+    pub fn new(kind: FacilityKind) -> Facility {
+        Facility { kind, online: true, offline_until_resolution: false, self_run: false, mothballed: false, change: None }
+    }
+    /// Ticket #54: standing, running and not mothballed - what every "while it is online" rule means.
+    pub fn working(&self) -> bool {
+        self.online && !self.mothballed
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -77,11 +130,18 @@ pub struct Module {
     pub offline_until_resolution: bool,
     /// Ticket #51: how many stages of the Archive stand here. 0 for every other Module.
     pub stage: u32,
+    /// Ticket #54: mothballed, exactly as a Facility is.
+    pub mothballed: bool,
+    pub change: Option<PendingChange>,
 }
 
 impl Module {
     pub fn new(kind: ModuleKind) -> Module {
-        Module { kind, online: true, offline_until_resolution: false, stage: 0 }
+        Module { kind, online: true, offline_until_resolution: false, stage: 0, mothballed: false, change: None }
+    }
+    /// Ticket #54: standing, running and not mothballed.
+    pub fn working(&self) -> bool {
+        self.online && !self.mothballed
     }
 }
 
@@ -138,6 +198,15 @@ pub struct NationState {
     /// Occupied. Neutral Development counts from here, so a state taken and then freed starts a
     /// fresh six-turn count.
     pub neutral_since: Option<u32>,
+    /// Ticket #54: what Leapfrog has taken off this state's per-person Emissions coefficient, for
+    /// good. It starts at 0 and the coefficient never falls below the table's base.
+    pub leapfrog: f64,
+    /// Ticket #54: what a spent Strip Permit added to the card's Baseline Emissions, for good.
+    pub baseline_rise: f64,
+    /// Ticket #54: a Strip Permit has been taken here; one per state, ever.
+    pub strip_permit_used: bool,
+    /// Ticket #54: the last turn whose Income this state's Facilities double, while one runs.
+    pub strip_permit_ends: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -214,7 +283,9 @@ pub struct EmissionsBreakdown {
     /// Emissions added by Event cards (Wildfire, Permafrost Thaw); never counted against Stabilization.
     pub cards: f64,
     pub sink: f64,
-    pub restoration: f64,
+    /// Ticket #54: what the Scrubbers standing and online this Climate phase add to the Sink. It
+    /// took Restoration's place in the breakdown and in the Stabilization sum.
+    pub scrubbers: f64,
     /// Ticket #53: the Emissions of the sources each seat controlled this turn, which is what its
     /// Blame is made of. Cards are nobody's, and neither is a neutral state's industry or people.
     pub by_seat: [f64; SEAT_COUNT],
@@ -229,7 +300,7 @@ impl EmissionsBreakdown {
         self.counted() + self.cards
     }
     pub fn total_sink(&self) -> f64 {
-        self.sink + self.restoration
+        self.sink + self.scrubbers
     }
     pub fn net(&self) -> f64 {
         self.total() - self.total_sink()
@@ -244,17 +315,9 @@ pub struct Climate {
     /// Launches from Earth since the last Climate phase, per seat, charged next time.
     pub launches_pending: [u32; SEAT_COUNT],
     /// Emissions a card (Permafrost Thaw) adds at the next Climate phase, worldwide.
+    /// Ticket #54: `removal_next` went with Restoration. What a Faction takes back is now the
+    /// Scrubbers standing at the Climate phase, read off the board (`scrubber_removal_by_seat`).
     pub card_emissions_next: f64,
-    /// Ticket #53: the CO2 each seat removes at the next Climate phase, in ppm, for that phase
-    /// only. Restoration fills it now; a Scrubber will add to the same array on its own ticket.
-    pub removal_next: [f64; SEAT_COUNT],
-}
-
-impl Climate {
-    /// What the whole table removes at the next Climate phase: the Natural Sink's enlargement.
-    pub fn removal_total(&self) -> f64 {
-        self.removal_next.iter().sum()
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -515,7 +578,7 @@ impl Game {
                 population: c.population,
                 industry_level: c.industry_level,
                 control: Control::Neutral,
-                facilities: c.start_facilities.iter().map(|k| Facility { kind: *k, online: true, offline_until_resolution: false, self_run: false }).collect(),
+                facilities: c.start_facilities.iter().copied().map(Facility::new).collect(),
                 queue: Vec::new(),
                 lost_slots: 0,
                 thresholds_fired: vec![false; tables.climate.sea_level_thresholds.len()],
@@ -527,6 +590,10 @@ impl Game {
                 // Every state is neutral when the game opens; the clocks are staggered below, and
                 // `take_control` clears the four the Factions begin holding.
                 neutral_since: Some(1),
+                leapfrog: 0.0,
+                baseline_rise: 0.0,
+                strip_permit_used: false,
+                strip_permit_ends: None,
             })
             .collect();
         // Ticket #53: the opening clocks are staggered by the seed across the first development
@@ -554,7 +621,6 @@ impl Game {
                 last: EmissionsBreakdown::default(),
                 launches_pending: [0; SEAT_COUNT],
                 card_emissions_next: 0.0,
-                removal_next: [0.0; SEAT_COUNT],
             },
             research: Research {
                 current: None,
@@ -598,7 +664,7 @@ impl Game {
         for (sid, seat) in taken.iter().zip(Seat::ALL) {
             game.take_control(*sid, seat);
             let st = game.state_mut(*sid);
-            st.facilities.push(Facility { kind: FacilityKind::LaunchSite, online: true, offline_until_resolution: false, self_run: false });
+            st.facilities.push(Facility::new(FacilityKind::LaunchSite));
         }
         let places: Vec<String> = Seat::ALL
             .into_iter()
@@ -945,10 +1011,16 @@ impl Game {
         (self.tables.state(s).size + st.industry_level).saturating_sub(st.lost_slots)
     }
 
+    /// Ticket #54: a Scrubber takes no build slot, so neither the standing ones nor the ones on
+    /// order count against the state's slots.
+    pub fn takes_slot(&self, kind: FacilityKind) -> bool {
+        !self.tables.facility(kind).no_slot
+    }
+
     pub fn slots_used(&self, s: StateId) -> u32 {
         let st = self.state(s);
-        st.facilities.len() as u32
-            + st.queue.iter().filter(|b| matches!(b.item, BuildItem::Facility(_))).count() as u32
+        st.facilities.iter().filter(|f| self.takes_slot(f.kind)).count() as u32
+            + st.queue.iter().filter(|b| matches!(b.item, BuildItem::Facility(k) if self.takes_slot(k))).count() as u32
     }
 
     pub fn free_slots(&self, s: StateId) -> u32 {
@@ -1081,14 +1153,14 @@ impl Game {
             .controlled_states(seat)
             .iter()
             .flat_map(|s| self.state(*s).facilities.iter())
-            .filter(|f| f.online)
+            .filter(|f| f.working())
             .map(|f| self.tables.facility(f.kind).influence_allotment)
             .sum();
         let space: i64 = self
             .owned_colonies(seat)
             .iter()
             .flat_map(|c| self.colony(*c).into_iter().flat_map(|c| c.modules.iter()))
-            .filter(|m| m.online)
+            .filter(|m| m.working())
             .map(|m| self.tables.module(m.kind).influence_allotment)
             .sum();
         earth + space
@@ -1215,6 +1287,88 @@ impl Game {
         (turns.max(1), fuel)
     }
 
+    // ---------------------------------------------------------------- Ticket #54: the Scrubber
+
+    /// How many Scrubbers one Nation State may hold: clamp(round(population / 2), 2, 10).
+    pub fn scrubber_cap(&self, s: StateId) -> u32 {
+        let c = &self.tables.scrubber;
+        if c.per_population <= 0.0 {
+            return c.max;
+        }
+        ((self.state(s).population / c.per_population).round().max(0.0) as u32).clamp(c.min, c.max)
+    }
+
+    /// Scrubbers standing in a state, plus any on order there: what the cap is read against.
+    pub fn scrubbers_committed(&self, s: StateId) -> u32 {
+        let st = self.state(s);
+        st.facilities.iter().filter(|f| f.kind == FacilityKind::Scrubber).count() as u32
+            + st.queue.iter().filter(|b| b.item == BuildItem::Facility(FacilityKind::Scrubber)).count() as u32
+    }
+
+    /// Scrubbers standing and online in a state: the ones that enlarge the Sink and calm the place.
+    pub fn scrubbers_online(&self, s: StateId) -> u32 {
+        self.state(s).facilities.iter().filter(|f| f.kind == FacilityKind::Scrubber && f.working()).count() as u32
+    }
+
+    /// Ticket #54: the ppm each seat's Scrubbers take out of the air at this Climate phase. A
+    /// Scrubber belongs to whoever controls its state, and counts as removal for that seat's Blame.
+    pub fn scrubber_removal_by_seat(&self) -> [f64; SEAT_COUNT] {
+        let per = self.tables.facility(FacilityKind::Scrubber).sink_per_turn;
+        let mut out = [0.0; SEAT_COUNT];
+        for st in &self.states {
+            let Some(seat) = st.control.controller() else { continue };
+            out[seat.index()] += per * self.scrubbers_online(st.id) as f64;
+        }
+        out
+    }
+
+    /// What the whole table takes back this Climate phase.
+    pub fn scrubber_removal(&self) -> f64 {
+        self.scrubber_removal_by_seat().iter().sum()
+    }
+
+    // ---------------------------------------------------------------- Ticket #54: the two coefficients
+
+    /// A Nation State's Baseline Emissions now: its card figure plus whatever a spent Strip Permit
+    /// added for good.
+    pub fn baseline_emissions(&self, s: StateId) -> f64 {
+        self.tables.state(s).baseline_emissions + self.state(s).baseline_rise
+    }
+
+    /// Ticket #54: what one hundred million people in this state emit a turn, before Green Consensus
+    /// and the Faction multiplier: `base + per_level x Industry Level`, less what Leapfrog has taken
+    /// off, never below `base`.
+    pub fn population_coefficient(&self, s: StateId) -> f64 {
+        let c = &self.tables.climate;
+        let st = self.state(s);
+        let raw = c.population_emissions_base + c.population_emissions_per_level * st.industry_level as f64;
+        (raw - st.leapfrog).max(c.population_emissions_base)
+    }
+
+    /// How many times Leapfrog has been bought here, for the card.
+    pub fn leapfrogs(&self, s: StateId) -> u32 {
+        let per = self.tables.climate.population_emissions_per_level;
+        if per <= 0.0 { 0 } else { (self.state(s).leapfrog / per).round().max(0.0) as u32 }
+    }
+
+    /// Ticket #54: whether a Leapfrog would lower this state's coefficient at all. At the base it
+    /// would buy nothing, so the order is refused rather than taking 50 Ducats for nothing.
+    pub fn leapfrog_would_bite(&self, s: StateId) -> bool {
+        self.population_coefficient(s) > self.tables.climate.population_emissions_base + 1e-9
+    }
+
+    // ---------------------------------------------------------------- Ticket #54: the Strip Permit
+
+    /// True while a Strip Permit is doubling this state's Facility output.
+    pub fn strip_permit_running(&self, s: StateId) -> bool {
+        self.state(s).strip_permit_ends.map(|e| self.turn <= e).unwrap_or(false)
+    }
+
+    /// How many more turns of Income the doubling has after this one.
+    pub fn strip_permit_turns_left(&self, s: StateId) -> u32 {
+        self.state(s).strip_permit_ends.map(|e| e.saturating_sub(self.turn)).unwrap_or(0)
+    }
+
     /// Cheap Industry, the Prospectors' signature rule (spec 14.2).
     pub fn industry_cost(&self, seat: Seat) -> i64 {
         match self.kind(seat) {
@@ -1257,7 +1411,7 @@ impl Game {
 
     /// A Constabulary standing and online in the state.
     pub fn constabulary_online(&self, s: StateId) -> bool {
-        self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Constabulary && f.online)
+        self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Constabulary && f.working())
     }
 
     /// How much smaller a rise from `source` is here (rule 4 of #52, widened on #53 so the green
@@ -1308,24 +1462,31 @@ impl Game {
         before - after
     }
 
-    /// Ticket #52: a Facility mothballed in this state. The Mothball order arrives on a later
-    /// ticket; this is the function it calls.
+    /// Ticket #52: a Facility mothballed in this state; called by the Mothball order of ticket #54
+    /// when it lands. A Module mothballed in a Colony raises nothing.
     pub fn unrest_from_mothball(&mut self, s: StateId) -> f64 {
         let n = self.tables.unrest.per_mothball;
         self.raise_unrest(s, n, UnrestSource::Plain)
     }
 
-    /// Ticket #52: a Facility decommissioned in this state, the same way.
+    /// Ticket #52: a Facility decommissioned in this state, the same way (ticket #54).
     pub fn unrest_from_decommission(&mut self, s: StateId) -> f64 {
         let n = self.tables.unrest.per_decommission;
         self.raise_unrest(s, n, UnrestSource::Plain)
     }
 
-    /// The hook of rule 3 for what lowers Unrest by standing in the state: a Constabulary now, a
-    /// Scrubber when its ticket lands (`unrest.toml`, `scrubber_fall`).
+    /// The hook of rule 3 for what lowers Unrest by standing in the state: a Constabulary, and
+    /// since ticket #54 a Scrubber too (`unrest.toml`, `scrubber_fall`). A state with both gets both.
     pub fn calming_fall(&self, s: StateId) -> f64 {
         let u = &self.tables.unrest;
-        if self.constabulary_online(s) { u.constabulary_fall } else { 0.0 }
+        let mut n = 0.0;
+        if self.constabulary_online(s) {
+            n += u.constabulary_fall;
+        }
+        if self.scrubbers_online(s) > 0 {
+            n += u.scrubber_fall;
+        }
+        n
     }
 
     /// Ticket #52, a hook for the neutral-development rule of a later ticket: a state at

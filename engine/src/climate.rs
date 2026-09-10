@@ -23,15 +23,16 @@ impl Game {
         let net = breakdown.net();
         self.climate.co2 += net;
         // Ticket #53: Blame. Each Faction takes on what the sources it controls emitted this turn
-        // and is credited with what it removed; both totals stand for the whole game.
+        // and is credited with what it removed; both totals stand for the whole game. Ticket #54:
+        // what it removed is its Scrubbers, read off the same board `emissions_now` just read.
+        let removed_by_seat = self.scrubber_removal_by_seat();
         for seat in Seat::ALL {
             let i = seat.index();
-            let (emitted, removed) = (breakdown.by_seat[i], self.climate.removal_next[i]);
+            let (emitted, removed) = (breakdown.by_seat[i], removed_by_seat[i]);
             let s = self.seat_mut(seat);
             s.blame_emitted += emitted;
             s.blame_removed += removed;
         }
-        self.climate.removal_next = [0.0; SEAT_COUNT];
         self.climate.launches_pending = [0; SEAT_COUNT];
         self.climate.card_emissions_next = 0.0;
         for s in &mut self.states {
@@ -53,7 +54,7 @@ impl Game {
         self.climate.temperature = temp.max(c.base_temperature);
         self.climate.last = breakdown.clone();
         self.log(format!(
-            "Climate: emissions {:.1} (industry {:.1}, factories {:.1}, power {:.1}, refineries {:.1}, launches {:.1}, population {:.1}, cards {:.1}), sink {:.1}, net {:+.1}; CO2 {:.1} ppm; temperature {:+.2} heading to {:+.2}.",
+            "Climate: emissions {:.1} (industry {:.1}, factories {:.1}, power {:.1}, refineries {:.1}, launches {:.1}, population {:.1}, cards {:.1}), sink {:.1} (Scrubbers {:.1}), net {:+.1}; CO2 {:.1} ppm; temperature {:+.2} heading to {:+.2}.",
             breakdown.total(),
             breakdown.state_industry,
             breakdown.factories,
@@ -63,6 +64,7 @@ impl Game {
             breakdown.population,
             breakdown.cards,
             breakdown.total_sink(),
+            breakdown.scrubbers,
             net,
             self.climate.co2,
             self.climate.temperature,
@@ -134,13 +136,14 @@ impl Game {
         let pp_mult = if self.has_tech(TechId::CleanPower) { t.tech(TechId::CleanPower).value } else { 1.0 };
         let fr_mult = if self.has_tech(TechId::CleanManufacturing) { t.tech(TechId::CleanManufacturing).value } else { 1.0 };
         for st in &self.states {
-            let card = t.state(st.id);
             let director = st.control.director();
             let m = mult(director);
             // Ticket #53: whoever directs the state at this Climate phase wears its figure; a
             // neutral state's industry and people are nobody's Blame.
-            let industry = card.baseline_emissions * st.industry_level as f64 * m;
-            let people = c.population_emissions_per_hundred_million * st.population * pop_mult * m;
+            // Ticket #54: the state's own Baseline Emissions, which a spent Strip Permit raises for
+            // good, and its own per-person coefficient, which Leapfrog lowers for good.
+            let industry = self.baseline_emissions(st.id) * st.industry_level as f64 * m;
+            let people = self.population_coefficient(st.id) * st.population * pop_mult * m;
             b.state_industry += industry;
             b.population += people;
             let mut worn = industry + people;
@@ -149,7 +152,7 @@ impl Game {
             // nobody's Blame.
             if director.is_none() {
                 let half = if self.facilities_at_half(st.id) { 0.5 } else { 1.0 };
-                for f in st.facilities.iter().filter(|f| f.self_run && f.online) {
+                for f in st.facilities.iter().filter(|f| f.self_run && f.working()) {
                     let e = t.facility(f.kind).emissions * half;
                     match f.kind {
                         FacilityKind::Factory => b.factories += e * fr_mult,
@@ -161,7 +164,8 @@ impl Game {
             }
             if let Some(d) = director {
                 for f in &st.facilities {
-                    if !f.online {
+                    // Ticket #54: a mothballed Facility emits nothing at all.
+                    if !f.working() {
                         continue;
                     }
                     // Ticket #52: at Unrest 7 every Facility in the state emits at half.
@@ -192,7 +196,7 @@ impl Game {
         for col in self.colonies.iter().filter(|c| c.body == BodyId::Earth) {
             let Some(d) = col.control.director() else { continue };
             let m = mult(Some(d));
-            for md in col.modules.iter().filter(|md| md.online) {
+            for md in col.modules.iter().filter(|md| md.working()) {
                 let e = t.module(md.kind).earth_emissions;
                 let charged = match md.kind {
                     ModuleKind::Mine | ModuleKind::Refinery => e * fr_mult * m,
@@ -218,7 +222,8 @@ impl Game {
             b.by_seat[seat.index()] += charged;
         }
         b.sink = c.natural_sink;
-        b.restoration = self.climate.removal_total();
+        // Ticket #54: the Scrubbers standing and online enlarge the Natural Sink this phase.
+        b.scrubbers = self.scrubber_removal();
         b
     }
 

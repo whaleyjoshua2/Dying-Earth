@@ -9,8 +9,9 @@ blurb = "Colonize the solar system while limiting ecological damage to Earth."
 output_multiplier = 1.0
 emissions_multiplier = 0.75
 research_multiplier = 1.25
-influence_multiplier = 1.3
-signature = "Restoration: in Orders, spend Energy in multiples of 10; each 10 adds 3.0 ppm to the Natural Sink in the next Climate phase only."
+# Ticket #54 (version 0.05): 1.3 down to 1.25, with the Scrubber and Leapfrog in the same hand.
+influence_multiplier = 1.25
+signature = "The Scrubber and Leapfrog. A Scrubber is a Facility only they build, in a Nation State they control, taking no build slot: 30 Materials, 2 turns, 4 Energy upkeep, no Emissions; while it is online it enlarges the Natural Sink by 3.0 ppm a turn and takes 1 off that state's Unrest. A state holds as many as half its population in hundreds of millions, between 2 and 10, and they are destroyed if it changes hands. Leapfrog costs 50 Ducats on a state they control and lowers its people's Emissions coefficient by 0.03 for good, never below 0.04."
 victory = "Stabilization (3 consecutive Climate phases with net Emissions below the Natural Sink) plus 12 Colonists living off Earth."
 victory_first = { kind = "stabilization_run", bar = 3 }
 victory_second = { kind = "off_world_presence", bar = 12 }
@@ -25,7 +26,7 @@ output_multiplier = 1.25
 emissions_multiplier = 1.25
 research_multiplier = 0.75
 influence_multiplier = 1.0
-signature = "Cheap Industry: raising Industry Level costs 15 Materials instead of 30."
+signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs 15 Materials instead of 30. A Strip Permit is free, once per Nation State ever: for three turns every Facility there produces double, and when it ends that state's Baseline Emissions rise by 0.2 for good and its Unrest by 3."
 victory = "An Extraction Total of 500 Materials plus Fuel produced by Mines, Refineries and Factories, plus 12 Colonists living off Earth."
 victory_first = { kind = "extraction_total", bar = 500 }
 victory_second = { kind = "off_world_presence", bar = 12 }
@@ -75,9 +76,8 @@ victory_first = { kind = "archive_stages", bar = 4 }
 victory_second = { kind = "colonists_at_archive", bar = 12 }
 colour = [0.75, 0.82, 0.92]
 
-[restoration]
-energy_per_step = 10
-sink_per_step = 3.0
+# Ticket #54 (version 0.05): the [restoration] table is retired with the order; the Custodians'
+# signature rule is the Scrubber (facilities.toml) and Leapfrog (per_leapfrog below).
 
 [start]
 # Raised from 60 on ticket #24, since income now flows from turn one.
@@ -89,12 +89,13 @@ ducats = 0
 
 # Ticket #35 (version 0.03): Ducats. A controlled Nation State makes gdp x Industry Level / 10 a turn
 # (gdp on its card); a Bank adds bank_per_gdp_tenth x gdp / 10; a Trade Post makes trade_post_base x
-# the Body's Habitat yield. Ducats buy Influence, Restoration steps and repair points at these rates.
+# the Body's Habitat yield. Ducats buy Influence, Leapfrogs and repair points at these rates.
 [ducats]
 per_influence = 2
-# Version 0.04 (ticket #41): two Ducats for one of the thing bought, as with Influence. A
-# Restoration step is 10 Energy, a repair point 5 Materials.
-per_restoration_step = 20
+# Version 0.04 (ticket #41): two Ducats for one of the thing bought, as with Influence. A repair
+# point is 5 Materials, so 10 Ducats. Ticket #54 retired `per_restoration_step` with Restoration and
+# put `per_leapfrog` in its place: what one Leapfrog costs the Custodians on a state they control.
+per_leapfrog = 50
 per_repair_point = 10
 # Version 0.04 (ticket #42): the trading window. Ducats per unit bought; a sale returns the buying
 # price divided by sell_divisor (rounded down over the lot); a building bought for Ducats costs its

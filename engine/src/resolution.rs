@@ -8,11 +8,12 @@ use crate::state::*;
 impl Game {
     pub fn resolution_phase(&mut self) {
         // Flags that last "until the next Resolution" clear now.
+        // Ticket #54: a mothballed building is never woken by a flag clearing; only a Restart wakes it.
         for s in &mut self.states {
             for f in &mut s.facilities {
                 if f.offline_until_resolution {
                     f.offline_until_resolution = false;
-                    f.online = true;
+                    f.online = !f.mothballed;
                 }
             }
         }
@@ -20,12 +21,12 @@ impl Game {
             if c.grid_failed {
                 c.grid_failed = false;
                 for m in &mut c.modules {
-                    m.online = true;
+                    m.online = !m.mothballed;
                 }
             }
             for m in c.modules.iter_mut().filter(|m| m.offline_until_resolution) {
                 m.offline_until_resolution = false;
-                m.online = true;
+                m.online = !m.mothballed;
             }
         }
         self.blackout_stances();
@@ -33,10 +34,12 @@ impl Game {
         self.resolve_battles(); // (b)
         self.resolve_occupation(); // (c)
         self.resolve_influence(); // (d)
+        self.resolve_changes(); // (e), ticket #54: a decommission frees its slot before a build wants it
         self.resolve_builds(); // (e)
         self.resolve_repairs(); // (f)
         self.resolve_cargo(); // (g)
         self.apply_event_now(); // (h)
+        self.resolve_strip_permits(); // (h), ticket #54: a permit that ran out charges its price
         self.resolve_unrest(); // (i), ticket #52
         self.pending = Pending::default();
         for a in &mut self.armies {
@@ -541,8 +544,34 @@ impl Game {
         }
     }
 
+    /// Ticket #54: every Scrubber in a Nation State is destroyed when the state changes hands, by
+    /// Influence, by Occupation or by being thrown off. They are the Custodians' own works, and they
+    /// do not pass to whoever takes the place.
+    pub fn destroy_scrubbers(&mut self, sid: StateId, why: &str) {
+        let n = self.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::Scrubber).count();
+        if n == 0 {
+            return;
+        }
+        self.state_mut(sid).facilities.retain(|f| f.kind != FacilityKind::Scrubber);
+        self.state_mut(sid).queue.retain(|b| b.item != BuildItem::Facility(FacilityKind::Scrubber));
+        let line = format!(
+            "{} Scrubber(s) in {} were destroyed when the state {}.",
+            n,
+            self.tables.state(sid).name,
+            why
+        );
+        self.log(line.clone());
+        self.report.lines.push(line);
+    }
+
     /// Control passes to `seat` (spec 8.3, 8.5): rivals' Influence wiped, a destruction roll, Armies follow.
     pub fn transfer_control(&mut self, place: Place, seat: Seat, why: &str) {
+        // Ticket #54: the Scrubbers go first, before the place has a new owner to hold them.
+        if let Place::State(sid) = place
+            && self.place_control(place).controller() != Some(seat)
+        {
+            self.destroy_scrubbers(sid, "changed hands");
+        }
         // Ticket #51: an Archive is destroyed when its Colony changes hands, whether by Occupation
         // or by Influence. The Archive fund is kept, so the Archivists can start again.
         if let Place::Colony(c) = place
@@ -591,7 +620,7 @@ impl Game {
         let mut rises: Vec<(Seat, Place, i64)> = Vec::new();
         for st in &self.states {
             if let Some(c) = st.control.controller() {
-                let r: i64 = st.facilities.iter().filter(|f| f.online).map(|f| self.tables.facility(f.kind).standing_per_turn).sum();
+                let r: i64 = st.facilities.iter().filter(|f| f.working()).map(|f| self.tables.facility(f.kind).standing_per_turn).sum();
                 if r > 0 {
                     rises.push((c, Place::State(st.id), r));
                 }
@@ -599,7 +628,7 @@ impl Game {
         }
         for col in &self.colonies {
             if let Some(c) = col.control.controller() {
-                let r: i64 = col.modules.iter().filter(|m| m.online).map(|m| self.tables.module(m.kind).standing_per_turn).sum();
+                let r: i64 = col.modules.iter().filter(|m| m.working()).map(|m| self.tables.module(m.kind).standing_per_turn).sum();
                 if r > 0 {
                     rises.push((c, Place::Colony(col.id), r));
                 }
@@ -730,6 +759,142 @@ impl Game {
         }
     }
 
+    /// Ticket #54: every Mothball, Restart and Decommission whose turn has come. A decommission
+    /// refunds half the building's Materials, rounded down, and frees its slot; in a Nation State a
+    /// mothball and a decommission each add their Unrest, and in a Colony neither adds anything.
+    fn resolve_changes(&mut self) {
+        let turn = self.turn;
+        let mut lines: Vec<String> = Vec::new();
+        let mut unrest: Vec<(StateId, BuildingChange)> = Vec::new();
+        for sid in StateId::ALL {
+            // Highest position first, so a removal never shifts one still to come.
+            let due: Vec<usize> = (0..self.state(sid).facilities.len())
+                .rev()
+                .filter(|i| self.state(sid).facilities[*i].change.map(|c| c.due_turn <= turn).unwrap_or(false))
+                .collect();
+            for i in due {
+                let change = self.state(sid).facilities[i].change.unwrap();
+                let kind = self.state(sid).facilities[i].kind;
+                let refund = self.tables.facility(kind).materials / 2;
+                let f = &mut self.state_mut(sid).facilities[i];
+                f.change = None;
+                match change.what {
+                    BuildingChange::Mothball => {
+                        f.mothballed = true;
+                        f.online = false;
+                    }
+                    BuildingChange::Restart => {
+                        f.mothballed = false;
+                        f.online = true;
+                    }
+                    BuildingChange::Decommission => {
+                        self.state_mut(sid).facilities.remove(i);
+                        self.seat_mut(change.seat).stockpile.materials += refund;
+                    }
+                }
+                let where_ = self.tables.state(sid).name.clone();
+                lines.push(match change.what {
+                    BuildingChange::Decommission => format!(
+                        "The {} decommissioned the {} in {}: {} Materials back and its slot free.",
+                        self.seat_name(change.seat),
+                        kind.name(),
+                        where_,
+                        refund
+                    ),
+                    w => format!("The {} {} the {} in {}.", self.seat_name(change.seat), w.done(), kind.name(), where_),
+                });
+                if matches!(change.what, BuildingChange::Mothball | BuildingChange::Decommission) {
+                    unrest.push((sid, change.what));
+                }
+            }
+        }
+        let cids: Vec<ColonyId> = self.colonies.iter().map(|c| c.id).collect();
+        for cid in cids {
+            let len = self.colony(cid).map(|c| c.modules.len()).unwrap_or(0);
+            let due: Vec<usize> = (0..len)
+                .rev()
+                .filter(|i| self.colony(cid).unwrap().modules[*i].change.map(|c| c.due_turn <= turn).unwrap_or(false))
+                .collect();
+            for i in due {
+                let change = self.colony(cid).unwrap().modules[i].change.unwrap();
+                let kind = self.colony(cid).unwrap().modules[i].kind;
+                let refund = self.module_materials(change.seat, kind) / 2;
+                let col = self.colony_mut(cid).unwrap();
+                let m = &mut col.modules[i];
+                m.change = None;
+                match change.what {
+                    BuildingChange::Mothball => {
+                        m.mothballed = true;
+                        m.online = false;
+                    }
+                    BuildingChange::Restart => {
+                        m.mothballed = false;
+                        m.online = true;
+                    }
+                    BuildingChange::Decommission => {
+                        col.modules.remove(i);
+                        self.seat_mut(change.seat).stockpile.materials += refund;
+                    }
+                }
+                let where_ = self.place_name(Place::Colony(cid));
+                lines.push(match change.what {
+                    BuildingChange::Decommission => {
+                        format!("The {} decommissioned the {} at {}: {} Materials back.", self.seat_name(change.seat), kind.name(), where_, refund)
+                    }
+                    w => format!("The {} {} the {} at {}.", self.seat_name(change.seat), w.done(), kind.name(), where_),
+                });
+            }
+            // Colonists beyond the Habitats a decommission left are lost with them.
+            if let Some(col) = self.colony(cid) {
+                let room = self.habitat_room(col);
+                if let Some(col) = self.colony_mut(cid) {
+                    col.colonists = col.colonists.min(room);
+                }
+            }
+        }
+        for (sid, what) in unrest {
+            let rose = match what {
+                BuildingChange::Mothball => self.unrest_from_mothball(sid),
+                _ => self.unrest_from_decommission(sid),
+            };
+            if rose > 0.0 {
+                lines.push(format!(
+                    "{}: Unrest rose by {} to {}.",
+                    self.tables.state(sid).name,
+                    Game::unrest_figure(rose),
+                    self.unrest_text(sid)
+                ));
+            }
+        }
+        for line in lines {
+            self.log(line.clone());
+            self.report.lines.push(line);
+        }
+    }
+
+    /// Ticket #54: a Strip Permit whose last doubled turn has run charges its price: the state's
+    /// Baseline Emissions rise for good, and its Unrest with them.
+    fn resolve_strip_permits(&mut self) {
+        let t = self.tables.strip_permit.clone();
+        for sid in StateId::ALL {
+            if self.state(sid).strip_permit_ends != Some(self.turn) {
+                continue;
+            }
+            self.state_mut(sid).strip_permit_ends = None;
+            self.state_mut(sid).baseline_rise += t.baseline_rise;
+            let rose = self.raise_unrest(sid, t.unrest, UnrestSource::Plain);
+            let line = format!(
+                "The Strip Permit in {} ran out: its Baseline Emissions stand at {:.1} for good, and its Unrest rose by {} to {}.",
+                self.tables.state(sid).name,
+                self.baseline_emissions(sid),
+                Game::unrest_figure(rose),
+                self.unrest_text(sid)
+            );
+            self.log(line.clone());
+            self.report.lines.push(line);
+        }
+    }
+
     fn requeue(&mut self, place: Place, b: Build) {
         match place {
             Place::State(s) => self.state_mut(s).queue.push(b),
@@ -746,13 +911,15 @@ impl Game {
         let name = b.item.name();
         match (place, b.item) {
             (Place::State(s), BuildItem::Facility(k)) => {
-                if self.state(s).facilities.len() as u32 >= self.build_slots(s) {
+                // Ticket #54: a Scrubber takes no build slot, so it is never lost for want of one.
+                let used = self.state(s).facilities.iter().filter(|f| self.takes_slot(f.kind)).count() as u32;
+                if self.takes_slot(k) && used >= self.build_slots(s) {
                     let line = format!("{} at {} had no slot left and was lost.", name, self.place_name(place));
                     self.log(line.clone());
                     self.report.lines.push(line);
                     return;
                 }
-                self.state_mut(s).facilities.push(Facility { kind: k, online: true, offline_until_resolution: false, self_run: false });
+                self.state_mut(s).facilities.push(Facility::new(k));
             }
             (Place::State(s), BuildItem::IndustryLevel) => {
                 self.state_mut(s).industry_level += 1;
@@ -1113,6 +1280,7 @@ impl Game {
     fn throw_off(&mut self, sid: StateId, seat: Seat) {
         let u = &self.tables.unrest;
         let back = u.throw_off_reset;
+        self.destroy_scrubbers(sid, "threw off its controller");
         self.state_mut(sid).control = Control::Neutral;
         self.state_mut(sid).unrest = back;
         // Ticket #53: a state that is thrown off counts six fresh turns of neutrality.

@@ -30,7 +30,15 @@ enum Cat {
     Transit,
     LoadUnload,
     FoundColony,
-    Restoration,
+    /// Ticket #54: the Scrubber, which took Restoration's place and its Stabilization gap.
+    Scrubber,
+    /// Ticket #54: Mothball, Restart and Decommission, on a Facility or a Module.
+    Mothball,
+    Restart,
+    Decommission,
+    /// Ticket #54: the Custodians' Leapfrog and the Prospectors' Strip Permit.
+    Leapfrog,
+    StripPermit,
     StanceAttack,
     StanceIntercept,
     StanceHold,
@@ -87,7 +95,12 @@ impl Game {
             Cat::Transit => w.transit,
             Cat::LoadUnload => w.load_unload,
             Cat::FoundColony => w.found_colony,
-            Cat::Restoration => w.restoration,
+            Cat::Scrubber => w.build_scrubber,
+            Cat::Mothball => w.mothball,
+            Cat::Restart => w.restart,
+            Cat::Decommission => w.decommission,
+            Cat::Leapfrog => w.leapfrog,
+            Cat::StripPermit => w.strip_permit,
             Cat::StanceAttack => w.stance_attack,
             Cat::StanceIntercept => w.stance_intercept,
             Cat::StanceHold => w.stance_hold,
@@ -209,8 +222,9 @@ impl Game {
     /// Every Energy upkeep the seat pays now: Facilities, Modules, Ships and Armies.
     fn total_upkeep(&self, seat: Seat) -> i64 {
         self.unit_upkeep(seat)
-            + self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).map(|f| self.tables.facility(f.kind).energy_upkeep).sum::<i64>()
-            + self.directed_colonies(seat).iter().flat_map(|c| self.colony(*c).unwrap().modules.iter()).map(|m| self.tables.module(m.kind).energy_upkeep).sum::<i64>()
+            // Ticket #54: a mothballed building pays no upkeep, so it is no part of the drain.
+            + self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| !f.mothballed).map(|f| self.tables.facility(f.kind).energy_upkeep).sum::<i64>()
+            + self.directed_colonies(seat).iter().flat_map(|c| self.colony(*c).unwrap().modules.iter()).filter(|m| !m.mothballed).map(|m| self.tables.module(m.kind).energy_upkeep).sum::<i64>()
     }
 
     /// Energy the seat's producers make in a turn, at current multipliers.
@@ -220,7 +234,7 @@ impl Game {
         let mut e = 0.0;
         for sid in self.directed_states(seat) {
             let lean = if self.tables.state(sid).resource_lean == Resource::Energy { 1.5 } else { 1.0 };
-            for f in &self.state(sid).facilities {
+            for f in self.state(sid).facilities.iter().filter(|f| !f.mothballed) {
                 if f.kind == FacilityKind::PowerPlant {
                     e += (6.0 * lean * fac * grids).floor();
                 }
@@ -228,7 +242,7 @@ impl Game {
         }
         for cid in self.directed_colonies(seat) {
             let col = self.colony(cid).unwrap();
-            for m in &col.modules {
+            for m in col.modules.iter().filter(|m| !m.mothballed) {
                 if m.kind == ModuleKind::Generator {
                     e += (5.0 * self.tables.body(col.body).generator_yield * fac * grids).floor();
                 }
@@ -339,6 +353,24 @@ impl Game {
         // every win: a Bank on turn one displaced the Research Lab, and 4 Ducats a turn buys 2
         // Influence, which never repays 25 Materials the way a Factory does. Banks and Trade Posts
         // stay plain producers at their base weight.
+        // Ticket #54: the state a Leapfrog would go to (the most populous the seat controls) and the
+        // one a Strip Permit would (the one whose Facilities make the most), settled once.
+        let most_populous = self
+            .controlled_states(seat)
+            .into_iter()
+            .filter(|s| self.leapfrog_would_bite(*s))
+            .max_by(|a, b| self.state(*a).population.partial_cmp(&self.state(*b).population).unwrap_or(std::cmp::Ordering::Equal));
+        let output_of = |sid: StateId| -> i64 {
+            self.state(sid).facilities.iter().filter(|f| !f.mothballed).map(|f| self.facility_yield(seat, sid, f.kind).amount).sum()
+        };
+        let highest_output = self.controlled_states(seat).into_iter().filter(|s| !self.state(*s).strip_permit_used).max_by_key(|s| output_of(*s));
+        // Ticket #54: behind on the Extraction pace itself, whichever part the seat is furthest
+        // behind on overall: the Strip Permit is bought against the Extraction schedule.
+        let behind_on_extraction = first_kind == VictoryFirstKind::ExtractionTotal && {
+            let pace = self.tables.ai_pace(kind);
+            let want = Self::expected(&pace.first, self.turn);
+            want > 0.0 && (self.progress(seat).first_value) < want
+        };
         let mut cands: Vec<Candidate> = Vec::new();
 
         let mut push = |orders: Vec<Order>, cat: Cat, base: f64, gap: f64, threat: f64, opportunity: f64, note: String, stack: Option<String>| {
@@ -349,9 +381,13 @@ impl Game {
         let advances_first = |cat: Cat, item: Option<&str>| -> bool {
             match first_kind {
                 VictoryFirstKind::ExtractionTotal => {
-                    cat == Cat::Producer && item.map(|i| i != "Power Plant" && i != "Generator").unwrap_or(false) || cat == Cat::RaiseIndustry
+                    cat == Cat::Producer && item.map(|i| i != "Power Plant" && i != "Generator").unwrap_or(false)
+                        || cat == Cat::RaiseIndustry
+                        // Ticket #54: a Strip Permit is three turns of double Extraction.
+                        || cat == Cat::StripPermit
                 }
-                VictoryFirstKind::StabilizationRun => cat == Cat::Restoration || cat == Cat::ResearchLab,
+                // Ticket #54: a Scrubber is what a Custodian buys Stabilization with now.
+                VictoryFirstKind::StabilizationRun => cat == Cat::Scrubber || cat == Cat::ResearchLab,
                 VictoryFirstKind::ColonistsOffEarth => matches!(cat, Cat::Habitat | Cat::ColonyShip | Cat::FoundColony | Cat::LoadUnload | Cat::Transit),
                 VictoryFirstKind::ResearchProduced => cat == Cat::ResearchLab,
                 // Ticket #51: the Archive wants Research, a fund and stages, and a Colony off Earth
@@ -407,6 +443,9 @@ impl Game {
                             }
                             (Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard))
                         }
+                        // Ticket #54: a Scrubber has its own weight, its own cap and no build slot,
+                        // so it is enumerated below rather than here.
+                        FacilityKind::Scrubber => continue,
                     };
                     let produces = self.tables.facility(fk).produces.as_ref().map(|p| p.resource);
                     if cat == Cat::Producer {
@@ -430,6 +469,65 @@ impl Game {
                     let sway = if (first_embassy && self.standing_pressed(seat, Place::State(sid))) || just_occupied { m.threat } else { 1.0 };
                     push(vec![Order::BuildFacility { state: sid, kind: fk }], cat, base, gap_for(cat, Some(name)), sway, 1.0, format!("build {} in {}", name, self.tables.state(sid).name), None);
                 }
+            }
+            // Ticket #54: a Scrubber takes no build slot, so it is offered whether or not one is
+            // free, up to the state's cap, and only while the seat's Energy is not already tight:
+            // 4 Energy upkeep with nothing to run it is a Facility shut down at the next Income.
+            if kind == FactionKind::Custodians
+                && self.state(sid).control == Control::Controlled(seat)
+                && self.scrubbers_committed(sid) < self.scrubber_cap(sid)
+                && !tight
+            {
+                let cat = Cat::Scrubber;
+                let opp = if self.scrubbers_online(sid) == 0 { m.opportunity } else { 1.0 };
+                push(
+                    vec![Order::BuildFacility { state: sid, kind: FacilityKind::Scrubber }],
+                    cat,
+                    self.base_weight(seat, cat),
+                    gap_for(cat, Some("Scrubber")),
+                    1.0,
+                    opp,
+                    format!("build a Scrubber in {} ({} of {})", self.tables.state(sid).name, self.scrubbers_committed(sid) + 1, self.scrubber_cap(sid)),
+                    None,
+                );
+            }
+            // Ticket #54: Leapfrog, the Custodians' other clause, on the most populous state they
+            // hold once they have Ducats to spare.
+            if kind == FactionKind::Custodians
+                && self.seat(seat).stockpile.ducats > 60
+                && self.state(sid).control == Control::Controlled(seat)
+                && self.leapfrog_would_bite(sid)
+                && most_populous == Some(sid)
+            {
+                push(
+                    vec![Order::Leapfrog { state: sid }],
+                    Cat::Leapfrog,
+                    self.base_weight(seat, Cat::Leapfrog),
+                    1.0,
+                    1.0,
+                    1.0,
+                    format!("Leapfrog {} ({:.2} per hundred million now)", self.tables.state(sid).name, self.population_coefficient(sid)),
+                    None,
+                );
+            }
+            // Ticket #54: the Strip Permit, on the Prospectors' highest-output state while they are
+            // behind on the Extraction pace. It is free, and its price falls due three turns later.
+            if kind == FactionKind::Prospectors
+                && behind_on_extraction
+                && !self.state(sid).strip_permit_used
+                && self.state(sid).control == Control::Controlled(seat)
+                && highest_output == Some(sid)
+            {
+                push(
+                    vec![Order::StripPermit { state: sid }],
+                    Cat::StripPermit,
+                    self.base_weight(seat, Cat::StripPermit),
+                    gap_for(Cat::StripPermit, Some("Strip Permit")),
+                    1.0,
+                    1.0,
+                    format!("issue a Strip Permit in {}", self.tables.state(sid).name),
+                    None,
+                );
             }
             let base = self.base_weight(seat, Cat::RaiseIndustry);
             push(vec![Order::RaiseIndustry { state: sid }], Cat::RaiseIndustry, base, gap_for(Cat::RaiseIndustry, Some("Industry Level")), 1.0, 1.0, format!("raise Industry Level in {}", self.tables.state(sid).name), None);
@@ -597,7 +695,7 @@ impl Game {
         for body in BodyId::ALL {
             let has_station = self.colonies.iter().any(|c| c.in_orbit && c.body == body && c.control.director() == Some(seat));
             let foothold = match body {
-                BodyId::Earth => self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online)),
+                BodyId::Earth => self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working())),
                 _ => self.colonies.iter().any(|c| !c.in_orbit && c.body == body && c.control.director() == Some(seat) && c.modules.iter().any(|m| matches!(m.kind, ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery))),
             };
             if has_station || !foothold {
@@ -681,15 +779,107 @@ impl Game {
             );
         }
 
-        // --- Restoration
-        if kind == FactionKind::Custodians {
-            let energy = self.seat(seat).stockpile.energy;
-            let steps = (energy / self.tables.restoration.energy_per_step).max(0);
-            let net = self.climate.last.counted() - self.climate.last.total_sink();
-            let needed = if net > 0.0 { (net / self.tables.restoration.sink_per_step).ceil() as i64 } else { 0 };
-            for i in 0..steps.min(needed + 1) {
-                let opp = if i + 1 == needed { m.opportunity } else { 1.0 };
-                push(vec![Order::Restoration { steps: 1 }], Cat::Restoration, self.base_weight(seat, Cat::Restoration), gap_for(Cat::Restoration, None), 1.0, opp, "spend 10 Energy on Restoration".into(), None);
+        // --- Ticket #54: Mothball, Restart and Decommission.
+        // A mothball answers an Energy shortfall a turn ahead: the highest-upkeep building that
+        // produces nothing is the one to shut. A Custodian behind on Stabilization with Scrubbers
+        // standing and a run of nothing mothballs its dirtiest Facility instead, since its own
+        // industry is what is keeping the net above the Sink.
+        {
+            let upkeep_of = |b: &BuildingRef| -> i64 {
+                match b {
+                    BuildingRef::Facility(sid, i) => self.state(*sid).facilities.get(*i).map(|f| self.tables.facility(f.kind).energy_upkeep).unwrap_or(0),
+                    BuildingRef::Module(cid, i) => self
+                        .colony(*cid)
+                        .and_then(|c| c.modules.get(*i))
+                        .map(|md| self.module_yield(seat, *cid, md.kind).upkeep)
+                        .unwrap_or(0),
+                }
+            };
+            let mut standing: Vec<(BuildingRef, &'static str, bool, bool, f64)> = Vec::new();
+            for sid in self.directed_states(seat) {
+                for (i, f) in self.state(sid).facilities.iter().enumerate() {
+                    let produces = self.tables.facility(f.kind).produces.is_some();
+                    standing.push((BuildingRef::Facility(sid, i), f.kind.name(), f.mothballed, produces, self.facility_yield(seat, sid, f.kind).emissions));
+                }
+            }
+            for cid in self.directed_colonies(seat) {
+                let col = self.colony(cid).unwrap();
+                for (i, md) in col.modules.iter().enumerate() {
+                    if md.kind == ModuleKind::Archive {
+                        continue;
+                    }
+                    let produces = self.tables.module(md.kind).produces.is_some();
+                    standing.push((BuildingRef::Module(cid, i), md.kind.name(), md.mothballed, produces, 0.0));
+                }
+            }
+            // The one to mothball for Energy: standing, working, making nothing, dearest to run.
+            let idle_cost: Option<&(BuildingRef, &str, bool, bool, f64)> =
+                standing.iter().filter(|(b, _, moth, produces, _)| !*moth && !*produces && upkeep_of(b) > 0).max_by_key(|(b, _, _, _, _)| upkeep_of(b));
+            if tight && let Some((b, name, _, _, _)) = idle_cost {
+                push(
+                    vec![Order::Change { building: *b, what: BuildingChange::Mothball }],
+                    Cat::Mothball,
+                    self.base_weight(seat, Cat::Mothball),
+                    1.0,
+                    1.0,
+                    m.opportunity,
+                    format!("mothball the {} at {} (Energy is a turn from short)", name, self.place_name(b.place())),
+                    None,
+                );
+            }
+            // The Custodians' other reason to mothball: a Stabilization run that will not start.
+            let scrubbers_stand = self.controlled_states(seat).iter().any(|s| self.scrubbers_online(*s) > 0);
+            if kind == FactionKind::Custodians && self.seat(seat).stabilization_run == 0 && scrubbers_stand {
+                let dirtiest = standing
+                    .iter()
+                    .filter(|(_, _, moth, _, em)| !*moth && *em > 0.0)
+                    .max_by(|a, b| a.4.partial_cmp(&b.4).unwrap_or(std::cmp::Ordering::Equal));
+                if let Some((b, name, _, _, em)) = dirtiest {
+                    push(
+                        vec![Order::Change { building: *b, what: BuildingChange::Mothball }],
+                        Cat::Mothball,
+                        self.base_weight(seat, Cat::Mothball),
+                        gap_for(Cat::Scrubber, None),
+                        1.0,
+                        1.0,
+                        format!("mothball the {} at {} ({:.1} Emissions, and the run is still nothing)", name, self.place_name(b.place()), em),
+                        None,
+                    );
+                }
+            }
+            // Restart once Energy is back above two turns of upkeep; otherwise scrap it for half.
+            let restart_ok = self.seat(seat).stockpile.energy > 2 * self.total_upkeep(seat);
+            for (b, name, mothballed, _, _) in standing.iter().filter(|(_, _, moth, _, _)| *moth) {
+                if restart_ok {
+                    push(
+                        vec![Order::Change { building: *b, what: BuildingChange::Restart }],
+                        Cat::Restart,
+                        self.base_weight(seat, Cat::Restart),
+                        1.0,
+                        1.0,
+                        1.0,
+                        format!("restart the {} at {}", name, self.place_name(b.place())),
+                        None,
+                    );
+                } else if let BuildingRef::Facility(sid, i) = b
+                    && *mothballed
+                    && self.state(*sid).facilities.get(*i).map(|f| self.takes_slot(f.kind)).unwrap_or(false)
+                    && self.free_slots(*sid) == 0
+                {
+                    // Scrapping is for the slot: a mothballed Facility that cannot be restarted yet
+                    // and is holding the state's last slot. A Scrubber takes no slot, so it is never
+                    // scrapped, and a Colony has no slot limit, so a Module never is either.
+                    push(
+                        vec![Order::Change { building: *b, what: BuildingChange::Decommission }],
+                        Cat::Decommission,
+                        self.base_weight(seat, Cat::Decommission),
+                        1.0,
+                        1.0,
+                        1.0,
+                        format!("decommission the mothballed {} in {} for its slot", name, self.tables.state(*sid).name),
+                        None,
+                    );
+                }
             }
         }
 
@@ -708,7 +898,7 @@ impl Game {
                     let from = self
                         .directed_states(seat)
                         .into_iter()
-                        .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online))
+                        .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()))
                         .max_by(|a, b| self.state(*a).population.partial_cmp(&self.state(*b).population).unwrap());
                     if let Some(st) = from {
                         let n = capacity - s.colonists;
@@ -785,7 +975,7 @@ impl Game {
                             if !a.standing
                                 && self.army_seat(a) == Some(seat)
                                 && self.state(st).control.director() == Some(seat)
-                                && self.state(st).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online) =>
+                                && self.state(st).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()) =>
                         {
                             Some((a.id, st))
                         }

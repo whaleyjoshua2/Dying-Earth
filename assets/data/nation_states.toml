@@ -24,6 +24,19 @@
 # while the state's Unrest is at `no_development_at` (unrest.toml) or more. The designer's names
 # for these three are development_turns, development_max_level and
 # development_stops_at_temperature; inside their own table the prefix would only repeat itself.
+
+# Ticket #54 (version 0.05): the Strip Permit, the second clause of the Prospectors' signature rule.
+# Free, once per Nation State ever: for `turns` turns every Facility there produces `multiplier`
+# times what it would; when it ends the state's Baseline Emissions rise by `baseline_rise` for good
+# and its Unrest by `unrest`. The designer named these strip_permit_turns, strip_permit_multiplier,
+# strip_permit_baseline_rise and strip_permit_unrest; inside their own table the prefix would only
+# repeat itself, as with [development] on ticket #53.
+[strip_permit]
+turns = 3
+multiplier = 2.0
+baseline_rise = 0.2
+unrest = 3.0
+
 [development]
 turns = 9
 max_level = 4

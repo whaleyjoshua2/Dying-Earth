@@ -36,6 +36,19 @@ pub struct SimResult {
     pub blame_share: [f64; SEAT_COUNT],
     pub threshold_multiplier: [f64; SEAT_COUNT],
     pub developments: u32,
+    /// Ticket #54: Scrubbers completed, Mothballs, Restarts and Decommissions landed, Leapfrogs
+    /// bought and Strip Permits issued over the game, by any seat.
+    pub scrubbers: u32,
+    pub mothballs: u32,
+    pub restarts: u32,
+    pub decommissions: u32,
+    pub leapfrogs: u32,
+    pub strip_permits: u32,
+    /// Ticket #54: the longest Stabilization run each seat held at any point in the game.
+    pub longest_stabilization: [u32; SEAT_COUNT],
+    /// Ticket #54: the world's net Emissions at the Climate phase of turn 12, and at the last turn.
+    pub net_at_twelve: Option<f64>,
+    pub net_at_end: f64,
     pub log: Vec<String>,
 }
 
@@ -62,6 +75,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let mut founded: Vec<(ColonyId, u32, Option<Seat>)> = Vec::new();
     let mut changed: Vec<(u32, u32)> = Vec::new();
     let mut peak_unrest = 0.0f64;
+    // Ticket #54: the longest Stabilization run each seat reached, and the net at turn 12.
+    let mut longest_stabilization = [0u32; SEAT_COUNT];
+    let mut net_at_twelve: Option<f64> = None;
     let max_turns = tables.victory.turns;
     let mut guard = 0;
     while !game.is_over() && guard < max_turns + 2 {
@@ -86,6 +102,12 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
             projected_collapse = game.projection().collapse_turn;
         }
         peak_unrest = game.states.iter().map(|s| s.unrest).fold(peak_unrest, f64::max);
+        for s in Seat::ALL {
+            longest_stabilization[s.index()] = longest_stabilization[s.index()].max(game.seat(s).stabilization_run);
+        }
+        if game.turn >= 12 && net_at_twelve.is_none() {
+            net_at_twelve = Some(game.climate.last.net());
+        }
     }
     let buildings = Seat::ALL.map(|s| {
         let f: u32 = game.directed_states(s).iter().map(|st| game.state(*st).facilities.len() as u32).sum();
@@ -121,6 +143,14 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let blame_share = Seat::ALL.map(|s| game.blame_share(s));
     let threshold_multiplier = Seat::ALL.map(|s| game.blame_threshold_multiplier(s));
     let developments = game.log.iter().filter(|l| l.contains(" raised its Industry Level to ")).count() as u32;
+    // Ticket #54, read off the log the same way the #52 and #53 figures are.
+    let scrubbers = game.log.iter().filter(|l| l.contains("completed Scrubber at")).count() as u32;
+    let mothballs = game.log.iter().filter(|l| l.contains(" mothballed the ")).count() as u32;
+    let restarts = game.log.iter().filter(|l| l.contains(" restarted the ")).count() as u32;
+    let decommissions = game.log.iter().filter(|l| l.contains(" decommissioned the ")).count() as u32;
+    let leapfrogs = game.log.iter().filter(|l| l.contains(" Leapfrogged ")).count() as u32;
+    let strip_permits = game.log.iter().filter(|l| l.contains(" issued a Strip Permit in ")).count() as u32;
+    let net_at_end = game.climate.last.net();
     SimResult {
         seed,
         player,
@@ -143,6 +173,15 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         blame_share,
         threshold_multiplier,
         developments,
+        scrubbers,
+        mothballs,
+        restarts,
+        decommissions,
+        leapfrogs,
+        strip_permits,
+        longest_stabilization,
+        net_at_twelve,
+        net_at_end,
         log: game.log,
     }
 }

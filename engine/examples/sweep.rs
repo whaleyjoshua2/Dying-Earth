@@ -25,7 +25,7 @@ fn main() {
     let sinks = list("--sinks=", &[6.0]);
     let steps = list("--steps=", &[90.0, 100.0, 110.0, 120.0, 130.0, 140.0]);
     let base = Tables::load(&default_data_dir()).expect("tables");
-    println!("seat 0: {} starting in {}", player.name(), format!("{start:?}"));
+    println!("seat 0: {} starting in {start:?}", player.name());
     println!("sink  step | collapses/{} | collapse turns (median, min..max) | temp at end (median) | wins by seat", seeds);
     for &sink in &sinks {
         for &step in &steps {

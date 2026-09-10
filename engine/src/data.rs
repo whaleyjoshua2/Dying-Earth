@@ -110,6 +110,30 @@ pub struct FacilityCard {
     /// Ticket #36: how much its place's standing for its controller rises each turn.
     #[serde(default)]
     pub standing_per_turn: i64,
+    /// Ticket #54: ppm this Facility adds to the Natural Sink each Climate phase while it is online
+    /// (the Scrubber; 0.0 for every other row).
+    #[serde(default)]
+    pub sink_per_turn: f64,
+    /// Ticket #54: true for a Facility that occupies no build slot (the Scrubber).
+    #[serde(default)]
+    pub no_slot: bool,
+}
+
+/// Ticket #54 (version 0.05): the cap on Scrubbers in one Nation State (`facilities.toml`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct ScrubberCard {
+    pub per_population: f64,
+    pub min: u32,
+    pub max: u32,
+}
+
+/// Ticket #54 (version 0.05): what a Restart and a Decommission cost (`facilities.toml`). A
+/// Mothball is free and lands at the Resolution of the turn it is ordered.
+#[derive(Debug, Clone, Deserialize)]
+pub struct MothballCard {
+    pub restart_materials: i64,
+    pub restart_turns: u32,
+    pub decommission_turns: u32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -329,12 +353,6 @@ pub struct VictoryFirstCard {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct RestorationCard {
-    pub energy_per_step: i64,
-    pub sink_per_step: f64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
 pub struct StartCard {
     pub materials: i64,
     pub fuel: i64,
@@ -348,7 +366,8 @@ pub struct StartCard {
 #[derive(Debug, Clone, Deserialize)]
 pub struct DucatsCard {
     pub per_influence: i64,
-    pub per_restoration_step: i64,
+    /// Ticket #54: what one Leapfrog costs the Custodians; it replaced `per_restoration_step`.
+    pub per_leapfrog: i64,
     pub per_repair_point: i64,
     /// Version 0.04 (ticket #42): the trading window's prices.
     pub per_materials: i64,
@@ -371,7 +390,10 @@ pub struct ClimateTable {
     pub temperature_lag_fraction: f64,
     pub population_growth: f64,
     pub population_loss_per_tenth_degree: f64,
-    pub population_emissions_per_hundred_million: f64,
+    /// Ticket #54: Population Emissions per hundred million are `base + per_level x Industry Level`,
+    /// less the state's own Leapfrog adjustment, never below `base`.
+    pub population_emissions_base: f64,
+    pub population_emissions_per_level: f64,
     pub launch_emissions: f64,
     pub sea_level_thresholds: Vec<f64>,
 }
@@ -480,7 +502,15 @@ pub struct AiWeights {
     pub transit: f64,
     pub load_unload: f64,
     pub found_colony: f64,
-    pub restoration: f64,
+    /// Ticket #54: the Scrubber, which took Restoration's place and its Stabilization gap.
+    pub build_scrubber: f64,
+    /// Ticket #54: Mothball, Restart and Decommission, on a Facility or a Module.
+    pub mothball: f64,
+    pub restart: f64,
+    pub decommission: f64,
+    /// Ticket #54: the Custodians' Leapfrog and the Prospectors' Strip Permit.
+    pub leapfrog: f64,
+    pub strip_permit: f64,
     pub stance_attack: f64,
     pub stance_intercept: f64,
     pub stance_hold: f64,
@@ -563,6 +593,23 @@ fn one_i64() -> i64 {
 struct StatesFile {
     state: Vec<StateCard>,
     development: DevelopmentTable,
+    strip_permit: StripPermitTable,
+}
+
+/// Ticket #54 (version 0.05): the Strip Permit, in `nation_states.toml` under `[strip_permit]`.
+/// The designer named these `strip_permit_turns`, `strip_permit_multiplier`,
+/// `strip_permit_baseline_rise` and `strip_permit_unrest`; inside their own table the prefix would
+/// only repeat itself, as with `[development]`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct StripPermitTable {
+    /// How many turns of Income every Facility in the state produces double.
+    pub turns: u32,
+    /// What it multiplies that output by.
+    pub multiplier: f64,
+    /// What the state's Baseline Emissions rise by, for good, when it ends.
+    pub baseline_rise: f64,
+    /// What its Unrest rises by when it ends.
+    pub unrest: f64,
 }
 
 /// Ticket #53 (version 0.05): Neutral Development, in `nation_states.toml` under `[development]`.
@@ -581,6 +628,8 @@ pub struct DevelopmentTable {
 struct FacilitiesFile {
     facility: Vec<FacilityCard>,
     industry_level: IndustryLevelCard,
+    scrubber: ScrubberCard,
+    mothball: MothballCard,
 }
 /// Ticket #51: the Archive, the first Project. Its Materials, build turns and Energy upkeep sit on
 /// its Module row; how many stages it has and what each costs in Research live here.
@@ -607,7 +656,6 @@ struct TechsFile {
 #[derive(Debug, Clone, Deserialize)]
 struct FactionsFile {
     faction: Vec<FactionCard>,
-    restoration: RestorationCard,
     start: StartCard,
     ducats: DucatsCard,
 }
@@ -623,8 +671,13 @@ pub struct Tables {
     pub states: Vec<StateCard>,
     /// Ticket #53: how a neutral Nation State develops itself (`nation_states.toml`).
     pub development: DevelopmentTable,
+    /// Ticket #54: the Strip Permit's figures (`nation_states.toml`).
+    pub strip_permit: StripPermitTable,
     pub facilities: Vec<FacilityCard>,
     pub industry_level: IndustryLevelCard,
+    /// Ticket #54: the Scrubber cap and the Mothball prices (`facilities.toml`).
+    pub scrubber: ScrubberCard,
+    pub mothball: MothballCard,
     pub modules: Vec<ModuleCard>,
     /// Ticket #51: the Archive's stages and their Research price.
     pub archive: ArchiveCard,
@@ -633,7 +686,6 @@ pub struct Tables {
     pub techs: Vec<TechCard>,
     pub events: EventsTable,
     pub factions: Vec<FactionCard>,
-    pub restoration: RestorationCard,
     pub start: StartCard,
     pub ducats: DucatsCard,
     pub climate: ClimateTable,
@@ -682,8 +734,11 @@ impl Tables {
             bodies: bodies.body,
             states: states.state,
             development: states.development,
+            strip_permit: states.strip_permit,
             facilities: facilities.facility,
             industry_level: facilities.industry_level,
+            scrubber: facilities.scrubber,
+            mothball: facilities.mothball,
             archive: modules.archive,
             modules: modules.module,
             units: units.unit,
@@ -691,7 +746,6 @@ impl Tables {
             techs: techs.tech,
             events,
             factions: factions.faction,
-            restoration: factions.restoration,
             start: factions.start,
             ducats: factions.ducats,
             climate,

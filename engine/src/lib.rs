@@ -21,6 +21,6 @@ pub mod victory;
 pub use data::{DataError, Tables};
 pub use economy::Yield;
 pub use ids::*;
-pub use orders::{Cost, LoadSource, Order, OrderError, UnitRef, UnloadTarget};
+pub use orders::{BuildingRef, Cost, LoadSource, Order, OrderError, UnitRef, UnloadTarget};
 pub use state::*;
 pub use turn::Phase;
