@@ -135,7 +135,6 @@ fn sea_level_thresholds_fire_once_per_state() {
     let asia_before = g.build_slots(StateId::Asia);
     g.climate_phase();
     assert_eq!(g.build_slots(StateId::Asia), asia_before - 2, "Asia has Coastal Exposure 2");
-    assert_eq!(g.build_slots(StateId::Antarctica), 5, "Antarctica has no coast to lose");
     g.climate_phase();
     assert_eq!(g.build_slots(StateId::Asia), asia_before - 2, "the same threshold never fires twice");
 }
@@ -367,10 +366,9 @@ fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction
     g.state_mut(StateId::Asia).industry_level += 1;
     assert_eq!(g.state_influence_value(StateId::Asia), 8);
     assert_eq!(g.influence_allotment(Seat(0)), 23, "(10 + 8) x 1.3 = 23.4");
-    // The card figures, as decided: Antarctica counts for nothing.
-    assert_eq!(g.state_influence_value(StateId::Antarctica), 0);
+    // The card figures, as decided (Antarctica, once a 0 here, left the list on ticket #44).
     let total: i64 = StateId::ALL.iter().map(|s| g.tables.state(*s).influence).sum();
-    assert_eq!(total, 34, "8 + 7 + 5 + 4 + 4 + 2 + 2 + 2 + 0");
+    assert_eq!(total, 34, "8 + 7 + 5 + 4 + 4 + 2 + 2 + 2");
 }
 
 // ---------------------------------------------------------------- #35 Ducats
@@ -381,7 +379,6 @@ fn a_controlled_state_pays_ducats_from_gdp_times_industry_and_a_bank_adds_more()
     // Asia: gdp 30 x Industry 3 / 10 = 9 a turn for the Custodians; Europe 20 x 3 / 10 = 6 for the Prospectors.
     assert_eq!(g.state_ducats(StateId::Asia), 9);
     assert_eq!(g.state_ducats(StateId::Europe), 6);
-    assert_eq!(g.state_ducats(StateId::Antarctica), 0);
     let paid = income_of(&mut g, Seat(0));
     assert_eq!(paid.ducats, 9);
     // A Bank in Asia adds 4 x 30 / 10 = 12 (Custodian output x1.0); in Africa (gdp 3) it would add 1.
@@ -441,6 +438,30 @@ fn ducats_pay_for_restoration_and_repairs_at_the_table_rates() {
     assert_eq!(g.ship(ShipId(1)).unwrap().damage, 0);
     assert_eq!(g.seats[0].stockpile.ducats, 0);
     assert!(g.check_order(Seat(0), &[], &Order::RepairWithDucats { unit: UnitRef::Ship(ShipId(1)), points: 1 }).is_err(), "nothing to repair");
+}
+
+// ---------------------------------------------------------------- #44 Antarctica
+
+#[test]
+fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_whose_modules_emit() {
+    let mut g = game();
+    let earth = g.tables.body(BodyId::Earth).clone();
+    assert_eq!(earth.colony_slots, 3, "three Colony Slots on Earth, in Antarctica");
+    assert_eq!((earth.mine_yield, earth.generator_yield, earth.refinery_yield, earth.habitat_yield), (1.0, 0.75, 1.5, 0.75));
+    assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3);
+    assert_eq!(StateId::ALL.len(), 8, "Antarctica is no longer a Nation State");
+    let m = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
+    let before = g.emissions_now();
+    colony(&mut g, Seat(0), BodyId::Earth, &[ModuleKind::Habitat, ModuleKind::Mine, ModuleKind::Refinery, ModuleKind::Generator], 4);
+    assert_eq!(g.off_world_colonists(Seat(0)), 0, "Antarctic Colonists live on Earth");
+    let after = g.emissions_now();
+    assert!((after.factories - before.factories - 1.0 * m).abs() < 1e-9, "a Mine on Earth emits as a Factory does");
+    assert!((after.refineries - before.refineries - 1.5 * m).abs() < 1e-9, "a Refinery on Earth emits as one on a state does");
+    assert!((after.power_plants - before.power_plants - 1.5 * m).abs() < 1e-9, "a Generator on Earth emits as a Power Plant does");
+    // Off Earth a Mine emits nothing, as before.
+    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 0);
+    let off = g.emissions_now();
+    assert!((off.factories - after.factories).abs() < 1e-9);
 }
 
 // ---------------------------------------------------------------- #43 Colony Ship and Carrier

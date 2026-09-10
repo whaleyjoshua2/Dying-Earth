@@ -62,7 +62,8 @@ pub fn slot_lonlat(body: BodyId, slot: u32) -> (f32, f32) {
     match body {
         BodyId::Moon => [(-42.0, 22.0), (28.0, 28.0), (-18.0, -24.0), (38.0, -14.0)][slot as usize % 4],
         BodyId::Mars => [(-125.0, 22.0), (-62.0, -24.0), (-5.0, 12.0), (58.0, -20.0), (118.0, 26.0), (168.0, -4.0)][slot as usize % 6],
-        BodyId::Earth => (0.0, 0.0),
+        // Ticket #44: Antarctica. The Peninsula, the interior and Wilkes Land.
+        BodyId::Earth => [(-62.0, -72.0), (15.0, -80.0), (115.0, -74.0)][slot as usize % 3],
     }
 }
 
@@ -70,7 +71,6 @@ pub fn slot_lonlat(body: BodyId, slot: u32) -> (f32, f32) {
 pub fn state_lonlat(state: StateId) -> (f32, f32) {
     match state {
         StateId::Africa => (20.0, 5.0),
-        StateId::Antarctica => (0.0, -78.0),
         StateId::Asia => (100.0, 30.0),
         StateId::Australia => (135.0, -25.0),
         StateId::Europe => (12.0, 50.0),

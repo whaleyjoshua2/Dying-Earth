@@ -24,6 +24,8 @@ pub struct ShotPlan {
     pub toggled: bool,
     /// `trade:1` (a building aid): the trading window is open in every picture.
     pub trade: bool,
+    /// `look:<lon>,<lat>` (a building aid): every surface picture faces that point.
+    pub look: Option<(f32, f32)>,
 }
 
 fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
@@ -32,6 +34,10 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     }
     if plan.trade {
         view.show_trade = true;
+    }
+    if let (Some((lon, lat)), View::Surface(_)) = (plan.look, view.view) {
+        view.yaw = crate::geo::yaw_facing(lon, lat);
+        view.pitch = lat.to_radians().clamp(-1.3, 1.3);
     }
     if plan.climate_toggle && view.view == View::Surface(BodyId::Earth) {
         view.show_climate = false;
@@ -144,6 +150,10 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         plan.select = std::env::args().find_map(|a| a.strip_prefix("select:").map(str::to_owned));
         plan.tech = std::env::args().any(|a| a == "tech:1");
         plan.trade = std::env::args().any(|a| a == "trade:1");
+        plan.look = std::env::args().find_map(|a| {
+            let (lon, lat) = a.strip_prefix("look:")?.split_once(',')?;
+            Some((lon.parse().ok()?, lat.parse().ok()?))
+        });
         plan.climate_toggle = std::env::args().any(|a| a == "climate:toggle");
         apply_aids(&mut plan, &mut view);
         plan.next_at = t + 4.0;

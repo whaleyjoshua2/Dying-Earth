@@ -95,6 +95,20 @@ impl Game {
             }
             b.cards += st.wildfire_emissions_next;
         }
+        // Version 0.04 (ticket #44): a Module on Earth (Antarctica) emits as its counterpart Facility does.
+        for col in self.colonies.iter().filter(|c| c.body == BodyId::Earth) {
+            let Some(d) = col.control.director() else { continue };
+            let m = mult(Some(d));
+            for md in col.modules.iter().filter(|md| md.online) {
+                let e = t.module(md.kind).earth_emissions;
+                match md.kind {
+                    ModuleKind::Mine => b.factories += e * fr_mult * m,
+                    ModuleKind::Generator => b.power_plants += e * pp_mult * m,
+                    ModuleKind::Refinery => b.refineries += e * fr_mult * m,
+                    _ => {}
+                }
+            }
+        }
         b.cards += self.climate.card_emissions_next;
         let per_launch = if self.has_tech(TechId::CleanPropellant) { t.tech(TechId::CleanPropellant).value } else { c.launch_emissions };
         for seat in Seat::ALL {
@@ -180,10 +194,6 @@ impl Game {
     fn population_change(&mut self) {
         let rate = self.population_growth_rate();
         for s in &mut self.states {
-            if s.id == StateId::Antarctica {
-                s.population = 0.0;
-                continue;
-            }
             s.population = (s.population * (1.0 + rate)).max(0.0);
         }
     }

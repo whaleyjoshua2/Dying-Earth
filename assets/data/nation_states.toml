@@ -20,25 +20,10 @@ baseline_emissions = 0.3
 education_level = 0.8
 size = 3
 coastal_exposure = 1
-neighbours = ["europe", "middle_east", "antarctica"]
+neighbours = ["europe", "middle_east"]
 start_facilities = ["factory"]
 influence = 2
 gdp = 3
-
-[[state]]
-id = "antarctica"
-name = "Antarctica"
-population = 0.0
-industry_level = 0
-resource_lean = "fuel"
-baseline_emissions = 0.0
-education_level = 1.0
-size = 2
-coastal_exposure = 0
-neighbours = ["south_america", "africa", "australia"]
-start_facilities = []
-influence = 0
-gdp = 0
 
 [[state]]
 id = "asia"
@@ -65,7 +50,7 @@ baseline_emissions = 0.2
 education_level = 1.35
 size = 2
 coastal_exposure = 2
-neighbours = ["asia", "antarctica"]
+neighbours = ["asia"]
 start_facilities = ["power_plant", "factory"]
 influence = 2
 gdp = 2
@@ -110,7 +95,7 @@ baseline_emissions = 0.2
 education_level = 1.1
 size = 3
 coastal_exposure = 1
-neighbours = ["north_america", "antarctica"]
+neighbours = ["north_america"]
 start_facilities = ["refinery"]
 influence = 2
 gdp = 5

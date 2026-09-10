@@ -4,13 +4,16 @@
 [[body]]
 id = "earth"
 name = "Earth"
-colony_slots = 0
+# Version 0.04 (ticket #44): Antarctica is Earth's three Colony Slots, founded by a Colony Ship at
+# Earth with no transit. Cold and Fuel-leaning: good for Refineries, poor for Habitats and Generators.
+# Its Colonists live on Earth (no Off-world Presence) and its Modules emit like Facilities.
+colony_slots = 3
 transit_turns = 0
 transit_fuel = 0
 mine_yield = 1.0
-generator_yield = 1.0
-refinery_yield = 1.0
-habitat_yield = 1.0
+generator_yield = 0.75
+refinery_yield = 1.5
+habitat_yield = 0.75
 
 [[body]]
 id = "moon"

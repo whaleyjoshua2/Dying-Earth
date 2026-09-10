@@ -102,6 +102,9 @@ pub struct ModuleCard {
     pub influence_allotment: i64,
     #[serde(default)]
     pub standing_per_turn: i64,
+    /// Version 0.04 (ticket #44): what the Module emits on Earth, as its counterpart Facility does.
+    #[serde(default)]
+    pub earth_emissions: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]

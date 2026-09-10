@@ -492,7 +492,7 @@ impl Game {
     pub fn ai_start_state(&self, taken: StateId) -> StateId {
         let mut best: Option<StateId> = None;
         for c in &self.tables.states {
-            if c.id == taken || c.id == StateId::Antarctica {
+            if c.id == taken {
                 continue;
             }
             let better = match best {
@@ -678,7 +678,8 @@ impl Game {
 
     /// Colonists living in Habitats off Earth, for one seat (spec 15).
     pub fn off_world_colonists(&self, seat: Seat) -> u32 {
-        self.colonies.iter().filter(|c| c.control.controller() == Some(seat)).map(|c| c.colonists).sum()
+        // Ticket #44: Colonists in Antarctica live on Earth.
+        self.colonies.iter().filter(|c| c.control.controller() == Some(seat) && c.body != BodyId::Earth).map(|c| c.colonists).sum()
     }
 
     pub fn influence_threshold(&self, target: Target) -> i64 {

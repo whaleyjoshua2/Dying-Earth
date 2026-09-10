@@ -266,9 +266,6 @@ fn start_screen(root: &mut Ui, session: &Session, faction: FactionKind, actions:
         ui.label(format!("You play the {}. The AI takes the uncontrolled continent with the highest Industry Level.", faction.name()));
         ui.add_space(10.0);
         for sid in StateId::ALL {
-            if sid == StateId::Antarctica {
-                continue;
-            }
             let c = session.tables.state(sid);
             let text = format!("{}  (population {:.1}, Industry {}, leans {:?}, education {})", c.name, c.population, c.industry_level, c.resource_lean, c.education_level);
             if ui.add(egui::Button::new(text).min_size(egui::vec2(300.0, 32.0))).clicked() {
@@ -276,7 +273,7 @@ fn start_screen(root: &mut Ui, session: &Session, faction: FactionKind, actions:
             }
         }
         ui.add_space(20.0);
-        ui.label(RichText::new("Antarctica is not offered.").weak());
+        ui.label(RichText::new("Antarctica has no people to govern: it is three Colony Slots, founded from a Colony Ship at Earth.").weak());
     });
     egui::CentralPanel::default().frame(egui::Frame::NONE).show(root, |ui| {
         ui.allocate_exact_size(ui.available_size(), egui::Sense::hover());
@@ -510,27 +507,11 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             hotspots.push(Hotspot { pos: centre, radius: 12.0, hit: Hit::Select(Selection::State(sid)) });
                         }
                     }
+                    // Ticket #44: Antarctica's Colony Slots.
+                    slot_labels(painter, session, game, body, &visible, hotspots);
                 }
                 _ => {
-                    for slot in 0..game.tables.body(body).colony_slots {
-                        let (lon, lat) = geo::slot_lonlat(body, slot);
-                        let Some(p) = visible(geo::local_from_lonlat(lon, lat) * 1.03) else { continue };
-                        let (text, colour, hit) = match game.colony_at(body, slot) {
-                            Some(c) => {
-                                let mods: Vec<String> = c.modules.iter().map(|m| format!("{}{}", m.kind.name(), if m.online { "" } else { " (offline)" })).collect();
-                                let army = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(c.id))).count();
-                                let owner = c.control.director().map(|s| game.seat_name(s)).unwrap_or_default();
-                                (
-                                    format!("Slot {}: {}\n{} Colonists\n{}{}", slot + 1, owner, c.colonists, mods.join(", "), if army > 0 { format!("\nArmies: {army}") } else { String::new() }),
-                                    c.control.director().map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY),
-                                    Hit::Select(Selection::Colony(c.id)),
-                                )
-                            }
-                            None => (format!("Slot {}: empty", slot + 1), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot))),
-                        };
-                        label_at(painter, p + egui::vec2(0.0, 24.0), &text, colour, 12.0);
-                        hotspots.push(Hotspot { pos: p, radius: 22.0, hit });
-                    }
+                    slot_labels(painter, session, game, body, &visible, hotspots);
                     // The band along the top: Ship stacks in orbit and Orbital Control.
                     let mut band = Vec::new();
                     for seat in Seat::ALL {
@@ -549,6 +530,43 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
             }
         }
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+/// Colony Slot labels on a Body's surface: Antarctica's on Earth since ticket #44.
+fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: BodyId, visible: &dyn Fn(Vec3) -> Option<Pos2>, hotspots: &mut Vec<Hotspot>) {
+            for slot in 0..game.tables.body(body).colony_slots {
+                let (lon, lat) = geo::slot_lonlat(body, slot);
+                let Some(p) = visible(geo::local_from_lonlat(lon, lat) * 1.03) else { continue };
+                let (text, colour, hit) = match game.colony_at(body, slot) {
+                    Some(c) => {
+                        let mods: Vec<String> = c.modules.iter().map(|m| format!("{}{}", m.kind.name(), if m.online { "" } else { " (offline)" })).collect();
+                        let army = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(c.id))).count();
+                        let owner = c.control.director().map(|s| game.seat_name(s)).unwrap_or_default();
+                        (
+                            format!("Slot {}: {}\n{} Colonists\n{}{}", slot + 1, owner, c.colonists, mods.join(", "), if army > 0 { format!("\nArmies: {army}") } else { String::new() }),
+                            c.control.director().map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY),
+                            Hit::Select(Selection::Colony(c.id)),
+                        )
+                    }
+                    None => (format!("Slot {}: empty", slot + 1), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot))),
+                };
+                label_at(painter, p + egui::vec2(0.0, 24.0), &text, colour, 12.0);
+                hotspots.push(Hotspot { pos: p, radius: 22.0, hit });
+            }
+}
+
+/// The Colony Slot within fourteen degrees of a point on a Body, nearest first.
+fn nearest_slot(game: &Game, body: BodyId, lon: f32, lat: f32) -> Option<u32> {
+    let mut best: Option<(f32, u32)> = None;
+    for slot in 0..game.tables.body(body).colony_slots {
+        let (slon, slat) = geo::slot_lonlat(body, slot);
+        let d = geo::local_from_lonlat(slon, slat).angle_between(geo::local_from_lonlat(lon, lat)).to_degrees();
+        if d < 14.0 && best.map(|(bd, _)| d < bd).unwrap_or(true) {
+            best = Some((d, slot));
+        }
+    }
+    best.map(|(_, slot)| slot)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -593,23 +611,21 @@ fn pick(pos: Pos2, session: &Session, game: &Game, view: &mut ViewState, camera:
             let (lon, lat) = geo::lonlat_from_local(local);
             match body {
                 BodyId::Earth => {
-                    let (x, y) = geo::pixel_for(lon, lat, textures.earth.w, textures.earth.h);
-                    view.selection = match textures.state_at(x, y) {
-                        Some(s) => Selection::State(s),
-                        None => Selection::None,
+                    // Ticket #44: a Colony Slot in Antarctica first, else the Nation State under the click.
+                    view.selection = match nearest_slot(game, body, lon, lat) {
+                        Some(slot) => match game.colony_at(body, slot) {
+                            Some(c) => Selection::Colony(c.id),
+                            None => Selection::Slot(body, slot),
+                        },
+                        None => {
+                            let (x, y) = geo::pixel_for(lon, lat, textures.earth.w, textures.earth.h);
+                            textures.state_at(x, y).map(Selection::State).unwrap_or(Selection::None)
+                        }
                     };
                 }
                 _ => {
-                    let mut best: Option<(f32, u32)> = None;
-                    for slot in 0..game.tables.body(body).colony_slots {
-                        let (slon, slat) = geo::slot_lonlat(body, slot);
-                        let d = geo::local_from_lonlat(slon, slat).angle_between(geo::local_from_lonlat(lon, lat)).to_degrees();
-                        if d < 14.0 && best.map(|(bd, _)| d < bd).unwrap_or(true) {
-                            best = Some((d, slot));
-                        }
-                    }
-                    view.selection = match best {
-                        Some((_, slot)) => match game.colony_at(body, slot) {
+                    view.selection = match nearest_slot(game, body, lon, lat) {
+                        Some(slot) => match game.colony_at(body, slot) {
                             Some(c) => Selection::Colony(c.id),
                             None => Selection::Slot(body, slot),
                         },

@@ -486,7 +486,7 @@ impl Game {
         let my_states = self.controlled_states(seat);
         for sid in StateId::ALL {
             let st = self.state(sid);
-            if st.control.controller() == Some(seat) || sid == StateId::Antarctica {
+            if st.control.controller() == Some(seat) {
                 continue;
             }
             let card = self.tables.state(sid);
@@ -582,6 +582,13 @@ impl Game {
                     if let Some(slot) = free.first() {
                         let opp = if free.len() == 1 || presence_needed <= s.colonists { m.opportunity } else { 1.0 };
                         push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, *slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony), gap_for(Cat::FoundColony, None), 1.0, 1.0, opp, format!("found a Colony in slot {} on {}", slot + 1, self.tables.body(body).name), None);
+                    }
+                }
+                // Ticket #44: Antarctica, Earth's slots. A foothold, not Presence: half weight and no gap,
+                // so it is taken when the Ship cannot go anywhere better.
+                if s.colonists > 0 && body == BodyId::Earth {
+                    if let Some(slot) = self.free_slots_on(BodyId::Earth).first() {
+                        push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, *slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, 1.0, format!("found a Colony in Antarctica, slot {}", slot + 1), None);
                     }
                     for c in self.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(seat)) {
                         let room = self.habitat_room(c).saturating_sub(c.colonists);
@@ -731,7 +738,7 @@ impl Game {
                     }
                     for n in &self.tables.state(sid).neighbours {
                         let ctrl = self.state(*n).control;
-                        if ctrl == Control::Controlled(seat) || *n == StateId::Antarctica {
+                        if ctrl == Control::Controlled(seat) {
                             continue;
                         }
                         let def: i64 = self.defenders_at(Place::State(*n), seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_strength(a)).sum();

@@ -110,3 +110,32 @@ nothing else; a Battleship fights and carries no Army, so every landing needs a 
 **Finding, not retuned:** the Prospector AI has never built an Army in any batch this version or the
 last, so it has never loaded or landed one, with a Battleship before or a Carrier now. Twenty seeds
 in both orders give the same numbers as #42.
+
+## #44: Antarctica
+
+Decided by the designer: Antarctica becomes Colony Slots on Earth, three of them with Mine 1.0,
+Generator 0.75, Refinery 1.5 and Habitat 0.75; its Colonists live on Earth and count nothing
+toward Off-world Presence; its Modules emit as Facilities do.
+
+- **It leaves the Nation State list**: eight remain. The Earth mask keeps Antarctica's painted value
+  and the window maps it to no state, so the ice stays as painted, untinted and unbrowned.
+- **Earth has three Colony Slots** at the Peninsula, the interior and Wilkes Land, founded from a
+  Colony Ship at Earth with no transit through the same Unload order as the Moon. Slot markers,
+  labels and clicks come through the same code as the other Bodies; a click in Antarctica finds the
+  nearest slot first, then the state under it. The Solar System Map reads "Earth 0/3 slots".
+- **Colonists there live on Earth**: Presence, the twelve-Colonist condition and the tiebreak skip
+  Colonies on Earth.
+- **Modules there emit**: `earth_emissions` in `modules.toml` (Mine 1.0 as a Factory, Generator 1.5
+  as a Power Plant, Refinery 1.5), on the Climate Panel's Factories, Power Plants and Refineries
+  lines, with the Clean techs and the Faction multiplier applying. Off Earth a Module still emits
+  nothing.
+- **The AI** founds there at half weight and no gap; in twenty seeds it never did, since a loaded
+  Colony Ship always has a transit first.
+
+A test watched red first (Earth had no slots): the slots and yields, eight states, a Colony there
+adding to the three emission lines while its Colonists count nothing, a Moon Mine adding nothing.
+The shot aid `look:<lon>,<lat>` turns every surface picture to face a point.
+
+![The Earth Map at turn 11 turned to face Antarctica: the ice unbrowned while the continents brown, Slot 3 marked and empty](antarctica.png)
+
+Twenty seeds in both orders give the same numbers as #43.

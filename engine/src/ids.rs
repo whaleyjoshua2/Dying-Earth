@@ -30,7 +30,7 @@ impl BodyId {
 #[serde(rename_all = "snake_case")]
 pub enum StateId {
     Africa,
-    Antarctica,
+    // Antarctica left the list in version 0.04 (ticket #44): it is Earth's three Colony Slots.
     Asia,
     Australia,
     Europe,
@@ -42,9 +42,8 @@ pub enum StateId {
 }
 
 impl StateId {
-    pub const ALL: [StateId; 9] = [
+    pub const ALL: [StateId; 8] = [
         StateId::Africa,
-        StateId::Antarctica,
         StateId::Asia,
         StateId::Australia,
         StateId::Europe,

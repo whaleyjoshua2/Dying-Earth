@@ -4,7 +4,9 @@
 //! `cargo run --example prep_assets -- <dir with earth.jpg moon.jpg mars.jpg> [preview.png]`
 //!
 //! Mask layout (`assets/textures/earth_states.png`, grey 8-bit): 0 = water, 1..9 = the Nation
-//! State index in the engine's order (Africa, Antarctica, Asia, Australia and Oceania, Europe,
+//! State index in the order the mask was painted (Africa, Antarctica, Asia, Australia and Oceania, Europe,
+//! ...); since ticket #44 Antarctica is no Nation State and the window maps its value (2) to none.
+//! The old order was (Africa, Antarctica, Asia, Australia and Oceania, Europe,
 //! North America, South America, Russia, the Middle East). Islands go with the nearest continent,
 //! Central America and the Caribbean with North America. Since ticket #26 Russia is its own state
 //! (with northern Kazakhstan, as before) and so is the Middle East (Turkey, the Caucasus, the Levant,
