@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.03
+DYING EARTH - playtest build, version 0.04
 ==========================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -24,8 +24,14 @@ HOW TO PLAY, IN ONE MINUTE
   Drag to turn the globe, mouse wheel to zoom. Tab switches to the Solar System Map;
   Esc goes back.
 - Build things with the buttons on a card. Hover a build button to see what it makes.
-- Spend Influence on other countries to win them over. Ships are built at your Launch
-  Site and ordered on the Solar System Map (click the label next to Earth).
+- Spend Influence on other countries to win them over.
+- You start with a space station over Earth (the ISS or Tiangong). Build a Shipyard on it
+  first: Ships are built only at a Shipyard. Click the station in the panel on the right of
+  the Earth Map. Ships are ordered on the Solar System Map (click the label next to Earth).
+- A Colony Ship carries Colonists, a Carrier carries an Army. A Launch Site is what lifts
+  them into orbit. Antarctica has three Colony Slots on Earth; Mars has two small moons.
+- The Trading button buys resources and Influence with Ducats, and sells spare Materials
+  and Fuel.
 - End Turn (top left, red). Twenty-four turns. Watch the temperature in the top bar:
   at +3.0 C the world collapses and nobody wins.
 - The Tech Tree, Climate Panel and Victory buttons open panels that explain the rest.
