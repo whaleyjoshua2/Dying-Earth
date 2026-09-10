@@ -2923,12 +2923,32 @@ fn e_a_scrubber_enlarges_the_sink_and_is_capped_destroyed_and_calming() {
     // The cap: half the population in hundreds of millions, between 2 and 10.
     assert_eq!(g.scrubber_cap(StateId::Russia), 2, "Russia at 1.5 takes the floor");
     assert_eq!(g.scrubber_cap(StateId::SouthAsia), 10, "South Asia at 19.4 takes the ceiling");
-    // Only the Custodians, and only on a state they control.
+    // Only the Custodians, and only on a state they control. Every seat that is not the Custodians
+    // is refused, on its own state and on anyone else's, by BOTH build paths: the Materials one and
+    // the Ducat one of ticket #42, which a Faction with money could otherwise walk in through.
     g.take_control(StateId::SouthAmerica, Seat(1));
-    g.seats[1].stockpile.materials = 300;
+    g.take_control(StateId::SouthEastAsia, Seat(2));
+    g.take_control(StateId::MiddleEast, Seat(3));
+    for seat in [Seat(1), Seat(2), Seat(3)] {
+        g.seats[seat.index()].stockpile.materials = 900;
+        g.seats[seat.index()].stockpile.ducats = 900;
+        for state in [StateId::SouthAmerica, StateId::SouthEastAsia, StateId::MiddleEast, StateId::EastAsia] {
+            for o in [
+                Order::BuildFacility { state, kind: FacilityKind::Scrubber },
+                Order::BuildFacilityWithDucats { state, kind: FacilityKind::Scrubber },
+            ] {
+                assert!(
+                    g.check_order(seat, &[], &o).is_err(),
+                    "only the Custodians build a Scrubber: {:?} was allowed one in {state:?} ({o:?})",
+                    g.kind(seat)
+                );
+            }
+        }
+    }
+    // And a Custodian may not build one in a state it merely occupies, or does not hold at all.
     assert!(
-        g.check_order(Seat(1), &[], &Order::BuildFacility { state: StateId::SouthAmerica, kind: FacilityKind::Scrubber }).is_err(),
-        "only the Custodians build a Scrubber"
+        g.check_order(Seat(0), &[], &Order::BuildFacility { state: StateId::SouthAmerica, kind: FacilityKind::Scrubber }).is_err(),
+        "a Scrubber needs a Nation State the Custodians control"
     );
     // It is built without a slot: fill the state and build one anyway.
     g.seats[0].stockpile.materials = 900;
