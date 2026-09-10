@@ -403,9 +403,10 @@ impl Game {
                 ducats: gained.ducats,
             };
             s.research_last_turn = research;
-            if s.kind == FactionKind::Prospectors {
-                s.extraction_total += extraction;
-            }
+            // Ticket #50: every seat keeps both running totals; a Faction's card says which one its
+            // Victory Condition counts.
+            s.research_total += research;
+            s.extraction_total += extraction;
         }
         if !shut.is_empty() {
             let line = format!("{}: Energy ran short; shut down {}.", self.seat_name(seat), shut.join(", "));

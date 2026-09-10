@@ -3,6 +3,8 @@
 use dying_earth_engine::combat::{self, Combatant, Dice};
 use dying_earth_engine::data::{default_data_dir, Tables};
 use dying_earth_engine::*;
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
 use std::collections::VecDeque;
 use std::sync::Arc;
 
@@ -10,9 +12,10 @@ fn tables() -> Arc<Tables> {
     Arc::new(Tables::load(&default_data_dir()).expect("tables load"))
 }
 
-/// A player Custodian in Asia against an AI Prospector, before the first turn runs, on a bare board:
-/// the start Facilities of ticket #24 are stripped (Launch Sites stay) so each test places exactly
-/// the buildings it reasons about. `fresh()` keeps the real start.
+/// A player Custodian in Asia against the three AI Factions, before the first turn runs, on a bare
+/// board: the start Facilities of ticket #24 are stripped (Launch Sites stay) so each test places
+/// exactly the buildings it reasons about. `fresh()` keeps the real start.
+/// Ticket #50: seat 1 is the Prospectors, seat 2 the Arkwrights, seat 3 the Archivists.
 fn game() -> Game {
     let mut g = fresh();
     for s in &mut g.states {
@@ -22,7 +25,11 @@ fn game() -> Game {
 }
 
 fn fresh() -> Game {
-    Game::new(tables(), NewGame { seed: 7, seats: [(FactionKind::Custodians, false), (FactionKind::Prospectors, true)], player_start: StateId::Asia })
+    with_seed(7)
+}
+
+fn with_seed(seed: u64) -> Game {
+    Game::new(tables(), NewGame { seed, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::Asia })
 }
 
 fn facility(kind: FacilityKind) -> Facility {
@@ -200,10 +207,10 @@ fn battle_round_three_hit_rolls_then_disengage_then_pursuit() {
     let mut dice = Script { chances: VecDeque::from(vec![true, true, true]), d6s: VecDeque::new(), picks: VecDeque::new() };
     let stats = combat::fight(&mut a, &mut d, &mut dice);
     assert_eq!(stats.rounds, 1);
-    assert_eq!(stats.hits_by_attacker, 3);
-    assert_eq!(stats.hits_by_defender, 0);
+    assert_eq!(stats.hits_of(0), 3);
+    assert_eq!(stats.hits_of(1), 0);
     assert!(d[0].destroyed());
-    assert_eq!(stats.destroyed, vec!["Colony Ship 2".to_string()]);
+    assert_eq!(stats.all_destroyed(), vec!["Colony Ship 2".to_string()]);
 }
 
 #[test]
@@ -223,7 +230,7 @@ fn battle_defender_hits_land_on_the_attacker_and_a_damaged_unit_may_disengage() 
     assert_eq!(a[0].damage, 3, "2 from the round and 1 from the pursuit");
     assert!(a[0].escaped && !a[0].engaged);
     assert_eq!(d[0].damage, 1);
-    assert_eq!(stats.escaped, vec!["Frigate 1".to_string()]);
+    assert_eq!(stats.all_escaped(), vec!["Frigate 1".to_string()]);
 }
 
 // ---------------------------------------------------------------- 10.2 Disengage and Pursuit probabilities
@@ -452,18 +459,22 @@ fn ducats_pay_for_restoration_and_repairs_at_the_table_rates() {
 fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard_and_habitats() {
     let mut g = game();
     let slots: Vec<u32> = BodyId::ALL.iter().map(|b| g.tables.body(*b).orbital_slots).collect();
-    assert_eq!(slots, vec![4, 2, 3, 1, 1]);
-    // The start: the Custodians' ISS and the Prospectors' Tiangong over Earth, bare core modules.
+    assert_eq!(slots, vec![5, 2, 3, 1, 1], "ticket #50: five orbital slots over Earth");
+    // The start (ticket #50): the Custodians' ISS, the Prospectors' Tiangong and the Archivists'
+    // Axiom over Earth, bare; the Arkwrights start with no station, so two slots stand free.
     let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the Custodians start with a station");
     let tiangong = station_of(&g, Seat(1), BodyId::Earth).expect("the Prospectors start with a station");
+    let axiom = station_of(&g, Seat(3), BodyId::Earth).expect("the Archivists start with a station");
     assert_eq!(g.place_name(Place::Colony(iss)), "ISS over Earth");
     assert_eq!(g.place_name(Place::Colony(tiangong)), "Tiangong over Earth");
+    assert_eq!(g.place_name(Place::Colony(axiom)), "Axiom over Earth");
+    assert!(station_of(&g, Seat(2), BodyId::Earth).is_none(), "the Arkwrights start with no station");
     assert!(g.colony(iss).unwrap().modules.is_empty(), "no Shipyard at the start");
     assert!(g.colony(iss).unwrap().in_orbit);
-    assert_eq!(g.free_orbital_slots(BodyId::Earth), vec![2, 3]);
+    assert_eq!(g.free_orbital_slots(BodyId::Earth), vec![3, 4]);
     assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3, "stations take no surface slot");
     // Built for 40 Materials from a state with a Launch Site (Earth) or a Colony (elsewhere); no crew.
-    let build = Order::BuildStation { body: BodyId::Earth, slot: 2 };
+    let build = Order::BuildStation { body: BodyId::Earth, slot: 3 };
     assert_eq!(g.order_cost(Seat(0), &build).materials, 40);
     assert!(g.check_order(Seat(0), &[], &build).is_ok(), "Asia has a Launch Site");
     assert!(g.check_order(Seat(0), &[], &Order::BuildStation { body: BodyId::Mars, slot: 0 }).is_err(), "nothing of the Custodians' at Mars");
@@ -471,10 +482,10 @@ fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard
     g.commit_orders(Seat(0), &[build]);
     assert_eq!(g.seats[0].stockpile.materials, 40);
     g.resolution_phase();
-    let skylab = g.station_at(BodyId::Earth, 2).expect("built at the Resolution");
-    assert_eq!(g.place_name(Place::Colony(skylab.id)), "Skylab over Earth");
-    assert_eq!(skylab.control, Control::Controlled(Seat(0)));
-    assert_eq!(skylab.colonists, 0);
+    let reef = g.station_at(BodyId::Earth, 3).expect("built at the Resolution");
+    assert_eq!(g.place_name(Place::Colony(reef.id)), "Orbital Reef over Earth");
+    assert_eq!(reef.control, Control::Controlled(Seat(0)));
+    assert_eq!(reef.colonists, 0);
     // Only a Shipyard and Habitats stand on a station.
     assert!(g.check_order(Seat(0), &[], &Order::BuildModule { colony: iss, kind: ModuleKind::Mine }).is_err(), "nothing to dig in orbit");
     assert!(g.check_order(Seat(0), &[], &Order::BuildModule { colony: iss, kind: ModuleKind::Shipyard }).is_ok());
@@ -779,6 +790,8 @@ fn meet_first(g: &mut Game, seat: Seat) {
     match g.kind(seat) {
         FactionKind::Prospectors => g.seats[seat.index()].extraction_total = 500,
         FactionKind::Custodians => g.seats[seat.index()].stabilization_run = 3,
+        FactionKind::Arkwrights => {}
+        FactionKind::Archivists => g.seats[seat.index()].research_total = 150,
     }
 }
 
@@ -1087,7 +1100,7 @@ fn tech_clean_manufacturing_cuts_factory_and_refinery_emissions() {
 #[test]
 fn tech_clean_propellant_makes_a_launch_emit_less() {
     let mut g = game();
-    g.climate.launches_pending = [1, 0];
+    g.climate.launches_pending = [1, 0, 0, 0];
     let plain = g.emissions_now().launches;
     with_tech(&mut g, TechId::CleanPropellant);
     let clean = g.emissions_now().launches;
@@ -1217,7 +1230,7 @@ fn a_zero_threshold_is_not_met_by_zero_influence() {
 }
 
 fn colony_attack_turns(seed: u64) -> Option<u32> {
-    let mut g = Game::new(tables(), NewGame { seed, seats: [(FactionKind::Custodians, false), (FactionKind::Prospectors, true)], player_start: StateId::Asia });
+    let mut g = with_seed(seed);
     // The AI Prospectors hold a Colony on the Moon with a Barracks and its Army.
     let cid = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Barracks], 4);
     let defender = ArmyId(g.fresh_id());
@@ -1243,7 +1256,7 @@ fn colony_attack_turns(seed: u64) -> Option<u32> {
         } else if !g.armies_of_seat_at(Seat(0), Place::Colony(cid)).is_empty() {
             orders.push(Order::ArmyStance { place: Place::Colony(cid), stance: Stance::Attack });
         }
-        g.end_turn([orders, Vec::new()]);
+        g.end_turn([orders, Vec::new(), Vec::new(), Vec::new()]);
         if g.colony(cid).map(|c| c.control == Control::Controlled(Seat(0))).unwrap_or(false) {
             return Some(turn);
         }
@@ -1383,7 +1396,7 @@ fn only_climate_cards_scale_with_the_temperature() {
 #[test]
 fn a_place_taken_by_influence_keeps_every_facility() {
     for seed in 1..=5u64 {
-        let mut g = Game::new(tables(), NewGame { seed, seats: [(FactionKind::Custodians, false), (FactionKind::Prospectors, true)], player_start: StateId::Asia });
+        let mut g = with_seed(seed);
         g.state_mut(StateId::Africa).facilities = (0..8).map(|_| facility(FacilityKind::Factory)).collect();
         g.seats[0].influence.insert(Place::State(StateId::Africa), 60);
         g.seats[0].influenced_this_turn.push(Place::State(StateId::Africa));
@@ -1398,7 +1411,252 @@ fn a_place_taken_by_influence_keeps_every_facility() {
 #[test]
 fn an_ai_versus_ai_game_runs_to_an_outcome() {
     let t = tables();
-    let r = dying_earth_engine::sim::run(t.clone(), 3, [FactionKind::Custodians, FactionKind::Prospectors]);
+    let r = dying_earth_engine::sim::run(t.clone(), 3, FactionKind::Custodians);
     assert!(r.outcome.is_some());
     assert!(r.last_turn <= t.victory.turns);
+}
+
+
+// ================================================================ #50 four Factions in every game
+
+// ---------------------------------------------------------------- 10.2 the melee
+
+/// A party of one unit with the strength, hit points and pursuit given.
+fn party(id: u32, name: &str, strength: i64, hp: u32, pursuit: u32) -> Vec<Combatant> {
+    vec![Combatant::new(UnitRef::Ship(ShipId(id)), name.to_string(), strength, hp, 0, pursuit, false)]
+}
+
+#[test]
+fn a_partys_chance_to_land_a_hit_is_its_share_of_the_total_strength_present() {
+    // Two parties: exactly the old p = A / (A + D).
+    assert!((combat::hit_share(&[3, 1], 0) - 0.75).abs() < 1e-12);
+    assert!((combat::hit_share(&[3, 1], 1) - 0.25).abs() < 1e-12);
+    assert!((combat::hit_share(&[3, 3], 0) - 0.5).abs() < 1e-12);
+    // Three parties: each party's share of the whole strength present.
+    assert!((combat::hit_share(&[6, 3, 1], 0) - 0.6).abs() < 1e-12);
+    assert!((combat::hit_share(&[6, 3, 1], 1) - 0.3).abs() < 1e-12);
+    assert!((combat::hit_share(&[6, 3, 1], 2) - 0.1).abs() < 1e-12);
+    assert_eq!(combat::hit_share(&[0, 0, 0], 0), 0.0);
+    // And the melee itself lands hits in those proportions.
+    let mut rng = ChaCha8Rng::seed_from_u64(11);
+    let mut landed = [0u32; 3];
+    for _ in 0..400 {
+        let mut a = party(1, "A Frigate", 6, 10_000, 0);
+        let mut b = party(2, "B Frigate", 3, 10_000, 0);
+        let mut c = party(3, "C Frigate", 1, 10_000, 0);
+        let stats = combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice);
+        for (i, l) in landed.iter_mut().enumerate() {
+            *l += stats.hits_of(i);
+        }
+    }
+    let total: u32 = landed.iter().sum();
+    let share = |i: usize| landed[i] as f64 / total as f64;
+    assert!((share(0) - 0.6).abs() < 0.05, "party A landed {:.3} of the hits, expected 0.60: {landed:?}", share(0));
+    assert!((share(1) - 0.3).abs() < 0.05, "party B landed {:.3} of the hits, expected 0.30: {landed:?}", share(1));
+    assert!((share(2) - 0.1).abs() < 0.05, "party C landed {:.3} of the hits, expected 0.10: {landed:?}", share(2));
+}
+
+#[test]
+fn a_partys_hits_are_spread_across_the_enemy_parties_in_proportion_to_their_strength() {
+    // The rule in figures: the attacker's own share is nothing, the enemies' shares are their
+    // strengths over the enemy total.
+    let shares = combat::target_shares(&[6, 3, 1], 0);
+    assert_eq!(shares[0], 0.0);
+    assert!((shares[1] - 0.75).abs() < 1e-12);
+    assert!((shares[2] - 0.25).abs() < 1e-12);
+    // With one enemy it is a certainty.
+    assert_eq!(combat::target_shares(&[3, 1], 0), vec![0.0, 1.0]);
+    // And the melee spreads the damage that way: B has three times C's strength, so it takes about
+    // three times the damage from A.
+    let mut rng = ChaCha8Rng::seed_from_u64(23);
+    let (mut b_damage, mut c_damage) = (0u32, 0u32);
+    for _ in 0..400 {
+        let mut a = party(1, "A Frigate", 6, 10_000, 0);
+        let mut b = party(2, "B Frigate", 3, 10_000, 0);
+        let mut c = party(3, "C Frigate", 1, 10_000, 0);
+        combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice);
+        b_damage += b[0].damage;
+        c_damage += c[0].damage;
+    }
+    assert!(c_damage > 0, "the weaker party was never hit at all: {b_damage} to {c_damage}");
+    let ratio = b_damage as f64 / c_damage as f64;
+    assert!((2.0..4.5).contains(&ratio), "B took {b_damage} and C {c_damage}, a ratio of {ratio:.2}; strength says about 3");
+}
+
+// ---------------------------------------------------------------- 9.3 Orbital Control in a melee
+
+#[test]
+fn orbital_control_needs_the_only_engaged_warship_at_the_body() {
+    let mut g = game();
+    let warship = |id: u32, seat: Seat| Ship {
+        id: ShipId(id),
+        kind: UnitKind::Frigate,
+        seat,
+        damage: 0,
+        at: ShipAt::Body(BodyId::Mars),
+        colonists: 0,
+        army: None,
+        stance: Stance::Hold,
+        escaped: false,
+        arrived_this_turn: false,
+        built_turn: 1,
+    };
+    assert_eq!(g.orbital_control(BodyId::Mars), None, "nobody is there");
+    g.ships.push(warship(201, Seat(0)));
+    assert_eq!(g.orbital_control(BodyId::Mars), Some(Seat(0)), "one seat's warship, engaged, alone");
+    g.ships.push(warship(202, Seat(1)));
+    assert_eq!(g.orbital_control(BodyId::Mars), None, "two seats have engaged warships");
+    g.ships.push(warship(203, Seat(2)));
+    assert_eq!(g.orbital_control(BodyId::Mars), None, "three seats, still nobody");
+    // A warship that escaped is no longer engaged and contests nothing.
+    for s in g.ships.iter_mut().filter(|s| s.seat != Seat(2) && s.at == ShipAt::Body(BodyId::Mars)) {
+        s.escaped = true;
+    }
+    assert_eq!(g.orbital_control(BodyId::Mars), Some(Seat(2)), "only the Arkwrights are still engaged");
+    // Landing follows control.
+    assert!(g.may_land(Seat(2), BodyId::Mars));
+    assert!(!g.may_land(Seat(0), BodyId::Mars));
+}
+
+// ---------------------------------------------------------------- 15 victory over four seats
+
+#[test]
+fn more_than_one_seat_meeting_its_condition_gives_the_game_to_the_larger_margin() {
+    let mut g = game();
+    // The Custodians and the Prospectors both meet theirs; the Prospectors by the larger margin.
+    colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
+    colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
+    g.seats[0].stabilization_run = 3; // parts 1.0 and 1.0 -> margin 1.0
+    g.seats[1].extraction_total = 600; // parts 1.2 and 1.25 -> margin 1.2
+    g.end_phase();
+    assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
+}
+
+#[test]
+fn the_last_turn_ranks_every_seat_by_score() {
+    let mut g = game();
+    g.turn = g.tables.victory.turns;
+    // Presence bar 12. Custodians 6 Colonists but no run: score 0. Prospectors 9 and the full
+    // Extraction Total: score 0.75. Arkwrights 3 Colonists: first 3/24 = 0.125, score 0.125.
+    // Archivists nothing: score 0.
+    colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 6);
+    let p = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 9);
+    let _ = p;
+    g.seats[1].extraction_total = 500;
+    colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat], 3);
+    assert!((g.progress(Seat(1)).score() - 0.75).abs() < 1e-9, "{:?}", g.progress(Seat(1)).score());
+    g.end_phase();
+    assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "the highest score of four: {:?}", g.outcome);
+    // With the leader's score removed, the next seat down takes it.
+    let mut g = game();
+    g.turn = g.tables.victory.turns;
+    colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat], 3); // 0.125
+    colony(&mut g, Seat(3), BodyId::Moon, &[ModuleKind::Habitat], 4); // presence 4/12, research 0 -> 0
+    g.end_phase();
+    assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(2), .. })), "{:?}", g.outcome);
+}
+
+// ---------------------------------------------------------------- 14.3 the AI seats spread out
+
+#[test]
+fn the_ai_seats_take_start_states_not_adjacent_to_any_taken_one() {
+    let g = Game::new(tables(), NewGame { seed: 7, player: FactionKind::Prospectors, player_is_ai: false, player_start: StateId::Europe });
+    let held = |seat: Seat| g.controlled_states(seat);
+    assert_eq!(held(Seat(0)), vec![StateId::Europe]);
+    // Europe touches North America, Africa, Russia and the Middle East, so the first AI seat takes
+    // the highest Industry Level among Asia, Australia and South America: Asia at 3.
+    assert_eq!(held(Seat(1)), vec![StateId::Asia]);
+    // Asia adds Russia, the Middle East and Australia to the adjacent set; only South America is
+    // left untouched.
+    assert_eq!(held(Seat(2)), vec![StateId::SouthAmerica]);
+    // Now every free state touches a taken one, so the rule falls back to the highest Industry
+    // Level free state: North America at 3.
+    assert_eq!(held(Seat(3)), vec![StateId::NorthAmerica]);
+    // Every seat's start carries a Launch Site.
+    for seat in Seat::ALL {
+        let sid = held(seat)[0];
+        assert!(g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite), "{seat:?} has no Launch Site");
+    }
+}
+
+// ---------------------------------------------------------------- 8.3 a same-turn Influence tie
+
+#[test]
+fn two_challengers_at_the_same_standing_leave_the_place_where_it_was() {
+    let mut g = game();
+    // Africa's threshold is 50. Two seats reach it in the same Resolution at the same Standing.
+    for seat in [Seat(0), Seat(1)] {
+        g.seats[seat.index()].influence.insert(Place::State(StateId::Africa), 50);
+        g.seats[seat.index()].influenced_this_turn.push(Place::State(StateId::Africa));
+    }
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::Africa).control, Control::Neutral, "an exact tie goes to nobody");
+    // One more point and the higher Standing takes it.
+    g.seats[0].influence.insert(Place::State(StateId::Africa), 51);
+    for seat in [Seat(0), Seat(1)] {
+        g.seats[seat.index()].influenced_this_turn.push(Place::State(StateId::Africa));
+    }
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)), "the higher Standing takes it");
+}
+
+// ---------------------------------------------------------------- 12.2 the Research Lead tie
+
+#[test]
+fn a_tied_research_lead_goes_to_the_seat_that_picked_least_recently() {
+    let mut g = game();
+    g.research.contributions = [10, 10, 0, 0];
+    g.research.last_picked_turn = [Some(5), Some(2), None, None];
+    assert_eq!(g.research_lead(), Seat(1), "seat 1 picked on turn 2, seat 0 on turn 5");
+    g.research.last_picked_turn = [Some(1), Some(3), None, None];
+    assert_eq!(g.research_lead(), Seat(0), "seat 0 picked on turn 1, seat 1 on turn 3");
+    // A seat that has never picked counts as longest ago.
+    g.research.contributions = [10, 0, 10, 0];
+    g.research.last_picked_turn = [Some(1), None, None, None];
+    assert_eq!(g.research_lead(), Seat(2), "the Arkwrights have never picked");
+    // The highest contributor still wins outright when there is no tie.
+    g.research.contributions = [4, 9, 2, 1];
+    g.research.last_picked_turn = [None, Some(9), None, None];
+    assert_eq!(g.research_lead(), Seat(1));
+    // And picking records the turn.
+    g.turn = 7;
+    g.research.current = None;
+    g.pick_tech(Seat(3), TechId::EfficientGrids).expect("a free pick");
+    assert_eq!(g.research.last_picked_turn[3], Some(7));
+}
+
+// ---------------------------------------------------------------- #50 ties are drawn, not ordered
+
+#[test]
+fn a_tie_between_seats_is_drawn_from_the_seed_and_is_the_same_every_replay() {
+    // Two seats want the same orbital slot with no Ships anywhere: strength decides nothing, so the
+    // draw does. The same seed draws the same seat twice; over many seeds both seats come up, which
+    // is what tells a draw from "seat 0 wins".
+    let winner = |seed: u64| {
+        let mut g = with_seed(seed);
+        g.tiebreak_at_body(BodyId::Mars, &[Seat(0), Seat(1)])
+    };
+    for seed in 1..=20u64 {
+        assert_eq!(winner(seed), winner(seed), "seed {seed} drew differently on a replay");
+    }
+    let firsts = (1..=40u64).filter(|s| winner(*s) == Seat(0)).count();
+    assert!((8..=32).contains(&firsts), "seat 0 took {firsts} of 40 draws; a draw should be near half");
+    // Greater strength still decides before the draw.
+    let mut g = with_seed(3);
+    g.ships.push(Ship {
+        id: ShipId(301),
+        kind: UnitKind::Frigate,
+        seat: Seat(1),
+        damage: 0,
+        at: ShipAt::Body(BodyId::Mars),
+        colonists: 0,
+        army: None,
+        stance: Stance::Hold,
+        escaped: false,
+        arrived_this_turn: false,
+        built_turn: 1,
+    });
+    for _ in 0..8 {
+        assert_eq!(g.tiebreak_at_body(BodyId::Mars, &[Seat(0), Seat(1)]), Seat(1), "the stronger stack takes it");
+    }
 }

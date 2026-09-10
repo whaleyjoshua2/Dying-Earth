@@ -1,5 +1,9 @@
 //! The battle algorithm (spec 10). One algorithm serves space and ground.
 //! It works on plain combatants so tests can drive it with fixed dice.
+//!
+//! Ticket #50: a Battle is a melee. Every Faction present at the place is hostile to every other,
+//! so the algorithm takes N parties rather than two sides. The two-party case reduces exactly to the
+//! old one: with parties a and d, the attacker's chance to land a hit is a / (a + d).
 
 use crate::orders::UnitRef;
 use rand::Rng;
@@ -58,13 +62,27 @@ impl Combatant {
     }
 }
 
+/// What one battle did, per party, in the order the parties were given.
 #[derive(Debug, Clone, Default)]
 pub struct BattleStats {
     pub rounds: u32,
-    pub hits_by_attacker: u32,
-    pub hits_by_defender: u32,
-    pub destroyed: Vec<String>,
-    pub escaped: Vec<String>,
+    /// Hits each party landed on the others.
+    pub hits: Vec<u32>,
+    pub destroyed: Vec<Vec<String>>,
+    pub escaped: Vec<Vec<String>>,
+}
+
+impl BattleStats {
+    pub fn all_destroyed(&self) -> Vec<String> {
+        self.destroyed.iter().flatten().cloned().collect()
+    }
+    pub fn all_escaped(&self) -> Vec<String> {
+        self.escaped.iter().flatten().cloned().collect()
+    }
+    /// The hits one party landed, 0 if there is no such party.
+    pub fn hits_of(&self, party: usize) -> u32 {
+        self.hits.get(party).copied().unwrap_or(0)
+    }
 }
 
 pub const MAX_ROUNDS: u32 = 3;
@@ -87,7 +105,35 @@ fn random_engaged(side: &[Combatant], dice: &mut dyn Dice) -> Option<usize> {
     }
 }
 
+/// Ticket #50: one party's chance to land a hit is its share of the total strength present.
+/// With two parties this is the attacker's old p = A / (A + D).
+pub fn hit_share(strengths: &[i64], party: usize) -> f64 {
+    let total: i64 = strengths.iter().sum();
+    if total <= 0 {
+        return 0.0;
+    }
+    strengths.get(party).copied().unwrap_or(0) as f64 / total as f64
+}
+
+/// Ticket #50: a party's hits are spread across the enemy parties in proportion to the strength
+/// each has present. The attacking party's own entry is zero; with one enemy it is a certainty.
+pub fn target_shares(strengths: &[i64], attacker: usize) -> Vec<f64> {
+    let enemy_total: i64 = strengths.iter().enumerate().filter(|(i, _)| *i != attacker).map(|(_, s)| *s).sum();
+    strengths
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            if i == attacker || enemy_total <= 0 {
+                0.0
+            } else {
+                *s as f64 / enemy_total as f64
+            }
+        })
+        .collect()
+}
+
 /// Spec 10.4: the chance the attacker wins more hit-rolls than the defender in the first round.
+/// Ticket #50: in a melee the "defender" strength is the sum of every other party present.
 pub fn first_round_odds(attacker_strength: i64, defender_strength: i64) -> f64 {
     let total = attacker_strength + defender_strength;
     if total <= 0 {
@@ -108,45 +154,52 @@ pub fn disengage_chance(c: &Combatant) -> f64 {
     }
 }
 
-/// Run one battle to its end. Units are mutated in place; escaped units are marked.
+/// Run one battle between two parties to its end. Kept for the two-sided callers and the tests;
+/// it is `melee` with two parties.
 pub fn fight(attackers: &mut [Combatant], defenders: &mut [Combatant], dice: &mut dyn Dice) -> BattleStats {
-    let mut stats = BattleStats::default();
+    melee(&mut [attackers, defenders], dice)
+}
+
+/// Run one melee to its end: every party is hostile to every other. Units are mutated in place;
+/// escaped units are marked.
+pub fn melee(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice) -> BattleStats {
+    let n = parties.len();
+    let mut stats = BattleStats { rounds: 0, hits: vec![0; n], destroyed: vec![Vec::new(); n], escaped: vec![Vec::new(); n] };
     // Evade rolls at the start of the battle, at current damage (spec 9.2).
-    for side in [&mut *attackers, &mut *defenders] {
-        for c in side.iter_mut().filter(|c| c.engaged && c.evade && !c.destroyed()) {
+    for party in parties.iter_mut() {
+        for c in party.iter_mut().filter(|c| c.engaged && c.evade && !c.destroyed()) {
             if dice.chance(0.5) {
                 c.engaged = false;
                 c.escaped = true;
             }
         }
     }
-    // Pursue units that fled before round one.
-    pursue(attackers, defenders, dice, &mut stats);
+    pursue(parties, dice, &mut stats);
     for _round in 0..MAX_ROUNDS {
-        if !any_engaged(attackers) || !any_engaged(defenders) {
+        if parties.iter().filter(|p| any_engaged(p)).count() < 2 {
             break;
         }
         stats.rounds += 1;
-        let a = total_strength(attackers);
-        let d = total_strength(defenders);
+        // Strengths and the engaged parties are read once, at the start of the round, as the
+        // two-sided battle read A and D once.
+        let strengths: Vec<i64> = parties.iter().map(|p| total_strength(p)).collect();
+        let live: Vec<usize> = (0..n).filter(|i| any_engaged(parties[*i])).collect();
+        let total: i64 = strengths.iter().sum();
         for _ in 0..HIT_ROLLS {
-            if a + d <= 0 {
+            if total <= 0 {
                 break;
             }
-            let p = a as f64 / (a + d) as f64;
-            if dice.chance(p) {
-                if let Some(i) = random_engaged(defenders, dice) {
-                    defenders[i].damage += 1;
-                    stats.hits_by_attacker += 1;
-                }
-            } else if let Some(i) = random_engaged(attackers, dice) {
-                attackers[i].damage += 1;
-                stats.hits_by_defender += 1;
+            let Some(hitter) = pick_weighted(&strengths, &live, dice) else { break };
+            let targets: Vec<usize> = live.iter().copied().filter(|i| *i != hitter).collect();
+            let Some(target) = pick_weighted(&strengths, &targets, dice) else { continue };
+            if let Some(i) = random_engaged(parties[target], dice) {
+                parties[target][i].damage += 1;
+                stats.hits[hitter] += 1;
             }
         }
         // Disengage.
-        for side in [&mut *attackers, &mut *defenders] {
-            for c in side.iter_mut().filter(|c| c.engaged && !c.destroyed()) {
+        for party in parties.iter_mut() {
+            for c in party.iter_mut().filter(|c| c.engaged && !c.destroyed()) {
                 let p = disengage_chance(c);
                 if p > 0.0 && dice.chance(p) {
                     c.engaged = false;
@@ -154,10 +207,10 @@ pub fn fight(attackers: &mut [Combatant], defenders: &mut [Combatant], dice: &mu
                 }
             }
         }
-        pursue(attackers, defenders, dice, &mut stats);
+        pursue(parties, dice, &mut stats);
         // Remove destroyed units.
-        for side in [&mut *attackers, &mut *defenders] {
-            for c in side.iter_mut() {
+        for party in parties.iter_mut() {
+            for c in party.iter_mut() {
                 if c.destroyed() {
                     c.engaged = false;
                     c.escaped = false;
@@ -165,48 +218,80 @@ pub fn fight(attackers: &mut [Combatant], defenders: &mut [Combatant], dice: &mu
             }
         }
     }
-    for side in [&*attackers, &*defenders] {
-        for c in side.iter() {
+    for (i, party) in parties.iter().enumerate() {
+        for c in party.iter() {
             if c.destroyed() {
-                stats.destroyed.push(c.name.clone());
+                stats.destroyed[i].push(c.name.clone());
             } else if c.escaped {
-                stats.escaped.push(c.name.clone());
+                stats.escaped[i].push(c.name.clone());
             }
         }
     }
     stats
 }
 
-/// Units that have just disengaged (escaped, not yet pursued) are chased by the enemy's best pursuer.
-fn pursue(attackers: &mut [Combatant], defenders: &mut [Combatant], dice: &mut dyn Dice, stats: &mut BattleStats) {
-    let mut pursue_side = |leavers: &mut [Combatant], enemies: &mut [Combatant], enemy_is_attacker: bool| {
-        let leaver_idx: Vec<usize> =
-            leavers.iter().enumerate().filter(|(_, c)| c.escaped && !c.destroyed() && !c.engaged && !c.pursued).map(|(i, _)| i).collect();
+/// One draw over `live`, each weighted by its strength, spending one `chance` roll per candidate
+/// but the last, and none at all when there is only one candidate. With two candidates this is the
+/// single roll at p = strengths[live[0]] / (a + d) the two-sided battle made.
+fn pick_weighted(strengths: &[i64], live: &[usize], dice: &mut dyn Dice) -> Option<usize> {
+    match live.len() {
+        0 => None,
+        1 => Some(live[0]),
+        _ => {
+            let mut left: i64 = live.iter().map(|i| strengths[*i]).sum();
+            for i in &live[..live.len() - 1] {
+                let s = strengths[*i];
+                if left <= 0 {
+                    return Some(*i);
+                }
+                if dice.chance(s as f64 / left as f64) {
+                    return Some(*i);
+                }
+                left -= s;
+            }
+            Some(live[live.len() - 1])
+        }
+    }
+}
+
+/// Units that have just disengaged (escaped, not yet pursued) are chased by the enemy's best
+/// pursuer. Ticket #50: the pursuer is the highest Pursuit among all enemy units still engaged,
+/// whichever party it belongs to.
+fn pursue(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, stats: &mut BattleStats) {
+    let n = parties.len();
+    for i in 0..n {
+        let leaver_idx: Vec<usize> = parties[i]
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| c.escaped && !c.destroyed() && !c.engaged && !c.pursued)
+            .map(|(j, _)| j)
+            .collect();
         for li in leaver_idx {
-            let leaver_strength = leavers[li].strength;
-            let pursuer = enemies
-                .iter()
-                .filter(|e| e.engaged && !e.destroyed())
-                .max_by_key(|e| e.pursuit)
-                .map(|e| (e.pursuit, e.strength));
-            leavers[li].pursued = true;
-            let Some((pursuit, strength)) = pursuer else { continue };
+            let leaver_strength = parties[i][li].strength;
+            // The best pursuer among every other party's engaged units.
+            let mut best: Option<(u32, i64, usize)> = None;
+            for (j, party) in parties.iter().enumerate() {
+                if j == i {
+                    continue;
+                }
+                for e in party.iter().filter(|e| e.engaged && !e.destroyed()) {
+                    if best.map(|(p, _, _)| e.pursuit > p).unwrap_or(true) {
+                        best = Some((e.pursuit, e.strength, j));
+                    }
+                }
+            }
+            parties[i][li].pursued = true;
+            let Some((pursuit, strength, party)) = best else { continue };
             if pursuit == 0 {
                 continue;
             }
             if dice.d6() <= pursuit {
                 let p = if strength + leaver_strength <= 0 { 0.0 } else { strength as f64 / (strength + leaver_strength) as f64 };
                 if dice.chance(p) {
-                    leavers[li].damage += 1;
-                    if enemy_is_attacker {
-                        stats.hits_by_attacker += 1;
-                    } else {
-                        stats.hits_by_defender += 1;
-                    }
+                    parties[i][li].damage += 1;
+                    stats.hits[party] += 1;
                 }
             }
         }
-    };
-    pursue_side(attackers, defenders, false);
-    pursue_side(defenders, attackers, true);
+    }
 }

@@ -1,5 +1,6 @@
-//! Victory and defeat (spec 15).
+//! Victory and defeat (spec 15), for four seats since ticket #50.
 
+use crate::data::VictoryFirstKind;
 use crate::ids::*;
 use crate::state::*;
 
@@ -34,59 +35,63 @@ impl Progress {
 
 impl Game {
     pub fn progress(&self, seat: Seat) -> Progress {
-        let v = &self.tables.victory;
         let s = self.seat(seat);
-        let (first_name, first_value, first_bar) = match s.kind {
-            FactionKind::Prospectors => ("Extraction Total".to_string(), s.extraction_total as f64, v.extraction_total as f64),
-            FactionKind::Custodians => ("Stabilization run".to_string(), s.stabilization_run as f64, v.stabilization_turns as f64),
+        // Ticket #50: the first part is whatever the Faction's card names, at the bar on the card.
+        let card = self.tables.faction(s.kind).victory_first;
+        let first_value = match card.kind {
+            VictoryFirstKind::ExtractionTotal => s.extraction_total as f64,
+            VictoryFirstKind::StabilizationRun => s.stabilization_run as f64,
+            VictoryFirstKind::ColonistsOffEarth => self.off_world_colonists(seat) as f64,
+            VictoryFirstKind::ResearchProduced => s.research_total as f64,
         };
-        Progress { first_name, first_value, first_bar, presence: self.off_world_colonists(seat), presence_bar: v.off_world_presence }
+        Progress {
+            first_name: card.kind.name().to_string(),
+            first_value,
+            first_bar: card.bar,
+            presence: self.off_world_colonists(seat),
+            presence_bar: self.tables.victory.off_world_presence,
+        }
     }
 
     /// Phase 7: End. Victory checks in their stated order, then Collapse, then the turn advances.
     pub fn end_phase(&mut self) {
-        let p0 = self.progress(Seat(0));
-        let p1 = self.progress(Seat(1));
-        match (p0.met(), p1.met()) {
-            (true, false) => {
-                self.outcome = Some(Outcome::Win { seat: Seat(0), margin_note: "met its Victory Condition".into() });
-            }
-            (false, true) => {
-                self.outcome = Some(Outcome::Win { seat: Seat(1), margin_note: "met its Victory Condition".into() });
-            }
-            (true, true) => {
-                let (m0, m1) = (p0.margin(), p1.margin());
-                self.outcome = Some(if m0 > m1 {
-                    Outcome::Win { seat: Seat(0), margin_note: "both met their Victory Conditions; larger margin".into() }
-                } else if m1 > m0 {
-                    Outcome::Win { seat: Seat(1), margin_note: "both met their Victory Conditions; larger margin".into() }
-                } else {
-                    Outcome::Draw { note: "both met their Victory Conditions by the same margin".into() }
-                });
-            }
-            (false, false) => {}
+        let progress: Vec<Progress> = Seat::ALL.into_iter().map(|s| self.progress(s)).collect();
+        let met: Vec<Seat> = Seat::ALL.into_iter().filter(|s| progress[s.index()].met()).collect();
+        if met.len() == 1 {
+            self.outcome = Some(Outcome::Win { seat: met[0], margin_note: "met its Victory Condition".into() });
+        } else if met.len() > 1 {
+            let best = met.iter().map(|s| progress[s.index()].margin()).fold(f64::MIN, f64::max);
+            let leaders: Vec<Seat> = met.iter().copied().filter(|s| progress[s.index()].margin() >= best).collect();
+            self.outcome = Some(if leaders.len() == 1 {
+                Outcome::Win { seat: leaders[0], margin_note: "more than one met its Victory Condition; the larger margin".into() }
+            } else {
+                Outcome::Draw { note: "more than one met its Victory Condition by the same margin".into() }
+            });
         }
         if self.outcome.is_none() && self.climate.temperature >= self.tables.climate.collapse_line {
             self.outcome = Some(Outcome::Collapse);
         }
         if self.outcome.is_none() && self.turn >= self.tables.victory.turns {
-            let (s0, s1) = (p0.score(), p1.score());
-            self.outcome = Some(if s0 > s1 {
-                Outcome::Win { seat: Seat(0), margin_note: "higher score at the last turn".into() }
-            } else if s1 > s0 {
-                Outcome::Win { seat: Seat(1), margin_note: "higher score at the last turn".into() }
+            // Rank every seat by score, then Colonists off Earth, then Colonies held, then a draw.
+            let leaders = |key: &dyn Fn(Seat) -> f64, from: &[Seat]| -> Vec<Seat> {
+                let best = from.iter().map(|s| key(*s)).fold(f64::MIN, f64::max);
+                from.iter().copied().filter(|s| key(*s) >= best).collect()
+            };
+            let all: Vec<Seat> = Seat::ALL.to_vec();
+            let mut note = "higher score at the last turn";
+            let mut top = leaders(&|s| progress[s.index()].score(), &all);
+            if top.len() > 1 {
+                note = "tie broken by Colonists off Earth";
+                top = leaders(&|s| self.off_world_colonists(s) as f64, &top);
+            }
+            if top.len() > 1 {
+                note = "tie broken by Colonies held";
+                top = leaders(&|s| self.owned_colonies(s).len() as f64, &top);
+            }
+            self.outcome = Some(if top.len() == 1 {
+                Outcome::Win { seat: top[0], margin_note: note.into() }
             } else {
-                let (c0, c1) = (self.off_world_colonists(Seat(0)), self.off_world_colonists(Seat(1)));
-                if c0 != c1 {
-                    Outcome::Win { seat: if c0 > c1 { Seat(0) } else { Seat(1) }, margin_note: "tie broken by Colonists off Earth".into() }
-                } else {
-                    let (n0, n1) = (self.owned_colonies(Seat(0)).len(), self.owned_colonies(Seat(1)).len());
-                    if n0 != n1 {
-                        Outcome::Win { seat: if n0 > n1 { Seat(0) } else { Seat(1) }, margin_note: "tie broken by Colonies held".into() }
-                    } else {
-                        Outcome::Draw { note: "equal at the last turn".into() }
-                    }
-                }
+                Outcome::Draw { note: "equal at the last turn".into() }
             });
         }
         if let Some(o) = &self.outcome {

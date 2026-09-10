@@ -942,11 +942,9 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
         view.show_trade = true;
     }
     let threshold = game.influence_threshold(target);
-    for seat in Seat::ALL {
-        let _ = seat;
-    }
     let standing = |s: Seat| game.seat(s).influence.get(&target).copied().unwrap_or(0);
-    ui.label(format!("Standings: {} {}, {} {}; threshold {}", game.seat_name(Seat(0)), standing(Seat(0)), game.seat_name(Seat(1)), standing(Seat(1)), threshold));
+    let standings: Vec<String> = Seat::ALL.iter().map(|s| format!("{} {}", game.seat_name(*s), standing(*s))).collect();
+    ui.label(format!("Standings: {}; threshold {}", standings.join(", "), threshold));
     match game.place_control(target).controller() {
         Some(c) => {
             let need = threshold.max(standing(c) + 1);
@@ -1163,7 +1161,8 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     }
     if seat != Seat(0) {
         let mine = game.ship_stack_strength(Seat(0), body);
-        let theirs = game.ship_stack_strength(seat, body);
+        // Ticket #50: a Battle at a Body is a melee, so the odds run against everyone else present.
+        let theirs = game.enemy_ship_strength(Seat(0), body);
         ui.label(format!("Odds of winning the first round if you attack: {:.0}% (your strength {} against {})", first_round_odds(mine, theirs) * 100.0, mine, theirs));
         return;
     }
@@ -1172,15 +1171,16 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     }
     ui.separator();
     stance_row(ui, game, &session.pending, ships[0].stance, |s| Order::ShipStance { body, stance: s }, true, actions);
-    let enemy = game.ship_stack_strength(seat.other(), body);
-    if enemy > 0 || !game.ships_at(seat.other(), body).is_empty() {
+    let enemy = game.enemy_ship_strength(seat, body);
+    let enemy_ships: usize = seat.others().iter().map(|s| game.ships_at(*s, body).len()).sum();
+    if enemy > 0 || enemy_ships > 0 {
         let mine = game.ship_stack_strength(Seat(0), body);
         ui.label(format!("Enemy stack strength {}. Attack odds (first round): {:.0}%", enemy, first_round_odds(mine, enemy) * 100.0));
         if ui.button("Attack this turn").clicked() {
             view.attack_preview = true;
         }
         if view.attack_preview {
-            ui.label(format!("Your {} (strength {}) against their {} (strength {}). Confirm?", ships.len(), mine, game.ships_at(seat.other(), body).len(), enemy));
+            ui.label(format!("Your {} (strength {}) against their {} (strength {}). Confirm?", ships.len(), mine, enemy_ships, enemy));
             if ui.button("Confirm Attack").clicked() {
                 actions.push(Action::Place(Order::ShipStance { body, stance: Stance::Attack }));
                 view.attack_preview = false;
@@ -1572,7 +1572,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         ui.label(l);
                     }
                     if !game.report.ai_lines.is_empty() {
-                        ui.label(RichText::new(format!("What the {} did", game.seat_name(Seat(1)))).strong());
+                        ui.label(RichText::new("What the AI Factions did").strong());
                         for l in game.report.ai_lines.iter().filter(|l| l.contains("take")) {
                             ui.label(l.trim().trim_start_matches("take").trim());
                         }

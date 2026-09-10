@@ -289,34 +289,56 @@ pub enum EventKind {
 pub enum FactionKind {
     Custodians,
     Prospectors,
+    /// Version 0.05 (ticket #50): every game seats all four Factions.
+    Arkwrights,
+    Archivists,
 }
 
 impl FactionKind {
+    pub const ALL: [FactionKind; 4] = [FactionKind::Custodians, FactionKind::Prospectors, FactionKind::Arkwrights, FactionKind::Archivists];
     pub fn name(self) -> &'static str {
         match self {
             FactionKind::Custodians => "Custodians",
             FactionKind::Prospectors => "Prospectors",
+            FactionKind::Arkwrights => "Arkwrights",
+            FactionKind::Archivists => "Archivists",
         }
     }
-    pub fn other(self) -> FactionKind {
+    /// The id the data tables and the command line use.
+    pub fn id(self) -> &'static str {
         match self {
-            FactionKind::Custodians => FactionKind::Prospectors,
-            FactionKind::Prospectors => FactionKind::Custodians,
+            FactionKind::Custodians => "custodians",
+            FactionKind::Prospectors => "prospectors",
+            FactionKind::Arkwrights => "arkwrights",
+            FactionKind::Archivists => "archivists",
         }
+    }
+    /// Parse a Faction by its full id; nothing else is accepted, since two ids share a first letter.
+    pub fn from_id(s: &str) -> Option<FactionKind> {
+        FactionKind::ALL.into_iter().find(|k| k.id() == s.to_ascii_lowercase())
+    }
+    pub fn index(self) -> usize {
+        self as usize
     }
 }
 
-/// One of the two seats at the table. Seat 0 is the player's seat (the one that wins ties).
+/// How many seats every game has (ticket #50).
+pub const SEAT_COUNT: usize = 4;
+
+/// One of the four seats at the table. Seat 0 is the player's seat, whichever Faction it picked;
+/// seats 1 to 3 hold the other three Factions in enum order. A seat wins no tie for being first:
+/// every tie is drawn at random from the game's own generator (ticket #50).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Seat(pub u8);
 
 impl Seat {
-    pub const ALL: [Seat; 2] = [Seat(0), Seat(1)];
-    pub fn other(self) -> Seat {
-        Seat(1 - self.0)
-    }
+    pub const ALL: [Seat; SEAT_COUNT] = [Seat(0), Seat(1), Seat(2), Seat(3)];
     pub fn index(self) -> usize {
         self.0 as usize
+    }
+    /// Every other seat at the table.
+    pub fn others(self) -> Vec<Seat> {
+        Seat::ALL.into_iter().filter(|s| *s != self).collect()
     }
 }
 

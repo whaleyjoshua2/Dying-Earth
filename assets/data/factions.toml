@@ -12,6 +12,7 @@ research_multiplier = 1.25
 influence_multiplier = 1.3
 signature = "Restoration: in Orders, spend Energy in multiples of 10; each 10 adds 3.0 ppm to the Natural Sink in the next Climate phase only."
 victory = "Stabilization (3 consecutive Climate phases with net Emissions below the Natural Sink) plus 12 Colonists living off Earth."
+victory_first = { kind = "stabilization_run", bar = 3 }
 colour = [0.15, 0.65, 0.6]
 
 [[faction]]
@@ -25,7 +26,39 @@ research_multiplier = 0.75
 influence_multiplier = 1.0
 signature = "Cheap Industry: raising Industry Level costs 15 Materials instead of 30."
 victory = "An Extraction Total of 500 Materials plus Fuel produced by Mines, Refineries and Factories, plus 12 Colonists living off Earth."
+victory_first = { kind = "extraction_total", bar = 500 }
 colour = [0.85, 0.5, 0.2]
+
+# Ticket #50: two more Factions, so every game seats four. Their cards are provisional.
+[[faction]]
+# provisional, decided on ticket #51
+id = "arkwrights"
+name = "Arkwrights"
+# The Arkwrights start with no station over Earth (ticket #50): they leave from the ground.
+blurb = "Leave Earth: the diaspora is the point."
+output_multiplier = 1.0
+emissions_multiplier = 1.0
+research_multiplier = 1.0
+influence_multiplier = 1.0
+signature = "(decided on ticket #51)"
+victory = "24 Colonists living off Earth (which carries the 12 of Off-world Presence with it)."
+victory_first = { kind = "colonists_off_earth", bar = 24 }
+colour = [0.55, 0.35, 0.80]
+
+[[faction]]
+# provisional, decided on ticket #51
+id = "archivists"
+name = "Archivists"
+start_station = "Axiom"
+blurb = "Build the Archive and upload everyone."
+output_multiplier = 1.0
+emissions_multiplier = 1.0
+research_multiplier = 1.25
+influence_multiplier = 1.0
+signature = "(decided on ticket #51)"
+victory = "150 Research produced by their own Labs, plus 12 Colonists living off Earth."
+victory_first = { kind = "research_produced", bar = 150 }
+colour = [0.75, 0.82, 0.92]
 
 [restoration]
 energy_per_step = 10

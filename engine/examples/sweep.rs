@@ -1,4 +1,4 @@
-//! Ticket #27: sweep the two Climate knobs and report when a Custodian-versus-Prospector game collapses.
+//! Ticket #27: sweep the two Climate knobs and report when a four-Faction game collapses (ticket #50).
 //! `cargo run -p dying-earth-engine --example sweep -- [seeds]`
 
 use dying_earth_engine::data::{default_data_dir, Tables};
@@ -19,7 +19,7 @@ fn main() {
             let mut turns = Vec::new();
             let mut temps = Vec::new();
             for seed in 1..=seeds {
-                let r = dying_earth_engine::sim::run(tables.clone(), seed, [FactionKind::Custodians, FactionKind::Prospectors]);
+                let r = dying_earth_engine::sim::run(tables.clone(), seed, FactionKind::Custodians);
                 if r.outcome == Some(Outcome::Collapse) {
                     turns.push(r.last_turn);
                 }

@@ -209,7 +209,7 @@ pub struct Climate {
     pub temperature: f64,
     pub last: EmissionsBreakdown,
     /// Launches from Earth since the last Climate phase, per seat, charged next time.
-    pub launches_pending: [u32; 2],
+    pub launches_pending: [u32; SEAT_COUNT],
     /// Emissions a card (Permafrost Thaw) adds at the next Climate phase, worldwide.
     pub card_emissions_next: f64,
     /// Restoration bought in the last Orders phase, in ppm, for the next Climate phase only.
@@ -220,13 +220,16 @@ pub struct Climate {
 pub struct Research {
     pub current: Option<TechId>,
     pub progress: i64,
-    pub contributions: [i64; 2],
+    pub contributions: [i64; SEAT_COUNT],
     pub done: Vec<TechId>,
     /// Research produced while no Tech was chosen; flows into the next one.
     pub unallocated: i64,
     /// Who must pick the next Tech, when a human has to.
     pub awaiting_pick: Option<Seat>,
     pub last_lead: Option<Seat>,
+    /// Ticket #50: the turn each seat last picked a Tech, so a tie in contributions goes to the
+    /// seat that has picked least recently. None means it has never picked, which counts as longest ago.
+    pub last_picked_turn: [Option<u32>; SEAT_COUNT],
 }
 
 impl Research {
@@ -300,6 +303,8 @@ pub struct SeatState {
     pub influenced_this_turn: Vec<Target>,
     pub allotment: i64,
     pub research_last_turn: i64,
+    /// Ticket #50: all the Research this seat's own Labs have produced, counted at production.
+    pub research_total: i64,
     pub income_last_turn: Stockpile,
     /// Last Income by source (ticket #31): "Factory in Asia", the resource, the amount; upkeep as negatives.
     pub income_sources: Vec<(String, Resource, i64)>,
@@ -312,41 +317,52 @@ pub enum Outcome {
     Collapse,
 }
 
-/// One line of the Battle Report (spec 10.3).
+/// One party in a Battle (ticket #50): a Battle is a melee of every Faction present, so the
+/// Battle Report lists each of them rather than an attacker and a defender.
+#[derive(Debug, Clone)]
+pub struct BattleParty {
+    /// None for a neutral state's own Armies.
+    pub seat: Option<Seat>,
+    /// True for the party whose Attack or Intercept started the Battle.
+    pub aggressor: bool,
+    pub units: String,
+    pub strength: i64,
+    pub hits: u32,
+    pub destroyed: Vec<String>,
+    pub escaped: Vec<String>,
+}
+
+/// One line of the Battle Report (spec 10.3), amended by ticket #50: every party present.
 #[derive(Debug, Clone)]
 pub struct BattleLine {
     pub place: String,
-    pub attacker: Seat,
-    pub defender: Option<Seat>,
-    pub attacker_units: String,
-    pub defender_units: String,
-    pub attacker_strength: i64,
-    pub defender_strength: i64,
-    pub hits_by_attacker: u32,
-    pub hits_by_defender: u32,
-    pub destroyed: Vec<String>,
-    pub escaped: Vec<String>,
+    pub parties: Vec<BattleParty>,
     pub result: String,
 }
 
 impl BattleLine {
+    /// The seat whose order started the Battle, for the log and the map.
+    pub fn aggressor(&self) -> Option<Seat> {
+        self.parties.iter().find(|p| p.aggressor).and_then(|p| p.seat)
+    }
     pub fn text(&self, names: &dyn Fn(Seat) -> String, neutral: &str) -> String {
-        let def = self.defender.map(names).unwrap_or_else(|| neutral.to_string());
-        format!(
-            "{}: {} ({}, strength {}) attacked {} ({}, strength {}). Hits {} to {}. Destroyed: {}. Escaped: {}. {}",
-            self.place,
-            names(self.attacker),
-            self.attacker_units,
-            self.attacker_strength,
-            def,
-            self.defender_units,
-            self.defender_strength,
-            self.hits_by_attacker,
-            self.hits_by_defender,
-            if self.destroyed.is_empty() { "none".to_string() } else { self.destroyed.join(", ") },
-            if self.escaped.is_empty() { "none".to_string() } else { self.escaped.join(", ") },
-            self.result
-        )
+        let listed: Vec<String> = self
+            .parties
+            .iter()
+            .map(|p| {
+                format!(
+                    "{}{} ({}, strength {}, {} hit(s) landed; destroyed: {}; escaped: {})",
+                    p.seat.map(names).unwrap_or_else(|| neutral.to_string()),
+                    if p.aggressor { ", attacking," } else { "," },
+                    p.units,
+                    p.strength,
+                    p.hits,
+                    if p.destroyed.is_empty() { "none".to_string() } else { p.destroyed.join(", ") },
+                    if p.escaped.is_empty() { "none".to_string() } else { p.escaped.join(", ") },
+                )
+            })
+            .collect();
+        format!("{}: {}. {}", self.place, listed.join(" against "), self.result)
     }
 }
 
@@ -367,7 +383,7 @@ pub struct Game {
     pub seed: u64,
     pub rng: ChaCha8Rng,
     pub turn: u32,
-    pub seats: [SeatState; 2],
+    pub seats: [SeatState; SEAT_COUNT],
     pub states: Vec<NationState>,
     pub colonies: Vec<Colony>,
     pub ships: Vec<Ship>,
@@ -388,9 +404,13 @@ pub struct Game {
     pub log: Vec<String>,
 }
 
+/// Ticket #50: every game seats all four Factions. The player picks one Faction and a start
+/// continent; seat 0 is theirs and seats 1 to 3 hold the other three in enum order, all AI.
 pub struct NewGame {
     pub seed: u64,
-    pub seats: [(FactionKind, bool); 2],
+    pub player: FactionKind,
+    /// True in simulate mode, where seat 0 plays itself.
+    pub player_is_ai: bool,
     pub player_start: StateId,
 }
 
@@ -408,9 +428,14 @@ impl Game {
             influenced_this_turn: Vec::new(),
             allotment: 0,
             research_last_turn: 0,
+            research_total: 0,
             income_last_turn: Stockpile::default(),
             income_sources: Vec::new(),
         };
+        // Seat 0 is the player's Faction; the other three follow in enum order (ticket #50).
+        let mut kinds: Vec<FactionKind> = vec![setup.player];
+        kinds.extend(FactionKind::ALL.into_iter().filter(|k| *k != setup.player));
+        let seats: [SeatState; SEAT_COUNT] = std::array::from_fn(|i| seat(kinds[i], i > 0 || setup.player_is_ai));
         let states: Vec<NationState> = tables
             .states
             .iter()
@@ -431,7 +456,7 @@ impl Game {
             seed: setup.seed,
             rng,
             turn: 1,
-            seats: [seat(setup.seats[0].0, setup.seats[0].1), seat(setup.seats[1].0, setup.seats[1].1)],
+            seats,
             states,
             colonies: Vec::new(),
             ships: Vec::new(),
@@ -440,18 +465,19 @@ impl Game {
                 co2: tables.climate.starting_co2,
                 temperature: tables.climate.base_temperature,
                 last: EmissionsBreakdown::default(),
-                launches_pending: [0, 0],
+                launches_pending: [0; SEAT_COUNT],
                 card_emissions_next: 0.0,
                 restoration_next: 0.0,
             },
             research: Research {
                 current: None,
                 progress: 0,
-                contributions: [0, 0],
+                contributions: [0; SEAT_COUNT],
                 done: Vec::new(),
                 unallocated: 0,
                 awaiting_pick: Some(Seat(0)),
                 last_lead: None,
+                last_picked_turn: [None; SEAT_COUNT],
             },
             deck,
             discoveries: Vec::new(),
@@ -468,55 +494,77 @@ impl Game {
         for id in StateId::ALL {
             game.spawn_standing_army(id);
         }
-        // Starting positions (spec 14.3): the player's pick, then the AI's continent (section 20).
-        game.take_control(setup.player_start, Seat(0));
-        // Version 0.04 (ticket #46): each Faction starts with a bare station over Earth, named on its card.
+        // Version 0.04 (ticket #46): a bare station over Earth for each Faction whose card names one.
+        // Ticket #50: the Arkwrights name none, so two of Earth's five slots stand free.
         for seat in Seat::ALL {
-            let want = game.tables.faction(game.kind(seat)).start_station.clone();
-            let slot = game.tables.body(BodyId::Earth).stations.iter().position(|n| *n == want).unwrap_or(seat.index()) as u32;
+            let Some(want) = game.tables.faction(game.kind(seat)).start_station.clone() else { continue };
+            let Some(slot) = game.tables.body(BodyId::Earth).stations.iter().position(|n| *n == want) else { continue };
             let id = ColonyId(game.fresh_id());
-            game.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(seat), modules: Vec::new(), colonists: 0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules: Vec::new(), colonists: 0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
         }
-        let ai_start = game.ai_start_state(setup.player_start);
-        game.take_control(ai_start, Seat(1));
-        for (sid, seat) in [(setup.player_start, Seat(0)), (ai_start, Seat(1))] {
-            let st = game.state_mut(sid);
-            st.control = Control::Controlled(seat);
+        // Starting positions (spec 14.3, ticket #50): the player's pick, then each AI seat in turn.
+        let mut taken = vec![setup.player_start];
+        for _ in Seat::ALL.into_iter().skip(1) {
+            let pick = game.ai_start_state(&taken);
+            taken.push(pick);
+        }
+        for (sid, seat) in taken.iter().zip(Seat::ALL) {
+            game.take_control(*sid, seat);
+            let st = game.state_mut(*sid);
             st.facilities.push(Facility { kind: FacilityKind::LaunchSite, online: true, offline_until_resolution: false });
         }
-        game.log.push(format!(
-            "New game, seed {}. Seat 0 {} ({}) starts in {}; seat 1 {} ({}) starts in {}.",
-            setup.seed,
-            game.seats[0].kind.name(),
-            if game.seats[0].ai { "AI" } else { "player" },
-            game.tables.state(setup.player_start).name,
-            game.seats[1].kind.name(),
-            if game.seats[1].ai { "AI" } else { "player" },
-            game.tables.state(ai_start).name
-        ));
+        let places: Vec<String> = Seat::ALL
+            .into_iter()
+            .map(|seat| {
+                format!(
+                    "seat {} {} ({}) starts in {}",
+                    seat.0,
+                    game.seats[seat.index()].kind.name(),
+                    if game.seats[seat.index()].ai { "AI" } else { "player" },
+                    game.tables.state(taken[seat.index()]).name
+                )
+            })
+            .collect();
+        let line = format!("New game, seed {}. {}.", setup.seed, places.join("; "));
+        game.log.push(line);
         game
     }
 
-    /// The uncontrolled state with the highest Industry Level, ties by population (section 20).
-    pub fn ai_start_state(&self, taken: StateId) -> StateId {
-        let mut best: Option<StateId> = None;
-        for c in &self.tables.states {
-            if c.id == taken {
-                continue;
-            }
-            let better = match best {
-                None => true,
-                Some(b) => {
-                    let bc = self.tables.state(b);
-                    c.industry_level > bc.industry_level
-                        || (c.industry_level == bc.industry_level && c.population > bc.population)
+    /// The start state for the next AI seat (spec 14.3, ticket #50): the free Nation State that is
+    /// NOT adjacent to any state already taken, with the highest Industry Level, ties by population;
+    /// if every free state touches a taken one, the highest Industry Level free state, ties by
+    /// population. A tie the population does not settle keeps the table's order.
+    pub fn ai_start_state(&self, taken: &[StateId]) -> StateId {
+        let adjacent: Vec<StateId> = taken.iter().flat_map(|t| self.tables.state(*t).neighbours.iter().copied()).collect();
+        let free: Vec<&crate::data::StateCard> = self.tables.states.iter().filter(|c| !taken.contains(&c.id)).collect();
+        let best = |list: &[&crate::data::StateCard]| -> Option<StateId> {
+            let mut best: Option<&crate::data::StateCard> = None;
+            for c in list {
+                let better = match best {
+                    None => true,
+                    Some(b) => c.industry_level > b.industry_level || (c.industry_level == b.industry_level && c.population > b.population),
+                };
+                if better {
+                    best = Some(c);
                 }
-            };
-            if better {
-                best = Some(c.id);
+            }
+            best.map(|c| c.id)
+        };
+        let spread: Vec<&crate::data::StateCard> = free.iter().copied().filter(|c| !adjacent.contains(&c.id)).collect();
+        best(&spread).or_else(|| best(&free)).unwrap_or(StateId::Asia)
+    }
+
+    /// Ticket #50: break a tie among seats by a draw from the game's own generator, so a seed stays
+    /// replayable and no seat wins a tie for sitting first.
+    pub fn random_tie(&mut self, tied: &[Seat]) -> Seat {
+        match tied.len() {
+            0 => Seat(0),
+            1 => tied[0],
+            n => {
+                let i = crate::combat::Dice::pick(&mut self.rng, n);
+                tied[i]
             }
         }
-        best.unwrap_or(StateId::Asia)
     }
 
     pub fn fresh_id(&mut self) -> u32 {
@@ -558,13 +606,9 @@ impl Game {
     pub fn kind(&self, s: Seat) -> FactionKind {
         self.seats[s.index()].kind
     }
+    /// Every game seats four different Factions (ticket #50), so a Faction's name names its seat.
     pub fn seat_name(&self, s: Seat) -> String {
-        let k = self.kind(s);
-        if self.seats[0].kind == self.seats[1].kind {
-            format!("{} (seat {})", k.name(), s.0 + 1)
-        } else {
-            k.name().to_string()
-        }
+        self.kind(s).name().to_string()
     }
     pub fn place_name(&self, p: Place) -> String {
         match p {
@@ -799,16 +843,14 @@ impl Game {
         self.tables.body(body).stations.get(slot as usize).cloned().unwrap_or_else(|| format!("Station {}", slot + 1))
     }
 
-    /// Orbital Control at a Body (spec 9.3): a warship there, and no enemy warship still engaged.
+    /// Orbital Control at a Body (spec 9.3, ticket #50): held by the one seat with a Frigate or
+    /// Battleship there and no other seat's warship still engaged. Two or more, and nobody holds it.
     pub fn orbital_control(&self, body: BodyId) -> Option<Seat> {
-        let warships = |seat: Seat| {
-            self.ships.iter().any(|s| s.seat == seat && s.at == ShipAt::Body(body) && s.kind.is_warship() && !s.escaped)
-        };
-        let a = warships(Seat(0));
-        let b = warships(Seat(1));
-        match (a, b) {
-            (true, false) => Some(Seat(0)),
-            (false, true) => Some(Seat(1)),
+        let mut holders = Seat::ALL
+            .into_iter()
+            .filter(|seat| self.ships.iter().any(|s| s.seat == *seat && s.at == ShipAt::Body(body) && s.kind.is_warship() && !s.escaped));
+        match (holders.next(), holders.next()) {
+            (Some(one), None) => Some(one),
             _ => None,
         }
     }
@@ -849,10 +891,11 @@ impl Game {
         (turns.max(1), fuel)
     }
 
+    /// Cheap Industry, the Prospectors' signature rule (spec 14.2).
     pub fn industry_cost(&self, seat: Seat) -> i64 {
         match self.kind(seat) {
             FactionKind::Prospectors => self.tables.industry_level.materials_cheap_industry,
-            FactionKind::Custodians => self.tables.industry_level.materials,
+            _ => self.tables.industry_level.materials,
         }
     }
 

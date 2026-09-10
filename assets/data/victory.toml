@@ -1,6 +1,10 @@
 # Spec section 15.
+# Ticket #50: each Faction's first Victory part and its bar now live on its own card in
+# factions.toml (victory_first). These two are kept as the reference figures the Custodian and
+# Prospector cards quote; the engine reads the cards.
 extraction_total = 500
 stabilization_turns = 3
+# Off-world Presence is the same bar for every Faction.
 off_world_presence = 12
 # Ticket #27 (version 0.02): twenty-four turns of one month.
 turns = 24

@@ -41,10 +41,15 @@ impl Game {
             self.seat(Seat(0)).stockpile.fuel,
             self.seat(Seat(0)).stockpile.energy
         ));
+        // Ticket #50: three rivals, not one.
+        let rivals: Vec<String> = Seat::ALL
+            .into_iter()
+            .skip(1)
+            .map(|s| format!("the {} in {}", self.seat_name(s), self.tables.state(self.controlled_states(s)[0]).name))
+            .collect();
         self.report.lines.push(format!(
-            "The {} hold {}. Build, spread Influence, and get twelve Colonists off Earth before the Temperature reaches +{:.1} C.",
-            self.seat_name(Seat(1)),
-            self.tables.state(self.controlled_states(Seat(1))[0]).name,
+            "Your rivals are {}. Build, spread Influence, and get twelve Colonists off Earth before the Temperature reaches +{:.1} C.",
+            rivals.join(", "),
             self.tables.climate.collapse_line
         ));
         if self.seat(Seat(0)).ai {
@@ -69,12 +74,15 @@ impl Game {
 
     /// End Turn: the player's orders are committed, the AI orders, and the turn runs to the next Orders phase.
     /// `orders[i]` is used for a human seat; an AI seat computes its own.
-    pub fn end_turn(&mut self, orders: [Vec<Order>; 2]) {
+    pub fn end_turn(&mut self, orders: [Vec<Order>; SEAT_COUNT]) {
         if self.is_over() {
             return;
         }
         self.log("Phase 4: Orders");
-        let mut all: [Vec<Order>; 2] = [Vec::new(), Vec::new()];
+        let mut all: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+        // Report for the coming turn starts collecting now, before the AI seats order, so their
+        // scored lists survive into it (ticket #50: three AI seats write to it, one after another).
+        self.report = Report::default();
         for seat in Seat::ALL {
             if self.seat(seat).ai {
                 all[seat.index()] = self.ai_orders(seat);
@@ -82,8 +90,6 @@ impl Game {
                 all[seat.index()] = orders[seat.index()].clone();
             }
         }
-        // Report for the coming turn starts collecting now.
-        self.report = Report::default();
         for seat in Seat::ALL {
             let list = all[seat.index()].clone();
             if let Err((i, e)) = self.check_orders(seat, &list) {

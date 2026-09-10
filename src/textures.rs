@@ -77,12 +77,12 @@ impl Textures {
     }
 
     /// The Earth Map for the current board (spec 17.1, 11.4).
-    pub fn compose_earth(&self, game: &Game, colours: &[[f32; 3]; 2]) -> Rgba {
+    pub fn compose_earth(&self, game: &Game, colours: &[[f32; 3]]) -> Rgba {
         let (w, h) = (self.earth.w, self.earth.h);
         let mut out = self.earth.data.clone();
         let warm = ((game.climate.temperature - game.tables.climate.base_temperature) / 1.8).clamp(0.0, 1.0) as f32;
         let fired: Vec<u32> = game.states.iter().map(|s| s.thresholds_fired.iter().filter(|f| **f).count() as u32).collect();
-        let tint_of = |seat: Seat| -> [f32; 3] { colours[seat.index()] };
+        let tint_of = |seat: Seat| -> [f32; 3] { colours.get(seat.index()).copied().unwrap_or([0.6, 0.6, 0.6]) };
         for y in 0..h {
             for x in 0..w {
                 let i = (y * w + x) as usize;

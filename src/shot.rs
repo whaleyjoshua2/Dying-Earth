@@ -139,7 +139,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
                     if g.is_over() {
                         break;
                     }
-                    g.end_turn([Vec::new(), Vec::new()]);
+                    g.end_turn(std::array::from_fn(|_| Vec::new()));
                 }
                 g.seats[0].ai = false;
             }

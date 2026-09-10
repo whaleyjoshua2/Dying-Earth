@@ -60,15 +60,16 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn colours(&self) -> [[f32; 3]; 2] {
+    /// Ticket #50: one colour per seat, four of them.
+    pub fn colours(&self) -> Vec<[f32; 3]> {
         match &self.game {
-            Some(g) => [self.tables.faction(g.kind(Seat(0))).colour, self.tables.faction(g.kind(Seat(1))).colour],
-            None => [self.tables.faction(FactionKind::Custodians).colour, self.tables.faction(FactionKind::Prospectors).colour],
+            Some(g) => Seat::ALL.iter().map(|s| self.tables.faction(g.kind(*s)).colour).collect(),
+            None => FactionKind::ALL.iter().map(|k| self.tables.faction(*k).colour).collect(),
         }
     }
 
     pub fn new_game(&mut self, faction: FactionKind, start: StateId) {
-        let mut game = Game::new(self.tables.clone(), NewGame { seed: self.seed, seats: [(faction, false), (faction.other(), true)], player_start: start });
+        let mut game = Game::new(self.tables.clone(), NewGame { seed: self.seed, player: faction, player_is_ai: false, player_start: start });
         game.start();
         self.game = Some(game);
         self.pending.clear();
@@ -95,7 +96,9 @@ impl Session {
     pub fn end_turn(&mut self) {
         let Some(game) = &mut self.game else { return };
         let orders = std::mem::take(&mut self.pending);
-        game.end_turn([orders, Vec::new()]);
+        let mut all: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+        all[0] = orders;
+        game.end_turn(all);
         self.earth_dirty = true;
         if game.is_over() {
             self.screen = Screen::GameOver;

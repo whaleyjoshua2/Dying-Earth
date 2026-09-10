@@ -10,7 +10,9 @@ sibling_fuel = 1
 # Version 0.04 (ticket #46): a Space Station is built for this many Materials into a free orbital
 # slot, from a Nation State with a Launch Site (over Earth) or a Colony (elsewhere); no crew needed.
 # It holds only a Shipyard and Habitats. Ships are built only at Shipyards. Each Body names its
-# orbital slots in `stations`, in order; the two Factions start with the first two over Earth.
+# orbital slots in `stations`, in order. Ticket #50: five over Earth. The Custodians start with the
+# ISS, the Prospectors with Tiangong and the Archivists with Axiom; the Arkwrights start with none,
+# and two slots stand free.
 station_materials = 40
 
 [[body]]
@@ -25,8 +27,8 @@ mine_yield = 1.0
 generator_yield = 0.75
 refinery_yield = 1.5
 habitat_yield = 0.75
-orbital_slots = 4
-stations = ["ISS", "Tiangong", "Skylab", "Mir"]
+orbital_slots = 5
+stations = ["ISS", "Tiangong", "Axiom", "Orbital Reef", "Starlab"]
 slots = [
     { name = "Antarctic Peninsula", lon = -63.0, lat = -69.0 },
     { name = "Lake Vostok", lon = 105.0, lat = -77.5 },

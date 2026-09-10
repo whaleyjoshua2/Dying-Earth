@@ -18,7 +18,7 @@ impl Game {
         let net = breakdown.net();
         self.climate.co2 += net;
         self.climate.restoration_next = 0.0;
-        self.climate.launches_pending = [0, 0];
+        self.climate.launches_pending = [0; SEAT_COUNT];
         self.climate.card_emissions_next = 0.0;
         for s in &mut self.states {
             s.wildfire_emissions_next = 0.0;

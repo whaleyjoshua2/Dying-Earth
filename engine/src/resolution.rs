@@ -84,25 +84,35 @@ impl Game {
             self.report.lines.push(line.clone());
             self.log(line);
         }
-        // Intercept battles: the intercepting stack attacks the arrivals.
+        // Intercept battles (ticket #50): one melee per intercepting stack, against every arriving
+        // enemy stack that turn.
         for body in BodyId::ALL {
             for seat in Seat::ALL {
-                let arriving: Vec<ShipId> = arrivals.iter().filter(|(s, b, _)| *s == seat && *b == body).map(|(_, _, id)| *id).collect();
-                if arriving.is_empty() {
-                    continue;
-                }
-                let enemy = seat.other();
                 let interceptors: Vec<ShipId> = self
                     .ships
                     .iter()
-                    .filter(|s| s.seat == enemy && s.at == ShipAt::Body(body) && s.stance == Stance::Intercept && !s.escaped)
+                    .filter(|s| s.seat == seat && s.at == ShipAt::Body(body) && s.stance == Stance::Intercept && !s.escaped)
                     .map(|s| s.id)
                     .collect();
                 if interceptors.is_empty() {
                     continue;
                 }
+                let mut parties: Vec<(Seat, bool, Vec<ShipId>)> = vec![(seat, true, interceptors)];
+                for other in seat.others() {
+                    let arriving: Vec<ShipId> = arrivals
+                        .iter()
+                        .filter(|(s, b, id)| *s == other && *b == body && self.ship(*id).map(|x| !x.escaped).unwrap_or(false))
+                        .map(|(_, _, id)| *id)
+                        .collect();
+                    if !arriving.is_empty() {
+                        parties.push((other, false, arriving));
+                    }
+                }
+                if parties.len() < 2 {
+                    continue;
+                }
                 let name = format!("{} orbit (interception)", self.tables.body(body).name);
-                self.ship_battle(&name, enemy, seat, &interceptors, &arriving);
+                self.ship_melee(&name, body, &parties);
             }
         }
     }
@@ -110,31 +120,33 @@ impl Game {
     // ------------------------------------------------------------------ (b)
 
     fn resolve_battles(&mut self) {
-        // Ship battles: an Attack stack engages every enemy stack at its Body.
+        // Ship battles (ticket #50): any stack ordered Attack pulls every other Faction's Ships at
+        // that Body into one melee. Evade stacks still try to disengage; Hold stacks fight.
         for body in BodyId::ALL {
-            for seat in Seat::ALL {
-                let attackers: Vec<ShipId> = self
-                    .ships
-                    .iter()
-                    .filter(|s| s.seat == seat && s.at == ShipAt::Body(body) && s.stance == Stance::Attack && !s.escaped)
-                    .map(|s| s.id)
-                    .collect();
-                if attackers.is_empty() {
-                    continue;
-                }
-                let enemy = seat.other();
-                let defenders: Vec<ShipId> = self
-                    .ships
-                    .iter()
-                    .filter(|s| s.seat == enemy && s.at == ShipAt::Body(body) && !s.escaped)
-                    .map(|s| s.id)
-                    .collect();
-                if defenders.is_empty() {
-                    continue;
-                }
-                let name = format!("{} orbit", self.tables.body(body).name);
-                self.ship_battle(&name, seat, enemy, &attackers, &defenders);
+            let aggressors: Vec<Seat> = Seat::ALL
+                .into_iter()
+                .filter(|seat| self.ships.iter().any(|s| s.seat == *seat && s.at == ShipAt::Body(body) && s.stance == Stance::Attack && !s.escaped))
+                .collect();
+            if aggressors.is_empty() {
+                continue;
             }
+            let parties: Vec<(Seat, bool, Vec<ShipId>)> = Seat::ALL
+                .into_iter()
+                .filter_map(|seat| {
+                    let ships: Vec<ShipId> =
+                        self.ships.iter().filter(|s| s.seat == seat && s.at == ShipAt::Body(body) && !s.escaped).map(|s| s.id).collect();
+                    if ships.is_empty() {
+                        None
+                    } else {
+                        Some((seat, aggressors.contains(&seat), ships))
+                    }
+                })
+                .collect();
+            if parties.len() < 2 {
+                continue;
+            }
+            let name = format!("{} orbit", self.tables.body(body).name);
+            self.ship_melee(&name, body, &parties);
         }
         // Army moves and attacks on Earth.
         let moving: Vec<(ArmyId, StateId)> = self.armies.iter().filter_map(|a| a.move_to.map(|t| (a.id, t))).collect();
@@ -165,32 +177,61 @@ impl Game {
             self.log(line.clone());
             self.report.lines.push(line);
         }
-        // Ground battles at every place where an Attack stack faces defenders.
+        // Ground battles (ticket #50): an attacking Army fights every other Faction's Armies at the
+        // place, and two Factions attacking the same place the same turn make one melee of all parties.
         let mut places: Vec<Place> = StateId::ALL.into_iter().map(Place::State).collect();
         places.extend(self.colonies.iter().map(|c| Place::Colony(c.id)));
         for place in places {
-            for seat in Seat::ALL {
-                let attackers: Vec<ArmyId> = self
+            let aggressors: Vec<Seat> = Seat::ALL
+                .into_iter()
+                .filter(|seat| {
+                    self.place_director(place) != Some(*seat)
+                        && self.armies.iter().any(|a| {
+                            a.at == ArmyAt::Place(place)
+                                && self.army_seat(a) == Some(*seat)
+                                && a.stance == Stance::Attack
+                                && !a.escaped
+                                && !self.army_stands_down(a)
+                        })
+                })
+                .collect();
+            if aggressors.is_empty() {
+                continue;
+            }
+            let mut parties: Vec<(Option<Seat>, bool, Vec<ArmyId>)> = Vec::new();
+            for seat in &aggressors {
+                let mine: Vec<ArmyId> = self
                     .armies
                     .iter()
-                    .filter(|a| a.at == ArmyAt::Place(place) && self.army_seat(a) == Some(seat) && a.stance == Stance::Attack && !a.escaped && !self.army_stands_down(a))
+                    .filter(|a| {
+                        a.at == ArmyAt::Place(place) && self.army_seat(a) == Some(*seat) && a.stance == Stance::Attack && !a.escaped && !self.army_stands_down(a)
+                    })
                     .map(|a| a.id)
                     .collect();
-                if attackers.is_empty() {
-                    continue;
-                }
-                if self.place_director(place) == Some(seat) {
-                    continue;
-                }
-                let defenders: Vec<ArmyId> = self.defenders_at(place, seat);
-                if defenders.is_empty() {
-                    continue;
-                }
-                let defender_seat = self.armies.iter().find(|a| a.id == defenders[0]).and_then(|a| self.army_seat(a));
-                let name = self.place_name(place);
-                self.army_battle(&name, place, seat, defender_seat, &attackers, &defenders);
-                self.destruction_rolls(place, "attacked");
+                parties.push((Some(*seat), true, mine));
             }
+            // Everyone else at the place defends: the other Factions' Armies and the place's own.
+            for owner in Seat::ALL.into_iter().map(Some).chain(std::iter::once(None)) {
+                if owner.map(|s| aggressors.contains(&s)).unwrap_or(false) {
+                    continue;
+                }
+                let theirs: Vec<ArmyId> = self
+                    .armies
+                    .iter()
+                    .filter(|a| a.at == ArmyAt::Place(place) && self.army_seat(a) == owner && !self.army_stands_down(a) && !a.escaped)
+                    .filter(|a| self.army_strength(a) > 0 || !a.standing)
+                    .map(|a| a.id)
+                    .collect();
+                if !theirs.is_empty() {
+                    parties.push((owner, false, theirs));
+                }
+            }
+            if parties.len() < 2 {
+                continue;
+            }
+            let name = self.place_name(place);
+            self.army_melee(&name, place, &aggressors, &parties);
+            self.destruction_rolls(place, "attacked");
         }
     }
 
@@ -228,64 +269,69 @@ impl Game {
         Combatant::new(UnitRef::Army(id), name, self.army_strength(a), card.hit_points, a.damage, card.pursuit, a.stance == Stance::Evade)
     }
 
-    fn ship_battle(&mut self, place: &str, attacker: Seat, defender: Seat, attackers: &[ShipId], defenders: &[ShipId]) {
-        let mut a: Vec<Combatant> = attackers.iter().map(|id| self.ship_combatant(*id)).collect();
-        let mut d: Vec<Combatant> = defenders.iter().map(|id| self.ship_combatant(*id)).collect();
-        let line = self.run_battle(place, attacker, Some(defender), &mut a, &mut d);
-        self.apply_combatants(&a);
-        self.apply_combatants(&d);
-        let mut line = line;
-        if let Some(body) = BodyId::ALL.into_iter().find(|b| place.starts_with(&self.tables.body(*b).name)) {
-            match self.orbital_control(body) {
-                Some(s) if s == attacker => line.result.push_str(&format!(" The {} hold Orbital Control.", self.seat_name(s))),
-                Some(s) => line.result.push_str(&format!(" The {} keep Orbital Control.", self.seat_name(s))),
-                None => {}
+    /// One melee of Ship stacks at a Body (ticket #50).
+    fn ship_melee(&mut self, place: &str, body: BodyId, parties: &[(Seat, bool, Vec<ShipId>)]) {
+        let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
+            parties.iter().map(|(seat, agg, ids)| (Some(*seat), *agg, ids.iter().map(|id| self.ship_combatant(*id)).collect())).collect();
+        let mut line = self.run_melee(place, units);
+        match self.orbital_control(body) {
+            Some(s) if parties.iter().any(|(seat, agg, _)| *agg && *seat == s) => {
+                line.result.push_str(&format!(" The {} hold Orbital Control.", self.seat_name(s)))
+            }
+            Some(s) => line.result.push_str(&format!(" The {} keep Orbital Control.", self.seat_name(s))),
+            None => line.result.push_str(" Nobody holds Orbital Control."),
+        }
+        self.log(line.text(&|s| self.seat_name(s), "neutral"));
+        self.report.battles.push(line);
+    }
+
+    /// One melee of Armies at a ground place (ticket #50).
+    fn army_melee(&mut self, place_name: &str, place: Place, aggressors: &[Seat], parties: &[(Option<Seat>, bool, Vec<ArmyId>)]) {
+        let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
+            parties.iter().map(|(seat, agg, ids)| (*seat, *agg, ids.iter().map(|id| self.army_combatant(*id)).collect())).collect();
+        let mut line = self.run_melee(place_name, units);
+        for seat in aggressors {
+            if self.defenders_at(place, *seat).is_empty() && !self.armies_of_seat_at(*seat, place).is_empty() {
+                line.result.push_str(&format!(" The {} are alone at the place; Occupation begins.", self.seat_name(*seat)));
             }
         }
         self.log(line.text(&|s| self.seat_name(s), "neutral"));
         self.report.battles.push(line);
     }
 
-    fn army_battle(&mut self, place_name: &str, place: Place, attacker: Seat, defender: Option<Seat>, attackers: &[ArmyId], defenders: &[ArmyId]) {
-        let mut a: Vec<Combatant> = attackers.iter().map(|id| self.army_combatant(*id)).collect();
-        let mut d: Vec<Combatant> = defenders.iter().map(|id| self.army_combatant(*id)).collect();
-        let mut line = self.run_battle(place_name, attacker, defender, &mut a, &mut d);
-        self.apply_combatants(&a);
-        self.apply_combatants(&d);
-        if self.defenders_at(place, attacker).is_empty() && !self.armies_of_seat_at(attacker, place).is_empty() {
-            line.result.push_str(" The defenders are gone; Occupation begins.");
-        }
-        self.log(line.text(&|s| self.seat_name(s), "neutral"));
-        self.report.battles.push(line);
-    }
-
-    fn run_battle(&mut self, place: &str, attacker: Seat, defender: Option<Seat>, a: &mut [Combatant], d: &mut [Combatant]) -> BattleLine {
+    fn run_melee(&mut self, place: &str, parties: Vec<(Option<Seat>, bool, Vec<Combatant>)>) -> BattleLine {
         let describe = |side: &[Combatant]| -> String {
             let mut names: Vec<String> = side.iter().map(|c| c.name.split(' ').skip(1).collect::<Vec<_>>().join(" ")).collect();
             names.sort();
             names.join(", ")
         };
-        let a_units = describe(a);
-        let d_units = describe(d);
-        let a_str: i64 = a.iter().map(|c| c.strength).sum();
-        let d_str: i64 = d.iter().map(|c| c.strength).sum();
-        let mut rng = self.rng.clone();
-        let stats = combat::fight(a, d, &mut rng as &mut dyn Dice);
-        self.rng = rng;
-        BattleLine {
-            place: place.to_string(),
-            attacker,
-            defender,
-            attacker_units: a_units,
-            defender_units: d_units,
-            attacker_strength: a_str,
-            defender_strength: d_str,
-            hits_by_attacker: stats.hits_by_attacker,
-            hits_by_defender: stats.hits_by_defender,
-            destroyed: stats.destroyed,
-            escaped: stats.escaped,
-            result: format!("{} round(s).", stats.rounds),
+        let mut parties = parties;
+        let described: Vec<String> = parties.iter().map(|(_, _, c)| describe(c)).collect();
+        let strengths: Vec<i64> = parties.iter().map(|(_, _, c)| c.iter().map(|x| x.strength).sum()).collect();
+        let stats = {
+            let mut slices: Vec<&mut [Combatant]> = parties.iter_mut().map(|(_, _, c)| c.as_mut_slice()).collect();
+            let mut rng = self.rng.clone();
+            let stats = combat::melee(&mut slices, &mut rng as &mut dyn Dice);
+            self.rng = rng;
+            stats
+        };
+        let listed: Vec<BattleParty> = parties
+            .iter()
+            .enumerate()
+            .map(|(i, (seat, agg, _))| BattleParty {
+                seat: *seat,
+                aggressor: *agg,
+                units: described[i].clone(),
+                strength: strengths[i],
+                hits: stats.hits_of(i),
+                destroyed: stats.destroyed.get(i).cloned().unwrap_or_default(),
+                escaped: stats.escaped.get(i).cloned().unwrap_or_default(),
+            })
+            .collect();
+        for (_, _, c) in &parties {
+            self.apply_combatants(c);
         }
+        BattleLine { place: place.to_string(), parties: listed, result: format!("{} round(s).", stats.rounds) }
     }
 
     fn apply_combatants(&mut self, side: &[Combatant]) {
@@ -563,49 +609,35 @@ impl Game {
                     controller != Some(*s) && have > 0 && have >= needed
                 })
                 .collect();
+            // Ticket #50: among challengers who all qualify the same turn, the higher Standing takes
+            // the place; an exact tie goes to nobody and everything stays as it is until next turn.
             let winner = match qualifying.len() {
                 0 => continue,
                 1 => qualifying[0],
-                _ => self.tiebreak(target),
+                _ => {
+                    let standing = |s: &Seat| self.seat(*s).influence.get(&target).copied().unwrap_or(0);
+                    let top = qualifying.iter().map(standing).max().unwrap_or(0);
+                    let leaders: Vec<Seat> = qualifying.iter().copied().filter(|s| standing(s) == top).collect();
+                    if leaders.len() > 1 {
+                        let names: Vec<String> = leaders.iter().map(|s| self.seat_name(*s)).collect();
+                        let line = format!("{} is claimed by {} at the same Standing; it stays as it is.", self.place_name(target), names.join(" and "));
+                        self.log(line.clone());
+                        self.report.lines.push(line);
+                        continue;
+                    }
+                    leaders[0]
+                }
             };
             self.transfer_control(target, winner, "Influence");
         }
     }
 
-    /// The same tiebreak for a Colony Slot: the Ship stacks in orbit decide.
-    pub fn tiebreak_at_body(&mut self, body: BodyId) -> Seat {
-        let (a, b) = (self.ship_stack_strength(Seat(0), body), self.ship_stack_strength(Seat(1), body));
-        if a != b {
-            return if a > b { Seat(0) } else { Seat(1) };
-        }
-        loop {
-            let (ra, rb) = (self.rng.d6(), self.rng.d6());
-            if ra != rb {
-                return if ra > rb { Seat(0) } else { Seat(1) };
-            }
-        }
-    }
-
-    /// Spec 6: greater total unit strength present, else a d6 each, re-rolled on a tie.
-    pub fn tiebreak(&mut self, place: Place) -> Seat {
-        let strength = |g: &Game, seat: Seat| -> i64 {
-            let ground = g.army_stack_strength(seat, place);
-            let orbit = match place {
-                Place::Colony(c) => g.colony(c).map(|c| g.ship_stack_strength(seat, c.body)).unwrap_or(0),
-                Place::State(_) => g.ship_stack_strength(seat, BodyId::Earth),
-            };
-            ground + orbit
-        };
-        let (a, b) = (strength(self, Seat(0)), strength(self, Seat(1)));
-        if a != b {
-            return if a > b { Seat(0) } else { Seat(1) };
-        }
-        loop {
-            let (ra, rb) = (self.rng.d6(), self.rng.d6());
-            if ra != rb {
-                return if ra > rb { Seat(0) } else { Seat(1) };
-            }
-        }
+    /// Who takes a contested slot at a Body: the greater Ship stack strength in orbit, and among
+    /// seats tied at the top a random draw from the game's own generator (ticket #50).
+    pub fn tiebreak_at_body(&mut self, body: BodyId, among: &[Seat]) -> Seat {
+        let top = among.iter().map(|s| self.ship_stack_strength(*s, body)).max().unwrap_or(0);
+        let tied: Vec<Seat> = among.iter().copied().filter(|s| self.ship_stack_strength(*s, body) == top).collect();
+        self.random_tie(&tied)
     }
 
     // ------------------------------------------------------------------ (e)
@@ -753,41 +785,56 @@ impl Game {
 
     fn resolve_cargo(&mut self) {
         let cargo = std::mem::take(&mut self.pending.cargo);
-        // Ticket #46: stations ordered this turn, one per orbital slot; two seats for one slot go to the tiebreak.
+        // Ticket #46: stations ordered this turn, one per orbital slot. Ticket #50: more than one
+        // seat for one slot is settled at the Body, ties drawn at random.
         let stations = std::mem::take(&mut self.pending.stations);
-        for (i, (seat, body, slot)) in stations.iter().enumerate() {
-            if self.station_at(*body, *slot).is_some() {
+        let mut slots_done: Vec<(BodyId, u32)> = Vec::new();
+        for (seat, body, slot) in stations.iter() {
+            if self.station_at(*body, *slot).is_some() || slots_done.contains(&(*body, *slot)) {
                 continue;
             }
-            let rival = stations.iter().enumerate().any(|(j, (s2, b2, sl2))| j != i && s2 != seat && b2 == body && sl2 == slot);
-            if rival && self.tiebreak_at_body(*body) != *seat {
-                continue;
+            slots_done.push((*body, *slot));
+            let mut contenders: Vec<Seat> = Vec::new();
+            for (s2, b2, sl2) in stations.iter() {
+                if b2 == body && sl2 == slot && !contenders.contains(s2) {
+                    contenders.push(*s2);
+                }
             }
+            let seat = &if contenders.len() > 1 { self.tiebreak_at_body(*body, &contenders) } else { *seat };
             let id = ColonyId(self.fresh_id());
             self.colonies.push(Colony { id, body: *body, slot: *slot, control: Control::Controlled(*seat), modules: Vec::new(), colonists: 0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: true });
             let line = format!("{} built {}.", self.seat_name(*seat), self.place_name(Place::Colony(id)));
             self.log(line.clone());
             self.report.lines.push(line);
         }
-        // Founding orders into the same slot from both seats are decided by the tiebreak.
-        let mut founding: Vec<(Seat, ShipId, u32, BodyId, u32)> = Vec::new();
+        // Founding orders into the same Colony Slot from more than one seat are decided at the Body,
+        // ties drawn at random (ticket #50).
+        let mut founding: Vec<(Seat, ShipId, BodyId, u32)> = Vec::new();
         for (seat, order) in &cargo {
-            if let Order::Unload { ship, colonists, into: UnloadTarget::Slot(b, slot), .. } = order {
-                founding.push((*seat, *ship, *colonists, *b, *slot));
+            if let Order::Unload { ship, into: UnloadTarget::Slot(b, slot), .. } = order {
+                founding.push((*seat, *ship, *b, *slot));
             }
         }
         let mut blocked: Vec<ShipId> = Vec::new();
-        for i in 0..founding.len() {
-            for j in (i + 1)..founding.len() {
-                let (sa, ship_a, _, ba, slot_a) = founding[i];
-                let (sb, ship_b, _, bb, slot_b) = founding[j];
-                if sa != sb && ba == bb && slot_a == slot_b {
-                    let winner = self.tiebreak_at_body(ba);
-                    if winner == sa {
-                        blocked.push(ship_b);
-                    } else {
-                        blocked.push(ship_a);
-                    }
+        let mut contested: Vec<(BodyId, u32)> = Vec::new();
+        for (_, _, body, slot) in founding.clone() {
+            if contested.contains(&(body, slot)) {
+                continue;
+            }
+            let mut contenders: Vec<Seat> = Vec::new();
+            for (s, _, b, sl) in &founding {
+                if *b == body && *sl == slot && !contenders.contains(s) {
+                    contenders.push(*s);
+                }
+            }
+            if contenders.len() < 2 {
+                continue;
+            }
+            contested.push((body, slot));
+            let winner = self.tiebreak_at_body(body, &contenders);
+            for (s, ship, b, sl) in &founding {
+                if *b == body && *sl == slot && *s != winner {
+                    blocked.push(*ship);
                 }
             }
         }
@@ -835,7 +882,7 @@ impl Game {
                 }
                 Order::Unload { ship, colonists, army, into } => {
                     if blocked.contains(&ship) {
-                        let line = format!("{}: the rival took that Colony Slot first.", self.seat_name(seat));
+                        let line = format!("{}: another Faction took that Colony Slot first.", self.seat_name(seat));
                         self.log(line.clone());
                         self.report.lines.push(line);
                         continue;

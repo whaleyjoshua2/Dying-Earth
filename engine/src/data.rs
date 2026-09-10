@@ -4,6 +4,7 @@
 
 use crate::ids::*;
 use serde::Deserialize;
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
@@ -220,11 +221,42 @@ pub struct FactionCard {
     pub research_multiplier: f64,
     pub influence_multiplier: f64,
     pub signature: String,
+    /// The Victory Condition in prose, for the cards and the panel.
     pub victory: String,
+    /// Ticket #50: the first part of the Victory Condition, in figures.
+    pub victory_first: VictoryFirstCard,
     pub colour: [f32; 3],
     /// Ticket #46: the station over Earth the Faction starts with, by name in bodies.toml.
+    /// Ticket #50: the Arkwrights start with none, so this is optional.
     #[serde(default)]
-    pub start_station: String,
+    pub start_station: Option<String>,
+}
+
+/// Ticket #50: which measure a Faction's first Victory part counts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VictoryFirstKind {
+    ExtractionTotal,
+    StabilizationRun,
+    ColonistsOffEarth,
+    ResearchProduced,
+}
+
+impl VictoryFirstKind {
+    pub fn name(self) -> &'static str {
+        match self {
+            VictoryFirstKind::ExtractionTotal => "Extraction Total",
+            VictoryFirstKind::StabilizationRun => "Stabilization run",
+            VictoryFirstKind::ColonistsOffEarth => "Colonists off Earth",
+            VictoryFirstKind::ResearchProduced => "Research produced",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct VictoryFirstCard {
+    pub kind: VictoryFirstKind,
+    pub bar: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -324,54 +356,57 @@ pub struct AiWeights {
     pub stance_evade: f64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct AiWeightsByFaction {
-    pub prospectors: AiWeights,
-    pub custodians: AiWeights,
-}
+
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiMultipliers {
     pub victory_gap_max: f64,
-    pub denial: f64,
     pub threat: f64,
     pub opportunity: f64,
     pub energy_shortage_bonus: f64,
 }
 
+/// Ticket #50: one pace schedule per Faction. `first` is the schedule for the Faction's first
+/// Victory part as [turn, value]; a Faction whose first part is a Stabilization run uses the ppm
+/// figures instead, since a run has no useful interpolation.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiPace {
-    pub prospector_extraction: Vec<[i64; 2]>,
-    pub custodian_within_ppm: f64,
-    pub custodian_within_by_turn: u32,
-    pub custodian_under_sink_by_turn: u32,
+    #[serde(default)]
+    pub first: Vec<[i64; 2]>,
+    #[serde(default)]
+    pub within_ppm: f64,
+    #[serde(default)]
+    pub within_by_turn: u32,
+    #[serde(default)]
+    pub under_sink_by_turn: u32,
     pub colonists: Vec<[i64; 2]>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiThresholds {
     pub attack_odds: f64,
-    pub attack_odds_versus_near_winner: f64,
     pub evade_damage_fraction: f64,
     pub influence_step: i64,
-    pub near_win_fraction: f64,
 }
 
+/// Ticket #50: one pick list per Faction. `order` is tried first, then the cheapest available
+/// Tech that is not `never`, and `last` only when nothing else is left.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiTechPicks {
-    pub prospectors: Vec<TechId>,
-    pub prospectors_last: TechId,
-    pub prospectors_never: TechId,
-    pub custodians: Vec<TechId>,
+    pub order: Vec<TechId>,
+    #[serde(default)]
+    pub last: Option<TechId>,
+    #[serde(default)]
+    pub never: Option<TechId>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiTable {
-    pub weights: AiWeightsByFaction,
+    pub weights: BTreeMap<FactionKind, AiWeights>,
     pub multipliers: AiMultipliers,
-    pub pace: AiPace,
+    pub pace: BTreeMap<FactionKind, AiPace>,
     pub thresholds: AiThresholds,
-    pub tech_picks: AiTechPicks,
+    pub tech_picks: BTreeMap<FactionKind, AiTechPicks>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -518,11 +553,30 @@ impl Tables {
         )?;
         check_rows("techs.toml", &TechId::ALL, self.techs.iter().map(|t| t.id))?;
         check_rows("events.toml", &EventId::ALL, self.events.event.iter().map(|e| e.id))?;
-        check_rows(
-            "factions.toml",
-            &[FactionKind::Custodians, FactionKind::Prospectors],
-            self.factions.iter().map(|f| f.id),
-        )?;
+        check_rows("factions.toml", &FactionKind::ALL, self.factions.iter().map(|f| f.id))?;
+        // Ticket #50: every Faction needs its own weights, pace and Tech picks.
+        for k in FactionKind::ALL {
+            if !self.ai.weights.contains_key(&k) {
+                return Err(err("ai.toml", format!("no [weights.{}] table for the {}", k.id(), k.name())));
+            }
+            if !self.ai.pace.contains_key(&k) {
+                return Err(err("ai.toml", format!("no [pace.{}] table for the {}", k.id(), k.name())));
+            }
+            if !self.ai.tech_picks.contains_key(&k) {
+                return Err(err("ai.toml", format!("no [tech_picks.{}] table for the {}", k.id(), k.name())));
+            }
+        }
+        // Ticket #50: a Faction's start station, when it has one, must name an orbital slot over Earth.
+        for f in &self.factions {
+            if let Some(name) = &f.start_station
+                && !self.body(BodyId::Earth).stations.contains(name)
+            {
+                return Err(err("factions.toml", format!("row {}: start_station {:?} is no orbital slot over Earth", f.name, name)));
+            }
+            if f.victory_first.bar <= 0.0 {
+                return Err(err("factions.toml", format!("row {}: victory_first.bar must be positive", f.name)));
+            }
+        }
         for s in &self.states {
             for n in &s.neighbours {
                 let back = &self.states[n.index()];
@@ -596,10 +650,13 @@ impl Tables {
         &self.factions[kind as usize]
     }
     pub fn ai_weights(&self, kind: FactionKind) -> &AiWeights {
-        match kind {
-            FactionKind::Custodians => &self.ai.weights.custodians,
-            FactionKind::Prospectors => &self.ai.weights.prospectors,
-        }
+        &self.ai.weights[&kind]
+    }
+    pub fn ai_pace(&self, kind: FactionKind) -> &AiPace {
+        &self.ai.pace[&kind]
+    }
+    pub fn ai_tech_picks(&self, kind: FactionKind) -> &AiTechPicks {
+        &self.ai.tech_picks[&kind]
     }
 }
 
