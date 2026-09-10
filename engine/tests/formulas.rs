@@ -442,7 +442,7 @@ fn ducats_pay_for_restoration_and_repairs_at_the_table_rates() {
     let r = Order::RestorationWithDucats { steps: 2 };
     assert_eq!(g.order_cost(Seat(0), &r).ducats, 40);
     g.commit_orders(Seat(0), &[r]);
-    assert!((g.climate.restoration_next - 6.0).abs() < 1e-9, "two steps of 3.0 ppm");
+    assert!((g.climate.removal_total() - 6.0).abs() < 1e-9, "two steps of 3.0 ppm");
     assert_eq!(g.seats[0].stockpile.ducats, 10);
     // A repair: 10 Ducats a point, same legality as a Materials repair.
     g.ships.push(Ship { id: ShipId(1), kind: UnitKind::Frigate, seat: Seat(0), damage: 1, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 });
@@ -2441,3 +2441,271 @@ fn twelve_nation_states_share_out_the_eight_they_came_from() {
     }
 }
 
+
+// ================================================================ #53 Blame and neutral development
+
+/// A board with nothing emitting but what the test puts on it: every state's people gone, every
+/// Facility stripped, the sea already done with, and every state calm and neutral.
+fn quiet_world(g: &mut Game) {
+    calm(g);
+    for s in &mut g.states {
+        s.population = 0.0;
+        s.facilities.clear();
+        s.industry_level = 0;
+        s.control = Control::Neutral;
+        s.neutral_since = Some(1);
+    }
+}
+
+/// (a) A Climate phase adds a controlled state's attributable Emissions to its controller's emitted
+/// total, and a neutral state's to nobody's.
+#[test]
+fn a_blame_follows_control_and_a_neutral_state_belongs_to_nobody() {
+    let mut g = game();
+    quiet_world(&mut g);
+    // North Africa is the Prospectors': baseline 0.4 at Industry Level 2, with 3.0 hundred million
+    // people. Sub-Saharan Africa stays neutral carrying exactly the same weight.
+    g.take_control(StateId::NorthAfrica, Seat(1));
+    g.state_mut(StateId::NorthAfrica).industry_level = 2;
+    g.state_mut(StateId::NorthAfrica).population = 3.0;
+    g.state_mut(StateId::SubSaharanAfrica).industry_level = 2;
+    g.state_mut(StateId::SubSaharanAfrica).population = 3.0;
+    let card = g.tables.state(StateId::NorthAfrica).baseline_emissions;
+    let mult = g.tables.faction(FactionKind::Prospectors).emissions_multiplier;
+    let per_hundred = g.tables.climate.population_emissions_per_hundred_million;
+    let expected = card * 2.0 * mult + per_hundred * 3.0 * mult;
+    g.climate_phase();
+    assert!(
+        (g.seats[1].blame_emitted - expected).abs() < 1e-9,
+        "the Prospectors wear North Africa's industry and its people: emitted {}, expected {expected}",
+        g.seats[1].blame_emitted
+    );
+    for seat in [Seat(0), Seat(2), Seat(3)] {
+        assert_eq!(g.seats[seat.index()].blame_emitted, 0.0, "a neutral state's Emissions are nobody's");
+    }
+    assert_eq!(g.blame(Seat(1)), g.seats[1].blame_emitted, "nothing removed, so Blame is what was emitted");
+}
+
+/// (b) Restoration adds to the remover's removed total, and Blame floors at zero: a Faction that
+/// takes back more than it put out shows Blame 0 and a credit.
+#[test]
+fn b_restoration_is_removed_and_blame_floors_at_zero() {
+    let mut g = game();
+    quiet_world(&mut g);
+    g.take_control(StateId::EastAsia, Seat(0));
+    g.state_mut(StateId::EastAsia).industry_level = 1;
+    g.seats[0].stockpile.energy = 200;
+    g.commit_orders(Seat(0), &[Order::Restoration { steps: 4 }]);
+    let removed = g.tables.restoration.sink_per_step * 4.0;
+    assert_eq!(g.climate.removal_next[0], removed, "the Custodians' Restoration is theirs, not the table's");
+    g.climate_phase();
+    assert_eq!(g.seats[0].blame_removed, removed, "the Climate phase banks what was removed");
+    assert!(g.seats[0].blame_emitted > 0.0, "East Asia's industry is still theirs");
+    assert_eq!(g.blame(Seat(0)), 0.0, "removing more than you emitted floors Blame at zero");
+    assert!(
+        (g.blame_credit(Seat(0)) - (removed - g.seats[0].blame_emitted)).abs() < 1e-9,
+        "and shows as a credit of {:.1} ppm",
+        g.blame_credit(Seat(0))
+    );
+}
+
+/// (c) The share and the multiplier: an even quarter each is x1.0, half the table x1.25, the whole
+/// of it x1.5 (the cap), and none of it x1.0 (the floor).
+#[test]
+fn c_blame_share_sets_the_threshold_multiplier() {
+    let mut g = game();
+    for s in &mut g.seats {
+        s.blame_emitted = 40.0;
+        s.blame_removed = 0.0;
+    }
+    for seat in Seat::ALL {
+        assert_eq!(g.blame_share(seat), 0.25, "four Factions at equal Blame each hold a quarter");
+        assert_eq!(g.blame_threshold_multiplier(seat), 1.0, "a fair share costs nothing");
+    }
+    // One Faction with half the table's Blame: 60 against 20 each.
+    g.seats[1].blame_emitted = 60.0;
+    for i in [0usize, 2, 3] {
+        g.seats[i].blame_emitted = 20.0;
+    }
+    assert_eq!(g.blame_share(Seat(1)), 0.5, "60 of 120");
+    assert_eq!(g.blame_threshold_multiplier(Seat(1)), 1.25, "1 + (0.5 - 0.25)");
+    // The whole of it: the cap.
+    for i in [0usize, 2, 3] {
+        g.seats[i].blame_emitted = 0.0;
+    }
+    assert_eq!(g.blame_share(Seat(1)), 1.0);
+    assert_eq!(g.blame_threshold_multiplier(Seat(1)), 1.5, "1.75 is capped at x1.5");
+    assert_eq!(g.blame_threshold_multiplier(Seat(0)), 1.0, "a Faction with no Blame is floored at x1.0");
+    // Nobody has any: no share, no multiplier, and no division by zero.
+    for s in &mut g.seats {
+        s.blame_emitted = 0.0;
+    }
+    assert_eq!(g.blame_total(), 0.0);
+    assert_eq!(g.blame_share(Seat(1)), 0.0, "no Blame at the table is no share");
+    assert_eq!(g.blame_threshold_multiplier(Seat(1)), 1.0);
+}
+
+/// (d) The per-seat threshold applies to a neutral state and to a rival's state, and to nothing
+/// else: not the seat's own state, not a Colony, not a Space Station.
+#[test]
+fn d_the_raised_threshold_lands_only_on_states_the_seat_does_not_hold() {
+    let mut g = game();
+    // Seat 1 wears the whole table's Blame: x1.5.
+    for s in &mut g.seats {
+        s.blame_emitted = 0.0;
+    }
+    g.seats[1].blame_emitted = 100.0;
+    assert_eq!(g.blame_threshold_multiplier(Seat(1)), 1.5);
+    let neutral = Place::State(StateId::NorthAfrica);
+    let plain = g.influence_threshold(neutral);
+    assert_eq!(plain, 40, "North Africa is Size 2: 20 + 10 x 2");
+    assert_eq!(g.influence_threshold_for(Seat(1), neutral), 60, "x1.5 on a neutral state");
+    assert_eq!(g.influence_threshold_for(Seat(0), neutral), 40, "and nothing on a Faction with no Blame");
+    // Another Faction's state.
+    g.take_control(StateId::NorthAfrica, Seat(0));
+    assert_eq!(g.influence_threshold_for(Seat(1), neutral), 60, "x1.5 on another Faction's state");
+    // The seat's own state.
+    g.take_control(StateId::SouthAmerica, Seat(1));
+    let own = Place::State(StateId::SouthAmerica);
+    assert_eq!(g.influence_threshold_for(Seat(1), own), g.influence_threshold(own), "never on a state it holds");
+    // A Colony and a Space Station.
+    let col = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 3);
+    let station = station_of(&g, Seat(0), BodyId::Earth).expect("the ISS");
+    for place in [Place::Colony(col), Place::Colony(station)] {
+        assert_eq!(
+            g.influence_threshold_for(Seat(1), place),
+            g.influence_threshold(place),
+            "Blame never touches a Colony or a Space Station: {place:?}"
+        );
+    }
+}
+
+/// (e) An Influence transfer reads the challenger's own threshold: a Faction sitting under its
+/// raised threshold does not take the place, and the seat beside it, with no Blame, does.
+#[test]
+fn e_a_transfer_uses_the_challengers_own_threshold() {
+    let mut g = game();
+    for s in &mut g.seats {
+        s.blame_emitted = 0.0;
+    }
+    g.seats[1].blame_emitted = 100.0;
+    let target = Place::State(StateId::NorthAfrica);
+    assert_eq!(g.influence_threshold(target), 40);
+    assert_eq!(g.influence_threshold_for(Seat(1), target), 60);
+    // 45 clears the plain threshold of 40 and not the Prospectors' own 60.
+    g.pending.influence.push((Seat(1), target, 45));
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Neutral, "45 does not reach a Blamed Faction's 60");
+    assert_eq!(g.seats[1].influence[&target], 45, "the Standing is there; it is the threshold that moved");
+    // The Arkwrights, with no Blame at all, take it on 40.
+    g.pending.influence.push((Seat(2), target, 40));
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(2)), "40 is enough for a Faction with no Blame");
+}
+
+/// (f) A neutral state develops on its sixth neutral turn, and does not at Industry Level 4, at
+/// +2.5 C, at Unrest 7, or while a Faction holds it.
+#[test]
+fn f_a_neutral_state_raises_its_industry_level_every_sixth_turn() {
+    // North Africa is neutral when the game opens; Sub-Saharan Africa is one of the four start states.
+    let sid = StateId::NorthAfrica;
+    // The plain case: six neutral turns, one level, one idle Facility woken.
+    let mut g = game();
+    calm(&mut g);
+    hold_temperature(&mut g, 1.2);
+    g.state_mut(sid).facilities.push(Facility { kind: FacilityKind::Factory, online: false, offline_until_resolution: false });
+    let start = g.state(sid).industry_level;
+    for turn in 1..=6 {
+        g.turn = turn;
+        g.neutral_development();
+        if turn < 6 {
+            assert_eq!(g.state(sid).industry_level, start, "nothing on neutral turn {turn}");
+        }
+    }
+    assert_eq!(g.state(sid).industry_level, start + 1, "the sixth neutral turn raises the Industry Level");
+    assert!(g.state(sid).facilities.iter().all(|f| f.online), "and brings the idle Factory online");
+    assert!(
+        g.report.lines.iter().any(|l| l.contains("raised its Industry Level to") && l.contains("Factory")),
+        "the Report names it: {:?}",
+        g.report.lines
+    );
+    // The clock starts again, so nothing happens for another five turns.
+    for turn in 7..=11 {
+        g.turn = turn;
+        g.neutral_development();
+    }
+    assert_eq!(g.state(sid).industry_level, start + 1, "and not again until the twelfth turn");
+    g.turn = 12;
+    g.neutral_development();
+    assert_eq!(g.state(sid).industry_level, start + 2, "every six turns");
+
+    // At the ceiling.
+    let mut g = game();
+    calm(&mut g);
+    hold_temperature(&mut g, 1.2);
+    let ceiling = g.tables.development.max_level;
+    g.state_mut(sid).industry_level = ceiling;
+    g.turn = 6;
+    g.neutral_development();
+    assert_eq!(g.state(sid).industry_level, ceiling, "Industry Level 4 develops no further");
+
+    // Too hot.
+    let mut g = game();
+    calm(&mut g);
+    let stops = g.tables.development.stops_at_temperature;
+    hold_temperature(&mut g, stops);
+    g.turn = 6;
+    g.neutral_development();
+    assert_eq!(g.state(sid).industry_level, start, "nothing develops at +2.5 C");
+
+    // Too restive.
+    let mut g = game();
+    calm(&mut g);
+    hold_temperature(&mut g, 1.2);
+    g.state_mut(sid).unrest = g.tables.unrest.no_development_at;
+    g.turn = 6;
+    g.neutral_development();
+    assert_eq!(g.state(sid).industry_level, start, "a state at Unrest 7 does not develop");
+
+    // Held.
+    let mut g = game();
+    calm(&mut g);
+    hold_temperature(&mut g, 1.2);
+    g.take_control(sid, Seat(1));
+    g.state_mut(sid).neutral_since = Some(1);
+    g.turn = 6;
+    g.neutral_development();
+    assert_eq!(g.state(sid).industry_level, start, "a controlled state is developed by its controller, not by itself");
+}
+
+/// (g) The clock is per state: a state taken and then freed counts six fresh turns.
+#[test]
+fn g_the_neutrality_clock_restarts_when_a_state_goes_neutral_again() {
+    let sid = StateId::NorthAfrica;
+    let mut g = game();
+    calm(&mut g);
+    hold_temperature(&mut g, 1.2);
+    assert_eq!(g.state(sid).neutral_since, Some(1), "every state is neutral when the game opens");
+    g.turn = 3;
+    g.take_control(sid, Seat(1));
+    assert_eq!(g.state(sid).neutral_since, None, "a state a Faction holds has no clock");
+    // Thrown off on turn 5: the count starts again from turn 6, so nothing on turn 8 (the sixth
+    // turn of the original clock) and the raise on turn 11.
+    g.turn = 5;
+    g.state_mut(sid).unrest = g.tables.unrest.throw_off_threshold;
+    // It changed hands this turn, so the natural fall is withheld and 10 is still 10 at the throw-off.
+    g.state_mut(sid).changed_hands = true;
+    g.resolve_unrest();
+    assert_eq!(g.state(sid).control, Control::Neutral, "it threw its controller off");
+    assert_eq!(g.state(sid).neutral_since, Some(6), "the clock starts on the turn after the change");
+    let start = g.state(sid).industry_level;
+    g.state_mut(sid).unrest = 0.0;
+    for turn in 6..=10 {
+        g.turn = turn;
+        g.neutral_development();
+    }
+    assert_eq!(g.state(sid).industry_level, start, "the old clock is gone: nothing by turn 10");
+    g.turn = 11;
+    g.neutral_development();
+    assert_eq!(g.state(sid).industry_level, start + 1, "six fresh turns from turn 6");
+}

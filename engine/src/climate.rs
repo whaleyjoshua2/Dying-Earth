@@ -22,7 +22,16 @@ impl Game {
         let breakdown = self.emissions_now();
         let net = breakdown.net();
         self.climate.co2 += net;
-        self.climate.restoration_next = 0.0;
+        // Ticket #53: Blame. Each Faction takes on what the sources it controls emitted this turn
+        // and is credited with what it removed; both totals stand for the whole game.
+        for seat in Seat::ALL {
+            let i = seat.index();
+            let (emitted, removed) = (breakdown.by_seat[i], self.climate.removal_next[i]);
+            let s = self.seat_mut(seat);
+            s.blame_emitted += emitted;
+            s.blame_removed += removed;
+        }
+        self.climate.removal_next = [0.0; SEAT_COUNT];
         self.climate.launches_pending = [0; SEAT_COUNT];
         self.climate.card_emissions_next = 0.0;
         for s in &mut self.states {
@@ -61,9 +70,49 @@ impl Game {
         ));
         self.sea_level_check();
         self.population_change();
+        self.neutral_development();
         // Ticket #52: a Resettle order steers only the flows of the Climate phase that follows it.
         for seat in Seat::ALL {
             self.seat_mut(seat).resettle_to = None;
+        }
+    }
+
+    /// Ticket #53, Neutral Development: a neutral Nation State below the ceiling raises its
+    /// Industry Level by one every `turns` turns of unbroken neutrality, and brings the first idle
+    /// Facility in its list online with it. The clock is per state and does not run while a Faction
+    /// holds the place. A world at `stops_at_temperature` or above develops nothing, and neither
+    /// does a state whose Unrest has passed `no_development_at` (`may_develop`); a state held back
+    /// that way keeps its place in the queue and develops the moment the block lifts.
+    pub fn neutral_development(&mut self) {
+        let d = self.tables.development.clone();
+        let turn = self.turn;
+        let hot = self.climate.temperature >= d.stops_at_temperature;
+        for sid in StateId::ALL {
+            if self.state(sid).control != Control::Neutral {
+                self.state_mut(sid).neutral_since = None;
+                continue;
+            }
+            let since = *self.state_mut(sid).neutral_since.get_or_insert(turn);
+            if (turn + 1).saturating_sub(since) < d.turns {
+                continue;
+            }
+            if hot || self.state(sid).industry_level >= d.max_level || !self.may_develop(sid) {
+                continue;
+            }
+            self.state_mut(sid).industry_level += 1;
+            self.state_mut(sid).neutral_since = Some(turn + 1);
+            let level = self.state(sid).industry_level;
+            let woken = self.state_mut(sid).facilities.iter_mut().find(|f| !f.online).map(|f| {
+                f.online = true;
+                f.kind.name()
+            });
+            let name = self.tables.state(sid).name.clone();
+            let line = match woken {
+                Some(k) => format!("{name} raised its Industry Level to {level} and brought a {k} online."),
+                None => format!("{name} raised its Industry Level to {level}."),
+            };
+            self.log(line.clone());
+            self.report.lines.push(line);
         }
     }
 
@@ -83,27 +132,44 @@ impl Game {
         let fr_mult = if self.has_tech(TechId::CleanManufacturing) { t.tech(TechId::CleanManufacturing).value } else { 1.0 };
         for st in &self.states {
             let card = t.state(st.id);
-            let m = mult(st.control.director());
-            b.state_industry += card.baseline_emissions * st.industry_level as f64 * m;
-            b.population += c.population_emissions_per_hundred_million * st.population * pop_mult * m;
+            let director = st.control.director();
+            let m = mult(director);
+            // Ticket #53: whoever directs the state at this Climate phase wears its figure; a
+            // neutral state's industry and people are nobody's Blame.
+            let industry = card.baseline_emissions * st.industry_level as f64 * m;
+            let people = c.population_emissions_per_hundred_million * st.population * pop_mult * m;
+            b.state_industry += industry;
+            b.population += people;
+            let mut worn = industry + people;
             // A Facility nobody directs stands idle: it makes nothing and emits nothing (ticket #24).
-            if st.control.director().is_none() {
-                continue;
-            }
-            for f in &st.facilities {
-                if !f.online {
-                    continue;
+            if let Some(d) = director {
+                for f in &st.facilities {
+                    if !f.online {
+                        continue;
+                    }
+                    // Ticket #52: at Unrest 7 every Facility in the state emits at half.
+                    let e = t.facility(f.kind).emissions * if self.facilities_at_half(st.id) { 0.5 } else { 1.0 };
+                    let charged = match f.kind {
+                        FacilityKind::Factory | FacilityKind::Refinery => e * fr_mult * m,
+                        FacilityKind::PowerPlant => e * pp_mult * m,
+                        _ => 0.0,
+                    };
+                    match f.kind {
+                        FacilityKind::Factory => b.factories += charged,
+                        FacilityKind::PowerPlant => b.power_plants += charged,
+                        FacilityKind::Refinery => b.refineries += charged,
+                        _ => {}
+                    }
+                    worn += charged;
                 }
-                // Ticket #52: at Unrest 7 every Facility in the state emits at half.
-                let e = t.facility(f.kind).emissions * if self.facilities_at_half(st.id) { 0.5 } else { 1.0 };
-                match f.kind {
-                    FacilityKind::Factory => b.factories += e * fr_mult * m,
-                    FacilityKind::PowerPlant => b.power_plants += e * pp_mult * m,
-                    FacilityKind::Refinery => b.refineries += e * fr_mult * m,
-                    _ => {}
-                }
+                b.by_seat[d.index()] += worn;
+                // An Event card is the world's doing, not a Faction's, so it is nobody's Blame.
+                // It stays inside the directed branch, where it has been since ticket #24: a
+                // Wildfire on a state nobody holds charges nothing at all today. That is almost
+                // certainly an accident of where the old `continue` sat rather than a rule, but
+                // moving it would change the Climate Model, so it is left for its own ticket.
+                b.cards += st.wildfire_emissions_next;
             }
-            b.cards += st.wildfire_emissions_next;
         }
         // Version 0.04 (ticket #44): a Module on Earth (Antarctica) emits as its counterpart Facility does.
         for col in self.colonies.iter().filter(|c| c.body == BodyId::Earth) {
@@ -111,21 +177,31 @@ impl Game {
             let m = mult(Some(d));
             for md in col.modules.iter().filter(|md| md.online) {
                 let e = t.module(md.kind).earth_emissions;
+                let charged = match md.kind {
+                    ModuleKind::Mine | ModuleKind::Refinery => e * fr_mult * m,
+                    ModuleKind::Generator => e * pp_mult * m,
+                    _ => 0.0,
+                };
                 match md.kind {
-                    ModuleKind::Mine => b.factories += e * fr_mult * m,
-                    ModuleKind::Generator => b.power_plants += e * pp_mult * m,
-                    ModuleKind::Refinery => b.refineries += e * fr_mult * m,
+                    ModuleKind::Mine => b.factories += charged,
+                    ModuleKind::Generator => b.power_plants += charged,
+                    ModuleKind::Refinery => b.refineries += charged,
                     _ => {}
                 }
+                // Ticket #53: an Antarctic Module is its Faction's, as a Facility is.
+                b.by_seat[d.index()] += charged;
             }
         }
         b.cards += self.climate.card_emissions_next;
         let per_launch = if self.has_tech(TechId::CleanPropellant) { t.tech(TechId::CleanPropellant).value } else { c.launch_emissions };
         for seat in Seat::ALL {
-            b.launches += self.climate.launches_pending[seat.index()] as f64 * per_launch * mult(Some(seat));
+            let charged = self.climate.launches_pending[seat.index()] as f64 * per_launch * mult(Some(seat));
+            b.launches += charged;
+            // Ticket #53: a Faction wears its own launches, wherever they lifted from.
+            b.by_seat[seat.index()] += charged;
         }
         b.sink = c.natural_sink;
-        b.restoration = self.climate.restoration_next;
+        b.restoration = self.climate.removal_total();
         b
     }
 

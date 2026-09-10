@@ -392,6 +392,17 @@ pub struct InfluenceTable {
     pub station_threshold_base: i64,
     pub occupation_turns: u32,
     pub destruction_chance: f64,
+    /// Ticket #53: what a Faction's share of the table's Blame does to its Influence thresholds.
+    pub blame: BlameTable,
+}
+
+/// Ticket #53 (version 0.05): Blame, in `influence.toml` under `[blame]`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct BlameTable {
+    /// The share of the table's Blame that costs a Faction nothing: an even quarter of four seats.
+    pub fair_share: f64,
+    /// The most a Faction's thresholds can be multiplied by, however dirty it is.
+    pub cap: f64,
 }
 
 /// Ticket #52 (version 0.05): every number that moves a Nation State's Unrest (`unrest.toml`).
@@ -551,6 +562,20 @@ fn one_i64() -> i64 {
 #[derive(Debug, Clone, Deserialize)]
 struct StatesFile {
     state: Vec<StateCard>,
+    development: DevelopmentTable,
+}
+
+/// Ticket #53 (version 0.05): Neutral Development, in `nation_states.toml` under `[development]`.
+/// The designer named these `development_turns`, `development_max_level` and
+/// `development_stops_at_temperature`; inside their own table the prefix would only repeat itself.
+#[derive(Debug, Clone, Deserialize)]
+pub struct DevelopmentTable {
+    /// Turns of unbroken neutrality between one raise of the Industry Level and the next.
+    pub turns: u32,
+    /// The Industry Level a neutral state develops itself up to, and no further.
+    pub max_level: u32,
+    /// A world standing at this Temperature or above develops nothing.
+    pub stops_at_temperature: f64,
 }
 #[derive(Debug, Clone, Deserialize)]
 struct FacilitiesFile {
@@ -596,6 +621,8 @@ pub struct Tables {
     /// Ticket #46: what a station costs.
     pub station_materials: i64,
     pub states: Vec<StateCard>,
+    /// Ticket #53: how a neutral Nation State develops itself (`nation_states.toml`).
+    pub development: DevelopmentTable,
     pub facilities: Vec<FacilityCard>,
     pub industry_level: IndustryLevelCard,
     pub modules: Vec<ModuleCard>,
@@ -654,6 +681,7 @@ impl Tables {
             station_materials: bodies.station_materials,
             bodies: bodies.body,
             states: states.state,
+            development: states.development,
             facilities: facilities.facility,
             industry_level: facilities.industry_level,
             archive: modules.archive,

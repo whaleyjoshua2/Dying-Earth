@@ -896,7 +896,8 @@ impl Game {
                 }
                 Order::Influence { target, amount } => self.pending.influence.push((seat, *target, *amount)),
                 Order::Restoration { steps } | Order::RestorationWithDucats { steps } => {
-                    self.climate.restoration_next += self.tables.restoration.sink_per_step * *steps as f64;
+                    // Ticket #53: the removal is the seat's, so its Blame can be credited with it.
+                    self.climate.removal_next[seat.index()] += self.tables.restoration.sink_per_step * *steps as f64;
                 }
                 Order::BuyInfluence { amount } => {
                     self.seat_mut(seat).allotment += amount;

@@ -15,6 +15,15 @@ fn median(v: &mut [u32]) -> String {
     v[v.len() / 2].to_string()
 }
 
+/// Ticket #53: the middle value of a run of figures, for the Blame tables.
+fn median_f(v: &mut [f64]) -> f64 {
+    if v.is_empty() {
+        return 0.0;
+    }
+    v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    v[v.len() / 2]
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let seed: u64 = args.first().and_then(|a| a.parse().ok()).unwrap_or(1);
@@ -42,6 +51,11 @@ fn main() {
     let mut constabularies = 0u32;
     let mut relief = 0u32;
     let mut moved = 0.0f64;
+    // Ticket #53.
+    let mut blame: [Vec<f64>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+    let mut shares: [Vec<f64>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+    let mut mults: [Vec<f64>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+    let mut developments: Vec<u32> = Vec::new();
     let mut kinds = [FactionKind::Custodians; SEAT_COUNT];
     for s in seed..seed + count {
         let r = dying_earth_engine::sim::run(tables.clone(), s, player);
@@ -68,6 +82,12 @@ fn main() {
         constabularies += r.constabularies;
         relief += r.relief_orders;
         moved += r.population_moved;
+        for seat in Seat::ALL {
+            blame[seat.index()].push(r.blame[seat.index()]);
+            shares[seat.index()].push(r.blame_share[seat.index()]);
+            mults[seat.index()].push(r.threshold_multiplier[seat.index()]);
+        }
+        developments.push(r.developments);
         println!(
             "seed {:3} | {:?} | turn {:2} | first colony {:?} | buildings {:?} | colonists {:?} | temp {:+.2} | collapse proj {:?} | colony hands {:?} | influence transfers {:2} | bank/post/embassy/relay {:?}",
             r.seed, r.outcome, r.last_turn, r.first_colony_turn, r.buildings, r.colonists_off_earth, r.temperature, r.collapse_projected_turn, r.colony_changed_hands, r.influence_transfers, r.new_buildings
@@ -75,6 +95,13 @@ fn main() {
         println!(
             "         | unrest: threw off {} | peak {:.1} | constabularies {} | relief orders {} | population moved {:.1}",
             r.throw_offs, r.peak_unrest, r.constabularies, r.relief_orders, r.population_moved
+        );
+        println!(
+            "         | blame {:?} | share {:?} | thresholds {:?} | neutral developments {}",
+            r.blame.map(|b| format!("{b:.0}")),
+            r.blame_share.map(|b| format!("{b:.2}")),
+            r.threshold_multiplier.map(|b| format!("x{b:.2}")),
+            r.developments
         );
     }
     if count > 1 {
@@ -93,5 +120,20 @@ fn main() {
         println!("{:>12}         : {}", "Constabularies built by the AIs", constabularies);
         println!("{:>12}         : {}", "Relief orders paid by the AIs", relief);
         println!("{:>12}         : {:.1}", "population moved by refugees", moved);
+        // Ticket #53: the Blame game, per seat, and how much the world developed on its own.
+        println!();
+        println!("{:>12} | {:>12} | {:>11} | {:>10}", "seat", "Faction", "median Blame", "share");
+        for seat in Seat::ALL {
+            let i = seat.index();
+            println!(
+                "{:>12} | {:>12} | {:>12.0} | {:>9.2} | thresholds x{:.2}",
+                seat.0,
+                kinds[i].name(),
+                median_f(&mut blame[i]),
+                median_f(&mut shares[i]),
+                median_f(&mut mults[i])
+            );
+        }
+        println!("{:>12}         : {}", "median neutral developments a game", median(&mut developments));
     }
 }

@@ -219,6 +219,10 @@ _Avoid_: carbon capture, cleanup, scrubbing, terraforming
 How built-up a Nation State is. Together with the state's size it sets how many Facilities fit, and it scales the state's emissions. Raising it is a build action.
 _Avoid_: development, tier, infrastructure
 
+**Neutral Development**:
+What a Nation State nobody holds does for itself: every sixth turn of unbroken neutrality it raises its own Industry Level by one and brings an idle Facility online, until it is as built-up as a neutral state gets. A world already too hot, or a population already too restive, stops it. The clock is the state's own and starts again whenever it is freed.
+_Avoid_: growth, expansion, auto-build, industrialization, AI development
+
 **Education Level**:
 A fixed figure on a Nation State's card, taken from real-world values in the First Playable, that multiplies the Research each Lab in that state produces.
 _Avoid_: literacy, science level, schooling
@@ -255,8 +259,12 @@ _Avoid_: migrants, displaced, evacuees, exodus, immigration
 The Orders-phase order that steers Refugees: once a turn, for Ducats, every flow leaving the states a Faction directs goes to one Nation State of its choosing instead of to the neighbours, and its Standing there rises.
 _Avoid_: relocate, evacuate, transfer, deport
 
+**Blame**:
+The CO2 a Faction is answerable for over the whole game: everything the sources it controlled has emitted, less everything it has taken back, and never less than nothing. What no Faction controls is nobody's. A Faction's share of the four Factions' Blame, when it rises above a fair quarter, makes every Nation State it does not hold harder for it to win over.
+_Avoid_: carbon debt, guilt, pollution score, emissions total, footprint
+
 **Influence**:
-A Faction's claim on a Nation State or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold; a controlled place goes to a rival whose Standing is at least the controller's plus the challenge margin (10 since version 0.04) and at least the threshold.
+A Faction's claim on a Nation State or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold; a controlled place goes to a rival whose Standing is at least the controller's plus the challenge margin (10 since version 0.04) and at least the threshold, which since version 0.05 each Faction reads for itself, since its Blame raises it on every Nation State it does not hold.
 _Avoid_: diplomacy points, favour, reputation
 
 **Standing**:

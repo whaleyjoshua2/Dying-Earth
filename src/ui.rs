@@ -1033,7 +1033,8 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
     if ui.small_button("Buy more Influence in the Trading window").clicked() {
         view.show_trade = true;
     }
-    let threshold = game.influence_threshold(target);
+    // Ticket #53: the threshold shown is the player's own, since Blame raises it seat by seat.
+    let threshold = game.influence_threshold_for(Seat(0), target);
     let standing = |s: Seat| game.seat(s).influence.get(&target).copied().unwrap_or(0);
     // Ticket #50: four seats, so the Standings are chips in Faction colours, and only where there
     // is a Standing to show.
@@ -1053,6 +1054,20 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
         }
     });
     ui.label(format!("Threshold {}; a place already held changes hands only at the holder's Standing plus the challenge margin of {}.", threshold, game.tables.influence.challenge_margin));
+    // Ticket #53: on every Nation State the player does not hold, what its Blame is costing it here.
+    let blame_mult = game.blame_threshold_multiplier_on(Seat(0), target);
+    if blame_mult > 1.0 {
+        ui.label(
+            RichText::new(format!(
+                "Blame: your threshold here is {}, not {} (share {:.2}, x{:.2}). Emit less, or take back what you emit, and it comes down.",
+                threshold,
+                game.influence_threshold(target),
+                game.blame_share(Seat(0)),
+                blame_mult
+            ))
+            .color(Color32::from_rgb(255, 170, 120)),
+        );
+    }
     match game.place_control(target).controller() {
         Some(c) => {
             let need = threshold.max(standing(c) + 1);
@@ -1717,6 +1732,36 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             ui.label(RichText::new(line).size(16.0).strong().color(Color32::from_rgb(255, 200, 120)));
             ui.separator();
             ui.label(format!("Stabilization run: {} consecutive turn(s) under the Sink.", game.seat(Seat(0)).stabilization_run));
+            // Ticket #53: Blame, Faction by Faction, in the panel that attributes the Emissions.
+            ui.separator();
+            ui.label(RichText::new("Blame: the CO2 each Faction is answerable for").strong());
+            for seat in Seat::ALL {
+                let s = game.seat(seat);
+                let credit = game.blame_credit(seat);
+                let line = if credit > 0.0 {
+                    format!(
+                        "{}: emitted {:.0} ppm, removed {:.0}, Blame 0, credit {:.0} ppm, share {:.2}, thresholds x{:.2}",
+                        game.seat_name(seat),
+                        s.blame_emitted,
+                        s.blame_removed,
+                        credit,
+                        game.blame_share(seat),
+                        game.blame_threshold_multiplier(seat)
+                    )
+                } else {
+                    format!(
+                        "{}: emitted {:.0} ppm, removed {:.0}, Blame {:.0}, share {:.2}, thresholds x{:.2}",
+                        game.seat_name(seat),
+                        s.blame_emitted,
+                        s.blame_removed,
+                        game.blame(seat),
+                        game.blame_share(seat),
+                        game.blame_threshold_multiplier(seat)
+                    )
+                };
+                ui.label(RichText::new(line).color(seat_colour(session, seat)));
+            }
+            ui.label(RichText::new("A share above a fair quarter raises that Faction's Influence thresholds on every Nation State it does not hold, up to half again.").weak());
         });
         view.show_climate = open;
     }
@@ -1739,6 +1784,27 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.add_space(8.0);
             }
             ui.label(format!("Collapse Line +{:.1} C; the Temperature is {:+.1}.", game.tables.climate.collapse_line, game.climate.temperature));
+            // Ticket #53: who is doing this to the world, as one strip of four bars.
+            ui.separator();
+            ui.label(RichText::new("Blame: each Faction's share of the CO2 the table has put up").strong());
+            for seat in Seat::ALL {
+                let share = game.blame_share(seat);
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(format!("{:>12}", game.seat_name(seat))).color(seat_colour(session, seat)));
+                    ui.add(
+                        egui::ProgressBar::new(share as f32)
+                            .desired_width(240.0)
+                            .fill(seat_colour(session, seat))
+                            .text(RichText::new(format!("{:.0}%", share * 100.0)).color(Color32::BLACK)),
+                    );
+                    let credit = game.blame_credit(seat);
+                    if credit > 0.0 {
+                        ui.label(RichText::new(format!("Blame 0, credit {credit:.0} ppm")).weak());
+                    } else {
+                        ui.label(RichText::new(format!("Blame {:.0} ppm, thresholds x{:.2}", game.blame(seat), game.blame_threshold_multiplier(seat))).weak());
+                    }
+                });
+            }
         });
         view.show_victory = open;
     }

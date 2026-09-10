@@ -179,6 +179,20 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.materials = 200;
             g.seats[0].stockpile.ducats = 200;
         }
+        // `blame:1` (a building aid, ticket #53): the Custodian in seat 0 buys, in one turn, enough
+        // Restoration to take back more CO2 than it has emitted all game, so the Climate Panel's
+        // Blame section shows a removal credit as well as three Factions carrying Blame. The AI
+        // Custodian buys Restoration a few steps at a time and never gets ahead of its own industry.
+        if std::env::args().any(|a| a == "blame:1") && g.kind(Seat(0)) == FactionKind::Custodians {
+            let per_step = g.tables.restoration.sink_per_step;
+            let steps = (g.seats[0].blame_emitted / per_step).ceil() as u32 + 6;
+            g.seats[0].stockpile.energy = g.tables.restoration.energy_per_step * steps as i64 + 40;
+            g.seats[0].ai = false;
+            let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+            orders[0] = vec![Order::Restoration { steps }];
+            g.end_turn(orders);
+            g.seats[0].ai = true;
+        }
         // `tints:1` (a building aid): one Nation State per seat on the face the Earth picture shows,
         // so all four Faction tints are in one picture. The AI seldom leaves four controllers alive.
         if std::env::args().any(|a| a == "tints:1") {

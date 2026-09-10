@@ -478,3 +478,148 @@ where at eight states the Custodian in Asia won 19 of 20. That is the board the 
 for. The AI still builds no Constabulary — the same finding as #52, and for the same reason: the
 victory-gap multiplier applies to producers and not to a Constabulary, so it never wins a build slot
 while the gap is wide.
+
+## #53: Blame and neutral development
+
+Two rules that make the world answer back. **Blame** is the CO2 each Faction is answerable for over
+the whole game: at every Climate phase the Emissions the Climate Panel attributes to the sources a
+Faction controls — a controlled state's industry line, its Facilities and its Antarctic Modules, its
+population line, and the Faction's own launches — are added to its emitted total, and whatever CO2 it
+removed that turn (Restoration now; a Scrubber will join `Climate::removal_next` on its own ticket)
+to its removed total. Blame is the difference, floored at zero. What no Faction controls is nobody's:
+a neutral state's industry and people, and every Event card, are the world's doing. A Faction's share
+of the four Factions' Blame, above a fair quarter, multiplies its Influence thresholds on every
+Nation State it does not hold by `1 + (share - 0.25)`, floored at x1.0 and capped at x1.5
+(`influence.toml`, `[blame]`). Never on a Colony or a Space Station, never on the challenge margin,
+never on Standing decay, never on Pacification.
+
+**Neutral Development** is what a Nation State nobody holds does for itself: every six turns of
+unbroken neutrality it raises its own Industry Level by one, up to 4, and brings the first idle
+Facility in its list online (`nation_states.toml`, `[development]`). The clock is the state's own and
+runs from the turn it was last freed, so a state taken and then thrown off counts six fresh turns. A
+world at +2.5 C or above develops nothing, and neither does a state whose Unrest has reached 7
+(`may_develop`, the hook #52 left).
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![A Nation State card for North Africa, held by the Custodians, with an orange line reading "Blame: your threshold here is 45, not 40 (share 0.39, x1.14)"](blame-card.png)
+
+- **blame-card.png** — `shot:bcard turns:12 player:prospectors select:northafrica`. North Africa's
+  card, seen by a Prospector player who does not hold it. The threshold line now reads the player's
+  own figure, and the orange line under it says what a 0.39 share of the table's Blame is costing
+  them here: 45 where a clean Faction would need 40. The line is omitted entirely at x1.00, so a
+  Faction pulling its weight never sees it.
+
+![The Victory panel with a four-bar Blame strip along the bottom: Custodians 23 per cent in teal, Prospectors 45 per cent in orange, Arkwrights 16 per cent in violet, Archivists 16 per cent in pale blue](blame-victory-strip.png)
+
+- **blame-victory-strip.png** — `shot:bvic turns:12 victory:1`. Under the four Victory rows, one bar
+  per Faction in its own colour: the share as a percentage inside the bar, the Blame in ppm and the
+  thresholds multiplier beside it. At turn 13 of this game the Prospectors carry 45% of the table's
+  Blame on 125 ppm and pay x1.20 for it; the other three sit at or under a fair quarter and pay
+  nothing.
+
+![The Climate Panel with a Blame section listing all four Factions, the Custodians showing "emitted 73 ppm, removed 96, Blame 0, credit 23 ppm"](blame-climate-panel.png)
+
+- **blame-climate-panel.png** — `shot:bcp turns:10 blame:1`. The Blame section sits under the
+  Stabilization run, in the panel that attributes the Emissions in the first place: emitted, removed,
+  Blame, share and thresholds, one line per Faction in its colour. `blame:1` is a building aid that
+  has the Custodian player buy, in one turn, enough Restoration to take back more than it has emitted
+  all game (the -87.0 ppm on the Restoration line), so the credit case is visible: **Custodians:
+  emitted 73 ppm, removed 96, Blame 0, credit 23 ppm, share 0.00, thresholds x1.00**, against the
+  Prospectors on Blame 125 and x1.35.
+
+![The Report at turn 6, its News section carrying eight lines of the form "North Africa raised its Industry Level to 2."](neutral-development-report.png)
+
+- **neutral-development-report.png** — `shot:ndev turns:5 menus:1`. The Report the player opens on
+  turn 6, the first six-turn mark: eight neutral states raise their Industry Level in one Climate
+  phase — North Africa to 2, South Asia to 3, South-East Asia to 3, North America to 4, Central
+  America to 2, South America to 2, Russia to 3, the Middle East to 3. No line names a Facility, and
+  that is a finding rather than a bug: see below.
+
+### Twenty seeds
+
+`cargo run --release -p dying-earth-engine --example sim -- 1 --count=20`, three seatings, plus
+`sweep -- 20 --player=custodians --start=europe --sinks=6 --steps=150`. Nothing was re-tuned; these
+are measurements.
+
+| seat 0 | wins | collapses | median collapse turn | median turn of first Colony | Relief orders |
+|---|---|---|---|---|---|
+| Custodians in East Asia | none | 20/20 | 23 | 10 | 42 |
+| Prospectors in East Asia | none | 20/20 | 21 | 10 | 213 |
+| Arkwrights in East Asia | none | 20/20 | 21 | 9 | 187 |
+| Custodians in Europe (sweep) | none | 20/20 | 21 (20..21) | - | - |
+
+Blame at the end of each game, median over the twenty seeds, with the multiplier that share puts on
+the seat's Influence thresholds.
+
+| seat 0 the Custodians | median Blame | median share | median thresholds |
+|---|---|---|---|
+| Custodians (seat 0) | 88 | 0.22 | x1.00 |
+| Prospectors (seat 1) | 191 | 0.47 | x1.22 |
+| Arkwrights (seat 2) | 50 | 0.12 | x1.00 |
+| Archivists (seat 3) | 76 | 0.18 | x1.00 |
+
+| seat 0 the Prospectors | median Blame | median share | median thresholds |
+|---|---|---|---|
+| Prospectors (seat 0) | 178 | 0.30 | x1.05 |
+| Custodians (seat 1) | 307 | 0.51 | x1.26 |
+| Arkwrights (seat 2) | 45 | 0.08 | x1.00 |
+| Archivists (seat 3) | 66 | 0.11 | x1.00 |
+
+| seat 0 the Arkwrights | median Blame | median share | median thresholds |
+|---|---|---|---|
+| Arkwrights (seat 0) | 142 | 0.24 | x1.00 |
+| Custodians (seat 1) | 317 | 0.53 | x1.28 |
+| Prospectors (seat 2) | 78 | 0.13 | x1.00 |
+| Archivists (seat 3) | 65 | 0.11 | x1.00 |
+
+| seating | median neutral developments a game |
+|---|---|
+| Custodians in East Asia | 30 |
+| Prospectors in East Asia | 20 |
+| Arkwrights in East Asia | 18 |
+
+**What the twenty seeds say, as measured, not fixed.** One Faction a game runs away with the Blame
+and pays x1.20 to x1.28 for it; the other three sit at or under the fair quarter and pay nothing, so
+the rule taxes the runaway rather than the table. Which Faction it is depends on **how much Earth it
+holds, not on its Emissions multiplier**: the AI Custodians in seat 1, on a x0.75 multiplier, carry
+the largest Blame in two of the three seatings (307 and 317 ppm) because they end up directing more
+Nation States than anyone else, while the Prospectors' x1.25 only wins them the title when they also
+hold the board. The cap is never reached in an AI game; the largest median share measured is 0.53.
+
+Neutral development is **large**: 18 to 30 raises a game, and every clock starts on turn 1, so eight
+neutral states develop together on turn 6, again on turn 12, and so on, in one visible pulse in the
+Report rather than a trickle. That is exactly what "the clock runs from the turn the state was last
+neutral, i.e. the game start" asks for, and it is worth the designer seeing what it looks like.
+
+It also **costs the world its one habitable board**, and a control run says so plainly. Against the
+same twenty seeds on #52/#63 the Custodian-in-East-Asia seating was the board that stayed liveable:
+the Prospectors won 19 of 20 there and only one seed collapsed. It now collapses 20 of 20 with nobody
+winning. Re-running that seating with `development_turns` set to 9999 — Blame in force, neutral
+development off — returns it exactly to the old figures:
+
+| Custodians in East Asia, twenty seeds | wins | collapses | median collapse turn | developments |
+|---|---|---|---|---|
+| #52/#63, before this ticket | Prospectors 19 | 1/20 | 23 | - |
+| #53 as built | none | 20/20 | 23 | 30 |
+| #53 with `development_turns = 9999` (control) | Prospectors 19 | 1/20 | 23 | 0 |
+
+So **Blame changes no outcome on its own** — the control's Blame figures (91 / 202 / 53 / 80 ppm at
+x1.00 / x1.23 / x1.00 / x1.00) are within noise of the built game's — and **neutral development
+changes all of them**. Twelve states developing themselves up to Industry Level 4 is a great deal of
+new industry no Faction ever chose to build, and it lands before anyone can reach their bar; the two
+dirtier boards moved from a median collapse of 22 to 21 and the Europe sweep from 23 to 21 for the
+same reason. Nothing was re-tuned here. If the designer wants that board liveable again,
+`development_turns` (6) and `development_max_level` (4) are the two numbers to turn, and sweeping
+them belongs on its own ticket.
+
+**The idle-Facility clause fires almost never.** A neutral state's start Facilities are created
+`online: true`, and a Facility nobody directs is already idle in the sense the Climate phase means
+(it makes nothing and emits nothing), so "the first idle one in its list" finds nothing to wake in a
+state that has never been held. It only bites on a state that was held, had a Facility shut down by
+the Energy shortfall rule or a card, and was then thrown off. The formula test covers the clause with
+such a state; no Report line in sixty games named a Facility. If the intent was that a neutral
+state's Facilities should stand idle until the state develops itself — which is what the Climate
+phase's own comment says about them — that is a change to how neutral states start, and the
+designer's call.

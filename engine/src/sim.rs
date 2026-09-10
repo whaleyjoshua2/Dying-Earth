@@ -30,6 +30,12 @@ pub struct SimResult {
     pub constabularies: u32,
     pub relief_orders: u32,
     pub population_moved: f64,
+    /// Ticket #53: each seat's Blame at the end, its share of the table's, and the multiplier its
+    /// share puts on its Influence thresholds; and how many neutral states developed themselves.
+    pub blame: [f64; SEAT_COUNT],
+    pub blame_share: [f64; SEAT_COUNT],
+    pub threshold_multiplier: [f64; SEAT_COUNT],
+    pub developments: u32,
     pub log: Vec<String>,
 }
 
@@ -110,6 +116,11 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         .filter_map(|l| l.trim_start().split(' ').next().and_then(|n| n.parse::<f64>().ok()))
         .sum();
     let new_buildings = ["Bank", "Trade Post", "Embassy", "Relay"].map(|b| game.log.iter().filter(|l| l.contains(&format!("completed {b} at"))).count() as u32);
+    // Ticket #53: Blame as it stands at the end, and the neutral states that developed themselves.
+    let blame = Seat::ALL.map(|s| game.blame(s));
+    let blame_share = Seat::ALL.map(|s| game.blame_share(s));
+    let threshold_multiplier = Seat::ALL.map(|s| game.blame_threshold_multiplier(s));
+    let developments = game.log.iter().filter(|l| l.contains(" raised its Industry Level to ")).count() as u32;
     SimResult {
         seed,
         player,
@@ -128,6 +139,10 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         constabularies,
         relief_orders,
         population_moved,
+        blame,
+        blame_share,
+        threshold_multiplier,
+        developments,
         log: game.log,
     }
 }

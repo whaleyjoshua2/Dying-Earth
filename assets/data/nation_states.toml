@@ -16,6 +16,19 @@
 # / 10 Ducats a turn, and a Bank there adds 4 x gdp / 10. Splits share out the parent's figure too.
 # unrest (ticket #52): the Unrest the state starts with. Every state starts calm.
 
+# Ticket #53 (version 0.05): Neutral Development. A neutral Nation State (not Controlled, not
+# Occupied) below `max_level` raises its Industry Level by one every `turns` turns of unbroken
+# neutrality, and brings one idle Facility of its own online at the same moment. The clock is per
+# state and runs from the turn it was last neutral, so a state taken and then freed starts a fresh
+# count. Nothing develops while the Temperature stands at `stops_at_temperature` or above, nor
+# while the state's Unrest is at `no_development_at` (unrest.toml) or more. The designer's names
+# for these three are development_turns, development_max_level and
+# development_stops_at_temperature; inside their own table the prefix would only repeat itself.
+[development]
+turns = 6
+max_level = 4
+stops_at_temperature = 2.5
+
 # Sub-Saharan Africa: the continent below the Sahara, about 1.2 billion people, little industry,
 # the youngest population on the map and the least schooling.
 [[state]]

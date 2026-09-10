@@ -15,3 +15,12 @@ challenge_margin = 10
 station_threshold_base = 20
 occupation_turns = 3
 destruction_chance = 0.25
+
+# Ticket #53 (version 0.05): Blame. Every Faction wears the Emissions of the sources it controls,
+# less the CO2 it removes; its share of the four Factions' total Blame above `fair_share` multiplies
+# its Influence thresholds on every Nation State it does not hold, by 1 + (share - fair_share),
+# floored at x1.0 and capped at `cap`. Never on a Colony or a Space Station, never on the challenge
+# margin, never on Standing decay, never on Pacification.
+[blame]
+fair_share = 0.25
+cap = 1.5

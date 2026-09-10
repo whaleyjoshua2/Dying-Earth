@@ -131,6 +131,10 @@ pub struct NationState {
     pub refugees_in: f64,
     /// The Unrest last named in the Report, so a crossing of 4, 7 or 10 is reported once.
     pub unrest_reported: f64,
+    /// Ticket #53: the turn the state's current run of neutrality began, None while it is held or
+    /// Occupied. Neutral Development counts from here, so a state taken and then freed starts a
+    /// fresh six-turn count.
+    pub neutral_since: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -208,6 +212,9 @@ pub struct EmissionsBreakdown {
     pub cards: f64,
     pub sink: f64,
     pub restoration: f64,
+    /// Ticket #53: the Emissions of the sources each seat controlled this turn, which is what its
+    /// Blame is made of. Cards are nobody's, and neither is a neutral state's industry or people.
+    pub by_seat: [f64; SEAT_COUNT],
 }
 
 impl EmissionsBreakdown {
@@ -235,8 +242,16 @@ pub struct Climate {
     pub launches_pending: [u32; SEAT_COUNT],
     /// Emissions a card (Permafrost Thaw) adds at the next Climate phase, worldwide.
     pub card_emissions_next: f64,
-    /// Restoration bought in the last Orders phase, in ppm, for the next Climate phase only.
-    pub restoration_next: f64,
+    /// Ticket #53: the CO2 each seat removes at the next Climate phase, in ppm, for that phase
+    /// only. Restoration fills it now; a Scrubber will add to the same array on its own ticket.
+    pub removal_next: [f64; SEAT_COUNT],
+}
+
+impl Climate {
+    /// What the whole table removes at the next Climate phase: the Natural Sink's enlargement.
+    pub fn removal_total(&self) -> f64 {
+        self.removal_next.iter().sum()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -342,6 +357,10 @@ pub struct SeatState {
     /// Ticket #52: the state a Resettle order steers this Faction's refugee flows to, until the
     /// next Climate phase spends it.
     pub resettle_to: Option<StateId>,
+    /// Ticket #53: every ppm the sources this Faction controlled have emitted, over the whole game.
+    pub blame_emitted: f64,
+    /// Ticket #53: every ppm this Faction has removed, over the whole game.
+    pub blame_removed: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -478,6 +497,8 @@ impl Game {
             funding_archive: false,
             provisional_findings: true,
             resettle_to: None,
+            blame_emitted: 0.0,
+            blame_removed: 0.0,
         };
         // Seat 0 is the player's Faction; the other three follow in enum order (ticket #50).
         let mut kinds: Vec<FactionKind> = vec![setup.player];
@@ -500,6 +521,9 @@ impl Game {
                 changed_hands: false,
                 refugees_in: 0.0,
                 unrest_reported: c.unrest,
+                // Every state is neutral when the game opens, so every clock starts on turn 1;
+                // `take_control` clears the four the Factions begin holding.
+                neutral_since: Some(1),
             })
             .collect();
         let deck = crate::events::new_deck(&tables, &mut rng);
@@ -518,7 +542,7 @@ impl Game {
                 last: EmissionsBreakdown::default(),
                 launches_pending: [0; SEAT_COUNT],
                 card_emissions_next: 0.0,
-                restoration_next: 0.0,
+                removal_next: [0.0; SEAT_COUNT],
             },
             research: Research {
                 current: None,
@@ -874,6 +898,16 @@ impl Game {
 
     pub fn take_control(&mut self, s: StateId, seat: Seat) {
         self.state_mut(s).control = Control::Controlled(seat);
+        self.restart_neutrality_clock(s);
+    }
+
+    /// Ticket #53: called wherever a Nation State's control is written. A state that is neutral
+    /// counts its six turns from the turn after the change, since the change lands in a Resolution
+    /// the turn is already half through; a state held or Occupied has no clock at all.
+    pub fn restart_neutrality_clock(&mut self, s: StateId) {
+        let turn = self.turn;
+        let st = self.state_mut(s);
+        st.neutral_since = if st.control == Control::Neutral { Some(turn + 1) } else { None };
     }
 
     pub fn controlled_states(&self, seat: Seat) -> Vec<StateId> {
@@ -951,7 +985,8 @@ impl Game {
     }
 
     /// The threshold as one seat reads it (ticket #51): Provisional Findings gives the Archivists
-    /// half of Green Consensus while it is under research.
+    /// half of Green Consensus while it is under research. Ticket #53: and its Blame raises it on
+    /// every Nation State it does not control.
     pub fn influence_threshold_for(&self, seat: Seat, target: Target) -> i64 {
         let full = self.green_consensus_multiplier();
         let m = if self.has_tech(TechId::GreenConsensus) {
@@ -961,7 +996,47 @@ impl Game {
         } else {
             1.0
         };
-        self.threshold_with(target, m)
+        self.threshold_with(target, m * self.blame_threshold_multiplier_on(seat, target))
+    }
+
+    /// Ticket #53: Blame raises this seat's threshold on a Nation State it does not control, and
+    /// on nothing else: never on a Colony, never on a Space Station, never on a place it holds.
+    pub fn blame_threshold_multiplier_on(&self, seat: Seat, target: Target) -> f64 {
+        match target {
+            Place::State(_) if self.place_control(target).controller() != Some(seat) => self.blame_threshold_multiplier(seat),
+            _ => 1.0,
+        }
+    }
+
+    /// Ticket #53: the ppm this Faction is answerable for, over the whole game: what the sources it
+    /// controlled emitted, less what it removed, floored at zero.
+    pub fn blame(&self, seat: Seat) -> f64 {
+        let s = self.seat(seat);
+        (s.blame_emitted - s.blame_removed).max(0.0)
+    }
+
+    /// Ticket #53: the ppm a Faction removed beyond everything it ever emitted, which is what the
+    /// panels call a credit. Zero for everyone who has emitted more than they took back.
+    pub fn blame_credit(&self, seat: Seat) -> f64 {
+        let s = self.seat(seat);
+        (s.blame_removed - s.blame_emitted).max(0.0)
+    }
+
+    /// Ticket #53: the four Factions' Blame added together.
+    pub fn blame_total(&self) -> f64 {
+        Seat::ALL.into_iter().map(|s| self.blame(s)).sum()
+    }
+
+    /// Ticket #53: this Faction's share of the table's Blame; zero when nobody has any.
+    pub fn blame_share(&self, seat: Seat) -> f64 {
+        let total = self.blame_total();
+        if total <= 0.0 { 0.0 } else { self.blame(seat) / total }
+    }
+
+    /// Ticket #53: 1 + (share - a fair quarter), floored at x1.0 and capped by the table.
+    pub fn blame_threshold_multiplier(&self, seat: Seat) -> f64 {
+        let b = &self.tables.influence.blame;
+        (1.0 + (self.blame_share(seat) - b.fair_share)).clamp(1.0, b.cap)
     }
 
     fn green_consensus_multiplier(&self) -> f64 {
@@ -977,7 +1052,9 @@ impl Game {
                 .map(|c| t.colony_threshold_per_colonist * c.colonists as i64 + if c.in_orbit { t.station_threshold_base } else { 0 })
                 .unwrap_or(i64::MAX / 4),
         };
-        if multiplier < 1.0 { (raw as f64 * multiplier).floor() as i64 } else { raw }
+        // Ticket #53: the multiplier now runs both ways (Green Consensus down, Blame up), so it is
+        // always applied; the epsilon keeps 40 x 0.75 x 1.25 off the wrong side of a whole number.
+        if (multiplier - 1.0).abs() < 1e-9 { raw } else { (raw as f64 * multiplier + 1e-9).floor() as i64 }
     }
 
     /// A Nation State's Influence value (ticket #34): its card figure plus one per Industry Level raised.
