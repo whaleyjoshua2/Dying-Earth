@@ -29,7 +29,7 @@ fn fresh() -> Game {
 }
 
 fn with_seed(seed: u64) -> Game {
-    Game::new(tables(), NewGame { seed, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::Asia })
+    Game::new(tables(), NewGame { seed, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia })
 }
 
 fn facility(kind: FacilityKind) -> Facility {
@@ -65,7 +65,7 @@ fn station_of(g: &Game, seat: Seat, body: BodyId) -> Option<ColonyId> {
 fn income_shortfall_shuts_highest_upkeep_first_modules_before_facilities_then_alphabetical() {
     let mut g = game();
     g.seats[0].stockpile.energy = 0;
-    let st = g.state_mut(StateId::Asia);
+    let st = g.state_mut(StateId::EastAsia);
     st.facilities.clear();
     st.facilities.push(facility(FacilityKind::Factory)); // upkeep 2
     st.facilities.push(facility(FacilityKind::ResearchLab)); // upkeep 3
@@ -79,7 +79,7 @@ fn income_shortfall_shuts_highest_upkeep_first_modules_before_facilities_then_al
 fn income_shortfall_stops_once_the_balance_is_met() {
     let mut g = game();
     g.seats[0].stockpile.energy = 4;
-    let st = g.state_mut(StateId::Asia);
+    let st = g.state_mut(StateId::EastAsia);
     st.facilities.clear();
     st.facilities.push(facility(FacilityKind::Factory)); // 2
     st.facilities.push(facility(FacilityKind::Refinery)); // 3
@@ -87,7 +87,7 @@ fn income_shortfall_stops_once_the_balance_is_met() {
     // 4 - 8 = -4: shut Refinery (3) -> -1, then Research Lab (3) -> 2. Factory stays on.
     assert_eq!(g.shortfall_order(Seat(0)), vec!["Refinery", "Research Lab"]);
     g.income_phase();
-    let st = g.state(StateId::Asia);
+    let st = g.state(StateId::EastAsia);
     assert!(st.facilities.iter().find(|f| f.kind == FacilityKind::Factory).unwrap().online);
     assert!(!st.facilities.iter().find(|f| f.kind == FacilityKind::Refinery).unwrap().online);
     assert_eq!(g.seats[0].stockpile.energy, 2);
@@ -145,11 +145,11 @@ fn sea_level_thresholds_fire_once_per_state() {
     }
     g.climate.temperature = 1.85;
     g.climate.co2 = 420.0 + 1.5 * g.tables.climate.ppm_step; // target 1.95 keeps it above 1.8
-    let asia_before = g.build_slots(StateId::Asia);
+    let asia_before = g.build_slots(StateId::EastAsia);
     g.climate_phase();
-    assert_eq!(g.build_slots(StateId::Asia), asia_before - 2, "Asia has Coastal Exposure 2");
+    assert_eq!(g.build_slots(StateId::EastAsia), asia_before - 2, "Asia has Coastal Exposure 2");
     g.climate_phase();
-    assert_eq!(g.build_slots(StateId::Asia), asia_before - 2, "the same threshold never fires twice");
+    assert_eq!(g.build_slots(StateId::EastAsia), asia_before - 2, "the same threshold never fires twice");
 }
 
 #[test]
@@ -277,19 +277,19 @@ fn first_round_odds_formula() {
 #[test]
 fn influence_threshold_takes_control_and_decay_takes_two_from_untouched_targets() {
     let mut g = game();
-    // Africa: 20 + 10 * 3 = 50.
-    assert_eq!(g.influence_threshold(Place::State(StateId::Africa)), 50);
+    // Ticket #53: North Africa is Size 2, so 20 + 10 * 2 = 40.
+    assert_eq!(g.influence_threshold(Place::State(StateId::NorthAfrica)), 40);
     g.seats[0].allotment = 100;
-    g.pending.influence.push((Seat(0), Place::State(StateId::Africa), 49));
+    g.pending.influence.push((Seat(0), Place::State(StateId::NorthAfrica), 39));
     g.pending.influence.push((Seat(0), Place::State(StateId::Europe), 10));
     g.resolution_phase();
-    assert_eq!(g.state(StateId::Africa).control, Control::Neutral, "49 is under the threshold");
-    assert_eq!(g.seats[0].influence[&Place::State(StateId::Africa)], 49);
-    // Next turn: 1 more on Africa flips it; Europe, untouched, decays by 2.
-    g.pending.influence.push((Seat(0), Place::State(StateId::Africa), 1));
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Neutral, "39 is under the threshold");
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::NorthAfrica)], 39);
+    // Next turn: 1 more on North Africa flips it; Europe, untouched, decays by 2.
+    g.pending.influence.push((Seat(0), Place::State(StateId::NorthAfrica), 1));
     g.resolution_phase();
-    assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)));
-    assert_eq!(g.seats[0].influence[&Place::State(StateId::Africa)], 50, "the standing persists through the transfer (#33)");
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(0)));
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::NorthAfrica)], 40, "the standing persists through the transfer (#33)");
     assert_eq!(g.seats[0].influence[&Place::State(StateId::Europe)], 8);
 }
 
@@ -314,30 +314,30 @@ fn spending_on_your_own_place_raises_your_standing_and_it_decays_one_a_turn() {
 fn a_challenger_needs_a_standing_above_the_controllers_and_at_least_the_threshold() {
     let mut g = game();
     // Africa (threshold 50) is taken by seat 0 with a standing of 60.
-    g.seats[0].influence.insert(Place::State(StateId::Africa), 60);
-    g.seats[0].influenced_this_turn.push(Place::State(StateId::Africa));
+    g.seats[0].influence.insert(Place::State(StateId::NorthAfrica), 60);
+    g.seats[0].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
     g.resolution_phase();
-    assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)));
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(0)));
     // Seat 1 reaches the threshold but not the controller's standing: no change.
-    g.seats[1].influence.insert(Place::State(StateId::Africa), 55);
-    g.seats[1].influenced_this_turn.push(Place::State(StateId::Africa));
-    g.seats[0].influenced_this_turn.push(Place::State(StateId::Africa));
+    g.seats[1].influence.insert(Place::State(StateId::NorthAfrica), 55);
+    g.seats[1].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
+    g.seats[0].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
     g.resolution_phase();
-    assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)), "55 is not above 60");
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(0)), "55 is not above 60");
     // Version 0.04 (ticket #41): above the controller's standing but inside the challenge margin
     // of 10: still no change. That is what stops a place flipping back and forth every turn.
-    g.seats[1].influence.insert(Place::State(StateId::Africa), 69);
-    g.seats[1].influenced_this_turn.push(Place::State(StateId::Africa));
-    g.seats[0].influenced_this_turn.push(Place::State(StateId::Africa));
+    g.seats[1].influence.insert(Place::State(StateId::NorthAfrica), 69);
+    g.seats[1].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
+    g.seats[0].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
     g.resolution_phase();
-    assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)), "69 is not 60 plus the margin of 10");
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(0)), "69 is not 60 plus the margin of 10");
     // The controller's standing plus the margin: it flips, and seat 0 keeps its 60 to contest it back.
-    g.seats[1].influence.insert(Place::State(StateId::Africa), 70);
-    g.seats[1].influenced_this_turn.push(Place::State(StateId::Africa));
-    g.seats[0].influenced_this_turn.push(Place::State(StateId::Africa));
+    g.seats[1].influence.insert(Place::State(StateId::NorthAfrica), 70);
+    g.seats[1].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
+    g.seats[0].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
     g.resolution_phase();
-    assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(1)));
-    assert_eq!(g.seats[0].influence[&Place::State(StateId::Africa)], 60);
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(1)));
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::NorthAfrica)], 60);
     // Above the controller but under the threshold: a Colony with 8 Colonists (threshold 80) held at 20.
     let c = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 8);
     g.seats[0].influence.insert(Place::Colony(c), 20);
@@ -357,7 +357,7 @@ fn occupation_transfer_keeps_the_old_controllers_standing() {
     // Pacification gain is halved, so it needs a standing of its own to end up holding the place.
     g.seats[0].influence.insert(Place::State(StateId::Europe), 20);
     g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
-    occupier_in(&mut g, StateId::Asia, StateId::Europe);
+    occupier_in(&mut g, StateId::EastAsia, StateId::Europe);
     for _ in 0..3 {
         g.seats[1].influenced_this_turn.push(Place::State(StateId::Europe));
         g.resolution_phase();
@@ -373,18 +373,18 @@ fn occupation_transfer_keeps_the_old_controllers_standing() {
 #[test]
 fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction_multiplier() {
     let mut g = game();
-    // Custodians hold Asia (7): (10 + 7) x 1.3 = 22.1 -> 22. Prospectors hold Europe (5): 15.
-    assert_eq!(g.influence_allotment(Seat(0)), 22);
+    // Ticket #53: Custodians hold East Asia (4): (10 + 4) x 1.3 = 18.2 -> 18. Europe is still 5.
+    assert_eq!(g.influence_allotment(Seat(0)), 18);
     assert_eq!(g.influence_allotment(Seat(1)), 15);
     g.state_mut(StateId::NorthAmerica).control = Control::Controlled(Seat(1));
-    assert_eq!(g.influence_allotment(Seat(1)), 23, "North America adds 8");
-    // Raising Asia's Industry Level adds one to its value.
-    g.state_mut(StateId::Asia).industry_level += 1;
-    assert_eq!(g.state_influence_value(StateId::Asia), 8);
-    assert_eq!(g.influence_allotment(Seat(0)), 23, "(10 + 8) x 1.3 = 23.4");
-    // The card figures, as decided (Antarctica, once a 0 here, left the list on ticket #44).
+    assert_eq!(g.influence_allotment(Seat(1)), 22, "North America adds 7");
+    // Raising East Asia's Industry Level adds one to its value.
+    g.state_mut(StateId::EastAsia).industry_level += 1;
+    assert_eq!(g.state_influence_value(StateId::EastAsia), 5);
+    assert_eq!(g.influence_allotment(Seat(0)), 19, "(10 + 5) x 1.3 = 19.5");
+    // Ticket #53: twelve states share out the eight states' figures exactly, so the total stands.
     let total: i64 = StateId::ALL.iter().map(|s| g.tables.state(*s).influence).sum();
-    assert_eq!(total, 34, "8 + 7 + 5 + 4 + 4 + 2 + 2 + 2");
+    assert_eq!(total, 34, "7 + 5 + 4 + 4 + 4 + 2 + 2 + 2 + 1 + 1 + 1 + 1, as the eight totalled 34");
 }
 
 // ---------------------------------------------------------------- #35 Ducats
@@ -392,16 +392,16 @@ fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction
 #[test]
 fn a_controlled_state_pays_ducats_from_gdp_times_industry_and_a_bank_adds_more() {
     let mut g = game();
-    // Asia: gdp 30 x Industry 3 / 10 = 9 a turn for the Custodians; Europe 20 x 3 / 10 = 6 for the Prospectors.
-    assert_eq!(g.state_ducats(StateId::Asia), 9);
+    // Ticket #53: East Asia gdp 23 x Industry 3 / 10 = 6 a turn; Europe 20 x 3 / 10 = 6.
+    assert_eq!(g.state_ducats(StateId::EastAsia), 6);
     assert_eq!(g.state_ducats(StateId::Europe), 6);
     let paid = income_of(&mut g, Seat(0));
-    assert_eq!(paid.ducats, 9);
-    // A Bank in Asia adds 4 x 30 / 10 = 12 (Custodian output x1.0); in Africa (gdp 3) it would add 1.
-    g.state_mut(StateId::Asia).facilities.push(facility(FacilityKind::Bank));
-    assert_eq!(g.facility_yield(Seat(0), StateId::Asia, FacilityKind::Bank).amount, 12);
-    assert_eq!(g.facility_yield(Seat(0), StateId::Africa, FacilityKind::Bank).amount, 1);
-    assert_eq!(income_of(&mut g, Seat(0)).ducats, 21);
+    assert_eq!(paid.ducats, 6);
+    // A Bank in East Asia adds 4 x 23 / 10 = 9; in North Africa (gdp 1) it would add nothing.
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Bank));
+    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Bank).amount, 9);
+    assert_eq!(g.facility_yield(Seat(0), StateId::NorthAfrica, FacilityKind::Bank).amount, 0);
+    assert_eq!(income_of(&mut g, Seat(0)).ducats, 15);
     // A Trade Post follows the Habitat yield: 3 on the Moon, 4 on Mars (3 x 1.5 rounded down).
     let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::TradePost], 0);
     let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::TradePost], 0);
@@ -425,7 +425,7 @@ fn ducats_buy_influence_two_for_one_and_the_bought_influence_is_spendable_at_onc
     let pending = vec![buy.clone()];
     let (_, left) = g.remaining(Seat(0), &pending);
     assert_eq!(left, 32, "the Allotment plus the bought 10");
-    let spend = Order::Influence { target: Place::State(StateId::Africa), amount: 30 };
+    let spend = Order::Influence { target: Place::State(StateId::NorthAfrica), amount: 30 };
     assert!(g.check_order(Seat(0), &pending, &spend).is_ok());
     g.commit_orders(Seat(0), &[buy, spend]);
     assert_eq!(g.seats[0].stockpile.ducats, 0);
@@ -505,18 +505,18 @@ fn ships_are_built_only_at_shipyards_and_lifts_need_a_launch_site() {
     let mut g = game();
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
     let frigate = |site: Place| Order::BuildShip { site, kind: UnitKind::Frigate };
-    assert!(g.check_order(Seat(0), &[], &frigate(Place::State(StateId::Asia))).is_err(), "a Launch Site builds no Ship now");
+    assert!(g.check_order(Seat(0), &[], &frigate(Place::State(StateId::EastAsia))).is_err(), "a Launch Site builds no Ship now");
     assert!(g.check_order(Seat(0), &[], &frigate(Place::Colony(iss))).is_err(), "no Shipyard on the ISS yet");
     g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
     assert!(g.check_order(Seat(0), &[], &frigate(Place::Colony(iss))).is_ok());
     // Lifts: a Ship at Earth loads Colonists only from a state with a Launch Site, and each lift is a launch.
     let ship = ShipId(g.fresh_id());
     g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 });
-    g.state_mut(StateId::Africa).control = Control::Controlled(Seat(0));
-    g.state_mut(StateId::Africa).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
-    let from_africa = Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::Africa), army: None };
+    g.state_mut(StateId::NorthAfrica).control = Control::Controlled(Seat(0));
+    g.state_mut(StateId::NorthAfrica).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
+    let from_africa = Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::NorthAfrica), army: None };
     assert!(g.check_order(Seat(0), &[], &from_africa).is_err(), "no Launch Site in Africa");
-    let from_asia = Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::Asia), army: None };
+    let from_asia = Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::EastAsia), army: None };
     assert!(g.check_order(Seat(0), &[], &from_asia).is_ok());
     g.commit_orders(Seat(0), &[from_asia]);
     assert_eq!(g.climate.launches_pending[0], 1, "a lift is a launch");
@@ -586,7 +586,7 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
     assert_eq!(earth.colony_slots(), 3, "three Colony Slots on Earth, in Antarctica");
     assert_eq!((earth.mine_yield, earth.generator_yield, earth.refinery_yield, earth.habitat_yield), (1.0, 0.75, 1.5, 0.75));
     assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3);
-    assert_eq!(StateId::ALL.len(), 8, "Antarctica is no longer a Nation State");
+    assert_eq!(StateId::ALL.len(), 12, "twelve Nation States since ticket #53, and Antarctica is none of them");
     let m = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
     let before = g.emissions_now();
     colony(&mut g, Seat(0), BodyId::Earth, &[ModuleKind::Habitat, ModuleKind::Mine, ModuleKind::Refinery, ModuleKind::Generator], 4);
@@ -607,15 +607,15 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
 fn only_a_carrier_carries_an_army_and_a_colony_ship_carries_only_colonists() {
     let mut g = game();
     let army = ArmyId(g.fresh_id());
-    g.armies.push(Army { id: army, home: ArmyHome::State(StateId::Asia), at: ArmyAt::Place(Place::State(StateId::Asia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+    g.armies.push(Army { id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
     let ship = |id: u32, kind: UnitKind| Ship { id: ShipId(id), kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 };
     g.ships.extend([ship(101, UnitKind::ColonyShip), ship(102, UnitKind::Battleship), ship(103, UnitKind::Carrier)]);
-    let load_army = |s: u32| Order::Load { ship: ShipId(s), colonists: 0, from: LoadSource::State(StateId::Asia), army: Some(army) };
+    let load_army = |s: u32| Order::Load { ship: ShipId(s), colonists: 0, from: LoadSource::State(StateId::EastAsia), army: Some(army) };
     assert!(g.check_order(Seat(0), &[], &load_army(101)).is_err(), "a Colony Ship carries Colonists only");
     assert!(g.check_order(Seat(0), &[], &load_army(102)).is_err(), "a Battleship fights; it carries no Army");
     assert!(g.check_order(Seat(0), &[], &load_army(103)).is_ok(), "a Carrier carries one Army");
-    assert!(g.check_order(Seat(0), &[], &Order::Load { ship: ShipId(103), colonists: 1, from: LoadSource::State(StateId::Asia), army: None }).is_err(), "a Carrier carries no Colonists");
-    assert!(g.check_order(Seat(0), &[], &Order::Load { ship: ShipId(101), colonists: 4, from: LoadSource::State(StateId::Asia), army: None }).is_ok());
+    assert!(g.check_order(Seat(0), &[], &Order::Load { ship: ShipId(103), colonists: 1, from: LoadSource::State(StateId::EastAsia), army: None }).is_err(), "a Carrier carries no Colonists");
+    assert!(g.check_order(Seat(0), &[], &Order::Load { ship: ShipId(101), colonists: 4, from: LoadSource::State(StateId::EastAsia), army: None }).is_ok());
     let card = g.tables.unit(UnitKind::Carrier);
     assert_eq!(card.materials, 30);
     assert_eq!(card.build_turns, 1);
@@ -635,7 +635,7 @@ fn the_trading_window_sells_materials_fuel_and_energy_at_the_table_prices() {
     let m = Order::Buy { resource: Resource::Materials, amount: 10 };
     assert_eq!(g.order_cost(Seat(0), &m).ducats, 20, "Materials are 2 Ducats each");
     // Bought Materials are spendable at once: a Factory (20 Materials) is affordable with the buy pending.
-    let factory = Order::BuildFacility { state: StateId::Asia, kind: FacilityKind::Factory };
+    let factory = Order::BuildFacility { state: StateId::EastAsia, kind: FacilityKind::Factory };
     assert!(g.check_order(Seat(0), &[], &factory).is_err(), "no Materials yet");
     let pending = vec![Order::Buy { resource: Resource::Materials, amount: 20 }];
     let (left, _) = g.remaining(Seat(0), &pending);
@@ -656,21 +656,21 @@ fn the_trading_window_sells_materials_fuel_and_energy_at_the_table_prices() {
 fn a_building_bought_for_ducats_costs_twice_its_materials_and_queues_like_a_materials_build() {
     let mut g = game();
     g.seats[0].stockpile = Stockpile { materials: 0, fuel: 0, energy: 50, ducats: 40 };
-    let order = Order::BuildFacilityWithDucats { state: StateId::Asia, kind: FacilityKind::Factory };
+    let order = Order::BuildFacilityWithDucats { state: StateId::EastAsia, kind: FacilityKind::Factory };
     let cost = g.order_cost(Seat(0), &order);
     assert_eq!((cost.materials, cost.ducats), (0, 40), "a 20-Materials Factory is 40 Ducats");
     assert!(g.check_order(Seat(0), &[], &order).is_ok());
     // It takes a build slot like any build: Asia has one free slot on the bare board, so a second is refused.
-    let free = g.free_slots(StateId::Asia);
+    let free = g.free_slots(StateId::EastAsia);
     let mut pending = Vec::new();
     for _ in 0..free {
         pending.push(order.clone());
     }
-    assert!(g.check_order_legality(Seat(0), &pending, &Order::BuildFacility { state: StateId::Asia, kind: FacilityKind::Factory }).is_err(), "no free build slot");
+    assert!(g.check_order_legality(Seat(0), &pending, &Order::BuildFacility { state: StateId::EastAsia, kind: FacilityKind::Factory }).is_err(), "no free build slot");
     g.commit_orders(Seat(0), &[order]);
     assert_eq!(g.seats[0].stockpile.ducats, 0);
-    assert_eq!(g.state(StateId::Asia).queue.len(), 1);
-    assert_eq!(g.state(StateId::Asia).queue[0].item, BuildItem::Facility(FacilityKind::Factory));
+    assert_eq!(g.state(StateId::EastAsia).queue.len(), 1);
+    assert_eq!(g.state(StateId::EastAsia).queue[0].item, BuildItem::Facility(FacilityKind::Factory));
     // A Module too: a Mine on a Colony.
     let c = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 4);
     let mine = Order::BuildModuleWithDucats { colony: c, kind: ModuleKind::Mine };
@@ -702,30 +702,30 @@ fn selling_materials_or_fuel_returns_half_the_buying_price() {
 #[test]
 fn embassies_and_relays_add_to_the_allotment_and_raise_their_places_standing_each_turn() {
     let mut g = game();
-    // Custodians in Asia: (10 + 7) x 1.3 = 22. Two Embassies (they stack) add 4: (10 + 7 + 4) x 1.3 = 27.
-    assert_eq!(g.influence_allotment(Seat(0)), 22);
-    g.state_mut(StateId::Asia).facilities.push(facility(FacilityKind::Embassy));
-    g.state_mut(StateId::Asia).facilities.push(facility(FacilityKind::Embassy));
+    // Custodians in East Asia: (10 + 4) x 1.3 = 18. Two Embassies (they stack) add 4: (10 + 4 + 4) x 1.3 = 23.
+    assert_eq!(g.influence_allotment(Seat(0)), 18);
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Embassy));
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Embassy));
     assert_eq!(g.building_allotment(Seat(0)), 4);
-    assert_eq!(g.influence_allotment(Seat(0)), 27);
+    assert_eq!(g.influence_allotment(Seat(0)), 23);
     // A Relay in a Colony adds 1 more.
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Relay], 4);
-    assert_eq!(g.influence_allotment(Seat(0)), 28, "(10 + 7 + 5) x 1.3 = 28.6");
+    assert_eq!(g.influence_allotment(Seat(0)), 24, "(10 + 4 + 5) x 1.3 = 24.7");
     // Each Resolution the standing rises by the buildings' figures and does not decay.
     g.resolution_phase();
-    assert_eq!(g.seats[0].influence[&Place::State(StateId::Asia)], 4, "two Embassies, 2 each");
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::EastAsia)], 4, "two Embassies, 2 each");
     assert_eq!(g.seats[0].influence[&Place::Colony(c)], 2, "one Relay");
     g.resolution_phase();
-    assert_eq!(g.seats[0].influence[&Place::State(StateId::Asia)], 8);
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::EastAsia)], 8);
     // An offline Embassy adds nothing.
-    for f in g.state_mut(StateId::Asia).facilities.iter_mut().filter(|f| f.kind == FacilityKind::Embassy) {
+    for f in g.state_mut(StateId::EastAsia).facilities.iter_mut().filter(|f| f.kind == FacilityKind::Embassy) {
         f.online = false;
     }
     assert_eq!(g.building_allotment(Seat(0)), 1, "only the Relay");
     g.resolution_phase();
-    assert_eq!(g.seats[0].influence[&Place::State(StateId::Asia)], 7, "no rise, and decay 1 on your own place");
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::EastAsia)], 7, "no rise, and decay 1 on your own place");
     // The card says what they do.
-    let y = g.facility_yield(Seat(0), StateId::Asia, FacilityKind::Embassy);
+    let y = g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Embassy);
     assert_eq!(y.text(), "+2 Influence Allotment, standing here +2 a turn, 2 Energy upkeep");
 }
 
@@ -742,7 +742,7 @@ fn occupation_transfers_control_at_the_end_of_the_third_turn() {
     let mut g = game();
     // Seat 0 (Asia) has an Army in Europe, whose Standing Army has been removed.
     g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
-    occupier_in(&mut g, StateId::Asia, StateId::Europe);
+    occupier_in(&mut g, StateId::EastAsia, StateId::Europe);
     g.resolution_phase();
     assert!(matches!(g.state(StateId::Europe).control, Control::Occupied { occupier: Seat(0), turns: 1, .. }));
     g.resolution_phase();
@@ -755,7 +755,7 @@ fn occupation_transfers_control_at_the_end_of_the_third_turn() {
 fn occupation_transfers_at_once_when_pacified() {
     let mut g = game();
     g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
-    occupier_in(&mut g, StateId::Asia, StateId::Europe);
+    occupier_in(&mut g, StateId::EastAsia, StateId::Europe);
     // Threshold 50; 40 already accumulated; one turn of Occupation adds ceil(50/3) = 17.
     g.seats[0].influence.insert(Place::State(StateId::Europe), 40);
     g.resolution_phase();
@@ -766,20 +766,20 @@ fn occupation_transfers_at_once_when_pacified() {
 fn occupation_ends_when_the_occupier_leaves() {
     let mut g = game();
     // Africa is neutral (Europe is the AI's start state).
-    g.armies.retain(|a| a.home != ArmyHome::State(StateId::Africa));
-    let a = occupier_in(&mut g, StateId::Asia, StateId::Africa);
+    g.armies.retain(|a| a.home != ArmyHome::State(StateId::NorthAfrica));
+    let a = occupier_in(&mut g, StateId::EastAsia, StateId::NorthAfrica);
     g.resolution_phase();
-    assert!(matches!(g.state(StateId::Africa).control, Control::Occupied { occupier: Seat(0), previous: None, turns: 1 }));
+    assert!(matches!(g.state(StateId::NorthAfrica).control, Control::Occupied { occupier: Seat(0), previous: None, turns: 1 }));
     g.armies.retain(|x| x.id != a);
     g.resolution_phase();
-    assert_eq!(g.state(StateId::Africa).control, Control::Neutral);
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Neutral);
 }
 
 #[test]
 fn occupation_of_a_controlled_state_returns_it_to_its_owner_when_broken() {
     let mut g = game();
     g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
-    let a = occupier_in(&mut g, StateId::Asia, StateId::Europe);
+    let a = occupier_in(&mut g, StateId::EastAsia, StateId::Europe);
     g.resolution_phase();
     assert!(matches!(g.state(StateId::Europe).control, Control::Occupied { occupier: Seat(0), previous: Some(Seat(1)), turns: 1 }));
     g.armies.retain(|x| x.id != a);
@@ -900,26 +900,26 @@ fn the_deck_is_twenty_six_cards_as_the_table_deals_them_and_no_calm() {
 fn launch_pad_fire_closes_a_launch_site_unless_clean_propellant_is_known() {
     let mut g = game();
     g.turn = 3;
-    drawn(&mut g, EventId::LaunchPadFire, EventTarget::State(StateId::Asia));
+    drawn(&mut g, EventId::LaunchPadFire, EventTarget::State(StateId::EastAsia));
     g.resolution_phase();
-    assert!(!g.state(StateId::Asia).facilities.iter().find(|f| f.kind == FacilityKind::LaunchSite).unwrap().online, "the Launch Site is offline");
+    assert!(!g.state(StateId::EastAsia).facilities.iter().find(|f| f.kind == FacilityKind::LaunchSite).unwrap().online, "the Launch Site is offline");
     let ship = ShipId(g.fresh_id());
     g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 });
-    assert!(g.check_order(Seat(0), &[], &Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::Asia), army: None }).is_err(), "nothing lifts from a closed Launch Site");
+    assert!(g.check_order(Seat(0), &[], &Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::EastAsia), army: None }).is_err(), "nothing lifts from a closed Launch Site");
     // With Clean Propellant the Launch Site stays open.
     let mut g = game();
     g.turn = 3;
     with_tech(&mut g, TechId::CleanPropellant);
-    drawn(&mut g, EventId::LaunchPadFire, EventTarget::State(StateId::Asia));
+    drawn(&mut g, EventId::LaunchPadFire, EventTarget::State(StateId::EastAsia));
     g.resolution_phase();
-    assert!(g.state(StateId::Asia).facilities.iter().find(|f| f.kind == FacilityKind::LaunchSite).unwrap().online);
+    assert!(g.state(StateId::EastAsia).facilities.iter().find(|f| f.kind == FacilityKind::LaunchSite).unwrap().online);
 }
 
 #[test]
 fn labour_dispute_idles_a_states_facilities_at_the_next_income_and_public_science_spares_all_but_one() {
     let mut g = game();
-    g.state_mut(StateId::Asia).facilities = vec![facility(FacilityKind::Factory), facility(FacilityKind::Refinery), facility(FacilityKind::PowerPlant)];
-    drawn(&mut g, EventId::LabourDispute, EventTarget::State(StateId::Asia));
+    g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::Factory), facility(FacilityKind::Refinery), facility(FacilityKind::PowerPlant)];
+    drawn(&mut g, EventId::LabourDispute, EventTarget::State(StateId::EastAsia));
     g.apply_event_now();
     let paid = income_of(&mut g, Seat(0));
     assert_eq!((paid.materials, paid.fuel), (0, 0), "nothing made: {paid:?}");
@@ -928,9 +928,9 @@ fn labour_dispute_idles_a_states_facilities_at_the_next_income_and_public_scienc
     let paid = income_of(&mut g, Seat(0));
     assert!(paid.materials > 0 && paid.fuel > 0, "back at work after Resolution: {paid:?}");
     with_tech(&mut g, TechId::PublicScience);
-    drawn(&mut g, EventId::LabourDispute, EventTarget::State(StateId::Asia));
+    drawn(&mut g, EventId::LabourDispute, EventTarget::State(StateId::EastAsia));
     g.apply_event_now();
-    let idle = g.state(StateId::Asia).facilities.iter().filter(|f| f.offline_until_resolution).count();
+    let idle = g.state(StateId::EastAsia).facilities.iter().filter(|f| f.offline_until_resolution).count();
     assert_eq!(idle, 1, "one Facility only");
 }
 
@@ -960,7 +960,7 @@ fn drawn(g: &mut Game, id: EventId, target: EventTarget) {
 #[test]
 fn solar_maximum_boosts_power_plants_and_generators_at_the_next_income_once() {
     let mut g = game();
-    g.state_mut(StateId::Asia).facilities = vec![facility(FacilityKind::PowerPlant)];
+    g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::PowerPlant)];
     colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator], 0);
     drawn(&mut g, EventId::SolarMaximum, EventTarget::Everyone);
     g.apply_event_now();
@@ -1061,7 +1061,7 @@ fn income_of(g: &mut Game, seat: Seat) -> Stockpile {
 #[test]
 fn tech_efficient_grids_raises_power_plant_and_generator_output() {
     let mut g = game();
-    g.state_mut(StateId::Asia).facilities = vec![facility(FacilityKind::PowerPlant)];
+    g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::PowerPlant)];
     let plain = income_of(&mut g, Seat(0)).energy;
     with_tech(&mut g, TechId::EfficientGrids);
     let boosted = income_of(&mut g, Seat(0)).energy;
@@ -1072,7 +1072,7 @@ fn tech_efficient_grids_raises_power_plant_and_generator_output() {
 #[test]
 fn tech_clean_power_cuts_power_plant_emissions() {
     let mut g = game();
-    g.state_mut(StateId::Asia).facilities = vec![facility(FacilityKind::PowerPlant)];
+    g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::PowerPlant)];
     let plain = g.emissions_now().power_plants;
     with_tech(&mut g, TechId::CleanPower);
     let clean = g.emissions_now().power_plants;
@@ -1083,7 +1083,7 @@ fn tech_clean_power_cuts_power_plant_emissions() {
 #[test]
 fn tech_clean_manufacturing_cuts_factory_and_refinery_emissions() {
     let mut g = game();
-    g.state_mut(StateId::Asia).facilities = vec![facility(FacilityKind::Factory), facility(FacilityKind::Refinery)];
+    g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::Factory), facility(FacilityKind::Refinery)];
     with_tech(&mut g, TechId::CleanManufacturing);
     let e = g.emissions_now();
     assert!((e.factories - 1.0 * 0.4 * 0.75).abs() < 1e-9);
@@ -1134,7 +1134,7 @@ fn tech_expanded_habitats_holds_two_more() {
 fn tech_closed_loop_colonies_halves_module_upkeep() {
     let mut g = game();
     colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 0); // upkeep 3
-    g.state_mut(StateId::Asia).facilities.clear();
+    g.state_mut(StateId::EastAsia).facilities.clear();
     let plain = income_of(&mut g, Seat(0)).energy;
     with_tech(&mut g, TechId::ClosedLoopColonies);
     let halved = income_of(&mut g, Seat(0)).energy;
@@ -1145,7 +1145,7 @@ fn tech_closed_loop_colonies_halves_module_upkeep() {
 #[test]
 fn tech_deep_mining_raises_mine_and_factory_output() {
     let mut g = game();
-    g.state_mut(StateId::Asia).facilities = vec![facility(FacilityKind::Factory)];
+    g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::Factory)];
     colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 0);
     // Factory: 4 x 1.5 (Asia leans Materials) = 6. Mine: 4 x 1.5 (Moon) = 6.
     assert_eq!(income_of(&mut g, Seat(0)).materials, 12);
@@ -1157,7 +1157,7 @@ fn tech_deep_mining_raises_mine_and_factory_output() {
 #[test]
 fn tech_automated_refining_raises_refinery_output() {
     let mut g = game();
-    g.state_mut(StateId::Asia).facilities = vec![facility(FacilityKind::Refinery)];
+    g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::Refinery)];
     assert_eq!(income_of(&mut g, Seat(0)).fuel, 3);
     with_tech(&mut g, TechId::AutomatedRefining);
     assert_eq!(income_of(&mut g, Seat(0)).fuel, 4, "4.5 rounded down");
@@ -1166,27 +1166,27 @@ fn tech_automated_refining_raises_refinery_output() {
 #[test]
 fn tech_public_science_raises_research_lab_output() {
     let mut g = game();
-    g.state_mut(StateId::Asia).facilities = vec![facility(FacilityKind::ResearchLab)];
+    g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::ResearchLab)];
     g.research.current = Some(TechId::CleanPower);
     g.research.done.push(TechId::EfficientGrids);
     g.seats[0].stockpile.energy = 1000;
     g.income_phase();
-    // 2 x (1 + 47/50) x 0.9 x 1.25 = 4.23 -> 4
-    assert_eq!(g.seats[0].research_last_turn, 4);
+    // Ticket #53, East Asia: 2 x (1 + 16.4/50) x 1.1 x 1.25 = 3.65 -> 3
+    assert_eq!(g.seats[0].research_last_turn, 3);
     with_tech(&mut g, TechId::PublicScience);
     g.income_phase();
-    assert_eq!(g.seats[0].research_last_turn, 6, "6.345 rounded down");
+    assert_eq!(g.seats[0].research_last_turn, 5, "5.48 rounded down");
 }
 
 #[test]
 fn tech_green_consensus_halves_per_person_emissions_and_lowers_thresholds() {
     let mut g = game();
     let before = g.emissions_now().population;
-    assert_eq!(g.influence_threshold(Place::State(StateId::Africa)), 50);
+    assert_eq!(g.influence_threshold(Place::State(StateId::NorthAfrica)), 40);
     with_tech(&mut g, TechId::GreenConsensus);
     let after = g.emissions_now().population;
     assert!((after - before / 2.0).abs() < 1e-9);
-    assert_eq!(g.influence_threshold(Place::State(StateId::Africa)), 37, "50 x 0.75 rounded down");
+    assert_eq!(g.influence_threshold(Place::State(StateId::NorthAfrica)), 30, "40 x 0.75");
 }
 
 // ---------------------------------------------------------------- 19.3 a defended Colony changes hands
@@ -1234,7 +1234,7 @@ fn colony_attack_turns(seed: u64) -> Option<u32> {
     for kind in [UnitKind::Carrier, UnitKind::Carrier] {
         let attacker = ArmyId(g.fresh_id());
         let ship = ShipId(g.fresh_id());
-        g.armies.push(Army { id: attacker, home: ArmyHome::State(StateId::Asia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+        g.armies.push(Army { id: attacker, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
         g.ships.push(Ship { id: ship, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, army: Some(attacker), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 });
         attackers.push(attacker);
         ships.push(ship);
@@ -1265,15 +1265,15 @@ fn colony_attack_turns(seed: u64) -> Option<u32> {
 #[test]
 fn building_yields_on_the_card_equal_what_income_pays() {
     let mut g = game();
-    g.state_mut(StateId::Asia).facilities = vec![facility(FacilityKind::Factory), facility(FacilityKind::Refinery), facility(FacilityKind::ResearchLab), facility(FacilityKind::PowerPlant)];
-    g.state_mut(StateId::Africa).control = Control::Controlled(Seat(0));
-    g.state_mut(StateId::Africa).facilities = vec![facility(FacilityKind::Factory)];
+    g.state_mut(StateId::EastAsia).facilities = vec![facility(FacilityKind::Factory), facility(FacilityKind::Refinery), facility(FacilityKind::ResearchLab), facility(FacilityKind::PowerPlant)];
+    g.state_mut(StateId::NorthAfrica).control = Control::Controlled(Seat(0));
+    g.state_mut(StateId::NorthAfrica).facilities = vec![facility(FacilityKind::Factory)];
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Generator, ModuleKind::Refinery], 0);
     g.research.done.push(TechId::DeepMining);
     g.research.current = Some(TechId::CleanPower);
     let mut expect = Stockpile::default();
     let mut research = 0;
-    for sid in [StateId::Asia, StateId::Africa] {
+    for sid in [StateId::EastAsia, StateId::NorthAfrica] {
         for f in &g.state(sid).facilities {
             let y = g.facility_yield(Seat(0), sid, f.kind);
             match y.resource {
@@ -1301,9 +1301,9 @@ fn building_yields_on_the_card_equal_what_income_pays() {
     assert_eq!((paid.materials, paid.fuel, paid.energy), (expect.materials, expect.fuel, expect.energy));
     assert_eq!(g.seats[0].research_last_turn, research);
     // And the Emissions figure on the card is the Climate phase's figure for that building.
-    let card: f64 = g.state(StateId::Asia).facilities.iter().map(|f| g.facility_yield(Seat(0), StateId::Asia, f.kind).emissions).sum();
+    let card: f64 = g.state(StateId::EastAsia).facilities.iter().map(|f| g.facility_yield(Seat(0), StateId::EastAsia, f.kind).emissions).sum();
     let e = g.emissions_now();
-    let asia_share = e.factories + e.power_plants + e.refineries - g.facility_yield(Seat(0), StateId::Africa, FacilityKind::Factory).emissions;
+    let asia_share = e.factories + e.power_plants + e.refineries - g.facility_yield(Seat(0), StateId::NorthAfrica, FacilityKind::Factory).emissions;
     assert!((card - asia_share).abs() < 1e-9, "card {card} climate {asia_share}");
 }
 
@@ -1328,13 +1328,13 @@ fn every_state_starts_with_its_start_facilities_and_the_faction_states_add_a_lau
 #[test]
 fn idle_facilities_in_a_neutral_state_make_nothing_and_emit_nothing() {
     let mut g = fresh();
-    // Africa is neutral and starts with a Factory.
-    assert_eq!(g.state(StateId::Africa).control, Control::Neutral);
-    assert!(g.state(StateId::Africa).facilities.iter().any(|f| f.kind == FacilityKind::Factory));
-    let before = g.emissions_now().factories;
-    g.state_mut(StateId::Africa).control = Control::Controlled(Seat(0));
-    let after = g.emissions_now().factories;
-    assert!(after > before, "the Factory emits once somebody directs it: {before} -> {after}");
+    // Ticket #53: North Africa is neutral and, leaning Fuel, starts with a Refinery.
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Neutral);
+    assert!(g.state(StateId::NorthAfrica).facilities.iter().any(|f| f.kind == FacilityKind::Refinery));
+    let before = g.emissions_now().refineries;
+    g.state_mut(StateId::NorthAfrica).control = Control::Controlled(Seat(0));
+    let after = g.emissions_now().refineries;
+    assert!(after > before, "the Refinery emits once somebody directs it: {before} -> {after}");
 }
 
 #[test]
@@ -1390,12 +1390,12 @@ fn only_climate_cards_scale_with_the_temperature() {
 fn a_place_taken_by_influence_keeps_every_facility() {
     for seed in 1..=5u64 {
         let mut g = with_seed(seed);
-        g.state_mut(StateId::Africa).facilities = (0..8).map(|_| facility(FacilityKind::Factory)).collect();
-        g.seats[0].influence.insert(Place::State(StateId::Africa), 60);
-        g.seats[0].influenced_this_turn.push(Place::State(StateId::Africa));
+        g.state_mut(StateId::NorthAfrica).facilities = (0..8).map(|_| facility(FacilityKind::Factory)).collect();
+        g.seats[0].influence.insert(Place::State(StateId::NorthAfrica), 60);
+        g.seats[0].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
         g.resolution_phase();
-        assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)), "seed {seed}");
-        assert_eq!(g.state(StateId::Africa).facilities.len(), 8, "seed {seed}: nothing destroyed by Influence");
+        assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(0)), "seed {seed}");
+        assert_eq!(g.state(StateId::NorthAfrica).facilities.len(), 8, "seed {seed}: nothing destroyed by Influence");
     }
 }
 
@@ -1561,15 +1561,19 @@ fn the_ai_seats_take_start_states_not_adjacent_to_any_taken_one() {
     let g = Game::new(tables(), NewGame { seed: 7, player: FactionKind::Prospectors, player_is_ai: false, player_start: StateId::Europe });
     let held = |seat: Seat| g.controlled_states(seat);
     assert_eq!(held(Seat(0)), vec![StateId::Europe]);
-    // Europe touches North America, Africa, Russia and the Middle East, so the first AI seat takes
-    // the highest Industry Level among Asia, Australia and South America: Asia at 3.
-    assert_eq!(held(Seat(1)), vec![StateId::Asia]);
-    // Asia adds Russia, the Middle East and Australia to the adjacent set; only South America is
-    // left untouched.
-    assert_eq!(held(Seat(2)), vec![StateId::SouthAmerica]);
-    // Now every free state touches a taken one, so the rule falls back to the highest Industry
-    // Level free state: North America at 3.
-    assert_eq!(held(Seat(3)), vec![StateId::NorthAmerica]);
+    // Europe touches North America, North Africa, Russia and the Middle East, so the first AI seat
+    // takes the highest Industry Level among what is left untouched: East Asia at 3.
+    assert_eq!(held(Seat(1)), vec![StateId::EastAsia]);
+    // East Asia adds Russia, South Asia and South-East Asia to the adjacent set; Australia is the
+    // highest Industry Level still untouched, at 2.
+    assert_eq!(held(Seat(2)), vec![StateId::Australia]);
+    // Then the untouched states are all at Industry 1, so the tie goes to the most populous:
+    // Sub-Saharan Africa at 11.4.
+    assert_eq!(held(Seat(3)), vec![StateId::SubSaharanAfrica]);
+    // The fallback, when every free state touches a taken one: the highest Industry Level free
+    // state, ties by population. With everything above taken, North America at 3 wins.
+    let taken = [StateId::Europe, StateId::EastAsia, StateId::Australia, StateId::SubSaharanAfrica, StateId::SouthAmerica, StateId::CentralAmerica];
+    assert_eq!(g.ai_start_state(&taken), StateId::NorthAmerica, "the fallback picks the best free state");
     // Every seat's start carries a Launch Site.
     for seat in Seat::ALL {
         let sid = held(seat)[0];
@@ -1584,18 +1588,18 @@ fn two_challengers_at_the_same_standing_leave_the_place_where_it_was() {
     let mut g = game();
     // Africa's threshold is 50. Two seats reach it in the same Resolution at the same Standing.
     for seat in [Seat(0), Seat(1)] {
-        g.seats[seat.index()].influence.insert(Place::State(StateId::Africa), 50);
-        g.seats[seat.index()].influenced_this_turn.push(Place::State(StateId::Africa));
+        g.seats[seat.index()].influence.insert(Place::State(StateId::NorthAfrica), 50);
+        g.seats[seat.index()].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
     }
     g.resolution_phase();
-    assert_eq!(g.state(StateId::Africa).control, Control::Neutral, "an exact tie goes to nobody");
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Neutral, "an exact tie goes to nobody");
     // One more point and the higher Standing takes it.
-    g.seats[0].influence.insert(Place::State(StateId::Africa), 51);
+    g.seats[0].influence.insert(Place::State(StateId::NorthAfrica), 51);
     for seat in [Seat(0), Seat(1)] {
-        g.seats[seat.index()].influenced_this_turn.push(Place::State(StateId::Africa));
+        g.seats[seat.index()].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
     }
     g.resolution_phase();
-    assert_eq!(g.state(StateId::Africa).control, Control::Controlled(Seat(0)), "the higher Standing takes it");
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(0)), "the higher Standing takes it");
 }
 
 // ---------------------------------------------------------------- 12.2 the Research Lead tie
@@ -1701,11 +1705,14 @@ fn steerage_doubles_an_arkwright_colony_ships_load_and_cuts_its_price() {
     assert_eq!(g.colony_ship_capacity(Seat(0)), 6);
     assert_eq!(g.colony_ship_capacity(Seat(2)), 12, "(4 + 2) doubled");
     // Price: 30 Materials on the units.toml row, 20 on the Arkwrights' card.
-    let build = Order::BuildShip { site: Place::State(StateId::Asia), kind: UnitKind::ColonyShip };
+    let build = Order::BuildShip { site: Place::State(StateId::EastAsia), kind: UnitKind::ColonyShip };
     assert_eq!(g.order_cost(Seat(0), &build).materials, 30);
     assert_eq!(g.order_cost(Seat(2), &build).materials, 20);
     // And the Load order holds them to it.
     let sid = g.controlled_states(Seat(2))[0];
+    // Ticket #53: a lift of twelve costs an Arkwright state 2.4 population, more than some of the
+    // twelve states hold, so the test gives its start state people to spare.
+    g.state_mut(sid).population = 10.0;
     let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
     let load = |n: u32| Order::Load { ship, colonists: n, from: LoadSource::State(sid), army: None };
     assert!(g.check_order(Seat(2), &[], &load(12)).is_ok());
@@ -1716,16 +1723,16 @@ fn steerage_doubles_an_arkwright_colony_ships_load_and_cuts_its_price() {
 #[test]
 fn an_arkwright_lift_takes_twice_the_population_out_of_its_state() {
     let mut g = game();
-    g.state_mut(StateId::Africa).control = Control::Controlled(Seat(2));
-    g.state_mut(StateId::Africa).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
-    g.state_mut(StateId::Africa).facilities.push(facility(FacilityKind::LaunchSite));
+    g.state_mut(StateId::NorthAfrica).control = Control::Controlled(Seat(2));
+    g.state_mut(StateId::NorthAfrica).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
+    g.state_mut(StateId::NorthAfrica).facilities.push(facility(FacilityKind::LaunchSite));
     assert!((g.lift_population(Seat(0), 4) - 0.4).abs() < 1e-9);
     assert!((g.lift_population(Seat(2), 4) - 0.8).abs() < 1e-9, "Steerage costs the state twice");
-    let before = g.state(StateId::Africa).population;
+    let before = g.state(StateId::NorthAfrica).population;
     let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
-    g.commit_orders(Seat(2), &[Order::Load { ship, colonists: 4, from: LoadSource::State(StateId::Africa), army: None }]);
+    g.commit_orders(Seat(2), &[Order::Load { ship, colonists: 4, from: LoadSource::State(StateId::NorthAfrica), army: None }]);
     g.resolution_phase();
-    let taken = before - g.state(StateId::Africa).population;
+    let taken = before - g.state(StateId::NorthAfrica).population;
     assert!((taken - 0.8).abs() < 1e-9, "the lift took {taken}, not 0.8");
     assert_eq!(g.ship(ship).unwrap().colonists, 4);
 }
@@ -1989,9 +1996,9 @@ fn the_archivist_ai_funds_the_archive_before_it_holds_a_colony() {
 fn calm(g: &mut Game) {
     let n = g.tables.climate.sea_level_thresholds.len();
     for s in &mut g.states {
-        s.unrest = 0;
-        s.unrest_rose = false;
-        s.unrest_reported = 0;
+        s.unrest = 0.0;
+        s.changed_hands = false;
+        s.unrest_reported = 0.0;
         s.refugees_in = 0.0;
         s.thresholds_fired = vec![true; n];
     }
@@ -2018,7 +2025,7 @@ fn a_population_fall_raises_unrest_by_one_and_a_fall_over_one_percent_by_two() {
     let rate = g.population_growth_rate();
     assert!(rate < 0.0 && rate > -0.01, "a small fall: {rate}");
     g.climate_phase();
-    assert_eq!(g.unrest(StateId::Asia), 1, "a fall of less than one per cent raises Unrest by one");
+    assert_eq!(g.unrest(StateId::EastAsia), 1.5, "a fall of less than one per cent raises Unrest by one and a half");
 
     let mut g = game();
     calm(&mut g);
@@ -2026,7 +2033,7 @@ fn a_population_fall_raises_unrest_by_one_and_a_fall_over_one_percent_by_two() {
     let rate = g.population_growth_rate();
     assert!(rate < -0.01, "a fall of more than one per cent: {rate}");
     g.climate_phase();
-    assert_eq!(g.unrest(StateId::Asia), 2, "a fall of more than one per cent raises Unrest by two");
+    assert_eq!(g.unrest(StateId::EastAsia), 2.0, "a fall of more than one per cent raises Unrest by two");
 }
 
 /// (b) A Sea Level threshold raises Unrest by 2 per build slot lost and drives 5% of the people out
@@ -2035,23 +2042,23 @@ fn a_population_fall_raises_unrest_by_one_and_a_fall_over_one_percent_by_two() {
 fn b_a_sea_level_threshold_raises_two_a_slot_and_displaces_five_percent_an_exposure() {
     let mut g = game();
     calm(&mut g);
-    // Asia: Coastal Exposure 2; neighbours Russia, the Middle East and Australia.
+    // East Asia: Coastal Exposure 2; neighbours Russia, South Asia and South-East Asia.
     let pop = 40.0;
-    g.state_mut(StateId::Asia).population = pop;
-    for s in [StateId::Russia, StateId::MiddleEast, StateId::Australia] {
+    g.state_mut(StateId::EastAsia).population = pop;
+    for s in [StateId::Russia, StateId::SouthAsia, StateId::SouthEastAsia] {
         g.state_mut(s).population = 0.0;
     }
     g.state_mut(StateId::Russia).industry_level = 3;
-    g.state_mut(StateId::MiddleEast).industry_level = 1;
-    g.state_mut(StateId::Australia).industry_level = 0;
-    g.apply_sea_threshold(StateId::Asia, 0);
-    assert_eq!(g.unrest(StateId::Asia), 4, "two per build slot, and Asia is exposed 2");
+    g.state_mut(StateId::SouthAsia).industry_level = 1;
+    g.state_mut(StateId::SouthEastAsia).industry_level = 0;
+    g.apply_sea_threshold(StateId::EastAsia, 0);
+    assert_eq!(g.unrest(StateId::EastAsia), 2.0, "one per build slot, and Asia is exposed 2");
     let displaced = pop * 0.05 * 2.0;
-    assert!((g.state(StateId::Asia).population - (pop - displaced)).abs() < 1e-9, "{}", g.state(StateId::Asia).population);
+    assert!((g.state(StateId::EastAsia).population - (pop - displaced)).abs() < 1e-9, "{}", g.state(StateId::EastAsia).population);
     let moved = displaced * 0.5;
     assert!((g.state(StateId::Russia).population - moved * 0.75).abs() < 1e-9, "Russia {}", g.state(StateId::Russia).population);
-    assert!((g.state(StateId::MiddleEast).population - moved * 0.25).abs() < 1e-9, "the Middle East {}", g.state(StateId::MiddleEast).population);
-    assert_eq!(g.state(StateId::Australia).population, 0.0, "an Industry Level of 0 takes none while another has some");
+    assert!((g.state(StateId::SouthAsia).population - moved * 0.25).abs() < 1e-9, "South Asia {}", g.state(StateId::SouthAsia).population);
+    assert_eq!(g.state(StateId::SouthEastAsia).population, 0.0, "an Industry Level of 0 takes none while another has some");
     assert!(g.report.lines.iter().any(|l| l.contains("Unrest there rose")), "the Report says so: {:?}", g.report.lines);
 }
 
@@ -2065,33 +2072,36 @@ fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_half_a_person()
         s.population = 0.0;
     }
     let before = 100.0;
-    g.state_mut(StateId::Asia).population = before;
-    // Russia is the only neighbour of Asia's with any Industry Level, so it takes the whole flow.
+    g.state_mut(StateId::EastAsia).population = before;
+    // Russia is the only neighbour of East Asia's with any Industry Level, so it takes the whole flow.
     g.state_mut(StateId::Russia).industry_level = 2;
-    g.state_mut(StateId::MiddleEast).industry_level = 0;
-    g.state_mut(StateId::Australia).industry_level = 0;
+    g.state_mut(StateId::SouthAsia).industry_level = 0;
+    g.state_mut(StateId::SouthEastAsia).industry_level = 0;
     hold_temperature(&mut g, 3.0);
     assert!(g.population_growth_rate() < 0.0);
     g.climate_phase();
-    let lost = before - g.state(StateId::Asia).population;
+    let lost = before - g.state(StateId::EastAsia).population;
     let arrived = lost * 0.5;
-    assert!(arrived > 0.5, "the flow is worth a point of Unrest: {arrived}");
+    assert!(arrived > 0.5 && arrived < 1.0, "the flow is worth exactly one point of Unrest: {arrived}");
     assert!((g.state(StateId::Russia).population - arrived).abs() < 1e-6, "Russia took the flow: {}", g.state(StateId::Russia).population);
     assert!(
-        g.report.lines.iter().any(|l| l.contains("left Asia for") && l.contains("Russia")),
+        g.report.lines.iter().any(|l| l.contains("left East Asia for") && l.contains("Russia")),
         "a refugee line naming where they went: {:?}",
         g.report.lines
     );
+    // Russia changed nothing and holds nobody, so the turn's fall of 1.5 nets against the rise.
+    g.state_mut(StateId::Russia).changed_hands = true;
     g.resolve_unrest();
-    let want = (arrived / 0.5).floor() as i64;
-    assert_eq!(g.unrest(StateId::Russia), want.min(3), "one Unrest per half a person arriving");
+    let want = (arrived / 0.5).floor();
+    assert_eq!(g.unrest(StateId::Russia), want.min(2.0), "one Unrest per half a person arriving");
 
-    // The cap: eight people arriving in a turn is still only three.
+    // The cap: eight people arriving in a turn is still only two, where #52 allowed three.
     let mut g = game();
     calm(&mut g);
     g.state_mut(StateId::Russia).refugees_in = 8.0;
+    g.state_mut(StateId::Russia).changed_hands = true;
     g.resolve_unrest();
-    assert_eq!(g.unrest(StateId::Russia), 3, "at most three from refugees in a turn");
+    assert_eq!(g.unrest(StateId::Russia), 2.0, "at most two from refugees in a turn");
 }
 
 /// (d) Occupation: +3 when it begins and +1 a turn after; the figure carries over when control
@@ -2101,23 +2111,25 @@ fn d_occupation_raises_three_then_one_a_turn_carries_over_and_halves_pacificatio
     let mut g = game();
     calm(&mut g);
     g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
-    occupier_in(&mut g, StateId::Asia, StateId::Europe);
+    occupier_in(&mut g, StateId::EastAsia, StateId::Europe);
     g.resolution_phase();
     assert!(g.state(StateId::Europe).control.is_occupied(), "{:?}", g.state(StateId::Europe).control);
-    assert_eq!(g.unrest(StateId::Europe), 3, "Occupation begins at +3");
+    // The turn a place changes hands it goes without its natural fall (ticket #53), so the whole
+    // +3 stands; the turns after, the fall of 1.5 nets against the +1 Occupation adds.
+    assert_eq!(g.unrest(StateId::Europe), 3.0, "Occupation begins at +3");
     g.resolution_phase();
-    assert_eq!(g.unrest(StateId::Europe), 4, "and each turn it lasts adds one");
+    assert_eq!(g.unrest(StateId::Europe), 2.5, "a turn of Occupation adds one against a fall of 1.5");
     g.resolution_phase();
     assert_eq!(g.state(StateId::Europe).control, Control::Controlled(Seat(0)), "the third turn transfers it");
-    assert_eq!(g.unrest(StateId::Europe), 5, "and the figure carries over to the new controller");
+    assert_eq!(g.unrest(StateId::Europe), 3.5, "the figure carries over, and a transfer takes no fall");
 
     // Pacification: one third of the threshold rounded up while calm, one sixth from Unrest 4.
     let mut g = game();
     calm(&mut g);
-    let threshold = g.influence_threshold(Place::State(StateId::Africa));
-    assert_eq!(g.pacification_gain(Place::State(StateId::Africa)), (threshold + 2) / 3, "the calm gain");
-    g.state_mut(StateId::Africa).unrest = 4;
-    assert_eq!(g.pacification_gain(Place::State(StateId::Africa)), (threshold + 5) / 6, "halved from Unrest 4");
+    let threshold = g.influence_threshold(Place::State(StateId::NorthAfrica));
+    assert_eq!(g.pacification_gain(Place::State(StateId::NorthAfrica)), (threshold + 2) / 3, "the calm gain");
+    g.state_mut(StateId::NorthAfrica).unrest = 4.0;
+    assert_eq!(g.pacification_gain(Place::State(StateId::NorthAfrica)), (threshold + 5) / 6, "halved from Unrest 4");
 }
 
 /// (e) The thresholds: 4 stops the Standing Army replenishing, 7 halves output and Emissions, 10
@@ -2126,26 +2138,26 @@ fn d_occupation_raises_three_then_one_a_turn_carries_over_and_halves_pacificatio
 fn e_four_stops_replenishment_seven_halves_output_ten_throws_the_controller_off() {
     let mut g = game();
     calm(&mut g);
-    g.take_control(StateId::Africa, Seat(0));
-    let damage = |g: &Game| g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(StateId::Africa)).unwrap().damage;
-    g.armies.iter_mut().find(|a| a.standing && a.home == ArmyHome::State(StateId::Africa)).unwrap().damage = 1;
-    g.state_mut(StateId::Africa).unrest = 3;
+    g.take_control(StateId::NorthAfrica, Seat(0));
+    let damage = |g: &Game| g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(StateId::NorthAfrica)).unwrap().damage;
+    g.armies.iter_mut().find(|a| a.standing && a.home == ArmyHome::State(StateId::NorthAfrica)).unwrap().damage = 1;
+    g.state_mut(StateId::NorthAfrica).unrest = 3.0;
     g.income_phase();
     assert_eq!(damage(&g), 0, "below Unrest 4 the Standing Army replenishes");
-    g.armies.iter_mut().find(|a| a.standing && a.home == ArmyHome::State(StateId::Africa)).unwrap().damage = 1;
-    g.state_mut(StateId::Africa).unrest = 4;
+    g.armies.iter_mut().find(|a| a.standing && a.home == ArmyHome::State(StateId::NorthAfrica)).unwrap().damage = 1;
+    g.state_mut(StateId::NorthAfrica).unrest = 4.0;
     g.income_phase();
     assert_eq!(damage(&g), 1, "at Unrest 4 it does not");
 
     // 7: half the output and half the Emissions.
     let mut g = game();
     calm(&mut g);
-    g.take_control(StateId::Asia, Seat(0));
-    g.state_mut(StateId::Asia).facilities.push(facility(FacilityKind::Factory));
-    let full = g.facility_yield(Seat(0), StateId::Asia, FacilityKind::Factory);
+    g.take_control(StateId::EastAsia, Seat(0));
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Factory));
+    let full = g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Factory);
     let all_full = g.emissions_now().factories;
-    g.state_mut(StateId::Asia).unrest = 7;
-    let half = g.facility_yield(Seat(0), StateId::Asia, FacilityKind::Factory);
+    g.state_mut(StateId::EastAsia).unrest = 7.0;
+    let half = g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Factory);
     assert!(full.amount > 0);
     assert_eq!(half.amount, full.amount / 2, "output at half, rounded down (full {})", full.amount);
     assert!((half.emissions - full.emissions / 2.0).abs() < 1e-9, "Emissions at half: {} of {}", half.emissions, full.emissions);
@@ -2154,22 +2166,29 @@ fn e_four_stops_replenishment_seven_halves_output_ten_throws_the_controller_off(
     // 10: the state throws its controller off.
     let mut g = game();
     calm(&mut g);
-    g.take_control(StateId::Africa, Seat(0));
+    g.take_control(StateId::NorthAfrica, Seat(0));
     g.take_control(StateId::Europe, Seat(0));
-    g.seats[0].influence.insert(Place::State(StateId::Africa), 42);
-    g.seats[1].influence.insert(Place::State(StateId::Africa), 17);
-    g.state_mut(StateId::Africa).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(0), due_turn: 99 });
+    g.seats[0].influence.insert(Place::State(StateId::NorthAfrica), 42);
+    g.seats[1].influence.insert(Place::State(StateId::NorthAfrica), 17);
+    g.state_mut(StateId::NorthAfrica).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(0), due_turn: 99 });
     let id = ArmyId(g.fresh_id());
-    g.armies.push(Army { id, home: ArmyHome::State(StateId::Europe), at: ArmyAt::Place(Place::State(StateId::Africa)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
-    g.raise_unrest(StateId::Africa, 10, UnrestSource::Plain);
-    assert_eq!(g.unrest(StateId::Africa), 10);
+    g.armies.push(Army { id, home: ArmyHome::State(StateId::Europe), at: ArmyAt::Place(Place::State(StateId::NorthAfrica)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+    g.raise_unrest(StateId::NorthAfrica, 10.0, UnrestSource::Plain);
+    assert_eq!(g.unrest(StateId::NorthAfrica), 10.0);
+    // Ticket #53: the falls run first, so a state at 10 that did not change hands is pulled back
+    // to 8.5 and keeps its controller. Only a state with no fall to take crosses.
     g.resolve_unrest();
-    assert_eq!(g.state(StateId::Africa).control, Control::Neutral, "it throws its controller off");
-    assert_eq!(g.unrest(StateId::Africa), 5, "and settles back to 5");
-    assert_eq!(g.seats[0].influence.get(&Place::State(StateId::Africa)).copied(), Some(42), "every Faction's Standing stays");
-    assert_eq!(g.seats[1].influence.get(&Place::State(StateId::Africa)).copied(), Some(17));
-    assert_eq!(g.state(StateId::Africa).queue.len(), 1, "the build queue is kept");
-    assert_eq!(g.army(id).unwrap().home, ArmyHome::State(StateId::Africa), "the Armies there become the state's own");
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(0)), "the fall saved it");
+    assert_eq!(g.unrest(StateId::NorthAfrica), 8.5, "pulled back by the turn's fall");
+    g.raise_unrest(StateId::NorthAfrica, 10.0, UnrestSource::Plain);
+    g.state_mut(StateId::NorthAfrica).changed_hands = true;
+    g.resolve_unrest();
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Neutral, "it throws its controller off");
+    assert_eq!(g.unrest(StateId::NorthAfrica), 5.0, "and settles back to 5");
+    assert_eq!(g.seats[0].influence.get(&Place::State(StateId::NorthAfrica)).copied(), Some(42), "every Faction's Standing stays");
+    assert_eq!(g.seats[1].influence.get(&Place::State(StateId::NorthAfrica)).copied(), Some(17));
+    assert_eq!(g.state(StateId::NorthAfrica).queue.len(), 1, "the build queue is kept");
+    assert_eq!(g.army(id).unwrap().home, ArmyHome::State(StateId::NorthAfrica), "the Armies there become the state's own");
     assert!(g.army_seat(g.army(id).unwrap()).is_none(), "so they fight for nobody");
     assert!(g.report.lines.iter().any(|l| l.contains("threw off")), "a Report line names it: {:?}", g.report.lines);
 }
@@ -2179,16 +2198,17 @@ fn e_four_stops_replenishment_seven_halves_output_ten_throws_the_controller_off(
 fn f_a_neutral_state_caps_at_nine_and_the_faction_that_takes_it_inherits_its_unrest() {
     let mut g = game();
     calm(&mut g);
-    assert_eq!(g.state(StateId::Africa).control, Control::Neutral);
-    g.raise_unrest(StateId::Africa, 20, UnrestSource::Plain);
-    assert_eq!(g.unrest(StateId::Africa), 9, "a neutral state stops at 9");
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Neutral);
+    g.raise_unrest(StateId::NorthAfrica, 20.0, UnrestSource::Plain);
+    assert_eq!(g.unrest(StateId::NorthAfrica), 9.0, "a neutral state stops at 9");
     g.resolve_unrest();
-    assert_eq!(g.state(StateId::Africa).control, Control::Neutral, "and throws nobody off, since it holds nobody");
-    assert_eq!(g.unrest(StateId::Africa), 9, "something raised it, so nothing falls");
-    g.transfer_control(Place::State(StateId::Africa), Seat(1), "Influence");
-    assert_eq!(g.unrest(StateId::Africa), 9, "the Faction that takes it inherits its Unrest");
-    g.raise_unrest(StateId::Africa, 5, UnrestSource::Plain);
-    assert_eq!(g.unrest(StateId::Africa), 10, "and now the ceiling is 10");
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Neutral, "and throws nobody off, since it holds nobody");
+    assert_eq!(g.unrest(StateId::NorthAfrica), 7.5, "and the turn's fall lands whatever raised it");
+    g.state_mut(StateId::NorthAfrica).unrest = 9.0;
+    g.transfer_control(Place::State(StateId::NorthAfrica), Seat(1), "Influence");
+    assert_eq!(g.unrest(StateId::NorthAfrica), 9.0, "the Faction that takes it inherits its Unrest");
+    g.raise_unrest(StateId::NorthAfrica, 5.0, UnrestSource::Plain);
+    assert_eq!(g.unrest(StateId::NorthAfrica), 10.0, "and now the ceiling is 10");
 }
 
 /// (g) Relief costs 10 Ducats a point; a Constabulary lowers Unrest by 1 a turn and damps a
@@ -2197,34 +2217,33 @@ fn f_a_neutral_state_caps_at_nine_and_the_faction_that_takes_it_inherits_its_unr
 fn g_relief_costs_ten_ducats_a_point_and_a_constabulary_calms_and_damps() {
     let mut g = game();
     calm(&mut g);
-    g.take_control(StateId::Africa, Seat(0));
+    g.take_control(StateId::NorthAfrica, Seat(0));
     g.state_mut(StateId::SouthAmerica).control = Control::Neutral;
-    g.state_mut(StateId::Africa).unrest = 6;
+    g.state_mut(StateId::NorthAfrica).unrest = 6.0;
     g.seats[0].stockpile.ducats = 30;
-    let order = Order::Relief { state: StateId::Africa };
+    let order = Order::Relief { state: StateId::NorthAfrica };
     assert_eq!(g.order_cost(Seat(0), &order).ducats, 10, "10 Ducats a point");
     assert!(g.check_order(Seat(0), &[], &order).is_ok());
     assert!(g.check_order(Seat(0), &[], &Order::Relief { state: StateId::SouthAmerica }).is_err(), "only on a state you direct");
     g.commit_orders(Seat(0), &[order.clone(), order.clone()]);
     assert_eq!(g.seats[0].stockpile.ducats, 10, "two orders, twenty Ducats");
     g.resolve_unrest();
-    // Two points of Relief off six, and the natural fall as well, since nothing raised it.
-    assert_eq!(g.unrest(StateId::Africa), 3, "two points of Relief and the natural fall off six");
+    assert_eq!(g.unrest(StateId::NorthAfrica), 2.5, "two points of Relief and the turn's fall of 1.5 off six");
 
     let mut g = game();
     calm(&mut g);
-    g.take_control(StateId::Asia, Seat(0));
-    constabulary_in(&mut g, StateId::Asia);
-    g.state_mut(StateId::Asia).unrest = 5;
-    assert_eq!(g.unrest_damping(StateId::Asia, UnrestSource::Climate), 1);
-    assert_eq!(g.raise_unrest(StateId::Asia, 2, UnrestSource::Climate), 1, "a climate rise of two arrives as one");
-    assert_eq!(g.raise_unrest(StateId::Asia, 2, UnrestSource::Plain), 2, "nothing damps Occupation, a mothball or the card");
-    let before = g.unrest(StateId::Asia);
+    g.take_control(StateId::EastAsia, Seat(0));
+    constabulary_in(&mut g, StateId::EastAsia);
+    g.state_mut(StateId::EastAsia).unrest = 5.0;
+    assert_eq!(g.unrest_damping(StateId::EastAsia, UnrestSource::Climate), 0.5);
+    assert_eq!(g.raise_unrest(StateId::EastAsia, 2.0, UnrestSource::Climate), 1.5, "a climate rise of two arrives as one and a half");
+    assert_eq!(g.raise_unrest(StateId::EastAsia, 2.0, UnrestSource::Plain), 2.0, "nothing damps Occupation, a mothball or the card");
+    let before = g.unrest(StateId::EastAsia);
     g.resolve_unrest();
-    assert_eq!(g.unrest(StateId::Asia), before - 1, "the Constabulary takes one off whatever else happened");
+    assert_eq!(g.unrest(StateId::EastAsia), before - 2.5, "the Constabulary's 1 and the turn's own 1.5");
     g.seats[0].stockpile.materials = 200;
     assert!(
-        g.check_order(Seat(0), &[], &Order::BuildFacility { state: StateId::Asia, kind: FacilityKind::Constabulary }).is_err(),
+        g.check_order(Seat(0), &[], &Order::BuildFacility { state: StateId::EastAsia, kind: FacilityKind::Constabulary }).is_err(),
         "at most one Constabulary per Nation State"
     );
 }
@@ -2235,25 +2254,27 @@ fn g_relief_costs_ten_ducats_a_point_and_a_constabulary_calms_and_damps() {
 fn h_two_green_techs_damp_a_climate_rise_by_one_and_four_by_two() {
     let mut g = game();
     calm(&mut g);
-    assert_eq!(g.raise_unrest(StateId::Africa, 2, UnrestSource::Climate), 2, "no Techs, no damping");
-    g.state_mut(StateId::Africa).unrest = 0;
+    assert_eq!(g.raise_unrest(StateId::NorthAfrica, 2.0, UnrestSource::Climate), 2.0, "no Techs, no damping");
+    g.state_mut(StateId::NorthAfrica).unrest = 0.0;
     g.research.done.push(TechId::CleanPropellant);
     g.research.done.push(TechId::CleanPower);
     assert_eq!(g.green_techs_done(), 2);
-    assert_eq!(g.raise_unrest(StateId::Africa, 2, UnrestSource::Climate), 1, "two green Techs take one off");
-    g.state_mut(StateId::Africa).unrest = 0;
+    assert_eq!(g.raise_unrest(StateId::NorthAfrica, 2.0, UnrestSource::Climate), 1.5, "two green Techs take a half off");
+    g.state_mut(StateId::NorthAfrica).unrest = 0.0;
     g.research.done.push(TechId::CleanManufacturing);
     g.research.done.push(TechId::GreenConsensus);
     assert_eq!(g.green_techs_done(), 4);
-    assert_eq!(g.raise_unrest(StateId::Africa, 2, UnrestSource::Climate), 0, "four green Techs take two off");
-    assert_eq!(g.raise_unrest(StateId::Africa, 1, UnrestSource::Climate), 0, "and it never goes below zero");
-    assert_eq!(g.unrest(StateId::Africa), 0, "damping never lowers Unrest by itself");
-    assert_eq!(g.raise_unrest(StateId::Africa, 3, UnrestSource::Refugees), 3, "the Techs do not damp arriving refugees");
+    assert_eq!(g.raise_unrest(StateId::NorthAfrica, 2.0, UnrestSource::Climate), 1.0, "four green Techs take one off");
+    assert_eq!(g.raise_unrest(StateId::NorthAfrica, 1.0, UnrestSource::Climate), 0.0, "and it never goes below zero");
+    assert_eq!(g.unrest(StateId::NorthAfrica), 1.0, "damping never lowers Unrest by itself");
+    // Ticket #53: the green Techs moderate arriving refugees too, which they did not on #52.
+    assert_eq!(g.raise_unrest(StateId::NorthAfrica, 3.0, UnrestSource::Refugees), 2.0, "four green Techs damp refugees as well");
+    assert_eq!(g.raise_unrest(StateId::NorthAfrica, 3.0, UnrestSource::Plain), 3.0, "but never Occupation or the card");
     let mut g = game();
     calm(&mut g);
-    assert!(g.may_develop(StateId::Africa), "a calm state develops itself");
-    g.state_mut(StateId::Africa).unrest = 7;
-    assert!(!g.may_develop(StateId::Africa), "a state at 7 or more does not");
+    assert!(g.may_develop(StateId::NorthAfrica), "a calm state develops itself");
+    g.state_mut(StateId::NorthAfrica).unrest = 7.0;
+    assert!(!g.may_develop(StateId::NorthAfrica), "a state at 7 or more does not");
 }
 
 /// (i) Resettle routes this turn's flows to the chosen state and adds 5 Standing there.
@@ -2264,10 +2285,10 @@ fn i_resettle_routes_the_flow_and_adds_five_standing() {
     for s in &mut g.states {
         s.population = 0.0;
     }
-    g.take_control(StateId::Asia, Seat(0));
+    g.take_control(StateId::EastAsia, Seat(0));
     g.take_control(StateId::SouthAmerica, Seat(0));
     let before = 100.0;
-    g.state_mut(StateId::Asia).population = before;
+    g.state_mut(StateId::EastAsia).population = before;
     g.seats[0].stockpile.ducats = 40;
     let order = Order::Resettle { state: StateId::SouthAmerica };
     assert_eq!(g.order_cost(Seat(0), &order).ducats, 20, "20 Ducats");
@@ -2278,7 +2299,7 @@ fn i_resettle_routes_the_flow_and_adds_five_standing() {
     assert_eq!(g.seats[0].influence.get(&Place::State(StateId::SouthAmerica)).copied(), Some(5), "+5 Standing on the chosen state");
     hold_temperature(&mut g, 3.0);
     g.climate_phase();
-    let arrived = (before - g.state(StateId::Asia).population) * 0.5;
+    let arrived = (before - g.state(StateId::EastAsia).population) * 0.5;
     assert!(arrived > 0.0);
     assert!(
         (g.state(StateId::SouthAmerica).population - arrived).abs() < 1e-6,
@@ -2293,29 +2314,29 @@ fn i_resettle_routes_the_flow_and_adds_five_standing() {
 fn j_the_unrest_card_adds_three() {
     let mut g = game();
     calm(&mut g);
-    g.take_control(StateId::Asia, Seat(0));
-    constabulary_in(&mut g, StateId::Asia);
+    g.take_control(StateId::EastAsia, Seat(0));
+    constabulary_in(&mut g, StateId::EastAsia);
     for t in Game::GREEN_TECHS {
         g.research.done.push(t);
     }
-    let damage = |g: &Game| g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(StateId::Asia)).unwrap().damage;
+    let damage = |g: &Game| g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(StateId::EastAsia)).unwrap().damage;
     let before = damage(&g);
-    g.seats[0].influence.insert(Place::State(StateId::Asia), 30);
-    g.last_event = Some(DrawnEvent { card: Card::Event(EventId::Unrest), target: EventTarget::State(StateId::Asia), scale: 1.0, text: String::new() });
+    g.seats[0].influence.insert(Place::State(StateId::EastAsia), 30);
+    g.last_event = Some(DrawnEvent { card: Card::Event(EventId::Unrest), target: EventTarget::State(StateId::EastAsia), scale: 1.0, text: String::new() });
     g.apply_event_now();
-    assert_eq!(g.unrest(StateId::Asia), 3, "a flat three, damped by nothing");
+    assert_eq!(g.unrest(StateId::EastAsia), 3.0, "a flat three, damped by nothing");
     assert_eq!(damage(&g), before, "no Army damage any more");
-    assert_eq!(g.seats[0].influence.get(&Place::State(StateId::Asia)).copied(), Some(30), "and no Standing loss");
+    assert_eq!(g.seats[0].influence.get(&Place::State(StateId::EastAsia)).copied(), Some(30), "and no Standing loss");
     // A Heatwave, by contrast, is one of the three Climate cards, so the Techs and the Constabulary damp it.
-    g.state_mut(StateId::Asia).unrest = 0;
-    g.last_event = Some(DrawnEvent { card: Card::Event(EventId::Heatwave), target: EventTarget::State(StateId::Asia), scale: 1.0, text: String::new() });
+    g.state_mut(StateId::EastAsia).unrest = 0.0;
+    g.last_event = Some(DrawnEvent { card: Card::Event(EventId::Heatwave), target: EventTarget::State(StateId::EastAsia), scale: 1.0, text: String::new() });
     g.apply_event_now();
-    assert_eq!(g.unrest(StateId::Asia), 0, "a Climate card of two, damped by three, raises nothing");
+    assert_eq!(g.unrest(StateId::EastAsia), 0.0, "a Climate card of 1.5, damped by 1.5, raises nothing");
     let mut g = game();
     calm(&mut g);
-    g.last_event = Some(DrawnEvent { card: Card::Event(EventId::Wildfire), target: EventTarget::State(StateId::Africa), scale: 1.0, text: String::new() });
+    g.last_event = Some(DrawnEvent { card: Card::Event(EventId::Wildfire), target: EventTarget::State(StateId::NorthAfrica), scale: 1.0, text: String::new() });
     g.apply_event_now();
-    assert_eq!(g.unrest(StateId::Africa), 2, "an undamped Climate card is two");
+    assert_eq!(g.unrest(StateId::NorthAfrica), 1.5, "an undamped Climate card is one and a half");
 }
 
 /// (k) Unrest falls by 1 on its own only in a turn nothing raised it.
@@ -2323,19 +2344,26 @@ fn j_the_unrest_card_adds_three() {
 fn k_the_natural_fall_lands_only_in_a_turn_nothing_raised_it() {
     let mut g = game();
     calm(&mut g);
-    g.take_control(StateId::Africa, Seat(0));
-    g.state_mut(StateId::Africa).unrest = 5;
+    g.take_control(StateId::NorthAfrica, Seat(0));
+    g.state_mut(StateId::NorthAfrica).unrest = 5.0;
     g.resolve_unrest();
-    assert_eq!(g.unrest(StateId::Africa), 4, "nothing raised it, so it falls by one");
-    g.raise_unrest(StateId::Africa, 1, UnrestSource::Plain);
-    assert_eq!(g.unrest(StateId::Africa), 5);
+    assert_eq!(g.unrest(StateId::NorthAfrica), 3.5, "a quiet turn takes 1.5 off");
+    // Ticket #53: the fall lands even in a turn something raised it, by subtraction.
+    g.raise_unrest(StateId::NorthAfrica, 1.0, UnrestSource::Plain);
+    assert_eq!(g.unrest(StateId::NorthAfrica), 4.5);
     g.resolve_unrest();
-    assert_eq!(g.unrest(StateId::Africa), 5, "a turn something raised it has no natural fall");
+    assert_eq!(g.unrest(StateId::NorthAfrica), 3.0, "a rise of one against a fall of 1.5 is a net half off");
+    // The one turn it does not fall is the turn the state changed hands.
+    g.state_mut(StateId::NorthAfrica).unrest = 5.0;
+    g.transfer_control(Place::State(StateId::NorthAfrica), Seat(1), "Influence");
+    assert!(g.state(StateId::NorthAfrica).changed_hands, "the transfer marked it");
     g.resolve_unrest();
-    assert_eq!(g.unrest(StateId::Africa), 4, "and the turn after, it falls again");
-    g.state_mut(StateId::Africa).unrest = 0;
+    assert_eq!(g.unrest(StateId::NorthAfrica), 5.0, "a state that changed hands this turn takes no fall");
     g.resolve_unrest();
-    assert_eq!(g.unrest(StateId::Africa), 0, "never below zero");
+    assert_eq!(g.unrest(StateId::NorthAfrica), 3.5, "and the turn after, it falls again");
+    g.state_mut(StateId::NorthAfrica).unrest = 0.0;
+    g.resolve_unrest();
+    assert_eq!(g.unrest(StateId::NorthAfrica), 0.0, "never below zero");
 }
 
 /// The AI of ticket #52: Relief where Unrest has taken hold, a Constabulary where it is worse, and
@@ -2346,22 +2374,22 @@ fn the_ai_pays_relief_and_raises_a_constabulary_where_unrest_has_taken_hold() {
     calm(&mut g);
     // A state the seat has just Occupied, restive enough that one more turn would throw it off:
     // Relief takes the opportunity multiplier at 9, a Constabulary the threat multiplier here.
-    g.state_mut(StateId::Africa).control = Control::Occupied { occupier: Seat(1), previous: None, turns: 1 };
+    g.state_mut(StateId::NorthAfrica).control = Control::Occupied { occupier: Seat(1), previous: None, turns: 1 };
     g.seats[1].stockpile.ducats = 200;
     g.seats[1].stockpile.materials = 200;
     // On pace, so the victory gap is not multiplying every producer past everything else.
     g.seats[1].extraction_total = 1000;
-    g.state_mut(StateId::Africa).unrest = 9;
+    g.state_mut(StateId::NorthAfrica).unrest = 9.0;
     let orders = g.ai_orders(Seat(1));
-    assert!(orders.iter().any(|o| matches!(o, Order::Relief { state: StateId::Africa })), "no Relief: {orders:?}");
+    assert!(orders.iter().any(|o| matches!(o, Order::Relief { state: StateId::NorthAfrica })), "no Relief: {orders:?}");
     assert!(
-        orders.iter().any(|o| matches!(o, Order::BuildFacility { state: StateId::Africa, kind: FacilityKind::Constabulary })),
+        orders.iter().any(|o| matches!(o, Order::BuildFacility { state: StateId::NorthAfrica, kind: FacilityKind::Constabulary })),
         "no Constabulary: {orders:?}"
     );
     // A calm state gets neither.
     let mut g = game();
     calm(&mut g);
-    g.take_control(StateId::Africa, Seat(1));
+    g.take_control(StateId::NorthAfrica, Seat(1));
     g.seats[1].stockpile.ducats = 200;
     g.seats[1].stockpile.materials = 200;
     g.seats[1].extraction_total = 1000;
@@ -2372,3 +2400,44 @@ fn the_ai_pays_relief_and_raises_a_constabulary_where_unrest_has_taken_hold() {
         "a Constabulary in a calm state: {orders:?}"
     );
 }
+
+/// Ticket #53: twelve Nation States, each split sharing out its parent's real-world figures rather
+/// than inventing more, and every neighbour edge listed on both states.
+#[test]
+fn twelve_nation_states_share_out_the_eight_they_came_from() {
+    let g = game();
+    let t = &g.tables;
+    assert_eq!(StateId::ALL.len(), 12);
+    let card = |s: StateId| t.state(s);
+    // Asia's 30 GDP and 7 Influence go to East Asia, South Asia and South-East Asia.
+    let asia = [StateId::EastAsia, StateId::SouthAsia, StateId::SouthEastAsia];
+    assert_eq!(asia.iter().map(|s| card(*s).gdp).sum::<i64>(), 30, "Asia's GDP share");
+    assert_eq!(asia.iter().map(|s| card(*s).influence).sum::<i64>(), 7, "Asia's Influence value");
+    // Africa's 3 and 2 split at the Sahara.
+    let africa = [StateId::SubSaharanAfrica, StateId::NorthAfrica];
+    assert_eq!(africa.iter().map(|s| card(*s).gdp).sum::<i64>(), 3);
+    assert_eq!(africa.iter().map(|s| card(*s).influence).sum::<i64>(), 2);
+    // North America's 25 and 8 split with Central America and the Caribbean.
+    let america = [StateId::NorthAmerica, StateId::CentralAmerica];
+    assert_eq!(america.iter().map(|s| card(*s).gdp).sum::<i64>(), 25);
+    assert_eq!(america.iter().map(|s| card(*s).influence).sum::<i64>(), 8);
+    // The world still holds about 7.9 billion people, as the eight states did.
+    let people: f64 = StateId::ALL.iter().map(|s| card(*s).population).sum();
+    assert!((people - 78.6).abs() < 0.1, "population {people}");
+    // Every edge is listed on both states, and nothing neighbours itself.
+    for s in StateId::ALL {
+        assert!(!card(s).neighbours.contains(&s), "{s:?} neighbours itself");
+        assert!(!card(s).neighbours.is_empty(), "{s:?} is an island with no neighbour");
+        for n in &card(s).neighbours {
+            assert!(card(*n).neighbours.contains(&s), "{s:?} lists {n:?} but not the other way");
+        }
+    }
+    // Every state's start Facilities fit its slots with a Launch Site on top, and follow its Lean.
+    for s in StateId::ALL {
+        let c = card(s);
+        assert_eq!(c.start_facilities.len() as u32, c.industry_level, "{s:?} starts with as many Facilities as its Industry Level");
+        assert!(c.start_facilities.len() as u32 + 1 <= c.size + c.industry_level, "{s:?} has no room for a Launch Site");
+        assert!(c.unrest == 0.0, "{s:?} starts calm");
+    }
+}
+

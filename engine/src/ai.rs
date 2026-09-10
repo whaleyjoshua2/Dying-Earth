@@ -396,7 +396,7 @@ impl Game {
                         FacilityKind::Embassy => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
                         // Ticket #52: a Constabulary is worth raising only where Unrest has taken hold.
                         FacilityKind::Constabulary => {
-                            if self.state(sid).unrest < 5 {
+                            if self.state(sid).unrest < 5.0 {
                                 continue;
                             }
                             (Cat::Constabulary, self.base_weight(seat, Cat::Constabulary))
@@ -642,11 +642,11 @@ impl Game {
         let ducats = self.seat(seat).stockpile.ducats;
         for sid in self.directed_states(seat) {
             let n = self.state(sid).unrest;
-            if n < 6 {
+            if n < 6.0 {
                 continue;
             }
-            let points = if u.relief_ducats > 0 { (ducats / u.relief_ducats).min(n) } else { 0 };
-            let opp = if n >= 9 { m.opportunity } else { 1.0 };
+            let points = if u.relief_ducats > 0 { (ducats / u.relief_ducats).min(n.ceil() as i64) } else { 0 };
+            let opp = if n >= 9.0 { m.opportunity } else { 1.0 };
             for _ in 0..points {
                 push(
                     vec![Order::Relief { state: sid }],
@@ -655,7 +655,7 @@ impl Game {
                     1.0,
                     1.0,
                     opp,
-                    format!("pay Relief in {} (Unrest {})", self.tables.state(sid).name, n),
+                    format!("pay Relief in {} (Unrest {})", self.tables.state(sid).name, Game::unrest_figure(n)),
                     None,
                 );
             }
@@ -663,7 +663,11 @@ impl Game {
         // Resettle: while the world's population is falling there are flows to steer, and the
         // calmest state the seat directs is the one that can take them.
         if self.population_growth_rate() < 0.0
-            && let Some(sid) = self.directed_states(seat).into_iter().filter(|s| self.state(*s).unrest < 3).min_by_key(|s| self.state(*s).unrest)
+            && let Some(sid) = self
+                .directed_states(seat)
+                .into_iter()
+                .filter(|s| self.state(*s).unrest < 3.0)
+                .min_by(|a, b| self.state(*a).unrest.partial_cmp(&self.state(*b).unrest).unwrap_or(std::cmp::Ordering::Equal))
         {
             push(
                 vec![Order::Resettle { state: sid }],

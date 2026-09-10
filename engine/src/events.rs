@@ -215,8 +215,8 @@ impl Game {
     fn climate_card_unrest(&mut self, s: StateId) {
         let n = self.tables.unrest.climate_card;
         let rose = self.raise_unrest(s, n, UnrestSource::Climate);
-        if rose > 0 {
-            let line = format!("{}: Unrest rose by {} to {}.", self.tables.state(s).name, rose, self.state(s).unrest);
+        if rose > 0.0 {
+            let line = format!("{}: Unrest rose by {} to {}.", self.tables.state(s).name, Game::unrest_figure(rose), self.unrest_text(s));
             self.log(line.clone());
             self.report.lines.push(line);
         }
@@ -354,8 +354,8 @@ impl Game {
             (EventId::Unrest, EventTarget::State(s)) => {
                 let n = t.events.unrest_card_unrest;
                 let rose = self.raise_unrest(s, n, UnrestSource::Plain);
-                if rose > 0 {
-                    let line = format!("Unrest in {}: its Unrest rose by {} to {}.", t.state(s).name, rose, self.state(s).unrest);
+                if rose > 0.0 {
+                    let line = format!("Unrest in {}: its Unrest rose by {} to {}.", t.state(s).name, Game::unrest_figure(rose), self.unrest_text(s));
                     self.log(line.clone());
                     self.report.lines.push(line);
                 }

@@ -39,22 +39,28 @@ pub struct Textures {
     /// Ticket #45: the moons of Mars, USGS and Stooke maps on spheres (`examples/prep_moons.rs`).
     pub phobos: Rgba,
     pub deimos: Rgba,
-    /// 0 = water, 1..7 = Nation State index + 1 (see `examples/prep_assets.rs`).
+    /// 0 = water, 1..13 = the mask value of a Nation State (see `examples/prep_assets.rs`).
     pub mask: Vec<u8>,
 }
 
-/// The mask's values, 1 to 9, in the order the file was painted (`examples/prep_assets.rs`).
-/// Antarctica keeps its value though it is no longer a Nation State (ticket #44).
-const MASK_STATES: [Option<StateId>; 9] = [
-    Some(StateId::Africa),
+/// The mask's values, 1 to 13, in the order the file was painted (`examples/prep_assets.rs`).
+/// Antarctica keeps value 2 though it is no longer a Nation State (ticket #44), and ticket #53's
+/// four new states were appended rather than renumbered, so an old mask still reads correctly for
+/// the states that did not move.
+const MASK_STATES: [Option<StateId>; 13] = [
+    Some(StateId::SubSaharanAfrica),
     None,
-    Some(StateId::Asia),
+    Some(StateId::EastAsia),
     Some(StateId::Australia),
     Some(StateId::Europe),
     Some(StateId::NorthAmerica),
     Some(StateId::SouthAmerica),
     Some(StateId::Russia),
     Some(StateId::MiddleEast),
+    Some(StateId::NorthAfrica),
+    Some(StateId::SouthAsia),
+    Some(StateId::SouthEastAsia),
+    Some(StateId::CentralAmerica),
 ];
 
 impl Textures {

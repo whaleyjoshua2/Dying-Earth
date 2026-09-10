@@ -21,7 +21,7 @@ fn main() {
     let start = std::env::args()
         .find_map(|a| a.strip_prefix("--start=").map(|s| s.to_string()))
         .and_then(|s| StateId::ALL.into_iter().find(|k| format!("{k:?}").to_lowercase().starts_with(&s)))
-        .unwrap_or(StateId::Asia);
+        .unwrap_or(StateId::EastAsia);
     let sinks = list("--sinks=", &[6.0]);
     let steps = list("--steps=", &[90.0, 100.0, 110.0, 120.0, 130.0, 140.0]);
     let base = Tables::load(&default_data_dir()).expect("tables");

@@ -38,7 +38,7 @@ fn main() {
     let mut first_colony: Vec<u32> = Vec::new();
     // Ticket #52.
     let mut throw_offs = 0u32;
-    let mut peaks: Vec<u32> = Vec::new();
+    let mut peaks: Vec<f64> = Vec::new();
     let mut constabularies = 0u32;
     let mut relief = 0u32;
     let mut moved = 0.0f64;
@@ -64,7 +64,7 @@ fn main() {
             first_colony.push(t);
         }
         throw_offs += r.throw_offs;
-        peaks.push(r.peak_unrest.max(0) as u32);
+        peaks.push(r.peak_unrest.max(0.0));
         constabularies += r.constabularies;
         relief += r.relief_orders;
         moved += r.population_moved;
@@ -73,7 +73,7 @@ fn main() {
             r.seed, r.outcome, r.last_turn, r.first_colony_turn, r.buildings, r.colonists_off_earth, r.temperature, r.collapse_projected_turn, r.colony_changed_hands, r.influence_transfers, r.new_buildings
         );
         println!(
-            "         | unrest: threw off {} | peak {} | constabularies {} | relief orders {} | population moved {:.1}",
+            "         | unrest: threw off {} | peak {:.1} | constabularies {} | relief orders {} | population moved {:.1}",
             r.throw_offs, r.peak_unrest, r.constabularies, r.relief_orders, r.population_moved
         );
     }
@@ -88,7 +88,8 @@ fn main() {
         println!("{:>12}         : {}", "median collapse turn", median(&mut collapse_turns));
         println!("{:>12}         : {}", "median turn of first Colony", median(&mut first_colony));
         println!("{:>12}         : {}", "states that threw off a controller", throw_offs);
-        println!("{:>12}         : {}", "median peak Unrest", median(&mut peaks));
+        peaks.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        println!("{:>12}         : {:.1}", "median peak Unrest", peaks.get(peaks.len() / 2).copied().unwrap_or(0.0));
         println!("{:>12}         : {}", "Constabularies built by the AIs", constabularies);
         println!("{:>12}         : {}", "Relief orders paid by the AIs", relief);
         println!("{:>12}         : {:.1}", "population moved by refugees", moved);

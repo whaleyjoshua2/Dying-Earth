@@ -568,7 +568,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         if st.unrest >= army_line {
                             let hot = st.unrest >= game.tables.unrest.facility_threshold;
                             let tint = if hot { Color32::from_rgb(255, 90, 80) } else { Color32::from_rgb(255, 190, 90) };
-                            label_at(painter, p - egui::vec2(0.0, 38.0), &format!("Unrest {}", st.unrest), tint, 13.0);
+                            label_at(painter, p - egui::vec2(0.0, 38.0), &format!("Unrest {}", game.unrest_text(sid)), tint, 13.0);
                         }
                         hotspots.push(Hotspot { pos: p, radius: 30.0, hit: Hit::Select(Selection::State(sid)) });
                         // Army shields (ticket #31): one per Faction present, grey for a neutral Standing Army.
@@ -1097,7 +1097,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         } else {
             Color32::LIGHT_GREEN
         };
-        ui.colored_label(colour, format!("Unrest {}: {}", n, game.unrest_note(sid)));
+        ui.colored_label(colour, format!("Unrest {}: {}", game.unrest_text(sid), game.unrest_note(sid)));
         if game.constabulary_online(sid) {
             ui.label(RichText::new("A Constabulary here takes 1 off every turn and damps what the climate and the refugees add.").weak());
         }
@@ -1452,7 +1452,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     ArmyAt::Place(p) => game.place_name(p),
                     _ => String::new(),
                 };
-                cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: 0, from: LoadSource::State(StateId::Asia), army: Some(a.id) }, &format!("Load the Army from {from}"), actions);
+                cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: 0, from: LoadSource::State(StateId::EastAsia), army: Some(a.id) }, &format!("Load the Army from {from}"), actions);
             }
         }
         if s.colonists > 0 || s.army.is_some() {

@@ -13,7 +13,7 @@ permafrost_emissions = 3.0
 meteor_damage = 1
 # Ticket #52 (version 0.05): the Unrest card is a flat rise in the state's Unrest now; the Army
 # damage and the Standing loss it used to carry are gone.
-unrest_card_unrest = 3
+unrest_card_unrest = 3.0
 reactor_leak_energy = 5
 breakthrough_research = 15
 breakthrough_research_public_science = 25

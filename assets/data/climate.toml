@@ -12,7 +12,14 @@ degrees_per_ppm_step = 0.5
 # world on turn 13 in every seed; at 120 that seating collapses on turns 16 to 18, the other
 # seatings end at +2.5 to +2.9 C, and a Custodian starting outside Asia collapses on turn 18. At
 # 150 half the seatings end comfortable at +2.3. The sweep tables are in the 0.05 dev diary.
-ppm_step = 120.0
+# Ticket #53 (version 0.05): twelve Nation States raise total Industry Level from 17 to 23 and
+# state industry Emissions from 6.0 to 8.4 a turn, with six more start Facilities, so the step is
+# re-swept as it was on #26 and #46. At 120 every seating collapsed (a Custodian in East Asia by
+# turn 21, where at eight states it never collapsed at all). At 150 a Prospector in East Asia
+# collapses on turns 20 to 24, a Custodian starting in Europe on 22 to 24, and a Custodian in East
+# Asia survives 19 of 20 at +2.90. At 170 half the seatings finish comfortable. 150 keeps every
+# seating hot to the end, which is what #46 chose the step for.
+ppm_step = 150.0
 natural_sink = 6.0
 collapse_line = 3.0
 temperature_lag_fraction = 0.5

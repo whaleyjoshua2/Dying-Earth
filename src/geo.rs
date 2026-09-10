@@ -82,11 +82,15 @@ pub fn slot_lonlat(card: &BodyCard, slot: u32) -> (f32, f32) {
 /// A point on each Nation State to hang its icons from.
 pub fn state_lonlat(state: StateId) -> (f32, f32) {
     match state {
-        StateId::Africa => (20.0, 5.0),
-        StateId::Asia => (100.0, 30.0),
+        StateId::SubSaharanAfrica => (20.0, -2.0),
+        StateId::NorthAfrica => (14.0, 27.0),
+        StateId::EastAsia => (110.0, 38.0),
+        StateId::SouthAsia => (78.0, 22.0),
+        StateId::SouthEastAsia => (108.0, 4.0),
         StateId::Australia => (135.0, -25.0),
         StateId::Europe => (12.0, 50.0),
-        StateId::NorthAmerica => (-100.0, 45.0),
+        StateId::NorthAmerica => (-100.0, 47.0),
+        StateId::CentralAmerica => (-89.0, 17.0),
         StateId::SouthAmerica => (-60.0, -15.0),
         StateId::Russia => (90.0, 62.0),
         StateId::MiddleEast => (46.0, 28.0),

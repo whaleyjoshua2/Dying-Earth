@@ -15,7 +15,6 @@ impl Game {
         // Ticket #52: the turn's Unrest bookkeeping starts here, since the Climate phase opens the
         // turn's rises and the falls are settled at the end of its Resolution.
         for s in &mut self.states {
-            s.unrest_rose = false;
             s.refugees_in = 0.0;
         }
         let t = self.tables.clone();
@@ -159,7 +158,7 @@ impl Game {
         // Ticket #52: two Unrest per build slot the sea took, and 5% of the people per point of
         // Coastal Exposure driven out, half of them to the neighbours.
         let u = self.tables.unrest.clone();
-        let per_slot = u.per_sea_level_slot * exposure as i64;
+        let per_slot = u.per_sea_level_slot * exposure as f64;
         let rose = self.raise_unrest(sid, per_slot, UnrestSource::Climate);
         let displaced = self.state(sid).population * u.sea_loss_per_exposure * exposure as f64;
         if displaced > 0.0 {
@@ -202,8 +201,8 @@ impl Game {
         } else {
             format!("Sea level at {thr:+.1} C: {name} lost {exposure} build slots; destroyed {}.", destroyed.join(", "))
         };
-        if rose > 0 {
-            line.push_str(&format!(" Unrest there rose by {} to {}.", rose, self.state(sid).unrest));
+        if rose > 0.0 {
+            line.push_str(&format!(" Unrest there rose by {} to {}.", Game::unrest_figure(rose), self.unrest_text(sid)));
         }
         self.report.lines.push(line.clone());
         self.log(line);
@@ -237,14 +236,14 @@ impl Game {
             let big = lost / before > u.population_fall_big_fraction;
             let n = if big { u.population_fall_big } else { u.population_fall };
             let rose = self.raise_unrest(sid, n, UnrestSource::Climate);
-            if rose > 0 {
+            if rose > 0.0 {
                 let line = format!(
                     "{}: population fell {:.1}% to {:.1}; Unrest rose by {} to {}.",
                     self.tables.state(sid).name,
                     100.0 * lost / before,
                     after,
-                    rose,
-                    self.state(sid).unrest
+                    Game::unrest_figure(rose),
+                    self.unrest_text(sid)
                 );
                 self.log(line.clone());
                 self.report.lines.push(line);

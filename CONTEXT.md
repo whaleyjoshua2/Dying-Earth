@@ -198,8 +198,8 @@ A person counted in the population of a Colony or Nation State. Colonists are ca
 _Avoid_: settler, crew, worker, population resource
 
 **Nation State**:
-One of eight regions of the Earth Map (six continents, plus Russia and the Middle East since version 0.02; Antarctica left the list in version 0.04 to become Earth's Colony Slots) that a Faction can control and build in. Each carries a population, an Industry Level, a Resource Lean, a Baseline Emissions figure, an Education Level and a Standing Army. Armies move only between neighbouring continents.
-_Avoid_: country, nation, territory, region, state
+One of twelve regions of the Earth Map that a Faction can control and build in. Eight until version 0.05, which split Africa at the Sahara, Asia into East, South and South-East, and Central America and the Caribbean out of North America; Antarctica left the list in version 0.04 to become Earth's Colony Slots. Each carries a population, an Industry Level, a Resource Lean, a Baseline Emissions figure, an Education Level, a GDP, an Influence value, an Unrest figure and a Standing Army. Armies move only between neighbouring states.
+_Avoid_: country, nation, territory, region, state, continent (some are, some are not)
 
 ### Earth
 

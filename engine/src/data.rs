@@ -92,7 +92,7 @@ pub struct StateCard {
     pub gdp: i64,
     /// Ticket #52 (version 0.05): the Unrest the state starts with, 0 to 10.
     #[serde(default)]
-    pub unrest: i64,
+    pub unrest: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -202,7 +202,7 @@ pub struct EventsTable {
     pub meteor_damage: u32,
     /// Ticket #52: the Unrest card is a flat rise in the state's Unrest; the Army damage and the
     /// Standing loss it carried until version 0.05 are gone.
-    pub unrest_card_unrest: i64,
+    pub unrest_card_unrest: f64,
     pub reactor_leak_energy: i64,
     pub breakthrough_research: i64,
     pub breakthrough_research_public_science: i64,
@@ -397,37 +397,37 @@ pub struct InfluenceTable {
 /// Ticket #52 (version 0.05): every number that moves a Nation State's Unrest (`unrest.toml`).
 #[derive(Debug, Clone, Deserialize)]
 pub struct UnrestTable {
-    pub max: i64,
-    pub neutral_max: i64,
-    pub population_fall: i64,
-    pub population_fall_big: i64,
+    pub max: f64,
+    pub neutral_max: f64,
+    pub population_fall: f64,
+    pub population_fall_big: f64,
     pub population_fall_big_fraction: f64,
-    pub per_sea_level_slot: i64,
-    pub climate_card: i64,
-    pub per_mothball: i64,
-    pub per_decommission: i64,
+    pub per_sea_level_slot: f64,
+    pub climate_card: f64,
+    pub per_mothball: f64,
+    pub per_decommission: f64,
     pub refugees_per: f64,
-    pub refugees_max: i64,
-    pub occupation_start: i64,
-    pub occupation_per_turn: i64,
-    pub unrest_card: i64,
-    pub natural_fall: i64,
+    pub refugees_max: f64,
+    pub occupation_start: f64,
+    pub occupation_per_turn: f64,
+    pub unrest_card: f64,
+    pub natural_fall: f64,
     pub relief_ducats: i64,
-    pub relief_points: i64,
-    pub constabulary_fall: i64,
+    pub relief_points: f64,
+    pub constabulary_fall: f64,
     /// The hook a Scrubber joins on its own ticket; nothing reads it yet.
-    pub scrubber_fall: i64,
-    pub green_techs_two: i64,
-    pub green_techs_four: i64,
-    pub constabulary_damping: i64,
-    pub army_threshold: i64,
-    pub facility_threshold: i64,
-    pub throw_off_threshold: i64,
-    pub throw_off_reset: i64,
-    pub no_development_at: i64,
+    pub scrubber_fall: f64,
+    pub green_techs_two: f64,
+    pub green_techs_four: f64,
+    pub constabulary_damping: f64,
+    pub army_threshold: f64,
+    pub facility_threshold: f64,
+    pub throw_off_threshold: f64,
+    pub throw_off_reset: f64,
+    pub no_development_at: f64,
     pub pacification_divisor: i64,
     pub pacification_divisor_unrest: i64,
-    pub pacification_unrest: i64,
+    pub pacification_unrest: f64,
     pub heat_share: f64,
     pub sea_loss_per_exposure: f64,
     pub sea_share: f64,
@@ -781,7 +781,7 @@ impl Tables {
             return Err(err("unrest.toml", "neutral_max must not exceed max, and refugees_per must be positive"));
         }
         for s in &self.states {
-            if s.unrest < 0 || s.unrest > u.max {
+            if s.unrest < 0.0 || s.unrest > u.max {
                 return Err(err("nation_states.toml", format!("row {}: unrest {} is outside 0..={}", s.name, s.unrest, u.max)));
             }
         }

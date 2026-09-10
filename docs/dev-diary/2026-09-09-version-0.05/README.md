@@ -357,3 +357,124 @@ build_constabulary 4 to 6 against build_producer 6 to 8 x1.5 x3 it never wins a 
 the time Unrest reaches 5 the state usually has no free slot left. **Relief it pays readily** (478
 and 566 orders), but only from Unrest 9, where the opportunity multiplier doubles it: below that it
 loses to buying Influence with the same Ducats (relief 4 to 6 against influence 5 to 8 x0.9).
+
+
+## #53: twelve Nation States, and Unrest as a pressure rather than a ratchet
+
+Two tickets in one commit each, both asked for after the twenty seeds of #52 were read.
+
+### The Unrest rebalance
+
+#52 measured Unrest as a **ratchet**: every state climbed to 10 and stayed, and states threw off a
+controller about forty times a game. The cause was the shape of the rule, not the size of the
+numbers — the fall of 1 landed only in a turn nothing raised Unrest, and from about turn 8 something
+raised it every turn, so nothing ever came down. The designer's fix, three parts:
+
+- **The fall is 1.5 and lands every turn**, whatever else happened, by subtraction: a rise and the
+  fall net out. The one turn a state goes without it is the turn it **changed hands** — a population
+  with a fresh grievance is not calmed by the passing of a month. `changed_hands` is set wherever
+  control actually moves (a transfer, an Occupation beginning or ending, a throw-off), and the
+  Occupation turn counter ticking does not count as a change.
+- **The climate and refugee rises are smaller**: a population fall 1.5 (2 when it is more than one
+  per cent), a Sea Level slot 1 rather than 2, a Climate card 1.5 rather than 2, and the refugee cap
+  2 rather than 3.
+- **The green Techs now moderate arriving refugees as well as the climate**, which they did not on
+  #52, and the damping is in halves: 0.5 for two Techs, 1.0 for four, 0.5 more for a Constabulary.
+
+Unrest is no longer a whole number: it moves in halves, and the card and the map print the fraction
+("Unrest 4.5"). Everything else about it — the thresholds at 4, 7 and 10, the neutral cap of 9,
+Occupation's +3 and +1, the Unrest card's flat +3, Relief, Resettle and the Constabulary — is
+unchanged from #52.
+
+**What it did, over the same twenty seeds** (eight Nation States, so these compare like with like):
+
+| seating | threw off a controller | median peak Unrest | Relief orders |
+|---|---|---|---|
+| Custodians in Asia, #52 | 776 | 10 | 478 |
+| Custodians in Asia, #53 | 10 | 10.0 | 112 |
+| Prospectors in Asia, #52 | 810 | 10 | 566 |
+| Prospectors in Asia, #53 | 8 | 10.0 | 305 |
+
+About half a throw-off a game instead of forty, and the median game still sees one state reach the
+ceiling, so the drama is there without the board dissolving. The climate clock went back to the
+shape #51 left it in: the Custodian seating won 19 of 20 again, and the Prospector seating collapsed
+20 of 20.
+
+### Twelve Nation States
+
+Two new Factions need more places to go, and eight states made one of them — Asia, a third of the
+world's people — decide every game. Ticketed as
+[#63](https://github.com/whaleyjoshua2/Dying-Earth/issues/63).
+
+- **Asia** becomes **East Asia** (China, Mongolia, the Koreas, Japan, Taiwan, Central Asia),
+  **South Asia** (India, Pakistan, Bangladesh, Nepal, Sri Lanka, Afghanistan) and **South-East
+  Asia** (Myanmar round to the Philippines and most of Indonesia).
+- **Africa** splits at the Sahara into **North Africa** and **Sub-Saharan Africa**.
+- **Central America and the Caribbean** is cut out of **North America**.
+- **Antarctica stays off the list**: it is Earth's three Colony Slots, as version 0.04 made it.
+
+Every split shares out its parent's real-world figures rather than inventing new ones, as ticket #26
+did for Russia and the Middle East: Asia's 30 GDP becomes 23 + 4 + 3 and its Influence value 7
+becomes 4 + 2 + 1; Africa's 3 and 2 become 2 + 1 and 1 + 1; North America's 25 and 8 become 23 + 2
+and 7 + 1. **The world's totals are unchanged** — 34 Influence and about 7.9 billion people — so the
+Influence economy plays as it did, pinned by
+`twelve_nation_states_share_out_the_eight_they_came_from`. Central America is the map's first
+**Size 1** state: two build slots and the lowest Influence threshold on the board, a small place
+between two large ones.
+
+The globe mask is derived from longitude and latitude rules in `examples/prep_assets.rs`, which now
+takes `--mask-only` so the borders can be redrawn from the `earth.png` already in the tree without
+the source JPEGs. Mask values were **appended** (10 North Africa, 11 South Asia, 12 South-East Asia,
+13 Central America) rather than renumbered, so every old value still means what it meant and the map
+can be split again the same way when a later version wants more states.
+
+![The mask preview: twelve coloured regions on the Blue Marble, Antarctica white and unclaimed](twelve-states-mask.png)
+
+- **twelve-states-mask.png** — `cargo run --example prep_assets -- --mask-only preview.png`. The
+  twelve regions as the mask paints them. The borders are lines of longitude and latitude, close
+  enough for a globe drawn at 2048 by 1024: North Africa parts from Sub-Saharan Africa at 18 N, the
+  Himalaya line slopes from 37 N at Iran's border to 29 N at the Burmese one, South-East Asia sits
+  below 24 N (22 N past Hong Kong, so Taiwan stays with East Asia), and Central America runs below
+  the United States border from San Diego to Brownsville, taking Cuba, Hispaniola and the Bahamas.
+  They are a board, not an atlas.
+
+![The Earth Map at turn 11 with the new borders: Europe orange for the Prospectors, East Asia teal for the Custodians, and North Africa, Sub-Saharan Africa, the Middle East, South Asia and Russia neutral](twelve-states.png)
+
+- **twelve-states.png** — `shot:tw turns:10 look:20,20`. The Earth Map with the twelve states drawn,
+  outlined and labelled: the Sahara border across Africa, the Middle East between Europe and South
+  Asia, and East Asia tinted for the Custodians. The Climate Panel shows what the bigger board costs
+  — Nation State industry 8.6 a turn where eight states charged 6.0.
+
+### The climate clock, re-swept
+
+Twelve states raise total Industry Level from 17 to 23 and state industry Emissions from 6.0 to 8.4
+a turn, with six more start Facilities on the board, so `ppm_step` was re-swept exactly as tickets
+#26 and #46 re-swept it whenever the state list changed. Twenty seeds a cell.
+
+| seat 0, start | step 120 | step 150 | step 170 | step 190 |
+|---|---|---|---|---|
+| Prospectors in East Asia | 20/20, turn 19 | 20/20, turn 22 | 14/20, turn 24 | 0/20, +2.90 |
+| Custodians in East Asia | (collapsed by 21) | 1/20, turn 23 | 0/20, +2.74 | - |
+| Custodians in Europe | - | 20/20, turn 23 | 10/20, turn 24 | - |
+
+**Chosen: `ppm_step = 150`** (`climate.toml`; it was 120). At 120 every seating collapsed, including
+the Custodian-in-East-Asia game that never collapsed at all on eight states. At 150 every seating
+stays hot to the end — the two Prospector-ish boards collapse on turns 22 to 24 and a Custodian
+holding East Asia survives 19 of 20 at +2.90 — which is what #46 chose its step for. At 170 half the
+seatings finish comfortable.
+
+Twenty seeds at the chosen step, on the twelve-state board:
+
+| seat 0 | wins | collapses | median collapse turn | threw off a controller | Relief orders | population moved |
+|---|---|---|---|---|---|---|
+| Custodians in East Asia | Prospectors 19 (seat 1) | 1/20 | 23 | 0 | 34 | 226.0 |
+| Prospectors in East Asia | none | 20/20 | 22 | 12 | 256 | 233.6 |
+| Custodians in Europe (sweep) | none | 20/20 | 23 | - | - | - |
+
+**What the twelve seeds say, as measured, not fixed.** The one-state-decides-it problem is gone:
+holding East Asia is no longer holding a third of the world, and in the Custodian-in-East-Asia
+seating it is now the **Prospectors** who win 19 of 20 from Europe and what they take around it,
+where at eight states the Custodian in Asia won 19 of 20. That is the board the split was asked
+for. The AI still builds no Constabulary — the same finding as #52, and for the same reason: the
+victory-gap multiplier applies to producers and not to a Constabulary, so it never wins a build slot
+while the gap is wide.

@@ -523,7 +523,14 @@ impl Game {
 
     fn set_place_control(&mut self, place: Place, control: Control) {
         match place {
-            Place::State(s) => self.state_mut(s).control = control,
+            // Ticket #53: a state that changed hands this turn does not get its natural fall.
+            Place::State(s) => {
+                let was = self.state(s).control;
+                let changed = was.director() != control.director() || was.controller() != control.controller();
+                let st = self.state_mut(s);
+                st.control = control;
+                st.changed_hands |= changed;
+            }
             Place::Colony(c) => {
                 if let Some(col) = self.colony_mut(c) {
                     col.control = control;
@@ -1029,10 +1036,10 @@ impl Game {
             if arrived <= 0.0 {
                 continue;
             }
-            let want = ((arrived / u.refugees_per).floor() as i64).min(u.refugees_max);
+            let want = (arrived / u.refugees_per).floor().min(u.refugees_max);
             let rose = self.raise_unrest(sid, want, UnrestSource::Refugees);
-            if rose > 0 {
-                let line = format!("{:.1} people arrived in {}; Unrest rose by {} to {}.", arrived, self.tables.state(sid).name, rose, self.state(sid).unrest);
+            if rose > 0.0 {
+                let line = format!("{:.1} people arrived in {}; Unrest rose by {} to {}.", arrived, self.tables.state(sid).name, Game::unrest_figure(rose), self.unrest_text(sid));
                 self.log(line.clone());
                 self.report.lines.push(line);
             }
@@ -1046,7 +1053,7 @@ impl Game {
             self.report.lines.push(line);
         }
         // Relief (rule 3): one point per order, paid for in Ducats at the Orders phase.
-        let mut relieved: Vec<(Seat, StateId, i64)> = Vec::new();
+        let mut relieved: Vec<(Seat, StateId, f64)> = Vec::new();
         for (seat, sid) in std::mem::take(&mut self.pending.relief) {
             let fell = self.lower_unrest(sid, u.relief_points);
             match relieved.iter_mut().find(|(s, x, _)| *s == seat && *x == sid) {
@@ -1054,17 +1061,18 @@ impl Game {
                 None => relieved.push((seat, sid, fell)),
             }
         }
-        for (seat, sid, fell) in relieved.into_iter().filter(|(_, _, n)| *n > 0) {
-            let line = format!("The {} paid Relief in {}: Unrest fell by {} to {}.", self.seat_name(seat), self.tables.state(sid).name, fell, self.state(sid).unrest);
+        for (seat, sid, fell) in relieved.into_iter().filter(|(_, _, n)| *n > 0.0) {
+            let line = format!("The {} paid Relief in {}: Unrest fell by {} to {}.", self.seat_name(seat), self.tables.state(sid).name, Game::unrest_figure(fell), self.unrest_text(sid));
             self.log(line.clone());
             self.report.lines.push(line);
         }
         // What calms a state by standing in it (a Constabulary now, a Scrubber later), then the
-        // natural fall, which lands only in a turn nothing raised it.
+        // natural fall. Ticket #53: the fall lands every turn, whatever else happened, so a rise
+        // and the fall net out; only a state that changed hands this turn goes without it.
         for sid in StateId::ALL {
             let calm = self.calming_fall(sid);
             self.lower_unrest(sid, calm);
-            if !self.state(sid).unrest_rose {
+            if !self.state(sid).changed_hands {
                 self.lower_unrest(sid, u.natural_fall);
             }
         }
@@ -1082,7 +1090,7 @@ impl Game {
             let was = self.state(sid).unrest_reported;
             for line in [u.army_threshold, u.facility_threshold] {
                 if now >= line && was < line {
-                    let text = format!("{}: Unrest reached {} - {}.", self.tables.state(sid).name, now, self.unrest_note(sid));
+                    let text = format!("{}: Unrest reached {} - {}.", self.tables.state(sid).name, self.unrest_text(sid), self.unrest_note(sid));
                     self.log(text.clone());
                     self.report.lines.push(text);
                     break;
@@ -1090,7 +1098,7 @@ impl Game {
             }
             let st = self.state_mut(sid);
             st.unrest_reported = now;
-            st.unrest_rose = false;
+            st.changed_hands = false;
             st.refugees_in = 0.0;
         }
     }
@@ -1115,7 +1123,7 @@ impl Game {
             "{} threw off the {}: it is neutral again, its Armies are its own, and its Unrest settles at {}.",
             self.tables.state(sid).name,
             self.seat_name(seat),
-            back
+            Game::unrest_figure(back)
         );
         self.log(line.clone());
         self.report.lines.push(line);

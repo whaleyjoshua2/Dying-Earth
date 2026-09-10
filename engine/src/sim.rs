@@ -26,7 +26,7 @@ pub struct SimResult {
     /// Ticket #52: states that threw off a controller, the highest Unrest any state reached, the
     /// Constabularies raised, the Relief orders paid, and the population refugees carried.
     pub throw_offs: u32,
-    pub peak_unrest: i64,
+    pub peak_unrest: f64,
     pub constabularies: u32,
     pub relief_orders: u32,
     pub population_moved: f64,
@@ -44,7 +44,7 @@ impl SimResult {
 
 /// Play one whole game with all four seats on the AI. `player` is the Faction in seat 0.
 pub fn run(tables: Arc<Tables>, seed: u64, player: FactionKind) -> SimResult {
-    run_from(tables, seed, player, StateId::Asia)
+    run_from(tables, seed, player, StateId::EastAsia)
 }
 
 /// As `run`, with seat 0 starting in `start` (the sweep uses this to try other seats at the table).
@@ -55,7 +55,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let mut projected_collapse: Option<u32> = None;
     let mut founded: Vec<(ColonyId, u32, Option<Seat>)> = Vec::new();
     let mut changed: Vec<(u32, u32)> = Vec::new();
-    let mut peak_unrest = 0i64;
+    let mut peak_unrest = 0.0f64;
     let max_turns = tables.victory.turns;
     let mut guard = 0;
     while !game.is_over() && guard < max_turns + 2 {
@@ -79,7 +79,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         if projected_collapse.is_none() {
             projected_collapse = game.projection().collapse_turn;
         }
-        peak_unrest = peak_unrest.max(game.states.iter().map(|s| s.unrest).max().unwrap_or(0));
+        peak_unrest = game.states.iter().map(|s| s.unrest).fold(peak_unrest, f64::max);
     }
     let buildings = Seat::ALL.map(|s| {
         let f: u32 = game.directed_states(s).iter().map(|st| game.state(*st).facilities.len() as u32).sum();

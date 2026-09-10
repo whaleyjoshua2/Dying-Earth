@@ -91,7 +91,7 @@ fn build_board(session: &mut Session) {
     let player = std::env::args()
         .find_map(|a| a.strip_prefix("player:").and_then(FactionKind::from_id))
         .unwrap_or(FactionKind::Custodians);
-    session.new_game(player, StateId::Asia);
+    session.new_game(player, StateId::EastAsia);
     let turns: u32 = std::env::args().find_map(|a| a.strip_prefix("turns:").and_then(|v| v.parse().ok())).unwrap_or(0);
     if let Some(g) = &mut session.game {
         if let Some(first) = g.available_techs().first().copied() {
@@ -167,22 +167,22 @@ fn build_board(session: &mut Session) {
         // `unrest:<n>` (a building aid, ticket #52): a spread of Unrest over three states on the
         // face the Earth picture shows, so one card, the map labels and the thresholds are all
         // visible at once. The AI seldom leaves a state of the player's this restive.
-        if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("unrest:").and_then(|v| v.parse::<i64>().ok())) {
-            for (sid, off) in [(StateId::Asia, 0), (StateId::Europe, 1), (StateId::Africa, 3)] {
-                let v = (n - off).clamp(0, 10);
+        if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("unrest:").and_then(|v| v.parse::<f64>().ok())) {
+            for (sid, off) in [(StateId::EastAsia, 0.0), (StateId::Europe, 1.0), (StateId::NorthAfrica, 3.0)] {
+                let v = (n - off).clamp(0.0, 10.0);
                 let st = g.state_mut(sid);
                 st.unrest = v;
                 st.unrest_reported = v;
             }
             // Room and money, so the card shows the Constabulary and the Relief buttons live.
-            g.state_mut(StateId::Asia).industry_level += 3;
+            g.state_mut(StateId::EastAsia).industry_level += 3;
             g.seats[0].stockpile.materials = 200;
             g.seats[0].stockpile.ducats = 200;
         }
         // `tints:1` (a building aid): one Nation State per seat on the face the Earth picture shows,
         // so all four Faction tints are in one picture. The AI seldom leaves four controllers alive.
         if std::env::args().any(|a| a == "tints:1") {
-            for (sid, seat) in [(StateId::SouthAmerica, Seat(0)), (StateId::Europe, Seat(1)), (StateId::MiddleEast, Seat(2)), (StateId::Africa, Seat(3))] {
+            for (sid, seat) in [(StateId::SouthAmerica, Seat(0)), (StateId::Europe, Seat(1)), (StateId::MiddleEast, Seat(2)), (StateId::SubSaharanAfrica, Seat(3))] {
                 g.state_mut(sid).control = Control::Controlled(seat);
             }
         }

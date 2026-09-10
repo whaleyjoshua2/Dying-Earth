@@ -1,48 +1,110 @@
-# Spec section 4.2, amended by ticket #26 (version 0.02): nine Nation States. Russia is cut out of
-# Europe and the Middle East out of Asia; each parent loses the population that leaves and one Size.
-# Population in hundreds of millions. Education Level from UN 2023 schooling data.
-# Neighbours are symmetric; each edge is listed on both states. Rows stay in the engine's order.
+# Spec section 4.2, amended by ticket #26 (version 0.02) and ticket #53 (version 0.05): twelve
+# Nation States. Africa is split at the Sahara; Asia becomes East Asia, South Asia and South-East
+# Asia; Central America and the Caribbean are cut out of North America. Antarctica stays off the
+# list (ticket #44): it is Earth's three Colony Slots.
+#
+# Population in hundreds of millions, from 2023 figures; every split shares out its parent's people
+# rather than inventing more. Education Level from UN 2023 schooling data. Neighbours are symmetric;
+# each edge is listed on both states. Rows stay in the engine's order.
 # start_facilities (ticket #24): what stands when the game begins, as many as the Industry Level,
 # chosen by the Resource Lean. They come with the state whoever takes it. The Faction start states
 # get a Launch Site on top.
-# influence (ticket #34, version 0.03): what the state adds to its controller's Allotment each turn,
-# from 2023 GDP and military spending shares; plus one for every Industry Level raised above the card.
-# gdp (ticket #35): world GDP share in tenths (2023); a controlled state makes gdp x Industry Level / 10
-# Ducats a turn, and a Bank there adds 4 x gdp / 10.
+# influence (ticket #34): what the state adds to its controller's Allotment each turn, from 2023 GDP
+# and military spending shares; plus one for every Industry Level raised above the card. A split
+# shares out its parent's figure exactly, so the Influence economy is unchanged by ticket #53.
+# gdp (ticket #35): world GDP share in tenths (2023); a controlled state makes gdp x Industry Level
+# / 10 Ducats a turn, and a Bank there adds 4 x gdp / 10. Splits share out the parent's figure too.
+# unrest (ticket #52): the Unrest the state starts with. Every state starts calm.
 
-# unrest (ticket #52, version 0.05): the Unrest the state starts with, 0 to 10. Every state starts calm.
-
+# Sub-Saharan Africa: the continent below the Sahara, about 1.2 billion people, little industry,
+# the youngest population on the map and the least schooling.
 [[state]]
-id = "africa"
-name = "Africa"
-population = 14.0
+id = "sub_saharan_africa"
+name = "Sub-Saharan Africa"
+population = 11.4
 industry_level = 1
 resource_lean = "materials"
 baseline_emissions = 0.3
-education_level = 0.8
+education_level = 0.7
 size = 3
 coastal_exposure = 1
-neighbours = ["europe", "middle_east"]
+neighbours = ["north_africa", "middle_east"]
 start_facilities = ["factory"]
-influence = 2
-gdp = 3
-unrest = 0
+influence = 1
+gdp = 2
+unrest = 0.0
 
+# North Africa: Morocco to Egypt and down through Sudan, about 260 million people, oil and gas along
+# the Mediterranean, the Nile delta exposed to the sea.
 [[state]]
-id = "asia"
-name = "Asia"
-population = 43.5
+id = "north_africa"
+name = "North Africa"
+population = 2.6
+industry_level = 1
+resource_lean = "fuel"
+baseline_emissions = 0.4
+education_level = 0.85
+size = 2
+coastal_exposure = 1
+neighbours = ["sub_saharan_africa", "europe", "middle_east"]
+start_facilities = ["refinery"]
+influence = 1
+gdp = 1
+unrest = 0.0
+
+# East Asia: China, Mongolia, the Koreas, Japan, Taiwan and Central Asia. The workshop of the world,
+# the dirtiest industry per unit on the map alongside the Middle East, and vast coastal cities.
+[[state]]
+id = "east_asia"
+name = "East Asia"
+population = 16.4
 industry_level = 3
 resource_lean = "materials"
-baseline_emissions = 0.4
-education_level = 0.9
+baseline_emissions = 0.5
+education_level = 1.1
 size = 3
 coastal_exposure = 2
-neighbours = ["russia", "middle_east", "australia"]
+neighbours = ["russia", "south_asia", "south_east_asia"]
 start_facilities = ["factory", "power_plant", "refinery"]
-influence = 7
-gdp = 30
-unrest = 0
+influence = 4
+gdp = 23
+unrest = 0.0
+
+# South Asia: India, Pakistan, Bangladesh, Nepal, Sri Lanka and Afghanistan. The most people of any
+# state on the map, the least schooling outside Africa, and deltas the sea will take first.
+[[state]]
+id = "south_asia"
+name = "South Asia"
+population = 19.4
+industry_level = 2
+resource_lean = "materials"
+baseline_emissions = 0.4
+education_level = 0.75
+size = 2
+coastal_exposure = 2
+neighbours = ["east_asia", "south_east_asia", "middle_east"]
+start_facilities = ["factory", "power_plant"]
+influence = 2
+gdp = 4
+unrest = 0.0
+
+# South-East Asia: Myanmar to the Philippines and most of Indonesia, about 680 million people, oil
+# and gas offshore, and more coastline than anywhere.
+[[state]]
+id = "south_east_asia"
+name = "South-East Asia"
+population = 6.8
+industry_level = 2
+resource_lean = "fuel"
+baseline_emissions = 0.3
+education_level = 0.95
+size = 2
+coastal_exposure = 2
+neighbours = ["east_asia", "south_asia", "australia"]
+start_facilities = ["refinery", "power_plant"]
+influence = 1
+gdp = 3
+unrest = 0.0
 
 [[state]]
 id = "australia"
@@ -54,11 +116,11 @@ baseline_emissions = 0.2
 education_level = 1.35
 size = 2
 coastal_exposure = 2
-neighbours = ["asia"]
+neighbours = ["south_east_asia"]
 start_facilities = ["power_plant", "factory"]
 influence = 2
 gdp = 2
-unrest = 0
+unrest = 0.0
 
 [[state]]
 id = "europe"
@@ -70,27 +132,46 @@ baseline_emissions = 0.3
 education_level = 1.45
 size = 2
 coastal_exposure = 1
-neighbours = ["north_america", "africa", "russia", "middle_east"]
+neighbours = ["north_america", "north_africa", "russia", "middle_east"]
 start_facilities = ["power_plant", "factory", "refinery"]
 influence = 5
 gdp = 20
-unrest = 0
+unrest = 0.0
 
+# North America: the United States and Canada, about 375 million people.
 [[state]]
 id = "north_america"
 name = "North America"
-population = 6.0
+population = 3.8
 industry_level = 3
 resource_lean = "fuel"
 baseline_emissions = 0.4
 education_level = 1.5
 size = 3
 coastal_exposure = 1
-neighbours = ["south_america", "europe", "russia"]
+neighbours = ["europe", "russia", "central_america"]
 start_facilities = ["refinery", "power_plant", "factory"]
-influence = 8
-gdp = 25
-unrest = 0
+influence = 7
+gdp = 23
+unrest = 0.0
+
+# Central America and the Caribbean: Mexico down to Panama and the islands, about 220 million
+# people. Small, poor beside its northern neighbour, and all coast.
+[[state]]
+id = "central_america"
+name = "Central America and the Caribbean"
+population = 2.2
+industry_level = 1
+resource_lean = "materials"
+baseline_emissions = 0.3
+education_level = 1.0
+size = 1
+coastal_exposure = 2
+neighbours = ["north_america", "south_america"]
+start_facilities = ["factory"]
+influence = 1
+gdp = 2
+unrest = 0.0
 
 [[state]]
 id = "south_america"
@@ -102,11 +183,11 @@ baseline_emissions = 0.2
 education_level = 1.1
 size = 3
 coastal_exposure = 1
-neighbours = ["north_america"]
+neighbours = ["central_america"]
 start_facilities = ["refinery"]
 influence = 2
 gdp = 5
-unrest = 0
+unrest = 0.0
 
 # Ticket #26. Russia: 145 million people, industry between Europe's and Africa's, gas and oil, dirty
 # per unit of industry, well schooled, vast and mostly landlocked in the game's sense.
@@ -120,11 +201,11 @@ baseline_emissions = 0.4
 education_level = 1.35
 size = 3
 coastal_exposure = 1
-neighbours = ["europe", "asia", "north_america"]
+neighbours = ["europe", "east_asia", "north_america"]
 start_facilities = ["refinery", "power_plant"]
 influence = 4
 gdp = 3
-unrest = 0
+unrest = 0.0
 
 # The Middle East: Turkey to Iran and the Arabian Peninsula, about 350 million people, oil, the
 # highest Emissions per unit of industry on the map, Gulf coasts exposed.
@@ -138,8 +219,8 @@ baseline_emissions = 0.5
 education_level = 1.0
 size = 2
 coastal_exposure = 1
-neighbours = ["europe", "asia", "africa"]
+neighbours = ["europe", "north_africa", "sub_saharan_africa", "south_asia"]
 start_facilities = ["refinery", "power_plant"]
 influence = 4
 gdp = 5
-unrest = 0
+unrest = 0.0

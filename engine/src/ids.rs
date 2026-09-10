@@ -34,25 +34,35 @@ impl BodyId {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StateId {
-    Africa,
-    // Antarctica left the list in version 0.04 (ticket #44): it is Earth's three Colony Slots.
-    Asia,
+    // Version 0.05 (ticket #53): twelve Nation States. Africa split at the Sahara, Asia into three,
+    // and Central America and the Caribbean cut out of North America. Antarctica stays off the list
+    // (ticket #44): it is Earth's three Colony Slots.
+    SubSaharanAfrica,
+    NorthAfrica,
+    EastAsia,
+    SouthAsia,
+    SouthEastAsia,
     Australia,
     Europe,
     NorthAmerica,
+    CentralAmerica,
     SouthAmerica,
-    // Version 0.02 (ticket #26): two more, cut from Europe and Asia.
+    // Version 0.02 (ticket #26): cut from Europe and Asia.
     Russia,
     MiddleEast,
 }
 
 impl StateId {
-    pub const ALL: [StateId; 8] = [
-        StateId::Africa,
-        StateId::Asia,
+    pub const ALL: [StateId; 12] = [
+        StateId::SubSaharanAfrica,
+        StateId::NorthAfrica,
+        StateId::EastAsia,
+        StateId::SouthAsia,
+        StateId::SouthEastAsia,
         StateId::Australia,
         StateId::Europe,
         StateId::NorthAmerica,
+        StateId::CentralAmerica,
         StateId::SouthAmerica,
         StateId::Russia,
         StateId::MiddleEast,
