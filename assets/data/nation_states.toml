@@ -25,7 +25,7 @@
 # for these three are development_turns, development_max_level and
 # development_stops_at_temperature; inside their own table the prefix would only repeat itself.
 [development]
-turns = 6
+turns = 9
 max_level = 4
 stops_at_temperature = 2.5
 

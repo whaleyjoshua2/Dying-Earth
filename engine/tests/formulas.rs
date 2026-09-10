@@ -2616,14 +2616,16 @@ fn f_a_neutral_state_raises_its_industry_level_every_sixth_turn() {
     g.state_mut(sid).facilities.push(Facility { kind: FacilityKind::Factory, online: false, offline_until_resolution: false, self_run: false });
     let start = g.state(sid).industry_level;
     let before = g.emissions_now();
-    for turn in 1..=6 {
+    let n = g.tables.development.turns;
+    g.state_mut(sid).neutral_since = Some(1);
+    for turn in 1..=n {
         g.turn = turn;
         g.neutral_development();
-        if turn < 6 {
+        if turn < n {
             assert_eq!(g.state(sid).industry_level, start, "nothing on neutral turn {turn}");
         }
     }
-    assert_eq!(g.state(sid).industry_level, start + 1, "the sixth neutral turn raises the Industry Level");
+    assert_eq!(g.state(sid).industry_level, start + 1, "the {n}th neutral turn raises the Industry Level");
     assert!(g.state(sid).facilities.iter().all(|f| f.online), "and brings the idle Factory online");
     // The woken Factory is run by the state itself: while nobody directs the state it emits at
     // x1.0 (a Facility nobody directs otherwise emits nothing), to nobody's Blame.
@@ -2636,15 +2638,15 @@ fn f_a_neutral_state_raises_its_industry_level_every_sixth_turn() {
         "the Report names it: {:?}",
         g.report.lines
     );
-    // The clock starts again, so nothing happens for another five turns.
-    for turn in 7..=11 {
+    // The clock starts again, so nothing happens until the period has run a second time.
+    for turn in n + 1..2 * n {
         g.turn = turn;
         g.neutral_development();
     }
-    assert_eq!(g.state(sid).industry_level, start + 1, "and not again until the twelfth turn");
-    g.turn = 12;
+    assert_eq!(g.state(sid).industry_level, start + 1, "and not again until turn {}", 2 * n);
+    g.turn = 2 * n;
     g.neutral_development();
-    assert_eq!(g.state(sid).industry_level, start + 2, "every six turns");
+    assert_eq!(g.state(sid).industry_level, start + 2, "every {n} turns");
 
     // At the ceiling.
     let mut g = game();
@@ -2652,7 +2654,8 @@ fn f_a_neutral_state_raises_its_industry_level_every_sixth_turn() {
     hold_temperature(&mut g, 1.2);
     let ceiling = g.tables.development.max_level;
     g.state_mut(sid).industry_level = ceiling;
-    g.turn = 6;
+    g.state_mut(sid).neutral_since = Some(1);
+    g.turn = g.tables.development.turns;
     g.neutral_development();
     assert_eq!(g.state(sid).industry_level, ceiling, "Industry Level 4 develops no further");
 
@@ -2661,7 +2664,8 @@ fn f_a_neutral_state_raises_its_industry_level_every_sixth_turn() {
     calm(&mut g);
     let stops = g.tables.development.stops_at_temperature;
     hold_temperature(&mut g, stops);
-    g.turn = 6;
+    g.state_mut(sid).neutral_since = Some(1);
+    g.turn = g.tables.development.turns;
     g.neutral_development();
     assert_eq!(g.state(sid).industry_level, start, "nothing develops at +2.5 C");
 
@@ -2670,7 +2674,8 @@ fn f_a_neutral_state_raises_its_industry_level_every_sixth_turn() {
     calm(&mut g);
     hold_temperature(&mut g, 1.2);
     g.state_mut(sid).unrest = g.tables.unrest.no_development_at;
-    g.turn = 6;
+    g.state_mut(sid).neutral_since = Some(1);
+    g.turn = g.tables.development.turns;
     g.neutral_development();
     assert_eq!(g.state(sid).industry_level, start, "a state at Unrest 7 does not develop");
 
@@ -2680,7 +2685,7 @@ fn f_a_neutral_state_raises_its_industry_level_every_sixth_turn() {
     hold_temperature(&mut g, 1.2);
     g.take_control(sid, Seat(1));
     g.state_mut(sid).neutral_since = Some(1);
-    g.turn = 6;
+    g.turn = g.tables.development.turns;
     g.neutral_development();
     assert_eq!(g.state(sid).industry_level, start, "a controlled state is developed by its controller, not by itself");
 }
@@ -2692,12 +2697,12 @@ fn g_the_neutrality_clock_restarts_when_a_state_goes_neutral_again() {
     let mut g = game();
     calm(&mut g);
     hold_temperature(&mut g, 1.2);
-    assert_eq!(g.state(sid).neutral_since, Some(1), "every state is neutral when the game opens");
+    assert!(g.state(sid).neutral_since.is_some(), "every state is neutral when the game opens (clocks staggered by the seed)");
     g.turn = 3;
     g.take_control(sid, Seat(1));
     assert_eq!(g.state(sid).neutral_since, None, "a state a Faction holds has no clock");
-    // Thrown off on turn 5: the count starts again from turn 6, so nothing on turn 8 (the sixth
-    // turn of the original clock) and the raise on turn 11.
+    // Thrown off on turn 5: the count starts again from turn 6, so nothing until the period has
+    // run from there, and the raise on turn 5 + period.
     g.turn = 5;
     g.state_mut(sid).unrest = g.tables.unrest.throw_off_threshold;
     // It changed hands this turn, so the natural fall is withheld and 10 is still 10 at the throw-off.
@@ -2707,12 +2712,13 @@ fn g_the_neutrality_clock_restarts_when_a_state_goes_neutral_again() {
     assert_eq!(g.state(sid).neutral_since, Some(6), "the clock starts on the turn after the change");
     let start = g.state(sid).industry_level;
     g.state_mut(sid).unrest = 0.0;
-    for turn in 6..=10 {
+    let n = g.tables.development.turns;
+    for turn in 6..5 + n {
         g.turn = turn;
         g.neutral_development();
     }
-    assert_eq!(g.state(sid).industry_level, start, "the old clock is gone: nothing by turn 10");
-    g.turn = 11;
+    assert_eq!(g.state(sid).industry_level, start, "the old clock is gone: nothing by turn {}", 4 + n);
+    g.turn = 5 + n;
     g.neutral_development();
     assert_eq!(g.state(sid).industry_level, start + 1, "six fresh turns from turn 6");
 }

@@ -644,3 +644,9 @@ turn 19, 22 developments a game), the Prospector seating 20 of 20 (median 20, 14
 Before neutral development the Custodian seating had one Collapse in twenty. Whether the six-turn
 clock, the Industry Level 4 ceiling, or the +2.5 C stop moves is the designer's call, recorded on
 the map.
+
+**The designer's answer: a nine-turn clock** (`nation_states.toml`, `[development] turns = 9`),
+ceiling 4, stop at +2.5 C, so a state steps at most twice a game. Twenty seeds afterwards, seat 0
+in East Asia: the Custodian seating collapses 20 of 20 at a median turn 22 with 14 developments a
+game; the Prospector seating 20 of 20 at a median 21 with 6. The step is re-swept on the build
+ticket with every climate rule in.
