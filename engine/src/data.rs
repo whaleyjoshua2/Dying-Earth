@@ -41,6 +41,11 @@ pub struct BodyCard {
     pub name: String,
     #[serde(default)]
     pub slots: Vec<SlotCard>,
+    /// Ticket #46: orbital slots for stations, and the station names by slot.
+    #[serde(default)]
+    pub orbital_slots: u32,
+    #[serde(default)]
+    pub stations: Vec<String>,
     /// Ticket #45: the Body this one orbits, and the hop between them.
     #[serde(default)]
     pub parent: Option<BodyId>,
@@ -217,6 +222,9 @@ pub struct FactionCard {
     pub signature: String,
     pub victory: String,
     pub colour: [f32; 3],
+    /// Ticket #46: the station over Earth the Faction starts with, by name in bodies.toml.
+    #[serde(default)]
+    pub start_station: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -278,6 +286,9 @@ pub struct InfluenceTable {
     pub decay_controlled: i64,
     /// Version 0.04 (ticket #41): a challenger needs the controller's standing plus this.
     pub challenge_margin: i64,
+    /// Ticket #46: a station's threshold starts here.
+    #[serde(default)]
+    pub station_threshold_base: i64,
     pub occupation_turns: u32,
     pub destruction_chance: f64,
 }
@@ -370,6 +381,11 @@ struct BodiesFile {
     sibling_turns: u32,
     #[serde(default = "one_i64")]
     sibling_fuel: i64,
+    #[serde(default = "forty")]
+    station_materials: i64,
+}
+fn forty() -> i64 {
+    40
 }
 fn one_u32() -> u32 {
     1
@@ -413,6 +429,8 @@ pub struct Tables {
     pub bodies: Vec<BodyCard>,
     /// Ticket #45: the hop between two satellites of the same Body.
     pub sibling_transit: (u32, i64),
+    /// Ticket #46: what a station costs.
+    pub station_materials: i64,
     pub states: Vec<StateCard>,
     pub facilities: Vec<FacilityCard>,
     pub industry_level: IndustryLevelCard,
@@ -464,6 +482,7 @@ impl Tables {
         let ai: AiTable = read(dir, "ai.toml")?;
         let tables = Tables {
             sibling_transit: (bodies.sibling_turns, bodies.sibling_fuel),
+            station_materials: bodies.station_materials,
             bodies: bodies.body,
             states: states.state,
             facilities: facilities.facility,

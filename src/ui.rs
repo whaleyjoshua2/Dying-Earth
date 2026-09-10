@@ -425,8 +425,10 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                 if let Some(p) = project(pos + Vec3::Y * (geo::solar_radius(body) + 0.05)) {
                     let name = game.tables.body(body).name.clone();
                     let slots = game.tables.body(body).colony_slots();
-                    let filled = game.colonies.iter().filter(|c| c.body == body).count();
-                    let text = if slots > 0 { format!("{name}  {filled}/{slots} slots") } else { name };
+                    let filled = game.colonies.iter().filter(|c| c.body == body && !c.in_orbit).count();
+                    let orbital = game.tables.body(body).orbital_slots;
+                    let stations = game.colonies.iter().filter(|c| c.body == body && c.in_orbit).count();
+                    let text = format!("{name}  {filled}/{slots} slots, {stations}/{orbital} stations");
                     label_at(painter, p - egui::vec2(0.0, 22.0), &text, Color32::WHITE, 13.0);
                     hotspots.push(Hotspot { pos: p, radius: 40.0, hit: Hit::Enter(body) });
                     if let Some(s) = game.orbital_control(body) {
@@ -520,6 +522,10 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             band.push(format!("{}: {} Ship(s), strength {}", game.seat_name(seat), n, game.ship_stack_strength(seat, body)));
                         }
                     }
+                    for c in game.colonies.iter().filter(|c| c.in_orbit && c.body == body) {
+                        let who = c.control.director().map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".into());
+                        band.push(format!("{} ({})", game.station_name(body, c.slot), who));
+                    }
                     band.push(match game.orbital_control(body) {
                         Some(s) => format!("Orbital Control: {}", game.seat_name(s)),
                         None => "Orbital Control: nobody".to_string(),
@@ -555,6 +561,34 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                 label_at(painter, p + egui::vec2(0.0, 24.0), &text, colour, 12.0);
                 hotspots.push(Hotspot { pos: p, radius: 22.0, hit });
             }
+}
+
+/// Ticket #46: the stations over the Body on screen, and the orbital slots still free.
+fn stations_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    let View::Surface(body) = view.view else { return };
+    let card = game.tables.body(body);
+    if card.orbital_slots == 0 {
+        return;
+    }
+    ui.separator();
+    let count = game.colonies.iter().filter(|c| c.in_orbit && c.body == body).count();
+    ui.label(RichText::new(format!("In orbit: {} of {} station slots", count, card.orbital_slots)).strong());
+    for c in game.colonies.iter().filter(|c| c.in_orbit && c.body == body) {
+        let owner = match c.control {
+            Control::Neutral => "nobody's".to_string(),
+            Control::Controlled(s) => game.seat_name(s),
+            Control::Occupied { occupier, .. } => format!("occupied by the {}", game.seat_name(occupier)),
+        };
+        let mods: Vec<&str> = c.modules.iter().map(|m| m.kind.name()).collect();
+        let text = format!("{}: {}, {} Colonists, {}", game.station_name(body, c.slot), owner, c.colonists, if mods.is_empty() { "a bare core module".to_string() } else { mods.join(", ") });
+        if ui.button(text).clicked() {
+            view.selection = Selection::Colony(c.id);
+        }
+    }
+    for slot in game.free_orbital_slots(body) {
+        cost_button(ui, game, &session.pending, Order::BuildStation { body, slot }, &format!("Build {} here", game.station_name(body, slot)), actions);
+    }
+    ui.label(RichText::new("A station holds a Shipyard and Habitats. Ships are built only at a Shipyard.").weak());
 }
 
 /// The Colony Slot within fourteen degrees of a point on a Body, nearest first.
@@ -669,6 +703,7 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                     if let Some(e) = &session.last_error {
                         ui.colored_label(Color32::LIGHT_RED, e);
                     }
+                    stations_panel(ui, session, game, view, actions);
                     ui.separator();
                     roster(ui, session, game, view);
                 }
@@ -746,7 +781,7 @@ fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
         }
     }
     if !any_ship {
-        ui.label(RichText::new("  none; a Launch Site builds them").weak());
+        ui.label(RichText::new("  none; a Shipyard on a station or Colony builds them").weak());
     }
     // Armies.
     ui.label(RichText::new("Armies").strong());
@@ -775,7 +810,7 @@ fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
         ui.label(RichText::new("  none").weak());
     }
     // Colonies.
-    ui.label(RichText::new("Colonies").strong());
+    ui.label(RichText::new("Colonies and stations").strong());
     let mut any_colony = false;
     for c in game.colonies.iter().filter(|c| c.control.director() == Some(Seat(0))) {
         any_colony = true;
@@ -840,6 +875,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::Sell { resource, amount } => format!("Sell {} {} for {} Ducats", amount, resource.name(), -game.order_cost(Seat(0), o).ducats),
         Order::BuildFacilityWithDucats { state, kind } => format!("Build {} in {} for Ducats", kind.name(), game.tables.state(*state).name),
         Order::BuildModuleWithDucats { colony, kind } => format!("Build {} at {} for Ducats", kind.name(), game.place_name(Place::Colony(*colony))),
+        Order::BuildStation { body, slot } => format!("Build {} over {}", game.station_name(*body, *slot), game.tables.body(*body).name),
     }
 }
 
@@ -982,12 +1018,15 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         }
         cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
-        if st.facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite) {
-            ui.label(RichText::new("Ships (Launch Site)").strong());
-            for uk in UnitKind::SHIPS {
-                cost_button(ui, game, &session.pending, Order::BuildShip { site: Place::State(sid), kind: uk }, uk.name(), actions);
-            }
-        }
+        // Ticket #46: Ships come from Shipyards; a Launch Site lifts people to orbit.
+        ui.label(
+            RichText::new(if st.facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online) {
+                "Launch Site: Colonists and Armies lift to orbit from here. Ships are built at a Shipyard on a station or Colony."
+            } else {
+                "No working Launch Site: nothing lifts to orbit from here."
+            })
+            .weak(),
+        );
         let my_armies: Vec<&Army> = armies.iter().copied().filter(|a| game.army_seat(a) == Some(Seat(0)) && !game.army_stands_down(a)).collect();
         if !my_armies.is_empty() {
             ui.label(RichText::new("Army orders").strong());
@@ -1063,13 +1102,18 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     if mine {
         ui.label(RichText::new("Build (hover a button for what it makes)").strong());
         for mk in ModuleKind::ALL {
+            if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Habitat) {
+                continue;
+            }
             let hover = game.module_yield(Seat(0), cid, mk).text();
             ui.horizontal(|ui| {
                 cost_button_with_hover(ui, game, &session.pending, Order::BuildModule { colony: cid, kind: mk }, mk.name(), Some(hover), actions);
                 cost_button(ui, game, &session.pending, Order::BuildModuleWithDucats { colony: cid, kind: mk }, "or", actions);
             });
         }
-        cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::Colony(cid) }, "Build Army (Barracks)", actions);
+        if !col.in_orbit {
+            cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::Colony(cid) }, "Build Army (Barracks)", actions);
+        }
         if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
             ui.label(RichText::new("Ships (Shipyard)").strong());
             for uk in UnitKind::SHIPS {

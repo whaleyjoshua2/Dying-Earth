@@ -178,3 +178,50 @@ name of each Body, and a Colony named for its slot.
 ![Mars at turn 13: Chryse Planitia held by the Custodians, Hellas Planitia by the Prospectors, the empty slots grey](mars-named-slots.png)
 
 Twenty seeds in both orders give the same numbers as #44.
+
+## #46: orbital slots, stations, Shipyards and Launch Sites
+
+Decided by the designer: a Space Station is built for Materials with no crew and holds only a
+Shipyard and Habitats; orbital slots Earth 4, the Moon 2, Mars 3, Phobos 1, Deimos 1; the
+Custodians start with the ISS and the Prospectors with Tiangong, bare core modules with no
+Shipyard. From the ticket: Ships are built only at Shipyards, and a Launch Site is still what lifts
+things into space.
+
+- **A station is a Colony in orbit**: the same struct with `in_orbit` set, so Influence, Occupation,
+  Battles, the queue and the roster work unchanged. It is named for its orbital slot from a
+  `stations` list per Body (Earth: ISS, Tiangong, Skylab, Mir; the Moon: Gateway, Selene; Mars:
+  Mars Base Camp, Ares, Hermes; the moons: Phobos Gateway, Deimos Gateway), reads "Skylab over
+  Earth", and its threshold starts at 20 (`station_threshold_base`) plus 10 per Colonist so a bare
+  one is not free to take. Its Habitats take no Body yield. Colonists on a station over Earth are
+  still on Earth for Presence, like Antarctica's.
+- **Built for 40 Materials** (`station_materials` in `bodies.toml`) into a free orbital slot from a
+  Nation State with a working Launch Site (over Earth) or a Colony of the builder's (elsewhere);
+  it appears at the Resolution, and two seats ordering one slot go to the orbital tiebreak.
+- **Ships come only from Shipyards.** The state card's "Ships (Launch Site)" list is gone; the AI's
+  Earth shipbuilding with it. Until a seat has a Shipyard anywhere, one counts as advancing whatever
+  it is behind on, so both AIs build theirs on turn one and have it on turn three.
+- **A Launch Site lifts.** A Ship at Earth loads Colonists or an Army only from a state with a working
+  Launch Site; each lift is a launch for Emissions, and leaving orbit no longer is. A Launch Pad Fire
+  closes the Launch Site until the next Resolution; Clean Propellant keeps it open (the tech's text
+  changed to say so).
+- **The window**: the surface side panel lists the stations over the Body on screen and a "Build
+  Skylab here (40 Materials)" button per free slot; the Solar System Map label reads "Earth 0/3
+  slots, 2/4 stations"; the orbit band names the stations; a station's card offers only a Shipyard
+  and Habitats, and no Army.
+
+Three tests watched red first (they did not compile without the orders and fields): the slots,
+the two start stations, the cost and footholds, the module rule and the threshold; Ships refused at
+a Launch Site and taken at a Shipyard, a lift refused without a Launch Site and counted as a launch,
+leaving orbit not counted; the fire closing a Launch Site and Clean Propellant keeping it open.
+
+![The Earth Map on turn 1: the ISS and Tiangong in orbit, bare, and buttons to build Skylab or Mir](stations-at-start.png)
+
+![The Solar System Map at turn 9: every Body labelled with its slots and stations, the ISS with two Modules in the roster](stations-solar.png)
+
+**Twenty seeds, Custodians in seat 0**: wins 2 (3 on #45), first Colony on turn 10 (7), buildings
+at the end 32 (60). The first Shipyard costs 35 Materials and two turns before any Ship, and a
+station's Shipyard pays 4 Energy a turn, so both Factions start slower. A first pass had the
+Custodian AI building a Habitat on the ISS and parking Colonists there (first Colony on turn 14);
+the AI now builds no Habitat on a station over Earth and never disembarks there. The AI built no
+station beyond its start one in twenty seeds: its candidate carries the plain Shipyard weight and
+never outranks a producer.

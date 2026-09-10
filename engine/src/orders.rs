@@ -51,6 +51,9 @@ pub enum Order {
     Sell { resource: Resource, amount: i64 },
     BuildFacilityWithDucats { state: StateId, kind: FacilityKind },
     BuildModuleWithDucats { colony: ColonyId, kind: ModuleKind },
+    /// Version 0.04 (ticket #46): a Space Station in an orbital slot, built for Materials from a
+    /// Nation State with a Launch Site (over Earth) or a Colony of the seat's (elsewhere).
+    BuildStation { body: BodyId, slot: u32 },
 }
 
 impl Order {
@@ -126,6 +129,8 @@ fn fail<T>(msg: impl Into<String>) -> Result<T, OrderError> {
 pub struct Pending {
     pub repairs: Vec<(Seat, UnitRef, u32)>,
     pub cargo: Vec<(Seat, Order)>,
+    /// Ticket #46: stations ordered this turn.
+    pub stations: Vec<(Seat, BodyId, u32)>,
     pub influence: Vec<(Seat, Target, i64)>,
     /// Attack orders in the order given, for battle ordering (spec 10.1).
     pub attack_sequence: u32,
@@ -176,6 +181,7 @@ impl Game {
                 }
             }
             Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: t.facility(*kind).materials * t.ducats.per_building_material, ..Default::default() },
+            Order::BuildStation { .. } => Cost { materials: t.station_materials, ..Default::default() },
             Order::BuildModuleWithDucats { kind, .. } => Cost { ducats: t.module(*kind).materials * t.ducats.per_building_material, ..Default::default() },
             Order::RestorationWithDucats { steps } => Cost { ducats: t.ducats.per_restoration_step * *steps as i64, ..Default::default() },
             Order::RepairWithDucats { points, .. } => Cost { ducats: t.ducats.per_repair_point * *points as i64, ..Default::default() },
@@ -302,6 +308,22 @@ impl Game {
                 let materials_form = Order::BuildModule { colony: *colony, kind: *kind };
                 self.check_order_inner(seat, pending, &materials_form, false).map(|_| cost)
             }
+            Order::BuildStation { body, slot } => {
+                if !self.free_orbital_slots(*body).contains(slot) {
+                    return fail("that orbital slot is taken, or there is no such slot");
+                }
+                if pending.iter().any(|o| matches!(o, Order::BuildStation { body: b, slot: s } if b == body && s == slot)) {
+                    return fail("a station is already ordered there");
+                }
+                let foothold = match body {
+                    BodyId::Earth => self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online)),
+                    b => self.colonies.iter().any(|c| !c.in_orbit && c.body == *b && c.control.director() == Some(seat)),
+                };
+                if !foothold {
+                    return fail(if *body == BodyId::Earth { "needs a Nation State of yours with a Launch Site" } else { "needs a Colony of yours on this Body" });
+                }
+                Ok(cost)
+            }
             Order::BuildFacility { state, kind } => {
                 if self.state(*state).control.director() != Some(seat) {
                     return fail("you do not direct this Nation State");
@@ -329,6 +351,10 @@ impl Game {
                 if col.control.director() != Some(seat) {
                     return fail("you do not direct this Colony");
                 }
+                // Ticket #46: a station holds only a Shipyard and Habitats.
+                if col.in_orbit && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat) {
+                    return fail("a station holds only a Shipyard and Habitats");
+                }
                 if matches!(kind, ModuleKind::Shipyard | ModuleKind::Barracks) {
                     let has = col.modules.iter().any(|m| m.kind == *kind)
                         || col.queue.iter().any(|b| b.item == BuildItem::Module(*kind))
@@ -344,14 +370,8 @@ impl Game {
                     return fail("not a Ship");
                 }
                 match site {
-                    Place::State(s) => {
-                        if self.state(*s).control.director() != Some(seat) {
-                            return fail("you do not direct this Nation State");
-                        }
-                        if !self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite) {
-                            return fail("no Launch Site here");
-                        }
-                    }
+                    // Ticket #46: Ships are built only at Shipyards, on a station or a Colony.
+                    Place::State(_) => return fail("Ships are built at a Shipyard, on a station or a Colony"),
                     Place::Colony(c) => {
                         let Some(col) = self.colony(*c) else { return fail("no such Colony") };
                         if col.control.director() != Some(seat) {
@@ -516,6 +536,10 @@ impl Game {
                             if self.state(*st).control.director() != Some(seat) {
                                 return fail("you do not direct that Nation State");
                             }
+                            // Ticket #46: a lift to orbit needs a Launch Site there.
+                            if !self.state(*st).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online) {
+                                return fail("a lift to orbit needs a working Launch Site there");
+                            }
                             if self.state(*st).population < 0.1 * *colonists as f64 {
                                 return fail("not enough people there");
                             }
@@ -541,6 +565,9 @@ impl Game {
                     let Some(a) = self.army(*aid) else { return fail("no such Army") };
                     if self.army_seat(a) != Some(seat) || a.standing && self.army_stands_down(a) {
                         return fail("not your Army");
+                    }
+                    if matches!(a.at, ArmyAt::Place(Place::State(st)) if !self.state(st).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online)) {
+                        return fail("a lift to orbit needs a working Launch Site there");
                     }
                     if matches!(a.home, ArmyHome::Colony(_)) {
                         return fail("a Colony's Army never leaves");
@@ -709,9 +736,6 @@ impl Game {
                         _ => continue,
                     };
                     let (turns, _) = self.transit_cost(from, *to);
-                    if from == BodyId::Earth {
-                        self.climate.launches_pending[seat.index()] += 1;
-                    }
                     let name = self.tables.body(*to).name.clone();
                     if let Some(s) = self.ship_mut(*ship) {
                         s.at = ShipAt::Transit { from, to: *to, turns_left: turns };
@@ -737,7 +761,13 @@ impl Game {
                         a.move_to = Some(*to);
                     }
                 }
+                Order::Load { from: LoadSource::State(_), .. } => {
+                    // Ticket #46: a lift from a Nation State is a launch.
+                    self.climate.launches_pending[seat.index()] += 1;
+                    self.pending.cargo.push((seat, order.clone()));
+                }
                 Order::Load { .. } | Order::Unload { .. } => self.pending.cargo.push((seat, order.clone())),
+                Order::BuildStation { body, slot } => self.pending.stations.push((seat, *body, *slot)),
                 Order::Influence { target, amount } => self.pending.influence.push((seat, *target, *amount)),
                 Order::Restoration { steps } | Order::RestorationWithDucats { steps } => {
                     self.climate.restoration_next += self.tables.restoration.sink_per_step * *steps as f64;

@@ -122,6 +122,8 @@ pub struct Colony {
     /// Grid Failure: Modules offline until the next Resolution.
     pub grid_failed: bool,
     pub founded_turn: u32,
+    /// Version 0.04 (ticket #46): a Space Station in an orbital slot rather than a Colony on the ground.
+    pub in_orbit: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -468,6 +470,13 @@ impl Game {
         }
         // Starting positions (spec 14.3): the player's pick, then the AI's continent (section 20).
         game.take_control(setup.player_start, Seat(0));
+        // Version 0.04 (ticket #46): each Faction starts with a bare station over Earth, named on its card.
+        for seat in Seat::ALL {
+            let want = game.tables.faction(game.kind(seat)).start_station.clone();
+            let slot = game.tables.body(BodyId::Earth).stations.iter().position(|n| *n == want).unwrap_or(seat.index()) as u32;
+            let id = ColonyId(game.fresh_id());
+            game.colonies.push(Colony { id, body: BodyId::Earth, slot, control: Control::Controlled(seat), modules: Vec::new(), colonists: 0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+        }
         let ai_start = game.ai_start_state(setup.player_start);
         game.take_control(ai_start, Seat(1));
         for (sid, seat) in [(setup.player_start, Seat(0)), (ai_start, Seat(1))] {
@@ -561,6 +570,8 @@ impl Game {
         match p {
             Place::State(s) => self.tables.state(s).name.clone(),
             Place::Colony(c) => match self.colony(c) {
+                // Ticket #46: a station is named for its orbital slot.
+                Some(col) if col.in_orbit => format!("{} over {}", self.station_name(col.body, col.slot), self.tables.body(col.body).name),
                 // Ticket #45: a Colony is named for its slot, a real place on its Body.
                 Some(col) => format!("{} on {}", self.tables.body(col.body).slots[col.slot as usize].name, self.tables.body(col.body).name),
                 None => format!("{c}"),
@@ -672,7 +683,8 @@ impl Game {
     pub fn habitat_room(&self, c: &Colony) -> u32 {
         let per = self.tables.module(ModuleKind::Habitat).holds_colonists
             + if self.has_tech(TechId::ExpandedHabitats) { self.tables.tech(TechId::ExpandedHabitats).value as u32 } else { 0 };
-        let yield_ = self.tables.body(c.body).habitat_yield;
+        // A station's Habitats are built for orbit: no Body yield applies (ticket #46).
+        let yield_ = if c.in_orbit { 1.0 } else { self.tables.body(c.body).habitat_yield };
         let habitats = c.modules.iter().filter(|m| m.kind == ModuleKind::Habitat).count() as f64;
         (habitats * per as f64 * yield_).floor() as u32
     }
@@ -687,7 +699,10 @@ impl Game {
         let t = &self.tables.influence;
         let raw = match target {
             Place::State(s) => t.state_threshold_base + t.state_threshold_per_size * self.tables.state(s).size as i64,
-            Place::Colony(c) => self.colony(c).map(|c| t.colony_threshold_per_colonist * c.colonists as i64).unwrap_or(i64::MAX / 4),
+            Place::Colony(c) => self
+                .colony(c)
+                .map(|c| t.colony_threshold_per_colonist * c.colonists as i64 + if c.in_orbit { t.station_threshold_base } else { 0 })
+                .unwrap_or(i64::MAX / 4),
         };
         if self.has_tech(TechId::GreenConsensus) {
             let m = self.tables.tech(TechId::GreenConsensus).influence_threshold_multiplier.unwrap_or(0.75);
@@ -762,11 +777,26 @@ impl Game {
 
     pub fn free_slots_on(&self, body: BodyId) -> Vec<u32> {
         let total = self.tables.body(body).colony_slots();
-        (0..total).filter(|i| !self.colonies.iter().any(|c| c.body == body && c.slot == *i)).collect()
+        (0..total).filter(|i| !self.colonies.iter().any(|c| !c.in_orbit && c.body == body && c.slot == *i)).collect()
     }
 
     pub fn colony_at(&self, body: BodyId, slot: u32) -> Option<&Colony> {
-        self.colonies.iter().find(|c| c.body == body && c.slot == slot)
+        self.colonies.iter().find(|c| !c.in_orbit && c.body == body && c.slot == slot)
+    }
+
+    /// Ticket #46: the orbital slots with no station yet.
+    pub fn free_orbital_slots(&self, body: BodyId) -> Vec<u32> {
+        let total = self.tables.body(body).orbital_slots;
+        (0..total).filter(|i| !self.colonies.iter().any(|c| c.in_orbit && c.body == body && c.slot == *i)).collect()
+    }
+
+    pub fn station_at(&self, body: BodyId, slot: u32) -> Option<&Colony> {
+        self.colonies.iter().find(|c| c.in_orbit && c.body == body && c.slot == slot)
+    }
+
+    /// The name an orbital slot's station carries, from bodies.toml.
+    pub fn station_name(&self, body: BodyId, slot: u32) -> String {
+        self.tables.body(body).stations.get(slot as usize).cloned().unwrap_or_else(|| format!("Station {}", slot + 1))
     }
 
     /// Orbital Control at a Body (spec 9.3): a warship there, and no enemy warship still engaged.

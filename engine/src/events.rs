@@ -67,7 +67,6 @@ impl Game {
         let t = self.tables.clone();
         let card = t.event(id);
         let scale = if card.kind == EventKind::Climate { self.climate_scale() } else { 1.0 };
-        let turn = self.turn;
         let (target, text) = match id {
             EventId::SolarStorm | EventId::RadiationSurge | EventId::CommsBlackout | EventId::MeteorShower => {
                 (EventTarget::Everyone, format!("{}: {}.", card.name, card.effect))
@@ -87,9 +86,9 @@ impl Game {
                     .collect();
                 match self.pick_uniform(&states) {
                     Some(s) => {
-                        let ships = self.state(s).queue.iter().filter(|b| b.due_turn <= turn && matches!(b.item, BuildItem::Unit(k) if k != UnitKind::Army)).count();
-                        let delay = if self.has_tech(TechId::CleanPropellant) { "no Ship is delayed (Clean Propellant)".to_string() } else if ships > 0 { format!("{ships} Ship(s) due there complete next turn instead") } else { "no Ship was due there".to_string() };
-                        (EventTarget::State(s), format!("{} in {}: its Launch Site is offline until the next Resolution; {}.", card.name, t.state(s).name, delay))
+                        // Ticket #46: no Ship is built at a Launch Site now; the fire closes the lifts.
+                        let what = if self.has_tech(TechId::CleanPropellant) { "its Launch Site stays open (Clean Propellant)".to_string() } else { "its Launch Site is offline until the next Resolution, so nothing lifts to orbit from there".to_string() };
+                        (EventTarget::State(s), format!("{} in {}: {}.", card.name, t.state(s).name, what))
                     }
                     None => (EventTarget::None, format!("{}: no Launch Site stands anywhere, so nothing happens.", card.name)),
                 }
@@ -296,6 +295,9 @@ impl Game {
                 st.population = (st.population * (1.0 - loss * ev.scale)).max(0.0);
             }
             (EventId::LaunchPadFire, EventTarget::State(s)) => {
+                if self.has_tech(TechId::CleanPropellant) {
+                    return;
+                }
                 let st = self.state_mut(s);
                 for f in st.facilities.iter_mut().filter(|f| f.kind == FacilityKind::LaunchSite) {
                     f.offline_until_resolution = true;

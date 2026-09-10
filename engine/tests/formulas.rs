@@ -42,8 +42,14 @@ fn colony(g: &mut Game, seat: Seat, body: BodyId, modules: &[ModuleKind], coloni
         queue: Vec::new(),
         grid_failed: false,
         founded_turn: 1,
+        in_orbit: false,
     });
     id
+}
+
+/// The seat's station over a Body (ticket #46): the one it starts with over Earth, or None.
+fn station_of(g: &Game, seat: Seat, body: BodyId) -> Option<ColonyId> {
+    g.colonies.iter().find(|c| c.in_orbit && c.body == body && c.control == Control::Controlled(seat)).map(|c| c.id)
 }
 
 // ---------------------------------------------------------------- 7.2 Income shortfall order
@@ -440,6 +446,71 @@ fn ducats_pay_for_restoration_and_repairs_at_the_table_rates() {
     assert!(g.check_order(Seat(0), &[], &Order::RepairWithDucats { unit: UnitRef::Ship(ShipId(1)), points: 1 }).is_err(), "nothing to repair");
 }
 
+// ---------------------------------------------------------------- #46 orbital slots and stations
+
+#[test]
+fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard_and_habitats() {
+    let mut g = game();
+    let slots: Vec<u32> = BodyId::ALL.iter().map(|b| g.tables.body(*b).orbital_slots).collect();
+    assert_eq!(slots, vec![4, 2, 3, 1, 1]);
+    // The start: the Custodians' ISS and the Prospectors' Tiangong over Earth, bare core modules.
+    let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the Custodians start with a station");
+    let tiangong = station_of(&g, Seat(1), BodyId::Earth).expect("the Prospectors start with a station");
+    assert_eq!(g.place_name(Place::Colony(iss)), "ISS over Earth");
+    assert_eq!(g.place_name(Place::Colony(tiangong)), "Tiangong over Earth");
+    assert!(g.colony(iss).unwrap().modules.is_empty(), "no Shipyard at the start");
+    assert!(g.colony(iss).unwrap().in_orbit);
+    assert_eq!(g.free_orbital_slots(BodyId::Earth), vec![2, 3]);
+    assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3, "stations take no surface slot");
+    // Built for 40 Materials from a state with a Launch Site (Earth) or a Colony (elsewhere); no crew.
+    let build = Order::BuildStation { body: BodyId::Earth, slot: 2 };
+    assert_eq!(g.order_cost(Seat(0), &build).materials, 40);
+    assert!(g.check_order(Seat(0), &[], &build).is_ok(), "Asia has a Launch Site");
+    assert!(g.check_order(Seat(0), &[], &Order::BuildStation { body: BodyId::Mars, slot: 0 }).is_err(), "nothing of the Custodians' at Mars");
+    assert!(g.check_order(Seat(0), &[], &Order::BuildStation { body: BodyId::Earth, slot: 0 }).is_err(), "the ISS is there");
+    g.commit_orders(Seat(0), &[build]);
+    assert_eq!(g.seats[0].stockpile.materials, 40);
+    g.resolution_phase();
+    let skylab = g.station_at(BodyId::Earth, 2).expect("built at the Resolution");
+    assert_eq!(g.place_name(Place::Colony(skylab.id)), "Skylab over Earth");
+    assert_eq!(skylab.control, Control::Controlled(Seat(0)));
+    assert_eq!(skylab.colonists, 0);
+    // Only a Shipyard and Habitats stand on a station.
+    assert!(g.check_order(Seat(0), &[], &Order::BuildModule { colony: iss, kind: ModuleKind::Mine }).is_err(), "nothing to dig in orbit");
+    assert!(g.check_order(Seat(0), &[], &Order::BuildModule { colony: iss, kind: ModuleKind::Shipyard }).is_ok());
+    assert!(g.check_order(Seat(0), &[], &Order::BuildModule { colony: iss, kind: ModuleKind::Habitat }).is_ok());
+    // A bare station is not free to take: its threshold starts at the station base.
+    assert_eq!(g.influence_threshold(Place::Colony(iss)), 20);
+    // A Colony on Mars lets the seat build a station over Mars.
+    colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 0);
+    assert!(g.check_order(Seat(0), &[], &Order::BuildStation { body: BodyId::Mars, slot: 0 }).is_ok());
+}
+
+#[test]
+fn ships_are_built_only_at_shipyards_and_lifts_need_a_launch_site() {
+    let mut g = game();
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    let frigate = |site: Place| Order::BuildShip { site, kind: UnitKind::Frigate };
+    assert!(g.check_order(Seat(0), &[], &frigate(Place::State(StateId::Asia))).is_err(), "a Launch Site builds no Ship now");
+    assert!(g.check_order(Seat(0), &[], &frigate(Place::Colony(iss))).is_err(), "no Shipyard on the ISS yet");
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    assert!(g.check_order(Seat(0), &[], &frigate(Place::Colony(iss))).is_ok());
+    // Lifts: a Ship at Earth loads Colonists only from a state with a Launch Site, and each lift is a launch.
+    let ship = ShipId(g.fresh_id());
+    g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 });
+    g.state_mut(StateId::Africa).control = Control::Controlled(Seat(0));
+    g.state_mut(StateId::Africa).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
+    let from_africa = Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::Africa), army: None };
+    assert!(g.check_order(Seat(0), &[], &from_africa).is_err(), "no Launch Site in Africa");
+    let from_asia = Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::Asia), army: None };
+    assert!(g.check_order(Seat(0), &[], &from_asia).is_ok());
+    g.commit_orders(Seat(0), &[from_asia]);
+    assert_eq!(g.climate.launches_pending[0], 1, "a lift is a launch");
+    // Leaving orbit is no launch: the Ship is already up.
+    g.commit_orders(Seat(0), &[Order::Transit { ship, to: BodyId::Moon }]);
+    assert_eq!(g.climate.launches_pending[0], 1);
+}
+
 // ---------------------------------------------------------------- #45 Phobos and Deimos
 
 #[test]
@@ -810,26 +881,22 @@ fn the_deck_is_twenty_six_cards_as_the_table_deals_them_and_no_calm() {
 // ---------------------------------------------------------------- #32 the two replacement cards
 
 #[test]
-fn launch_pad_fire_delays_the_ships_due_at_that_state_unless_clean_propellant() {
+fn launch_pad_fire_closes_a_launch_site_unless_clean_propellant_is_known() {
     let mut g = game();
     g.turn = 3;
-    g.state_mut(StateId::Asia).queue.push(Build { item: BuildItem::Unit(UnitKind::Frigate), seat: Seat(0), due_turn: 3 });
-    g.state_mut(StateId::Asia).queue.push(Build { item: BuildItem::Facility(FacilityKind::Factory), seat: Seat(0), due_turn: 3 });
     drawn(&mut g, EventId::LaunchPadFire, EventTarget::State(StateId::Asia));
     g.resolution_phase();
-    assert!(g.ships.is_empty(), "the Frigate did not appear");
-    assert_eq!(g.state(StateId::Asia).queue.len(), 1, "it is back in the queue");
-    assert_eq!(g.state(StateId::Asia).queue[0].due_turn, 4);
-    assert!(g.state(StateId::Asia).facilities.iter().any(|f| f.kind == FacilityKind::Factory), "the Factory was not delayed");
     assert!(!g.state(StateId::Asia).facilities.iter().find(|f| f.kind == FacilityKind::LaunchSite).unwrap().online, "the Launch Site is offline");
-    // With Clean Propellant nothing is delayed.
+    let ship = ShipId(g.fresh_id());
+    g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 });
+    assert!(g.check_order(Seat(0), &[], &Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::Asia), army: None }).is_err(), "nothing lifts from a closed Launch Site");
+    // With Clean Propellant the Launch Site stays open.
     let mut g = game();
     g.turn = 3;
     with_tech(&mut g, TechId::CleanPropellant);
-    g.state_mut(StateId::Asia).queue.push(Build { item: BuildItem::Unit(UnitKind::Frigate), seat: Seat(0), due_turn: 3 });
     drawn(&mut g, EventId::LaunchPadFire, EventTarget::State(StateId::Asia));
     g.resolution_phase();
-    assert_eq!(g.ships.len(), 1);
+    assert!(g.state(StateId::Asia).facilities.iter().find(|f| f.kind == FacilityKind::LaunchSite).unwrap().online);
 }
 
 #[test]

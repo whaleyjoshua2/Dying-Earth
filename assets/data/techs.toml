@@ -38,7 +38,7 @@ branch = "Propulsion"
 rung = 1
 cost = 15
 needs = []
-effect = "Launch Emissions 0.8; a Launch Pad Fire delays no Ship"
+effect = "Launch Emissions 0.8; a Launch Pad Fire closes no Launch Site"
 value = 0.8
 
 [[tech]]

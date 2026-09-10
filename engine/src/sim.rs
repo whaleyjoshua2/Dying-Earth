@@ -36,8 +36,8 @@ pub fn run(tables: Arc<Tables>, seed: u64, kinds: [FactionKind; 2]) -> SimResult
     while !game.is_over() && guard < max_turns + 2 {
         guard += 1;
         game.end_turn([Vec::new(), Vec::new()]);
-        if first_colony_turn.is_none() && !game.colonies.is_empty() {
-            first_colony_turn = Some(game.colonies.iter().map(|c| c.founded_turn).min().unwrap());
+        if first_colony_turn.is_none() && game.colonies.iter().any(|c| !c.in_orbit) {
+            first_colony_turn = game.colonies.iter().filter(|c| !c.in_orbit).map(|c| c.founded_turn).min();
         }
         for c in &game.colonies {
             match founded.iter_mut().find(|(id, _, _)| *id == c.id) {

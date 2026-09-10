@@ -753,6 +753,22 @@ impl Game {
 
     fn resolve_cargo(&mut self) {
         let cargo = std::mem::take(&mut self.pending.cargo);
+        // Ticket #46: stations ordered this turn, one per orbital slot; two seats for one slot go to the tiebreak.
+        let stations = std::mem::take(&mut self.pending.stations);
+        for (i, (seat, body, slot)) in stations.iter().enumerate() {
+            if self.station_at(*body, *slot).is_some() {
+                continue;
+            }
+            let rival = stations.iter().enumerate().any(|(j, (s2, b2, sl2))| j != i && s2 != seat && b2 == body && sl2 == slot);
+            if rival && self.tiebreak_at_body(*body) != *seat {
+                continue;
+            }
+            let id = ColonyId(self.fresh_id());
+            self.colonies.push(Colony { id, body: *body, slot: *slot, control: Control::Controlled(*seat), modules: Vec::new(), colonists: 0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: true });
+            let line = format!("{} built {}.", self.seat_name(*seat), self.place_name(Place::Colony(id)));
+            self.log(line.clone());
+            self.report.lines.push(line);
+        }
         // Founding orders into the same slot from both seats are decided by the tiebreak.
         let mut founding: Vec<(Seat, ShipId, u32, BodyId, u32)> = Vec::new();
         for (seat, order) in &cargo {
@@ -850,6 +866,7 @@ impl Game {
                                 queue: Vec::new(),
                                 grid_failed: false,
                                 founded_turn: self.turn,
+                                in_orbit: false,
                             });
                             let room = self.habitat_room(self.colony(id).unwrap());
                             let moved = n.min(room);
