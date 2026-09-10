@@ -3,3 +3,5 @@
 /simulate-*.log
 /.claude/
 /dist/
+# a second cargo target dir for running the climate sweep beside a build
+target-sweep/

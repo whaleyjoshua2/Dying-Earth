@@ -37,7 +37,12 @@ impl SimResult {
 
 /// Play one whole game with all four seats on the AI. `player` is the Faction in seat 0.
 pub fn run(tables: Arc<Tables>, seed: u64, player: FactionKind) -> SimResult {
-    let mut game = Game::new(tables.clone(), NewGame { seed, player, player_is_ai: true, player_start: StateId::Asia });
+    run_from(tables, seed, player, StateId::Asia)
+}
+
+/// As `run`, with seat 0 starting in `start` (the sweep uses this to try other seats at the table).
+pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: StateId) -> SimResult {
+    let mut game = Game::new(tables.clone(), NewGame { seed, player, player_is_ai: true, player_start: start });
     game.start();
     let mut first_colony_turn = None;
     let mut projected_collapse: Option<u32> = None;

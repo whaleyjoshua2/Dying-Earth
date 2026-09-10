@@ -80,3 +80,77 @@ Every picture below was taken headlessly with the game's own `shot:` mode
   Collapse in this seed), the turn and the seed, then a row per Faction in its colour with its
   measure and its percentage. Where a Faction wins, the same line names it ("The Custodians win:
   ...").
+
+### The climate clock for four seats
+
+Added to the ticket by the designer. `engine/examples/sweep.rs` now takes `--player=` (the Faction
+in seat 0), `--start=` (its Nation State), `--sinks=` and `--steps=`, twenty seeds per cell, and
+reports collapses, the collapse turns, the end temperature and the wins by seat. The sim always
+starts seat 0 in Asia unless told otherwise; the AIs spread from there by the ticket's rule.
+
+**What the sweep found.** The clock is decided by who holds Asia (population 43.5, a third of the
+world's people). A Prospector there at the old step of 90 collapses the world on turn 13 in every
+seed; a Custodian there never collapses at any step above 90. No single step reproduces the 0.02
+target (collapse in most seeds between turns 15 and 21) for every seating, so the step was chosen
+to keep every seating hot at the end rather than to hit one figure.
+
+Seat 0 the Prospectors, starting in Asia:
+
+| sink | step | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|---|
+| 6 | 90 | 20/20 | 13 (13..13) | +3.06 | 0 0 0 0 |
+| 6 | 120 | 20/20 | 17 (16..18) | +3.04 | 0 0 0 0 |
+| 6 | 150 | 20/20 | 19 (19..21) | +3.02 | 0 0 0 0 |
+| 6 | 160 | 20/20 | 20 (20..21) | +3.02 | 0 0 0 0 |
+| 6 | 170 | 6/20 | 24 (22..24) | +2.92 | 7 7 0 0 |
+| 6 | 180 | 1/20 | 22 | +2.87 | 11 8 0 0 |
+| 8 | 120 | 20/20 | 18 (17..18) | +3.05 | 0 0 0 0 |
+| 8 | 180 | 1/20 | 23 | +2.80 | 15 4 0 0 |
+| 10 | 150 | 1/20 | 21 | +2.84 | 10 9 0 0 |
+
+Seat 0 the Custodians, starting in Asia:
+
+| sink | step | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|---|
+| 6 | 90 | 11/20 | 21 (18..23) | +3.01 | 9 0 0 0 |
+| 6 | 100 | 11/20 | 23 (21..24) | +3.00 | 9 0 0 0 |
+| 6 | 110 | 4/20 | 24 (21..24) | +2.88 | 16 0 0 0 |
+| 6 | 120 | 0/20 | - | +2.56 | 20 0 0 0 |
+| 6 | 150 | 0/20 | - | +2.30 | 20 0 0 0 |
+| 7 | 90 | 10/20 | 22 (19..23) | +3.00 | 10 0 0 0 |
+| 8 | 90 | 6/20 | 23 (21..24) | +2.96 | 14 0 0 0 |
+
+Seat 0 starting in Europe, sink 6 (an AI takes Asia):
+
+| seat 0 | step | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|---|
+| Custodians | 90 | 20/20 | 13 (13..14) | +3.04 | 0 0 0 0 |
+| Custodians | 120 | 20/20 | 18 (17..20) | +3.02 | 0 0 0 0 |
+| Custodians | 150 | 13/20 | 23 (21..24) | +3.00 | 1 6 0 0 |
+| Prospectors | 120 | 4/20 | 24 (21..24) | +2.88 | 0 16 0 0 |
+| Prospectors | 150 | 0/20 | - | +2.69 | 0 20 0 0 |
+| Arkwrights | 120 | 1/20 | 21 | +2.80 | 0 19 0 0 |
+| Archivists | 120 | 0/20 | - | +2.40 | 0 20 0 0 |
+
+**Chosen: `ppm_step = 120`, the Natural Sink unchanged at 6.0** (`climate.toml`). At 120 a
+Prospector in Asia collapses the world on turns 16 to 18, a Custodian starting outside Asia on
+turns 17 to 20, and every other seating ends between +2.4 and +2.9 C with a collapse in a seed or
+two. At 150 half the seatings finish comfortable. The step is re-swept on the build ticket once the
+climate tickets (Mothball, per-person Emissions, Scrubbers, Blame, neutral development, Tipping
+Points) are in, since each of them moves it.
+
+**The four-way balance, as measured, not fixed.** In every seating the seat that ends up holding
+Asia wins, and it is the only seat that ever wins: the Custodians 20 of 20 from Asia, the
+Prospectors 16 to 20 of 20 when the Custodians start elsewhere; the Arkwrights and the Archivists,
+on provisional cards, have not won a game. Every win is on the last-turn score or the Colonists
+tiebreak; no Faction has met its Victory Condition outright. The Custodian AI still takes every
+Nation State by Influence when it starts in Asia, so the other three seats end with nothing to
+build in (buildings 41, 0, 0, 0 in seed 19). No Battle happened in any logged AI game: the melee
+is proven by the formula tests and the `battle:1` shot aid, not by the AI.
+
+Twenty seeds at the chosen step:
+
+| seating | wins | collapses | median collapse turn | median first Colony |
+|---|---|---|---|---|
+| Custodians in Asia | Custodians 20 | 0 | - | 10 |
+| Prospectors in Asia | none | 20 | 17 | 9 |
