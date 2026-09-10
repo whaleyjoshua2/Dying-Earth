@@ -24,8 +24,15 @@ pub struct ShotPlan {
     pub toggled: bool,
     /// `trade:1` (a building aid): the trading window is open in every picture.
     pub trade: bool,
+    /// `victory:1` (a building aid): the Victory panel is open in every picture.
+    pub victory: bool,
+    /// `stack:1` (a building aid): the player's Ship stack at Mars is selected, so its card and the
+    /// attack odds preview are in the picture.
+    pub stack: bool,
     /// `look:<lon>,<lat>` (a building aid): every surface picture faces that point.
     pub look: Option<(f32, f32)>,
+    /// Ticket #50: 0 the Faction choice screen is not up yet, 1 it is up, 2 it has been captured.
+    pub factions_step: u8,
 }
 
 fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
@@ -34,6 +41,12 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     }
     if plan.trade {
         view.show_trade = true;
+    }
+    if plan.victory {
+        view.show_victory = true;
+    }
+    if plan.stack {
+        view.selection = Selection::ShipStack(BodyId::Mars, Seat(0));
     }
     if let (Some((lon, lat)), View::Surface(_)) = (plan.look, view.view) {
         view.yaw = crate::geo::yaw_facing(lon, lat);
@@ -56,11 +69,83 @@ const VIEWS: [(&str, View); 6] = [
 
 const MENUS: [&str; 4] = ["title", "faction", "start", "report"];
 
+/// The board every picture is taken of: a new game, the first Tech picked, the `turns:<n>` aid
+/// played out, and (ticket #50) a Ship stack for every seat at Mars so the four-angle stack markers
+/// and the four-Faction band are visible. Building aids, not part of the spec.
+fn build_board(session: &mut Session) {
+    session.new_game(FactionKind::Custodians, StateId::Asia);
+    let turns: u32 = std::env::args().find_map(|a| a.strip_prefix("turns:").and_then(|v| v.parse().ok())).unwrap_or(0);
+    if let Some(g) = &mut session.game {
+        if let Some(first) = g.available_techs().first().copied() {
+            g.pick_tech(Seat(0), first).ok();
+        }
+        if turns > 0 {
+            g.seats[0].ai = true;
+            for _ in 0..turns {
+                if g.is_over() {
+                    break;
+                }
+                g.end_turn(std::array::from_fn(|_| Vec::new()));
+            }
+            g.seats[0].ai = false;
+        }
+        for seat in Seat::ALL {
+            if !g.ships_at(seat, BodyId::Mars).is_empty() {
+                continue;
+            }
+            let kind = match seat.index() {
+                0 => UnitKind::Frigate,
+                2 => UnitKind::Carrier,
+                _ => UnitKind::ColonyShip,
+            };
+            let id = ShipId(g.fresh_id());
+            let built_turn = g.turn;
+            g.ships.push(Ship { id, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn });
+        }
+        // `battle:1` (a building aid): three seats bring a Frigate to Mars with Attack stances and
+        // one more turn runs, so the Report carries a three-party Battle (ticket #50).
+        if std::env::args().any(|a| a == "battle:1") {
+            for seat in [Seat(0), Seat(1), Seat(2)] {
+                let id = ShipId(g.fresh_id());
+                let built_turn = g.turn;
+                g.ships.push(Ship { id, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn });
+            }
+            for s in g.ships.iter_mut().filter(|s| s.at == ShipAt::Body(BodyId::Mars)) {
+                s.stance = Stance::Attack;
+            }
+            // The rivals sit still for this one turn, so their stacks are all at Mars when it runs.
+            for seat in Seat::ALL.into_iter().skip(1) {
+                g.seats[seat.index()].ai = false;
+            }
+            let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+            orders[0] = vec![Order::ShipStance { body: BodyId::Mars, stance: Stance::Attack }];
+            g.end_turn(orders);
+            for seat in Seat::ALL.into_iter().skip(1) {
+                g.seats[seat.index()].ai = true;
+            }
+        }
+        // `tints:1` (a building aid): one Nation State per seat on the face the Earth picture shows,
+        // so all four Faction tints are in one picture. The AI seldom leaves four controllers alive.
+        if std::env::args().any(|a| a == "tints:1") {
+            for (sid, seat) in [(StateId::SouthAmerica, Seat(0)), (StateId::Europe, Seat(1)), (StateId::MiddleEast, Seat(2)), (StateId::Africa, Seat(3))] {
+                g.state_mut(sid).control = Control::Controlled(seat);
+            }
+        }
+    }
+    // A game played to its end shows the game-over modal, as it would in play.
+    if session.game.as_ref().map(|g| g.is_over()).unwrap_or(false) {
+        session.screen = Screen::GameOver;
+    }
+    session.earth_dirty = true;
+}
+
 fn show_view(view: &mut ViewState, v: View) {
     match v {
         View::Solar => {
             view.view = View::Solar;
             view.selection = Selection::None;
+            // A building aid: stand back a little, so Mars is in frame wherever its orbit has it.
+            view.zoom = 1.35;
         }
         View::Surface(b) => view.enter_surface(b),
     }
@@ -102,19 +187,13 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
                 session.earth_dirty = true;
             }
             3 => {
-                session.new_game(FactionKind::Custodians, StateId::Asia);
+                build_board(&mut session);
                 view.popup = Popup::Report;
                 view.show_climate = false;
             }
             _ => {
                 // Fall through to the four views with the game already made.
                 view.popup = Popup::None;
-                if let Some(g) = &mut session.game {
-                    let first = g.available_techs().first().copied();
-                    if let Some(first) = first {
-                        g.pick_tech(Seat(0), first).ok();
-                    }
-                }
                 view.tech_prompted = true;
                 show_view(&mut view, VIEWS[0].1);
                 plan.next_at = t + 2.5;
@@ -124,27 +203,30 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         plan.next_at = t + 2.0;
         return;
     }
-    if session.game.is_none() {
-        session.new_game(FactionKind::Custodians, StateId::Asia);
-        // `turns:<n>` (a building aid, not part of the spec) lets both AIs play n turns first so the
-        // pictures show Colonies, transits and tinted states rather than an empty board.
-        let turns: u32 = std::env::args().find_map(|a| a.strip_prefix("turns:").and_then(|v| v.parse().ok())).unwrap_or(0);
-        if let Some(g) = &mut session.game {
-            if let Some(first) = g.available_techs().first().copied() {
-                g.pick_tech(Seat(0), first).ok();
-            }
-            if turns > 0 {
-                g.seats[0].ai = true;
-                for _ in 0..turns {
-                    if g.is_over() {
-                        break;
-                    }
-                    g.end_turn(std::array::from_fn(|_| Vec::new()));
-                }
-                g.seats[0].ai = false;
-            }
+    // Ticket #50: a picture of the Faction choice screen, where all four cards are dealt.
+    if session.game.is_none() && plan.factions_step < 2 {
+        if plan.factions_step == 0 {
+            session.screen = Screen::ChooseFaction;
+            plan.factions_step = 1;
+            plan.next_at = t + 2.0;
+            return;
         }
-        session.earth_dirty = true;
+        if t < plan.next_at {
+            return;
+        }
+        let path = format!("{}-factions.png", session.shot_prefix);
+        commands.spawn(Screenshot::primary_window()).observe(save_to_disk(path));
+        plan.factions_step = 2;
+        plan.next_at = t + 1.5;
+        return;
+    }
+    if session.game.is_none() {
+        if t < plan.next_at {
+            return;
+        }
+        // `turns:<n>` (a building aid, not part of the spec) lets the four AIs play n turns first so
+        // the pictures show Colonies, transits and tinted states rather than an empty board.
+        build_board(&mut session);
         view.popup = Popup::None;
         view.tech_prompted = true;
         show_view(&mut view, VIEWS[0].1);
@@ -152,6 +234,8 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         plan.select = std::env::args().find_map(|a| a.strip_prefix("select:").map(str::to_owned));
         plan.tech = std::env::args().any(|a| a == "tech:1");
         plan.trade = std::env::args().any(|a| a == "trade:1");
+        plan.victory = std::env::args().any(|a| a == "victory:1");
+        plan.stack = std::env::args().any(|a| a == "stack:1");
         plan.look = std::env::args().find_map(|a| {
             let (lon, lat) = a.strip_prefix("look:")?.split_once(',')?;
             Some((lon.parse().ok()?, lat.parse().ok()?))

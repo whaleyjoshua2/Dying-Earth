@@ -95,9 +95,28 @@ pub fn recompose_earth(
     session.earth_dirty = false;
 }
 
-fn seat_colour(session: &Session, seat: Seat) -> Color32 {
-    let c = session.colours()[seat.index()];
+/// A Faction colour from the data tables as an egui colour.
+fn rgb(c: [f32; 3]) -> Color32 {
     Color32::from_rgb((c[0] * 255.0) as u8, (c[1] * 255.0) as u8, (c[2] * 255.0) as u8)
+}
+
+fn seat_colour(session: &Session, seat: Seat) -> Color32 {
+    rgb(session.colours()[seat.index()])
+}
+
+/// Ticket #50: every other seat with Ships at a Body, in seat order, with its stack strength.
+fn rivals_at(game: &Game, seat: Seat, body: BodyId) -> Vec<(Seat, i64)> {
+    seat.others().into_iter().filter(|s| !game.ships_at(*s, body).is_empty()).map(|s| (s, game.ship_stack_strength(s, body))).collect()
+}
+
+/// "Prospectors 6 and Archivists 3", the Factions a Battle here would be against.
+fn rivals_text(game: &Game, rivals: &[(Seat, i64)]) -> String {
+    let names: Vec<String> = rivals.iter().map(|(s, str_)| format!("{} {}", game.seat_name(*s), str_)).collect();
+    match names.len() {
+        0 => "nobody".to_string(),
+        1 => names[0].clone(),
+        _ => format!("{} and {}", names[..names.len() - 1].join(", "), names[names.len() - 1]),
+    }
 }
 
 /// A shield with a number on it: the Army icon of the Earth Map.
@@ -222,40 +241,56 @@ fn title_screen(root: &mut Ui, session: &mut Session, actions: &mut Vec<Action>)
     });
 }
 
+/// Ticket #50: every game seats all four Factions, so the choice screen deals four cards in two
+/// rows of two. The three not picked are played by the computer.
 fn faction_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>) {
     egui::CentralPanel::default().show(root, |ui| {
         ui.vertical_centered(|ui| {
-            ui.add_space(40.0);
+            ui.add_space(10.0);
             ui.label(RichText::new("Choose your Faction").size(30.0).strong());
-            ui.add_space(20.0);
+            ui.label(RichText::new("All four sit at every table: you take one seat, the computer plays the other three.").size(15.0));
+            ui.add_space(10.0);
         });
-        ui.columns(2, |cols| {
-            for (i, kind) in [FactionKind::Custodians, FactionKind::Prospectors].into_iter().enumerate() {
-                let card = session.tables.faction(kind);
-                let ui = &mut cols[i];
-                egui::Frame::group(ui.style()).inner_margin(14.0).show(ui, |ui| {
-                    let c = card.colour;
-                    ui.label(RichText::new(&card.name).size(26.0).strong().color(Color32::from_rgb((c[0] * 255.0) as u8, (c[1] * 255.0) as u8, (c[2] * 255.0) as u8)));
-                    ui.label(&card.blurb);
-                    ui.add_space(8.0);
-                    ui.label(RichText::new("Multipliers").strong());
-                    ui.label(format!("Facility and Module output x{}", card.output_multiplier));
-                    ui.label(format!("Emissions from Earth sources it controls x{}", card.emissions_multiplier));
-                    ui.label(format!("Research x{}", card.research_multiplier));
-                    ui.label(format!("Influence Allotment x{}", card.influence_multiplier));
-                    ui.add_space(8.0);
-                    ui.label(RichText::new("Signature rule").strong());
-                    ui.label(&card.signature);
-                    ui.add_space(8.0);
-                    ui.label(RichText::new("Victory Condition").strong());
-                    ui.label(&card.victory);
-                    ui.add_space(12.0);
-                    if ui.add(egui::Button::new(RichText::new(format!("Play the {}", card.name)).size(18.0)).min_size(egui::vec2(200.0, 40.0))).clicked() {
-                        actions.push(Action::ChooseFaction(kind));
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            for row in FactionKind::ALL.chunks(2) {
+                ui.columns(2, |cols| {
+                    for (i, kind) in row.iter().enumerate() {
+                        faction_card(&mut cols[i], session, *kind, actions);
                     }
                 });
+                ui.add_space(6.0);
             }
         });
+    });
+}
+
+/// One Faction's card: its colour swatch and name, its blurb, its multipliers, its signature rule
+/// and its Victory Condition in plain words.
+fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut Vec<Action>) {
+    let card = session.tables.faction(kind);
+    egui::Frame::group(ui.style()).inner_margin(12.0).show(ui, |ui| {
+        ui.horizontal(|ui| {
+            let (swatch, _) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), egui::Sense::hover());
+            ui.painter().rect_filled(swatch, 4.0, rgb(card.colour));
+            ui.label(RichText::new(&card.name).size(24.0).strong().color(rgb(card.colour)));
+        });
+        ui.label(&card.blurb);
+        ui.add_space(6.0);
+        ui.label(RichText::new("Multipliers").strong());
+        ui.label(format!(
+            "Facility and Module output x{}; Emissions from Earth sources it controls x{}; Research x{}; Influence Allotment x{}",
+            card.output_multiplier, card.emissions_multiplier, card.research_multiplier, card.influence_multiplier
+        ));
+        ui.add_space(6.0);
+        ui.label(RichText::new("Signature rule").strong());
+        ui.label(&card.signature);
+        ui.add_space(6.0);
+        ui.label(RichText::new("Victory Condition").strong());
+        ui.label(&card.victory);
+        ui.add_space(10.0);
+        if ui.add(egui::Button::new(RichText::new(format!("Play the {}", card.name)).size(17.0)).min_size(egui::vec2(190.0, 36.0))).clicked() {
+            actions.push(Action::ChooseFaction(kind));
+        }
     });
 }
 
@@ -263,7 +298,15 @@ fn start_screen(root: &mut Ui, session: &Session, faction: FactionKind, actions:
     egui::Panel::right("start_panel").default_size(320.0).show(root, |ui| {
         ui.add_space(10.0);
         ui.label(RichText::new("Choose your starting continent").size(22.0).strong());
-        ui.label(format!("You play the {}. The AI takes the uncontrolled continent with the highest Industry Level.", faction.name()));
+        ui.label(format!("You play the {}.", faction.name()));
+        // Ticket #50: the three Factions not picked are played by the computer, in their own colours.
+        ui.horizontal_wrapped(|ui| {
+            ui.label("Played by the computer:");
+            for k in FactionKind::ALL.into_iter().filter(|k| *k != faction) {
+                ui.label(RichText::new(k.name()).strong().color(rgb(session.tables.faction(k).colour)));
+            }
+        });
+        ui.label("Each computer Faction takes the uncontrolled continent with the highest Industry Level.");
         ui.add_space(10.0);
         for sid in StateId::ALL {
             let c = session.tables.state(sid);
@@ -422,7 +465,8 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
         View::Solar => {
             for body in BodyId::ALL {
                 let pos = geo::solar_position(body, game.turn);
-                if let Some(p) = project(pos + Vec3::Y * (geo::solar_radius(body) + 0.05)) {
+                let head = project(pos + Vec3::Y * (geo::solar_radius(body) + 0.05));
+                if let Some(p) = head {
                     let name = game.tables.body(body).name.clone();
                     let slots = game.tables.body(body).colony_slots();
                     let filled = game.colonies.iter().filter(|c| c.body == body && !c.in_orbit).count();
@@ -431,22 +475,26 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     let text = format!("{name}  {filled}/{slots} slots, {stations}/{orbital} stations");
                     label_at(painter, p - egui::vec2(0.0, 22.0), &text, Color32::WHITE, 13.0);
                     hotspots.push(Hotspot { pos: p, radius: 40.0, hit: Hit::Enter(body) });
+                    // The Orbital Control flag in the holder's Faction colour.
                     if let Some(s) = game.orbital_control(body) {
                         label_at(painter, p - egui::vec2(0.0, 40.0), &format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s), 12.0);
                     }
                 }
+                // Ticket #50: up to four stacks at one Body. The markers sit at four fixed angles
+                // round it (`geo::stack_offset`); their labels stack above it in seat order, since
+                // four labels at four angles on a small Body would cover each other.
+                let mut row = 0.0;
                 for seat in Seat::ALL {
                     let ships = game.ships_at(seat, body);
                     if ships.is_empty() {
                         continue;
                     }
-                    let side = if seat == Seat(0) { -1.0 } else { 1.0 };
-                    let world = pos + Vec3::new(side * geo::solar_radius(body) * 1.4, geo::solar_radius(body) + 0.25, 0.0);
-                    if let Some(p) = project(world) {
-                        let text = format!("{} x{}  str {}", game.seat_name(seat), ships.len(), game.ship_stack_strength(seat, body));
-                        label_at(painter, p + egui::vec2(0.0, -16.0), &text, seat_colour(session, seat), 12.0);
-                        hotspots.push(Hotspot { pos: p, radius: 26.0, hit: Hit::Select(Selection::ShipStack(body, seat)) });
-                    }
+                    let Some(p) = head else { continue };
+                    let text = format!("{} x{}  str {}", game.seat_name(seat), ships.len(), game.ship_stack_strength(seat, body));
+                    let at = p - egui::vec2(0.0, 58.0 + row * 16.0);
+                    label_at(painter, at, &text, seat_colour(session, seat), 12.0);
+                    hotspots.push(Hotspot { pos: at, radius: 14.0, hit: Hit::Select(Selection::ShipStack(body, seat)) });
+                    row += 1.0;
                 }
             }
             for s in &game.ships {
@@ -514,24 +562,30 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                 }
                 _ => {
                     slot_labels(painter, session, game, body, &visible, hotspots);
-                    // The band along the top: Ship stacks in orbit and Orbital Control.
-                    let mut band = Vec::new();
+                    // The band along the top: Ship stacks in orbit and Orbital Control. Ticket #50:
+                    // four seats will not fit on one line, so each takes its own in its own colour.
+                    let mut band: Vec<(String, Color32)> = Vec::new();
                     for seat in Seat::ALL {
                         let n = game.ships_at(seat, body).len();
                         if n > 0 {
-                            band.push(format!("{}: {} Ship(s), strength {}", game.seat_name(seat), n, game.ship_stack_strength(seat, body)));
+                            band.push((format!("{}: {} Ship(s), strength {}", game.seat_name(seat), n, game.ship_stack_strength(seat, body)), seat_colour(session, seat)));
                         }
                     }
                     for c in game.colonies.iter().filter(|c| c.in_orbit && c.body == body) {
-                        let who = c.control.director().map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".into());
-                        band.push(format!("{} ({})", game.station_name(body, c.slot), who));
+                        let who = c.control.director();
+                        let name = who.map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".into());
+                        band.push((format!("{} ({})", game.station_name(body, c.slot), name), who.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY)));
                     }
                     band.push(match game.orbital_control(body) {
-                        Some(s) => format!("Orbital Control: {}", game.seat_name(s)),
-                        None => "Orbital Control: nobody".to_string(),
+                        Some(s) => (format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s)),
+                        None => ("Orbital Control: nobody".to_string(), Color32::LIGHT_GRAY),
                     });
                     let rect = painter.clip_rect();
-                    label_at(painter, Pos2::new(rect.center().x - 120.0, rect.min.y + 60.0), &format!("In orbit around {}: {}", game.tables.body(body).name, band.join(" | ")), Color32::WHITE, 13.0);
+                    let x = rect.center().x - 120.0;
+                    label_at(painter, Pos2::new(x, rect.min.y + 50.0), &format!("In orbit around {}", game.tables.body(body).name), Color32::WHITE, 13.0);
+                    for (i, (text, colour)) in band.iter().enumerate() {
+                        label_at(painter, Pos2::new(x, rect.min.y + 70.0 + 18.0 * i as f32), text, *colour, 12.0);
+                    }
                 }
             }
         }
@@ -943,8 +997,24 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
     }
     let threshold = game.influence_threshold(target);
     let standing = |s: Seat| game.seat(s).influence.get(&target).copied().unwrap_or(0);
-    let standings: Vec<String> = Seat::ALL.iter().map(|s| format!("{} {}", game.seat_name(*s), standing(*s))).collect();
-    ui.label(format!("Standings: {}; threshold {}", standings.join(", "), threshold));
+    // Ticket #50: four seats, so the Standings are chips in Faction colours, and only where there
+    // is a Standing to show.
+    ui.horizontal_wrapped(|ui| {
+        ui.label("Standings:");
+        let mut any = false;
+        for s in Seat::ALL {
+            let v = standing(s);
+            if v <= 0 {
+                continue;
+            }
+            any = true;
+            ui.label(RichText::new(format!(" {} {} ", game.seat_name(s), v)).color(Color32::BLACK).background_color(seat_colour(session, s)));
+        }
+        if !any {
+            ui.label(RichText::new("nobody has any yet").weak());
+        }
+    });
+    ui.label(format!("Threshold {}; a place already held changes hands only at the holder's Standing plus the challenge margin of {}.", threshold, game.tables.influence.challenge_margin));
     match game.place_control(target).controller() {
         Some(c) => {
             let need = threshold.max(standing(c) + 1);
@@ -1163,7 +1233,14 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         let mine = game.ship_stack_strength(Seat(0), body);
         // Ticket #50: a Battle at a Body is a melee, so the odds run against everyone else present.
         let theirs = game.enemy_ship_strength(Seat(0), body);
-        ui.label(format!("Odds of winning the first round if you attack: {:.0}% (your strength {} against {})", first_round_odds(mine, theirs) * 100.0, mine, theirs));
+        let rivals = rivals_at(game, Seat(0), body);
+        ui.label(format!(
+            "A Battle here is a melee against every Faction present. Odds of winning the first round if you attack: {:.0}% (your strength {} against {}{})",
+            first_round_odds(mine, theirs) * 100.0,
+            mine,
+            rivals_text(game, &rivals),
+            if rivals.len() > 1 { format!(", {theirs} in all") } else { String::new() }
+        ));
         return;
     }
     if ships.is_empty() {
@@ -1175,12 +1252,14 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     let enemy_ships: usize = seat.others().iter().map(|s| game.ships_at(*s, body).len()).sum();
     if enemy > 0 || enemy_ships > 0 {
         let mine = game.ship_stack_strength(Seat(0), body);
-        ui.label(format!("Enemy stack strength {}. Attack odds (first round): {:.0}%", enemy, first_round_odds(mine, enemy) * 100.0));
+        // Ticket #50: name every Faction with Ships here; the attack is against all of them at once.
+        let rivals = rivals_at(game, seat, body);
+        ui.label(format!("Against {} ({} in all). Attack odds (first round): {:.0}%", rivals_text(game, &rivals), enemy, first_round_odds(mine, enemy) * 100.0));
         if ui.button("Attack this turn").clicked() {
             view.attack_preview = true;
         }
         if view.attack_preview {
-            ui.label(format!("Your {} (strength {}) against their {} (strength {}). Confirm?", ships.len(), mine, enemy_ships, enemy));
+            ui.label(format!("Your {} Ship(s) (strength {}) against {} Ship(s) of {} (strength {} in all). Confirm?", ships.len(), mine, enemy_ships, rivals_text(game, &rivals), enemy));
             if ui.button("Confirm Attack").clicked() {
                 actions.push(Action::Place(Order::ShipStance { body, stance: Stance::Attack }));
                 view.attack_preview = false;
@@ -1503,9 +1582,11 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
     if view.show_victory {
         let mut open = true;
         egui::Window::new("Victory").open(&mut open).default_width(420.0).show(ctx, |ui| {
+            // Ticket #50: a row per seat, in seat order, each headed by its Faction in its colour.
             for seat in Seat::ALL {
                 let p = game.progress(seat);
-                ui.label(RichText::new(game.seat_name(seat)).strong().color(seat_colour(session, seat)));
+                ui.label(RichText::new(format!("{} - {:.0}% of the way there", game.seat_name(seat), p.score() * 100.0)).strong().color(seat_colour(session, seat)));
+                ui.label(RichText::new(&game.tables.faction(game.kind(seat)).victory).weak());
                 ui.label(format!("{}: {:.0} of {:.0}", p.first_name, p.first_value, p.first_bar));
                 ui.add(egui::ProgressBar::new(p.first_fraction() as f32));
                 ui.label(format!("Off-world Presence: {} of {} Colonists", p.presence, p.presence_bar));
@@ -1556,11 +1637,39 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             egui::Modal::new("report".into()).show(ctx, |ui| {
                 ui.set_width(620.0);
                 ui.label(RichText::new(format!("Report, turn {}", game.report.turn)).size(20.0).strong());
+                // Ticket #50: who is at this table, and under which seed.
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new(format!("Seed {}. You:", game.seed)).weak());
+                    ui.label(RichText::new(game.seat_name(Seat(0))).strong().color(seat_colour(session, Seat(0))));
+                    ui.label(RichText::new("Computer:").weak());
+                    for seat in Seat::ALL.into_iter().skip(1) {
+                        ui.label(RichText::new(game.seat_name(seat)).color(seat_colour(session, seat)));
+                    }
+                });
                 egui::ScrollArea::vertical().max_height(420.0).show(ui, |ui| {
                     if !game.report.battles.is_empty() {
                         ui.label(RichText::new("Battle Report").strong());
+                        // Ticket #50: a Battle is a melee, so every party present takes its own line.
                         for b in &game.report.battles {
-                            ui.label(b.text(&|s| game.seat_name(s), "neutral"));
+                            ui.label(RichText::new(&b.place).strong());
+                            for party in &b.parties {
+                                let who = party.seat.map(|s| game.seat_name(s)).unwrap_or_else(|| "Neutral".to_string());
+                                let colour = party.seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY);
+                                ui.label(
+                                    RichText::new(format!(
+                                        "   {}{}: {}, strength {}, {} hit(s) landed; destroyed: {}; escaped: {}",
+                                        who,
+                                        if party.aggressor { ", attacking" } else { "" },
+                                        party.units,
+                                        party.strength,
+                                        party.hits,
+                                        if party.destroyed.is_empty() { "none".to_string() } else { party.destroyed.join(", ") },
+                                        if party.escaped.is_empty() { "none".to_string() } else { party.escaped.join(", ") },
+                                    ))
+                                    .color(colour),
+                                );
+                            }
+                            ui.label(format!("   {}", b.result));
                         }
                     }
                     if let Some(e) = &game.report.event {
@@ -1571,10 +1680,19 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                     for l in &game.report.lines {
                         ui.label(l);
                     }
+                    // Ticket #50: a section per rival Faction, in seat order, headed in its colour.
                     if !game.report.ai_lines.is_empty() {
-                        ui.label(RichText::new("What the AI Factions did").strong());
-                        for l in game.report.ai_lines.iter().filter(|l| l.contains("take")) {
-                            ui.label(l.trim().trim_start_matches("take").trim());
+                        ui.label(RichText::new("What the rival Factions did").strong());
+                        for seat in Seat::ALL.into_iter().skip(1) {
+                            let Some(entry) = game.report.ai_lines.iter().find(|e| e.seat == seat) else { continue };
+                            let deeds: Vec<&String> = entry.lines.iter().filter(|l| l.trim_start().starts_with("take")).collect();
+                            if deeds.is_empty() {
+                                continue;
+                            }
+                            ui.label(RichText::new(game.seat_name(seat)).strong().color(seat_colour(session, seat)));
+                            for l in deeds {
+                                ui.label(format!("   {}", l.trim().trim_start_matches("take").trim()));
+                            }
                         }
                     }
                 });
@@ -1593,7 +1711,19 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             ui.label(format!("Turn {}. Seed {}.", game.turn, game.seed));
             for seat in Seat::ALL {
                 let p = game.progress(seat);
-                ui.label(format!("{}: {} {:.0} of {:.0}; {} of {} Colonists off Earth.", game.seat_name(seat), p.first_name, p.first_value, p.first_bar, p.presence, p.presence_bar));
+                ui.label(
+                    RichText::new(format!(
+                        "{}: {} {:.0} of {:.0}; {} of {} Colonists off Earth ({:.0}% of its Victory Condition).",
+                        game.seat_name(seat),
+                        p.first_name,
+                        p.first_value,
+                        p.first_bar,
+                        p.presence,
+                        p.presence_bar,
+                        p.score() * 100.0
+                    ))
+                    .color(seat_colour(session, seat)),
+                );
             }
             ui.horizontal(|ui| {
                 if ui.button("Title screen").clicked() {

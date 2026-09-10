@@ -366,6 +366,14 @@ impl BattleLine {
     }
 }
 
+/// Ticket #50: what one AI seat did in a turn, kept per seat so the Report can head each list with
+/// the Faction that did it.
+#[derive(Debug, Clone)]
+pub struct AiReport {
+    pub seat: Seat,
+    pub lines: Vec<String>,
+}
+
 /// Everything the Report popup shows at the start of a turn (spec 17.5).
 #[derive(Debug, Clone, Default)]
 pub struct Report {
@@ -373,7 +381,8 @@ pub struct Report {
     pub battles: Vec<BattleLine>,
     pub event: Option<String>,
     pub lines: Vec<String>,
-    pub ai_lines: Vec<String>,
+    /// One entry per AI seat that ordered this turn, in seat order (ticket #50).
+    pub ai_lines: Vec<AiReport>,
 }
 
 /// Everything about one game. Fields are public because the interface reads all of them.

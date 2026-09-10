@@ -864,8 +864,7 @@ impl Game {
         }
         // Ticket #50: three AI seats order each turn, so the Report keeps every seat's list under a
         // heading naming the Faction rather than the last seat's alone.
-        self.report.ai_lines.push(format!("{}:", self.seat_name(seat)));
-        self.report.ai_lines.extend(lines);
+        self.report.ai_lines.push(AiReport { seat, lines });
         chosen
     }
 }

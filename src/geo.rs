@@ -8,6 +8,20 @@ use dying_earth_engine::data::BodyCard;
 use dying_earth_engine::{BodyId, StateId};
 use std::f32::consts::{FRAC_PI_2, TAU};
 
+/// Ticket #50: four seats cannot be a left side and a right side, so a Body's Ship stack markers
+/// sit at four fixed angles round it by seat index: 0 left, 1 right, 2 above, 3 below. The Solar
+/// System Map is the XZ plane seen from above, so "above" is -Z and "below" is +Z.
+pub fn stack_offset(seat: dying_earth_engine::Seat, radius: f32) -> Vec3 {
+    let d = radius * 1.4;
+    let (x, z) = match seat.index() % 4 {
+        0 => (-d, 0.0),
+        1 => (d, 0.0),
+        2 => (0.0, -d),
+        _ => (0.0, d),
+    };
+    Vec3::new(x, radius + 0.25, z)
+}
+
 /// The rotation that stands a UV sphere upright (poles on Y).
 pub fn upright() -> Quat {
     Quat::from_rotation_x(-FRAC_PI_2)

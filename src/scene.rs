@@ -224,8 +224,8 @@ pub fn sync_scene(
             continue;
         }
         *vis = Visibility::Inherited;
-        let side = if m.seat.index() % 2 == 0 { -1.0 } else { 1.0 };
-        t.translation = geo::solar_position(m.body, turn) + Vec3::new(side * geo::solar_radius(m.body) * 1.4, geo::solar_radius(m.body) + 0.25, 0.0);
+        // Ticket #50: one of four fixed angles round the Body, by seat.
+        t.translation = geo::solar_position(m.body, turn) + geo::stack_offset(m.seat, geo::solar_radius(m.body));
     }
     for (r, mut t, mut vis, mut mat) in &mut rings {
         t.translation = geo::solar_position(r.0, turn);
