@@ -26,6 +26,9 @@ pub struct ShotPlan {
     /// `climate:toggle` (a building aid): the Earth picture closes the Climate Panel and brings it
     /// back through `toggle_climate`, the path the button and the C key use.
     pub climate_toggle: bool,
+    /// `panel:0` (a building aid, ticket #56): the Earth picture shows the globe with no Climate
+    /// Panel over it, for a picture of the map itself.
+    pub no_panel: bool,
     pub toggled: bool,
     /// `trade:1` (a building aid): the trading window is open in every picture.
     pub trade: bool,
@@ -68,6 +71,9 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     if plan.climate_toggle && view.view == View::Surface(BodyId::Earth) {
         view.show_climate = false;
         plan.toggled = false;
+    }
+    if plan.no_panel {
+        view.show_climate = false;
     }
 }
 
@@ -156,7 +162,7 @@ fn build_board(session: &mut Session) {
             let turn = g.turn;
             let mut queue = Vec::new();
             if stage < stages {
-                queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat: Seat(0), due_turn: turn });
+                queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat: Seat(0), due_turn: turn, coastal: false });
             }
             g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: 8, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
             g.seats[0].archive_fund = 14;
@@ -250,6 +256,35 @@ fn build_board(session: &mut Session) {
                 g.seats[0].stockpile.ducats = 300;
                 run_one_quiet_turn(g);
             }
+        }
+        // `walls:1` (a building aid, ticket #56): East Asia with the sea already through two of its
+        // coastal slots, a Factory drowned with them, a Sea Wall standing in a coastal slot and two
+        // Facilities inland, so one card carries both rows and everything the ticket changed. An AI
+        // game reaches that board on a turn nobody can choose, and never with a wall.
+        if std::env::args().any(|a| a == "walls:1") {
+            let sid = StateId::EastAsia;
+            g.take_control(sid, Seat(0));
+            if !g.has_tech(TechId::CoastalEngineering) {
+                g.research.done.push(TechId::CoastalEngineering);
+            }
+            g.state_mut(sid).facilities = vec![
+                Facility::in_coastal_slot(FacilityKind::Factory),
+                Facility::in_coastal_slot(FacilityKind::PowerPlant),
+                Facility::in_coastal_slot(FacilityKind::Refinery),
+                Facility::in_coastal_slot(FacilityKind::LaunchSite),
+                Facility::in_coastal_slot(FacilityKind::Bank),
+                Facility::new(FacilityKind::ResearchLab),
+            ];
+            // The first threshold: two coastal slots gone and the oldest coastal Facility with them.
+            g.apply_sea_threshold(sid, 0);
+            // The state stood the Bank down to make room for the wall, as a player would.
+            if let Some(i) = g.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::Bank) {
+                g.state_mut(sid).facilities.remove(i);
+            }
+            g.state_mut(sid).facilities.push(Facility::in_coastal_slot(FacilityKind::SeaWall));
+            g.seats[0].stockpile.materials = 300;
+            g.seats[0].stockpile.energy = 400;
+            g.seats[0].stockpile.ducats = 300;
         }
         // `tints:1` (a building aid): one Nation State per seat on the face the Earth picture shows,
         // so all four Faction tints are in one picture. The AI seldom leaves four controllers alive.
@@ -386,6 +421,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             Some((lon.parse().ok()?, lat.parse().ok()?))
         });
         plan.climate_toggle = std::env::args().any(|a| a == "climate:toggle");
+        plan.no_panel = std::env::args().any(|a| a == "panel:0");
         apply_aids(&mut plan, &mut view);
         plan.next_at = t + 4.0;
         return;

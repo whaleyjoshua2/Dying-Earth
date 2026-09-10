@@ -89,10 +89,13 @@ pub enum FacilityKind {
     /// Version 0.05 (ticket #54): the Custodians' signature Facility. Takes no build slot, enlarges
     /// the Natural Sink while it is online, and is destroyed if its state changes hands.
     Scrubber,
+    /// Version 0.05 (ticket #56): the Sea Wall. Always stands in a coastal slot, at most one per
+    /// Nation State, and it absorbs the state's next Sea Level threshold and is destroyed doing it.
+    SeaWall,
 }
 
 impl FacilityKind {
-    pub const ALL: [FacilityKind; 9] = [
+    pub const ALL: [FacilityKind; 10] = [
         FacilityKind::Factory,
         FacilityKind::PowerPlant,
         FacilityKind::Refinery,
@@ -102,6 +105,7 @@ impl FacilityKind {
         FacilityKind::Embassy,
         FacilityKind::Constabulary,
         FacilityKind::Scrubber,
+        FacilityKind::SeaWall,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -114,6 +118,7 @@ impl FacilityKind {
             FacilityKind::Embassy => "Embassy",
             FacilityKind::Constabulary => "Constabulary",
             FacilityKind::Scrubber => "Scrubber",
+            FacilityKind::SeaWall => "Sea Wall",
         }
     }
 }
@@ -239,10 +244,13 @@ pub enum TechId {
     AutomatedRefining,
     PublicScience,
     GreenConsensus,
+    /// Version 0.05 (ticket #56): the thirteenth Tech, Industry rung 2 beside Clean Power. It
+    /// unlocks the Sea Wall and nothing else.
+    CoastalEngineering,
 }
 
 impl TechId {
-    pub const ALL: [TechId; 12] = [
+    pub const ALL: [TechId; 13] = [
         TechId::EfficientGrids,
         TechId::CleanPower,
         TechId::CleanManufacturing,
@@ -255,6 +263,7 @@ impl TechId {
         TechId::AutomatedRefining,
         TechId::PublicScience,
         TechId::GreenConsensus,
+        TechId::CoastalEngineering,
     ];
     pub fn index(self) -> usize {
         self as usize

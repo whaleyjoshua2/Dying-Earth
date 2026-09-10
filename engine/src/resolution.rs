@@ -912,14 +912,29 @@ impl Game {
         match (place, b.item) {
             (Place::State(s), BuildItem::Facility(k)) => {
                 // Ticket #54: a Scrubber takes no build slot, so it is never lost for want of one.
-                let used = self.state(s).facilities.iter().filter(|f| self.takes_slot(f.kind)).count() as u32;
-                if self.takes_slot(k) && used >= self.build_slots(s) {
+                // Ticket #56: it stands in the row its order reserved, if that row still has room,
+                // and in the other one if it does not. A Sea Wall stands on the coast or nowhere.
+                let coastal_only = self.tables.facility(k).coastal_only;
+                let row = if !self.takes_slot(k) {
+                    Some(false)
+                } else if b.coastal {
+                    if self.free_coastal(s) > 0 {
+                        Some(true)
+                    } else if !coastal_only && self.free_inland(s) > 0 {
+                        Some(false)
+                    } else {
+                        None
+                    }
+                } else {
+                    self.next_slot_is_coastal(s, k, 0, 0)
+                };
+                let Some(coastal) = row else {
                     let line = format!("{} at {} had no slot left and was lost.", name, self.place_name(place));
                     self.log(line.clone());
                     self.report.lines.push(line);
                     return;
-                }
-                self.state_mut(s).facilities.push(Facility::new(k));
+                };
+                self.state_mut(s).facilities.push(if coastal { Facility::in_coastal_slot(k) } else { Facility::new(k) });
             }
             (Place::State(s), BuildItem::IndustryLevel) => {
                 self.state_mut(s).industry_level += 1;
@@ -1132,7 +1147,8 @@ impl Game {
                     let aboard_army = s.army;
                     match into {
                         UnloadTarget::Slot(b, slot) => {
-                            if b != body || !self.free_slots_on(b).contains(&slot) || colonists == 0 {
+                            // Ticket #56: Antarctica is shut until the ice opens at +1.6 C.
+                            if b != body || !self.free_slots_on(b).contains(&slot) || colonists == 0 || (b == BodyId::Earth && !self.antarctica_open) {
                                 continue;
                             }
                             let n = colonists.min(self.ship(ship).map(|s| s.colonists).unwrap_or(0));

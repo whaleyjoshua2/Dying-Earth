@@ -89,6 +89,9 @@ impl Game {
         // scheduled Sea Level check, so an Ice Sheets threshold and a scheduled one can both land
         // in the same phase.
         self.break_check();
+        // Ticket #56: the ice opens off the Temperature the phase has just settled, before the sea
+        // takes its slots, so one Report reads the whole of what the heat did this turn.
+        self.antarctica_check();
         self.sea_level_check();
         self.population_change();
         self.neutral_development();
@@ -282,9 +285,29 @@ impl Game {
         if exposure == 0 {
             return;
         }
-        self.state_mut(sid).lost_slots += exposure;
-        // Ticket #52: two Unrest per build slot the sea took, and 5% of the people per point of
-        // Coastal Exposure driven out, half of them to the neighbours.
+        // Ticket #56: a Sea Wall standing and working takes the whole threshold and is destroyed
+        // doing it; no coastal slot is lost. A mothballed wall is not working and absorbs nothing.
+        let wall = self.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::SeaWall && f.working());
+        let mut headline = if let Some(i) = wall {
+            self.state_mut(sid).facilities.remove(i);
+            format!("Sea level at {thr:+.1} C: the Sea Wall in {name} took the sea and was destroyed; no coastal slots were lost.")
+        } else {
+            // Ticket #56: the sea takes COASTAL slots only, and nothing once they are gone.
+            let take = exposure.min(self.coastal_slots(sid));
+            self.state_mut(sid).lost_slots += take;
+            let destroyed = self.drown_coastal(sid);
+            let slots = if take == 1 { "slot" } else { "slots" };
+            if take == 0 {
+                format!("Sea level at {thr:+.1} C: {name} has no coastal slots left to lose.")
+            } else if destroyed.is_empty() {
+                format!("The sea took {take} coastal {slots} from {name} at {thr:+.1} C.")
+            } else {
+                format!("The sea took {take} coastal {slots} from {name} at {thr:+.1} C: {}.", Game::and_list(&destroyed))
+            }
+        };
+        // Ticket #52: the Unrest and the displacement key on the threshold FIRING, not on the slots
+        // it managed to take, so a state with nothing left to lose still loses its people and its
+        // calm (ticket #56).
         let u = self.tables.unrest.clone();
         let per_slot = u.per_sea_level_slot * exposure as f64;
         let rose = self.raise_unrest(sid, per_slot, UnrestSource::Climate);
@@ -294,46 +317,71 @@ impl Game {
             *p = (*p - displaced).max(0.0);
             self.move_refugees(sid, displaced * u.sea_share, "the sea");
         }
-        let slots = self.build_slots(sid);
+        if rose > 0.0 {
+            headline.push_str(&format!(" Unrest there rose by {} to {}.", Game::unrest_figure(rose), self.unrest_text(sid)));
+        }
+        self.report.lines.push(headline.clone());
+        self.log(headline);
+    }
+
+    /// Ticket #56: whatever no longer fits the state's coastal slots, oldest first, standing before
+    /// building. Returns what went, named with its article for the Report.
+    fn drown_coastal(&mut self, sid: StateId) -> Vec<String> {
+        let slots = self.coastal_slots(sid);
         let mut destroyed = Vec::new();
         loop {
-            let st = self.state(sid);
-            if (st.facilities.len() as u32) <= slots {
+            let standing = self.state(sid).facilities.iter().filter(|f| f.coastal && self.takes_slot(f.kind)).count() as u32;
+            if standing <= slots {
                 break;
             }
-            // Highest upkeep first.
-            let (idx, _) = st
-                .facilities
-                .iter()
-                .enumerate()
-                .max_by_key(|(_, f)| self.tables.facility(f.kind).energy_upkeep)
-                .unwrap();
+            // Oldest first: the first coastal Facility in the state's list.
+            let Some(idx) = self.state(sid).facilities.iter().position(|f| f.coastal && self.takes_slot(f.kind)) else { break };
             let f = self.state_mut(sid).facilities.remove(idx);
-            destroyed.push(f.kind.name().to_string());
+            self.state_mut(sid).drowned.push(f.kind);
+            destroyed.push(Game::with_article(f.kind.name()));
         }
-        // Queued Facilities beyond the slots are lost too, without refund.
+        // Coastal builds beyond the slots are lost too, without refund.
         loop {
-            if self.slots_used(sid) <= slots {
+            if self.coastal_used(sid) <= slots {
                 break;
             }
             let st = self.state_mut(sid);
-            if let Some(pos) = st.queue.iter().rposition(|b| matches!(b.item, BuildItem::Facility(_))) {
+            if let Some(pos) = st.queue.iter().rposition(|b| b.coastal && matches!(b.item, BuildItem::Facility(_))) {
                 let b = st.queue.remove(pos);
-                destroyed.push(format!("{} under construction", b.item.name()));
+                destroyed.push(format!("{} under construction", Game::with_article(&b.item.name())));
             } else {
                 break;
             }
         }
-        let mut line = if destroyed.is_empty() {
-            format!("Sea level at {thr:+.1} C: {name} lost {exposure} build slots.")
-        } else {
-            format!("Sea level at {thr:+.1} C: {name} lost {exposure} build slots; destroyed {}.", destroyed.join(", "))
-        };
-        if rose > 0.0 {
-            line.push_str(&format!(" Unrest there rose by {} to {}.", Game::unrest_figure(rose), self.unrest_text(sid)));
+        destroyed
+    }
+
+    /// "a Factory", "an Embassy": the Report names what the sea took as things, not as a table.
+    pub fn with_article(name: &str) -> String {
+        let vowel = name.chars().next().map(|c| "AEIOUaeiou".contains(c)).unwrap_or(false);
+        format!("{} {name}", if vowel { "an" } else { "a" })
+    }
+
+    /// "a Factory and a Refinery"; "a Factory, a Refinery and a Bank".
+    pub fn and_list(items: &[String]) -> String {
+        match items {
+            [] => String::new(),
+            [one] => one.clone(),
+            _ => format!("{} and {}", items[..items.len() - 1].join(", "), items[items.len() - 1]),
         }
-        self.report.lines.push(line.clone());
-        self.log(line);
+    }
+
+    /// Ticket #56: Antarctica's three Colony Slots on Earth are shut under the ice until the
+    /// Temperature has stood at or above `antarctica_opens_at` in a Climate phase. Once open they
+    /// stay open, whatever the Temperature does afterwards.
+    fn antarctica_check(&mut self) {
+        if self.antarctica_open || self.climate.temperature < self.tables.climate.antarctica_opens_at {
+            return;
+        }
+        self.antarctica_open = true;
+        let line = format!("The Antarctic ice opens: {} Colony Slots on Earth.", self.tables.body(BodyId::Earth).colony_slots());
+        self.log(line.clone());
+        self.report.lines.push(line);
     }
 
     /// Spec 11.3: growth less 0.15% per full 0.1 C above +1.2.

@@ -600,7 +600,11 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     let filled = game.colonies.iter().filter(|c| c.body == body && !c.in_orbit).count();
                     let orbital = game.tables.body(body).orbital_slots;
                     let stations = game.colonies.iter().filter(|c| c.body == body && c.in_orbit).count();
-                    let text = format!("{name}  {filled}/{slots} slots, {stations}/{orbital} stations");
+                    let mut text = format!("{name}  {filled}/{slots} slots, {stations}/{orbital} stations");
+                    // Ticket #56: Earth says when its Antarctic slots open, until they do.
+                    if body == BodyId::Earth && !game.antarctica_open {
+                        text.push_str(&format!("\nAntarctica: opens at {:+.1} C", game.tables.climate.antarctica_opens_at));
+                    }
                     label_at(painter, p - egui::vec2(0.0, 22.0), &text, Color32::WHITE, 13.0);
                     hotspots.push(Hotspot { pos: p, radius: 40.0, hit: Hit::Enter(body) });
                     // The Orbital Control flag in the holder's Faction colour.
@@ -745,6 +749,12 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                             Hit::Select(Selection::Colony(c.id)),
                         )
                     }
+                    // Ticket #56: Antarctica's slots lie under the ice until the world is warm enough.
+                    None if body == BodyId::Earth && !game.antarctica_open => (
+                        format!("{name}: under the ice\nopens at {:+.1} C", game.tables.climate.antarctica_opens_at),
+                        Color32::from_rgb(150, 195, 235),
+                        Hit::Select(Selection::Slot(body, slot)),
+                    ),
                     None => (format!("{name}: empty"), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot))),
                 };
                 label_at(painter, p + egui::vec2(0.0, 24.0), &text, colour, 12.0);
@@ -1088,6 +1098,52 @@ fn building_name(game: &Game, b: BuildingRef) -> String {
 }
 
 /// Ticket #54: the Mothball / Restart / Decommission row under one standing building.
+/// Ticket #56: the two rows of a Nation State's build slots, Coastal and Inland, each slot named by
+/// what stands or builds in it, or "free". The coastal slots the sea has taken stand at the end of
+/// the coastal row, struck through in the sea's own blue.
+fn slot_rows(ui: &mut Ui, game: &Game, sid: StateId) {
+    let st = game.state(sid);
+    let occupants = |coastal: bool| -> Vec<String> {
+        let mut v: Vec<String> = st
+            .facilities
+            .iter()
+            .filter(|f| f.coastal == coastal && game.takes_slot(f.kind))
+            .map(|f| f.kind.name().to_string())
+            .collect();
+        v.extend(
+            st.queue
+                .iter()
+                .filter(|b| b.coastal == coastal && matches!(b.item, BuildItem::Facility(k) if game.takes_slot(k)))
+                .map(|b| format!("{} building", b.item.name())),
+        );
+        v
+    };
+    for (coastal, label, total) in [(true, "Coastal", game.coastal_slots(sid)), (false, "Inland", game.inland_slots(sid))] {
+        let mut cells = occupants(coastal);
+        while (cells.len() as u32) < total {
+            cells.push("free".to_string());
+        }
+        let lost = if coastal { st.lost_slots } else { 0 };
+        ui.horizontal_wrapped(|ui| {
+            ui.label(RichText::new(format!("{label}:")).strong());
+            for c in &cells {
+                let weak = c == "free";
+                ui.label(if weak { RichText::new(c).weak() } else { RichText::new(c) });
+            }
+            for i in 0..lost {
+                let what = match st.drowned.get(i as usize) {
+                    Some(k) => format!("{}, lost to the sea", k.name()),
+                    None => "lost to the sea".to_string(),
+                };
+                ui.label(RichText::new(what).color(Color32::from_rgb(110, 160, 220)).strikethrough());
+            }
+            if cells.is_empty() && lost == 0 {
+                ui.label(RichText::new("none").weak());
+            }
+        });
+    }
+}
+
 fn change_row(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, mothballed: bool, change: Option<PendingChange>, actions: &mut Vec<Action>) {
     if let Some(c) = change {
         ui.label(RichText::new(format!("    {} ordered, lands at turn {}'s Resolution", c.what.name(), c.due_turn)).weak());
@@ -1300,8 +1356,10 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         }
     }
     if st.lost_slots > 0 {
-        ui.colored_label(Color32::LIGHT_BLUE, format!("{} slot(s) lost to the sea", st.lost_slots));
+        ui.colored_label(Color32::LIGHT_BLUE, format!("{} coastal slot(s) lost to the sea", st.lost_slots));
     }
+    // Ticket #56: the two rows of slots, with what stands in each and what the sea has taken.
+    slot_rows(ui, game, sid);
     ui.label(RichText::new(format!("Facilities ({} of {} slots free)", game.free_slots(sid), game.build_slots(sid))).strong());
     let director = st.control.director();
     let mine = st.control.director() == Some(Seat(0));
@@ -1316,7 +1374,16 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             }
         };
         let colour = if f.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
-        ui.colored_label(colour, format!("  {}: {}{}", f.kind.name(), figures, if f.online || f.mothballed { "" } else { " (offline, making nothing)" }));
+        ui.colored_label(
+            colour,
+            format!(
+                "  {} ({}): {}{}",
+                f.kind.name(),
+                if f.coastal { "coastal" } else { "inland" },
+                figures,
+                if f.online || f.mothballed { "" } else { " (offline, making nothing)" }
+            ),
+        );
         if mine {
             change_row(ui, game, &session.pending, BuildingRef::Facility(sid, i), f.mothballed, f.change, actions);
         }
@@ -1370,6 +1437,10 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             if fk == FacilityKind::Scrubber {
                 continue;
             }
+            // Ticket #56: a Facility that waits on a Tech is not offered until the Tech is in.
+            if game.tables.facility(fk).needs_tech.map(|t| !game.has_tech(t)).unwrap_or(false) {
+                continue;
+            }
             let hover = game.facility_yield(Seat(0), sid, fk).text();
             ui.horizontal(|ui| {
                 cost_button_with_hover(ui, game, &session.pending, Order::BuildFacility { state: sid, kind: fk }, fk.name(), Some(hover), actions);
@@ -1377,7 +1448,14 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: fk }, "or", actions);
             });
         }
+        if game.has_tech(TechId::CoastalEngineering) {
+            ui.label(
+                RichText::new("A Sea Wall stands in a coastal slot and takes this state's next Sea Level threshold whole; it is destroyed doing it.")
+                    .weak(),
+            );
+        }
         cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
+        ui.label(RichText::new("Raising the Industry Level adds an inland slot, which the sea never reaches.").weak());
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
         // Ticket #52: Relief and Resettle, with their prices on the buttons.
         ui.label(RichText::new("Unrest").strong());
@@ -1559,6 +1637,13 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
 
 fn slot_panel(ui: &mut Ui, game: &Game, body: BodyId, slot: u32, actions: &mut Vec<Action>) {
     ui.label(RichText::new(format!("{}, Colony Slot {} on {}", game.tables.body(body).slots[slot as usize].name, slot + 1, game.tables.body(body).name)).size(22.0).strong());
+    // Ticket #56: Earth's three slots are Antarctica's, and they open at +1.6 C.
+    if body == BodyId::Earth && !game.antarctica_open {
+        ui.colored_label(
+            Color32::from_rgb(150, 195, 235),
+            format!("Under the Antarctic ice. It opens the first Climate phase the Temperature stands at {:+.1} C, and stays open.", game.tables.climate.antarctica_opens_at),
+        );
+    }
     ui.label("Empty. A Colony Ship carrying Colonists founds a Colony here; a Habitat comes with it.");
     let card = game.tables.body(body);
     ui.label(format!("Yields here: Mine x{}, Generator x{}, Refinery x{}, Habitat x{}", card.mine_yield, card.generator_yield, card.refinery_yield, card.habitat_yield));
@@ -1705,7 +1790,14 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 }
             }
             if s.kind == UnitKind::ColonyShip && s.colonists > 0 && body != BodyId::Earth {
-                for slot in game.free_slots_on(body) {
+                // Ticket #56: Antarctica's slots are shut until the ice opens.
+                if body == BodyId::Earth && !game.antarctica_open {
+                    ui.label(
+                        RichText::new(format!("Antarctica is under the ice: its Colony Slots open at {:+.1} C.", game.tables.climate.antarctica_opens_at))
+                            .color(Color32::from_rgb(150, 195, 235)),
+                    );
+                }
+                for slot in game.free_slots_on(body).into_iter().filter(|_| body != BodyId::Earth || game.antarctica_open) {
                     cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) }, &format!("Found a Colony at {}", game.tables.body(body).slots[slot as usize].name), actions);
                 }
             }
@@ -1810,17 +1902,41 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
         }
     }
     let rungs = TechId::ALL.iter().map(|t| game.tables.tech(*t).rung).max().unwrap_or(1).max(1);
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(COL * branches.len() as f32, HEAD + ROW * rungs as f32), egui::Sense::hover());
+    // Ticket #56: a branch may hold more than one Tech on a rung (Clean Power and Coastal
+    // Engineering both sit on Industry 2), so a branch's column is as many columns wide as its
+    // busiest rung, and the Techs on a rung share that width between them.
+    let cell: Vec<Vec<TechId>> = (0..branches.len() * rungs as usize)
+        .map(|i| {
+            let (b, r) = (i % branches.len(), i / branches.len());
+            TechId::ALL
+                .into_iter()
+                .filter(|t| {
+                    let card = game.tables.tech(*t);
+                    branches.iter().position(|x| *x == card.branch) == Some(b) && card.rung.max(1) as usize - 1 == r
+                })
+                .collect()
+        })
+        .collect();
+    let span: Vec<f32> = (0..branches.len())
+        .map(|b| (0..rungs as usize).map(|r| cell[r * branches.len() + b].len()).max().unwrap_or(1).max(1) as f32)
+        .collect();
+    let left: Vec<f32> = (0..branches.len()).map(|b| span[..b].iter().sum::<f32>() * COL).collect();
+    let width: f32 = span.iter().sum::<f32>() * COL;
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, HEAD + ROW * rungs as f32), egui::Sense::hover());
     let painter = ui.painter_at(rect);
     let box_of = |t: TechId| -> egui::Rect {
         let card = game.tables.tech(t);
-        let c = branches.iter().position(|b| *b == card.branch).unwrap_or(0) as f32;
-        let r = card.rung.max(1) as f32 - 1.0;
-        let min = rect.min + egui::vec2(c * COL + (COL - BOX_W) / 2.0, HEAD + r * ROW + (ROW - BOX_H) / 2.0);
+        let b = branches.iter().position(|x| *x == card.branch).unwrap_or(0);
+        let r = card.rung.max(1) as usize - 1;
+        let here = &cell[r * branches.len() + b];
+        let i = here.iter().position(|x| *x == t).unwrap_or(0) as f32;
+        let each = span[b] * COL / here.len().max(1) as f32;
+        let centre = left[b] + each * (i + 0.5);
+        let min = rect.min + egui::vec2(centre - BOX_W / 2.0, HEAD + r as f32 * ROW + (ROW - BOX_H) / 2.0);
         egui::Rect::from_min_size(min, egui::vec2(BOX_W, BOX_H))
     };
     for (i, b) in branches.iter().enumerate() {
-        painter.text(rect.min + egui::vec2(i as f32 * COL + COL / 2.0, HEAD / 2.0), egui::Align2::CENTER_CENTER, b, FontId::proportional(14.0), Color32::WHITE);
+        painter.text(rect.min + egui::vec2(left[i] + span[i] * COL / 2.0, HEAD / 2.0), egui::Align2::CENTER_CENTER, b, FontId::proportional(14.0), Color32::WHITE);
     }
     // Lines first, so the boxes sit on top of them. A line is green once the Tech it comes from is done.
     for t in TechId::ALL {

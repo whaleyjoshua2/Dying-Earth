@@ -94,6 +94,20 @@ emissions = 0.0
 sink_per_turn = 3.0
 no_slot = true
 
+# Ticket #56 (version 0.05): the Sea Wall. It needs Coastal Engineering, always stands in a coastal
+# slot (`coastal_only`), and at most one may stand in a Nation State. While it stands and is working
+# it absorbs the state's next Sea Level threshold of any kind -- scheduled, a Storm Surge applied
+# early, or the Ice Sheets Break -- so no coastal slot is lost, and it is destroyed doing it.
+[[facility]]
+id = "sea_wall"
+name = "Sea Wall"
+materials = 35
+build_turns = 2
+energy_upkeep = 1
+emissions = 0.0
+needs_tech = "coastal_engineering"
+coastal_only = true
+
 # Ticket #54: the cap on Scrubbers in one Nation State, from its population in hundreds of millions:
 # clamp(round(population / per_population), min, max). Russia at 1.5 gets the floor of 2; South Asia
 # at 19.4 gets the ceiling of 10.

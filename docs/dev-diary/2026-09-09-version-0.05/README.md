@@ -907,3 +907,127 @@ and a Break fires at the end of that phase, off the Temperature it settled. So o
 Sink Weakens fires, the panel still reads "Natural Sink -6.0" while the bar already shows the notch
 filled; from the next turn it reads -4.0. The bar is the state of the world, the Emissions list is
 the account of the turn just gone.
+
+
+## #56: sea level and the ice
+
+Until now the sea took **build slots**, any of them, and it took the highest-upkeep Facility standing in
+one. This ticket gives every Nation State three more slots and cuts the whole row in two.
+
+**Build slots** are now **Size + Industry Level + 3** (`base_slots` in `nation_states.toml`'s header),
+less the coastal slots the sea has taken. Every slot is either a **Coastal Slot** or an **Inland
+Slot**. A state's **start** slots (Size + 3 + the Industry Level on its card) hold **three coastal
+slots per point of Coastal Exposure** (`coastal_per_exposure`), never more than the start slots less
+one; the rest are inland, and **every slot a raise of the Industry Level adds is inland**. Only
+Central America and the Caribbean feels the cap: 1 + 3 + 1 = **5** start slots, 3 x 2 = 6 coastal
+wanted, **capped at 4**, leaving one inland. East Asia gets 6 coastal and 3 inland; every state at
+Coastal Exposure 1 gets 3 coastal.
+
+**The sea takes coastal slots and nothing else.** Each threshold -- scheduled, a Storm Surge applied
+early, or the Ice Sheets Break -- takes Coastal Exposure of them as before, and once a state's
+coastal slots are gone it loses no more. A Facility standing in a lost coastal slot is destroyed,
+**oldest first** (it was highest-upkeep-first). The displacement and the Unrest a threshold brings are
+unchanged: they key on the threshold firing, not on the slots it managed to take, so a state with no
+coast left still loses its people and its calm. Start Facilities take coastal slots first, in the
+table's order; a new build fills an inland slot while one is free.
+
+**Coastal Engineering** is the thirteenth Tech: Industry rung 2, cost 25, needing Efficient Grids,
+beside Clean Power. It unlocks one thing, the **Sea Wall** (35 Materials, 2 turns, 1 Energy upkeep, no
+Emissions): at most one to a state, always in a coastal slot, and while it stands and is working the
+state's **next Sea Level threshold of any kind takes no slots at all**. The wall is destroyed
+absorbing it. A mothballed wall absorbs nothing.
+
+**Antarctica opens.** Earth's three Colony Slots cannot be founded until the Temperature has stood at
+or above **+1.6 C** (`antarctica_opens_at`, the constant #55 put on the Temperature bar) in a Climate
+phase; once open they stay open however far the world cools back. Until then the Surface Map draws
+them under the ice with their opening Temperature, the Solar System Map's Earth line says so, and a
+Colony Ship ordered to found there is refused by name. Its yields are re-cut for what lies under the
+ice: **Mine 1.75, Refinery 2.0**, Generator 0.75, **Habitat 1.0**. Its Colonists still count as on
+Earth and its Modules still emit.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![The East Asia card with a Coastal row and an Inland row: a Sea Wall standing on the coast, a drowned Factory and one more slot struck through, and a Research Lab inland](slots-coastal-inland.png)
+
+- **slots-coastal-inland.png** -- `shot:w2 walls:1 select:eastasia turns:0 look:110,30`. East Asia after
+  the sea's first threshold. The card reads "2 coastal slot(s) lost to the sea", then **Coastal: Power
+  Plant, Refinery, Launch Site, Sea Wall,** *Factory, lost to the sea*, *lost to the sea* -- the
+  Factory was the oldest thing on that coast and went first -- and **Inland: Research Lab, free,
+  free**. Every Facility line names its row ("Sea Wall (coastal): no output, 1 Energy upkeep"), and the
+  slot count reads 5 used of 7. (`walls:1` is a new building aid: it puts the sea through East Asia's
+  coast once, stands the Bank down to make room as a player would, and raises the wall, since an AI
+  game never arrives at that board.)
+
+![The Tech Tree with thirteen boxes, Clean Power and Coastal Engineering side by side on Industry rung 2, both drawn from Efficient Grids](tech-tree-thirteen.png)
+
+- **tech-tree-thirteen.png** -- `shot:tt tech:1 turns:8`. Thirteen boxes. The Industry column is twice
+  as wide as the others because its second rung holds two Techs, and **Clean Power** and **Coastal
+  Engineering** sit side by side on it, each with its own line down from Efficient Grids; Clean
+  Manufacturing hangs under Clean Power alone. The tree lays a branch out this way whenever a rung
+  holds more than one Tech, so a fourteenth costs no code.
+
+![Earth's Surface Map from over the south pole: the three Antarctic slots labelled "under the ice, opens at +1.6 C" in pale blue](antarctica-closed.png)
+
+- **antarctica-closed.png** -- `shot:ice0 turns:2 look:0,-72 panel:0`. Turn 3 at +1.4 C. The Antarctic
+  Peninsula, Lake Vostok and the Ross Ice Shelf each read **"under the ice / opens at +1.6 C"** in the
+  ice's own pale blue, over the continent itself. (`panel:0` is a new building aid: the Earth picture
+  shows the globe with no Climate Panel over it.)
+
+![The same view at +1.7 C: the three Antarctic slots now read "empty" in the ordinary grey, ready to be founded](antarctica-open.png)
+
+- **antarctica-open.png** -- `shot:ice1 turns:2 temp:1.7 look:0,-72 panel:0`. Turn 4 at +1.7 C, one
+  Climate phase after the line. The same three slots read **"empty"** in the ordinary grey a free
+  Colony Slot carries anywhere else, and the Report that turn said "The Antarctic ice opens: 3 Colony
+  Slots on Earth."
+
+### Twenty seeds
+
+`cargo run --release -p dying-earth-engine --example sim -- 1 --count=20`, twice, plus
+`sweep -- 20 --player=custodians --start=europe --sinks=6 --steps=150`. Nothing was re-tuned; these
+are measurements.
+
+| seat 0 | wins | collapses | median collapse turn | median first Colony |
+|---|---|---|---|---|
+| Custodians in East Asia | none | 20/20 | 18 | none founded |
+| Prospectors in East Asia | Prospectors 1 | 19/20 | 22 | 10 |
+| Custodians in Europe (sweep) | none | 20/20 | 22 (19..22), end temp +3.03 | - |
+
+What the sea and the ice did, over the same twenty seeds a seating:
+
+| seating | Sea Walls built | Sea Walls spent | coastal slots lost a game (median) | Facilities the sea destroyed (median) | turn Antarctica opened (median) | Antarctic Colonies founded |
+|---|---|---|---|---|---|---|
+| Custodians in East Asia | 0 | 0 | 49 | 27 | 6 | 0 |
+| Prospectors in East Asia | 0 | 0 | 49 | 27 | 6 | 2 |
+
+**The sea takes the whole world's coast.** The twelve states hold exactly **49** coastal slots
+between them, and the median game loses **49**: all four thresholds fire in every seed of both
+seatings, and Coastal Exposure 2 x four thresholds is 8, more than the 6 any exposed state has. Every
+coast in the world is gone by the end, and twenty-seven Facilities go with it -- the start Facilities
+stand on the coast by rule now rather than by accident, and the sea reaches them oldest first.
+
+**The AI built no Sea Wall in any of the forty games, and the reason is upstream of the weights.**
+Coastal Engineering is Industry rung 2 and needs Efficient Grids, and **no game in either seating
+finishes a single rung-2 Tech**: across the Custodian seating's twenty seeds the world completed
+Public Science 17 times, Deep Mining 5, Expanded Habitats 4 and Efficient Grids 3 -- 29 Techs in
+twenty games, every one of them rung 1 -- and the Prospector seating completed Deep Mining 19 times.
+The Tech is never in, so the wall is never offered. The rule and its weights are pinned
+by formula test (h) instead, which puts Coastal Engineering in by hand and watches the AI wall
+Australia's coast with the sea 0.15 C away.
+
+**Three more slots a state cost the Custodian seating its Colonies.** Against #55's same twenty seeds
+the Custodian-in-East-Asia seating went from a first Colony at a median turn 10 to **no Colony in any
+of the twenty seeds**, and collapse came a turn sooner (18 against 19). The reason is in the AI's
+scored list, not in the sea: with three more slots in every state there is always another Factory or
+Power Plant to buy on Earth, and the greedy spend never holds 30 Materials back for a Colony Ship at
+the ISS -- seed 3 shows it skipping the Colony Ship eleven times for want of Materials while
+completing 36 buildings, against 30 at #55. The Prospector seating is unhurt (a first Colony at turn
+10, and its one win is the first anybody has taken since #54). Nothing here was re-tuned: the knobs
+that would settle it are `base_slots` in `nation_states.toml` and `build_producer` against
+`build_colony_ship` in `ai.toml`.
+
+**Antarctica opens early and nobody goes.** The ice is open by turn 6 in every seed of both seatings
+-- the Permafrost Thaw fires at the same +1.6 C, so the two arrive together -- and two Antarctic
+Colonies were founded across the forty games. It stays what #44 made it: a foothold the AI takes only
+when a loaded Colony Ship has nowhere better to be, and now with abundant ore and Fuel under it for a
+player who wants them.

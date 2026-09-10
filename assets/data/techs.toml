@@ -121,3 +121,15 @@ needs = ["public_science", "clean_power"]
 effect = "Per-person Emissions x0.5; Influence thresholds x0.75; Heatwave loss halved"
 value = 0.5
 influence_threshold_multiplier = 0.75
+
+# Ticket #56 (version 0.05): the thirteenth Tech, Industry rung 2 beside Clean Power. It unlocks the
+# Sea Wall and nothing else, so `value` carries no figure any rule reads.
+[[tech]]
+id = "coastal_engineering"
+name = "Coastal Engineering"
+branch = "Industry"
+rung = 2
+cost = 25
+needs = ["efficient_grids"]
+effect = "Unlocks the Sea Wall."
+value = 1.0

@@ -422,15 +422,41 @@ impl Game {
                 if self.state(*state).control.director() != Some(seat) {
                     return fail("you do not direct this Nation State");
                 }
+                // Ticket #56: a Facility that needs a Tech waits for it. Provisional Findings gives
+                // half an effect, never half an unlock, so the Tech must be done.
+                if let Some(t) = self.tables.facility(*kind).needs_tech
+                    && !self.has_tech(t)
+                {
+                    return fail(format!("{} needs {}", kind.name(), self.tables.tech(t).name));
+                }
                 // Ticket #54: a Scrubber takes no build slot, so it neither needs one nor uses one.
+                // Ticket #56: the slot it does need is coastal or inland, and a Sea Wall wants a
+                // coastal one. The orders already pending in this state take their slots first.
                 if self.takes_slot(*kind) {
-                    let pending_here = pending
+                    let (mut taken_coastal, mut taken_inland) = (0, 0);
+                    for k in pending
                         .iter()
-                        .filter(|o| o.build_state() == Some(*state) && o.build_facility().map(|k| self.takes_slot(k)).unwrap_or(false))
-                        .count() as u32;
-                    if self.free_slots(*state) <= pending_here {
-                        return fail("no free build slot");
+                        .filter(|o| o.build_state() == Some(*state))
+                        .filter_map(|o| o.build_facility())
+                        .filter(|k| self.takes_slot(*k))
+                    {
+                        match self.next_slot_is_coastal(*state, k, taken_coastal, taken_inland) {
+                            Some(true) => taken_coastal += 1,
+                            Some(false) => taken_inland += 1,
+                            None => {}
+                        }
                     }
+                    if self.next_slot_is_coastal(*state, *kind, taken_coastal, taken_inland).is_none() {
+                        return fail(if self.tables.facility(*kind).coastal_only { "no free coastal slot" } else { "no free build slot" });
+                    }
+                }
+                // Ticket #56: at most one Sea Wall stands in a Nation State.
+                if *kind == FacilityKind::SeaWall
+                    && (self.state(*state).facilities.iter().any(|f| f.kind == FacilityKind::SeaWall)
+                        || self.state(*state).queue.iter().any(|b| b.item == BuildItem::Facility(FacilityKind::SeaWall))
+                        || pending.iter().any(|o| o.build_state() == Some(*state) && o.build_facility() == Some(FacilityKind::SeaWall)))
+                {
+                    return fail("this Nation State already has a Sea Wall");
                 }
                 // Ticket #54: the Scrubber, the Custodians' signature Facility.
                 if *kind == FacilityKind::Scrubber {
@@ -762,6 +788,10 @@ impl Game {
                         if !self.free_slots_on(body).contains(slot) {
                             return fail("that Colony Slot is taken");
                         }
+                        // Ticket #56: Antarctica is shut under the ice until the world is warm enough.
+                        if *b == BodyId::Earth && !self.antarctica_open {
+                            return fail(format!("the Antarctic ice has not opened: it opens at {:+.1} C", self.tables.climate.antarctica_opens_at));
+                        }
                     }
                     UnloadTarget::Colony(c) => {
                         let Some(col) = self.colony(*c) else { return fail("no such Colony") };
@@ -902,21 +932,23 @@ impl Game {
             match order {
                 Order::BuildFacility { state, kind } | Order::BuildFacilityWithDucats { state, kind } => {
                     let due = turn + self.tables.facility(*kind).build_turns - 1;
-                    self.state_mut(*state).queue.push(Build { item: BuildItem::Facility(*kind), seat, due_turn: due });
+                    // Ticket #56: the build reserves the slot it will stand in, coastal or inland.
+                    let coastal = self.next_slot_is_coastal(*state, *kind, 0, 0).unwrap_or(false);
+                    self.state_mut(*state).queue.push(Build { item: BuildItem::Facility(*kind), seat, due_turn: due, coastal });
                 }
                 Order::RaiseIndustry { state } => {
                     let due = turn + self.tables.industry_level.build_turns - 1;
-                    self.state_mut(*state).queue.push(Build { item: BuildItem::IndustryLevel, seat, due_turn: due });
+                    self.state_mut(*state).queue.push(Build { item: BuildItem::IndustryLevel, seat, due_turn: due, coastal: false });
                 }
                 Order::BuildModule { colony, kind } | Order::BuildModuleWithDucats { colony, kind } => {
                     let due = turn + self.tables.module(*kind).build_turns - 1;
                     if let Some(c) = self.colony_mut(*colony) {
-                        c.queue.push(Build { item: BuildItem::Module(*kind), seat, due_turn: due });
+                        c.queue.push(Build { item: BuildItem::Module(*kind), seat, due_turn: due, coastal: false });
                     }
                 }
                 Order::BuildShip { site, kind } => {
                     let due = turn + self.tables.unit(*kind).build_turns - 1;
-                    let b = Build { item: BuildItem::Unit(*kind), seat, due_turn: due };
+                    let b = Build { item: BuildItem::Unit(*kind), seat, due_turn: due, coastal: false };
                     match site {
                         Place::State(s) => self.state_mut(*s).queue.push(b),
                         Place::Colony(c) => {
@@ -928,7 +960,7 @@ impl Game {
                 }
                 Order::BuildArmy { place } => {
                     let due = turn + self.tables.unit(UnitKind::Army).build_turns - 1;
-                    let b = Build { item: BuildItem::Unit(UnitKind::Army), seat, due_turn: due };
+                    let b = Build { item: BuildItem::Unit(UnitKind::Army), seat, due_turn: due, coastal: false };
                     match place {
                         Place::State(s) => self.state_mut(*s).queue.push(b),
                         Place::Colony(c) => {
@@ -984,7 +1016,7 @@ impl Game {
                     self.seat_mut(seat).archive_fund -= per;
                     let due = turn + self.tables.module(ModuleKind::Archive).build_turns - 1;
                     if let Some(c) = self.colony_mut(*colony) {
-                        c.queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat, due_turn: due });
+                        c.queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat, due_turn: due, coastal: false });
                     }
                     let stage = self.archive_stages_committed(seat);
                     let line = format!("The {} began stage {} of the Archive at {}.", self.seat_name(seat), stage, self.place_name(Place::Colony(*colony)));

@@ -23,6 +23,7 @@
 
 [weights.prospectors]
 build_scrubber = 0
+build_sea_wall = 4
 mothball = 3
 restart = 4
 decommission = 1
@@ -53,6 +54,7 @@ stance_evade = 1
 
 [weights.custodians]
 build_scrubber = 8
+build_sea_wall = 4
 mothball = 3
 restart = 4
 decommission = 1
@@ -86,6 +88,7 @@ stance_evade = 1
 # Influence is 5, since they buy passage rather than allegiance.
 [weights.arkwrights]
 build_scrubber = 0
+build_sea_wall = 4
 mothball = 3
 restart = 4
 decommission = 1
@@ -117,6 +120,7 @@ stance_evade = 1
 # Ticket #51: the Archivists research and build the Archive.
 [weights.archivists]
 build_scrubber = 0
+build_sea_wall = 4
 mothball = 3
 restart = 4
 decommission = 1

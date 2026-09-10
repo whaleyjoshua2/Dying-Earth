@@ -74,6 +74,12 @@ fn main() {
     let mut last_turn_twelve: Vec<u32> = Vec::new();
     let (mut gone_one, mut gone_twelve) = (0u32, 0u32);
     let (mut safe_one, mut safe_twelve) = (0u32, 0u32);
+    // Ticket #56: the sea and the ice.
+    let (mut sea_walls_built, mut sea_walls_spent) = (0u32, 0u32);
+    let mut coastal_lost: Vec<u32> = Vec::new();
+    let mut drowned: Vec<u32> = Vec::new();
+    let mut ice_turns: Vec<u32> = Vec::new();
+    let mut antarctic_colonies = 0u32;
     let mut kinds = [FactionKind::Custodians; SEAT_COUNT];
     for s in seed..seed + count {
         let r = dying_earth_engine::sim::run(tables.clone(), s, player);
@@ -119,6 +125,14 @@ fn main() {
             net_twelve.push(n);
         }
         net_end.push(r.net_at_end);
+        sea_walls_built += r.sea_walls_built;
+        sea_walls_spent += r.sea_walls_spent;
+        coastal_lost.push(r.coastal_slots_lost);
+        drowned.push(r.facilities_drowned);
+        if let Some(t) = r.antarctica_turn {
+            ice_turns.push(t);
+        }
+        antarctic_colonies += r.antarctic_colonies;
         for (i, t) in r.break_turns.iter().enumerate() {
             if let Some(t) = t {
                 break_turns[i].push(*t);
@@ -230,6 +244,20 @@ fn main() {
             gone_one,
             safe_one
         );
+        println!(
+            "{:>12}         : {} built, {} spent absorbing a threshold",
+            "Sea Walls", sea_walls_built, sea_walls_spent
+        );
+        println!("{:>12}         : {}", "median coastal slots lost a game", median(&mut coastal_lost));
+        println!("{:>12}         : {}", "median Facilities destroyed by the sea", median(&mut drowned));
+        println!(
+            "{:>12}         : median {} ({} of {} seeds opened it)",
+            "turn Antarctica opened",
+            median(&mut ice_turns),
+            ice_turns.len(),
+            count
+        );
+        println!("{:>12}         : {}", "Antarctic Colonies founded", antarctic_colonies);
         println!(
             "{:>12}         : median {} ({} seeds), cuts gone in {}, no Collapse on the path in {}",
             "Last Turn at turn 12",

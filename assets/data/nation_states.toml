@@ -31,6 +31,14 @@
 # and its Unrest by `unrest`. The designer named these strip_permit_turns, strip_permit_multiplier,
 # strip_permit_baseline_rise and strip_permit_unrest; inside their own table the prefix would only
 # repeat itself, as with [development] on ticket #53.
+# Ticket #56 (version 0.05): build slots. A state has Size + Industry Level + `base_slots` of them,
+# less the coastal slots the sea has taken. Its START slots (Size + base_slots + the Industry Level
+# on its card) hold `coastal_per_exposure` x Coastal Exposure coastal slots, never more than the
+# start slots minus one; the rest are inland, and every slot a raise of the Industry Level adds is
+# inland. The sea takes only coastal slots.
+base_slots = 3
+coastal_per_exposure = 3
+
 [strip_permit]
 turns = 3
 multiplier = 2.0

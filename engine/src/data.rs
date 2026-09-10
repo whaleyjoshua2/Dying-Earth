@@ -117,6 +117,12 @@ pub struct FacilityCard {
     /// Ticket #54: true for a Facility that occupies no build slot (the Scrubber).
     #[serde(default)]
     pub no_slot: bool,
+    /// Ticket #56: the Tech that unlocks this Facility, if any (the Sea Wall's Coastal Engineering).
+    #[serde(default)]
+    pub needs_tech: Option<TechId>,
+    /// Ticket #56: true for a Facility that stands only in a coastal slot (the Sea Wall).
+    #[serde(default)]
+    pub coastal_only: bool,
 }
 
 /// Ticket #54 (version 0.05): the cap on Scrubbers in one Nation State (`facilities.toml`).
@@ -537,6 +543,8 @@ pub struct VictoryTable {
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiWeights {
     pub build_producer: f64,
+    /// Ticket #56: raise a Sea Wall in a coastal slot before the sea takes it.
+    pub build_sea_wall: f64,
     pub raise_industry: f64,
     pub build_research_lab: f64,
     pub build_habitat: f64,
@@ -652,6 +660,16 @@ struct StatesFile {
     state: Vec<StateCard>,
     development: DevelopmentTable,
     strip_permit: StripPermitTable,
+    /// Ticket #56: the build slots every Nation State has on top of Size and Industry Level.
+    #[serde(default = "three")]
+    base_slots: u32,
+    /// Ticket #56: coastal slots per point of Coastal Exposure, capped at the start slots less one.
+    #[serde(default = "three")]
+    coastal_per_exposure: u32,
+}
+
+fn three() -> u32 {
+    3
 }
 
 /// Ticket #54 (version 0.05): the Strip Permit, in `nation_states.toml` under `[strip_permit]`.
@@ -731,6 +749,10 @@ pub struct Tables {
     pub development: DevelopmentTable,
     /// Ticket #54: the Strip Permit's figures (`nation_states.toml`).
     pub strip_permit: StripPermitTable,
+    /// Ticket #56: the build slots every state has beyond Size and Industry Level, and how many
+    /// coastal slots a point of Coastal Exposure buys (`nation_states.toml`'s header).
+    pub base_slots: u32,
+    pub coastal_per_exposure: u32,
     pub facilities: Vec<FacilityCard>,
     pub industry_level: IndustryLevelCard,
     /// Ticket #54: the Scrubber cap and the Mothball prices (`facilities.toml`).
@@ -793,6 +815,8 @@ impl Tables {
             states: states.state,
             development: states.development,
             strip_permit: states.strip_permit,
+            base_slots: states.base_slots,
+            coastal_per_exposure: states.coastal_per_exposure,
             facilities: facilities.facility,
             industry_level: facilities.industry_level,
             scrubber: facilities.scrubber,
@@ -887,8 +911,21 @@ impl Tables {
                 return Err(err("nation_states.toml", format!("row {}: population or education out of range", s.name)));
             }
             // A Launch Site is added for a Faction start state, so leave one slot for it.
-            if s.start_facilities.len() as u32 + 1 > s.size + s.industry_level {
-                return Err(err("nation_states.toml", format!("row {}: {} start_facilities do not fit its {} build slots with a Launch Site", s.name, s.start_facilities.len(), s.size + s.industry_level)));
+            let start_slots = s.size + s.industry_level + self.base_slots;
+            if s.start_facilities.len() as u32 + 1 > start_slots {
+                return Err(err("nation_states.toml", format!("row {}: {} start_facilities do not fit its {} build slots with a Launch Site", s.name, s.start_facilities.len(), start_slots)));
+            }
+            // Ticket #56: every state keeps at least one coastal slot and one inland slot, so the
+            // sea always has something to take and a raise always has somewhere to go.
+            if start_slots < 2 {
+                return Err(err("nation_states.toml", format!("row {}: {start_slots} start slots leave no room for a coastal slot and an inland one", s.name)));
+            }
+        }
+        // Ticket #56: a Facility that names an unlocking Tech must name a real one, and a
+        // coastal-only Facility must take a slot at all.
+        for f in &self.facilities {
+            if f.coastal_only && f.no_slot {
+                return Err(err("facilities.toml", format!("row {}: a coastal-only Facility must take a build slot", f.name)));
             }
         }
         for t in &self.techs {

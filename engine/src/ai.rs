@@ -32,6 +32,8 @@ enum Cat {
     FoundColony,
     /// Ticket #54: the Scrubber, which took Restoration's place and its Stabilization gap.
     Scrubber,
+    /// Ticket #56: the Sea Wall, raised before the sea takes the coastal slot it stands in.
+    SeaWall,
     /// Ticket #54: Mothball, Restart and Decommission, on a Facility or a Module.
     Mothball,
     Restart,
@@ -96,6 +98,7 @@ impl Game {
             Cat::LoadUnload => w.load_unload,
             Cat::FoundColony => w.found_colony,
             Cat::Scrubber => w.build_scrubber,
+            Cat::SeaWall => w.build_sea_wall,
             Cat::Mothball => w.mothball,
             Cat::Restart => w.restart,
             Cat::Decommission => w.decommission,
@@ -155,6 +158,38 @@ impl Game {
         let (ratio, behind) = if first_ratio <= presence_ratio { (first_ratio, Behind::First) } else { (presence_ratio, Behind::Presence) };
         let mult = if ratio >= 1.0 { 1.0 } else { 1.0 + (m.victory_gap_max - 1.0) * ((1.0 - ratio) / 0.5).min(1.0) };
         (mult, behind)
+    }
+
+    /// Ticket #56: a Sea Wall standing or on order in this Nation State (at most one may).
+    fn sea_wall_committed(&self, sid: StateId) -> bool {
+        let st = self.state(sid);
+        st.facilities.iter().any(|f| f.kind == FacilityKind::SeaWall) || st.queue.iter().any(|b| b.item == BuildItem::Facility(FacilityKind::SeaWall))
+    }
+
+    /// Ticket #56: a Sea Level threshold of any kind -- one still scheduled for this state, or the
+    /// Ice Sheets Break -- standing within 0.2 C of the Temperature, with a coast still to lose.
+    fn sea_is_close(&self, sid: StateId) -> bool {
+        if self.coastal_slots(sid) == 0 {
+            return false;
+        }
+        let now = self.climate.temperature;
+        let scheduled = self
+            .tables
+            .climate
+            .sea_level_thresholds
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !self.state(sid).thresholds_fired[*i])
+            .map(|(_, t)| *t);
+        let breaks = self
+            .tables
+            .climate
+            .breaks
+            .iter()
+            .enumerate()
+            .filter(|(i, b)| b.effect == crate::data::BreakEffect::SeaLevelThreshold && !self.climate.breaks_fired[*i])
+            .map(|(_, b)| b.temperature);
+        scheduled.chain(breaks).any(|t| t - now <= 0.2)
     }
 
     fn enemy_present_or_inbound(&self, seat: Seat, body: BodyId) -> bool {
@@ -446,6 +481,14 @@ impl Game {
                         // Ticket #54: a Scrubber has its own weight, its own cap and no build slot,
                         // so it is enumerated below rather than here.
                         FacilityKind::Scrubber => continue,
+                        // Ticket #56: a Sea Wall needs Coastal Engineering, a free COASTAL slot and
+                        // no wall standing already; it is worth its slot when a threshold is near.
+                        FacilityKind::SeaWall => {
+                            if self.free_coastal(sid) == 0 || self.sea_wall_committed(sid) {
+                                continue;
+                            }
+                            (Cat::SeaWall, self.base_weight(seat, Cat::SeaWall))
+                        }
                     };
                     let produces = self.tables.facility(fk).produces.as_ref().map(|p| p.resource);
                     if cat == Cat::Producer {
@@ -467,7 +510,14 @@ impl Game {
                     // Occupation is what put the Unrest there, and Pacification halves above 4.
                     let just_occupied = fk == FacilityKind::Constabulary && self.state(sid).control.is_occupied();
                     let sway = if (first_embassy && self.standing_pressed(seat, Place::State(sid))) || just_occupied { m.threat } else { 1.0 };
-                    push(vec![Order::BuildFacility { state: sid, kind: fk }], cat, base, gap_for(cat, Some(name)), sway, 1.0, format!("build {} in {}", name, self.tables.state(sid).name), None);
+                    // Ticket #56: a Facility that waits on a Tech is not offered until it is in.
+                    if self.tables.facility(fk).needs_tech.map(|t| !self.has_tech(t)).unwrap_or(false) {
+                        continue;
+                    }
+                    // Ticket #56: the Sea Wall doubles in worth while a threshold of any kind stands
+                    // within 0.2 C of the Temperature and the state still has a coast to lose.
+                    let opportunity = if fk == FacilityKind::SeaWall && self.sea_is_close(sid) { m.opportunity } else { 1.0 };
+                    push(vec![Order::BuildFacility { state: sid, kind: fk }], cat, base, gap_for(cat, Some(name)), sway, opportunity, format!("build {} in {}", name, self.tables.state(sid).name), None);
                 }
             }
             // Ticket #54: a Scrubber takes no build slot, so it is offered whether or not one is
@@ -916,7 +966,8 @@ impl Game {
                 // Ticket #44: Antarctica, Earth's slots. A foothold, not Presence: half weight and no gap,
                 // so it is taken when the Ship cannot go anywhere better.
                 if s.colonists > 0 && body == BodyId::Earth {
-                    if let Some(slot) = self.free_slots_on(BodyId::Earth).first() {
+                    // Ticket #56: Antarctica is shut until the ice opens; a loaded Ship goes elsewhere.
+                    if let Some(slot) = self.free_slots_on(BodyId::Earth).first().filter(|_| self.antarctica_open) {
                         push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, *slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, format!("found a Colony at {}", self.tables.body(BodyId::Earth).slots[*slot as usize].name), None);
                     }
                     // Ticket #46: Colonists on a station over Earth are still on Earth for Presence; never park them there.

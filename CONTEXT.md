@@ -57,7 +57,7 @@ The small model of global warming the game runs: Emissions add to the CO2 Stock,
 _Avoid_: warming track, doom clock, countdown, timer, disaster meter
 
 **Body**:
-A place in the solar system that can hold a Colony or a Space Station. Five since version 0.04: Earth (its Colony Slots are Antarctica's), the Moon, Mars, Phobos and Deimos. A Body may be another's satellite, which sets how far apart they are.
+A place in the solar system that can hold a Colony or a Space Station. Five since version 0.04: Earth (its Colony Slots are Antarctica's, shut under the ice until +1.6 C), the Moon, Mars, Phobos and Deimos. A Body may be another's satellite, which sets how far apart they are.
 _Avoid_: planet, world, site, location, node
 
 **Colony**:
@@ -65,7 +65,7 @@ A permanent settlement a Faction holds on a Body, founded when a Colony Ship unl
 _Avoid_: base, outpost, settlement
 
 **Colony Slot**:
-One of a fixed number of places on a Body where a Colony can be founded, shared by all Factions. Since version 0.04 each is a real geological place, drawn at its position on the Surface Map and giving its Colony its name. A landing Colony Ship is founded into a chosen one.
+One of a fixed number of places on a Body where a Colony can be founded, shared by all Factions. Since version 0.04 each is a real geological place, drawn at its position on the Surface Map and giving its Colony its name. A landing Colony Ship is founded into a chosen one. Earth's three, in Antarctica, are shut under the ice until the Temperature has stood at +1.6 C in a Climate phase; once open they stay open.
 _Avoid_: site, plot, capacity
 
 **Orbital Slot**:
@@ -110,7 +110,7 @@ An advance on the Tech Tree that changes an output, a capacity, an upkeep, a Shi
 _Avoid_: research, upgrade, invention
 
 **Tech Tree**:
-The single tree of Techs shared by all Factions, in five branches: Industry, Propulsion, Off-world Living, Extraction, Society. One Tech is under research at a time, worldwide.
+The single tree of Techs shared by all Factions, thirteen of them since version 0.05, in five branches: Industry, Propulsion, Off-world Living, Extraction, Society. A branch may hold more than one Tech on a rung. One Tech is under research at a time, worldwide.
 _Avoid_: per-faction tree, research tree
 
 **Research Lead**:
@@ -204,7 +204,7 @@ _Avoid_: country, nation, territory, region, state, continent (some are, some ar
 ### Earth
 
 **Facility**:
-A building placed in a Nation State. Nine kinds since version 0.05: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary and the Scrubber, which alone takes no build slot. Since version 0.04 a Launch Site builds no Ship: it lifts Colonists and Armies from its state into orbit, and each lift is a launch.
+A building placed in a Nation State. Ten kinds since version 0.05: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, the Sea Wall, which stands only in a Coastal Slot, and the Scrubber, which alone takes no build slot. Since version 0.04 a Launch Site builds no Ship: it lifts Colonists and Armies from its state into orbit, and each lift is a launch.
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Cheap Industry**:
@@ -236,7 +236,7 @@ The Orders-phase order that takes a Facility or a Module down for good: a turn l
 _Avoid_: demolish, scrap, sell, destroy
 
 **Industry Level**:
-How built-up a Nation State is. Together with the state's size it sets how many Facilities fit, and it scales the state's emissions. Raising it is a build action.
+How built-up a Nation State is. Together with the state's size it sets how many Facilities fit, and every slot it adds is an Inland Slot. It scales the state's emissions. Raising it is a build action.
 _Avoid_: development, tier, infrastructure
 
 **Neutral Development**:
@@ -255,9 +255,29 @@ _Avoid_: specialty, bonus, affinity
 How dirty a Nation State's industry is before any Facility is built there.
 _Avoid_: pollution rating, carbon score
 
+**Build Slot**:
+One of the places a Facility occupies in a Nation State. A state has Size + Industry Level + three of them, and each is either a **Coastal Slot** or an **Inland Slot**: the sea takes only the first, and every slot a raise of the Industry Level adds is one of the second. Its start Facilities stand on the coast first; a later build fills an inland slot while one is free.
+_Avoid_: building slot, plot, space, capacity
+
+**Coastal Slot**:
+A build slot on a Nation State's coast, where the sea can reach it. A state has three per point of Coastal Exposure, never more than its start slots less one, and never gains another. A Facility standing in one the sea takes is destroyed, oldest first.
+_Avoid_: shore slot, waterfront, flood zone
+
+**Inland Slot**:
+A build slot the sea never reaches: the start slots the coastal ones leave over, and every slot a raise of the Industry Level adds.
+_Avoid_: safe slot, interior, highland
+
 **Coastal Exposure**:
-How much of a Nation State the sea can take. As Sea Level passes its thresholds, an exposed state permanently loses build slots and drives some of its people out.
+How much of a Nation State stands on the coast, a figure on its card. It sets how many Coastal Slots the state has, three per point, and how many of them each Sea Level threshold takes. A state with no Coastal Slots left loses no more of them, though the threshold still drives out its people and raises its Unrest.
 _Avoid_: coastline, vulnerability, flood risk
+
+**Sea Wall**:
+The Facility that holds one threshold off: it stands in a Coastal Slot, at most one to a state, and while it is working the state's next Sea Level threshold of any kind takes no slots at all. The wall is destroyed absorbing it. It needs Coastal Engineering.
+_Avoid_: dyke, levee, barrier, flood defence
+
+**Coastal Engineering**:
+The Industry Tech that unlocks the Sea Wall, and does nothing else.
+_Avoid_: sea defence, civil engineering, hydrology
 
 **Unrest**:
 How restive a Nation State's people are, a figure from 0 to 10 on its card. Heat, the rising sea, the Climate cards, Occupation and arriving Refugees raise it; it falls on its own in a quiet turn, and to Relief and a Constabulary. Past its first threshold the Standing Army stops replenishing, past its second the state's Facilities run at half, and at the top the state throws its controller off and goes neutral.
@@ -404,7 +424,7 @@ The amount of CO2 the oceans and forests remove from the CO2 Stock every turn. N
 _Avoid_: absorption, offset, carbon capture
 
 **Sea Level**:
-How far the oceans have risen with the Temperature. It is drawn on the globe as a creeping waterline, and it permanently takes build slots from Nation States according to their Coastal Exposure.
+How far the oceans have risen with the Temperature. It is drawn on the globe as a creeping waterline, and at each of its thresholds it permanently takes Coastal Slots from every Nation State, as many as the state's Coastal Exposure and never more than it has left. It takes nothing else: an Inland Slot is out of its reach, and so is a state whose coast is already gone.
 _Avoid_: flooding, water line, ocean rise
 
 **Break**:

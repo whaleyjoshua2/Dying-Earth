@@ -55,6 +55,15 @@ pub struct SimResult {
     pub break_turns: Vec<Option<u32>>,
     pub last_turn_at_one: LastTurn,
     pub last_turn_at_twelve: Option<LastTurn>,
+    /// Ticket #56: Sea Walls completed and Sea Walls spent absorbing a threshold; coastal slots the
+    /// sea took over the game and Facilities it destroyed with them; the turn Antarctica opened and
+    /// how many Colonies were founded there.
+    pub sea_walls_built: u32,
+    pub sea_walls_spent: u32,
+    pub coastal_slots_lost: u32,
+    pub facilities_drowned: u32,
+    pub antarctica_turn: Option<u32>,
+    pub antarctic_colonies: u32,
     pub log: Vec<String>,
 }
 
@@ -96,6 +105,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     note_breaks(&game, &mut break_turns);
     let last_turn_at_one = game.last_turn_to_act();
     let mut last_turn_at_twelve: Option<LastTurn> = None;
+    // Ticket #56: the turn the ice opened, and the most Antarctic Colonies standing at once.
+    let mut antarctica_turn: Option<u32> = None;
+    let mut antarctic_colonies = 0u32;
     let max_turns = tables.victory.turns;
     let mut guard = 0;
     while !game.is_over() && guard < max_turns + 2 {
@@ -128,6 +140,10 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
             last_turn_at_twelve = Some(game.last_turn_to_act());
         }
         note_breaks(&game, &mut break_turns);
+        if antarctica_turn.is_none() && game.antarctica_open {
+            antarctica_turn = Some(game.turn);
+        }
+        antarctic_colonies = antarctic_colonies.max(game.colonies.iter().filter(|c| c.body == BodyId::Earth && !c.in_orbit).count() as u32);
     }
     let buildings = Seat::ALL.map(|s| {
         let f: u32 = game.directed_states(s).iter().map(|st| game.state(*st).facilities.len() as u32).sum();
@@ -171,6 +187,20 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let leapfrogs = game.log.iter().filter(|l| l.contains(" Leapfrogged ")).count() as u32;
     let strip_permits = game.log.iter().filter(|l| l.contains(" issued a Strip Permit in ")).count() as u32;
     let net_at_end = game.climate.last.net();
+    // Ticket #56, read off the log as the #52 to #55 figures are.
+    let sea_walls_built = game.log.iter().filter(|l| l.contains("completed Sea Wall at")).count() as u32;
+    let sea_walls_spent = game.log.iter().filter(|l| l.contains("the Sea Wall in") && l.contains("was destroyed")).count() as u32;
+    let mut coastal_slots_lost = 0u32;
+    let mut facilities_drowned = 0u32;
+    for l in game.log.iter().filter(|l| l.starts_with("The sea took ")) {
+        if let Some(n) = l.trim_start_matches("The sea took ").split(' ').next().and_then(|n| n.parse::<u32>().ok()) {
+            coastal_slots_lost += n;
+        }
+        if let Some((_, rest)) = l.split_once(" C: ") {
+            let list = rest.split('.').next().unwrap_or("");
+            facilities_drowned += list.split(" and ").flat_map(|p| p.split(", ")).filter(|p| !p.trim().is_empty()).count() as u32;
+        }
+    }
     SimResult {
         seed,
         player,
@@ -205,6 +235,12 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         break_turns,
         last_turn_at_one,
         last_turn_at_twelve,
+        sea_walls_built,
+        sea_walls_spent,
+        coastal_slots_lost,
+        facilities_drowned,
+        antarctica_turn,
+        antarctic_colonies,
         log: game.log,
     }
 }

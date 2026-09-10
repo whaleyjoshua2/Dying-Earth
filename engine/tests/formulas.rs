@@ -154,24 +154,8 @@ fn sea_level_thresholds_fire_once_per_state() {
     assert_eq!(g.build_slots(StateId::EastAsia), asia_before - 2, "the same threshold never fires twice");
 }
 
-#[test]
-fn sea_level_destroys_facilities_beyond_the_slots_highest_upkeep_first() {
-    let mut g = game();
-    for s in &mut g.states {
-        s.population = 0.0;
-    }
-    // Australia: size 2, industry 2 -> 4 slots, exposure 2. Fill all four.
-    let st = g.state_mut(StateId::Australia);
-    st.control = Control::Controlled(Seat(0));
-    st.facilities = vec![facility(FacilityKind::Factory), facility(FacilityKind::Refinery), facility(FacilityKind::PowerPlant), facility(FacilityKind::LaunchSite)];
-    g.climate.temperature = 1.85;
-    g.climate.co2 = 420.0 + 1.5 * g.tables.climate.ppm_step;
-    g.climate_phase();
-    let kinds: Vec<FacilityKind> = g.state(StateId::Australia).facilities.iter().map(|f| f.kind).collect();
-    assert_eq!(kinds.len(), 2);
-    assert!(!kinds.contains(&FacilityKind::Refinery), "Refinery (upkeep 3) went first");
-    assert!(kinds.contains(&FacilityKind::PowerPlant), "Power Plant (upkeep 0) stayed");
-}
+// Ticket #56 replaced the highest-upkeep-first rule with an oldest-first one that reaches only the
+// coastal slots: it is pinned by `d_the_sea_takes_coastal_slots_only_oldest_first_and_then_nothing`.
 
 // ---------------------------------------------------------------- 10.2 The battle round with fixed dice
 
@@ -589,7 +573,8 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
     let mut g = game();
     let earth = g.tables.body(BodyId::Earth).clone();
     assert_eq!(earth.colony_slots(), 3, "three Colony Slots on Earth, in Antarctica");
-    assert_eq!((earth.mine_yield, earth.generator_yield, earth.refinery_yield, earth.habitat_yield), (1.0, 0.75, 1.5, 0.75));
+    // Ticket #56 re-cut them: abundant ore and Fuel under the ice.
+    assert_eq!((earth.mine_yield, earth.generator_yield, earth.refinery_yield, earth.habitat_yield), (1.75, 0.75, 2.0, 1.0));
     assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3);
     assert_eq!(StateId::ALL.len(), 12, "twelve Nation States since ticket #53, and Antarctica is none of them");
     let m = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
@@ -2204,7 +2189,7 @@ fn e_four_stops_replenishment_seven_halves_output_ten_throws_the_controller_off(
     g.take_control(StateId::Europe, Seat(0));
     g.seats[0].influence.insert(Place::State(StateId::NorthAfrica), 42);
     g.seats[1].influence.insert(Place::State(StateId::NorthAfrica), 17);
-    g.state_mut(StateId::NorthAfrica).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(0), due_turn: 99 });
+    g.state_mut(StateId::NorthAfrica).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(0), coastal: false, due_turn: 99 });
     let id = ArmyId(g.fresh_id());
     g.armies.push(Army { id, home: ArmyHome::State(StateId::Europe), at: ArmyAt::Place(Place::State(StateId::NorthAfrica)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
     g.raise_unrest(StateId::NorthAfrica, 10.0, UnrestSource::Plain);
@@ -2470,7 +2455,8 @@ fn twelve_nation_states_share_out_the_eight_they_came_from() {
     for s in StateId::ALL {
         let c = card(s);
         assert_eq!(c.start_facilities.len() as u32, c.industry_level, "{s:?} starts with as many Facilities as its Industry Level");
-        assert!(c.start_facilities.len() as u32 + 1 <= c.size + c.industry_level, "{s:?} has no room for a Launch Site");
+        // Ticket #56: Size + Industry Level + base_slots, and the coastal row must leave one inland.
+        assert!((c.start_facilities.len() as u32) < c.size + c.industry_level + g.tables.base_slots, "{s:?} has no room for a Launch Site");
         assert!(c.unrest == 0.0, "{s:?} starts calm");
     }
 }
@@ -3366,4 +3352,333 @@ fn i_d_a_break_on_the_path_brings_the_last_turn_forward() {
     let LastTurn::Turn(with) = ahead.last_turn_to_act() else { panic!("the path with the Break has a Last Turn") };
 
     assert!(with < without, "the Permafrost Thaw on the path brings the Last Turn forward: {with} against {without}");
+}
+
+// ---------------------------------------------------------------- Ticket #56: sea level and the ice
+
+/// A Nation State this seat directs, with room and money, so a build order is legal.
+fn directed(g: &mut Game, sid: StateId) {
+    g.take_control(sid, Seat(0));
+    g.seats[0].stockpile.materials = 500;
+    g.seats[0].stockpile.energy = 500;
+    g.seats[0].stockpile.ducats = 500;
+}
+
+/// The kinds standing in a state's coastal slots, or in its inland ones, in the order they stand.
+fn standing(g: &Game, sid: StateId, coastal: bool) -> Vec<FacilityKind> {
+    g.state(sid).facilities.iter().filter(|f| f.coastal == coastal).map(|f| f.kind).collect()
+}
+
+/// Every sea-level threshold still ahead of every state.
+fn sea_ahead(g: &mut Game) {
+    let n = g.tables.climate.sea_level_thresholds.len();
+    for s in &mut g.states {
+        s.thresholds_fired = vec![false; n];
+    }
+}
+
+/// (a) Build slots are Size + Industry Level + `base_slots`, and `base_slots` is 3.
+#[test]
+fn a_every_state_has_three_more_build_slots() {
+    let g = fresh();
+    assert_eq!(g.tables.base_slots, 3, "nation_states.toml gives every state three slots on top");
+    for sid in StateId::ALL {
+        let card = g.tables.state(sid);
+        let want = card.size + g.state(sid).industry_level + 3;
+        assert_eq!(g.build_slots(sid), want, "{}: Size {} + Industry Level {} + 3", card.name, card.size, g.state(sid).industry_level);
+    }
+    // And a raise adds one more.
+    let mut g = fresh();
+    let before = g.build_slots(StateId::Europe);
+    g.state_mut(StateId::Europe).industry_level += 1;
+    assert_eq!(g.build_slots(StateId::Europe), before + 1, "a raise of the Industry Level adds a slot");
+}
+
+/// (b) Coastal slots are 3 x Coastal Exposure, capped at the start slots less one; the rest of the
+/// start slots are inland, and every slot a raise adds is inland.
+#[test]
+fn b_coastal_slots_are_three_an_exposure_capped_and_a_raise_is_inland() {
+    let mut g = fresh();
+    assert_eq!(g.tables.coastal_per_exposure, 3, "three coastal slots per point of Coastal Exposure");
+    for sid in StateId::ALL {
+        let card = g.tables.state(sid);
+        let start = card.size + card.industry_level + 3;
+        let want = (3 * card.coastal_exposure).min(start - 1);
+        assert_eq!(g.start_slots(sid), start, "{}: start slots", card.name);
+        assert_eq!(g.coastal_slots(sid), want, "{}: 3 x Exposure {} capped at {} start slots less one", card.name, card.coastal_exposure, start);
+        assert_eq!(g.inland_slots(sid), start - want, "{}: the rest of the start slots are inland", card.name);
+        assert_eq!(g.coastal_slots(sid) + g.inland_slots(sid), g.build_slots(sid), "{}: the two rows are the whole card", card.name);
+    }
+    // Central America and the Caribbean is where the cap bites: Size 1, Industry Level 1, Coastal
+    // Exposure 2 -> 1 + 3 + 1 = 5 start slots, 3 x 2 = 6 coastal wanted, capped at 4.
+    let ca = StateId::CentralAmerica;
+    assert_eq!(g.start_slots(ca), 5, "Central America starts with five slots");
+    assert_eq!(g.coastal_slots(ca), 4, "six coastal wanted, capped at the start slots less one");
+    assert_eq!(g.inland_slots(ca), 1, "and one inland");
+
+    // Every slot a raise adds is inland.
+    let coastal_before = g.coastal_slots(ca);
+    g.state_mut(ca).industry_level += 2;
+    assert_eq!(g.coastal_slots(ca), coastal_before, "a raise adds no coastal slot");
+    assert_eq!(g.inland_slots(ca), 3, "it adds inland slots");
+}
+
+/// (c) Start Facilities take coastal slots first, in the table's order; a new build fills an inland
+/// slot while one is free.
+#[test]
+fn c_start_facilities_are_coastal_first_and_a_new_build_is_inland_first() {
+    let mut g = fresh();
+    // East Asia: three start Facilities, six coastal slots, three inland.
+    let sid = StateId::EastAsia;
+    // East Asia is the player's start state, so its Launch Site is a start Facility too and takes
+    // the next coastal slot after the three on the card.
+    assert_eq!(
+        standing(&g, sid, true),
+        vec![FacilityKind::Factory, FacilityKind::PowerPlant, FacilityKind::Refinery, FacilityKind::LaunchSite],
+        "the start Facilities stand on the coast, in the table's order"
+    );
+    assert!(standing(&g, sid, false).is_empty(), "and nothing stands inland");
+
+    // A new build takes an inland slot while one is free.
+    directed(&mut g, sid);
+    let orders = vec![Order::BuildFacility { state: sid, kind: FacilityKind::Bank }];
+    g.end_turn([orders, Vec::new(), Vec::new(), Vec::new()]);
+    g.end_turn(std::array::from_fn(|_| Vec::new()));
+    assert!(standing(&g, sid, false).contains(&FacilityKind::Bank), "the Bank went inland: {:?}", standing(&g, sid, false));
+}
+
+/// (d) A threshold takes coastal slots only, destroys the oldest Facility standing in them first,
+/// and takes nothing once the coastal slots are gone.
+#[test]
+fn d_the_sea_takes_coastal_slots_only_oldest_first_and_then_nothing() {
+    let mut g = game();
+    calm(&mut g);
+    sea_ahead(&mut g);
+    for s in &mut g.states {
+        s.population = 0.0;
+    }
+    // Australia and Oceania: Size 2, Industry Level 2, Exposure 2 -> 7 slots, 6 coastal, 1 inland.
+    let sid = StateId::Australia;
+    let st = g.state_mut(sid);
+    st.control = Control::Controlled(Seat(0));
+    st.facilities = vec![
+        Facility::in_coastal_slot(FacilityKind::Factory),
+        Facility::in_coastal_slot(FacilityKind::Refinery),
+        Facility::in_coastal_slot(FacilityKind::PowerPlant),
+        Facility::new(FacilityKind::ResearchLab),
+    ];
+    assert_eq!(g.coastal_slots(sid), 6);
+    assert_eq!(g.inland_slots(sid), 1);
+
+    g.apply_sea_threshold(sid, 0);
+    assert_eq!(g.coastal_slots(sid), 4, "Exposure 2 takes two coastal slots");
+    assert_eq!(g.inland_slots(sid), 1, "and no inland slot");
+    assert_eq!(
+        standing(&g, sid, true),
+        vec![FacilityKind::Factory, FacilityKind::Refinery, FacilityKind::PowerPlant],
+        "three coastal Facilities still fit four coastal slots"
+    );
+
+    g.apply_sea_threshold(sid, 1);
+    assert_eq!(g.coastal_slots(sid), 2, "two more");
+    assert_eq!(standing(&g, sid, true), vec![FacilityKind::Refinery, FacilityKind::PowerPlant], "the oldest coastal Facility went first: the Factory");
+    g.apply_sea_threshold(sid, 2);
+    assert_eq!(g.coastal_slots(sid), 0, "the coast is gone");
+    assert!(standing(&g, sid, true).is_empty(), "and everything that stood on it with it");
+    assert_eq!(standing(&g, sid, false), vec![FacilityKind::ResearchLab], "the inland Research Lab never moved");
+    assert!(
+        g.report.lines.iter().any(|l| l.contains("The sea took 2 coastal slots from Australia and Oceania")),
+        "the Report names what the sea took: {:?}",
+        g.report.lines
+    );
+
+    // Nothing more to take.
+    let slots = g.build_slots(sid);
+    g.apply_sea_loss(sid, 2.9);
+    assert_eq!(g.build_slots(sid), slots, "once a state's coastal slots are gone it loses nothing more");
+    assert!(g.report.lines.iter().any(|l| l.contains("no coastal slots left")), "and the Report says so: {:?}", g.report.lines);
+}
+
+/// (e) The Sea Wall: it needs Coastal Engineering and a free coastal slot, one per state, and it
+/// absorbs the state's next threshold of any kind and is destroyed doing it. A mothballed one does not.
+#[test]
+fn e_the_sea_wall_needs_its_tech_and_a_coastal_slot_and_takes_one_threshold() {
+    let sid = StateId::Australia;
+    let mut g = game();
+    directed(&mut g, sid);
+    let order = Order::BuildFacility { state: sid, kind: FacilityKind::SeaWall };
+    assert!(g.check_order(Seat(0), &[], &order).is_err(), "no Coastal Engineering, no Sea Wall");
+    g.research.done.push(TechId::CoastalEngineering);
+    assert!(g.check_order(Seat(0), &[], &order).is_ok(), "with the Tech in, it is legal");
+
+    // One per state.
+    g.state_mut(sid).facilities.push(Facility::in_coastal_slot(FacilityKind::SeaWall));
+    assert!(g.check_order(Seat(0), &[], &order).is_err(), "at most one Sea Wall stands in a state");
+
+    // No free coastal slot: illegal even in a state with inland room.
+    let mut g2 = game();
+    let s2 = StateId::CentralAmerica;
+    directed(&mut g2, s2);
+    g2.research.done.push(TechId::CoastalEngineering);
+    for _ in 0..g2.coastal_slots(s2) {
+        g2.state_mut(s2).facilities.push(Facility::in_coastal_slot(FacilityKind::Factory));
+    }
+    assert!(g2.free_inland(s2) > 0, "there is inland room");
+    assert!(
+        g2.check_order(Seat(0), &[], &Order::BuildFacility { state: s2, kind: FacilityKind::SeaWall }).is_err(),
+        "but a Sea Wall wants a coastal slot"
+    );
+
+    // It absorbs a scheduled threshold and is destroyed doing it.
+    let mut g = game();
+    calm(&mut g);
+    sea_ahead(&mut g);
+    for s in &mut g.states {
+        s.population = 0.0;
+    }
+    g.state_mut(sid).facilities = vec![Facility::in_coastal_slot(FacilityKind::SeaWall)];
+    let before = g.coastal_slots(sid);
+    g.apply_sea_threshold(sid, 0);
+    assert_eq!(g.coastal_slots(sid), before, "the wall took the sea: no coastal slot lost");
+    assert!(!g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::SeaWall), "and it was destroyed doing it");
+    assert!(g.report.lines.iter().any(|l| l.contains("Sea Wall") && l.contains("destroyed")), "the Report says so: {:?}", g.report.lines);
+    // The next one lands as normal.
+    g.apply_sea_threshold(sid, 1);
+    assert_eq!(g.coastal_slots(sid), before - 2, "the wall absorbed one threshold, not two");
+
+    // The Ice Sheets Break is a threshold of a kind too.
+    let mut g = game();
+    calm(&mut g);
+    breaks_ahead(&mut g);
+    bare_world(&mut g);
+    g.state_mut(sid).facilities = vec![Facility::in_coastal_slot(FacilityKind::SeaWall)];
+    let before = g.coastal_slots(sid);
+    hold_temperature(&mut g, 2.25);
+    g.climate_phase();
+    assert_eq!(g.coastal_slots(sid), before, "the wall took the Ice Sheets Break");
+    assert!(!g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::SeaWall), "and went with it");
+
+    // A mothballed wall absorbs nothing.
+    let mut g = game();
+    calm(&mut g);
+    sea_ahead(&mut g);
+    for s in &mut g.states {
+        s.population = 0.0;
+    }
+    let mut wall = Facility::in_coastal_slot(FacilityKind::SeaWall);
+    wall.mothballed = true;
+    wall.online = false;
+    g.state_mut(sid).facilities = vec![wall];
+    let before = g.coastal_slots(sid);
+    g.apply_sea_threshold(sid, 0);
+    assert_eq!(g.coastal_slots(sid), before - 2, "a mothballed Sea Wall absorbs nothing");
+}
+
+/// (f) Coastal Engineering is Industry rung 2, needs Efficient Grids, and the tree holds thirteen.
+#[test]
+fn f_coastal_engineering_is_the_thirteenth_tech() {
+    let g = fresh();
+    assert_eq!(TechId::ALL.len(), 13, "thirteen Techs");
+    assert_eq!(g.tables.techs.len(), 13, "and thirteen rows in techs.toml");
+    let c = g.tables.tech(TechId::CoastalEngineering);
+    assert_eq!(c.name, "Coastal Engineering");
+    assert_eq!(c.branch, "Industry");
+    assert_eq!(c.rung, 2, "rung 2, beside Clean Power");
+    assert_eq!(c.cost, 25);
+    assert_eq!(c.needs, vec![TechId::EfficientGrids], "it needs Efficient Grids");
+    assert!(c.effect.contains("Sea Wall"), "its effect names the Sea Wall: {}", c.effect);
+    // Two boxes on Industry rung 2.
+    let rung_two: Vec<&str> = TechId::ALL
+        .into_iter()
+        .map(|t| g.tables.tech(t))
+        .filter(|t| t.branch == "Industry" && t.rung == 2)
+        .map(|t| t.name.as_str())
+        .collect();
+    assert_eq!(rung_two, vec!["Clean Power", "Coastal Engineering"], "two boxes on Industry rung 2");
+    // The Sea Wall's card names it as its unlock, and there are ten Facilities.
+    assert_eq!(g.tables.facility(FacilityKind::SeaWall).needs_tech, Some(TechId::CoastalEngineering));
+    assert_eq!(FacilityKind::ALL.len(), 10, "ten Facilities");
+}
+
+/// (g) Antarctica opens the first Climate phase the Temperature stands at +1.6, stays open, and its
+/// yields are the card's.
+#[test]
+fn g_antarctica_opens_at_one_point_six_and_stays_open() {
+    let mut g = game();
+    calm(&mut g);
+    let opens = g.tables.climate.antarctica_opens_at;
+    assert!((opens - 1.6).abs() < 1e-9, "+1.6 C: {opens}");
+    assert!(!g.antarctica_open, "the ice is shut when the game opens");
+
+    // A Colony Ship at Earth cannot found there yet.
+    let id = ShipId(g.fresh_id());
+    let turn = g.turn;
+    g.ships.push(Ship {
+        id,
+        kind: UnitKind::ColonyShip,
+        seat: Seat(0),
+        damage: 0,
+        at: ShipAt::Body(BodyId::Earth),
+        colonists: 4,
+        army: None,
+        stance: Stance::Hold,
+        escaped: false,
+        arrived_this_turn: false,
+        built_turn: turn,
+    });
+    let found = Order::Unload { ship: id, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Earth, 0) };
+    let refused = g.check_order(Seat(0), &[], &found).unwrap_err();
+    assert!(format!("{refused}").contains("+1.6"), "the refusal says when it opens: {refused}");
+
+    // Below the line, a Climate phase leaves it shut.
+    hold_temperature(&mut g, 1.55);
+    g.climate_phase();
+    assert!(!g.antarctica_open, "still shut at +1.55");
+    // At the line it opens, and says so.
+    hold_temperature(&mut g, 1.6);
+    g.climate_phase();
+    assert!(g.antarctica_open, "open at +1.6");
+    assert!(g.report.lines.iter().any(|l| l.contains("The Antarctic ice opens")), "the Report says so: {:?}", g.report.lines);
+    assert!(g.check_order(Seat(0), &[], &found).is_ok(), "and the Colony Ship may found there");
+    // It stays open when the world cools.
+    hold_temperature(&mut g, 1.2);
+    g.climate_phase();
+    assert!(g.antarctica_open, "once open it stays open");
+
+    // The yields on the card.
+    let e = g.tables.body(BodyId::Earth);
+    assert!((e.mine_yield - 1.75).abs() < 1e-9, "Mine 1.75: {}", e.mine_yield);
+    assert!((e.refinery_yield - 2.0).abs() < 1e-9, "Refinery 2.0: {}", e.refinery_yield);
+    assert!((e.generator_yield - 0.75).abs() < 1e-9, "Generator 0.75: {}", e.generator_yield);
+    assert!((e.habitat_yield - 1.0).abs() < 1e-9, "Habitat 1.0: {}", e.habitat_yield);
+}
+
+/// (h) The AI enumerates a Sea Wall once Coastal Engineering is in and a threshold is near.
+#[test]
+fn h_the_ai_raises_a_sea_wall_when_the_sea_is_close() {
+    let sid = StateId::Australia;
+    let mut g = game();
+    calm(&mut g);
+    sea_ahead(&mut g);
+    directed(&mut g, sid);
+    g.research.done.push(TechId::CoastalEngineering);
+    // The first threshold is +1.8; stand within 0.2 C of it.
+    hold_temperature(&mut g, 1.65);
+    let orders = g.ai_orders(Seat(0));
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::BuildFacility { state, kind: FacilityKind::SeaWall } if *state == sid)),
+        "the AI walls the coast with the sea 0.15 C away: {orders:?}"
+    );
+
+    // Without the Tech it enumerates none, however close the sea.
+    let mut g = game();
+    calm(&mut g);
+    sea_ahead(&mut g);
+    directed(&mut g, sid);
+    hold_temperature(&mut g, 1.65);
+    let orders = g.ai_orders(Seat(0));
+    assert!(
+        !orders.iter().any(|o| matches!(o, Order::BuildFacility { kind: FacilityKind::SeaWall, .. })),
+        "no Coastal Engineering, no Sea Wall: {orders:?}"
+    );
 }

@@ -109,11 +109,18 @@ pub struct Facility {
     pub mothballed: bool,
     /// Ticket #54: a Mothball, Restart or Decommission ordered and not yet landed.
     pub change: Option<PendingChange>,
+    /// Ticket #56: whether this Facility stands in one of its state's coastal slots. The sea takes
+    /// coastal slots only, so a coastal Facility is the one it can destroy.
+    pub coastal: bool,
 }
 
 impl Facility {
     pub fn new(kind: FacilityKind) -> Facility {
-        Facility { kind, online: true, offline_until_resolution: false, self_run: false, mothballed: false, change: None }
+        Facility { kind, online: true, offline_until_resolution: false, self_run: false, mothballed: false, change: None, coastal: false }
+    }
+    /// Ticket #56: a Facility standing in a coastal slot.
+    pub fn in_coastal_slot(kind: FacilityKind) -> Facility {
+        Facility { coastal: true, ..Facility::new(kind) }
     }
     /// Ticket #54: standing, running and not mothballed - what every "while it is online" rule means.
     pub fn working(&self) -> bool {
@@ -169,6 +176,9 @@ pub struct Build {
     pub item: BuildItem,
     pub seat: Seat,
     pub due_turn: u32,
+    /// Ticket #56: the slot a Facility build in a Nation State reserved, coastal or inland. False
+    /// for everything else, which has no slot of this kind to reserve.
+    pub coastal: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -179,7 +189,11 @@ pub struct NationState {
     pub control: Control,
     pub facilities: Vec<Facility>,
     pub queue: Vec<Build>,
+    /// Ticket #56: COASTAL slots the sea has taken, for good. The sea takes nothing else.
     pub lost_slots: u32,
+    /// Ticket #56: what stood in those slots when the sea took them, oldest first, so the state
+    /// card can say what a lost slot cost.
+    pub drowned: Vec<FacilityKind>,
     /// Sea-level thresholds already applied to this state, by index into the table.
     pub thresholds_fired: Vec<bool>,
     /// Extra Emissions charged next Climate phase by a Wildfire.
@@ -539,6 +553,10 @@ pub struct Game {
     pub next_id: u32,
     /// Orders committed at End Turn that act later in Resolution.
     pub pending: crate::orders::Pending,
+    /// Ticket #56: Antarctica's three Colony Slots on Earth are shut under the ice until the
+    /// Temperature has stood at or above `antarctica_opens_at` in a Climate phase. Once open they
+    /// stay open, however far the Temperature comes back down.
+    pub antarctica_open: bool,
     /// Lines for the simulate log and the dev diary; the interface ignores them.
     pub log: Vec<String>,
 }
@@ -589,9 +607,27 @@ impl Game {
                 population: c.population,
                 industry_level: c.industry_level,
                 control: Control::Neutral,
-                facilities: c.start_facilities.iter().copied().map(Facility::new).collect(),
+                // Ticket #56: the start Facilities take coastal slots first, in the table's order.
+                facilities: {
+                    let start_slots = c.size + c.industry_level + tables.base_slots;
+                    let coastal = (tables.coastal_per_exposure * c.coastal_exposure).min(start_slots.saturating_sub(1));
+                    let mut on_the_coast = 0;
+                    c.start_facilities
+                        .iter()
+                        .copied()
+                        .map(|k| {
+                            if on_the_coast < coastal {
+                                on_the_coast += 1;
+                                Facility::in_coastal_slot(k)
+                            } else {
+                                Facility::new(k)
+                            }
+                        })
+                        .collect()
+                },
                 queue: Vec::new(),
                 lost_slots: 0,
+                drowned: Vec::new(),
                 thresholds_fired: vec![false; tables.climate.sea_level_thresholds.len()],
                 wildfire_emissions_next: 0.0,
                 unrest: c.unrest,
@@ -654,6 +690,7 @@ impl Game {
             outcome: None,
             next_id: 1,
             pending: crate::orders::Pending::default(),
+            antarctica_open: false,
             log: Vec::new(),
             tables,
         };
@@ -677,8 +714,7 @@ impl Game {
         }
         for (sid, seat) in taken.iter().zip(Seat::ALL) {
             game.take_control(*sid, seat);
-            let st = game.state_mut(*sid);
-            st.facilities.push(Facility::new(FacilityKind::LaunchSite));
+            game.add_start_facility(*sid, FacilityKind::LaunchSite);
         }
         let places: Vec<String> = Seat::ALL
             .into_iter()
@@ -1019,10 +1055,90 @@ impl Game {
         self.colonies.iter().filter(|c| c.control.director() == Some(seat)).map(|c| c.id).collect()
     }
 
-    /// Build slots a Nation State has now (spec 4.2, 11.4).
+    /// Build slots a Nation State has now (spec 4.2, 11.4, ticket #56): Size + Industry Level +
+    /// `base_slots`, less the coastal slots the sea has taken. They come in two rows, coastal and
+    /// inland, and the sea takes only from the first.
     pub fn build_slots(&self, s: StateId) -> u32 {
+        self.coastal_slots(s) + self.inland_slots(s)
+    }
+
+    /// Ticket #56: the slots a state begins the game with: Size + `base_slots` + the Industry Level
+    /// on its card. Every slot beyond these came from a raise, and every raise adds an inland slot.
+    pub fn start_slots(&self, s: StateId) -> u32 {
+        let card = self.tables.state(s);
+        card.size + card.industry_level + self.tables.base_slots
+    }
+
+    /// Ticket #56: the coastal slots the state began with, before the sea took any:
+    /// `coastal_per_exposure` x Coastal Exposure, never more than the start slots less one.
+    pub fn coastal_slots_start(&self, s: StateId) -> u32 {
+        let exposure = self.tables.state(s).coastal_exposure;
+        (self.tables.coastal_per_exposure * exposure).min(self.start_slots(s).saturating_sub(1))
+    }
+
+    /// Ticket #56: the coastal slots it has left, once the sea has had its thresholds.
+    pub fn coastal_slots(&self, s: StateId) -> u32 {
+        self.coastal_slots_start(s).saturating_sub(self.state(s).lost_slots)
+    }
+
+    /// Ticket #56: its inland slots, which the sea never touches and a raise always adds to.
+    pub fn inland_slots(&self, s: StateId) -> u32 {
+        let raised = self.state(s).industry_level.saturating_sub(self.tables.state(s).industry_level);
+        self.start_slots(s) - self.coastal_slots_start(s) + raised
+    }
+
+    /// Ticket #56: coastal slots with something standing or building in them.
+    pub fn coastal_used(&self, s: StateId) -> u32 {
+        self.slots_used_in(s, true)
+    }
+
+    /// Ticket #56: inland slots with something standing or building in them.
+    pub fn inland_used(&self, s: StateId) -> u32 {
+        self.slots_used_in(s, false)
+    }
+
+    fn slots_used_in(&self, s: StateId, coastal: bool) -> u32 {
         let st = self.state(s);
-        (self.tables.state(s).size + st.industry_level).saturating_sub(st.lost_slots)
+        st.facilities.iter().filter(|f| self.takes_slot(f.kind) && f.coastal == coastal).count() as u32
+            + st.queue.iter().filter(|b| b.coastal == coastal && matches!(b.item, BuildItem::Facility(k) if self.takes_slot(k))).count() as u32
+    }
+
+    /// Ticket #56: which row the next Facility of this kind would stand in, or None when it does not
+    /// fit at all. A Sea Wall always wants a coastal slot; anything else fills an inland slot while
+    /// one is free and takes a coastal one otherwise. `taken_coastal` and `taken_inland` are slots
+    /// already spoken for by orders in the same turn that have not been committed yet.
+    pub fn next_slot_is_coastal(&self, s: StateId, kind: FacilityKind, taken_coastal: u32, taken_inland: u32) -> Option<bool> {
+        if !self.takes_slot(kind) {
+            return Some(false);
+        }
+        let free_coastal = self.free_coastal(s).saturating_sub(taken_coastal);
+        let free_inland = self.free_inland(s).saturating_sub(taken_inland);
+        if self.tables.facility(kind).coastal_only {
+            return if free_coastal > 0 { Some(true) } else { None };
+        }
+        if free_inland > 0 {
+            Some(false)
+        } else if free_coastal > 0 {
+            Some(true)
+        } else {
+            None
+        }
+    }
+
+    /// Ticket #56: a Facility that stands from the start, or arrives without an order (a Faction's
+    /// Launch Site). It takes a coastal slot first, as the start Facilities do.
+    pub fn add_start_facility(&mut self, s: StateId, kind: FacilityKind) {
+        let coastal = self.takes_slot(kind) && self.free_coastal(s) > 0;
+        let f = if coastal { Facility::in_coastal_slot(kind) } else { Facility::new(kind) };
+        self.state_mut(s).facilities.push(f);
+    }
+
+    pub fn free_coastal(&self, s: StateId) -> u32 {
+        self.coastal_slots(s).saturating_sub(self.coastal_used(s))
+    }
+
+    pub fn free_inland(&self, s: StateId) -> u32 {
+        self.inland_slots(s).saturating_sub(self.inland_used(s))
     }
 
     /// Ticket #54: a Scrubber takes no build slot, so neither the standing ones nor the ones on
