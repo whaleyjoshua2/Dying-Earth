@@ -10,10 +10,13 @@ pub enum BodyId {
     Earth,
     Moon,
     Mars,
+    /// Version 0.04 (ticket #45): the moons of Mars.
+    Phobos,
+    Deimos,
 }
 
 impl BodyId {
-    pub const ALL: [BodyId; 3] = [BodyId::Earth, BodyId::Moon, BodyId::Mars];
+    pub const ALL: [BodyId; 5] = [BodyId::Earth, BodyId::Moon, BodyId::Mars, BodyId::Phobos, BodyId::Deimos];
     pub fn index(self) -> usize {
         self as usize
     }
@@ -22,6 +25,8 @@ impl BodyId {
             BodyId::Earth => "Earth",
             BodyId::Moon => "the Moon",
             BodyId::Mars => "Mars",
+            BodyId::Phobos => "Phobos",
+            BodyId::Deimos => "Deimos",
         }
     }
 }

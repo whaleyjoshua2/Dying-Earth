@@ -161,7 +161,7 @@ impl Game {
     /// The Body whose yields best serve the part the AI is furthest behind on (spec 16.4).
     fn best_body_for(&self, seat: Seat, behind: Behind) -> BodyId {
         let t = &self.tables;
-        let mut bodies: Vec<BodyId> = [BodyId::Moon, BodyId::Mars].into_iter().filter(|b| !self.free_slots_on(*b).is_empty()).collect();
+        let mut bodies: Vec<BodyId> = BodyId::ALL.into_iter().filter(|b| *b != BodyId::Earth && !self.free_slots_on(*b).is_empty()).collect();
         if bodies.is_empty() {
             return BodyId::Moon;
         }
@@ -581,14 +581,14 @@ impl Game {
                     let free = self.free_slots_on(body);
                     if let Some(slot) = free.first() {
                         let opp = if free.len() == 1 || presence_needed <= s.colonists { m.opportunity } else { 1.0 };
-                        push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, *slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony), gap_for(Cat::FoundColony, None), 1.0, 1.0, opp, format!("found a Colony in slot {} on {}", slot + 1, self.tables.body(body).name), None);
+                        push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, *slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony), gap_for(Cat::FoundColony, None), 1.0, 1.0, opp, format!("found a Colony at {} on {}", self.tables.body(body).slots[*slot as usize].name, self.tables.body(body).name), None);
                     }
                 }
                 // Ticket #44: Antarctica, Earth's slots. A foothold, not Presence: half weight and no gap,
                 // so it is taken when the Ship cannot go anywhere better.
                 if s.colonists > 0 && body == BodyId::Earth {
                     if let Some(slot) = self.free_slots_on(BodyId::Earth).first() {
-                        push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, *slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, 1.0, format!("found a Colony in Antarctica, slot {}", slot + 1), None);
+                        push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, *slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, 1.0, format!("found a Colony at {}", self.tables.body(BodyId::Earth).slots[*slot as usize].name), None);
                     }
                     for c in self.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(seat)) {
                         let room = self.habitat_room(c).saturating_sub(c.colonists);

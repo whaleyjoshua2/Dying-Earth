@@ -36,6 +36,9 @@ pub struct Textures {
     pub earth: Rgba,
     pub moon: Rgba,
     pub mars: Rgba,
+    /// Ticket #45: the moons of Mars, USGS and Stooke maps on spheres (`examples/prep_moons.rs`).
+    pub phobos: Rgba,
+    pub deimos: Rgba,
     /// 0 = water, 1..7 = Nation State index + 1 (see `examples/prep_assets.rs`).
     pub mask: Vec<u8>,
 }
@@ -63,7 +66,9 @@ impl Textures {
         if mask_img.dimensions() != (earth.w, earth.h) {
             return Err("earth_states.png must match earth.png in size".into());
         }
-        Ok(Textures { earth, moon, mars, mask: mask_img.into_raw() })
+        let phobos = Rgba::load(&dir.join("phobos.png"))?;
+        let deimos = Rgba::load(&dir.join("deimos.png"))?;
+        Ok(Textures { earth, moon, mars, phobos, deimos, mask: mask_img.into_raw() })
     }
 
     pub fn state_at(&self, x: u32, y: u32) -> Option<StateId> {

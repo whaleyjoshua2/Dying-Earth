@@ -60,6 +60,8 @@ pub fn setup_scene(
     let earth_material = textured(&mut images, &mut materials, &textures.earth);
     let moon_material = textured(&mut images, &mut materials, &textures.moon);
     let mars_material = textured(&mut images, &mut materials, &textures.mars);
+    let phobos_material = textured(&mut images, &mut materials, &textures.phobos);
+    let deimos_material = textured(&mut images, &mut materials, &textures.deimos);
     let colours = session.colours();
     let mut flat = |c: [f32; 3], unlit: bool| {
         materials.add(StandardMaterial { base_color: Color::srgb(c[0], c[1], c[2]), unlit, double_sided: true, cull_mode: None, ..default() })
@@ -87,6 +89,8 @@ pub fn setup_scene(
                     BodyId::Earth => earth_material.clone(),
                     BodyId::Moon => moon_material.clone(),
                     BodyId::Mars => mars_material.clone(),
+                    BodyId::Phobos => phobos_material.clone(),
+                    BodyId::Deimos => deimos_material.clone(),
                 };
                 p.spawn((
                     Mesh3d(sphere.clone()),
@@ -97,7 +101,7 @@ pub fn setup_scene(
                 // Orbital Control ring.
                 p.spawn((Mesh3d(ring.clone()), MeshMaterial3d(grey.clone()), Transform::from_scale(Vec3::splat(geo::solar_radius(body) * 1.6)).with_rotation(flat_ring.rotation), Visibility::Hidden, ControlRing(body)));
                 // Colony Slot dots in a ring around the body.
-                let n = session.tables.body(body).colony_slots;
+                let n = session.tables.body(body).colony_slots();
                 for slot in 0..n {
                     p.spawn((Mesh3d(small_sphere.clone()), MeshMaterial3d(grey.clone()), Transform::from_scale(Vec3::splat(0.05)), SlotMarker { body, slot, on_surface: false }));
                 }
@@ -115,15 +119,17 @@ pub fn setup_scene(
             BodyId::Earth => earth_material.clone(),
             BodyId::Moon => moon_material.clone(),
             BodyId::Mars => mars_material.clone(),
+            BodyId::Phobos => phobos_material.clone(),
+            BodyId::Deimos => deimos_material.clone(),
         };
         commands
             .spawn((Transform::default(), Visibility::Hidden, SurfaceRoot(body)))
             .with_children(|p| {
                 p.spawn((Mesh3d(sphere.clone()), MeshMaterial3d(mat), Transform::from_scale(Vec3::splat(GLOBE_RADIUS)).with_rotation(geo::upright()), Globe(body)))
                     .with_children(|g| {
-                        let n = session.tables.body(body).colony_slots;
+                        let n = session.tables.body(body).colony_slots();
                         for slot in 0..n {
-                            let (lon, lat) = geo::slot_lonlat(body, slot);
+                            let (lon, lat) = geo::slot_lonlat(session.tables.body(body), slot);
                             let pos = geo::local_from_lonlat(lon, lat) * 1.02;
                             g.spawn((Mesh3d(small_sphere.clone()), MeshMaterial3d(grey.clone()), Transform::from_translation(pos).with_scale(Vec3::splat(0.045)), SlotMarker { body, slot, on_surface: true }));
                         }
@@ -203,7 +209,7 @@ pub fn sync_scene(
             mat.0 = want;
         }
         if !m.on_surface {
-            let n = game.tables.body(m.body).colony_slots.max(1) as f32;
+            let n = game.tables.body(m.body).colony_slots().max(1) as f32;
             let a = m.slot as f32 / n * std::f32::consts::TAU;
             let r = geo::solar_radius(m.body) * 1.35;
             t.translation = geo::solar_position(m.body, turn) + Vec3::new(a.cos() * r, 0.0, a.sin() * r);

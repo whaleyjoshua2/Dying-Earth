@@ -561,7 +561,8 @@ impl Game {
         match p {
             Place::State(s) => self.tables.state(s).name.clone(),
             Place::Colony(c) => match self.colony(c) {
-                Some(col) => format!("Colony {} on {}", col.slot + 1, self.tables.body(col.body).name),
+                // Ticket #45: a Colony is named for its slot, a real place on its Body.
+                Some(col) => format!("{} on {}", self.tables.body(col.body).slots[col.slot as usize].name, self.tables.body(col.body).name),
                 None => format!("{c}"),
             },
         }
@@ -760,7 +761,7 @@ impl Game {
     }
 
     pub fn free_slots_on(&self, body: BodyId) -> Vec<u32> {
-        let total = self.tables.body(body).colony_slots;
+        let total = self.tables.body(body).colony_slots();
         (0..total).filter(|i| !self.colonies.iter().any(|c| c.body == body && c.slot == *i)).collect()
     }
 
@@ -793,18 +794,29 @@ impl Game {
         }
     }
 
+    /// Ticket #45: a satellite and its parent are a local hop apart; two satellites of one parent a
+    /// sibling hop; Earth and the Moon reach anything else at that Body's card figures; anything else
+    /// (a moon of Mars to the Moon, say) is the farther card.
     pub fn transit_cost(&self, from: BodyId, to: BodyId) -> (u32, i64) {
-        let card = if from == BodyId::Earth || to == BodyId::Earth {
-            self.tables.body(if from == BodyId::Earth { to } else { from })
+        let t = &self.tables;
+        let parent = |b: BodyId| t.body(b).parent;
+        let near_earth = |b: BodyId| b == BodyId::Earth || parent(b) == Some(BodyId::Earth);
+        let far = |b: BodyId| (t.body(b).transit_turns, t.body(b).transit_fuel);
+        let (turns, fuel) = if parent(from) == Some(to) {
+            (t.body(from).local_turns, t.body(from).local_fuel)
+        } else if parent(to) == Some(from) {
+            (t.body(to).local_turns, t.body(to).local_fuel)
+        } else if parent(from).is_some() && parent(from) == parent(to) && !near_earth(from) {
+            t.sibling_transit
+        } else if near_earth(from) {
+            far(to)
+        } else if near_earth(to) || far(from).0 >= far(to).0 {
+            far(from)
         } else {
-            self.tables.body(BodyId::Mars)
+            far(to)
         };
-        let fuel = if self.has_tech(TechId::EfficientTransit) {
-            (card.transit_fuel as f64 * self.tables.tech(TechId::EfficientTransit).value).floor() as i64
-        } else {
-            card.transit_fuel
-        };
-        (card.transit_turns.max(1), fuel)
+        let fuel = if self.has_tech(TechId::EfficientTransit) { (fuel as f64 * t.tech(TechId::EfficientTransit).value).floor() as i64 } else { fuel };
+        (turns.max(1), fuel)
     }
 
     pub fn industry_cost(&self, seat: Seat) -> i64 {

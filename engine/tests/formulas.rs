@@ -440,13 +440,65 @@ fn ducats_pay_for_restoration_and_repairs_at_the_table_rates() {
     assert!(g.check_order(Seat(0), &[], &Order::RepairWithDucats { unit: UnitRef::Ship(ShipId(1)), points: 1 }).is_err(), "nothing to repair");
 }
 
+// ---------------------------------------------------------------- #45 Phobos and Deimos
+
+#[test]
+fn phobos_and_deimos_are_small_different_bodies_one_hop_past_mars() {
+    let g = game();
+    assert_eq!(BodyId::ALL.len(), 5);
+    let ph = g.tables.body(BodyId::Phobos).clone();
+    let de = g.tables.body(BodyId::Deimos).clone();
+    assert_eq!(ph.name, "Phobos");
+    assert_eq!(de.name, "Deimos");
+    assert_eq!((ph.colony_slots(), de.colony_slots()), (2, 1));
+    assert_eq!((ph.mine_yield, ph.generator_yield, ph.refinery_yield, ph.habitat_yield), (1.75, 0.75, 0.5, 0.5));
+    assert_eq!((de.mine_yield, de.generator_yield, de.refinery_yield, de.habitat_yield), (1.0, 1.0, 0.25, 0.5));
+    // Reach: five turns and 24 Fuel from Earth (and from the Moon, which counts as Earth), one turn
+    // and 2 Fuel from Mars, one turn and 1 Fuel between the two moons; Earth to Mars stays 4 and 20.
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Phobos), (5, 24));
+    assert_eq!(g.transit_cost(BodyId::Deimos, BodyId::Earth), (5, 24));
+    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Deimos), (5, 24));
+    assert_eq!(g.transit_cost(BodyId::Mars, BodyId::Phobos), (1, 2));
+    assert_eq!(g.transit_cost(BodyId::Deimos, BodyId::Mars), (1, 2));
+    assert_eq!(g.transit_cost(BodyId::Phobos, BodyId::Deimos), (1, 1));
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars), (4, 20));
+    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Mars), (4, 20));
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Moon), (1, 6));
+    // Their Colonists are off Earth.
+    let mut g = g;
+    colony(&mut g, Seat(0), BodyId::Phobos, &[ModuleKind::Habitat], 4);
+    assert_eq!(g.off_world_colonists(Seat(0)), 4);
+}
+
+#[test]
+fn every_colony_slot_is_a_named_place_on_its_body() {
+    let g = game();
+    for b in BodyId::ALL {
+        let card = g.tables.body(b);
+        assert_eq!(card.slots.len() as u32, card.colony_slots(), "{}", card.name);
+        for sl in &card.slots {
+            assert!(!sl.name.is_empty(), "{}: a slot without a name", card.name);
+            assert!((-180.0..=180.0).contains(&sl.lon) && (-90.0..=90.0).contains(&sl.lat), "{}: {} off the globe", card.name, sl.name);
+        }
+    }
+    assert_eq!(g.tables.body(BodyId::Moon).slots[0].name, "Mare Tranquillitatis");
+    assert_eq!(g.tables.body(BodyId::Mars).slots[0].name, "Olympus Mons");
+    assert_eq!(g.tables.body(BodyId::Earth).slots[0].name, "Antarctic Peninsula");
+    assert_eq!(g.tables.body(BodyId::Phobos).slots[0].name, "Stickney");
+    assert_eq!(g.tables.body(BodyId::Deimos).slots[0].name, "Swift");
+    // A Colony is named for its slot.
+    let mut g = g;
+    let c = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    assert_eq!(g.place_name(Place::Colony(c)), "Olympus Mons on Mars");
+}
+
 // ---------------------------------------------------------------- #44 Antarctica
 
 #[test]
 fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_whose_modules_emit() {
     let mut g = game();
     let earth = g.tables.body(BodyId::Earth).clone();
-    assert_eq!(earth.colony_slots, 3, "three Colony Slots on Earth, in Antarctica");
+    assert_eq!(earth.colony_slots(), 3, "three Colony Slots on Earth, in Antarctica");
     assert_eq!((earth.mine_yield, earth.generator_yield, earth.refinery_yield, earth.habitat_yield), (1.0, 0.75, 1.5, 0.75));
     assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3);
     assert_eq!(StateId::ALL.len(), 8, "Antarctica is no longer a Nation State");

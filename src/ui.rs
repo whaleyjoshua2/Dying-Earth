@@ -424,7 +424,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                 let pos = geo::solar_position(body, game.turn);
                 if let Some(p) = project(pos + Vec3::Y * (geo::solar_radius(body) + 0.05)) {
                     let name = game.tables.body(body).name.clone();
-                    let slots = game.tables.body(body).colony_slots;
+                    let slots = game.tables.body(body).colony_slots();
                     let filled = game.colonies.iter().filter(|c| c.body == body).count();
                     let text = if slots > 0 { format!("{name}  {filled}/{slots} slots") } else { name };
                     label_at(painter, p - egui::vec2(0.0, 22.0), &text, Color32::WHITE, 13.0);
@@ -535,8 +535,9 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
 #[allow(clippy::too_many_arguments)]
 /// Colony Slot labels on a Body's surface: Antarctica's on Earth since ticket #44.
 fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: BodyId, visible: &dyn Fn(Vec3) -> Option<Pos2>, hotspots: &mut Vec<Hotspot>) {
-            for slot in 0..game.tables.body(body).colony_slots {
-                let (lon, lat) = geo::slot_lonlat(body, slot);
+            for slot in 0..game.tables.body(body).colony_slots() {
+                let (lon, lat) = geo::slot_lonlat(game.tables.body(body), slot);
+        let name = &game.tables.body(body).slots[slot as usize].name;
                 let Some(p) = visible(geo::local_from_lonlat(lon, lat) * 1.03) else { continue };
                 let (text, colour, hit) = match game.colony_at(body, slot) {
                     Some(c) => {
@@ -544,12 +545,12 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                         let army = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(c.id))).count();
                         let owner = c.control.director().map(|s| game.seat_name(s)).unwrap_or_default();
                         (
-                            format!("Slot {}: {}\n{} Colonists\n{}{}", slot + 1, owner, c.colonists, mods.join(", "), if army > 0 { format!("\nArmies: {army}") } else { String::new() }),
+                            format!("{}: {}\n{} Colonists\n{}{}", name, owner, c.colonists, mods.join(", "), if army > 0 { format!("\nArmies: {army}") } else { String::new() }),
                             c.control.director().map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY),
                             Hit::Select(Selection::Colony(c.id)),
                         )
                     }
-                    None => (format!("Slot {}: empty", slot + 1), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot))),
+                    None => (format!("{name}: empty"), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot))),
                 };
                 label_at(painter, p + egui::vec2(0.0, 24.0), &text, colour, 12.0);
                 hotspots.push(Hotspot { pos: p, radius: 22.0, hit });
@@ -559,8 +560,8 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
 /// The Colony Slot within fourteen degrees of a point on a Body, nearest first.
 fn nearest_slot(game: &Game, body: BodyId, lon: f32, lat: f32) -> Option<u32> {
     let mut best: Option<(f32, u32)> = None;
-    for slot in 0..game.tables.body(body).colony_slots {
-        let (slon, slat) = geo::slot_lonlat(body, slot);
+    for slot in 0..game.tables.body(body).colony_slots() {
+        let (slon, slat) = geo::slot_lonlat(game.tables.body(body), slot);
         let d = geo::local_from_lonlat(slon, slat).angle_between(geo::local_from_lonlat(lon, lat)).to_degrees();
         if d < 14.0 && best.map(|(bd, _)| d < bd).unwrap_or(true) {
             best = Some((d, slot));
@@ -658,7 +659,7 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                     ui.label(RichText::new(match view.view {
                         View::Solar => "Solar System Map",
                         View::Surface(BodyId::Earth) => "Earth Map",
-                        View::Surface(b) => if b == BodyId::Moon { "The Moon" } else { "Mars" },
+                        View::Surface(b) => game.tables.body(b).name.as_str(),
                     }).size(20.0).strong());
                     ui.label(match view.view {
                         View::Solar => "Click a Body to enter its surface. Click a Ship stack for orders.",
@@ -827,7 +828,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::MoveArmy { army, to } => format!("{} to {}", army, game.tables.state(*to).name),
         Order::Load { ship, colonists, army, .. } => format!("Load {} onto {}", if *colonists > 0 { format!("{colonists} Colonists") } else { format!("{}", army.unwrap_or(ArmyId(0))) }, ship),
         Order::Unload { ship, colonists, army, into } => match into {
-            UnloadTarget::Slot(b, s) => format!("Found a Colony in slot {} on {} from {}", s + 1, game.tables.body(*b).name, ship),
+            UnloadTarget::Slot(b, s) => format!("Found a Colony at {} on {} from {}", game.tables.body(*b).slots[*s as usize].name, game.tables.body(*b).name, ship),
             UnloadTarget::Colony(c) => format!("Unload {} from {} into {}", if *colonists > 0 { format!("{colonists} Colonists") } else if *army { "the Army".into() } else { "nothing".into() }, ship, game.place_name(Place::Colony(*c))),
         },
         Order::Influence { target, amount } => format!("{} Influence on {}", amount, game.place_name(*target)),
@@ -1090,7 +1091,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
 }
 
 fn slot_panel(ui: &mut Ui, game: &Game, body: BodyId, slot: u32, actions: &mut Vec<Action>) {
-    ui.label(RichText::new(format!("Colony Slot {} on {}", slot + 1, game.tables.body(body).name)).size(22.0).strong());
+    ui.label(RichText::new(format!("{}, Colony Slot {} on {}", game.tables.body(body).slots[slot as usize].name, slot + 1, game.tables.body(body).name)).size(22.0).strong());
     ui.label("Empty. A Colony Ship carrying Colonists founds a Colony here; a Habitat comes with it.");
     let card = game.tables.body(body);
     ui.label(format!("Yields here: Mine x{}, Generator x{}, Refinery x{}, Habitat x{}", card.mine_yield, card.generator_yield, card.refinery_yield, card.habitat_yield));
@@ -1185,7 +1186,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 _ => {
                     for c in game.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(Seat(0)) && c.colonists > 0) {
                         let k = n.min(c.colonists);
-                        cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: k, from: LoadSource::Colony(c.id), army: None }, &format!("Load {} Colonists from slot {}", k, c.slot + 1), actions);
+                        cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: k, from: LoadSource::Colony(c.id), army: None }, &format!("Load {} Colonists from {}", k, game.tables.body(c.body).slots[c.slot as usize].name), actions);
                     }
                 }
             }
@@ -1216,17 +1217,17 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     let room = game.habitat_room(c).saturating_sub(c.colonists);
                     let k = s.colonists.min(room);
                     if k > 0 {
-                        cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: k, army: false, into: UnloadTarget::Colony(c.id) }, &format!("Unload {} Colonists into slot {}", k, c.slot + 1), actions);
+                        cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: k, army: false, into: UnloadTarget::Colony(c.id) }, &format!("Unload {} Colonists into {}", k, game.tables.body(c.body).slots[c.slot as usize].name), actions);
                     }
                 }
                 if s.army.is_some() {
-                    let label = if own { format!("Land the Army at slot {}", c.slot + 1) } else { format!("Land the Army to attack slot {}", c.slot + 1) };
+                    let label = if own { format!("Land the Army at {}", game.tables.body(c.body).slots[c.slot as usize].name) } else { format!("Land the Army to attack {}", game.tables.body(c.body).slots[c.slot as usize].name) };
                     cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: 0, army: true, into: UnloadTarget::Colony(c.id) }, &label, actions);
                 }
             }
             if s.kind == UnitKind::ColonyShip && s.colonists > 0 && body != BodyId::Earth {
                 for slot in game.free_slots_on(body) {
-                    cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) }, &format!("Found a Colony in slot {}", slot + 1), actions);
+                    cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) }, &format!("Found a Colony at {}", game.tables.body(body).slots[slot as usize].name), actions);
                 }
             }
         }

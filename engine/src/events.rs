@@ -131,8 +131,9 @@ impl Game {
             }
             EventId::RichSeam | EventId::IceDeposit => {
                 let kind = if id == EventId::RichSeam { ModuleKind::Mine } else { ModuleKind::Refinery };
-                let bodies: Vec<BodyId> = [BodyId::Moon, BodyId::Mars]
+                let bodies: Vec<BodyId> = BodyId::ALL
                     .into_iter()
+                    .filter(|b| *b != BodyId::Earth)
                     .filter(|b| self.colonies.iter().any(|c| c.body == *b && c.modules.iter().any(|m| m.kind == kind)))
                     .collect();
                 match self.pick_uniform(&bodies) {

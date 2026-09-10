@@ -4,6 +4,7 @@
 //! and u = 0 is longitude -180. Every globe is rotated -90 degrees about X to stand upright.
 
 use bevy::prelude::*;
+use dying_earth_engine::data::BodyCard;
 use dying_earth_engine::{BodyId, StateId};
 use std::f32::consts::{FRAC_PI_2, TAU};
 
@@ -58,13 +59,10 @@ pub fn pixel_for(lon: f32, lat: f32, w: u32, h: u32) -> (u32, u32) {
 }
 
 /// Colony Slot positions, spread across each globe, on the near side for the Moon (section 20).
-pub fn slot_lonlat(body: BodyId, slot: u32) -> (f32, f32) {
-    match body {
-        BodyId::Moon => [(-42.0, 22.0), (28.0, 28.0), (-18.0, -24.0), (38.0, -14.0)][slot as usize % 4],
-        BodyId::Mars => [(-125.0, 22.0), (-62.0, -24.0), (-5.0, 12.0), (58.0, -20.0), (118.0, 26.0), (168.0, -4.0)][slot as usize % 6],
-        // Ticket #44: Antarctica. The Peninsula, the interior and Wilkes Land.
-        BodyId::Earth => [(-62.0, -72.0), (15.0, -80.0), (115.0, -74.0)][slot as usize % 3],
-    }
+pub fn slot_lonlat(card: &BodyCard, slot: u32) -> (f32, f32) {
+    // Ticket #45: every slot is a named place at its real position, from bodies.toml.
+    let s = &card.slots[slot as usize % card.slots.len().max(1)];
+    (s.lon, s.lat)
 }
 
 /// A point on each Nation State to hang its icons from.
@@ -94,6 +92,9 @@ pub fn solar_position(body: BodyId, turn: u32) -> Vec3 {
             let a = 2.4 + t * 0.07;
             Vec3::new(a.cos() * 6.0, 0.0, a.sin() * 6.0)
         }
+        // Ticket #45: the moons of Mars, close in, drawn far larger than life to be clickable.
+        BodyId::Phobos => solar_position(BodyId::Mars, turn) + Vec3::new(0.7 * (t * 1.3).cos(), 0.0, 0.7 * (t * 1.3).sin()),
+        BodyId::Deimos => solar_position(BodyId::Mars, turn) + Vec3::new(1.05 * (t * 0.7 + 2.0).cos(), 0.0, 1.05 * (t * 0.7 + 2.0).sin()),
     }
 }
 
@@ -102,5 +103,7 @@ pub fn solar_radius(body: BodyId) -> f32 {
         BodyId::Earth => 0.42,
         BodyId::Moon => 0.16,
         BodyId::Mars => 0.32,
+        BodyId::Phobos => 0.1,
+        BodyId::Deimos => 0.08,
     }
 }

@@ -139,3 +139,42 @@ The shot aid `look:<lon>,<lat>` turns every surface picture to face a point.
 ![The Earth Map at turn 11 turned to face Antarctica: the ice unbrowned while the continents brown, Slot 3 marked and empty](antarctica.png)
 
 Twenty seeds in both orders give the same numbers as #43.
+
+## #45: Phobos and Deimos, and every slot a named place
+
+Decided by the designer: both moons, small and different; one turn and 2 Fuel from Mars, five turns
+and 24 Fuel from Earth, one turn and 1 Fuel between them; their Colonists off Earth; real maps on
+spheres. And, added on the same answer: **every Colony Slot in the system is a real geological place
+on its Body, at its approximate position, and a Colony takes its name.**
+
+- **Two Bodies more** in `bodies.toml`, five in all. Phobos: two slots, Mine 1.75, Generator 0.75,
+  Refinery 0.5, Habitat 0.5. Deimos: one slot, Mine 1.0, Generator 1.0, Refinery 0.25, Habitat 0.5.
+- **Reach** is a rule over the cards now: a Body with a `parent` is that Body's satellite and the two
+  are `local_turns` and `local_fuel` apart; two satellites of one parent are the file's
+  `sibling_turns` and `sibling_fuel` apart; Earth and the Moon reach anything at its own card's
+  figures; anything else is the farther card. The Moon is Earth's satellite (1 turn, 6 Fuel), so
+  Earth to Mars stays 4 and 20 and Moon to Mars too.
+- **Named slots.** `colony_slots` became a `slots` list of `{ name, lon, lat }`, read by the window
+  for every marker, label and click, and by the engine for a Colony's name: the roster reads
+  "Olympus Mons on Mars", the log "found a Colony at Tycho on the Moon". The Moon: Mare
+  Tranquillitatis, Mare Imbrium, Tycho, the South Pole-Aitken Basin. Mars: Olympus Mons, Valles
+  Marineris, Chryse, Hellas, Isidis, Elysium. Antarctica: the Peninsula, Lake Vostok, the Ross Ice
+  Shelf. Phobos: Stickney, Roche. Deimos: Swift.
+- **Pictures**: the USGS Viking cylindrical map of Phobos and Philip Stooke's map of Deimos, both
+  public domain, resampled to 1024 x 512 by `examples/prep_moons.rs`; both moons are potatoes in
+  life and spheres here. On the Solar System Map they circle Mars close in, drawn far larger than
+  life to be clickable.
+- **The AI** weighs every Body but Earth when it picks where to send a Colony Ship; by yields Mars
+  still wins for both Factions, so in twenty seeds nobody reached the moons.
+
+Two tests watched red first (they did not compile without the Bodies and the slot list): the two
+cards and nine transit pairs including the old ones; every slot named and on the globe, the first
+name of each Body, and a Colony named for its slot.
+
+![The Solar System Map at turn 13: Phobos (0/2 slots) and Deimos (0/1) circling Mars, the Moon 0/4, Earth 0/3](moons-of-mars.png)
+
+![Phobos at turn 13: the USGS map on a sphere, Stickney's slot empty at the left limb](phobos.png)
+
+![Mars at turn 13: Chryse Planitia held by the Custodians, Hellas Planitia by the Prospectors, the empty slots grey](mars-named-slots.png)
+
+Twenty seeds in both orders give the same numbers as #44.
