@@ -10,6 +10,108 @@ use dying_earth_engine::combat::first_round_odds;
 use dying_earth_engine::*;
 use egui::{Color32, FontId, Pos2, RichText, Ui};
 
+/// Ticket #55: the Temperature bar on the Climate Panel. It runs from the Base Temperature to the
+/// Collapse Line, with a notch for every Break across the whole bar and a shorter one along the
+/// foot for every Sea Level threshold and for Antarctica's opening; the notches already crossed are
+/// filled and the ones ahead are thin and dim; the Temperature now carries a filled marker and the
+/// Temperature the CO2 Stock has already committed the world to a hollow one, with the warming
+/// between them shaded; and the line beneath names the next Break ahead.
+fn temperature_bar(ui: &mut Ui, game: &Game) {
+    const BREAK: Color32 = Color32::from_rgb(236, 88, 76);
+    const SEA: Color32 = Color32::from_rgb(96, 156, 236);
+    const ICE: Color32 = Color32::from_rgb(206, 226, 244);
+    let c = &game.tables.climate;
+    let (lo, hi) = (c.base_temperature, c.collapse_line);
+    let now = game.climate.temperature;
+    let committed = game.target_temperature();
+    // A Break is crossed when it has FIRED, not when the Temperature happens to stand past it: what
+    // it did is permanent and the Temperature may come back down afterwards. `foot` is the notch
+    // that runs along the bottom of the bar rather than the whole height, so a Break and a Sea Level
+    // threshold at the same Temperature are both visible.
+    struct Notch {
+        at: f64,
+        what: String,
+        colour: Color32,
+        crossed: bool,
+        foot: bool,
+    }
+    let mut notches: Vec<Notch> = Vec::new();
+    for (i, b) in c.breaks.iter().enumerate() {
+        notches.push(Notch { at: b.temperature, what: b.name.clone(), colour: BREAK, crossed: game.climate.breaks_fired[i], foot: false });
+    }
+    for (i, t) in c.sea_level_thresholds.iter().enumerate() {
+        let crossed = game.states.iter().any(|s| s.thresholds_fired[i]);
+        notches.push(Notch { at: *t, what: "Sea Level".to_string(), colour: SEA, crossed, foot: true });
+    }
+    notches.push(Notch { at: c.antarctica_opens_at, what: "Antarctica opens".to_string(), colour: ICE, crossed: now >= c.antarctica_opens_at, foot: true });
+    notches.sort_by(|a, b| a.at.partial_cmp(&b.at).unwrap_or(std::cmp::Ordering::Equal));
+
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 50.0), egui::Sense::hover());
+    let bar = egui::Rect::from_min_max(egui::pos2(rect.left(), rect.top() + 8.0), egui::pos2(rect.right(), rect.top() + 34.0));
+    let painter = ui.painter();
+    let at = |t: f64| bar.left() + (((t - lo) / (hi - lo)).clamp(0.0, 1.0) as f32) * bar.width();
+    let column = |x: f32, half: f32, top: f32, bottom: f32, colour: Color32| {
+        painter.rect_filled(egui::Rect::from_min_max(egui::pos2(x - half, top), egui::pos2(x + half, bottom)), 0.0, colour);
+    };
+    painter.rect_filled(bar, 3.0, Color32::from_rgb(38, 38, 44));
+    // The warming the Stock has already committed the world to, then the warming that has arrived.
+    if committed > now {
+        painter.rect_filled(
+            egui::Rect::from_min_max(egui::pos2(at(now), bar.top()), egui::pos2(at(committed), bar.bottom())),
+            0.0,
+            Color32::from_rgb(104, 62, 40),
+        );
+    }
+    painter.rect_filled(egui::Rect::from_min_max(bar.min, egui::pos2(at(now), bar.bottom())), 3.0, Color32::from_rgb(206, 112, 54));
+    for n in &notches {
+        let x = at(n.at);
+        let (top, bottom) = if n.foot { (bar.top() + 15.0, bar.bottom()) } else { (bar.top(), bar.bottom()) };
+        // Every notch stands on a dark backing, so a crossed one reads against the warmed fill as
+        // well as against the ground ahead of it.
+        if n.crossed {
+            column(x, 3.0, top, bottom, Color32::from_rgb(18, 18, 22));
+            column(x, 1.5, top, bottom, n.colour);
+        } else {
+            column(x, 2.0, top + 4.0, bottom - 4.0, Color32::from_rgb(18, 18, 22));
+            column(x, 0.75, top + 5.0, bottom - 5.0, n.colour.gamma_multiply(0.7));
+        }
+    }
+    // The Temperature now, filled, and the Temperature the Stock commits the world to, hollow.
+    let pointer = |x: f32, colour: Color32, filled: bool| {
+        let tip = egui::pos2(x, bar.top() - 1.0);
+        let points = vec![tip, egui::pos2(x - 4.5, bar.top() - 8.0), egui::pos2(x + 4.5, bar.top() - 8.0)];
+        let stroke = egui::Stroke::new(1.2, colour);
+        let fill = if filled { colour } else { Color32::TRANSPARENT };
+        painter.add(egui::Shape::convex_polygon(points, fill, stroke));
+    };
+    column(at(committed), 1.0, bar.top(), bar.bottom(), Color32::from_rgb(186, 186, 194));
+    pointer(at(committed), Color32::from_rgb(186, 186, 194), false);
+    column(at(now), 1.5, bar.top(), bar.bottom(), Color32::WHITE);
+    pointer(at(now), Color32::WHITE, true);
+    let small = FontId::proportional(11.0);
+    let grey = Color32::from_gray(150);
+    painter.text(egui::pos2(bar.left() + 3.0, bar.bottom() + 2.0), egui::Align2::LEFT_TOP, format!("{lo:+.1}"), small.clone(), grey);
+    painter.text(egui::pos2(bar.right() - 3.0, bar.bottom() + 2.0), egui::Align2::RIGHT_TOP, format!("Collapse {hi:+.1}"), small, grey);
+    // What is ahead, in words, under the bar.
+    let line = match game.next_break() {
+        Some(b) => format!("next: {} at {:+.1}", b.name, b.temperature),
+        None => match notches.iter().find(|n| !n.crossed) {
+            Some(n) => format!("next: {} at {:+.1}", n.what, n.at),
+            None => "every notch on the bar is behind us".to_string(),
+        },
+    };
+    ui.label(RichText::new(line).size(13.0).color(BREAK));
+    // The whole list on hover, since no bar this wide can label nine notches.
+    let list: Vec<String> = notches
+        .iter()
+        .map(|n| format!("{:+.1}  {}{}", n.at, n.what, if n.crossed { "  - crossed" } else { "" }))
+        .collect();
+    response.on_hover_text(format!(
+        "The filled marker is the Temperature now, the hollow one what the CO2 Stock already commits the world to.\nBreaks (red), Sea Level thresholds and Antarctica's opening (along the foot):\n{}",
+        list.join("\n")
+    ));
+}
+
 /// What the drawn interface asks the session to do, applied after drawing.
 enum Action {
     Place(Order),
@@ -1819,6 +1921,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             let e = &c.last;
             ui.label(RichText::new(format!("CO2 Stock {:.1} ppm", c.co2)).strong());
             ui.label(format!("Temperature {:+.1} C, heading to {:+.1}", c.temperature, game.target_temperature()));
+            // Ticket #55: the Temperature bar, with every notch the game turns on.
+            temperature_bar(ui, game);
             ui.separator();
             ui.label(RichText::new("Emissions this turn, by source").strong());
             ui.label(format!("Nation State industry {:.1}", e.state_industry));
@@ -1836,6 +1940,12 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             if e.cards > 0.0 {
                 ui.label(format!("Event cards {:.1}", e.cards));
             }
+            // Ticket #55: the Permafrost Thaw Break's own line, once it has fired. It is the world's
+            // carbon: nobody's Blame, and it never counts against a Stabilization run.
+            if e.permafrost > 0.0 {
+                ui.label(format!("Permafrost {:.1}", e.permafrost))
+                    .on_hover_text("The permafrost has thawed. This much CO2 comes out of the ground every turn now, whatever anybody does. It is nobody's Blame and it does not count against a Stabilization run.");
+            }
             // Ticket #54: the Scrubbers stand beside the Natural Sink in the same line.
             ui.label(format!("Natural Sink -{:.1}{}", e.sink, if e.scrubbers > 0.0 { format!(" and Scrubbers -{:.1}", e.scrubbers) } else { String::new() }));
             ui.label(RichText::new(format!("Net {:+.1} ppm", e.net())).strong());
@@ -1848,6 +1958,22 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 game.deck.cards.len(),
                 game.deck.climate_cards_left()
             ));
+            // Ticket #55: what the Stock already commits the world to, and how long cutting can
+            // still avoid the Collapse Line.
+            ui.label(
+                RichText::new(format!("Committed: {:+.1} C even if net Emissions stopped today", game.target_temperature()))
+                    .size(15.0)
+                    .color(Color32::from_rgb(240, 180, 140)),
+            )
+            .on_hover_text("The Temperature the CO2 Stock as it stands will deliver once the lag has caught up. Nothing anybody builds or stops building takes it back.");
+            let (last_turn, last_colour) = match game.last_turn_to_act() {
+                LastTurn::Turn(t) => (format!("Last turn to act: {t}"), Color32::from_rgb(240, 210, 120)),
+                LastTurn::TooLate => ("Cuts alone no longer avoid Collapse.".to_string(), Color32::from_rgb(240, 110, 100)),
+                LastTurn::NoCollapse => ("On this path Collapse is not reached.".to_string(), Color32::from_rgb(150, 220, 160)),
+            };
+            ui.label(RichText::new(last_turn).size(15.0).strong().color(last_colour)).on_hover_text(
+                "The latest turn on which cutting net Emissions to zero from that turn onward still keeps the Temperature under the Collapse Line by the last turn, counting every Break the world would cross on the way.",
+            );
             let p = game.projection();
             let line = match p.collapse_turn {
                 Some(t) => format!("At this rate, {:+.1} C by turn {}; Collapse at +{:.1} around turn {}.", p.temperature_at_last_turn, game.tables.victory.turns, game.tables.climate.collapse_line, t),

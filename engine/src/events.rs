@@ -75,8 +75,8 @@ impl Game {
                 let m = if self.has_tech(TechId::EfficientGrids) { t.events.solar_maximum_multiplier_with_tech } else { t.events.solar_maximum_multiplier };
                 (EventTarget::Everyone, format!("{}: every Power Plant and Generator makes x{} at the next Income.", card.name, m))
             }
-            EventId::PermafrostThaw => {
-                let e = if self.has_tech(TechId::GreenConsensus) { t.events.permafrost_emissions / 2.0 } else { t.events.permafrost_emissions } * scale;
+            EventId::MethaneBurst => {
+                let e = if self.has_tech(TechId::GreenConsensus) { t.events.methane_emissions / 2.0 } else { t.events.methane_emissions } * scale;
                 (EventTarget::Everyone, format!("{}: +{:.1} Emissions next turn (x{:.2} at this Temperature).", card.name, e, scale))
             }
             EventId::LaunchPadFire => {
@@ -254,8 +254,8 @@ impl Game {
             (EventId::SolarMaximum, EventTarget::Everyone) => {
                 self.solar_maximum_next = true;
             }
-            (EventId::PermafrostThaw, EventTarget::Everyone) => {
-                let e = if self.has_tech(TechId::GreenConsensus) { t.events.permafrost_emissions / 2.0 } else { t.events.permafrost_emissions };
+            (EventId::MethaneBurst, EventTarget::Everyone) => {
+                let e = if self.has_tech(TechId::GreenConsensus) { t.events.methane_emissions / 2.0 } else { t.events.methane_emissions };
                 self.climate.card_emissions_next += e * ev.scale;
             }
             (EventId::GridFailure, EventTarget::Colony(c)) => {

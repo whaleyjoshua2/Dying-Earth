@@ -400,17 +400,29 @@ The CO2-equivalent a source adds to the CO2 Stock in a turn. Every source has it
 _Avoid_: output, carbon, footprint
 
 **Natural Sink**:
-The fixed amount of CO2 the oceans and forests remove from the CO2 Stock every turn. Net emissions below it stabilize the stock. Every Scrubber standing and online enlarges it while it stands.
+The amount of CO2 the oceans and forests remove from the CO2 Stock every turn. Net emissions below it stabilize the stock. Every Scrubber standing and online enlarges it while it stands, and since version 0.05 a Break can weaken it for good.
 _Avoid_: absorption, offset, carbon capture
 
 **Sea Level**:
 How far the oceans have risen with the Temperature. It is drawn on the globe as a creeping waterline, and it permanently takes build slots from Nation States according to their Coastal Exposure.
 _Avoid_: flooding, water line, ocean rise
 
+**Break**:
+A Temperature at which a permanent change to the world fires once, the first time the Temperature stands at or above it. Five since version 0.05: the reefs die, the permafrost thaws, the Natural Sink weakens, the ice sheets go and the Amazon dies back. Nothing undoes a Break, and the Report says it happened rather than that it is coming.
+_Avoid_: tipping point, threshold, trigger
+
+**Committed Warming**:
+The Temperature the CO2 Stock as it stands will deliver once the lag has caught up. It is what the world has already bought, whatever anybody builds or stops building.
+_Avoid_: locked-in warming, pipeline, inertia, baked in
+
+**Last Turn**:
+The latest turn on which cutting net Emissions to zero from that turn onward still keeps the Temperature under the Collapse Line by the last turn, counting every Break the world would cross on the way. The Climate Panel names it, or says that cuts alone no longer avoid Collapse, or that Collapse is not reached on this path.
+_Avoid_: deadline, point of no return, countdown
+
 **Collapse Line**:
 The one Temperature at which the game ends with nobody winning, unless a Faction had already met its Victory Condition in an earlier End phase. Every other effect of Temperature is continuous; this is the only line.
 _Avoid_: threshold, tipping point, game over temperature
 
 **Climate Panel**:
-The screen showing the CO2 Stock, the Temperature and where it is heading, this turn's Emissions by source, the sink and the net, the penalties in force, and a projection to the last turn.
+The screen showing the CO2 Stock, the Temperature and where it is heading, a Temperature bar notched with every Break, every Sea Level threshold and Antarctica's opening, this turn's Emissions by source, the sink and the net, the penalties in force, the Committed Warming, the Last Turn, and a projection to the last turn.
 _Avoid_: warming meter, climate HUD

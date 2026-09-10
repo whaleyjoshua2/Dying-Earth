@@ -36,3 +36,63 @@ population_emissions_base = 0.04
 population_emissions_per_level = 0.03
 launch_emissions = 2.0
 sea_level_thresholds = [1.8, 2.3, 2.8]
+
+# Ticket #55 (version 0.05): the Temperature at which Antarctica's Colony Slots open. The sea-level
+# ticket will read it; the Climate Panel's Temperature bar draws its notch from here already.
+antarctica_opens_at = 1.6
+
+# Ticket #55 (version 0.05): the Breaks. A Break is a Temperature at which a permanent change fires
+# once, in the Climate phase, the first time the Temperature stands at or above it -- the same
+# "fires once" bookkeeping as the Sea Level thresholds above. The Report says it HAPPENED and never
+# that it is committed: `happened` is the sentence and `text` the card line under it. Move a
+# Temperature, change a figure or add a row, and the game and the Climate Panel's bar follow; the
+# list must rise in Temperature. The real-world warming each is drawn from is in the research note
+# on the branch `research/tipping-points`.
+
+[[break]]
+id = "coral_die_off"
+name = "Coral Die-off"
+temperature = 1.4
+effect = "coastal_unrest"
+exposure = 2
+unrest = 1.0
+population_loss = 0.02
+happened = "The reefs die."
+text = "The reefs bleach white and die; the coasts that lived off them do not forget."
+
+[[break]]
+id = "permafrost_thaw"
+name = "Permafrost Thaw"
+temperature = 1.6
+effect = "emissions_per_turn"
+emissions = 4.0
+happened = "The permafrost thaws."
+text = "The frozen ground gives way, and a thousand billion tonnes of old carbon starts breathing out."
+
+[[break]]
+id = "sink_weakens"
+name = "The Sink Weakens"
+temperature = 2.0
+effect = "weaken_sink"
+sink_after = 4.0
+happened = "The Natural Sink weakens."
+text = "The forests and the oceans are full; the world stops taking back what we give it."
+
+[[break]]
+id = "ice_sheets_committed"
+name = "Ice Sheets Committed"
+temperature = 2.2
+effect = "sea_level_threshold"
+happened = "The ice sheets let go."
+text = "Greenland and Thwaites pass the point of return; the sea is coming for the coasts and it will not stop."
+
+[[break]]
+id = "amazon_dieback"
+name = "Amazon Dieback"
+temperature = 2.6
+effect = "carbon_pulse"
+co2 = 20.0
+baseline_rise = 1.0
+state = "south_america"
+happened = "The Amazon dies back."
+text = "The rainforest stops making its own rain, and the biggest carbon sink on land becomes a source."

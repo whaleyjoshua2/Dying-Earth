@@ -18,6 +18,7 @@ pub mod state;
 pub mod turn;
 pub mod victory;
 
+pub use climate::{LastTurn, Projection};
 pub use data::{DataError, Tables};
 pub use economy::Yield;
 pub use ids::*;

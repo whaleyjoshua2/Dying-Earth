@@ -781,3 +781,129 @@ as a Stabilization action for the victory-gap multiplier, the Custodians' `leapf
 and the greedy spend now holds Ducats for a higher-scored Ducat action that three turns of Ducat
 income would bring within reach, as it holds Materials. Twenty seeds afterwards, Custodians in East
 Asia: 6 to 8 Leapfrogs a game, 19 of 20 Collapses at median turn 21, one Prospector win.
+
+
+## #55: Breaks, Committed Warming and the Last Turn
+
+Until now the Climate Model was one smooth curve with a line at the end of it. This ticket puts five
+**Breaks** on the curve: a Temperature at which a permanent change fires once, in the Climate phase,
+the first time the Temperature stands at or above it. Nothing undoes one, and the Report says it
+**happened** rather than that it is coming. They live as `[[break]]` rows in `climate.toml` -- id,
+name, Temperature, effect kind, figures, the sentence and the card line -- so a Temperature can be
+moved, a figure changed or a sixth Break added without touching the engine. The real-world warming
+each is drawn from is in the research note on the branch `research/tipping-points`.
+
+| Break | at | what it does |
+|---|---|---|
+| **Coral Die-off** | +1.4 | every Nation State at Coastal Exposure 2 takes +1 Unrest (damped like any climate rise) and loses 2% of its people, half of whom flow on as refugees. No climate effect at all. |
+| **Permafrost Thaw** | +1.6 | **+4.0 ppm** of Emissions every Climate phase from then on, as its own **Permafrost** line on the Climate Panel. The world's carbon: nobody's Blame, and never counted against a Stabilization run. |
+| **The Sink Weakens** | +2.0 | the Natural Sink falls from 6.0 to **4.0** for good. This one *does* bear on Stabilization, because the Sink is the bar. |
+| **Ice Sheets Committed** | +2.2 | a Sea Level threshold's slot loss, displacement and Unrest lands at once on every state, **out of sequence**. The three scheduled thresholds still fire on their own turns, so a game that reaches +2.8 takes four. |
+| **Amazon Dieback** | +2.6 | a one-off **+20 ppm** into the CO2 Stock and **South America's Baseline Emissions up by 1.0** for good. Both the world's: nobody's Blame, exempt from Stabilization. |
+
+The Event card that used to be called **Permafrost Thaw** is now the **Methane Burst**, and its
+figure comes down from 3.0 to **2.5** (`events.toml`), so the name is free for the Break that thaws
+the permafrost for good.
+
+Two lines join the Climate Panel above the projection. **Committed Warming** is the Temperature the
+CO2 Stock as it stands will deliver once the lag has caught up -- "Committed: +2.1 C even if net
+Emissions stopped today". **The Last Turn** is the latest turn on which cutting net Emissions to zero
+from that turn onward still keeps the Temperature under the Collapse Line by the last turn, found by
+running the projection forward from every future turn in turn and firing every Break the run would
+cross in it: the Sink Weakens lowers the Sink in the projection, Permafrost adds its line, Amazon its
+pulse. It is `Game::last_turn_to_act()` in the engine, and it says one of three things: "Last turn to
+act: 14", "Cuts alone no longer avoid Collapse.", or "On this path Collapse is not reached."
+
+And the panel gains a **Temperature bar**, from +1.2 to the Collapse Line, notched across its whole
+height for every Break and along its foot for every Sea Level threshold and for Antarctica's opening
+at +1.6 (`antarctica_opens_at`, a constant the still-open sea-level ticket will read). A notch that
+has been crossed is filled, one still ahead is thin and dim; the Temperature now carries a filled
+marker and the committed Temperature a hollow one, with the warming between them shaded; and the line
+beneath names the next Break ahead.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![The Climate Panel at turn 8: the Temperature bar with two red Break notches filled behind the current Temperature and the rest dim ahead of it, a Permafrost line among the Emissions, and the Committed and Last Turn lines above the projection](climate-panel-breaks.png)
+
+- **climate-panel-breaks.png** -- `shot:cpb turns:6 temp:1.7,1.95 look:20,25`. Turn 8 at +1.9 C. On
+  the bar, the Coral Die-off at +1.4 and the Permafrost Thaw at +1.6 are filled red; Antarctica's
+  opening sits under the second of them along the foot and the first Sea Level threshold at +1.8 is
+  filled blue; the Sink Weakens, Ice Sheets and Amazon are dim ahead, and "next: The Sink Weakens at
+  +2.0" reads under it. The filled white marker is the Temperature now, the hollow one the +2.1 the
+  Stock has already bought, with the gap between them shaded. **Permafrost 4.0** stands in the
+  Emissions list between Population and the Sink, and underneath: "Committed: +2.1 C even if net
+  Emissions stopped today" and "Last turn to act: 14". (`temp:<now>[,<committed>]` is a new building
+  aid: it puts the Temperature and the CO2 Stock where the picture needs them and runs one quiet
+  turn, since an AI game arrives at a given Temperature on a turn nobody can choose.)
+
+![The Report at turn 8 carrying two Break lines with their card text, and the Sea Level lines the Ice Sheets Break fired out of sequence](break-report.png)
+
+- **break-report.png** -- `shot:br menus:1 turns:6 temp:2.3,2.5`. One Report, two Breaks: "Break at
+  +2.0 C - The Sink Weakens. The Natural Sink weakens. The forests and the oceans are full; the world
+  stops taking back what we give it." and "Break at +2.2 C - Ice Sheets Committed. The ice sheets let
+  go. Greenland and Thwaites pass the point of return; the sea is coming for the coasts and it will
+  not stop." Under them is what the second one cost: state after state losing build slots at "+2.2 C", a
+  Scrubber and a Refinery destroyed in East Asia, and the refugee flows that followed.
+
+![The Climate Panel of a doomed board: Committed +3.2 C and a red line reading "Cuts alone no longer avoid Collapse"](climate-panel-last-turn-gone.png)
+
+- **climate-panel-last-turn-gone.png** -- `shot:ltg turns:8 temp:2.0,3.05 look:20,25`. Turn 10 at
+  +2.6 C with a CO2 Stock of 1011 ppm. Four Break notches are filled and only the Amazon is left
+  ahead; the committed marker is pinned at the right-hand end of the bar; and where the last picture
+  named a turn, this one reads **"Cuts alone no longer avoid Collapse."** in red under "Committed:
+  +3.2 C even if net Emissions stopped today". The Sink line still reads -6.0 because the panel
+  reports the Climate phase that has just run, and the Sink Weakens fired at the end of it.
+
+### Twenty seeds
+
+`cargo run --release -p dying-earth-engine --example sim -- 1 --count=20`, twice, plus
+`sweep -- 20 --player=custodians --start=europe --sinks=6 --steps=150`. Nothing was re-tuned; these
+are measurements.
+
+| seat 0 | wins | collapses | median collapse turn | median first Colony | net at turn 12 | net at the end |
+|---|---|---|---|---|---|---|
+| Custodians in East Asia | none | 20/20 | 19 | 10 | +41.4 | +25.4 |
+| Prospectors in East Asia | none | 20/20 | 21 | 10 | +32.6 | +17.6 |
+| Custodians in Europe (sweep) | none | 20/20 | 21 (19..23) | - | - | end temp +3.03 |
+
+Which Breaks fired, in how many of the twenty seeds, and on what turn:
+
+| Break | at | Custodians in East Asia | Prospectors in East Asia |
+|---|---|---|---|
+| Coral Die-off | +1.4 | 20 seeds, median turn 4 | 20 seeds, median turn 4 |
+| Permafrost Thaw | +1.6 | 20 seeds, median turn 6 | 20 seeds, median turn 6 |
+| The Sink Weakens | +2.0 | 20 seeds, median turn 10 | 20 seeds, median turn 10 |
+| Ice Sheets Committed | +2.2 | 20 seeds, median turn 12 | 20 seeds, median turn 11 |
+| Amazon Dieback | +2.6 | 20 seeds, median turn 16 | 20 seeds, median turn 16 |
+
+And the Last Turn the panel showed, at turn 1 and at turn 12:
+
+| seat 0 | median Last Turn at turn 1 | at turn 12 | seeds already past saving | seeds not on a collapsing path |
+|---|---|---|---|---|
+| Custodians in East Asia | 21 | 16 | 0 | 0 |
+| Prospectors in East Asia | 20 | 16 | 0 | 0 |
+
+**All five Breaks fire in every seed of both seatings, and the world now collapses in every game.**
+Against #54's same twenty seeds the Custodian-in-East-Asia seating went from 19/20 collapses at a
+median turn 21 to **20/20 at turn 19**; the Prospector-in-East-Asia seating, which #54 measured at
+**1/20** with nineteen Prospector wins, is now **20/20 with nobody winning**; and the Europe sweep
+went from 2/20 to 20/20. The Scrubber's cooling of #54 has been undone and then some: the Permafrost
+line alone is +4.0 ppm a turn from about turn 6, which is two thirds of the Natural Sink, and the
+Sink itself is cut by a third from about turn 10. That is the ticket's numbers as they came out, not
+a balance: the knobs that would settle it are one line each in `climate.toml` (each Break's
+`temperature` and its own figure) and the `ppm_step` that has been re-swept on every ticket that
+changed the board.
+
+**The Last Turn is a real clock, and it is always running out.** At turn 1 the median board says
+turn 20 or 21 -- most of the game still to play with. By turn 12 it says 16: four turns of room left,
+where eleven turns earlier there were nineteen. No seed at either moment was ever told "Cuts alone no longer
+avoid Collapse" or "On this path Collapse is not reached", so the line is doing what it was meant to
+do at both ends of the game -- though on these boards the AI never acts on it, because no seat has an
+order that cuts a whole world's Emissions to zero.
+
+**A note on the Climate Panel's Sink line.** The panel reports the Climate phase that has just run,
+and a Break fires at the end of that phase, off the Temperature it settled. So on the one turn the
+Sink Weakens fires, the panel still reads "Natural Sink -6.0" while the bar already shows the notch
+filled; from the next turn it reads -4.0. The bar is the state of the world, the Emissions list is
+the account of the turn just gone.

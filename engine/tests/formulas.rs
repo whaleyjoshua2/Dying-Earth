@@ -124,6 +124,8 @@ fn temperature_halves_the_remaining_distance_each_phase() {
         s.industry_level = 0;
     }
     // Nothing emits, so each phase takes the Sink off; the stock lands two steps above 420, target 2.2.
+    // Ticket #55: and no Break fires on the way, so this reads the lag alone.
+    breaks_held(&mut g);
     let (step, sink) = (g.tables.climate.ppm_step, g.tables.climate.natural_sink);
     g.climate.co2 = 420.0 + 2.0 * step + sink;
     g.climate_phase();
@@ -979,19 +981,19 @@ fn solar_maximum_boosts_power_plants_and_generators_at_the_next_income_once() {
 }
 
 #[test]
-fn permafrost_thaw_adds_scaled_emissions_next_turn_that_do_not_count_against_stabilization() {
+fn the_methane_burst_adds_scaled_emissions_next_turn_that_do_not_count_against_stabilization() {
     let mut g = game();
     g.climate.temperature = 2.2; // scale 1.5
-    drawn(&mut g, EventId::PermafrostThaw, EventTarget::Everyone);
+    drawn(&mut g, EventId::MethaneBurst, EventTarget::Everyone);
     g.apply_event_now();
     let e = g.emissions_now();
-    assert!((e.cards - 4.5).abs() < 1e-9, "3.0 x 1.5: {}", e.cards);
-    assert!((e.total() - e.counted() - 4.5).abs() < 1e-9);
+    assert!((e.cards - 3.75).abs() < 1e-9, "2.5 x 1.5: {}", e.cards);
+    assert!((e.total() - e.counted() - 3.75).abs() < 1e-9);
     with_tech(&mut g, TechId::GreenConsensus);
     g.climate.card_emissions_next = 0.0;
-    drawn(&mut g, EventId::PermafrostThaw, EventTarget::Everyone);
+    drawn(&mut g, EventId::MethaneBurst, EventTarget::Everyone);
     g.apply_event_now();
-    assert!((g.emissions_now().cards - 2.25).abs() < 1e-9, "halved");
+    assert!((g.emissions_now().cards - 1.875).abs() < 1e-9, "halved");
 }
 
 #[test]
@@ -2005,6 +2007,34 @@ fn calm(g: &mut Game) {
         s.unrest_reported = 0.0;
         s.refugees_in = 0.0;
         s.thresholds_fired = vec![true; n];
+    }
+    // Ticket #55: and every Break already fired, so a Climate-phase test at a high Temperature sees
+    // only what it set up. `breaks_ahead` puts them back for the tests that are about them.
+    breaks_held(g);
+}
+
+/// Ticket #55: every Break already fired, so none of them fires in the phase under test.
+fn breaks_held(g: &mut Game) {
+    g.climate.breaks_fired = vec![true; g.tables.climate.breaks.len()];
+}
+
+/// Ticket #55: every Break still ahead of the game, whatever `calm` did.
+fn breaks_ahead(g: &mut Game) {
+    g.climate.breaks_fired = vec![false; g.tables.climate.breaks.len()];
+}
+
+/// The index of a Break in `climate.toml`'s list, by its id.
+fn break_at(g: &Game, id: &str) -> usize {
+    g.tables.climate.breaks.iter().position(|b| b.id == id).unwrap_or_else(|| panic!("no [[break]] {id} in climate.toml"))
+}
+
+/// A board with nothing on it that emits: every state empty of people, industry and buildings, so a
+/// Climate-phase test reads only the Break it fired.
+fn bare_world(g: &mut Game) {
+    for s in &mut g.states {
+        s.population = 0.0;
+        s.industry_level = 0;
+        s.facilities.clear();
     }
 }
 
@@ -3074,4 +3104,266 @@ fn a_custodian_ai_behind_on_stabilization_leapfrogs_when_it_has_the_ducats() {
     assert!(orders.iter().any(|o| matches!(o, Order::Leapfrog { .. })), "no Leapfrog among: {orders:?}
 scored: {scored:#?}
 probe: {probe:?}");
+}
+
+
+// ---------------------------------------------------------------- Ticket #55: Breaks, Committed
+// Warming and the Last Turn
+
+/// (a) A Break fires in the first Climate phase whose Temperature stands at or above its figure,
+/// and never again.
+#[test]
+fn a_a_break_fires_once_at_its_temperature_and_never_again() {
+    let mut g = game();
+    calm(&mut g);
+    breaks_ahead(&mut g);
+    let i = break_at(&g, "permafrost_thaw");
+    let at = g.tables.climate.breaks[i].temperature;
+    hold_temperature(&mut g, at - 0.05);
+    g.climate_phase();
+    assert!(!g.climate.breaks_fired[i], "under its Temperature it has not fired");
+    assert_eq!(g.climate.permafrost, 0.0, "and nothing of it is in the world yet");
+
+    hold_temperature(&mut g, at);
+    g.climate_phase();
+    assert!(g.climate.breaks_fired[i], "at its Temperature it fires");
+    assert_eq!(g.climate.permafrost, 4.0, "and its effect is in the world");
+    assert!(
+        g.report.lines.iter().any(|l| l.contains("Permafrost Thaw. The permafrost thaws.")),
+        "the Report says it happened: {:?}",
+        g.report.lines
+    );
+
+    hold_temperature(&mut g, at + 0.5);
+    g.climate_phase();
+    assert_eq!(g.climate.permafrost, 4.0, "a Break never fires twice, however far the Temperature goes past it");
+}
+
+/// (b) Coral Die-off: +1 Unrest and -2% population on the Coastal Exposure 2 states, and on no others.
+#[test]
+fn b_coral_die_off_costs_the_exposed_coasts_their_people_and_their_calm() {
+    let mut g = game();
+    calm(&mut g);
+    breaks_ahead(&mut g);
+    bare_world(&mut g);
+    // Central America is Coastal Exposure 2 and both its neighbours are 1, so nothing flows back
+    // into it. Europe is Coastal Exposure 1 and stands as the control.
+    g.state_mut(StateId::CentralAmerica).population = 10.0;
+    g.state_mut(StateId::Europe).population = 10.0;
+    // A shade above the Break's figure: with nothing emitting, the phase takes the Sink off the
+    // Stock and the Temperature settles just under where it was held.
+    let at = g.tables.climate.breaks[break_at(&g, "coral_die_off")].temperature;
+    hold_temperature(&mut g, at + 0.05);
+    g.climate_phase();
+    assert!(g.climate.temperature >= at, "the phase settled at or above the Break: {}", g.climate.temperature);
+    let rate = g.population_growth_rate();
+    assert!((g.state(StateId::CentralAmerica).population - 9.8 * (1.0 + rate)).abs() < 1e-9, "-2%: {}", g.state(StateId::CentralAmerica).population);
+    assert!((g.state(StateId::Europe).population - 10.0 * (1.0 + rate)).abs() < 1e-9, "Coastal Exposure 1 loses nothing: {}", g.state(StateId::Europe).population);
+    assert_eq!(g.unrest(StateId::CentralAmerica), 1.0, "one Unrest on an exposed coast");
+    assert_eq!(g.unrest(StateId::EastAsia), 1.0, "every Coastal Exposure 2 state, not one");
+    assert_eq!(g.unrest(StateId::Europe), 0.0, "and no other");
+    // The 2% that left flowed on as refugees, by the rule for a population that falls.
+    assert!(g.state(StateId::NorthAmerica).population > 0.0 || g.state(StateId::SouthAmerica).population > 0.0, "the people who left went to the neighbours");
+}
+
+/// (c) Permafrost Thaw: 4.0 ppm every Climate phase after it, on its own line, nobody's Blame and
+/// never counted against a Stabilization run.
+#[test]
+fn c_the_permafrost_break_adds_four_ppm_a_turn_on_its_own_line_outside_blame_and_stabilization() {
+    let mut g = game();
+    calm(&mut g);
+    breaks_ahead(&mut g);
+    bare_world(&mut g);
+    g.take_control(StateId::EastAsia, Seat(0));
+    hold_temperature(&mut g, 1.7);
+    g.climate_phase();
+    assert_eq!(g.climate.permafrost, 4.0, "the Break has fired");
+    let e = g.emissions_now();
+    assert_eq!(e.permafrost, 4.0, "its own line on the panel");
+    assert_eq!(e.counted(), 0.0, "and not among the counted sources");
+    assert!((e.total() - 4.0).abs() < 1e-9, "but in the total that reaches the air: {}", e.total());
+
+    // A Sink of 2.0: 0 counted is under it, 4.0 of Permafrost would not be.
+    g.climate.natural_sink = 2.0;
+    let blame_before: f64 = Seat::ALL.into_iter().map(|s| g.seat(s).blame_emitted).sum();
+    let co2_before = g.climate.co2;
+    let run_before = g.seat(Seat(0)).stabilization_run;
+    g.climate_phase();
+    assert!((g.climate.co2 - (co2_before + 4.0 - 2.0)).abs() < 1e-9, "4.0 ppm again, every Climate phase from then on: {}", g.climate.co2);
+    let blame_after: f64 = Seat::ALL.into_iter().map(|s| g.seat(s).blame_emitted).sum();
+    assert_eq!(blame_after, blame_before, "nobody's Blame");
+    assert_eq!(g.seat(Seat(0)).stabilization_run, run_before + 1, "exempt from Stabilization: the run goes on");
+}
+
+/// (d) The Sink Weakens: the Natural Sink falls to 4.0 for good, and Stabilization is measured
+/// against 4.0 from then on.
+#[test]
+fn d_the_sink_weakens_lowers_the_sink_and_the_stabilization_bar_with_it() {
+    let mut g = game();
+    calm(&mut g);
+    breaks_ahead(&mut g);
+    bare_world(&mut g);
+    assert_eq!(g.climate.natural_sink, 6.0, "it opens at the table's figure");
+    hold_temperature(&mut g, 2.1);
+    g.climate_phase();
+    assert_eq!(g.climate.natural_sink, 4.0, "the Sink Weakens took it to 4.0");
+    assert_eq!(g.emissions_now().sink, 4.0, "and the panel's Sink line with it");
+    assert!(g.seat(Seat(0)).stabilization_run > 0, "0 counted was under the Sink");
+
+    // 5.0 counted Emissions: under the old Sink of 6.0, over the new one of 4.0. A neutral state,
+    // so no Faction's Emissions multiplier stands between the card and the sum.
+    g.state_mut(StateId::MiddleEast).control = Control::Neutral;
+    g.state_mut(StateId::MiddleEast).industry_level = 10; // Baseline 0.5 x 10
+    let e = g.emissions_now();
+    assert!((e.counted() - 5.0).abs() < 1e-9, "5.0 counted: {}", e.counted());
+    g.climate_phase();
+    assert_eq!(g.seat(Seat(0)).stabilization_run, 0, "5.0 breaks a run against a Sink of 4.0, where it would have held against 6.0");
+    // The Custodian AI steers by this same figure (`victory_gap` reads `climate.last.total_sink()`),
+    // so a weakened Sink moves its pace with it.
+    assert_eq!(g.climate.last.total_sink(), 4.0, "the Sink the AI reads is the weakened one");
+}
+
+/// (e) Ice Sheets Committed fires a Sea Level threshold out of sequence, and the scheduled ones
+/// still fire on their own turns: a state loses build slots twice between +2.2 and +2.3.
+#[test]
+fn e_ice_sheets_committed_fires_a_threshold_out_of_sequence_and_the_scheduled_ones_still_fire() {
+    let mut g = game();
+    breaks_ahead(&mut g);
+    for s in &mut g.states {
+        s.population = 0.0;
+    }
+    // The first scheduled threshold, +1.8, goes first.
+    hold_temperature(&mut g, 1.85);
+    g.climate_phase();
+    let after_first = g.build_slots(StateId::EastAsia);
+    assert!(g.state(StateId::EastAsia).thresholds_fired[0], "+1.8 has fired");
+
+    // +2.2: the Break, with +2.3 still ahead.
+    hold_temperature(&mut g, 2.25);
+    g.climate_phase();
+    let after_break = g.build_slots(StateId::EastAsia);
+    assert_eq!(after_break, after_first - 2, "the Break took a threshold's worth of slots out of sequence");
+    assert!(!g.state(StateId::EastAsia).thresholds_fired[1], "and it did not use up the scheduled +2.3");
+
+    // +2.3: the scheduled threshold, on its own turn.
+    hold_temperature(&mut g, 2.35);
+    g.climate_phase();
+    assert_eq!(g.build_slots(StateId::EastAsia), after_break - 2, "so the state loses slots twice between +2.2 and +2.3");
+}
+
+/// (f) Amazon Dieback: 20 ppm into the CO2 Stock once, and South America's Baseline Emissions up by
+/// 1.0 for good.
+#[test]
+fn f_amazon_dieback_pulses_twenty_ppm_once_and_leaves_south_america_dirtier_for_good() {
+    let mut g = game();
+    calm(&mut g);
+    breaks_ahead(&mut g);
+    bare_world(&mut g);
+    let base = g.baseline_emissions(StateId::SouthAmerica);
+    hold_temperature(&mut g, 2.7);
+    let co2_before = g.climate.co2;
+    g.climate_phase();
+    // Nothing counted, no Permafrost yet in the sum, a Sink of 6.0, then the 20 ppm pulse.
+    assert!((g.climate.co2 - (co2_before - 6.0 + 20.0)).abs() < 1e-9, "a 20 ppm pulse: {}", g.climate.co2);
+    assert!((g.baseline_emissions(StateId::SouthAmerica) - (base + 1.0)).abs() < 1e-9, "Baseline Emissions up by 1.0");
+    // And it bites: the state's industry emits at the raised figure.
+    g.state_mut(StateId::SouthAmerica).industry_level = 2;
+    assert!((g.emissions_now().state_industry - (base + 1.0) * 2.0).abs() < 1e-9, "{}", g.emissions_now().state_industry);
+    g.state_mut(StateId::SouthAmerica).industry_level = 0;
+
+    // A second phase: Permafrost 4.0 against the weakened Sink of 4.0, and no second pulse.
+    let co2_again = g.climate.co2;
+    g.climate_phase();
+    assert!((g.climate.co2 - co2_again).abs() < 1e-9, "the pulse does not come twice: {}", g.climate.co2);
+    assert!((g.baseline_emissions(StateId::SouthAmerica) - (base + 1.0)).abs() < 1e-9, "and the rise does not come twice either");
+}
+
+/// (g) The Event card that was Permafrost Thaw is the Methane Burst, at 2.5.
+#[test]
+fn g_the_methane_burst_card_is_two_and_a_half() {
+    let g = game();
+    assert_eq!(g.tables.event(EventId::MethaneBurst).name, "Methane Burst");
+    assert!((g.tables.events.methane_emissions - 2.5).abs() < 1e-9, "{}", g.tables.events.methane_emissions);
+    assert!(g.tables.event(EventId::MethaneBurst).effect.contains("2.5"), "the card text says so: {}", g.tables.event(EventId::MethaneBurst).effect);
+}
+
+/// (h) Committed Warming is the target Temperature: what the CO2 Stock as it stands delivers once
+/// the lag has caught up.
+#[test]
+fn h_committed_warming_is_the_temperature_the_stock_delivers_once_the_lag_catches_up() {
+    let mut g = game();
+    let c = g.tables.climate.clone();
+    g.climate.co2 = c.starting_co2 + 2.0 * c.ppm_step;
+    assert!((g.target_temperature() - (c.base_temperature + 2.0 * c.degrees_per_ppm_step)).abs() < 1e-9, "{}", g.target_temperature());
+    // Hold the stock still and let the lag run: the Temperature arrives at exactly that figure.
+    g.climate.temperature = c.base_temperature;
+    for _ in 0..40 {
+        let t = g.climate.temperature;
+        g.climate.temperature = t + (g.target_temperature() - t) * c.temperature_lag_fraction;
+    }
+    assert!((g.climate.temperature - g.target_temperature()).abs() < 1e-9, "{} against {}", g.climate.temperature, g.target_temperature());
+}
+
+/// A constructed path: `gross` ppm of Emissions a turn against the Sink as it stands, at `temp`
+/// with the CO2 Stock `above` ppm over its starting figure.
+fn path(g: &mut Game, gross: f64, temp: f64, above: f64) {
+    bare_world(g);
+    g.climate.co2 = g.tables.climate.starting_co2 + above;
+    g.climate.temperature = temp;
+    g.climate.last = EmissionsBreakdown { state_industry: gross, sink: g.climate.natural_sink, ..Default::default() };
+}
+
+/// (i) The Last Turn, on a path whose answer can be worked out by hand. Turn 1 of 24, the Stock 405
+/// ppm above its start (target +2.55 C), the Temperature +1.5, and 20 ppm a turn going in. Cutting
+/// net Emissions to zero at turn k freezes the Stock at 405 + (k - 2) x 20 ppm above the start, and
+/// the Temperature then arrives at 1.2 + 0.5 x that / 150. At k = 8 that is 1.2 + 0.5 x 525 / 150 =
+/// +2.95 C, under the Collapse Line; at k = 9 it is +3.017 C, over it. So the answer is 8.
+#[test]
+fn i_a_the_last_turn_is_the_latest_turn_a_cut_still_avoids_collapse() {
+    let mut g = game();
+    calm(&mut g);
+    path(&mut g, 26.0, 1.5, 405.0);
+    assert_eq!(g.turn, 1);
+    assert_eq!(g.last_turn_to_act(), LastTurn::Turn(8));
+}
+
+/// (i) A path that never collapses: net Emissions already at the Sink and the Stock at its start.
+#[test]
+fn i_b_the_last_turn_says_so_when_the_path_never_collapses() {
+    let mut g = game();
+    breaks_ahead(&mut g);
+    path(&mut g, 6.0, 1.2, 0.0);
+    assert_eq!(g.last_turn_to_act(), LastTurn::NoCollapse);
+}
+
+/// (i) A path already past saving: the Stock as it stands is committed to +3.2 C, so no cut of any
+/// kind keeps the Temperature under the line.
+#[test]
+fn i_c_the_last_turn_says_so_when_cuts_alone_no_longer_avoid_collapse() {
+    let mut g = game();
+    calm(&mut g);
+    path(&mut g, 6.0, 1.5, 600.0);
+    assert!((g.target_temperature() - 3.2).abs() < 1e-9, "committed to {:+.2}", g.target_temperature());
+    assert_eq!(g.last_turn_to_act(), LastTurn::TooLate);
+}
+
+/// (i) A Break on the path brings the Last Turn forward: the same path, with the Permafrost Thaw
+/// still ahead of it, leaves less room than one where it has already fired. Permafrost is the world's
+/// carbon, not anybody's, so a cut of net Emissions does not touch it: it goes on adding 4.0 ppm a
+/// turn past the cut, and the Temperature the Stock is committed to goes on rising with it.
+#[test]
+fn i_d_a_break_on_the_path_brings_the_last_turn_forward() {
+    let mut clear = game();
+    calm(&mut clear);
+    path(&mut clear, 26.0, 1.5, 405.0);
+    let LastTurn::Turn(without) = clear.last_turn_to_act() else { panic!("the clear path has a Last Turn") };
+
+    let mut ahead = game();
+    calm(&mut ahead);
+    path(&mut ahead, 26.0, 1.5, 405.0);
+    let i = break_at(&ahead, "permafrost_thaw");
+    ahead.climate.breaks_fired[i] = false;
+    let LastTurn::Turn(with) = ahead.last_turn_to_act() else { panic!("the path with the Break has a Last Turn") };
+
+    assert!(with < without, "the Permafrost Thaw on the path brings the Last Turn forward: {with} against {without}");
 }

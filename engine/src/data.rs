@@ -222,7 +222,7 @@ pub struct EventsTable {
     pub draw_chance_step_degrees: f64,
     pub solar_maximum_multiplier: f64,
     pub solar_maximum_multiplier_with_tech: f64,
-    pub permafrost_emissions: f64,
+    pub methane_emissions: f64,
     pub meteor_damage: u32,
     /// Ticket #52: the Unrest card is a flat rise in the state's Unrest; the Army damage and the
     /// Standing loss it carried until version 0.05 are gone.
@@ -379,6 +379,58 @@ pub struct DucatsCard {
     pub trade_post_base: f64,
 }
 
+/// Ticket #55 (version 0.05): what one Break does when it fires. The figures each kind reads sit
+/// beside it on the same `[[break]]` row, so the designer can move a Break or add one in the table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BreakEffect {
+    /// Every Nation State at `exposure` Coastal Exposure takes `unrest` Unrest, damped like any
+    /// climate rise, and loses `population_loss` of its people, who flow as refugees. No climate effect.
+    CoastalUnrest,
+    /// `emissions` ppm join the world's Emissions in this and every later Climate phase, on their
+    /// own line: nobody's Blame, and never counted against a Stabilization run.
+    EmissionsPerTurn,
+    /// The Natural Sink falls to `sink_after` for good. This one does bear on Stabilization: the
+    /// Sink is the bar the run is measured against.
+    WeakenSink,
+    /// One Sea Level threshold's slot loss, displacement and Unrest lands at once on every state,
+    /// out of sequence. The scheduled thresholds still fire on their own turns.
+    SeaLevelThreshold,
+    /// `co2` ppm join the CO2 Stock once, and `baseline_rise` is added to `state`'s Baseline
+    /// Emissions for good. Both are the world's doing: nobody's Blame, exempt from Stabilization.
+    CarbonPulse,
+}
+
+/// Ticket #55: one Break — a Temperature at which a permanent change fires once.
+#[derive(Debug, Clone, Deserialize)]
+pub struct BreakCard {
+    pub id: String,
+    pub name: String,
+    /// It fires in the first Climate phase whose Temperature stands at or above this.
+    pub temperature: f64,
+    pub effect: BreakEffect,
+    /// What the Report says happened, in a sentence. It says it happened, never that it is coming.
+    pub happened: String,
+    /// The card line: one line of prose under the sentence.
+    pub text: String,
+    #[serde(default)]
+    pub exposure: u32,
+    #[serde(default)]
+    pub unrest: f64,
+    #[serde(default)]
+    pub population_loss: f64,
+    #[serde(default)]
+    pub emissions: f64,
+    #[serde(default)]
+    pub sink_after: f64,
+    #[serde(default)]
+    pub co2: f64,
+    #[serde(default)]
+    pub baseline_rise: f64,
+    #[serde(default)]
+    pub state: Option<StateId>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct ClimateTable {
     pub starting_co2: f64,
@@ -396,6 +448,12 @@ pub struct ClimateTable {
     pub population_emissions_per_level: f64,
     pub launch_emissions: f64,
     pub sea_level_thresholds: Vec<f64>,
+    /// Ticket #55: the Temperature at which Antarctica's Colony Slots open. The sea-level ticket
+    /// will read it; the Climate Panel's Temperature bar draws its notch here already.
+    pub antarctica_opens_at: f64,
+    /// Ticket #55: the Breaks, in rising Temperature order (`[[break]]` in `climate.toml`).
+    #[serde(rename = "break", default)]
+    pub breaks: Vec<BreakCard>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -850,6 +908,28 @@ impl Tables {
         }
         if self.climate.sea_level_thresholds.is_empty() {
             return Err(err("climate.toml", "sea_level_thresholds is empty"));
+        }
+        // Ticket #55: the Breaks are read in order, so the panel's "next" line and the fired flags
+        // both depend on the list rising. A Break that does nothing is a typo, not a rule.
+        let mut previous = f64::MIN;
+        for b in &self.climate.breaks {
+            if b.temperature <= previous {
+                return Err(err("climate.toml", format!("[[break]] {}: the Breaks must rise in Temperature", b.id)));
+            }
+            previous = b.temperature;
+            if self.climate.breaks.iter().filter(|o| o.id == b.id).count() > 1 {
+                return Err(err("climate.toml", format!("[[break]] {}: two Breaks share an id", b.id)));
+            }
+            let figures = match b.effect {
+                BreakEffect::CoastalUnrest => b.unrest > 0.0 || b.population_loss > 0.0,
+                BreakEffect::EmissionsPerTurn => b.emissions > 0.0,
+                BreakEffect::WeakenSink => b.sink_after > 0.0,
+                BreakEffect::SeaLevelThreshold => true,
+                BreakEffect::CarbonPulse => b.co2 > 0.0 || (b.baseline_rise > 0.0 && b.state.is_some()),
+            };
+            if !figures {
+                return Err(err("climate.toml", format!("[[break]] {}: its effect kind has no figures to act on", b.id)));
+            }
         }
         if self.archive.stages == 0 || self.archive.research_per_stage <= 0 {
             return Err(err("modules.toml", "[archive] needs stages and research_per_stage above zero"));

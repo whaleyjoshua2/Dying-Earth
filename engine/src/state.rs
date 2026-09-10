@@ -280,8 +280,11 @@ pub struct EmissionsBreakdown {
     pub refineries: f64,
     pub launches: f64,
     pub population: f64,
-    /// Emissions added by Event cards (Wildfire, Permafrost Thaw); never counted against Stabilization.
+    /// Emissions added by Event cards (Wildfire, the Methane Burst); never counted against Stabilization.
     pub cards: f64,
+    /// Ticket #55: what the Permafrost Thaw Break adds every Climate phase once it has fired. Its
+    /// own line: nobody's Blame, and never counted against a Stabilization run.
+    pub permafrost: f64,
     pub sink: f64,
     /// Ticket #54: what the Scrubbers standing and online this Climate phase add to the Sink. It
     /// took Restoration's place in the breakdown and in the Stabilization sum.
@@ -297,7 +300,7 @@ impl EmissionsBreakdown {
         self.state_industry + self.factories + self.power_plants + self.refineries + self.launches + self.population
     }
     pub fn total(&self) -> f64 {
-        self.counted() + self.cards
+        self.counted() + self.cards + self.permafrost
     }
     pub fn total_sink(&self) -> f64 {
         self.sink + self.scrubbers
@@ -314,10 +317,18 @@ pub struct Climate {
     pub last: EmissionsBreakdown,
     /// Launches from Earth since the last Climate phase, per seat, charged next time.
     pub launches_pending: [u32; SEAT_COUNT],
-    /// Emissions a card (Permafrost Thaw) adds at the next Climate phase, worldwide.
+    /// Emissions a card (the Methane Burst) adds at the next Climate phase, worldwide.
     /// Ticket #54: `removal_next` went with Restoration. What a Faction takes back is now the
     /// Scrubbers standing at the Climate phase, read off the board (`scrubber_removal_by_seat`).
     pub card_emissions_next: f64,
+    /// Ticket #55: the Natural Sink as it stands. It opens at the table's figure and the Sink
+    /// Weakens Break lowers it for good; every reader of the Sink reads this, so a weakened Sink
+    /// moves the Stabilization bar and the Custodian AI's own pace with it.
+    pub natural_sink: f64,
+    /// Ticket #55: ppm the Permafrost Thaw Break adds to the world's Emissions every Climate phase.
+    pub permafrost: f64,
+    /// Ticket #55: which Breaks have fired, by index into `climate.toml`'s list. Each fires once.
+    pub breaks_fired: Vec<bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -621,6 +632,9 @@ impl Game {
                 last: EmissionsBreakdown::default(),
                 launches_pending: [0; SEAT_COUNT],
                 card_emissions_next: 0.0,
+                natural_sink: tables.climate.natural_sink,
+                permafrost: 0.0,
+                breaks_fired: vec![false; tables.climate.breaks.len()],
             },
             research: Research {
                 current: None,

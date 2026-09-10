@@ -283,7 +283,9 @@ pub enum EventId {
     DustStorm,
     Unrest,
     ReactorLeak,
-    PermafrostThaw,
+    // Ticket #55 (version 0.05): the Permafrost Thaw card became the Methane Burst, so the name is
+    // free for the Break that thaws the permafrost for good.
+    MethaneBurst,
 }
 
 impl EventId {
@@ -305,9 +307,9 @@ impl EventId {
         EventId::DustStorm,
         EventId::Unrest,
         EventId::ReactorLeak,
-        EventId::PermafrostThaw,
+        EventId::MethaneBurst,
     ];
-    pub const CLIMATE: [EventId; 4] = [EventId::Heatwave, EventId::Wildfire, EventId::StormSurge, EventId::PermafrostThaw];
+    pub const CLIMATE: [EventId; 4] = [EventId::Heatwave, EventId::Wildfire, EventId::StormSurge, EventId::MethaneBurst];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]

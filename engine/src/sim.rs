@@ -1,6 +1,7 @@
 //! Simulate mode (spec 19.3): an AI-versus-AI game, headless, with a full log.
 //! Ticket #50: four seats, so every Faction plays every game.
 
+use crate::climate::LastTurn;
 use crate::data::Tables;
 use crate::ids::*;
 use crate::state::*;
@@ -49,6 +50,11 @@ pub struct SimResult {
     /// Ticket #54: the world's net Emissions at the Climate phase of turn 12, and at the last turn.
     pub net_at_twelve: Option<f64>,
     pub net_at_end: f64,
+    /// Ticket #55: the turn each Break fired, by index into `climate.toml`'s list, None if it never
+    /// did; and the Last Turn the Climate Panel showed at turn 1 and at turn 12.
+    pub break_turns: Vec<Option<u32>>,
+    pub last_turn_at_one: LastTurn,
+    pub last_turn_at_twelve: Option<LastTurn>,
     pub log: Vec<String>,
 }
 
@@ -78,6 +84,18 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     // Ticket #54: the longest Stabilization run each seat reached, and the net at turn 12.
     let mut longest_stabilization = [0u32; SEAT_COUNT];
     let mut net_at_twelve: Option<f64> = None;
+    // Ticket #55: when each Break fired, and what the Last Turn line said at turn 1 and turn 12.
+    let mut break_turns: Vec<Option<u32>> = vec![None; tables.climate.breaks.len()];
+    let note_breaks = |g: &Game, turns: &mut Vec<Option<u32>>| {
+        for (i, fired) in g.climate.breaks_fired.iter().enumerate() {
+            if *fired && turns[i].is_none() {
+                turns[i] = Some(g.turn);
+            }
+        }
+    };
+    note_breaks(&game, &mut break_turns);
+    let last_turn_at_one = game.last_turn_to_act();
+    let mut last_turn_at_twelve: Option<LastTurn> = None;
     let max_turns = tables.victory.turns;
     let mut guard = 0;
     while !game.is_over() && guard < max_turns + 2 {
@@ -107,7 +125,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         }
         if game.turn >= 12 && net_at_twelve.is_none() {
             net_at_twelve = Some(game.climate.last.net());
+            last_turn_at_twelve = Some(game.last_turn_to_act());
         }
+        note_breaks(&game, &mut break_turns);
     }
     let buildings = Seat::ALL.map(|s| {
         let f: u32 = game.directed_states(s).iter().map(|st| game.state(*st).facilities.len() as u32).sum();
@@ -182,6 +202,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         longest_stabilization,
         net_at_twelve,
         net_at_end,
+        break_turns,
+        last_turn_at_one,
+        last_turn_at_twelve,
         log: game.log,
     }
 }

@@ -229,6 +229,28 @@ fn build_board(session: &mut Session) {
             g.end_turn(orders);
             g.seats[0].ai = true;
         }
+        // `temp:<now>[,<committed>]` (a building aid, ticket #55): the Temperature is put at `now`
+        // and the CO2 Stock at the figure that commits the world to `committed` (the same, if it is
+        // left off), then a quiet turn runs so the Climate phase fires every Break at or under the
+        // Temperature and the Report and the Climate Panel read a real board. An AI game reaches a
+        // given Temperature at a turn the aid cannot choose, and the last-turn picture needs a
+        // Stock well ahead of the Temperature, which no ordinary board offers on demand.
+        if let Some(arg) = std::env::args().find_map(|a| a.strip_prefix("temp:").map(str::to_owned)) {
+            let (now, committed) = match arg.split_once(',') {
+                Some((a, b)) => (a.parse::<f64>().ok(), b.parse::<f64>().ok()),
+                None => (arg.parse::<f64>().ok(), None),
+            };
+            if let Some(now) = now {
+                let c = g.tables.climate.clone();
+                let target = committed.unwrap_or(now);
+                g.climate.temperature = now;
+                g.climate.co2 = c.starting_co2 + (target - c.base_temperature) * c.ppm_step / c.degrees_per_ppm_step;
+                g.seats[0].stockpile.energy = 400;
+                g.seats[0].stockpile.materials = 300;
+                g.seats[0].stockpile.ducats = 300;
+                run_one_quiet_turn(g);
+            }
+        }
         // `tints:1` (a building aid): one Nation State per seat on the face the Earth picture shows,
         // so all four Faction tints are in one picture. The AI seldom leaves four controllers alive.
         if std::env::args().any(|a| a == "tints:1") {

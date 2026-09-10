@@ -2,6 +2,7 @@
 //! `cargo run -p dying-earth-engine --example sim -- <seed> [--player=<faction>] [--count=N] [--log]`
 //! Faction ids are the full names: custodians, prospectors, arkwrights, archivists.
 
+use dying_earth_engine::climate::LastTurn;
 use dying_earth_engine::data::{default_data_dir, Tables};
 use dying_earth_engine::ids::{FactionKind, Seat, SEAT_COUNT};
 use dying_earth_engine::state::Outcome;
@@ -66,6 +67,13 @@ fn main() {
     let mut runs: [Vec<u32>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
     let mut net_twelve: Vec<f64> = Vec::new();
     let mut net_end: Vec<f64> = Vec::new();
+    // Ticket #55: how many seeds each Break fired in and on what turn, and the Last Turn shown at
+    // turn 1 and at turn 12.
+    let mut break_turns: Vec<Vec<u32>> = tables.climate.breaks.iter().map(|_| Vec::new()).collect();
+    let mut last_turn_one: Vec<u32> = Vec::new();
+    let mut last_turn_twelve: Vec<u32> = Vec::new();
+    let (mut gone_one, mut gone_twelve) = (0u32, 0u32);
+    let (mut safe_one, mut safe_twelve) = (0u32, 0u32);
     let mut kinds = [FactionKind::Custodians; SEAT_COUNT];
     for s in seed..seed + count {
         let r = dying_earth_engine::sim::run(tables.clone(), s, player);
@@ -111,6 +119,22 @@ fn main() {
             net_twelve.push(n);
         }
         net_end.push(r.net_at_end);
+        for (i, t) in r.break_turns.iter().enumerate() {
+            if let Some(t) = t {
+                break_turns[i].push(*t);
+            }
+        }
+        for (shown, turns, gone, safe) in [
+            (Some(r.last_turn_at_one), &mut last_turn_one, &mut gone_one, &mut safe_one),
+            (r.last_turn_at_twelve, &mut last_turn_twelve, &mut gone_twelve, &mut safe_twelve),
+        ] {
+            match shown {
+                Some(LastTurn::Turn(t)) => turns.push(t),
+                Some(LastTurn::TooLate) => *gone += 1,
+                Some(LastTurn::NoCollapse) => *safe += 1,
+                None => {}
+            }
+        }
         println!(
             "seed {:3} | {:?} | turn {:2} | first colony {:?} | buildings {:?} | colonists {:?} | temp {:+.2} | collapse proj {:?} | colony hands {:?} | influence transfers {:2} | bank/post/embassy/relay {:?}",
             r.seed, r.outcome, r.last_turn, r.first_colony_turn, r.buildings, r.colonists_off_earth, r.temperature, r.collapse_projected_turn, r.colony_changed_hands, r.influence_transfers, r.new_buildings
@@ -186,5 +210,33 @@ fn main() {
         }
         println!("{:>12}         : {:+.1}", "median world net Emissions at turn 12", median_f(&mut net_twelve));
         println!("{:>12}         : {:+.1}", "median world net Emissions at the end", median_f(&mut net_end));
+        // Ticket #55: the Breaks, and the Last Turn the panel showed.
+        println!();
+        println!("{:>24} | {:>6} | {:>5} | {:>12}", "Break", "at", "seeds", "median turn");
+        for (i, b) in tables.climate.breaks.iter().enumerate() {
+            println!(
+                "{:>24} | {:>+6.1} | {:>5} | {:>12}",
+                b.name,
+                b.temperature,
+                break_turns[i].len(),
+                median(&mut break_turns[i])
+            );
+        }
+        println!(
+            "{:>12}         : median {} ({} seeds), cuts gone in {}, no Collapse on the path in {}",
+            "Last Turn at turn 1",
+            median(&mut last_turn_one),
+            last_turn_one.len(),
+            gone_one,
+            safe_one
+        );
+        println!(
+            "{:>12}         : median {} ({} seeds), cuts gone in {}, no Collapse on the path in {}",
+            "Last Turn at turn 12",
+            median(&mut last_turn_twelve),
+            last_turn_twelve.len(),
+            gone_twelve,
+            safe_twelve
+        );
     }
 }
