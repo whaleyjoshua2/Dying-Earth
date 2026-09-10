@@ -572,20 +572,29 @@ impl Game {
         }
 
         // --- Stations (ticket #46): one over each Body where the seat has a producing Colony and none yet.
+        // Ticket #51: over Earth the foothold is a Nation State with a working Launch Site, so a
+        // Faction that starts with no station (the Arkwrights) can build its first; while the seat
+        // has no Shipyard anywhere, that first station is the thing that unlocks every Ship, so it
+        // takes the opportunity multiplier.
+        let has_shipyard = self.colonies.iter().any(|c| c.control.director() == Some(seat) && c.modules.iter().any(|m| m.kind == ModuleKind::Shipyard));
         for body in BodyId::ALL {
             let has_station = self.colonies.iter().any(|c| c.in_orbit && c.body == body && c.control.director() == Some(seat));
-            let foothold = self.colonies.iter().any(|c| !c.in_orbit && c.body == body && c.control.director() == Some(seat) && c.modules.iter().any(|m| matches!(m.kind, ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery)));
+            let foothold = match body {
+                BodyId::Earth => self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.online)),
+                _ => self.colonies.iter().any(|c| !c.in_orbit && c.body == body && c.control.director() == Some(seat) && c.modules.iter().any(|m| matches!(m.kind, ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery))),
+            };
             if has_station || !foothold {
                 continue;
             }
             if let Some(slot) = self.free_orbital_slots(body).first() {
-                push(vec![Order::BuildStation { body, slot: *slot }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard), 1.0, 1.0, 1.0, format!("build {} over {}", self.station_name(body, *slot), self.tables.body(body).name), None);
+                let opp = if has_shipyard { 1.0 } else { m.opportunity };
+                push(vec![Order::BuildStation { body, slot: *slot }], Cat::LaunchSiteOrShipyard, self.base_weight(seat, Cat::LaunchSiteOrShipyard), 1.0, 1.0, opp, format!("build {} over {}", self.station_name(body, *slot), self.tables.body(body).name), None);
             }
         }
 
         // --- The Archive (ticket #51). The Archivist AI funds it whenever the next stage still
-        // wants Research and it holds a Colony off Earth to build at, and otherwise contributes to
-        // the shared Tech; it raises the Archive at the first such Colony it took.
+        // wants Research, from turn one if it likes, and otherwise contributes to the shared Tech;
+        // it raises the Archive at the first Colony off Earth it took, one stage at a time.
         if kind == FactionKind::Archivists {
             let home = self.archive_colony(seat).or_else(|| {
                 self.colonies
@@ -594,18 +603,18 @@ impl Game {
                     .min_by_key(|c| (c.founded_turn, c.id.0))
                     .map(|c| c.id)
             });
-            if let Some(cid) = home {
-                let per = self.tables.archive.research_per_stage;
-                let fund = self.seat(seat).archive_fund;
-                let left = self.archive_fund_cap(seat);
-                if left > 0 && fund < left && self.seat(seat).research_last_turn > 0 {
-                    let opp = if fund + self.seat(seat).research_last_turn >= per { m.opportunity } else { 1.0 };
-                    push(vec![Order::FundArchive], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, opp, format!("fund the Archive with this turn's {} Research", self.seat(seat).research_last_turn), None);
-                }
-                if fund >= per {
-                    let next = self.archive_stages_committed(seat) + 1;
-                    push(vec![Order::BuildArchiveStage { colony: cid }], Cat::ArchiveStage, self.base_weight(seat, Cat::ArchiveStage), gap_for(Cat::ArchiveStage, None), 1.0, m.opportunity, format!("raise stage {} of the Archive at {}", next, self.place_name(Place::Colony(cid))), None);
-                }
+            let per = self.tables.archive.research_per_stage;
+            let fund = self.seat(seat).archive_fund;
+            let left = self.archive_fund_cap(seat);
+            if left > 0 && fund < left && self.seat(seat).research_last_turn > 0 {
+                let opp = if fund + self.seat(seat).research_last_turn >= per { m.opportunity } else { 1.0 };
+                push(vec![Order::FundArchive], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, opp, format!("fund the Archive with this turn's {} Research", self.seat(seat).research_last_turn), None);
+            }
+            if let Some(cid) = home
+                && fund >= per
+            {
+                let next = self.archive_stages_committed(seat) + 1;
+                push(vec![Order::BuildArchiveStage { colony: cid }], Cat::ArchiveStage, self.base_weight(seat, Cat::ArchiveStage), gap_for(Cat::ArchiveStage, None), 1.0, m.opportunity, format!("raise stage {} of the Archive at {}", next, self.place_name(Place::Colony(cid))), None);
             }
         }
 

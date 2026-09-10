@@ -1857,13 +1857,17 @@ fn a_stage_of_the_archive_needs_its_research_banked_and_a_colony_off_earth() {
     // Ordering spends the banked Research, and the next stage wants its own twenty.
     g.commit_orders(Seat(3), &[order.clone()]);
     assert_eq!(g.seats[3].archive_fund, 0);
-    assert_eq!(g.check_order(Seat(3), &[], &order).unwrap_err().0, "stage 2 needs 20 Research banked in the Archive fund, 0 there");
+    // One stage at a time: while stage 1 is building, stage 2 cannot be ordered even with the Research banked.
+    g.seats[3].archive_fund = 20;
+    assert_eq!(g.check_order(Seat(3), &[], &order).unwrap_err().0, "a stage of the Archive is already building; one stage at a time");
+    g.seats[3].archive_fund = 0;
     // Two turns later the stage stands.
     g.resolution_phase();
     assert_eq!(g.archive_stage(Seat(3)), 0, "two turns to raise");
     g.turn += 1;
     g.resolution_phase();
     assert_eq!(g.archive_stage(Seat(3)), 1);
+    assert_eq!(g.check_order(Seat(3), &[], &order).unwrap_err().0, "stage 2 needs 20 Research banked in the Archive fund, 0 there");
     assert_eq!(g.archive_colony(Seat(3)), Some(mars));
     // At most one per Faction.
     let deimos = colony(&mut g, Seat(3), BodyId::Deimos, &[], 0);
@@ -1959,4 +1963,28 @@ fn the_archivists_win_with_the_archive_running_and_twelve_colonists_at_its_colon
     g.income_phase();
     g.end_phase();
     assert!(g.outcome.is_none(), "{:?}", g.outcome);
+}
+
+#[test]
+fn an_ai_with_no_station_over_earth_orders_one_from_its_launch_site() {
+    // Ticket #51: the Arkwrights start with no station, so the AI must be able to build its first.
+    let mut g = game();
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+    g.seats[ark.index()].stockpile.materials = 200;
+    let orders = g.ai_orders(ark);
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::BuildStation { body: BodyId::Earth, .. })),
+        "the Arkwright AI never orders a station over Earth: {orders:?}"
+    );
+}
+
+#[test]
+fn the_archivist_ai_funds_the_archive_before_it_holds_a_colony() {
+    // Ticket #51: the fund can start on turn one; only the stage needs a Colony off Earth.
+    let mut g = game();
+    let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
+    assert!(g.colonies.iter().all(|c| c.in_orbit || c.control.director() != Some(arc)));
+    g.seats[arc.index()].research_last_turn = 6;
+    let orders = g.ai_orders(arc);
+    assert!(orders.iter().any(|o| matches!(o, Order::FundArchive)), "no funding order: {orders:?}");
 }

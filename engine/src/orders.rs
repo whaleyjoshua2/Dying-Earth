@@ -350,6 +350,12 @@ impl Game {
                 if committed >= stages {
                     return fail("every stage of the Archive is built or on order");
                 }
+                // One stage at a time: four stages of two turns are eight turns of building.
+                let building = self.colonies.iter().flat_map(|c| c.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Archive))
+                    || pending.iter().any(|o| matches!(o, Order::BuildArchiveStage { .. }));
+                if building {
+                    return fail("a stage of the Archive is already building; one stage at a time");
+                }
                 // The Research must already be banked: a stage ordered this turn cannot be paid out
                 // of this turn's funding, which has not happened yet.
                 let per = self.tables.archive.research_per_stage;

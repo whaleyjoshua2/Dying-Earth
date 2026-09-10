@@ -82,7 +82,8 @@ build_research_lab = 9
 build_habitat = 7
 build_launch_site_or_shipyard = 6
 build_colony_ship = 8
-build_warship = 3
+build_warship = 1
+# Ticket #51: the Archivists spend on the Archive and Colony Ships, never a fleet.
 build_army_or_barracks = 4
 build_influence = 6
 influence = 8

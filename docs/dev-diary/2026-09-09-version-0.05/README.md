@@ -227,3 +227,36 @@ the fund never starts. The Arkwrights end with 0 Colonists off Earth in every As
 from #50 has not changed: whoever holds Asia wins, and the other three seats finish with nothing to
 build in (buildings 70, 0, 0, 4 in seed 1 of the Custodian seating). Nothing was re-tuned on this
 ticket; these are the figures as they came out.
+
+### After the build: the AI learns to play the two new Factions
+
+Two AI gaps showed up in the first twenty seeds and were fixed on the same ticket, each seen red
+first in `engine/tests/formulas.rs`:
+
+- **The AI never ordered a station over Earth**, because the 0.04 rule only built a station over a
+  Body where the seat already had a producing Colony. A Faction that starts without a station (the
+  Arkwrights) could therefore never build a Ship. Over Earth the foothold is now a Nation State with
+  a working Launch Site, and while the seat has no Shipyard anywhere the first station takes the
+  opportunity multiplier. Test: `an_ai_with_no_station_over_earth_orders_one_from_its_launch_site`.
+- **The Archivist AI funded the Archive only once it held a Colony off Earth**, which in every
+  seating it never did. It now funds from turn one; only the stage needs the Colony. Test:
+  `the_archivist_ai_funds_the_archive_before_it_holds_a_colony`.
+- **Archive stages are built one at a time** (the builder had let a second stage queue behind the
+  first, which made "four stages of two turns" six turns rather than eight). Test: the stage test
+  now refuses a second order while one is building.
+- The Archivists' `build_warship` weight is 1: they spend on the Archive and Colony Ships.
+
+Twenty seeds afterwards, seat 0 starting in Asia:
+
+| seat 0 | wins | collapses | median collapse turn | seat 0's Colonists off Earth (seeds 1 to 6) |
+|---|---|---|---|---|
+| Arkwrights | none | 20 | 19 | 24, 16, 16, 16, 16, 16 |
+| Archivists | none | 20 | 20 | 0, 0, 0, 0, 0, 0 |
+
+**The Arkwrights now play their Faction**: Orbital Reef, a Shipyard, six Colony Ships of twelve,
+Mars Colonies of twelve Colonists, 16 to 24 Colonists off Earth by the Collapse on turn 19; they
+would reach 30 around turn 22 if the world lasted. **The Archivists cannot yet**: at output x0.8
+their one state pays 4 Materials a turn, they lose Asia to Influence around turn 9, and in sixty
+games no Archive stage was ever raised (the fund fills to 80 with nowhere to spend it). That is the
+card's economy, not the AI, and it is recorded on the map as a balance finding for the designer.
+Starting in Europe the Archivists collapse 6 of 20 games and the Custodians win 14.
