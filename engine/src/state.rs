@@ -611,6 +611,9 @@ pub struct Game {
     /// game starts, keyed by Body and slot. A free slot has them too: they are what a Colony
     /// founded there would get.
     pub slot_yields: BTreeMap<(BodyId, u32), SlotYields>,
+    /// Ticket #64: nobody sits at this game; all four seats are the computer's and the interface
+    /// is a spectator's. It changes what the Report is written for, and nothing about the rules.
+    pub spectator: bool,
     /// Lines for the simulate log and the dev diary; the interface ignores them.
     pub log: Vec<String>,
 }
@@ -746,6 +749,7 @@ impl Game {
             pending: crate::orders::Pending::default(),
             antarctica_open: false,
             slot_yields: BTreeMap::new(),
+            spectator: false,
             log: Vec::new(),
             tables,
         };
@@ -791,28 +795,20 @@ impl Game {
         game
     }
 
-    /// The start state for the next AI seat (spec 14.3, ticket #50): the free Nation State that is
-    /// NOT adjacent to any state already taken, with the highest Industry Level, ties by population;
-    /// if every free state touches a taken one, the highest Industry Level free state, ties by
-    /// population. A tie the population does not settle keeps the table's order.
+    /// The start state for the next AI seat (spec 14.3, ticket #50). The rule itself lives on the
+    /// tables, since ticket #64 asks it before there is a game.
     pub fn ai_start_state(&self, taken: &[StateId]) -> StateId {
-        let adjacent: Vec<StateId> = taken.iter().flat_map(|t| self.tables.state(*t).neighbours.iter().copied()).collect();
-        let free: Vec<&crate::data::StateCard> = self.tables.states.iter().filter(|c| !taken.contains(&c.id)).collect();
-        let best = |list: &[&crate::data::StateCard]| -> Option<StateId> {
-            let mut best: Option<&crate::data::StateCard> = None;
-            for c in list {
-                let better = match best {
-                    None => true,
-                    Some(b) => c.industry_level > b.industry_level || (c.industry_level == b.industry_level && c.population > b.population),
-                };
-                if better {
-                    best = Some(c);
-                }
-            }
-            best.map(|c| c.id)
-        };
-        let spread: Vec<&crate::data::StateCard> = free.iter().copied().filter(|c| !adjacent.contains(&c.id)).collect();
-        best(&spread).or_else(|| best(&free)).unwrap_or(StateId::EastAsia)
+        self.tables.ai_start_state(taken)
+    }
+
+    /// Ticket #64: a game nobody sits at. All four seats are the computer's, seat 0 holds the
+    /// Custodians so the seating reads as it does in simulate mode, and seat 0's start is the first
+    /// pick of the same spreading rule the other three are dealt by, not a continent anybody chose.
+    pub fn spectate(tables: std::sync::Arc<Tables>, seed: u64) -> Game {
+        let start = tables.ai_start_state(&[]);
+        let mut game = Game::new(tables, NewGame { seed, player: FactionKind::Custodians, player_is_ai: true, player_start: start });
+        game.spectator = true;
+        game
     }
 
     /// Ticket #50: break a tie among seats by a draw from the game's own generator, so a seed stays
@@ -1898,7 +1894,7 @@ impl Game {
     /// The same, for a line that belongs to the player when seat 0 did it and to the board
     /// otherwise: the player's builds, lifts, repairs and funding go under "Your works".
     pub fn report_line_of(&mut self, seat: Seat, mine: LineKind, theirs: LineKind, place: Option<ReportPlace>, text: String) {
-        let kind = if seat == Seat(0) { mine } else { theirs };
+        let kind = crate::report::line_kind_of(seat, mine, theirs, self.spectator);
         self.report_line(kind, place, text);
     }
 
@@ -1929,5 +1925,21 @@ impl Game {
         }
         let deeds = Game::and_list(&entry.deeds);
         Some(self.tables.report.rival("paragraph", &[("faction", self.seat_name(seat)), ("deeds", deeds)]))
+    }
+
+    /// Ticket #58, widened by #64: the paragraphs the Report ends on. A player's game tells what the
+    /// three rivals did; a spectated game tells what all four Factions did, seat 0 included, and a
+    /// Faction that gave no orders says so rather than dropping out of the list.
+    pub fn faction_paragraphs(&self) -> Vec<(Seat, String)> {
+        if !self.spectator {
+            return Seat::ALL.into_iter().skip(1).filter_map(|s| self.rival_paragraph(s).map(|p| (s, p))).collect();
+        }
+        Seat::ALL
+            .into_iter()
+            .map(|s| {
+                let text = self.rival_paragraph(s).unwrap_or_else(|| self.tables.report.rival("nothing", &[("faction", self.seat_name(s))]));
+                (s, text)
+            })
+            .collect()
     }
 }

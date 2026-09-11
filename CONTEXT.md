@@ -353,6 +353,10 @@ _Avoid_: summary, news, digest
 A short modal that stops the turn before the Report, for one sentence and one number: a Colony founded, a Break or the sea rising, a Battle that cost a unit, a place changing hands, a Tech completed, Antarctica opening, or the Archive finished. At most two a turn, the most serious first, and every kind can be switched off.
 _Avoid_: popup, alert, notification, cutscene, interruption
 
+**Spectator**:
+Someone watching a game they hold no seat in. The computer plays all four Factions and the interface gives no orders at all; in return every Faction's board, card and Standing is open to be read. End Turn advances one turn, and the turns can be set to run on their own.
+_Avoid_: observer, replay, demo
+
 ### Combat
 
 **Battle**:

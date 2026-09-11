@@ -1115,6 +1115,33 @@ impl Tables {
     pub fn state(&self, id: StateId) -> &StateCard {
         &self.states[id.index()]
     }
+
+    /// The start state for the next AI seat (spec 14.3, ticket #50): the free Nation State that is
+    /// NOT adjacent to any state already taken, with the highest Industry Level, ties by population;
+    /// if every free state touches a taken one, the highest Industry Level free state, ties by
+    /// population. A tie the population does not settle keeps the table's order.
+    ///
+    /// Ticket #64: it lives on the tables rather than on a game, because a spectated game has to
+    /// pick seat 0's start by this same rule before there is a game to ask.
+    pub fn ai_start_state(&self, taken: &[StateId]) -> StateId {
+        let adjacent: Vec<StateId> = taken.iter().flat_map(|t| self.state(*t).neighbours.iter().copied()).collect();
+        let free: Vec<&StateCard> = self.states.iter().filter(|c| !taken.contains(&c.id)).collect();
+        let best = |list: &[&StateCard]| -> Option<StateId> {
+            let mut best: Option<&StateCard> = None;
+            for c in list {
+                let better = match best {
+                    None => true,
+                    Some(b) => c.industry_level > b.industry_level || (c.industry_level == b.industry_level && c.population > b.population),
+                };
+                if better {
+                    best = Some(c);
+                }
+            }
+            best.map(|c| c.id)
+        };
+        let spread: Vec<&StateCard> = free.iter().copied().filter(|c| !adjacent.contains(&c.id)).collect();
+        best(&spread).or_else(|| best(&free)).unwrap_or(StateId::EastAsia)
+    }
     pub fn facility(&self, kind: FacilityKind) -> &FacilityCard {
         &self.facilities[kind as usize]
     }

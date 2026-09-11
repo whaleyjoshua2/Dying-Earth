@@ -123,10 +123,17 @@ fn build_board(session: &mut Session) {
     let player = std::env::args()
         .find_map(|a| a.strip_prefix("player:").and_then(FactionKind::from_id))
         .unwrap_or(FactionKind::Custodians);
-    session.new_game(player, StateId::EastAsia);
+    // `spectate:1` (a building aid, ticket #64): the game nobody sits at, as the Spectate button
+    // makes it, so a picture can be taken of the spectator's board and its dispatch.
+    let spectate = std::env::args().any(|a| a == "spectate:1");
+    if spectate {
+        session.spectate();
+    } else {
+        session.new_game(player, StateId::EastAsia);
+    }
     let turns: u32 = std::env::args().find_map(|a| a.strip_prefix("turns:").and_then(|v| v.parse().ok())).unwrap_or(0);
     if let Some(g) = &mut session.game {
-        if let Some(first) = g.available_techs().first().copied() {
+        if !spectate && let Some(first) = g.available_techs().first().copied() {
             g.pick_tech(Seat(0), first).ok();
         }
         if turns > 0 {
@@ -137,7 +144,7 @@ fn build_board(session: &mut Session) {
                 }
                 g.end_turn(std::array::from_fn(|_| Vec::new()));
             }
-            g.seats[0].ai = false;
+            g.seats[0].ai = spectate;
         }
         for seat in Seat::ALL {
             if !g.ships_at(seat, BodyId::Mars).is_empty() {

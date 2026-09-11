@@ -1336,3 +1336,48 @@ between them -- the turns **earned 1162 Moments and showed 335**, a shade under 
 which is the cap doing its work: three turns in four earn more Moments than they are allowed to show,
 and the rest fall through to the dispatch where they belong. The sim reads the defaults in
 `report.toml`, so a player who switches a kind off sees fewer.
+
+## #64: spectator mode
+
+A fifth button under the four Faction cards hands every seat to the computer. There is no continent
+to choose: seat 0's start is the first pick of the same spreading rule the other three are dealt by,
+and the Custodians sit in it, so the table reads as it does in `simulate:`. What changes is who the
+interface is for. The spectator sees everything and orders nothing: the side panel carries **all four
+Factions' boards**, each under its own heading in its own colour, with its Ships, Armies, Colonies
+and stations and Nation States; whatever is clicked opens its card on the left, readable in full,
+with every Faction's Standing on it and **no Orders buttons anywhere** -- no build, no Influence, no
+Stance, no transit, no trading, no Tech pick. The Victory panel, the Climate Panel and the Tech Tree
+open as they do for a player.
+
+**End Turn advances one turn**, the engine running all four AI seats. An **Auto** box beside it runs
+a turn every **three seconds** until it is unticked, and the clock stops while a Moment, the Report or
+the game-over popup is up and picks up again when it closes; Escape unticks it. The dispatch is the
+player's dispatch with two headings renamed for who is reading it: **Builds and works** carries every
+Faction's builds, lifts, repairs and funding rather than one seat's, and **What the Factions did**
+tells all four paragraphs, seat 0 among them. Moments are on by default with the same switches, and
+the game-over popup names the winner as it always did.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> spectate:1 ...`, the window off-screen) and opened before it was
+written about.
+
+![The Faction choice screen with a Spectate button in a bar under the four cards, and the line "Spectate: the computer plays all four; you watch."](spectate-choice.png)
+
+- **spectate-choice.png** -- `shot:spb spectate:1 turns:6 select:EastAsia seed:7`. The choice screen
+  still deals four cards; the Spectate button stands in its own bar beneath them, outside the cards'
+  scroll, so it is on screen whatever the cards do.
+
+![The Earth Map in spectator mode: "Spectating. Custodians Prospectors Arkwrights Archivists" along the top with an Auto checkbox beside End Turn, the East Asia card on the left with no buttons on it, and all four Factions' rosters on the right in their own colours](spectate-board.png)
+
+- **spectate-board.png** -- the same run, turn 7. The top bar names the table and the Auto box sits
+  beside End Turn; East Asia's card is open on the left with its Facilities, its slots, its Unrest and
+  its Standings and not one order button; the right panel is the whole table, Custodians in teal,
+  Prospectors in orange, Arkwrights in violet and Archivists in pale silver-blue, each with its
+  Ships, Army, Colony and State.
+
+![The Report in spectator mode: "Seed 7. Spectating." and the four Factions in their colours, a Break headline, then In space, On Earth, The climate, Builds and works, and What the Factions did with four coloured paragraphs](spectate-report.png)
+
+- **spectate-report.png** -- `shot:spr spectate:1 menus:1 turns:5 race:1 seed:7`. June 2030: the
+  Permafrost Thaw headlines, **Builds and works** carries the Archivists' Archive fund, the
+  Prospectors' Power Plant and the Arkwrights' Colony Ship -- three different Factions under one
+  heading -- and **What the Factions did** runs to four paragraphs, the Custodians' among them.

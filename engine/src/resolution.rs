@@ -868,7 +868,7 @@ impl Game {
                     BuildingChange::Decommission => self.say("building_decommissioned_state", &args),
                     _ => self.say("building_changed_state", &args),
                 };
-                let mine = if change.seat == Seat(0) { LineKind::YourWorks } else { LineKind::Note };
+                let mine = crate::report::line_kind_of(change.seat, LineKind::YourWorks, LineKind::Note, self.spectator);
                 said.push((mine, Some(ReportPlace::State(sid)), text));
                 if matches!(change.what, BuildingChange::Mothball | BuildingChange::Decommission) {
                     unrest.push((sid, change.what));
@@ -921,7 +921,7 @@ impl Game {
                     BuildingChange::Decommission => self.say("building_decommissioned_colony", &args),
                     _ => self.say("building_changed_colony", &args),
                 };
-                let mine = if change.seat == Seat(0) { LineKind::YourWorks } else { LineKind::Archive };
+                let mine = crate::report::line_kind_of(change.seat, LineKind::YourWorks, LineKind::Archive, self.spectator);
                 said.push((mine, Some(ReportPlace::Colony(cid)), text));
             }
             // Colonists beyond the Habitats a decommission left are lost with them.

@@ -122,6 +122,10 @@ enum Action {
     GoTo(ReportPlace),
     ChooseFaction(FactionKind),
     NewGame(FactionKind, StateId),
+    /// Ticket #64: Spectate, the fifth button on the choice screen.
+    Spectate,
+    /// Ticket #64: the Auto box beside End Turn.
+    SetAuto(bool),
     ToTitle,
     Quit,
 }
@@ -138,7 +142,7 @@ enum Hit {
     Enter(BodyId),
 }
 
-pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, session: Res<Session>, contexts: Option<Res<bevy_egui::input::EguiWantsInput>>) {
+pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mut session: ResMut<Session>, contexts: Option<Res<bevy_egui::input::EguiWantsInput>>) {
     if session.screen != Screen::Playing {
         return;
     }
@@ -153,6 +157,11 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, se
         toggle_climate(&mut view);
     }
     if keys.just_pressed(KeyCode::Escape) {
+        // Ticket #64: Escape unticks Auto, so a spectator can always stop the clock.
+        if session.auto {
+            session.auto = false;
+            session.auto_elapsed = 0.0;
+        }
         if view.popup != Popup::None {
             let moments = session.game.as_ref().map(|g| view.moments_of(&session.tables, &g.report).len()).unwrap_or(0);
             advance_popup(&mut view, moments);
@@ -276,6 +285,20 @@ pub fn draw(
     let mut actions: Vec<Action> = Vec::new();
     view.spin += time.delta_secs() * 0.25;
     let _ = window;
+    // Ticket #64: Auto runs a turn every three seconds. The clock stops while a Moment, the Report
+    // or the game-over popup is up, and picks up again where it left off when the popup closes.
+    if session.screen == Screen::Playing {
+        let blocked = view.popup != Popup::None;
+        if blocked || !session.auto {
+            session.auto_elapsed = 0.0;
+        } else {
+            session.auto_elapsed += time.delta_secs();
+        }
+        if crate::app::auto_should_advance(session.auto, blocked, session.auto_elapsed) {
+            session.auto_elapsed = 0.0;
+            actions.push(Action::EndTurn);
+        }
+    }
     match session.screen.clone() {
         Screen::Title => title_screen(&mut root, &mut session, &mut actions),
         Screen::ChooseFaction => faction_screen(&mut root, &session, &mut actions),
@@ -347,6 +370,18 @@ pub fn draw(
                 }
                 view.attack_preview = false;
             }
+            Action::Spectate => {
+                session.spectate();
+                *view = ViewState::default();
+                view.popup = Popup::Report;
+                let start = session.game.as_ref().map(|g| g.controlled_states(Seat(0))[0]).unwrap_or(StateId::EastAsia);
+                let (lon, lat) = geo::state_lonlat(start);
+                view.yaw = geo::yaw_facing(lon, lat);
+            }
+            Action::SetAuto(on) => {
+                session.auto = on;
+                session.auto_elapsed = 0.0;
+            }
             Action::ChooseFaction(f) => {
                 session.screen = Screen::ChooseStart { faction: f };
                 session.earth_dirty = true;
@@ -398,6 +433,18 @@ fn title_screen(root: &mut Ui, session: &mut Session, actions: &mut Vec<Action>)
 /// Ticket #50: every game seats all four Factions, so the choice screen deals four cards in two
 /// rows of two. The three not picked are played by the computer.
 fn faction_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>) {
+    // Ticket #64: or take no seat at all and watch the four of them play. It stands under the
+    // cards and outside their scroll, so it is on screen whatever the cards do.
+    egui::Panel::bottom("spectate_bar").show(root, |ui| {
+        ui.add_space(6.0);
+        ui.vertical_centered(|ui| {
+            if ui.add(egui::Button::new(RichText::new("Spectate").size(19.0)).min_size(egui::vec2(260.0, 40.0))).clicked() {
+                actions.push(Action::Spectate);
+            }
+            ui.label(RichText::new("Spectate: the computer plays all four; you watch.").size(15.0).weak());
+        });
+        ui.add_space(6.0);
+    });
     egui::CentralPanel::default().show(root, |ui| {
         ui.vertical_centered(|ui| {
             ui.add_space(10.0);
@@ -530,7 +577,10 @@ fn game_screen(
     side_panel(root, session, game, view, actions);
     // The 3D area: drag turns, wheel zooms, click picks.
     let mut hotspots: Vec<Hotspot> = Vec::new();
-    let painter = ctx.layer_painter(egui::LayerId::background());
+    // Ticket #64: the globe fills the window and the panels are drawn over it, so the map's own
+    // labels are clipped to what is left between them; otherwise a label for a place behind a panel
+    // is painted across the panel's text.
+    let painter = ctx.layer_painter(egui::LayerId::background()).with_clip_rect(root.available_rect_before_wrap());
     if let Some((camera, cam_gt)) = cam {
         overlays(&painter, session, game, view, camera, cam_gt, globes, &mut hotspots);
     }
@@ -562,9 +612,23 @@ fn game_screen(
 
 fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
     egui::Panel::top("top_bar").show(root, |ui| {
+        // Ticket #64: the spectator's bar names the table instead of a Faction of their own, and
+        // says whose Stockpile the numbers beside it are.
+        if session.spectator {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(RichText::new("Spectating.").strong());
+                for seat in Seat::ALL {
+                    ui.label(RichText::new(game.seat_name(seat)).strong().color(seat_colour(session, seat)));
+                }
+                ui.label(RichText::new("- the computer plays all four.").weak());
+            });
+        }
         ui.horizontal_wrapped(|ui| {
             let s = game.seat(Seat(0));
             let (left, influence_left) = game.remaining(Seat(0), &session.pending);
+            if session.spectator {
+                ui.label(RichText::new(format!("{}:", game.seat_name(Seat(0)))).strong().color(seat_colour(session, Seat(0))));
+            }
             let inc = s.income_last_turn;
             let signed = |v: i64| if v >= 0 { format!("+{v}") } else { format!("{v}") };
             // Hover a resource for last Income by source (ticket #31).
@@ -609,7 +673,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             if ui.button("Victory").clicked() {
                 view.show_victory = !view.show_victory;
             }
-            if ui.button("Trading").clicked() {
+            if !session.spectator && ui.button("Trading").clicked() {
                 view.show_trade = !view.show_trade;
             }
             let swap_text = match view.view {
@@ -624,14 +688,22 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 view.selection = Selection::None;
             }
             if session.screen == Screen::Playing {
-                let must_pick = game.research.awaiting_pick == Some(Seat(0)) && !game.available_techs().is_empty();
+                let must_pick = !session.spectator && game.research.awaiting_pick == Some(Seat(0)) && !game.available_techs().is_empty();
                 let button = egui::Button::new(RichText::new("End Turn").strong().size(16.0)).fill(Color32::from_rgb(120, 40, 30));
                 if ui.add_enabled(!must_pick && view.popup == Popup::None, button).on_disabled_hover_text("Pick a Tech first").clicked() {
                     let (_, influence_left) = game.remaining(Seat(0), &session.pending);
-                    if influence_left > 0 && game.seat(Seat(0)).allotment > 0 {
+                    if !session.spectator && influence_left > 0 && game.seat(Seat(0)).allotment > 0 {
                         view.popup = Popup::ConfirmEndTurn;
                     } else {
                         actions.push(Action::EndTurn);
+                    }
+                }
+                // Ticket #64: Auto runs a turn every three seconds until it is unticked; the clock
+                // stops while a Moment, the Report or the game-over popup is up. Escape unticks it.
+                if session.spectator {
+                    let mut auto = session.auto;
+                    if ui.checkbox(&mut auto, "Auto").on_hover_text(format!("A turn every {:.0} seconds, paused while a Moment or the Report is up. Escape unticks it.", crate::app::AUTO_INTERVAL)).changed() {
+                        actions.push(Action::SetAuto(auto));
                     }
                 }
             }
@@ -890,8 +962,10 @@ fn stations_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             view.selection = Selection::Colony(c.id);
         }
     }
-    for slot in game.free_orbital_slots(body) {
-        cost_button(ui, game, &session.pending, Order::BuildStation { body, slot }, &format!("Build {} here", game.station_name(body, slot)), actions);
+    if !session.spectator {
+        for slot in game.free_orbital_slots(body) {
+            cost_button(ui, game, &session.pending, Order::BuildStation { body, slot }, &format!("Build {} here", game.station_name(body, slot)), actions);
+        }
     }
     ui.label(RichText::new("A station holds a Shipyard and Habitats. Ships are built only at a Shipyard.").weak());
 }
@@ -990,32 +1064,23 @@ fn apply_hit(hit: Hit, view: &mut ViewState) {
 // ------------------------------------------------------------------ the side panel
 
 fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    // Ticket #64: a spectator gives no orders, so the panel that held the order list holds the
+    // table instead -- all four Factions' boards -- and whatever has been clicked opens on the
+    // left, where nothing of the spectator's own has to share the room with it.
+    if session.spectator {
+        egui::Panel::left("spectator_card").default_size(400.0).resizable(true).show(root, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| selection_card(ui, session, game, view, actions));
+        });
+        egui::Panel::right("side").default_size(360.0).resizable(true).show(root, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| roster(ui, session, game, view));
+        });
+        return;
+    }
     egui::Panel::right("side").default_size(360.0).resizable(true).show(root, |ui| {
         egui::ScrollArea::vertical().show(ui, |ui| {
-            match view.selection {
-                Selection::None => {
-                    ui.add_space(6.0);
-                    ui.label(RichText::new(match view.view {
-                        View::Solar => "Solar System Map",
-                        View::Surface(BodyId::Earth) => "Earth Map",
-                        View::Surface(b) => game.tables.body(b).name.as_str(),
-                    }).size(20.0).strong());
-                    ui.label(match view.view {
-                        View::Solar => "Click a Body to enter its surface. Click a Ship stack for orders.",
-                        View::Surface(BodyId::Earth) => "Click a Nation State for its card and orders. Drag to turn, wheel to zoom.",
-                        View::Surface(_) => "Click a Colony Slot or Colony for its card and orders.",
-                    });
-                    if let Some(e) = &session.last_error {
-                        ui.colored_label(Color32::LIGHT_RED, e);
-                    }
-                    stations_panel(ui, session, game, view, actions);
-                    ui.separator();
-                    roster(ui, session, game, view);
-                }
-                Selection::State(sid) => state_panel(ui, session, game, view, sid, actions),
-                Selection::Colony(cid) => colony_panel(ui, session, game, view, cid, actions),
-                Selection::Slot(body, slot) => slot_panel(ui, game, body, slot, actions),
-                Selection::ShipStack(body, seat) => stack_panel(ui, session, game, view, body, seat, actions),
+            selection_card(ui, session, game, view, actions);
+            if view.selection == Selection::None {
+                roster(ui, session, game, view);
             }
             ui.separator();
             ui.label(RichText::new(format!("Orders this turn ({})", session.pending.len())).strong());
@@ -1038,105 +1103,56 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     });
 }
 
+/// Whatever is selected, as its card: the view's own heading and the stations over it when nothing
+/// is.
+fn selection_card(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    match view.selection {
+        Selection::None => {
+            ui.add_space(6.0);
+            ui.label(RichText::new(match view.view {
+                View::Solar => "Solar System Map",
+                View::Surface(BodyId::Earth) => "Earth Map",
+                View::Surface(b) => game.tables.body(b).name.as_str(),
+            }).size(20.0).strong());
+            ui.label(match (view.view, session.spectator) {
+                (View::Solar, false) => "Click a Body to enter its surface. Click a Ship stack for orders.",
+                (View::Solar, true) => "Click a Body to enter its surface. Click a Ship stack to read it.",
+                (View::Surface(BodyId::Earth), false) => "Click a Nation State for its card and orders. Drag to turn, wheel to zoom.",
+                (View::Surface(BodyId::Earth), true) => "Click a Nation State for its card. Drag to turn, wheel to zoom.",
+                (View::Surface(_), false) => "Click a Colony Slot or Colony for its card and orders.",
+                (View::Surface(_), true) => "Click a Colony Slot or Colony for its card.",
+            });
+            if let Some(e) = &session.last_error {
+                ui.colored_label(Color32::LIGHT_RED, e);
+            }
+            stations_panel(ui, session, game, view, actions);
+            ui.separator();
+        }
+        Selection::State(sid) => state_panel(ui, session, game, view, sid, actions),
+        Selection::Colony(cid) => colony_panel(ui, session, game, view, cid, actions),
+        Selection::Slot(body, slot) => slot_panel(ui, session, game, body, slot, actions),
+        Selection::ShipStack(body, seat) => stack_panel(ui, session, game, view, body, seat, actions),
+    }
+}
+
 /// The roster (#23): every Ship stack, Army, Colony and Nation State the player directs, each row a
 /// button that selects it and jumps to its view, with a mark on anything that has no order this turn.
+/// Ticket #64: a spectator directs nothing, so their roster deals all four Factions, each under its
+/// own heading in its own colour, and marks nothing, since nobody owes an order.
 fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
-    ui.label(RichText::new("Your roster").size(18.0).strong());
-    ui.label(RichText::new("Click a row to select it and go there. \"no order\" marks what still waits.").weak());
-    let pending = &session.pending;
     let mut jump: Option<(View, Selection)> = None;
-    // Ships, one row per stack, then those in transit.
-    ui.label(RichText::new("Ships").strong());
-    let mut any_ship = false;
-    for body in BodyId::ALL {
-        let ships: Vec<&Ship> = game.ships.iter().filter(|s| s.seat == Seat(0) && s.at == ShipAt::Body(body)).collect();
-        if ships.is_empty() {
-            continue;
+    if session.spectator {
+        ui.label(RichText::new("The table").size(18.0).strong());
+        ui.label(RichText::new("Every Faction's board. Click a row to go there.").weak());
+        for seat in Seat::ALL {
+            ui.add_space(6.0);
+            ui.label(RichText::new(game.seat_name(seat)).size(17.0).strong().color(seat_colour(session, seat)));
+            roster_of(ui, session, game, seat, false, &mut jump);
         }
-        any_ship = true;
-        let ordered = ships.iter().all(|s| {
-            pending.iter().any(|o| matches!(o, Order::Transit { ship, .. } | Order::Load { ship, .. } | Order::Unload { ship, .. } | Order::Repair { unit: UnitRef::Ship(ship), .. } if *ship == s.id))
-        }) || pending.iter().any(|o| matches!(o, Order::ShipStance { body: b, .. } if *b == body));
-        let mut kinds: Vec<String> = ships.iter().map(|s| s.kind.name().to_string()).collect();
-        kinds.sort();
-        kinds.dedup();
-        let cargo: u32 = ships.iter().map(|s| s.colonists).sum();
-        let armies = ships.iter().filter(|s| s.army.is_some()).count();
-        let mut text = format!("{} at {}: {} (strength {})", ships.len(), game.tables.body(body).name, kinds.join(", "), game.ship_stack_strength(Seat(0), body));
-        if cargo > 0 {
-            text.push_str(&format!(", {cargo} Colonists aboard"));
-        }
-        if armies > 0 {
-            text.push_str(&format!(", {armies} Army aboard"));
-        }
-        if !ordered {
-            text.push_str("  - no order");
-        }
-        if ui.button(text).clicked() {
-            jump = Some((View::Solar, Selection::ShipStack(body, Seat(0))));
-        }
-    }
-    for s in game.ships.iter().filter(|s| s.seat == Seat(0)) {
-        if let ShipAt::Transit { to, turns_left, .. } = s.at {
-            any_ship = true;
-            let text = format!("{} in transit to {}, {} turn(s) left", s.kind.name(), game.tables.body(to).name, turns_left);
-            if ui.button(text).clicked() {
-                jump = Some((View::Solar, Selection::None));
-            }
-        }
-    }
-    if !any_ship {
-        ui.label(RichText::new("  none; a Shipyard on a station or Colony builds them").weak());
-    }
-    // Armies.
-    ui.label(RichText::new("Armies").strong());
-    let mut any_army = false;
-    for a in game.armies.iter().filter(|a| game.army_seat(a) == Some(Seat(0)) && !game.army_stands_down(a)) {
-        any_army = true;
-        let ordered = pending.iter().any(|o| match o {
-            Order::MoveArmy { army, .. } | Order::Repair { unit: UnitRef::Army(army), .. } | Order::Load { army: Some(army), .. } => *army == a.id,
-            Order::ArmyStance { place, .. } => a.at == ArmyAt::Place(*place),
-            _ => false,
-        });
-        let (where_, target) = match a.at {
-            ArmyAt::Place(Place::State(s)) => (game.tables.state(s).name.clone(), Some((View::Surface(BodyId::Earth), Selection::State(s)))),
-            ArmyAt::Place(Place::Colony(c)) => (game.place_name(Place::Colony(c)), game.colony(c).map(|col| (View::Surface(col.body), Selection::Colony(c)))),
-            ArmyAt::Aboard(ship) => (format!("aboard {ship}"), game.ship(ship).map(|s| match s.at { ShipAt::Body(b) => (View::Solar, Selection::ShipStack(b, Seat(0))), _ => (View::Solar, Selection::None) })),
-        };
-        let mut text = format!("{} at {}: strength {}, damage {}", if a.standing { "Standing Army" } else { "Army" }, where_, game.army_strength(a), a.damage);
-        if !ordered && !matches!(a.at, ArmyAt::Aboard(_)) {
-            text.push_str("  - no order");
-        }
-        if ui.button(text).clicked() {
-            jump = target;
-        }
-    }
-    if !any_army {
-        ui.label(RichText::new("  none").weak());
-    }
-    // Colonies.
-    ui.label(RichText::new("Colonies and stations").strong());
-    let mut any_colony = false;
-    for c in game.colonies.iter().filter(|c| c.control.director() == Some(Seat(0))) {
-        any_colony = true;
-        let building = c.queue.len();
-        let text = format!("{}: {} Colonists, {} Modules{}", game.place_name(Place::Colony(c.id)), c.colonists, c.modules.len(), if building > 0 { format!(", {building} building") } else { String::new() });
-        if ui.button(text).clicked() {
-            jump = Some((View::Surface(c.body), Selection::Colony(c.id)));
-        }
-    }
-    if !any_colony {
-        ui.label(RichText::new("  none; a Colony Ship founds one").weak());
-    }
-    // Nation States.
-    ui.label(RichText::new("Nation States").strong());
-    for sid in game.directed_states(Seat(0)) {
-        let st = game.state(sid);
-        let building = st.queue.len();
-        let text = format!("{}: {} Facilities, {} free slot(s){}", game.tables.state(sid).name, st.facilities.len(), game.free_slots(sid), if building > 0 { format!(", {building} building") } else { String::new() });
-        if ui.button(text).clicked() {
-            jump = Some((View::Surface(BodyId::Earth), Selection::State(sid)));
-        }
+    } else {
+        ui.label(RichText::new("Your roster").size(18.0).strong());
+        ui.label(RichText::new("Click a row to select it and go there. \"no order\" marks what still waits.").weak());
+        roster_of(ui, session, game, Seat(0), true, &mut jump);
     }
     if let Some((v, sel)) = jump {
         match v {
@@ -1153,6 +1169,118 @@ fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
         view.attack_preview = false;
     }
 }
+
+/// One seat's Ships, Armies, Colonies and stations and Nation States. `marks` writes the "no order"
+/// mark, which only a seat that gives orders can owe; where it is off, four Factions share the
+/// panel, so each group is named on its own rows rather than over a heading, and an empty group is
+/// left out instead of saying so.
+fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: bool, jump: &mut Option<(View, Selection)>) {
+    let pending = &session.pending;
+    let heading = |ui: &mut Ui, text: &str| {
+        if marks {
+            ui.label(RichText::new(text).strong());
+        }
+    };
+    let tag = |text: &str| if marks { String::new() } else { format!("{text}: ") };
+    // Ships, one row per stack, then those in transit.
+    heading(ui, "Ships");
+    let mut any_ship = false;
+    for body in BodyId::ALL {
+        let ships: Vec<&Ship> = game.ships.iter().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)).collect();
+        if ships.is_empty() {
+            continue;
+        }
+        any_ship = true;
+        let ordered = ships.iter().all(|s| {
+            pending.iter().any(|o| matches!(o, Order::Transit { ship, .. } | Order::Load { ship, .. } | Order::Unload { ship, .. } | Order::Repair { unit: UnitRef::Ship(ship), .. } if *ship == s.id))
+        }) || pending.iter().any(|o| matches!(o, Order::ShipStance { body: b, .. } if *b == body));
+        let mut kinds: Vec<String> = ships.iter().map(|s| s.kind.name().to_string()).collect();
+        kinds.sort();
+        kinds.dedup();
+        let cargo: u32 = ships.iter().map(|s| s.colonists).sum();
+        let armies = ships.iter().filter(|s| s.army.is_some()).count();
+        let mut text = format!("{}{} at {}: {} (strength {})", tag("Ships"), ships.len(), game.tables.body(body).name, kinds.join(", "), game.ship_stack_strength(seat, body));
+        if cargo > 0 {
+            text.push_str(&format!(", {cargo} Colonists aboard"));
+        }
+        if armies > 0 {
+            text.push_str(&format!(", {armies} Army aboard"));
+        }
+        if marks && !ordered {
+            text.push_str("  - no order");
+        }
+        if ui.button(text).clicked() {
+            *jump = Some((View::Solar, Selection::ShipStack(body, seat)));
+        }
+    }
+    for s in game.ships.iter().filter(|s| s.seat == seat) {
+        if let ShipAt::Transit { to, turns_left, .. } = s.at {
+            any_ship = true;
+            let text = format!("{}{} in transit to {}, {} turn(s) left", tag("Ship"), s.kind.name(), game.tables.body(to).name, turns_left);
+            if ui.button(text).clicked() {
+                *jump = Some((View::Solar, Selection::None));
+            }
+        }
+    }
+    if !any_ship && marks {
+        ui.label(RichText::new("  none; a Shipyard on a station or Colony builds them").weak());
+    }
+    // Armies.
+    heading(ui, "Armies");
+    let mut any_army = false;
+    for a in game.armies.iter().filter(|a| game.army_seat(a) == Some(seat) && !game.army_stands_down(a)) {
+        any_army = true;
+        let ordered = pending.iter().any(|o| match o {
+            Order::MoveArmy { army, .. } | Order::Repair { unit: UnitRef::Army(army), .. } | Order::Load { army: Some(army), .. } => *army == a.id,
+            Order::ArmyStance { place, .. } => a.at == ArmyAt::Place(*place),
+            _ => false,
+        });
+        let (where_, target) = match a.at {
+            ArmyAt::Place(Place::State(s)) => (game.tables.state(s).name.clone(), Some((View::Surface(BodyId::Earth), Selection::State(s)))),
+            ArmyAt::Place(Place::Colony(c)) => (game.place_name(Place::Colony(c)), game.colony(c).map(|col| (View::Surface(col.body), Selection::Colony(c)))),
+            ArmyAt::Aboard(ship) => (format!("aboard {ship}"), game.ship(ship).map(|s| match s.at { ShipAt::Body(b) => (View::Solar, Selection::ShipStack(b, seat)), _ => (View::Solar, Selection::None) })),
+        };
+        let mut text = format!("{}{} at {}: strength {}, damage {}", tag("Army"), if a.standing { "Standing Army" } else { "Army" }, where_, game.army_strength(a), a.damage);
+        if marks && !ordered && !matches!(a.at, ArmyAt::Aboard(_)) {
+            text.push_str("  - no order");
+        }
+        if ui.button(text).clicked() {
+            *jump = target;
+        }
+    }
+    if !any_army && marks {
+        ui.label(RichText::new("  none").weak());
+    }
+    // Colonies.
+    heading(ui, "Colonies and stations");
+    let mut any_colony = false;
+    for c in game.colonies.iter().filter(|c| c.control.director() == Some(seat)) {
+        any_colony = true;
+        let building = c.queue.len();
+        let text = format!("{}{}: {} Colonists, {} Modules{}", tag("Colony"), game.place_name(Place::Colony(c.id)), c.colonists, c.modules.len(), if building > 0 { format!(", {building} building") } else { String::new() });
+        if ui.button(text).clicked() {
+            *jump = Some((View::Surface(c.body), Selection::Colony(c.id)));
+        }
+    }
+    if !any_colony && marks {
+        ui.label(RichText::new("  none; a Colony Ship founds one").weak());
+    }
+    // Nation States.
+    heading(ui, "Nation States");
+    let states = game.directed_states(seat);
+    if states.is_empty() && marks {
+        ui.label(RichText::new("  none").weak());
+    }
+    for sid in states {
+        let st = game.state(sid);
+        let building = st.queue.len();
+        let text = format!("{}{}: {} Facilities, {} free slot(s){}", tag("State"), game.tables.state(sid).name, st.facilities.len(), game.free_slots(sid), if building > 0 { format!(", {building} building") } else { String::new() });
+        if ui.button(text).clicked() {
+            *jump = Some((View::Surface(BodyId::Earth), Selection::State(sid)));
+        }
+    }
+}
+
 
 fn order_text(game: &Game, o: &Order) -> String {
     match o {
@@ -1310,6 +1438,20 @@ fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make
 }
 
 fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewState, target: Place, actions: &mut Vec<Action>) {
+    // Ticket #64: a spectator reads every Faction's Standing here and spends nothing.
+    if session.spectator {
+        standings_row(ui, game, session, target);
+        ui.label(format!(
+            "Threshold {}; a place already held changes hands only at the holder's Standing plus the challenge margin of {}.",
+            game.influence_threshold(target),
+            game.tables.influence.challenge_margin
+        ));
+        match game.place_control(target).controller() {
+            Some(c) => ui.label(RichText::new(format!("Held by the {}.", game.seat_name(c))).weak()),
+            None => ui.label(RichText::new("Neutral. The first Standing at the threshold takes it; Standings decay 2 a turn when nothing is spent.").weak()),
+        };
+        return;
+    }
     ui.horizontal(|ui| {
         ui.label("Influence:");
         ui.add(egui::DragValue::new(&mut view.influence_amount).range(1..=100));
@@ -1329,23 +1471,7 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
     // Ticket #53: the threshold shown is the player's own, since Blame raises it seat by seat.
     let threshold = game.influence_threshold_for(Seat(0), target);
     let standing = |s: Seat| game.seat(s).influence.get(&target).copied().unwrap_or(0);
-    // Ticket #50: four seats, so the Standings are chips in Faction colours, and only where there
-    // is a Standing to show.
-    ui.horizontal_wrapped(|ui| {
-        ui.label("Standings:");
-        let mut any = false;
-        for s in Seat::ALL {
-            let v = standing(s);
-            if v <= 0 {
-                continue;
-            }
-            any = true;
-            ui.label(RichText::new(format!(" {} {} ", game.seat_name(s), v)).color(Color32::BLACK).background_color(seat_colour(session, s)));
-        }
-        if !any {
-            ui.label(RichText::new("nobody has any yet").weak());
-        }
-    });
+    standings_row(ui, game, session, target);
     ui.label(format!("Threshold {}; a place already held changes hands only at the holder's Standing plus the challenge margin of {}.", threshold, game.tables.influence.challenge_margin));
     // Ticket #53: on every Nation State the player does not hold, what its Blame is costing it here.
     let blame_mult = game.blame_threshold_multiplier_on(Seat(0), target);
@@ -1374,6 +1500,26 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
             ui.label(RichText::new(format!("Neutral. The first standing at the threshold ({threshold}) takes it; standings decay 2 a turn when nothing is spent.")).weak());
         }
     }
+}
+
+/// Ticket #50: four seats, so the Standings are chips in Faction colours, and only where there is
+/// a Standing to show. Ticket #64: the spectator's cards carry the same row.
+fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place) {
+    ui.horizontal_wrapped(|ui| {
+        ui.label("Standings:");
+        let mut any = false;
+        for s in Seat::ALL {
+            let v = game.seat(s).influence.get(&target).copied().unwrap_or(0);
+            if v <= 0 {
+                continue;
+            }
+            any = true;
+            ui.label(RichText::new(format!(" {} {} ", game.seat_name(s), v)).color(Color32::BLACK).background_color(seat_colour(session, s)));
+        }
+        if !any {
+            ui.label(RichText::new("nobody has any yet").weak());
+        }
+    });
 }
 
 fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, sid: StateId, actions: &mut Vec<Action>) {
@@ -1468,7 +1614,8 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     slot_rows(ui, game, sid);
     ui.label(RichText::new(format!("Facilities ({} of {} slots free)", game.free_slots(sid), game.build_slots(sid))).strong());
     let director = st.control.director();
-    let mine = st.control.director() == Some(Seat(0));
+    // Ticket #64: a spectator reads every card and orders on none of them.
+    let mine = !session.spectator && st.control.director() == Some(Seat(0));
     for (i, f) in st.facilities.iter().enumerate() {
         // Ticket #54: a mothballed Facility says so rather than showing figures it is not making.
         let figures = if f.mothballed {
@@ -1624,7 +1771,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     ui.label(format!("Colonists {} of {} Habitat room", col.colonists, game.habitat_room(col)));
     ui.label(RichText::new("Modules").strong());
     let director = col.control.director();
-    let colony_mine = col.control.director() == Some(Seat(0));
+    let colony_mine = !session.spectator && col.control.director() == Some(Seat(0));
     let stages = game.tables.archive.stages;
     for (mi, m) in col.modules.iter().enumerate() {
         // Ticket #51: the Archive reads as a Project, by stage, not as a yield.
@@ -1671,7 +1818,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         ui.label(format!("  {} Army strength {}, damage {}", who, game.army_strength(a), a.damage));
     }
     ui.separator();
-    let mine = col.control.director() == Some(Seat(0));
+    let mine = !session.spectator && col.control.director() == Some(Seat(0));
     if mine {
         // Ticket #51: the Archive, the first Project, has its own orders on an Archivist's card.
         if game.kind(Seat(0)) == FactionKind::Archivists {
@@ -1728,7 +1875,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             }
         }
     }
-    let my_armies: Vec<&Army> = armies.iter().copied().filter(|a| game.army_seat(a) == Some(Seat(0))).collect();
+    let my_armies: Vec<&Army> = armies.iter().copied().filter(|a| !session.spectator && game.army_seat(a) == Some(Seat(0))).collect();
     if !my_armies.is_empty() {
         stance_row(ui, game, &session.pending, my_armies[0].stance, |s| Order::ArmyStance { place: Place::Colony(cid), stance: s }, false, actions);
         for a in &my_armies {
@@ -1741,7 +1888,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     influence_row(ui, game, session, view, Place::Colony(cid), actions);
 }
 
-fn slot_panel(ui: &mut Ui, game: &Game, body: BodyId, slot: u32, actions: &mut Vec<Action>) {
+fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u32, actions: &mut Vec<Action>) {
     ui.label(RichText::new(format!("{}, Colony Slot {} on {}", game.tables.body(body).slots[slot as usize].name, slot + 1, game.tables.body(body).name)).size(22.0).strong());
     // Ticket #56: Earth's three slots are Antarctica's, and they open at +1.6 C.
     if body == BodyId::Earth && !game.antarctica_open {
@@ -1762,7 +1909,7 @@ fn slot_panel(ui: &mut Ui, game: &Game, body: BodyId, slot: u32, actions: &mut V
         ))
         .weak(),
     );
-    for s in game.ships.iter().filter(|s| s.seat == Seat(0) && s.at == ShipAt::Body(body) && s.kind == UnitKind::ColonyShip && s.colonists > 0) {
+    for s in game.ships.iter().filter(|s| !session.spectator && s.seat == Seat(0) && s.at == ShipAt::Body(body) && s.kind == UnitKind::ColonyShip && s.colonists > 0) {
         let order = Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) };
         if ui.button(format!("Found a Colony here with the {} Colonists aboard {}", s.colonists, s.id)).clicked() {
             actions.push(Action::Place(order));
@@ -1783,6 +1930,14 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             extra.push("an Army".into());
         }
         ui.label(format!("  {} {}: strength {}, damage {}/{}{}", s.kind.name(), s.id.0, game.ship_strength(s), s.damage, card.hit_points, if extra.is_empty() { String::new() } else { format!(", carrying {}", extra.join(" and ")) }));
+    }
+    if session.spectator {
+        let enemy = game.enemy_ship_strength(seat, body);
+        if enemy > 0 {
+            let rivals = rivals_at(game, seat, body);
+            ui.label(format!("Against {} ({} in all) if it attacked here.", rivals_text(game, &rivals), enemy));
+        }
+        return;
     }
     if seat != Seat(0) {
         let mine = game.ship_stack_strength(Seat(0), body);
@@ -2115,7 +2270,7 @@ fn moments_corner(ui: &mut Ui, session: &Session, view: &mut ViewState) {
 }
 
 fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
-    if view.show_trade {
+    if view.show_trade && !session.spectator {
         let mut open = true;
         egui::Window::new("Trading").open(&mut open).default_width(470.0).show(ctx, |ui| trading_window(ui, session, game, view, actions));
         view.show_trade = open;
@@ -2158,7 +2313,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
     if view.show_climate {
         let mut open = true;
         let bottom = ctx.viewport_rect().max.y;
-        let home = (10.0, bottom - 400.0);
+        // Ticket #64: the spectator's card sits on the left, so the panel's home is clear of it.
+        let home = (if session.spectator { 420.0 } else { 10.0 }, bottom - 400.0);
         let mut window = egui::Window::new("Climate Panel").open(&mut open).default_pos(home).default_width(400.0);
         if view.climate_reopen {
             window = window.current_pos(home);
@@ -2349,12 +2505,20 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // Ticket #58: a dated bulletin.
                 ui.label(RichText::new(format!("Report, {}", game.date(game.report.turn).text())).size(20.0).strong());
                 // Ticket #50: who is at this table, and under which seed.
+                // Ticket #64: a spectator has no seat, so the line names all four.
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(RichText::new(format!("Seed {}. You:", game.seed)).weak());
-                    ui.label(RichText::new(game.seat_name(Seat(0))).strong().color(seat_colour(session, Seat(0))));
-                    ui.label(RichText::new("Computer:").weak());
-                    for seat in Seat::ALL.into_iter().skip(1) {
-                        ui.label(RichText::new(game.seat_name(seat)).color(seat_colour(session, seat)));
+                    if session.spectator {
+                        ui.label(RichText::new(format!("Seed {}. Spectating.", game.seed)).weak());
+                        for seat in Seat::ALL {
+                            ui.label(RichText::new(game.seat_name(seat)).color(seat_colour(session, seat)));
+                        }
+                    } else {
+                        ui.label(RichText::new(format!("Seed {}. You:", game.seed)).weak());
+                        ui.label(RichText::new(game.seat_name(Seat(0))).strong().color(seat_colour(session, Seat(0))));
+                        ui.label(RichText::new("Computer:").weak());
+                        for seat in Seat::ALL.into_iter().skip(1) {
+                            ui.label(RichText::new(game.seat_name(seat)).color(seat_colour(session, seat)));
+                        }
                     }
                 });
                 // The headline: the most severe thing that happened, in its own size.
@@ -2371,7 +2535,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 egui::ScrollArea::vertical().max_height(520.0).show(ui, |ui| {
                     // The four headings, empty ones left out; every line with a place is a way there.
                     for (section, lines) in game.report.sections() {
-                        ui.label(RichText::new(section.name()).strong());
+                        ui.label(RichText::new(section.name_for(session.spectator)).strong());
                         for l in lines {
                             match l.place {
                                 Some(place) => {
@@ -2413,10 +2577,10 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         ui.add_space(4.0);
                     }
                     // Ticket #58: what each rival Faction did, one paragraph each, in seat order.
-                    let paragraphs: Vec<(Seat, String)> =
-                        Seat::ALL.into_iter().skip(1).filter_map(|s| game.rival_paragraph(s).map(|p| (s, p))).collect();
+                    // Ticket #64: a spectator has no rivals, so all four Factions are told.
+                    let paragraphs = game.faction_paragraphs();
                     if !paragraphs.is_empty() {
-                        ui.label(RichText::new("What the rival Factions did").strong());
+                        ui.label(RichText::new(if session.spectator { "What the Factions did" } else { "What the rival Factions did" }).strong());
                         for (seat, text) in paragraphs {
                             ui.label(RichText::new(text).color(seat_colour(session, seat)));
                         }

@@ -59,6 +59,23 @@ pub struct Session {
     /// The Earth Map must be recomposed (control, occupation or the sea changed).
     pub earth_dirty: bool,
     pub last_error: Option<String>,
+    /// Ticket #64: nobody is playing this game. All four seats are the computer's, the interface
+    /// gives no orders, and every Faction's board is open to be read.
+    pub spectator: bool,
+    /// Ticket #64: Auto is ticked, so a turn runs every `AUTO_INTERVAL` seconds.
+    pub auto: bool,
+    /// Seconds since the last turn Auto ran; it does not count while a popup is up.
+    pub auto_elapsed: f32,
+}
+
+/// Ticket #64: how long Auto waits between turns.
+pub const AUTO_INTERVAL: f32 = 3.0;
+
+/// Ticket #64: whether Auto runs the next turn now. It runs only while the box is ticked, only when
+/// no Moment, Report or game-over popup is up, and only once the interval has passed; the clock is
+/// stopped, not merely ignored, while a popup is open, so closing one does not fire a turn at once.
+pub fn auto_should_advance(auto_on: bool, popup_open: bool, elapsed: f32) -> bool {
+    auto_on && !popup_open && elapsed >= AUTO_INTERVAL
 }
 
 impl Session {
@@ -73,10 +90,25 @@ impl Session {
     pub fn new_game(&mut self, faction: FactionKind, start: StateId) {
         let mut game = Game::new(self.tables.clone(), NewGame { seed: self.seed, player: faction, player_is_ai: false, player_start: start });
         game.start();
+        self.begin(game, false);
+    }
+
+    /// Ticket #64: Spectate. The computer takes all four seats and picks every start by its own
+    /// spreading rule, so no continent is chosen and no orders are ever given.
+    pub fn spectate(&mut self) {
+        let mut game = Game::spectate(self.tables.clone(), self.seed);
+        game.start();
+        self.begin(game, true);
+    }
+
+    fn begin(&mut self, game: Game, spectator: bool) {
         self.game = Some(game);
         self.pending.clear();
         self.screen = Screen::Playing;
         self.earth_dirty = true;
+        self.spectator = spectator;
+        self.auto = false;
+        self.auto_elapsed = 0.0;
     }
 
     /// Try to add an order; on failure remember why so the panel can show it.
@@ -197,5 +229,27 @@ impl ViewState {
             View::Surface(_) => View::Solar,
         };
         self.selection = Selection::None;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Ticket #64 (c): Auto advances only when it is ticked, no popup is up, and three seconds have
+    /// passed since the last turn.
+    #[test]
+    fn auto_advances_only_when_ticked_unblocked_and_three_seconds_have_passed() {
+        assert_eq!(AUTO_INTERVAL, 3.0, "three seconds a turn");
+        // Ticked, nothing in the way, the interval passed.
+        assert!(auto_should_advance(true, false, AUTO_INTERVAL));
+        assert!(auto_should_advance(true, false, AUTO_INTERVAL + 0.5));
+        // Unticked: never, however long it has been.
+        assert!(!auto_should_advance(false, false, 10.0));
+        // A Moment, the Report or the game-over popup is up: never, however long it has been.
+        assert!(!auto_should_advance(true, true, 10.0));
+        // Ticked and clear, but the interval has not passed.
+        assert!(!auto_should_advance(true, false, 0.0));
+        assert!(!auto_should_advance(true, false, AUTO_INTERVAL - 0.01));
     }
 }

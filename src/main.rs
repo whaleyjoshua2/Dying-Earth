@@ -89,6 +89,9 @@ fn main() {
             shot_prefix: shot.unwrap_or_default(),
             earth_dirty: false,
             last_error: None,
+            spectator: false,
+            auto: false,
+            auto_elapsed: 0.0,
         })
         .insert_resource(textures)
         .insert_resource(ViewState::default())

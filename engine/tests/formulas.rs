@@ -4384,3 +4384,94 @@ fn the_first_reports_headline_is_the_seating_explanation() {
     assert!(g.report.lines.len() > 1, "and there are other lines under it");
     assert_eq!(g.report.headline_index(), Some(0));
 }
+
+// ---------------------------------------------------------------- Ticket #64: spectator mode
+
+/// (a) A game nobody sits at: every seat is the computer's, End Turn with no orders runs all four
+/// and advances, and seat 0's start is the spreading rule's first pick rather than a continent
+/// anybody handed in.
+#[test]
+fn a_spectated_game_seats_four_computers_and_deals_seat_zero_by_the_spreading_rule() {
+    let t = tables();
+    let mut g = Game::spectate(t.clone(), 7);
+    g.start();
+    assert!(g.spectator, "the game knows nobody is sitting at it");
+    // Seat 0 holds the Custodians, so the seating reads as it does in simulate mode.
+    assert_eq!(g.kind(Seat(0)), FactionKind::Custodians);
+    for seat in Seat::ALL {
+        assert!(g.seat(seat).ai, "{seat:?} is played by the computer");
+    }
+    // The four starts are the spreading rule's own four picks, taken from an empty table.
+    let mut taken: Vec<StateId> = Vec::new();
+    for _ in Seat::ALL {
+        let pick = t.ai_start_state(&taken);
+        taken.push(pick);
+    }
+    assert_eq!(taken, vec![StateId::EastAsia, StateId::Europe, StateId::Australia, StateId::SubSaharanAfrica]);
+    for seat in Seat::ALL {
+        assert_eq!(g.controlled_states(seat), vec![taken[seat.index()]], "{seat:?} starts where the rule put it");
+    }
+    // And not where a handed-in start would have put it: the same seed with a player start of South
+    // America seats the Custodians there, where the spectated game seats them in East Asia.
+    let handed = Game::new(t.clone(), NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: true, player_start: StateId::SouthAmerica });
+    assert_eq!(handed.controlled_states(Seat(0)), vec![StateId::SouthAmerica], "a handed-in start is obeyed");
+    assert_ne!(g.controlled_states(Seat(0)), handed.controlled_states(Seat(0)), "the spectated game took no handed-in start");
+    // End Turn with empty orders runs all four seats and advances the turn.
+    let turn = g.turn;
+    g.end_turn(std::array::from_fn(|_| Vec::new()));
+    assert_eq!(g.turn, turn + 1, "the turn advanced");
+    assert_eq!(g.report.ai_lines.len(), SEAT_COUNT, "all four seats ordered");
+    for (i, entry) in g.report.ai_lines.iter().enumerate() {
+        assert_eq!(entry.seat, Seat(i as u8), "in seat order");
+    }
+}
+
+/// (b) The spectator's dispatch: the heading that carried one seat's works is named "Builds and
+/// works" and carries every seat's, and the Report ends on four paragraphs, seat 0 included.
+#[test]
+fn the_spectators_dispatch_carries_every_factions_works_and_all_four_paragraphs() {
+    // The heading, and the routing rule under it.
+    assert_eq!(Section::YourWorks.name_for(false), "Your works");
+    assert_eq!(Section::YourWorks.name_for(true), "Builds and works");
+    for seat in Seat::ALL {
+        assert_eq!(dying_earth_engine::report::line_kind_of(seat, LineKind::YourBuild, LineKind::BuildComplete, true), LineKind::YourBuild, "{seat:?}'s build is the spectator's business");
+    }
+    assert_eq!(dying_earth_engine::report::line_kind_of(Seat(0), LineKind::YourBuild, LineKind::BuildComplete, false), LineKind::YourBuild);
+    assert_eq!(dying_earth_engine::report::line_kind_of(Seat(2), LineKind::YourBuild, LineKind::BuildComplete, false), LineKind::BuildComplete);
+    assert_eq!(LineKind::YourBuild.section(Some(ReportPlace::State(StateId::Europe))), Section::YourWorks, "and it lands under that heading");
+
+    // On a real board: run the game until a seat other than 0 completes a build, and find its line
+    // under the works heading rather than out on the board.
+    let t = tables();
+    let mut g = Game::spectate(t.clone(), 7);
+    g.start();
+    let mut found: Option<(Seat, String)> = None;
+    for _ in 0..12 {
+        g.end_turn(std::array::from_fn(|_| Vec::new()));
+        let works: Vec<&ReportLine> = g.report.sections().into_iter().find(|(s, _)| *s == Section::YourWorks).map(|(_, l)| l).unwrap_or_default();
+        for seat in Seat::ALL.into_iter().skip(1) {
+            let name = g.seat_name(seat);
+            if let Some(l) = works.iter().find(|l| l.text.contains(&name)) {
+                found = Some((seat, l.text.clone()));
+            }
+        }
+        if found.is_some() {
+            break;
+        }
+    }
+    let (seat, text) = found.expect("a rival seat's works under the spectator's works heading");
+    assert!(seat != Seat(0) && text.contains(&g.seat_name(seat)), "it names the Faction whose work it is: {text}");
+
+    // And the paragraphs: four of them, in seat order, seat 0 among them.
+    let paragraphs = g.faction_paragraphs();
+    assert_eq!(paragraphs.len(), SEAT_COUNT, "four paragraphs");
+    for (i, (s, text)) in paragraphs.iter().enumerate() {
+        assert_eq!(*s, Seat(i as u8), "in seat order");
+        assert!(text.contains(&g.seat_name(*s)), "each names its Faction: {text}");
+    }
+    // A player's game still tells only the three rivals.
+    let mut p = with_seed(7);
+    p.start();
+    p.end_turn(std::array::from_fn(|_| Vec::new()));
+    assert!(p.faction_paragraphs().iter().all(|(s, _)| *s != Seat(0)), "a player's Report keeps seat 0 out of the rivals");
+}

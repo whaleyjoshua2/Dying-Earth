@@ -76,13 +76,28 @@ pub enum Section {
 impl Section {
     pub const ALL: [Section; 4] = [Section::InSpace, Section::OnEarth, Section::TheClimate, Section::YourWorks];
     pub fn name(self) -> &'static str {
+        self.name_for(false)
+    }
+
+    /// Ticket #64: a spectator has no works of their own, so the heading that carries them is named
+    /// for what it now holds: every Faction's builds and works, not one seat's.
+    pub fn name_for(self, spectator: bool) -> &'static str {
         match self {
             Section::InSpace => "In space",
             Section::OnEarth => "On Earth",
             Section::TheClimate => "The climate",
+            Section::YourWorks if spectator => "Builds and works",
             Section::YourWorks => "Your works",
         }
     }
+}
+
+/// Ticket #64: which kind a line written "for a seat" carries. A player's game routes seat 0's
+/// builds, lifts, repairs and funding to "Your works" and every other seat's to the board; a
+/// spectated game has no seat of its own, so every seat's works take the same route and the
+/// heading carries all four Factions.
+pub fn line_kind_of(seat: Seat, mine: LineKind, theirs: LineKind, spectator: bool) -> LineKind {
+    if spectator || seat == Seat(0) { mine } else { theirs }
 }
 
 impl LineKind {
