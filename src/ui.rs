@@ -1478,7 +1478,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildFacilityWithDucats { state, kind } => format!("Build {} in {} for Ducats", kind.name(), game.tables.state(*state).name),
         Order::BuildModuleWithDucats { colony, kind } => format!("Build {} at {} for Ducats", kind.name(), game.place_name(Place::Colony(*colony))),
         Order::BuildStation { body, slot } => format!("Build {} over {}", game.station_name(*body, *slot), game.tables.body(*body).name),
-        Order::BuildArchiveStage { colony } => format!("Raise a stage of the Archive at {}", game.place_name(Place::Colony(*colony))),
+        Order::BuildArchive { colony } => format!("Build the Archive at {}", game.place_name(Place::Colony(*colony))),
         Order::FundArchive => "Fund the Archive with this turn's Research".to_string(),
         // Ticket #52.
         Order::Relief { state } => format!("Relief in {}: Unrest -1", game.tables.state(*state).name),
@@ -1945,20 +1945,18 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     ui.label(RichText::new("Modules").strong());
     let director = col.control.director();
     let colony_mine = !session.spectator && col.control.director() == Some(Seat(0));
-    let stages = game.tables.archive.stages;
+    let research = game.tables.archive.research;
     for (mi, m) in col.modules.iter().enumerate() {
-        // Ticket #51: the Archive reads as a Project, by stage, not as a yield.
+        // Ticket #51: the Archive reads by its Research paid, not as a yield (ticket #68: one Module).
         if m.kind == ModuleKind::Archive {
-            let building = col.queue.iter().find(|b| b.item == BuildItem::Module(ModuleKind::Archive));
-            let state = if let Some(b) = building {
-                format!("building, {} turn(s) left", (b.due_turn + 1).saturating_sub(game.turn))
-            } else if m.stage >= stages {
+            let fund = director.map(|d| game.seat(d).archive_fund).unwrap_or(0);
+            let state = if fund >= research {
                 let running = m.online && !col.control.is_occupied();
                 format!("complete, {}", if running { "online" } else { "offline" })
             } else {
-                "waiting for its next stage".to_string()
+                format!("standing, {fund} of {research} Research paid")
             };
-            ui.label(format!("  The Archive: stage {} of {}, {}", m.stage, stages, state));
+            ui.label(format!("  The Archive: {state}"));
             continue;
         }
         // Ticket #54: a mothballed Module says so, and carries the same three buttons.
@@ -1976,11 +1974,11 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             change_row(ui, game, &session.pending, BuildingRef::Module(cid, mi), m.mothballed, m.change, actions);
         }
     }
-    // Ticket #51: a stage on order shows before its Module does.
+    // Ticket #51: the Archive on order shows before its Module does.
     if !col.modules.iter().any(|m| m.kind == ModuleKind::Archive)
         && let Some(b) = col.queue.iter().find(|b| b.item == BuildItem::Module(ModuleKind::Archive))
     {
-        ui.label(format!("  The Archive: stage 1 of {}, building, {} turn(s) left", stages, (b.due_turn + 1).saturating_sub(game.turn)));
+        ui.label(format!("  The Archive: building, {} turn(s) left", (b.due_turn + 1).saturating_sub(game.turn)));
     }
     for b in col.queue.iter().filter(|b| b.item != BuildItem::Module(ModuleKind::Archive)) {
         ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
@@ -1993,31 +1991,42 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     ui.separator();
     let mine = !session.spectator && col.control.director() == Some(Seat(0));
     if mine {
-        // Ticket #51: the Archive, the first Project, has its own orders on an Archivist's card.
+        // Ticket #51: the Archive has its own orders on an Archivist's card. Ticket #68: one Module
+        // from its own button, and a fund that holds a quarter of the Research until it stands.
         if game.kind(Seat(0)) == FactionKind::Archivists {
-            let per = game.tables.archive.research_per_stage;
             let fund = game.seat(Seat(0)).archive_fund;
-            let next = game.archive_stages_committed(Seat(0)) + 1;
+            let cap = game.archive_fund_cap(Seat(0));
             ui.separator();
             ui.label(RichText::new("The Archive").strong());
-            ui.label(format!("Archive fund {} of {}", fund, per));
+            let built = game.archive_built(Seat(0));
+            let fund_line = if built {
+                format!("Archive fund {fund} of {research}")
+            } else {
+                format!("Archive fund {fund} of {cap} (a quarter of the {research} until the Archive stands)")
+            };
+            ui.label(fund_line);
             let funding = game.seat(Seat(0)).funding_archive || session.pending.iter().any(|o| matches!(o, Order::FundArchive));
             let mut on = funding;
-            if ui.checkbox(&mut on, "Fund the Archive this turn (your Labs' Research goes to the fund, not the shared Tech)").changed() {
+            let may_fund = game.check_order(Seat(0), &session.pending, &Order::FundArchive).is_ok() || funding;
+            let box_ = ui.add_enabled(may_fund, egui::Checkbox::new(&mut on, "Fund the Archive this turn (your Labs' Research goes to the fund, not the shared Tech)"));
+            if !may_fund {
+                box_.clone().on_disabled_hover_text("The fund is at its cap; this turn's Research goes to the shared Tech.");
+            }
+            if box_.changed() {
                 if on {
                     actions.push(Action::Place(Order::FundArchive));
                 } else if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::FundArchive)) {
                     actions.push(Action::Cancel(i));
                 }
             }
-            if next <= stages {
-                let order = Order::BuildArchiveStage { colony: cid };
+            if !built && !game.archive_ordered(Seat(0)) {
+                let order = Order::BuildArchive { colony: cid };
                 let materials = game.order_cost(Seat(0), &order).materials;
                 let check = game.check_order(Seat(0), &session.pending, &order);
-                let label = format!("Build stage {next} ({materials} Materials, {per} Research)");
+                let label = format!("Build the Archive ({materials} Materials)");
                 let resp = ui
                     .add_enabled(check.is_ok(), egui::Button::new(label))
-                    .on_hover_text(format!("{} turn(s) to raise once paid", game.tables.module(ModuleKind::Archive).build_turns));
+                    .on_hover_text(format!("{} turns to raise; then the fund opens to the full {research} Research", game.tables.module(ModuleKind::Archive).build_turns));
                 if let Err(e) = &check {
                     resp.clone().on_disabled_hover_text(&e.0);
                 }

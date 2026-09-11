@@ -179,9 +179,13 @@ impl Game {
 
     /// Fund the Archive (ticket #51). This turn's Research from the seat's own Labs was paid into
     /// the shared Tech at Income; funding takes it back out and banks it, so it contributes nothing
-    /// to the Research Lead for the turn. Research past what the remaining stages need is wasted.
+    /// to the Research Lead for the turn. Ticket #68 (version 0.05.5): only what the fund has room
+    /// for under its cap is taken; the rest stays with the shared Tech, nothing is wasted, and the
+    /// point that fills the fund with the Module standing completes the Archive.
     pub fn fund_archive(&mut self, seat: Seat) {
-        let amount = self.seat(seat).research_last_turn.max(0);
+        let cap = self.archive_fund_cap(seat);
+        let before = self.seat(seat).archive_fund;
+        let amount = self.seat(seat).research_last_turn.max(0).min((cap - before).max(0));
         // Take it back out of wherever Income put it.
         let moved = if self.research.current.is_some() {
             let have = self.research.contributions[seat.index()].min(amount);
@@ -193,30 +197,34 @@ impl Game {
             self.research.unallocated -= have;
             have
         };
-        let cap = self.archive_fund_cap(seat);
-        let before = self.seat(seat).archive_fund;
         let after = (before + moved).min(cap).max(0);
         {
             let s = self.seat_mut(seat);
             s.archive_fund = after;
             s.funding_archive = true;
         }
-        let wasted = before + moved - after;
-        let line = if wasted > 0 {
-            format!("The {} are funding the Archive: {} Research banked, {} of it wasted, {} of {} in the fund.", self.seat_name(seat), moved, wasted, after, cap)
-        } else {
-            format!("The {} are funding the Archive: {} Research banked, {} of {} in the fund.", self.seat_name(seat), moved, after, cap)
-        };
+        let line = format!("The {} are funding the Archive: {} Research banked, {} of {} in the fund.", self.seat_name(seat), moved, after, cap);
         self.log(line);
-        let args = vec![
-            ("faction", self.seat_name(seat)),
-            ("banked", moved.to_string()),
-            ("wasted", wasted.to_string()),
-            ("fund", after.to_string()),
-            ("cap", cap.to_string()),
-        ];
-        let text = if wasted > 0 { self.say("archive_funded_wasted", &args) } else { self.say("archive_funded", &args) };
+        let args = vec![("faction", self.seat_name(seat)), ("banked", moved.to_string()), ("fund", after.to_string()), ("cap", cap.to_string())];
+        let text = self.say("archive_funded", &args);
         self.report_line_of(seat, LineKind::YourWorks, LineKind::Archive, None, text);
+        // Ticket #68: the payment that fills the fund with the Module standing completes the Archive.
+        let research = self.tables.archive.research;
+        if self.archive_built(seat) && before < research && after >= research {
+            self.archive_completed(seat);
+        }
+    }
+
+    /// Ticket #68: the Archive is complete, whether the last Research or the Module came last.
+    pub fn archive_completed(&mut self, seat: Seat) {
+        let Some(cid) = self.archive_colony(seat) else { return };
+        let place = Place::Colony(cid);
+        let line = format!("The {} completed the Archive at {}: it stands, and every point of its Research is paid.", self.seat_name(seat), self.place_name(place));
+        self.log(line);
+        let text = self.say("archive_complete", &[("faction", self.seat_name(seat)), ("place", self.place_name(place))]);
+        self.report_line(LineKind::Archive, Some(place.into()), text);
+        let research = self.tables.archive.research;
+        self.moment(MomentKind::ArchiveComplete, &[("faction", self.seat_name(seat)), ("place", self.place_name(place)), ("research", research.to_string())], Some(place.into()));
     }
 
     /// Ticket #51: whether the Archivists diverted this turn's Research, for the tech panel.

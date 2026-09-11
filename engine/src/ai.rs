@@ -24,8 +24,8 @@ enum Cat {
     Resettle,
     /// Ticket #51: divert this turn's Research into the Archive fund.
     FundArchive,
-    /// Ticket #51: order the next stage of the Archive.
-    ArchiveStage,
+    /// Ticket #51: build the Archive; one Module since ticket #68.
+    BuildArchive,
     Influence,
     Transit,
     LoadUnload,
@@ -92,7 +92,7 @@ impl Game {
             Cat::Relief => w.relief,
             Cat::Resettle => w.resettle,
             Cat::FundArchive => w.fund_archive,
-            Cat::ArchiveStage => w.build_archive_stage,
+            Cat::BuildArchive => w.build_archive,
             Cat::Influence => w.influence,
             Cat::Transit => w.transit,
             Cat::LoadUnload => w.load_unload,
@@ -232,7 +232,7 @@ impl Game {
             Behind::First => match self.first_kind(seat) {
                 VictoryFirstKind::ExtractionTotal => y.mine + y.refinery,
                 VictoryFirstKind::ColonistsOffEarth => y.habitat,
-                VictoryFirstKind::StabilizationRun | VictoryFirstKind::ResearchProduced | VictoryFirstKind::ArchiveStages => y.generator + y.habitat,
+                VictoryFirstKind::StabilizationRun | VictoryFirstKind::ResearchProduced | VictoryFirstKind::ArchiveResearch => y.generator + y.habitat,
             },
         }
     }
@@ -464,10 +464,13 @@ impl Game {
                 VictoryFirstKind::StabilizationRun => cat == Cat::Scrubber || cat == Cat::Leapfrog || cat == Cat::ResearchLab,
                 VictoryFirstKind::ColonistsOffEarth => matches!(cat, Cat::Habitat | Cat::ColonyShip | Cat::FoundColony | Cat::LoadUnload | Cat::Transit),
                 VictoryFirstKind::ResearchProduced => cat == Cat::ResearchLab,
-                // Ticket #51: the Archive wants Research, a fund and stages, and a Colony off Earth
-                // to stand at, which the Colony Ship, the transit and the founding provide.
-                VictoryFirstKind::ArchiveStages => {
-                    matches!(cat, Cat::ArchiveStage | Cat::FundArchive | Cat::ResearchLab | Cat::ColonyShip | Cat::FoundColony | Cat::Transit | Cat::LoadUnload)
+                // Ticket #51: the Archive wants Research, a fund and a Colony off Earth to stand at,
+                // which the Colony Ship, the transit and the founding provide. Ticket #68: and the
+                // Launch Site and Shipyard before them, which #51 left out, so an Archivist AI with
+                // neither (its station starts bare) spent every turn on Influence and never left
+                // Earth in twenty seeds of thirty-six turns.
+                VictoryFirstKind::ArchiveResearch => {
+                    matches!(cat, Cat::BuildArchive | Cat::FundArchive | Cat::ResearchLab | Cat::ColonyShip | Cat::FoundColony | Cat::Transit | Cat::LoadUnload | Cat::LaunchSiteOrShipyard | Cat::Habitat)
                 }
             }
         };
@@ -804,29 +807,22 @@ impl Game {
             }
         }
 
-        // --- The Archive (ticket #51). The Archivist AI funds it whenever the next stage still
-        // wants Research, from turn one if it likes, and otherwise contributes to the shared Tech;
-        // it raises the Archive at the first Colony off Earth it took, one stage at a time.
+        // --- The Archive (ticket #51). The Archivist AI funds it whenever the fund has room under
+        // its cap, from turn one if it likes, and otherwise contributes to the shared Tech. Ticket
+        // #68: it builds the one Module at the first Colony off Earth it took, and the fund's cap
+        // is a quarter until that Module stands, so the Module is what opens the rest.
         if kind == FactionKind::Archivists {
-            let home = self.archive_colony(seat).or_else(|| {
-                self.colonies
-                    .iter()
-                    .filter(|c| c.control.director() == Some(seat) && self.may_hold_archive(c))
-                    .min_by_key(|c| (c.founded_turn, c.id.0))
-                    .map(|c| c.id)
-            });
-            let per = self.tables.archive.research_per_stage;
             let fund = self.seat(seat).archive_fund;
-            let left = self.archive_fund_cap(seat);
-            if left > 0 && fund < left && self.seat(seat).research_last_turn > 0 {
-                let opp = if fund + self.seat(seat).research_last_turn >= per { m.opportunity } else { 1.0 };
+            let cap = self.archive_fund_cap(seat);
+            if fund < cap && self.seat(seat).research_last_turn > 0 {
+                let opp = if fund + self.seat(seat).research_last_turn >= cap { m.opportunity } else { 1.0 };
                 push(vec![Order::FundArchive], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, opp, format!("fund the Archive with this turn's {} Research", self.seat(seat).research_last_turn), None);
             }
-            if let Some(cid) = home
-                && fund >= per
-            {
-                let next = self.archive_stages_committed(seat) + 1;
-                push(vec![Order::BuildArchiveStage { colony: cid }], Cat::ArchiveStage, self.base_weight(seat, Cat::ArchiveStage), gap_for(Cat::ArchiveStage, None), 1.0, m.opportunity, format!("raise stage {} of the Archive at {}", next, self.place_name(Place::Colony(cid))), None);
+            if !self.archive_built(seat) && !self.archive_ordered(seat) {
+                let home = self.colonies.iter().filter(|c| c.control.director() == Some(seat) && self.may_hold_archive(c)).min_by_key(|c| (c.founded_turn, c.id.0)).map(|c| c.id);
+                if let Some(cid) = home {
+                    push(vec![Order::BuildArchive { colony: cid }], Cat::BuildArchive, self.base_weight(seat, Cat::BuildArchive), gap_for(Cat::BuildArchive, None), 1.0, m.opportunity, format!("build the Archive at {}", self.place_name(Place::Colony(cid))), None);
+                }
             }
         }
 
@@ -1283,8 +1279,12 @@ impl Game {
                     continue;
                 }
                 let (left, _) = self.remaining(seat, &chosen);
+                // Ticket #68: an Archivist on four Materials a turn never has a 50-Materials Module
+                // or a 35-Materials Shipyard within four turns of income, so for the steps of the
+                // Archive's own path the horizon is twelve turns.
+                let horizon = if first_kind == VictoryFirstKind::ArchiveResearch && advances_first(c.cat, None) { 12 } else { 4 };
                 if materials_cost > left.materials
-                    && materials_cost <= left.materials + 4 * materials_income
+                    && materials_cost <= left.materials + horizon * materials_income
                     && c.orders.iter().all(|o| self.check_order_legality(seat, &chosen, o).is_ok())
                 {
                     reserve = Some(c.note.clone());

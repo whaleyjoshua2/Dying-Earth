@@ -137,8 +137,6 @@ pub struct Module {
     /// Knocked offline by a card until the next Resolution (Reactor Leak).
     #[allow(dead_code)]
     pub offline_until_resolution: bool,
-    /// Ticket #51: how many stages of the Archive stand here. 0 for every other Module.
-    pub stage: u32,
     /// Ticket #54: mothballed, exactly as a Facility is.
     pub mothballed: bool,
     pub change: Option<PendingChange>,
@@ -146,7 +144,7 @@ pub struct Module {
 
 impl Module {
     pub fn new(kind: ModuleKind) -> Module {
-        Module { kind, online: true, offline_until_resolution: false, stage: 0, mothballed: false, change: None }
+        Module { kind, online: true, offline_until_resolution: false, mothballed: false, change: None }
     }
     /// Ticket #54: standing, running and not mothballed.
     pub fn working(&self) -> bool {
@@ -926,7 +924,7 @@ impl Game {
 
     // ---------------------------------------------------------------- Ticket #51: the Archive
 
-    /// The Colony holding this seat's Archive, at whatever stage.
+    /// The Colony holding this seat's Archive Module.
     pub fn archive_colony(&self, seat: Seat) -> Option<ColonyId> {
         self.colonies
             .iter()
@@ -934,35 +932,26 @@ impl Game {
             .map(|c| c.id)
     }
 
-    /// Stages of this seat's Archive already standing (0 with no Archive).
-    pub fn archive_stage(&self, seat: Seat) -> u32 {
-        self.archive_colony(seat)
-            .and_then(|c| self.colony(c))
-            .and_then(|c| c.modules.iter().find(|m| m.kind == ModuleKind::Archive))
-            .map(|m| m.stage)
-            .unwrap_or(0)
+    /// Ticket #68 (version 0.05.5): the Archive Module stands at a Colony of this seat's.
+    pub fn archive_built(&self, seat: Seat) -> bool {
+        self.archive_colony(seat).is_some()
     }
 
-    /// Stages already standing plus any stage in the Colony's queue: what the next order would raise.
-    pub fn archive_stages_committed(&self, seat: Seat) -> u32 {
-        let queued: u32 = self
-            .colonies
-            .iter()
-            .flat_map(|c| c.queue.iter())
-            .filter(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Archive))
-            .count() as u32;
-        self.archive_stage(seat) + queued
+    /// Ticket #68: the Archive Module is in a Colony's build queue for this seat.
+    pub fn archive_ordered(&self, seat: Seat) -> bool {
+        self.colonies.iter().flat_map(|c| c.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Archive))
     }
 
-    /// Research the Archive still wants: the stages neither standing nor ordered, times the price.
+    /// Ticket #68: what the Archive fund may hold. The whole requirement once the Module stands;
+    /// only `banked_before_built` of it (a quarter) until then.
     pub fn archive_fund_cap(&self, seat: Seat) -> i64 {
-        let left = self.tables.archive.stages.saturating_sub(self.archive_stages_committed(seat)) as i64;
-        left * self.tables.archive.research_per_stage
+        let a = &self.tables.archive;
+        if self.archive_built(seat) { a.research } else { (a.research as f64 * a.banked_before_built).floor() as i64 }
     }
 
-    /// Every stage is standing.
+    /// Ticket #68: the Archive Module stands and every point of its Research is paid.
     pub fn archive_complete(&self, seat: Seat) -> bool {
-        self.archive_stage(seat) >= self.tables.archive.stages
+        self.archive_built(seat) && self.seat(seat).archive_fund >= self.tables.archive.research
     }
 
     /// The Archive is complete, its Colony is not Occupied, and the Module is online: the state the

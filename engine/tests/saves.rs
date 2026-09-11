@@ -115,13 +115,14 @@ fn a_save_from_another_version_and_a_damaged_file_are_both_refused_with_a_messag
     let good = save::save_to(dir.path(), &game, SaveKind::Manual).expect("the save is written");
     let text = std::fs::read_to_string(&good).unwrap();
 
-    // The same save, stamped by the version before this one.
-    let older = text.replacen("save_version:1", "save_version:0", 1).replacen("game_version:\"0.05\"", "game_version:\"0.04\"", 1);
+    // The same save, stamped by the version before this one (ticket #68: read from the constant, so
+    // the test follows the stamp when a version bumps it).
+    let older = text.replacen("save_version:1", "save_version:0", 1).replacen(&format!("game_version:\"{}\"", save::GAME_VERSION), "game_version:\"0.05\"", 1);
     assert_ne!(older, text, "the stamp was actually changed");
-    let stamped = dir.path().join("save-5-turn-4-from-0.04.ron");
+    let stamped = dir.path().join("save-5-turn-4-from-0.05.ron");
     std::fs::write(&stamped, &older).unwrap();
     let refused = save::load_from(&stamped, tables()).expect_err("a save from another version is refused");
-    assert_eq!(refused, "This save was written by version 0.04 of the rules; this is 0.05. It cannot be loaded.", "the refusal names both versions");
+    assert_eq!(refused, format!("This save was written by version 0.05 of the rules; this is {}. It cannot be loaded.", save::GAME_VERSION), "the refusal names both versions");
 
     // A file that is not a save at all.
     let rubbish = dir.path().join("rubbish.ron");

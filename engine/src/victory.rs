@@ -50,8 +50,9 @@ impl Game {
             VictoryFirstKind::StabilizationRun => s.stabilization_run as f64,
             VictoryFirstKind::ColonistsOffEarth => self.off_world_colonists(seat) as f64,
             VictoryFirstKind::ResearchProduced => s.research_total as f64,
-            // Ticket #51: stages standing, and stage 4 only tells while the Archive is running.
-            VictoryFirstKind::ArchiveStages => self.archive_stage(seat) as f64,
+            // Ticket #68: the Research paid into the Archive, which the fund holds only a quarter of
+            // until the Module stands; the bar only tells while the Archive is running.
+            VictoryFirstKind::ArchiveResearch => s.archive_fund.min(self.archive_fund_cap(seat)) as f64,
         };
         // Ticket #51: the second part is whatever the card names, at the card's own figures.
         let second = self.tables.faction(s.kind).victory_second;
@@ -73,7 +74,7 @@ impl Game {
             ),
         };
         let first_held_back = match card.kind {
-            VictoryFirstKind::ArchiveStages if self.archive_complete(seat) && !self.archive_online(seat) => {
+            VictoryFirstKind::ArchiveResearch if self.archive_complete(seat) && !self.archive_online(seat) => {
                 Some("the Archive is complete but not running".to_string())
             }
             _ => None,

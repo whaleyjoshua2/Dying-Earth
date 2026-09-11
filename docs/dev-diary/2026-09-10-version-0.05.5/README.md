@@ -81,3 +81,64 @@ Engineering on rung 2 is still not reached in time; the Research ticket moves it
 
 Not pictured: the Load screen's month column and the save file names read the same `date` function
 and so name the first month too; the six save tests pass unchanged.
+
+## #68: the Archive as a Module of three turns, its fund capped at a quarter until it stands
+
+[The ticket](https://github.com/whaleyjoshua2/Dying-Earth/issues/68). The Archive is one Module,
+50 Materials and three turns from its own button at a Colony off Earth; the four stages are retired.
+Its 80 Research is still required, paid into the fund at any pace once the Module stands; until then
+the fund holds a quarter (20), and at the cap a turn of funding is refused rather than wasted. The
+Archive is complete when it stands and every point is paid; from then it draws its 12 Energy and the
+Victory Condition reads as before. Provisional Findings is unchanged.
+
+### What moved
+
+| file | figure | was | is |
+| --- | --- | --- | --- |
+| `modules.toml` | the Archive row | 30 Materials, 2 turns, a stage | 50 Materials, 3 turns, one Module |
+| `modules.toml` | `[archive]` | 4 stages of 20 Research | `research` 80, `banked_before_built` 0.25 |
+| `factions.toml` | the Archivists' first part | `archive_stages`, bar 4 | `archive_research`, bar 80 |
+| `ai.toml` | `[pace.archivists] first` | stages by turn 8, 13, 18, 22 | Research 20, 40, 60, 80 by turns 10, 18, 26, 32 |
+| `save.rs` | the rules version stamp | 0.05 | 0.05.5 (a Module lost its stage field) |
+
+**The AI learned the whole path.** Ticket #51 never counted a Launch Site or a Shipyard as
+advancing the Archive, so an Archivist AI whose station starts bare spent every turn on Influence
+and never left Earth; both count now, and for the steps of the Archive's own path the AI banks
+Materials over twelve turns of income rather than four, since 50 Materials is never within four
+turns of four a turn. The glossary retires "Project" and rewords the Archive and its fund.
+
+### Measured, twenty seeds each
+
+| seat 0 | collapses | Archivist Shipyards | Colony Ships | Archivist Colonies founded | Archive begun | Archive standing | lost their start state |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Archivists in East Asia | 7/20 | 40 | 42 | 10 | 1 | **0/20** | **20/20, median turn 20 (13..23)** |
+| Archivists from Europe | 20/20 | | | | | **0/20** | |
+
+Before this ticket the same seat founded no Colony in twenty seeds. Now it builds a Shipyard at Axiom
+in every seed and a Colony Ship in most, founds a Colony in about half, and began the Archive once;
+the Module stood in none. The fund sits at its quarter (20) at the end of every seed.
+
+**Why it stops there is not the Archive.** In every seed the Custodians take East Asia from the
+Archivists by Influence at a median turn 20, and from then the Archivists' income reads `+0
+Materials, Research 0`: a one-state Faction at output x0.8 and Influence x1.0, beside a Custodian
+seat at x1.25, holds its state for half the game and then holds nothing. That is the card and the
+start, which the map rules out of this version's scope; it is recorded for the build ticket's "Open
+for the designer" beside 0.05's finding 4. Other lines from the same batches: the Mars system
+reached in every seed (median turn 12), Techs at a median 8 and 13 a game with rung 3 reached, no
+Sea Wall, and four Custodian Stabilization wins outright in the East Asia batch, the first ever seen.
+
+### Pictures
+
+![The Olympus Mons Colony card on Mars: the Modules list ends "The Archive: standing, 40 of 80 Research paid", and below it "The Archive. Archive fund 40 of 80" with the Fund checkbox](archive1-mars.png)
+
+- **archive1-mars.png** — `shot:archive1 player:archivists turns:6 archive:1`. The Archive Module
+  standing at Olympus Mons with half its Research paid: the Modules list says **"standing, 40 of 80
+  Research paid"**, the Archive section reads **"Archive fund 40 of 80"** with the Fund box live, and
+  there is no Build button, because it is built.
+
+![The same card with the Archive on order: "The Archive: building, 2 turn(s) left", and "Archive fund 20 of 20 (a quarter of the 80 until the Archive stands)" with the Fund checkbox greyed](archive0-mars.png)
+
+- **archive0-mars.png** — `shot:archive0 player:archivists turns:6 archive:0`. The Module on order:
+  **"building, 2 turn(s) left"**, the fund at **"20 of 20 (a quarter of the 80 until the Archive
+  stands)"**, and the Fund box **greyed out** at the cap, which is the refusal of the resolution's
+  point 4 made visible.

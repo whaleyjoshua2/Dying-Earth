@@ -303,8 +303,10 @@ pub enum VictoryFirstKind {
     StabilizationRun,
     ColonistsOffEarth,
     ResearchProduced,
-    /// Ticket #51: stages of the Archive complete; complete counts only while it is online.
-    ArchiveStages,
+    /// Ticket #51: the Archive. Ticket #68 (version 0.05.5): counted as the Research paid into it,
+    /// which the fund holds only a quarter of until the Module stands; the bar only tells while the
+    /// Archive is running.
+    ArchiveResearch,
 }
 
 impl VictoryFirstKind {
@@ -314,7 +316,7 @@ impl VictoryFirstKind {
             VictoryFirstKind::StabilizationRun => "Stabilization run",
             VictoryFirstKind::ColonistsOffEarth => "Colonists off Earth",
             VictoryFirstKind::ResearchProduced => "Research produced",
-            VictoryFirstKind::ArchiveStages => "The Archive",
+            VictoryFirstKind::ArchiveResearch => "The Archive",
         }
     }
 }
@@ -620,8 +622,8 @@ pub struct AiWeights {
     pub build_influence: f64,
     /// Ticket #51: divert this turn's Research into the Archive fund.
     pub fund_archive: f64,
-    /// Ticket #51: order the next stage of the Archive.
-    pub build_archive_stage: f64,
+    /// Ticket #51: build the Archive. Ticket #68: one Module, from its own button.
+    pub build_archive: f64,
     /// Ticket #52: pay Relief on a state the seat directs.
     pub relief: f64,
     /// Ticket #52: raise a Constabulary in a restive state.
@@ -777,12 +779,13 @@ struct FacilitiesFile {
     scrubber: ScrubberCard,
     mothball: MothballCard,
 }
-/// Ticket #51: the Archive, the first Project. Its Materials, build turns and Energy upkeep sit on
-/// its Module row; how many stages it has and what each costs in Research live here.
+/// Ticket #51: the Archive. Its Materials, build turns and Energy upkeep sit on its Module row.
+/// Ticket #68 (version 0.05.5): the Research it requires in all, and the share of it the fund may
+/// hold before the Module stands.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ArchiveCard {
-    pub stages: u32,
-    pub research_per_stage: i64,
+    pub research: i64,
+    pub banked_before_built: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1053,9 +1056,6 @@ impl Tables {
                 return Err(err("climate.toml", format!("[[break]] {}: its effect kind has no figures to act on", b.id)));
             }
         }
-        if self.archive.stages == 0 || self.archive.research_per_stage <= 0 {
-            return Err(err("modules.toml", "[archive] needs stages and research_per_stage above zero"));
-        }
         // Ticket #52: the Unrest ladder must be in order and every start value on it.
         let u = &self.unrest;
         if !(u.army_threshold < u.facility_threshold && u.facility_threshold < u.throw_off_threshold && u.throw_off_threshold <= u.max) {
@@ -1075,6 +1075,9 @@ impl Tables {
         // Ticket #57: the game's first date, and the sky it opens on.
         if !(1..=12).contains(&self.victory.start_month) {
             return Err(err("victory.toml", format!("start_month {} is no month", self.victory.start_month)));
+        }
+        if self.archive.research <= 0 || !(0.0..=1.0).contains(&self.archive.banked_before_built) {
+            return Err(err("modules.toml", "[archive] needs research above zero and banked_before_built from 0 to 1"));
         }
         if !(1..=12).contains(&self.victory.months_per_turn) {
             return Err(err("victory.toml", format!("months_per_turn {} must be from 1 to 12", self.victory.months_per_turn)));

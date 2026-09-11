@@ -1032,51 +1032,24 @@ impl Game {
             (Place::State(s), BuildItem::IndustryLevel) => {
                 self.state_mut(s).industry_level += 1;
             }
-            // Ticket #51: a stage of the Archive raises the one that stands rather than adding another.
+            // Ticket #68 (version 0.05.5): the Archive Module stands. If its Research is already paid
+            // (a fund kept from a destroyed Archive) it is complete at once; otherwise it says what
+            // it still wants.
             (Place::Colony(c), BuildItem::Module(ModuleKind::Archive)) => {
-                let stages = self.tables.archive.stages;
-                let stage = if let Some(col) = self.colony_mut(c) {
-                    match col.modules.iter_mut().find(|m| m.kind == ModuleKind::Archive) {
-                        Some(m) => {
-                            m.stage += 1;
-                            m.stage
-                        }
-                        None => {
-                            let mut m = Module::new(ModuleKind::Archive);
-                            m.stage = 1;
-                            col.modules.push(m);
-                            1
-                        }
-                    }
+                if let Some(col) = self.colony_mut(c)
+                    && !col.modules.iter().any(|m| m.kind == ModuleKind::Archive)
+                {
+                    col.modules.push(Module::new(ModuleKind::Archive));
+                }
+                let research = self.tables.archive.research;
+                let left = (research - self.seat(b.seat).archive_fund).max(0);
+                if left == 0 {
+                    self.archive_completed(b.seat);
                 } else {
-                    0
-                };
-                let line = if stage >= stages {
-                    format!("The {} completed the Archive at {}: every stage stands.", self.seat_name(b.seat), self.place_name(place))
-                } else {
-                    format!("The {} completed stage {} of {} of the Archive at {}.", self.seat_name(b.seat), stage, stages, self.place_name(place))
-                };
-                self.log(line);
-                let text = if stage >= stages {
-                    self.say("archive_complete", &[("faction", self.seat_name(b.seat)), ("place", self.place_name(place))])
-                } else {
-                    self.say(
-                        "archive_stage_complete",
-                        &[
-                            ("faction", self.seat_name(b.seat)),
-                            ("stage", stage.to_string()),
-                            ("stages", stages.to_string()),
-                            ("place", self.place_name(place)),
-                        ],
-                    )
-                };
-                self.report_line(LineKind::Archive, Some(place.into()), text);
-                if stage >= stages {
-                    self.moment(
-                        MomentKind::ArchiveComplete,
-                        &[("faction", self.seat_name(b.seat)), ("place", self.place_name(place)), ("stages", stages.to_string())],
-                        Some(place.into()),
-                    );
+                    let line = format!("The {} raised the Archive at {}; it wants {} more Research.", self.seat_name(b.seat), self.place_name(place), left);
+                    self.log(line);
+                    let text = self.say("archive_built", &[("faction", self.seat_name(b.seat)), ("place", self.place_name(place)), ("left", left.to_string())]);
+                    self.report_line(LineKind::Archive, Some(place.into()), text);
                 }
                 return;
             }

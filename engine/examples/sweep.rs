@@ -86,6 +86,8 @@ fn main() {
                     // Ticket #67 (version 0.05.5): whether the Mars system is reached now that the
                     // game holds three windows, and how many Antarctic Colonies are founded.
                     let (mut mars_turns, mut antarctic) = (Vec::new(), 0u32);
+                    // Ticket #68: how far the Archivists' Archive gets.
+                    let (mut archive_built, mut archive_complete, mut archive_funds) = (Vec::new(), Vec::new(), Vec::new());
                     for seed in 1..=seeds {
                         let r = dying_earth_engine::sim::run_from(tables.clone(), seed, player, start);
                         match r.outcome {
@@ -109,6 +111,13 @@ fn main() {
                             mars_turns.push(t);
                         }
                         antarctic += r.antarctic_colonies;
+                        if let Some(t) = r.archive_built_turn {
+                            archive_built.push(t);
+                        }
+                        if let Some(t) = r.archive_complete_turn {
+                            archive_complete.push(t);
+                        }
+                        archive_funds.push(r.archive_fund_at_end.max(0) as u32);
                         if let Some((seat, kind)) = r.victory_met {
                             victory_met.push(format!("seed {seed} {} (seat {})", kind.name(), seat.0));
                         }
@@ -146,6 +155,14 @@ fn main() {
                             "      Mars system: a Colony founded in {}/{seeds} seeds, median first turn {}; Antarctic Colonies founded {antarctic}",
                             mars_turns.len(),
                             median_u(&mut mars_turns)
+                        );
+                        println!(
+                            "      The Archive: standing in {}/{seeds} seeds (median turn {}), complete in {}/{seeds} (median turn {}), median fund at the end {}",
+                            archive_built.len(),
+                            median_u(&mut archive_built),
+                            archive_complete.len(),
+                            median_u(&mut archive_complete),
+                            median_u(&mut archive_funds)
                         );
                         println!(
                             "      Victory Conditions met outright: {}",

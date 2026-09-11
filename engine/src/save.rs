@@ -24,7 +24,7 @@ use std::sync::Arc;
 pub const SAVE_VERSION: u32 = 1;
 
 /// The rules version this executable plays, named beside the file's own in a refusal.
-pub const GAME_VERSION: &str = "0.05";
+pub const GAME_VERSION: &str = "0.05.5";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;

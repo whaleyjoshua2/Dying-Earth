@@ -1707,13 +1707,12 @@ fn a_colony_ship(g: &mut Game, seat: Seat, body: BodyId) -> ShipId {
     id
 }
 
-/// A Colony off Earth holding the seat's Archive at `stage`, with Habitats and Colonists.
-fn archive_at(g: &mut Game, seat: Seat, body: BodyId, stage: u32, colonists: u32) -> ColonyId {
+/// A Colony off Earth holding the seat's Archive Module with `paid` Research in the fund, and
+/// Habitats and Colonists. Ticket #68 (version 0.05.5): one Module, no stages.
+fn archive_at(g: &mut Game, seat: Seat, body: BodyId, paid: i64, colonists: u32) -> ColonyId {
     let cid = colony(g, seat, body, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], colonists);
-    let col = g.colony_mut(cid).unwrap();
-    let mut m = Module::new(ModuleKind::Archive);
-    m.stage = stage;
-    col.modules.push(m);
+    g.colony_mut(cid).unwrap().modules.push(Module::new(ModuleKind::Archive));
+    g.seats[seat.index()].archive_fund = paid;
     cid
 }
 
@@ -1851,53 +1850,83 @@ fn funding_the_archive_banks_this_turns_research_and_contributes_nothing_to_the_
     assert!(g.report.lines.iter().any(|l| l.text.contains("Archivists are funding the Archive")), "{:?}", g.report.lines);
     // Nobody else may.
     assert_eq!(g.check_order(Seat(0), &[], &Order::FundArchive).unwrap_err().0, "only the Archivists fund the Archive");
-    // The fund never holds more than the remaining stages need.
-    assert_eq!(g.archive_fund_cap(Seat(3)), 80);
-    g.seats[3].archive_fund = 80;
-    g.seats[3].research_last_turn = 40;
+    // Ticket #68: until the Module stands the fund holds a quarter of the 80, and what it has no
+    // room for stays with the shared Tech rather than being wasted.
+    assert_eq!(g.archive_fund_cap(Seat(3)), 20, "a quarter of 80 before the Archive stands");
+    g.seats[3].archive_fund = 17;
+    g.seats[3].research_last_turn = 8;
+    g.research.contributions[3] = 8;
+    g.research.progress += 8;
+    let before = g.research.progress;
     g.commit_orders(Seat(3), &[Order::FundArchive]);
-    assert_eq!(g.seats[3].archive_fund, 80, "Research past what the stages need is wasted");
+    assert_eq!(g.seats[3].archive_fund, 20, "only the room under the cap is banked");
+    assert_eq!(g.research.progress, before - 3, "the other five stay with the shared Tech");
+    assert_eq!(g.research.contributions[3], 5, "and still count toward the Lead");
+    // At the cap a turn of funding is refused outright.
+    assert_eq!(
+        g.check_order(Seat(3), &[], &Order::FundArchive).unwrap_err().0,
+        "the Archive fund holds its quarter (20) until the Archive stands at a Colony off Earth"
+    );
+    // Once the Module stands the fund opens to the whole 80, and is refused again only when full.
+    let mars = colony(&mut g, Seat(3), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    g.colony_mut(mars).unwrap().modules.push(Module::new(ModuleKind::Archive));
+    assert_eq!(g.archive_fund_cap(Seat(3)), 80);
+    assert!(g.check_order(Seat(3), &[], &Order::FundArchive).is_ok());
+    g.seats[3].archive_fund = 80;
+    assert_eq!(g.check_order(Seat(3), &[], &Order::FundArchive).unwrap_err().0, "the Archive's Research is paid in full");
 }
 
+/// Ticket #68 (version 0.05.5): the Archive is one Module of 50 Materials and three turns, built
+/// once from its own button at a Colony off Earth, with no Research banked first; standing, it
+/// draws no Energy until its 80 Research is paid, and the payment that fills the fund completes it.
 #[test]
-fn a_stage_of_the_archive_needs_its_research_banked_and_a_colony_off_earth() {
+fn the_archive_is_one_module_of_fifty_materials_and_three_turns_built_once_off_earth() {
     let mut g = game();
     g.seats[3].stockpile.materials = 200;
     let mars = colony(&mut g, Seat(3), BodyId::Mars, &[ModuleKind::Habitat], 4);
-    let order = Order::BuildArchiveStage { colony: mars };
-    assert_eq!(g.order_cost(Seat(3), &order).materials, 30);
-    let err = g.check_order(Seat(3), &[], &order).unwrap_err();
-    assert_eq!(err.0, "stage 1 needs 20 Research banked in the Archive fund, 0 there");
-    g.seats[3].archive_fund = 20;
-    assert!(g.check_order(Seat(3), &[], &order).is_ok());
+    let order = Order::BuildArchive { colony: mars };
+    assert_eq!(g.order_cost(Seat(3), &order).materials, 50);
+    assert!(g.check_order(Seat(3), &[], &order).is_ok(), "no Research needs banking first");
     // Antarctica will not do, and neither will a station over Earth.
     let ant = colony(&mut g, Seat(3), BodyId::Earth, &[ModuleKind::Habitat], 4);
-    assert!(g.check_order(Seat(3), &[], &Order::BuildArchiveStage { colony: ant }).unwrap_err().0.contains("off Earth"));
+    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: ant }).unwrap_err().0.contains("off Earth"));
     let axiom = station_of(&g, Seat(3), BodyId::Earth).unwrap();
-    assert!(g.check_order(Seat(3), &[], &Order::BuildArchiveStage { colony: axiom }).unwrap_err().0.contains("off Earth"));
+    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: axiom }).unwrap_err().0.contains("off Earth"));
     // Nobody else builds one, and the ordinary Module button never places it.
     let mine = colony(&mut g, Seat(0), BodyId::Mars, &[], 0);
-    assert_eq!(g.check_order(Seat(0), &[], &Order::BuildArchiveStage { colony: mine }).unwrap_err().0, "only the Archivists build the Archive");
+    assert_eq!(g.check_order(Seat(0), &[], &Order::BuildArchive { colony: mine }).unwrap_err().0, "only the Archivists build the Archive");
     assert!(g.check_order(Seat(3), &[], &Order::BuildModule { colony: mars, kind: ModuleKind::Archive }).is_err());
-    // Ordering spends the banked Research, and the next stage wants its own twenty.
+    // Ordered once is ordered: a second order is refused while it builds.
     g.commit_orders(Seat(3), std::slice::from_ref(&order));
-    assert_eq!(g.seats[3].archive_fund, 0);
-    // One stage at a time: while stage 1 is building, stage 2 cannot be ordered even with the Research banked.
-    g.seats[3].archive_fund = 20;
-    assert_eq!(g.check_order(Seat(3), &[], &order).unwrap_err().0, "a stage of the Archive is already building; one stage at a time");
-    g.seats[3].archive_fund = 0;
-    // Two turns later the stage stands.
+    assert!(g.archive_ordered(Seat(3)));
+    assert_eq!(g.check_order(Seat(3), &[], &order).unwrap_err().0, "the Archive is already building");
+    assert!(g.log.to_vec().iter().any(|l| l.contains("began the Archive at")), "{:?}", g.log.to_vec());
+    // Three turns to raise: it stands after the third Resolution.
     g.resolution_phase();
-    assert_eq!(g.archive_stage(Seat(3)), 0, "two turns to raise");
+    assert!(!g.archive_built(Seat(3)), "one turn");
     g.turn += 1;
     g.resolution_phase();
-    assert_eq!(g.archive_stage(Seat(3)), 1);
-    assert_eq!(g.check_order(Seat(3), &[], &order).unwrap_err().0, "stage 2 needs 20 Research banked in the Archive fund, 0 there");
+    assert!(!g.archive_built(Seat(3)), "two turns");
+    g.turn += 1;
+    g.resolution_phase();
+    assert!(g.archive_built(Seat(3)), "three turns");
     assert_eq!(g.archive_colony(Seat(3)), Some(mars));
+    assert!(!g.archive_complete(Seat(3)), "standing is not complete: the Research is still owed");
+    assert!(g.log.to_vec().iter().any(|l| l.contains("raised the Archive at") && l.contains("80 more Research")), "{:?}", g.log.to_vec());
     // At most one per Faction.
     let deimos = colony(&mut g, Seat(3), BodyId::Deimos, &[], 0);
-    g.seats[3].archive_fund = 20;
-    assert!(g.check_order(Seat(3), &[], &Order::BuildArchiveStage { colony: deimos }).unwrap_err().0.contains("already stands"));
+    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: deimos }).unwrap_err().0.contains("already stands at"));
+    // No upkeep until it is complete; the payment that fills the fund completes it, with its Moment.
+    assert_eq!(g.module_yield(Seat(3), mars, ModuleKind::Archive).upkeep, 0);
+    g.seats[3].archive_fund = 76;
+    g.seats[3].research_last_turn = 10;
+    g.research.unallocated = 10;
+    g.commit_orders(Seat(3), &[Order::FundArchive]);
+    assert_eq!(g.seats[3].archive_fund, 80, "only the four still owed are banked");
+    assert_eq!(g.research.unallocated, 6, "the other six stay with the shared Tech");
+    assert!(g.archive_complete(Seat(3)));
+    assert_eq!(g.module_yield(Seat(3), mars, ModuleKind::Archive).upkeep, 12);
+    assert!(g.log.to_vec().iter().any(|l| l.contains("completed the Archive at")), "{:?}", g.log.to_vec());
 }
 
 #[test]
@@ -1931,7 +1960,7 @@ fn provisional_findings_halves_the_tech_under_research_and_goes_off_the_turn_aft
 #[test]
 fn a_complete_archive_goes_offline_when_energy_runs_short_and_wins_nothing_that_end_phase() {
     let mut g = game();
-    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 4, 12);
+    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 80, 12);
     g.seats[3].stockpile.energy = 0;
     assert_eq!(g.module_yield(Seat(3), cid, ModuleKind::Archive).upkeep, 12, "a complete Archive draws 12");
     assert_eq!(g.shortfall_order(Seat(3))[0], "The Archive", "the highest upkeep goes first");
@@ -1939,7 +1968,7 @@ fn a_complete_archive_goes_offline_when_energy_runs_short_and_wins_nothing_that_
     assert!(!g.colony(cid).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Archive && m.online), "shut down");
     assert!(!g.archive_online(Seat(3)));
     let p = g.progress(Seat(3));
-    assert_eq!(p.first_value, 4.0, "every stage stands");
+    assert_eq!(p.first_value, 80.0, "every point of Research is paid");
     assert_eq!(p.second_value, 12.0, "and the Colonists are there");
     assert!(p.first_held_back.is_some() && !p.met(), "but it is not running");
     g.end_phase();
@@ -1949,8 +1978,7 @@ fn a_complete_archive_goes_offline_when_energy_runs_short_and_wins_nothing_that_
 #[test]
 fn the_archive_is_destroyed_when_its_colony_changes_hands_and_the_fund_is_kept() {
     let mut g = game();
-    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 3, 6);
-    g.seats[3].archive_fund = 40;
+    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 40, 6);
     assert_eq!(g.archive_colony(Seat(3)), Some(cid));
     g.transfer_control(Place::Colony(cid), Seat(1), "Influence");
     assert_eq!(g.archive_colony(Seat(3)), None, "the Archive went with the Colony");
@@ -1958,7 +1986,7 @@ fn the_archive_is_destroyed_when_its_colony_changes_hands_and_the_fund_is_kept()
     assert_eq!(g.seats[3].archive_fund, 40, "the fund is kept");
     assert!(g.report.lines.iter().any(|l| l.text.contains("Archive at") && l.text.contains("destroyed")), "{:?}", g.report.lines);
     // An Occupied Colony's Archive is dark while the Occupation lasts.
-    let again = archive_at(&mut g, Seat(3), BodyId::Moon, 4, 12);
+    let again = archive_at(&mut g, Seat(3), BodyId::Moon, 80, 12);
     g.income_phase();
     assert!(g.archive_online(Seat(3)));
     g.colony_mut(again).unwrap().control = Control::Occupied { occupier: Seat(1), previous: Some(Seat(3)), turns: 1 };
@@ -1969,20 +1997,20 @@ fn the_archive_is_destroyed_when_its_colony_changes_hands_and_the_fund_is_kept()
 #[test]
 fn the_archivists_win_with_the_archive_running_and_twelve_colonists_at_its_colony() {
     let mut g = game();
-    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 4, 12);
+    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 80, 12);
     let _ = cid;
     g.seats[3].stockpile.energy = 200;
     g.income_phase();
     assert!(g.archive_online(Seat(3)));
     let p = g.progress(Seat(3));
-    assert_eq!((p.first_value, p.first_bar), (4.0, 4.0));
+    assert_eq!((p.first_value, p.first_bar), (80.0, 80.0));
     assert_eq!((p.second_value, p.second_bar), (12.0, 12.0));
     assert!(p.met());
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(3), .. })), "{:?}", g.outcome);
     // One Colonist short and it is no win.
     let mut g = game();
-    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 4, 11);
+    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 80, 11);
     let _ = cid;
     g.seats[3].stockpile.energy = 200;
     g.income_phase();
@@ -2012,6 +2040,30 @@ fn the_archivist_ai_funds_the_archive_before_it_holds_a_colony() {
     g.seats[arc.index()].research_last_turn = 6;
     let orders = g.ai_orders(arc);
     assert!(orders.iter().any(|o| matches!(o, Order::FundArchive)), "no funding order: {orders:?}");
+}
+
+/// Ticket #68 (version 0.05.5): the Archivist AI builds its way off Earth before the Archive. With
+/// no Colony, no Launch Site and a bare station, its first steps are the Launch Site and the
+/// Shipyard, which #51 never counted as advancing the Archive (so it never left Earth); with a
+/// Colony off Earth and the Materials, it orders the Module there.
+#[test]
+fn the_archivist_ai_builds_its_way_off_earth_and_then_the_archive() {
+    let mut g = game();
+    let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
+    g.seats[arc.index()].stockpile.materials = 200;
+    g.seats[arc.index()].stockpile.energy = 200;
+    let orders = g.ai_orders(arc);
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::BuildFacility { kind: FacilityKind::LaunchSite, .. } | Order::BuildModule { kind: ModuleKind::Shipyard, .. })),
+        "no Launch Site or Shipyard on the way to a Colony: {orders:?}"
+    );
+    let mut g = game();
+    let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
+    g.seats[arc.index()].stockpile.materials = 200;
+    g.seats[arc.index()].stockpile.energy = 200;
+    let mars = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Mine, ModuleKind::Generator], 4);
+    let orders = g.ai_orders(arc);
+    assert!(orders.iter().any(|o| matches!(o, Order::BuildArchive { colony } if *colony == mars)), "no Archive order at its Colony: {orders:?}");
 }
 
 // ---------------------------------------------------------------- Ticket #52: Unrest, Occupation and refugees
@@ -4252,7 +4304,7 @@ fn a_rivals_paragraph_names_its_visible_orders_and_none_of_its_scores() {
         Order::BuildShip { site: Place::Colony(colony), kind: UnitKind::Frigate },
         Order::BuildArmy { place: Place::State(StateId::EastAsia) },
         Order::BuildStation { body: BodyId::Mars, slot: 0 },
-        Order::BuildArchiveStage { colony },
+        Order::BuildArchive { colony },
         Order::FundArchive,
         Order::Repair { unit: UnitRef::Ship(ship), points: 1 },
         Order::RepairWithDucats { unit: UnitRef::Ship(ship), points: 1 },

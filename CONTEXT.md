@@ -37,15 +37,15 @@ The Arkwrights' Victory Condition: thirty Colonists living off Earth, spread ove
 _Avoid_: spread, expansion, exodus, colonization score
 
 **Project**:
-A construction raised in stages, each stage paid in both Research and Materials and taking more than one turn to build once paid. The Archive is the first.
-_Avoid_: megaproject, wonder, great work, campaign
+Retired in version 0.05.5. The word named a construction raised in stages, each paid in Research and Materials; the Archive was the only one, and it is a Module now.
+_Avoid_: project, megaproject, wonder, great work, campaign, stage
 
 **The Archive**:
-The first Project: a Module only the Archivists build, at one Colony off Earth and at most one per Faction. Complete, it takes a great deal of Energy to keep running, and it is destroyed outright if its Colony changes hands.
-_Avoid_: library, vault, monument, database
+A Module only the Archivists build, at one Colony off Earth and at most one per Faction, three turns to raise from its own button. Standing, it still wants its Research, paid into the Archive fund at any pace; complete, with every point paid, it takes a great deal of Energy to keep running. It is destroyed outright if its Colony changes hands, and the fund is kept.
+_Avoid_: library, vault, monument, database, stage
 
 **Fund the Archive**:
-The Archivists' Orders-phase order, which sends a turn's Research from their own Labs into their Archive fund instead of the shared Tech, where it counts nothing toward the Research Lead.
+The Archivists' Orders-phase order, which sends a turn's Research from their own Labs into their Archive fund instead of the shared Tech, where it counts nothing toward the Research Lead. Until the Archive stands the fund holds only a quarter of what the Archive requires, and at that cap the order is refused.
 _Avoid_: donate, invest, bank research, save up
 
 **Provisional Findings**:

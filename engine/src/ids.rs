@@ -136,8 +136,8 @@ pub enum ModuleKind {
     TradePost,
     /// Version 0.03 (ticket #36): raises Influence off Earth.
     Relay,
-    /// Version 0.05 (ticket #51): the Archive, the first Project. Only the Archivists build it, one
-    /// stage at a time, and never through the ordinary Module build order.
+    /// Version 0.05 (ticket #51): the Archive. Only the Archivists build it, from its own button and
+    /// never through the ordinary Module build order; one Module since ticket #68 (version 0.05.5).
     Archive,
 }
 

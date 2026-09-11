@@ -360,12 +360,11 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("disembarked", &["n", "colony"]),
     ("station_built", &["faction", "station"]),
     ("antarctica_opens", &["n"]),
-    ("archive_stage_begun", &["faction", "stage", "colony"]),
-    ("archive_stage_complete", &["faction", "stage", "stages", "place"]),
+    ("archive_begun", &["faction", "colony"]),
+    ("archive_built", &["faction", "place", "left"]),
     ("archive_complete", &["faction", "place"]),
     ("archive_destroyed", &["place", "faction"]),
     ("archive_funded", &["faction", "banked", "fund", "cap"]),
-    ("archive_funded_wasted", &["faction", "banked", "wasted", "fund", "cap"]),
     ("army_moved", &["faction", "from", "to", "attacks"]),
     ("army_landed", &["faction", "colony"]),
     ("units_destroyed", &["place", "why", "lost"]),
@@ -438,7 +437,7 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("build_ship", &["unit", "place"]),
     ("build_army", &["place"]),
     ("build_station", &["body"]),
-    ("build_archive_stage", &["colony"]),
+    ("build_archive", &["colony"]),
     ("fund_archive", &[]),
     ("repair", &["unit"]),
     ("transit", &["unit", "body"]),
@@ -472,7 +471,7 @@ pub const MOMENT_ARGS: &[(&str, &[&str])] = &[
     ("decisive_battle", &["place", "result", "figure"]),
     ("tech_complete", &["tech", "faction", "lead", "cost"]),
     ("antarctica", &["n"]),
-    ("archive_complete", &["faction", "place", "stages"]),
+    ("archive_complete", &["faction", "place", "research"]),
 ];
 
 impl ReportTable {

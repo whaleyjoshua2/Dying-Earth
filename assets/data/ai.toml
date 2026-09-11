@@ -33,7 +33,7 @@ relief = 4
 build_constabulary = 5
 resettle = 2
 fund_archive = 0
-build_archive_stage = 0
+build_archive = 0
 build_producer = 8
 raise_industry = 9
 build_research_lab = 3
@@ -65,7 +65,7 @@ relief = 6
 build_constabulary = 6
 resettle = 2
 fund_archive = 0
-build_archive_stage = 0
+build_archive = 0
 build_producer = 6
 raise_industry = 3
 build_research_lab = 8
@@ -98,7 +98,7 @@ relief = 4
 build_constabulary = 4
 resettle = 2
 fund_archive = 0
-build_archive_stage = 0
+build_archive = 0
 build_producer = 6
 raise_industry = 3
 build_research_lab = 6
@@ -130,7 +130,7 @@ relief = 5
 build_constabulary = 5
 resettle = 2
 fund_archive = 8
-build_archive_stage = 9
+build_archive = 9
 build_producer = 6
 raise_industry = 3
 build_research_lab = 9
@@ -177,9 +177,10 @@ colonists = [[12, 4], [22, 12]]
 first = [[6, 4], [12, 12], [18, 22], [24, 30]]
 colonists = [[12, 4], [22, 12]]
 
-# Ticket #51: the Archive is four stages, and the pace is in stages complete.
+# Ticket #51: the pace is in the Archive's first Victory part. Ticket #68 (version 0.05.5): that is
+# Research paid into the Archive, 80 in all, over a thirty-six-turn game.
 [pace.archivists]
-first = [[8, 1], [13, 2], [18, 3], [22, 4]]
+first = [[10, 20], [18, 40], [26, 60], [32, 80]]
 colonists = [[12, 4], [22, 12]]
 
 [thresholds]

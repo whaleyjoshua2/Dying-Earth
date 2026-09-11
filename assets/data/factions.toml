@@ -71,8 +71,10 @@ emissions_multiplier = 0.9
 research_multiplier = 1.6
 influence_multiplier = 1.0
 signature = "Provisional Findings: while their Research went to the shared Tech last turn, they already have half the effect of the Tech under research (a multiplier x reads 1 + (x - 1) / 2, an addition reads half rounded down, and immunities do not carry). A turn of funding the Archive switches it off for the turn after."
-victory = "Complete the Archive and keep it running, with 12 Colonists living at its Colony to be uploaded."
-victory_first = { kind = "archive_stages", bar = 4 }
+# Ticket #68 (version 0.05.5): the first part is the Research paid into the Archive, 80 in all,
+# which the fund holds only a quarter of until the Archive Module stands at a Colony off Earth.
+victory = "Build the Archive at a Colony off Earth (50 Materials, three turns), pay 80 Research into it and keep it running, with 12 Colonists living at its Colony to be uploaded."
+victory_first = { kind = "archive_research", bar = 80 }
 victory_second = { kind = "colonists_at_archive", bar = 12 }
 colour = [0.75, 0.82, 0.92]
 

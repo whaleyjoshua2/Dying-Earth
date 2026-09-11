@@ -206,10 +206,10 @@ impl Game {
             y.resource = Some(p.resource);
             y.amount = v.floor() as i64;
         }
-        // Ticket #51: the Archive draws its Energy only once every stage stands; while it is
-        // rising it costs nothing to run.
+        // Ticket #51: the Archive draws its Energy only once it is complete; ticket #68: that is
+        // standing with its Research paid in full. Until then it costs nothing to run.
         if kind == ModuleKind::Archive {
-            let complete = col.modules.iter().any(|m| m.kind == ModuleKind::Archive && m.stage >= t.archive.stages);
+            let complete = self.seat(seat).archive_fund >= t.archive.research;
             y.upkeep = if complete { mc.energy_upkeep } else { 0 };
         }
         y.upkeep = (y.upkeep as f64 * self.tech_multiplier(seat, TechId::ClosedLoopColonies)).floor() as i64;

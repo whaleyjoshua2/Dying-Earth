@@ -70,9 +70,9 @@ pub enum Order {
     /// Version 0.04 (ticket #46): a Space Station in an orbital slot, built for Materials from a
     /// Nation State with a Launch Site (over Earth) or a Colony of the seat's (elsewhere).
     BuildStation { body: BodyId, slot: u32 },
-    /// Version 0.05 (ticket #51): the next stage of the Archive, at a Colony off Earth. Paid in
-    /// Materials from the Stockpile and Research already banked in the Archive fund.
-    BuildArchiveStage { colony: ColonyId },
+    /// Version 0.05 (ticket #51): the Archive, at a Colony off Earth. Version 0.05.5 (ticket #68):
+    /// one Module, paid in Materials from the Stockpile; its Research is paid into the fund after.
+    BuildArchive { colony: ColonyId },
     /// Version 0.05 (ticket #51): this turn's Research from the Archivists' Labs goes into the
     /// Archive fund instead of the shared Tech, and counts nothing toward the Research Lead.
     FundArchive,
@@ -234,9 +234,8 @@ impl Game {
             Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: t.facility(*kind).materials * t.ducats.per_building_material, ..Default::default() },
             Order::BuildStation { .. } => Cost { materials: self.station_materials(seat), ..Default::default() },
             Order::BuildModuleWithDucats { kind, .. } => Cost { ducats: self.module_materials(seat, *kind) * t.ducats.per_building_material, ..Default::default() },
-            // Ticket #51: a stage of the Archive costs Materials here and Research from the fund,
-            // which is not part of the Stockpile and so is checked in the legality rules below.
-            Order::BuildArchiveStage { .. } => Cost { materials: t.module(ModuleKind::Archive).materials, ..Default::default() },
+            // Ticket #68: the Archive Module costs its row's Materials; the Research comes after.
+            Order::BuildArchive { .. } => Cost { materials: t.module(ModuleKind::Archive).materials, ..Default::default() },
             // Ticket #52: Relief and Resettle are paid in Ducats.
             Order::Relief { .. } => Cost { ducats: t.unrest.relief_ducats, ..Default::default() },
             Order::Resettle { .. } => Cost { ducats: t.unrest.resettle_ducats, ..Default::default() },
@@ -362,9 +361,18 @@ impl Game {
                 if pending.iter().any(|o| matches!(o, Order::FundArchive)) {
                     return fail("the Archive is already being funded this turn");
                 }
+                // Ticket #68: at the cap a turn of funding is refused, and the Research stays with
+                // the shared Tech; until the Module stands the cap is a quarter of the requirement.
+                if self.seat(seat).archive_fund >= self.archive_fund_cap(seat) {
+                    return if self.archive_built(seat) {
+                        fail("the Archive's Research is paid in full")
+                    } else {
+                        fail(format!("the Archive fund holds its quarter ({}) until the Archive stands at a Colony off Earth", self.archive_fund_cap(seat)))
+                    };
+                }
                 Ok(cost)
             }
-            Order::BuildArchiveStage { colony } => {
+            Order::BuildArchive { colony } => {
                 if self.kind(seat) != FactionKind::Archivists {
                     return fail("only the Archivists build the Archive");
                 }
@@ -381,25 +389,12 @@ impl Game {
                 {
                     return fail(format!("the Archive already stands at {}", self.place_name(Place::Colony(home))));
                 }
-                let stages = self.tables.archive.stages;
-                let committed = self.archive_stages_committed(seat)
-                    + pending.iter().filter(|o| matches!(o, Order::BuildArchiveStage { .. })).count() as u32;
-                if committed >= stages {
-                    return fail("every stage of the Archive is built or on order");
+                // Ticket #68: one Module, built once.
+                if self.archive_built(seat) {
+                    return fail("the Archive already stands");
                 }
-                // One stage at a time: four stages of two turns are eight turns of building.
-                let building = self.colonies.iter().flat_map(|c| c.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Archive))
-                    || pending.iter().any(|o| matches!(o, Order::BuildArchiveStage { .. }));
-                if building {
-                    return fail("a stage of the Archive is already building; one stage at a time");
-                }
-                // The Research must already be banked: a stage ordered this turn cannot be paid out
-                // of this turn's funding, which has not happened yet.
-                let per = self.tables.archive.research_per_stage;
-                let spent = pending.iter().filter(|o| matches!(o, Order::BuildArchiveStage { .. })).count() as i64 * per;
-                let banked = self.seat(seat).archive_fund - spent;
-                if enforce_cost && banked < per {
-                    return fail(format!("stage {} needs {} Research banked in the Archive fund, {} there", committed + 1, per, banked.max(0)));
+                if self.archive_ordered(seat) || pending.iter().any(|o| matches!(o, Order::BuildArchive { .. })) {
+                    return fail("the Archive is already building");
                 }
                 Ok(cost)
             }
@@ -521,7 +516,7 @@ impl Game {
                 }
                 // Ticket #51: the Archive is never placed by an ordinary build order.
                 if *kind == ModuleKind::Archive {
-                    return fail("the Archive is raised one stage at a time, from its own button");
+                    return fail("the Archive is raised from its own button");
                 }
                 // Ticket #46: a station holds only a Shipyard and Habitats.
                 if col.in_orbit && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat) {
@@ -1010,22 +1005,16 @@ impl Game {
                 }
                 Order::Load { .. } | Order::Unload { .. } => self.pending.cargo.push((seat, order.clone())),
                 Order::BuildStation { body, slot } => self.pending.stations.push((seat, *body, *slot)),
-                Order::BuildArchiveStage { colony } => {
-                    // Ticket #51: the Research leaves the fund now, with the Materials; the stage
-                    // itself rises in the Colony's queue like any other build.
-                    let per = self.tables.archive.research_per_stage;
-                    self.seat_mut(seat).archive_fund -= per;
+                Order::BuildArchive { colony } => {
+                    // Ticket #68: the Module rises in the Colony's queue like any other build, three
+                    // turns from its own row; the Research is paid into the fund once it stands.
                     let due = turn + self.tables.module(ModuleKind::Archive).build_turns - 1;
                     if let Some(c) = self.colony_mut(*colony) {
                         c.queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat, due_turn: due, coastal: false });
                     }
-                    let stage = self.archive_stages_committed(seat);
-                    let line = format!("The {} began stage {} of the Archive at {}.", self.seat_name(seat), stage, self.place_name(Place::Colony(*colony)));
+                    let line = format!("The {} began the Archive at {}.", self.seat_name(seat), self.place_name(Place::Colony(*colony)));
                     self.log(line);
-                    let text = self.say(
-                        "archive_stage_begun",
-                        &[("faction", self.seat_name(seat)), ("stage", stage.to_string()), ("colony", self.place_name(Place::Colony(*colony)))],
-                    );
+                    let text = self.say("archive_begun", &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(*colony)))]);
                     self.report_line(LineKind::Archive, Some(ReportPlace::Colony(*colony)), text);
                 }
                 Order::FundArchive => self.fund_archive(seat),
@@ -1203,7 +1192,7 @@ impl Game {
             Order::BuildShip { site, kind } => r("build_ship", &[("unit", kind.name().to_string()), ("place", place(*site))]),
             Order::BuildArmy { place: p } => r("build_army", &[("place", place(*p))]),
             Order::BuildStation { body, .. } => r("build_station", &[("body", self.tables.body(*body).name.clone())]),
-            Order::BuildArchiveStage { colony } => r("build_archive_stage", &[("colony", place(Place::Colony(*colony)))]),
+            Order::BuildArchive { colony } => r("build_archive", &[("colony", place(Place::Colony(*colony)))]),
             Order::FundArchive => r("fund_archive", &[]),
             Order::Repair { unit, .. } | Order::RepairWithDucats { unit, .. } => r("repair", &[("unit", unit_of(*unit))]),
             Order::Transit { ship, to } => {

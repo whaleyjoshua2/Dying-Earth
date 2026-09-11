@@ -186,24 +186,28 @@ fn build_board(session: &mut Session) {
                 g.seats[seat.index()].ai = true;
             }
         }
-        // `archive:<stage>` (a building aid, ticket #51): seat 0 gets a Colony on Mars with the
-        // Archive at that stage, the next stage building, a part-filled fund and Colonists in its
-        // Habitats, since an AI Archivist rarely has all of that in six turns.
-        if let Some(stage) = std::env::args().find_map(|a| a.strip_prefix("archive:").and_then(|v| v.parse::<u32>().ok())) {
-            let stages = g.tables.archive.stages;
+        // `archive:<n>` (a building aid, ticket #51, reshaped by #68): seat 0 gets a Colony on Mars
+        // with Colonists in its Habitats and the Archive at one of three points: 0, the Module on
+        // order with the fund at its quarter; 1, the Module standing and the fund half paid; 2,
+        // complete. An AI Archivist rarely has any of that in six turns.
+        if let Some(point) = std::env::args().find_map(|a| a.strip_prefix("archive:").and_then(|v| v.parse::<u32>().ok())) {
+            let research = g.tables.archive.research;
             let slot = g.free_slots_on(BodyId::Mars).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
             let mut modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Mine)];
-            let mut archive = Module::new(ModuleKind::Archive);
-            archive.stage = stage.min(stages);
-            modules.push(archive);
             let turn = g.turn;
             let mut queue = Vec::new();
-            if stage < stages {
-                queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat: Seat(0), due_turn: turn, coastal: false });
+            if point == 0 {
+                queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat: Seat(0), due_turn: turn + 1, coastal: false });
+            } else {
+                modules.push(Module::new(ModuleKind::Archive));
             }
             g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: 8, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
-            g.seats[0].archive_fund = 14;
+            g.seats[0].archive_fund = match point {
+                0 => (research as f64 * g.tables.archive.banked_before_built) as i64,
+                1 => research / 2,
+                _ => research,
+            };
             g.seats[0].stockpile.materials = 120;
             g.seats[0].stockpile.energy = 60;
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
