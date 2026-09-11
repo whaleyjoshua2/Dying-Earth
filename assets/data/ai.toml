@@ -162,8 +162,10 @@ energy_shortage_bonus = 2
 # `within_ppm` of the Sink by `within_by_turn`, and under it by `under_sink_by_turn`.
 # `colonists` is the Colonists off Earth the Faction should hold, as [turn, colonists].
 
+# Ticket #72 (version 0.05.5): the pace is Materials banked in the Venture Capital Fund, 750 by
+# turn 34 of thirty-six; the AI sets its share each turn to stay on it.
 [pace.prospectors]
-first = [[6, 40], [12, 150], [18, 320], [24, 500]]
+first = [[9, 100], [18, 250], [27, 450], [34, 750]]
 colonists = [[12, 4], [22, 12]]
 
 [pace.custodians]

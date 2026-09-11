@@ -257,3 +257,59 @@ Custodians winning every seed on Stabilization.
   Prospectors' start state: **Coastal: Power Plant, Factory**; **Inland: Refinery, Launch Site**, and
   four free inland slots. In 0.05 all three start Facilities and the Launch Site stood on the coast
   (three coastal slots per point of Exposure), and the sea took the lot.
+
+## #72: the Venture Capital Fund, the 15% discount, and the Moon's yields
+
+[The ticket](https://github.com/whaleyjoshua2/Dying-Earth/issues/72). The Prospectors' first
+Victory part is 750 Materials in their **Venture Capital Fund**, a pool beside the Stockpile that
+takes a share of their Factories' and Mines' Materials output each Income, set on any turn from 0%
+to 80% in steps of 10; a draw returns nine tenths. The running Extraction Total is retired. Their
+Facilities and Colony Modules cost 15% less, rounded down. The Moon's four yields are up a tenth.
+
+### What moved
+
+| file | figure | was | is |
+| --- | --- | --- | --- |
+| `factions.toml` | the Prospectors' first part | `extraction_total`, bar 500 | `venture_fund`, bar 750 |
+| `factions.toml` | `facility_materials_multiplier`, `module_materials_multiplier` | 1.0 | 0.85 |
+| `factions.toml` | `[venture_capital]` (new) | | `max_share` 0.8, `share_step` 0.1, `draw_return` 0.9 |
+| `victory.toml` | `extraction_total` | 500 | retired |
+| `ai.toml` | `[pace.prospectors] first` | 40, 150, 320, 500 by turns 6, 12, 18, 24 | 100, 250, 450, 750 by turns 9, 18, 27, 34 |
+| `bodies.toml` | the Moon | 1.5, 1.25, 0.5, 1.0 | 1.65, 1.375, 0.55, 1.1 |
+
+**Builder's calls.** Two orders, the Prospectors only: setting the share (refused off the steps) and
+a draw (refused past what the Fund holds); both land at Resolution, and the share is read at the
+next Income. The banked Materials show in the Income sources as "Venture Capital Fund (banked)".
+The share row and the Draw button sit on the Victory panel under the Prospectors' own bars, and the
+top bar shows "Fund N (S%)" beside their Materials. The AI plays the share as the designer
+described: nothing before the pace's first waypoint (turn 9, it builds first), then the smallest
+step that reaches 750 by turn 34 at its current output, and 80% when nothing less will. A first cut
+zeroed the share whenever the AI was holding Materials for a build, which is nearly every turn, so
+it never banked; that is gone. A Module lost nothing, but a seat gained three fields, so saves are
+already refused by the stamp bumped on the Archive ticket.
+
+### Measured, twenty seeds each
+
+| seat 0 | collapses | Prospectors' Fund at the end (median) | Custodian wins | Sea Walls | Scrubbers |
+| --- | --- | --- | --- | --- | --- |
+| Prospectors in East Asia | 0/20 | **0** | 20/20 (Stabilization) | 5 | 677 |
+| Custodians from Europe | 0/20 | **0** | 20/20 (Stabilization) | 12 | 685 |
+
+**The Fund cannot be measured yet, and the reason is not the Fund.** In every seed the Prospectors
+in East Asia lose it **on turn 7** (min 7, median 7, max 7): from about turn 4 the Custodian AI
+pours 25 Influence a turn into East Asia, the other two AIs join it, and the holder's defence is a
+single 5-Influence "hold" a turn, so the richest state on the board passes to the Custodians before
+the Fund's first waypoint, and the Prospectors' Materials income reads +0 from then to the end. The
+same thing took East Asia from the Archivists at turn 20 on the Archive ticket; with the Prospectors
+it is turn 7. That is the four-way balance the map keeps out of this version, and it is now the one
+finding under every measurement since the Research ticket: the Custodians win every seed of every
+seating on Stabilization. It is written up as its own ticket for the designer, blocking the build.
+
+### Picture
+
+![The Victory panel for the Prospectors: "Venture Capital Fund: 120 of 750" with its bar, "Banking 50% of Materials output" with 0% to 80% buttons and 50% lit, and a "Draw 10 from the Fund" button](fund-earth.png)
+
+- **fund-earth.png** — `shot:fund player:prospectors turns:4 victory:1 venture:120 panel:0`. The
+  Victory panel with the Prospectors in seat 0: **"Venture Capital Fund: 120 of 750"**, the row of
+  share buttons from 0% to 80% with **50% lit**, and **"Draw 10 from the Fund"**. The first take
+  had the Climate Panel over the share row, and was retaken with `panel:0`.

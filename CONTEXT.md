@@ -17,7 +17,7 @@ The Faction that colonizes the solar system while limiting ecological damage to 
 _Avoid_: Stewards (the retired name), environmentalists, greens, moderates, eco-terrorists
 
 **Prospectors**:
-The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry and the Strip Permit, and they win on extraction and expansion.
+The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry and the Strip Permit, and since version 0.05.5 they win on a hoard: 750 Materials in their Venture Capital Fund, and expansion.
 _Avoid_: Extractors (the retired name), capitalists, industrialists, exploiters
 
 **Arkwrights**:
@@ -211,7 +211,7 @@ A building placed in a Nation State. Ten kinds since version 0.05: Factory, Powe
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Cheap Industry**:
-The first clause of the Prospectors' signature rule: raising a Nation State's Industry Level costs them half. The second is the Strip Permit.
+The first clause of the Prospectors' signature rule: raising a Nation State's Industry Level costs them half, and since version 0.05.5 every Facility and Colony Module costs them 15% less. The second is the Strip Permit.
 _Avoid_: industry discount, cheap building
 
 **Restoration**:
@@ -409,8 +409,12 @@ What one Faction must achieve to win. Each Faction has its own, and meeting it i
 _Avoid_: win condition, goal, objective, victory points
 
 **Extraction Total**:
-The Prospectors' measure: all the Materials and Fuel their Mines, Refineries and Factories have produced across the whole game. It is counted cumulatively and never spent down.
-_Avoid_: production score, output total, wealth
+Retired in version 0.05.5 for the Venture Capital Fund. It was the Prospectors' measure: all the Materials and Fuel their Mines, Refineries and Factories had produced across the whole game, counted cumulatively and never spent down.
+_Avoid_: extraction total, production score, output total, wealth
+
+**Venture Capital Fund**:
+The Prospectors' own pool beside the Stockpile, and their measure since version 0.05.5: 750 Materials in it is the first part of their Victory Condition. On any turn they set the share of their Factories' and Mines' Materials output that goes into it at Income, from nothing to four fifths in steps of a tenth; Materials bought, refunded or found are not output. A draw takes Materials back out at a tenth's loss.
+_Avoid_: the pool, savings, treasury, war chest, bank
 
 **Stabilization**:
 The Custodians' measure: net Emissions held under the Natural Sink, counting every Scrubber, for a run of consecutive turns. One turn over the Sink resets the run.

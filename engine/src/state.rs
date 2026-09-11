@@ -496,7 +496,15 @@ pub struct SeatState {
     pub kind: FactionKind,
     pub ai: bool,
     pub stockpile: Stockpile,
-    pub extraction_total: i64,
+    /// Ticket #72 (version 0.05.5): Materials banked in the Venture Capital Fund (the Prospectors'
+    /// first Victory part), the share of Materials output banked each Income, and what last
+    /// Income banked. The running Extraction Total this replaces is retired.
+    #[serde(default)]
+    pub venture_fund: i64,
+    #[serde(default)]
+    pub venture_share: f64,
+    #[serde(default)]
+    pub venture_banked_last_turn: i64,
     pub stabilization_run: u32,
     pub influence: BTreeMap<Target, i64>,
     /// Targets that received Influence this turn (spent or gained by Occupation), so they do not decay.
@@ -639,7 +647,9 @@ impl Game {
             kind,
             ai,
             stockpile: start,
-            extraction_total: 0,
+            venture_fund: 0,
+            venture_share: 0.0,
+            venture_banked_last_turn: 0,
             stabilization_run: 0,
             influence: BTreeMap::new(),
             influenced_this_turn: Vec::new(),
@@ -1007,6 +1017,13 @@ impl Game {
     }
 
     /// What a Space Station costs this seat in Materials, rounded down (ticket #51).
+    /// Ticket #72 (version 0.05.5): what a Facility costs this seat in Materials: the row's figure
+    /// times the Faction's multiplier (the Prospectors' 0.85), rounded down.
+    pub fn facility_materials(&self, seat: Seat, kind: FacilityKind) -> i64 {
+        let base = self.tables.facility(kind).materials as f64;
+        (base * self.tables.faction(self.kind(seat)).facility_materials_multiplier).floor() as i64
+    }
+
     pub fn station_materials(&self, seat: Seat) -> i64 {
         let base = self.tables.station_materials as f64;
         (base * self.tables.faction(self.kind(seat)).station_materials_multiplier).floor() as i64

@@ -796,6 +796,12 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 if lines.is_empty() { "No income from buildings last turn.".to_string() } else { format!("Last Income:\n{}", lines.join("\n")) }
             };
             ui.label(RichText::new(format!("Materials {} ({})", left.materials, signed(inc.materials))).strong()).on_hover_text(sources(dying_earth_engine::Resource::Materials));
+            // Ticket #72: the Prospectors' Fund beside their Materials.
+            if game.kind(Seat(0)) == FactionKind::Prospectors {
+                let s = game.seat(Seat(0));
+                ui.label(RichText::new(format!("Fund {} ({}%)", s.venture_fund, (s.venture_share * 100.0).round() as u32)).strong())
+                    .on_hover_text("The Venture Capital Fund: Materials banked toward the 750 your Victory Condition asks for, and the share of your Factories' and Mines' output going in each turn. Set it on the Victory panel.");
+            }
             ui.separator();
             ui.label(RichText::new(format!("Fuel {} ({})", left.fuel, signed(inc.fuel))).strong()).on_hover_text(sources(dying_earth_engine::Resource::Fuel));
             ui.separator();
@@ -1480,6 +1486,9 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildStation { body, slot } => format!("Build {} over {}", game.station_name(*body, *slot), game.tables.body(*body).name),
         Order::BuildArchive { colony } => format!("Build the Archive at {}", game.place_name(Place::Colony(*colony))),
         Order::FundArchive => "Fund the Archive with this turn's Research".to_string(),
+        // Ticket #72.
+        Order::SetVentureShare { share } => format!("Bank {share}% of Materials output in the Venture Capital Fund"),
+        Order::DrawVenture { amount } => format!("Draw {amount} Materials from the Venture Capital Fund"),
         // Ticket #52.
         Order::Relief { state } => format!("Relief in {}: Unrest -1", game.tables.state(*state).name),
         Order::Resettle { state } => format!("Resettle this turn's refugees in {}", game.tables.state(*state).name),
@@ -2621,6 +2630,35 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // Ticket #51: the second part in the words its own card uses.
                 ui.label(format!("{}: {}", p.second_name, p.second_text));
                 ui.add(egui::ProgressBar::new(p.second_fraction() as f32));
+                // Ticket #72: the Prospectors set their Venture Capital Fund's share here, and draw.
+                if seat == Seat(0) && !session.spectator && game.kind(Seat(0)) == FactionKind::Prospectors {
+                    let v = game.tables.venture.clone();
+                    let now = (game.seat(Seat(0)).venture_share * 100.0).round() as u32;
+                    let pending_share = session.pending.iter().find_map(|o| if let Order::SetVentureShare { share } = o { Some(*share) } else { None });
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(format!("Banking {now}% of Materials output{}:", pending_share.map(|p| format!(" ({p}% from next turn)")).unwrap_or_default()));
+                        let step = (v.share_step * 100.0).round().max(1.0) as u32;
+                        let max = (v.max_share * 100.0).round() as u32;
+                        let mut pct = 0u32;
+                        while pct <= max {
+                            if ui.selectable_label(pending_share.unwrap_or(now) == pct, format!("{pct}%")).clicked() {
+                                if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetVentureShare { .. })) {
+                                    actions.push(Action::Cancel(i));
+                                }
+                                if pct != now {
+                                    actions.push(Action::Place(Order::SetVentureShare { share: pct }));
+                                }
+                            }
+                            pct += step;
+                        }
+                    });
+                    let draw = Order::DrawVenture { amount: 10 };
+                    let ok = game.check_order(Seat(0), &session.pending, &draw).is_ok();
+                    let back = (10.0 * v.draw_return).floor() as i64;
+                    if ui.add_enabled(ok, egui::Button::new("Draw 10 from the Fund")).on_hover_text(format!("{back} Materials come back to the Stockpile; a tenth is lost.")).clicked() {
+                        actions.push(Action::Place(draw));
+                    }
+                }
                 ui.add_space(8.0);
             }
             ui.label(format!("Collapse Line +{:.1} C; the Temperature is {:+.1}.", game.tables.climate.collapse_line, game.climate.temperature));

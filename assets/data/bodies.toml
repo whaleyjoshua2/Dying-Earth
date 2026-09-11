@@ -48,10 +48,11 @@ local_turns = 1
 local_fuel = 6
 transit_turns = 1
 transit_fuel = 6
-mine_yield = 1.5
-generator_yield = 1.25
-refinery_yield = 0.5
-habitat_yield = 1.0
+# Ticket #72 (version 0.05.5): all four up a tenth (1.5, 1.25, 0.5, 1.0 before).
+mine_yield = 1.65
+generator_yield = 1.375
+refinery_yield = 0.55
+habitat_yield = 1.1
 orbital_slots = 2
 stations = ["Gateway", "Selene"]
 slots = [

@@ -46,7 +46,7 @@ impl Game {
         // Ticket #50: the first part is whatever the Faction's card names, at the bar on the card.
         let card = self.tables.faction(s.kind).victory_first;
         let first_value = match card.kind {
-            VictoryFirstKind::ExtractionTotal => s.extraction_total as f64,
+            VictoryFirstKind::VentureFund => s.venture_fund as f64,
             VictoryFirstKind::StabilizationRun => s.stabilization_run as f64,
             VictoryFirstKind::ColonistsOffEarth => self.off_world_colonists(seat) as f64,
             VictoryFirstKind::ResearchProduced => s.research_total as f64,

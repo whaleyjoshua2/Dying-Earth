@@ -289,6 +289,9 @@ pub struct FactionCard {
     /// A Colony Module's Materials, times this.
     #[serde(default = "one_f64")]
     pub module_materials_multiplier: f64,
+    /// Ticket #72 (version 0.05.5): a Facility's Materials, times this (the Prospectors' 0.85).
+    #[serde(default = "one_f64")]
+    pub facility_materials_multiplier: f64,
 }
 
 fn one_f64() -> f64 {
@@ -299,7 +302,9 @@ fn one_f64() -> f64 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum VictoryFirstKind {
-    ExtractionTotal,
+    /// Ticket #72 (version 0.05.5): Materials banked in the Prospectors' Venture Capital Fund; the
+    /// running Extraction Total it replaces is retired.
+    VentureFund,
     StabilizationRun,
     ColonistsOffEarth,
     ResearchProduced,
@@ -312,7 +317,7 @@ pub enum VictoryFirstKind {
 impl VictoryFirstKind {
     pub fn name(self) -> &'static str {
         match self {
-            VictoryFirstKind::ExtractionTotal => "Extraction Total",
+            VictoryFirstKind::VentureFund => "Venture Capital Fund",
             VictoryFirstKind::StabilizationRun => "Stabilization run",
             VictoryFirstKind::ColonistsOffEarth => "Colonists off Earth",
             VictoryFirstKind::ResearchProduced => "Research produced",
@@ -536,7 +541,6 @@ pub struct UnrestTable {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct VictoryTable {
-    pub extraction_total: i64,
     pub stabilization_turns: u32,
     pub off_world_presence: u32,
     pub turns: u32,
@@ -807,6 +811,16 @@ struct FactionsFile {
     faction: Vec<FactionCard>,
     start: StartCard,
     ducats: DucatsCard,
+    venture_capital: VentureCard,
+}
+
+/// Ticket #72 (version 0.05.5): the Prospectors' Venture Capital Fund: the largest share of their
+/// Materials output that may be banked a turn, the step the share moves in, and what a draw returns.
+#[derive(Debug, Clone, Deserialize)]
+pub struct VentureCard {
+    pub max_share: f64,
+    pub share_step: f64,
+    pub draw_return: f64,
 }
 
 /// Every table, loaded and checked.
@@ -846,6 +860,7 @@ pub struct Tables {
     pub factions: Vec<FactionCard>,
     pub start: StartCard,
     pub ducats: DucatsCard,
+    pub venture: VentureCard,
     pub climate: ClimateTable,
     pub influence: InfluenceTable,
     /// Ticket #52: `unrest.toml`.
@@ -915,6 +930,7 @@ impl Tables {
             factions: factions.faction,
             start: factions.start,
             ducats: factions.ducats,
+            venture: factions.venture_capital,
             climate,
             influence,
             unrest,

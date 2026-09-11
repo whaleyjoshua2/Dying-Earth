@@ -230,7 +230,7 @@ impl Game {
         match behind {
             Behind::Presence => y.habitat,
             Behind::First => match self.first_kind(seat) {
-                VictoryFirstKind::ExtractionTotal => y.mine + y.refinery,
+                VictoryFirstKind::VentureFund => y.mine + y.refinery,
                 VictoryFirstKind::ColonistsOffEarth => y.habitat,
                 VictoryFirstKind::StabilizationRun | VictoryFirstKind::ResearchProduced | VictoryFirstKind::ArchiveResearch => y.generator + y.habitat,
             },
@@ -438,9 +438,10 @@ impl Game {
             self.state(sid).facilities.iter().filter(|f| !f.mothballed).map(|f| self.facility_yield(seat, sid, f.kind).amount).sum()
         };
         let highest_output = self.controlled_states(seat).into_iter().filter(|s| !self.state(*s).strip_permit_used).max_by_key(|s| output_of(*s));
-        // Ticket #54: behind on the Extraction pace itself, whichever part the seat is furthest
-        // behind on overall: the Strip Permit is bought against the Extraction schedule.
-        let behind_on_extraction = first_kind == VictoryFirstKind::ExtractionTotal && {
+        // Ticket #54: behind on the first part's pace itself, whichever part the seat is furthest
+        // behind on overall: the Strip Permit is bought against that schedule (ticket #72: the
+        // Venture Capital Fund's).
+        let behind_on_extraction = first_kind == VictoryFirstKind::VentureFund && {
             let pace = self.tables.ai_pace(kind);
             let want = Self::expected(&pace.first, self.turn);
             want > 0.0 && (self.progress(seat).first_value) < want
@@ -454,7 +455,7 @@ impl Game {
         // What advances the Faction's own first Victory part (ticket #50).
         let advances_first = |cat: Cat, item: Option<&str>| -> bool {
             match first_kind {
-                VictoryFirstKind::ExtractionTotal => {
+                VictoryFirstKind::VentureFund => {
                     cat == Cat::Producer && item.map(|i| i != "Power Plant" && i != "Generator").unwrap_or(false)
                         || cat == Cat::RaiseIndustry
                         // Ticket #54: a Strip Permit is three turns of double Extraction.
@@ -1334,6 +1335,39 @@ impl Game {
                 lines.push(format!("  take  {:6.1}  {}", c.score(), c.note));
                 chosen = trial;
                 stacks_done.push(key);
+            }
+        }
+        // Ticket #72 (version 0.05.5): the Venture Capital Fund's share, played as the designer put
+        // it: "an AI/player may set it at 50% for five turns then down to 0% if they're trying to
+        // save; end game might try to max at 80% to reach the victory condition before others."
+        // So: 0% until the pace's first waypoint (it builds first), then the smallest step that
+        // reaches the bar by the pace's last turn at the current output, and the most it may when
+        // nothing less will. (A first cut zeroed the share whenever Materials were being held for
+        // a build, which is nearly every turn, so nothing was ever banked.)
+        if first_kind == VictoryFirstKind::VentureFund {
+            let v = self.tables.venture.clone();
+            let bar = self.tables.faction(kind).victory_first.bar;
+            let pace = self.tables.ai_pace(kind);
+            let first_waypoint = pace.first.first().map(|p| p[0]).unwrap_or(0) as u32;
+            let last = pace.first.last().map(|p| p[0]).unwrap_or(self.tables.victory.turns as i64) as u32;
+            let turns_to = last.saturating_sub(self.turn).max(1) as f64;
+            let s0 = self.seat(seat);
+            let gross = (s0.income_last_turn.materials + s0.venture_banked_last_turn).max(0) as f64;
+            let need = (bar - s0.venture_fund as f64).max(0.0);
+            let share = if self.turn < first_waypoint || need <= 0.0 {
+                0.0
+            } else {
+                let mut sh = 0.0;
+                while sh < v.max_share - 1e-9 && sh * gross * turns_to < need {
+                    sh += v.share_step;
+                }
+                sh.min(v.max_share)
+            };
+            let pct = (share * 100.0).round() as u32;
+            let now = (s0.venture_share * 100.0).round() as u32;
+            if pct != now {
+                lines.push(format!("  take          set the Venture Capital Fund to {pct}% (was {now}%; {need:.0} still wanted over {turns_to:.0} turns at {gross:.0} a turn)"));
+                chosen.push(Order::SetVentureShare { share: pct });
             }
         }
         self.log(format!("AI {} scored {} actions (gap x{:.2} on {:?}):", self.seat_name(seat), cands.len(), gap, behind));

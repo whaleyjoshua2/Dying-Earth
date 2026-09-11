@@ -212,6 +212,14 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.energy = 60;
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
         }
+        // `venture:<n>` (a building aid, ticket #72): seat 0 as the Prospectors holds n Materials in
+        // the Venture Capital Fund and banks half its output.
+        if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("venture:").and_then(|v| v.parse::<i64>().ok()))
+            && g.kind(Seat(0)) == FactionKind::Prospectors
+        {
+            g.seats[0].venture_fund = n;
+            g.seats[0].venture_share = 0.5;
+        }
         // `unrest:<n>` (a building aid, ticket #52): a spread of Unrest over three states on the
         // face the Earth picture shows, so one card, the map labels and the thresholds are all
         // visible at once. The AI seldom leaves a state of the player's this restive.

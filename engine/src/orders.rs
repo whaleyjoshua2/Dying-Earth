@@ -76,6 +76,12 @@ pub enum Order {
     /// Version 0.05 (ticket #51): this turn's Research from the Archivists' Labs goes into the
     /// Archive fund instead of the shared Tech, and counts nothing toward the Research Lead.
     FundArchive,
+    /// Version 0.05.5 (ticket #72): the Prospectors set the share of their Materials output the
+    /// Venture Capital Fund banks each Income, in whole percent (a step of 10, 0 to 80).
+    SetVentureShare { share: u32 },
+    /// Version 0.05.5 (ticket #72): the Prospectors take Materials back out of the Fund, nine
+    /// tenths of them returning to the Stockpile.
+    DrawVenture { amount: i64 },
     /// Version 0.05 (ticket #52): Relief. Ducats spent on a Nation State you direct, lowering its
     /// Unrest by one. Any number of times a turn, cancellable like any order.
     Relief { state: StateId },
@@ -190,7 +196,8 @@ impl Game {
     pub fn order_cost(&self, seat: Seat, order: &Order) -> Cost {
         let t = &self.tables;
         match order {
-            Order::BuildFacility { kind, .. } => Cost { materials: t.facility(*kind).materials, ..Default::default() },
+            // Ticket #72: the Faction's own Facility price (the Prospectors' 15% off).
+            Order::BuildFacility { kind, .. } => Cost { materials: self.facility_materials(seat, *kind), ..Default::default() },
             Order::RaiseIndustry { .. } => Cost { materials: self.industry_cost(seat), ..Default::default() },
             // Ticket #51: a Faction's card may make its Modules and its Colony Ships cost less.
             Order::BuildModule { kind, .. } => Cost { materials: self.module_materials(seat, *kind), ..Default::default() },
@@ -231,7 +238,7 @@ impl Game {
                     _ => Cost::default(),
                 }
             }
-            Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: t.facility(*kind).materials * t.ducats.per_building_material, ..Default::default() },
+            Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: self.facility_materials(seat, *kind) * t.ducats.per_building_material, ..Default::default() },
             Order::BuildStation { .. } => Cost { materials: self.station_materials(seat), ..Default::default() },
             Order::BuildModuleWithDucats { kind, .. } => Cost { ducats: self.module_materials(seat, *kind) * t.ducats.per_building_material, ..Default::default() },
             // Ticket #68: the Archive Module costs its row's Materials; the Research comes after.
@@ -823,6 +830,33 @@ impl Game {
             // Ticket #54: Mothball, Restart and Decommission.
             Order::Change { building, what } => self.check_change(seat, pending, *building, *what).map(|_| cost),
             // Ticket #54: Leapfrog, the Custodians only, on a state they control.
+            // Ticket #72: the Venture Capital Fund's two orders, the Prospectors only.
+            Order::SetVentureShare { share } => {
+                if self.kind(seat) != FactionKind::Prospectors {
+                    return fail("only the Prospectors have a Venture Capital Fund");
+                }
+                let v = &self.tables.venture;
+                let step = (v.share_step * 100.0).round() as u32;
+                let max = (v.max_share * 100.0).round() as u32;
+                if step == 0 || share % step != 0 || *share > max {
+                    return fail(format!("the share moves in steps of {step}% from 0% to {max}%"));
+                }
+                if pending.iter().any(|o| matches!(o, Order::SetVentureShare { .. })) {
+                    return fail("the share is already being set this turn");
+                }
+                Ok(cost)
+            }
+            Order::DrawVenture { amount } => {
+                if self.kind(seat) != FactionKind::Prospectors {
+                    return fail("only the Prospectors have a Venture Capital Fund");
+                }
+                let drawn: i64 = pending.iter().map(|o| if let Order::DrawVenture { amount } = o { *amount } else { 0 }).sum();
+                let fund = self.seat(seat).venture_fund - drawn;
+                if *amount <= 0 || *amount > fund {
+                    return fail(format!("the Fund holds {}", fund.max(0)));
+                }
+                Ok(cost)
+            }
             Order::Leapfrog { state } => {
                 if self.kind(seat) != FactionKind::Custodians {
                     return fail("only the Custodians Leapfrog");
@@ -1051,6 +1085,22 @@ impl Game {
                 }
                 // Ticket #54: Leapfrog is permanent and takes hold at once, before the next Climate
                 // phase reads the state's coefficient.
+                // Ticket #72: the Fund's orders land now; the share is read at the next Income.
+                Order::SetVentureShare { share } => {
+                    self.seat_mut(seat).venture_share = *share as f64 / 100.0;
+                    let line = format!("The {} set the Venture Capital Fund to bank {}% of their Materials output.", self.seat_name(seat), share);
+                    self.log(line);
+                }
+                Order::DrawVenture { amount } => {
+                    let back = (*amount as f64 * self.tables.venture.draw_return).floor() as i64;
+                    {
+                        let s = self.seat_mut(seat);
+                        s.venture_fund -= amount;
+                        s.stockpile.materials += back;
+                    }
+                    let line = format!("The {} drew {} Materials from the Venture Capital Fund; {} came back to the Stockpile.", self.seat_name(seat), amount, back);
+                    self.log(line);
+                }
                 Order::Leapfrog { state } => {
                     let per = self.tables.climate.population_emissions_per_level;
                     self.state_mut(*state).leapfrog += per;
@@ -1236,6 +1286,8 @@ impl Game {
                 };
                 r(key, &[("building", building(*b)), ("place", place(b.place()))])
             }
+            Order::SetVentureShare { share } => r("set_venture_share", &[("share", share.to_string())]),
+            Order::DrawVenture { amount } => r("draw_venture", &[("n", amount.to_string())]),
             Order::Leapfrog { state } => r("leapfrog", &[("state", self.tables.state(*state).name.clone())]),
             Order::StripPermit { state } => r("strip_permit", &[("state", self.tables.state(*state).name.clone())]),
         }

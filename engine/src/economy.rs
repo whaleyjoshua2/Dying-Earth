@@ -448,7 +448,8 @@ impl Game {
                     Resource::Research => {}
                 }
                 sources.push((format!("{} in {}", p.name, where_), res, v));
-                if p.extraction && matches!(res, Resource::Materials | Resource::Fuel) {
+                // Ticket #72: the Materials output the Venture Capital Fund takes its share of.
+                if p.extraction && res == Resource::Materials {
                     extraction += v;
                 }
             }
@@ -467,6 +468,14 @@ impl Game {
                 gained.ducats += v;
                 sources.push((format!("Economy of {}", self.tables.state(sid).name), Resource::Ducats, v));
             }
+        }
+        // Ticket #72 (version 0.05.5): the Venture Capital Fund takes its share of the Materials the
+        // seat's Factories and Mines paid, rounded down, before the Stockpile sees them.
+        let share = self.seat(seat).venture_share;
+        let banked = if share > 0.0 { (extraction as f64 * share).floor() as i64 } else { 0 };
+        if banked > 0 {
+            gained.materials -= banked;
+            sources.push(("Venture Capital Fund (banked)".to_string(), Resource::Materials, -banked));
         }
         self.seat_mut(seat).income_sources = sources;
         let before = self.seat(seat).stockpile;
@@ -487,7 +496,8 @@ impl Game {
             // Ticket #50: every seat keeps both running totals; a Faction's card says which one its
             // Victory Condition counts.
             s.research_total += research;
-            s.extraction_total += extraction;
+            s.venture_fund += banked;
+            s.venture_banked_last_turn = banked;
         }
         if !shut.is_empty() {
             let line = format!("{}: Energy ran short; shut down {}.", self.seat_name(seat), shut.join(", "));

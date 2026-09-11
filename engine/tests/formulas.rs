@@ -415,11 +415,13 @@ fn a_controlled_state_pays_ducats_from_gdp_times_industry_and_a_bank_adds_more()
     let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::TradePost], 0);
     assert_eq!(g.module_yield(Seat(0), moon, ModuleKind::TradePost).amount, 3);
     assert_eq!(g.module_yield(Seat(0), mars, ModuleKind::TradePost).amount, 4);
-    // Ducats never count toward the Extraction Total.
-    let before = g.seats[1].extraction_total;
+    // Ticket #72: Ducats are not Materials output, so a Bank banks nothing in the Venture Capital
+    // Fund however high the share is set.
+    g.seats[1].venture_share = 0.8;
+    let before = g.seats[1].venture_fund;
     g.state_mut(StateId::Europe).facilities = vec![facility(FacilityKind::Bank)];
     income_of(&mut g, Seat(1));
-    assert_eq!(g.seats[1].extraction_total, before);
+    assert_eq!(g.seats[1].venture_fund, before);
 }
 
 #[test]
@@ -812,7 +814,7 @@ fn occupation_of_a_controlled_state_returns_it_to_its_owner_when_broken() {
 
 fn meet_first(g: &mut Game, seat: Seat) {
     match g.kind(seat) {
-        FactionKind::Prospectors => g.seats[seat.index()].extraction_total = 500,
+        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 750,
         FactionKind::Custodians => g.seats[seat.index()].stabilization_run = 3,
         FactionKind::Arkwrights => {}
         FactionKind::Archivists => g.seats[seat.index()].research_total = 150,
@@ -835,7 +837,7 @@ fn both_met_the_larger_margin_wins() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
     g.seats[0].stabilization_run = 3; // parts 1.0 and 1.0 -> margin 1.0
-    g.seats[1].extraction_total = 600; // parts 1.2 and 1.25 -> margin 1.2
+    g.seats[1].venture_fund = 900; // parts 1.2 and 1.25 -> margin 1.2
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
 }
@@ -846,7 +848,7 @@ fn both_met_by_the_same_margin_is_a_draw() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     g.seats[0].stabilization_run = 3;
-    g.seats[1].extraction_total = 600; // the lower fraction is the presence, 1.0, on both sides
+    g.seats[1].venture_fund = 900; // the lower fraction is the presence, 1.0, on both sides
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Draw { .. })), "{:?}", g.outcome);
 }
@@ -866,7 +868,7 @@ fn the_last_turn_scores_the_lower_fraction_of_the_two_parts() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 6); // presence 0.5, run 0 -> score 0
     g.seats[0].stabilization_run = 3;
     colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat], 3); // presence 0.25
-    g.seats[1].extraction_total = 500; // first 1.0 -> score 0.25
+    g.seats[1].venture_fund = 750; // first 1.0 -> score 0.25
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(0), .. })), "0.5 beats 0.25: {:?}", g.outcome);
 }
@@ -985,14 +987,14 @@ fn solar_maximum_boosts_power_plants_and_generators_at_the_next_income_once() {
     colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator], 0);
     drawn(&mut g, EventId::SolarMaximum, EventTarget::Everyone);
     g.apply_event_now();
-    // Power Plant 6 x 1.5 = 9; Generator 5 x 1.25 (Moon) x 1.5 = 9.
-    assert_eq!(income_of(&mut g, Seat(0)).energy, 18);
+    // Power Plant 6 x 1.5 = 9; Generator 5 x 1.375 (the Moon since ticket #72) x 1.5 = 10.
+    assert_eq!(income_of(&mut g, Seat(0)).energy, 19);
     assert_eq!(income_of(&mut g, Seat(0)).energy, 12, "the boost lasts one Income");
     with_tech(&mut g, TechId::EfficientGrids);
     drawn(&mut g, EventId::SolarMaximum, EventTarget::Everyone);
     g.apply_event_now();
-    // Power Plant 6 x 1.5 x 2 = 18; Generator 5 x 1.25 x 1.5 x 2 = 18.
-    assert_eq!(income_of(&mut g, Seat(0)).energy, 36, "Efficient Grids makes it x2");
+    // Power Plant 6 x 1.5 x 2 = 18; Generator 5 x 1.375 x 1.5 x 2 = 20 (rounded down).
+    assert_eq!(income_of(&mut g, Seat(0)).energy, 38, "Efficient Grids makes it x2");
 }
 
 #[test]
@@ -1545,7 +1547,7 @@ fn more_than_one_seat_meeting_its_condition_gives_the_game_to_the_larger_margin(
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
     g.seats[0].stabilization_run = 3; // parts 1.0 and 1.0 -> margin 1.0
-    g.seats[1].extraction_total = 600; // parts 1.2 and 1.25 -> margin 1.2
+    g.seats[1].venture_fund = 900; // parts 1.2 and 1.25 -> margin 1.2
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
 }
@@ -1555,13 +1557,13 @@ fn the_last_turn_ranks_every_seat_by_score() {
     let mut g = game();
     g.turn = g.tables.victory.turns;
     // Each seat is scored on its own two parts (ticket #51). Custodians: 6 Colonists off Earth of
-    // 12 but no Stabilization run, score 0. Prospectors: 9 of 12 and the full Extraction Total,
+    // 12 but no Stabilization run, score 0. Prospectors: 9 of 12 and the full Venture Capital Fund,
     // score 0.75. Arkwrights: 3 Colonists of 30 and no Body with 4 on it, score 0. Archivists:
     // nothing, score 0.
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 6);
     let p = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 9);
     let _ = p;
-    g.seats[1].extraction_total = 500;
+    g.seats[1].venture_fund = 750;
     colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat], 3);
     assert!((g.progress(Seat(1)).score() - 0.75).abs() < 1e-9, "{:?}", g.progress(Seat(1)).score());
     g.end_phase();
@@ -2508,7 +2510,7 @@ fn the_ai_pays_relief_and_raises_a_constabulary_where_unrest_has_taken_hold() {
     g.seats[1].stockpile.ducats = 200;
     g.seats[1].stockpile.materials = 200;
     // On pace, so the victory gap is not multiplying every producer past everything else.
-    g.seats[1].extraction_total = 1000;
+    g.seats[1].venture_fund = 1500;
     g.state_mut(StateId::NorthAfrica).unrest = 9.0;
     let orders = g.ai_orders(Seat(1));
     assert!(orders.iter().any(|o| matches!(o, Order::Relief { state: StateId::NorthAfrica })), "no Relief: {orders:?}");
@@ -2522,7 +2524,7 @@ fn the_ai_pays_relief_and_raises_a_constabulary_where_unrest_has_taken_hold() {
     g.take_control(StateId::NorthAfrica, Seat(1));
     g.seats[1].stockpile.ducats = 200;
     g.seats[1].stockpile.materials = 200;
-    g.seats[1].extraction_total = 1000;
+    g.seats[1].venture_fund = 1500;
     let orders = g.ai_orders(Seat(1));
     assert!(!orders.iter().any(|o| matches!(o, Order::Relief { .. })), "Relief in a calm state: {orders:?}");
     assert!(
@@ -4790,4 +4792,125 @@ fn coastal_engineering_sits_on_rung_one_at_ten_research_with_no_prerequisite() {
     assert_eq!(g.tables.tech(TechId::CleanPower).needs, vec![TechId::EfficientGrids]);
     let w = g.tables.facility(FacilityKind::SeaWall);
     assert_eq!((w.materials, w.build_turns), (35, 2));
+}
+
+// ---------------------------------------------------------------- Ticket #72 (version 0.05.5): the Venture Capital Fund, the 15% discount, the Moon's yields
+
+/// Ticket #72 (a): the Prospectors' Facilities and Colony Modules cost 15% less, rounded down, and
+/// a building bought for Ducats follows; Space Stations, Ships and Industry Level do not.
+#[test]
+fn the_prospectors_pay_fifteen_percent_less_for_facilities_and_modules_and_nothing_less_for_the_rest() {
+    let mut g = game();
+    let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
+    let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    g.take_control(StateId::Europe, pro);
+    assert_eq!(g.order_cost(pro, &Order::BuildFacility { state: StateId::Europe, kind: FacilityKind::Factory }).materials, 17, "20 x 0.85 rounded down");
+    assert_eq!(g.order_cost(cus, &Order::BuildFacility { state: StateId::EastAsia, kind: FacilityKind::Factory }).materials, 20, "everyone else pays the row");
+    assert_eq!(g.order_cost(pro, &Order::BuildFacilityWithDucats { state: StateId::Europe, kind: FacilityKind::Factory }).ducats, 34, "the Ducat price follows: 17 x 2");
+    let moon = colony(&mut g, pro, BodyId::Moon, &[], 0);
+    assert_eq!(g.order_cost(pro, &Order::BuildModule { colony: moon, kind: ModuleKind::Habitat }).materials, 21, "25 x 0.85 rounded down");
+    assert_eq!(g.order_cost(pro, &Order::BuildModuleWithDucats { colony: moon, kind: ModuleKind::Habitat }).ducats, 42);
+    assert_eq!(g.order_cost(pro, &Order::BuildStation { body: BodyId::Moon, slot: 0 }).materials, 40, "a Space Station is not a building of theirs to discount");
+    assert_eq!(g.order_cost(pro, &Order::RaiseIndustry { state: StateId::Europe }).materials, 15, "Cheap Industry is its own clause");
+}
+
+/// Ticket #72 (b): the Venture Capital Fund. A share of the Materials the Prospectors' Factories
+/// and Mines pay at Income goes into it, set on any turn in steps of 10% from 0 to 80; a draw
+/// returns nine tenths, rounded down; nobody else has one.
+#[test]
+fn the_venture_capital_fund_banks_a_share_of_materials_output_and_a_draw_returns_nine_tenths() {
+    let mut g = game();
+    let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
+    g.take_control(StateId::Europe, pro);
+    g.state_mut(StateId::Europe).facilities = vec![facility(FacilityKind::Factory)];
+    let moon = colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Mine], 0);
+    let _ = moon;
+    // Output: a Factory at 4 x 1.25 = 5, a Mine at 4 x 1.65 x 1.25 = 8 (rounded down): 13 a turn.
+    assert_eq!(income_of(&mut g, pro).materials, 13, "at 0% nothing is banked");
+    assert_eq!(g.seats[pro.index()].venture_fund, 0);
+    // The share is an order, refused off the steps and to anyone else.
+    assert_eq!(g.check_order(Seat(0), &[], &Order::SetVentureShare { share: 50 }).unwrap_err().0, "only the Prospectors have a Venture Capital Fund");
+    assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 15 }).is_err(), "not a step of 10");
+    assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 90 }).is_err(), "over 80");
+    assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 0 }).is_ok());
+    assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 80 }).is_ok());
+    g.commit_orders(pro, &[Order::SetVentureShare { share: 50 }]);
+    assert!((g.seats[pro.index()].venture_share - 0.5).abs() < 1e-9);
+    // Half of 13, rounded down, is banked: 6 to the Fund, 7 to the Stockpile.
+    assert_eq!(income_of(&mut g, pro).materials, 7);
+    assert_eq!(g.seats[pro.index()].venture_fund, 6);
+    assert!(g.seat(pro).income_sources.iter().any(|(name, _, n)| name.contains("Venture Capital Fund") && *n == -6), "{:?}", g.seat(pro).income_sources);
+    // Bought Materials are not output.
+    g.seats[pro.index()].stockpile.ducats = 100;
+    g.commit_orders(pro, &[Order::Buy { resource: Resource::Materials, amount: 10 }]);
+    assert_eq!(g.seats[pro.index()].venture_fund, 6, "a purchase banks nothing");
+    // 80% of 13 is 10, rounded down.
+    g.commit_orders(pro, &[Order::SetVentureShare { share: 80 }]);
+    assert_eq!(income_of(&mut g, pro).materials, 3);
+    assert_eq!(g.seats[pro.index()].venture_fund, 16);
+    // A draw: 10 out, 9 back; never more than the Fund holds.
+    let before = g.seats[pro.index()].stockpile.materials;
+    assert!(g.check_order(pro, &[], &Order::DrawVenture { amount: 17 }).is_err(), "the Fund holds 16");
+    g.commit_orders(pro, &[Order::DrawVenture { amount: 10 }]);
+    assert_eq!(g.seats[pro.index()].venture_fund, 6);
+    assert_eq!(g.seats[pro.index()].stockpile.materials, before + 9, "nine tenths come back");
+    assert_eq!(g.check_order(Seat(0), &[], &Order::DrawVenture { amount: 1 }).unwrap_err().0, "only the Prospectors have a Venture Capital Fund");
+}
+
+/// Ticket #72 (c): 750 in the Fund is the first part of the Prospectors' condition, the running
+/// Extraction Total being retired, and the ranking reads the Fund over 750.
+#[test]
+fn seven_hundred_and_fifty_in_the_fund_is_the_prospectors_first_part() {
+    let mut g = game();
+    let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
+    let card = g.tables.faction(FactionKind::Prospectors).victory_first;
+    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 750.0));
+    assert_eq!(card.kind.name(), "Venture Capital Fund");
+    g.seats[pro.index()].venture_fund = 300;
+    let p = g.progress(pro);
+    assert_eq!((p.first_value, p.first_bar), (300.0, 750.0));
+    assert!((p.first_fraction() - 0.4).abs() < 1e-9);
+    colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 12);
+    g.seats[pro.index()].venture_fund = 750;
+    assert!(g.progress(pro).met());
+    g.end_phase();
+    assert!(matches!(g.outcome, Some(Outcome::Win { seat, .. }) if seat == pro), "{:?}", g.outcome);
+}
+
+/// Ticket #72 (d): the Moon's four yields up a tenth.
+#[test]
+fn the_moons_four_yields_are_up_a_tenth() {
+    let g = game();
+    let m = g.tables.body(BodyId::Moon);
+    assert!((m.mine_yield - 1.65).abs() < 1e-9 && (m.generator_yield - 1.375).abs() < 1e-9 && (m.refinery_yield - 0.55).abs() < 1e-9 && (m.habitat_yield - 1.1).abs() < 1e-9, "{:?}", (m.mine_yield, m.generator_yield, m.refinery_yield, m.habitat_yield));
+}
+
+/// Ticket #72 (e): the Prospector AI plays the share as a strategy: nothing before the pace's first
+/// waypoint (turn 9: it builds first), then the smallest step that reaches 750 by turn 34 at its
+/// current output, and 80 when nothing less will do.
+#[test]
+fn the_prospector_ai_sets_its_share_to_reach_the_fund_in_time_and_maxes_it_when_behind() {
+    let mut g = game();
+    let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
+    g.take_control(StateId::Europe, pro);
+    // Every slot full, so nothing is being saved for; a fat output, so a small share suffices.
+    while g.free_slots(StateId::Europe) > 0 {
+        g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::Factory));
+    }
+    g.seats[pro.index()].income_last_turn.materials = 60;
+    g.seats[pro.index()].stockpile.energy = 500;
+    g.turn = 4;
+    let orders = g.ai_orders(pro);
+    assert!(!orders.iter().any(|o| matches!(o, Order::SetVentureShare { .. })), "before turn 9 it builds and banks nothing: {orders:?}");
+    g.turn = 10;
+    let orders = g.ai_orders(pro);
+    let share = orders.iter().find_map(|o| if let Order::SetVentureShare { share } = o { Some(*share) } else { None });
+    assert!(matches!(share, Some(s) if s > 0 && s < 80), "a modest share from turn 9 on a fat output: {share:?} in {orders:?}");
+    // Late and far behind, everything it may: 80.
+    g.turn = 30;
+    g.seats[pro.index()].venture_share = 0.0;
+    g.seats[pro.index()].income_last_turn.materials = 10;
+    let orders = g.ai_orders(pro);
+    let share = orders.iter().find_map(|o| if let Order::SetVentureShare { share } = o { Some(*share) } else { None });
+    assert_eq!(share, Some(80), "{orders:?}");
 }
