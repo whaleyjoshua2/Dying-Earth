@@ -352,3 +352,55 @@ a game that runs its thirty-six turns hot would draw 22 to 26 of the 40.
 - **deck-earth.png** — `shot:deck turns:0`. The Climate Panel's penalties line at turn 1: **"40
   cards left in the deck, 12 of them Climate"**, where 0.05 read 28 and 7. Twelve is three
   Heatwaves, three Wildfires, two Storm Surges, two Methane Bursts, the Drought and the Eruption.
+
+## #73: Colonists are built, four a turn, launched or sent to Antarctica, and building them lowers Unrest
+
+[The ticket](https://github.com/whaleyjoshua2/Dying-Earth/issues/73). Colonists are built now: a
+Faction musters up to four **Emigrants** a turn, in one Nation State it directs, at a tenth of a
+person each, on the state's card at End Turn (a turn to muster: nothing lifts them the turn they are
+ordered). A batch takes 0.5 off the state's Unrest. A Launch Site lifts only the Emigrants waiting
+in its state, still a turn and still a launch. Once the ice is open, Emigrants go to Antarctica by
+sea from any state the Faction directs, a turn to arrive and no launch, founding a Colony in a free
+slot or joining the Faction's own. Steerage: the Arkwrights muster eight at twice the population.
+
+### What moved
+
+| file | figure | was | is |
+| --- | --- | --- | --- |
+| `factions.toml` | `[emigrants]` (new) | | `per_turn` 4, `population_each` 0.1, `unrest_fall` 0.5, `antarctica_turns` 1 |
+| `factions.toml` | the Arkwrights' `emigrants_multiplier` (new) | | 2.0 |
+| the lift | population taken | 0.1 a Colonist at the lift | 0.1 an Emigrant at the muster; the lift takes none |
+
+**Builder's calls.** Two new orders, Muster Emigrants and Send to Antarctica; the muster lands at
+End Turn (the population, the Emigrants and the Unrest fall together), the send puts the Emigrants
+at sea and they land at the next turn's Resolution, into their slot if it is still free, else into
+the Faction's own Antarctic Colony with room, else home to their state. A Launch Site refuses a lift
+past the Emigrants waiting ("only N Emigrants are waiting there"). The state card shows "Emigrants
+waiting: N" under the Unrest line and carries the Muster button and, with the ice open, a Send
+button per free Antarctic slot and per own Colony there; the Ship's Load button lifts what waits.
+The AI musters in the state with a working Launch Site while fewer wait than two Ship loads (one
+more with the ice open), lifts what waits, and with the ice open sends what waits by sea. Seven
+older tests that lifted straight from a population now muster first. The glossary gains Emigrant and
+rewords Colonist, Steerage and the Launch Site line.
+
+### Measured, twenty seeds each
+
+| seat 0 | Emigrant batches | Antarctic Colonies founded (by sea) | Colonists off Earth (median) | Mars system reached | median peak Unrest | throw-offs | Custodian wins |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Prospectors in East Asia | 946 | 60 (58) | 20 | 17/20, median turn 17 | **9.0** (was 10.0) | 4 (was 0 to 75) | 20/20 |
+| Custodians from Europe | 1105 | 60 (58) | 32 | 20/20, median turn 15 | | | 17/20 |
+
+About fifty batches a game are mustered; all three Antarctic slots are settled in every seed, nearly
+all by sea; Colonists off Earth stay at 20 to 32; the Mars system is reached a few turns later than
+before (the muster is one more step before the first lift). **The median peak Unrest falls from 10.0
+to 9.0**, the first time it has left the ceiling in any batch since ticket #52. The home-state
+finding stands: the Custodians win 17 and 20 of 20.
+
+### Picture
+
+![The East Asia card at turn 4 with the ice open: "Unrest 1: calm enough", then "Emigrants waiting: 8", then the coastal and inland rows and the Facilities list](emigrants-earth.png)
+
+- **emigrants-earth.png** — `shot:emigrants select:eastasia turns:2 temp:1.7 emigrants:8 look:110,30
+  panel:0`. East Asia's card with eight Emigrants mustered: **"Emigrants waiting: 8"** under the
+  Unrest line. The Muster and Send-by-sea buttons sit further down the card, in the orders list
+  below the Build buttons, past the bottom of this capture.

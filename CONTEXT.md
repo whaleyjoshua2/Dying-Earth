@@ -29,7 +29,7 @@ The Faction that means to save what humanity knows, and as many of its people as
 _Avoid_: scholars, librarians, scientists, the Academy
 
 **Steerage**:
-The Arkwrights' signature rule: their Colony Ships carry twice the Colonists and cost less to build, but every Colonist lifted from a Launch Site costs their Nation State twice the population.
+The Arkwrights' signature rule: their Colony Ships carry twice the Colonists and cost less to build, and they muster eight Emigrants a turn where others muster four, but every Emigrant costs their Nation State twice the population.
 _Avoid_: mass transit, cattle class, overcrowding, packing them in
 
 **Diaspora**:
@@ -197,7 +197,11 @@ The Module that lets a Colony hold and build a defensive Army. A Colony without 
 _Avoid_: fort, garrison, base
 
 **Colonist**:
-A person counted in the population of a Colony or Nation State. Colonists are carried by Ships and held by Habitats; they are never spent as a resource.
+A person counted in the population of a Colony or Nation State. Since version 0.05.5 Colonists are built: they muster in a Nation State as Emigrants, are carried by Ships and held by Habitats, and are never spent as a resource.
+
+**Emigrant**:
+A Colonist mustered in a Nation State and not yet gone: up to four a turn per Faction (eight for the Arkwrights), in one state the Faction directs, at a tenth of a person each, on the state's card at End Turn. A batch takes half a point off the state's Unrest. A working Launch Site lifts Emigrants onto a Ship, and once the Antarctic ice is open the sea takes them to Antarctica in a turn with no launch. They are people of their state until they leave it.
+_Avoid_: settler, recruit, migrant, passenger, colonist-in-waiting
 _Avoid_: settler, crew, worker, population resource
 
 **Nation State**:
@@ -207,7 +211,7 @@ _Avoid_: country, nation, territory, region, state, continent (some are, some ar
 ### Earth
 
 **Facility**:
-A building placed in a Nation State. Ten kinds since version 0.05: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, the Sea Wall, which stands only in a Coastal Slot, and the Scrubber, which alone takes no build slot. Since version 0.04 a Launch Site builds no Ship: it lifts Colonists and Armies from its state into orbit, and each lift is a launch.
+A building placed in a Nation State. Ten kinds since version 0.05: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, the Sea Wall, which stands only in a Coastal Slot, and the Scrubber, which alone takes no build slot. Since version 0.04 a Launch Site builds no Ship: it lifts Emigrants and Armies from its state into orbit, and each lift is a launch.
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Cheap Industry**:

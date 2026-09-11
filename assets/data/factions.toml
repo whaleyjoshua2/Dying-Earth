@@ -56,12 +56,15 @@ transit_fuel_multiplier = 0.75
 # Ticket #51, Steerage: double loads at double the population cost, and cheap Colony Ships.
 colony_ship_capacity_multiplier = 2.0
 lift_population_multiplier = 2.0
+# Ticket #73 (version 0.05.5): Steerage musters eight Emigrants a turn where everyone else musters
+# four, at the doubled population above.
+emigrants_multiplier = 2.0
 colony_ship_materials = 20
 # Ticket #51: they start with no station, so a Space Station costs them half and a Colony Module
 # three quarters (both rounded down).
 station_materials_multiplier = 0.5
 module_materials_multiplier = 0.75
-signature = "Steerage: a Colony Ship carries 8 Colonists (12 with Expanded Habitats) and costs 20 Materials, but a lift from a Launch Site takes twice the population per Colonist. Their Habitats hold half again as many (6, 9 with Expanded Habitats), a transit burns three quarters of the Fuel, and, starting with no station, a Space Station costs them 20 Materials and a Colony Module three quarters."
+signature = "Steerage: a Colony Ship carries 8 Colonists (12 with Expanded Habitats) and costs 20 Materials, and they muster 8 Emigrants a turn where others muster 4, but every Emigrant takes twice the population. Their Habitats hold half again as many (6, 9 with Expanded Habitats), a transit burns three quarters of the Fuel, and, starting with no station, a Space Station costs them 20 Materials and a Colony Module three quarters."
 victory = "Diaspora: 30 Colonists living off Earth, on Colonies spread over at least three Bodies with at least 4 Colonists each (Antarctica and stations over Earth do not count)."
 victory_first = { kind = "colonists_off_earth", bar = 30 }
 victory_second = { kind = "colonies_on_bodies", bodies = 3, colonists_each = 4 }
@@ -93,6 +96,17 @@ colour = [0.75, 0.82, 0.92]
 max_share = 0.8
 share_step = 0.1
 draw_return = 0.9
+
+# Ticket #73 (version 0.05.5): Emigrants. Colonists are built: a Faction musters up to `per_turn` a
+# turn in one Nation State it directs, at `population_each` population apiece (times the Faction's
+# lift multiplier: Steerage doubles it), landing on the state's card at End Turn; a batch takes
+# `unrest_fall` off the state's Unrest. Emigrants sent to Antarctica by sea arrive `antarctica_turns`
+# later, with no launch.
+[emigrants]
+per_turn = 4
+population_each = 0.1
+unrest_fall = 0.5
+antarctica_turns = 1
 
 [start]
 # Raised from 60 on ticket #24, since income now flows from turn one.

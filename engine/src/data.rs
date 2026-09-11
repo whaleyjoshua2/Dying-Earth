@@ -296,6 +296,9 @@ pub struct FactionCard {
     /// Ticket #72 (version 0.05.5): a Facility's Materials, times this (the Prospectors' 0.85).
     #[serde(default = "one_f64")]
     pub facility_materials_multiplier: f64,
+    /// Ticket #73 (version 0.05.5): Emigrants mustered a turn, times this (Steerage's 2.0).
+    #[serde(default = "one_f64")]
+    pub emigrants_multiplier: f64,
 }
 
 fn one_f64() -> f64 {
@@ -816,6 +819,18 @@ struct FactionsFile {
     start: StartCard,
     ducats: DucatsCard,
     venture_capital: VentureCard,
+    emigrants: EmigrantsCard,
+}
+
+/// Ticket #73 (version 0.05.5): Emigrants, the built Colonists: how many a Faction musters a turn,
+/// the population each takes, what a batch takes off the state's Unrest, and how many turns the sea
+/// crossing to Antarctica takes.
+#[derive(Debug, Clone, Deserialize)]
+pub struct EmigrantsCard {
+    pub per_turn: u32,
+    pub population_each: f64,
+    pub unrest_fall: f64,
+    pub antarctica_turns: u32,
 }
 
 /// Ticket #72 (version 0.05.5): the Prospectors' Venture Capital Fund: the largest share of their
@@ -865,6 +880,7 @@ pub struct Tables {
     pub start: StartCard,
     pub ducats: DucatsCard,
     pub venture: VentureCard,
+    pub emigrants: EmigrantsCard,
     pub climate: ClimateTable,
     pub influence: InfluenceTable,
     /// Ticket #52: `unrest.toml`.
@@ -935,6 +951,7 @@ impl Tables {
             start: factions.start,
             ducats: factions.ducats,
             venture: factions.venture_capital,
+            emigrants: factions.emigrants,
             climate,
             influence,
             unrest,

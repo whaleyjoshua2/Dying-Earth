@@ -525,6 +525,9 @@ fn ships_are_built_only_at_shipyards_and_lifts_need_a_launch_site() {
     g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 });
     g.state_mut(StateId::NorthAfrica).control = Control::Controlled(Seat(0));
     g.state_mut(StateId::NorthAfrica).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
+    // Ticket #73: a lift takes Emigrants already mustered, so both states hold some.
+    g.state_mut(StateId::NorthAfrica).emigrants = 2;
+    g.state_mut(StateId::EastAsia).emigrants = 2;
     let from_africa = Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::NorthAfrica), army: None };
     assert!(g.check_order(Seat(0), &[], &from_africa).is_err(), "no Launch Site in Africa");
     let from_asia = Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::EastAsia), army: None };
@@ -636,6 +639,7 @@ fn only_a_carrier_carries_an_army_and_a_colony_ship_carries_only_colonists() {
     assert!(g.check_order(Seat(0), &[], &load_army(101)).is_err(), "a Colony Ship carries Colonists only");
     assert!(g.check_order(Seat(0), &[], &load_army(102)).is_err(), "a Battleship fights; it carries no Army");
     assert!(g.check_order(Seat(0), &[], &load_army(103)).is_ok(), "a Carrier carries one Army");
+    g.state_mut(StateId::EastAsia).emigrants = 4;
     assert!(g.check_order(Seat(0), &[], &Order::Load { ship: ShipId(103), colonists: 1, from: LoadSource::State(StateId::EastAsia), army: None }).is_err(), "a Carrier carries no Colonists");
     assert!(g.check_order(Seat(0), &[], &Order::Load { ship: ShipId(101), colonists: 4, from: LoadSource::State(StateId::EastAsia), army: None }).is_ok());
     let card = g.tables.unit(UnitKind::Carrier);
@@ -1779,6 +1783,7 @@ fn steerage_doubles_an_arkwright_colony_ships_load_and_cuts_its_price() {
     // Ticket #53: a lift of twelve costs an Arkwright state 2.4 population, more than some of the
     // twelve states hold, so the test gives its start state people to spare.
     g.state_mut(sid).population = 10.0;
+    g.state_mut(sid).emigrants = 13;
     let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
     let load = |n: u32| Order::Load { ship, colonists: n, from: LoadSource::State(sid), army: None };
     assert!(g.check_order(Seat(2), &[], &load(12)).is_ok());
@@ -1787,19 +1792,23 @@ fn steerage_doubles_an_arkwright_colony_ships_load_and_cuts_its_price() {
 }
 
 #[test]
-fn an_arkwright_lift_takes_twice_the_population_out_of_its_state() {
+fn an_arkwright_muster_takes_twice_the_population_out_of_its_state() {
     let mut g = game();
     g.state_mut(StateId::NorthAfrica).control = Control::Controlled(Seat(2));
     g.state_mut(StateId::NorthAfrica).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
     g.state_mut(StateId::NorthAfrica).facilities.push(facility(FacilityKind::LaunchSite));
     assert!((g.lift_population(Seat(0), 4) - 0.4).abs() < 1e-9);
     assert!((g.lift_population(Seat(2), 4) - 0.8).abs() < 1e-9, "Steerage costs the state twice");
+    // Ticket #73: the population is paid when the Emigrants muster, and the lift takes none.
     let before = g.state(StateId::NorthAfrica).population;
+    g.commit_orders(Seat(2), &[Order::BuildEmigrants { state: StateId::NorthAfrica, n: 4 }]);
+    let taken = before - g.state(StateId::NorthAfrica).population;
+    assert!((taken - 0.8).abs() < 1e-9, "the muster took {taken}, not 0.8");
+    let after_muster = g.state(StateId::NorthAfrica).population;
     let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
     g.commit_orders(Seat(2), &[Order::Load { ship, colonists: 4, from: LoadSource::State(StateId::NorthAfrica), army: None }]);
     g.resolution_phase();
-    let taken = before - g.state(StateId::NorthAfrica).population;
-    assert!((taken - 0.8).abs() < 1e-9, "the lift took {taken}, not 0.8");
+    assert!((g.state(StateId::NorthAfrica).population - after_muster).abs() < 1e-9, "the lift itself takes nobody");
     assert_eq!(g.ship(ship).unwrap().colonists, 4);
 }
 
@@ -2958,6 +2967,7 @@ fn a_a_mothballed_facility_makes_nothing_costs_nothing_and_keeps_its_slot() {
     assert!(!g.state(sid).facilities[idx].mothballed, "one turn, and it works again");
 
     // A mothballed Launch Site lifts nobody.
+    g.state_mut(sid).emigrants = 1;
     let ship = a_colony_ship(&mut g, Seat(0), BodyId::Earth);
     let lift = Order::Load { ship, colonists: 1, from: LoadSource::State(sid), army: None };
     assert!(g.check_order(Seat(0), &[], &lift).is_ok(), "a working Launch Site lifts");
@@ -4381,6 +4391,8 @@ fn a_rivals_paragraph_names_its_visible_orders_and_none_of_its_scores() {
         Order::MoveArmy { army: ArmyId(0), to: StateId::Europe },
         Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::EastAsia), army: None },
         Order::Load { ship, colonists: 0, from: LoadSource::State(StateId::EastAsia), army: Some(ArmyId(0)) },
+        Order::BuildEmigrants { state: StateId::EastAsia, n: 4 },
+        Order::SendToAntarctica { state: StateId::EastAsia, n: 2, into: UnloadTarget::Slot(BodyId::Earth, 0) },
         Order::Unload { ship, colonists: 2, army: false, into: UnloadTarget::Slot(BodyId::Moon, 0) },
         Order::Influence { target: Place::State(StateId::Europe), amount: 5 },
         Order::BuyInfluence { amount: 3 },
@@ -5018,4 +5030,114 @@ fn a_helium_three_vein_doubles_the_moons_generators_for_two_turns_and_triples_wi
     drawn(&mut g, EventId::HeliumVein, EventTarget::Body(BodyId::Moon));
     g.apply_event_now();
     assert_eq!(g.discoveries[0].multiplier, 3.0, "x3 with Efficient Grids");
+}
+
+// ---------------------------------------------------------------- Ticket #73 (version 0.05.5): Emigrants
+
+/// Ticket #73 (a): Colonists are built. Up to four Emigrants a turn per Faction muster in one state
+/// it directs, at 0.1 population each, landing on the card at End Turn (a turn to muster: nothing
+/// lifts them the turn they are ordered), and the batch takes 0.5 off the state's Unrest. Steerage:
+/// eight a turn at twice the population.
+#[test]
+fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_a_tenth_of_population_each_and_calm_it() {
+    let mut g = game();
+    calm(&mut g);
+    g.state_mut(StateId::EastAsia).unrest = 3.0;
+    let pop = g.state(StateId::EastAsia).population;
+    let build = Order::BuildEmigrants { state: StateId::EastAsia, n: 4 };
+    assert!(g.check_order(Seat(0), &[], &build).is_ok());
+    assert!(g.check_order(Seat(0), &[], &Order::BuildEmigrants { state: StateId::EastAsia, n: 5 }).is_err(), "four a turn");
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&build), &Order::BuildEmigrants { state: StateId::Europe, n: 1 }).is_err(), "one state a turn");
+    assert!(g.check_order(Seat(1), &[], &Order::BuildEmigrants { state: StateId::EastAsia, n: 1 }).is_err(), "not your state");
+    assert!(g.check_order(Seat(0), &[], &Order::Load { ship: ShipId(999), colonists: 1, from: LoadSource::State(StateId::EastAsia), army: None }).is_err(), "nothing waits yet");
+    g.commit_orders(Seat(0), &[build]);
+    assert_eq!(g.state(StateId::EastAsia).emigrants, 4, "on the card at End Turn");
+    assert!((pop - g.state(StateId::EastAsia).population - 0.4).abs() < 1e-9, "a tenth of a person each");
+    assert_eq!(g.state(StateId::EastAsia).unrest, 2.5, "the batch took 0.5 off");
+    assert!(g.log.to_vec().iter().any(|l| l.contains("Emigrants mustered in East Asia")), "{:?}", g.log.to_vec());
+    // Steerage: eight a turn at twice the population.
+    assert_eq!(g.emigrants_per_turn(Seat(0)), 4);
+    assert_eq!(g.emigrants_per_turn(Seat(2)), 8, "the Arkwrights muster eight");
+    assert!((g.lift_population(Seat(2), 8) - 1.6).abs() < 1e-9, "at twice the population");
+}
+
+/// Ticket #73 (b): a Launch Site lifts only the Emigrants waiting in its state; the population was
+/// paid when they mustered, and a lift is still a launch.
+#[test]
+fn a_launch_site_lifts_only_the_emigrants_waiting_in_its_state() {
+    let mut g = game();
+    let ship = a_colony_ship(&mut g, Seat(0), BodyId::Earth);
+    let load = Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::EastAsia), army: None };
+    assert_eq!(g.check_order(Seat(0), &[], &load).unwrap_err().0, "only 0 Emigrants are waiting there");
+    g.state_mut(StateId::EastAsia).emigrants = 3;
+    let pop = g.state(StateId::EastAsia).population;
+    assert!(g.check_order(Seat(0), &[], &load).is_ok());
+    g.commit_orders(Seat(0), std::slice::from_ref(&load));
+    assert_eq!(g.climate.launches_pending[0], 1, "a lift is still a launch");
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::EastAsia).emigrants, 1, "the lift took two of the three");
+    assert_eq!(g.ship(ship).unwrap().colonists, 2);
+    assert!((g.state(StateId::EastAsia).population - pop).abs() < 1e-9, "the lift takes no population");
+}
+
+/// Ticket #73 (c): Emigrants go to Antarctica by sea from any state the Faction directs, a turn to
+/// arrive, no launch, founding a Colony in an open slot or joining one of the Faction's own; the ice
+/// must be open.
+#[test]
+fn emigrants_go_to_antarctica_by_sea_from_any_state_and_arrive_a_turn_later() {
+    let mut g = game();
+    calm(&mut g);
+    g.take_control(StateId::Europe, Seat(0));
+    g.state_mut(StateId::Europe).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
+    g.state_mut(StateId::Europe).emigrants = 6;
+    let slot = g.free_slots_on(BodyId::Earth)[0];
+    let send = Order::SendToAntarctica { state: StateId::Europe, n: 4, into: UnloadTarget::Slot(BodyId::Earth, slot) };
+    assert!(g.check_order(Seat(0), &[], &send).unwrap_err().0.contains("has not opened"), "shut ice");
+    g.antarctica_open = true;
+    assert!(g.check_order(Seat(0), &[], &send).is_ok(), "no Launch Site needed: they go by sea");
+    assert!(g.check_order(Seat(0), &[], &Order::SendToAntarctica { state: StateId::Europe, n: 7, into: UnloadTarget::Slot(BodyId::Earth, slot) }).is_err(), "six waiting");
+    assert!(g.check_order(Seat(1), &[], &send).is_err(), "not your state");
+    let launches = g.climate.launches_pending[0];
+    g.commit_orders(Seat(0), std::slice::from_ref(&send));
+    assert_eq!(g.state(StateId::Europe).emigrants, 2, "they have left");
+    assert_eq!(g.climate.launches_pending[0], launches, "no launch: the sea");
+    g.resolution_phase();
+    assert!(g.colonies.iter().all(|c| c.body != BodyId::Earth || c.in_orbit), "a turn to arrive");
+    g.turn += 1;
+    g.resolution_phase();
+    let col = g.colonies.iter().find(|c| c.body == BodyId::Earth && !c.in_orbit).expect("founded").clone();
+    assert_eq!((col.slot, col.colonists, col.control), (slot, 4, Control::Controlled(Seat(0))));
+    assert!(g.log.to_vec().iter().any(|l| l.contains("in Antarctica with 4 Emigrants from Europe")), "{:?}", g.log.to_vec());
+    // The last two join it, once it has room.
+    g.colony_mut(col.id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    g.commit_orders(Seat(0), &[Order::SendToAntarctica { state: StateId::Europe, n: 2, into: UnloadTarget::Colony(col.id) }]);
+    g.resolution_phase();
+    assert_eq!(g.colony(col.id).unwrap().colonists, 4, "not yet");
+    g.turn += 1;
+    g.resolution_phase();
+    assert_eq!(g.colony(col.id).unwrap().colonists, 6, "joined");
+    assert_eq!(g.state(StateId::Europe).emigrants, 0);
+}
+
+/// Ticket #73 (d): the AI musters before it can load, loads what waits, and with the ice open sends
+/// what waits to Antarctica by sea.
+#[test]
+fn the_ai_musters_emigrants_then_lifts_them_or_sends_them_to_antarctica() {
+    let mut g = game();
+    let ship = a_colony_ship(&mut g, Seat(0), BodyId::Earth);
+    let _ = ship;
+    g.seats[0].stockpile.energy = 200;
+    let orders = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::BuildEmigrants { state: StateId::EastAsia, .. })), "an empty Colony Ship at Earth and nobody waiting: it musters: {orders:?}");
+    assert!(!orders.iter().any(|o| matches!(o, Order::Load { .. })), "and cannot load yet: {orders:?}");
+    g.state_mut(StateId::EastAsia).emigrants = 4;
+    let orders = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::Load { colonists: 4, from: LoadSource::State(StateId::EastAsia), .. })), "it lifts the four: {orders:?}");
+    // The ice open and Emigrants waiting with no Ship to take them: by sea.
+    let mut g = game();
+    g.antarctica_open = true;
+    g.state_mut(StateId::EastAsia).emigrants = 4;
+    g.seats[0].stockpile.energy = 200;
+    let orders = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::SendToAntarctica { state: StateId::EastAsia, n: 4, .. })), "{orders:?}");
 }

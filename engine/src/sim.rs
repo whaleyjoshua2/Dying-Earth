@@ -82,6 +82,9 @@ pub struct SimResult {
     /// Ticket #76: cards drawn over the game, and whether the deck ran dry.
     pub cards_drawn: u32,
     pub deck_empty: bool,
+    /// Ticket #73: Emigrant batches mustered over the game, and Antarctic Colonies founded by sea.
+    pub emigrant_batches: u32,
+    pub antarctic_by_sea: u32,
     /// Ticket #58: how many Moments the turns of this game earned, how many the cap of two and the
     /// defaults in `report.toml` actually showed, how many turns stopped for at least one, and the
     /// most any one turn showed.
@@ -326,6 +329,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         venture_fund_at_end: Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Prospectors).map(|s| game.seat(s).venture_fund).unwrap_or(0),
         cards_drawn: game.deck.drawn.len() as u32,
         deck_empty: game.deck.cards.is_empty(),
+        emigrant_batches: game.log.iter().filter(|l| l.contains("Emigrants mustered in")).count() as u32,
+        antarctic_by_sea: game.log.iter().filter(|l| l.contains("in Antarctica with")).count() as u32,
         moments_earned,
         moments_shown,
         turns_with_moment,

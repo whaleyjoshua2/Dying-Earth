@@ -990,9 +990,52 @@ impl Game {
             }
         }
 
+        // --- Ticket #73: Emigrants. Colonists are built now, so before a Colony Ship can be loaded
+        // or Antarctica settled a batch must muster in a state the seat directs: the one with a
+        // working Launch Site, or, with the ice open, the most populous. It musters while fewer
+        // wait than two Ship loads (and one more while the ice is open), and never for nothing.
+        let presence_needed = self.tables.victory.off_world_presence.saturating_sub(self.off_world_colonists(seat));
+        {
+            let per = self.emigrants_per_turn(seat);
+            let capacity = self.colony_ship_capacity(seat);
+            let waiting: u32 = self.directed_states(seat).iter().map(|s| self.state(*s).emigrants).sum();
+            let has_ship_or_yard = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip)
+                || self.colonies.iter().any(|c| c.control.director() == Some(seat) && c.modules.iter().any(|m| m.kind == ModuleKind::Shipyard));
+            let want = if has_ship_or_yard { capacity * 2 } else { 0 } + if self.antarctica_open { capacity } else { 0 };
+            if per > 0 && waiting < want {
+                let by_population = |a: &StateId, b: &StateId| self.state(*a).population.partial_cmp(&self.state(*b).population).unwrap_or(std::cmp::Ordering::Equal);
+                let with_site = self
+                    .directed_states(seat)
+                    .into_iter()
+                    .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()))
+                    .max_by(by_population);
+                let target = with_site.or_else(|| if self.antarctica_open { self.directed_states(seat).into_iter().max_by(by_population) } else { None });
+                if let Some(st) = target {
+                    let opp = if presence_needed > 0 && waiting == 0 { m.opportunity } else { 1.0 };
+                    push(vec![Order::BuildEmigrants { state: st, n: per }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("muster {} Emigrants in {}", per, self.tables.state(st).name), None);
+                }
+            }
+            // With the ice open, waiting Emigrants go to Antarctica by sea: a free slot first, else
+            // a Colony of the seat's with room. A foothold, not Presence: half weight and no gap,
+            // as a Ship's unload there.
+            if self.antarctica_open {
+                for sid in self.directed_states(seat) {
+                    let n = self.state(sid).emigrants;
+                    if n == 0 {
+                        continue;
+                    }
+                    if let Some(slot) = self.best_slot_for(seat, BodyId::Earth, behind) {
+                        push(vec![Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, format!("send {} Emigrants from {} to {} by sea", n, self.tables.state(sid).name, self.tables.body(BodyId::Earth).slots[slot as usize].name), None);
+                    } else if let Some(c) = self.colonies.iter().find(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(seat) && self.habitat_room(c) > c.colonists) {
+                        let k = n.min(self.habitat_room(c) - c.colonists);
+                        push(vec![Order::SendToAntarctica { state: sid, n: k, into: UnloadTarget::Colony(c.id) }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload) * 0.5, 1.0, 1.0, 1.0, format!("send {} Emigrants from {} to {} by sea", k, self.tables.state(sid).name, self.place_name(Place::Colony(c.id))), None);
+                    }
+                }
+            }
+        }
+
         // --- Ships: load, unload, found, transit
         let ships: Vec<Ship> = self.ships.iter().filter(|s| s.seat == seat && matches!(s.at, ShipAt::Body(_)) && !s.arrived_this_turn).cloned().collect();
-        let presence_needed = self.tables.victory.off_world_presence.saturating_sub(self.off_world_colonists(seat));
         for s in &ships {
             let ShipAt::Body(body) = s.at else { continue };
             let card = self.tables.unit(s.kind);
@@ -1000,15 +1043,15 @@ impl Game {
             if s.kind == UnitKind::ColonyShip {
                 let capacity = self.colony_ship_capacity(seat);
                 if body == BodyId::Earth && s.colonists < capacity {
-                    // Load from the most populous directed state.
+                    // Load from the directed state with the most Emigrants waiting (ticket #73).
                     // Ticket #46: only a state with a working Launch Site lifts them.
                     let from = self
                         .directed_states(seat)
                         .into_iter()
-                        .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()))
-                        .max_by(|a, b| self.state(*a).population.partial_cmp(&self.state(*b).population).unwrap());
+                        .filter(|s| self.state(*s).emigrants > 0 && self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()))
+                        .max_by_key(|s| self.state(*s).emigrants);
                     if let Some(st) = from {
-                        let n = capacity - s.colonists;
+                        let n = (capacity - s.colonists).min(self.state(st).emigrants);
                         let opp = if presence_needed <= n { m.opportunity } else { 1.0 };
                         push(vec![Order::Load { ship: s.id, colonists: n, from: LoadSource::State(st), army: None }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("load {} Colonists onto {}", n, ship_name), None);
                     }

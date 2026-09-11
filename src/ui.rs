@@ -1486,6 +1486,16 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildStation { body, slot } => format!("Build {} over {}", game.station_name(*body, *slot), game.tables.body(*body).name),
         Order::BuildArchive { colony } => format!("Build the Archive at {}", game.place_name(Place::Colony(*colony))),
         Order::FundArchive => "Fund the Archive with this turn's Research".to_string(),
+        // Ticket #73.
+        Order::BuildEmigrants { state, n } => format!("Muster {n} Emigrants in {}", game.tables.state(*state).name),
+        Order::SendToAntarctica { state, n, into } => format!(
+            "Send {n} Emigrants from {} to {} by sea",
+            game.tables.state(*state).name,
+            match into {
+                UnloadTarget::Slot(_, slot) => game.tables.body(BodyId::Earth).slots[*slot as usize].name.clone(),
+                UnloadTarget::Colony(c) => game.place_name(Place::Colony(*c)),
+            }
+        ),
         // Ticket #72.
         Order::SetVentureShare { share } => format!("Bank {share}% of Materials output in the Venture Capital Fund"),
         Order::DrawVenture { amount } => format!("Draw {amount} Materials from the Venture Capital Fund"),
@@ -1773,6 +1783,10 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             Color32::LIGHT_GREEN
         };
         ui.colored_label(colour, format!("Unrest {}: {}", game.unrest_text(sid), game.unrest_note(sid)));
+        // Ticket #73: Emigrants waiting here for a lift or the sea.
+        if st.emigrants > 0 {
+            ui.label(format!("Emigrants waiting: {}", st.emigrants)).on_hover_text("Mustered here and not yet lifted or sent: a working Launch Site lifts them onto a Ship, or, once the ice is open, the sea takes them to Antarctica.");
+        }
         if game.constabulary_online(sid) {
             ui.label(RichText::new("A Constabulary here takes 1 off every turn and damps what the climate and the refugees add.").weak());
         }
@@ -1896,6 +1910,31 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
         ui.label(RichText::new("Raising the Industry Level adds an inland slot, which the sea never reaches.").weak());
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
+        // Ticket #73: muster Emigrants here, and send them to Antarctica by sea once the ice is open.
+        ui.label(RichText::new("Emigrants").strong());
+        let per = game.emigrants_per_turn(Seat(0));
+        cost_button_with_hover(
+            ui,
+            game,
+            &session.pending,
+            Order::BuildEmigrants { state: sid, n: per },
+            &format!("Muster {per} Emigrants"),
+            Some(format!(
+                "{:.1} population, on the card at End Turn, and {} off this state's Unrest. A working Launch Site lifts them onto a Ship; once the ice is open the sea takes them to Antarctica.",
+                game.lift_population(Seat(0), per),
+                Game::unrest_figure(game.tables.emigrants.unrest_fall)
+            )),
+            actions,
+        );
+        if game.antarctica_open && st.emigrants > 0 {
+            let n = st.emigrants;
+            for slot in game.free_slots_on(BodyId::Earth) {
+                cost_button(ui, game, &session.pending, Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) }, &format!("Send {n} to {} by sea", game.tables.body(BodyId::Earth).slots[slot as usize].name), actions);
+            }
+            for c in game.colonies.iter().filter(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(Seat(0))) {
+                cost_button(ui, game, &session.pending, Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Colony(c.id) }, &format!("Send {n} to {} by sea", game.place_name(Place::Colony(c.id))), actions);
+            }
+        }
         // Ticket #52: Relief and Resettle, with their prices on the buttons.
         ui.label(RichText::new("Unrest").strong());
         ui.horizontal(|ui| {
@@ -2208,7 +2247,9 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                                     }
                                 }
                             });
-                            cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: n, from: LoadSource::State(chosen), army: None }, &format!("Load {n} Colonists"), actions);
+                            // Ticket #73: a Launch Site lifts the Emigrants waiting there, no more.
+                            let lift = n.min(game.state(chosen).emigrants).max(1);
+                            cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(chosen), army: None }, &format!("Load {lift} Emigrants"), actions);
                         });
                     }
                 }

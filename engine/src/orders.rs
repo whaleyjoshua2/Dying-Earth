@@ -76,6 +76,12 @@ pub enum Order {
     /// Version 0.05 (ticket #51): this turn's Research from the Archivists' Labs goes into the
     /// Archive fund instead of the shared Tech, and counts nothing toward the Research Lead.
     FundArchive,
+    /// Version 0.05.5 (ticket #73): muster Emigrants, the built Colonists, in a Nation State the
+    /// seat directs: up to four a turn per Faction, in one state, at a tenth of a person each.
+    BuildEmigrants { state: StateId, n: u32 },
+    /// Version 0.05.5 (ticket #73): send waiting Emigrants to Antarctica by sea, into a free slot
+    /// (founding a Colony) or the seat's own Colony there; a turn to arrive, no launch.
+    SendToAntarctica { state: StateId, n: u32, into: UnloadTarget },
     /// Version 0.05.5 (ticket #72): the Prospectors set the share of their Materials output the
     /// Venture Capital Fund banks each Income, in whole percent (a step of 10, 0 to 80).
     SetVentureShare { share: u32 },
@@ -717,10 +723,10 @@ impl Game {
                             if !self.state(*st).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()) {
                                 return fail("a lift to orbit needs a working Launch Site there");
                             }
-                            // Ticket #51, Steerage: a lift may cost the state more than one tenth
-                            // of a person per Colonist.
-                            if self.state(*st).population < self.lift_population(seat, *colonists) {
-                                return fail("not enough people there");
+                            // Ticket #73: a Launch Site lifts only the Emigrants waiting there; the
+                            // population was paid when they mustered.
+                            if self.state(*st).emigrants < *colonists {
+                                return fail(format!("only {} Emigrants are waiting there", self.state(*st).emigrants));
                             }
                         }
                         LoadSource::Colony(c) => {
@@ -830,6 +836,54 @@ impl Game {
             // Ticket #54: Mothball, Restart and Decommission.
             Order::Change { building, what } => self.check_change(seat, pending, *building, *what).map(|_| cost),
             // Ticket #54: Leapfrog, the Custodians only, on a state they control.
+            // Ticket #73: Emigrants muster four a turn per Faction, in one state it directs.
+            Order::BuildEmigrants { state, n } => {
+                if self.state(*state).control.director() != Some(seat) {
+                    return fail("you do not direct that Nation State");
+                }
+                let cap = self.emigrants_per_turn(seat);
+                if *n == 0 || *n > cap {
+                    return fail(format!("up to {cap} Emigrants a turn"));
+                }
+                if pending.iter().any(|o| matches!(o, Order::BuildEmigrants { .. })) {
+                    return fail("Emigrants are already mustering this turn: one state a turn");
+                }
+                if self.state(*state).population < self.lift_population(seat, *n) {
+                    return fail("not enough people there");
+                }
+                Ok(cost)
+            }
+            // Ticket #73: waiting Emigrants go to Antarctica by sea, from any state the seat directs.
+            Order::SendToAntarctica { state, n, into } => {
+                if self.state(*state).control.director() != Some(seat) {
+                    return fail("you do not direct that Nation State");
+                }
+                if !self.antarctica_open {
+                    return fail(format!("the Antarctic ice has not opened: it opens at {:+.1} C", self.tables.climate.antarctica_opens_at));
+                }
+                let sending: u32 = pending.iter().map(|o| if let Order::SendToAntarctica { state: s, n, .. } = o { if s == state { *n } else { 0 } } else { 0 }).sum();
+                let waiting = self.state(*state).emigrants.saturating_sub(sending);
+                if *n == 0 || *n > waiting {
+                    return fail(format!("{waiting} Emigrants are waiting there"));
+                }
+                match into {
+                    UnloadTarget::Slot(b, slot) => {
+                        if *b != BodyId::Earth || !self.free_slots_on(BodyId::Earth).contains(slot) {
+                            return fail("that Antarctic slot is not free");
+                        }
+                        if pending.iter().any(|o| matches!(o, Order::SendToAntarctica { into: UnloadTarget::Slot(_, s), .. } if s == slot)) {
+                            return fail("Emigrants are already bound for that slot this turn");
+                        }
+                    }
+                    UnloadTarget::Colony(c) => {
+                        let Some(col) = self.colony(*c) else { return fail("no such Colony") };
+                        if col.body != BodyId::Earth || col.in_orbit || col.control.director() != Some(seat) {
+                            return fail("that is not your Colony in Antarctica");
+                        }
+                    }
+                }
+                Ok(cost)
+            }
             // Ticket #72: the Venture Capital Fund's two orders, the Prospectors only.
             Order::SetVentureShare { share } => {
                 if self.kind(seat) != FactionKind::Prospectors {
@@ -1085,6 +1139,33 @@ impl Game {
                 }
                 // Ticket #54: Leapfrog is permanent and takes hold at once, before the next Climate
                 // phase reads the state's coefficient.
+                // Ticket #73: Emigrants muster now, at the population's cost, and calm the state;
+                // nothing lifts them before next turn, which is the turn to muster.
+                Order::BuildEmigrants { state, n } => {
+                    let cost = self.lift_population(seat, *n);
+                    {
+                        let st = self.state_mut(*state);
+                        st.population = (st.population - cost).max(0.0);
+                        st.emigrants += n;
+                    }
+                    let fell = self.lower_unrest(*state, self.tables.emigrants.unrest_fall);
+                    let line = format!("{} Emigrants mustered in {} for the {}; its Unrest fell by {} to {}.", n, self.tables.state(*state).name, self.seat_name(seat), Game::unrest_figure(fell), self.unrest_text(*state));
+                    self.log(line);
+                    let text = self.say(
+                        "emigrants_mustered",
+                        &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone()), ("fell", Game::unrest_figure(fell).to_string()), ("unrest", self.unrest_text(*state))],
+                    );
+                    self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::State(*state)), text);
+                }
+                // Ticket #73: Emigrants leave for Antarctica by sea, and land a turn later.
+                Order::SendToAntarctica { state, n, into } => {
+                    let left = self.state(*state).emigrants.saturating_sub(*n);
+                    self.state_mut(*state).emigrants = left;
+                    let due = turn + self.tables.emigrants.antarctica_turns;
+                    self.antarctic_sends.push(AntarcticSend { seat, from: *state, n: *n, into: *into, due_turn: due });
+                    let line = format!("{} Emigrants left {} for Antarctica by sea, for the {}.", n, self.tables.state(*state).name, self.seat_name(seat));
+                    self.log(line);
+                }
                 // Ticket #72: the Fund's orders land now; the share is read at the next Income.
                 Order::SetVentureShare { share } => {
                     self.seat_mut(seat).venture_share = *share as f64 / 100.0;
@@ -1286,6 +1367,8 @@ impl Game {
                 };
                 r(key, &[("building", building(*b)), ("place", place(b.place()))])
             }
+            Order::BuildEmigrants { state, n } => r("build_emigrants", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone())]),
+            Order::SendToAntarctica { state, n, .. } => r("send_antarctica", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone())]),
             Order::SetVentureShare { share } => r("set_venture_share", &[("share", share.to_string())]),
             Order::DrawVenture { amount } => r("draw_venture", &[("n", amount.to_string())]),
             Order::Leapfrog { state } => r("leapfrog", &[("state", self.tables.state(*state).name.clone())]),

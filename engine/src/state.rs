@@ -201,6 +201,10 @@ pub struct NationState {
     /// Ticket #76 (version 0.05.5): a Drought landed here: its Facilities make half at the next Income.
     #[serde(default)]
     pub drought: bool,
+    /// Ticket #73 (version 0.05.5): Emigrants waiting here, mustered and not yet lifted or sent.
+    /// They are people of this state until they leave it: a new holder gets them.
+    #[serde(default)]
+    pub emigrants: u32,
     /// Ticket #52: Unrest, 0 to 10 (9 while the state is neutral). Ticket #53: it moves in halves.
     pub unrest: f64,
     /// Ticket #53: the state changed hands this turn, which is the one turn its Unrest does not
@@ -485,6 +489,16 @@ pub enum EventTarget {
     Tech,
 }
 
+/// Ticket #73 (version 0.05.5): Emigrants on the sea to Antarctica, landing on `due_turn`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AntarcticSend {
+    pub seat: Seat,
+    pub from: StateId,
+    pub n: u32,
+    pub into: crate::orders::UnloadTarget,
+    pub due_turn: u32,
+}
+
 /// A temporary effect from a Discovery card.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Discovery {
@@ -609,6 +623,8 @@ pub struct Game {
     pub research: Research,
     pub deck: Deck,
     pub discoveries: Vec<Discovery>,
+    /// Ticket #73: Emigrants on the sea to Antarctica.
+    pub antarctic_sends: Vec<AntarcticSend>,
     /// Solar Maximum: every Power Plant and Generator makes more at the next Income.
     pub solar_maximum_next: bool,
     pub last_event: Option<DrawnEvent>,
@@ -709,6 +725,7 @@ impl Game {
                 thresholds_fired: vec![false; tables.climate.sea_level_thresholds.len()],
                 wildfire_emissions_next: 0.0,
                 drought: false,
+                emigrants: 0,
                 unrest: c.unrest,
                 changed_hands: false,
                 refugees_in: 0.0,
@@ -764,6 +781,7 @@ impl Game {
             },
             deck,
             discoveries: Vec::new(),
+            antarctic_sends: Vec::new(),
             solar_maximum_next: false,
             last_event: None,
             report: Report::default(),
@@ -1001,6 +1019,11 @@ impl Game {
 
     // ---------------------------------------------------------------- Ticket #51: Steerage and the rest
 
+    /// Ticket #73: how many Emigrants this seat may muster in a turn (Steerage doubles it).
+    pub fn emigrants_per_turn(&self, seat: Seat) -> u32 {
+        (self.tables.emigrants.per_turn as f64 * self.tables.faction(self.kind(seat)).emigrants_multiplier).floor() as u32
+    }
+
     /// What one Colony Ship of this seat carries: the card figure, +2 with Expanded Habitats
     /// (version 0.04 section 4), times the Faction's own multiplier (Steerage doubles it).
     pub fn colony_ship_capacity(&self, seat: Seat) -> u32 {
@@ -1011,7 +1034,8 @@ impl Game {
 
     /// The population a lift from a Launch Site takes for this many Colonists (Steerage doubles it).
     pub fn lift_population(&self, seat: Seat, colonists: u32) -> f64 {
-        0.1 * colonists as f64 * self.tables.faction(self.kind(seat)).lift_population_multiplier
+        // Ticket #73: paid when the Emigrants muster, not when a Ship lifts them.
+        self.tables.emigrants.population_each * colonists as f64 * self.tables.faction(self.kind(seat)).lift_population_multiplier
     }
 
     /// What a Colony Module costs this seat in Materials, rounded down (ticket #51).

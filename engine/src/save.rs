@@ -97,6 +97,9 @@ pub struct SavedGame {
     pub research: Research,
     pub deck: Deck,
     pub discoveries: Vec<Discovery>,
+    /// Ticket #73: Emigrants on the sea to Antarctica.
+    #[serde(default)]
+    pub antarctic_sends: Vec<AntarcticSend>,
     pub solar_maximum_next: bool,
     pub last_event: Option<DrawnEvent>,
     pub report: Report,
@@ -127,6 +130,7 @@ impl SavedGame {
             research,
             deck,
             discoveries,
+            antarctic_sends,
             solar_maximum_next,
             last_event,
             report,
@@ -151,6 +155,7 @@ impl SavedGame {
             research: research.clone(),
             deck: deck.clone(),
             discoveries: discoveries.clone(),
+            antarctic_sends: antarctic_sends.clone(),
             solar_maximum_next: *solar_maximum_next,
             last_event: last_event.clone(),
             report: report.clone(),
@@ -180,6 +185,7 @@ impl SavedGame {
             research: self.research,
             deck: self.deck,
             discoveries: self.discoveries,
+            antarctic_sends: self.antarctic_sends,
             solar_maximum_next: self.solar_maximum_next,
             last_event: self.last_event,
             report: self.report,
