@@ -210,13 +210,12 @@ impl Game {
                     worn += charged;
                 }
                 b.by_seat[d.index()] += worn;
-                // An Event card is the world's doing, not a Faction's, so it is nobody's Blame.
-                // It stays inside the directed branch, where it has been since ticket #24: a
-                // Wildfire on a state nobody holds charges nothing at all today. That is almost
-                // certainly an accident of where the old `continue` sat rather than a rule, but
-                // moving it would change the Climate Model, so it is left for its own ticket.
-                b.cards += st.wildfire_emissions_next;
             }
+            // Ticket #60: an Event card is the world's doing, not a Faction's -- so it is nobody's
+            // Blame, and it burns whether or not anyone directs the state. Until this ticket the
+            // line sat inside the directed branch, an accident of where ticket #24's `continue`
+            // landed, and a Wildfire on a state nobody holds charged nothing at all.
+            b.cards += st.wildfire_emissions_next;
         }
         // Version 0.04 (ticket #44): a Module on Earth (Antarctica) emits as its counterpart Facility does.
         for col in self.colonies.iter().filter(|c| c.body == BodyId::Earth) {

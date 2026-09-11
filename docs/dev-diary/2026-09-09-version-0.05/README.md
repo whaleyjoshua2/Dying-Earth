@@ -1373,7 +1373,10 @@ written about.
   beside End Turn; East Asia's card is open on the left with its Facilities, its slots, its Unrest and
   its Standings and not one order button; the right panel is the whole table, Custodians in teal,
   Prospectors in orange, Arkwrights in violet and Archivists in pale silver-blue, each with its
-  Ships, Army, Colony and State.
+  Ships, Army, Colony and State. **Re-taken on ticket #60**: the Stockpile row used to carry a
+  "Custodians:" prefix that pushed the Temperature onto a second line at 1280 wide, so whose figures
+  they are is said on the seating line above instead ("- the figures below are the Custodians'.",
+  which also replaced "- the computer plays all four."), and every row of the bar is now one line.
 
 ![The Report in spectator mode: "Seed 7. Spectating." and the four Factions in their colours, a Break headline, then In space, On Earth, The climate, Builds and works, and What the Factions did with four coloured paragraphs](spectate-report.png)
 

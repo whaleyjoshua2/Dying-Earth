@@ -4475,3 +4475,109 @@ fn the_spectators_dispatch_carries_every_factions_works_and_all_four_paragraphs(
     p.end_turn(std::array::from_fn(|_| Vec::new()));
     assert!(p.faction_paragraphs().iter().all(|(s, _)| *s != Seat(0)), "a player's Report keeps seat 0 out of the rivals");
 }
+// ---------------------------------------------------------------- Ticket #60: four small fixes
+
+/// A Wildfire is the world's carbon wherever it burns, so the Emissions it leaves stand on the
+/// cards line whether or not a Faction directs the state. Until this ticket the line sat inside the
+/// directed branch of `emissions_now` -- an accident of where ticket #24's `continue` landed -- so
+/// a Wildfire on a state nobody holds charged nothing at all.
+#[test]
+fn a_wildfire_on_a_neutral_nation_state_charges_its_emissions_to_the_cards_line() {
+    let mut g = game();
+    calm(&mut g);
+    let sid = StateId::NorthAfrica;
+    assert!(g.state(sid).control.director().is_none(), "North Africa is neutral at the start");
+    let before = g.emissions_now();
+    g.last_event = Some(DrawnEvent { card: Card::Event(EventId::Wildfire), target: EventTarget::State(sid), scale: 1.0, text: String::new() });
+    g.apply_event_now();
+    let after = g.emissions_now();
+    assert_eq!(after.cards - before.cards, g.tables.events.wildfire_emissions, "a Wildfire on a neutral state adds its Emissions to the cards line");
+    // And it stays the world's doing: nobody's Blame.
+    assert_eq!(after.by_seat, before.by_seat, "an Event card is nobody's Blame, neutral state or not");
+    // A Wildfire on a directed state charges the same line, as it always has.
+    let mut g = game();
+    calm(&mut g);
+    g.take_control(sid, Seat(1));
+    let before = g.emissions_now().cards;
+    g.last_event = Some(DrawnEvent { card: Card::Event(EventId::Wildfire), target: EventTarget::State(sid), scale: 1.0, text: String::new() });
+    g.apply_event_now();
+    assert_eq!(g.emissions_now().cards - before, g.tables.events.wildfire_emissions, "and a directed state is unchanged");
+}
+
+/// Ticket #41 put the challenge margin on a held place; the figure the state card printed for
+/// "N now" kept ticket #33's `controller + 1`, so the card asked for less than the Resolution
+/// would honour. `influence_needed_for` is the one computation all three read.
+#[test]
+fn the_figure_for_taking_a_held_place_includes_the_challenge_margin() {
+    let mut g = game();
+    let target = Place::State(StateId::NorthAfrica);
+    let margin = g.tables.influence.challenge_margin;
+    g.take_control(StateId::NorthAfrica, Seat(1));
+    let threshold = g.influence_threshold_for(Seat(0), target);
+    // The holder standing at the threshold: a challenger needs its Standing plus the margin.
+    g.seats[1].influence.insert(target, threshold);
+    assert_eq!(g.influence_needed_for(Seat(0), target), threshold + margin, "the holder's Standing plus the challenge margin");
+    // A holder with almost nothing: the threshold is the greater, and the figure is the threshold.
+    g.seats[1].influence.insert(target, 1);
+    assert_eq!(g.influence_needed_for(Seat(0), target), threshold, "the threshold, where it is the greater");
+    // A neutral place asks the threshold and nothing else.
+    let neutral = Place::State(StateId::SouthAsia);
+    assert_eq!(g.influence_needed_for(Seat(0), neutral), g.influence_threshold_for(Seat(0), neutral), "a neutral place asks the threshold");
+    // And it is the figure the Resolution actually applies: one short takes nothing.
+    let mut g = game();
+    g.take_control(StateId::NorthAfrica, Seat(1));
+    g.seats[1].influence.insert(target, g.influence_threshold_for(Seat(0), target));
+    let need = g.influence_needed_for(Seat(0), target);
+    let hold = |g: &mut Game| {
+        for s in Seat::ALL {
+            g.seats[s.index()].influenced_this_turn.push(target);
+        }
+    };
+    g.seats[0].influence.insert(target, need - 1);
+    hold(&mut g);
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::NorthAfrica).control.controller(), Some(Seat(1)), "one short of the figure takes nothing");
+    g.seats[0].influence.insert(target, need);
+    hold(&mut g);
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::NorthAfrica).control.controller(), Some(Seat(0)), "the figure itself takes the place");
+}
+
+/// Tickets #52 and #53 measured no Constabulary in any AI game: a building that fixes nothing
+/// economic never beat a producer under the victory-gap multiplier, so it never won a build slot.
+/// From Unrest 5 it takes that multiplier too, because a state at 7 halves every Facility there.
+#[test]
+fn a_custodian_ai_behind_on_pace_builds_a_constabulary_where_unrest_has_reached_seven() {
+    let mut g = game();
+    calm(&mut g);
+    let seat = Seat(0);
+    assert_eq!(g.kind(seat), FactionKind::Custodians);
+    assert_eq!(g.state(StateId::EastAsia).control.controller(), Some(seat), "seat 0 starts in East Asia");
+    // Behind on its pace: turn 14 with no Stabilization run at all, which is every game's shape.
+    g.turn = 14;
+    g.seats[seat.index()].stabilization_run = 0;
+    // Materials for three builds and no more, so the scored list has to RANK the Constabulary above
+    // the cheap economic answers rather than reach it once everything else is bought: at its bare
+    // weight of 6 it sits under the Research Lab's 8 and is never reached.
+    g.seats[seat.index()].stockpile.materials = 70;
+    g.seats[seat.index()].stockpile.energy = 100;
+    g.state_mut(StateId::EastAsia).unrest = 7.0;
+    assert!(g.free_slots(StateId::EastAsia) > 0, "a free slot to build it in");
+    let orders = g.ai_orders(seat);
+    let scored: Vec<String> = g.log.iter().cloned().filter(|l| l.contains("take") || l.contains("skip")).take(12).collect();
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::BuildFacility { state: StateId::EastAsia, kind: FacilityKind::Constabulary })),
+        "no Constabulary where Unrest has reached 7: {orders:?}\nscored: {scored:#?}"
+    );
+    // And a calm state still gets none.
+    let mut g = game();
+    calm(&mut g);
+    g.turn = 14;
+    g.seats[seat.index()].stockpile.materials = 400;
+    g.seats[seat.index()].stockpile.energy = 100;
+    let orders = g.ai_orders(seat);
+    assert!(
+        !orders.iter().any(|o| matches!(o, Order::BuildFacility { kind: FacilityKind::Constabulary, .. })),
+        "a Constabulary in a calm state: {orders:?}"
+    );
+}

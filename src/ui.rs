@@ -778,15 +778,16 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 for seat in Seat::ALL {
                     ui.label(RichText::new(game.seat_name(seat)).strong().color(seat_colour(session, seat)));
                 }
-                ui.label(RichText::new("- the computer plays all four.").weak());
+                // Ticket #60: whose Stockpile the row below shows, said here instead of as a prefix
+                // on that row: at 1280 wide the prefix pushed the Temperature onto a second line,
+                // and this line has room to spare. "- the computer plays all four." went with it,
+                // since four Faction names under "Spectating." say the same thing.
+                ui.label(RichText::new(format!("- the figures below are the {}'.", game.seat_name(Seat(0)))).weak());
             });
         }
         ui.horizontal_wrapped(|ui| {
             let s = game.seat(Seat(0));
             let (left, influence_left) = game.remaining(Seat(0), &session.pending);
-            if session.spectator {
-                ui.label(RichText::new(format!("{}:", game.seat_name(Seat(0)))).strong().color(seat_colour(session, Seat(0))));
-            }
             let inc = s.income_last_turn;
             let signed = |v: i64| if v >= 0 { format!("+{v}") } else { format!("{v}") };
             // Hover a resource for last Income by source (ticket #31).
@@ -1639,7 +1640,6 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
     }
     // Ticket #53: the threshold shown is the player's own, since Blame raises it seat by seat.
     let threshold = game.influence_threshold_for(Seat(0), target);
-    let standing = |s: Seat| game.seat(s).influence.get(&target).copied().unwrap_or(0);
     standings_row(ui, game, session, target);
     ui.label(format!("Threshold {}; a place already held changes hands only at the holder's Standing plus the challenge margin of {}.", threshold, game.tables.influence.challenge_margin));
     // Ticket #53: on every Nation State the player does not hold, what its Blame is costing it here.
@@ -1658,7 +1658,10 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
     }
     match game.place_control(target).controller() {
         Some(c) => {
-            let need = threshold.max(standing(c) + 1);
+            // Ticket #60: the engine's own figure, which the Resolution and the AI read too. It
+            // was `threshold.max(standing + 1)` here, which ignored the challenge margin ticket #41
+            // put on a held place, so the card printed a figure the Resolution would not honour.
+            let need = game.influence_needed_for(Seat(0), target);
             if c == Seat(0) {
                 ui.label(RichText::new(format!("Yours. A rival takes it with a standing above yours and at least the threshold: {need} now. Spending here raises your standing; it decays 1 a turn.")).weak());
             } else {

@@ -1269,6 +1269,19 @@ impl Game {
         self.threshold_with(target, m * self.blame_threshold_multiplier_on(seat, target))
     }
 
+    /// Ticket #60: the Standing this seat needs to take `target` as it stands now -- its own
+    /// threshold on a neutral place, and on a held one the greater of that and the holder's
+    /// Standing plus the challenge margin ticket #41 put there. The Resolution, the AI and the
+    /// state card all read this one computation, so the figure a card prints and the figure the
+    /// Resolution applies cannot drift apart again, as they did from #41 to here.
+    pub fn influence_needed_for(&self, seat: Seat, target: Target) -> i64 {
+        let threshold = self.influence_threshold_for(seat, target);
+        match self.place_control(target).controller() {
+            Some(c) => threshold.max(self.seat(c).influence.get(&target).copied().unwrap_or(0) + self.tables.influence.challenge_margin),
+            None => threshold,
+        }
+    }
+
     /// Ticket #53: Blame raises this seat's threshold on a Nation State it does not control, and
     /// on nothing else: never on a Colony, never on a Space Station, never on a place it holds.
     pub fn blame_threshold_multiplier_on(&self, seat: Seat, target: Target) -> f64 {

@@ -705,21 +705,17 @@ impl Game {
         // the controller's plus the challenge margin (version 0.04, ticket #41) and at least the threshold.
         // Ticket #53: the threshold is the CHALLENGER's own, since Blame raises it seat by seat; the
         // challenge margin is the same for everyone.
-        let margin = self.tables.influence.challenge_margin;
+        // Ticket #60: that whole figure is `influence_needed_for`, which the AI and the state card
+        // read too, so what a card prints and what this applies cannot drift apart.
         let mut targets: Vec<Place> = StateId::ALL.into_iter().map(Place::State).collect();
         targets.extend(self.colonies.iter().map(|c| Place::Colony(c.id)));
         for target in targets {
             let controller = self.place_control(target).controller();
-            let held = controller.map(|c| self.seat(c).influence.get(&target).copied().unwrap_or(0) + margin);
             let qualifying: Vec<Seat> = Seat::ALL
                 .into_iter()
                 .filter(|s| {
                     let have = self.seat(*s).influence.get(&target).copied().unwrap_or(0);
-                    let needed = match held {
-                        Some(over) => self.influence_threshold_for(*s, target).max(over),
-                        None => self.influence_threshold_for(*s, target),
-                    };
-                    controller != Some(*s) && have > 0 && have >= needed
+                    controller != Some(*s) && have > 0 && have >= self.influence_needed_for(*s, target)
                 })
                 .collect();
             // Ticket #50: among challengers who all qualify the same turn, the higher Standing takes

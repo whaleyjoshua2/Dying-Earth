@@ -400,7 +400,6 @@ impl Game {
         let scarce = self.scarcest(seat);
         let tight = self.energy_tight(seat);
         let allotment = self.seat(seat).allotment;
-        let margin = self.tables.influence.challenge_margin;
         let materials_income = self.seat(seat).income_last_turn.materials;
         let no_materials_income = materials_income == 0
             && !self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::Factory))
@@ -556,8 +555,19 @@ impl Game {
                     }
                     // Ticket #56: the Sea Wall doubles in worth while a threshold of any kind stands
                     // within 0.2 C of the Temperature and the state still has a coast to lose.
-                    let opportunity = if fk == FacilityKind::SeaWall && self.sea_is_close(sid) { m.opportunity } else { 1.0 };
-                    push(vec![Order::BuildFacility { state: sid, kind: fk }], cat, base, gap_for(cat, Some(name)), sway, opportunity, format!("build {} in {}", name, self.tables.state(sid).name), None);
+                    // Ticket #60: and a Constabulary doubles at Unrest 9, where one more turn would
+                    // throw the seat off the state, exactly as Relief doubles at the same figure.
+                    let seizes_the_moment = (fk == FacilityKind::SeaWall && self.sea_is_close(sid))
+                        || (fk == FacilityKind::Constabulary && self.state(sid).unrest >= 9.0);
+                    let opportunity = if seizes_the_moment { m.opportunity } else { 1.0 };
+                    // Ticket #60: #52 and #53 measured no Constabulary in any AI game -- a building
+                    // that fixes nothing economic never beat a producer under the victory-gap
+                    // multiplier, so it never won a build slot while the gap was wide. From Unrest 5
+                    // (the only Unrest at which the candidate is offered at all, above) it takes the
+                    // multiplier too, because a state at 7 halves every Facility's output and every
+                    // Facility's Emissions: calming it advances whatever the seat is behind on.
+                    let pull = if fk == FacilityKind::Constabulary { gap } else { gap_for(cat, Some(name)) };
+                    push(vec![Order::BuildFacility { state: sid, kind: fk }], cat, base, pull, sway, opportunity, format!("build {} in {}", name, self.tables.state(sid).name), None);
                 }
             }
             // Ticket #54: a Scrubber takes no build slot, so it is offered whether or not one is
@@ -733,13 +743,10 @@ impl Game {
         targets.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
         for (rank, (target, _)) in targets.iter().enumerate() {
             let have = self.seat(seat).influence.get(target).copied().unwrap_or(0);
-            let threshold = self.influence_threshold_for(seat, *target);
             // Ticket #33: a controlled place needs a standing above the controller's as well, by the
-            // challenge margin (ticket #41).
-            let needed = match self.place_control(*target).controller() {
-                Some(c) => threshold.max(self.seat(c).influence.get(target).copied().unwrap_or(0) + margin),
-                None => threshold,
-            };
+            // challenge margin (ticket #41). Ticket #60: one computation, shared with the Resolution
+            // and the state card.
+            let needed = self.influence_needed_for(seat, *target);
             let base = self.base_weight(seat, Cat::Influence) * (1.0 - 0.15 * rank as f64).max(0.3);
             let opp = if needed - have <= step { m.opportunity } else { 1.0 };
             let bought = if self.tables.ducats.per_influence > 0 { self.seat(seat).stockpile.ducats / self.tables.ducats.per_influence } else { 0 };
