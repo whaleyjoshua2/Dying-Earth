@@ -11,6 +11,8 @@ enum Cat {
     Producer,
     RaiseIndustry,
     ResearchLab,
+    /// Ticket #81 (version 0.06.0): the Observatory, weighted apart from the Lab.
+    Observatory,
     Habitat,
     LaunchSiteOrShipyard,
     ColonyShip,
@@ -82,6 +84,7 @@ impl Game {
             Cat::Producer => w.build_producer,
             Cat::RaiseIndustry => w.raise_industry,
             Cat::ResearchLab => w.build_research_lab,
+            Cat::Observatory => w.build_observatory,
             Cat::Habitat => w.build_habitat,
             Cat::LaunchSiteOrShipyard => w.build_launch_site_or_shipyard,
             Cat::ColonyShip => w.build_colony_ship,
@@ -462,16 +465,16 @@ impl Game {
                         || cat == Cat::StripPermit
                 }
                 // Ticket #54: a Scrubber is what a Custodian buys Stabilization with now.
-                VictoryFirstKind::StabilizationRun => cat == Cat::Scrubber || cat == Cat::Leapfrog || cat == Cat::ResearchLab,
+                VictoryFirstKind::StabilizationRun => cat == Cat::Scrubber || cat == Cat::Leapfrog || cat == Cat::ResearchLab || cat == Cat::Observatory,
                 VictoryFirstKind::ColonistsOffEarth => matches!(cat, Cat::Habitat | Cat::ColonyShip | Cat::FoundColony | Cat::LoadUnload | Cat::Transit),
-                VictoryFirstKind::ResearchProduced => cat == Cat::ResearchLab,
+                VictoryFirstKind::ResearchProduced => cat == Cat::ResearchLab || cat == Cat::Observatory,
                 // Ticket #51: the Archive wants Research, a fund and a Colony off Earth to stand at,
                 // which the Colony Ship, the transit and the founding provide. Ticket #68: and the
                 // Launch Site and Shipyard before them, which #51 left out, so an Archivist AI with
                 // neither (its station starts bare) spent every turn on Influence and never left
                 // Earth in twenty seeds of thirty-six turns.
                 VictoryFirstKind::ArchiveResearch => {
-                    matches!(cat, Cat::BuildArchive | Cat::FundArchive | Cat::ResearchLab | Cat::ColonyShip | Cat::FoundColony | Cat::Transit | Cat::LoadUnload | Cat::LaunchSiteOrShipyard | Cat::Habitat)
+                    matches!(cat, Cat::BuildArchive | Cat::FundArchive | Cat::ResearchLab | Cat::Observatory | Cat::ColonyShip | Cat::FoundColony | Cat::Transit | Cat::LoadUnload | Cat::LaunchSiteOrShipyard | Cat::Habitat)
                 }
             }
         };
@@ -662,10 +665,10 @@ impl Game {
             let col = self.colony(cid).unwrap().clone();
             let threat = if self.enemy_present_or_inbound(seat, col.body) || self.enemy_army_near(seat, Place::Colony(cid)) { m.threat } else { 1.0 };
             for mk in ModuleKind::BUILDABLE {
-                // Ticket #46: a station holds only a Shipyard and Habitats, and a Habitat over Earth
-                // houses nobody who counts as off Earth, so the AI builds none there.
-                // Ticket #80: a station holds an Observatory too.
-                if col.in_orbit && (mk != ModuleKind::Shipyard && mk != ModuleKind::Observatory && (mk != ModuleKind::Habitat || col.body == BodyId::Earth)) {
+                // Ticket #46: a station holds only a Shipyard and Habitats; ticket #80: and an
+                // Observatory. Ticket #81: a Habitat over Earth now houses people who count as off
+                // Earth, so the AI builds them there too.
+                if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Observatory | ModuleKind::Habitat) {
                     continue;
                 }
                 let (cat, mut base) = match mk {
@@ -678,7 +681,8 @@ impl Game {
                         {
                             continue;
                         }
-                        (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab))
+                        // Ticket #81: at its own weight.
+                        (Cat::Observatory, self.base_weight(seat, Cat::Observatory))
                     }
                     ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery | ModuleKind::TradePost => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                     ModuleKind::Relay => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),

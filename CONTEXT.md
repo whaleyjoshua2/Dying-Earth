@@ -33,7 +33,7 @@ The Arkwrights' signature rule: their Colony Ships carry twice the Colonists and
 _Avoid_: mass transit, cattle class, overcrowding, packing them in
 
 **Diaspora**:
-The Arkwrights' Victory Condition: thirty Colonists living off Earth, spread over at least three Bodies with at least four Colonists on each. Antarctica and the stations over Earth count toward neither part.
+The Arkwrights' Victory Condition: thirty Colonists living off Earth, spread over at least three Bodies with at least four Colonists on each. Antarctica counts toward neither part; since version 0.06.0 Colonists on a station over Earth count toward the thirty, but Earth is never one of the three Bodies.
 _Avoid_: spread, expansion, exodus, colonization score
 
 **Project**:
@@ -73,7 +73,7 @@ One of a fixed number of places in orbit around a Body where a Space Station can
 _Avoid_: dock, berth, orbit
 
 **Space Station**:
-A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard, Habitats and, since version 0.06.0, Observatories. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with a bare one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom); the Arkwrights start with none, and build theirs at half price. Colonists on a station over Earth are still on Earth for Off-world Presence.
+A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard, Habitats and, since version 0.06.0, Observatories. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with a bare one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom); the Arkwrights start with none, and build theirs at half price. Since version 0.06.0 a station over Earth is off Earth: its Colonists count for Off-world Presence and it may hold the Archive.
 _Avoid_: base, platform, orbital, outpost
 
 **Trading window**:
@@ -429,7 +429,7 @@ The Custodians' measure: net Emissions held under the Natural Sink, counting eve
 _Avoid_: carbon neutral, balance, equilibrium
 
 **Off-world Presence**:
-The number of Colonists living away from Earth, required by the Custodians' and the Prospectors' Victory Conditions. No Faction can win on Earth alone. Colonists in Antarctica or on a station over Earth are still on Earth.
+The number of Colonists living away from Earth, required by the Custodians' and the Prospectors' Victory Conditions. No Faction can win on Earth alone. Colonists in Antarctica are still on Earth; since version 0.06.0 those on a station over Earth are off it, as is everything else that asks "off Earth": the Archive's place and the Archivists' Research.
 _Avoid_: population off Earth, colony size, settlers
 
 ### Climate

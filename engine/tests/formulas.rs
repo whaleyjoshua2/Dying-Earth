@@ -1947,11 +1947,12 @@ fn the_archive_is_one_module_of_fifty_materials_and_three_turns_built_once_off_e
     let order = Order::BuildArchive { colony: mars };
     assert_eq!(g.order_cost(Seat(3), &order).materials, 50);
     assert!(g.check_order(Seat(3), &[], &order).is_ok(), "no Research needs banking first");
-    // Antarctica will not do, and neither will a station over Earth.
+    // Antarctica will not do. Ticket #81 (version 0.06.0): a station over Earth is off Earth, so
+    // Axiom will.
     let ant = colony(&mut g, Seat(3), BodyId::Earth, &[ModuleKind::Habitat], 4);
     assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: ant }).unwrap_err().0.contains("off Earth"));
     let axiom = station_of(&g, Seat(3), BodyId::Earth).unwrap();
-    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: axiom }).unwrap_err().0.contains("off Earth"));
+    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: axiom }).is_ok(), "a station over Earth is off Earth since ticket #81");
     // Nobody else builds one, and the ordinary Module button never places it.
     let mine = colony(&mut g, Seat(0), BodyId::Mars, &[], 0);
     assert_eq!(g.check_order(Seat(0), &[], &Order::BuildArchive { colony: mine }).unwrap_err().0, "only the Archivists build the Archive");
@@ -2123,7 +2124,14 @@ fn the_archivist_ai_builds_its_way_off_earth_and_then_the_archive() {
     g.seats[arc.index()].stockpile.energy = 200;
     let mars = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Mine, ModuleKind::Generator], 4);
     let orders = g.ai_orders(arc);
-    assert!(orders.iter().any(|o| matches!(o, Order::BuildArchive { colony } if *colony == mars)), "no Archive order at its Colony: {orders:?}");
+    // Ticket #81 (version 0.06.0): a station over Earth is off Earth, so the first Colony off Earth
+    // the AI holds is Axiom, its start station, and it raises the Archive there rather than on Mars.
+    let axiom = station_of(&g, arc, BodyId::Earth).unwrap();
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::BuildArchive { colony } if *colony == axiom || *colony == mars)),
+        "no Archive order at a Colony off Earth: {orders:?}"
+    );
+    assert!(orders.iter().any(|o| matches!(o, Order::BuildArchive { colony } if *colony == axiom)), "since ticket #81 the AI raises it on Axiom first: {orders:?}");
 }
 
 // ---------------------------------------------------------------- Ticket #52: Unrest, Occupation and refugees
@@ -4751,10 +4759,12 @@ fn a_custodian_ai_behind_on_pace_builds_a_constabulary_where_unrest_has_reached_
     // Behind on its pace: turn 14 with no Stabilization run at all, which is every game's shape.
     g.turn = 14;
     g.seats[seat.index()].stabilization_run = 0;
-    // Materials for three builds and no more, so the scored list has to RANK the Constabulary above
+    // Materials for four builds and no more, so the scored list has to RANK the Constabulary above
     // the cheap economic answers rather than reach it once everything else is bought: at its bare
-    // weight of 6 it sits under the Research Lab's 8 and is never reached.
-    g.seats[seat.index()].stockpile.materials = 70;
+    // weight of 6 it sits under the Research Lab's 8 and is never reached. Ticket #81 (version
+    // 0.06.0): a Habitat on the ISS now advances Off-world Presence and ranks above the
+    // Constabulary too, so the fourth build is the one this test reads (was three builds, 70).
+    g.seats[seat.index()].stockpile.materials = 95;
     g.seats[seat.index()].stockpile.energy = 100;
     g.state_mut(StateId::EastAsia).unrest = 7.0;
     assert!(g.free_slots(StateId::EastAsia) > 0, "a free slot to build it in");
@@ -5287,4 +5297,51 @@ fn a_habitat_holds_eight_and_twelve_for_the_arkwrights() {
     assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 12, "half again for the Arkwrights");
     with_tech(&mut g, TechId::ExpandedHabitats);
     assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 15, "(8 + 2) x 1.5");
+}
+
+// ---------------------------------------------------------------- 0.06.0 ticket #81: the Archivists' card
+
+/// Ticket #81: the output nerf is lifted whole (x1.0), Research is x1.5 on Earth and x1.75 off it,
+/// and a station over Earth is off Earth while Antarctica is not. Fifty Colonists at each, so the
+/// old 1.6 (4.8, so 4) reads apart from 1.75 (5.25, so 5): Axiom over Earth and Mars make 5; with
+/// Public Science Antarctica makes 2 x 1.5 x 1.5 x 1.5 = 6.75, so 6, where 1.6 gave 7.2, so 7.
+/// A Mars Mine makes 4 x 1.25 x 1.0 = 5, not 4.
+#[test]
+fn archivists_research_is_one_and_a_half_on_earth_and_one_and_three_quarters_off() {
+    let mut g = game();
+    let ark = Seat(3);
+    let axiom = station_of(&g, ark, BodyId::Earth).expect("the Archivists start with Axiom");
+    g.colony_mut(axiom).unwrap().modules.push(Module::new(ModuleKind::Observatory));
+    g.colony_mut(axiom).unwrap().colonists = 50;
+    assert_eq!(g.module_yield(ark, axiom, ModuleKind::Observatory).research, 5, "a station over Earth is off Earth: 2 x 1.5 x 1.75 = 5.25");
+    let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Observatory, ModuleKind::Mine], 50);
+    assert_eq!(g.module_yield(ark, mars, ModuleKind::Observatory).research, 5, "2 x 1.5 x 1.75 = 5.25");
+    assert_eq!(g.module_yield(ark, mars, ModuleKind::Mine).amount, 5, "the output nerf is gone: 4 x 1.25 x 1.0");
+    let vostok = colony(&mut g, ark, BodyId::Earth, &[ModuleKind::Observatory], 50);
+    with_tech(&mut g, TechId::PublicScience);
+    assert_eq!(g.module_yield(ark, vostok, ModuleKind::Observatory).research, 6, "Antarctica is Earth: 2 x 1.5 x 1.5 x 1.5 = 6.75");
+}
+
+/// Ticket #81: Colonists on a station over Earth count as off Earth for Off-world Presence and the
+/// Arkwrights' Diaspora count; Antarctica's still do not; Earth is still not one of Diaspora's Bodies.
+#[test]
+fn a_station_over_earth_is_off_earth_and_antarctica_is_not() {
+    let mut g = game();
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    g.colony_mut(iss).unwrap().colonists = 6;
+    colony(&mut g, Seat(0), BodyId::Earth, &[ModuleKind::Habitat], 5);
+    assert_eq!(g.off_world_colonists(Seat(0)), 6, "the ISS's six count, Antarctica's five do not");
+    assert_eq!(g.bodies_settled(Seat(0), 4), 0, "Earth is not a Body for Diaspora, in orbit or on the ice");
+}
+
+/// Ticket #81: the Archive may stand on a station over Earth, and still not in Antarctica.
+#[test]
+fn the_archive_may_stand_on_a_station_over_earth() {
+    let g = game();
+    let axiom = station_of(&g, Seat(3), BodyId::Earth).unwrap();
+    assert!(g.may_hold_archive(g.colony(axiom).unwrap()));
+    let mut g = game();
+    let vostok = colony(&mut g, Seat(3), BodyId::Earth, &[ModuleKind::Habitat], 0);
+    assert!(!g.may_hold_archive(g.colony(vostok).unwrap()));
 }

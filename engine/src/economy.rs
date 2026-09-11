@@ -256,7 +256,10 @@ impl Game {
                 // multiplier: its amount, plus one per cent for every Colonist at its Colony, times
                 // the Faction's Research multiplier and Public Science, rounded down, as a Lab is.
                 let per = t.observatory.research_per_colonist;
-                let mut r = p.amount as f64 * (1.0 + col.colonists as f64 * per) * fac.research_multiplier;
+                // Ticket #81: a Faction may carry a second Research multiplier for off Earth (the
+                // Archivists' 1.75), a station over Earth counting as off and Antarctica as on.
+                let research_multiplier = if self.off_earth(col) { fac.research_multiplier_off_earth.unwrap_or(fac.research_multiplier) } else { fac.research_multiplier };
+                let mut r = p.amount as f64 * (1.0 + col.colonists as f64 * per) * research_multiplier;
                 r *= self.tech_multiplier(seat, TechId::PublicScience);
                 y.research = r.floor() as i64;
             } else {
@@ -459,7 +462,7 @@ impl Game {
                 sources.push((format!("{} in {}", p.name, where_), Resource::Research, p.research));
                 // Ticket #80: Research made off Earth, for the measurement.
                 if let ProducerPlace::Module(cid, _) = p.place
-                    && self.colony(cid).map(|c| c.body != BodyId::Earth).unwrap_or(false)
+                    && self.colony(cid).map(|c| self.off_earth(c)).unwrap_or(false)
                 {
                     off_earth += p.research;
                 }

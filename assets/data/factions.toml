@@ -64,7 +64,7 @@ colony_ship_materials = 20
 # three quarters (both rounded down).
 station_materials_multiplier = 0.5
 module_materials_multiplier = 0.75
-signature = "Steerage: a Colony Ship carries 8 Colonists (12 with Expanded Habitats) and costs 20 Materials, and they muster 8 Emigrants a turn where others muster 4, but every Emigrant takes twice the population. Their Habitats hold half again as many (6, 9 with Expanded Habitats), a transit burns three quarters of the Fuel, and, starting with no station, a Space Station costs them 20 Materials and a Colony Module three quarters."
+signature = "Steerage: a Colony Ship carries 8 Colonists (12 with Expanded Habitats) and costs 20 Materials, and they muster 8 Emigrants a turn where others muster 4, but every Emigrant takes twice the population. Their Habitats hold half again as many (12, 15 with Expanded Habitats), a transit burns three quarters of the Fuel, and, starting with no station, a Space Station costs them 20 Materials and a Colony Module three quarters."
 victory = "Diaspora: 30 Colonists living off Earth, on Colonies spread over at least three Bodies with at least 4 Colonists each (Antarctica and stations over Earth do not count)."
 victory_first = { kind = "colonists_off_earth", bar = 30 }
 victory_second = { kind = "colonies_on_bodies", bodies = 3, colonists_each = 4 }
@@ -75,11 +75,15 @@ id = "archivists"
 name = "Archivists"
 start_station = "Axiom"
 blurb = "Build the Archive and upload everyone."
-output_multiplier = 0.8
+# Ticket #81 (version 0.06.0): the output nerf (0.8) is lifted whole, and Research is 1.5 on Earth
+# (every Lab, and an Observatory in Antarctica) and 1.75 off it (an Observatory on any other Body
+# or on a station, a station over Earth included), where 1.6 stood everywhere.
+output_multiplier = 1.0
 emissions_multiplier = 0.9
-research_multiplier = 1.6
+research_multiplier = 1.5
+research_multiplier_off_earth = 1.75
 influence_multiplier = 1.0
-signature = "Provisional Findings: while their Research went to the shared Tech last turn, they already have half the effect of the Tech under research (a multiplier x reads 1 + (x - 1) / 2, an addition reads half rounded down, and immunities do not carry). A turn of funding the Archive switches it off for the turn after."
+signature = "Provisional Findings: while their Research went to the shared Tech last turn, they already have half the effect of the Tech under research (a multiplier x reads 1 + (x - 1) / 2, an addition reads half rounded down, and immunities do not carry). A turn of funding the Archive switches it off for the turn after. Their Research is x1.5 on Earth and x1.75 off it, an Observatory on a station over Earth counting as off."
 # Ticket #68 (version 0.05.5): the first part is the Research paid into the Archive, 80 in all,
 # which the fund holds only a quarter of until the Archive Module stands at a Colony off Earth.
 victory = "Build the Archive at a Colony off Earth (50 Materials, three turns), pay 80 Research into it and keep it running, with 12 Colonists living at its Colony to be uploaded."

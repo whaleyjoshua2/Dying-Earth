@@ -394,7 +394,7 @@ impl Game {
                     return fail("you do not direct this Colony");
                 }
                 if !self.may_hold_archive(col) {
-                    return fail("the Archive stands at a Colony off Earth; Antarctica and a station over Earth will not do");
+                    return fail("the Archive stands at a Colony off Earth; Antarctica will not do");
                 }
                 // At most one Archive per Faction, wherever it stands.
                 if let Some(home) = self.archive_colony(seat)

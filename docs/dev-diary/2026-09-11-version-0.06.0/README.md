@@ -35,3 +35,33 @@ whose Colonies fill to twelve, is the one that builds any. The Archivist AI, whi
 Colonists, loses East Asia in 17 of 20 seeds at a median turn 21 (0.05.5's open item) and ends with
 no buildings at all. Nothing else moved: wins, Collapses, Techs and the Fund read as 0.05.5 did.
 Whether the Observatory should outrank a Scrubber in the Custodian AI's hand is on the map.
+
+## The Archivists' card ([ticket #81](https://github.com/whaleyjoshua2/Dying-Earth/issues/81))
+
+- **archivists-factions.png** — `shot:archivists player:archivists turns:0 observatory:25`, the
+  Faction choice screen. The Archivists' card now reads **"Facility and Module output x1"** (0.8
+  before) and **"Research x1.5"**, and its signature ends **"Their Research is x1.5 on Earth and
+  x1.75 off it, an Observatory on a station over Earth counting as off."** The Arkwrights' card
+  reads "(12, 15 with Expanded Habitats)" where the Observatory ticket's build had left "(6, 9)".
+
+### Measured, twenty seeds each (`sweep/archivists.txt`)
+
+The same two seatings as the Observatory ticket, so the figures read against that file.
+
+| Seat 0 | Wins by seat | Collapses | Techs (median) | Observatories at the end, by seat | The Archive standing | Research off Earth (median) |
+|---|---|---|---|---|---|---|
+| Archivists from East Asia | Custodians 18, Arkwrights 1 | 1/20 | 13, rung 3 | [2, 7, 0, 0] | **20/20 seeds, median turn 4**, complete 0/20 | 0 everywhere |
+| Custodians from East Asia | Custodians 3 | 17/20 | 7, rung 3 | [0, 0, 0, 8] | **20/20 seeds, median turn 4**, complete 0/20 | 0 everywhere |
+
+**The Archive stands on Axiom.** With a station over Earth counting as off Earth, the Archivist AI
+raises the Archive on its start station on turn 4 in every seed, where before this ticket it stood
+in no seed of either seating. It is never completed: the fund ends at a median 20 and 12, so the
+Research is not being paid in, and the Archivists lose East Asia in 20 of 20 seeds at a median
+turn 22 (0.05.5's open item) before it could be. Off-world Presence and the Archivists' twelve
+Colonists at the Archive can now both be met in orbit over Earth; how far that should be allowed
+is the designer's, and is on the map.
+
+**Observatories** rose from 0 and 3 to 9 and 8 across the two batches with their own weight (the
+Archivists' at 12), the Custodian AI in seat 1 building most of them (7); Research made off Earth
+still reads a median 0 a game for every seat, so most seeds see none. Everything else moved within
+seed noise: the Custodians' wins 5 to 3 and 20 to 18, Techs 9 to 7 and 13 to 13.

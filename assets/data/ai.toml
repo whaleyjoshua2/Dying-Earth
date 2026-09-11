@@ -37,6 +37,9 @@ build_archive = 0
 build_producer = 8
 raise_industry = 9
 build_research_lab = 3
+# Ticket #81 (version 0.06.0): the Observatory has its own weight, the Archivists' set high so
+# their AI chases its 1.75 off Earth.
+build_observatory = 3
 # Ticket #80 (version 0.06.0): build an Observatory (at the Research Lab weight) at a Colony or
 # station holding this many Colonists.
 observatory_colonists = 8
@@ -72,6 +75,7 @@ build_archive = 0
 build_producer = 6
 raise_industry = 3
 build_research_lab = 8
+build_observatory = 8
 observatory_colonists = 8
 build_habitat = 7
 build_launch_site_or_shipyard = 6
@@ -106,6 +110,7 @@ build_archive = 0
 build_producer = 6
 raise_industry = 3
 build_research_lab = 6
+build_observatory = 6
 observatory_colonists = 8
 build_habitat = 9
 build_launch_site_or_shipyard = 9
@@ -139,6 +144,7 @@ build_archive = 9
 build_producer = 6
 raise_industry = 3
 build_research_lab = 9
+build_observatory = 12
 # Ticket #80: the Archivist AI raises its Observatory a load earlier than the others.
 observatory_colonists = 4
 build_habitat = 7

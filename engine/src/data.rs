@@ -257,6 +257,10 @@ pub struct FactionCard {
     pub output_multiplier: f64,
     pub emissions_multiplier: f64,
     pub research_multiplier: f64,
+    /// Ticket #81 (version 0.06.0): the Research multiplier for an Observatory off Earth (a station
+    /// over Earth included, Antarctica not); absent, the one figure serves both.
+    #[serde(default)]
+    pub research_multiplier_off_earth: Option<f64>,
     pub influence_multiplier: f64,
     pub signature: String,
     /// The Victory Condition in prose, for the cards and the panel.
@@ -627,6 +631,8 @@ pub struct AiWeights {
     /// Ticket #80 (version 0.06.0): an Observatory is offered, at the Research Lab weight, at a
     /// Colony or station holding this many Colonists.
     pub observatory_colonists: u32,
+    /// Ticket #81: the Observatory's own weight, apart from the Lab's.
+    pub build_observatory: f64,
     pub build_habitat: f64,
     pub build_launch_site_or_shipyard: f64,
     pub build_colony_ship: f64,

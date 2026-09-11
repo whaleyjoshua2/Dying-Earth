@@ -1023,9 +1023,10 @@ impl Game {
         self.archive_colony(seat).and_then(|c| self.colony(c)).map(|c| c.colonists).unwrap_or(0)
     }
 
-    /// A Colony off Earth may hold the Archive; Antarctica and a station over Earth may not.
+    /// A Colony off Earth may hold the Archive; Antarctica may not. Ticket #81: a station over
+    /// Earth is off Earth, so it may.
     pub fn may_hold_archive(&self, c: &Colony) -> bool {
-        c.body != BodyId::Earth
+        self.off_earth(c)
     }
 
     // ---------------------------------------------------------------- Ticket #51: Steerage and the rest
@@ -1299,10 +1300,17 @@ impl Game {
             .count() as u32
     }
 
+    /// Ticket #81 (version 0.06.0): whether a Colony is off Earth for every rule that asks. Any
+    /// Body but Earth is; so is a station over Earth; Antarctica (Earth's ground) is not.
+    pub fn off_earth(&self, c: &Colony) -> bool {
+        c.body != BodyId::Earth || c.in_orbit
+    }
+
     /// Colonists living in Habitats off Earth, for one seat (spec 15).
     pub fn off_world_colonists(&self, seat: Seat) -> u32 {
-        // Ticket #44: Colonists in Antarctica live on Earth.
-        self.colonies.iter().filter(|c| c.control.controller() == Some(seat) && c.body != BodyId::Earth).map(|c| c.colonists).sum()
+        // Ticket #44: Colonists in Antarctica live on Earth. Ticket #81: those on a station over
+        // Earth do not.
+        self.colonies.iter().filter(|c| c.control.controller() == Some(seat) && self.off_earth(c)).map(|c| c.colonists).sum()
     }
 
     pub fn influence_threshold(&self, target: Target) -> i64 {
