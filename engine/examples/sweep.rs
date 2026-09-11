@@ -98,6 +98,8 @@ fn main() {
                     let (mut cards_drawn, mut deck_empty) = (Vec::new(), 0u32);
                     // Ticket #73: Emigrants.
                     let (mut emigrant_batches, mut by_sea) = (0u32, 0u32);
+                    // Ticket #75: seat 0's start state.
+                    let mut home_lost = Vec::new();
                     for seed in 1..=seeds {
                         let r = dying_earth_engine::sim::run_from(tables.clone(), seed, player, start);
                         match r.outcome {
@@ -138,6 +140,9 @@ fn main() {
                         }
                         emigrant_batches += r.emigrant_batches;
                         by_sea += r.antarctic_by_sea;
+                        if let Some(t) = r.start_state_lost_turn {
+                            home_lost.push(t);
+                        }
                         if let Some(t) = r.coastal_engineering_turn {
                             coastal_engineering.push(t);
                         }
@@ -197,6 +202,7 @@ fn main() {
                         println!("      The Prospectors' Venture Capital Fund at the end: median {}", median_u(&mut venture));
                         println!("      The deck: median {} cards drawn a game, empty at the end in {deck_empty}/{seeds} seeds", median_u(&mut cards_drawn));
                         println!("      Emigrants: {emigrant_batches} batches mustered, {by_sea} Antarctic Colonies founded by sea");
+                        println!("      Seat 0 lost its start state in {}/{seeds} seeds (median turn {})", home_lost.len(), median_u(&mut home_lost));
                         println!(
                             "      Victory Conditions met outright: {}",
                             if victory_met.is_empty() { "none in any seed".to_string() } else { victory_met.join(", ") }

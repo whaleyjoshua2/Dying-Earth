@@ -403,4 +403,51 @@ finding stands: the Custodians win 17 and 20 of 20.
 - **emigrants-earth.png** — `shot:emigrants select:eastasia turns:2 temp:1.7 emigrants:8 look:110,30
   panel:0`. East Asia's card with eight Emigrants mustered: **"Emigrants waiting: 8"** under the
   Unrest line. The Muster and Send-by-sea buttons sit further down the card, in the orders list
-  below the Build buttons, past the bottom of this capture.
+  below the Build buttons, past the bottom of this capture (the Muster button is in frame on the
+  shorter North Africa card of the next ticket's picture).
+
+## #75: the undefended home state
+
+[The ticket](https://github.com/whaleyjoshua2/Dying-Earth/issues/75), opened from the Prospectors
+ticket's finding. The designer chose the AI fix inside scope and a warning on the player's card.
+Every AI holder now pushes as many 5-Influence holds as it takes to stand two steps clear of a
+rival's Standing plus the challenge margin once the rival comes within two steps, as many as its
+Allotment and Ducats allow; the state card warns in orange when a rival's Standing is within two
+steps of the player's own on a place the player holds; the simulation reports the turn seat 0
+loses its start state.
+
+### Measured, twenty seeds each, and the fix does not hold the state
+
+| seat 0 | lost its start state | Custodian wins | Prospectors' Fund |
+| --- | --- | --- | --- |
+| Prospectors in East Asia | **20/20, median turn 8** (was 7) | 20/20 | 0 |
+| Archivists in East Asia | **20/20, median turn 21** (was 20) | | |
+| Custodians from Europe | 0/20 | 17/20 | 0 |
+
+**Why, from one seed's log.** The Custodians spend 10 on East Asia on turn 5 and 25 a turn from
+turn 6; the Prospectors answer with their whole Allotment, 15 on turn 6 and 20 on turn 7; the state
+goes on turn 7 at a Custodian Standing of 60. The defence fires, and it is outspent from a standing
+start: **a Faction's own Standing on its start state is zero when the game begins**, so a challenger
+needs only the threshold (about 58 on East Asia) until the holder has built a Standing, and a holder
+at 17 a turn cannot build one faster than a challenger at 25 tears past it. The margin of 10 over
+the holder's Standing is the only thing a hold buys, and it is bought too late.
+
+**So this is a rule, not the AI, and it is the designer's.** Three knobs, none touched here: a
+Faction beginning with a Standing on its start state equal to that state's threshold; the challenge
+margin of 10; the Custodians' Influence x1.25. The map's "Not yet specified" carries them, and the
+build ticket asks before it sweeps, since the Fund, the Archive and Diaspora cannot be measured
+while seat 0 loses its only state before turn 10.
+
+**Builder's calls.** The warning line sits at the top of the card under the Unrest line, not in the
+Influence section, which is below the fold on every card; the first two takes of the picture showed
+that. The AI's hold count is capped by what its Allotment and Ducats can buy in a turn.
+
+### Picture
+
+![The North Africa card held by the player: under "Unrest 0: calm enough", in orange, "The Prospectors stand at 40 here against your 40: they take it at 50. Spend here to stay ahead."](pressed-earth.png)
+
+- **pressed-earth.png** — `shot:pressed select:northafrica turns:0 pressed:40 look:15,25 panel:0`.
+  North Africa held by the player (the aid gives it to seat 0 for a short card) with a rival's
+  Standing level with the player's: the orange line **"The Prospectors stand at 40 here against
+  your 40: they take it at 50. Spend here to stay ahead."** under the Unrest line. The Emigrants
+  section's **"Muster 4 Emigrants (free)"** button is in frame at the foot of the card.

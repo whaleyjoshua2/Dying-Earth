@@ -381,7 +381,7 @@ impl Game {
     }
 
     /// The highest Standing any other seat has on a place (ticket #50).
-    fn rival_standing(&self, seat: Seat, place: Place) -> i64 {
+    pub fn rival_standing(&self, seat: Seat, place: Place) -> i64 {
         seat.others().iter().map(|s| self.seat(*s).influence.get(&place).copied().unwrap_or(0)).max().unwrap_or(0)
     }
 
@@ -783,14 +783,25 @@ impl Game {
             }
         }
         // Hold own places where a rival's standing approaches yours (ticket #33: spending raises your standing).
+        // Ticket #75 (version 0.05.5): as many steps as it takes to stand two steps clear of the
+        // rival's Standing plus the challenge margin, as many as the Allotment and the Ducats allow.
+        // One hold a turn against a rival pouring its whole Allotment in lost seat 0's start state
+        // on turn 7 in every seed of the Prospectors' batch.
         let mut owned: Vec<Place> = self.controlled_states(seat).into_iter().map(Place::State).collect();
         owned.extend(self.colonies.iter().filter(|c| c.control.controller() == Some(seat)).map(|c| Place::Colony(c.id)));
+        let bought_steps = if per > 0 { ducats / per } else { 0 };
         for place in owned {
             let rival = self.rival_standing(seat, place);
             let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
             if rival > 0 && rival + 2 * step >= mine {
+                let margin = self.tables.influence.challenge_margin;
+                let need = (rival + margin + 2 * step - mine).max(step);
+                let can = ((allotment + bought_steps) / step).max(1);
+                let copies = ((need + step - 1) / step).clamp(1, can);
                 let opp = if rival + step >= mine { m.opportunity } else { 1.0 };
-                push(vec![Order::Influence { target: place, amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, m.threat, opp, format!("hold {} with {} Influence", self.place_name(place), step), None);
+                for _ in 0..copies {
+                    push(vec![Order::Influence { target: place, amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, m.threat, opp, format!("hold {} with {} Influence", self.place_name(place), step), None);
+                }
             }
         }
 

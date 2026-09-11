@@ -1783,6 +1783,26 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             Color32::LIGHT_GREEN
         };
         ui.colored_label(colour, format!("Unrest {}: {}", game.unrest_text(sid), game.unrest_note(sid)));
+        // Ticket #75: a rival's Standing within two steps of the player's own, at the top of the
+        // card where it is seen, not in the Influence section below the fold.
+        if game.place_control(Place::State(sid)).controller() == Some(Seat(0)) {
+            let target = Place::State(sid);
+            let mine = game.seat(Seat(0)).influence.get(&target).copied().unwrap_or(0);
+            let step = game.tables.ai.thresholds.influence_step;
+            let pressing = Seat(0).others().iter().map(|s| (*s, game.seat(*s).influence.get(&target).copied().unwrap_or(0))).max_by_key(|(_, n)| *n).filter(|(_, n)| *n > 0 && *n + 2 * step >= mine);
+            if let Some((rival, standing)) = pressing {
+                ui.label(
+                    RichText::new(format!(
+                        "The {} stand at {} here against your {}: they take it at {}. Spend here to stay ahead.",
+                        game.seat_name(rival),
+                        standing,
+                        mine,
+                        mine + game.tables.influence.challenge_margin
+                    ))
+                    .color(Color32::from_rgb(255, 160, 60)),
+                );
+            }
+        }
         // Ticket #73: Emigrants waiting here for a lift or the sea.
         if st.emigrants > 0 {
             ui.label(format!("Emigrants waiting: {}", st.emigrants)).on_hover_text("Mustered here and not yet lifted or sent: a working Launch Site lifts them onto a Ship, or, once the ice is open, the sea takes them to Antarctica.");

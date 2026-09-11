@@ -5141,3 +5141,27 @@ fn the_ai_musters_emigrants_then_lifts_them_or_sends_them_to_antarctica() {
     let orders = g.ai_orders(Seat(0));
     assert!(orders.iter().any(|o| matches!(o, Order::SendToAntarctica { state: StateId::EastAsia, n: 4, .. })), "{orders:?}");
 }
+
+// ---------------------------------------------------------------- Ticket #75 (version 0.05.5): the undefended home state
+
+/// Ticket #75: an AI holder defends a place it holds the way challengers attack it: once a rival's
+/// Standing comes within two steps of its own it pushes as many holds as it takes to stand two steps
+/// clear of the rival plus the challenge margin, as many as its Allotment allows; a rival far below
+/// gets no answer.
+#[test]
+fn an_ai_holder_pushes_as_many_holds_as_it_takes_when_a_rival_comes_within_reach() {
+    let mut g = game();
+    g.take_control(StateId::Europe, Seat(1));
+    g.seats[1].influence.insert(Place::State(StateId::Europe), 30);
+    g.seats[0].influence.insert(Place::State(StateId::Europe), 25);
+    g.seats[1].allotment = 20;
+    g.seats[1].stockpile.energy = 200;
+    let held = |orders: &[Order]| -> i64 { orders.iter().map(|o| match o { Order::Influence { target: Place::State(StateId::Europe), amount } => *amount, _ => 0 }).sum() };
+    let orders = g.ai_orders(Seat(1));
+    // 25 + the margin of 10 + two steps of 5 - 30 = 15: three holds, within an Allotment of 20.
+    assert!(held(&orders) >= 15, "it held Europe with {} Influence: {orders:?}", held(&orders));
+    // A rival far below needs no answer.
+    g.seats[0].influence.insert(Place::State(StateId::Europe), 5);
+    let orders = g.ai_orders(Seat(1));
+    assert_eq!(held(&orders), 0, "{orders:?}");
+}

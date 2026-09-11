@@ -212,6 +212,14 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.energy = 60;
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
         }
+        // `pressed:<n>` (a building aid, ticket #75): seat 0 holds North Africa (a short card) with a
+        // Standing of n there, and seat 1 stands at n too, so the card's warning line shows.
+        if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("pressed:").and_then(|v| v.parse::<i64>().ok())) {
+            let sid = StateId::NorthAfrica;
+            g.take_control(sid, Seat(0));
+            g.seats[0].influence.insert(Place::State(sid), n);
+            g.seats[1].influence.insert(Place::State(sid), n);
+        }
         // `emigrants:<n>` (a building aid, ticket #73): n Emigrants wait in seat 0's start state.
         if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("emigrants:").and_then(|v| v.parse::<u32>().ok())) {
             let start = g.controlled_states(Seat(0)).first().copied();
