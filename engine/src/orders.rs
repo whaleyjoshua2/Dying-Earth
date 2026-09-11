@@ -1020,8 +1020,12 @@ impl Game {
                     }
                     let stage = self.archive_stages_committed(seat);
                     let line = format!("The {} began stage {} of the Archive at {}.", self.seat_name(seat), stage, self.place_name(Place::Colony(*colony)));
-                    self.log(line.clone());
-                    self.report.lines.push(line);
+                    self.log(line);
+                    let text = self.say(
+                        "archive_stage_begun",
+                        &[("faction", self.seat_name(seat)), ("stage", stage.to_string()), ("colony", self.place_name(Place::Colony(*colony)))],
+                    );
+                    self.report_line(LineKind::Archive, Some(ReportPlace::Colony(*colony)), text);
                 }
                 Order::FundArchive => self.fund_archive(seat),
                 // Ticket #52: both act at Resolution; Resettle also steers the next Climate phase's
@@ -1066,8 +1070,16 @@ impl Game {
                         self.tables.state(*state).name,
                         self.population_coefficient(*state)
                     );
-                    self.log(line.clone());
-                    self.report.lines.push(line);
+                    self.log(line);
+                    let text = self.say(
+                        "leapfrog",
+                        &[
+                            ("faction", self.seat_name(seat)),
+                            ("state", self.tables.state(*state).name.clone()),
+                            ("coefficient", format!("{:.2}", self.population_coefficient(*state))),
+                        ],
+                    );
+                    self.report_line(LineKind::Climate, Some(ReportPlace::State(*state)), text);
                 }
                 // Ticket #54: the Strip Permit runs from the next Income for `turns` turns.
                 Order::StripPermit { state } => {
@@ -1083,8 +1095,12 @@ impl Game {
                         self.tables.state(*state).name,
                         turns
                     );
-                    self.log(line.clone());
-                    self.report.lines.push(line);
+                    self.log(line);
+                    let text = self.say(
+                        "strip_permit",
+                        &[("faction", self.seat_name(seat)), ("state", self.tables.state(*state).name.clone()), ("turns", turns.to_string())],
+                    );
+                    self.report_line(LineKind::Note, Some(ReportPlace::State(*state)), text);
                 }
                 Order::BuyInfluence { amount } => {
                     self.seat_mut(seat).allotment += amount;
@@ -1098,6 +1114,140 @@ impl Game {
                     self.log(format!("{} sold {} {} for {} Ducats.", self.seat_name(seat), amount, resource.name(), -cost.ducats));
                 }
             }
+        }
+    }
+}
+
+/// Ticket #58: orders the board would show as one act are told as one. Three Influence orders on the
+/// same place are one spend of their sum, three buys of Materials are one purchase, and an order
+/// repeated exactly is said once. Everything else keeps the order it was given in.
+pub fn merged_for_report(list: &[Order]) -> Vec<Order> {
+    let mut out: Vec<Order> = Vec::new();
+    for o in list {
+        let merged = match o {
+            Order::Influence { target, amount } => out
+                .iter_mut()
+                .find_map(|x| match x {
+                    Order::Influence { target: t, amount: a } if t == target => Some(a),
+                    _ => None,
+                })
+                .map(|a| *a += amount),
+            Order::BuyInfluence { amount } => out
+                .iter_mut()
+                .find_map(|x| match x {
+                    Order::BuyInfluence { amount: a } => Some(a),
+                    _ => None,
+                })
+                .map(|a| *a += amount),
+            Order::Buy { resource, amount } => out
+                .iter_mut()
+                .find_map(|x| match x {
+                    Order::Buy { resource: r, amount: a } if r == resource => Some(a),
+                    _ => None,
+                })
+                .map(|a| *a += amount),
+            Order::Sell { resource, amount } => out
+                .iter_mut()
+                .find_map(|x| match x {
+                    Order::Sell { resource: r, amount: a } if r == resource => Some(a),
+                    _ => None,
+                })
+                .map(|a| *a += amount),
+            other => out.iter().find(|x| *x == other).map(|_| ()),
+        };
+        if merged.is_none() {
+            out.push(o.clone());
+        }
+    }
+    out
+}
+
+impl Game {
+    /// Ticket #58: one clause saying what a rival Faction did with one order it committed. Only
+    /// what the board or its cards would show: nothing the AI scored, waited for or skipped. `None`
+    /// for an order that leaves no visible mark.
+    pub fn rival_deed(&self, _seat: Seat, order: &Order) -> Option<String> {
+        let r = |key: &str, args: &[(&str, String)]| Some(self.tables.report.rival(key, args));
+        let place = |p: Place| self.place_name(p);
+        let building = |b: BuildingRef| -> String {
+            match b {
+                BuildingRef::Facility(sid, i) => {
+                    self.state(sid).facilities.get(i).map(|f| f.kind.name().to_string()).unwrap_or_else(|| "building".into())
+                }
+                BuildingRef::Module(cid, i) => {
+                    self.colony(cid).and_then(|c| c.modules.get(i)).map(|m| m.kind.name().to_string()).unwrap_or_else(|| "building".into())
+                }
+            }
+        };
+        let unit_of = |u: UnitRef| -> String {
+            match u {
+                UnitRef::Ship(id) => self.ship(id).map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into()),
+                UnitRef::Army(_) => "an Army".to_string(),
+            }
+        };
+        match order {
+            Order::BuildFacility { state, kind } => {
+                r("build_facility", &[("building", kind.name().to_string()), ("state", self.tables.state(*state).name.clone())])
+            }
+            Order::BuildFacilityWithDucats { state, kind } => {
+                r("build_facility_ducats", &[("building", kind.name().to_string()), ("state", self.tables.state(*state).name.clone())])
+            }
+            Order::RaiseIndustry { state } => r("raise_industry", &[("state", self.tables.state(*state).name.clone())]),
+            Order::BuildModule { colony, kind } => {
+                r("build_module", &[("building", kind.name().to_string()), ("colony", place(Place::Colony(*colony)))])
+            }
+            Order::BuildModuleWithDucats { colony, kind } => {
+                r("build_module_ducats", &[("building", kind.name().to_string()), ("colony", place(Place::Colony(*colony)))])
+            }
+            Order::BuildShip { site, kind } => r("build_ship", &[("unit", kind.name().to_string()), ("place", place(*site))]),
+            Order::BuildArmy { place: p } => r("build_army", &[("place", place(*p))]),
+            Order::BuildStation { body, .. } => r("build_station", &[("body", self.tables.body(*body).name.clone())]),
+            Order::BuildArchiveStage { colony } => r("build_archive_stage", &[("colony", place(Place::Colony(*colony)))]),
+            Order::FundArchive => r("fund_archive", &[]),
+            Order::Repair { unit, .. } | Order::RepairWithDucats { unit, .. } => r("repair", &[("unit", unit_of(*unit))]),
+            Order::Transit { ship, to } => {
+                let unit = self.ship(*ship).map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into());
+                r("transit", &[("unit", unit), ("body", self.tables.body(*to).name.clone())])
+            }
+            Order::ShipStance { body, stance } => {
+                r("ship_stance", &[("body", self.tables.body(*body).name.clone()), ("stance", stance.name().to_string())])
+            }
+            Order::ArmyStance { place: p, stance } => r("army_stance", &[("place", place(*p)), ("stance", stance.name().to_string())]),
+            Order::MoveArmy { to, .. } => r("move_army", &[("state", self.tables.state(*to).name.clone())]),
+            Order::Load { colonists, from, .. } => {
+                let where_ = match from {
+                    LoadSource::State(s) => self.tables.state(*s).name.clone(),
+                    LoadSource::Colony(c) => place(Place::Colony(*c)),
+                };
+                if *colonists > 0 {
+                    r("load_colonists", &[("n", colonists.to_string()), ("place", where_)])
+                } else {
+                    r("load_army", &[("place", where_)])
+                }
+            }
+            Order::Unload { into, .. } => {
+                let where_ = match into {
+                    UnloadTarget::Slot(b, i) => format!("{} slot {}", self.tables.body(*b).name, i + 1),
+                    UnloadTarget::Colony(c) => place(Place::Colony(*c)),
+                };
+                r("unload", &[("place", where_)])
+            }
+            Order::Influence { target, amount } => r("influence", &[("n", amount.to_string()), ("place", place(*target))]),
+            Order::BuyInfluence { amount } => r("buy_influence", &[("n", amount.to_string())]),
+            Order::Buy { resource, amount } => r("buy", &[("n", amount.to_string()), ("resource", resource.name().to_string())]),
+            Order::Sell { resource, amount } => r("sell", &[("n", amount.to_string()), ("resource", resource.name().to_string())]),
+            Order::Relief { state } => r("relief", &[("state", self.tables.state(*state).name.clone())]),
+            Order::Resettle { state } => r("resettle", &[("state", self.tables.state(*state).name.clone())]),
+            Order::Change { building: b, what } => {
+                let key = match what {
+                    BuildingChange::Mothball => "mothball",
+                    BuildingChange::Restart => "restart",
+                    BuildingChange::Decommission => "decommission",
+                };
+                r(key, &[("building", building(*b)), ("place", place(b.place()))])
+            }
+            Order::Leapfrog { state } => r("leapfrog", &[("state", self.tables.state(*state).name.clone())]),
+            Order::StripPermit { state } => r("strip_permit", &[("state", self.tables.state(*state).name.clone())]),
         }
     }
 }

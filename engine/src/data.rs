@@ -843,6 +843,8 @@ pub struct Tables {
     pub unrest: UnrestTable,
     pub victory: VictoryTable,
     pub ai: AiTable,
+    /// Ticket #58: every sentence the Report says (`report.toml`).
+    pub report: crate::report::ReportTable,
 }
 
 fn read<T: for<'de> Deserialize<'de>>(dir: &Path, file: &str) -> Result<T, DataError> {
@@ -878,6 +880,7 @@ impl Tables {
         let victory: VictoryTable = read(dir, "victory.toml")?;
         let ai: AiTable = read(dir, "ai.toml")?;
         let ephemeris: EphemerisFile = read(dir, "ephemeris.toml")?;
+        let report: crate::report::ReportTable = read(dir, "report.toml")?;
         let tables = Tables {
             sibling_transit: (bodies.sibling_turns, bodies.sibling_fuel),
             station_materials: bodies.station_materials,
@@ -908,12 +911,15 @@ impl Tables {
             unrest,
             victory,
             ai,
+            report,
         };
         tables.validate()?;
         Ok(tables)
     }
 
     fn validate(&self) -> Result<(), DataError> {
+        // Ticket #58: every sentence the Report says, with every placeholder the engine supplies.
+        self.report.check().map_err(|m| err("report.toml", m))?;
         // Every fixed id must have exactly one row, in the engine's order.
         check_rows("bodies.toml", &BodyId::ALL, self.bodies.iter().map(|b| b.id))?;
         check_rows("nation_states.toml", &StateId::ALL, self.states.iter().map(|s| s.id))?;

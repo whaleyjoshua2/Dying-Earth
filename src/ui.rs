@@ -118,6 +118,8 @@ enum Action {
     Cancel(usize),
     EndTurn,
     PickTech(TechId),
+    /// Ticket #58: a Report line was clicked; go where it points.
+    GoTo(ReportPlace),
     ChooseFaction(FactionKind),
     NewGame(FactionKind, StateId),
     ToTitle,
@@ -152,7 +154,8 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, se
     }
     if keys.just_pressed(KeyCode::Escape) {
         if view.popup != Popup::None {
-            advance_popup(&mut view);
+            let moments = session.game.as_ref().map(|g| view.moments_of(&session.tables, &g.report).len()).unwrap_or(0);
+            advance_popup(&mut view, moments);
         } else if matches!(view.view, View::Surface(_)) {
             view.view = View::Solar;
             view.selection = Selection::None;
@@ -167,9 +170,13 @@ pub fn toggle_climate(view: &mut ViewState) {
     view.climate_reopen = view.show_climate;
 }
 
-fn advance_popup(view: &mut ViewState) {
+/// Ticket #58: Event, then the turn's Moments one after another, then the Report.
+fn advance_popup(view: &mut ViewState, moments: usize) {
     view.popup = match view.popup {
+        Popup::Event if moments > 0 => Popup::Moment(0),
         Popup::Event => Popup::Report,
+        Popup::Moment(i) if i + 1 < moments => Popup::Moment(i + 1),
+        Popup::Moment(_) => Popup::Report,
         _ => Popup::None,
     };
 }
@@ -296,7 +303,14 @@ pub fn draw(
             Action::EndTurn => {
                 session.end_turn();
                 view.selection = Selection::None;
-                view.popup = if session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some() { Popup::Event } else { Popup::Report };
+                let moments = session.game.as_ref().map(|g| view.moments_of(&session.tables, &g.report).len()).unwrap_or(0);
+                view.popup = if session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some() {
+                    Popup::Event
+                } else if moments > 0 {
+                    Popup::Moment(0)
+                } else {
+                    Popup::Report
+                };
                 view.attack_preview = false;
             }
             Action::PickTech(t) => {
@@ -304,6 +318,34 @@ pub fn draw(
                 if let Some(Err(e)) = result {
                     session.last_error = Some(e);
                 }
+            }
+            Action::GoTo(place) => {
+                view.popup = Popup::None;
+                match place {
+                    ReportPlace::State(s) => {
+                        if view.view != View::Surface(BodyId::Earth) {
+                            view.enter_surface(BodyId::Earth);
+                        }
+                        view.selection = Selection::State(s);
+                    }
+                    ReportPlace::Colony(c) => {
+                        let body = session.game.as_ref().and_then(|g| g.colony(c)).map(|col| col.body);
+                        if let Some(b) = body {
+                            if view.view != View::Surface(b) {
+                                view.enter_surface(b);
+                            }
+                            view.selection = Selection::Colony(c);
+                        }
+                    }
+                    ReportPlace::Body(BodyId::Earth) => {
+                        view.enter_surface(BodyId::Earth);
+                    }
+                    ReportPlace::Body(_) => {
+                        view.view = View::Solar;
+                        view.selection = Selection::None;
+                    }
+                }
+                view.attack_preview = false;
             }
             Action::ChooseFaction(f) => {
                 session.screen = Screen::ChooseStart { faction: f };
@@ -543,6 +585,9 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 None => format!("Research: no Tech chosen ({} waiting)", game.research.unallocated),
             };
             ui.label(research);
+            // Ticket #58: the Research race, as a bar of the four Factions' contributions to the
+            // Tech under research, in Faction colours and in proportion.
+            research_race_bar(ui, session, game);
             ui.separator();
             // Ticket #42: the turn's Allotment and what the trading window added, shown apart.
             let bought: i64 = session.pending.iter().map(|o| if let Order::BuyInfluence { amount } = o { *amount } else { 0 }).sum();
@@ -592,6 +637,31 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             }
         });
     });
+}
+
+/// Ticket #58: the four Factions' shares of the Tech under research, drawn as one bar in Faction
+/// colours. The unfilled part of the bar is what the Tech still needs.
+fn research_race_bar(ui: &mut Ui, session: &Session, game: &Game) {
+    let Some(tech) = game.research.current else { return };
+    let cost = game.tables.tech(tech).cost.max(1);
+    let c = game.research.contributions;
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(150.0, 14.0), egui::Sense::hover());
+    let painter = ui.painter_at(rect);
+    painter.rect_filled(rect, 3.0, Color32::from_gray(45));
+    let mut x = rect.min.x;
+    for seat in Seat::ALL {
+        let w = rect.width() * (c[seat.index()].max(0) as f32) / cost as f32;
+        if w <= 0.0 {
+            continue;
+        }
+        let seg = egui::Rect::from_min_size(egui::pos2(x, rect.min.y), egui::vec2(w.min(rect.max.x - x), rect.height()));
+        painter.rect_filled(seg, 0.0, seat_colour(session, seat));
+        x += w;
+    }
+    painter.rect_stroke(rect, 3.0, egui::Stroke::new(1.0, Color32::from_gray(120)), egui::StrokeKind::Inside);
+    let shares: Vec<String> = Seat::ALL.into_iter().map(|s| format!("{} {}", game.seat_name(s), c[s.index()])).collect();
+    ui.interact(rect, ui.id().with("race"), egui::Sense::hover())
+        .on_hover_text(format!("The Research race for {}: {}. {} of {}.", game.tables.tech(tech).name, shares.join(", "), game.research.progress, cost));
 }
 
 // ------------------------------------------------------------------ overlays and picking
@@ -2027,6 +2097,23 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     });
 }
 
+/// Ticket #58: the Moments corner at the foot of the Report. A checkbox per kind, remembered for
+/// the session; `report.toml` holds the defaults.
+fn moments_corner(ui: &mut Ui, session: &Session, view: &mut ViewState) {
+    egui::CollapsingHeader::new("Moments").id_salt("moments_corner").show(ui, |ui| {
+        ui.label(RichText::new("A Moment stops the turn for one sentence and one number before this Report. At most two a turn, the most serious first.").weak());
+        let mut on: [bool; MomentKind::ALL.len()] =
+            std::array::from_fn(|i| view.moment_on(&session.tables, MomentKind::ALL[i]));
+        let before = on;
+        for (i, kind) in MomentKind::ALL.into_iter().enumerate() {
+            ui.checkbox(&mut on[i], kind.name());
+        }
+        if on != before || view.moments_on.is_some() {
+            view.moments_on = Some(on);
+        }
+    });
+}
+
 fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
     if view.show_trade {
         let mut open = true;
@@ -2234,7 +2321,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                     ui.label(RichText::new("Not a Climate card: the Temperature does not change it.").weak());
                 }
                 if ui.button("Continue").clicked() {
-                    advance_popup(view);
+                    let moments = view.moments_of(&session.tables, &game.report).len();
+                    advance_popup(view, moments);
                 }
             });
         }
@@ -2258,7 +2346,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         Popup::Report => {
             egui::Modal::new("report".into()).show(ctx, |ui| {
                 ui.set_width(620.0);
-                ui.label(RichText::new(format!("Report, turn {}", game.report.turn)).size(20.0).strong());
+                // Ticket #58: a dated bulletin.
+                ui.label(RichText::new(format!("Report, {}", game.date(game.report.turn).text())).size(20.0).strong());
                 // Ticket #50: who is at this table, and under which seed.
                 ui.horizontal_wrapped(|ui| {
                     ui.label(RichText::new(format!("Seed {}. You:", game.seed)).weak());
@@ -2268,7 +2357,35 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         ui.label(RichText::new(game.seat_name(seat)).color(seat_colour(session, seat)));
                     }
                 });
-                egui::ScrollArea::vertical().max_height(420.0).show(ui, |ui| {
+                // The headline: the most severe thing that happened, in its own size.
+                if let Some(head) = game.report.headline() {
+                    ui.add_space(4.0);
+                    let label = ui.label(RichText::new(&head.text).size(17.0).strong().color(Color32::from_rgb(255, 220, 150)));
+                    if let Some(place) = head.place
+                        && label.interact(egui::Sense::click()).on_hover_text("Go there").clicked()
+                    {
+                        actions.push(Action::GoTo(place));
+                    }
+                }
+                ui.separator();
+                egui::ScrollArea::vertical().max_height(520.0).show(ui, |ui| {
+                    // The four headings, empty ones left out; every line with a place is a way there.
+                    for (section, lines) in game.report.sections() {
+                        ui.label(RichText::new(section.name()).strong());
+                        for l in lines {
+                            match l.place {
+                                Some(place) => {
+                                    if ui.add(egui::Button::new(&l.text).frame(false)).on_hover_text("Go there").clicked() {
+                                        actions.push(Action::GoTo(place));
+                                    }
+                                }
+                                None => {
+                                    ui.label(&l.text);
+                                }
+                            }
+                        }
+                        ui.add_space(4.0);
+                    }
                     if !game.report.battles.is_empty() {
                         ui.label(RichText::new("Battle Report").strong());
                         // Ticket #50: a Battle is a melee, so every party present takes its own line.
@@ -2293,34 +2410,54 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                             }
                             ui.label(format!("   {}", b.result));
                         }
+                        ui.add_space(4.0);
                     }
-                    if let Some(e) = &game.report.event {
-                        ui.label(RichText::new("Last turn's Event").strong());
-                        ui.label(e);
-                    }
-                    ui.label(RichText::new("News").strong());
-                    for l in &game.report.lines {
-                        ui.label(l);
-                    }
-                    // Ticket #50: a section per rival Faction, in seat order, headed in its colour.
-                    if !game.report.ai_lines.is_empty() {
+                    // Ticket #58: what each rival Faction did, one paragraph each, in seat order.
+                    let paragraphs: Vec<(Seat, String)> =
+                        Seat::ALL.into_iter().skip(1).filter_map(|s| game.rival_paragraph(s).map(|p| (s, p))).collect();
+                    if !paragraphs.is_empty() {
                         ui.label(RichText::new("What the rival Factions did").strong());
-                        for seat in Seat::ALL.into_iter().skip(1) {
-                            let Some(entry) = game.report.ai_lines.iter().find(|e| e.seat == seat) else { continue };
-                            let deeds: Vec<&String> = entry.lines.iter().filter(|l| l.trim_start().starts_with("take")).collect();
-                            if deeds.is_empty() {
-                                continue;
-                            }
-                            ui.label(RichText::new(game.seat_name(seat)).strong().color(seat_colour(session, seat)));
-                            for l in deeds {
-                                ui.label(format!("   {}", l.trim().trim_start_matches("take").trim()));
-                            }
+                        for (seat, text) in paragraphs {
+                            ui.label(RichText::new(text).color(seat_colour(session, seat)));
                         }
                     }
                 });
+                ui.separator();
+                moments_corner(ui, session, view);
                 if ui.button("Close").clicked() {
-                    advance_popup(view);
+                    let moments = view.moments_of(&session.tables, &game.report).len();
+                    advance_popup(view, moments);
                 }
+            });
+        }
+        Popup::Moment(i) => {
+            let shown = view.moments_of(&session.tables, &game.report);
+            let Some(m) = shown.get(i).copied().cloned() else {
+                view.popup = Popup::Report;
+                return;
+            };
+            let count = shown.len();
+            egui::Modal::new("moment".into()).show(ctx, |ui| {
+                ui.set_width(if m.tech.is_some() { 780.0 } else { 460.0 });
+                ui.label(RichText::new(&m.figure).size(30.0).strong().color(Color32::from_rgb(255, 220, 150)));
+                ui.label(RichText::new(&m.text).size(17.0));
+                if let Some(note) = &m.note {
+                    ui.label(RichText::new(note).size(15.0).color(Color32::from_rgb(200, 220, 255)));
+                }
+                // Ticket #58: a completed Tech shows the tree with its new box lit, and the Pick
+                // buttons when the player is the Research Lead.
+                if m.tech.is_some() {
+                    ui.separator();
+                    let must_pick = game.research.awaiting_pick == Some(Seat(0)) && game.research.current.is_none();
+                    let available = game.available_techs();
+                    tech_tree(ui, game, &available, must_pick, actions);
+                }
+                ui.horizontal(|ui| {
+                    if ui.button("Close").clicked() {
+                        advance_popup(view, count);
+                    }
+                    ui.label(RichText::new(format!("{} of {}", i + 1, count)).weak());
+                });
             });
         }
         Popup::None => {}

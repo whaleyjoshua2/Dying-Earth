@@ -68,6 +68,13 @@ pub struct SimResult {
     /// launch window falls on, which the ephemeris fixes and no seed moves.
     pub first_mars_colony_turn: Option<u32>,
     pub window_turn: u32,
+    /// Ticket #58: how many Moments the turns of this game earned, how many the cap of two and the
+    /// defaults in `report.toml` actually showed, how many turns stopped for at least one, and the
+    /// most any one turn showed.
+    pub moments_earned: u32,
+    pub moments_shown: u32,
+    pub turns_with_moment: u32,
+    pub most_moments_in_a_turn: u32,
     pub log: Vec<String>,
 }
 
@@ -117,9 +124,18 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let window_turn = game.next_window_turn(1);
     let max_turns = tables.victory.turns;
     let mut guard = 0;
+    // Ticket #58: what the Moments did over the game.
+    let (mut moments_earned, mut moments_shown, mut turns_with_moment, mut most_moments_in_a_turn) = (0u32, 0u32, 0u32, 0u32);
     while !game.is_over() && guard < max_turns + 2 {
         guard += 1;
         game.end_turn(std::array::from_fn(|_| Vec::new()));
+        moments_earned += game.report.moments.len() as u32;
+        let shown = game.report.moments_shown(&|k| tables.report.moment_on(k)).len() as u32;
+        moments_shown += shown;
+        most_moments_in_a_turn = most_moments_in_a_turn.max(shown);
+        if shown > 0 {
+            turns_with_moment += 1;
+        }
         if first_colony_turn.is_none() && game.colonies.iter().any(|c| !c.in_orbit) {
             first_colony_turn = game.colonies.iter().filter(|c| !c.in_orbit).map(|c| c.founded_turn).min();
         }
@@ -258,6 +274,10 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         antarctic_colonies,
         first_mars_colony_turn,
         window_turn,
+        moments_earned,
+        moments_shown,
+        turns_with_moment,
+        most_moments_in_a_turn,
         log: game.log,
     }
 }

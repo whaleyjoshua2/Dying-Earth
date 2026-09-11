@@ -81,11 +81,18 @@ impl Game {
             }
         }
         if storm && self.ships.iter().any(|s| matches!(s.at, ShipAt::Transit { .. })) {
-            self.report.lines.push("Solar Storm: no transit advanced this turn.".into());
+            let text = self.say("solar_storm", &[]);
+            self.report_line(LineKind::Ship, None, text);
         }
         for (seat, body, id) in &arrivals {
-            let line = format!("{} {} arrived at {}.", self.seat_name(*seat), self.ship(*id).map(|s| s.kind.name()).unwrap_or("Ship"), self.tables.body(*body).name);
-            self.report.lines.push(line.clone());
+            let kind = self.ship(*id).map(|s| s.kind.name()).unwrap_or("Ship").to_string();
+            let line = format!("{} {} arrived at {}.", self.seat_name(*seat), kind, self.tables.body(*body).name);
+            let text = self.say(
+                "ship_arrived",
+                &[("faction", self.seat_name(*seat)), ("ship", kind.clone()), ("body", self.tables.body(*body).name.clone())],
+            );
+            self.report_line(LineKind::Ship, Some(ReportPlace::Body(*body)), text);
+            self.ai_deed(*seat, "arrived", &[("unit", kind), ("body", self.tables.body(*body).name.clone())]);
             self.log(line);
         }
         // Intercept battles (ticket #50): one melee per intercepting stack, against every arriving
@@ -178,8 +185,17 @@ impl Game {
                 self.tables.state(to).name,
                 if entering_own { "" } else { " and attacks" }
             );
-            self.log(line.clone());
-            self.report.lines.push(line);
+            self.log(line);
+            let text = self.say(
+                "army_moved",
+                &[
+                    ("faction", self.seat_name(seat)),
+                    ("from", self.tables.state(from).name.clone()),
+                    ("to", self.tables.state(to).name.clone()),
+                    ("attacks", if entering_own { String::new() } else { self.phrase("attacks", &[]) }),
+                ],
+            );
+            self.report_line(LineKind::Army, Some(ReportPlace::State(to)), text);
         }
         // Ground battles (ticket #50): an attacking Army fights every other Faction's Armies at the
         // place, and two Factions attacking the same place the same turn make one melee of all parties.
@@ -374,8 +390,17 @@ impl Game {
             why,
             if ship.colonists > 0 { format!(" with {} Colonists aboard", ship.colonists) } else { String::new() }
         );
-        self.log(line.clone());
-        self.report.lines.push(line);
+        self.log(line);
+        let cargo = if ship.colonists > 0 { self.phrase("cargo_aboard", &[("n", ship.colonists.to_string())]) } else { String::new() };
+        let text = self.say(
+            "ship_destroyed",
+            &[("faction", self.seat_name(ship.seat)), ("ship", ship.kind.name().to_string()), ("why", why.to_string()), ("cargo", cargo)],
+        );
+        let place = match ship.at {
+            ShipAt::Body(b) => Some(ReportPlace::Body(b)),
+            _ => None,
+        };
+        self.report_line(LineKind::DecisiveBattle, place, text);
     }
 
     pub fn destroy_army(&mut self, id: ArmyId) {
@@ -430,8 +455,17 @@ impl Game {
         }
         if !lost.is_empty() {
             let line = format!("{} was {}: {} destroyed.", self.place_name(place), why, lost.join(", "));
-            self.log(line.clone());
-            self.report.lines.push(line);
+            self.log(line);
+            let text = self.say(
+                "units_destroyed",
+                &[("place", self.place_name(place)), ("why", why.to_string()), ("lost", lost.join(", "))],
+            );
+            self.report_line(LineKind::DecisiveBattle, Some(place.into()), text.clone());
+            self.moment(
+                MomentKind::DecisiveBattle,
+                &[("place", self.place_name(place)), ("result", text), ("figure", format!("{} lost", lost.len()))],
+                Some(place.into()),
+            );
         }
     }
 
@@ -452,8 +486,9 @@ impl Game {
                         };
                         self.set_place_control(place, back);
                         let line = format!("Occupation of {} by the {} ended.", self.place_name(place), self.seat_name(occupier));
-                        self.log(line.clone());
-                        self.report.lines.push(line);
+                        self.log(line);
+                        let text = self.say("occupation_ended", &[("place", self.place_name(place)), ("faction", self.seat_name(occupier))]);
+                        self.report_line(LineKind::Occupation, Some(place.into()), text);
                         continue;
                     }
                     if !self.defenders_at(place, occupier).is_empty() {
@@ -495,8 +530,9 @@ impl Game {
                             self.raise_unrest(sid, n, UnrestSource::Plain);
                         }
                         let line = format!("The {} occupy {}.", self.seat_name(seat), self.place_name(place));
-                        self.log(line.clone());
-                        self.report.lines.push(line);
+                        self.log(line);
+                        let text = self.say("occupation_begun", &[("faction", self.seat_name(seat)), ("place", self.place_name(place))]);
+                        self.report_line(LineKind::Occupation, Some(place.into()), text);
                         self.occupation_gain(place, seat);
                         let have = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
                         let pacified = have > 0 && have >= self.influence_threshold(place);
@@ -560,8 +596,9 @@ impl Game {
             self.tables.state(sid).name,
             why
         );
-        self.log(line.clone());
-        self.report.lines.push(line);
+        self.log(line);
+        let text = self.say("scrubbers_destroyed", &[("n", n.to_string()), ("state", self.tables.state(sid).name.clone()), ("why", why.to_string())]);
+        self.report_line(LineKind::Climate, Some(ReportPlace::State(sid)), text);
     }
 
     /// Control passes to `seat` (spec 8.3, 8.5): rivals' Influence wiped, a destruction roll, Armies follow.
@@ -584,15 +621,25 @@ impl Game {
             }
             let whose = owner.map(|o| self.seat_name(o)).unwrap_or_else(|| "nobody".to_string());
             let line = format!("The Archive at {} was destroyed when the Colony passed out of the {}' hands; their Archive fund is kept.", self.place_name(place), whose);
-            self.log(line.clone());
-            self.report.lines.push(line);
+            self.log(line);
+            let text = self.say("archive_destroyed", &[("place", self.place_name(place)), ("faction", whose)]);
+            self.report_line(LineKind::Archive, Some(place.into()), text);
         }
         self.set_place_control(place, Control::Controlled(seat));
         // Standings persist through a transfer (ticket #33): the old controller keeps its own and
         // can contest the place back.
         let line = format!("{} now belongs to the {} ({}).", self.place_name(place), self.seat_name(seat), why);
-        self.log(line.clone());
-        self.report.lines.push(line);
+        self.log(line);
+        let text = self.say(
+            "control_changed",
+            &[("place", self.place_name(place)), ("faction", self.seat_name(seat)), ("why", why.to_string())],
+        );
+        self.report_line(LineKind::ControlChanged, Some(place.into()), text);
+        self.moment(
+            MomentKind::ControlChanged,
+            &[("place", self.place_name(place)), ("faction", self.seat_name(seat))],
+            Some(place.into()),
+        );
         // Version 0.03 (ticket #31): a place taken by Influence keeps everything; only a place
         // that Occupation transfers rolls for destruction.
         if why != "Influence" {
@@ -687,8 +734,9 @@ impl Game {
                     if leaders.len() > 1 {
                         let names: Vec<String> = leaders.iter().map(|s| self.seat_name(*s)).collect();
                         let line = format!("{} is claimed by {} at the same Standing; it stays as it is.", self.place_name(target), names.join(" and "));
-                        self.log(line.clone());
-                        self.report.lines.push(line);
+                        self.log(line);
+                        let text = self.say("claim_tied", &[("place", self.place_name(target)), ("factions", names.join(" and "))]);
+                        self.report_line(LineKind::Note, Some(target.into()), text);
                         continue;
                     }
                     leaders[0]
@@ -751,8 +799,12 @@ impl Game {
                 b.due_turn = turn + 1;
                 self.requeue(place, b.clone());
                 let line = format!("Launch Pad Fire: the {} {} at {} completes next turn instead.", self.seat_name(b.seat), b.item.name(), self.place_name(place));
-                self.log(line.clone());
-                self.report.lines.push(line);
+                self.log(line);
+                let text = self.say(
+                    "launch_pad_fire",
+                    &[("faction", self.seat_name(b.seat)), ("item", b.item.name().to_string()), ("place", self.place_name(place))],
+                );
+                self.report_line(LineKind::Note, Some(place.into()), text);
                 continue;
             }
             self.complete_build(place, b);
@@ -765,6 +817,8 @@ impl Game {
     fn resolve_changes(&mut self) {
         let turn = self.turn;
         let mut lines: Vec<String> = Vec::new();
+        // Ticket #58: the dispatch's own copy, each with the heading it belongs under.
+        let mut said: Vec<(LineKind, Option<ReportPlace>, String)> = Vec::new();
         let mut unrest: Vec<(StateId, BuildingChange)> = Vec::new();
         for sid in StateId::ALL {
             // Highest position first, so a removal never shifts one still to come.
@@ -803,6 +857,19 @@ impl Game {
                     ),
                     w => format!("The {} {} the {} in {}.", self.seat_name(change.seat), w.done(), kind.name(), where_),
                 });
+                let args = vec![
+                    ("faction", self.seat_name(change.seat)),
+                    ("done", change.what.done().to_string()),
+                    ("building", kind.name().to_string()),
+                    ("state", where_.clone()),
+                    ("refund", refund.to_string()),
+                ];
+                let text = match change.what {
+                    BuildingChange::Decommission => self.say("building_decommissioned_state", &args),
+                    _ => self.say("building_changed_state", &args),
+                };
+                let mine = if change.seat == Seat(0) { LineKind::YourWorks } else { LineKind::Note };
+                said.push((mine, Some(ReportPlace::State(sid)), text));
                 if matches!(change.what, BuildingChange::Mothball | BuildingChange::Decommission) {
                     unrest.push((sid, change.what));
                 }
@@ -843,6 +910,19 @@ impl Game {
                     }
                     w => format!("The {} {} the {} at {}.", self.seat_name(change.seat), w.done(), kind.name(), where_),
                 });
+                let args = vec![
+                    ("faction", self.seat_name(change.seat)),
+                    ("done", change.what.done().to_string()),
+                    ("building", kind.name().to_string()),
+                    ("colony", where_.clone()),
+                    ("refund", refund.to_string()),
+                ];
+                let text = match change.what {
+                    BuildingChange::Decommission => self.say("building_decommissioned_colony", &args),
+                    _ => self.say("building_changed_colony", &args),
+                };
+                let mine = if change.seat == Seat(0) { LineKind::YourWorks } else { LineKind::Archive };
+                said.push((mine, Some(ReportPlace::Colony(cid)), text));
             }
             // Colonists beyond the Habitats a decommission left are lost with them.
             if let Some(col) = self.colony(cid) {
@@ -864,11 +944,18 @@ impl Game {
                     Game::unrest_figure(rose),
                     self.unrest_text(sid)
                 ));
+                let text = self.say(
+                    "unrest_rose_state",
+                    &[("state", self.tables.state(sid).name.clone()), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(sid))],
+                );
+                said.push((LineKind::Unrest, Some(ReportPlace::State(sid)), text));
             }
         }
         for line in lines {
-            self.log(line.clone());
-            self.report.lines.push(line);
+            self.log(line);
+        }
+        for (kind, place, text) in said {
+            self.report_line(kind, place, text);
         }
     }
 
@@ -890,8 +977,17 @@ impl Game {
                 Game::unrest_figure(rose),
                 self.unrest_text(sid)
             );
-            self.log(line.clone());
-            self.report.lines.push(line);
+            self.log(line);
+            let text = self.say(
+                "strip_permit_ended",
+                &[
+                    ("state", self.tables.state(sid).name.clone()),
+                    ("baseline", format!("{:.1}", self.baseline_emissions(sid))),
+                    ("rose", Game::unrest_figure(rose).to_string()),
+                    ("unrest", self.unrest_text(sid)),
+                ],
+            );
+            self.report_line(LineKind::Unrest, Some(ReportPlace::State(sid)), text);
         }
     }
 
@@ -930,8 +1026,9 @@ impl Game {
                 };
                 let Some(coastal) = row else {
                     let line = format!("{} at {} had no slot left and was lost.", name, self.place_name(place));
-                    self.log(line.clone());
-                    self.report.lines.push(line);
+                    self.log(line);
+                    let text = self.say("build_lost", &[("building", name.clone()), ("place", self.place_name(place))]);
+                    self.report_line(LineKind::Note, Some(place.into()), text);
                     return;
                 };
                 self.state_mut(s).facilities.push(if coastal { Facility::in_coastal_slot(k) } else { Facility::new(k) });
@@ -963,8 +1060,28 @@ impl Game {
                 } else {
                     format!("The {} completed stage {} of {} of the Archive at {}.", self.seat_name(b.seat), stage, stages, self.place_name(place))
                 };
-                self.log(line.clone());
-                self.report.lines.push(line);
+                self.log(line);
+                let text = if stage >= stages {
+                    self.say("archive_complete", &[("faction", self.seat_name(b.seat)), ("place", self.place_name(place))])
+                } else {
+                    self.say(
+                        "archive_stage_complete",
+                        &[
+                            ("faction", self.seat_name(b.seat)),
+                            ("stage", stage.to_string()),
+                            ("stages", stages.to_string()),
+                            ("place", self.place_name(place)),
+                        ],
+                    )
+                };
+                self.report_line(LineKind::Archive, Some(place.into()), text);
+                if stage >= stages {
+                    self.moment(
+                        MomentKind::ArchiveComplete,
+                        &[("faction", self.seat_name(b.seat)), ("place", self.place_name(place)), ("stages", stages.to_string())],
+                        Some(place.into()),
+                    );
+                }
                 return;
             }
             (Place::Colony(c), BuildItem::Module(k)) => {
@@ -1003,8 +1120,10 @@ impl Game {
             _ => {}
         }
         let line = format!("{} completed {} at {}.", self.seat_name(b.seat), name, self.place_name(place));
-        self.log(line.clone());
-        self.report.lines.push(line);
+        self.log(line);
+        let text = self.say("build_complete", &[("faction", self.seat_name(b.seat)), ("building", name.clone()), ("place", self.place_name(place))]);
+        self.report_line_of(b.seat, LineKind::YourBuild, LineKind::BuildComplete, Some(place.into()), text);
+        self.ai_deed(b.seat, "completed", &[("building", name.clone()), ("place", self.place_name(place))]);
     }
 
     // ------------------------------------------------------------------ (f)
@@ -1051,8 +1170,9 @@ impl Game {
             let id = ColonyId(self.fresh_id());
             self.colonies.push(Colony { id, body: *body, slot: *slot, control: Control::Controlled(*seat), modules: Vec::new(), colonists: 0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: true });
             let line = format!("{} built {}.", self.seat_name(*seat), self.place_name(Place::Colony(id)));
-            self.log(line.clone());
-            self.report.lines.push(line);
+            self.log(line);
+            let text = self.say("station_built", &[("faction", self.seat_name(*seat)), ("station", self.place_name(Place::Colony(id)))]);
+            self.report_line_of(*seat, LineKind::YourBuild, LineKind::BuildComplete, Some(ReportPlace::Colony(id)), text);
         }
         // Founding orders into the same Colony Slot from more than one seat are decided at the Body,
         // ties drawn at random (ticket #50).
@@ -1125,23 +1245,30 @@ impl Game {
                             }
                         }
                     }
-                    let line = format!("{} loaded {} at {}.", self.seat_name(seat), if colonists > 0 { format!("{colonists} Colonists") } else { "an Army".into() }, self.tables.body(body).name);
-                    self.log(line.clone());
-                    self.report.lines.push(line);
+                    let cargo: String = if colonists > 0 { format!("{colonists} Colonists") } else { "an Army".into() };
+                    let line = format!("{} loaded {} at {}.", self.seat_name(seat), cargo, self.tables.body(body).name);
+                    self.log(line);
+                    let text = self.say(
+                        "loaded",
+                        &[("faction", self.seat_name(seat)), ("cargo", cargo), ("body", self.tables.body(body).name.clone())],
+                    );
+                    self.report_line_of(seat, LineKind::YourWorks, LineKind::Ship, Some(ReportPlace::Body(body)), text);
                 }
                 Order::Unload { ship, colonists, army, into } => {
                     if blocked.contains(&ship) {
                         let line = format!("{}: another Faction took that Colony Slot first.", self.seat_name(seat));
-                        self.log(line.clone());
-                        self.report.lines.push(line);
+                        self.log(line);
+                        let text = self.say("slot_taken", &[("faction", self.seat_name(seat))]);
+                        self.report_line(LineKind::Ship, None, text);
                         continue;
                     }
                     let Some(s) = self.ship(ship) else { continue };
                     let ShipAt::Body(body) = s.at else { continue };
                     if !self.may_land(seat, body) {
                         let line = format!("{} could not land at {}: the orbit is contested.", self.seat_name(seat), self.tables.body(body).name);
-                        self.log(line.clone());
-                        self.report.lines.push(line);
+                        self.log(line);
+                        let text = self.say("landing_contested", &[("faction", self.seat_name(seat)), ("body", self.tables.body(body).name.clone())]);
+                        self.report_line(LineKind::Ship, Some(ReportPlace::Body(body)), text);
                         continue;
                     }
                     let aboard_army = s.army;
@@ -1175,8 +1302,35 @@ impl Game {
                                 self.land_army(aid, ship, Place::Colony(id));
                             }
                             let line = format!("The {} founded a Colony in slot {} on {} with {} Colonists.", self.seat_name(seat), slot + 1, self.tables.body(b).name, moved);
-                            self.log(line.clone());
-                            self.report.lines.push(line);
+                            self.log(line);
+                            let text = self.say(
+                                "colony_founded",
+                                &[
+                                    ("faction", self.seat_name(seat)),
+                                    ("slot", (slot + 1).to_string()),
+                                    ("body", self.tables.body(b).name.clone()),
+                                    ("n", moved.to_string()),
+                                ],
+                            );
+                            self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(id)), text);
+                            let off_earth =
+                                self.colonies.iter().filter(|c| c.control.director() == Some(seat) && c.body != BodyId::Earth && !c.in_orbit).count();
+                            let note = if off_earth <= 1 {
+                                self.phrase("first_colony", &[])
+                            } else {
+                                self.phrase("more_colonies", &[("count", off_earth.to_string())])
+                            };
+                            self.moment(
+                                MomentKind::ColonyFounded,
+                                &[
+                                    ("faction", self.seat_name(seat)),
+                                    ("colony", self.place_name(Place::Colony(id))),
+                                    ("note", note),
+                                    ("n", moved.to_string()),
+                                ],
+                                Some(ReportPlace::Colony(id)),
+                            );
+                            self.ai_deed(seat, "founded", &[("colony", self.place_name(Place::Colony(id)))]);
                         }
                         UnloadTarget::Colony(cid) => {
                             let Some(col) = self.colony(cid) else { continue };
@@ -1193,14 +1347,16 @@ impl Game {
                                     s.colonists -= n;
                                 }
                                 let line = format!("{} Colonists disembarked into {}.", n, self.place_name(Place::Colony(cid)));
-                                self.log(line.clone());
-                                self.report.lines.push(line);
+                                self.log(line);
+                                let text = self.say("disembarked", &[("n", n.to_string()), ("colony", self.place_name(Place::Colony(cid)))]);
+                                self.report_line_of(seat, LineKind::YourWorks, LineKind::Ship, Some(ReportPlace::Colony(cid)), text);
                             }
                             if let Some(aid) = aboard_army.filter(|_| army) {
                                 self.land_army(aid, ship, Place::Colony(cid));
                                 let line = format!("{} landed an Army at {}.", self.seat_name(seat), self.place_name(Place::Colony(cid)));
-                                self.log(line.clone());
-                                self.report.lines.push(line);
+                                self.log(line);
+                                let text = self.say("army_landed", &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(cid)))]);
+                                self.report_line(LineKind::Army, Some(ReportPlace::Colony(cid)), text);
                             }
                         }
                     }
@@ -1227,8 +1383,17 @@ impl Game {
             let rose = self.raise_unrest(sid, want, UnrestSource::Refugees);
             if rose > 0.0 {
                 let line = format!("{:.1} people arrived in {}; Unrest rose by {} to {}.", arrived, self.tables.state(sid).name, Game::unrest_figure(rose), self.unrest_text(sid));
-                self.log(line.clone());
-                self.report.lines.push(line);
+                self.log(line);
+                let text = self.say(
+                    "refugees_arrived",
+                    &[
+                        ("n", format!("{arrived:.1}")),
+                        ("state", self.tables.state(sid).name.clone()),
+                        ("rose", Game::unrest_figure(rose).to_string()),
+                        ("unrest", self.unrest_text(sid)),
+                    ],
+                );
+                self.report_line(LineKind::Refugees, Some(ReportPlace::State(sid)), text);
             }
         }
         // Resettle (rule 9): the Standing the chosen state gives its Faction.
@@ -1236,8 +1401,12 @@ impl Game {
             let gain = u.resettle_standing;
             *self.seat_mut(seat).influence.entry(Place::State(sid)).or_insert(0) += gain;
             let line = format!("The {} resettled this turn's refugees in {} (+{} Standing there).", self.seat_name(seat), self.tables.state(sid).name, gain);
-            self.log(line.clone());
-            self.report.lines.push(line);
+            self.log(line);
+            let text = self.say(
+                "resettled",
+                &[("faction", self.seat_name(seat)), ("state", self.tables.state(sid).name.clone()), ("standing", gain.to_string())],
+            );
+            self.report_line(LineKind::Refugees, Some(ReportPlace::State(sid)), text);
         }
         // Relief (rule 3): one point per order, paid for in Ducats at the Orders phase.
         let mut relieved: Vec<(Seat, StateId, f64)> = Vec::new();
@@ -1250,8 +1419,17 @@ impl Game {
         }
         for (seat, sid, fell) in relieved.into_iter().filter(|(_, _, n)| *n > 0.0) {
             let line = format!("The {} paid Relief in {}: Unrest fell by {} to {}.", self.seat_name(seat), self.tables.state(sid).name, Game::unrest_figure(fell), self.unrest_text(sid));
-            self.log(line.clone());
-            self.report.lines.push(line);
+            self.log(line);
+            let text = self.say(
+                "relief",
+                &[
+                    ("faction", self.seat_name(seat)),
+                    ("state", self.tables.state(sid).name.clone()),
+                    ("fell", Game::unrest_figure(fell).to_string()),
+                    ("unrest", self.unrest_text(sid)),
+                ],
+            );
+            self.report_line(LineKind::Unrest, Some(ReportPlace::State(sid)), text);
         }
         // What calms a state by standing in it (a Constabulary now, a Scrubber later), then the
         // natural fall. Ticket #53: the fall lands every turn, whatever else happened, so a rise
@@ -1278,8 +1456,12 @@ impl Game {
             for line in [u.army_threshold, u.facility_threshold] {
                 if now >= line && was < line {
                     let text = format!("{}: Unrest reached {} - {}.", self.tables.state(sid).name, self.unrest_text(sid), self.unrest_note(sid));
-                    self.log(text.clone());
-                    self.report.lines.push(text);
+                    self.log(text);
+                    let said = self.say(
+                        "unrest_threshold",
+                        &[("state", self.tables.state(sid).name.clone()), ("unrest", self.unrest_text(sid)), ("note", self.unrest_note(sid))],
+                    );
+                    self.report_line(LineKind::Unrest, Some(ReportPlace::State(sid)), said);
                     break;
                 }
             }
@@ -1315,8 +1497,21 @@ impl Game {
             self.seat_name(seat),
             Game::unrest_figure(back)
         );
-        self.log(line.clone());
-        self.report.lines.push(line);
+        self.log(line);
+        let text = self.say(
+            "threw_off",
+            &[
+                ("state", self.tables.state(sid).name.clone()),
+                ("faction", self.seat_name(seat)),
+                ("unrest", Game::unrest_figure(back).to_string()),
+            ],
+        );
+        self.report_line(LineKind::ControlChanged, Some(ReportPlace::State(sid)), text);
+        self.moment(
+            MomentKind::ControlChanged,
+            &[("place", self.tables.state(sid).name.clone()), ("faction", "nobody".to_string())],
+            Some(ReportPlace::State(sid)),
+        );
     }
 
     /// Ticket #52: what one turn of Occupation adds to the occupier's Standing (spec 8.5): the

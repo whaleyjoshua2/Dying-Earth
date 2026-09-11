@@ -118,7 +118,7 @@ The single tree of Techs shared by all Factions, thirteen of them since version 
 _Avoid_: per-faction tree, research tree
 
 **Research Lead**:
-The Faction that contributed the most Research to the Tech that just completed. It chooses the next Tech. Decided afresh for every Tech.
+The Faction that contributed the most Research to the Tech that just completed. It chooses the next Tech. Decided afresh for every Tech, and the race for it stands in the top bar as one bar of the four Factions' contributions in their own colours.
 _Avoid_: science leader, tech leader
 
 ### Resources
@@ -346,8 +346,12 @@ The phase in which the turn actually happens: transits advance, arrivals land, B
 _Avoid_: processing, execution, upkeep phase
 
 **Report**:
-The phase that opens a turn for the player, carrying the Battle Report, last turn's Event, completed builds, arrivals and control changes.
+The phase that opens a turn for the player, and the dated dispatch it shows. It opens with a headline: the most serious thing that happened, chosen by a fixed order of severity. Everything else is grouped under four headings, In space, On Earth, The climate and Your works, and an empty heading is left out. Every line that is about somewhere is a way there. It ends with what each rival Faction did, told in plain sentences of what the board could see.
 _Avoid_: summary, news, digest
+
+**Moment**:
+A short modal that stops the turn before the Report, for one sentence and one number: a Colony founded, a Break or the sea rising, a Battle that cost a unit, a place changing hands, a Tech completed, Antarctica opening, or the Archive finished. At most two a turn, the most serious first, and every kind can be switched off.
+_Avoid_: popup, alert, notification, cutscene, interruption
 
 ### Combat
 

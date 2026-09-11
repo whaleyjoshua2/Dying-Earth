@@ -85,6 +85,9 @@ fn main() {
     let mut first_mars: Vec<u32> = Vec::new();
     let mut off_earth_at_end: Vec<u32> = Vec::new();
     let mut window_turn = 0u32;
+    // Ticket #58: what the Moments did, over every seed.
+    let (mut moments_earned, mut moments_shown, mut turns_with_moment, mut report_turns) = (0u32, 0u32, 0u32, 0u32);
+    let mut most_in_a_turn = 0u32;
     let mut kinds = [FactionKind::Custodians; SEAT_COUNT];
     for s in seed..seed + count {
         let r = dying_earth_engine::sim::run(tables.clone(), s, player);
@@ -143,6 +146,11 @@ fn main() {
         }
         off_earth_at_end.push(r.colonists_off_earth.iter().sum());
         window_turn = r.window_turn;
+        moments_earned += r.moments_earned;
+        moments_shown += r.moments_shown;
+        turns_with_moment += r.turns_with_moment;
+        most_in_a_turn = most_in_a_turn.max(r.most_moments_in_a_turn);
+        report_turns += r.last_turn;
         for (i, t) in r.break_turns.iter().enumerate() {
             if let Some(t) = t {
                 break_turns[i].push(*t);
@@ -278,6 +286,11 @@ fn main() {
         );
         println!("{:>12}         : median {}", "Colonists off Earth at the end, all seats", median(&mut off_earth_at_end));
         println!("{:>12}         : turn {}", "the Mars launch window", window_turn);
+        // Ticket #58.
+        println!(
+            "{:>12}         : {} earned, {} shown ({:.2} a turn over {} turns), {} of those turns stopped for one, most in a turn {}",
+            "Moments", moments_earned, moments_shown, moments_shown as f64 / report_turns.max(1) as f64, report_turns, turns_with_moment, most_in_a_turn
+        );
         println!(
             "{:>12}         : median {} ({} seeds), cuts gone in {}, no Collapse on the path in {}",
             "Last Turn at turn 12",

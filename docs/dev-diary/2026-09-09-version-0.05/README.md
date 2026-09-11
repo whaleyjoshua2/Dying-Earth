@@ -1234,3 +1234,105 @@ Twenty seeds afterwards, seat 0 in East Asia:
 |---|---|---|---|---|---|
 | Custodians | Prospectors 3 | 17 | 17 | 9 | 11 (was 0) |
 | Arkwrights | none | 20 | 17 | 7 | 16 (was 0) |
+
+
+## #58: the turn as a story
+
+The Report used to be a list. It is a dated dispatch now.
+
+**One headline, by severity.** Every Report line carries a **kind** and, where it is about somewhere,
+a **place**: `Report.lines` is a `Vec<ReportLine { kind, place, text }>` and every one of the
+forty-odd places the engine writes a line names both. The headline is the line with the lowest rank
+in a fixed order over everything the last Resolution and Climate phase did: a Colony founded, a place
+changing controller, a Break or a Sea Level threshold, a Battle that cost a unit or moved Orbital
+Control, an Occupation, a Tech completed, an Event drawn, a build completed. Position in the turn
+counts for nothing: a Tech written down after a founding still comes second.
+
+**Then four headings**, in this order and with the empty ones left out: **In space**, **On Earth**,
+**The climate**, **Your works**. The kind decides the heading, and the kinds that can happen either
+side of the sky follow their place, so a change of control at a Colony is In space and the same
+change in a Nation State is On Earth. Every line with a place is a button that takes the player
+there -- the Earth Map to the state, the Body Surface Map to the Colony, the Solar System Map to the
+Body -- the way the roster's rows do.
+
+**And what the rivals did, in words.** The scored list the AI chose from was never the player's
+business; it is in the simulate log and nowhere else now. What the Report shows is one paragraph per
+rival Faction, in seat order, built from the orders that Faction actually committed and what the
+Resolution made of them: builds begun and finished, Influence spent and where, Ships built, sent and
+arrived, Colonists lifted, Colonies founded, Armies moved, Stances set, Scrubbers, Sea Walls, Strip
+Permits, Leapfrogs, the Archive funded and raised. Orders the board would show as one act are told as
+one, so three Influence orders on North America read "spent 15 Influence on North America".
+
+**Moments.** Seven kinds of thing stop the turn before the Report for one sentence and one number: a
+Colony founded, a place changing hands, a Break or the sea rising, a Battle that cost a unit, a Tech
+completed, Antarctica opening, the Archive finished. **At most two a turn**, the most severe first by
+the same order the headline reads, the rest falling through to the dispatch. Each kind has a
+checkbox in a Moments corner at the foot of the Report, remembered for the session; `report.toml`
+holds the defaults.
+
+**The Research race.** The top bar's Research item gained a bar of the four Factions' contributions
+to the Tech under research, in Faction colours and in proportion, with the unfilled tail standing for
+what the Tech still needs. When a Tech completes its Moment names the Lead and the margin, shows the
+Tech Tree with the new box lit, and either gives the player the Pick buttons or says in one line what
+the AI picked and why.
+
+**Every sentence lives in `assets/data/report.toml`** -- the dispatch's lines, the rivals' clauses and
+the Moments -- as templates with named placeholders. The engine declares, per key, the placeholders
+it supplies, and loading the tables refuses the file if a key is missing, a key is there that nothing
+reads, or a template uses a placeholder the engine never hands it. The engine's own **log** lines are
+untouched and say the same thing in the same words, because the simulate run reads them.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![The Report popup for July 2030: an orange headline "The Custodians founded a Colony in slot 1 on the Moon with 3 Colonists.", then In space, On Earth and Your works, then a paragraph per rival Faction in its own colour](report-dispatch.png)
+
+- **report-dispatch.png** -- `shot:rd menus:1 turns:5 found:1 race:1`. "Report, July 2030", the
+  seating line, then the headline in orange, then **In space** (the Archive fund, a Prospector Colony
+  Ship completed at Tiangong), **On Earth** (North America changing hands, an Archivist Power Plant)
+  and **Your works** (the Custodians' Energy shortfall), then the three rivals' paragraphs in teal,
+  violet and silver. **The climate** is absent because nothing climatic happened that turn, which is
+  the rule -- an empty heading is left out. (`found:1` is a new building aid that lands a loaded
+  Colony Ship of seat 0's at the Moon, since an AI game founds on a turn nobody can choose;
+  `race:1` spreads the Research four ways so the top bar's race bar shows all four colours.)
+
+![The Moment modal over the Earth Map: "3 Colonists" in large type, then "The Custodians founded Mare Tranquillitatis on the Moon, their first Colony off Earth.", with Close and "1 of 2"](moment-colony-founded.png)
+
+- **moment-colony-founded.png** -- `shot:mc menus:1 turns:5 moment:colony race:1`. The founding
+  Moment: the number first and large, the sentence under it, Close and how many Moments this turn
+  has. The Report follows it. (`moment:<kind>` is a new building aid: it switches every other kind
+  off, the way the Moments corner would, so the named Moment is the one the turn stops for.)
+
+![The Tech completion Moment: "6 of 15" large, "Efficient Grids is complete. The Prospectors led, 6 of 15.", "The Prospectors pick Deep Mining, their first choice.", and the whole Tech Tree with Efficient Grids green and Deep Mining amber](moment-tech-complete.png)
+
+- **moment-tech-complete.png** -- `shot:mt menus:1 turns:5 moment:tech`. The margin as the number,
+  the Lead named, the AI's pick and its reason on its own line, and the existing Tech Tree panel
+  underneath with Efficient Grids lit green and Deep Mining amber under research. The top bar carries
+  the four-colour race bar for the new Tech. When the player is the Lead the same modal carries the
+  Pick buttons instead, and the line reads "You led. Pick the next Tech."
+
+![A crop of the top bar: "Research 14 / 15 toward Efficient Grids" beside a bar in four segments, teal, orange, violet and pale silver-blue, with a dark tail](research-race-bar.png)
+
+- **research-race-bar.png** -- `shot:rr turns:5 race:1`, the top bar cropped and scaled three times.
+  The four Factions' contributions to the Tech under research, in seat order and in proportion:
+  Custodians 6, Prospectors 4, Arkwrights 3, Archivists 1 of the 15 Efficient Grids costs, and the
+  dark tail is the one point still wanting. Hovering it gives the figures in words.
+
+### Twenty seeds
+
+`cargo run --release -p dying-earth-engine --example sim -- 1 --count=20`. **No rule changed**, so
+this table is here to show that nothing moved: it is the same table #57 ended on, figure for figure.
+
+| seat 0 | wins | collapses | median collapse turn | median first Colony | first Mars Colony | Colonists off Earth at the end (all seats, median) |
+|---|---|---|---|---|---|---|
+| Custodians in East Asia | Prospectors 3 | 17 | 17 | 9 | none in 20 seeds | 11 |
+
+Everything else is unchanged too: 49 coastal slots lost a game, 27 Facilities drowned, no Sea Wall
+built, all five Breaks in all twenty seeds, the ice open by turn 6, the Mars window at turn 14.
+
+**What the severity cap did.** The sim counts Moments now. Over those twenty games -- 343 turns
+between them -- the turns **earned 1162 Moments and showed 335**, a shade under **one a turn**
+(0.98). **211 of the 343 turns stopped for at least one**, and no turn ever showed more than two,
+which is the cap doing its work: three turns in four earn more Moments than they are allowed to show,
+and the rest fall through to the dispatch where they belong. The sim reads the defaults in
+`report.toml`, so a player who switches a kind off sees fewer.

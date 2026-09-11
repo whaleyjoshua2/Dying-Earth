@@ -138,8 +138,12 @@ impl Game {
                 Some(k) => format!("{name} raised its Industry Level to {level} and brought a {k} online."),
                 None => format!("{name} raised its Industry Level to {level}."),
             };
-            self.log(line.clone());
-            self.report.lines.push(line);
+            self.log(line);
+            let text = match woken {
+                Some(k) => self.say("development_woke", &[("state", name.clone()), ("level", level.to_string()), ("building", k.to_string())]),
+                None => self.say("development", &[("state", name.clone()), ("level", level.to_string())]),
+            };
+            self.report_line(LineKind::Development, Some(ReportPlace::State(sid)), text);
         }
     }
 
@@ -288,8 +292,13 @@ impl Game {
         // Ticket #56: a Sea Wall standing and working takes the whole threshold and is destroyed
         // doing it; no coastal slot is lost. A mothballed wall is not working and absorbs nothing.
         let wall = self.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::SeaWall && f.working());
+        let temperature = format!("{thr:+.1}");
+        // Ticket #58: the dispatch says the same thing in the words of report.toml; the log keeps its own.
+        let said;
+        let mut figure = "the Sea Wall".to_string();
         let mut headline = if let Some(i) = wall {
             self.state_mut(sid).facilities.remove(i);
+            said = self.say("sea_wall", &[("temperature", temperature.clone()), ("state", name.clone())]);
             format!("Sea level at {thr:+.1} C: the Sea Wall in {name} took the sea and was destroyed; no coastal slots were lost.")
         } else {
             // Ticket #56: the sea takes COASTAL slots only, and nothing once they are gone.
@@ -297,14 +306,22 @@ impl Game {
             self.state_mut(sid).lost_slots += take;
             let destroyed = self.drown_coastal(sid);
             let slots = if take == 1 { "slot" } else { "slots" };
+            let word = self.phrase(if take == 1 { "slot" } else { "slots" }, &[]);
+            figure = format!("{take} coastal {word}");
+            let mut args = vec![("n", take.to_string()), ("slots", word), ("state", name.clone()), ("temperature", temperature.clone())];
             if take == 0 {
+                said = self.say("sea_nothing_left", &[("temperature", temperature.clone()), ("state", name.clone())]);
                 format!("Sea level at {thr:+.1} C: {name} has no coastal slots left to lose.")
             } else if destroyed.is_empty() {
+                said = self.say("sea_took", &args);
                 format!("The sea took {take} coastal {slots} from {name} at {thr:+.1} C.")
             } else {
+                args.push(("destroyed", Game::and_list(&destroyed)));
+                said = self.say("sea_took_destroying", &args);
                 format!("The sea took {take} coastal {slots} from {name} at {thr:+.1} C: {}.", Game::and_list(&destroyed))
             }
         };
+        let mut said = said;
         // Ticket #52: the Unrest and the displacement key on the threshold FIRING, not on the slots
         // it managed to take, so a state with nothing left to lose still loses its people and its
         // calm (ticket #56).
@@ -319,9 +336,12 @@ impl Game {
         }
         if rose > 0.0 {
             headline.push_str(&format!(" Unrest there rose by {} to {}.", Game::unrest_figure(rose), self.unrest_text(sid)));
+            let suffix = self.phrase("sea_unrest", &[("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(sid))]);
+            said.push_str(&suffix);
         }
-        self.report.lines.push(headline.clone());
         self.log(headline);
+        self.report_line(LineKind::SeaLevel, Some(ReportPlace::State(sid)), said.clone());
+        self.moment(MomentKind::ClimateThreshold, &[("what", said), ("figure", figure)], Some(ReportPlace::State(sid)));
     }
 
     /// Ticket #56: whatever no longer fits the state's coastal slots, oldest first, standing before
@@ -379,9 +399,11 @@ impl Game {
             return;
         }
         self.antarctica_open = true;
-        let line = format!("The Antarctic ice opens: {} Colony Slots on Earth.", self.tables.body(BodyId::Earth).colony_slots());
-        self.log(line.clone());
-        self.report.lines.push(line);
+        let n = self.tables.body(BodyId::Earth).colony_slots();
+        self.log(format!("The Antarctic ice opens: {n} Colony Slots on Earth."));
+        let text = self.say("antarctica_opens", &[("n", n.to_string())]);
+        self.report_line(LineKind::Antarctica, Some(ReportPlace::Body(BodyId::Earth)), text);
+        self.moment(MomentKind::Antarctica, &[("n", n.to_string())], Some(ReportPlace::Body(BodyId::Earth)));
     }
 
     /// Spec 11.3: growth less 0.15% per full 0.1 C above +1.2.
@@ -421,8 +443,18 @@ impl Game {
                     Game::unrest_figure(rose),
                     self.unrest_text(sid)
                 );
-                self.log(line.clone());
-                self.report.lines.push(line);
+                self.log(line);
+                let text = self.say(
+                    "heat_population",
+                    &[
+                        ("state", self.tables.state(sid).name.clone()),
+                        ("percent", format!("{:.1}", 100.0 * lost / before)),
+                        ("after", format!("{after:.1}")),
+                        ("rose", Game::unrest_figure(rose).to_string()),
+                        ("unrest", self.unrest_text(sid)),
+                    ],
+                );
+                self.report_line(LineKind::Climate, Some(ReportPlace::State(sid)), text);
             }
             // Ticket #52: half of what the heat took moves to the neighbours instead of vanishing.
             self.move_refugees(sid, lost * u.heat_share, "the heat");
@@ -474,8 +506,12 @@ impl Game {
             n => format!("{} and {}", names[..n - 1].join(", "), names[n - 1]),
         };
         let line = format!("{:.1} population left {} for {} ({}).", amount, self.tables.state(from).name, list, why);
-        self.log(line.clone());
-        self.report.lines.push(line);
+        self.log(line);
+        let text = self.say(
+            "refugees_left",
+            &[("n", format!("{amount:.1}")), ("state", self.tables.state(from).name.clone()), ("to", list), ("why", why.to_string())],
+        );
+        self.report_line(LineKind::Refugees, Some(ReportPlace::State(from)), text);
     }
 
     /// Repeat the current net to the last turn (spec 11.5).
@@ -524,8 +560,18 @@ impl Game {
             }
             self.climate.breaks_fired[i] = true;
             let line = format!("Break at {:+.1} C - {}. {} {}", b.temperature, b.name, b.happened, b.text);
-            self.log(line.clone());
-            self.report.lines.push(line);
+            self.log(line);
+            let text = self.say(
+                "break_fired",
+                &[
+                    ("temperature", format!("{:+.1}", b.temperature)),
+                    ("name", b.name.clone()),
+                    ("happened", b.happened.clone()),
+                    ("text", b.text.clone()),
+                ],
+            );
+            self.report_line(LineKind::Break, None, text.clone());
+            self.moment(MomentKind::ClimateThreshold, &[("what", text), ("figure", format!("{:+.1} C", b.temperature))], None);
             self.apply_break(b);
         }
     }
@@ -559,8 +605,17 @@ impl Game {
                         b.population_loss * 100.0,
                         Game::unrest_figure(b.unrest)
                     );
-                    self.log(line.clone());
-                    self.report.lines.push(line);
+                    self.log(line);
+                    let text = self.say(
+                        "break_coastal",
+                        &[
+                            ("states", hit.join(", ")),
+                            ("exposure", b.exposure.to_string()),
+                            ("percent", format!("{:.0}", b.population_loss * 100.0)),
+                            ("unrest", Game::unrest_figure(b.unrest).to_string()),
+                        ],
+                    );
+                    self.report_line(LineKind::Break, None, text);
                 }
             }
             // Permafrost Thaw: its own Emissions line from now on, the world's and nobody's Blame.
@@ -579,8 +634,9 @@ impl Game {
                 if let Some(sid) = b.state {
                     self.state_mut(sid).baseline_rise += b.baseline_rise;
                     let line = format!("{}: its Baseline Emissions rise by {:.1} for good.", self.tables.state(sid).name, b.baseline_rise);
-                    self.log(line.clone());
-                    self.report.lines.push(line);
+                    self.log(line);
+                    let text = self.say("break_baseline", &[("state", self.tables.state(sid).name.clone()), ("rise", format!("{:.1}", b.baseline_rise))]);
+                    self.report_line(LineKind::Break, Some(ReportPlace::State(sid)), text);
                 }
             }
         }

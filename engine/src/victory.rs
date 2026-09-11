@@ -131,14 +131,23 @@ impl Game {
                 Outcome::Draw { note: "equal at the last turn".into() }
             });
         }
-        if let Some(o) = &self.outcome {
-            let line = match o {
+        if let Some(o) = self.outcome.clone() {
+            let line = match &o {
                 Outcome::Win { seat, margin_note } => format!("Game over on turn {}: the {} win ({}).", self.turn, self.seat_name(*seat), margin_note),
                 Outcome::Draw { note } => format!("Game over on turn {}: a draw ({}).", self.turn, note),
                 Outcome::Collapse => format!("Game over on turn {}: Collapse at {:+.1} C. Nobody wins.", self.turn, self.climate.temperature),
             };
-            self.log(line.clone());
-            self.report.lines.push(line);
+            self.log(line);
+            let text = match &o {
+                Outcome::Win { seat, margin_note } => {
+                    self.say("game_over_win", &[("turn", self.turn.to_string()), ("faction", self.seat_name(*seat)), ("note", margin_note.clone())])
+                }
+                Outcome::Draw { note } => self.say("game_over_draw", &[("turn", self.turn.to_string()), ("note", note.clone())]),
+                Outcome::Collapse => {
+                    self.say("game_over_collapse", &[("turn", self.turn.to_string()), ("temperature", format!("{:+.1}", self.climate.temperature))])
+                }
+            };
+            self.report_line(LineKind::Note, None, text);
         }
     }
 

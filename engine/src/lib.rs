@@ -12,6 +12,7 @@ pub mod ephemeris;
 pub mod events;
 pub mod ids;
 pub mod orders;
+pub mod report;
 pub mod research;
 pub mod resolution;
 pub mod sim;

@@ -83,16 +83,43 @@ impl Game {
                 self.seat_name(lead),
                 shares.join(", ")
             );
-            self.report.lines.push(line.clone());
             self.log(line);
+            let text = self.say(
+                "tech_complete",
+                &[("tech", self.tables.tech(tech).name.clone()), ("faction", self.seat_name(lead)), ("shares", shares.join(", "))],
+            );
+            self.report_line(LineKind::TechComplete, None, text);
+            // Ticket #58: the Tech Moment names the Lead and the margin, and says what the AI picked
+            // and why. It is filled in before the pick, so the note can name the Tech chosen.
+            self.moment(
+                MomentKind::TechComplete,
+                &[
+                    ("tech", self.tables.tech(tech).name.clone()),
+                    ("faction", self.seat_name(lead)),
+                    ("lead", c[lead.index()].to_string()),
+                    ("cost", cost.to_string()),
+                ],
+                None,
+            );
+            if let Some(m) = self.report.moments.last_mut() {
+                m.tech = Some(tech);
+            }
             if self.available_techs().is_empty() {
                 self.research.awaiting_pick = None;
                 return;
             }
             if self.seat(lead).ai {
-                let pick = self.ai_tech_pick(lead);
+                let (pick, why) = self.ai_tech_pick_with_reason(lead);
+                let note = self.phrase(why, &[("faction", self.seat_name(lead)), ("tech", self.tables.tech(pick).name.clone())]);
+                if let Some(m) = self.report.moments.last_mut() {
+                    m.note = Some(note);
+                }
                 self.pick_tech(lead, pick).ok();
             } else {
+                let note = self.phrase("you_pick", &[]);
+                if let Some(m) = self.report.moments.last_mut() {
+                    m.note = Some(note);
+                }
                 self.research.awaiting_pick = Some(lead);
                 return;
             }
@@ -123,23 +150,29 @@ impl Game {
 
     /// The AI's fixed pick order (spec 16.4), then the cheapest available.
     pub fn ai_tech_pick(&self, seat: Seat) -> TechId {
+        self.ai_tech_pick_with_reason(seat).0
+    }
+
+    /// The same pick, with the `report.toml` phrase that says why it was made (ticket #58): the
+    /// Faction's own first choice off its list, the cheapest left, or the one it leaves until last.
+    pub fn ai_tech_pick_with_reason(&self, seat: Seat) -> (TechId, &'static str) {
         let picks = self.tables.ai_tech_picks(self.kind(seat));
         let available = self.available_techs();
         for t in &picks.order {
             if available.contains(t) {
-                return *t;
+                return (*t, "pick_first_choice");
             }
         }
         let mut rest: Vec<TechId> = available.clone();
         rest.retain(|t| Some(*t) != picks.never && Some(*t) != picks.last);
         rest.sort_by_key(|t| self.tables.tech(*t).cost);
         if let Some(t) = rest.first() {
-            return *t;
+            return (*t, "pick_cheapest");
         }
         if let Some(last) = picks.last.filter(|t| available.contains(t)) {
-            return last;
+            return (last, "pick_last");
         }
-        available[0]
+        (available[0], "pick_cheapest")
     }
 
     // ---------------------------------------------------------------- Ticket #51: the Archive fund
@@ -174,8 +207,16 @@ impl Game {
         } else {
             format!("The {} are funding the Archive: {} Research banked, {} of {} in the fund.", self.seat_name(seat), moved, after, cap)
         };
-        self.log(line.clone());
-        self.report.lines.push(line);
+        self.log(line);
+        let args = vec![
+            ("faction", self.seat_name(seat)),
+            ("banked", moved.to_string()),
+            ("wasted", wasted.to_string()),
+            ("fund", after.to_string()),
+            ("cap", cap.to_string()),
+        ];
+        let text = if wasted > 0 { self.say("archive_funded_wasted", &args) } else { self.say("archive_funded", &args) };
+        self.report_line_of(seat, LineKind::YourWorks, LineKind::Archive, None, text);
     }
 
     /// Ticket #51: whether the Archivists diverted this turn's Research, for the tech panel.

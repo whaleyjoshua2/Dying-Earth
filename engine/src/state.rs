@@ -2,6 +2,7 @@
 
 use crate::data::Tables;
 use crate::ids::*;
+pub use crate::report::*;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use std::collections::BTreeMap;
@@ -577,24 +578,6 @@ impl BattleLine {
     }
 }
 
-/// Ticket #50: what one AI seat did in a turn, kept per seat so the Report can head each list with
-/// the Faction that did it.
-#[derive(Debug, Clone)]
-pub struct AiReport {
-    pub seat: Seat,
-    pub lines: Vec<String>,
-}
-
-/// Everything the Report popup shows at the start of a turn (spec 17.5).
-#[derive(Debug, Clone, Default)]
-pub struct Report {
-    pub turn: u32,
-    pub battles: Vec<BattleLine>,
-    pub event: Option<String>,
-    pub lines: Vec<String>,
-    /// One entry per AI seat that ordered this turn, in seat order (ticket #50).
-    pub ai_lines: Vec<AiReport>,
-}
 
 /// Everything about one game. Fields are public because the interface reads all of them.
 #[derive(Debug, Clone)]
@@ -1892,5 +1875,59 @@ impl Game {
 
     pub fn log(&mut self, line: impl Into<String>) {
         self.log.push(line.into());
+    }
+
+    // ------------------------------------------------ Ticket #58: the dispatch
+
+    /// One sentence from `report.toml`'s `[line]` table.
+    pub fn say(&self, key: &str, args: &[(&str, String)]) -> String {
+        self.tables.report.line(key, args)
+    }
+
+    /// One fragment from `report.toml`'s `[phrase]` table.
+    pub fn phrase(&self, key: &str, args: &[(&str, String)]) -> String {
+        self.tables.report.phrase(key, args)
+    }
+
+    /// Add one line to the dispatch, with the kind that places it in the severity order and under
+    /// its heading, and the place it takes the player to when it is clicked.
+    pub fn report_line(&mut self, kind: LineKind, place: Option<ReportPlace>, text: String) {
+        self.report.lines.push(ReportLine { kind, place, text });
+    }
+
+    /// The same, for a line that belongs to the player when seat 0 did it and to the board
+    /// otherwise: the player's builds, lifts, repairs and funding go under "Your works".
+    pub fn report_line_of(&mut self, seat: Seat, mine: LineKind, theirs: LineKind, place: Option<ReportPlace>, text: String) {
+        let kind = if seat == Seat(0) { mine } else { theirs };
+        self.report_line(kind, place, text);
+    }
+
+    /// Add a Moment the turn may stop for. The cap of two and the switches are applied when the
+    /// Report is shown, so every Moment a turn earned is kept here.
+    pub fn moment(&mut self, kind: MomentKind, args: &[(&str, String)], place: Option<ReportPlace>) {
+        let Some(card) = self.tables.report.moment(kind) else { return };
+        let (text, figure) = (crate::report::render(&card.text, args), crate::report::render(&card.figure, args));
+        self.report.moments.push(Moment { kind, text, figure, place, tech: None, note: None });
+    }
+
+    /// A sentence about what one AI seat's turn came to, appended to that Faction's paragraph.
+    pub fn ai_deed(&mut self, seat: Seat, key: &str, args: &[(&str, String)]) {
+        if !self.seat(seat).ai {
+            return;
+        }
+        let text = self.tables.report.rival(key, args);
+        if let Some(entry) = self.report.ai_lines.iter_mut().find(|e| e.seat == seat) {
+            entry.deeds.push(text);
+        }
+    }
+
+    /// What one rival Faction did this turn, as one paragraph.
+    pub fn rival_paragraph(&self, seat: Seat) -> Option<String> {
+        let entry = self.report.ai_lines.iter().find(|e| e.seat == seat)?;
+        if entry.deeds.is_empty() {
+            return None;
+        }
+        let deeds = Game::and_list(&entry.deeds);
+        Some(self.tables.report.rival("paragraph", &[("faction", self.seat_name(seat)), ("deeds", deeds)]))
     }
 }

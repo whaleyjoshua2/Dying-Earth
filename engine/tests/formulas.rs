@@ -1847,7 +1847,7 @@ fn funding_the_archive_banks_this_turns_research_and_contributes_nothing_to_the_
     assert_eq!(g.research.contributions[3], 0, "and counts nothing toward the Research Lead");
     assert_eq!(g.research.progress, before - made, "the shared Tech gives it back");
     assert!(g.funding_archive(Seat(3)));
-    assert!(g.report.lines.iter().any(|l| l.contains("Archivists are funding the Archive")), "{:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Archivists are funding the Archive")), "{:?}", g.report.lines);
     // Nobody else may.
     assert_eq!(g.check_order(Seat(0), &[], &Order::FundArchive).unwrap_err().0, "only the Archivists fund the Archive");
     // The fund never holds more than the remaining stages need.
@@ -1955,7 +1955,7 @@ fn the_archive_is_destroyed_when_its_colony_changes_hands_and_the_fund_is_kept()
     assert_eq!(g.archive_colony(Seat(3)), None, "the Archive went with the Colony");
     assert!(!g.colony(cid).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Archive));
     assert_eq!(g.seats[3].archive_fund, 40, "the fund is kept");
-    assert!(g.report.lines.iter().any(|l| l.contains("Archive at") && l.contains("destroyed")), "{:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Archive at") && l.text.contains("destroyed")), "{:?}", g.report.lines);
     // An Occupied Colony's Archive is dark while the Occupation lasts.
     let again = archive_at(&mut g, Seat(3), BodyId::Moon, 4, 12);
     g.income_phase();
@@ -2111,7 +2111,7 @@ fn b_a_sea_level_threshold_raises_two_a_slot_and_displaces_five_percent_an_expos
     assert!((g.state(StateId::Russia).population - moved * 0.75).abs() < 1e-9, "Russia {}", g.state(StateId::Russia).population);
     assert!((g.state(StateId::SouthAsia).population - moved * 0.25).abs() < 1e-9, "South Asia {}", g.state(StateId::SouthAsia).population);
     assert_eq!(g.state(StateId::SouthEastAsia).population, 0.0, "an Industry Level of 0 takes none while another has some");
-    assert!(g.report.lines.iter().any(|l| l.contains("Unrest there rose")), "the Report says so: {:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Unrest there rose")), "the Report says so: {:?}", g.report.lines);
 }
 
 /// (c) Heat refugees: half of what a state lost arrives at its neighbours and raises their Unrest
@@ -2137,7 +2137,7 @@ fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_half_a_person()
     assert!(arrived > 0.5 && arrived < 1.0, "the flow is worth exactly one point of Unrest: {arrived}");
     assert!((g.state(StateId::Russia).population - arrived).abs() < 1e-6, "Russia took the flow: {}", g.state(StateId::Russia).population);
     assert!(
-        g.report.lines.iter().any(|l| l.contains("left East Asia for") && l.contains("Russia")),
+        g.report.lines.iter().any(|l| l.text.contains("left East Asia for") && l.text.contains("Russia")),
         "a refugee line naming where they went: {:?}",
         g.report.lines
     );
@@ -2242,7 +2242,7 @@ fn e_four_stops_replenishment_seven_halves_output_ten_throws_the_controller_off(
     assert_eq!(g.state(StateId::NorthAfrica).queue.len(), 1, "the build queue is kept");
     assert_eq!(g.army(id).unwrap().home, ArmyHome::State(StateId::NorthAfrica), "the Armies there become the state's own");
     assert!(g.army_seat(g.army(id).unwrap()).is_none(), "so they fight for nobody");
-    assert!(g.report.lines.iter().any(|l| l.contains("threw off")), "a Report line names it: {:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("threw off")), "a Report line names it: {:?}", g.report.lines);
 }
 
 /// (f) A neutral state's Unrest is capped at 9, and a Faction taking it by Influence inherits it.
@@ -2690,7 +2690,7 @@ fn f_a_neutral_state_raises_its_industry_level_every_sixth_turn() {
     assert!(b.factories > before.factories, "a self-run Factory in a neutral state emits: {b:?}");
     assert_eq!(b.by_seat, before.by_seat, "and it is nobody's Blame");
     assert!(
-        g.report.lines.iter().any(|l| l.contains("raised its Industry Level to") && l.contains("Factory")),
+        g.report.lines.iter().any(|l| l.text.contains("raised its Industry Level to") && l.text.contains("Factory")),
         "the Report names it: {:?}",
         g.report.lines
     );
@@ -3039,7 +3039,7 @@ fn e_a_scrubber_enlarges_the_sink_and_is_capped_destroyed_and_calming() {
     // Destroyed when the state changes hands.
     g.transfer_control(Place::State(sid), Seat(1), "Influence");
     assert_eq!(g.scrubbers_online(sid), 0, "the Scrubbers do not pass to whoever takes the state");
-    assert!(g.report.lines.iter().any(|l| l.contains("Scrubber(s) in East Asia were destroyed")), "and the Report says so");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Scrubber(s) in East Asia were destroyed")), "and the Report says so");
 }
 
 /// (f) A Strip Permit doubles a state's Facility output for three turns, then raises its Baseline
@@ -3118,7 +3118,7 @@ fn a_custodian_ai_behind_on_stabilization_leapfrogs_when_it_has_the_ducats() {
     g.seats[cust.index()].stockpile.ducats = 120;
     g.seats[cust.index()].stockpile.materials = 0;
     let orders = g.ai_orders(cust);
-    let scored: Vec<String> = g.report.ai_lines.iter().flat_map(|r| r.lines.iter().cloned()).filter(|l| l.contains("Leapfrog") || l.contains("Scrubber") || l.contains("Ducats")).collect();
+    let scored: Vec<String> = g.log.iter().cloned().filter(|l| l.contains("Leapfrog") || l.contains("Scrubber") || l.contains("Ducats")).collect();
     let probe = (g.controlled_states(cust), g.leapfrog_would_bite(StateId::EastAsia), g.population_coefficient(StateId::EastAsia), g.seats[cust.index()].stockpile.ducats, g.kind(cust));
     assert!(orders.iter().any(|o| matches!(o, Order::Leapfrog { .. })), "no Leapfrog among: {orders:?}
 scored: {scored:#?}
@@ -3148,7 +3148,7 @@ fn a_a_break_fires_once_at_its_temperature_and_never_again() {
     assert!(g.climate.breaks_fired[i], "at its Temperature it fires");
     assert_eq!(g.climate.permafrost, 4.0, "and its effect is in the world");
     assert!(
-        g.report.lines.iter().any(|l| l.contains("Permafrost Thaw. The permafrost thaws.")),
+        g.report.lines.iter().any(|l| l.text.contains("Permafrost Thaw. The permafrost thaws.")),
         "the Report says it happened: {:?}",
         g.report.lines
     );
@@ -3520,7 +3520,7 @@ fn d_the_sea_takes_coastal_slots_only_oldest_first_and_then_nothing() {
     assert!(standing(&g, sid, true).is_empty(), "and everything that stood on it with it");
     assert_eq!(standing(&g, sid, false), vec![FacilityKind::ResearchLab], "the inland Research Lab never moved");
     assert!(
-        g.report.lines.iter().any(|l| l.contains("The sea took 2 coastal slots from Australia and Oceania")),
+        g.report.lines.iter().any(|l| l.text.contains("The sea took 2 coastal slots from Australia and Oceania")),
         "the Report names what the sea took: {:?}",
         g.report.lines
     );
@@ -3529,7 +3529,7 @@ fn d_the_sea_takes_coastal_slots_only_oldest_first_and_then_nothing() {
     let slots = g.build_slots(sid);
     g.apply_sea_loss(sid, 2.9);
     assert_eq!(g.build_slots(sid), slots, "once a state's coastal slots are gone it loses nothing more");
-    assert!(g.report.lines.iter().any(|l| l.contains("no coastal slots left")), "and the Report says so: {:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("no coastal slots left")), "and the Report says so: {:?}", g.report.lines);
 }
 
 /// (e) The Sea Wall: it needs Coastal Engineering and a free coastal slot, one per state, and it
@@ -3574,7 +3574,7 @@ fn e_the_sea_wall_needs_its_tech_and_a_coastal_slot_and_takes_one_threshold() {
     g.apply_sea_threshold(sid, 0);
     assert_eq!(g.coastal_slots(sid), before, "the wall took the sea: no coastal slot lost");
     assert!(!g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::SeaWall), "and it was destroyed doing it");
-    assert!(g.report.lines.iter().any(|l| l.contains("Sea Wall") && l.contains("destroyed")), "the Report says so: {:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Sea Wall") && l.text.contains("destroyed")), "the Report says so: {:?}", g.report.lines);
     // The next one lands as normal.
     g.apply_sea_threshold(sid, 1);
     assert_eq!(g.coastal_slots(sid), before - 2, "the wall absorbed one threshold, not two");
@@ -3671,7 +3671,7 @@ fn g_antarctica_opens_at_one_point_six_and_stays_open() {
     hold_temperature(&mut g, 1.6);
     g.climate_phase();
     assert!(g.antarctica_open, "open at +1.6");
-    assert!(g.report.lines.iter().any(|l| l.contains("The Antarctic ice opens")), "the Report says so: {:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("The Antarctic ice opens")), "the Report says so: {:?}", g.report.lines);
     assert!(g.check_order(Seat(0), &[], &found).is_ok(), "and the Colony Ship may found there");
     // It stays open when the world cools.
     hold_temperature(&mut g, 1.2);
@@ -3739,7 +3739,7 @@ fn the_ai_holds_materials_four_turns_for_a_colony_ship_it_wants_more_than_a_fact
     g.seats[cust.index()].income_last_turn.energy = 20;
     let orders = g.ai_orders(cust);
     let spent: Vec<&Order> = orders.iter().filter(|o| g.order_cost(cust, o).materials > 0).collect();
-    let lines: Vec<String> = g.report.ai_lines.iter().flat_map(|r| r.lines.iter().cloned()).filter(|l| l.contains("Colony Ship") || l.starts_with("  take")).collect();
+    let lines: Vec<String> = g.log.iter().cloned().filter(|l| l.contains("Colony Ship") || l.starts_with("  take")).collect();
     assert!(lines.iter().any(|l| l.contains("wait") && l.contains("Colony Ship")), "the Colony Ship is waited for: {lines:#?}");
     assert!(spent.is_empty(), "and nothing cheaper takes the Materials meanwhile: {spent:?}");
 }
@@ -4034,7 +4034,7 @@ fn the_ai_banks_fuel_when_the_mars_window_is_within_two_turns() {
     // Two turns out: the bank is on.
     let mut near = board(window - 2);
     let orders = near.ai_orders(Seat(0));
-    let lines: Vec<String> = near.report.ai_lines.iter().flat_map(|r| r.lines.iter().cloned()).collect();
+    let lines: Vec<String> = near.log.iter().cloned().collect();
     assert!(lines.iter().any(|l| l.contains("banking Fuel for")), "the window is two turns off, so Fuel is banked: {lines:#?}");
     let crossings = orders
         .iter()
@@ -4045,7 +4045,7 @@ fn the_ai_banks_fuel_when_the_mars_window_is_within_two_turns() {
     // Three turns out, and the AI spends Fuel as it always did.
     let mut off = board(window - 3);
     off.ai_orders(Seat(0));
-    let lines: Vec<String> = off.report.ai_lines.iter().flat_map(|r| r.lines.iter().cloned()).collect();
+    let lines: Vec<String> = off.log.iter().cloned().collect();
     assert!(!lines.iter().any(|l| l.contains("banking Fuel for")), "three turns out the bank is off: {lines:#?}");
 }
 
@@ -4069,4 +4069,318 @@ fn a_loaded_colony_ship_goes_to_the_moon_when_mars_is_a_year_away() {
         _ => None,
     });
     assert_eq!(dest, Some(BodyId::Moon), "the Moon, not a year-long flight: {orders:?}");
+}
+
+
+// ---------------------------------------------------------------- Ticket #58: the turn as a story
+
+/// A Colony Ship of seat 0's standing at `body` with `colonists` aboard, and the Unload order that
+/// founds a Colony into that Body's first free slot.
+fn colony_ship_ready(g: &mut Game, body: BodyId) -> (ShipId, Order) {
+    let id = ShipId(g.fresh_id());
+    let turn = g.turn;
+    g.ships.push(Ship {
+        id,
+        kind: UnitKind::ColonyShip,
+        seat: Seat(0),
+        damage: 0,
+        at: ShipAt::Body(body),
+        colonists: 4,
+        army: None,
+        stance: Stance::Hold,
+        escaped: false,
+        arrived_this_turn: false,
+        built_turn: turn,
+    });
+    let slot = g.free_slots_on(body)[0];
+    (id, Order::Unload { ship: id, colonists: 4, army: false, into: UnloadTarget::Slot(body, slot) })
+}
+
+/// (a) The headline follows the severity order: a turn that completed a Tech and founded a Colony
+/// headlines the Colony, whichever of the two the engine wrote down first.
+#[test]
+fn the_headline_takes_the_most_severe_line_whatever_order_it_came_in() {
+    let mut g = game();
+    calm(&mut g);
+    let (_, found) = colony_ship_ready(&mut g, BodyId::Moon);
+    let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+    orders[0] = vec![found];
+    g.end_turn(orders);
+    let founded = g.report.lines.iter().position(|l| l.kind == LineKind::ColonyFounded).expect("a Colony was founded");
+    // The Tech completes after the founding, so only the severity order can put the Colony first.
+    g.research.current = Some(TechId::EfficientGrids);
+    let cost = g.tables.tech(TechId::EfficientGrids).cost;
+    g.accrue_research(Seat(0), cost);
+    let tech = g.report.lines.iter().position(|l| l.kind == LineKind::TechComplete).expect("a Tech completed");
+    assert!(tech > founded, "the Tech line was written after the founding: {tech} > {founded}");
+    let head = g.report.headline().expect("a headline");
+    assert_eq!(head.kind, LineKind::ColonyFounded, "the Colony headlines over the Tech: {}", head.text);
+    // And the ranks are the order the ticket set, all eight of them.
+    let ranks: Vec<Option<u8>> = [
+        LineKind::ColonyFounded,
+        LineKind::ControlChanged,
+        LineKind::Break,
+        LineKind::SeaLevel,
+        LineKind::DecisiveBattle,
+        LineKind::Occupation,
+        LineKind::TechComplete,
+        LineKind::Event,
+        LineKind::BuildComplete,
+    ]
+    .iter()
+    .map(|k| k.headline_rank())
+    .collect();
+    assert_eq!(ranks, vec![Some(1), Some(2), Some(3), Some(3), Some(4), Some(5), Some(6), Some(7), Some(8)]);
+}
+
+/// (b) Every line carries its kind and its place, and the four headings take them by both.
+#[test]
+fn every_report_line_carries_its_kind_and_place_and_falls_under_the_right_heading() {
+    let mut g = game();
+    calm(&mut g);
+    // The player's own Factory completes this turn, a Colony is founded at the Moon, and the
+    // Climate phase that opens the next turn fires every Break at the Temperature.
+    let turn = g.turn;
+    g.state_mut(StateId::EastAsia).queue.push(Build {
+        item: BuildItem::Facility(FacilityKind::Factory),
+        seat: Seat(0),
+        due_turn: turn,
+        coastal: false,
+    });
+    let (_, found) = colony_ship_ready(&mut g, BodyId::Moon);
+    hold_temperature(&mut g, 1.7);
+    breaks_ahead(&mut g);
+    let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+    orders[0] = vec![found];
+    g.end_turn(orders);
+
+    let founded = g.report.lines.iter().find(|l| l.kind == LineKind::ColonyFounded).expect("a Colony was founded");
+    assert!(matches!(founded.place, Some(ReportPlace::Colony(_))), "the founding points at its Colony: {:?}", founded.place);
+    assert_eq!(founded.section(), Section::InSpace, "a founding is In space");
+
+    let broke = g.report.lines.iter().find(|l| l.kind == LineKind::Break).expect("a Break fired at +1.7 C");
+    assert_eq!(broke.section(), Section::TheClimate, "a Break is The climate");
+
+    let mine = g
+        .report
+        .lines
+        .iter()
+        .find(|l| l.kind == LineKind::YourBuild && l.text.contains("Factory"))
+        .expect("the player's Factory completed");
+    assert_eq!(mine.section(), Section::YourWorks, "the player's build is Your works");
+    assert!(matches!(mine.place, Some(ReportPlace::State(StateId::EastAsia))), "and points at East Asia: {:?}", mine.place);
+
+    // A rival's build at a Nation State is On Earth, not Your works.
+    assert_eq!(LineKind::BuildComplete.section(Some(ReportPlace::State(StateId::Europe))), Section::OnEarth);
+    assert_eq!(LineKind::BuildComplete.section(Some(ReportPlace::Body(BodyId::Mars))), Section::InSpace);
+    assert_eq!(LineKind::Unrest.section(Some(ReportPlace::State(StateId::Europe))), Section::OnEarth);
+
+    // The headings partition the report: every line but the headline appears exactly once.
+    let grouped: usize = g.report.sections().iter().map(|(_, l)| l.len()).sum();
+    assert_eq!(grouped, g.report.lines.len() - 1, "every line but the headline is under a heading");
+    let names: Vec<&str> = g.report.sections().iter().map(|(s, _)| s.name()).collect();
+    let wanted: Vec<&str> = ["In space", "On Earth", "The climate", "Your works"].into_iter().filter(|n| names.contains(n)).collect();
+    assert_eq!(names, wanted, "the headings come in their fixed order and empty ones are left out");
+}
+
+/// (c) A rival's paragraph names every visible order it committed, and carries none of the scores,
+/// waits and skips the AI chose from.
+#[test]
+fn a_rivals_paragraph_names_its_visible_orders_and_none_of_its_scores() {
+    let mut g = game();
+    let seat = Seat(1);
+    let colony = colony(&mut g, seat, BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Shipyard], 4);
+    let ship = ShipId(g.fresh_id());
+    let turn = g.turn;
+    g.ships.push(Ship {
+        id: ship,
+        kind: UnitKind::ColonyShip,
+        seat,
+        damage: 0,
+        at: ShipAt::Body(BodyId::Earth),
+        colonists: 0,
+        army: None,
+        stance: Stance::Hold,
+        escaped: false,
+        arrived_this_turn: false,
+        built_turn: turn,
+    });
+    // One order of every visible kind: each must have its own sentence.
+    let every: Vec<Order> = vec![
+        Order::BuildFacility { state: StateId::EastAsia, kind: FacilityKind::Factory },
+        Order::BuildFacilityWithDucats { state: StateId::EastAsia, kind: FacilityKind::Bank },
+        Order::RaiseIndustry { state: StateId::EastAsia },
+        Order::BuildModule { colony, kind: ModuleKind::Mine },
+        Order::BuildModuleWithDucats { colony, kind: ModuleKind::Relay },
+        Order::BuildShip { site: Place::Colony(colony), kind: UnitKind::Frigate },
+        Order::BuildArmy { place: Place::State(StateId::EastAsia) },
+        Order::BuildStation { body: BodyId::Mars, slot: 0 },
+        Order::BuildArchiveStage { colony },
+        Order::FundArchive,
+        Order::Repair { unit: UnitRef::Ship(ship), points: 1 },
+        Order::RepairWithDucats { unit: UnitRef::Ship(ship), points: 1 },
+        Order::Transit { ship, to: BodyId::Moon },
+        Order::ShipStance { body: BodyId::Earth, stance: Stance::Hold },
+        Order::ArmyStance { place: Place::State(StateId::EastAsia), stance: Stance::Hold },
+        Order::MoveArmy { army: ArmyId(0), to: StateId::Europe },
+        Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::EastAsia), army: None },
+        Order::Load { ship, colonists: 0, from: LoadSource::State(StateId::EastAsia), army: Some(ArmyId(0)) },
+        Order::Unload { ship, colonists: 2, army: false, into: UnloadTarget::Slot(BodyId::Moon, 0) },
+        Order::Influence { target: Place::State(StateId::Europe), amount: 5 },
+        Order::BuyInfluence { amount: 3 },
+        Order::Buy { resource: Resource::Materials, amount: 4 },
+        Order::Sell { resource: Resource::Fuel, amount: 4 },
+        Order::Relief { state: StateId::EastAsia },
+        Order::Resettle { state: StateId::EastAsia },
+        Order::Change { building: BuildingRef::Facility(StateId::EastAsia, 0), what: BuildingChange::Mothball },
+        Order::Change { building: BuildingRef::Facility(StateId::EastAsia, 0), what: BuildingChange::Restart },
+        Order::Change { building: BuildingRef::Module(colony, 0), what: BuildingChange::Decommission },
+        Order::Leapfrog { state: StateId::EastAsia },
+        Order::StripPermit { state: StateId::EastAsia },
+    ];
+    for o in &every {
+        let deed = g.rival_deed(seat, o);
+        assert!(deed.is_some(), "no sentence for {o:?}");
+        let text = deed.unwrap();
+        assert!(!text.starts_with('['), "{o:?} fell through to a missing template: {text}");
+    }
+
+    // And a real AI turn's paragraph says what it did, with none of the scored list in it.
+    let mut g = game();
+    g.end_turn(std::array::from_fn(|_| Vec::new()));
+    let entry = g.report.ai_lines.iter().find(|e| e.seat == Seat(1)).expect("the Prospectors ordered");
+    assert!(!entry.deeds.is_empty(), "and the Report keeps what they did");
+    let para = g.rival_paragraph(Seat(1)).expect("a paragraph");
+    for deed in &entry.deeds {
+        assert!(para.contains(deed.as_str()), "the paragraph names {deed:?}: {para}");
+    }
+    for marker in ["  take", "  skip", "  wait", "  save", "[", "Category"] {
+        assert!(!para.contains(marker), "no {marker:?} from the AI's scored list: {para}");
+    }
+    // The scored list is still in the log, where the simulate run reads it.
+    assert!(g.log.iter().any(|l| l.trim_start().starts_with("take")), "the scored list stays in the log");
+}
+
+/// (d) At most two Moments a turn, the most severe first, and a kind switched off is skipped.
+#[test]
+fn moments_are_capped_at_two_a_turn_most_severe_first_and_a_switched_off_kind_is_skipped() {
+    let mut g = game();
+    g.report = Report::default();
+    // Written down in the least severe order, so only the severity order can sort them.
+    g.moment(MomentKind::ArchiveComplete, &[("faction", "the Archivists".into()), ("place", "Tycho".into()), ("stages", "3".into())], None);
+    g.moment(MomentKind::TechComplete, &[("tech", "Deep Mining".into()), ("faction", "the Prospectors".into()), ("lead", "9".into()), ("cost", "15".into())], None);
+    g.moment(MomentKind::ControlChanged, &[("place", "Europe".into()), ("faction", "the Prospectors".into())], None);
+    g.moment(MomentKind::ColonyFounded, &[("faction", "the Custodians".into()), ("colony", "Tycho".into()), ("note", "their first".into()), ("n", "4".into())], None);
+    assert_eq!(g.report.moments.len(), 4, "every Moment the turn earned is kept");
+
+    let all_on = |_: MomentKind| true;
+    let shown = g.report.moments_shown(&all_on);
+    assert_eq!(shown.len(), 2, "at most two a turn");
+    assert_eq!(shown[0].kind, MomentKind::ColonyFounded, "the founding is the most severe");
+    assert_eq!(shown[1].kind, MomentKind::ControlChanged, "then the change of control");
+
+    let without_founding = |k: MomentKind| k != MomentKind::ColonyFounded;
+    let shown = g.report.moments_shown(&without_founding);
+    assert_eq!(shown.len(), 2);
+    assert_eq!(shown[0].kind, MomentKind::ControlChanged, "a switched-off kind is skipped, not shown");
+    assert_eq!(shown[1].kind, MomentKind::TechComplete);
+
+    let none = |_: MomentKind| false;
+    assert!(g.report.moments_shown(&none).is_empty(), "every kind off is no Moments at all");
+    // Every kind has a default in report.toml.
+    for k in MomentKind::ALL {
+        assert!(g.tables.report.moment(k).is_some(), "{k:?} has a [moments] table");
+    }
+}
+
+/// (e) The Tech Moment names the Lead and the margin, and says what the AI picked and why.
+#[test]
+fn the_tech_moment_names_the_lead_the_margin_and_the_ai_pick() {
+    let mut g = game();
+    g.report = Report::default();
+    let tech = TechId::EfficientGrids;
+    let cost = g.tables.tech(tech).cost;
+    g.research.current = Some(tech);
+    g.research.progress = 0;
+    g.research.contributions = [0; SEAT_COUNT];
+    g.accrue_research(Seat(1), cost);
+    let m = g.report.moments.iter().find(|m| m.kind == MomentKind::TechComplete).expect("a Tech Moment");
+    assert!(m.text.contains("Efficient Grids"), "it names the Tech: {}", m.text);
+    assert!(m.text.contains(&g.seat_name(Seat(1))), "it names the Lead: {}", m.text);
+    assert!(m.text.contains(&format!("{cost} of {cost}")), "it gives the margin: {}", m.text);
+    assert_eq!(m.figure, format!("{cost} of {cost}"), "the number is the margin");
+    assert_eq!(m.tech, Some(tech), "and the Moment knows which boxes to light");
+    let note = m.note.as_ref().expect("the AI's pick line");
+    let picked = g.research.current.expect("the AI picked at once");
+    assert!(note.contains(&g.tables.tech(picked).name), "the note names the pick: {note}");
+    assert!(
+        note.contains("first choice") || note.contains("cheapest left") || note.contains("until last"),
+        "and why it was picked: {note}"
+    );
+
+    // When the player leads, the Moment hands the pick back instead.
+    let mut g = game();
+    g.report = Report::default();
+    g.research.current = Some(TechId::CleanPropellant);
+    g.research.progress = 0;
+    g.research.contributions = [0; SEAT_COUNT];
+    g.accrue_research(Seat(0), g.tables.tech(TechId::CleanPropellant).cost);
+    let m = g.report.moments.iter().find(|m| m.kind == MomentKind::TechComplete).expect("a Tech Moment");
+    assert_eq!(g.research.awaiting_pick, Some(Seat(0)), "the player picks");
+    assert_eq!(m.note.as_deref(), Some("You led. Pick the next Tech."));
+}
+
+/// (f) Every template in report.toml has its placeholders satisfied: every key the engine asks for
+/// is there, nothing else is, and no template uses a placeholder the engine does not supply.
+#[test]
+fn every_template_in_report_toml_has_its_placeholders_satisfied() {
+    let t = tables();
+    assert!(t.report.check().is_ok(), "the shipped file passes: {:?}", t.report.check());
+
+    // A placeholder the engine never supplies is refused, by name.
+    let mut bad = t.report.clone();
+    bad.line.insert("colony_founded".into(), "The {faction} founded {nonesuch}.".into());
+    let e = bad.check().unwrap_err();
+    assert!(e.contains("nonesuch") && e.contains("colony_founded"), "it names the placeholder and the key: {e}");
+
+    // A missing key is refused.
+    let mut bad = t.report.clone();
+    bad.line.remove("colony_founded");
+    assert!(bad.check().unwrap_err().contains("colony_founded"), "a missing sentence is named");
+
+    // A key the engine never asks for is refused, so a template cannot rot unread.
+    let mut bad = t.report.clone();
+    bad.rival.insert("nobody_asks".into(), "did something".into());
+    assert!(bad.check().unwrap_err().contains("nobody_asks"), "an unread sentence is named");
+
+    // The same for a Moment's figure.
+    let mut bad = t.report.clone();
+    let mut card = bad.moments.get("antarctica").unwrap().clone();
+    card.figure = "{slots} Colony Slots".into();
+    bad.moments.insert("antarctica".into(), card);
+    assert!(bad.check().unwrap_err().contains("slots"), "a Moment's figure is checked too");
+
+    // And rendering leaves nothing standing: every placeholder in every [line] template is filled
+    // when the engine supplies the arguments it declares for that key.
+    for (key, args) in dying_earth_engine::report::LINE_ARGS {
+        let filled: Vec<(&str, String)> = args.iter().map(|a| (*a, format!("<{a}>"))).collect();
+        let text = t.report.line(key, &filled);
+        assert!(!text.contains('{'), "{key} still has a placeholder standing: {text}");
+    }
+}
+
+/// (g) The first Report keeps its explanation as the headline.
+#[test]
+fn the_first_reports_headline_is_the_seating_explanation() {
+    let mut g = with_seed(7);
+    g.start();
+    let head = g.report.headline().expect("a headline on turn 1");
+    assert_eq!(head.kind, LineKind::Seating);
+    assert_eq!(
+        head.text,
+        "January 2030. You play the Custodians from East Asia; the computer plays the Prospectors, the Arkwrights and the Archivists."
+    );
+    // It headlines over everything else the first turn wrote down.
+    assert!(g.report.lines.len() > 1, "and there are other lines under it");
+    assert_eq!(g.report.headline_index(), Some(0));
 }

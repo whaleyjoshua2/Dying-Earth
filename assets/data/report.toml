@@ -1,0 +1,178 @@
+# Ticket #58: every sentence the Report says.
+#
+# The Report is a dated dispatch: one headline chosen by severity, then the lines that are left
+# grouped under In space, On Earth, The climate and Your works, then what each rival Faction did in
+# plain words. Every one of those sentences is a template here, with named placeholders in braces.
+#
+# The engine declares, per key, the placeholders it supplies (`report::TEMPLATE_ARGS`). Loading the
+# tables checks three things and refuses the file otherwise: every declared key is present, no key
+# here is unknown, and every placeholder a template uses is one the engine supplies for that key.
+#
+# The engine's own log lines are NOT here. The simulate log reads them and they say the same thing
+# in the same words; these are the Report's copy, and they are what a change of wording changes.
+
+# ---------------------------------------------------------------- the dispatch, line by line
+[line]
+
+# Turn 1 only: the headline that explains the table.
+seating = "{date}. You play the {faction} from {state}; the computer plays {rivals}."
+start_holding = "You hold {state} with a Launch Site and its Standing Army. The Stockpile holds {materials} Materials, {fuel} Fuel and {energy} Energy."
+start_rivals = "Your rivals are {rivals}. Build, spread Influence, and get twelve Colonists off Earth before the Temperature reaches +{collapse} C."
+
+# In space
+solar_storm = "Solar Storm: no transit advanced this turn."
+ship_arrived = "{faction} {ship} arrived at {body}."
+ship_destroyed = "{faction} {ship} destroyed ({why}){cargo}."
+event_damaged_ships = "{event} damaged {n} Ship(s)."
+loaded = "{faction} loaded {cargo} at {body}."
+slot_taken = "{faction}: another Faction took that Colony Slot first."
+landing_contested = "{faction} could not land at {body}: the orbit is contested."
+colony_founded = "The {faction} founded a Colony in slot {slot} on {body} with {n} Colonists."
+disembarked = "{n} Colonists disembarked into {colony}."
+station_built = "{faction} built {station}."
+antarctica_opens = "The Antarctic ice opens: {n} Colony Slots on Earth."
+archive_stage_begun = "The {faction} began stage {stage} of the Archive at {colony}."
+archive_stage_complete = "The {faction} completed stage {stage} of {stages} of the Archive at {place}."
+archive_complete = "The {faction} completed the Archive at {place}: every stage stands."
+archive_destroyed = "The Archive at {place} was destroyed when the Colony passed out of the {faction}' hands; their Archive fund is kept."
+archive_funded = "The {faction} are funding the Archive: {banked} Research banked, {fund} of {cap} in the fund."
+archive_funded_wasted = "The {faction} are funding the Archive: {banked} Research banked, {wasted} of it wasted, {fund} of {cap} in the fund."
+
+# On Earth
+army_moved = "{faction} Army moved from {from} to {to}{attacks}."
+army_landed = "{faction} landed an Army at {colony}."
+units_destroyed = "{place} was {why}: {lost} destroyed."
+occupation_begun = "The {faction} occupy {place}."
+occupation_ended = "Occupation of {place} by the {faction} ended."
+control_changed = "{place} now belongs to the {faction} ({why})."
+claim_tied = "{place} is claimed by {factions} at the same Standing; it stays as it is."
+threw_off = "{state} threw off the {faction}: it is neutral again, its Armies are its own, and its Unrest settles at {unrest}."
+unrest_rose_state = "{state}: Unrest rose by {rose} to {unrest}."
+unrest_card = "Unrest in {state}: its Unrest rose by {rose} to {unrest}."
+unrest_threshold = "{state}: Unrest reached {unrest} - {note}."
+relief = "The {faction} paid Relief in {state}: Unrest fell by {fell} to {unrest}."
+refugees_arrived = "{n} people arrived in {state}; Unrest rose by {rose} to {unrest}."
+refugees_left = "{n} population left {state} for {to} ({why})."
+resettled = "The {faction} resettled this turn's refugees in {state} (+{standing} Standing there)."
+strip_permit = "The {faction} issued a Strip Permit in {state}: every Facility there produces double for {turns} turns."
+strip_permit_ended = "The Strip Permit in {state} ran out: its Baseline Emissions stand at {baseline} for good, and its Unrest rose by {rose} to {unrest}."
+building_changed_state = "The {faction} {done} the {building} in {state}."
+building_decommissioned_state = "The {faction} decommissioned the {building} in {state}: {refund} Materials back and its slot free."
+building_changed_colony = "The {faction} {done} the {building} at {colony}."
+building_decommissioned_colony = "The {faction} decommissioned the {building} at {colony}: {refund} Materials back."
+build_lost = "{building} at {place} had no slot left and was lost."
+launch_pad_fire = "Launch Pad Fire: the {faction} {item} at {place} completes next turn instead."
+game_over_win = "Game over on turn {turn}: the {faction} win ({note})."
+game_over_draw = "Game over on turn {turn}: a draw ({note})."
+game_over_collapse = "Game over on turn {turn}: Collapse at {temperature} C. Nobody wins."
+
+# The climate
+event_drawn = "{text}"
+break_fired = "Break at {temperature} C - {name}. {happened} {text}"
+break_coastal = "{states}: every state at Coastal Exposure {exposure} lost {percent}% of its people and took {unrest} Unrest."
+break_baseline = "{state}: its Baseline Emissions rise by {rise} for good."
+sea_wall = "Sea level at {temperature} C: the Sea Wall in {state} took the sea and was destroyed; no coastal slots were lost."
+sea_nothing_left = "Sea level at {temperature} C: {state} has no coastal slots left to lose."
+sea_took = "The sea took {n} coastal {slots} from {state} at {temperature} C."
+sea_took_destroying = "The sea took {n} coastal {slots} from {state} at {temperature} C: {destroyed}."
+heat_population = "{state}: population fell {percent}% to {after}; Unrest rose by {rose} to {unrest}."
+development = "{state} raised its Industry Level to {level}."
+development_woke = "{state} raised its Industry Level to {level} and brought a {building} online."
+scrubbers_destroyed = "{n} Scrubber(s) in {state} were destroyed when the state {why}."
+leapfrog = "The {faction} Leapfrogged {state}: its people now emit {coefficient} per hundred million."
+
+# Your works
+tech_complete = "{tech} is complete; every Faction has it. The {faction} led ({shares}) and pick the next Tech."
+build_complete = "{faction} completed {building} at {place}."
+energy_short = "{faction}: Energy ran short; shut down {buildings}."
+energy_zero = "{faction}: Energy fell to zero even with every producer off."
+
+# ---------------------------------------------------------------- fragments other sentences use
+[phrase]
+attacks = " and attacks"
+cargo_aboard = " with {n} Colonists aboard"
+sea_unrest = " Unrest there rose by {rose} to {unrest}."
+first_colony = "their first Colony off Earth"
+more_colonies = "their {count} Colony off Earth"
+slot = "slot"
+slots = "slots"
+pick_first_choice = "The {faction} pick {tech}, their first choice."
+pick_cheapest = "The {faction} pick {tech}, the cheapest left."
+pick_last = "The {faction} pick {tech}, the one they leave until last."
+you_pick = "You led. Pick the next Tech."
+
+# ---------------------------------------------------------------- what a rival Faction did
+# Each is one clause; the paragraph strings them together with the Faction's name in front.
+[rival]
+paragraph = "The {faction} {deeds}."
+nothing = "The {faction} gave no orders this turn."
+build_facility = "began a {building} in {state}"
+build_facility_ducats = "bought a {building} in {state}"
+raise_industry = "raised the Industry Level in {state}"
+build_module = "began a {building} at {colony}"
+build_module_ducats = "bought a {building} at {colony}"
+build_ship = "began a {unit} at {place}"
+build_army = "began an Army at {place}"
+build_station = "began a Space Station over {body}"
+build_archive_stage = "raised the next stage of the Archive at {colony}"
+fund_archive = "put this turn's Research into the Archive fund"
+repair = "repaired {unit}"
+transit = "sent a {unit} to {body}"
+ship_stance = "set its Ships at {body} to {stance}"
+army_stance = "set its Armies at {place} to {stance}"
+move_army = "moved an Army into {state}"
+load_colonists = "lifted {n} Colonists at {place}"
+load_army = "loaded an Army at {place}"
+unload = "unloaded at {place}"
+influence = "spent {n} Influence on {place}"
+buy_influence = "bought {n} Influence"
+buy = "bought {n} {resource}"
+sell = "sold {n} {resource}"
+relief = "paid Relief in {state}"
+resettle = "resettled its refugees in {state}"
+mothball = "mothballed the {building} at {place}"
+restart = "restarted the {building} at {place}"
+decommission = "decommissioned the {building} at {place}"
+leapfrog = "Leapfrogged {state}"
+strip_permit = "issued a Strip Permit in {state}"
+arrived = "its {unit} reached {body}"
+completed = "finished {building} at {place}"
+founded = "founded {colony}"
+
+# ---------------------------------------------------------------- the Moments
+# A Moment is a short modal shown before the Report: one sentence and one number. `on` is the
+# default; the Moments corner at the foot of the Report remembers a change for the session.
+[moments.colony_founded]
+on = true
+text = "The {faction} founded {colony}, {note}."
+figure = "{n} Colonists"
+
+[moments.control_changed]
+on = true
+text = "{place} changed hands."
+figure = "the {faction}"
+
+[moments.climate_threshold]
+on = true
+text = "{what}"
+figure = "{figure}"
+
+[moments.decisive_battle]
+on = true
+text = "A Battle at {place}: {result}"
+figure = "{figure}"
+
+[moments.tech_complete]
+on = true
+text = "{tech} is complete. The {faction} led, {lead} of {cost}."
+figure = "{lead} of {cost}"
+
+[moments.antarctica]
+on = true
+text = "The Antarctic ice opens: Colony Slots on Earth for the first time."
+figure = "{n} Colony Slots"
+
+[moments.archive_complete]
+on = true
+text = "The {faction} completed the Archive at {place}."
+figure = "{stages} stages"

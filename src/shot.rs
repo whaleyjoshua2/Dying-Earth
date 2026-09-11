@@ -47,6 +47,23 @@ pub struct ShotPlan {
     /// Ticket #51: `archive:<stage>` planted an Archive at this Colony, so the Body picture opens
     /// its card rather than the globe alone.
     pub archive_colony: Option<ColonyId>,
+    /// Ticket #58, a building aid (`moment:colony`, `moment:tech`): the Report picture of a
+    /// `menus:1` run opens that Moment instead of the Report itself.
+    pub moment: Option<MomentKind>,
+}
+
+/// Ticket #58: the Moment a `moment:` aid names.
+fn moment_from_id(name: &str) -> Option<MomentKind> {
+    match name {
+        "colony" => Some(MomentKind::ColonyFounded),
+        "tech" => Some(MomentKind::TechComplete),
+        "control" => Some(MomentKind::ControlChanged),
+        "climate" => Some(MomentKind::ClimateThreshold),
+        "battle" => Some(MomentKind::DecisiveBattle),
+        "antarctica" => Some(MomentKind::Antarctica),
+        "archive" => Some(MomentKind::ArchiveComplete),
+        _ => None,
+    }
 }
 
 fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
@@ -295,6 +312,61 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.energy = 400;
             g.seats[0].stockpile.ducats = 300;
         }
+        // `found:1` (a building aid, ticket #58): seat 0 lands a loaded Colony Ship at the Moon and
+        // the turn runs, so the Report carries a real founding, its headline and its Moment. An AI
+        // game founds one on a turn nobody can choose. `moment:colony` implies it.
+        if std::env::args().any(|a| a == "found:1" || a == "moment:colony") {
+            let id = ShipId(g.fresh_id());
+            let built_turn = g.turn;
+            g.ships.push(Ship {
+                id,
+                kind: UnitKind::ColonyShip,
+                seat: Seat(0),
+                damage: 0,
+                at: ShipAt::Body(BodyId::Moon),
+                colonists: 4,
+                army: None,
+                stance: Stance::Hold,
+                escaped: false,
+                arrived_this_turn: false,
+                built_turn,
+            });
+            if let Some(slot) = g.free_slots_on(BodyId::Moon).first().copied() {
+                let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+                orders[0] = vec![Order::Unload { ship: id, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Moon, slot) }];
+                g.seats[0].ai = false;
+                g.end_turn(orders);
+                g.seats[0].ai = true;
+            }
+        }
+        // `moment:tech` (a building aid, ticket #58): a rival seat pushes the Tech under research
+        // over the line, so the Report carries a Tech Moment with the Lead, the margin and the AI's
+        // pick. The turn a Tech completes is not one an aid can choose.
+        if std::env::args().any(|a| a == "moment:tech") {
+            if g.research.current.is_none()
+                && let Some(first) = g.available_techs().first().copied()
+            {
+                g.pick_tech(Seat(0), first).ok();
+            }
+            if let Some(tech) = g.research.current {
+                let cost = g.tables.tech(tech).cost;
+                // A real race, then the Prospectors take it by a margin.
+                g.research.progress = 0;
+                g.research.contributions = [0; SEAT_COUNT];
+                for (seat, share) in [(Seat(0), cost / 5), (Seat(2), cost / 5), (Seat(3), cost / 5)] {
+                    g.accrue_research(seat, share);
+                }
+                let left = cost - g.research.progress;
+                g.accrue_research(Seat(1), left);
+            }
+            // And a race under way again, so the top bar's four-colour bar is in the picture.
+            race_spread(g);
+        }
+        // `race:1` (a building aid, ticket #58): the four seats each hold a share of the Tech under
+        // research, so the top bar's Research race bar shows all four colours at once.
+        if std::env::args().any(|a| a == "race:1") {
+            race_spread(g);
+        }
         // `tints:1` (a building aid): one Nation State per seat on the face the Earth picture shows,
         // so all four Faction tints are in one picture. The AI seldom leaves four controllers alive.
         if std::env::args().any(|a| a == "tints:1") {
@@ -308,6 +380,25 @@ fn build_board(session: &mut Session) {
         session.screen = Screen::GameOver;
     }
     session.earth_dirty = true;
+}
+
+/// A building aid (ticket #58): a four-way share of the Tech under research, so the top bar's
+/// Research race bar carries all four Faction colours.
+fn race_spread(g: &mut Game) {
+    if g.research.current.is_none()
+        && let Some(first) = g.available_techs().first().copied()
+    {
+        g.pick_tech(Seat(0), first).ok();
+    }
+    let Some(tech) = g.research.current else { return };
+    let cost = g.tables.tech(tech).cost;
+    g.research.progress = 0;
+    g.research.contributions = [0; SEAT_COUNT];
+    let shares = [cost * 4 / 10, cost * 3 / 10, cost * 2 / 10, cost / 10];
+    for (i, share) in shares.into_iter().enumerate() {
+        g.research.contributions[i] = share;
+        g.research.progress += share;
+    }
 }
 
 /// A building aid (ticket #54): as many Scrubbers as the state's cap allows, standing and online.
@@ -376,7 +467,21 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             3 => {
                 build_board(&mut session);
                 plan.archive_colony = ARCHIVE_COLONY.with(|c| c.get());
-                view.popup = Popup::Report;
+                plan.moment = std::env::args().find_map(|a| a.strip_prefix("moment:").and_then(moment_from_id));
+                // Ticket #58: `moment:<kind>` opens that Moment in the Report picture's place. Every
+                // other kind is switched off for the picture, the way the Moments corner would, so
+                // the named Moment is the one the turn stops for whatever else happened.
+                if let Some(k) = plan.moment {
+                    view.moments_on = Some(std::array::from_fn(|i| MomentKind::ALL[i] == k));
+                }
+                let at = plan.moment.and_then(|k| {
+                    let game = session.game.as_ref()?;
+                    view.moments_of(&session.tables, &game.report).iter().position(|m| m.kind == k)
+                });
+                view.popup = match at {
+                    Some(i) => Popup::Moment(i),
+                    None => Popup::Report,
+                };
                 view.show_climate = false;
             }
             _ => {

@@ -440,13 +440,15 @@ impl Game {
         }
         if !shut.is_empty() {
             let line = format!("{}: Energy ran short; shut down {}.", self.seat_name(seat), shut.join(", "));
-            self.report.lines.push(line.clone());
             self.log(line);
+            let text = self.say("energy_short", &[("faction", self.seat_name(seat)), ("buildings", shut.join(", "))]);
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
         }
         if balance < 0 {
             let line = format!("{}: Energy fell to zero even with every producer off.", self.seat_name(seat));
-            self.report.lines.push(line.clone());
             self.log(line);
+            let text = self.say("energy_zero", &[("faction", self.seat_name(seat))]);
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
         }
         self.accrue_research(seat, research);
         self.log(format!(

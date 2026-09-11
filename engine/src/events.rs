@@ -56,6 +56,8 @@ impl Game {
         let drawn = self.target_event(id);
         self.log(format!("Event: {}", drawn.text));
         self.report.event = Some(drawn.text.clone());
+        let text = self.say("event_drawn", &[("text", drawn.text.clone())]);
+        self.report_line(LineKind::Event, None, text);
         self.last_event = Some(drawn);
     }
 
@@ -217,8 +219,12 @@ impl Game {
         let rose = self.raise_unrest(s, n, UnrestSource::Climate);
         if rose > 0.0 {
             let line = format!("{}: Unrest rose by {} to {}.", self.tables.state(s).name, Game::unrest_figure(rose), self.unrest_text(s));
-            self.log(line.clone());
-            self.report.lines.push(line);
+            self.log(line);
+            let text = self.say(
+                "unrest_rose_state",
+                &[("state", self.tables.state(s).name.clone()), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(s))],
+            );
+            self.report_line(LineKind::Unrest, Some(ReportPlace::State(s)), text);
         }
     }
 
@@ -247,7 +253,8 @@ impl Game {
                         self.destroy_ship(sid, t.event(id).name.as_str());
                     }
                     if hit > 0 {
-                        self.report.lines.push(format!("{} damaged {} Ship(s).", t.event(id).name, hit));
+                        let text = self.say("event_damaged_ships", &[("event", t.event(id).name.clone()), ("n", hit.to_string())]);
+                        self.report_line(LineKind::Ship, None, text);
                     }
                 }
             }
@@ -356,8 +363,12 @@ impl Game {
                 let rose = self.raise_unrest(s, n, UnrestSource::Plain);
                 if rose > 0.0 {
                     let line = format!("Unrest in {}: its Unrest rose by {} to {}.", t.state(s).name, Game::unrest_figure(rose), self.unrest_text(s));
-                    self.log(line.clone());
-                    self.report.lines.push(line);
+                    self.log(line);
+                    let text = self.say(
+                        "unrest_card",
+                        &[("state", t.state(s).name.clone()), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(s))],
+                    );
+                    self.report_line(LineKind::Unrest, Some(ReportPlace::State(s)), text);
                 }
             }
             (EventId::StormSurge, EventTarget::State(s)) => {

@@ -1326,9 +1326,8 @@ impl Game {
         for l in &lines {
             self.log(l.clone());
         }
-        // Ticket #50: three AI seats order each turn, so the Report keeps every seat's list under a
-        // heading naming the Faction rather than the last seat's alone.
-        self.report.ai_lines.push(AiReport { seat, lines });
+        // Ticket #58: the scored list is the AI's own head, so it stays in the log. What the Report
+        // shows is built from the orders this seat actually commits, in `end_turn`.
         chosen
     }
 }

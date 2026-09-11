@@ -40,6 +40,8 @@ pub enum Selection {
 pub enum Popup {
     None,
     Event,
+    /// Ticket #58: the nth Moment of this turn, shown before the Report.
+    Moment(usize),
     Report,
     /// End Turn pressed with Influence unspent (ticket #31): ask once.
     ConfirmEndTurn,
@@ -131,6 +133,9 @@ pub struct ViewState {
     pub load_state: Option<StateId>,
     pub influence_amount: i64,
     pub attack_preview: bool,
+    /// Ticket #58: which Moment kinds are switched on, remembered for the session. `None` until the
+    /// player touches a checkbox, when it is filled from the defaults in `report.toml`.
+    pub moments_on: Option<[bool; dying_earth_engine::MomentKind::ALL.len()]>,
     /// Ticket #57, a building aid (`hover:<body id>`): the Solar System Map draws that Body's launch
     /// window tooltip as though the pointer were on it, so a picture can be taken of it.
     pub force_hover: Option<BodyId>,
@@ -158,12 +163,26 @@ impl Default for ViewState {
             load_state: None,
             influence_amount: 5,
             attack_preview: false,
+            moments_on: None,
             force_hover: None,
         }
     }
 }
 
 impl ViewState {
+    /// Ticket #58: whether a Moment kind stops the turn, the session's answer over the table's.
+    pub fn moment_on(&self, tables: &Tables, kind: dying_earth_engine::MomentKind) -> bool {
+        match &self.moments_on {
+            Some(on) => on[dying_earth_engine::MomentKind::ALL.iter().position(|k| *k == kind).unwrap_or(0)],
+            None => tables.report.moment_on(kind),
+        }
+    }
+
+    /// The same, as a closure the engine's `moments_shown` can read.
+    pub fn moments_of<'a>(&'a self, tables: &'a Tables, report: &'a dying_earth_engine::Report) -> Vec<&'a dying_earth_engine::Moment> {
+        report.moments_shown(&|k| self.moment_on(tables, k))
+    }
+
     pub fn enter_surface(&mut self, body: BodyId) {
         self.view = View::Surface(body);
         self.last_surface = body;
