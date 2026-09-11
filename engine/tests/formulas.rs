@@ -3665,7 +3665,7 @@ fn d_the_sea_takes_coastal_slots_only_oldest_first_and_then_nothing() {
 /// (e) The Sea Wall: it needs Coastal Engineering and a free coastal slot, one per state, and it
 /// absorbs the state's next threshold of any kind and is destroyed doing it. A mothballed one does not.
 #[test]
-fn e_the_sea_wall_needs_its_tech_and_a_coastal_slot_and_takes_one_threshold() {
+fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
     let sid = StateId::Australia;
     let mut g = game();
     directed(&mut g, sid);
@@ -3675,23 +3675,23 @@ fn e_the_sea_wall_needs_its_tech_and_a_coastal_slot_and_takes_one_threshold() {
     assert!(g.check_order(Seat(0), &[], &order).is_ok(), "with the Tech in, it is legal");
 
     // One per state.
-    g.state_mut(sid).facilities.push(Facility::in_coastal_slot(FacilityKind::SeaWall));
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::SeaWall));
     assert!(g.check_order(Seat(0), &[], &order).is_err(), "at most one Sea Wall stands in a state");
 
-    // No free coastal slot: illegal even in a state with inland room (ticket #77 tried a wall
-    // that took no slot for one round and put it back).
+    // Ticket #77 (version 0.05.5): it takes no build slot, as the Scrubber does: legal with every
+    // slot full, counting against none once it stands, and 20 Materials.
     let mut g2 = game();
     let s2 = StateId::CentralAmerica;
     directed(&mut g2, s2);
     g2.research.done.push(TechId::CoastalEngineering);
-    for _ in 0..g2.coastal_slots(s2) {
-        g2.state_mut(s2).facilities.push(Facility::in_coastal_slot(FacilityKind::Factory));
+    while g2.free_slots(s2) > 0 {
+        g2.state_mut(s2).facilities.push(facility(FacilityKind::Factory));
     }
-    assert!(g2.free_inland(s2) > 0, "there is inland room");
-    assert!(
-        g2.check_order(Seat(0), &[], &Order::BuildFacility { state: s2, kind: FacilityKind::SeaWall }).is_err(),
-        "but a Sea Wall wants a coastal slot"
-    );
+    assert_eq!(g2.free_slots(s2), 0, "every slot full");
+    assert!(g2.tables.facility(FacilityKind::SeaWall).no_slot, "the Sea Wall takes no slot");
+    assert!(g2.check_order(Seat(0), &[], &Order::BuildFacility { state: s2, kind: FacilityKind::SeaWall }).is_ok(), "a Sea Wall needs no slot");
+    g2.state_mut(s2).facilities.push(Facility::new(FacilityKind::SeaWall));
+    assert_eq!(g2.free_slots(s2), 0, "and takes none once it stands");
     assert_eq!(g2.tables.facility(FacilityKind::SeaWall).materials, 20, "20 Materials since ticket #77");
 
     // It absorbs a scheduled threshold and is destroyed doing it.
@@ -3844,22 +3844,22 @@ fn h_the_ai_raises_a_sea_wall_when_the_sea_is_close() {
         "no Coastal Engineering, no Sea Wall: {orders:?}"
     );
 
-    // Ticket #77 (version 0.05.5): with no free coastal slot, no wall is offered.
+    // Ticket #77 (version 0.05.5): the wall takes no slot, so it is offered with every slot full.
     let mut g = game();
     calm(&mut g);
     sea_ahead(&mut g);
     directed(&mut g, sid);
     g.research.done.push(TechId::CoastalEngineering);
     hold_temperature(&mut g, 1.65);
-    while g.free_coastal(sid) > 0 {
-        g.state_mut(sid).facilities.push(Facility::in_coastal_slot(FacilityKind::Factory));
+    while g.free_slots(sid) > 0 {
+        g.state_mut(sid).facilities.push(facility(FacilityKind::Factory));
     }
     g.seats[0].stockpile.materials = 200;
     g.seats[0].stockpile.energy = 200;
     let orders = g.ai_orders(Seat(0));
     assert!(
-        !orders.iter().any(|o| matches!(o, Order::BuildFacility { state, kind: FacilityKind::SeaWall } if *state == sid)),
-        "no free coastal slot, no wall offered: {orders:?}"
+        orders.iter().any(|o| matches!(o, Order::BuildFacility { state, kind: FacilityKind::SeaWall } if *state == sid)),
+        "every slot full and the AI still walls the coast, since the wall takes none: {orders:?}"
     );
 
     // Ticket #70 (version 0.05.5): with the sea close the wall takes the victory-gap and threat

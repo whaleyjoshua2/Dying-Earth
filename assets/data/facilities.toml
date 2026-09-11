@@ -97,10 +97,12 @@ no_slot = true
 # Ticket #56 (version 0.05): the Sea Wall. It needs Coastal Engineering, and at most one may stand
 # in a Nation State. While it stands and is working it absorbs the state's next Sea Level threshold
 # of any kind -- scheduled, a Storm Surge applied early, or the Ice Sheets Break -- so no coastal
-# slot is lost, and it is destroyed doing it. Ticket #77 (version 0.05.5): it stands in a coastal
-# slot (`coastal_only`), as ticket #56 had it, after a round with no slot at all; what kept every
-# wall from being built was the AI picking Coastal Engineering after the sea had taken the coast,
-# which the pick lists in ai.toml settle. 35 Materials to 20 on the same ticket.
+# slot is lost, and it is destroyed doing it. Ticket #77 (version 0.05.5): it takes NO build slot
+# (`no_slot`), as the Scrubber does, and costs 20 Materials, after three rounds measured over
+# twenty seeds: in a coastal slot at 35 with the AI picking Coastal Engineering late, no wall was
+# ever built (the sea had taken every coastal slot by the time the Tech came); with no slot at 35
+# and the Tech picked early, 220 to 372 a batch; in a coastal slot at 20, 30 to 48. The pick lists
+# in ai.toml settle the timing.
 [[facility]]
 id = "sea_wall"
 name = "Sea Wall"
@@ -109,7 +111,7 @@ build_turns = 2
 energy_upkeep = 1
 emissions = 0.0
 needs_tech = "coastal_engineering"
-coastal_only = true
+no_slot = true
 
 # Ticket #54: the cap on Scrubbers in one Nation State, from its population in hundreds of millions:
 # clamp(round(population / per_population), min, max). Russia at 1.5 gets the floor of 2; South Asia

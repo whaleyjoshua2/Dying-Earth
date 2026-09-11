@@ -541,3 +541,27 @@ states have one (Europe, North America, Russia and the Middle East none), so mos
 unwalled and the sea takes what it took. The two rounds are the designer's pair to choose from: a
 wall in a coastal slot at 20 Materials, one or two a game; or a wall taking no slot at 35, eleven to
 eighteen a game.
+
+### The third round: no slot at 20, and the comparison
+
+The designer: "no slot at 20 and let me see a comparison." Set, built (184 formula tests, 6 save
+tests, clippy clean) and measured, and the two earlier rules re-measured with the same early Tech
+pick so the four rows differ in the wall alone. Twenty seeds each, seat 0 the Prospectors in East
+Asia and the Custodians from Europe.
+
+| rule | Sea Walls a batch | Collapses | Custodian wins | coastal slots lost a game | Facilities drowned | Scrubbers a batch |
+| --- | --- | --- | --- | --- | --- | --- |
+| before the ticket: coastal slot, 35, Tech late | 0 and 0 | | 10 and 12 | 34 and 34 | 24 and 24 | 366 and 606 |
+| coastal slot, 35, Tech early | 22 and 6 | 11 and 9 | 9 and 11 | 34 and 34 | 24 and 24 | 438 and 646 |
+| no slot, 35, Tech early | 220 and 372 | 13 and 11 | 7 and 9 | 34 and 29 | 24 and 19 | 365 and 571 |
+| coastal slot, 20, Tech early | 30 and 48 | 14 and 10 | 6 and 10 | 34 and 34 | 24 and 25 | 329 and 606 |
+| **no slot, 20, Tech early (chosen)** | **345 and 514** | **16 and 14** | **4 and 6** | **34 and 29** | **24 and 19** | **341 and 402** |
+
+What the rows say: the early Tech pick is what lets any wall be built at all; a wall in a coastal
+slot is one or two a game whatever it costs, because few states have a coastal slot free; a wall
+that takes no slot is eleven to twenty-six a game, and in the Custodian seating saves five slots and
+five Facilities a game. The cheaper the wall and the freer its slot, the more Materials the
+Custodian AI puts into walls rather than Scrubbers (402 against 606 in its own seating), and the more
+seeds collapse (14 against 9) and the fewer it wins (6 against 11). The wall is a trade against the
+Scrubber for the same Materials, and at no slot and 20 the AI takes it often. The designer's rule
+stands; the build ticket's re-sweep and balance report will show it in the whole.

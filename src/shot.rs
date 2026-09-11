@@ -346,7 +346,7 @@ fn build_board(session: &mut Session) {
             if let Some(i) = g.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::Bank) {
                 g.state_mut(sid).facilities.remove(i);
             }
-            g.state_mut(sid).facilities.push(Facility::in_coastal_slot(FacilityKind::SeaWall));
+            g.state_mut(sid).facilities.push(Facility::new(FacilityKind::SeaWall));
             g.seats[0].stockpile.materials = 300;
             g.seats[0].stockpile.energy = 400;
             g.seats[0].stockpile.ducats = 300;
