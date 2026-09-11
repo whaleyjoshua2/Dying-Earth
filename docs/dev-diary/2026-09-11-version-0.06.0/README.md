@@ -300,3 +300,30 @@ a game, on the Antarctic Colonies and the ISS, where a Faction holding Earth and
 earns 3 a turn per other Body before a Colonist lives there) and 4 over the Arkwright batch.
 Ducats moved little: the Fund reads 393 (385) and 196 (196). Wins and Collapses are the Solar
 Array batch's within seed noise.
+
+## The Mass Driver ([ticket #92](https://github.com/whaleyjoshua2/Dying-Earth/issues/92))
+
+- **driver-moon.png** — `shot:driver driver:1 turns:0`. Mare Tranquillitatis on the Moon, held by
+  the Custodians with Efficient Transit researched: a Habitat, a Generator, a Mine and a Mass
+  Driver. The card reads **"Mine: +6 Materials"** (the slot's 4 x 1.29 = 5, plus the driver's 1)
+  and **"Mass Driver: (departures from here 4 Fuel cheaper, never under 1; each Mine here +1
+  Materials), 4 Energy upkeep"**; the driver's own button is greyed, one per Colony, and the rest
+  carry the one-working-Mine discount of the ticket before.
+
+### Measured, twenty seeds each (`sweep/mass-driver.txt`)
+
+Read against `sweep/trade.txt`.
+
+| Seat 0 | Wins by seat | Collapses | Techs (median) | Mass Drivers standing at the end, over the batch | Colonies on Phobos or Deimos, over the batch |
+|---|---|---|---|---|---|
+| Custodians from East Asia | nobody (nobody) | 20/20 (20) | 7 | **0** | **0** |
+| Arkwrights from East Asia | Custodians 20 (20) | 0/20 (0) | 11 | **1** | **0** |
+
+**The rule waits on the Tech, and the Tech comes late.** Efficient Transit is a rung-2 Tech nobody
+lists first; the Custodian seating researches a median seven Techs and rarely reaches it, the
+Arkwright seating eleven and reaches it in time for one driver in twenty games. No AI has founded
+on Phobos or Deimos in either batch, as in 0.05.5: Mars still beats them on every number that
+exists before a driver stands. Every other figure is the Trade Post batch's to the digit. On the
+player's side the rule works as the picture shows; on the AI's it is the first Tech-gated Module,
+and the AI's Tech picks do not yet know it exists. Whether Efficient Transit should sit on the
+Arkwrights' or Prospectors' pick list earlier is on the map.

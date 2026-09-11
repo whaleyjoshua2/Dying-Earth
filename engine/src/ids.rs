@@ -145,10 +145,13 @@ pub enum ModuleKind {
     /// Version 0.06.0 (ticket #89): the Solar Array, a Module only a Space Station holds, making
     /// Energy that scales with the inverse square of its Body's distance from the Sun.
     SolarArray,
+    /// Version 0.06.0 (ticket #92): the Mass Driver, a Module only a ground Colony on a low-gravity
+    /// Body holds, behind Efficient Transit: the owner's departures four Fuel cheaper, its Mines +1.
+    MassDriver,
 }
 
 impl ModuleKind {
-    pub const ALL: [ModuleKind; 11] = [
+    pub const ALL: [ModuleKind; 12] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -160,9 +163,10 @@ impl ModuleKind {
         ModuleKind::Archive,
         ModuleKind::Observatory,
         ModuleKind::SolarArray,
+        ModuleKind::MassDriver,
     ];
     /// The Modules an ordinary build order may place (ticket #51: the Archive is not one of them).
-    pub const BUILDABLE: [ModuleKind; 10] = [
+    pub const BUILDABLE: [ModuleKind; 11] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -173,6 +177,7 @@ impl ModuleKind {
         ModuleKind::Relay,
         ModuleKind::Observatory,
         ModuleKind::SolarArray,
+        ModuleKind::MassDriver,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -187,6 +192,7 @@ impl ModuleKind {
             ModuleKind::Archive => "The Archive",
             ModuleKind::Observatory => "Observatory",
             ModuleKind::SolarArray => "Solar Array",
+            ModuleKind::MassDriver => "Mass Driver",
         }
     }
 }

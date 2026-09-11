@@ -6045,3 +6045,81 @@ fn the_ai_offers_a_trade_post_at_each_body_it_holds() {
     g.ai_orders(Seat(0));
     assert!(!g.log.iter().any(|l| l.contains(&format!("build Trade Post at {name}"))), "one per Body: not offered again");
 }
+
+// ---------------------------------------------------------------- 0.06.0 ticket #92: the Mass Driver
+
+/// Ticket #92: the Moon, Phobos and Deimos are low-gravity; the Mass Driver is 35 Materials, two
+/// turns, 4 Energy, behind Efficient Transit, on a ground Colony of a low-gravity Body, one per
+/// Colony.
+#[test]
+fn the_mass_driver_stands_on_a_low_gravity_colony_behind_efficient_transit_one_per_colony() {
+    let mut g = game();
+    for b in BodyId::ALL {
+        assert_eq!(g.tables.body(b).low_gravity, matches!(b, BodyId::Moon | BodyId::Phobos | BodyId::Deimos), "{b:?}");
+    }
+    let card = g.tables.module(ModuleKind::MassDriver);
+    assert_eq!((card.materials, card.build_turns, card.energy_upkeep), (35, 2, 4));
+    assert_eq!(card.needs_tech, Some(TechId::EfficientTransit));
+    g.seats[0].stockpile.materials = 300;
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 0);
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 0);
+    let build = |c| Order::BuildModule { colony: c, kind: ModuleKind::MassDriver };
+    assert!(g.check_order(Seat(0), &[], &build(moon)).unwrap_err().0.contains("Efficient Transit"), "the Tech first");
+    with_tech(&mut g, TechId::EfficientTransit);
+    assert!(g.check_order(Seat(0), &[], &build(moon)).is_ok());
+    assert!(g.check_order(Seat(0), &[], &build(mars)).unwrap_err().0.contains("low"), "Mars is not a small world");
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    assert!(g.check_order(Seat(0), &[], &build(iss)).is_err(), "not on a station");
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::MassDriver));
+    assert!(g.check_order(Seat(0), &[], &build(moon)).unwrap_err().0.contains("Mass Driver"), "one per Colony");
+}
+
+/// Ticket #92: a working Mass Driver takes a flat 4 Fuel off every leg the owner's Ships fly from
+/// its Body, after the multipliers, to a minimum of 1; a rival pays the full leg; a mothballed one
+/// does nothing; and each Mine at its Colony makes +1 Materials.
+#[test]
+fn a_mass_driver_cuts_the_owners_departures_by_four_and_gives_its_mines_one_more() {
+    let mut g = game();
+    at_window(&mut g);
+    let cus = Seat(0);
+    let moon = colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Mine, ModuleKind::MassDriver], 0);
+    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Earth).1, 2, "6 - 4");
+    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Mars).1, 16, "20 - 4");
+    assert_eq!(g.transit_cost_for(cus, BodyId::Earth, BodyId::Moon).1, 6, "arriving is not departing");
+    assert_eq!(g.transit_cost_for(Seat(1), BodyId::Moon, BodyId::Earth).1, 6, "a rival pays the leg");
+    let ark = Seat(2);
+    colony(&mut g, ark, BodyId::Moon, &[ModuleKind::MassDriver], 0);
+    assert_eq!(g.transit_cost_for(ark, BodyId::Moon, BodyId::Earth).1, 1, "6 x 0.75 = 4, - 4, minimum 1");
+    assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 7, "4 x 1.65 = 6, +1");
+    g.colony_mut(moon).unwrap().modules[1].mothballed = true;
+    assert_eq!(g.transit_cost_for(cus, BodyId::Moon, BodyId::Earth).1, 6, "mothballed, it throws nothing");
+    assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 6);
+}
+
+/// Ticket #92: the AI offers a Mass Driver at a low-gravity Colony with a Mine once the Tech
+/// stands, and weighs a Mine higher where one stands.
+#[test]
+fn the_ai_offers_a_mass_driver_and_weighs_a_mine_higher_beside_one() {
+    let mut g = game();
+    calm(&mut g);
+    with_tech(&mut g, TechId::EfficientTransit);
+    g.seats[0].stockpile.materials = 300;
+    g.seats[0].stockpile.energy = 300;
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Generator], 4);
+    let plain = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine, ModuleKind::Generator], 4);
+    g.ai_orders(Seat(0));
+    let moon_name = g.place_name(Place::Colony(moon));
+    assert!(g.log.iter().any(|l| l.contains(&format!("build Mass Driver at {moon_name}"))), "no Mass Driver offered on the Moon");
+    let score = |g: &Game, c: ColonyId| -> f64 {
+        let name = g.place_name(Place::Colony(c));
+        let needle = format!("build Mine at {name}");
+        g.log.iter().find(|l| l.contains(&needle)).and_then(|l| l.split_whitespace().nth(1).and_then(|s| s.parse().ok())).unwrap_or(0.0)
+    };
+    let before = score(&g, moon);
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::MassDriver));
+    g.log.clear();
+    g.ai_orders(Seat(0));
+    let after = score(&g, moon);
+    let mars = score(&g, plain);
+    assert!(after > before && after > mars, "a Mine beside a Mass Driver weighs more: {before} then {after}, Mars {mars}");
+}

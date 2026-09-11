@@ -67,6 +67,13 @@ produces = { resource = "ducats", amount = 2 }
 [trade_post]
 per_other_body = 3
 
+# Ticket #92 (version 0.06.0): the Mass Driver's figures; its row is the last in the file, in the
+# engine's order.
+[mass_driver]
+fuel_off = 4
+fuel_min = 1
+mine_bonus = 1
+
 # Ticket #36 (version 0.03). Adds to its holder's Allotment and raises its Colony's standing each turn.
 [[module]]
 id = "relay"
@@ -126,6 +133,20 @@ energy_upkeep = 0
 produces = { resource = "energy", amount = 6 }
 station_only = true
 sun_scaled = true
+
+# Ticket #92 (version 0.06.0): the Mass Driver, a Module only a ground Colony on a low-gravity
+# Body (bodies.toml `low_gravity`: the Moon, Phobos, Deimos) holds, one per Colony, behind
+# `needs_tech`. While it is working, every transit the owner's Ships fly from that Body spends
+# `[mass_driver] fuel_off` less, after the Faction's and the Tech's multipliers, never below
+# `fuel_min`; and each Mine at its Colony makes `mine_bonus` more Materials, after everything.
+[[module]]
+id = "mass_driver"
+name = "Mass Driver"
+materials = 35
+build_turns = 2
+energy_upkeep = 4
+needs_tech = "efficient_transit"
+low_gravity_only = true
 
 # Ticket #88 (version 0.06.0): build it where you dig. A Module (the Archive included) built at a
 # Colony with one working Mine costs `one_mine` of its price, with two or more `two_mines`,

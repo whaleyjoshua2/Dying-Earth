@@ -180,8 +180,12 @@ _Avoid_: lab, laboratory, research station, institute, science module
 The Module only a Space Station holds, since version 0.06.0. It makes Energy that follows the sunlight where the station is: six a turn at Earth's distance, less than half that over Mars, nearly twice it over Venus, by the inverse square of the Body's mean distance from the Sun. Efficient Grids lifts it as it lifts a Generator, a Solar Storm turn silences it, and any number may stand on one station.
 _Avoid_: solar panel, power satellite, collector
 
+**Mass Driver**:
+The Module only a ground Colony on a small world (the Moon, Phobos, Deimos) holds, since version 0.06.0, one to a Colony, behind Efficient Transit. While it works, every transit its owner's Ships fly from that Body spends four Fuel less, after every multiplier and never below one, and each Mine at its Colony makes one Materials more.
+_Avoid_: catapult, launcher, railgun, launch loop
+
 **Module**:
-A building placed inside a Colony. Eleven kinds since version 0.06.0: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, the Solar Array (a Space Station's alone), and the Archive, which only the Archivists raise, one to a Faction, from its own button. A Habitat holds eight Colonists since version 0.06.0.
+A building placed inside a Colony. Twelve kinds since version 0.06.0: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, the Solar Array (a Space Station's alone), the Mass Driver (a small world's alone), and the Archive, which only the Archivists raise, one to a Faction, from its own button. A Habitat holds eight Colonists since version 0.06.0.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:

@@ -703,7 +703,32 @@ impl Game {
                         let w = self.base_weight(seat, Cat::Producer) * if bodies >= 2 { 1.5 } else { 1.0 };
                         (Cat::Producer, w)
                     }
-                    ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
+                    // Ticket #92: a Mass Driver at a low-gravity ground Colony with a Mine, once the
+                    // Tech stands, one per Colony; and a Mine beside one weighs what the driver adds.
+                    ModuleKind::MassDriver => {
+                        let card = self.tables.module(mk);
+                        let allowed = !col.in_orbit
+                            && self.tables.body(col.body).low_gravity
+                            && card.needs_tech.map(|t| self.has_tech(t)).unwrap_or(true)
+                            && col.modules.iter().any(|m| m.kind == ModuleKind::Mine)
+                            && !col.modules.iter().any(|m| m.kind == ModuleKind::MassDriver)
+                            && !col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::MassDriver));
+                        if !allowed {
+                            continue;
+                        }
+                        (Cat::Producer, self.base_weight(seat, Cat::Producer) * 1.5)
+                    }
+                    ModuleKind::Mine => {
+                        let mut w = self.base_weight(seat, Cat::Producer);
+                        if col.modules.iter().any(|m| m.kind == ModuleKind::MassDriver && m.working()) {
+                            // The yield here already carries the bonus; weigh it against the bare figure.
+                            let with = self.module_yield(seat, cid, ModuleKind::Mine).amount as f64;
+                            let plain = (with - self.tables.mass_driver.mine_bonus as f64).max(1.0);
+                            w *= with / plain;
+                        }
+                        (Cat::Producer, w)
+                    }
+                    ModuleKind::Generator | ModuleKind::Refinery => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                     ModuleKind::Relay => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
                     // Ticket #51: the Archive is never an ordinary Module build; it has its own order.
                     ModuleKind::Archive => continue,

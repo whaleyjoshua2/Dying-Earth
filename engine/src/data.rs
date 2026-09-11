@@ -56,6 +56,9 @@ pub struct BodyCard {
     pub local_fuel: i64,
     pub transit_turns: u32,
     pub transit_fuel: i64,
+    /// Ticket #92 (version 0.06.0): a small world, where a Mass Driver may stand.
+    #[serde(default)]
+    pub low_gravity: bool,
     pub mine_yield: f64,
     pub generator_yield: f64,
     pub refinery_yield: f64,
@@ -173,6 +176,21 @@ pub struct ModuleCard {
     /// Sun instead of a Body yield, and a Solar Storm turn silences it.
     #[serde(default)]
     pub sun_scaled: bool,
+    /// Ticket #92 (version 0.06.0): the Tech that must stand before it can be built, if any.
+    #[serde(default)]
+    pub needs_tech: Option<TechId>,
+    /// Ticket #92: only a ground Colony on a low-gravity Body holds it.
+    #[serde(default)]
+    pub low_gravity_only: bool,
+}
+
+/// Ticket #92 (version 0.06.0): the Mass Driver's figures: the Fuel it takes off the owner's
+/// departures (never below the minimum) and what each Mine at its Colony makes more.
+#[derive(Debug, Clone, Deserialize)]
+pub struct MassDriverCard {
+    pub fuel_off: i64,
+    pub fuel_min: i64,
+    pub mine_bonus: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -877,6 +895,7 @@ struct ModulesFile {
     observatory: ObservatoryCard,
     in_situ: InSituCard,
     trade_post: TradePostCard,
+    mass_driver: MassDriverCard,
 }
 #[derive(Debug, Clone, Deserialize)]
 struct UnitsFile {
@@ -965,6 +984,8 @@ pub struct Tables {
     pub in_situ: InSituCard,
     /// Ticket #90: the Trade Post's network figure.
     pub trade_post: TradePostCard,
+    /// Ticket #92: the Mass Driver's Fuel cut and Mine bonus.
+    pub mass_driver: MassDriverCard,
     pub units: Vec<UnitCard>,
     pub repair: RepairCard,
     /// Ticket #86: the crowd a warming Earth puts aboard a Colony Ship, and what it risks.
@@ -1040,6 +1061,7 @@ impl Tables {
             observatory: modules.observatory,
             in_situ: modules.in_situ,
             trade_post: modules.trade_post,
+            mass_driver: modules.mass_driver,
             modules: modules.module,
             units: units.unit,
             repair: units.repair,

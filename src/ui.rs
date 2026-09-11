@@ -2274,7 +2274,9 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         if to == body {
             continue;
         }
-        let (turns, fuel) = game.transit_cost(body, to);
+        // Ticket #92: the player's own figure, with the Faction's and the Tech's multipliers and a
+        // Mass Driver's cut on it.
+        let (turns, fuel) = game.transit_cost_for(Seat(0), body, to);
         ui.horizontal_wrapped(|ui| {
             ui.label(format!("To {}: {} turn(s), {} Fuel each from the tank", game.tables.body(to).name, turns, fuel));
             for s in &ships {

@@ -310,7 +310,17 @@ impl Game {
                 }
                 y.resource = Some(p.resource);
                 y.amount = if mc.sun_scaled { v.round() as i64 } else { v.floor() as i64 };
+                // Ticket #92: a working Mass Driver at the Colony gives each Mine there more, after
+                // everything.
+                if kind == ModuleKind::Mine && col.modules.iter().any(|m| m.kind == ModuleKind::MassDriver && m.working()) {
+                    y.amount += t.mass_driver.mine_bonus;
+                }
             }
+        }
+        // Ticket #92: a Mass Driver makes nothing itself; the card says what it does.
+        if kind == ModuleKind::MassDriver {
+            let md = &t.mass_driver;
+            y.detail = Some(format!("departures from here {} Fuel cheaper, never under {}; each Mine here +{} Materials", md.fuel_off, md.fuel_min, md.mine_bonus));
         }
         // Ticket #51: the Archive draws its Energy only once it is complete; ticket #68: that is
         // standing with its Research paid in full. Until then it costs nothing to run.

@@ -556,7 +556,17 @@ impl Game {
                 {
                     return fail(format!("you already hold a Trade Post at {}; one per Body", self.tables.body(col.body).name));
                 }
-                if matches!(kind, ModuleKind::Shipyard | ModuleKind::Barracks) {
+                // Ticket #92: the Mass Driver waits on its Tech, stands only on a ground Colony of
+                // a low-gravity Body, and once per Colony.
+                if let Some(t) = self.tables.module(*kind).needs_tech
+                    && !self.has_tech(t)
+                {
+                    return fail(format!("a {} needs {} first", kind.name(), self.tables.tech(t).name));
+                }
+                if self.tables.module(*kind).low_gravity_only && (col.in_orbit || !self.tables.body(col.body).low_gravity) {
+                    return fail(format!("a {} stands only on the ground of a low-gravity Body (the Moon, Phobos, Deimos)", kind.name()));
+                }
+                if matches!(kind, ModuleKind::Shipyard | ModuleKind::Barracks | ModuleKind::MassDriver) {
                     let has = col.modules.iter().any(|m| m.kind == *kind)
                         || col.queue.iter().any(|b| b.item == BuildItem::Module(*kind))
                         || pending.iter().any(|o| o.build_module() == Some((*colony, *kind)));

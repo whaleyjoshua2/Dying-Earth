@@ -102,6 +102,10 @@ pub struct SimResult {
     pub solar_arrays: u32,
     /// Ticket #90: Trade Posts standing at the end, all seats.
     pub trade_posts: u32,
+    /// Ticket #92: Mass Drivers standing at the end, all seats, and Colonies founded on Phobos or
+    /// Deimos over the game.
+    pub mass_drivers: u32,
+    pub martian_moon_colonies: u32,
     /// Ticket #72: the Prospectors' Venture Capital Fund at the end.
     pub venture_fund_at_end: i64,
     /// Ticket #76: cards drawn over the game, and whether the deck ran dry.
@@ -391,6 +395,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         ground_colonies: game.colonies.iter().filter(|c| !c.in_orbit).count() as u32,
         solar_arrays: game.colonies.iter().map(|c| c.modules.iter().filter(|m| m.kind == ModuleKind::SolarArray).count() as u32).sum(),
         trade_posts: game.colonies.iter().map(|c| c.modules.iter().filter(|m| m.kind == ModuleKind::TradePost).count() as u32).sum(),
+        mass_drivers: game.colonies.iter().map(|c| c.modules.iter().filter(|m| m.kind == ModuleKind::MassDriver).count() as u32).sum(),
+        martian_moon_colonies: game.colonies.iter().filter(|c| !c.in_orbit && matches!(c.body, BodyId::Phobos | BodyId::Deimos)).count() as u32,
         venture_fund_at_end: Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Prospectors).map(|s| game.seat(s).venture_fund).unwrap_or(0),
         cards_drawn: game.deck.drawn.len() as u32,
         deck_empty: game.deck.cards.is_empty(),

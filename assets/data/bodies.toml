@@ -42,6 +42,8 @@ slots = [
 
 [[body]]
 id = "moon"
+# Ticket #92 (version 0.06.0): a small world, where a Mass Driver may stand.
+low_gravity = true
 name = "the Moon"
 parent = "earth"
 local_turns = 1
@@ -87,6 +89,7 @@ slots = [
 # 1 Fuel between them.
 [[body]]
 id = "phobos"
+low_gravity = true
 name = "Phobos"
 parent = "mars"
 local_turns = 1
@@ -106,6 +109,7 @@ slots = [
 
 [[body]]
 id = "deimos"
+low_gravity = true
 name = "Deimos"
 parent = "mars"
 local_turns = 1

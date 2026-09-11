@@ -308,6 +308,18 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.materials = 120;
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
         }
+        // `driver:1` (a building aid, ticket #92): Efficient Transit stands, and seat 0 holds a
+        // Colony on the Moon with a Mine and a Mass Driver, its card open in the Moon picture.
+        if std::env::args().any(|a| a == "driver:1") {
+            g.research.done.push(TechId::EfficientTransit);
+            let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
+            let id = ColonyId(g.fresh_id());
+            let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Mine), Module::new(ModuleKind::MassDriver)];
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.seats[0].stockpile.materials = 120;
+            g.seats[0].stockpile.energy = 60;
+            ARCHIVE_COLONY.with(|c| c.set(Some(id)));
+        }
         // `dry:1` (a building aid, ticket #87): seat 0's Ships at Mars have one Fuel in the tank and
         // no station of theirs overhead, so the stack reads stranded and its panel says why.
         if std::env::args().any(|a| a == "dry:1") {

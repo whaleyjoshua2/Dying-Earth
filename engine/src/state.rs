@@ -1694,7 +1694,22 @@ impl Game {
 
     pub fn transit_cost_for_at(&self, seat: Seat, from: BodyId, to: BodyId, turn: u32) -> (u32, i64) {
         let faction = self.tables.faction(self.kind(seat)).transit_fuel_multiplier;
-        self.transit_cost_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit), turn)
+        let (turns, fuel) = self.transit_cost_with(from, to, faction, self.tech_multiplier(seat, TechId::EfficientTransit), turn);
+        // Ticket #92 (version 0.06.0): a working Mass Driver of the seat's at the Body it leaves
+        // takes a flat figure off, after the multipliers, never below the minimum.
+        if self.mass_driver_at(seat, from) {
+            let md = &self.tables.mass_driver;
+            return (turns, (fuel - md.fuel_off).max(md.fuel_min));
+        }
+        (turns, fuel)
+    }
+
+    /// Ticket #92: whether the seat has a working Mass Driver at a ground Colony on this Body.
+    pub fn mass_driver_at(&self, seat: Seat, body: BodyId) -> bool {
+        self.colonies
+            .iter()
+            .filter(|c| !c.in_orbit && c.body == body && c.control.director() == Some(seat))
+            .any(|c| c.modules.iter().any(|m| m.kind == ModuleKind::MassDriver && m.working()))
     }
 
     fn transit_cost_with(&self, from: BodyId, to: BodyId, faction: f64, tech: f64, turn: u32) -> (u32, i64) {
