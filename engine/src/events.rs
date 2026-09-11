@@ -56,6 +56,8 @@ impl Game {
         let drawn = self.target_event(id);
         self.log(format!("Event: {}", drawn.text));
         self.report.event = Some(drawn.text.clone());
+        let text = self.say("event_drawn", &[("text", drawn.text.clone())]);
+        self.report_line(LineKind::Event, None, text);
         self.last_event = Some(drawn);
     }
 
@@ -75,8 +77,8 @@ impl Game {
                 let m = if self.has_tech(TechId::EfficientGrids) { t.events.solar_maximum_multiplier_with_tech } else { t.events.solar_maximum_multiplier };
                 (EventTarget::Everyone, format!("{}: every Power Plant and Generator makes x{} at the next Income.", card.name, m))
             }
-            EventId::PermafrostThaw => {
-                let e = if self.has_tech(TechId::GreenConsensus) { t.events.permafrost_emissions / 2.0 } else { t.events.permafrost_emissions } * scale;
+            EventId::MethaneBurst => {
+                let e = if self.has_tech(TechId::GreenConsensus) { t.events.methane_emissions / 2.0 } else { t.events.methane_emissions } * scale;
                 (EventTarget::Everyone, format!("{}: +{:.1} Emissions next turn (x{:.2} at this Temperature).", card.name, e, scale))
             }
             EventId::LaunchPadFire => {
@@ -165,7 +167,8 @@ impl Game {
                                 let em = if self.has_tech(TechId::CleanManufacturing) { 0.0 } else { t.events.wildfire_emissions * scale };
                                 format!("{} in {}: one Facility offline until next Resolution; +{:.1} Emissions next turn.", card.name, name, em)
                             }
-                            _ => format!("{} in {}: its Standing Army takes {} damage and every Faction's Influence there drops by {}.", card.name, name, t.events.unrest_army_damage, t.events.unrest_influence_loss),
+                            // Ticket #52: the Unrest card is a flat rise in the state's Unrest.
+                            _ => format!("{} in {}: its Unrest rises by {}.", card.name, name, t.events.unrest_card_unrest),
                         };
                         (EventTarget::State(s), text)
                     }
@@ -209,6 +212,22 @@ impl Game {
         self.states.iter().rev().find(|s| s.population > 0.0).map(|s| s.id)
     }
 
+    /// Ticket #52: a Heatwave, a Wildfire or a Storm Surge landing on a state raises its Unrest
+    /// as a climate source, so the green Techs and a Constabulary damp it.
+    fn climate_card_unrest(&mut self, s: StateId) {
+        let n = self.tables.unrest.climate_card;
+        let rose = self.raise_unrest(s, n, UnrestSource::Climate);
+        if rose > 0.0 {
+            let line = format!("{}: Unrest rose by {} to {}.", self.tables.state(s).name, Game::unrest_figure(rose), self.unrest_text(s));
+            self.log(line);
+            let text = self.say(
+                "unrest_rose_state",
+                &[("state", self.tables.state(s).name.clone()), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(s))],
+            );
+            self.report_line(LineKind::Unrest, Some(ReportPlace::State(s)), text);
+        }
+    }
+
     /// Whether this turn's card is the named Event.
     pub fn event_is(&self, id: EventId) -> bool {
         matches!(&self.last_event, Some(DrawnEvent { card: Card::Event(e), target, .. }) if *e == id && *target != EventTarget::None)
@@ -234,15 +253,16 @@ impl Game {
                         self.destroy_ship(sid, t.event(id).name.as_str());
                     }
                     if hit > 0 {
-                        self.report.lines.push(format!("{} damaged {} Ship(s).", t.event(id).name, hit));
+                        let text = self.say("event_damaged_ships", &[("event", t.event(id).name.clone()), ("n", hit.to_string())]);
+                        self.report_line(LineKind::Ship, None, text);
                     }
                 }
             }
             (EventId::SolarMaximum, EventTarget::Everyone) => {
                 self.solar_maximum_next = true;
             }
-            (EventId::PermafrostThaw, EventTarget::Everyone) => {
-                let e = if self.has_tech(TechId::GreenConsensus) { t.events.permafrost_emissions / 2.0 } else { t.events.permafrost_emissions };
+            (EventId::MethaneBurst, EventTarget::Everyone) => {
+                let e = if self.has_tech(TechId::GreenConsensus) { t.events.methane_emissions / 2.0 } else { t.events.methane_emissions };
                 self.climate.card_emissions_next += e * ev.scale;
             }
             (EventId::GridFailure, EventTarget::Colony(c)) => {
@@ -293,6 +313,8 @@ impl Game {
                 let loss = if self.has_tech(TechId::GreenConsensus) { t.events.heatwave_loss_green_consensus } else { t.events.heatwave_loss };
                 let st = self.state_mut(s);
                 st.population = (st.population * (1.0 - loss * ev.scale)).max(0.0);
+                // Ticket #52: a Heatwave is one of the three Climate cards that raise Unrest.
+                self.climate_card_unrest(s);
             }
             (EventId::LaunchPadFire, EventTarget::State(s)) => {
                 if self.has_tech(TechId::CleanPropellant) {
@@ -332,29 +354,30 @@ impl Game {
                 if !self.has_tech(TechId::CleanManufacturing) {
                     self.state_mut(s).wildfire_emissions_next += t.events.wildfire_emissions * ev.scale;
                 }
+                // Ticket #52: a Wildfire is one of the three Climate cards that raise Unrest.
+                self.climate_card_unrest(s);
             }
+            // Ticket #52: the card is a flat rise in the state's Unrest, damped by nothing.
             (EventId::Unrest, EventTarget::State(s)) => {
-                let hp = t.unit(UnitKind::Army).hit_points;
-                let mut dead = None;
-                if let Some(a) = self.armies.iter_mut().find(|a| a.standing && a.home == ArmyHome::State(s)) {
-                    a.damage += t.events.unrest_army_damage;
-                    if a.damage >= hp {
-                        dead = Some(a.id);
-                    }
-                }
-                if let Some(id) = dead {
-                    self.destroy_army(id);
-                }
-                for seat in Seat::ALL {
-                    if let Some(v) = self.seat_mut(seat).influence.get_mut(&Place::State(s)) {
-                        *v = (*v - t.events.unrest_influence_loss).max(0);
-                    }
+                let n = t.events.unrest_card_unrest;
+                let rose = self.raise_unrest(s, n, UnrestSource::Plain);
+                if rose > 0.0 {
+                    let line = format!("Unrest in {}: its Unrest rose by {} to {}.", t.state(s).name, Game::unrest_figure(rose), self.unrest_text(s));
+                    self.log(line);
+                    let text = self.say(
+                        "unrest_card",
+                        &[("state", t.state(s).name.clone()), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(s))],
+                    );
+                    self.report_line(LineKind::Unrest, Some(ReportPlace::State(s)), text);
                 }
             }
             (EventId::StormSurge, EventTarget::State(s)) => {
                 if let Some(i) = self.state(s).thresholds_fired.iter().position(|f| !f) {
                     self.apply_sea_threshold(s, i);
                 }
+                // Ticket #52: a Storm Surge is one of the three Climate cards that raise Unrest,
+                // on top of what the threshold it brings forward costs in build slots.
+                self.climate_card_unrest(s);
             }
             _ => {}
         }

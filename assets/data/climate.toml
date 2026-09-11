@@ -7,12 +7,115 @@ degrees_per_ppm_step = 0.5
 # re-run on ticket #28 after the two new Nation States of #26 added four emitting start Facilities.
 # At 40 ppm the Custodian-versus-Prospector game collapsed by turn 10. At 90 it collapses in 17 of
 # 20 seeds between turns 15 and 21, median 16; 100 would give 10 of 20 with a median of 19.
-ppm_step = 90.0
+# Ticket #50 (version 0.05): four Factions' industry on eight Nation States adds about a third more
+# Emissions, so the step is re-swept with four seats. At 90 a Prospector holding Asia collapses the
+# world on turn 13 in every seed; at 120 that seating collapses on turns 16 to 18, the other
+# seatings end at +2.5 to +2.9 C, and a Custodian starting outside Asia collapses on turn 18. At
+# 150 half the seatings end comfortable at +2.3. The sweep tables are in the 0.05 dev diary.
+# Ticket #53 (version 0.05): twelve Nation States raise total Industry Level from 17 to 23 and
+# state industry Emissions from 6.0 to 8.4 a turn, with six more start Facilities, so the step is
+# re-swept as it was on #26 and #46. At 120 every seating collapsed (a Custodian in East Asia by
+# turn 21, where at eight states it never collapsed at all). At 150 a Prospector in East Asia
+# collapses on turns 20 to 24, a Custodian starting in Europe on 22 to 24, and a Custodian in East
+# Asia survives 19 of 20 at +2.90. At 170 half the seatings finish comfortable. 150 keeps every
+# seating hot to the end, which is what #46 chose the step for.
+# Ticket #60 (version 0.05): the build ticket's re-sweep, with every climate rule of the version in
+# -- the Scrubber, per-person Emissions, Blame, neutral development, the sea, and above all the five
+# Breaks of #55, which #55 measured as taking every seating to 20 of 20 Collapses at a median turn
+# 17 to 22. Thirty-two cells a seating, twenty seeds a cell, over five seatings: `ppm_step` {150,
+# 180, 210, 240} x `natural_sink` {6, 8} x the Permafrost Thaw's `emissions_per_turn` {4.0, 2.5} x
+# the Sink Weakens' `sink_after` {4.0, 5.0}. The full tables are in the 0.05 dev diary.
+#
+# CHOSEN: step 180, the Sink at 6.0, and BOTH BREAK FIGURES LEFT WHERE #55 PUT THEM. At 180 every
+# one of the five seatings still ends at about +3.0 -- hot to the last turn, which is what #46 and
+# #53 chose the step for -- and every seating's median Collapse turn is 20 or later, against the 17
+# to 22 of #55. It is the cell closest to the target over all five seatings, tied on that measure
+# with (sink 6, step 180, sink_after 5.0); the tie went to this one because the two Break figures
+# are drawn from real-world warming (the research note on `research/tipping-points`) while
+# `ppm_step` is the game's own pacing knob, re-swept on every ticket that changed the board (#26,
+# #46, #50, #53). Moving a researched figure to pace the game is the wrong knob to reach for first.
+#
+# NO CELL MEETS THE TARGET FOR EVERY SEATING, and at this one three of the five miss it: the
+# Arkwrights in East Asia and the Archivists from Europe still collapse 20 of 20 (median turns 20
+# and 20), the Custodians from Europe 18 of 20 at 23, and the Custodians in East Asia 9 of 20 at 20
+# -- just under the half the target wants. Only the Prospectors in East Asia land inside it, 12 of
+# 20 at a median 24. THE DESIGNER MAY MOVE THIS: at 210 the Prospector and Europe boards fall to 0
+# or 1 Collapse in 20 and finish at +2.8, which is the next cell up; 150 is where it stood, at 19 or
+# 20 of 20 everywhere.
+ppm_step = 180.0
 natural_sink = 6.0
 collapse_line = 3.0
 temperature_lag_fraction = 0.5
 population_growth = 0.01
 population_loss_per_tenth_degree = 0.0015
-population_emissions_per_hundred_million = 0.1
+# Ticket #54 (version 0.05): Population Emissions follow the Industry Level of the state the people
+# live in, in place of the flat 0.1 a hundred million every state paid: a state emits
+# `population_emissions_base + population_emissions_per_level x Industry Level` per hundred million.
+# At the opening board that is 0.07 in Sub-Saharan Africa and 0.13 in East Asia, and the world's
+# total is 8.03 against the old 7.86, within a fiftieth. Green Consensus halves the whole line as
+# before, the Faction Emissions multiplier applies as before, and the Custodians' Leapfrog lowers a
+# state's own coefficient by one level's worth at a time, never below the base.
+population_emissions_base = 0.04
+population_emissions_per_level = 0.03
 launch_emissions = 2.0
 sea_level_thresholds = [1.8, 2.3, 2.8]
+
+# Ticket #55 (version 0.05): the Temperature at which Antarctica's Colony Slots open. The sea-level
+# ticket will read it; the Climate Panel's Temperature bar draws its notch from here already.
+antarctica_opens_at = 1.6
+
+# Ticket #55 (version 0.05): the Breaks. A Break is a Temperature at which a permanent change fires
+# once, in the Climate phase, the first time the Temperature stands at or above it -- the same
+# "fires once" bookkeeping as the Sea Level thresholds above. The Report says it HAPPENED and never
+# that it is committed: `happened` is the sentence and `text` the card line under it. Move a
+# Temperature, change a figure or add a row, and the game and the Climate Panel's bar follow; the
+# list must rise in Temperature. The real-world warming each is drawn from is in the research note
+# on the branch `research/tipping-points`.
+
+[[break]]
+id = "coral_die_off"
+name = "Coral Die-off"
+temperature = 1.4
+effect = "coastal_unrest"
+exposure = 2
+unrest = 1.0
+population_loss = 0.02
+happened = "The reefs die."
+text = "The reefs bleach white and die; the coasts that lived off them do not forget."
+
+[[break]]
+id = "permafrost_thaw"
+name = "Permafrost Thaw"
+temperature = 1.6
+effect = "emissions_per_turn"
+emissions = 4.0
+happened = "The permafrost thaws."
+text = "The frozen ground gives way, and a thousand billion tonnes of old carbon starts breathing out."
+
+[[break]]
+id = "sink_weakens"
+name = "The Sink Weakens"
+temperature = 2.0
+effect = "weaken_sink"
+sink_after = 4.0
+happened = "The Natural Sink weakens."
+text = "The forests and the oceans are full; the world stops taking back what we give it."
+
+[[break]]
+id = "ice_sheets_committed"
+name = "Ice Sheets Committed"
+temperature = 2.2
+effect = "sea_level_threshold"
+happened = "The ice sheets let go."
+text = "Greenland and Thwaites pass the point of return; the sea is coming for the coasts and it will not stop."
+
+[[break]]
+id = "amazon_dieback"
+name = "Amazon Dieback"
+temperature = 2.6
+effect = "carbon_pulse"
+co2 = 20.0
+baseline_rise = 1.0
+state = "south_america"
+happened = "The Amazon dies back."
+text = "The rainforest stops making its own rain, and the biggest carbon sink on land becomes a source."

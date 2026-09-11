@@ -9,10 +9,11 @@ draw_chance_per_step = 0.025
 draw_chance_step_degrees = 0.2
 solar_maximum_multiplier = 1.5
 solar_maximum_multiplier_with_tech = 2.0
-permafrost_emissions = 3.0
+methane_emissions = 2.5
 meteor_damage = 1
-unrest_army_damage = 2
-unrest_influence_loss = 5
+# Ticket #52 (version 0.05): the Unrest card is a flat rise in the state's Unrest now; the Army
+# damage and the Standing loss it used to carry are gone.
+unrest_card_unrest = 3.0
 reactor_leak_energy = 5
 breakthrough_research = 15
 breakthrough_research_public_science = 25
@@ -166,7 +167,7 @@ id = "unrest"
 name = "Unrest"
 kind = "failure"
 target = "nation_state"
-effect = "Its Standing Army takes 2 damage and every Faction's Influence there drops by 5"
+effect = "Its Unrest rises by 3"
 copies = 1
 
 [[event]]
@@ -179,10 +180,10 @@ blunted_by = "closed_loop_colonies"
 copies = 1
 
 [[event]]
-id = "permafrost_thaw"
-name = "Permafrost Thaw"
+id = "methane_burst"
+name = "Methane Burst"
 kind = "climate"
 target = "everyone"
-effect = "+3.0 Emissions next turn, scaled by the Temperature"
+effect = "+2.5 Emissions next turn, scaled by the Temperature"
 blunted_by = "green_consensus"
 copies = 1

@@ -34,9 +34,9 @@ pub struct Sunlight;
 #[derive(Resource)]
 pub struct SceneHandles {
     pub earth_material: Handle<StandardMaterial>,
-    pub flat: [Handle<StandardMaterial>; 2],
+    pub flat: Vec<Handle<StandardMaterial>>,
     pub grey: Handle<StandardMaterial>,
-    pub ring_materials: [Handle<StandardMaterial>; 2],
+    pub ring_materials: Vec<Handle<StandardMaterial>>,
 }
 
 pub const GLOBE_RADIUS: f32 = 1.9;
@@ -66,13 +66,12 @@ pub fn setup_scene(
     let mut flat = |c: [f32; 3], unlit: bool| {
         materials.add(StandardMaterial { base_color: Color::srgb(c[0], c[1], c[2]), unlit, double_sided: true, cull_mode: None, ..default() })
     };
-    let flat0 = flat(colours[0], true);
-    let flat1 = flat(colours[1], true);
+    // Ticket #50: one material per seat, four of them.
+    let flats: Vec<Handle<StandardMaterial>> = colours.iter().map(|c| flat(*c, true)).collect();
     let grey = flat([0.45, 0.45, 0.5], true);
     let sun = flat([1.0, 0.85, 0.3], true);
     let orbit = flat([0.3, 0.3, 0.38], true);
-    let ring0 = flat(colours[0], true);
-    let ring1 = flat(colours[1], true);
+    let rings: Vec<Handle<StandardMaterial>> = colours.iter().map(|c| flat(*c, true)).collect();
 
     // --- Solar System Map
     let flat_ring = Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2));
@@ -107,7 +106,7 @@ pub fn setup_scene(
                 }
                 // One stack marker per seat.
                 for seat in Seat::ALL {
-                    let mat = if seat == Seat(0) { flat0.clone() } else { flat1.clone() };
+                    let mat = flats[seat.index() % flats.len()].clone();
                     p.spawn((Mesh3d(marker.clone()), MeshMaterial3d(mat), Transform::from_scale(Vec3::splat(0.09)), Visibility::Hidden, StackMarker { body, seat }));
                 }
             }
@@ -146,7 +145,7 @@ pub fn setup_scene(
         AmbientLight { color: Color::WHITE, brightness: 900.0, ..default() },
         MainCamera,
     ));
-    commands.insert_resource(SceneHandles { earth_material, flat: [flat0, flat1], grey, ring_materials: [ring0, ring1] });
+    commands.insert_resource(SceneHandles { earth_material, flat: flats, grey, ring_materials: rings });
 }
 
 type RootQuery<'w, 's> = Query<'w, 's, (&'static mut Visibility, Option<&'static SolarRoot>, Option<&'static SurfaceRoot>), Or<(With<SolarRoot>, With<SurfaceRoot>)>>;
@@ -183,6 +182,12 @@ pub fn sync_scene(
         *vis = if show { Visibility::Inherited } else { Visibility::Hidden };
     }
     let turn = session.game.as_ref().map(|g| g.turn).unwrap_or(1);
+    // Ticket #57: every Body stands at its true heliocentric longitude for the turn. Before a game
+    // is made there is no sky to read, so the title screen's system stands at longitude zero.
+    let place = |body: BodyId| match session.game.as_ref() {
+        Some(g) => geo::solar_place(g, body),
+        None => geo::solar_position(body, turn, 0.0),
+    };
     // Globes turn under the pointer; the start-screen Earth spins on its own.
     for (globe, mut t) in &mut globes {
         let yaw = if matches!(session.screen, Screen::ChooseStart { .. }) { view.spin } else { view.yaw };
@@ -190,7 +195,7 @@ pub fn sync_scene(
         let _ = globe;
     }
     for (body, mut t) in &mut bodies {
-        t.translation = geo::solar_position(body.0, turn);
+        t.translation = place(body.0);
         t.rotation = Quat::from_rotation_y(turn as f32 * 0.3) * geo::upright();
     }
     let Some(game) = session.game.as_ref() else {
@@ -212,7 +217,7 @@ pub fn sync_scene(
             let n = game.tables.body(m.body).colony_slots().max(1) as f32;
             let a = m.slot as f32 / n * std::f32::consts::TAU;
             let r = geo::solar_radius(m.body) * 1.35;
-            t.translation = geo::solar_position(m.body, turn) + Vec3::new(a.cos() * r, 0.0, a.sin() * r);
+            t.translation = place(m.body) + Vec3::new(a.cos() * r, 0.0, a.sin() * r);
             t.scale = Vec3::splat(if owner.is_some() { 0.07 } else { 0.045 });
         } else {
             t.scale = Vec3::splat(if owner.is_some() { 0.065 } else { 0.045 });
@@ -225,15 +230,15 @@ pub fn sync_scene(
             continue;
         }
         *vis = Visibility::Inherited;
-        let side = if m.seat == Seat(0) { -1.0 } else { 1.0 };
-        t.translation = geo::solar_position(m.body, turn) + Vec3::new(side * geo::solar_radius(m.body) * 1.4, geo::solar_radius(m.body) + 0.25, 0.0);
+        // Ticket #50: one of four fixed angles round the Body, by seat.
+        t.translation = place(m.body) + geo::stack_offset(m.seat, geo::solar_radius(m.body));
     }
     for (r, mut t, mut vis, mut mat) in &mut rings {
-        t.translation = geo::solar_position(r.0, turn);
+        t.translation = place(r.0);
         match game.orbital_control(r.0) {
             Some(s) => {
                 *vis = Visibility::Inherited;
-                let want = handles.ring_materials[s.index()].clone();
+                let want = handles.ring_materials[s.index() % handles.ring_materials.len()].clone();
                 if mat.0 != want {
                     mat.0 = want;
                 }
@@ -245,8 +250,8 @@ pub fn sync_scene(
     if current == View::Solar && showing_3d {
         for s in &game.ships {
             if let ShipAt::Transit { from, to, turns_left } = s.at {
-                let a = geo::solar_position(from, turn);
-                let b = geo::solar_position(to, turn);
+                let a = place(from);
+                let b = place(to);
                 let colour = session.colours()[s.seat.index()];
                 let c = Color::srgb(colour[0], colour[1], colour[2]);
                 gizmos.line(a, b, c);

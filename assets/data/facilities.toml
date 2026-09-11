@@ -67,6 +67,65 @@ emissions = 0.0
 influence_allotment = 2
 standing_per_turn = 2
 
+# Ticket #52 (version 0.05): the Constabulary. At most one per Nation State, buildable by any
+# Faction. It lowers its state's Unrest by 1 every turn it stands and is online, whatever else
+# happened, and damps every climate-source and refugee rise there by 1 on top of the green Techs.
+[[facility]]
+id = "constabulary"
+name = "Constabulary"
+materials = 25
+build_turns = 1
+energy_upkeep = 2
+emissions = 0.0
+
+# Ticket #54 (version 0.05): the Scrubber, the Custodians' signature Facility, which replaces
+# Restoration. Only they build it, only in a Nation State they control, and it takes NO build slot
+# (`no_slot`). While it stands and is online it enlarges the Natural Sink by `sink_per_turn` ppm in
+# that Climate phase, which counts as removal for its controller's Blame, and it takes 1 off its
+# state's Unrest every turn (`unrest.toml`, `scrubber_fall`). It is destroyed outright if the state
+# changes hands. How many one state may hold is `[scrubber]` below.
+[[facility]]
+id = "scrubber"
+name = "Scrubber"
+materials = 30
+build_turns = 2
+energy_upkeep = 4
+emissions = 0.0
+sink_per_turn = 3.0
+no_slot = true
+
+# Ticket #56 (version 0.05): the Sea Wall. It needs Coastal Engineering, always stands in a coastal
+# slot (`coastal_only`), and at most one may stand in a Nation State. While it stands and is working
+# it absorbs the state's next Sea Level threshold of any kind -- scheduled, a Storm Surge applied
+# early, or the Ice Sheets Break -- so no coastal slot is lost, and it is destroyed doing it.
+[[facility]]
+id = "sea_wall"
+name = "Sea Wall"
+materials = 35
+build_turns = 2
+energy_upkeep = 1
+emissions = 0.0
+needs_tech = "coastal_engineering"
+coastal_only = true
+
+# Ticket #54: the cap on Scrubbers in one Nation State, from its population in hundreds of millions:
+# clamp(round(population / per_population), min, max). Russia at 1.5 gets the floor of 2; South Asia
+# at 19.4 gets the ceiling of 10.
+[scrubber]
+per_population = 2.0
+min = 2
+max = 10
+
+# Ticket #54: Mothball, Restart and Decommission, on any Facility or any Colony Module. A Mothball is
+# free and lands at this Resolution; a Restart costs `restart_materials` and takes `restart_turns`;
+# a Decommission takes `decommission_turns`, refunds half the building's Materials rounded down, and
+# frees its slot. In a Nation State a mothball adds `per_mothball` Unrest and a decommission
+# `per_decommission` (`unrest.toml`); in a Colony neither adds anything.
+[mothball]
+restart_materials = 5
+restart_turns = 1
+decommission_turns = 1
+
 [industry_level]
 materials = 30
 materials_cheap_industry = 15

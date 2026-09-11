@@ -37,6 +37,29 @@ impl Game {
         self.check_tech_complete();
     }
 
+    /// The Research Lead (spec 12.2, ticket #50): the highest contributor to the Tech just done.
+    /// A tie goes to the seat that has picked least recently, never-picked counting as longest ago;
+    /// a tie the picking order does not settle is drawn at random.
+    pub fn research_lead(&mut self) -> Seat {
+        let tied = self.research_lead_candidates();
+        self.random_tie(&tied)
+    }
+
+    /// The seats still tied for the Research Lead once the least-recent-picker rule has been
+    /// applied. One seat is the Lead; more than one goes to a random draw.
+    pub fn research_lead_candidates(&self) -> Vec<Seat> {
+        let c = self.research.contributions;
+        let top = c.iter().copied().max().unwrap_or(0);
+        let mut tied: Vec<Seat> = Seat::ALL.into_iter().filter(|s| c[s.index()] == top).collect();
+        if tied.len() > 1 {
+            // Never picked counts as longest ago; otherwise the earliest turn it last picked.
+            let key = |s: &Seat| self.research.last_picked_turn[s.index()].unwrap_or(0);
+            let oldest = tied.iter().map(key).min().unwrap_or(0);
+            tied.retain(|s| key(s) == oldest);
+        }
+        tied
+    }
+
     fn check_tech_complete(&mut self) {
         loop {
             let Some(tech) = self.research.current else { return };
@@ -46,30 +69,57 @@ impl Game {
             }
             let overflow = self.research.progress - cost;
             let c = self.research.contributions;
-            let lead = if c[1] > c[0] { Seat(1) } else { Seat(0) };
+            let lead = self.research_lead();
             self.research.done.push(tech);
             self.research.current = None;
             self.research.progress = 0;
-            self.research.contributions = [0, 0];
+            self.research.contributions = [0; SEAT_COUNT];
             self.research.unallocated += overflow;
             self.research.last_lead = Some(lead);
+            let shares: Vec<String> = Seat::ALL.into_iter().map(|s| format!("{} {}", self.seat_name(s), c[s.index()])).collect();
             let line = format!(
-                "{} is complete; every Faction has it. The {} led ({} to {}) and pick the next Tech.",
+                "{} is complete; every Faction has it. The {} led ({}) and pick the next Tech.",
                 self.tables.tech(tech).name,
                 self.seat_name(lead),
-                c[lead.index()],
-                c[lead.other().index()]
+                shares.join(", ")
             );
-            self.report.lines.push(line.clone());
             self.log(line);
+            let text = self.say(
+                "tech_complete",
+                &[("tech", self.tables.tech(tech).name.clone()), ("faction", self.seat_name(lead)), ("shares", shares.join(", "))],
+            );
+            self.report_line(LineKind::TechComplete, None, text);
+            // Ticket #58: the Tech Moment names the Lead and the margin, and says what the AI picked
+            // and why. It is filled in before the pick, so the note can name the Tech chosen.
+            self.moment(
+                MomentKind::TechComplete,
+                &[
+                    ("tech", self.tables.tech(tech).name.clone()),
+                    ("faction", self.seat_name(lead)),
+                    ("lead", c[lead.index()].to_string()),
+                    ("cost", cost.to_string()),
+                ],
+                None,
+            );
+            if let Some(m) = self.report.moments.last_mut() {
+                m.tech = Some(tech);
+            }
             if self.available_techs().is_empty() {
                 self.research.awaiting_pick = None;
                 return;
             }
             if self.seat(lead).ai {
-                let pick = self.ai_tech_pick(lead);
+                let (pick, why) = self.ai_tech_pick_with_reason(lead);
+                let note = self.phrase(why, &[("faction", self.seat_name(lead)), ("tech", self.tables.tech(pick).name.clone())]);
+                if let Some(m) = self.report.moments.last_mut() {
+                    m.note = Some(note);
+                }
                 self.pick_tech(lead, pick).ok();
             } else {
+                let note = self.phrase("you_pick", &[]);
+                if let Some(m) = self.report.moments.last_mut() {
+                    m.note = Some(note);
+                }
                 self.research.awaiting_pick = Some(lead);
                 return;
             }
@@ -86,6 +136,7 @@ impl Game {
         }
         self.research.current = Some(tech);
         self.research.awaiting_pick = None;
+        self.research.last_picked_turn[seat.index()] = Some(self.turn);
         let carried = std::mem::take(&mut self.research.unallocated);
         self.research.progress = 0;
         let line = format!("{} chose {} as the next Tech.", self.seat_name(seat), self.tables.tech(tech).name);
@@ -99,44 +150,95 @@ impl Game {
 
     /// The AI's fixed pick order (spec 16.4), then the cheapest available.
     pub fn ai_tech_pick(&self, seat: Seat) -> TechId {
-        let picks = &self.tables.ai.tech_picks;
+        self.ai_tech_pick_with_reason(seat).0
+    }
+
+    /// The same pick, with the `report.toml` phrase that says why it was made (ticket #58): the
+    /// Faction's own first choice off its list, the cheapest left, or the one it leaves until last.
+    pub fn ai_tech_pick_with_reason(&self, seat: Seat) -> (TechId, &'static str) {
+        let picks = self.tables.ai_tech_picks(self.kind(seat));
         let available = self.available_techs();
-        let list: Vec<TechId> = match self.kind(seat) {
-            FactionKind::Prospectors => picks.prospectors.clone(),
-            FactionKind::Custodians => picks.custodians.clone(),
-        };
-        for t in &list {
+        for t in &picks.order {
             if available.contains(t) {
-                return *t;
+                return (*t, "pick_first_choice");
             }
         }
         let mut rest: Vec<TechId> = available.clone();
-        if self.kind(seat) == FactionKind::Prospectors {
-            rest.retain(|t| *t != picks.prospectors_never && *t != picks.prospectors_last);
-        }
+        rest.retain(|t| Some(*t) != picks.never && Some(*t) != picks.last);
         rest.sort_by_key(|t| self.tables.tech(*t).cost);
         if let Some(t) = rest.first() {
-            return *t;
+            return (*t, "pick_cheapest");
         }
-        if available.contains(&picks.prospectors_last) {
-            return picks.prospectors_last;
+        if let Some(last) = picks.last.filter(|t| available.contains(t)) {
+            return (last, "pick_last");
         }
-        available[0]
+        (available[0], "pick_cheapest")
     }
 
-    /// The tech panel line: "Custodians 41%, Prospectors 59% - Prospectors pick next."
+    // ---------------------------------------------------------------- Ticket #51: the Archive fund
+
+    /// Fund the Archive (ticket #51). This turn's Research from the seat's own Labs was paid into
+    /// the shared Tech at Income; funding takes it back out and banks it, so it contributes nothing
+    /// to the Research Lead for the turn. Research past what the remaining stages need is wasted.
+    pub fn fund_archive(&mut self, seat: Seat) {
+        let amount = self.seat(seat).research_last_turn.max(0);
+        // Take it back out of wherever Income put it.
+        let moved = if self.research.current.is_some() {
+            let have = self.research.contributions[seat.index()].min(amount);
+            self.research.contributions[seat.index()] -= have;
+            self.research.progress -= have;
+            have
+        } else {
+            let have = self.research.unallocated.min(amount);
+            self.research.unallocated -= have;
+            have
+        };
+        let cap = self.archive_fund_cap(seat);
+        let before = self.seat(seat).archive_fund;
+        let after = (before + moved).min(cap).max(0);
+        {
+            let s = self.seat_mut(seat);
+            s.archive_fund = after;
+            s.funding_archive = true;
+        }
+        let wasted = before + moved - after;
+        let line = if wasted > 0 {
+            format!("The {} are funding the Archive: {} Research banked, {} of it wasted, {} of {} in the fund.", self.seat_name(seat), moved, wasted, after, cap)
+        } else {
+            format!("The {} are funding the Archive: {} Research banked, {} of {} in the fund.", self.seat_name(seat), moved, after, cap)
+        };
+        self.log(line);
+        let args = vec![
+            ("faction", self.seat_name(seat)),
+            ("banked", moved.to_string()),
+            ("wasted", wasted.to_string()),
+            ("fund", after.to_string()),
+            ("cap", cap.to_string()),
+        ];
+        let text = if wasted > 0 { self.say("archive_funded_wasted", &args) } else { self.say("archive_funded", &args) };
+        self.report_line_of(seat, LineKind::YourWorks, LineKind::Archive, None, text);
+    }
+
+    /// Ticket #51: whether the Archivists diverted this turn's Research, for the tech panel.
+    pub fn funding_archive(&self, seat: Seat) -> bool {
+        self.seat(seat).funding_archive
+    }
+
+    /// The tech panel line: every seat's share of the Tech under research, and who picks next.
     pub fn research_lead_text(&self) -> String {
         let c = self.research.contributions;
-        let total = c[0] + c[1];
-        let pct = |v: i64| if total == 0 { 50 } else { v * 100 / total };
-        let lead = if c[1] > c[0] { Seat(1) } else { Seat(0) };
-        format!(
-            "{} {}%, {} {}% - {} pick next.",
-            self.seat_name(Seat(0)),
-            pct(c[0]),
-            self.seat_name(Seat(1)),
-            pct(c[1]),
-            self.seat_name(lead)
-        )
+        let total: i64 = c.iter().sum();
+        let pct = |v: i64| if total == 0 { 100 / SEAT_COUNT as i64 } else { v * 100 / total };
+        let shares: Vec<String> = Seat::ALL.into_iter().map(|s| format!("{} {}%", self.seat_name(s), pct(c[s.index()]))).collect();
+        let funders: Vec<String> = Seat::ALL.into_iter().filter(|s| self.funding_archive(*s)).map(|s| self.seat_name(s)).collect();
+        let tied = self.research_lead_candidates();
+        let next = if tied.len() == 1 {
+            format!("{} pick next", self.seat_name(tied[0]))
+        } else {
+            let names: Vec<String> = tied.iter().map(|s| self.seat_name(*s)).collect();
+            format!("{} are tied; the next pick is drawn at random", names.join(" and "))
+        };
+        let funding = if funders.is_empty() { String::new() } else { format!(" The {} are funding the Archive this turn.", funders.join(" and ")) };
+        format!("{} - {}.{}", shares.join(", "), next, funding)
     }
 }

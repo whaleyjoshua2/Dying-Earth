@@ -39,22 +39,28 @@ pub struct Textures {
     /// Ticket #45: the moons of Mars, USGS and Stooke maps on spheres (`examples/prep_moons.rs`).
     pub phobos: Rgba,
     pub deimos: Rgba,
-    /// 0 = water, 1..7 = Nation State index + 1 (see `examples/prep_assets.rs`).
+    /// 0 = water, 1..13 = the mask value of a Nation State (see `examples/prep_assets.rs`).
     pub mask: Vec<u8>,
 }
 
-/// The mask's values, 1 to 9, in the order the file was painted (`examples/prep_assets.rs`).
-/// Antarctica keeps its value though it is no longer a Nation State (ticket #44).
-const MASK_STATES: [Option<StateId>; 9] = [
-    Some(StateId::Africa),
+/// The mask's values, 1 to 13, in the order the file was painted (`examples/prep_assets.rs`).
+/// Antarctica keeps value 2 though it is no longer a Nation State (ticket #44), and ticket #53's
+/// four new states were appended rather than renumbered, so an old mask still reads correctly for
+/// the states that did not move.
+const MASK_STATES: [Option<StateId>; 13] = [
+    Some(StateId::SubSaharanAfrica),
     None,
-    Some(StateId::Asia),
+    Some(StateId::EastAsia),
     Some(StateId::Australia),
     Some(StateId::Europe),
     Some(StateId::NorthAmerica),
     Some(StateId::SouthAmerica),
     Some(StateId::Russia),
     Some(StateId::MiddleEast),
+    Some(StateId::NorthAfrica),
+    Some(StateId::SouthAsia),
+    Some(StateId::SouthEastAsia),
+    Some(StateId::CentralAmerica),
 ];
 
 impl Textures {
@@ -77,12 +83,12 @@ impl Textures {
     }
 
     /// The Earth Map for the current board (spec 17.1, 11.4).
-    pub fn compose_earth(&self, game: &Game, colours: &[[f32; 3]; 2]) -> Rgba {
+    pub fn compose_earth(&self, game: &Game, colours: &[[f32; 3]]) -> Rgba {
         let (w, h) = (self.earth.w, self.earth.h);
         let mut out = self.earth.data.clone();
         let warm = ((game.climate.temperature - game.tables.climate.base_temperature) / 1.8).clamp(0.0, 1.0) as f32;
         let fired: Vec<u32> = game.states.iter().map(|s| s.thresholds_fired.iter().filter(|f| **f).count() as u32).collect();
-        let tint_of = |seat: Seat| -> [f32; 3] { colours[seat.index()] };
+        let tint_of = |seat: Seat| -> [f32; 3] { colours.get(seat.index()).copied().unwrap_or([0.6, 0.6, 0.6]) };
         for y in 0..h {
             for x in 0..w {
                 let i = (y * w + x) as usize;

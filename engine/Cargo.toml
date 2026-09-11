@@ -8,4 +8,11 @@ description = "The rules of Dying Earth, with no window attached"
 serde = { version = "1", features = ["derive"] }
 toml = "0.9"
 rand = "0.9"
-rand_chacha = "0.9"
+# Ticket #59: a save carries the generator's own state, so a loaded game draws exactly what the
+# unsaved one would. `serde` is rand_chacha's own feature for it.
+rand_chacha = { version = "0.9", features = ["serde"] }
+# Ticket #59: a save is readable RON. JSON cannot write a map keyed by a `Place` or by a
+# (Body, slot) pair, and both are in the state.
+# `integer128` because the generator's own state carries a u128 word position, which RON refuses
+# to write without it ("u128 is not supported").
+ron = { version = "0.12", features = ["integer128"] }

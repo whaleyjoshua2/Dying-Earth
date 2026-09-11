@@ -1,0 +1,1827 @@
+# 2026-09-09: version 0.05, ticket by ticket
+
+Work on the 0.05 map, on the branch `version-0.05`.
+
+## #50: four Factions in every game
+
+The engine seats four Factions; this is the window catching up. Four cards at New Game, the rivals'
+deeds kept apart per Faction in the Report, four-way Standings on every card, stack markers at four
+angles round a Body instead of a left side and a right side, four Earth tints, the attack preview
+against everyone present, and a Battle Report line per party.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![The New Game Faction screen: four cards in two rows of two, each with its colour swatch, name, blurb, multipliers, signature rule and Victory Condition](factions.png)
+
+- **factions.png** — `shot:four turns:6`. The choice screen deals all four cards: Custodians (teal),
+  Prospectors (orange), Arkwrights (violet), Archivists (pale silver-blue), each with its swatch,
+  blurb, multipliers, signature rule and Victory Condition in words, and its own Play button.
+
+![The start screen: "You play the Custodians" and "Played by the computer: Prospectors, Arkwrights, Archivists", each name in its Faction colour, beside the spinning Earth](start-rivals.png)
+
+- **start-rivals.png** — `shot:st menus:1`. After the pick, the starting-continent screen names the
+  three Factions the computer plays, in their own colours.
+
+![The Solar System Map at turn 7: four coloured stack labels above Mars and the Orbital Control flag in the Custodians' teal](solar-four-stacks.png)
+
+- **solar-four-stacks.png** — `shot:four turns:6`. Four Ship stacks at Mars, one per seat, marked at
+  four fixed angles round the Body (left, right, above, below) with their labels stacked above it in
+  seat order and coloured by Faction; "Orbital Control: Custodians" in teal above the Mars label.
+
+![The Mars Body Surface Map: the band along the top listing four Factions' stacks, one line each in its own colour, and the Orbital Control line](mars-four-stacks.png)
+
+- **mars-four-stacks.png** — `shot:four turns:6`. The band along the top of a Body Surface Map, which
+  used to be one line: now one line per Faction present, in its colour, then Orbital Control in the
+  holder's colour.
+
+![The Earth Map with four Nation States in four different Faction colours and the South America card open beside it](earth-four-tints.png)
+
+- **earth-four-tints.png** — `shot:tint2 turns:6 tints:1 look:-15,10 select:southamerica`. Four
+  controllers, four tints: South America teal, Europe orange, the Middle East violet, Africa pale
+  silver-blue. (`tints:1` is a building aid that hands one state to each seat; over twelve AI turns
+  the Custodians usually hold everything, so a real board rarely shows four colours at once.)
+
+![The Europe card with the Standings line as four coloured chips: Custodians 72, Prospectors 63, Arkwrights 60, Archivists 64](standings-four-chips.png)
+
+- **standings-four-chips.png** — `shot:stand turns:12 select:europe look:20,35`. The Standings line
+  on a Nation State card: a chip per seat with a Standing, in Faction colours, then the threshold and
+  the challenge margin.
+
+![The Report popup at turn 9: the seating line, then What the rival Factions did with a coloured section per rival](report-rivals.png)
+
+- **report-rivals.png** — `shot:rep menus:1 turns:8`. The Report names the table ("Seed ... You:
+  Custodians. Computer: Prospectors, Arkwrights, Archivists", each in its colour) and lists what each
+  rival Faction did under its own coloured heading. Empty sections are left out.
+
+![The Report popup at turn 10 with a Battle Report at Mars orbit: four party lines, one per Faction, each in its colour](battle-four-parties.png)
+
+- **battle-four-parties.png** — `shot:bat menus:1 turns:8 battle:1`. A Battle is a melee now, so the
+  Battle Report gives the place, then a line per party in its Faction's colour with its units,
+  strength, hits landed, losses and escapes, then the result. Four parties here: the Custodians
+  attacking, the Prospectors, the Arkwrights and the Archivists. (`battle:1` is a building aid that
+  sends everyone's Ships to Mars and orders the attack, since the AI rarely stages a four-way fight.)
+
+![The Custodians' Ship stack at Mars selected: "Against Prospectors 3, Arkwrights 3 and Archivists 0 (6 in all). Attack odds (first round): 50%"](attack-preview.png)
+
+- **attack-preview.png** — `shot:stk turns:8 battle:1 stack:1`. The stack card's attack preview names
+  every Faction with Ships at the Body and its strength, then the total and the first-round odds,
+  because an attack there is a melee against all of them at once.
+
+![The Victory panel with four rows, one per Faction, each headed in its colour with its percentage and its Victory Condition in words](victory-four-rows.png)
+
+- **victory-four-rows.png** — `shot:vic turns:12 victory:1`. The Victory panel: a row per seat in
+  seat order, the Faction name and its percentage in its colour, the Victory Condition in plain
+  words, then the two bars.
+
+![The game-over modal after a Collapse at turn 23, with a row per Faction in its colour](game-over-four-rows.png)
+
+- **game-over-four-rows.png** — `shot:over turns:24`. The game-over modal names the outcome (a
+  Collapse in this seed), the turn and the seed, then a row per Faction in its colour with its
+  measure and its percentage. Where a Faction wins, the same line names it ("The Custodians win:
+  ...").
+
+### The climate clock for four seats
+
+Added to the ticket by the designer. `engine/examples/sweep.rs` now takes `--player=` (the Faction
+in seat 0), `--start=` (its Nation State), `--sinks=` and `--steps=`, twenty seeds per cell, and
+reports collapses, the collapse turns, the end temperature and the wins by seat. The sim always
+starts seat 0 in Asia unless told otherwise; the AIs spread from there by the ticket's rule.
+
+**What the sweep found.** The clock is decided by who holds Asia (population 43.5, a third of the
+world's people). A Prospector there at the old step of 90 collapses the world on turn 13 in every
+seed; a Custodian there never collapses at any step above 90. No single step reproduces the 0.02
+target (collapse in most seeds between turns 15 and 21) for every seating, so the step was chosen
+to keep every seating hot at the end rather than to hit one figure.
+
+Seat 0 the Prospectors, starting in Asia:
+
+| sink | step | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|---|
+| 6 | 90 | 20/20 | 13 (13..13) | +3.06 | 0 0 0 0 |
+| 6 | 120 | 20/20 | 17 (16..18) | +3.04 | 0 0 0 0 |
+| 6 | 150 | 20/20 | 19 (19..21) | +3.02 | 0 0 0 0 |
+| 6 | 160 | 20/20 | 20 (20..21) | +3.02 | 0 0 0 0 |
+| 6 | 170 | 6/20 | 24 (22..24) | +2.92 | 7 7 0 0 |
+| 6 | 180 | 1/20 | 22 | +2.87 | 11 8 0 0 |
+| 8 | 120 | 20/20 | 18 (17..18) | +3.05 | 0 0 0 0 |
+| 8 | 180 | 1/20 | 23 | +2.80 | 15 4 0 0 |
+| 10 | 150 | 1/20 | 21 | +2.84 | 10 9 0 0 |
+
+Seat 0 the Custodians, starting in Asia:
+
+| sink | step | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|---|
+| 6 | 90 | 11/20 | 21 (18..23) | +3.01 | 9 0 0 0 |
+| 6 | 100 | 11/20 | 23 (21..24) | +3.00 | 9 0 0 0 |
+| 6 | 110 | 4/20 | 24 (21..24) | +2.88 | 16 0 0 0 |
+| 6 | 120 | 0/20 | - | +2.56 | 20 0 0 0 |
+| 6 | 150 | 0/20 | - | +2.30 | 20 0 0 0 |
+| 7 | 90 | 10/20 | 22 (19..23) | +3.00 | 10 0 0 0 |
+| 8 | 90 | 6/20 | 23 (21..24) | +2.96 | 14 0 0 0 |
+
+Seat 0 starting in Europe, sink 6 (an AI takes Asia):
+
+| seat 0 | step | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|---|
+| Custodians | 90 | 20/20 | 13 (13..14) | +3.04 | 0 0 0 0 |
+| Custodians | 120 | 20/20 | 18 (17..20) | +3.02 | 0 0 0 0 |
+| Custodians | 150 | 13/20 | 23 (21..24) | +3.00 | 1 6 0 0 |
+| Prospectors | 120 | 4/20 | 24 (21..24) | +2.88 | 0 16 0 0 |
+| Prospectors | 150 | 0/20 | - | +2.69 | 0 20 0 0 |
+| Arkwrights | 120 | 1/20 | 21 | +2.80 | 0 19 0 0 |
+| Archivists | 120 | 0/20 | - | +2.40 | 0 20 0 0 |
+
+**Chosen: `ppm_step = 120`, the Natural Sink unchanged at 6.0** (`climate.toml`). At 120 a
+Prospector in Asia collapses the world on turns 16 to 18, a Custodian starting outside Asia on
+turns 17 to 20, and every other seating ends between +2.4 and +2.9 C with a collapse in a seed or
+two. At 150 half the seatings finish comfortable. The step is re-swept on the build ticket once the
+climate tickets (Mothball, per-person Emissions, Scrubbers, Blame, neutral development, Tipping
+Points) are in, since each of them moves it.
+
+**The four-way balance, as measured, not fixed.** In every seating the seat that ends up holding
+Asia wins, and it is the only seat that ever wins: the Custodians 20 of 20 from Asia, the
+Prospectors 16 to 20 of 20 when the Custodians start elsewhere; the Arkwrights and the Archivists,
+on provisional cards, have not won a game. Every win is on the last-turn score or the Colonists
+tiebreak; no Faction has met its Victory Condition outright. The Custodian AI still takes every
+Nation State by Influence when it starts in Asia, so the other three seats end with nothing to
+build in (buildings 41, 0, 0, 0 in seed 19). No Battle happened in any logged AI game: the melee
+is proven by the formula tests and the `battle:1` shot aid, not by the AI.
+
+Twenty seeds at the chosen step:
+
+| seating | wins | collapses | median collapse turn | median first Colony |
+|---|---|---|---|---|
+| Custodians in Asia | Custodians 20 | 0 | - | 10 |
+| Prospectors in Asia | none | 20 | 17 | 9 |
+
+
+## #51: the Arkwrights and the Archivists
+
+Ticket #50 seated the two new Factions on provisional cards. This ticket gives them real ones. The
+**Arkwrights** get Steerage (a Colony Ship that carries 8, 12 with Expanded Habitats, for 20
+Materials, at twice the population per Colonist lifted), Habitats that hold half again, transits at
+three quarters of the Fuel, half-price Space Stations and three-quarter-price Colony Modules to make
+up for starting with no station, and **Diaspora**: 30 Colonists off Earth spread over at least three
+Bodies with 4 on each. The **Archivists** get **the Archive**, the first **Project**: four stages, each
+30 Materials and 20 Research and two turns, at one Colony off Earth, 12 Energy to run once complete,
+destroyed if its Colony changes hands; **Fund the Archive** diverts a turn's Lab Research out of the
+shared Tech into the Archive fund; and **Provisional Findings** gives them half the effect of the Tech
+under research on every turn after one where they contributed to it.
+
+The second half of a Victory Condition is now a Faction figure like the first (`victory_second` on
+the card): Off-world Presence for the Custodians and the Prospectors, Bodies settled for the
+Arkwrights, Colonists at the Archive for the Archivists.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![The New Game Faction screen, all four cards real: the Arkwrights with Steerage and Diaspora, the Archivists with Provisional Findings and the Archive](factions.png)
+
+- **factions.png** — `shot:f51`. Re-taken with the finished cards. The Arkwrights carry a second
+  multiplier line of their own (Habitat capacity x1.5, transit Fuel x0.75, Colony Ship capacity x2,
+  population per lifted Colonist x2, a Colony Ship 20 Materials, a Space Station x0.5, a Colony
+  Module x0.75), then Steerage, then Diaspora in words. The Archivists carry Provisional Findings and
+  "Complete the Archive and keep it running, with 12 Colonists living at its Colony to be uploaded."
+
+![The Olympus Mons Colony card in an Archivist game: the Archive at stage 2 of 4 building, the Archive fund at 14 of 20, the funding toggle and the greyed-out Build stage 4 button](archive-colony-card.png)
+
+- **archive-colony-card.png** — `shot:arch52 player:archivists archive:2 turns:4`. The Colony card for
+  an Archivist player: the Archive reads as a Project rather than a yield ("The Archive: stage 2 of
+  4, building, 1 turn(s) left"), then its own block with "Archive fund 14 of 20", the "Fund the
+  Archive this turn" toggle, and "Build stage 4 (30 Materials, 20 Research)", greyed because 14
+  banked Research is not the 20 a stage wants. (`player:<faction>` and `archive:<stage>` are new
+  building aids: the AI Archivist has never yet held a Colony off Earth to build one at, see below.)
+
+![The Victory panel in an Arkwright game, four rows: Diaspora's two parts at the top, then Stabilization, Extraction and the Archive](victory-diaspora.png)
+
+- **victory-diaspora.png** — `shot:vic52 player:arkwrights victory:1 turns:16`. The Victory panel now
+  reads both halves off each card. The Arkwrights' row: "Colonists off Earth: 0 of 30" and "Bodies
+  settled: 0 of 3 Bodies with 4 Colonists or more". The Archivists': "The Archive: 0 of 4" and
+  "Colonists at the Archive: 0 of 12". Both at zero here, which is the honest state of the AI at turn
+  17 of this seed rather than a fault in the counters; the counters themselves are pinned by the
+  formula tests.
+
+### Twenty seeds
+
+`cargo run --release -p dying-earth-engine --example sim -- 1 --count=20`, seat 0 starting in Asia:
+
+| seat 0 | wins | draws | collapses | median collapse turn | median first Colony |
+|---|---|---|---|---|---|
+| Arkwrights | none (0 0 0 0) | 0 | 20/20 | 16 | 14 |
+| Archivists | none (0 0 0 0) | 0 | 20/20 | 17 | 13 |
+| Custodians | Custodians 19 | 0 | 1/20 | 24 | 11 |
+
+`cargo run --release -p dying-earth-engine --example sweep -- 20 --start=europe --sinks=6 --steps=120`:
+
+| seat 0 | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|
+| Arkwrights | 0/20 | - | +2.88 | 0 20 0 0 (the Custodians, in Asia) |
+| Archivists | 15/20 | 21 (18..24) | +3.01 | 0 2 3 0 (Custodians 2, Prospectors 3) |
+
+**What the twenty seeds say, as measured, not fixed.** Neither new Faction has won a game and neither
+has completed its Victory Condition. Across all sixty logged games the words "funding the Archive"
+and "stage of the Archive" appear **not once**: the AI Archivist funds only once it holds a Colony
+off Earth (the ticket's rule), and in every seating where it does not own Earth it never gets one, so
+the fund never starts. The Arkwrights end with 0 Colonists off Earth in every Asia seed. The picture
+from #50 has not changed: whoever holds Asia wins, and the other three seats finish with nothing to
+build in (buildings 70, 0, 0, 4 in seed 1 of the Custodian seating). Nothing was re-tuned on this
+ticket; these are the figures as they came out.
+
+### After the build: the AI learns to play the two new Factions
+
+Two AI gaps showed up in the first twenty seeds and were fixed on the same ticket, each seen red
+first in `engine/tests/formulas.rs`:
+
+- **The AI never ordered a station over Earth**, because the 0.04 rule only built a station over a
+  Body where the seat already had a producing Colony. A Faction that starts without a station (the
+  Arkwrights) could therefore never build a Ship. Over Earth the foothold is now a Nation State with
+  a working Launch Site, and while the seat has no Shipyard anywhere the first station takes the
+  opportunity multiplier. Test: `an_ai_with_no_station_over_earth_orders_one_from_its_launch_site`.
+- **The Archivist AI funded the Archive only once it held a Colony off Earth**, which in every
+  seating it never did. It now funds from turn one; only the stage needs the Colony. Test:
+  `the_archivist_ai_funds_the_archive_before_it_holds_a_colony`.
+- **Archive stages are built one at a time** (the builder had let a second stage queue behind the
+  first, which made "four stages of two turns" six turns rather than eight). Test: the stage test
+  now refuses a second order while one is building.
+- The Archivists' `build_warship` weight is 1: they spend on the Archive and Colony Ships.
+
+Twenty seeds afterwards, seat 0 starting in Asia:
+
+| seat 0 | wins | collapses | median collapse turn | seat 0's Colonists off Earth (seeds 1 to 6) |
+|---|---|---|---|---|
+| Arkwrights | none | 20 | 19 | 24, 16, 16, 16, 16, 16 |
+| Archivists | none | 20 | 20 | 0, 0, 0, 0, 0, 0 |
+
+**The Arkwrights now play their Faction**: Orbital Reef, a Shipyard, six Colony Ships of twelve,
+Mars Colonies of twelve Colonists, 16 to 24 Colonists off Earth by the Collapse on turn 19; they
+would reach 30 around turn 22 if the world lasted. **The Archivists cannot yet**: at output x0.8
+their one state pays 4 Materials a turn, they lose Asia to Influence around turn 9, and in sixty
+games no Archive stage was ever raised (the fund fills to 80 with nowhere to spend it). That is the
+card's economy, not the AI, and it is recorded on the map as a balance finding for the designer.
+Starting in Europe the Archivists collapse 6 of 20 games and the Custodians win 14.
+
+
+## #52: Unrest, Occupation and refugees
+
+Every Nation State now carries **Unrest**, an integer 0 to 10 on its card and in `nation_states.toml`
+(every state starts at 0; every number that moves it lives in the new `assets/data/unrest.toml`).
+Heat, the sea, the three Climate cards, Occupation and arriving refugees raise it; it falls one on
+its own in a turn nothing raised it, one per **Relief** order (10 Ducats on a state you direct), and
+one a turn while a **Constabulary** stands there. Two of the four green Techs make every
+climate-source rise one smaller and all four make it two, and a Constabulary damps climate and
+refugee rises by one on top. At **4** the Standing Army stops replenishing, at **7** every Facility
+there produces and emits at half, at **10** a controlled state **throws its controller off** and goes
+neutral at 5 with every Standing kept. Neutral states track Unrest too but cap at 9, and a Faction
+taking one by Influence inherits the figure. Occupation adds 3 when it begins and 1 a turn after, and
+from Unrest 4 the occupier's Pacification gain is halved.
+
+**Refugees.** When the heat takes a state's people, half of what it lost now moves to its neighbours
+in proportion to their Industry Level instead of vanishing; when a Sea Level threshold fires, the
+state loses 5% of its people per point of Coastal Exposure and half of those move the same way. What
+arrives is added to the receiving state, so its Population Emissions and its Research weight follow,
+and it raises that state's Unrest by one per half a person, at most three in a turn. **Resettle** (20
+Ducats, once a turn per Faction) sends every flow leaving that Faction's states to one state of its
+choosing and raises its Standing there by 5.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![The Asia card at Unrest 7: the red Unrest line in words, the Constabulary in the build list, and the Relief and Resettle buttons with their prices](unrest-card.png)
+
+- **unrest-card.png** — `shot:u7 turns:8 unrest:7 select:asia look:95,30`. Asia at Unrest 7, the line
+  on its card in red ("every Facility here produces and emits at half, and the Standing Army does not
+  replenish"), the **Constabulary (25 Materials)** button in the build list beside the other seven
+  Facilities, and an Unrest block with **Relief: Unrest -1 (10 Ducats)** and **Resettle here (20
+  Ducats)**. The globe behind it carries the Unrest labels for five states. (`unrest:<n>` is a new
+  building aid that spreads n, n-1 and n-3 over Asia, Europe and Africa and hands seat 0 room and
+  money, since the AI seldom leaves a state of the player's this restive with slots to spare.)
+
+![The Earth Map at turn 15: Russia Unrest 10 and Asia Unrest 9 in red, Europe and the Middle East 6 in amber, Africa 10 behind the Climate Panel](earth-unrest-labels.png)
+
+- **earth-unrest-labels.png** — `shot:lab turns:14 look:20,25`. The Earth Map label carries "Unrest
+  N" above a state's name once it is 4 or more, amber to 6 and red from 7. Five states are labelled
+  here without any building aid at all: Russia 10, Asia 9 and Africa 10 in red, Europe and the Middle
+  East at 6 in amber. Europe already reads "neutral": it threw its controller off two turns earlier.
+
+![The Report at turn 14: Relief paid, two states crossing Unrest 7, refugee lines naming where the people went, and Sea Level lines saying how far Unrest rose](refugees-report.png)
+
+- **refugees-report.png** — `shot:r13 menus:1 turns:13`. The Report reads the whole system in one
+  screen: "The Custodians paid Relief in Australia and Oceania: Unrest fell by 2 to 7", two states
+  crossing the second threshold ("Asia: Unrest reached 7 - every Facility here produces and emits at
+  half..."), the refugee flows in words ("1.9 population left Asia for Russia, The Middle East and
+  Australia and Oceania (the sea)"), and the Sea Level lines with the Unrest they cost ("Sea level at
+  +2.3 C: Asia lost 2 build slots; destroyed Launch Site, Factory. Unrest there rose by 3 to 10").
+
+### Twenty seeds
+
+`cargo run --release -p dying-earth-engine --example sim -- 1 --count=20`, seat 0 starting in Asia:
+
+| seat 0 | wins | draws | collapses | median collapse turn | median first Colony |
+|---|---|---|---|---|---|
+| Custodians | Arkwrights 20 (seat 2) | 0 | 0/20 | - | 10 |
+| Prospectors | Prospectors 2 | 0 | 18/20 | 24 | 9 |
+
+`cargo run --release -p dying-earth-engine --example sweep -- 20 --player=custodians --start=europe --sinks=6 --steps=120`:
+
+| seat 0 | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|
+| Custodians in Europe | 17/20 | 24 (23..24) | +3.01 | 0 2 1 0 |
+
+The Unrest statistics over the same twenty seeds:
+
+| seating | states that threw off a controller | median peak Unrest | Constabularies built | Relief orders paid | population moved by refugees |
+|---|---|---|---|---|---|
+| Custodians in Asia | 776 | 10 | 0 | 478 | 187.6 |
+| Prospectors in Asia | 810 | 10 | 0 | 566 | 261.5 |
+
+**What the twenty seeds say, as measured, not fixed.** The rules as specified make Unrest a ratchet
+rather than a pressure. From about turn 8 the population is falling worldwide every turn, so every
+state takes +1 or +2 in every Climate phase and another +1 to +3 from the refugees its neighbours
+send it; the falls available are one natural fall (which never lands, because something raised it
+every turn), one per Relief order at 10 Ducats, and one a turn per Constabulary. Every state
+therefore climbs to 10 and stays there: the median peak Unrest is 10 in every seed of both seatings,
+and across twenty games states threw off a controller **776 and 810 times** — about forty a game on
+eight states, so a state is taken by Influence, ratchets back to 10 and throws its Faction off again
+every two or three turns for the second half of the game. The Custodian seating stopped collapsing
+altogether (0 of 20, against 1 of 20 on ticket #51), because a world of neutral states has no
+directed Facilities and so emits far less; the Arkwrights win all twenty on the last-turn score
+instead. Nothing here was re-tuned: these are the ticket's numbers as they came out, and the knobs
+that would settle it (`natural_fall`, `population_fall`, `refugees_per`, `constabulary_fall`,
+`throw_off_reset`) are all one line each in `unrest.toml`.
+
+**The AI built no Constabulary in any of the forty games**, though the rule and the weights are in
+and pinned by a formula test. Two reasons, both measurable in the scored lists: the victory-gap
+multiplier is x3 for most of a game and applies to producers but not to a Constabulary, so at
+build_constabulary 4 to 6 against build_producer 6 to 8 x1.5 x3 it never wins a build slot; and by
+the time Unrest reaches 5 the state usually has no free slot left. **Relief it pays readily** (478
+and 566 orders), but only from Unrest 9, where the opportunity multiplier doubles it: below that it
+loses to buying Influence with the same Ducats (relief 4 to 6 against influence 5 to 8 x0.9).
+
+
+## #53: twelve Nation States, and Unrest as a pressure rather than a ratchet
+
+Two tickets in one commit each, both asked for after the twenty seeds of #52 were read.
+
+### The Unrest rebalance
+
+#52 measured Unrest as a **ratchet**: every state climbed to 10 and stayed, and states threw off a
+controller about forty times a game. The cause was the shape of the rule, not the size of the
+numbers — the fall of 1 landed only in a turn nothing raised Unrest, and from about turn 8 something
+raised it every turn, so nothing ever came down. The designer's fix, three parts:
+
+- **The fall is 1.5 and lands every turn**, whatever else happened, by subtraction: a rise and the
+  fall net out. The one turn a state goes without it is the turn it **changed hands** — a population
+  with a fresh grievance is not calmed by the passing of a month. `changed_hands` is set wherever
+  control actually moves (a transfer, an Occupation beginning or ending, a throw-off), and the
+  Occupation turn counter ticking does not count as a change.
+- **The climate and refugee rises are smaller**: a population fall 1.5 (2 when it is more than one
+  per cent), a Sea Level slot 1 rather than 2, a Climate card 1.5 rather than 2, and the refugee cap
+  2 rather than 3.
+- **The green Techs now moderate arriving refugees as well as the climate**, which they did not on
+  #52, and the damping is in halves: 0.5 for two Techs, 1.0 for four, 0.5 more for a Constabulary.
+
+Unrest is no longer a whole number: it moves in halves, and the card and the map print the fraction
+("Unrest 4.5"). Everything else about it — the thresholds at 4, 7 and 10, the neutral cap of 9,
+Occupation's +3 and +1, the Unrest card's flat +3, Relief, Resettle and the Constabulary — is
+unchanged from #52.
+
+**What it did, over the same twenty seeds** (eight Nation States, so these compare like with like):
+
+| seating | threw off a controller | median peak Unrest | Relief orders |
+|---|---|---|---|
+| Custodians in Asia, #52 | 776 | 10 | 478 |
+| Custodians in Asia, #53 | 10 | 10.0 | 112 |
+| Prospectors in Asia, #52 | 810 | 10 | 566 |
+| Prospectors in Asia, #53 | 8 | 10.0 | 305 |
+
+About half a throw-off a game instead of forty, and the median game still sees one state reach the
+ceiling, so the drama is there without the board dissolving. The climate clock went back to the
+shape #51 left it in: the Custodian seating won 19 of 20 again, and the Prospector seating collapsed
+20 of 20.
+
+### Twelve Nation States
+
+Two new Factions need more places to go, and eight states made one of them — Asia, a third of the
+world's people — decide every game. Ticketed as
+[#63](https://github.com/whaleyjoshua2/Dying-Earth/issues/63).
+
+- **Asia** becomes **East Asia** (China, Mongolia, the Koreas, Japan, Taiwan, Central Asia),
+  **South Asia** (India, Pakistan, Bangladesh, Nepal, Sri Lanka, Afghanistan) and **South-East
+  Asia** (Myanmar round to the Philippines and most of Indonesia).
+- **Africa** splits at the Sahara into **North Africa** and **Sub-Saharan Africa**.
+- **Central America and the Caribbean** is cut out of **North America**.
+- **Antarctica stays off the list**: it is Earth's three Colony Slots, as version 0.04 made it.
+
+Every split shares out its parent's real-world figures rather than inventing new ones, as ticket #26
+did for Russia and the Middle East: Asia's 30 GDP becomes 23 + 4 + 3 and its Influence value 7
+becomes 4 + 2 + 1; Africa's 3 and 2 become 2 + 1 and 1 + 1; North America's 25 and 8 become 23 + 2
+and 7 + 1. **The world's totals are unchanged** — 34 Influence and about 7.9 billion people — so the
+Influence economy plays as it did, pinned by
+`twelve_nation_states_share_out_the_eight_they_came_from`. Central America is the map's first
+**Size 1** state: two build slots and the lowest Influence threshold on the board, a small place
+between two large ones.
+
+The globe mask is derived from longitude and latitude rules in `examples/prep_assets.rs`, which now
+takes `--mask-only` so the borders can be redrawn from the `earth.png` already in the tree without
+the source JPEGs. Mask values were **appended** (10 North Africa, 11 South Asia, 12 South-East Asia,
+13 Central America) rather than renumbered, so every old value still means what it meant and the map
+can be split again the same way when a later version wants more states.
+
+![The mask preview: twelve coloured regions on the Blue Marble, Antarctica white and unclaimed](twelve-states-mask.png)
+
+- **twelve-states-mask.png** — `cargo run --example prep_assets -- --mask-only preview.png`. The
+  twelve regions as the mask paints them. The borders are lines of longitude and latitude, close
+  enough for a globe drawn at 2048 by 1024: North Africa parts from Sub-Saharan Africa at 18 N, the
+  Himalaya line slopes from 37 N at Iran's border to 29 N at the Burmese one, South-East Asia sits
+  below 24 N (22 N past Hong Kong, so Taiwan stays with East Asia), and Central America runs below
+  the United States border from San Diego to Brownsville, taking Cuba, Hispaniola and the Bahamas.
+  They are a board, not an atlas.
+
+![The Earth Map at turn 11 with the new borders: Europe orange for the Prospectors, East Asia teal for the Custodians, and North Africa, Sub-Saharan Africa, the Middle East, South Asia and Russia neutral](twelve-states.png)
+
+- **twelve-states.png** — `shot:tw turns:10 look:20,20`. The Earth Map with the twelve states drawn,
+  outlined and labelled: the Sahara border across Africa, the Middle East between Europe and South
+  Asia, and East Asia tinted for the Custodians. The Climate Panel shows what the bigger board costs
+  — Nation State industry 8.6 a turn where eight states charged 6.0.
+
+### The climate clock, re-swept
+
+Twelve states raise total Industry Level from 17 to 23 and state industry Emissions from 6.0 to 8.4
+a turn, with six more start Facilities on the board, so `ppm_step` was re-swept exactly as tickets
+#26 and #46 re-swept it whenever the state list changed. Twenty seeds a cell.
+
+| seat 0, start | step 120 | step 150 | step 170 | step 190 |
+|---|---|---|---|---|
+| Prospectors in East Asia | 20/20, turn 19 | 20/20, turn 22 | 14/20, turn 24 | 0/20, +2.90 |
+| Custodians in East Asia | (collapsed by 21) | 1/20, turn 23 | 0/20, +2.74 | - |
+| Custodians in Europe | - | 20/20, turn 23 | 10/20, turn 24 | - |
+
+**Chosen: `ppm_step = 150`** (`climate.toml`; it was 120). At 120 every seating collapsed, including
+the Custodian-in-East-Asia game that never collapsed at all on eight states. At 150 every seating
+stays hot to the end — the two Prospector-ish boards collapse on turns 22 to 24 and a Custodian
+holding East Asia survives 19 of 20 at +2.90 — which is what #46 chose its step for. At 170 half the
+seatings finish comfortable.
+
+Twenty seeds at the chosen step, on the twelve-state board:
+
+| seat 0 | wins | collapses | median collapse turn | threw off a controller | Relief orders | population moved |
+|---|---|---|---|---|---|---|
+| Custodians in East Asia | Prospectors 19 (seat 1) | 1/20 | 23 | 0 | 34 | 226.0 |
+| Prospectors in East Asia | none | 20/20 | 22 | 12 | 256 | 233.6 |
+| Custodians in Europe (sweep) | none | 20/20 | 23 | - | - | - |
+
+**What the twelve seeds say, as measured, not fixed.** The one-state-decides-it problem is gone:
+holding East Asia is no longer holding a third of the world, and in the Custodian-in-East-Asia
+seating it is now the **Prospectors** who win 19 of 20 from Europe and what they take around it,
+where at eight states the Custodian in Asia won 19 of 20. That is the board the split was asked
+for. The AI still builds no Constabulary — the same finding as #52, and for the same reason: the
+victory-gap multiplier applies to producers and not to a Constabulary, so it never wins a build slot
+while the gap is wide.
+
+## #53: Blame and neutral development
+
+Two rules that make the world answer back. **Blame** is the CO2 each Faction is answerable for over
+the whole game: at every Climate phase the Emissions the Climate Panel attributes to the sources a
+Faction controls — a controlled state's industry line, its Facilities and its Antarctic Modules, its
+population line, and the Faction's own launches — are added to its emitted total, and whatever CO2 it
+removed that turn (Restoration now; a Scrubber will join `Climate::removal_next` on its own ticket)
+to its removed total. Blame is the difference, floored at zero. What no Faction controls is nobody's:
+a neutral state's industry and people, and every Event card, are the world's doing. A Faction's share
+of the four Factions' Blame, above a fair quarter, multiplies its Influence thresholds on every
+Nation State it does not hold by `1 + (share - 0.25)`, floored at x1.0 and capped at x1.5
+(`influence.toml`, `[blame]`). Never on a Colony or a Space Station, never on the challenge margin,
+never on Standing decay, never on Pacification.
+
+**Neutral Development** is what a Nation State nobody holds does for itself: every six turns of
+unbroken neutrality it raises its own Industry Level by one, up to 4, and brings the first idle
+Facility in its list online (`nation_states.toml`, `[development]`). The clock is the state's own and
+runs from the turn it was last freed, so a state taken and then thrown off counts six fresh turns. A
+world at +2.5 C or above develops nothing, and neither does a state whose Unrest has reached 7
+(`may_develop`, the hook #52 left).
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![A Nation State card for North Africa, held by the Custodians, with an orange line reading "Blame: your threshold here is 45, not 40 (share 0.39, x1.14)"](blame-card.png)
+
+- **blame-card.png** — `shot:bcard turns:12 player:prospectors select:northafrica`. North Africa's
+  card, seen by a Prospector player who does not hold it. The threshold line now reads the player's
+  own figure, and the orange line under it says what a 0.39 share of the table's Blame is costing
+  them here: 45 where a clean Faction would need 40. The line is omitted entirely at x1.00, so a
+  Faction pulling its weight never sees it.
+
+![The Victory panel with a four-bar Blame strip along the bottom: Custodians 23 per cent in teal, Prospectors 45 per cent in orange, Arkwrights 16 per cent in violet, Archivists 16 per cent in pale blue](blame-victory-strip.png)
+
+- **blame-victory-strip.png** — `shot:bvic turns:12 victory:1`. Under the four Victory rows, one bar
+  per Faction in its own colour: the share as a percentage inside the bar, the Blame in ppm and the
+  thresholds multiplier beside it. At turn 13 of this game the Prospectors carry 45% of the table's
+  Blame on 125 ppm and pay x1.20 for it; the other three sit at or under a fair quarter and pay
+  nothing.
+
+![The Climate Panel with a Blame section listing all four Factions, the Custodians showing "emitted 73 ppm, removed 96, Blame 0, credit 23 ppm"](blame-climate-panel.png)
+
+- **blame-climate-panel.png** — `shot:bcp turns:10 blame:1`. The Blame section sits under the
+  Stabilization run, in the panel that attributes the Emissions in the first place: emitted, removed,
+  Blame, share and thresholds, one line per Faction in its colour. `blame:1` is a building aid that
+  has the Custodian player buy, in one turn, enough Restoration to take back more than it has emitted
+  all game (the -87.0 ppm on the Restoration line), so the credit case is visible: **Custodians:
+  emitted 73 ppm, removed 96, Blame 0, credit 23 ppm, share 0.00, thresholds x1.00**, against the
+  Prospectors on Blame 125 and x1.35.
+
+![The Report at turn 6, its News section carrying eight lines of the form "North Africa raised its Industry Level to 2."](neutral-development-report.png)
+
+- **neutral-development-report.png** — `shot:ndev turns:5 menus:1`. The Report the player opens on
+  turn 6, the first six-turn mark: eight neutral states raise their Industry Level in one Climate
+  phase — North Africa to 2, South Asia to 3, South-East Asia to 3, North America to 4, Central
+  America to 2, South America to 2, Russia to 3, the Middle East to 3. No line names a Facility, and
+  that is a finding rather than a bug: see below.
+
+### Twenty seeds
+
+`cargo run --release -p dying-earth-engine --example sim -- 1 --count=20`, three seatings, plus
+`sweep -- 20 --player=custodians --start=europe --sinks=6 --steps=150`. Nothing was re-tuned; these
+are measurements.
+
+| seat 0 | wins | collapses | median collapse turn | median turn of first Colony | Relief orders |
+|---|---|---|---|---|---|
+| Custodians in East Asia | none | 20/20 | 23 | 10 | 42 |
+| Prospectors in East Asia | none | 20/20 | 21 | 10 | 213 |
+| Arkwrights in East Asia | none | 20/20 | 21 | 9 | 187 |
+| Custodians in Europe (sweep) | none | 20/20 | 21 (20..21) | - | - |
+
+Blame at the end of each game, median over the twenty seeds, with the multiplier that share puts on
+the seat's Influence thresholds.
+
+| seat 0 the Custodians | median Blame | median share | median thresholds |
+|---|---|---|---|
+| Custodians (seat 0) | 88 | 0.22 | x1.00 |
+| Prospectors (seat 1) | 191 | 0.47 | x1.22 |
+| Arkwrights (seat 2) | 50 | 0.12 | x1.00 |
+| Archivists (seat 3) | 76 | 0.18 | x1.00 |
+
+| seat 0 the Prospectors | median Blame | median share | median thresholds |
+|---|---|---|---|
+| Prospectors (seat 0) | 178 | 0.30 | x1.05 |
+| Custodians (seat 1) | 307 | 0.51 | x1.26 |
+| Arkwrights (seat 2) | 45 | 0.08 | x1.00 |
+| Archivists (seat 3) | 66 | 0.11 | x1.00 |
+
+| seat 0 the Arkwrights | median Blame | median share | median thresholds |
+|---|---|---|---|
+| Arkwrights (seat 0) | 142 | 0.24 | x1.00 |
+| Custodians (seat 1) | 317 | 0.53 | x1.28 |
+| Prospectors (seat 2) | 78 | 0.13 | x1.00 |
+| Archivists (seat 3) | 65 | 0.11 | x1.00 |
+
+| seating | median neutral developments a game |
+|---|---|
+| Custodians in East Asia | 30 |
+| Prospectors in East Asia | 20 |
+| Arkwrights in East Asia | 18 |
+
+**What the twenty seeds say, as measured, not fixed.** One Faction a game runs away with the Blame
+and pays x1.20 to x1.28 for it; the other three sit at or under the fair quarter and pay nothing, so
+the rule taxes the runaway rather than the table. Which Faction it is depends on **how much Earth it
+holds, not on its Emissions multiplier**: the AI Custodians in seat 1, on a x0.75 multiplier, carry
+the largest Blame in two of the three seatings (307 and 317 ppm) because they end up directing more
+Nation States than anyone else, while the Prospectors' x1.25 only wins them the title when they also
+hold the board. The cap is never reached in an AI game; the largest median share measured is 0.53.
+
+Neutral development is **large**: 18 to 30 raises a game, and every clock starts on turn 1, so eight
+neutral states develop together on turn 6, again on turn 12, and so on, in one visible pulse in the
+Report rather than a trickle. That is exactly what "the clock runs from the turn the state was last
+neutral, i.e. the game start" asks for, and it is worth the designer seeing what it looks like.
+
+It also **costs the world its one habitable board**, and a control run says so plainly. Against the
+same twenty seeds on #52/#63 the Custodian-in-East-Asia seating was the board that stayed liveable:
+the Prospectors won 19 of 20 there and only one seed collapsed. It now collapses 20 of 20 with nobody
+winning. Re-running that seating with `development_turns` set to 9999 — Blame in force, neutral
+development off — returns it exactly to the old figures:
+
+| Custodians in East Asia, twenty seeds | wins | collapses | median collapse turn | developments |
+|---|---|---|---|---|
+| #52/#63, before this ticket | Prospectors 19 | 1/20 | 23 | - |
+| #53 as built | none | 20/20 | 23 | 30 |
+| #53 with `development_turns = 9999` (control) | Prospectors 19 | 1/20 | 23 | 0 |
+
+So **Blame changes no outcome on its own** — the control's Blame figures (91 / 202 / 53 / 80 ppm at
+x1.00 / x1.23 / x1.00 / x1.00) are within noise of the built game's — and **neutral development
+changes all of them**. Twelve states developing themselves up to Industry Level 4 is a great deal of
+new industry no Faction ever chose to build, and it lands before anyone can reach their bar; the two
+dirtier boards moved from a median collapse of 22 to 21 and the Europe sweep from 23 to 21 for the
+same reason. Nothing was re-tuned here. If the designer wants that board liveable again,
+`development_turns` (6) and `development_max_level` (4) are the two numbers to turn, and sweeping
+them belongs on its own ticket.
+
+**The idle-Facility clause fires almost never.** A neutral state's start Facilities are created
+`online: true`, and a Facility nobody directs is already idle in the sense the Climate phase means
+(it makes nothing and emits nothing), so "the first idle one in its list" finds nothing to wake in a
+state that has never been held. It only bites on a state that was held, had a Facility shut down by
+the Energy shortfall rule or a card, and was then thrown off. The formula test covers the clause with
+such a state; no Report line in sixty games named a Facility. If the intent was that a neutral
+state's Facilities should stand idle until the state develops itself — which is what the Climate
+phase's own comment says about them — that is a change to how neutral states start, and the
+designer's call.
+
+### After the build: neutral states run what they wake, and the opening clocks are staggered
+
+Two corrections on the same ticket, each seen red first:
+
+- **"Brings one idle start Facility online" could never fire.** A neutral state's start Facilities
+  are `online` from the first turn; they make nothing and emit nothing only because nobody directs
+  them (ticket #24). Development now marks the woken Facility **self-run**: while the state stays
+  neutral it emits at x1.0 (with the worldwide Clean Techs and the Unrest-7 halving applied) to
+  nobody's Blame, and it makes nothing for anyone. Test: the development test asserts the Factory
+  is self-run, that the world's Factory Emissions rise, and that no seat's Blame moves.
+- **Every state neutral at the start shared one clock**, so on turn 6 eight states developed at
+  once (pictured above, the turn-6 Report). The opening clocks are now staggered by the seed across
+  the first development period, so first developments fall between turns 6 and 11. Test:
+  `the_opening_neutral_states_do_not_all_develop_on_the_same_turn`.
+
+Twenty seeds afterwards, seat 0 in East Asia: the Custodian seating collapses 20 of 20 (median
+turn 19, 22 developments a game), the Prospector seating 20 of 20 (median 20, 14 developments).
+Before neutral development the Custodian seating had one Collapse in twenty. Whether the six-turn
+clock, the Industry Level 4 ceiling, or the +2.5 C stop moves is the designer's call, recorded on
+the map.
+
+**The designer's answer: a nine-turn clock** (`nation_states.toml`, `[development] turns = 9`),
+ceiling 4, stop at +2.5 C, so a state steps at most twice a game. Twenty seeds afterwards, seat 0
+in East Asia: the Custodian seating collapses 20 of 20 at a median turn 22 with 14 developments a
+game; the Prospector seating 20 of 20 at a median 21 with 6. The step is re-swept on the build
+ticket with every climate rule in.
+
+## #54: Emissions you can lower
+
+Every Emissions line in the game was, until now, something you could only add to. This ticket gives
+the player three ways to take one down and one way to buy a burst of output at a permanent price.
+
+**Mothball, Restart and Decommission** work on any Facility in a Nation State you direct and any
+Module in a Colony you direct. A Mothball is free and lands at the Resolution: the building makes
+nothing, pays no Energy upkeep, emits nothing, counts as online for no rule — no lift from a
+mothballed Launch Site, no Ship from a mothballed Shipyard, no Allotment from a mothballed Embassy,
+no calm from a mothballed Constabulary — and keeps its slot. A **Restart** is 5 Materials and a
+turn; a **Decommission** is a turn, half the building's Materials back, and the slot free. In a
+Nation State a mothball adds 1 Unrest and a decommission 2 (`unrest.toml`, the hooks #52 left); in
+a Colony neither adds anything.
+
+**Population Emissions follow the Industry Level.** A state's people emit
+`0.04 + 0.03 x Industry Level` per hundred million (`climate.toml`), in place of the flat 0.1 every
+state used to pay: 0.07 in Sub-Saharan Africa, 0.13 in East Asia, and 8.03 for the world against the
+old 7.86. Green Consensus still halves the whole line and the Faction multiplier still applies.
+
+**Restoration is retired.** The order, its Ducat price, the `[restoration]` table, its AI weight and
+the Custodian card's text are gone. The Custodians' signature rule is now the **Scrubber**: a
+Facility only they build, only in a state they control, **taking no build slot** — 30 Materials, two
+turns, 4 Energy upkeep, no Emissions. While it is online it enlarges the Natural Sink by 3.0 ppm,
+takes 1 off its state's Unrest, and counts as removal for its controller's Blame. A state holds
+`clamp(round(population / 2), 2, 10)` of them, so Russia gets 2 and South Asia 10, and they are
+destroyed outright if the state changes hands. Their other clause is **Leapfrog**: 50 Ducats on a
+state they control lowers that state's per-person coefficient by 0.03 for good, any number of times,
+never below the 0.04 base. Their Allotment multiplier comes down from 1.3 to **1.25** to pay for it.
+
+**The Prospectors gain the Strip Permit** beside Cheap Industry: free, once per Nation State ever,
+three turns in which every Facility there produces double, and then that state's Baseline Emissions
+rise 0.2 and its Unrest 3, for good.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![A Custodian Nation State card for East Asia with three Scrubbers standing, two mothballed Facilities greyed out with Restart and Decommission buttons, the per-person Emissions line, and the Scrubber and Leapfrog buttons under "Scrubbers 3 of 9"](scrubbers-card.png)
+
+- **scrubbers-card.png** — `shot:s4 scrub:3 turns:4 select:eastasia look:110,30`. East Asia in
+  Custodian hands: three Scrubbers on the Facilities list at 4 Energy upkeep and no output, a
+  mothballed Factory and a mothballed Power Plant greyed and reading "making nothing, paying no
+  upkeep, emitting nothing, keeping its slot" with Restart (5 Materials) and Decommission (free)
+  under each, the line "3 Scrubber(s) here take 9.0 ppm off the Sink and 1 off the Unrest every
+  turn", the per-person line "Its people emit 0.07 per hundred million (0.04 base + 0.03 x Industry
+  Level 3, Leapfrogged twice)", and the Build section headed "Scrubbers 3 of 9" with the Scrubber
+  and Leapfrog buttons. (`scrub:<n>` is a building aid: an AI Custodian builds one Scrubber at a
+  time and mothballs it again the moment Energy runs close.)
+
+![The Climate Panel with the Sink line reading "Natural Sink -6.0 and Scrubbers -9.0", and the Blame section showing the Custodians with 15 ppm removed](climate-panel-scrubbers.png)
+
+- **climate-panel-scrubbers.png** — `shot:cp scrub:3 turns:4 look:110,30`. The Sink line now carries
+  the Scrubbers beside the Natural Sink: "Natural Sink -6.0 and Scrubbers -9.0", with the population
+  line above it (7.6) carrying its formula in the hover. Underneath, the Blame section credits the
+  Custodians with the 15 ppm their Scrubbers have taken back so far, which is what Restoration used
+  to fill.
+
+![A Prospector Nation State card for East Asia under a Strip Permit, with an orange line reading "Strip Permit: 2 turn(s) left of double output" and every Factory reading +14 Materials](strip-permit-card.png)
+
+- **strip-permit-card.png** — `shot:sp player:prospectors strip:1 turns:4 select:eastasia
+  look:110,30`. East Asia under a Prospector Strip Permit with one of its three turns spent: the
+  orange line reads "Strip Permit: 2 turn(s) left of double output, then +0.2 Baseline Emissions for
+  good and +3 Unrest", each Factory reads +14 Materials where it would read +7, and the top bar
+  shows Materials +28 a turn. (`strip:1` is a building aid: the AI Prospector is never behind its
+  Extraction pace in its own seat, so it never issues one there.)
+
+### Twenty seeds
+
+`cargo run --release -p dying-earth-engine --example sim -- 1 --count=20`, three seatings, plus
+`sweep -- 20 --player=custodians --start=europe --sinks=6 --steps=150`. Nothing was re-tuned; these
+are measurements.
+
+| seat 0 | wins | collapses | median collapse turn | median first Colony | net at turn 12 | net at the end |
+|---|---|---|---|---|---|---|
+| Custodians in East Asia | Prospectors 1 | 19/20 | 21 | 10 | +36.1 | +16.5 |
+| Prospectors in East Asia | Prospectors 19 | 1/20 | 24 | 10 | +30.5 | +8.2 |
+| Arkwrights in East Asia | Arkwrights 4 | 16/20 | 22 | 10 | +30.5 | +11.8 |
+| Custodians in Europe (sweep) | Prospectors 18 | 2/20 | 24 (24..24) | - | - | end temp +2.91 |
+
+What the new orders did over each batch of twenty:
+
+| seat 0 | Scrubbers built | Mothballs | Restarts | Decommissions | Leapfrogs | Strip Permits |
+|---|---|---|---|---|---|---|
+| Custodians in East Asia | 288 | 834 | 241 | 245 | 0 | 27 |
+| Prospectors in East Asia | 430 | 1114 | 174 | 420 | 0 | 64 |
+| Arkwrights in East Asia | 267 | 868 | 193 | 290 | 0 | 64 |
+
+The Custodians' longest Stabilization run, median and max over the twenty seeds: **0 and 0** in the
+Custodian and Arkwright seatings, **0 and 6** in the Prospector seating. (A note on that figure: the
+Stabilization test is a world test — net counted Emissions under the Sink — so every seat's run moves
+together. It is one number about the board, not four about the Factions.)
+
+**The Scrubber cools the world, and by a lot.** Against #53's twenty seeds the Prospector-in-East-Asia
+seating collapsed 20 of 20 at a median turn 21 with nobody winning; it now collapses **1 of 20**, ends
+at a net of +8.2 ppm, and the Prospectors win 19 of 20. The Europe sweep went the same way: 20 of 20
+collapses before, **2 of 20** now, and 18 Prospector wins. The Custodian-in-East-Asia seating moved
+from 20 of 20 to 19 of 20 — that board still burns, because the seat that holds most of Earth is the
+one that keeps building, and the Custodian AI's own Scrubbers cannot outrun twelve states of industry.
+
+**Two of the six new AI weights never fire, at the numbers the designer set, and that is a finding
+rather than a bug.**
+
+- **`leapfrog` (Custodians 5, when Ducats exceed 60) fired 0 times in 60 games.** A Custodian AI
+  never holds 60 Ducats at an Orders phase: bought Influence scores 7.2 against Leapfrog's 5, and
+  the greedy spend turns every Ducat into Influence the turn it arrives. Either the weight has to
+  beat bought Influence or the trigger has to be lower than 60.
+- **`strip_permit` (Prospectors 7, when behind on Extraction pace) fired 0 times in the seating where
+  the Prospectors sit in seat 0**, and 27 to 64 times over twenty seeds in the other two. The seat-0
+  Prospector runs 20 to 50 per cent **ahead** of its Extraction schedule all game (turn 6: 93 against
+  a pace of 40; turn 12: 201 against 150), so it is never behind and never asks. A Prospector in a
+  worse seat is behind often enough to use it.
+
+**The Energy clause makes the AI mothball a great deal.** "Mothball the highest-upkeep non-producer
+when an Energy shortfall is within one turn" fires most turns for most seats, because the shortfall
+rule leaves the Energy balance hovering near zero by design: 834 to 1114 mothballs a batch, against
+174 to 241 restarts. It also means a Custodian AI builds a Scrubber (4 Energy upkeep, no output) and
+mothballs it again a turn or two later, which is visible in the log as a build-and-stand-down cycle.
+Each mothball costs the state 1 Unrest, which is part of why Relief orders are up at 258 to 311 a
+batch. Whether the trigger should be tighter than "within one turn" is the designer's call.
+
+
+### After the build: the Custodian AI learns to Leapfrog
+
+The first twenty seeds had **no Leapfrog in sixty games**: it was scored at its bare weight of 5,
+under buying Materials (9) and Influence (7.2), which took every Ducat the turn it arrived, and
+the AI saved Materials for a dearer action but never Ducats. Two changes, the new rule seen red
+first (`a_custodian_ai_behind_on_stabilization_leapfrogs_when_it_has_the_ducats`): Leapfrog counts
+as a Stabilization action for the victory-gap multiplier, the Custodians' `leapfrog` weight is 10,
+and the greedy spend now holds Ducats for a higher-scored Ducat action that three turns of Ducat
+income would bring within reach, as it holds Materials. Twenty seeds afterwards, Custodians in East
+Asia: 6 to 8 Leapfrogs a game, 19 of 20 Collapses at median turn 21, one Prospector win.
+
+
+## #55: Breaks, Committed Warming and the Last Turn
+
+Until now the Climate Model was one smooth curve with a line at the end of it. This ticket puts five
+**Breaks** on the curve: a Temperature at which a permanent change fires once, in the Climate phase,
+the first time the Temperature stands at or above it. Nothing undoes one, and the Report says it
+**happened** rather than that it is coming. They live as `[[break]]` rows in `climate.toml` -- id,
+name, Temperature, effect kind, figures, the sentence and the card line -- so a Temperature can be
+moved, a figure changed or a sixth Break added without touching the engine. The real-world warming
+each is drawn from is in the research note on the branch `research/tipping-points`.
+
+| Break | at | what it does |
+|---|---|---|
+| **Coral Die-off** | +1.4 | every Nation State at Coastal Exposure 2 takes +1 Unrest (damped like any climate rise) and loses 2% of its people, half of whom flow on as refugees. No climate effect at all. |
+| **Permafrost Thaw** | +1.6 | **+4.0 ppm** of Emissions every Climate phase from then on, as its own **Permafrost** line on the Climate Panel. The world's carbon: nobody's Blame, and never counted against a Stabilization run. |
+| **The Sink Weakens** | +2.0 | the Natural Sink falls from 6.0 to **4.0** for good. This one *does* bear on Stabilization, because the Sink is the bar. |
+| **Ice Sheets Committed** | +2.2 | a Sea Level threshold's slot loss, displacement and Unrest lands at once on every state, **out of sequence**. The three scheduled thresholds still fire on their own turns, so a game that reaches +2.8 takes four. |
+| **Amazon Dieback** | +2.6 | a one-off **+20 ppm** into the CO2 Stock and **South America's Baseline Emissions up by 1.0** for good. Both the world's: nobody's Blame, exempt from Stabilization. |
+
+The Event card that used to be called **Permafrost Thaw** is now the **Methane Burst**, and its
+figure comes down from 3.0 to **2.5** (`events.toml`), so the name is free for the Break that thaws
+the permafrost for good.
+
+Two lines join the Climate Panel above the projection. **Committed Warming** is the Temperature the
+CO2 Stock as it stands will deliver once the lag has caught up -- "Committed: +2.1 C even if net
+Emissions stopped today". **The Last Turn** is the latest turn on which cutting net Emissions to zero
+from that turn onward still keeps the Temperature under the Collapse Line by the last turn, found by
+running the projection forward from every future turn in turn and firing every Break the run would
+cross in it: the Sink Weakens lowers the Sink in the projection, Permafrost adds its line, Amazon its
+pulse. It is `Game::last_turn_to_act()` in the engine, and it says one of three things: "Last turn to
+act: 14", "Cuts alone no longer avoid Collapse.", or "On this path Collapse is not reached."
+
+And the panel gains a **Temperature bar**, from +1.2 to the Collapse Line, notched across its whole
+height for every Break and along its foot for every Sea Level threshold and for Antarctica's opening
+at +1.6 (`antarctica_opens_at`, a constant the still-open sea-level ticket will read). A notch that
+has been crossed is filled, one still ahead is thin and dim; the Temperature now carries a filled
+marker and the committed Temperature a hollow one, with the warming between them shaded; and the line
+beneath names the next Break ahead.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![The Climate Panel at turn 8: the Temperature bar with two red Break notches filled behind the current Temperature and the rest dim ahead of it, a Permafrost line among the Emissions, and the Committed and Last Turn lines above the projection](climate-panel-breaks.png)
+
+- **climate-panel-breaks.png** -- `shot:cpb turns:6 temp:1.7,1.95 look:20,25`. Turn 8 at +1.9 C. On
+  the bar, the Coral Die-off at +1.4 and the Permafrost Thaw at +1.6 are filled red; Antarctica's
+  opening sits under the second of them along the foot and the first Sea Level threshold at +1.8 is
+  filled blue; the Sink Weakens, Ice Sheets and Amazon are dim ahead, and "next: The Sink Weakens at
+  +2.0" reads under it. The filled white marker is the Temperature now, the hollow one the +2.1 the
+  Stock has already bought, with the gap between them shaded. **Permafrost 4.0** stands in the
+  Emissions list between Population and the Sink, and underneath: "Committed: +2.1 C even if net
+  Emissions stopped today" and "Last turn to act: 14". (`temp:<now>[,<committed>]` is a new building
+  aid: it puts the Temperature and the CO2 Stock where the picture needs them and runs one quiet
+  turn, since an AI game arrives at a given Temperature on a turn nobody can choose.)
+
+![The Report at turn 8 carrying two Break lines with their card text, and the Sea Level lines the Ice Sheets Break fired out of sequence](break-report.png)
+
+- **break-report.png** -- `shot:br menus:1 turns:6 temp:2.3,2.5`. One Report, two Breaks: "Break at
+  +2.0 C - The Sink Weakens. The Natural Sink weakens. The forests and the oceans are full; the world
+  stops taking back what we give it." and "Break at +2.2 C - Ice Sheets Committed. The ice sheets let
+  go. Greenland and Thwaites pass the point of return; the sea is coming for the coasts and it will
+  not stop." Under them is what the second one cost: state after state losing build slots at "+2.2 C", a
+  Scrubber and a Refinery destroyed in East Asia, and the refugee flows that followed.
+
+![The Climate Panel of a doomed board: Committed +3.2 C and a red line reading "Cuts alone no longer avoid Collapse"](climate-panel-last-turn-gone.png)
+
+- **climate-panel-last-turn-gone.png** -- `shot:ltg turns:8 temp:2.0,3.05 look:20,25`. Turn 10 at
+  +2.6 C with a CO2 Stock of 1011 ppm. Four Break notches are filled and only the Amazon is left
+  ahead; the committed marker is pinned at the right-hand end of the bar; and where the last picture
+  named a turn, this one reads **"Cuts alone no longer avoid Collapse."** in red under "Committed:
+  +3.2 C even if net Emissions stopped today". The Sink line still reads -6.0 because the panel
+  reports the Climate phase that has just run, and the Sink Weakens fired at the end of it.
+
+### Twenty seeds
+
+`cargo run --release -p dying-earth-engine --example sim -- 1 --count=20`, twice, plus
+`sweep -- 20 --player=custodians --start=europe --sinks=6 --steps=150`. Nothing was re-tuned; these
+are measurements.
+
+| seat 0 | wins | collapses | median collapse turn | median first Colony | net at turn 12 | net at the end |
+|---|---|---|---|---|---|---|
+| Custodians in East Asia | none | 20/20 | 19 | 10 | +41.4 | +25.4 |
+| Prospectors in East Asia | none | 20/20 | 21 | 10 | +32.6 | +17.6 |
+| Custodians in Europe (sweep) | none | 20/20 | 21 (19..23) | - | - | end temp +3.03 |
+
+Which Breaks fired, in how many of the twenty seeds, and on what turn:
+
+| Break | at | Custodians in East Asia | Prospectors in East Asia |
+|---|---|---|---|
+| Coral Die-off | +1.4 | 20 seeds, median turn 4 | 20 seeds, median turn 4 |
+| Permafrost Thaw | +1.6 | 20 seeds, median turn 6 | 20 seeds, median turn 6 |
+| The Sink Weakens | +2.0 | 20 seeds, median turn 10 | 20 seeds, median turn 10 |
+| Ice Sheets Committed | +2.2 | 20 seeds, median turn 12 | 20 seeds, median turn 11 |
+| Amazon Dieback | +2.6 | 20 seeds, median turn 16 | 20 seeds, median turn 16 |
+
+And the Last Turn the panel showed, at turn 1 and at turn 12:
+
+| seat 0 | median Last Turn at turn 1 | at turn 12 | seeds already past saving | seeds not on a collapsing path |
+|---|---|---|---|---|
+| Custodians in East Asia | 21 | 16 | 0 | 0 |
+| Prospectors in East Asia | 20 | 16 | 0 | 0 |
+
+**All five Breaks fire in every seed of both seatings, and the world now collapses in every game.**
+Against #54's same twenty seeds the Custodian-in-East-Asia seating went from 19/20 collapses at a
+median turn 21 to **20/20 at turn 19**; the Prospector-in-East-Asia seating, which #54 measured at
+**1/20** with nineteen Prospector wins, is now **20/20 with nobody winning**; and the Europe sweep
+went from 2/20 to 20/20. The Scrubber's cooling of #54 has been undone and then some: the Permafrost
+line alone is +4.0 ppm a turn from about turn 6, which is two thirds of the Natural Sink, and the
+Sink itself is cut by a third from about turn 10. That is the ticket's numbers as they came out, not
+a balance: the knobs that would settle it are one line each in `climate.toml` (each Break's
+`temperature` and its own figure) and the `ppm_step` that has been re-swept on every ticket that
+changed the board.
+
+**The Last Turn is a real clock, and it is always running out.** At turn 1 the median board says
+turn 20 or 21 -- most of the game still to play with. By turn 12 it says 16: four turns of room left,
+where eleven turns earlier there were nineteen. No seed at either moment was ever told "Cuts alone no longer
+avoid Collapse" or "On this path Collapse is not reached", so the line is doing what it was meant to
+do at both ends of the game -- though on these boards the AI never acts on it, because no seat has an
+order that cuts a whole world's Emissions to zero.
+
+**A note on the Climate Panel's Sink line.** The panel reports the Climate phase that has just run,
+and a Break fires at the end of that phase, off the Temperature it settled. So on the one turn the
+Sink Weakens fires, the panel still reads "Natural Sink -6.0" while the bar already shows the notch
+filled; from the next turn it reads -4.0. The bar is the state of the world, the Emissions list is
+the account of the turn just gone.
+
+
+## #56: sea level and the ice
+
+Until now the sea took **build slots**, any of them, and it took the highest-upkeep Facility standing in
+one. This ticket gives every Nation State three more slots and cuts the whole row in two.
+
+**Build slots** are now **Size + Industry Level + 3** (`base_slots` in `nation_states.toml`'s header),
+less the coastal slots the sea has taken. Every slot is either a **Coastal Slot** or an **Inland
+Slot**. A state's **start** slots (Size + 3 + the Industry Level on its card) hold **three coastal
+slots per point of Coastal Exposure** (`coastal_per_exposure`), never more than the start slots less
+one; the rest are inland, and **every slot a raise of the Industry Level adds is inland**. Only
+Central America and the Caribbean feels the cap: 1 + 3 + 1 = **5** start slots, 3 x 2 = 6 coastal
+wanted, **capped at 4**, leaving one inland. East Asia gets 6 coastal and 3 inland; every state at
+Coastal Exposure 1 gets 3 coastal.
+
+**The sea takes coastal slots and nothing else.** Each threshold -- scheduled, a Storm Surge applied
+early, or the Ice Sheets Break -- takes Coastal Exposure of them as before, and once a state's
+coastal slots are gone it loses no more. A Facility standing in a lost coastal slot is destroyed,
+**oldest first** (it was highest-upkeep-first). The displacement and the Unrest a threshold brings are
+unchanged: they key on the threshold firing, not on the slots it managed to take, so a state with no
+coast left still loses its people and its calm. Start Facilities take coastal slots first, in the
+table's order; a new build fills an inland slot while one is free.
+
+**Coastal Engineering** is the thirteenth Tech: Industry rung 2, cost 25, needing Efficient Grids,
+beside Clean Power. It unlocks one thing, the **Sea Wall** (35 Materials, 2 turns, 1 Energy upkeep, no
+Emissions): at most one to a state, always in a coastal slot, and while it stands and is working the
+state's **next Sea Level threshold of any kind takes no slots at all**. The wall is destroyed
+absorbing it. A mothballed wall absorbs nothing.
+
+**Antarctica opens.** Earth's three Colony Slots cannot be founded until the Temperature has stood at
+or above **+1.6 C** (`antarctica_opens_at`, the constant #55 put on the Temperature bar) in a Climate
+phase; once open they stay open however far the world cools back. Until then the Surface Map draws
+them under the ice with their opening Temperature, the Solar System Map's Earth line says so, and a
+Colony Ship ordered to found there is refused by name. Its yields are re-cut for what lies under the
+ice: **Mine 1.75, Refinery 2.0**, Generator 0.75, **Habitat 1.0**. Its Colonists still count as on
+Earth and its Modules still emit.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![The East Asia card with a Coastal row and an Inland row: a Sea Wall standing on the coast, a drowned Factory and one more slot struck through, and a Research Lab inland](slots-coastal-inland.png)
+
+- **slots-coastal-inland.png** -- `shot:w2 walls:1 select:eastasia turns:0 look:110,30`. East Asia after
+  the sea's first threshold. The card reads "2 coastal slot(s) lost to the sea", then **Coastal: Power
+  Plant, Refinery, Launch Site, Sea Wall,** *Factory, lost to the sea*, *lost to the sea* -- the
+  Factory was the oldest thing on that coast and went first -- and **Inland: Research Lab, free,
+  free**. Every Facility line names its row ("Sea Wall (coastal): no output, 1 Energy upkeep"), and the
+  slot count reads 5 used of 7. (`walls:1` is a new building aid: it puts the sea through East Asia's
+  coast once, stands the Bank down to make room as a player would, and raises the wall, since an AI
+  game never arrives at that board.)
+
+![The Tech Tree with thirteen boxes, Clean Power and Coastal Engineering side by side on Industry rung 2, both drawn from Efficient Grids](tech-tree-thirteen.png)
+
+- **tech-tree-thirteen.png** -- `shot:tt tech:1 turns:8`. Thirteen boxes. The Industry column is twice
+  as wide as the others because its second rung holds two Techs, and **Clean Power** and **Coastal
+  Engineering** sit side by side on it, each with its own line down from Efficient Grids; Clean
+  Manufacturing hangs under Clean Power alone. The tree lays a branch out this way whenever a rung
+  holds more than one Tech, so a fourteenth costs no code.
+
+![Earth's Surface Map from over the south pole: the three Antarctic slots labelled "under the ice, opens at +1.6 C" in pale blue](antarctica-closed.png)
+
+- **antarctica-closed.png** -- `shot:ice0 turns:2 look:0,-72 panel:0`. Turn 3 at +1.4 C. The Antarctic
+  Peninsula, Lake Vostok and the Ross Ice Shelf each read **"under the ice / opens at +1.6 C"** in the
+  ice's own pale blue, over the continent itself. (`panel:0` is a new building aid: the Earth picture
+  shows the globe with no Climate Panel over it.)
+
+![The same view at +1.7 C: the three Antarctic slots now read "empty" in the ordinary grey, ready to be founded](antarctica-open.png)
+
+- **antarctica-open.png** -- `shot:ice1 turns:2 temp:1.7 look:0,-72 panel:0`. Turn 4 at +1.7 C, one
+  Climate phase after the line. The same three slots read **"empty"** in the ordinary grey a free
+  Colony Slot carries anywhere else, and the Report that turn said "The Antarctic ice opens: 3 Colony
+  Slots on Earth."
+
+### Twenty seeds
+
+`cargo run --release -p dying-earth-engine --example sim -- 1 --count=20`, twice, plus
+`sweep -- 20 --player=custodians --start=europe --sinks=6 --steps=150`. Nothing was re-tuned; these
+are measurements.
+
+| seat 0 | wins | collapses | median collapse turn | median first Colony |
+|---|---|---|---|---|
+| Custodians in East Asia | none | 20/20 | 18 | none founded |
+| Prospectors in East Asia | Prospectors 1 | 19/20 | 22 | 10 |
+| Custodians in Europe (sweep) | none | 20/20 | 22 (19..22), end temp +3.03 | - |
+
+What the sea and the ice did, over the same twenty seeds a seating:
+
+| seating | Sea Walls built | Sea Walls spent | coastal slots lost a game (median) | Facilities the sea destroyed (median) | turn Antarctica opened (median) | Antarctic Colonies founded |
+|---|---|---|---|---|---|---|
+| Custodians in East Asia | 0 | 0 | 49 | 27 | 6 | 0 |
+| Prospectors in East Asia | 0 | 0 | 49 | 27 | 6 | 2 |
+
+**The sea takes the whole world's coast.** The twelve states hold exactly **49** coastal slots
+between them, and the median game loses **49**: all four thresholds fire in every seed of both
+seatings, and Coastal Exposure 2 x four thresholds is 8, more than the 6 any exposed state has. Every
+coast in the world is gone by the end, and twenty-seven Facilities go with it -- the start Facilities
+stand on the coast by rule now rather than by accident, and the sea reaches them oldest first.
+
+**The AI built no Sea Wall in any of the forty games, and the reason is upstream of the weights.**
+Coastal Engineering is Industry rung 2 and needs Efficient Grids, and **no game in either seating
+finishes a single rung-2 Tech**: across the Custodian seating's twenty seeds the world completed
+Public Science 17 times, Deep Mining 5, Expanded Habitats 4 and Efficient Grids 3 -- 29 Techs in
+twenty games, every one of them rung 1 -- and the Prospector seating completed Deep Mining 19 times.
+The Tech is never in, so the wall is never offered. The rule and its weights are pinned
+by formula test (h) instead, which puts Coastal Engineering in by hand and watches the AI wall
+Australia's coast with the sea 0.15 C away.
+
+**Three more slots a state cost the Custodian seating its Colonies.** Against #55's same twenty seeds
+the Custodian-in-East-Asia seating went from a first Colony at a median turn 10 to **no Colony in any
+of the twenty seeds**, and collapse came a turn sooner (18 against 19). The reason is in the AI's
+scored list, not in the sea: with three more slots in every state there is always another Factory or
+Power Plant to buy on Earth, and the greedy spend never holds 30 Materials back for a Colony Ship at
+the ISS -- seed 3 shows it skipping the Colony Ship eleven times for want of Materials while
+completing 36 buildings, against 30 at #55. The Prospector seating is unhurt (a first Colony at turn
+10, and its one win is the first anybody has taken since #54). Nothing here was re-tuned: the knobs
+that would settle it are `base_slots` in `nation_states.toml` and `build_producer` against
+`build_colony_ship` in `ai.toml`.
+
+**Antarctica opens early and nobody goes.** The ice is open by turn 6 in every seed of both seatings
+-- the Permafrost Thaw fires at the same +1.6 C, so the two arrive together -- and two Antarctic
+Colonies were founded across the forty games. It stays what #44 made it: a foothold the AI takes only
+when a loaded Colony Ship has nowhere better to be, and now with abundant ore and Fuel under it for a
+player who wants them.
+
+### After the build: the AI keeps its Shipyard and saves for the Ship
+
+The twenty seeds with three more slots per state showed the Custodian AI founding **no Colony in any
+seed**. The log showed the loop: its Scrubbers (4 Energy each) pushed Energy a turn from short, the
+Mothball rule shut the dearest non-producer, which was the Shipyard, so no Colony Ship could be
+built, and the Materials went to a Power Plant and another Scrubber, and round again; and the
+Colony Ship, scoring highest, was only ever "skipped" because the AI saved Materials only for an
+action affordable within one turn's income, so a cheaper Factory took the reserve every turn. Two
+AI changes, each seen red first:
+
+- **The AI never mothballs a Shipyard or a Launch Site** (`the_ai_never_mothballs_a_shipyard_or_a_launch_site`,
+  red on "never the Shipyard or the Launch Site: [Shipyard]" with the rule stashed).
+- **The Materials reserve reaches four turns of income**, as the Ducat reserve reaches three
+  (`the_ai_holds_materials_four_turns_for_a_colony_ship_it_wants_more_than_a_factory`).
+
+Twenty seeds afterwards, Custodians in East Asia: first Colony at median turn 12 (was none), 20 of
+20 Collapses at median turn 17; Prospectors in East Asia: first Colony at 10, 20 of 20 at median 19.
+
+## #57: named sites with real yields, and real launch windows
+
+Two changes, one about the ground and one about the sky.
+
+**Every Colony Slot draws its own four yields when the game starts.** A Body's card figures stop
+being what a Colony there gets and become what its slots draw from: each slot takes the Body's Mine,
+Generator, Refinery and Habitat yields times a factor from a **triangular distribution centred on
+1.0 with limits 0.75 and 1.25** (`slot_yield_spread = 0.25` in `bodies.toml`), rounded to two
+decimals, drawn from the game's own seeded generator in Body order then slot order, so a seed always
+deals the same board. Nothing ever falls outside a quarter either side, the middle is much the
+likelier, and the four are drawn separately, so Isidis Planitia can be the best Habitat site on Mars
+and a middling Mine. Every yield a Module in a Colony reads is now its slot's -- what a Mine makes, a
+Trade Post's Ducats, and the Colonists a Habitat holds. A Space Station's Habitats still take no
+Body yield and no slot's either; a station stands in an Orbital Slot, which draws nothing.
+
+The AI reads the slot figures now, not the Body's average: it picks the free slot on a Body whose own
+yields best serve the part of its Victory Condition it is furthest behind on, and it ranks the Bodies
+themselves by their best free slot rather than by the card.
+
+**NOTE, to be revisited when board lenses arrive.** The Surface Map writes the four figures under
+every slot's name, filled or free, always. That is the right thing while there is no other way to see
+them, and the wrong thing the moment the board grows lenses the player can turn on and off: four
+numbers under sixteen labels is a lot of ink to carry permanently. The same note is on the code, in
+`slot_labels`.
+
+**The game begins at 2030-01-01 00:00:00 UTC and a Turn is a calendar month.** `start_year = 2030`
+and `start_month = 1` sit in `victory.toml` beside `turns`; turn 1 is January 2030 and turn 24 is
+December 2031, and the top bar reads "Turn 7 / 24, July 2030". Every turn is sampled at the first
+instant of its month, so turn 1 is exactly the moment the game begins.
+
+**The sky is the real one.** `assets/data/ephemeris.toml` carries the Keplerian elements of Earth
+(strictly the Earth-Moon barycentre) and Mars at J2000 with their rates per Julian century, copied
+from JPL's "Keplerian Elements for Approximate Positions of the Major Planets", the table valid 1800
+to 2050. The engine propagates them to the turn's date, solves Kepler's equation and takes the
+heliocentric ecliptic longitude, which is all a game played on a plane needs. On 2030-01-01 it puts
+**Earth at 100.182 degrees and Mars at 337.831**, against JPL Horizons' 100.1845 and 337.8203 --
+0.003 and 0.011 degrees out, a hundred times inside the tolerance the test asks for. The Solar System
+Map draws each Body on its existing ring at that longitude; the Moon still sits beside Earth and
+Phobos and Deimos beside Mars. The workings, the sources and the reference positions are in
+[`docs/research/earth-mars-ephemeris.md`](../../research/earth-mars-ephemeris.md).
+
+**And so the launch windows are real.** The **phase angle** is Mars's heliocentric longitude less
+Earth's; the **window offset** is the signed difference between it and the Hohmann departure angle of
+**+44 degrees**. A transit between the Earth system (Earth, the Moon) and the Mars system (Mars,
+Phobos, Deimos) no longer pays the fixed 4 turns and 20 Fuel on the card. It pays
+
+    turns = ceil((259 + 1.5 x |offset|) / 30)      Fuel = card Fuel x (1 + |offset| / 120)
+
+capped at 18 turns, with everything in a `[transit]` table in `ephemeris.toml`. At the window that is
+**9 turns for the card's Fuel**; at the far side of the cycle it is 18 turns and two and a half times
+the Fuel. Efficient Transit and the Arkwrights' Steerage multiplier both apply **after** the window
+factor, so they cut a bill the sky has already set. A Solar Storm still stops every transit that
+turn, with no special case. Hops inside the Earth system and inside the Mars system are untouched:
+the Moon is still 1 turn and 6 Fuel, Phobos to Deimos still 1 and 1, on every turn of the game.
+
+**One correction to the ticket, flagged rather than made quietly.** The ticket gave the return
+Hohmann angle as "about -75 degrees, Earth leading". Worked out from the ephemeris (research file,
+section 4.3), under the ticket's own convention that the phase angle is Mars's longitude minus
+Earth's, the return angle is **+75 degrees**, with Earth 75 degrees *behind* Mars at the moment of
+departure and overtaking during the cruise; the magnitude is right and only the direction is turned
+round. Both legs must read the phase angle the same way or the return window lands two years out, so
+`return_hohmann_angle = 75.0` went into `ephemeris.toml`, where it is one line to change back. Every
+other figure the ticket gave was confirmed: 259 days (computed 258.87), +44 degrees (44.35), the
+direction of both penalties, and a real fast Type I transfer of 178 to 228 days.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![Mars's Surface Map: Olympus Mons, Valles Marineris and Chryse Planitia each labelled "empty" with a line of four small yield figures under the name](slot-yields-mars.png)
+
+- **slot-yields-mars.png** -- `shot:sy turns:0 look:-124,40`. Three of Mars's six Colony Slots, each
+  with its own four figures under its name: **Olympus Mons M 1.27 G 0.60 R 1.39 H 1.43**, **Valles
+  Marineris M 1.07 G 0.79 R 1.81 H 1.51**, **Chryse Planitia M 1.14 G 0.64 R 1.60 H 1.40**, against
+  the Body's 1.25 / 0.75 / 1.50 / 1.50. No two are alike, none is more than a quarter out, and
+  Valles Marineris is plainly the Refinery site while Olympus Mons is the Mine. Three, not six,
+  because a globe has a far side: Mars's six slots are spread over 269 degrees of longitude and the
+  most that ever face the camera at once is three. The top bar reads **"Turn 1 / 24, January 2030"**.
+
+![The Solar System Map in April 2030: Earth on the inner ring at the left of the Sun, Mars on the outer ring above and to the right, and a yellow line of text giving the Mars window](solar-real-sky.png)
+
+- **solar-real-sky.png** -- `shot:srs turns:3 hover:mars`. Turn 4, April 2030, with Earth at
+  heliocentric longitude 190.9 and Mars at 33.4 -- Earth left of the Sun on the inner ring, Mars up
+  and to the right on the outer one, near enough opposite. Hovering Mars gives **"Mars window: in 10
+  turns (February 2031). Flight now: 17 turns, 46 Fuel. At the window: 9 turns, 20 Fuel."** The
+  seventeen turns is the point: a Ship that leaves in April 2030 is still in flight when the game
+  ends. (`hover:<body id>` is a new building aid: nothing hovers in a headless capture, so the aid
+  draws the tooltip as though the pointer were on that Body.)
+
+![The same map on turn 14: Earth and Mars both left of the Sun and about fifty degrees apart, a Colony Ship on the line between them, and the tooltip reading "this turn"](solar-window-turn.png)
+
+- **solar-window-turn.png** -- `shot:swt turns:13 hover:mars`. Turn 14, **February 2031**, the window
+  turn. Earth stands at 131.5 and Mars at 180.4, forty-nine degrees apart with Mars ahead -- the
+  geometry a minimum-energy departure wants. The tooltip reads **"Mars window: this turn (February
+  2031). Flight now: 9 turns, 20 Fuel. At the window: 9 turns, 20 Fuel."**, and an AI Colony Ship is
+  already on the line between the two worlds with eight turns left to run.
+
+**NOTE, on what the tooltip is not saying.** These are transits **from Earth**. Once a Faction can
+launch from the Moon, or start home from Mars, one line about one departure point is no longer the
+whole truth -- the return window is a different turn from the outbound one, and inside the game's
+twenty-four turns it never quite arrives. How that is presented has to be settled again before
+launches from other Bodies go in. The same note is on the code, over the tooltip.
+
+### What this does to the pace, plainly
+
+**There is exactly one Mars launch window in the game, turn 14 (February 2031), and the shortest
+flight there is is nine turns.** The real 2031 opportunity departs 28 January 2031 (research file,
+section 3.3), which is turn 13, so the game's own window turn is one turn late -- close enough that
+the test pins it to within one turn. The next window is a synodic period away, 26 turns, well past
+the last turn. What follows from those two numbers:
+
+- A Colony Ship that launches on the window lands on **turn 23**, with one turn left to build a
+  Habitat and none to fill it.
+- A Colony Ship that launches on turn 1 pays 17 turns and 47 Fuel and lands on turn 18.
+- Off the window a crossing costs 21 to 49 Fuel where it used to cost 20, which is more than a turn's
+  Fuel income for most of the game.
+
+Measured over twenty seeds a seating, that is not a tax on Mars. It closes Mars.
+
+| twenty seeds, seat 0 | first Mars-system Colony | Colonists off Earth at the end | Antarctic Colonies |
+|---|---|---|---|
+| Custodians, window rule **off** | median turn 12, 20 of 20 seeds | median 8 | 21 |
+| Custodians, window rule **on** | **none in any seed** | **0** | 60 |
+| Arkwrights, window rule **off** | median turn 10, 20 of 20 seeds | median 20 | 29 |
+| Arkwrights, window rule **on** | **none in any seed** | **0** | 43 |
+
+(The "off" rows were measured by switching `crossing_offset` to `None` and re-running the same twenty
+seeds; nothing else was changed and nothing was re-tuned.) The AI still orders the crossing -- the
+log shows "take 18.0 send Colony Ship 18 to Mars" and then a run of "skip ... send Colony Ship 21 to
+Mars (needs 27 Fuel, 19 left)" -- and the Ships that do leave are still in flight when the world
+collapses. The Colonists go to Antarctica instead, and **not one Colony was founded on the Moon in
+any of the forty games**: the destination list a loaded Colony Ship is offered is the single best
+Body plus any Body the Faction already holds room on (ticket #51), and Mars's Habitat slots are the
+best, so when the crossing is unaffordable the Ship is never offered the Moon at all -- it is offered
+Antarctica, which needs no flight. That is an older rule the window has just made visible.
+
+**This is a decision for the build ticket, not a bug.** The three knobs are all in
+`ephemeris.toml`: `days_at_window = 259` (the real minimum-energy flight; the real *fast* Type I
+transfer in 2031 is 190 days, which would be 7 turns), `days_per_degree = 1.5` and
+`fuel_per_degree = 1/120`. The fourth is upstream and larger: a game whose median collapse is turn
+17 has no room for a nine-turn flight to a window on turn 14, whatever the sky does. Either the
+window has to be earlier, or the flight shorter, or the game longer, or Mars stops being where the
+Colonists go.
+
+### Twenty seeds
+
+`cargo run --release -p dying-earth-engine --example sim -- 1 --count=20`, and the same with
+`--player=arkwrights`. Nothing was re-tuned; these are measurements.
+
+| seat 0 | wins | collapses | median collapse turn | median first Colony | median first Mars Colony | Colonists off Earth at the end |
+|---|---|---|---|---|---|---|
+| Custodians in East Asia | none | 20/20 | 17 | 13 | none in 20 seeds | 0 |
+| Arkwrights in East Asia | none | 20/20 | 17 | 6 | none in 20 seeds | 0 |
+
+The Mars launch window is **turn 14** in every seed of both seatings: the sky is not seeded, so no
+seed moves it.
+
+Every first Colony in both tables is an Antarctic one. The Custodian seating's median of 13 and the
+Arkwright seating's of 6 are the turn a loaded Colony Ship gave up on the crossing, not the turn it
+reached another world -- the ice opens on turn 6 in every seed, and the Arkwrights, who carry twice
+the Colonists, go straight there. Against #56's last measurement (Custodians first Colony at median
+turn 12, off-world Colonists reached) the whole off-Earth game has moved to the one place that needs
+no flight.
+
+Everything else the sea and the ice do is unchanged from #56: 49 coastal slots lost a game, 27
+Facilities drowned, no Sea Wall built in forty games, all five Breaks in all forty, and the ice open
+by turn 6.
+
+### After the build: a loaded Ship weighs the flight
+
+The first twenty seeds founded every Colony in Antarctica and none on the Moon: a loaded Colony
+Ship was only ever offered the single best Body by yield, Mars, and with the window at turn 14 and
+a nine-turn flight the AI waited for a Mars it could never reach. Now `best_body_for` weighs each
+Body's best slot by the share of the game left that the flight from Earth would eat, and drops any
+Body the Ship cannot reach before the last turn, so off the window the Moon (one turn) beats Mars
+(seventeen). Seen red first: `a_loaded_colony_ship_goes_to_the_moon_when_mars_is_a_year_away`
+failed on "left: Some(Mars), right: Some(Moon)". The Fuel-banking test now fills the Moon so Mars is
+the only destination on its board.
+
+Twenty seeds afterwards, seat 0 in East Asia:
+
+| seat 0 | wins | collapses | median collapse turn | first Colony | Colonists off Earth at the end (all seats, median) |
+|---|---|---|---|---|---|
+| Custodians | Prospectors 3 | 17 | 17 | 9 | 11 (was 0) |
+| Arkwrights | none | 20 | 17 | 7 | 16 (was 0) |
+
+
+## #58: the turn as a story
+
+The Report used to be a list. It is a dated dispatch now.
+
+**One headline, by severity.** Every Report line carries a **kind** and, where it is about somewhere,
+a **place**: `Report.lines` is a `Vec<ReportLine { kind, place, text }>` and every one of the
+forty-odd places the engine writes a line names both. The headline is the line with the lowest rank
+in a fixed order over everything the last Resolution and Climate phase did: a Colony founded, a place
+changing controller, a Break or a Sea Level threshold, a Battle that cost a unit or moved Orbital
+Control, an Occupation, a Tech completed, an Event drawn, a build completed. Position in the turn
+counts for nothing: a Tech written down after a founding still comes second.
+
+**Then four headings**, in this order and with the empty ones left out: **In space**, **On Earth**,
+**The climate**, **Your works**. The kind decides the heading, and the kinds that can happen either
+side of the sky follow their place, so a change of control at a Colony is In space and the same
+change in a Nation State is On Earth. Every line with a place is a button that takes the player
+there -- the Earth Map to the state, the Body Surface Map to the Colony, the Solar System Map to the
+Body -- the way the roster's rows do.
+
+**And what the rivals did, in words.** The scored list the AI chose from was never the player's
+business; it is in the simulate log and nowhere else now. What the Report shows is one paragraph per
+rival Faction, in seat order, built from the orders that Faction actually committed and what the
+Resolution made of them: builds begun and finished, Influence spent and where, Ships built, sent and
+arrived, Colonists lifted, Colonies founded, Armies moved, Stances set, Scrubbers, Sea Walls, Strip
+Permits, Leapfrogs, the Archive funded and raised. Orders the board would show as one act are told as
+one, so three Influence orders on North America read "spent 15 Influence on North America".
+
+**Moments.** Seven kinds of thing stop the turn before the Report for one sentence and one number: a
+Colony founded, a place changing hands, a Break or the sea rising, a Battle that cost a unit, a Tech
+completed, Antarctica opening, the Archive finished. **At most two a turn**, the most severe first by
+the same order the headline reads, the rest falling through to the dispatch. Each kind has a
+checkbox in a Moments corner at the foot of the Report, remembered for the session; `report.toml`
+holds the defaults.
+
+**The Research race.** The top bar's Research item gained a bar of the four Factions' contributions
+to the Tech under research, in Faction colours and in proportion, with the unfilled tail standing for
+what the Tech still needs. When a Tech completes its Moment names the Lead and the margin, shows the
+Tech Tree with the new box lit, and either gives the player the Pick buttons or says in one line what
+the AI picked and why.
+
+**Every sentence lives in `assets/data/report.toml`** -- the dispatch's lines, the rivals' clauses and
+the Moments -- as templates with named placeholders. The engine declares, per key, the placeholders
+it supplies, and loading the tables refuses the file if a key is missing, a key is there that nothing
+reads, or a template uses a placeholder the engine never hands it. The engine's own **log** lines are
+untouched and say the same thing in the same words, because the simulate run reads them.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![The Report popup for July 2030: an orange headline "The Custodians founded a Colony in slot 1 on the Moon with 3 Colonists.", then In space, On Earth and Your works, then a paragraph per rival Faction in its own colour](report-dispatch.png)
+
+- **report-dispatch.png** -- `shot:rd menus:1 turns:5 found:1 race:1`. "Report, July 2030", the
+  seating line, then the headline in orange, then **In space** (the Archive fund, a Prospector Colony
+  Ship completed at Tiangong), **On Earth** (North America changing hands, an Archivist Power Plant)
+  and **Your works** (the Custodians' Energy shortfall), then the three rivals' paragraphs in teal,
+  violet and silver. **The climate** is absent because nothing climatic happened that turn, which is
+  the rule -- an empty heading is left out. (`found:1` is a new building aid that lands a loaded
+  Colony Ship of seat 0's at the Moon, since an AI game founds on a turn nobody can choose;
+  `race:1` spreads the Research four ways so the top bar's race bar shows all four colours.)
+
+![The Moment modal over the Earth Map: "3 Colonists" in large type, then "The Custodians founded Mare Tranquillitatis on the Moon, their first Colony off Earth.", with Close and "1 of 2"](moment-colony-founded.png)
+
+- **moment-colony-founded.png** -- `shot:mc menus:1 turns:5 moment:colony race:1`. The founding
+  Moment: the number first and large, the sentence under it, Close and how many Moments this turn
+  has. The Report follows it. (`moment:<kind>` is a new building aid: it switches every other kind
+  off, the way the Moments corner would, so the named Moment is the one the turn stops for.)
+
+![The Tech completion Moment: "6 of 15" large, "Efficient Grids is complete. The Prospectors led, 6 of 15.", "The Prospectors pick Deep Mining, their first choice.", and the whole Tech Tree with Efficient Grids green and Deep Mining amber](moment-tech-complete.png)
+
+- **moment-tech-complete.png** -- `shot:mt menus:1 turns:5 moment:tech`. The margin as the number,
+  the Lead named, the AI's pick and its reason on its own line, and the existing Tech Tree panel
+  underneath with Efficient Grids lit green and Deep Mining amber under research. The top bar carries
+  the four-colour race bar for the new Tech. When the player is the Lead the same modal carries the
+  Pick buttons instead, and the line reads "You led. Pick the next Tech."
+
+![A crop of the top bar: "Research 14 / 15 toward Efficient Grids" beside a bar in four segments, teal, orange, violet and pale silver-blue, with a dark tail](research-race-bar.png)
+
+- **research-race-bar.png** -- `shot:rr turns:5 race:1`, the top bar cropped and scaled three times.
+  The four Factions' contributions to the Tech under research, in seat order and in proportion:
+  Custodians 6, Prospectors 4, Arkwrights 3, Archivists 1 of the 15 Efficient Grids costs, and the
+  dark tail is the one point still wanting. Hovering it gives the figures in words.
+
+### Twenty seeds
+
+`cargo run --release -p dying-earth-engine --example sim -- 1 --count=20`. **No rule changed**, so
+this table is here to show that nothing moved: it is the same table #57 ended on, figure for figure.
+
+| seat 0 | wins | collapses | median collapse turn | median first Colony | first Mars Colony | Colonists off Earth at the end (all seats, median) |
+|---|---|---|---|---|---|---|
+| Custodians in East Asia | Prospectors 3 | 17 | 17 | 9 | none in 20 seeds | 11 |
+
+Everything else is unchanged too: 49 coastal slots lost a game, 27 Facilities drowned, no Sea Wall
+built, all five Breaks in all twenty seeds, the ice open by turn 6, the Mars window at turn 14.
+
+**What the severity cap did.** The sim counts Moments now. Over those twenty games -- 343 turns
+between them -- the turns **earned 1162 Moments and showed 335**, a shade under **one a turn**
+(0.98). **211 of the 343 turns stopped for at least one**, and no turn ever showed more than two,
+which is the cap doing its work: three turns in four earn more Moments than they are allowed to show,
+and the rest fall through to the dispatch where they belong. The sim reads the defaults in
+`report.toml`, so a player who switches a kind off sees fewer.
+
+## #64: spectator mode
+
+A fifth button under the four Faction cards hands every seat to the computer. There is no continent
+to choose: seat 0's start is the first pick of the same spreading rule the other three are dealt by,
+and the Custodians sit in it, so the table reads as it does in `simulate:`. What changes is who the
+interface is for. The spectator sees everything and orders nothing: the side panel carries **all four
+Factions' boards**, each under its own heading in its own colour, with its Ships, Armies, Colonies
+and stations and Nation States; whatever is clicked opens its card on the left, readable in full,
+with every Faction's Standing on it and **no Orders buttons anywhere** -- no build, no Influence, no
+Stance, no transit, no trading, no Tech pick. The Victory panel, the Climate Panel and the Tech Tree
+open as they do for a player.
+
+**End Turn advances one turn**, the engine running all four AI seats. An **Auto** box beside it runs
+a turn every **three seconds** until it is unticked, and the clock stops while a Moment, the Report or
+the game-over popup is up and picks up again when it closes; Escape unticks it. The dispatch is the
+player's dispatch with two headings renamed for who is reading it: **Builds and works** carries every
+Faction's builds, lifts, repairs and funding rather than one seat's, and **What the Factions did**
+tells all four paragraphs, seat 0 among them. Moments are on by default with the same switches, and
+the game-over popup names the winner as it always did.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> spectate:1 ...`, the window off-screen) and opened before it was
+written about.
+
+![The Faction choice screen with a Spectate button in a bar under the four cards, and the line "Spectate: the computer plays all four; you watch."](spectate-choice.png)
+
+- **spectate-choice.png** -- `shot:spb spectate:1 turns:6 select:EastAsia seed:7`. The choice screen
+  still deals four cards; the Spectate button stands in its own bar beneath them, outside the cards'
+  scroll, so it is on screen whatever the cards do.
+
+![The Earth Map in spectator mode: "Spectating. Custodians Prospectors Arkwrights Archivists" along the top with an Auto checkbox beside End Turn, the East Asia card on the left with no buttons on it, and all four Factions' rosters on the right in their own colours](spectate-board.png)
+
+- **spectate-board.png** -- the same run, turn 7. The top bar names the table and the Auto box sits
+  beside End Turn; East Asia's card is open on the left with its Facilities, its slots, its Unrest and
+  its Standings and not one order button; the right panel is the whole table, Custodians in teal,
+  Prospectors in orange, Arkwrights in violet and Archivists in pale silver-blue, each with its
+  Ships, Army, Colony and State. **Re-taken on ticket #60**: the Stockpile row used to carry a
+  "Custodians:" prefix that pushed the Temperature onto a second line at 1280 wide, so whose figures
+  they are is said on the seating line above instead ("- the figures below are the Custodians'.",
+  which also replaced "- the computer plays all four."), and every row of the bar is now one line.
+
+![The Report in spectator mode: "Seed 7. Spectating." and the four Factions in their colours, a Break headline, then In space, On Earth, The climate, Builds and works, and What the Factions did with four coloured paragraphs](spectate-report.png)
+
+- **spectate-report.png** -- `shot:spr spectate:1 menus:1 turns:5 race:1 seed:7`. June 2030: the
+  Permafrost Thaw headlines, **Builds and works** carries the Archivists' Archive fund, the
+  Prospectors' Power Plant and the Arkwrights' Colony Ship -- three different Factions under one
+  heading -- and **What the Factions did** runs to four paragraphs, the Custodians' among them.
+
+## #59: saves
+
+A **Save** is a turn start written to a file. The whole game goes into readable RON -- the seed, the
+generator's own state, the Event Deck in its shuffled order, every board and the log -- and the
+`Tables` do not, because the rules live in `assets/data/` and a save that carried its own copy could
+disagree with the executable it is loaded into. The file begins with a one-line header holding a
+`save_version` and the rules version it was written by; a file from another version is refused with
+a sentence naming both ("This save was written by version 0.04 of the rules; this is 0.05. It cannot
+be loaded."), and it is never migrated. Every save goes to
+**`%LOCALAPPDATA%\DyingEarth\data\saves`** -- on this machine
+`C:\Users\Josh\AppData\Local\DyingEarth\data\saves` -- written to a temporary file and renamed over
+the target, so a crash never leaves half a save where a good one used to be.
+
+The game **autosaves at the start of every third turn** and at game over, keeping the **last three
+per game**, and the **Save** button in the top bar takes a manual save whenever no order is pending:
+a save captures the beginning of a turn, never half-entered orders, and the button says so when it is
+dead. A spectated game saves the same way, with the spectator flag inside it.
+
+A turn-12 save of a played-out game (seed 11) is **296,556 bytes**, about two thirds of which is the
+log the designer asked to keep in the file. The engine's own check, run by the release binary in
+`shot:` mode, says so: `dying-earth.exe shot:rt turns:11 seed:11 save:1 savedir:<folder>` prints
+`save round trip ok: turn 12, 296556 bytes, ...\save-11-turn-12.ron`.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![The title screen's Load list: three rows, each with a Faction or Spectating, a turn and month, a Temperature, a seed, the file's time and Load and Delete buttons, two of them marked autosave, over a bottom bar with Back, Open saves folder and the folder path](load-screen.png)
+
+- **load-screen.png** -- `shot:ls load:1 turns:6 seed:11 savedir:<folder>`. Three saves, newest
+  first: a spectated game's autosave at Turn 3, March 2030, +1.4 C, seed 12; the player's own
+  Custodian autosave at Turn 9, September 2030, +2.0 C, seed 11; and the manual save it came from at
+  Turn 7, July 2030, +1.8 C. Each row carries the file's own time in this machine's zone, a **Load**
+  and a **Delete** (which asks once before it removes anything), and the file name. The bottom bar
+  holds **Back**, **Open saves folder** -- which opens Explorer, the player's own file manager -- and
+  the folder's full path, so the designer can find a save without knowing what `%LOCALAPPDATA%`
+  means.
+
+![The Earth Map at Turn 9, September 2030, with the top bar's second row reading Tech Tree, Climate Panel, Victory, Trading, Save and a green "Saved." beside it](save-button.png)
+
+- **save-button.png** -- `shot:sb2 saved:1 turns:8 seed:11 panel:0 savedir:<folder>`. The top bar
+  after a Save: the **Save** button stands live between Trading and the map swap, and **Saved.**
+  stands beside it in green for four seconds. The save it wrote, `save-11-turn-9.ron`, is in the
+  folder. With an order pending the button goes dead and its hover says why.
+## #60: the climate re-swept and the four-way balance
+
+The build ticket's half of the map: four small fixes the earlier tickets left on the board, then the
+climate clock re-swept with every rule of version 0.05 in it, and a four-way balance report at the
+numbers that came out.
+
+### The four small fixes
+
+Each was seen failing first, and each carries a formula test.
+
+- **A Wildfire on a neutral Nation State charged nothing.** Since ticket #24 the line
+  `b.cards += st.wildfire_emissions_next` sat inside the *directed* branch of `emissions_now`, an
+  accident of where that ticket's `continue` landed, so a fire in a state nobody holds burned
+  without any carbon. It is the world's card, so it now charges the cards line whether or not
+  anyone directs the state, and stays nobody's Blame either way. Red first at 0.0 against 2.0
+  (`a_wildfire_on_a_neutral_nation_state_charges_its_emissions_to_the_cards_line`). Eight of the
+  twelve states are neutral for most of a game, so this is a real, if small, addition to the world's
+  Emissions.
+- **The state card's "N now" for taking a held place ignored the challenge margin.** Ticket #41 put
+  the margin of 10 on a held place; the card kept ticket #33's `threshold.max(controller + 1)`, so
+  it printed a figure the Resolution would not honour -- 41 where the answer was 50. The whole
+  computation is now `Game::influence_needed_for(seat, place)` in the engine, and the Resolution,
+  the AI's Influence list and the card all read that one function, so the two cannot drift apart
+  again. Red first at 41 against 50
+  (`the_figure_for_taking_a_held_place_includes_the_challenge_margin`).
+- **The AI never built a Constabulary** -- 0 in every game logged from #52 to #57, for the reason
+  #52 measured: the victory-gap multiplier (x3 for most of a game) applies to producers and not to a
+  building that fixes nothing economic, so at a bare weight of 6 a Constabulary never won a build
+  slot. It now takes the victory-gap multiplier too from **Unrest 5** (which is the only Unrest at
+  which the candidate is offered at all), because a state at 7 halves every Facility's output *and*
+  its Emissions there, so calming it does advance whatever the seat is behind on; and it takes the
+  opportunity multiplier at **9**, where one more turn would throw the seat off, exactly as Relief
+  does at the same figure. Red first on the scored list: `skip 6.0 build Constabulary in East Asia`,
+  losing the last 25 Materials to a Research Lab at 8.0
+  (`a_custodian_ai_behind_on_pace_builds_a_constabulary_where_unrest_has_reached_seven`). The
+  balance report below is the first in this version's diary with Constabularies in it: **11 to 100 a
+  batch of twenty seeds**, against 0.
+- **The spectator's top bar wrapped its Temperature onto a second line at 1280 x 800.** The
+  Stockpile row carried a "Custodians:" prefix that a player's bar does not, and "+1.9" fell to a
+  fourth line. Whose figures they are is said on the seating line above instead, which had room to
+  spare, and "- the computer plays all four." went with it, since four Faction names under
+  "Spectating." say the same thing. Seen red as a picture and green as a picture, both taken
+  headlessly with `shot:spb spectate:1 turns:6 select:EastAsia seed:7` at the game's own 1280 x 800:
+  **spectate-board.png** above is the re-taken one, and the bar is now three rows of one line each.
+
+### The climate clock, re-swept for four seats, twelve states and the Breaks
+
+Ticket #55 put five Breaks on the curve and measured what they cost: **every seating collapsed 20 of
+20, at a median turn 17 to 22**, where #53 had chosen `ppm_step = 150` to keep every seating hot
+without making Collapse certain. #55 said plainly that its numbers were measurements and not a
+balance, and named the knobs. This is the ticket that turns them.
+
+**The target, restated** (it is the one #46 and #53 swept for, with Collapse made explicit):
+
+> Every seating stays hot to the end -- a median end Temperature of +2.5 to +2.9 C where it does not
+> collapse -- and Collapse is a real threat but not a certainty: roughly half to three quarters of
+> seeds collapsing, with a median Collapse turn of 19 or later. Measured over five seatings:
+> Custodians, Prospectors and Arkwrights in East Asia, and Custodians and Archivists from Europe.
+
+`engine/examples/sweep.rs` now takes `--permafrost=` and `--sink-after=` beside `--sinks=` and
+`--steps=`, so the two Break figures that actually move the clock can be swept with it: the
+Permafrost Thaw's `emissions_per_turn` (4.0 ppm every phase from about turn 6) and the Sink Weakens'
+`sink_after` (6.0 down to 4.0 from about turn 10). The other three Breaks' figures are left where
+`climate.toml` has them. Thirty-two cells a seating -- step {150, 180, 210, 240} x sink {6, 8} x
+permafrost {4.0, 2.5} x sink_after {4.0, 5.0} -- twenty seeds a cell, five seatings run as five
+concurrent processes: **3,200 games**.
+
+**Custodians in East Asia.** Twenty seeds a cell.
+
+| sink | step | permafrost | sink_after | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|---|---|---|
+| 6 | 150 | 4.0 | 4.0 | 17/20 | 17 (17..18) | +3.05 | 0 3 0 0 |
+| 6 | 150 | 4.0 | 5.0 | 14/20 | 17 (17..18) | +3.04 | 0 6 0 0 |
+| 6 | 150 | 2.5 | 4.0 | 10/20 | 18 (17..18) | +3.06 | 0 10 0 0 |
+| 6 | 150 | 2.5 | 5.0 | 10/20 | 18 (17..18) | +3.04 | 0 10 0 0 |
+| **6** | **180** | **4.0** | **4.0** | **9**/20 | 20 (19..20) | +3.03 | 0 11 0 0 |
+| 6 | 180 | 4.0 | 5.0 | 9/20 | 20 (20..21) | +3.02 | 0 11 0 0 |
+| 6 | 180 | 2.5 | 4.0 | 9/20 | 20 (20..21) | +3.01 | 0 11 0 0 |
+| 6 | 180 | 2.5 | 5.0 | 9/20 | 21 (20..21) | +3.01 | 0 11 0 0 |
+| 6 | 210 | 4.0 | 4.0 | 9/20 | 22 (22..23) | +2.83 | 0 11 0 0 |
+| 6 | 210 | 4.0 | 5.0 | 9/20 | 23 (22..23) | +2.82 | 0 11 0 0 |
+| 6 | 210 | 2.5 | 4.0 | 9/20 | 23 (22..24) | +2.82 | 0 11 0 0 |
+| 6 | 210 | 2.5 | 5.0 | 9/20 | 23 (22..24) | +2.80 | 0 11 0 0 |
+| 6 | 240 | 4.0 | 4.0 | 2/20 | 24 (24..24) | +2.69 | 0 18 0 0 |
+| 6 | 240 | 4.0 | 5.0 | 0/20 | - | +2.66 | 0 20 0 0 |
+| 6 | 240 | 2.5 | 4.0 | 0/20 | - | +2.63 | 0 20 0 0 |
+| 6 | 240 | 2.5 | 5.0 | 0/20 | - | +2.62 | 0 20 0 0 |
+| 8 | 150 | 4.0 | 4.0 | 10/20 | 18 (17..18) | +3.06 | 0 10 0 0 |
+| 8 | 150 | 4.0 | 5.0 | 9/20 | 18 (17..18) | +3.04 | 0 11 0 0 |
+| 8 | 150 | 2.5 | 4.0 | 8/20 | 18 (17..19) | +3.05 | 0 12 0 0 |
+| 8 | 150 | 2.5 | 5.0 | 8/20 | 18 (18..19) | +3.03 | 0 12 0 0 |
+| 8 | 180 | 4.0 | 4.0 | 8/20 | 20 (19..20) | +3.04 | 0 12 0 0 |
+| 8 | 180 | 4.0 | 5.0 | 8/20 | 20 (20..20) | +3.01 | 0 12 0 0 |
+| 8 | 180 | 2.5 | 4.0 | 8/20 | 21 (20..21) | +3.02 | 0 12 0 0 |
+| 8 | 180 | 2.5 | 5.0 | 8/20 | 21 (20..21) | +3.01 | 0 12 0 0 |
+| 8 | 210 | 4.0 | 4.0 | 9/20 | 23 (22..24) | +2.80 | 0 11 0 0 |
+| 8 | 210 | 4.0 | 5.0 | 9/20 | 23 (22..24) | +2.78 | 0 11 0 0 |
+| 8 | 210 | 2.5 | 4.0 | 9/20 | 24 (23..24) | +2.75 | 0 11 0 0 |
+| 8 | 210 | 2.5 | 5.0 | 9/20 | 24 (23..24) | +2.73 | 0 11 0 0 |
+| 8 | 240 | 4.0 | 4.0 | 0/20 | - | +2.61 | 0 20 0 0 |
+| 8 | 240 | 4.0 | 5.0 | 0/20 | - | +2.60 | 0 20 0 0 |
+| 8 | 240 | 2.5 | 4.0 | 0/20 | - | +2.58 | 0 20 0 0 |
+| 8 | 240 | 2.5 | 5.0 | 0/20 | - | +2.59 | 0 20 0 0 |
+
+**Prospectors in East Asia.** Twenty seeds a cell.
+
+| sink | step | permafrost | sink_after | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|---|---|---|
+| 6 | 150 | 4.0 | 4.0 | 19/20 | 19 (18..21) | +3.04 | 1 0 0 0 |
+| 6 | 150 | 4.0 | 5.0 | 19/20 | 20 (18..21) | +3.02 | 1 0 0 0 |
+| 6 | 150 | 2.5 | 4.0 | 19/20 | 20 (19..22) | +3.04 | 1 0 0 0 |
+| 6 | 150 | 2.5 | 5.0 | 19/20 | 21 (19..22) | +3.02 | 1 0 0 0 |
+| **6** | **180** | **4.0** | **4.0** | **12**/20 | 24 (22..24) | +3.01 | 8 0 0 0 |
+| 6 | 180 | 4.0 | 5.0 | 7/20 | 24 (23..24) | +2.99 | 13 0 0 0 |
+| 6 | 180 | 2.5 | 4.0 | 4/20 | 24 (23..24) | +2.95 | 16 0 0 0 |
+| 6 | 180 | 2.5 | 5.0 | 2/20 | 24 (24..24) | +2.91 | 18 0 0 0 |
+| 6 | 210 | 4.0 | 4.0 | 0/20 | - | +2.81 | 20 0 0 0 |
+| 6 | 210 | 4.0 | 5.0 | 0/20 | - | +2.79 | 20 0 0 0 |
+| 6 | 210 | 2.5 | 4.0 | 0/20 | - | +2.77 | 20 0 0 0 |
+| 6 | 210 | 2.5 | 5.0 | 0/20 | - | +2.74 | 20 0 0 0 |
+| 6 | 240 | 4.0 | 4.0 | 0/20 | - | +2.63 | 20 0 0 0 |
+| 6 | 240 | 4.0 | 5.0 | 0/20 | - | +2.62 | 20 0 0 0 |
+| 6 | 240 | 2.5 | 4.0 | 0/20 | - | +2.61 | 20 0 0 0 |
+| 6 | 240 | 2.5 | 5.0 | 0/20 | - | +2.59 | 20 0 0 0 |
+| 8 | 150 | 4.0 | 4.0 | 19/20 | 20 (19..22) | +3.04 | 1 0 0 0 |
+| 8 | 150 | 4.0 | 5.0 | 19/20 | 21 (19..22) | +3.02 | 1 0 0 0 |
+| 8 | 150 | 2.5 | 4.0 | 19/20 | 21 (20..23) | +3.03 | 1 0 0 0 |
+| 8 | 150 | 2.5 | 5.0 | 19/20 | 22 (20..24) | +3.03 | 1 0 0 0 |
+| 8 | 180 | 4.0 | 4.0 | 7/20 | 24 (23..24) | +2.97 | 13 0 0 0 |
+| 8 | 180 | 4.0 | 5.0 | 4/20 | 24 (24..24) | +2.96 | 16 0 0 0 |
+| 8 | 180 | 2.5 | 4.0 | 1/20 | 24 (24..24) | +2.93 | 19 0 0 0 |
+| 8 | 180 | 2.5 | 5.0 | 0/20 | - | +2.90 | 20 0 0 0 |
+| 8 | 210 | 4.0 | 4.0 | 0/20 | - | +2.78 | 20 0 0 0 |
+| 8 | 210 | 4.0 | 5.0 | 0/20 | - | +2.75 | 20 0 0 0 |
+| 8 | 210 | 2.5 | 4.0 | 0/20 | - | +2.75 | 20 0 0 0 |
+| 8 | 210 | 2.5 | 5.0 | 0/20 | - | +2.73 | 20 0 0 0 |
+| 8 | 240 | 4.0 | 4.0 | 0/20 | - | +2.62 | 20 0 0 0 |
+| 8 | 240 | 4.0 | 5.0 | 0/20 | - | +2.60 | 20 0 0 0 |
+| 8 | 240 | 2.5 | 4.0 | 0/20 | - | +2.58 | 20 0 0 0 |
+| 8 | 240 | 2.5 | 5.0 | 0/20 | - | +2.57 | 20 0 0 0 |
+
+**Arkwrights in East Asia.** Twenty seeds a cell.
+
+| sink | step | permafrost | sink_after | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|---|---|---|
+| 6 | 150 | 4.0 | 4.0 | 20/20 | 17 (16..18) | +3.04 | 0 0 0 0 |
+| 6 | 150 | 4.0 | 5.0 | 20/20 | 17 (16..18) | +3.04 | 0 0 0 0 |
+| 6 | 150 | 2.5 | 4.0 | 20/20 | 17 (16..19) | +3.04 | 0 0 0 0 |
+| 6 | 150 | 2.5 | 5.0 | 20/20 | 18 (16..19) | +3.03 | 0 0 0 0 |
+| **6** | **180** | **4.0** | **4.0** | **20**/20 | 20 (18..23) | +3.03 | 0 0 0 0 |
+| 6 | 180 | 4.0 | 5.0 | 20/20 | 21 (18..23) | +3.03 | 0 0 0 0 |
+| 6 | 180 | 2.5 | 4.0 | 20/20 | 21 (19..24) | +3.02 | 0 0 0 0 |
+| 6 | 180 | 2.5 | 5.0 | 20/20 | 22 (19..24) | +3.03 | 0 0 0 0 |
+| 6 | 210 | 4.0 | 4.0 | 9/20 | 24 (21..24) | +3.00 | 8 0 3 0 |
+| 6 | 210 | 4.0 | 5.0 | 7/20 | 24 (21..24) | +2.97 | 8 0 5 0 |
+| 6 | 210 | 2.5 | 4.0 | 5/20 | 24 (21..24) | +2.96 | 11 0 4 0 |
+| 6 | 210 | 2.5 | 5.0 | 2/20 | 24 (22..24) | +2.94 | 13 0 5 0 |
+| 6 | 240 | 4.0 | 4.0 | 1/20 | 24 (24..24) | +2.79 | 16 0 3 0 |
+| 6 | 240 | 4.0 | 5.0 | 0/20 | - | +2.77 | 16 0 4 0 |
+| 6 | 240 | 2.5 | 4.0 | 0/20 | - | +2.75 | 17 0 3 0 |
+| 6 | 240 | 2.5 | 5.0 | 0/20 | - | +2.73 | 17 0 3 0 |
+| 8 | 150 | 4.0 | 4.0 | 20/20 | 18 (16..19) | +3.05 | 0 0 0 0 |
+| 8 | 150 | 4.0 | 5.0 | 20/20 | 18 (16..19) | +3.04 | 0 0 0 0 |
+| 8 | 150 | 2.5 | 4.0 | 20/20 | 18 (16..19) | +3.02 | 0 0 0 0 |
+| 8 | 150 | 2.5 | 5.0 | 20/20 | 18 (16..20) | +3.03 | 0 0 0 0 |
+| 8 | 180 | 4.0 | 4.0 | 20/20 | 22 (19..24) | +3.03 | 0 0 0 0 |
+| 8 | 180 | 4.0 | 5.0 | 20/20 | 22 (19..24) | +3.02 | 0 0 0 0 |
+| 8 | 180 | 2.5 | 4.0 | 19/20 | 22 (19..24) | +3.03 | 0 0 1 0 |
+| 8 | 180 | 2.5 | 5.0 | 18/20 | 23 (20..24) | +3.03 | 1 0 1 0 |
+| 8 | 210 | 4.0 | 4.0 | 6/20 | 23 (22..24) | +2.97 | 11 0 3 0 |
+| 8 | 210 | 4.0 | 5.0 | 5/20 | 24 (21..24) | +2.94 | 11 0 4 0 |
+| 8 | 210 | 2.5 | 4.0 | 4/20 | 24 (21..24) | +2.92 | 12 0 4 0 |
+| 8 | 210 | 2.5 | 5.0 | 2/20 | 24 (22..24) | +2.89 | 12 0 6 0 |
+| 8 | 240 | 4.0 | 4.0 | 0/20 | - | +2.75 | 17 0 3 0 |
+| 8 | 240 | 4.0 | 5.0 | 0/20 | - | +2.73 | 17 0 3 0 |
+| 8 | 240 | 2.5 | 4.0 | 0/20 | - | +2.69 | 17 0 3 0 |
+| 8 | 240 | 2.5 | 5.0 | 0/20 | - | +2.67 | 17 0 3 0 |
+
+**Custodians from Europe.** Twenty seeds a cell.
+
+| sink | step | permafrost | sink_after | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|---|---|---|
+| 6 | 150 | 4.0 | 4.0 | 20/20 | 19 (18..20) | +3.04 | 0 0 0 0 |
+| 6 | 150 | 4.0 | 5.0 | 20/20 | 19 (18..21) | +3.03 | 0 0 0 0 |
+| 6 | 150 | 2.5 | 4.0 | 20/20 | 19 (18..21) | +3.02 | 0 0 0 0 |
+| 6 | 150 | 2.5 | 5.0 | 20/20 | 20 (19..22) | +3.03 | 0 0 0 0 |
+| **6** | **180** | **4.0** | **4.0** | **18**/20 | 23 (20..24) | +3.02 | 0 2 0 0 |
+| 6 | 180 | 4.0 | 5.0 | 14/20 | 24 (21..24) | +3.02 | 0 6 0 0 |
+| 6 | 180 | 2.5 | 4.0 | 9/20 | 23 (21..24) | +2.99 | 0 11 0 0 |
+| 6 | 180 | 2.5 | 5.0 | 7/20 | 24 (21..24) | +2.97 | 0 13 0 0 |
+| 6 | 210 | 4.0 | 4.0 | 1/20 | 23 (23..23) | +2.86 | 0 19 0 0 |
+| 6 | 210 | 4.0 | 5.0 | 1/20 | 24 (24..24) | +2.83 | 0 19 0 0 |
+| 6 | 210 | 2.5 | 4.0 | 0/20 | - | +2.79 | 0 20 0 0 |
+| 6 | 210 | 2.5 | 5.0 | 0/20 | - | +2.77 | 0 20 0 0 |
+| 6 | 240 | 4.0 | 4.0 | 0/20 | - | +2.69 | 0 20 0 0 |
+| 6 | 240 | 4.0 | 5.0 | 0/20 | - | +2.67 | 0 20 0 0 |
+| 6 | 240 | 2.5 | 4.0 | 0/20 | - | +2.62 | 0 20 0 0 |
+| 6 | 240 | 2.5 | 5.0 | 0/20 | - | +2.61 | 0 20 0 0 |
+| 8 | 150 | 4.0 | 4.0 | 20/20 | 19 (18..21) | +3.04 | 0 0 0 0 |
+| 8 | 150 | 4.0 | 5.0 | 20/20 | 20 (18..21) | +3.04 | 0 0 0 0 |
+| 8 | 150 | 2.5 | 4.0 | 20/20 | 20 (18..22) | +3.02 | 0 0 0 0 |
+| 8 | 150 | 2.5 | 5.0 | 20/20 | 21 (18..22) | +3.03 | 0 0 0 0 |
+| 8 | 180 | 4.0 | 4.0 | 11/20 | 23 (21..24) | +3.01 | 0 9 0 0 |
+| 8 | 180 | 4.0 | 5.0 | 9/20 | 24 (21..24) | +2.99 | 0 11 0 0 |
+| 8 | 180 | 2.5 | 4.0 | 3/20 | 24 (21..24) | +2.98 | 0 17 0 0 |
+| 8 | 180 | 2.5 | 5.0 | 1/20 | 22 (22..22) | +2.95 | 0 19 0 0 |
+| 8 | 210 | 4.0 | 4.0 | 0/20 | - | +2.81 | 0 20 0 0 |
+| 8 | 210 | 4.0 | 5.0 | 0/20 | - | +2.80 | 0 20 0 0 |
+| 8 | 210 | 2.5 | 4.0 | 0/20 | - | +2.76 | 0 20 0 0 |
+| 8 | 210 | 2.5 | 5.0 | 0/20 | - | +2.74 | 0 20 0 0 |
+| 8 | 240 | 4.0 | 4.0 | 0/20 | - | +2.65 | 0 20 0 0 |
+| 8 | 240 | 4.0 | 5.0 | 0/20 | - | +2.63 | 0 20 0 0 |
+| 8 | 240 | 2.5 | 4.0 | 0/20 | - | +2.60 | 0 20 0 0 |
+| 8 | 240 | 2.5 | 5.0 | 0/20 | - | +2.58 | 0 20 0 0 |
+
+**Archivists from Europe.** Twenty seeds a cell.
+
+| sink | step | permafrost | sink_after | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|---|---|---|
+| 6 | 150 | 4.0 | 4.0 | 20/20 | 17 (16..18) | +3.05 | 0 0 0 0 |
+| 6 | 150 | 4.0 | 5.0 | 20/20 | 17 (17..18) | +3.04 | 0 0 0 0 |
+| 6 | 150 | 2.5 | 4.0 | 20/20 | 17 (17..18) | +3.05 | 0 0 0 0 |
+| 6 | 150 | 2.5 | 5.0 | 20/20 | 18 (17..18) | +3.06 | 0 0 0 0 |
+| **6** | **180** | **4.0** | **4.0** | **20**/20 | 20 (19..21) | +3.04 | 0 0 0 0 |
+| 6 | 180 | 4.0 | 5.0 | 20/20 | 20 (19..22) | +3.03 | 0 0 0 0 |
+| 6 | 180 | 2.5 | 4.0 | 20/20 | 21 (19..23) | +3.04 | 0 0 0 0 |
+| 6 | 180 | 2.5 | 5.0 | 20/20 | 21 (20..23) | +3.03 | 0 0 0 0 |
+| 6 | 210 | 4.0 | 4.0 | 19/20 | 24 (22..24) | +3.04 | 0 0 0 1 |
+| 6 | 210 | 4.0 | 5.0 | 18/20 | 24 (22..24) | +3.01 | 0 0 0 2 |
+| 6 | 210 | 2.5 | 4.0 | 12/20 | 24 (23..24) | +3.01 | 0 0 2 6 |
+| 6 | 210 | 2.5 | 5.0 | 8/20 | 24 (23..24) | +2.99 | 0 0 4 8 |
+| 6 | 240 | 4.0 | 4.0 | 0/20 | - | +2.87 | 0 0 1 19 |
+| 6 | 240 | 4.0 | 5.0 | 0/20 | - | +2.84 | 0 0 1 19 |
+| 6 | 240 | 2.5 | 4.0 | 0/20 | - | +2.82 | 0 0 1 19 |
+| 6 | 240 | 2.5 | 5.0 | 0/20 | - | +2.80 | 0 0 1 19 |
+| 8 | 150 | 4.0 | 4.0 | 20/20 | 18 (17..18) | +3.06 | 0 0 0 0 |
+| 8 | 150 | 4.0 | 5.0 | 20/20 | 18 (17..19) | +3.04 | 0 0 0 0 |
+| 8 | 150 | 2.5 | 4.0 | 20/20 | 18 (17..19) | +3.03 | 0 0 0 0 |
+| 8 | 150 | 2.5 | 5.0 | 20/20 | 19 (18..19) | +3.06 | 0 0 0 0 |
+| 8 | 180 | 4.0 | 4.0 | 20/20 | 21 (20..23) | +3.04 | 0 0 0 0 |
+| 8 | 180 | 4.0 | 5.0 | 20/20 | 21 (20..23) | +3.03 | 0 0 0 0 |
+| 8 | 180 | 2.5 | 4.0 | 20/20 | 21 (20..23) | +3.03 | 0 0 0 0 |
+| 8 | 180 | 2.5 | 5.0 | 20/20 | 21 (20..24) | +3.04 | 0 0 0 0 |
+| 8 | 210 | 4.0 | 4.0 | 12/20 | 24 (23..24) | +3.01 | 0 0 2 6 |
+| 8 | 210 | 4.0 | 5.0 | 8/20 | 24 (23..24) | +2.99 | 0 0 3 9 |
+| 8 | 210 | 2.5 | 4.0 | 5/20 | 24 (23..24) | +2.97 | 0 0 4 11 |
+| 8 | 210 | 2.5 | 5.0 | 4/20 | 24 (23..24) | +2.94 | 0 0 4 12 |
+| 8 | 240 | 4.0 | 4.0 | 0/20 | - | +2.83 | 0 0 3 17 |
+| 8 | 240 | 4.0 | 5.0 | 0/20 | - | +2.80 | 0 0 3 17 |
+| 8 | 240 | 2.5 | 4.0 | 0/20 | - | +2.81 | 0 0 3 17 |
+| 8 | 240 | 2.5 | 5.0 | 0/20 | - | +2.80 | 0 0 4 16 |
+
+### Chosen: `ppm_step = 180`, the Sink at 6.0, and both Break figures left where #55 put them
+
+At 180 every one of the five seatings still ends at about **+3.0 C** -- hot to the last turn, which
+is what #46 and #53 chose the step for -- and **every seating's median Collapse turn is 20 or
+later**, against #55's 17 to 22. It is the cell closest to the target over all five seatings. It
+ties on that measure with (sink 6, step 180, `sink_after` 5.0), and the tie went to this one for a
+reason that is not about the numbers: **the two Break figures are drawn from real-world warming**
+(the research note on the branch `research/tipping-points`), while `ppm_step` is the game's own
+abstract pacing knob and has been re-swept on every ticket that changed the board -- #26, #46, #50,
+#53. Reaching for a researched figure to pace the game is the wrong knob to reach for first. The
+choice and every word of this reasoning are in `climate.toml`'s comments beside the number.
+
+**No cell in the sweep meets the target for every seating, and at this one three of the five miss
+it.** What fails, exactly:
+
+| seating | collapses | median Collapse turn | end temp | on target? |
+|---|---|---|---|---|
+| Custodians in East Asia | 9/20 | 20 | +3.03 | one seed under the half the target wants |
+| Prospectors in East Asia | 12/20 | 24 | +3.01 | **yes** |
+| Arkwrights in East Asia | 20/20 | 20 | +3.03 | no: Collapse is certain |
+| Custodians from Europe | 18/20 | 23 | +3.02 | no: above three quarters |
+| Archivists from Europe | 20/20 | 20 | +3.04 | no: Collapse is certain |
+
+The shape of the sweep says why no cell can do better. The two seatings that collapse in every seed
+-- the Arkwrights in East Asia and the Archivists from Europe -- are the two whose seat 0 spends its
+Materials on something other than Earth's economy (Colony Ships and Habitats; the Archive), so the
+board they leave behind is run by three AIs who build industry and little else; they do not come off
+20 of 20 until step **210**, and at 210 the
+Prospector and Custodian boards fall to 0 or 1 Collapse in twenty and finish at +2.8. There is no
+step between the two. **That is a Faction-economy finding, not a climate one**, and the designer may
+well want the step here and the Arkwright and Archivist cards looked at instead; it is one line in
+`climate.toml` either way.
+
+### The four-way balance, at the chosen numbers
+
+`sim -- 1 --count=20 --player=<faction>` for each of the four Factions in seat 0 starting in East
+Asia, and `sweep -- 20 --player=<faction> --start=europe --sinks=6 --steps=180 --permafrost=4.0
+--sink-after=4.0 --balance` for each of the four starting in Europe. Twenty seeds each, eight
+batches, 160 games. **Nothing was re-tuned for this table beyond the climate cell above**; these are
+the figures as they came out.
+
+| seat 0 | wins | draws | collapses | median Collapse turn | median first Colony | Colonists off Earth at the end | Victory Condition met outright |
+|---|---|---|---|---|---|---|---|
+| Custodians in East Asia | Prospectors 11 (seat 1) | 0 | 9/20 | 20 | 9 | 12 | Prospectors, 11 seeds |
+| Prospectors in East Asia | Prospectors 8 | 0 | 12/20 | 24 | 7 | 16 | Prospectors, 2 seeds |
+| Arkwrights in East Asia | none | 0 | 20/20 | 20 | 7 | 16 | none |
+| Archivists in East Asia | none | 0 | 20/20 | 21 | 7 | 16 | none |
+| Custodians from Europe | Prospectors 2 (seat 1) | 0 | 18/20 | 23 | 7 | 15 | none |
+| Prospectors from Europe | Prospectors 12 | 0 | 8/20 | 20 | 9 | 12 | Prospectors, 12 seeds |
+| Arkwrights from Europe | none | 0 | 20/20 | 20 | 7 | 17 | none |
+| Archivists from Europe | none | 0 | 20/20 | 20 | 7 | 15 | none |
+
+What the seats built and finished over each batch of twenty:
+
+| seat 0 | Scrubbers | Leapfrogs | Constabularies | Sea Walls | Techs completed (median) | highest rung | Breaks fired |
+|---|---|---|---|---|---|---|---|
+| Custodians in East Asia | 40 | 0 | 34 | **0** | 1 | 1 | all five, 20/20 |
+| Prospectors in East Asia | 192 | 227 | 68 | **0** | 1 | 1 | all five, 20/20 |
+| Arkwrights in East Asia | 107 | 119 | 49 | **0** | 1 | 1 | all five, 20/20 |
+| Archivists in East Asia | 118 | 136 | 59 | **0** | 2 | 2 | all five, 20/20 |
+| Custodians from Europe | 163 | 224 | 76 | **0** | 1 | 1 | all five, 20/20 |
+| Prospectors from Europe | 40 | 0 | 16 | **0** | 1 | 1 | all five, 20/20 |
+| Arkwrights from Europe | 52 | 60 | 100 | **0** | 1 | 1 | all five, 20/20 |
+| Archivists from Europe | 46 | 0 | 11 | **0** | 8 | 2 | all five, 20/20 |
+
+The Breaks, by median turn, over the four East Asia batches: Coral Die-off 4, Permafrost Thaw 6 to
+7, The Sink Weakens 10 to 11, Ice Sheets Committed 11 to 12, Amazon Dieback 15 to 18. All five fire
+in every seed of all eight batches, as they did on #55.
+
+### What the 160 games say, as measured, not fixed
+
+**One Faction wins this game and it is the Prospectors.** Across eight batches and 160 games they
+take 33 wins and every other Faction takes none -- not one win for the Custodians, the Arkwrights or
+the Archivists in any seating, in their own seat or anyone else's. They are also the only Faction
+that has ever met a Victory Condition outright rather than winning on the last turn's score:
+Extraction Total is met in 25 of the 160 games, and Stabilization, Diaspora and the Archive in none.
+The reason is not subtle. Extraction Total is a running sum of what a Faction digs out of a dying
+world, and everything the world does -- the heat, the sea, the Unrest, the refugees, the Breaks --
+makes a Faction dig faster rather than slower. The other three ask the Faction to fix something, get
+somewhere, or finish something, on a clock that runs out at turn 17 to 24.
+
+**The Custodians' own Victory Condition is unreachable, and the report says so with a zero.** The
+longest Stabilization run any of the four seats held at any point in any of the eighty East Asia
+games is **0 turns** -- median 0, max 0, for all four seats in all four batches. The bar is the
+world's net counted Emissions under the Sink, and the world's net at turn 12 is +44 to +51 ppm and
+still +18 to +32 at the end. A Custodian player who reads their own card is being asked for
+something no board in this version has ever offered, and no amount of Scrubbers by one seat gets
+there while the other three build industry. That is the clearest single finding in the table.
+
+**The off-Earth game is the Moon and nothing else.** No Colony in the Mars system is founded in any
+seed of seven of the eight batches; only the Prospectors in East Asia reach one, in 9 of 20 seeds at
+a median turn 23, one turn from the end. **Every other Colony founded in these 160 games is a lunar
+one** -- the log of any seed is a run of "founded a Colony in slot N on the Moon" -- at a median turn
+7 to 9. That is #57's after-build fix doing exactly its job (a loaded Colony Ship weighs the flight
+and takes the Moon when Mars is a year away) and it has moved the off-Earth game off the ice: at #57
+every first Colony was Antarctic, and here Antarctica takes 0, 1, 7 and 14 Colonies over the four
+East Asia batches while the Moon takes the rest. The Colonists off Earth at the end sit at 12 to 17
+for the whole table -- the Arkwrights' Diaspora asks for 30 spread over three Bodies with 4 on each,
+and the Moon is one Body. The Mars window is turn 14 and the flight nine turns, which #57 already
+recorded as closing Mars; this table is that finding measured across all four Factions.
+
+**The Sea Wall has still never been built, in any game, by any Faction, in any version.** The reason
+is the one #56 found and it has not moved: Coastal Engineering is on Industry rung 2 and the world
+completes a median of **one** Tech a game and never leaves rung 1. The two Archivist batches are the
+only ones that reach rung 2 at all -- a median of 8 Techs from Europe, on Provisional Findings and
+Research Labs -- and even there no wall was raised. Meanwhile the sea takes all 49 coastal slots in
+the world and drowns 27 to 29 Facilities in the median game. The defence exists, is pinned by a
+formula test, and has never once been reachable in play.
+
+**The Constabulary fires now, and Unrest is still a ratchet at the top.** 11 to 100 a batch, against
+the 0 every batch since #52 has recorded, which is ticket #60's AI fix showing up in the sim. It has
+not made the Unrest picture calm: the median peak Unrest is still 10.0 in every one of the four East
+Asia batches, states threw off a controller 0 to 75 times a batch, and 286 to 297 population a batch
+still moves as refugees. What it
+has bought is that the seat holding a state at 7 now has an answer it will actually reach for.
+
+**What never fires, batch by batch.** The Sea Wall, everywhere, as above. The **Strip Permit** fires
+0 times in the Custodian-in-East-Asia batch and 32, 42 and 40 in the other three East Asia batches --
+which is #54's finding turned round: #54 measured 0 for a *seat-0* Prospector who is never behind its
+Extraction pace, and now it is the *seat-1* Prospector of the Custodian batch who is never behind,
+because that is the batch where the Prospectors run away with the board. **Leapfrog** is 0 in three of
+the eight batches -- the Custodians in East Asia, the Prospectors from Europe and the Archivists from
+Europe -- and 60 to 227 in the other five, the Custodians from Europe among them at 224.
+
+**And the Custodian-in-East-Asia zero was chased down, because it names something larger.** The
+Leapfrog candidate is never *offered* in that batch: the scored list carries no Leapfrog line in any
+turn of any seed. Its gate is "the 50 Ducats are within three turns of Ducat income", and **that
+Custodian is a one-state economy for the whole game** -- it ends with **4 to 6 buildings** while the
+Prospectors beside it end with **21 to 30**, its Income line reads `+6 Materials, +3 Fuel` from turn 1
+to the Collapse, and its Energy hovers between 1 and 5. The same Faction's AI in seat 1 of the
+Prospector batch reads `+12 to +48 Materials` with Energy over 100, clears the gate, and the log duly
+says `wait 10.0 Leapfrog Europe (affordable within three turns)`; and the Custodians starting from
+*Europe* Leapfrog 224 times. So Leapfrog is fine, and what is not fine is **the Custodian AI's opening
+in East Asia specifically**: given that state and three rivals spreading out from it, it never gets a
+second place to stand on. That is the thing most worth a ticket of its own out of this whole report,
+because it is also a large part of why the Custodians take 0 wins in 160 games. (The other two zero
+batches were not probed; they are both batches the Prospectors dominate, and the same small-economy
+explanation is the obvious first place to look.)
+
+**The Last Turn has stopped being a clock at the start of the game.** At turn 1 all twenty seeds of
+every East Asia batch now read "On this path Collapse is not reached", where at #55's step of 150
+the median board read turn 20 or 21. By turn 12 every seed reads turn 15 or 16. So the opening board
+is honestly not yet on a collapsing path at 180, and the eleven turns in between are where the game
+is lost -- which is a better shape for a game than #55's, where the player was told at turn 1 that
+the end was already dated.

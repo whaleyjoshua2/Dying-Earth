@@ -72,6 +72,14 @@ enum ProducerPlace {
 impl Game {
     /// Phase 1: Income. Standing Armies replenish, producers produce, upkeep is paid with the shortfall rule.
     pub fn income_phase(&mut self) {
+        // Ticket #51: Provisional Findings holds this turn only if last turn's Research went to the
+        // shared Tech, so it is settled before any yield reads a Tech.
+        for seat in Seat::ALL {
+            let funded = self.seat(seat).funding_archive;
+            let s = self.seat_mut(seat);
+            s.provisional_findings = !funded;
+            s.funding_archive = false;
+        }
         self.replenish_standing_armies();
         for s in &mut self.ships {
             s.escaped = false;
@@ -109,7 +117,8 @@ impl Game {
                 }
                 continue;
             }
-            if occupied {
+            // Ticket #52: at Unrest 4 the Standing Army stops replenishing.
+            if occupied || !self.army_replenishes(sid) {
                 continue;
             }
             if let Some(a) = self.armies.iter_mut().find(|a| a.standing && a.home == ArmyHome::State(sid)) {
@@ -130,9 +139,7 @@ impl Game {
             match p.resource {
                 Resource::Research => {
                     let mut r = p.amount as f64 * self.population_factor(sid) * card.education_level * fac.research_multiplier;
-                    if self.has_tech(TechId::PublicScience) {
-                        r *= t.tech(TechId::PublicScience).value;
-                    }
+                    r *= self.tech_multiplier(seat, TechId::PublicScience);
                     y.research = r.floor() as i64;
                 }
                 Resource::Ducats => {
@@ -147,14 +154,14 @@ impl Game {
                         v *= 1.5;
                     }
                     v *= fac.output_multiplier;
-                    v *= self.tech_output_multiplier_facility(kind);
+                    v *= self.tech_output_multiplier_facility(seat, kind);
                     y.resource = Some(res);
                     y.amount = v.floor() as i64;
                 }
             }
         }
-        let pp = if self.has_tech(TechId::CleanPower) { t.tech(TechId::CleanPower).value } else { 1.0 };
-        let fr = if self.has_tech(TechId::CleanManufacturing) { t.tech(TechId::CleanManufacturing).value } else { 1.0 };
+        let pp = self.tech_multiplier(seat, TechId::CleanPower);
+        let fr = self.tech_multiplier(seat, TechId::CleanManufacturing);
         y.emissions = fc.emissions
             * fac.emissions_multiplier
             * match kind {
@@ -162,6 +169,20 @@ impl Game {
                 FacilityKind::Factory | FacilityKind::Refinery => fr,
                 _ => 1.0,
             };
+        // Ticket #54: while a Strip Permit runs, every Facility in the state produces double. It
+        // multiplies the output, never the Emissions: the price is paid once, when the permit ends.
+        if self.strip_permit_running(sid) {
+            let m = self.tables.strip_permit.multiplier;
+            y.amount = (y.amount as f64 * m).floor() as i64;
+            y.research = (y.research as f64 * m).floor() as i64;
+        }
+        // Ticket #52: at Unrest 7 every Facility in the state produces at half, rounded down, and
+        // emits at half. What it adds to the Allotment and to the standing is untouched.
+        if self.facilities_at_half(sid) {
+            y.amount /= 2;
+            y.research /= 2;
+            y.emissions *= 0.5;
+        }
         y
     }
 
@@ -172,17 +193,11 @@ impl Game {
         let mc = t.module(kind);
         let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn };
         let Some(col) = self.colony(cid) else { return y };
-        let body = t.body(col.body);
+        // Ticket #57: the yield is the Colony Slot's own, not its Body's. The Body's figures are
+        // what the slot drew from when the game started; a station in orbit keeps the Body's.
         if let Some(p) = &mc.produces {
-            let yield_ = match kind {
-                ModuleKind::Mine => body.mine_yield,
-                ModuleKind::Generator => body.generator_yield,
-                ModuleKind::Refinery => body.refinery_yield,
-                // A Trade Post (ticket #35) follows the Habitat yield: trade goes where people live.
-                ModuleKind::TradePost => body.habitat_yield,
-                _ => 1.0,
-            };
-            let mut v = p.amount as f64 * yield_ * fac.output_multiplier * self.tech_output_multiplier_module(kind);
+            let yield_ = self.colony_yields(col).of_module(kind);
+            let mut v = p.amount as f64 * yield_ * fac.output_multiplier * self.tech_output_multiplier_module(seat, kind);
             for d in &self.discoveries {
                 if d.body == col.body && d.kind == kind {
                     v *= d.multiplier;
@@ -191,9 +206,13 @@ impl Game {
             y.resource = Some(p.resource);
             y.amount = v.floor() as i64;
         }
-        if self.has_tech(TechId::ClosedLoopColonies) {
-            y.upkeep = (y.upkeep as f64 * t.tech(TechId::ClosedLoopColonies).value).floor() as i64;
+        // Ticket #51: the Archive draws its Energy only once every stage stands; while it is
+        // rising it costs nothing to run.
+        if kind == ModuleKind::Archive {
+            let complete = col.modules.iter().any(|m| m.kind == ModuleKind::Archive && m.stage >= t.archive.stages);
+            y.upkeep = if complete { mc.energy_upkeep } else { 0 };
         }
+        y.upkeep = (y.upkeep as f64 * self.tech_multiplier(seat, TechId::ClosedLoopColonies)).floor() as i64;
         y
     }
 
@@ -202,6 +221,11 @@ impl Game {
         for sid in self.directed_states(seat) {
             let st = self.state(sid);
             for (i, f) in st.facilities.iter().enumerate() {
+                // Ticket #54: a mothballed Facility makes nothing and pays no Energy upkeep, so it
+                // is not on the shortfall list at all and Income never turns it back on.
+                if f.mothballed {
+                    continue;
+                }
                 let y = self.facility_yield(seat, sid, f.kind);
                 out.push(Producer {
                     place: ProducerPlace::Facility(sid, i),
@@ -217,7 +241,13 @@ impl Game {
         }
         for cid in self.directed_colonies(seat) {
             let col = self.colony(cid).unwrap();
+            // Ticket #51: an Occupied Colony's Archive is offline, whoever is directing the Colony.
+            let occupied = col.control.is_occupied();
             for (i, m) in col.modules.iter().enumerate() {
+                // Ticket #54: a mothballed Module, the same way.
+                if m.mothballed {
+                    continue;
+                }
                 let y = self.module_yield(seat, cid, m.kind);
                 out.push(Producer {
                     place: ProducerPlace::Module(cid, i),
@@ -227,7 +257,7 @@ impl Game {
                     output: y.resource.map(|r| (r, y.amount)),
                     extraction: matches!(m.kind, ModuleKind::Mine | ModuleKind::Refinery),
                     research: 0,
-                    online: !col.grid_failed && !m.offline_until_resolution,
+                    online: !col.grid_failed && !m.offline_until_resolution && !(m.kind == ModuleKind::Archive && occupied),
                 });
             }
         }
@@ -240,34 +270,34 @@ impl Game {
             return 1.0;
         }
         let e = &self.tables.events;
+        // A Solar Maximum reads a whole Tech or none: it picks between two Event figures rather than
+        // scaling one, so Provisional Findings, which halves an effect, has nothing to halve here.
         if self.has_tech(TechId::EfficientGrids) { e.solar_maximum_multiplier_with_tech } else { e.solar_maximum_multiplier }
     }
 
-    fn tech_output_multiplier_facility(&self, kind: FacilityKind) -> f64 {
-        let t = &self.tables;
+    fn tech_output_multiplier_facility(&self, seat: Seat, kind: FacilityKind) -> f64 {
         let mut m = 1.0;
         if kind == FacilityKind::PowerPlant {
             m *= self.solar_maximum_multiplier();
         }
         match kind {
-            FacilityKind::PowerPlant if self.has_tech(TechId::EfficientGrids) => m *= t.tech(TechId::EfficientGrids).value,
-            FacilityKind::Factory if self.has_tech(TechId::DeepMining) => m *= t.tech(TechId::DeepMining).value,
-            FacilityKind::Refinery if self.has_tech(TechId::AutomatedRefining) => m *= t.tech(TechId::AutomatedRefining).value,
+            FacilityKind::PowerPlant => m *= self.tech_multiplier(seat, TechId::EfficientGrids),
+            FacilityKind::Factory => m *= self.tech_multiplier(seat, TechId::DeepMining),
+            FacilityKind::Refinery => m *= self.tech_multiplier(seat, TechId::AutomatedRefining),
             _ => {}
         }
         m
     }
 
-    fn tech_output_multiplier_module(&self, kind: ModuleKind) -> f64 {
-        let t = &self.tables;
+    fn tech_output_multiplier_module(&self, seat: Seat, kind: ModuleKind) -> f64 {
         let mut m = 1.0;
         if kind == ModuleKind::Generator {
             m *= self.solar_maximum_multiplier();
         }
         match kind {
-            ModuleKind::Generator if self.has_tech(TechId::EfficientGrids) => m *= t.tech(TechId::EfficientGrids).value,
-            ModuleKind::Mine if self.has_tech(TechId::DeepMining) => m *= t.tech(TechId::DeepMining).value,
-            ModuleKind::Refinery if self.has_tech(TechId::AutomatedRefining) => m *= t.tech(TechId::AutomatedRefining).value,
+            ModuleKind::Generator => m *= self.tech_multiplier(seat, TechId::EfficientGrids),
+            ModuleKind::Mine => m *= self.tech_multiplier(seat, TechId::DeepMining),
+            ModuleKind::Refinery => m *= self.tech_multiplier(seat, TechId::AutomatedRefining),
             _ => {}
         }
         m
@@ -403,19 +433,22 @@ impl Game {
                 ducats: gained.ducats,
             };
             s.research_last_turn = research;
-            if s.kind == FactionKind::Prospectors {
-                s.extraction_total += extraction;
-            }
+            // Ticket #50: every seat keeps both running totals; a Faction's card says which one its
+            // Victory Condition counts.
+            s.research_total += research;
+            s.extraction_total += extraction;
         }
         if !shut.is_empty() {
             let line = format!("{}: Energy ran short; shut down {}.", self.seat_name(seat), shut.join(", "));
-            self.report.lines.push(line.clone());
             self.log(line);
+            let text = self.say("energy_short", &[("faction", self.seat_name(seat)), ("buildings", shut.join(", "))]);
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
         }
         if balance < 0 {
             let line = format!("{}: Energy fell to zero even with every producer off.", self.seat_name(seat));
-            self.report.lines.push(line.clone());
             self.log(line);
+            let text = self.say("energy_zero", &[("faction", self.seat_name(seat))]);
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
         }
         self.accrue_research(seat, research);
         self.log(format!(

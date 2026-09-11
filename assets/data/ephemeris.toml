@@ -1,0 +1,67 @@
+# Ticket #57 (version 0.05). The real sky the Solar System Map draws, and the real launch windows
+# a transit between the Earth system and the Mars system pays for.
+#
+# The elements are JPL's "Keplerian Elements for Approximate Positions of the Major Planets"
+# (Standish), the table valid 1800 AD to 2050 AD, at the J2000 epoch with rates per Julian century:
+#   https://ssd.jpl.nasa.gov/planets/approx_pos.html
+# `earth` is the Earth-Moon barycentre, which is the row that table carries. Angles are in degrees,
+# `a` in astronomical units, every `_rate` per Julian century. The elements, the reference positions
+# they were checked against and the real launch windows are in docs/research/earth-mars-ephemeris.md.
+#
+# The Moon reads Earth's row and Phobos and Deimos read Mars's: at this scale a satellite stands
+# where its parent stands.
+
+[[planet]]
+id = "earth"
+a = 1.00000261
+a_rate = 0.00000562
+e = 0.01671123
+e_rate = -0.00004392
+inclination = -0.00001531
+inclination_rate = -0.01294668
+mean_longitude = 100.46457166
+mean_longitude_rate = 35999.37244981
+perihelion_longitude = 102.93768193
+perihelion_longitude_rate = 0.32327364
+node_longitude = 0.0
+node_longitude_rate = 0.0
+
+[[planet]]
+id = "mars"
+a = 1.52371034
+a_rate = 0.00001847
+e = 0.09339410
+e_rate = 0.00007882
+inclination = 1.84969142
+inclination_rate = -0.00813131
+mean_longitude = -4.55343205
+mean_longitude_rate = 19140.30268499
+perihelion_longitude = -23.94362959
+perihelion_longitude_rate = 0.44441088
+node_longitude = 49.55953891
+node_longitude_rate = -0.29257343
+
+# What a transit between the Earth system and the Mars system costs. The window offset is the
+# signed difference, in degrees, between the phase angle now (Mars's heliocentric longitude less
+# Earth's) and the Hohmann departure angle. At the window a transit costs the Hohmann flight and
+# the card's Fuel; away from it, turns and Fuel both rise with the offset.
+[transit]
+# The minimum-energy Earth-to-Mars transfer.
+days_at_window = 259.0
+# The departure phase angle that flight wants, and the one the return wants. Both are read in the
+# same direction, Mars's heliocentric longitude less Earth's. The ticket wrote the return as -75
+# with Earth leading; the research file (section 4.3) works it out from the ephemeris as +75, with
+# Earth 75 degrees BEHIND Mars at the moment of departure and overtaking during the cruise. The
+# magnitude the ticket gave is right; only the direction is turned round, and the two legs must
+# read the phase angle the same way or the return window lands two years out.
+hohmann_angle = 44.0
+return_hohmann_angle = 75.0
+# What a degree off the window costs: days added to the flight, and a fraction of the card's Fuel.
+days_per_degree = 1.5
+fuel_per_degree = 0.00833333
+# A Turn is a calendar month; the flight is charged in months of this length.
+days_per_turn = 30.0
+# However far from the window, a transit is never longer than this.
+max_turns = 18
+# Earth and Mars come back to the same phase angle this often: the cycle a window is looked for in.
+synodic_days = 779.9

@@ -3,10 +3,12 @@
 //!   dying-earth.exe                     play
 //!   dying-earth.exe seed:<n>            play with a fixed seed
 //!   dying-earth.exe shot:<prefix>       headless screenshots of the four views, then exit
-//!   dying-earth.exe simulate:<seed> [--custodian-ai] [--prospector-ai]   AI versus AI, headless log
+//!   dying-earth.exe savedir:<path>      (ticket #59) saves go here instead of the local app-data folder
+//!   dying-earth.exe simulate:<seed> [--player=<faction>]   all four seats on the AI, headless log
 
 mod app;
 mod geo;
+mod saves;
 mod scene;
 mod shot;
 mod textures;
@@ -25,25 +27,18 @@ fn assets_root() -> std::path::PathBuf {
 }
 
 fn simulate(seed: u64, args: &[String], tables: Arc<Tables>) -> i32 {
-    let mut kinds: Vec<FactionKind> = args
-        .iter()
-        .filter_map(|a| match a.as_str() {
-            "--custodian-ai" => Some(FactionKind::Custodians),
-            "--prospector-ai" => Some(FactionKind::Prospectors),
-            _ => None,
-        })
-        .collect();
-    if kinds.is_empty() {
-        kinds = vec![FactionKind::Custodians, FactionKind::Prospectors];
-    }
-    if kinds.len() == 1 {
-        kinds.push(kinds[0].other());
-    }
-    if kinds[0] == kinds[1] {
-        eprintln!("Factions must be unique (ticket #27): a game is one Custodian seat against one Prospector seat.");
-        return 2;
-    }
-    let result = dying_earth_engine::sim::run(tables, seed, [kinds[0], kinds[1]]);
+    // Ticket #50: every game seats all four Factions; --player says which one sits in seat 0.
+    let player = match args.iter().find_map(|a| a.strip_prefix("--player=")) {
+        None => FactionKind::Custodians,
+        Some(name) => match FactionKind::from_id(name) {
+            Some(k) => k,
+            None => {
+                eprintln!("unknown Faction {name:?}: use custodians, prospectors, arkwrights or archivists");
+                return 2;
+            }
+        },
+    };
+    let result = dying_earth_engine::sim::run(tables, seed, player);
     let text = result.log.join("\n");
     println!("{text}");
     let path = format!("simulate-{seed}.log");
@@ -96,6 +91,15 @@ fn main() {
             shot_prefix: shot.unwrap_or_default(),
             earth_dirty: false,
             last_error: None,
+            spectator: false,
+            auto: false,
+            auto_elapsed: 0.0,
+            // Ticket #59: where this machine keeps the saves. A machine that will not say keeps
+            // the reason, and the interface shows it rather than failing quietly.
+            saves: saves::saves_dir(),
+            save_notice: None,
+            saves_list: Vec::new(),
+            confirm_delete: None,
         })
         .insert_resource(textures)
         .insert_resource(ViewState::default())

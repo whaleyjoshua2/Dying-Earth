@@ -1,6 +1,14 @@
 # Spec section 15.
+# Ticket #50: each Faction's first Victory part and its bar now live on its own card in
+# factions.toml (victory_first). These two are kept as the reference figures the Custodian and
+# Prospector cards quote; the engine reads the cards.
 extraction_total = 500
 stabilization_turns = 3
+# Off-world Presence is the same bar for every Faction.
 off_world_presence = 12
 # Ticket #27 (version 0.02): twenty-four turns of one month.
 turns = 24
+# Ticket #57 (version 0.05): the game begins on 1 January 2030 and a Turn is a calendar month, so
+# turn 1 is January 2030 and turn 24 December 2031.
+start_year = 2030
+start_month = 1

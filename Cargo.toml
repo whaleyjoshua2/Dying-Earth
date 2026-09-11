@@ -14,6 +14,9 @@ dying-earth-engine = { path = "engine" }
 bevy = "=0.19.1"
 bevy_egui = "=0.42.0"
 image = "0.25"
+# Ticket #59: the saves folder, %LOCALAPPDATA%\DyingEarth\data\saves, found the way Microsoft's
+# own guidance for game developers asks for it rather than beside the executable.
+directories = "6"
 
 [profile.release]
 opt-level = 3

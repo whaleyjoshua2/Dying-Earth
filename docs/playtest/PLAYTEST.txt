@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.04
+DYING EARTH - playtest build, version 0.05
 ==========================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -19,22 +19,38 @@ HOW TO RUN
 
 HOW TO PLAY, IN ONE MINUTE
 --------------------------
-- New Game > pick a Faction > pick a starting continent. Read the first Report.
+- New Game > pick one of the four sides > pick a starting continent. The computer plays
+  the other three. There is also a Spectate button under the cards: the computer plays
+  all four and you just watch, which is a quick way to see what a whole game looks like.
 - You are looking at the Earth Map. Click a country for its card and orders on the right.
   Drag to turn the globe, mouse wheel to zoom. Tab switches to the Solar System Map;
   Esc goes back.
 - Build things with the buttons on a card. Hover a build button to see what it makes.
 - Spend Influence on other countries to win them over.
-- You start with a space station over Earth (the ISS or Tiangong). Build a Shipyard on it
-  first: Ships are built only at a Shipyard. Click the station in the panel on the right of
-  the Earth Map. Ships are ordered on the Solar System Map (click the label next to Earth).
-- A Colony Ship carries Colonists, a Carrier carries an Army. A Launch Site is what lifts
-  them into orbit. Antarctica has three Colony Slots on Earth; Mars has two small moons.
-- The Trading button buys resources and Influence with Ducats, and sells spare Materials
-  and Fuel.
+- Every country now has an "Unrest" number. Heat, floods and refugees push it up. At 4 its
+  army stops growing, at 7 its factories work at half speed, and at 10 the country throws
+  you out. Pay Relief, or build a Constabulary (a police station), to push it back down.
+- If you are the Custodians, build Scrubbers: they cost no building space, they pull carbon
+  back out of the air, and they calm the country they stand in.
+- Open the Climate Panel (the C key). The coloured bar across it marks five points where
+  the world changes for good - the reefs die, the permafrost thaws, and so on. Under it,
+  "Last turn to act" is the last turn on which stopping all emissions would still save you.
+- Getting off Earth: you start with a space station over Earth (except the Arkwrights, who
+  build one). Put a Shipyard on it first - ships are only built at a Shipyard. The Moon is
+  one turn away and is where most colonies go. Mars is only cheap to reach in the one month
+  the two planets line up, February 2031 (turn 14), and the flight still takes nine turns,
+  so in a twenty-four turn game Mars is very hard to reach. Hover Mars to see the window.
+- Antarctica has three colony sites on Earth itself, but they stay under the ice until the
+  world has warmed to +1.6 C.
+- The game saves itself every three turns and when it ends, and there is a Save button in
+  the top bar you can press at the start of any turn. Saves live in
+  %LOCALAPPDATA%\DyingEarth\data\saves - the Load screen has a button that opens that
+  folder for you. Load a game from the title screen.
+- Some turns stop for a "Moment": one big sentence about something that just happened. At
+  the bottom of each turn's Report there are tick boxes to switch any of them off.
 - End Turn (top left, red). Twenty-four turns. Watch the temperature in the top bar:
   at +3.0 C the world collapses and nobody wins.
-- The Tech Tree, Climate Panel and Victory buttons open panels that explain the rest.
+- The Tech Tree, Climate Panel, Victory and Trading buttons open panels that explain the rest.
 
 WHAT WE WANT TO KNOW
 --------------------
@@ -44,6 +60,12 @@ Write down anything, however small. Especially:
 - A rule you could not find explained anywhere.
 - The turn the game got boring, if it did.
 - The turn you felt you had lost, and why.
+- The turn you first understood what one of the five climate "Breaks" was, and whether
+  anything told you clearly enough before it happened.
+- Whether the big line at the top of each turn's Report was the right thing to put there,
+  or whether something more important was buried below it.
+- Whether the Moments interrupted too much, and whether you switched any of them off.
+- Whether you found the saves: did you notice the game saving, and could you load one?
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.
 
@@ -51,7 +73,16 @@ Screenshots help. Print Screen, then paste into a message.
 
 KNOWN ROUGH EDGES
 -----------------
-- No saving. A game is one sitting.
+- Mars is effectively out of reach. There is one launch window, on turn 14, the flight
+  takes nine turns, and most games are over before a ship could land. The number of turns
+  in a game will change in a later version.
+- The sides are not balanced against each other. In our own test games the Prospectors win
+  and nobody else ever does, and the Custodians' own win condition - holding emissions
+  below the world's natural absorption for three turns running - has never once been
+  reached by anybody.
+- Research is very slow. In test games the world finishes about one technology per game
+  and never gets past the first row of the tech tree, so the Sea Wall and the other
+  second-row things are never available.
+- Countries still grind up to maximum Unrest and stay there in the second half of a game.
 - The computer opponent is simple and does not build some of the newer buildings.
-- Contested countries can flip back and forth between you and the opponent every turn.
 - No sound, no tutorial beyond the first Report.

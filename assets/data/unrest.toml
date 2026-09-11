@@ -1,0 +1,94 @@
+# Version 0.05 (ticket #52): Unrest, the figure every Nation State carries. Its start value per
+# state is on the state's card in nation_states.toml; every number that moves it lives here.
+#
+# Ticket #53 retuned the whole table after twenty seeds of #52 measured Unrest as a ratchet rather
+# than a pressure: every state climbed to 10 and stayed, and states threw off a controller about
+# forty times a game. Three things changed. The fall is larger (1.5) and lands EVERY turn, not only
+# in a turn nothing raised it, so a rise and the fall net out; it is withheld only from a state that
+# changed hands that turn, which is the one turn a population has a fresh grievance. The climate
+# and refugee rises are smaller. And the green Techs now damp arriving refugees as well as the
+# climate. Unrest is no longer whole: it moves in halves, and the card prints the fraction.
+
+# The ceiling on a state a Faction holds or occupies, and on a neutral state (rule 5 of #52).
+max = 10.0
+neutral_max = 9.0
+
+# ---- rises
+# The Climate phase in which the state's population fell, and the same when it fell by more than
+# `population_fall_big_fraction` of what stood. Halved on #53.
+population_fall = 1.5
+population_fall_big = 2.0
+population_fall_big_fraction = 0.01
+# Per build slot lost to Sea Level. Halved on #53; an exposed state still takes 2 at a threshold.
+per_sea_level_slot = 1.0
+# A Heatwave, Wildfire or Storm Surge landing on the state.
+climate_card = 1.5
+# A Facility mothballed or decommissioned there (ticket #54). Nothing damps either, and a Module
+# mothballed or decommissioned in a Colony adds nothing at all.
+per_mothball = 1.0
+per_decommission = 2.0
+# Refugees arriving: one per this much population, at most `refugees_max` in a turn. #53 doubled
+# the population a point of Unrest costs and cut the cap from 3 to 2.
+refugees_per = 0.5
+refugees_max = 2.0
+# Occupation: when it begins, and each turn it lasts. Unchanged: Occupation should hurt.
+occupation_start = 3.0
+occupation_per_turn = 1.0
+# The Unrest Event card. Unchanged.
+unrest_card = 3.0
+
+# ---- falls
+# Every turn, unless the state changed hands that turn, and whatever else happened: a rise and this
+# net out. It was 1 and conditional on a quiet turn until #53, which is why nothing ever came down.
+natural_fall = 1.5
+# One Relief order: this many Ducats lowers Unrest by `relief_points`, any number of times a turn.
+relief_ducats = 10
+relief_points = 1.0
+# A Constabulary standing and online there, every turn, on top of the natural fall.
+constabulary_fall = 1.0
+# A Scrubber standing and online there, every turn, on top of the natural fall (ticket #54); it
+# joins the Constabulary in `calming_fall`, and a state with both gets both.
+scrubber_fall = 1.0
+
+# ---- damping (rule 4 of #52, widened on #53)
+# While two of the four green Techs are complete every climate-source AND refugee rise is this much
+# smaller; while all four are, that much. A Constabulary online there damps the same rises by
+# `constabulary_damping` on top. Nothing falls below zero, and nothing damps Occupation, a mothball,
+# a decommission or the Unrest card.
+green_techs_two = 0.5
+green_techs_four = 1.0
+constabulary_damping = 0.5
+
+# ---- thresholds (rule 5 of #52)
+# At `army_threshold` the Standing Army stops replenishing; at `facility_threshold` every Facility
+# there produces and emits at half; at `throw_off_threshold` a controlled state throws off its
+# controller, becomes neutral and settles back to `throw_off_reset`.
+army_threshold = 4.0
+facility_threshold = 7.0
+throw_off_threshold = 10.0
+throw_off_reset = 5.0
+# A hook for the neutral-development rule of a later ticket: a state at or above this does not
+# develop itself.
+no_development_at = 7.0
+
+# ---- Occupation (rule 6 of #52)
+# The occupier's Pacification gain each turn is the place's threshold over this, rounded up: the
+# calm divisor normally, the unrest one while the state's Unrest is at `pacification_unrest` or more.
+pacification_divisor = 3
+pacification_divisor_unrest = 6
+pacification_unrest = 4.0
+
+# ---- refugees (rule 8 of #52)
+# When a state's population falls to the heat, this share of what it lost moves to its neighbours
+# instead of vanishing, split in proportion to Industry Level (equally if every neighbour is at 0).
+heat_share = 0.5
+# When a Sea Level threshold fires for a state it loses this much population per point of Coastal
+# Exposure, and this share of that moves to the neighbours the same way.
+sea_loss_per_exposure = 0.05
+sea_share = 0.5
+
+# ---- Resettle (rule 9 of #52)
+# An Orders-phase order on a state you control, once a turn per Faction: every refugee flow leaving
+# a state you direct goes entirely to the chosen state, and you gain `resettle_standing` Standing there.
+resettle_ducats = 20
+resettle_standing = 5

@@ -10,8 +10,13 @@ sibling_fuel = 1
 # Version 0.04 (ticket #46): a Space Station is built for this many Materials into a free orbital
 # slot, from a Nation State with a Launch Site (over Earth) or a Colony (elsewhere); no crew needed.
 # It holds only a Shipyard and Habitats. Ships are built only at Shipyards. Each Body names its
-# orbital slots in `stations`, in order; the two Factions start with the first two over Earth.
+# orbital slots in `stations`, in order. Ticket #50: five over Earth. The Custodians start with the
+# ISS, the Prospectors with Tiangong and the Archivists with Axiom; the Arkwrights start with none,
+# and two slots stand free.
 station_materials = 40
+# Ticket #57 (version 0.05): every Colony Slot draws its own four yields when the game starts, its
+# Body's figures times a factor from a triangular distribution centred on 1.0 with these limits.
+slot_yield_spread = 0.25
 
 [[body]]
 id = "earth"
@@ -21,12 +26,14 @@ name = "Earth"
 # Its Colonists live on Earth (no Off-world Presence) and its Modules emit like Facilities.
 transit_turns = 0
 transit_fuel = 0
-mine_yield = 1.0
+# Ticket #56 (version 0.05): abundant ore and Fuel under the ice, and Habitats that work as well as
+# anywhere. The slots stay shut until the Temperature has stood at antarctica_opens_at (climate.toml).
+mine_yield = 1.75
 generator_yield = 0.75
-refinery_yield = 1.5
-habitat_yield = 0.75
-orbital_slots = 4
-stations = ["ISS", "Tiangong", "Skylab", "Mir"]
+refinery_yield = 2.0
+habitat_yield = 1.0
+orbital_slots = 5
+stations = ["ISS", "Tiangong", "Axiom", "Orbital Reef", "Starlab"]
 slots = [
     { name = "Antarctic Peninsula", lon = -63.0, lat = -69.0 },
     { name = "Lake Vostok", lon = 105.0, lat = -77.5 },

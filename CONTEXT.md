@@ -5,27 +5,59 @@ A single-player, turn-based strategy game about colonizing the solar system befo
 ## Language
 
 **First Playable**:
-The small version of the game covering only the Moon and Mars, with three resources and two factions: twelve turns as first built, twenty-four since version 0.02. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`.
+The small version of the game: twelve turns and two Factions as first built, twenty-four turns since version 0.02 and four Factions since version 0.05. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`, `docs/spec/version-0.03.md`, `docs/spec/version-0.04.md` and `docs/spec/version-0.05.md`.
 _Avoid_: slice, MVP, demo, v1, prototype
 
 **Faction**:
-A competing power with its own multipliers, signature rule and victory condition. The finished game has six; the First Playable has two, the Custodians and the Prospectors, who differ in everything but combat and their starting position.
+A competing power with its own multipliers, signature rule and victory condition. The finished game has six; the First Playable has four since version 0.05, the Custodians, the Prospectors, the Arkwrights and the Archivists, and all four sit at every table.
 _Avoid_: side, team, empire
 
 **Custodians**:
-The Faction that colonizes the solar system while limiting ecological damage to Earth. Their signature rule is Restoration, and they win only if Earth is still habitable.
+The Faction that colonizes the solar system while limiting ecological damage to Earth. Their signature rule is the Scrubber and Leapfrog, and they win only if Earth is still habitable.
 _Avoid_: Stewards (the retired name), environmentalists, greens, moderates, eco-terrorists
 
 **Prospectors**:
-The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry, and they win on extraction and expansion.
+The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry and the Strip Permit, and they win on extraction and expansion.
 _Avoid_: Extractors (the retired name), capitalists, industrialists, exploiters
+
+**Arkwrights**:
+The Faction that exists to get people off Earth and spread them as widely as it can. Their signature rule is Steerage, and they win on Diaspora.
+_Avoid_: settlers, arks, exodus, nomads
+
+**Archivists**:
+The Faction that means to save what humanity knows, and as many of its people as it can, in one place off Earth. Their signature rule is Provisional Findings, and they win by completing the Archive.
+_Avoid_: scholars, librarians, scientists, the Academy
+
+**Steerage**:
+The Arkwrights' signature rule: their Colony Ships carry twice the Colonists and cost less to build, but every Colonist lifted from a Launch Site costs their Nation State twice the population.
+_Avoid_: mass transit, cattle class, overcrowding, packing them in
+
+**Diaspora**:
+The Arkwrights' Victory Condition: thirty Colonists living off Earth, spread over at least three Bodies with at least four Colonists on each. Antarctica and the stations over Earth count toward neither part.
+_Avoid_: spread, expansion, exodus, colonization score
+
+**Project**:
+A construction raised in stages, each stage paid in both Research and Materials and taking more than one turn to build once paid. The Archive is the first.
+_Avoid_: megaproject, wonder, great work, campaign
+
+**The Archive**:
+The first Project: a Module only the Archivists build, at one Colony off Earth and at most one per Faction. Complete, it takes a great deal of Energy to keep running, and it is destroyed outright if its Colony changes hands.
+_Avoid_: library, vault, monument, database
+
+**Fund the Archive**:
+The Archivists' Orders-phase order, which sends a turn's Research from their own Labs into their Archive fund instead of the shared Tech, where it counts nothing toward the Research Lead.
+_Avoid_: donate, invest, bank research, save up
+
+**Provisional Findings**:
+The Archivists' signature rule: they already have half the effect of the Tech under research, so long as their Research went to the shared Tech last turn rather than to the Archive.
+_Avoid_: early access, preview, partial tech, head start
 
 **Climate Model**:
 The small model of global warming the game runs: Emissions add to the CO2 Stock, the Temperature follows the stock with a lag, and the Temperature acts on population and Events. It moves as a consequence of player and faction choices, never on a fixed schedule.
 _Avoid_: warming track, doom clock, countdown, timer, disaster meter
 
 **Body**:
-A place in the solar system that can hold a Colony or a Space Station. Five since version 0.04: Earth (its Colony Slots are Antarctica's), the Moon, Mars, Phobos and Deimos. A Body may be another's satellite, which sets how far apart they are.
+A place in the solar system that can hold a Colony or a Space Station. Five since version 0.04: Earth (its Colony Slots are Antarctica's, shut under the ice until +1.6 C), the Moon, Mars, Phobos and Deimos. A Body may be another's satellite, which sets how far apart they are.
 _Avoid_: planet, world, site, location, node
 
 **Colony**:
@@ -33,7 +65,7 @@ A permanent settlement a Faction holds on a Body, founded when a Colony Ship unl
 _Avoid_: base, outpost, settlement
 
 **Colony Slot**:
-One of a fixed number of places on a Body where a Colony can be founded, shared by all Factions. Since version 0.04 each is a real geological place, drawn at its position on the Surface Map and giving its Colony its name. A landing Colony Ship is founded into a chosen one.
+One of a fixed number of places on a Body where a Colony can be founded, shared by all Factions. Since version 0.04 each is a real geological place, drawn at its position on the Surface Map and giving its Colony its name. Since version 0.05 each also has its own four yields, drawn when the game starts and never far from its Body's, so no two places on a world are equally worth settling; a free slot shows what a Colony there would get. A landing Colony Ship is founded into a chosen one. Earth's three, in Antarctica, are shut under the ice until the Temperature has stood at +1.6 C in a Climate phase; once open they stay open.
 _Avoid_: site, plot, capacity
 
 **Orbital Slot**:
@@ -41,13 +73,12 @@ One of a fixed number of places in orbit around a Body where a Space Station can
 _Avoid_: dock, berth, orbit
 
 **Space Station**:
-A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard and Habitats. Influence, Occupation and Battles work on it as on a Colony. Each Faction starts with one over Earth (the Custodians the ISS, the Prospectors Tiangong), bare. Colonists on a station over Earth are still on Earth for Off-world Presence.
+A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard and Habitats. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with a bare one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom); the Arkwrights start with none, and build theirs at half price. Colonists on a station over Earth are still on Earth for Off-world Presence.
 _Avoid_: base, platform, orbital, outpost
 
 **Trading window**:
 Where Ducats buy Influence, Materials, Fuel and Energy at table prices, spendable in the same turn's orders, and where Materials and Fuel sell back at half. A building can also be bought outright for Ducats from its own build button, at twice its Materials cost.
 _Avoid_: market, shop, exchange, store
-_Avoid_: site, plot, capacity
 
 **Body Surface Map**:
 The 3D view of one Body's surface, entered by clicking that Body on the Solar System Map. Every Body has one.
@@ -58,15 +89,19 @@ Earth's Body Surface Map, divided into Nation States, where Earth-side building,
 _Avoid_: home view, globe view, terrestrial map
 
 **Solar System Map**:
-The 3D view of the solar system, where Bodies, Ship stacks, transits and Orbital Control are seen and acted on. Transits, launches, Ship Stances and attacks are ordered here and nowhere else.
+The 3D view of the solar system, where Bodies, Ship stacks, transits and Orbital Control are seen and acted on. Transits, launches, Ship Stances and attacks are ordered here and nowhere else. Since version 0.05 the sky it draws is the real one: Earth and Mars stand on their rings where they truly stand in the month the turn is, so the distance between them, and the Launch Window, are things the player can see.
 _Avoid_: space view, orbital map, star map
+
+**Launch Window**:
+The months in which the flight between the Earth system and the Mars system is cheap, because the two worlds stand where a minimum-energy transfer wants them. On the window a crossing takes the shortest flight there is and costs the Fuel on the card; away from it it takes longer and costs more, the further off the dearer, up to a limit. There is one window in the game. A hop inside the Earth system or inside the Mars system does not have one.
+_Avoid_: transfer window, launch period, alignment, conjunction
 
 **Event**:
 An unplanned occurrence drawn from the Event Deck after orders are committed and taking effect during Resolution — a solar storm, an equipment failure, a discovery. It can never directly break a Victory Condition.
 _Avoid_: incident, crisis, card
 
 **Event Deck**:
-The deck a card may be drawn from each turn, holding only Events: thirty cards in version 0.02, the twelve First Playable Events twice and six newer ones once. It is never reshuffled. Whether a card is drawn at all is the Draw Chance.
+The deck a card may be drawn from each turn, holding only Events: twenty-eight cards since version 0.03, ten of the First Playable's Events twice each and eight newer ones once. It is never reshuffled. Whether a card is drawn at all is the Draw Chance.
 _Avoid_: event pool, random table, encounter deck, calm card (retired in version 0.02)
 
 **Draw Chance**:
@@ -78,11 +113,11 @@ An advance on the Tech Tree that changes an output, a capacity, an upkeep, a Shi
 _Avoid_: research, upgrade, invention
 
 **Tech Tree**:
-The single tree of Techs shared by all Factions, in five branches: Industry, Propulsion, Off-world Living, Extraction, Society. One Tech is under research at a time, worldwide.
+The single tree of Techs shared by all Factions, thirteen of them since version 0.05, in five branches: Industry, Propulsion, Off-world Living, Extraction, Society. A branch may hold more than one Tech on a rung. One Tech is under research at a time, worldwide.
 _Avoid_: per-faction tree, research tree
 
 **Research Lead**:
-The Faction that contributed the most Research to the Tech that just completed. It chooses the next Tech. Decided afresh for every Tech.
+The Faction that contributed the most Research to the Tech that just completed. It chooses the next Tech. Decided afresh for every Tech, and the race for it stands in the top bar as one bar of the four Factions' contributions in their own colours.
 _Avoid_: science leader, tech leader
 
 ### Resources
@@ -104,7 +139,7 @@ The single shared pool holding all Materials, Fuel, Energy and, since version 0.
 _Avoid_: central bank, per-world stocks, inventory
 
 **Ducats**:
-Money, the fourth resource since version 0.03. A controlled Nation State pays them from its GDP figure times its Industry Level; a Bank on Earth and a Trade Post in a Colony make more. They buy Influence at two for one, added to this turn's Allotment, and pay for Restoration steps and repair points in place of Energy and Materials.
+Money, the fourth resource since version 0.03. A controlled Nation State pays them from its GDP figure times its Industry Level; a Bank on Earth and a Trade Post in a Colony make more. They buy Influence at two for one, added to this turn's Allotment, and pay for Relief, Resettle, a Leapfrog and repair points in place of Materials.
 _Avoid_: Ducketts, credits, money, gold, cash
 
 **Bank**:
@@ -126,7 +161,7 @@ _Avoid_: antenna, transmitter, beacon
 ### Pieces
 
 **Module**:
-A building placed inside a Colony. Eight kinds since version 0.03: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post and Relay.
+A building placed inside a Colony. Nine kinds since version 0.05: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay and the Archive, which only the Archivists raise and only one stage at a time.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:
@@ -166,26 +201,50 @@ A person counted in the population of a Colony or Nation State. Colonists are ca
 _Avoid_: settler, crew, worker, population resource
 
 **Nation State**:
-One of eight regions of the Earth Map (six continents, plus Russia and the Middle East since version 0.02; Antarctica left the list in version 0.04 to become Earth's Colony Slots) that a Faction can control and build in. Each carries a population, an Industry Level, a Resource Lean, a Baseline Emissions figure, an Education Level and a Standing Army. Armies move only between neighbouring continents.
-_Avoid_: country, nation, territory, region, state
+One of twelve regions of the Earth Map that a Faction can control and build in. Eight until version 0.05, which split Africa at the Sahara, Asia into East, South and South-East, and Central America and the Caribbean out of North America; Antarctica left the list in version 0.04 to become Earth's Colony Slots. Each carries a population, an Industry Level, a Resource Lean, a Baseline Emissions figure, an Education Level, a GDP, an Influence value, an Unrest figure and a Standing Army. Armies move only between neighbouring states.
+_Avoid_: country, nation, territory, region, state, continent (some are, some are not)
 
 ### Earth
 
 **Facility**:
-A building placed in a Nation State. Seven kinds since version 0.03: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank and Embassy. Since version 0.04 a Launch Site builds no Ship: it lifts Colonists and Armies from its state into orbit, and each lift is a launch.
+A building placed in a Nation State. Ten kinds since version 0.05: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, the Sea Wall, which stands only in a Coastal Slot, and the Scrubber, which alone takes no build slot. Since version 0.04 a Launch Site builds no Ship: it lifts Colonists and Armies from its state into orbit, and each lift is a launch.
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Cheap Industry**:
-The Prospectors' signature rule: raising a Nation State's Industry Level costs them half.
+The first clause of the Prospectors' signature rule: raising a Nation State's Industry Level costs them half. The second is the Strip Permit.
 _Avoid_: industry discount, cheap building
 
 **Restoration**:
-The Custodians' signature rule: Energy spent in a turn enlarges the Natural Sink for that turn only.
-_Avoid_: carbon capture, cleanup, scrubbing, terraforming
+Retired in version 0.05; see Scrubber. It was the Custodians' signature rule: Energy spent in a turn enlarged the Natural Sink for that turn only.
+_Avoid_: using it for anything the Scrubber now does
+
+**Scrubber**:
+The Custodians' signature Facility, which only they build and only in a Nation State they control. It takes no build slot, draws Energy, emits nothing, and while it is online it enlarges the Natural Sink and lowers its state's Unrest every turn. How many one state may hold follows its population, and they are destroyed outright if the state changes hands.
+_Avoid_: carbon capture, cleanup, restoration (the retired rule), terraforming, filter
+
+**Leapfrog**:
+The Custodians' other signature clause: an Orders-phase order paid in Ducats on a Nation State they control, which lowers that state's per-person Emissions coefficient by one Industry Level's worth, for good. It may be bought any number of times, and never takes the figure below the base every state pays.
+_Avoid_: clean development, technology transfer, offset, upgrade
+
+**Strip Permit**:
+The Prospectors' other signature clause: an Orders-phase order, free, that may be taken once in a Nation State's whole life. For three turns every Facility there produces double; when it ends, that state's Baseline Emissions and its Unrest rise for good.
+_Avoid_: licence, boom, overdrive, exploitation
+
+**Mothball**:
+The Orders-phase order that stands a Facility or a Module down. A mothballed building produces nothing, pays no Energy upkeep, emits nothing, is online for no rule, and keeps its slot. It is free, it takes effect at the Resolution, it raises the Unrest of a Nation State it happens in, and only a Restart brings the building back, for Materials and a turn.
+_Avoid_: pause, disable, switch off, idle, shut down (that is the Energy shortfall rule)
+
+**Decommission**:
+The Orders-phase order that takes a Facility or a Module down for good: a turn later half its Materials come back, its slot is free, and it is gone. In a Nation State it raises Unrest more than a Mothball does; in a Colony it raises none.
+_Avoid_: demolish, scrap, sell, destroy
 
 **Industry Level**:
-How built-up a Nation State is. Together with the state's size it sets how many Facilities fit, and it scales the state's emissions. Raising it is a build action.
+How built-up a Nation State is. Together with the state's size it sets how many Facilities fit, and every slot it adds is an Inland Slot. It scales the state's emissions. Raising it is a build action.
 _Avoid_: development, tier, infrastructure
+
+**Neutral Development**:
+What a Nation State nobody holds does for itself: every ninth turn of unbroken neutrality it raises its own Industry Level by one and wakes one of its own Facilities to run itself, emitting to nobody and making nothing for anyone, until it is as built-up as a neutral state gets. A world already too hot, or a population already too restive, stops it. The clock is the state's own, starts again whenever it is freed, and the states neutral at the start are staggered so they do not all step together.
+_Avoid_: growth, expansion, auto-build, industrialization, AI development
 
 **Education Level**:
 A fixed figure on a Nation State's card, taken from real-world values in the First Playable, that multiplies the Research each Lab in that state produces.
@@ -199,12 +258,56 @@ _Avoid_: specialty, bonus, affinity
 How dirty a Nation State's industry is before any Facility is built there.
 _Avoid_: pollution rating, carbon score
 
+**Build Slot**:
+One of the places a Facility occupies in a Nation State. A state has Size + Industry Level + three of them, and each is either a **Coastal Slot** or an **Inland Slot**: the sea takes only the first, and every slot a raise of the Industry Level adds is one of the second. Its start Facilities stand on the coast first; a later build fills an inland slot while one is free.
+_Avoid_: building slot, plot, space, capacity
+
+**Coastal Slot**:
+A build slot on a Nation State's coast, where the sea can reach it. A state has three per point of Coastal Exposure, never more than its start slots less one, and never gains another. A Facility standing in one the sea takes is destroyed, oldest first.
+_Avoid_: shore slot, waterfront, flood zone
+
+**Inland Slot**:
+A build slot the sea never reaches: the start slots the coastal ones leave over, and every slot a raise of the Industry Level adds.
+_Avoid_: safe slot, interior, highland
+
 **Coastal Exposure**:
-How much of a Nation State the sea can take. As Sea Level passes its thresholds, an exposed state permanently loses build slots.
+How much of a Nation State stands on the coast, a figure on its card. It sets how many Coastal Slots the state has, three per point, and how many of them each Sea Level threshold takes. A state with no Coastal Slots left loses no more of them, though the threshold still drives out its people and raises its Unrest.
 _Avoid_: coastline, vulnerability, flood risk
 
+**Sea Wall**:
+The Facility that holds one threshold off: it stands in a Coastal Slot, at most one to a state, and while it is working the state's next Sea Level threshold of any kind takes no slots at all. The wall is destroyed absorbing it. It needs Coastal Engineering.
+_Avoid_: dyke, levee, barrier, flood defence
+
+**Coastal Engineering**:
+The Industry Tech that unlocks the Sea Wall, and does nothing else.
+_Avoid_: sea defence, civil engineering, hydrology
+
+**Unrest**:
+How restive a Nation State's people are, a figure from 0 to 10 on its card, moving in halves. Heat, the rising sea, the Climate cards, Occupation and arriving Refugees raise it; it falls on its own every turn except the turn the state changed hands, so a rise and the fall net out, and it falls further to Relief, a Constabulary and a Scrubber. Past its first threshold the Standing Army stops replenishing, past its second the state's Facilities run at half, and at the top the state throws its controller off and goes neutral.
+_Avoid_: unhappiness, morale, stability, dissent, revolt meter
+
+**Relief**:
+The Orders-phase order that buys a Nation State's calm: Ducats spent on a state you direct to lower its Unrest by one, as many times in a turn as you can pay for.
+_Avoid_: aid, welfare, subsidy, bribe, appeasement
+
+**Constabulary**:
+The Facility that holds a Nation State's Unrest down: while it stands and is online it lowers Unrest every turn whatever else happened that turn, and softens what the climate and arriving Refugees add. At most one stands in a state.
+_Avoid_: police, militia, garrison, barracks (that is the Colony word)
+
+**Refugees**:
+The people who leave a Nation State for its neighbours when the heat or the sea takes their homes, instead of simply being lost. They are added to the state that receives them, and their arrival raises its Unrest.
+_Avoid_: migrants, displaced, evacuees, exodus, immigration
+
+**Resettle**:
+The Orders-phase order that steers Refugees: once a turn, for Ducats, every flow leaving the states a Faction directs goes to one Nation State of its choosing instead of to the neighbours, and its Standing there rises.
+_Avoid_: relocate, evacuate, transfer, deport
+
+**Blame**:
+The CO2 a Faction is answerable for over the whole game: everything the sources it controlled has emitted, less everything it has taken back, and never less than nothing. What no Faction controls is nobody's. A Faction's share of the four Factions' Blame, when it rises above a fair quarter, makes every Nation State it does not hold harder for it to win over.
+_Avoid_: carbon debt, guilt, pollution score, emissions total, footprint
+
 **Influence**:
-A Faction's claim on a Nation State or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold; a controlled place goes to a rival whose Standing is at least the controller's plus the challenge margin (10 since version 0.04) and at least the threshold.
+A Faction's claim on a Nation State or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold; a controlled place goes to a rival whose Standing is at least the controller's plus the challenge margin (10 since version 0.04) and at least the threshold, which since version 0.05 each Faction reads for itself, since its Blame raises it on every Nation State it does not hold.
 _Avoid_: diplomacy points, favour, reputation
 
 **Standing**:
@@ -222,7 +325,7 @@ _Avoid_: science, research points, RP, fourth resource
 ### The turn
 
 **Turn**:
-One month of game time, and the unit the whole game runs in. The First Playable is twelve turns long. Both Factions order simultaneously against the same board, then the turn runs through its phases.
+One calendar month of game time, and the unit the whole game runs in. The game begins in January 2030, so turn 1 is January 2030 and the twenty-fourth is December 2031, and the top bar names the month. All four Factions order simultaneously against the same board, then the turn runs through its phases.
 _Avoid_: round, month, tick, cycle
 
 **Phase**:
@@ -242,13 +345,25 @@ The phase in which the turn actually happens: transits advance, arrivals land, B
 _Avoid_: processing, execution, upkeep phase
 
 **Report**:
-The phase that opens a turn for the player, carrying the Battle Report, last turn's Event, completed builds, arrivals and control changes.
+The phase that opens a turn for the player, and the dated dispatch it shows. It opens with a headline: the most serious thing that happened, chosen by a fixed order of severity. Everything else is grouped under four headings, In space, On Earth, The climate and Your works, and an empty heading is left out. Every line that is about somewhere is a way there. It ends with what each rival Faction did, told in plain sentences of what the board could see.
 _Avoid_: summary, news, digest
+
+**Moment**:
+A short modal that stops the turn before the Report, for one sentence and one number: a Colony founded, a Break or the sea rising, a Battle that cost a unit, a place changing hands, a Tech completed, Antarctica opening, or the Archive finished. At most two a turn, the most serious first, and every kind can be switched off.
+_Avoid_: popup, alert, notification, cutscene, interruption
+
+**Spectator**:
+Someone watching a game they hold no seat in. The computer plays all four Factions and the interface gives no orders at all; in return every Faction's board, card and Standing is open to be read. End Turn advances one turn, and the turns can be set to run on their own.
+_Avoid_: observer, replay, demo
+
+**Save**:
+A turn start written to a file, holding everything about one game: the same seed, the same deck, the same board. The game writes one of its own every three turns and when the game ends, keeping the last three of a game, and the player may write one at any turn start where nothing has been ordered yet. Saves are loaded from the title screen, and one written by another version of the rules is refused rather than brought forward.
+_Avoid_: checkpoint, snapshot, savegame
 
 ### Combat
 
 **Battle**:
-A fight between opposed stacks at one Body, Nation State or Colony, resolved automatically in rounds during end-of-turn processing and always finished inside the turn. Each round each side rolls to land hits, biased by its share of the strength present.
+A melee at one Body, Nation State or Colony in which every Faction present is hostile to every other, resolved automatically in rounds during end-of-turn processing and always finished inside the turn. Each round a party's chance to hit is its share of the total strength present, and its hits are spread across the other parties in proportion to theirs.
 _Avoid_: fight, engagement, skirmish, encounter
 
 **Stance**:
@@ -284,13 +399,13 @@ The state of a Nation State or Colony whose defenders were beaten by an Army. Th
 _Avoid_: conquest, annexation, capture
 
 **Pacified**:
-An occupied population whose occupier's Influence, gained automatically each turn of Occupation, has passed the place's threshold. Control transfers at that moment.
+An occupied population whose occupier's Influence, gained automatically each turn of Occupation, has passed the place's threshold. The gain is halved while the state's Unrest is past its first threshold. Control transfers at the moment the threshold is passed.
 _Avoid_: subdued, loyal, converted
 
 ### Winning
 
 **Victory Condition**:
-What one Faction must achieve to win. Each Faction has its own, and meeting it in an End phase wins the game at once. If neither Faction has met its condition by the end of the last turn, the higher percentage of its own condition wins.
+What one Faction must achieve to win. Each Faction has its own, and meeting it in an End phase wins the game at once; if more than one seat meets it in the same phase, the larger margin over its own bar wins and an exact tie is a draw. If no Faction has met its condition by the end of the last turn, the seats are ranked by the percentage of their own condition, then by Colonists off Earth, then by Colonies held.
 _Avoid_: win condition, goal, objective, victory points
 
 **Extraction Total**:
@@ -298,11 +413,11 @@ The Prospectors' measure: all the Materials and Fuel their Mines, Refineries and
 _Avoid_: production score, output total, wealth
 
 **Stabilization**:
-The Custodians' measure: net Emissions held under the Natural Sink for a run of consecutive turns. One turn over the Sink resets the run.
+The Custodians' measure: net Emissions held under the Natural Sink, counting every Scrubber, for a run of consecutive turns. One turn over the Sink resets the run.
 _Avoid_: carbon neutral, balance, equilibrium
 
 **Off-world Presence**:
-The number of Colonists living away from Earth, required by both Factions' Victory Conditions. Neither can win on Earth alone. Colonists in Antarctica or on a station over Earth are still on Earth.
+The number of Colonists living away from Earth, required by the Custodians' and the Prospectors' Victory Conditions. No Faction can win on Earth alone. Colonists in Antarctica or on a station over Earth are still on Earth.
 _Avoid_: population off Earth, colony size, settlers
 
 ### Climate
@@ -316,21 +431,33 @@ Degrees above pre-industrial. It follows the CO2 Stock with a lag of one to two 
 _Avoid_: heat, warming percentage
 
 **Emissions**:
-The CO2-equivalent a source adds to the CO2 Stock in a turn. Every source has its own figure and the Climate Panel shows them one by one before the sum; methane-heavy sources carry a heavier weight.
+The CO2-equivalent a source adds to the CO2 Stock in a turn. Every source has its own figure and the Climate Panel shows them one by one before the sum; methane-heavy sources carry a heavier weight. Since version 0.05 a Nation State's people emit more the more built-up the state is, and a Leapfrog lowers that state's figure for good.
 _Avoid_: output, carbon, footprint
 
 **Natural Sink**:
-The fixed amount of CO2 the oceans and forests remove from the CO2 Stock every turn. Net emissions below it stabilize the stock. Restoration enlarges it for a single turn.
+The amount of CO2 the oceans and forests remove from the CO2 Stock every turn. Net emissions below it stabilize the stock. Every Scrubber standing and online enlarges it while it stands, and since version 0.05 a Break can weaken it for good.
 _Avoid_: absorption, offset, carbon capture
 
 **Sea Level**:
-How far the oceans have risen with the Temperature. It is drawn on the globe as a creeping waterline, and it permanently takes build slots from Nation States according to their Coastal Exposure.
+How far the oceans have risen with the Temperature. It is drawn on the globe as a creeping waterline, and at each of its thresholds it permanently takes Coastal Slots from every Nation State, as many as the state's Coastal Exposure and never more than it has left. It takes nothing else: an Inland Slot is out of its reach, and so is a state whose coast is already gone.
 _Avoid_: flooding, water line, ocean rise
+
+**Break**:
+A Temperature at which a permanent change to the world fires once, the first time the Temperature stands at or above it. Five since version 0.05: the reefs die, the permafrost thaws, the Natural Sink weakens, the ice sheets go and the Amazon dies back. Nothing undoes a Break, and the Report says it happened rather than that it is coming.
+_Avoid_: tipping point, threshold, trigger
+
+**Committed Warming**:
+The Temperature the CO2 Stock as it stands will deliver once the lag has caught up. It is what the world has already bought, whatever anybody builds or stops building.
+_Avoid_: locked-in warming, pipeline, inertia, baked in
+
+**Last Turn**:
+The latest turn on which cutting net Emissions to zero from that turn onward still keeps the Temperature under the Collapse Line by the last turn, counting every Break the world would cross on the way. The Climate Panel names it, or says that cuts alone no longer avoid Collapse, or that Collapse is not reached on this path.
+_Avoid_: deadline, point of no return, countdown
 
 **Collapse Line**:
 The one Temperature at which the game ends with nobody winning, unless a Faction had already met its Victory Condition in an earlier End phase. Every other effect of Temperature is continuous; this is the only line.
 _Avoid_: threshold, tipping point, game over temperature
 
 **Climate Panel**:
-The screen showing the CO2 Stock, the Temperature and where it is heading, this turn's Emissions by source, the sink and the net, the penalties in force, and a projection to the last turn.
+The screen showing the CO2 Stock, the Temperature and where it is heading, a Temperature bar notched with every Break, every Sea Level threshold and Antarctica's opening, this turn's Emissions by source, the sink and the net, the penalties in force, the Committed Warming, the Last Turn, and a projection to the last turn.
 _Avoid_: warming meter, climate HUD
