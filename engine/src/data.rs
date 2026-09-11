@@ -538,17 +538,23 @@ pub struct VictoryTable {
     pub stabilization_turns: u32,
     pub off_world_presence: u32,
     pub turns: u32,
-    /// Ticket #57: the game begins on the first of this month, and a Turn is a calendar month.
+    /// Ticket #57: the game begins on the first of this month. Ticket #67 (version 0.05.5): a Turn
+    /// is `months_per_turn` calendar months, two since 0.05.5, and is named by its first month.
     #[serde(default = "twenty_thirty")]
     pub start_year: i64,
     #[serde(default = "january")]
     pub start_month: i64,
+    #[serde(default = "one_month")]
+    pub months_per_turn: i64,
 }
 
 fn twenty_thirty() -> i64 {
     2030
 }
 fn january() -> i64 {
+    1
+}
+fn one_month() -> i64 {
     1
 }
 
@@ -1069,6 +1075,9 @@ impl Tables {
         // Ticket #57: the game's first date, and the sky it opens on.
         if !(1..=12).contains(&self.victory.start_month) {
             return Err(err("victory.toml", format!("start_month {} is no month", self.victory.start_month)));
+        }
+        if !(1..=12).contains(&self.victory.months_per_turn) {
+            return Err(err("victory.toml", format!("months_per_turn {} must be from 1 to 12", self.victory.months_per_turn)));
         }
         if !(0.0..1.0).contains(&self.slot_yield_spread) {
             return Err(err("bodies.toml", format!("slot_yield_spread {} must be at least 0 and under 1", self.slot_yield_spread)));

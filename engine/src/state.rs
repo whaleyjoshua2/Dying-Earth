@@ -1554,10 +1554,11 @@ impl Game {
     // ---------------------------------------------- Ticket #57: the calendar and the real sky
 
     /// The year and month of a turn. Turn 1 is the game's start month, January 2030 (`victory.toml`),
-    /// and a Turn is one calendar month after it.
+    /// and each Turn is `months_per_turn` calendar months after the last (two since ticket #67,
+    /// version 0.05.5), named by its first month alone: turn 2 is March 2030.
     pub fn date(&self, turn: u32) -> Date {
         let v = &self.tables.victory;
-        let months = v.start_month - 1 + (turn.max(1) - 1) as i64;
+        let months = v.start_month - 1 + (turn.max(1) - 1) as i64 * v.months_per_turn;
         Date { year: v.start_year + months.div_euclid(12), month: (months.rem_euclid(12) + 1) as u32 }
     }
 
@@ -1586,13 +1587,34 @@ impl Game {
 
     /// The window offset for a departure at a turn: the signed difference in degrees between the
     /// phase angle and the Hohmann departure angle. Zero is the launch window.
+    ///
+    /// Ticket #67 (version 0.05.5): a turn spans two months, over which the phase angle moves
+    /// nearly thirty degrees, so the offset is the nearest the angle comes to the window ANYWHERE
+    /// in the turn, from its first instant to the next turn's: zero when it crosses the window
+    /// inside the turn, else the nearer end. Read at the first instant alone, no turn would ever
+    /// stand at the window and every "window" crossing would pay a little over the card.
     pub fn window_offset(&self, turn: u32) -> f64 {
-        crate::ephemeris::wrap_180(self.phase_angle(turn) - self.tables.transit.hohmann_angle)
+        self.span_offset(turn, self.tables.transit.hohmann_angle)
     }
 
     /// The same for the flight home, which wants Earth ahead of Mars instead.
     pub fn return_window_offset(&self, turn: u32) -> f64 {
-        crate::ephemeris::wrap_180(self.phase_angle(turn) - self.tables.transit.return_hohmann_angle)
+        self.span_offset(turn, self.tables.transit.return_hohmann_angle)
+    }
+
+    /// The signed offset of the phase angle from `angle` over the span of a turn (see `window_offset`).
+    /// A change of sign between the turn's two ends is a crossing only when the ends are near each
+    /// other; a jump across the far side of the circle (+170 to -170) is not.
+    fn span_offset(&self, turn: u32, angle: f64) -> f64 {
+        let start = crate::ephemeris::wrap_180(self.phase_angle(turn) - angle);
+        let end = crate::ephemeris::wrap_180(self.phase_angle(turn + 1) - angle);
+        if start.signum() != end.signum() && (start - end).abs() < 90.0 {
+            0.0
+        } else if start.abs() <= end.abs() {
+            start
+        } else {
+            end
+        }
     }
 
     /// Which two systems a transit crosses, if it crosses at all, and the offset it pays. `None` for

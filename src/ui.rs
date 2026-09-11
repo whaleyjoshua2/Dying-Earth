@@ -817,7 +817,8 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             let influence = if bought > 0 { format!("Influence {} of {} ({} free + {} bought)", influence_left, s.allotment + bought, s.allotment, bought) } else { format!("Influence {} of {}", influence_left, s.allotment) };
             ui.label(influence).on_hover_text("The Allotment is what your places and buildings give each turn; bought Influence comes from the Trading window at 2 Ducats each.");
             ui.separator();
-            // Ticket #57: a Turn is a calendar month from January 2030, so the bar names the month.
+            // Ticket #57: the bar names the turn's month. Ticket #67 (version 0.05.5): a Turn is two months,
+            // named by its first alone, so turn 2 reads March 2030.
             ui.label(RichText::new(format!("Turn {} / {}, {}", game.turn, game.tables.victory.turns, game.date_text())).strong());
             ui.separator();
             ui.label(format!("{:+.1} C, heading to {:+.1}", game.climate.temperature, game.target_temperature()));

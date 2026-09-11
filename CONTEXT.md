@@ -325,7 +325,7 @@ _Avoid_: science, research points, RP, fourth resource
 ### The turn
 
 **Turn**:
-One calendar month of game time, and the unit the whole game runs in. The game begins in January 2030, so turn 1 is January 2030 and the twenty-fourth is December 2031, and the top bar names the month. All four Factions order simultaneously against the same board, then the turn runs through its phases.
+Two calendar months of game time since version 0.05.5 (one before), and the unit the whole game runs in. The game begins in January 2030 and runs thirty-six turns, so turn 1 is January 2030, turn 2 March 2030 and the thirty-sixth November 2035; a turn is named by its first month alone, and the top bar names it. All four Factions order simultaneously against the same board, then the turn runs through its phases.
 _Avoid_: round, month, tick, cycle
 
 **Phase**:

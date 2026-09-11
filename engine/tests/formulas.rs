@@ -552,13 +552,14 @@ fn phobos_and_deimos_are_small_different_bodies_one_hop_past_mars() {
     // for the card's Fuel. The hops inside a system are untouched by it.
     let mut g = g;
     at_window(&mut g);
-    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Phobos), (9, 24));
-    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Deimos), (9, 24));
+    // Ticket #67 (version 0.05.5): the Hohmann flight is five turns of sixty days.
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Phobos), (5, 24));
+    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Deimos), (5, 24));
     assert_eq!(g.transit_cost(BodyId::Mars, BodyId::Phobos), (1, 2));
     assert_eq!(g.transit_cost(BodyId::Deimos, BodyId::Mars), (1, 2));
     assert_eq!(g.transit_cost(BodyId::Phobos, BodyId::Deimos), (1, 1));
-    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars), (9, 20));
-    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Mars), (9, 20));
+    assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Mars), (5, 20));
+    assert_eq!(g.transit_cost(BodyId::Moon, BodyId::Mars), (5, 20));
     assert_eq!(g.transit_cost(BodyId::Earth, BodyId::Moon), (1, 6));
     // The flight home reads the same cards, at its own window, which is not the same turn: the
     // moons' 24 against Mars's 20, both stretched by however far off that window the best turn in
@@ -3887,19 +3888,25 @@ fn a_modules_output_uses_its_own_slots_yield() {
     assert_eq!(g.habitat_room(g.colony(iss).unwrap()), per as u32, "a station's Habitats take no Body yield and no slot's either");
 }
 
-/// Ticket #57 (c): the game begins on 1 January 2030 and a Turn is a calendar month.
+/// Ticket #57 (c), amended by ticket #67 (version 0.05.5): the game begins on 1 January 2030, runs
+/// thirty-six turns, and a Turn is TWO calendar months, named by its first month alone.
 #[test]
-fn a_turn_is_a_calendar_month_from_january_2030() {
+fn a_turn_is_two_calendar_months_from_january_2030() {
     let g = game();
+    assert_eq!(g.tables.victory.turns, 36, "thirty-six turns");
+    assert_eq!(g.tables.victory.months_per_turn, 2, "of two months each");
     assert_eq!(g.date(1), Date { year: 2030, month: 1 });
     assert_eq!(g.date(1).text(), "January 2030");
-    assert_eq!(g.date(7).text(), "July 2030");
-    assert_eq!(g.date(12).text(), "December 2030");
-    assert_eq!(g.date(13).text(), "January 2031");
-    assert_eq!(g.date(24), Date { year: 2031, month: 12 }, "the last turn is December 2031");
-    assert_eq!(g.date(24).text(), "December 2031");
-    // Turn 1 is exactly 2030-01-01 00:00 UTC, the moment the game begins.
+    assert_eq!(g.date(2).text(), "March 2030", "turn 2 is named by its first month, March, not February");
+    assert_eq!(g.date(6).text(), "November 2030");
+    assert_eq!(g.date(7).text(), "January 2031");
+    assert_eq!(g.date(13).text(), "January 2032");
+    assert_eq!(g.date(36), Date { year: 2035, month: 11 }, "the last turn is November 2035");
+    assert_eq!(g.date(36).text(), "November 2035");
+    // Turn 1 is exactly 2030-01-01 00:00 UTC, the moment the game begins, and turn 2's sky is read
+    // at the first instant of March 2030 (59 days on; 2030 is no leap year).
     assert_eq!(g.julian_day(1), 2462502.5);
+    assert_eq!(g.julian_day(2), 2462502.5 + 59.0);
 }
 
 /// Ticket #57 (d): the sky the game draws is the real one. Earth's and Mars's heliocentric ecliptic
@@ -3923,26 +3930,35 @@ fn earth_and_mars_stand_where_jpl_horizons_puts_them_on_the_first_of_january_203
     assert_eq!(g.heliocentric_longitude(BodyId::Phobos, 1), mars);
 }
 
-/// Ticket #57 (e): the first Mars launch window after January 2030 falls where the real one does.
-/// The research file (section 3.3) puts the 2031 Type I optimum departure at 28 January 2031, which
-/// is turn 13; the game's own window turn must be within one turn of it.
+/// Ticket #57 (e), amended by ticket #67 (version 0.05.5): the first Mars launch window after
+/// January 2030 falls where the real one does. The research file (section 3.3) puts the 2031 Type I
+/// optimum departure at 28 January 2031, which at two months a turn is turn 7; the game's own window
+/// turn must be within one turn of it. With thirty-six turns the game now holds THREE windows: the
+/// real ones of early 2031, spring 2033 and spring 2035, a synodic period (13 turns) apart.
 #[test]
 fn the_first_mars_window_falls_where_the_real_one_of_early_2031_does() {
     let g = game();
     let window = g.next_window_turn(1);
-    assert!((12..=14).contains(&window), "the window is turn {window} ({}), not within one turn of January 2031", g.date(window).text());
+    assert!((6..=8).contains(&window), "the window is turn {window} ({}), not within one turn of January 2031", g.date(window).text());
     assert_eq!(g.date(window).year, 2031, "and it is in 2031");
-    // It really is the smallest offset in the span, and no other turn is nearer.
+    // It really is the smallest offset in the whole first cycle, and no other turn of it is nearer.
     let offset = g.window_offset(window).abs();
     assert!(offset < 15.0, "the window turn stands {offset:.1} degrees off the Hohmann angle");
-    for t in 1..=g.tables.victory.turns {
+    let cycle = (g.tables.transit.synodic_days / g.tables.transit.days_per_turn).ceil() as u32;
+    assert_eq!(cycle, 13, "780 days is thirteen turns of sixty");
+    for t in 1..=cycle {
         if t != window {
             assert!(g.window_offset(t).abs() >= offset, "turn {t} is no nearer the window than turn {window}");
         }
     }
-    // One window in the whole game: the next is a synodic period away, past the last turn.
-    let after = g.next_window_turn(window + 1);
-    assert!(after > g.tables.victory.turns, "the second window is turn {after}, inside the game's {} turns", g.tables.victory.turns);
+    // The second and third windows are inside the game, a synodic period apart; a fourth is not.
+    let second = g.next_window_turn(window + 1);
+    assert!((19..=21).contains(&second), "the second window is turn {second} ({}), not spring 2033", g.date(second).text());
+    assert_eq!(g.date(second).year, 2033);
+    let third = g.next_window_turn(second + 1);
+    assert!((32..=34).contains(&third), "the third window is turn {third} ({}), not spring 2035", g.date(third).text());
+    assert_eq!(g.date(third).year, 2035);
+    assert!(g.next_window_turn(third + 1) > g.tables.victory.turns, "a fourth window lies past the last turn");
 }
 
 /// Ticket #57 (f): what a crossing between the Earth system and the Mars system costs. At the
@@ -3955,7 +3971,10 @@ fn a_crossing_costs_the_hohmann_flight_at_the_window_and_more_away_from_it() {
     let card_fuel = g.tables.body(BodyId::Mars).transit_fuel;
     let window = g.next_window_turn(1);
     let hohmann = (tr.days_at_window / tr.days_per_turn).ceil() as u32;
-    assert_eq!(hohmann, 9, "259 days is nine turns of thirty");
+    // Ticket #67 (version 0.05.5): a turn is sixty days, so the same flight is five turns, and the
+    // cap of a year and a half is nine turns rather than eighteen.
+    assert_eq!(hohmann, 5, "259 days is five turns of sixty");
+    assert_eq!(tr.max_turns, 9, "the cap is nine turns of sixty, the same year and a half");
     assert_eq!(
         g.transit_cost_at(BodyId::Earth, BodyId::Mars, window),
         (hohmann, card_fuel),
@@ -4063,15 +4082,20 @@ fn the_ai_banks_fuel_when_the_mars_window_is_within_two_turns() {
 }
 
 /// Ticket #57: a loaded Colony Ship weighs a Body by what its slot is worth less the share of the
-/// game the flight would eat, so off the window the Moon, one turn away, beats a Mars that is
-/// seventeen turns away; before this the AI was only ever offered the single best Body.
+/// game the flight would eat, so off the window the Moon, one turn away, beats a Mars that is a
+/// year and a half away; before this the AI was only ever offered the single best Body.
+/// Ticket #67 (version 0.05.5): with thirty-six turns a nine-turn flight is a quarter of the game,
+/// and early on the AI rightly takes it; so the board stands on the turn farthest from the SECOND
+/// window, in the last third of the game, where the flight at its cap eats nearly all that is left.
 #[test]
 fn a_loaded_colony_ship_goes_to_the_moon_when_mars_is_a_year_away() {
     let mut g = game();
     let cust = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
-    g.turn = 4; // ten turns short of the window: the Mars flight is seventeen turns
+    let second = g.next_window_turn(g.next_window_turn(1) + 1);
+    let last = g.tables.victory.turns;
+    g.turn = (second..=last).max_by(|a, b| g.window_offset(*a).abs().partial_cmp(&g.window_offset(*b).abs()).unwrap()).unwrap();
     let (mars_turns, _) = g.transit_cost_for(cust, BodyId::Earth, BodyId::Mars);
-    assert!(mars_turns >= 12, "off the window Mars is far: {mars_turns} turns");
+    assert!(mars_turns >= 8, "off the window Mars is far: {mars_turns} turns");
     let ship = ShipId(900);
     g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: cust, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1 });
     g.seats[cust.index()].stockpile.fuel = 100;

@@ -83,6 +83,9 @@ fn main() {
                     let mut breaks_fired = vec![0u32; tables.climate.breaks.len()];
                     let mut highest_rung = 0u32;
                     let mut victory_met: Vec<String> = Vec::new();
+                    // Ticket #67 (version 0.05.5): whether the Mars system is reached now that the
+                    // game holds three windows, and how many Antarctic Colonies are founded.
+                    let (mut mars_turns, mut antarctic) = (Vec::new(), 0u32);
                     for seed in 1..=seeds {
                         let r = dying_earth_engine::sim::run_from(tables.clone(), seed, player, start);
                         match r.outcome {
@@ -102,6 +105,10 @@ fn main() {
                         off_earth.push(r.colonists_off_earth.iter().sum::<u32>());
                         techs.push(r.techs_completed);
                         highest_rung = highest_rung.max(r.highest_rung);
+                        if let Some(t) = r.first_mars_colony_turn {
+                            mars_turns.push(t);
+                        }
+                        antarctic += r.antarctic_colonies;
                         if let Some((seat, kind)) = r.victory_met {
                             victory_met.push(format!("seed {seed} {} (seat {})", kind.name(), seat.0));
                         }
@@ -135,6 +142,11 @@ fn main() {
                         println!("      median Colonists off Earth at the end, all seats {}", median_u(&mut off_earth));
                         println!("      Scrubbers {scrubbers}, Leapfrogs {leapfrogs}, Constabularies {constabularies}, Sea Walls {sea_walls}");
                         println!("      Techs: median {} completed, highest rung reached {highest_rung}", median_u(&mut techs));
+                        println!(
+                            "      Mars system: a Colony founded in {}/{seeds} seeds, median first turn {}; Antarctic Colonies founded {antarctic}",
+                            mars_turns.len(),
+                            median_u(&mut mars_turns)
+                        );
                         println!(
                             "      Victory Conditions met outright: {}",
                             if victory_met.is_empty() { "none in any seed".to_string() } else { victory_met.join(", ") }
