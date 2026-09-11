@@ -1130,7 +1130,9 @@ impl Game {
             let card = self.tables.unit(s.kind);
             let ship_name = format!("{} {}", s.kind.name(), s.id.0);
             if s.kind == UnitKind::ColonyShip {
-                let capacity = self.colony_ship_capacity(seat);
+                // Ticket #86: behind on Off-world Presence, the AI lifts the crowded load at Earth;
+                // otherwise the safe one.
+                let capacity = if body == BodyId::Earth && presence_needed > 0 { self.colony_ship_crowded_capacity(seat) } else { self.colony_ship_capacity(seat) };
                 if body == BodyId::Earth && s.colonists < capacity {
                     // Load from the directed state with the most Emigrants waiting (ticket #73).
                     // Ticket #46: only a state with a working Launch Site lifts them.

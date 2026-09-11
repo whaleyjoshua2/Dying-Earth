@@ -173,8 +173,12 @@ A persistent piece that travels between Bodies. It is one of four types since ve
 _Avoid_: vessel, rocket, fleet, expedition
 
 **Colony Ship**:
-The Ship type that carries Colonists, and nothing else since version 0.04. It cannot attack and is weak if caught.
+The Ship type that carries Colonists, and nothing else since version 0.04. It cannot attack and is weak if caught. Since version 0.06.0 a warming Earth crowds it: lifting at Earth it may take Colonists beyond its capacity, one for every fifth of a degree the Temperature stands above +1.8, at most four, and each of those crowded aboard may die when it arrives.
 _Avoid_: transport, colony (that is the settlement), settler ship
+
+**Crowding**:
+The extra Colonists a warming Earth puts aboard a Colony Ship lifting at Earth, beyond its capacity, since version 0.06.0, and the risk they run: rolled once at arrival, each crowded Colonist dies with a chance that grows with the size of the crowd. The player chooses whether to take them; the sea to Antarctica carries no crowd.
+_Avoid_: overloading, steerage (that is the Arkwrights' rule), refugees aboard
 
 **Carrier**:
 The Ship type that carries one Army and nothing else, since version 0.04. Unarmed, it needs an escort and is a target for Intercept like a Colony Ship. Every landing needs one.
@@ -361,7 +365,7 @@ The phase that opens a turn for the player, and the dated dispatch it shows. It 
 _Avoid_: summary, news, digest
 
 **Moment**:
-A short modal that stops the turn before the Report, for one sentence and one number: a Colony founded, a Break or the sea rising, a Battle that cost a unit, a place changing hands, a Tech completed, Antarctica opening, or the Archive finished. At most two a turn, the most serious first, and every kind can be switched off.
+A short modal that stops the turn before the Report, for one sentence and one number: a Colony founded, a Break or the sea rising, a Battle that cost a unit, a place changing hands, a Tech completed, Antarctica opening, the Archive finished, or Colonists lost in transit. At most two a turn, the most serious first, and every kind can be switched off.
 _Avoid_: popup, alert, notification, cutscene, interruption
 
 **Spectator**:

@@ -67,6 +67,7 @@ fn moment_from_id(name: &str) -> Option<MomentKind> {
         "battle" => Some(MomentKind::DecisiveBattle),
         "antarctica" => Some(MomentKind::Antarctica),
         "archive" => Some(MomentKind::ArchiveComplete),
+        "lost" => Some(MomentKind::LostInTransit),
         _ => None,
     }
 }
@@ -260,6 +261,38 @@ fn build_board(session: &mut Session) {
             }
             g.report.moments.clear();
             g.resolution_phase();
+        }
+        // `crowded:1` (a building aid, ticket #86): the world at +2.6 C, and seat 0's Colony Ship
+        // arrives at the Moon with eight aboard, four beyond its capacity; the turn is rerun on the
+        // game's own dice until someone dies, so `moment:lost` has a Moment to show.
+        if std::env::args().any(|a| a == "crowded:1") {
+            g.climate.temperature = 2.6;
+            let id = ShipId(g.fresh_id());
+            let built_turn = g.turn;
+            g.ships.push(Ship {
+                id,
+                kind: UnitKind::ColonyShip,
+                seat: Seat(0),
+                damage: 0,
+                at: ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 1 },
+                colonists: 8,
+                army: None,
+                stance: Stance::Hold,
+                escaped: false,
+                arrived_this_turn: false,
+                built_turn,
+            });
+            for _ in 0..40 {
+                let before = g.clone();
+                g.report.moments.clear();
+                g.resolution_phase();
+                if g.report.moments.iter().any(|m| m.kind == MomentKind::LostInTransit) {
+                    break;
+                }
+                *g = before;
+                // Advance the dice one roll and try the same turn again.
+                dying_earth_engine::combat::Dice::chance(&mut g.rng, 0.5);
+            }
         }
         // `pressed:<n>` (a building aid, ticket #75): seat 0 holds North Africa (a short card) with a
         // Standing of n there, and seat 1 stands at n too, so the card's warning line shows.

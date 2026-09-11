@@ -171,3 +171,26 @@ builder's, and the median turn 27 for the Custodians says it fires about when it
 
 No batch for this ticket: it changes four phrases and a count, seen red first in a test that founds
 twice in Antarctica and twice on the Moon and reads all four Moments.
+
+## A warming Earth fills the Colony Ships ([ticket #86](https://github.com/whaleyjoshua2/Dying-Earth/issues/86))
+
+- **crowded-report.png** — `shot:crowded crowded:1 moment:lost menus:1`. The world at **+2.6 C**
+  (the top bar), and a Custodian Colony Ship that left Earth with eight aboard, four beyond its
+  capacity, arriving at the Moon. The new Moment reads **"2 of the 4 crowded aboard the Custodians'
+  Colony Ship 20 died on the way to the Moon."** with the figure "2 lost"; the roster beside it
+  shows the ship at the Moon with six aboard.
+
+### Measured, twenty seeds each (`sweep/crowding.txt`)
+
+Read against `sweep/gates.txt`, the batch before this ticket.
+
+| Seat 0 | Wins by seat | Collapses | Colonists off Earth (median) | Colonists lost in transit over the batch, by seat |
+|---|---|---|---|---|
+| Custodians from East Asia | Custodians 1 (0) | 19/20 (20) | 18 (16) | [7, 11, 0, 0] |
+| Arkwrights from East Asia | Custodians 18 (18) | 2/20 (2) | 41 (39) | [1, 11, 0, 0] |
+
+**The crowd flies, and it costs what the rule says.** In both seatings the AIs behind on Off-world
+Presence lift the crowded load once the world passes +2.0 C, and about a Colonist a game dies for
+it, all of them Custodians' and Prospectors' (the Arkwrights and Archivists, in seats 2 and 3, lose
+none: the Arkwrights carry eight safely and are seldom behind, the Archivists seldom fly). The
+Colonists who survive show as two more off Earth at the end in each seating. Nothing else moved.

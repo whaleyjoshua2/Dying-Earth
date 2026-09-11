@@ -85,6 +85,8 @@ pub struct SimResult {
     pub doubled_module_turns: [i64; 4],
     /// Ticket #84: the turn each seat's Victory gate completed, if it did.
     pub gate_turn: [Option<u32>; 4],
+    /// Ticket #86: Colonists each seat lost in transit to crowding.
+    pub lost_in_transit: [i64; 4],
     /// Ticket #72: the Prospectors' Venture Capital Fund at the end.
     pub venture_fund_at_end: i64,
     /// Ticket #76: cards drawn over the game, and whether the deck ran dry.
@@ -365,6 +367,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         research_off_earth: Seat::ALL.map(|s| game.seat(s).research_off_earth_total),
         doubled_module_turns: Seat::ALL.map(|s| game.seat(s).doubled_module_turns),
         gate_turn,
+        lost_in_transit: Seat::ALL.map(|s| game.seat(s).lost_in_transit),
         venture_fund_at_end: Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Prospectors).map(|s| game.seat(s).venture_fund).unwrap_or(0),
         cards_drawn: game.deck.drawn.len() as u32,
         deck_empty: game.deck.cards.is_empty(),

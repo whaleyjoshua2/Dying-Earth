@@ -2263,11 +2263,21 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     ui.label(RichText::new("Load and unload").strong());
     for s in &ships {
         let card = game.tables.unit(s.kind);
-        let capacity = if s.kind == UnitKind::ColonyShip { game.colony_ship_capacity(Seat(0)) } else { card.carries_colonists };
+        // Ticket #86: at Earth a warming world crowds a Colony Ship beyond its safe capacity.
+        let safe = if s.kind == UnitKind::ColonyShip { game.colony_ship_capacity(Seat(0)) } else { card.carries_colonists };
+        let crowd = if s.kind == UnitKind::ColonyShip && body == BodyId::Earth { game.crowd_extra() } else { 0 };
+        let capacity = safe + crowd;
         if capacity == 0 && !card.carries_army {
             continue;
         }
         ui.label(format!("{} {}:", s.kind.name(), s.id.0));
+        if crowd > 0 {
+            let p = game.tables.crowding.death_chance_per_extra * 100.0;
+            ui.colored_label(
+                Color32::from_rgb(230, 170, 90),
+                format!("+{:.1} C: {safe} ride safely, up to {capacity} may board; each one beyond {safe} risks {:.0}% per extra aboard on arrival.", game.climate.temperature, p),
+            );
+        }
         if capacity > s.colonists {
             let n = capacity - s.colonists;
             match body {

@@ -852,6 +852,19 @@ struct ModulesFile {
 struct UnitsFile {
     unit: Vec<UnitCard>,
     repair: RepairCard,
+    crowding: CrowdingCard,
+}
+
+/// Ticket #86 (version 0.06.0): a warming Earth fills the Colony Ships. `per_step` Colonists
+/// beyond capacity for every full `step` degrees above `above`, at most `cap`; at arrival each
+/// extra dies with a chance of `death_chance_per_extra` times the number of extras.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CrowdingCard {
+    pub above: f64,
+    pub step: f64,
+    pub per_step: u32,
+    pub cap: u32,
+    pub death_chance_per_extra: f64,
 }
 #[derive(Debug, Clone, Deserialize)]
 struct TechsFile {
@@ -920,6 +933,8 @@ pub struct Tables {
     pub observatory: ObservatoryCard,
     pub units: Vec<UnitCard>,
     pub repair: RepairCard,
+    /// Ticket #86: the crowd a warming Earth puts aboard a Colony Ship, and what it risks.
+    pub crowding: CrowdingCard,
     pub techs: Vec<TechCard>,
     pub events: EventsTable,
     pub factions: Vec<FactionCard>,
@@ -992,6 +1007,7 @@ impl Tables {
             modules: modules.module,
             units: units.unit,
             repair: units.repair,
+            crowding: units.crowding,
             techs: techs.tech,
             events,
             factions: factions.faction,

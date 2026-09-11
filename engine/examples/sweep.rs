@@ -105,6 +105,8 @@ fn main() {
                     let mut doubled_turns: [Vec<u32>; 4] = Default::default();
                     // Ticket #84: the turn each seat's Victory gate completed, over the seeds it did.
                     let mut gate_turns: [Vec<u32>; 4] = Default::default();
+                    // Ticket #86: Colonists lost in transit to crowding, per seat, over the batch.
+                    let mut lost_in_transit = [0i64; 4];
                     // Ticket #75: seat 0's start state.
                     let mut home_lost = Vec::new();
                     for seed in 1..=seeds {
@@ -134,6 +136,7 @@ fn main() {
                             if let Some(t) = r.gate_turn[s] {
                                 gate_turns[s].push(t);
                             }
+                            lost_in_transit[s] += r.lost_in_transit[s];
                         }
                         if let Some(t) = r.first_mars_colony_turn {
                             mars_turns.push(t);
@@ -208,6 +211,7 @@ fn main() {
                             gate_turns.iter().map(|v| v.len()).collect::<Vec<_>>(),
                             gate_turns.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
                         );
+                        println!("      Crowded ships: Colonists lost in transit over the batch, by seat {lost_in_transit:?}");
                         println!(
                             "      Mars system: a Colony founded in {}/{seeds} seeds, median first turn {}; Antarctic Colonies founded {antarctic}",
                             mars_turns.len(),

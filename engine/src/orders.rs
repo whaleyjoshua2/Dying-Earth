@@ -707,7 +707,12 @@ impl Game {
                 let card = self.tables.unit(s.kind);
                 // Ticket #51: what a Colony Ship carries is a Faction figure (Steerage doubles it)
                 // and rises with Expanded Habitats; nothing else carries Colonists.
-                let capacity = if s.kind == UnitKind::ColonyShip { self.colony_ship_capacity(seat) } else { card.carries_colonists };
+                // Ticket #86: at Earth a warming world crowds a Colony Ship beyond its capacity.
+                let capacity = if s.kind == UnitKind::ColonyShip {
+                    if body == BodyId::Earth { self.colony_ship_crowded_capacity(seat) } else { self.colony_ship_capacity(seat) }
+                } else {
+                    card.carries_colonists
+                };
                 if *colonists == 0 && army.is_none() {
                     return fail("nothing to load");
                 }

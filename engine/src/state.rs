@@ -538,6 +538,9 @@ pub struct SeatState {
     /// game (the Custodians' signature), for the measurement.
     #[serde(default)]
     pub doubled_module_turns: i64,
+    /// Ticket #86 (version 0.06.0): Colonists this seat lost in transit to crowding over the game.
+    #[serde(default)]
+    pub lost_in_transit: i64,
     pub income_last_turn: Stockpile,
     /// Last Income by source (ticket #31): "Factory in Asia", the resource, the amount; upkeep as negatives.
     pub income_sources: Vec<(String, Resource, i64)>,
@@ -685,6 +688,7 @@ impl Game {
             research_total: 0,
             research_off_earth_total: 0,
             doubled_module_turns: 0,
+            lost_in_transit: 0,
             income_last_turn: Stockpile::default(),
             income_sources: Vec::new(),
             archive_fund: 0,
@@ -1048,6 +1052,25 @@ impl Game {
         let base = self.tables.unit(UnitKind::ColonyShip).carries_colonists as i64 + self.tech_addition(seat, TechId::ExpandedHabitats) + self.tech_addition(seat, TechId::GenerationShips);
         let m = self.tables.faction(self.kind(seat)).colony_ship_capacity_multiplier;
         (base.max(0) as f64 * m).floor().max(0.0) as u32
+    }
+
+    /// Ticket #86 (version 0.06.0): how many Colonists a Colony Ship at Earth may take beyond its
+    /// capacity, from the Temperature: `per_step` for every full `step` degrees above `above`, at
+    /// most `cap`; the same for every Faction.
+    pub fn crowd_extra(&self) -> u32 {
+        let c = &self.tables.crowding;
+        let over = self.climate.temperature - c.above;
+        if over <= 0.0 || c.step <= 0.0 {
+            return 0;
+        }
+        // A hair of tolerance so +2.0 reads a full step over +1.8 in floating point.
+        let steps = ((over + 1e-9) / c.step).floor() as u32;
+        (steps * c.per_step).min(c.cap)
+    }
+
+    /// Ticket #86: the capacity plus the crowd.
+    pub fn colony_ship_crowded_capacity(&self, seat: Seat) -> u32 {
+        self.colony_ship_capacity(seat) + self.crowd_extra()
     }
 
     /// The population a lift from a Launch Site takes for this many Colonists (Steerage doubles it).

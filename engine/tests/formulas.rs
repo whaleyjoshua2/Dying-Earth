@@ -5653,3 +5653,111 @@ fn the_founding_moment_names_antarctica_and_counts_in_ordinals() {
     assert_eq!(dying_earth_engine::report::ordinal(13), "13th");
     assert_eq!(dying_earth_engine::report::ordinal(22), "22nd");
 }
+
+// ---------------------------------------------------------------- 0.06.0 ticket #86: a warming Earth fills the Colony Ships
+
+/// Ticket #86: one Colonist beyond capacity for every full 0.2 C above +1.8, capped at +4, the
+/// same for every Faction; the Load order accepts up to the crowded figure and no more.
+#[test]
+fn a_warming_earth_lets_a_colony_ship_lift_beyond_its_capacity() {
+    let mut g = game();
+    calm(&mut g);
+    for (t, extra) in [(1.2, 0), (1.8, 0), (1.99, 0), (2.0, 1), (2.39, 2), (2.6, 4), (3.2, 4)] {
+        g.climate.temperature = t;
+        assert_eq!(g.crowd_extra(), extra, "at +{t}");
+    }
+    g.climate.temperature = 2.6;
+    assert_eq!(g.colony_ship_crowded_capacity(Seat(0)), 8, "4 + 4");
+    assert_eq!(g.colony_ship_crowded_capacity(Seat(2)), 12, "the Arkwrights' 8 + 4, not + 8");
+    g.state_mut(StateId::EastAsia).emigrants = 12;
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    g.ship_mut(ship).unwrap().colonists = 0;
+    let load = |n| Order::Load { ship, colonists: n, from: LoadSource::State(StateId::EastAsia), army: None };
+    assert!(g.check_order(Seat(0), &[], &load(8)).is_ok(), "the crowded load");
+    assert!(g.check_order(Seat(0), &[], &load(9)).is_err(), "and no more");
+    g.climate.temperature = 1.2;
+    assert!(g.check_order(Seat(0), &[], &load(5)).is_err(), "no crowd in a cool world");
+}
+
+/// Ticket #86: at arrival each crowded Colonist dies with a chance of 5% times the extras, once,
+/// from the game's own generator; a Report line and a Moment say so; nothing else counts them.
+/// Forty seeds of a ship with four extras (each at 20%) lose about 0.8 a flight: between 10 and
+/// 60 in all, and never more than the four extras; with no extras, nobody dies.
+#[test]
+fn crowded_colonists_may_die_on_arrival_once_and_only_the_extras() {
+    let (mut deaths, mut moments) = (0u32, 0u32);
+    for seed in 1..=40u64 {
+        let mut g = with_seed(seed);
+        calm(&mut g);
+        g.climate.temperature = 2.6;
+        let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+        g.ship_mut(ship).unwrap().colonists = 8;
+        g.ship_mut(ship).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 1 };
+        g.report.moments.clear();
+        g.resolution_phase();
+        let aboard = g.ship(ship).unwrap().colonists;
+        assert!((4..=8).contains(&aboard), "only the extras are at risk: {aboard}");
+        let lost = 8 - aboard;
+        deaths += lost;
+        assert_eq!(g.seat(Seat(0)).lost_in_transit, lost as i64);
+        let m = g.report.moments.iter().filter(|m| m.kind == MomentKind::LostInTransit).count() as u32;
+        assert_eq!(m, u32::from(lost > 0), "a Moment when and only when someone died");
+        moments += m;
+        assert!(g.state(StateId::EastAsia).unrest < 0.5, "deaths move no Unrest");
+    }
+    assert!((10..=60).contains(&deaths), "about 0.8 a flight over forty: {deaths}");
+    assert!(moments > 0);
+    let mut g = with_seed(3);
+    calm(&mut g);
+    g.climate.temperature = 2.6;
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    g.ship_mut(ship).unwrap().colonists = 4;
+    g.ship_mut(ship).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 1 };
+    g.resolution_phase();
+    assert_eq!(g.ship(ship).unwrap().colonists, 4, "a safe load loses nobody");
+}
+
+/// Ticket #86: Emigrants sent to Antarctica by sea carry no crowd and lose nobody, hot or not.
+#[test]
+fn the_sea_crossing_to_antarctica_carries_no_crowd_and_loses_nobody() {
+    let mut g = game();
+    calm(&mut g);
+    g.antarctica_open = true;
+    g.climate.temperature = 3.0;
+    g.take_control(StateId::Europe, Seat(0));
+    g.state_mut(StateId::Europe).emigrants = 8;
+    let slot = g.free_slots_on(BodyId::Earth)[0];
+    let send = Order::SendToAntarctica { state: StateId::Europe, n: 8, into: UnloadTarget::Slot(BodyId::Earth, slot) };
+    g.commit_orders(Seat(0), std::slice::from_ref(&send));
+    g.resolution_phase();
+    g.turn += 1;
+    g.resolution_phase();
+    let col = g.colonies.iter().find(|c| c.body == BodyId::Earth && !c.in_orbit).expect("founded");
+    assert_eq!(col.colonists, 8);
+    assert_eq!(g.seat(Seat(0)).lost_in_transit, 0);
+}
+
+/// Ticket #86: the AI lifts the crowded load when behind on Off-world Presence, the safe one
+/// otherwise.
+#[test]
+fn the_ai_lifts_a_crowded_load_only_when_behind_on_presence() {
+    let mut g = game();
+    calm(&mut g);
+    g.climate.temperature = 2.6;
+    g.state_mut(StateId::EastAsia).emigrants = 12;
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    g.ship_mut(ship).unwrap().colonists = 0;
+    let orders = g.ai_orders(Seat(0));
+    let lifted = orders.iter().find_map(|o| match o {
+        Order::Load { ship: s, colonists, .. } if *s == ship => Some(*colonists),
+        _ => None,
+    });
+    assert_eq!(lifted, Some(8), "behind on Presence with 0 off Earth: the crowded load: {orders:?}");
+    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
+    let orders = g.ai_orders(Seat(0));
+    let lifted = orders.iter().find_map(|o| match o {
+        Order::Load { ship: s, colonists, .. } if *s == ship => Some(*colonists),
+        _ => None,
+    });
+    assert_eq!(lifted, Some(4), "Presence met: the safe load: {orders:?}");
+}

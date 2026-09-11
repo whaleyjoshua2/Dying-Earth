@@ -162,10 +162,12 @@ pub enum MomentKind {
     TechComplete,
     Antarctica,
     ArchiveComplete,
+    /// Version 0.06.0 (ticket #86): Colonists lost to crowding on a Colony Ship's arrival.
+    LostInTransit,
 }
 
 impl MomentKind {
-    pub const ALL: [MomentKind; 7] = [
+    pub const ALL: [MomentKind; 8] = [
         MomentKind::ColonyFounded,
         MomentKind::ControlChanged,
         MomentKind::ClimateThreshold,
@@ -173,6 +175,7 @@ impl MomentKind {
         MomentKind::TechComplete,
         MomentKind::Antarctica,
         MomentKind::ArchiveComplete,
+        MomentKind::LostInTransit,
     ];
 
     /// The key its table carries in `report.toml`.
@@ -185,6 +188,7 @@ impl MomentKind {
             MomentKind::TechComplete => "tech_complete",
             MomentKind::Antarctica => "antarctica",
             MomentKind::ArchiveComplete => "archive_complete",
+            MomentKind::LostInTransit => "lost_in_transit",
         }
     }
 
@@ -198,6 +202,7 @@ impl MomentKind {
             MomentKind::TechComplete => "A Tech completed",
             MomentKind::Antarctica => "Antarctica opening",
             MomentKind::ArchiveComplete => "The Archive completed",
+            MomentKind::LostInTransit => "Colonists lost in transit",
         }
     }
 
@@ -206,6 +211,8 @@ impl MomentKind {
     pub fn rank(self) -> u8 {
         match self {
             MomentKind::ColonyFounded => 1,
+            // Ticket #86: lives lost read before a place changing hands.
+            MomentKind::LostInTransit => 2,
             MomentKind::ControlChanged => 2,
             MomentKind::ClimateThreshold | MomentKind::Antarctica => 3,
             MomentKind::DecisiveBattle => 4,
@@ -493,6 +500,7 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
 /// The arguments a Moment's `text` and `figure` may use, by kind.
 pub const MOMENT_ARGS: &[(&str, &[&str])] = &[
     ("colony_founded", &["faction", "colony", "note", "n"]),
+    ("lost_in_transit", &["faction", "ship", "body", "n", "of"]),
     ("control_changed", &["place", "faction"]),
     ("climate_threshold", &["what", "figure"]),
     ("decisive_battle", &["place", "result", "figure"]),
