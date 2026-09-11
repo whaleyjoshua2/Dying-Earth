@@ -1058,6 +1058,13 @@ impl Game {
         (base.max(0) as f64 * m).floor().max(0.0) as u32
     }
 
+    /// Ticket #89 (version 0.06.0): how much sunlight a Body gets against Earth's: the inverse
+    /// square of its mean distance from the Sun (a satellite reads its parent's).
+    pub fn sun_factor(&self, body: BodyId) -> f64 {
+        let a = self.tables.planet(body).a;
+        if a <= 0.0 { 1.0 } else { (1.0 / a).powi(2) }
+    }
+
     /// Ticket #87 (version 0.06.0): whether the seat holds a Space Station over this Body, where
     /// its Ships may refuel.
     pub fn own_station_at(&self, seat: Seat, body: BodyId) -> bool {

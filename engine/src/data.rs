@@ -166,6 +166,13 @@ pub struct ModuleCard {
     /// Version 0.04 (ticket #44): what the Module emits on Earth, as its counterpart Facility does.
     #[serde(default)]
     pub earth_emissions: f64,
+    /// Ticket #89 (version 0.06.0): only a Space Station holds it.
+    #[serde(default)]
+    pub station_only: bool,
+    /// Ticket #89: its output scales with the inverse square of its Body's mean distance from the
+    /// Sun instead of a Body yield, and a Solar Storm turn silences it.
+    #[serde(default)]
+    pub sun_scaled: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]

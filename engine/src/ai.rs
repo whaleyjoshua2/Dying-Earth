@@ -668,10 +668,17 @@ impl Game {
                 // Ticket #46: a station holds only a Shipyard and Habitats; ticket #80: and an
                 // Observatory. Ticket #81: a Habitat over Earth now houses people who count as off
                 // Earth, so the AI builds them there too.
-                if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Observatory | ModuleKind::Habitat) {
+                if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Observatory | ModuleKind::Habitat | ModuleKind::SolarArray) {
+                    continue;
+                }
+                // Ticket #89: a station-only Module stands on no ground Colony.
+                if !col.in_orbit && self.tables.module(mk).station_only {
                     continue;
                 }
                 let (cat, mut base) = match mk {
+                    // Ticket #89: a Solar Array is an Energy producer; the Energy-shortage bonus below
+                    // is what makes the AI raise one when the Stockpile is within a turn of nothing.
+                    ModuleKind::SolarArray => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                     // Ticket #80: an Observatory once the Colony holds enough Colonists to make it worth
                     // its keep (`observatory_colonists`), at the Research Lab's weight.
                     ModuleKind::Observatory => {

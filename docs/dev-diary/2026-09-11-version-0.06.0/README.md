@@ -252,3 +252,27 @@ reading of how deep the AI's Colonies go: in the Custodian seating 29 Colonies o
 hold two working Mines (most of them Antarctic, where the Mine yield is 1.75), with 3.5 Modules
 a Colony; in the Arkwright seating one, with 1.5. Whether the AI should weigh a cheap second
 build at a dug Colony is a design question, on the map with the rest of the AI's appetite.
+
+## The Solar Array ([ticket #89](https://github.com/whaleyjoshua2/Dying-Earth/issues/89))
+
+- **array-earth.png** — `shot:array array:1 turns:0 panel:0`. The ISS card, held by the
+  Custodians, with one Module: **"Solar Array: +6 Energy"**, no upkeep line because it has none;
+  the Build list below reads Habitat, Shipyard, Observatory and **Solar Array (25 Materials)**, the
+  four Modules a station holds. Over Mars the same array would read +3, over Venus +11.
+
+### Measured, twenty seeds each (`sweep/solar.txt`)
+
+Read against `sweep/in-situ.txt`.
+
+| Seat 0 | Wins by seat | Collapses | Temperature at the end (median) | Techs (median) | Solar Arrays standing at the end, over the batch |
+|---|---|---|---|---|---|
+| Custodians from East Asia | Custodians 2 (0) | 18/20 (20) | +3.06 (+3.08) | 7 (7) | **220** |
+| Arkwrights from East Asia | Custodians 20 (19) | 0/20 (1) | **+2.67** (+2.82) | 11 (15) | **98** |
+
+**The AI builds arrays freely, and the world is a little cooler for it.** Eleven and five arrays a
+game stand at the end, nearly all on stations over Earth, where the Energy-shortage bonus fires and
+an array makes six clean Energy for 25 Materials with no upkeep. Fewer Power Plants follow, the
+Arkwright seating ends fifteen hundredths cooler, and the Custodian seating collapses in eighteen
+seeds instead of twenty and wins two. Techs fell from a median 15 to 11 in the Arkwright seating,
+the Materials that built Labs going into arrays; whether an array should be cheaper than a Power
+Plant to the AI is a weight question, on the map with the rest.

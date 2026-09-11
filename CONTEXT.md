@@ -73,7 +73,7 @@ One of a fixed number of places in orbit around a Body where a Space Station can
 _Avoid_: dock, berth, orbit
 
 **Space Station**:
-A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard, Habitats and, since version 0.06.0, Observatories. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with a bare one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom); the Arkwrights start with none, and build theirs at half price. Since version 0.06.0 a station over Earth is off Earth: its Colonists count for Off-world Presence and it may hold the Archive. A station is also the one place a Ship of its Faction can refuel.
+A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard, Habitats and, since version 0.06.0, Observatories and Solar Arrays. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with a bare one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom); the Arkwrights start with none, and build theirs at half price. Since version 0.06.0 a station over Earth is off Earth: its Colonists count for Off-world Presence and it may hold the Archive. A station is also the one place a Ship of its Faction can refuel.
 
 **Tank**:
 The Fuel a Ship carries, since version 0.06.0: a figure per Ship type, filled at the Shipyard for Fuel paid at the build, spent by transits, and refilled only by a Refuel. A Ship whose Tank cannot pay any leg from where it stands, with no Space Station of its Faction there, is stranded until one is built in orbit there.
@@ -176,8 +176,12 @@ _Avoid_: antenna, transmitter, beacon
 The Module that makes Research away from Earth, since version 0.06.0: on a Colony, a Space Station or in Antarctica. It takes no Body yield; every Colonist living at its Colony adds one per cent to what it makes, and Public Science lifts it as it lifts a Research Lab. Its Research counts toward the Research Lead as a Lab's does.
 _Avoid_: lab, laboratory, research station, institute, science module
 
+**Solar Array**:
+The Module only a Space Station holds, since version 0.06.0. It makes Energy that follows the sunlight where the station is: six a turn at Earth's distance, less than half that over Mars, nearly twice it over Venus, by the inverse square of the Body's mean distance from the Sun. Efficient Grids lifts it as it lifts a Generator, a Solar Storm turn silences it, and any number may stand on one station.
+_Avoid_: solar panel, power satellite, collector
+
 **Module**:
-A building placed inside a Colony. Ten kinds since version 0.06.0: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, and the Archive, which only the Archivists raise, one to a Faction, from its own button. A Habitat holds eight Colonists since version 0.06.0.
+A building placed inside a Colony. Eleven kinds since version 0.06.0: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, the Solar Array (a Space Station's alone), and the Archive, which only the Archivists raise, one to a Faction, from its own button. A Habitat holds eight Colonists since version 0.06.0.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:

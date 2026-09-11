@@ -5915,3 +5915,68 @@ fn modules_cost_less_at_a_colony_with_working_mines() {
     let site = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Mine, ModuleKind::Mine, ModuleKind::Habitat], 4);
     assert_eq!(g.order_cost(arc, &Order::BuildArchive { colony: site }).materials, 30);
 }
+
+// ---------------------------------------------------------------- 0.06.0 ticket #89: the Solar Array
+
+/// A station of seat 0's over `body`, bare, for the tests that need one.
+fn station_at(g: &mut Game, seat: Seat, body: BodyId) -> ColonyId {
+    let id = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id, body, slot: 0, control: Control::Controlled(seat), modules: Vec::new(), colonists: 0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    id
+}
+
+/// Ticket #89: a Solar Array makes 6 Energy at Earth's distance, scaled by the inverse square of
+/// its Body's mean distance from the Sun (a satellite reads its parent's), rounded to the nearest
+/// whole: the Moon 6, Mars 6 x 0.43 = 2.6, so 3; Efficient Grids lifts it (9 and 3.9, so 4); a
+/// Solar Storm turn silences it.
+#[test]
+fn a_solar_array_scales_with_the_inverse_square_of_the_distance_from_the_sun() {
+    let mut g = game();
+    let cus = Seat(0);
+    assert!((g.sun_factor(BodyId::Earth) - 1.0).abs() < 1e-3);
+    assert!((g.sun_factor(BodyId::Moon) - 1.0).abs() < 1e-3);
+    assert!((g.sun_factor(BodyId::Mars) - 0.4307).abs() < 1e-3, "{}", g.sun_factor(BodyId::Mars));
+    assert!((g.sun_factor(BodyId::Phobos) - 0.4307).abs() < 1e-3);
+    let iss = station_of(&g, cus, BodyId::Earth).unwrap();
+    let moon = station_at(&mut g, cus, BodyId::Moon);
+    let mars = station_at(&mut g, cus, BodyId::Mars);
+    for c in [iss, moon, mars] {
+        g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::SolarArray));
+    }
+    let y = g.module_yield(cus, iss, ModuleKind::SolarArray);
+    assert_eq!((y.resource, y.amount, y.upkeep), (Some(Resource::Energy), 6, 0));
+    assert_eq!(g.module_yield(cus, moon, ModuleKind::SolarArray).amount, 6, "the Moon reads Earth's distance");
+    assert_eq!(g.module_yield(cus, mars, ModuleKind::SolarArray).amount, 3, "6 x 0.43 = 2.6, nearest 3");
+    with_tech(&mut g, TechId::EfficientGrids);
+    assert_eq!(g.module_yield(cus, iss, ModuleKind::SolarArray).amount, 9);
+    assert_eq!(g.module_yield(cus, mars, ModuleKind::SolarArray).amount, 4, "2.6 x 1.5 = 3.9, nearest 4");
+    g.last_event = Some(DrawnEvent { card: Card::Event(EventId::SolarStorm), target: EventTarget::Everyone, scale: 1.0, text: String::new() });
+    assert_eq!(g.module_yield(cus, iss, ModuleKind::SolarArray).amount, 0, "a Solar Storm turn silences it");
+}
+
+/// Ticket #89: a Solar Array stands only on a Space Station; a ground Colony refuses it.
+#[test]
+fn a_solar_array_stands_only_on_a_station() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 200;
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    let ground = colony(&mut g, Seat(0), BodyId::Moon, &[], 0);
+    assert!(g.check_order(Seat(0), &[], &Order::BuildModule { colony: iss, kind: ModuleKind::SolarArray }).is_ok());
+    let err = g.check_order(Seat(0), &[], &Order::BuildModule { colony: ground, kind: ModuleKind::SolarArray }).unwrap_err().0;
+    assert!(err.contains("station"), "{err}");
+    assert_eq!(g.tables.module(ModuleKind::SolarArray).materials, 25);
+    assert_eq!(g.tables.module(ModuleKind::SolarArray).build_turns, 2);
+}
+
+/// Ticket #89: the AI raises a Solar Array on a station of its own when Energy is within a turn's
+/// upkeep of nothing.
+#[test]
+fn the_ai_raises_a_solar_array_on_its_station_when_energy_is_tight() {
+    let mut g = game();
+    calm(&mut g);
+    g.seats[0].stockpile.materials = 200;
+    g.seats[0].stockpile.energy = 0;
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    let orders = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: ModuleKind::SolarArray } if *colony == iss)), "no Solar Array on the ISS: {orders:?}");
+}

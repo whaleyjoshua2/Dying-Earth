@@ -276,15 +276,21 @@ impl Game {
                 r *= self.tech_multiplier(seat, TechId::TheUpload);
                 y.research = r.floor() as i64;
             } else {
-                let yield_ = self.colony_yields(col).of_module(kind);
+                // Ticket #89: a sun-scaled Module (the Solar Array) reads the sunlight where its
+                // Body stands instead of a Body yield, is silenced by a Solar Storm turn, and
+                // rounds to the nearest whole.
+                let yield_ = if mc.sun_scaled { self.sun_factor(col.body) } else { self.colony_yields(col).of_module(kind) };
                 let mut v = p.amount as f64 * yield_ * fac.output_multiplier * self.tech_output_multiplier_module(seat, kind);
                 for d in &self.discoveries {
                     if d.body == col.body && d.kind == kind {
                         v *= d.multiplier;
                     }
                 }
+                if mc.sun_scaled && self.event_is(EventId::SolarStorm) {
+                    v = 0.0;
+                }
                 y.resource = Some(p.resource);
-                y.amount = v.floor() as i64;
+                y.amount = if mc.sun_scaled { v.round() as i64 } else { v.floor() as i64 };
             }
         }
         // Ticket #51: the Archive draws its Energy only once it is complete; ticket #68: that is
@@ -430,11 +436,12 @@ impl Game {
 
     fn tech_output_multiplier_module(&self, seat: Seat, kind: ModuleKind) -> f64 {
         let mut m = 1.0;
-        if kind == ModuleKind::Generator {
+        // Ticket #89: a Solar Array reads the Sun as a Generator does.
+        if matches!(kind, ModuleKind::Generator | ModuleKind::SolarArray) {
             m *= self.solar_maximum_multiplier();
         }
         match kind {
-            ModuleKind::Generator => m *= self.tech_multiplier(seat, TechId::EfficientGrids),
+            ModuleKind::Generator | ModuleKind::SolarArray => m *= self.tech_multiplier(seat, TechId::EfficientGrids),
             // Ticket #84: the Extraction Charter stacks on Deep Mining.
             ModuleKind::Mine => m *= self.tech_multiplier(seat, TechId::DeepMining) * self.tech_multiplier(seat, TechId::ExtractionCharter),
             ModuleKind::Refinery => m *= self.tech_multiplier(seat, TechId::AutomatedRefining),

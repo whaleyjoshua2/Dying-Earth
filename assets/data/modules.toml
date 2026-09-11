@@ -105,6 +105,21 @@ produces = { resource = "research", amount = 2 }
 [observatory]
 research_per_colonist = 0.01
 
+# Ticket #89 (version 0.06.0): the Solar Array, a Module only a Space Station holds
+# (`station_only`). It makes `amount` Energy at Earth's distance from the Sun, scaled by the
+# inverse square of its Body's mean distance (`sun_scaled`: Earth and the Moon x1, Mars and its
+# moons x0.43, Venus x1.91), rounded to the nearest whole; no Body yield; Efficient Grids lifts it
+# and a Solar Storm turn silences it. Any number may stand on one station.
+[[module]]
+id = "solar_array"
+name = "Solar Array"
+materials = 25
+build_turns = 2
+energy_upkeep = 0
+produces = { resource = "energy", amount = 6 }
+station_only = true
+sun_scaled = true
+
 # Ticket #88 (version 0.06.0): build it where you dig. A Module (the Archive included) built at a
 # Colony with one working Mine costs `one_mine` of its price, with two or more `two_mines`,
 # multiplicative with the Faction's own discount, rounded down, never below `floor` of the row.

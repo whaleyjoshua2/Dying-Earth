@@ -142,10 +142,13 @@ pub enum ModuleKind {
     /// Version 0.06.0 (ticket #80): the Observatory, the one Module that makes Research, on a
     /// Colony or a Space Station; each Colonist at its Colony adds one per cent.
     Observatory,
+    /// Version 0.06.0 (ticket #89): the Solar Array, a Module only a Space Station holds, making
+    /// Energy that scales with the inverse square of its Body's distance from the Sun.
+    SolarArray,
 }
 
 impl ModuleKind {
-    pub const ALL: [ModuleKind; 10] = [
+    pub const ALL: [ModuleKind; 11] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -156,9 +159,10 @@ impl ModuleKind {
         ModuleKind::Relay,
         ModuleKind::Archive,
         ModuleKind::Observatory,
+        ModuleKind::SolarArray,
     ];
     /// The Modules an ordinary build order may place (ticket #51: the Archive is not one of them).
-    pub const BUILDABLE: [ModuleKind; 9] = [
+    pub const BUILDABLE: [ModuleKind; 10] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -168,6 +172,7 @@ impl ModuleKind {
         ModuleKind::TradePost,
         ModuleKind::Relay,
         ModuleKind::Observatory,
+        ModuleKind::SolarArray,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -181,6 +186,7 @@ impl ModuleKind {
             ModuleKind::Relay => "Relay",
             ModuleKind::Archive => "The Archive",
             ModuleKind::Observatory => "Observatory",
+            ModuleKind::SolarArray => "Solar Array",
         }
     }
 }

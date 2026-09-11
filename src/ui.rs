@@ -2144,8 +2144,12 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             }
         }
         for mk in ModuleKind::BUILDABLE {
-            // Ticket #80: a station holds a Shipyard, Habitats and Observatories.
-            if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory) {
+            // Ticket #80: a station holds a Shipyard, Habitats and Observatories; ticket #89: and
+            // Solar Arrays, which stand nowhere else.
+            if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray) {
+                continue;
+            }
+            if !col.in_orbit && game.tables.module(mk).station_only {
                 continue;
             }
             let hover = game.module_yield(Seat(0), cid, mk).text();

@@ -295,6 +295,15 @@ fn build_board(session: &mut Session) {
                 dying_earth_engine::combat::Dice::chance(&mut g.rng, 0.5);
             }
         }
+        // `array:1` (a building aid, ticket #89): a Solar Array stands on seat 0's station over
+        // Earth and its card opens in the Earth picture, so the array's line and the button show.
+        if std::env::args().any(|a| a == "array:1")
+            && let Some(id) = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.id)
+        {
+            g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::SolarArray));
+            g.seats[0].stockpile.materials = 120;
+            ARCHIVE_COLONY.with(|c| c.set(Some(id)));
+        }
         // `dry:1` (a building aid, ticket #87): seat 0's Ships at Mars have one Fuel in the tank and
         // no station of theirs overhead, so the stack reads stranded and its panel says why.
         if std::env::args().any(|a| a == "dry:1") {
