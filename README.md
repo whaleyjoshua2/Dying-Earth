@@ -62,3 +62,11 @@ table stops the game with a message naming the file and the row.
 - `assets/data/` — the tables. `assets/textures/` — NASA Blue Marble, LRO Moon and USGS Viking Mars
   maps, plus the Nation State mask derived from the coastlines (`examples/prep_assets.rs` makes it).
 - `docs/` — the spec, the glossary's decisions (`docs/adr/`), agent notes and the dev diary.
+
+## Kits for other systems
+
+This machine builds only the Windows kit. The GitHub Actions workflow `release-kits` (Actions tab,
+"Run workflow", or `gh workflow run release-kits.yml --ref <branch> -f version=0.05`) builds a Linux
+kit on an Ubuntu 22.04 runner and a Windows kit, each as a downloadable artifact zip ready for
+itch.io. With a repository secret `BUTLER_API_KEY` and a variable `ITCH_TARGET` set, it also pushes
+both to itch.io.
