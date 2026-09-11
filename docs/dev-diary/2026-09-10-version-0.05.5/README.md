@@ -450,4 +450,36 @@ that. The AI's hold count is capped by what its Allotment and Ducats can buy in 
   North Africa held by the player (the aid gives it to seat 0 for a short card) with a rival's
   Standing level with the player's: the orange line **"The Prospectors stand at 40 here against
   your 40: they take it at 50. Spend here to stay ahead."** under the Unrest line. The Emigrants
-  section's **"Muster 4 Emigrants (free)"** button is in frame at the foot of the card.
+  section's **"Muster 4 Emigrants (free)"** button is in frame at the foot of the card. (Taken at a
+  margin of 10; the line reads "they take it at 60" since the second round below.)
+
+### The second round: the rule
+
+The designer chose the rule after the AI fix failed: **a Faction begins with a Standing on its start
+state equal to that state's threshold** (a claim on its home from turn 1), **the challenge margin goes
+from 10 to 20**, and **a held state counts 0.3 of a neutral one** on the AI's Influence target list
+(0.6 before), so a held place is attacked only when no neutral one is worth having.
+
+| file | figure | was | is |
+| --- | --- | --- | --- |
+| `influence.toml` | `challenge_margin` | 10 | 20 |
+| `ai.toml` | `[thresholds] held_state_weight` (new) | 0.6 in code | 0.3 |
+| the start | a Faction's Standing on its start state | 0 | the state's threshold |
+
+Two older tests moved with the rules: the ticket #33 challenger test now flips at 60 plus 20, and
+the Embassy test counts its rises from the home claim rather than from zero. The start-Standing
+test was watched red first (a margin of 10 for 20), and the AI-weight test red under a mutation of
+the weight to 1.0.
+
+| seat 0 | lost its start state | Custodian wins | Prospectors' Fund at the end | Colonists off Earth |
+| --- | --- | --- | --- | --- |
+| Prospectors in East Asia | **11/20, median turn 11** (was 20/20 at 8) | **10/20** (was 20) | **219** (was 0) | 16 |
+| Custodians from Europe | 0/20 | 12/20 (was 17) | 87 | 30 |
+| Archivists in East Asia | 20/20, median turn 22 (was 21) | 20/20 | 165 | 36 |
+
+The home holds for half the Prospector seeds now and for eleven turns where it held for seven, the
+Fund fills to a median 219 of 750, and the Custodians' wins fall by half in two seatings. The
+Archivists still lose East Asia in every seed, four turns later: a one-state Faction at Influence
+x1.0 beside a Custodian at x1.25 pouring 25 a turn in cannot hold the richest state on the board
+past turn 22 whatever it starts with. That, and the Sea Wall count back at 0 in these batches (the
+AI's Allotment now goes to holds), are the build ticket's to report.

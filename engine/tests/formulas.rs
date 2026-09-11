@@ -331,14 +331,15 @@ fn a_challenger_needs_a_standing_above_the_controllers_and_at_least_the_threshol
     g.resolution_phase();
     assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(0)), "55 is not above 60");
     // Version 0.04 (ticket #41): above the controller's standing but inside the challenge margin
-    // of 10: still no change. That is what stops a place flipping back and forth every turn.
-    g.seats[1].influence.insert(Place::State(StateId::NorthAfrica), 69);
+    // (20 since ticket #75; 10 before): still no change. That is what stops a place flipping back
+    // and forth every turn.
+    g.seats[1].influence.insert(Place::State(StateId::NorthAfrica), 79);
     g.seats[1].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
     g.seats[0].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
     g.resolution_phase();
-    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(0)), "69 is not 60 plus the margin of 10");
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(0)), "79 is not 60 plus the margin of 20");
     // The controller's standing plus the margin: it flips, and seat 0 keeps its 60 to contest it back.
-    g.seats[1].influence.insert(Place::State(StateId::NorthAfrica), 70);
+    g.seats[1].influence.insert(Place::State(StateId::NorthAfrica), 80);
     g.seats[1].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
     g.seats[0].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
     g.resolution_phase();
@@ -738,19 +739,22 @@ fn embassies_and_relays_add_to_the_allotment_and_raise_their_places_standing_eac
     // A Relay in a Colony adds 1 more.
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Relay], 4);
     assert_eq!(g.influence_allotment(Seat(0)), 23, "(10 + 4 + 5) x 1.25 = 23.75");
-    // Each Resolution the standing rises by the buildings' figures and does not decay.
+    // Each Resolution the standing rises by the buildings' figures and does not decay. Ticket #75:
+    // the start state begins at its threshold, so the rises are counted from there.
+    let claim = g.seats[0].influence[&Place::State(StateId::EastAsia)];
+    assert_eq!(claim, g.influence_threshold(Place::State(StateId::EastAsia)), "a claim on the home state from turn 1");
     g.resolution_phase();
-    assert_eq!(g.seats[0].influence[&Place::State(StateId::EastAsia)], 4, "two Embassies, 2 each");
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::EastAsia)], claim + 4, "two Embassies, 2 each");
     assert_eq!(g.seats[0].influence[&Place::Colony(c)], 2, "one Relay");
     g.resolution_phase();
-    assert_eq!(g.seats[0].influence[&Place::State(StateId::EastAsia)], 8);
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::EastAsia)], claim + 8);
     // An offline Embassy adds nothing.
     for f in g.state_mut(StateId::EastAsia).facilities.iter_mut().filter(|f| f.kind == FacilityKind::Embassy) {
         f.online = false;
     }
     assert_eq!(g.building_allotment(Seat(0)), 1, "only the Relay");
     g.resolution_phase();
-    assert_eq!(g.seats[0].influence[&Place::State(StateId::EastAsia)], 7, "no rise, and decay 1 on your own place");
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::EastAsia)], claim + 7, "no rise, and decay 1 on your own place");
     // The card says what they do.
     let y = g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Embassy);
     assert_eq!(y.text(), "+2 Influence Allotment, standing here +2 a turn, 2 Energy upkeep");
@@ -5164,4 +5168,40 @@ fn an_ai_holder_pushes_as_many_holds_as_it_takes_when_a_rival_comes_within_reach
     g.seats[0].influence.insert(Place::State(StateId::Europe), 5);
     let orders = g.ai_orders(Seat(1));
     assert_eq!(held(&orders), 0, "{orders:?}");
+}
+
+/// Ticket #75, second round: a Faction begins with a Standing on its start state equal to that
+/// state's threshold, a claim on its home from turn 1, and a challenger needs the holder's Standing
+/// plus a margin of 20 (10 from version 0.04 until now).
+#[test]
+fn a_faction_starts_with_a_standing_on_its_home_at_the_threshold_and_the_margin_is_twenty() {
+    let g = fresh();
+    assert_eq!(g.tables.influence.challenge_margin, 20, "20 since ticket #75; 10 from version 0.04");
+    for seat in Seat::ALL {
+        let home = g.controlled_states(seat)[0];
+        let standing = g.seat(seat).influence.get(&Place::State(home)).copied().unwrap_or(0);
+        assert_eq!(standing, g.influence_threshold(Place::State(home)), "{seat:?} starts with a claim on {home:?} at its threshold");
+        assert!(standing > 0);
+        let rival = seat.others()[0];
+        assert_eq!(g.influence_needed_for(rival, Place::State(home)), standing + 20, "a rival needs the holder's Standing plus 20 from turn 1");
+    }
+}
+
+/// Ticket #75, second round: a state another Faction holds counts 0.3 of a neutral one on the AI's
+/// Influence target list, so on the opening board every AI's Influence goes to neutral states.
+#[test]
+fn the_ai_spends_its_influence_on_neutral_states_while_any_are_worth_having() {
+    let mut g = fresh();
+    assert!((g.tables.ai.thresholds.held_state_weight - 0.3).abs() < 1e-9, "0.3 since ticket #75; 0.6 before");
+    for seat in Seat::ALL.into_iter().skip(1) {
+        g.seats[seat.index()].allotment = 20;
+        g.seats[seat.index()].stockpile.energy = 200;
+        let orders = g.ai_orders(seat);
+        let on_held: Vec<&Order> = orders
+            .iter()
+            .filter(|o| matches!(o, Order::Influence { target: Place::State(s), .. } if g.state(*s).control.controller().map(|c| c != seat).unwrap_or(false)))
+            .collect();
+        assert!(on_held.is_empty(), "{seat:?} spent Influence on a held state with neutral ones on the board: {on_held:?}");
+        assert!(orders.iter().any(|o| matches!(o, Order::Influence { target: Place::State(s), .. } if g.state(*s).control == Control::Neutral)), "{seat:?} spent nothing on a neutral state: {orders:?}");
+    }
 }

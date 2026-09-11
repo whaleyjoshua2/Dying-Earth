@@ -189,6 +189,10 @@ colonists = [[12, 4], [22, 12]]
 attack_odds = 0.6
 evade_damage_fraction = 0.6667
 influence_step = 5
+# Ticket #75 (version 0.05.5): what a state another Faction holds is worth on the AI's Influence
+# target list, as a share of a neutral one's worth. 0.6 until now; at 0.3 a held place is attacked
+# only when no neutral one is worth having.
+held_state_weight = 0.3
 
 # Tech picks as Research Lead (spec 16.4): `order` first, then the cheapest available that is not
 # `never`, and `last` only when nothing else is left.

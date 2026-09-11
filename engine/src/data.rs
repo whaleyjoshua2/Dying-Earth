@@ -691,6 +691,8 @@ pub struct AiThresholds {
     pub attack_odds: f64,
     pub evade_damage_fraction: f64,
     pub influence_step: i64,
+    /// Ticket #75: a held state's worth on the Influence target list, as a share of a neutral one's.
+    pub held_state_weight: f64,
 }
 
 /// Ticket #50: one pick list per Faction. `order` is tried first, then the cheapest available

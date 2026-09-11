@@ -818,6 +818,12 @@ impl Game {
         for (sid, seat) in taken.iter().zip(Seat::ALL) {
             game.take_control(*sid, seat);
             game.add_start_facility(*sid, FacilityKind::LaunchSite);
+            // Ticket #75 (version 0.05.5): a claim on its home from turn 1. The seat's Standing on its
+            // start state begins at the state's threshold, so a challenger needs the threshold plus
+            // the margin at once and the holder's spending counts from a real footing; with nothing
+            // there, a richer rival took seat 0's start state on turn 7 in every seed.
+            let claim = game.influence_threshold(Place::State(*sid));
+            game.seats[seat.index()].influence.insert(Place::State(*sid), claim);
         }
         let places: Vec<String> = Seat::ALL
             .into_iter()

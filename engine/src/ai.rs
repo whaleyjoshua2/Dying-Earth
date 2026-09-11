@@ -742,7 +742,9 @@ impl Game {
             let near = card.neighbours.iter().any(|n| my_states.contains(n));
             // Ticket #34: the state's Influence value plus its Industry Level, closest first.
             let value = (self.state_influence_value(sid) + st.industry_level as i64) as f64 + if near { 2.0 } else { 0.0 };
-            let neutral_bonus = if st.control == Control::Neutral { 1.0 } else { 0.6 };
+            // Ticket #75: a held place counts a fraction of a neutral one (0.3), so it is attacked
+            // only when no neutral one is worth having.
+            let neutral_bonus = if st.control == Control::Neutral { 1.0 } else { th.held_state_weight };
             targets.push((Place::State(sid), value * neutral_bonus));
         }
         // Ticket #50: any rival's Colony, the fewest Colonists first.
