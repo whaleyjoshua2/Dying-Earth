@@ -431,7 +431,9 @@ pub struct DucatsCard {
     pub sell_divisor: i64,
     pub per_building_material: i64,
     pub bank_per_gdp_tenth: f64,
-    pub trade_post_base: f64,
+    /// Ticket #90 (version 0.06.0): retired; kept optional so an old table still loads.
+    #[serde(default)]
+    pub trade_post_base: Option<f64>,
 }
 
 /// Ticket #55 (version 0.05): what one Break does when it fires. The figures each kind reads sit
@@ -861,12 +863,20 @@ pub struct InSituCard {
     pub floor: f64,
 }
 
+/// Ticket #90 (version 0.06.0): the Trade Post's network figure, Ducats for every other Body the
+/// Faction holds; the per-Colonist figure is the row's `produces.amount`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct TradePostCard {
+    pub per_other_body: i64,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct ModulesFile {
     module: Vec<ModuleCard>,
     archive: ArchiveCard,
     observatory: ObservatoryCard,
     in_situ: InSituCard,
+    trade_post: TradePostCard,
 }
 #[derive(Debug, Clone, Deserialize)]
 struct UnitsFile {
@@ -953,6 +963,8 @@ pub struct Tables {
     pub observatory: ObservatoryCard,
     /// Ticket #88: the discount a Colony's working Mines give its Modules.
     pub in_situ: InSituCard,
+    /// Ticket #90: the Trade Post's network figure.
+    pub trade_post: TradePostCard,
     pub units: Vec<UnitCard>,
     pub repair: RepairCard,
     /// Ticket #86: the crowd a warming Earth puts aboard a Colony Ship, and what it risks.
@@ -1027,6 +1039,7 @@ impl Tables {
             archive: modules.archive,
             observatory: modules.observatory,
             in_situ: modules.in_situ,
+            trade_post: modules.trade_post,
             modules: modules.module,
             units: units.unit,
             repair: units.repair,

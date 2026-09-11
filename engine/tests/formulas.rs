@@ -413,11 +413,13 @@ fn a_controlled_state_pays_ducats_from_gdp_times_industry_and_a_bank_adds_more()
     assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Bank).amount, 9);
     assert_eq!(g.facility_yield(Seat(0), StateId::NorthAfrica, FacilityKind::Bank).amount, 0);
     assert_eq!(income_of(&mut g, Seat(0)).ducats, 15);
-    // A Trade Post follows the Habitat yield: 3 on the Moon, 4 on Mars (3 x 1.5 rounded down).
+    // A Trade Post followed the Habitat yield; ticket #90 (version 0.06.0): it pays 2 per Colonist
+    // at its Body plus 3 per other Body held. Empty Colonies on the Moon and Mars, with Earth held:
+    // each sees two other Bodies, so 6.
     let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::TradePost], 0);
     let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::TradePost], 0);
-    assert_eq!(g.module_yield(Seat(0), moon, ModuleKind::TradePost).amount, 3);
-    assert_eq!(g.module_yield(Seat(0), mars, ModuleKind::TradePost).amount, 4);
+    assert_eq!(g.module_yield(Seat(0), moon, ModuleKind::TradePost).amount, 6);
+    assert_eq!(g.module_yield(Seat(0), mars, ModuleKind::TradePost).amount, 6);
     // Ticket #72: Ducats are not Materials output, so a Bank banks nothing in the Venture Capital
     // Fund however high the share is set.
     g.seats[1].venture_share = 0.8;
@@ -5979,4 +5981,67 @@ fn the_ai_raises_a_solar_array_on_its_station_when_energy_is_tight() {
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
     let orders = g.ai_orders(Seat(0));
     assert!(orders.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: ModuleKind::SolarArray } if *colony == iss)), "no Solar Array on the ISS: {orders:?}");
+}
+
+// ---------------------------------------------------------------- 0.06.0 ticket #90: the Trade Post pays for the shape of the empire
+
+/// Ticket #90: a Trade Post pays 2 Ducats per Colonist of its Faction at its Body (stations
+/// overhead included) plus 3 for every other Body where the Faction holds a Colony, a station or,
+/// for Earth, a Nation State; the Habitat yield is gone; the Prospectors' x1.25 applies.
+#[test]
+fn a_trade_post_pays_for_colonists_at_its_body_and_every_other_body_held() {
+    let mut g = game();
+    let cus = Seat(0);
+    let mars = colony(&mut g, cus, BodyId::Mars, &[ModuleKind::TradePost, ModuleKind::Habitat, ModuleKind::Habitat], 12);
+    // Earth counts: the Custodians direct East Asia and hold the ISS. Mars is its own Body.
+    let y = g.module_yield(cus, mars, ModuleKind::TradePost);
+    assert_eq!((y.resource, y.amount), (Some(Resource::Ducats), 2 * 12 + 3), "12 Colonists at Mars, one other Body (Earth)");
+    assert!(y.detail.as_deref().unwrap_or("").contains("2 x 12"), "{:?}", y.detail);
+    colony(&mut g, cus, BodyId::Moon, &[], 0);
+    assert_eq!(g.module_yield(cus, mars, ModuleKind::TradePost).amount, 24 + 6, "the Moon is a second other Body");
+    let over_mars = station_at(&mut g, cus, BodyId::Mars);
+    g.colony_mut(over_mars).unwrap().colonists = 3;
+    assert_eq!(g.module_yield(cus, mars, ModuleKind::TradePost).amount, 30 + 6, "three more Colonists at the Body, on the station");
+    let pro = Seat(1);
+    let theirs = colony(&mut g, pro, BodyId::Mars, &[ModuleKind::TradePost, ModuleKind::Habitat], 8);
+    assert_eq!(g.module_yield(pro, theirs, ModuleKind::TradePost).amount, ((16 + 3) as f64 * 1.25).floor() as i64, "the Prospectors' x1.25");
+}
+
+/// Ticket #90: one Trade Post per Faction per Body, on a station or on the ground.
+#[test]
+fn one_trade_post_per_faction_per_body_on_the_ground_or_in_orbit() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 300;
+    let cus = Seat(0);
+    let a = colony(&mut g, cus, BodyId::Mars, &[ModuleKind::TradePost], 0);
+    let b = colony(&mut g, cus, BodyId::Mars, &[], 0);
+    let post = |c| Order::BuildModule { colony: c, kind: ModuleKind::TradePost };
+    assert!(g.check_order(cus, &[], &post(a)).unwrap_err().0.contains("Trade Post"), "a second at the same Colony");
+    assert!(g.check_order(cus, &[], &post(b)).unwrap_err().0.contains("Trade Post"), "a second on the same Body");
+    let moon = colony(&mut g, cus, BodyId::Moon, &[], 0);
+    assert!(g.check_order(cus, &[], &post(moon)).is_ok(), "another Body");
+    let iss = station_of(&g, cus, BodyId::Earth).unwrap();
+    assert!(g.check_order(cus, &[], &post(iss)).is_ok(), "a station may hold one");
+    let pro = Seat(1);
+    g.seats[1].stockpile.materials = 300;
+    let theirs = colony(&mut g, pro, BodyId::Mars, &[], 0);
+    assert!(g.check_order(pro, &[], &post(theirs)).is_ok(), "the Prospectors' first on Mars");
+}
+
+/// Ticket #90: the AI offers a Trade Post at a Body it holds and has none on, and values it more
+/// once it holds a second Body.
+#[test]
+fn the_ai_offers_a_trade_post_at_each_body_it_holds() {
+    let mut g = game();
+    calm(&mut g);
+    g.seats[0].stockpile.materials = 300;
+    g.seats[0].stockpile.energy = 300;
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine, ModuleKind::Generator, ModuleKind::Habitat], 8);
+    g.ai_orders(Seat(0));
+    let name = g.place_name(Place::Colony(mars));
+    assert!(g.log.iter().any(|l| l.contains(&format!("build Trade Post at {name}"))), "no Trade Post offered at Mars");
+    g.colony_mut(mars).unwrap().modules.push(Module::new(ModuleKind::TradePost));
+    g.log.clear();
+    g.ai_orders(Seat(0));
+    assert!(!g.log.iter().any(|l| l.contains(&format!("build Trade Post at {name}"))), "one per Body: not offered again");
 }

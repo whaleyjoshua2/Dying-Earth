@@ -2146,7 +2146,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         for mk in ModuleKind::BUILDABLE {
             // Ticket #80: a station holds a Shipyard, Habitats and Observatories; ticket #89: and
             // Solar Arrays, which stand nowhere else.
-            if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray) {
+            if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost) {
                 continue;
             }
             if !col.in_orbit && game.tables.module(mk).station_only {

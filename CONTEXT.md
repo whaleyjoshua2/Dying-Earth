@@ -159,7 +159,7 @@ The Facility that makes Ducats in a Nation State, in proportion to the state's G
 _Avoid_: treasury, mint, exchange
 
 **Trade Post**:
-The Module that makes Ducats in a Colony, in proportion to the Body's Habitat yield: trade goes where people live.
+The Module that makes Ducats off Earth. Since version 0.06.0 trade is a network: a Trade Post pays for every Colonist of its Faction at its Body and for every other Body where the Faction holds a Colony, a Space Station or, on Earth, a Nation State, so it pays for the shape of an empire rather than its size. One per Faction per Body, on the ground or on a station.
 _Avoid_: market, exchange, shop
 
 **Embassy**:

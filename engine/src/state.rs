@@ -1065,6 +1065,25 @@ impl Game {
         if a <= 0.0 { 1.0 } else { (1.0 / a).powi(2) }
     }
 
+    /// Ticket #90 (version 0.06.0): the Bodies where the seat holds a Colony or a Space Station,
+    /// Earth counting for a station over it or any Nation State the seat directs.
+    pub fn bodies_held(&self, seat: Seat) -> Vec<BodyId> {
+        BodyId::ALL
+            .into_iter()
+            .filter(|b| {
+                self.colonies.iter().any(|c| c.body == *b && c.control.director() == Some(seat))
+                    || (*b == BodyId::Earth && !self.directed_states(seat).is_empty())
+            })
+            .collect()
+    }
+
+    /// Ticket #90: whether the seat already holds a Trade Post, standing or on order, at this Body.
+    pub fn trade_post_at_body(&self, seat: Seat, body: BodyId) -> bool {
+        self.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(seat)).any(|c| {
+            c.modules.iter().any(|m| m.kind == ModuleKind::TradePost) || c.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::TradePost))
+        })
+    }
+
     /// Ticket #87 (version 0.06.0): whether the seat holds a Space Station over this Body, where
     /// its Ships may refuel.
     pub fn own_station_at(&self, seat: Seat, body: BodyId) -> bool {

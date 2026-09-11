@@ -20,7 +20,8 @@ struct Producer {
 }
 
 /// One building's per-turn figures at today's multipliers, for the cards and the build buttons.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// (Not `Copy` since ticket #90: the detail line is a String.)
+#[derive(Debug, Clone, PartialEq)]
 pub struct Yield {
     pub resource: Option<Resource>,
     pub amount: i64,
@@ -33,6 +34,9 @@ pub struct Yield {
     /// Ticket #82 (version 0.06.0): the Facility on Earth whose mothball doubles this Module, if
     /// one does (the Custodians' signature).
     pub doubled_by: Option<&'static str>,
+    /// Ticket #90 (version 0.06.0): how the figure was reached, for the card ("2 x 12 Colonists +
+    /// 3 x 2 Bodies"), when a Module's arithmetic is worth showing.
+    pub detail: Option<String>,
 }
 
 impl Yield {
@@ -48,6 +52,10 @@ impl Yield {
         }
         if self.research > 0 {
             parts.push(format!("+{} Research", self.research));
+        }
+        // Ticket #90: the arithmetic, when a Module has one worth showing.
+        if let Some(d) = &self.detail {
+            parts.push(format!("({d})"));
         }
         // Ticket #82: the Custodians' Production Moved.
         if let Some(f) = self.doubled_by {
@@ -192,7 +200,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let card = t.state(sid);
         let fc = t.facility(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None };
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None };
         if let Some(p) = &fc.produces {
             match p.resource {
                 Resource::Research => {
@@ -257,12 +265,23 @@ impl Game {
         let t = &self.tables;
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None };
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None };
         let Some(col) = self.colony(cid) else { return y };
         // Ticket #57: the yield is the Colony Slot's own, not its Body's. The Body's figures are
         // what the slot drew from when the game started; a station in orbit keeps the Body's.
         if let Some(p) = &mc.produces {
-            if p.resource == Resource::Research {
+            if kind == ModuleKind::TradePost {
+                // Ticket #90 (version 0.06.0): trade is a network. `amount` Ducats per Colonist of
+                // the Faction at this Body, plus `per_other_body` for every other Body the Faction
+                // holds; no Body yield; the Faction's output multiplier applies.
+                let here = self.colonists_at_body(seat, col.body) as i64;
+                let others = self.bodies_held(seat).into_iter().filter(|b| *b != col.body).count() as i64;
+                let per_other = t.trade_post.per_other_body;
+                let raw = p.amount * here + per_other * others;
+                y.resource = Some(Resource::Ducats);
+                y.amount = (raw as f64 * fac.output_multiplier).floor() as i64;
+                y.detail = Some(format!("{} x {here} Colonists + {per_other} x {others} Bodies", p.amount));
+            } else if p.resource == Resource::Research {
                 // Ticket #80 (version 0.06.0): the Observatory. No Body yield and no output
                 // multiplier: its amount, plus one per cent for every Colonist at its Colony, times
                 // the Faction's Research multiplier and Public Science, rounded down, as a Lab is.
@@ -342,7 +361,7 @@ impl Game {
     /// `doubled_modules`, named for the Facility whose mothball pays for it.
     pub fn module_yield_at(&self, seat: Seat, cid: ColonyId, index: usize) -> Yield {
         let Some(kind) = self.colony(cid).and_then(|c| c.modules.get(index)).map(|m| m.kind) else {
-            return Yield { resource: None, amount: 0, research: 0, upkeep: 0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None };
+            return Yield { resource: None, amount: 0, research: 0, upkeep: 0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None };
         };
         let mut y = self.module_yield(seat, cid, kind);
         if self.doubled_modules(seat).contains(&(cid, index)) {

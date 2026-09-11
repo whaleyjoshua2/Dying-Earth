@@ -276,3 +276,27 @@ Arkwright seating ends fifteen hundredths cooler, and the Custodian seating coll
 seeds instead of twenty and wins two. Techs fell from a median 15 to 11 in the Arkwright seating,
 the Materials that built Labs going into arrays; whether an array should be cheaper than a Power
 Plant to the AI is a weight question, on the map with the rest.
+
+## The Trade Post pays for the shape of the empire ([ticket #90](https://github.com/whaleyjoshua2/Dying-Earth/issues/90))
+
+- **trade-mars.png** — `shot:trade player:custodians observatory:12 post:1 turns:0`. A Custodian
+  Colony on Mars with twelve Colonists and a Trade Post; the Custodians hold Earth (East Asia and
+  the ISS) and nothing else off it. The card reads **"Trade Post: +27 Ducats, (2 x 12 Colonists +
+  3 x 1 Bodies), 2 Energy upkeep"**, and the Build list's Trade Post button is greyed: one per
+  Faction per Body.
+
+### Measured, twenty seeds each (`sweep/trade.txt`)
+
+Read against `sweep/solar.txt`.
+
+| Seat 0 | Wins by seat | Collapses | Colonists off Earth (median) | The Fund at the end (median) | Trade Posts standing at the end, over the batch |
+|---|---|---|---|---|---|
+| Custodians from East Asia | nobody (Custodians 2) | 20/20 (18) | 16 (16) | 393 (385) | **56** |
+| Arkwrights from East Asia | Custodians 20 (20) | 0/20 (0) | 39 (39) | 196 (196) | **4** |
+
+**The AI builds Trade Posts for the first time.** Version 0.05.5 recorded that no AI had ever
+built one; with a network to pay for, 56 stand at the end over the Custodian batch (nearly three
+a game, on the Antarctic Colonies and the ISS, where a Faction holding Earth and the Moon or Mars
+earns 3 a turn per other Body before a Colonist lives there) and 4 over the Arkwright batch.
+Ducats moved little: the Fund reads 393 (385) and 196 (196). Wins and Collapses are the Solar
+Array batch's within seed noise.

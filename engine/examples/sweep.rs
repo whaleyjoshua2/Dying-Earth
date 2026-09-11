@@ -114,6 +114,8 @@ fn main() {
                     let (mut deep_colonies, mut ground_modules, mut ground_colonies) = (0u32, 0u32, 0u32);
                     // Ticket #89: Solar Arrays standing at the end over the batch.
                     let mut solar_arrays = 0u32;
+                    // Ticket #90: Trade Posts standing at the end over the batch.
+                    let mut trade_posts = 0u32;
                     // Ticket #75: seat 0's start state.
                     let mut home_lost = Vec::new();
                     for seed in 1..=seeds {
@@ -152,6 +154,7 @@ fn main() {
                         ground_modules += r.ground_modules;
                         ground_colonies += r.ground_colonies;
                         solar_arrays += r.solar_arrays;
+                        trade_posts += r.trade_posts;
                         if let Some(t) = r.first_mars_colony_turn {
                             mars_turns.push(t);
                         }
@@ -231,7 +234,7 @@ fn main() {
                             "      Build it where you dig: {deep_colonies} ground Colonies with two or more working Mines at the end over the batch; {:.1} Modules per ground Colony",
                             if ground_colonies > 0 { ground_modules as f64 / ground_colonies as f64 } else { 0.0 }
                         );
-                        println!("      Solar Arrays standing at the end over the batch: {solar_arrays}");
+                        println!("      Solar Arrays standing at the end over the batch: {solar_arrays}; Trade Posts {trade_posts}");
                         println!(
                             "      Mars system: a Colony founded in {}/{seeds} seeds, median first turn {}; Antarctic Colonies founded {antarctic}",
                             mars_turns.len(),

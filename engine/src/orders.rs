@@ -543,11 +543,18 @@ impl Game {
                 }
                 // Ticket #46: a station holds only a Shipyard and Habitats; ticket #80: and Observatories;
                 // ticket #89: and Solar Arrays, which stand nowhere else.
-                if col.in_orbit && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray) {
-                    return fail("a station holds only a Shipyard, Habitats, Observatories and Solar Arrays");
+                // Ticket #90: and a Trade Post.
+                if col.in_orbit && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost) {
+                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays and a Trade Post");
                 }
                 if !col.in_orbit && self.tables.module(*kind).station_only {
                     return fail(format!("a {} stands only on a station", kind.name()));
+                }
+                // Ticket #90: one Trade Post per Faction per Body, on the ground or in orbit.
+                if *kind == ModuleKind::TradePost
+                    && (self.trade_post_at_body(seat, col.body) || pending.iter().any(|o| o.build_module().map(|(c, k)| k == ModuleKind::TradePost && self.colony(c).map(|x| x.body == col.body).unwrap_or(false)).unwrap_or(false)))
+                {
+                    return fail(format!("you already hold a Trade Post at {}; one per Body", self.tables.body(col.body).name));
                 }
                 if matches!(kind, ModuleKind::Shipyard | ModuleKind::Barracks) {
                     let has = col.modules.iter().any(|m| m.kind == *kind)

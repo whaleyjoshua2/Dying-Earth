@@ -668,7 +668,12 @@ impl Game {
                 // Ticket #46: a station holds only a Shipyard and Habitats; ticket #80: and an
                 // Observatory. Ticket #81: a Habitat over Earth now houses people who count as off
                 // Earth, so the AI builds them there too.
-                if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Observatory | ModuleKind::Habitat | ModuleKind::SolarArray) {
+                if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Observatory | ModuleKind::Habitat | ModuleKind::SolarArray | ModuleKind::TradePost) {
+                    continue;
+                }
+                // Ticket #90: one Trade Post per Body; worth more once a second Body is held, since
+                // the network is what it pays for.
+                if mk == ModuleKind::TradePost && self.trade_post_at_body(seat, col.body) {
                     continue;
                 }
                 // Ticket #89: a station-only Module stands on no ground Colony.
@@ -691,7 +696,14 @@ impl Game {
                         // Ticket #81: at its own weight.
                         (Cat::Observatory, self.base_weight(seat, Cat::Observatory))
                     }
-                    ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery | ModuleKind::TradePost => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
+                    // Ticket #90: a Trade Post pays for the network, so it is worth half again once
+                    // the seat holds two Bodies or more.
+                    ModuleKind::TradePost => {
+                        let bodies = self.bodies_held(seat).len();
+                        let w = self.base_weight(seat, Cat::Producer) * if bodies >= 2 { 1.5 } else { 1.0 };
+                        (Cat::Producer, w)
+                    }
+                    ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                     ModuleKind::Relay => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
                     // Ticket #51: the Archive is never an ordinary Module build; it has its own order.
                     ModuleKind::Archive => continue,

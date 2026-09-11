@@ -51,14 +51,21 @@ materials = 20
 build_turns = 1
 energy_upkeep = 2
 
-# Ticket #35 (version 0.03). Makes 3 Ducats x the Body's Habitat yield.
+# Ticket #35 (version 0.03): made 3 Ducats x the Body's Habitat yield. Ticket #90 (version 0.06.0):
+# trade is a network. It makes `amount` Ducats per Colonist of its Faction at its Body (stations
+# overhead included) plus `[trade_post] per_other_body` for every other Body where the Faction
+# holds a Colony, a station or, for Earth, a Nation State; no Habitat yield; the Faction's output
+# multiplier applies. One per Faction per Body, on a station or on the ground.
 [[module]]
 id = "trade_post"
 name = "Trade Post"
 materials = 25
 build_turns = 1
 energy_upkeep = 2
-produces = { resource = "ducats", amount = 3 }
+produces = { resource = "ducats", amount = 2 }
+
+[trade_post]
+per_other_body = 3
 
 # Ticket #36 (version 0.03). Adds to its holder's Allotment and raises its Colony's standing each turn.
 [[module]]

@@ -219,7 +219,7 @@ fn build_board(session: &mut Session) {
         if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("observatory:").and_then(|v| v.parse::<u32>().ok())) {
             let slot = g.free_slots_on(BodyId::Mars).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
-            let modules = vec![
+            let mut modules = vec![
                 Module::new(ModuleKind::Habitat),
                 Module::new(ModuleKind::Habitat),
                 Module::new(ModuleKind::Habitat),
@@ -227,6 +227,10 @@ fn build_board(session: &mut Session) {
                 Module::new(ModuleKind::Mine),
                 Module::new(ModuleKind::Observatory),
             ];
+            // `post:1` (ticket #90): a Trade Post there too, so its network line can be pictured.
+            if std::env::args().any(|a| a == "post:1") {
+                modules.push(Module::new(ModuleKind::TradePost));
+            }
             g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: n, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
             g.seats[0].stockpile.materials = 120;
             g.seats[0].stockpile.energy = 60;

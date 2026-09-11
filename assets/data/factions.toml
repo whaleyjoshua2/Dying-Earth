@@ -152,4 +152,5 @@ per_energy = 1
 sell_divisor = 2
 per_building_material = 2
 bank_per_gdp_tenth = 4.0
-trade_post_base = 3.0
+# Ticket #90 (version 0.06.0): `trade_post_base` is retired; the Trade Post's figures are on
+# modules.toml (2 per Colonist at its Body, 3 per other Body held).
