@@ -39,6 +39,7 @@ jobs:
           K="dying-earth-$V-linux"
           rm -rf "$K" && mkdir -p "$K"
           cp target/release/dying-earth "$K/dying-earth"
+          strip "$K/dying-earth"
           chmod +x "$K/dying-earth"
           cp -r assets "$K/assets"
           cp docs/playtest/PLAYTEST.txt "$K/README.txt"
