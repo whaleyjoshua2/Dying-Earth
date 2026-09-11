@@ -36,7 +36,12 @@ influence_multiplier = 1.0
 # Level are not discounted.
 facility_materials_multiplier = 0.85
 module_materials_multiplier = 0.85
-signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs 15 Materials instead of 30, and every Facility and Colony Module costs them 15% less. A Strip Permit is free, once per Nation State ever: for three turns every Facility there produces double, and when it ends that state's Baseline Emissions rise by 0.2 for good and its Unrest by 3. The Venture Capital Fund: on any turn they set a share of their Factories' and Mines' Materials output, 0% to 80% in steps of 10, to be banked in the Fund; a draw from it returns nine tenths."
+# Ticket #83 (version 0.06.0): a Nation State they control pays its GDP income x1.2 (Banks and
+# Trade Posts keep the general x1.25), and the Trading window charges them 15% less for a lot of
+# Materials, Fuel or Energy or a building bought outright; Influence and selling are untouched.
+ducats_multiplier = 1.2
+market_multiplier = 0.85
+signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs 15 Materials instead of 30, and every Facility and Colony Module costs them 15% less. Their states pay a fifth more Ducats, and the Trading window sells to them at 15% off. A Strip Permit is free, once per Nation State ever: for three turns every Facility there produces double, and when it ends that state's Baseline Emissions rise by 0.2 for good and its Unrest by 3. The Venture Capital Fund: on any turn they set a share of their Factories' and Mines' Materials output, 0% to 80% in steps of 10, to be banked in the Fund; a draw from it returns nine tenths."
 # Ticket #72: the Extraction Total is retired; the first part is Materials banked in the Fund.
 victory = "750 Materials in the Venture Capital Fund, plus 12 Colonists living off Earth."
 victory_first = { kind = "venture_fund", bar = 750 }
@@ -64,12 +69,15 @@ lift_population_multiplier = 2.0
 # Ticket #73 (version 0.05.5): Steerage musters eight Emigrants a turn where everyone else musters
 # four, at the doubled population above.
 emigrants_multiplier = 2.0
-colony_ship_materials = 20
+# Ticket #83 (version 0.06.0): the 20-Materials Colony Ship is retired for the common 30, and
+# every Ship costs them 15% less, rounded down: Colony Ship 25, Frigate 21, Carrier 25,
+# Battleship 42.
+ship_materials_multiplier = 0.85
 # Ticket #51: they start with no station, so a Space Station costs them half and a Colony Module
 # three quarters (both rounded down).
 station_materials_multiplier = 0.5
 module_materials_multiplier = 0.75
-signature = "Steerage: a Colony Ship carries 8 Colonists (12 with Expanded Habitats) and costs 20 Materials, and they muster 8 Emigrants a turn where others muster 4, but every Emigrant takes twice the population. Their Habitats hold half again as many (12, 15 with Expanded Habitats), a transit burns three quarters of the Fuel, and, starting with no station, a Space Station costs them 20 Materials and a Colony Module three quarters."
+signature = "Steerage: a Colony Ship carries 8 Colonists (12 with Expanded Habitats), every Ship costs them 15% less (a Colony Ship 25 Materials), and they muster 8 Emigrants a turn where others muster 4, but every Emigrant takes twice the population. Their Habitats hold half again as many (12, 15 with Expanded Habitats), a transit burns three quarters of the Fuel, and, starting with no station, a Space Station costs them 20 Materials and a Colony Module three quarters."
 victory = "Diaspora: 30 Colonists living off Earth, on Colonies spread over at least three Bodies with at least 4 Colonists each (Antarctica and stations over Earth do not count)."
 victory_first = { kind = "colonists_off_earth", bar = 30 }
 victory_second = { kind = "colonies_on_bodies", bodies = 3, colonists_each = 4 }

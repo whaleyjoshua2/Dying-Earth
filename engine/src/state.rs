@@ -1074,13 +1074,16 @@ impl Game {
         (base * self.tables.faction(self.kind(seat)).station_materials_multiplier).floor() as i64
     }
 
-    /// What a Ship costs this seat: the units.toml figure, or the Faction's own Colony Ship price.
+    /// What a Ship costs this seat: the units.toml figure, or the Faction's own Colony Ship price;
+    /// ticket #83 (version 0.06.0): times the Faction's Ship multiplier, rounded down (the
+    /// Arkwrights' 0.85).
     pub fn ship_materials(&self, seat: Seat, kind: UnitKind) -> i64 {
         let card = self.tables.faction(self.kind(seat));
-        match (kind, card.colony_ship_materials) {
+        let base = match (kind, card.colony_ship_materials) {
             (UnitKind::ColonyShip, Some(m)) => m,
             _ => self.tables.unit(kind).materials,
-        }
+        };
+        (base as f64 * card.ship_materials_multiplier).floor() as i64
     }
 
     /// Which seat an Army fights for, if any: it follows its home (spec 8.4).

@@ -439,8 +439,11 @@ impl Game {
     }
 
     /// A controlled state's base Ducats a turn (ticket #35): gdp x Industry Level / 10, rounded down.
+    /// Ticket #83 (version 0.06.0): times its controller's `ducats_multiplier` (the Prospectors' 1.2).
     pub fn state_ducats(&self, sid: StateId) -> i64 {
-        (self.tables.state(sid).gdp * self.state(sid).industry_level as i64) / 10
+        let base = (self.tables.state(sid).gdp * self.state(sid).industry_level as i64) / 10;
+        let m = self.state(sid).control.controller().map(|s| self.tables.faction(self.kind(s)).ducats_multiplier).unwrap_or(1.0);
+        (base as f64 * m).floor() as i64
     }
 
     /// Upkeep of every Ship and non-standing Army of a seat; always paid first (spec 7.2).

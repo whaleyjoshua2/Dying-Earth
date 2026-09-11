@@ -657,6 +657,16 @@ fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut
         if let Some(m) = card.colony_ship_materials {
             extras.push(format!("a Colony Ship {m} Materials"));
         }
+        // Ticket #83: the Arkwrights' Ships, the Prospectors' Ducats and market.
+        if card.ship_materials_multiplier != 1.0 {
+            extras.push(format!("every Ship x{} Materials", card.ship_materials_multiplier));
+        }
+        if card.ducats_multiplier != 1.0 {
+            extras.push(format!("a state's Ducats x{}", card.ducats_multiplier));
+        }
+        if card.market_multiplier != 1.0 {
+            extras.push(format!("the Trading window's prices x{}", card.market_multiplier));
+        }
         if card.station_materials_multiplier != 1.0 {
             extras.push(format!("a Space Station x{} Materials", card.station_materials_multiplier));
         }
@@ -2369,7 +2379,11 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             };
             ui.label(name);
             let sells = matches!(res, Some(dying_earth_engine::Resource::Materials) | Some(dying_earth_engine::Resource::Fuel));
-            ui.label(if sells { format!("{per} Ducats each; sells for {:.1}", per as f64 / game.tables.ducats.sell_divisor.max(1) as f64) } else { format!("{per} Ducats each") });
+            // Ticket #83: the Prospectors' 15% off is taken over the lot, so the button's figure is
+            // the price; the line says so.
+            let off = game.tables.faction(game.kind(Seat(0))).market_multiplier;
+            let discount = if res.is_some() && off != 1.0 { format!(" (x{off} for you, over the lot)") } else { String::new() };
+            ui.label(if sells { format!("{per} Ducats each; sells for {:.1}{discount}", per as f64 / game.tables.ducats.sell_divisor.max(1) as f64) } else { format!("{per} Ducats each{discount}") });
             ui.add(egui::DragValue::new(&mut view.trade_amounts[i]).range(1..=999).speed(1.0));
             let n = view.trade_amounts[i].max(1);
             let buy = match res {

@@ -402,9 +402,10 @@ fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction
 #[test]
 fn a_controlled_state_pays_ducats_from_gdp_times_industry_and_a_bank_adds_more() {
     let mut g = game();
-    // Ticket #53: East Asia gdp 23 x Industry 3 / 10 = 6 a turn; Europe 20 x 3 / 10 = 6.
+    // Ticket #53: East Asia gdp 23 x Industry 3 / 10 = 6 a turn; Europe 20 x 3 / 10 = 6, and
+    // ticket #83 (version 0.06.0): x1.2 for the Prospectors who hold it, 7.
     assert_eq!(g.state_ducats(StateId::EastAsia), 6);
-    assert_eq!(g.state_ducats(StateId::Europe), 6);
+    assert_eq!(g.state_ducats(StateId::Europe), 7);
     let paid = income_of(&mut g, Seat(0));
     assert_eq!(paid.ducats, 6);
     // A Bank in East Asia adds 4 x 23 / 10 = 9; in North Africa (gdp 1) it would add nothing.
@@ -1781,10 +1782,11 @@ fn steerage_doubles_an_arkwright_colony_ships_load_and_cuts_its_price() {
     g.research.done.push(TechId::ExpandedHabitats);
     assert_eq!(g.colony_ship_capacity(Seat(0)), 6);
     assert_eq!(g.colony_ship_capacity(Seat(2)), 12, "(4 + 2) doubled");
-    // Price: 30 Materials on the units.toml row, 20 on the Arkwrights' card.
+    // Price: 30 Materials on the units.toml row; ticket #83 (version 0.06.0): the Arkwrights' 20
+    // is retired and every Ship costs them 15% less, so 25.
     let build = Order::BuildShip { site: Place::State(StateId::EastAsia), kind: UnitKind::ColonyShip };
     assert_eq!(g.order_cost(Seat(0), &build).materials, 30);
-    assert_eq!(g.order_cost(Seat(2), &build).materials, 20);
+    assert_eq!(g.order_cost(Seat(2), &build).materials, 25);
     // And the Load order holds them to it.
     let sid = g.controlled_states(Seat(2))[0];
     // Ticket #53: a lift of twelve costs an Arkwright state 2.4 population, more than some of the
@@ -4873,10 +4875,11 @@ fn the_prospectors_pay_fifteen_percent_less_for_facilities_and_modules_and_nothi
     g.take_control(StateId::Europe, pro);
     assert_eq!(g.order_cost(pro, &Order::BuildFacility { state: StateId::Europe, kind: FacilityKind::Factory }).materials, 17, "20 x 0.85 rounded down");
     assert_eq!(g.order_cost(cus, &Order::BuildFacility { state: StateId::EastAsia, kind: FacilityKind::Factory }).materials, 20, "everyone else pays the row");
-    assert_eq!(g.order_cost(pro, &Order::BuildFacilityWithDucats { state: StateId::Europe, kind: FacilityKind::Factory }).ducats, 34, "the Ducat price follows: 17 x 2");
+    // Ticket #83 (version 0.06.0): the Ducat price then takes their 15% off the market too.
+    assert_eq!(g.order_cost(pro, &Order::BuildFacilityWithDucats { state: StateId::Europe, kind: FacilityKind::Factory }).ducats, 28, "the Ducat price follows: 17 x 2 = 34, x 0.85 = 28.9");
     let moon = colony(&mut g, pro, BodyId::Moon, &[], 0);
     assert_eq!(g.order_cost(pro, &Order::BuildModule { colony: moon, kind: ModuleKind::Habitat }).materials, 21, "25 x 0.85 rounded down");
-    assert_eq!(g.order_cost(pro, &Order::BuildModuleWithDucats { colony: moon, kind: ModuleKind::Habitat }).ducats, 42);
+    assert_eq!(g.order_cost(pro, &Order::BuildModuleWithDucats { colony: moon, kind: ModuleKind::Habitat }).ducats, 35, "21 x 2 = 42, x 0.85 = 35.7");
     assert_eq!(g.order_cost(pro, &Order::BuildStation { body: BodyId::Moon, slot: 0 }).materials, 40, "a Space Station is not a building of theirs to discount");
     assert_eq!(g.order_cost(pro, &Order::RaiseIndustry { state: StateId::Europe }).materials, 15, "Cheap Industry is its own clause");
 }
@@ -5459,4 +5462,55 @@ fn the_custodian_ai_idles_a_factory_a_phobos_mine_outproduces_and_keeps_it_idle(
         !orders.iter().any(|o| matches!(o, Order::Change { building: BuildingRef::Facility(StateId::EastAsia, j), what: BuildingChange::Restart } if *j == i)),
         "the doubling stands, so no restart: {orders:?}"
     );
+}
+
+// ---------------------------------------------------------------- 0.06.0 ticket #83: the Prospectors' Ducats and market; the Arkwrights' Ships
+
+/// Ticket #83: a Nation State the Prospectors control pays its GDP income x1.2, rounded down;
+/// everyone else's is unchanged, and so are Banks and Trade Posts (they keep the general x1.25).
+#[test]
+fn the_prospectors_states_pay_their_ducats_at_one_point_two() {
+    let mut g = game();
+    let pro = Seat(1);
+    assert_eq!(g.kind(pro), FactionKind::Prospectors);
+    let sid = StateId::NorthAmerica;
+    g.state_mut(sid).industry_level = 10;
+    let gdp = g.tables.state(sid).gdp;
+    g.state_mut(sid).control = Control::Controlled(Seat(0));
+    assert_eq!(g.state_ducats(sid), gdp, "the Custodians: gdp x 10 / 10");
+    g.state_mut(sid).control = Control::Controlled(pro);
+    assert_eq!(g.state_ducats(sid), (gdp as f64 * 1.2).floor() as i64, "the Prospectors: x1.2");
+}
+
+/// Ticket #83: the Prospectors buy Materials, Fuel, Energy and outright buildings at 15% off,
+/// rounded down over the lot; Influence and selling are untouched; nobody else gets it.
+#[test]
+fn the_prospectors_buy_at_fifteen_per_cent_off() {
+    let g = game();
+    let (cus, pro) = (Seat(0), Seat(1));
+    let buy = |r, n| Order::Buy { resource: r, amount: n };
+    assert_eq!(g.order_cost(cus, &buy(Resource::Materials, 10)).ducats, 20);
+    assert_eq!(g.order_cost(pro, &buy(Resource::Materials, 10)).ducats, 17, "20 x 0.85");
+    assert_eq!(g.order_cost(pro, &buy(Resource::Fuel, 5)).ducats, 12, "15 x 0.85 = 12.75");
+    assert_eq!(g.order_cost(pro, &buy(Resource::Energy, 10)).ducats, 8, "10 x 0.85");
+    assert_eq!(g.order_cost(pro, &Order::BuyInfluence { amount: 5 }).ducats, 10, "Influence is not a commodity");
+    assert_eq!(g.order_cost(pro, &Order::Sell { resource: Resource::Materials, amount: 10 }).ducats, -10, "selling unchanged");
+    let sid = g.controlled_states(pro)[0];
+    let outright = Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::Factory };
+    assert_eq!(g.order_cost(pro, &outright).ducats, 28, "17 Materials x 2 = 34, x 0.85 = 28.9");
+}
+
+/// Ticket #83: the Arkwrights' Ships cost 15% less, rounded down, the Colony Ship from the common
+/// 30 (their 20 retired): 25, 21, 25, 42; everyone else pays the card.
+#[test]
+fn the_arkwrights_ships_cost_fifteen_per_cent_less() {
+    let g = game();
+    let ark = Seat(2);
+    assert_eq!(g.kind(ark), FactionKind::Arkwrights);
+    assert_eq!(g.ship_materials(ark, UnitKind::ColonyShip), 25);
+    assert_eq!(g.ship_materials(ark, UnitKind::Frigate), 21);
+    assert_eq!(g.ship_materials(ark, UnitKind::Carrier), 25);
+    assert_eq!(g.ship_materials(ark, UnitKind::Battleship), 42);
+    assert_eq!(g.ship_materials(Seat(0), UnitKind::ColonyShip), 30);
+    assert_eq!(g.ship_materials(Seat(0), UnitKind::Battleship), 50);
 }

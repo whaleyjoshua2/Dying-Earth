@@ -97,3 +97,34 @@ undoubled Module off Earth outproduces it, and its Colonies seldom hold one that
 Factory in a Materials-leaning state makes 6, a Moon Mine 6, a Mars Mine 5; only Phobos (7) or
 Deep Mining tips it, and the AI reaches neither in time. The rule works on the player's side, as
 the picture shows; on the AI's it is a rule in waiting.
+
+## The Prospectors' Ducats and market; the Arkwrights' Ships ([ticket #83](https://github.com/whaleyjoshua2/Dying-Earth/issues/83))
+
+- **cards-factions.png** — `shot:cards player:prospectors turns:0`. The Faction choice screen. The
+  Prospectors' multipliers now read **"a state's Ducats x1.2; the Trading window's prices x0.85"**
+  and their signature ends "Their states pay a fifth more Ducats, and the Trading window sells to
+  them at 15% off." The Arkwrights' read **"every Ship x0.85 Materials"** and their signature says
+  "every Ship costs them 15% less (a Colony Ship 25 Materials)" where it said 20.
+
+### Measured, twenty seeds each (`sweep/prospectors-arkwrights.txt`)
+
+The two seatings this ticket touches, read against the 0.05.5 balance report (the same seeds and
+cell), so the figures carry every 0.06.0 ticket built so far, not this one alone.
+
+| Seat 0 | Wins by seat | Collapses | Seat 0 lost its home | The Fund at the end (median) | Colonists off Earth (median) | Scrubbers |
+|---|---|---|---|---|---|---|
+| Prospectors from East Asia | Custodians 2 (11 in 0.05.5) | 18/20 (9) | 3/20 (11) | **437** (165) | 12 (16) | 109 (344) |
+| Arkwrights from East Asia | Custodians 18 (19) | 2/20 (0) | 20/20 (20) | 176 (160) | 36 (50) | 425 (572) |
+
+**The Prospectors keep their home and fill the Fund; nobody wins.** From East Asia they lose the
+state in 3 seeds where they lost it in 11, and the Fund ends at a median 437 where it ended at 165,
+its best figure yet; but 750 is not reached in any seed, and the seating now collapses in 18 of 20
+where it collapsed in 9, because the Custodian AI beside them builds 109 Scrubbers where it built
+344. That is the Influence 1.2 story of the Custodians' ticket seen from the other chair: the
+Custodians hold fewer states, the Prospectors keep theirs, and the world burns sooner.
+
+**The Arkwrights' cheaper Ships did not move their Colonists.** From East Asia they end with 36
+Colonists off Earth, all seats, where 0.05.5 had 50; they lose East Asia in every seed at turn 23
+as before, and the Custodians beside them still win 18. What a cheaper Ship buys them is spent on
+the same shipping schedule; the bar that stops Diaspora is the three Bodies with four each, which
+the Venus and tank tickets will change more than a price does.

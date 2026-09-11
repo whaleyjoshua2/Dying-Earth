@@ -228,7 +228,8 @@ impl Game {
             // A purchase is a negative cost in the resource bought, so `remaining` and `commit_orders`
             // add it without a special case; a sale is the mirror, with a negative Ducat cost.
             Order::Buy { resource, amount } => {
-                let ducats = self.trade_price(*resource).unwrap_or(0) * *amount;
+                // Ticket #83: the lot's price, times the seat's market multiplier, rounded down.
+                let ducats = self.market_price(seat, self.trade_price(*resource).unwrap_or(0) * *amount);
                 match resource {
                     Resource::Materials => Cost { materials: -*amount, ducats, ..Default::default() },
                     Resource::Fuel => Cost { fuel: -*amount, ducats, ..Default::default() },
@@ -244,9 +245,9 @@ impl Game {
                     _ => Cost::default(),
                 }
             }
-            Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: self.facility_materials(seat, *kind) * t.ducats.per_building_material, ..Default::default() },
+            Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: self.market_price(seat, self.facility_materials(seat, *kind) * t.ducats.per_building_material), ..Default::default() },
             Order::BuildStation { .. } => Cost { materials: self.station_materials(seat), ..Default::default() },
-            Order::BuildModuleWithDucats { kind, .. } => Cost { ducats: self.module_materials(seat, *kind) * t.ducats.per_building_material, ..Default::default() },
+            Order::BuildModuleWithDucats { kind, .. } => Cost { ducats: self.market_price(seat, self.module_materials(seat, *kind) * t.ducats.per_building_material), ..Default::default() },
             // Ticket #68: the Archive Module costs its row's Materials; the Research comes after.
             Order::BuildArchive { .. } => Cost { materials: t.module(ModuleKind::Archive).materials, ..Default::default() },
             // Ticket #52: Relief and Resettle are paid in Ducats.
@@ -267,6 +268,12 @@ impl Game {
             Resource::Energy => Some(d.per_energy),
             _ => None,
         }
+    }
+
+    /// Ticket #83 (version 0.06.0): what the window charges this seat for a lot priced at `ducats`:
+    /// times the Faction's market multiplier (the Prospectors' 0.85), rounded down.
+    pub fn market_price(&self, seat: Seat, ducats: i64) -> i64 {
+        (ducats as f64 * self.tables.faction(self.kind(seat)).market_multiplier).floor() as i64
     }
 
     /// Ticket #42: what the window pays for a lot, or None for what it does not buy back.

@@ -296,6 +296,19 @@ pub struct FactionCard {
     /// Steerage: what a Colony Ship costs, in place of the units.toml figure.
     #[serde(default)]
     pub colony_ship_materials: Option<i64>,
+    /// Ticket #83 (version 0.06.0): every Ship's Materials, times this, rounded down (the
+    /// Arkwrights' 0.85).
+    #[serde(default = "one_f64")]
+    pub ship_materials_multiplier: f64,
+    /// Ticket #83: a controlled Nation State's own GDP income, times this, rounded down (the
+    /// Prospectors' 1.2). Banks and Trade Posts take the general output multiplier instead.
+    #[serde(default = "one_f64")]
+    pub ducats_multiplier: f64,
+    /// Ticket #83: what the Trading window charges this Faction for a lot of Materials, Fuel or
+    /// Energy, or a building bought outright, times this, rounded down (the Prospectors' 0.85).
+    /// Influence and selling are untouched.
+    #[serde(default = "one_f64")]
+    pub market_multiplier: f64,
     /// A Space Station's Materials, times this.
     #[serde(default = "one_f64")]
     pub station_materials_multiplier: f64,
