@@ -65,3 +65,35 @@ is the designer's, and is on the map.
 Archivists' at 12), the Custodian AI in seat 1 building most of them (7); Research made off Earth
 still reads a median 0 a game for every seat, so most seeds see none. Everything else moved within
 seed noise: the Custodians' wins 5 to 3 and 20 to 18, Techs 9 to 7 and 13 to 13.
+
+## The Custodians' card ([ticket #82](https://github.com/whaleyjoshua2/Dying-Earth/issues/82))
+
+- **moved-mars.png** — `shot:moved player:custodians turns:0 observatory:16 idle:1`. A Custodian
+  Colony on Mars with a Factory and a Research Lab standing mothballed in East Asia. The card reads
+  **"Mine: +10 Materials, doubled by an idle Factory on Earth"** and **"Observatory: +4 Research,
+  doubled by an idle Research Lab on Earth"**, and the top bar's Allotment reads **16 of 16**:
+  (10 + 4) x 1.2, where 1.25 gave 17.
+
+### Measured, twenty seeds each (`sweep/custodians.txt`)
+
+The same two seatings as the two tickets before, read against `sweep/archivists.txt`.
+
+| Seat 0 | Wins by seat | Collapses | Scrubbers | Techs (median) | Production Moved (median doubled Module-turns a game) |
+|---|---|---|---|---|---|
+| Custodians from East Asia | **nobody** (Custodians 3 before) | **20/20** (17) | **94** (173) | 7 | 0 for every seat |
+| Archivists from East Asia | Custodians 15, Arkwrights 4 (18 and 1) | 1/20 (1) | 496 (539) | 13 | 0 for every seat |
+
+**Influence 1.2 is the whole of the move, and it is not small.** Seed 3's log shows the new
+mothball rule never taken (no "would double" order, no doubled Income line), so the doubling
+cannot be what moved the Custodian seating. The other change is the Influence multiplier, so the
+seating was rerun once with 1.25 put back and everything else kept: **Scrubbers 185, Collapses
+17, Custodian wins 3**, the previous batch's figures. The five hundredths cost the Custodians in
+East Asia every win in twenty seeds and half their Scrubbers; East Asia's Allotment falls from 17
+to 16, and the AI's Influence game turns on those steps. Read against the Observatory batch, this
+seat has gone 5, 3, 0 wins across the three tickets so far.
+
+**Production Moved never fires in AI play.** The Custodian AI idles a Facility only when an
+undoubled Module off Earth outproduces it, and its Colonies seldom hold one that does: an Earth
+Factory in a Materials-leaning state makes 6, a Moon Mine 6, a Mars Mine 5; only Phobos (7) or
+Deep Mining tips it, and the AI reaches neither in time. The rule works on the player's side, as
+the picture shows; on the AI's it is a rule in waiting.

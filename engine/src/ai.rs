@@ -988,9 +988,64 @@ impl Game {
                     );
                 }
             }
+            // Ticket #82 (version 0.06.0): Production Moved. The Custodian AI idles a Facility once
+            // an undoubled Module of its pair off Earth outproduces it, so the trade never loses,
+            // and keeps a Facility idle while its doubling stands.
+            let pairs = &self.tables.faction(kind).mothball_pairs;
+            let doubled = self.doubled_modules(seat);
+            let mut in_use: Vec<FacilityKind> = Vec::new();
+            for (fk, mk) in pairs {
+                let idle = self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| f.kind == *fk && f.mothballed).count();
+                let paired = doubled.iter().filter(|(cid, i)| self.colony(*cid).and_then(|c| c.modules.get(*i)).map(|m| m.kind == *mk).unwrap_or(false)).count();
+                if idle > 0 && paired >= idle {
+                    in_use.push(*fk);
+                }
+                let mut best_undoubled: Option<i64> = None;
+                for cid in self.directed_colonies(seat) {
+                    let col = self.colony(cid).unwrap();
+                    if !self.off_earth(col) {
+                        continue;
+                    }
+                    for (i, md) in col.modules.iter().enumerate() {
+                        if md.kind == *mk && !md.mothballed && !doubled.contains(&(cid, i)) {
+                            let y = self.module_yield_at(seat, cid, i);
+                            let out = y.amount.max(y.research);
+                            best_undoubled = Some(best_undoubled.map_or(out, |b| b.max(out)));
+                        }
+                    }
+                }
+                let Some(best) = best_undoubled else { continue };
+                for sid in self.directed_states(seat) {
+                    for (i, f) in self.state(sid).facilities.iter().enumerate() {
+                        if f.kind != *fk || f.mothballed {
+                            continue;
+                        }
+                        let y = self.facility_yield(seat, sid, f.kind);
+                        let out = y.amount.max(y.research);
+                        if out < best {
+                            push(
+                                vec![Order::Change { building: BuildingRef::Facility(sid, i), what: BuildingChange::Mothball }],
+                                Cat::Mothball,
+                                self.base_weight(seat, Cat::Mothball),
+                                1.0,
+                                1.0,
+                                m.opportunity,
+                                format!("mothball the {} in {} (a {} off Earth making {} would double)", f.kind.name(), self.tables.state(sid).name, mk.name(), best),
+                                None,
+                            );
+                        }
+                    }
+                }
+            }
             // Restart once Energy is back above two turns of upkeep; otherwise scrap it for half.
             let restart_ok = self.seat(seat).stockpile.energy > 2 * self.total_upkeep(seat);
             for (b, name, mothballed, _, _) in standing.iter().filter(|(_, _, moth, _, _)| *moth) {
+                // Ticket #82: not a Facility whose idleness is doubling a Module off Earth.
+                if let BuildingRef::Facility(sid, i) = b
+                    && self.state(*sid).facilities.get(*i).map(|f| in_use.contains(&f.kind)).unwrap_or(false)
+                {
+                    continue;
+                }
                 if restart_ok {
                     push(
                         vec![Order::Change { building: *b, what: BuildingChange::Restart }],

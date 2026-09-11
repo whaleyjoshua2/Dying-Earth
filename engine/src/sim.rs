@@ -81,6 +81,8 @@ pub struct SimResult {
     /// each seat's Observatories made away from Earth over the game.
     pub observatories: [u32; 4],
     pub research_off_earth: [i64; 4],
+    /// Ticket #82 (version 0.06.0): Module-turns doubled by an idle Facility on Earth, per seat.
+    pub doubled_module_turns: [i64; 4],
     /// Ticket #72: the Prospectors' Venture Capital Fund at the end.
     pub venture_fund_at_end: i64,
     /// Ticket #76: cards drawn over the game, and whether the deck ran dry.
@@ -349,6 +351,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
             game.directed_colonies(s).iter().map(|c| game.colony(*c).unwrap().modules.iter().filter(|m| m.kind == ModuleKind::Observatory).count() as u32).sum::<u32>()
         }),
         research_off_earth: Seat::ALL.map(|s| game.seat(s).research_off_earth_total),
+        doubled_module_turns: Seat::ALL.map(|s| game.seat(s).doubled_module_turns),
         venture_fund_at_end: Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Prospectors).map(|s| game.seat(s).venture_fund).unwrap_or(0),
         cards_drawn: game.deck.drawn.len() as u32,
         deck_empty: game.deck.cards.is_empty(),

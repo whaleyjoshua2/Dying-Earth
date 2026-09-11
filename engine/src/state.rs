@@ -534,6 +534,10 @@ pub struct SeatState {
     /// not at Earth (Antarctica and a station over Earth are on Earth), for the measurement.
     #[serde(default)]
     pub research_off_earth_total: i64,
+    /// Ticket #82 (version 0.06.0): Module-turns doubled by a mothballed Facility on Earth over the
+    /// game (the Custodians' signature), for the measurement.
+    #[serde(default)]
+    pub doubled_module_turns: i64,
     pub income_last_turn: Stockpile,
     /// Last Income by source (ticket #31): "Factory in Asia", the resource, the amount; upkeep as negatives.
     pub income_sources: Vec<(String, Resource, i64)>,
@@ -680,6 +684,7 @@ impl Game {
             research_last_turn: 0,
             research_total: 0,
             research_off_earth_total: 0,
+            doubled_module_turns: 0,
             income_last_turn: Stockpile::default(),
             income_sources: Vec::new(),
             archive_fund: 0,

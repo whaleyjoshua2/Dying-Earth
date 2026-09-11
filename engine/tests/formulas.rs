@@ -380,10 +380,11 @@ fn occupation_transfer_keeps_the_old_controllers_standing() {
 #[test]
 fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction_multiplier() {
     let mut g = game();
-    // Ticket #54 (g): the Custodians' multiplier is 1.25, not 1.3. They hold East Asia (4):
-    // (10 + 4) x 1.25 = 17.5 -> 17. Europe is still 5, and the Prospectors are still x1.0.
-    assert_eq!(g.tables.faction(FactionKind::Custodians).influence_multiplier, 1.25);
-    assert_eq!(g.influence_allotment(Seat(0)), 17);
+    // Ticket #54 (g): the Custodians' multiplier is 1.25, not 1.3; ticket #82 (version 0.06.0):
+    // 1.2. They hold East Asia (4): (10 + 4) x 1.2 = 16.8 -> 16. Europe is still 5, and the
+    // Prospectors are still x1.0.
+    assert_eq!(g.tables.faction(FactionKind::Custodians).influence_multiplier, 1.2);
+    assert_eq!(g.influence_allotment(Seat(0)), 16);
     assert_eq!(g.influence_allotment(Seat(1)), 15);
     g.state_mut(StateId::NorthAmerica).control = Control::Controlled(Seat(1));
     assert_eq!(g.influence_allotment(Seat(1)), 22, "North America adds 7");
@@ -729,16 +730,16 @@ fn selling_materials_or_fuel_returns_half_the_buying_price() {
 #[test]
 fn embassies_and_relays_add_to_the_allotment_and_raise_their_places_standing_each_turn() {
     let mut g = game();
-    // Ticket #54: the Custodians' multiplier is 1.25. In East Asia: (10 + 4) x 1.25 = 17. Two
-    // Embassies (they stack) add 4: (10 + 4 + 4) x 1.25 = 22.
-    assert_eq!(g.influence_allotment(Seat(0)), 17);
+    // Ticket #54: the Custodians' multiplier is 1.25; ticket #82 (version 0.06.0): 1.2. In East
+    // Asia: (10 + 4) x 1.2 = 16. Two Embassies (they stack) add 4: (10 + 4 + 4) x 1.2 = 21.6 -> 21.
+    assert_eq!(g.influence_allotment(Seat(0)), 16);
     g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Embassy));
     g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Embassy));
     assert_eq!(g.building_allotment(Seat(0)), 4);
-    assert_eq!(g.influence_allotment(Seat(0)), 22);
+    assert_eq!(g.influence_allotment(Seat(0)), 21);
     // A Relay in a Colony adds 1 more.
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Relay], 4);
-    assert_eq!(g.influence_allotment(Seat(0)), 23, "(10 + 4 + 5) x 1.25 = 23.75");
+    assert_eq!(g.influence_allotment(Seat(0)), 22, "(10 + 4 + 5) x 1.2 = 22.8");
     // Each Resolution the standing rises by the buildings' figures and does not decay. Ticket #75:
     // the start state begins at its threshold, so the rises are counted from there.
     let claim = g.seats[0].influence[&Place::State(StateId::EastAsia)];
@@ -5344,4 +5345,118 @@ fn the_archive_may_stand_on_a_station_over_earth() {
     let mut g = game();
     let vostok = colony(&mut g, Seat(3), BodyId::Earth, &[ModuleKind::Habitat], 0);
     assert!(!g.may_hold_archive(g.colony(vostok).unwrap()));
+}
+
+// ---------------------------------------------------------------- 0.06.0 ticket #82: the Custodians' card
+
+/// Ticket #82: a mothballed Custodian Factory on Earth doubles their most productive undoubled
+/// Mine off Earth, one for one; Antarctica is not off Earth; a Restart ends it. The Moon's Mine
+/// makes 4 x 1.65 = 6, Mars's 4 x 1.25 = 5, Lake Vostok's 4 x 1.75 = 7 but on Earth.
+#[test]
+fn a_custodian_mothballed_factory_doubles_their_best_mine_off_earth_one_for_one() {
+    let mut g = game();
+    let cus = Seat(0);
+    assert_eq!(g.kind(cus), FactionKind::Custodians);
+    let moon = colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Mine], 0);
+    let mars = colony(&mut g, cus, BodyId::Mars, &[ModuleKind::Mine], 0);
+    let vostok = colony(&mut g, cus, BodyId::Earth, &[ModuleKind::Mine], 0);
+    let st = g.state_mut(StateId::EastAsia);
+    st.facilities.push(facility(FacilityKind::Factory));
+    st.facilities.push(facility(FacilityKind::Factory));
+    assert!(g.doubled_modules(cus).is_empty(), "no idle Factory, no bonus");
+    assert_eq!(g.module_yield_at(cus, moon, 0).amount, 6);
+    let i = g.state(StateId::EastAsia).facilities.len() - 1;
+    g.state_mut(StateId::EastAsia).facilities[i].mothballed = true;
+    assert_eq!(g.doubled_modules(cus), vec![(moon, 0)], "one idle Factory, the best Mine off Earth");
+    let y = g.module_yield_at(cus, moon, 0);
+    assert_eq!(y.amount, 12, "6 doubled");
+    assert_eq!(y.doubled_by, Some("Factory"));
+    assert_eq!(g.module_yield_at(cus, mars, 0).amount, 5, "the second Mine is not doubled");
+    assert_eq!(g.module_yield_at(cus, vostok, 0).amount, 7, "Antarctica is Earth");
+    g.state_mut(StateId::EastAsia).facilities[i - 1].mothballed = true;
+    assert_eq!(g.doubled_modules(cus), vec![(moon, 0), (mars, 0)], "two idle Factories, two Mines, still not Antarctica");
+    g.state_mut(StateId::EastAsia).facilities[i].mothballed = false;
+    g.state_mut(StateId::EastAsia).facilities[i - 1].mothballed = false;
+    assert!(g.doubled_modules(cus).is_empty(), "a Restart ends it");
+}
+
+/// Ticket #82: the pairs are Factory/Mine, Power Plant/Generator, Refinery/Refinery and Research
+/// Lab/Observatory, and the doubling lands on the final figure; the Prospectors get none of it.
+#[test]
+fn the_custodian_pairs_and_nobody_elses() {
+    let mut g = game();
+    let cus = Seat(0);
+    let moon = colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Generator, ModuleKind::Refinery, ModuleKind::Observatory], 20);
+    let st = g.state_mut(StateId::EastAsia);
+    for k in [FacilityKind::PowerPlant, FacilityKind::Refinery, FacilityKind::ResearchLab, FacilityKind::Bank] {
+        let mut f = facility(k);
+        f.mothballed = true;
+        st.facilities.push(f);
+    }
+    let mut d = g.doubled_modules(cus);
+    d.sort();
+    assert_eq!(d, vec![(moon, 0), (moon, 1), (moon, 2)]);
+    with_tech(&mut g, TechId::EfficientGrids);
+    // Generator 5 x 1.375 x 1.5 = 10.3, so 10, doubled 20; Refinery 3 x 0.55 = 1.65, so 1, doubled 2;
+    // Observatory 2 x 1.2 x 1.25 = 3, doubled 6.
+    assert_eq!(g.module_yield_at(cus, moon, 0).amount, 20);
+    assert_eq!(g.module_yield_at(cus, moon, 1).amount, 2);
+    assert_eq!(g.module_yield_at(cus, moon, 2).research, 6);
+    let pro = Seat(1);
+    let theirs = colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Mine], 0);
+    let sid = g.controlled_states(pro)[0];
+    let mut f = facility(FacilityKind::Factory);
+    f.mothballed = true;
+    g.state_mut(sid).facilities.push(f);
+    assert!(g.doubled_modules(pro).is_empty(), "only the Custodians");
+    assert_eq!(g.module_yield_at(pro, theirs, 0).doubled_by, None);
+}
+
+/// Ticket #82: the doubled figure is what the Income pays, named for what doubled it.
+#[test]
+fn the_income_pays_the_doubled_mine() {
+    let mut g = game();
+    let cus = Seat(0);
+    g.seats[0].stockpile.energy = 100;
+    let moon = colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Generator], 0);
+    let mut f = facility(FacilityKind::Factory);
+    f.mothballed = true;
+    g.state_mut(StateId::EastAsia).facilities.push(f);
+    g.income_phase();
+    let name = g.place_name(Place::Colony(moon));
+    assert!(g.seat(cus).income_sources.iter().any(|(src, r, n)| src.starts_with(&format!("Mine in {name}")) && src.contains("doubled") && *r == Resource::Materials && *n == 12), "{:?}", g.seat(cus).income_sources);
+    assert_eq!(g.seat(cus).doubled_module_turns, 1);
+}
+
+/// Ticket #82: the Custodians' Influence multiplier is 1.2 (1.25 before).
+#[test]
+fn the_custodians_influence_multiplier_is_one_point_two() {
+    let g = game();
+    assert!((g.tables.faction(FactionKind::Custodians).influence_multiplier - 1.2).abs() < 1e-9);
+}
+
+/// Ticket #82: the Custodian AI idles a Factory once an undoubled Mine off Earth outproduces it,
+/// and does not restart a Factory whose doubling stands, even with Energy to spare. East Asia
+/// leans Materials, so its Factory makes 4 x 1.5 = 6; a Phobos Mine makes 4 x 1.75 = 7.
+#[test]
+fn the_custodian_ai_idles_a_factory_a_phobos_mine_outproduces_and_keeps_it_idle() {
+    let mut g = game();
+    calm(&mut g);
+    let cus = Seat(0);
+    g.seats[0].stockpile.energy = 500;
+    g.seats[0].stockpile.materials = 10;
+    colony(&mut g, cus, BodyId::Phobos, &[ModuleKind::Mine, ModuleKind::Generator], 0);
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Factory));
+    let i = g.state(StateId::EastAsia).facilities.len() - 1;
+    let orders = g.ai_orders(cus);
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::Change { building: BuildingRef::Facility(StateId::EastAsia, j), what: BuildingChange::Mothball } if *j == i)),
+        "no mothball of the Factory a Phobos Mine (7) outproduces (6): {orders:?}"
+    );
+    g.state_mut(StateId::EastAsia).facilities[i].mothballed = true;
+    let orders = g.ai_orders(cus);
+    assert!(
+        !orders.iter().any(|o| matches!(o, Order::Change { building: BuildingRef::Facility(StateId::EastAsia, j), what: BuildingChange::Restart } if *j == i)),
+        "the doubling stands, so no restart: {orders:?}"
+    );
 }

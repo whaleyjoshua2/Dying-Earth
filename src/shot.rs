@@ -231,6 +231,18 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.energy = 60;
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
         }
+        // `idle:1` (a building aid, ticket #82): a Factory and a Research Lab stand mothballed in
+        // seat 0's start state, so a Custodian's Mars card (with `observatory:<n>`) shows its Mine
+        // and Observatory doubled by Production Moved.
+        if std::env::args().any(|a| a == "idle:1")
+            && let Some(sid) = g.controlled_states(Seat(0)).first().copied()
+        {
+            for k in [FacilityKind::Factory, FacilityKind::ResearchLab] {
+                let mut f = Facility::new(k);
+                f.mothballed = true;
+                g.state_mut(sid).facilities.push(f);
+            }
+        }
         // `pressed:<n>` (a building aid, ticket #75): seat 0 holds North Africa (a short card) with a
         // Standing of n there, and seat 1 stands at n too, so the card's warning line shows.
         if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("pressed:").and_then(|v| v.parse::<i64>().ok())) {

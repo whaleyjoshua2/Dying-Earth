@@ -13,7 +13,7 @@ A competing power with its own multipliers, signature rule and victory condition
 _Avoid_: side, team, empire
 
 **Custodians**:
-The Faction that colonizes the solar system while limiting ecological damage to Earth. Their signature rule is the Scrubber and Leapfrog, and they win only if Earth is still habitable.
+The Faction that colonizes the solar system while limiting ecological damage to Earth. Their signature rules are the Scrubber, Leapfrog and, since version 0.06.0, Production Moved, and they win only if Earth is still habitable.
 _Avoid_: Stewards (the retired name), environmentalists, greens, moderates, eco-terrorists
 
 **Prospectors**:
@@ -241,6 +241,10 @@ _Avoid_: licence, boom, overdrive, exploitation
 **Mothball**:
 The Orders-phase order that stands a Facility or a Module down. A mothballed building produces nothing, pays no Energy upkeep, emits nothing, is online for no rule, and keeps its slot. It is free, it takes effect at the Resolution, it raises the Unrest of a Nation State it happens in, and only a Restart brings the building back, for Materials and a turn.
 _Avoid_: pause, disable, switch off, idle, shut down (that is the Energy shortfall rule)
+
+**Production Moved**:
+The Custodians' third signature rule, since version 0.06.0. While a Factory, Power Plant, Refinery or Research Lab of theirs on Earth is mothballed, one Mine, Generator, Refinery or Observatory of theirs off Earth makes double, one Facility for one Module, the most productive undoubled Module first, on its final figure. A Restart ends it; with no idle Facility of the pair there is no bonus.
+_Avoid_: offshoring, relocation bonus, the mothball bonus
 
 **Decommission**:
 The Orders-phase order that takes a Facility or a Module down for good: a turn later half its Materials come back, its slot is free, and it is gone. In a Nation State it raises Unrest more than a Mothball does; in a Colony it raises none.

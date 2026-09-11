@@ -262,6 +262,11 @@ pub struct FactionCard {
     #[serde(default)]
     pub research_multiplier_off_earth: Option<f64>,
     pub influence_multiplier: f64,
+    /// Ticket #82 (version 0.06.0): the Custodians' Production Moved. While a Facility of the key's
+    /// kind in a state they direct is mothballed, one Module of the value's kind off Earth makes
+    /// double. Empty on every other card.
+    #[serde(default)]
+    pub mothball_pairs: std::collections::BTreeMap<FacilityKind, ModuleKind>,
     pub signature: String,
     /// The Victory Condition in prose, for the cards and the panel.
     pub victory: String,

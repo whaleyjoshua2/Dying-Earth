@@ -101,6 +101,8 @@ fn main() {
                     // Ticket #80: Observatories and Research off Earth, per seat.
                     let mut observatories = [0u32; 4];
                     let mut research_off_earth: [Vec<u32>; 4] = Default::default();
+                    // Ticket #82: Module-turns doubled by an idle Facility on Earth, per seat.
+                    let mut doubled_turns: [Vec<u32>; 4] = Default::default();
                     // Ticket #75: seat 0's start state.
                     let mut home_lost = Vec::new();
                     for seed in 1..=seeds {
@@ -126,6 +128,7 @@ fn main() {
                         for s in 0..4 {
                             observatories[s] += r.observatories[s];
                             research_off_earth[s].push(r.research_off_earth[s].max(0) as u32);
+                            doubled_turns[s].push(r.doubled_module_turns[s].max(0) as u32);
                         }
                         if let Some(t) = r.first_mars_colony_turn {
                             mars_turns.push(t);
@@ -190,6 +193,10 @@ fn main() {
                         println!(
                             "      Observatories standing at the end, all seeds, by seat {observatories:?}; median Research made off Earth a game, by seat {:?}",
                             research_off_earth.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
+                        );
+                        println!(
+                            "      Production Moved: median Module-turns doubled by an idle Facility a game, by seat {:?}",
+                            doubled_turns.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
                         );
                         println!(
                             "      Mars system: a Colony founded in {}/{seeds} seeds, median first turn {}; Antarctic Colonies founded {antarctic}",

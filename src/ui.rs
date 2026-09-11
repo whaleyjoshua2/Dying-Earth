@@ -2036,7 +2036,8 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             "mothballed: making nothing and paying no upkeep".to_string()
         } else {
             match director {
-                Some(d) => game.module_yield(d, cid, m.kind).text(),
+                // Ticket #82: this Module's own figure, its doubling included.
+                Some(d) => game.module_yield_at(d, cid, mi).text(),
                 None => "idle".to_string(),
             }
         };
