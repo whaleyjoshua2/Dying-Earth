@@ -845,11 +845,21 @@ pub struct ObservatoryCard {
     pub research_per_colonist: f64,
 }
 
+/// Ticket #88 (version 0.06.0): build it where you dig. A Module at a Colony with one working
+/// Mine costs `one_mine` of its price, with two or more `two_mines`, never below `floor` of the row.
+#[derive(Debug, Clone, Deserialize)]
+pub struct InSituCard {
+    pub one_mine: f64,
+    pub two_mines: f64,
+    pub floor: f64,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct ModulesFile {
     module: Vec<ModuleCard>,
     archive: ArchiveCard,
     observatory: ObservatoryCard,
+    in_situ: InSituCard,
 }
 #[derive(Debug, Clone, Deserialize)]
 struct UnitsFile {
@@ -934,6 +944,8 @@ pub struct Tables {
     pub archive: ArchiveCard,
     /// Ticket #80: the Observatory's Research per Colonist.
     pub observatory: ObservatoryCard,
+    /// Ticket #88: the discount a Colony's working Mines give its Modules.
+    pub in_situ: InSituCard,
     pub units: Vec<UnitCard>,
     pub repair: RepairCard,
     /// Ticket #86: the crowd a warming Earth puts aboard a Colony Ship, and what it risks.
@@ -1007,6 +1019,7 @@ impl Tables {
             mothball: facilities.mothball,
             archive: modules.archive,
             observatory: modules.observatory,
+            in_situ: modules.in_situ,
             modules: modules.module,
             units: units.unit,
             repair: units.repair,

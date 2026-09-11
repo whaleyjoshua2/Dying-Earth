@@ -110,6 +110,8 @@ fn main() {
                     // Ticket #87: stranded Ships at the end, Refuel orders and stations off Earth.
                     let mut stranded = [0u32; 4];
                     let (mut refuels, mut stations_off_earth) = (0u32, 0u32);
+                    // Ticket #88: Colonies with two or more working Mines, and Modules per ground Colony.
+                    let (mut deep_colonies, mut ground_modules, mut ground_colonies) = (0u32, 0u32, 0u32);
                     // Ticket #75: seat 0's start state.
                     let mut home_lost = Vec::new();
                     for seed in 1..=seeds {
@@ -144,6 +146,9 @@ fn main() {
                         }
                         refuels += r.refuels;
                         stations_off_earth += r.stations_off_earth;
+                        deep_colonies += r.deep_colonies;
+                        ground_modules += r.ground_modules;
+                        ground_colonies += r.ground_colonies;
                         if let Some(t) = r.first_mars_colony_turn {
                             mars_turns.push(t);
                         }
@@ -219,6 +224,10 @@ fn main() {
                         );
                         println!("      Crowded ships: Colonists lost in transit over the batch, by seat {lost_in_transit:?}");
                         println!("      Tanks: Ships stranded at the end over the batch, by seat {stranded:?}; {refuels} Refuel orders; {stations_off_earth} stations standing off Earth at the end");
+                        println!(
+                            "      Build it where you dig: {deep_colonies} ground Colonies with two or more working Mines at the end over the batch; {:.1} Modules per ground Colony",
+                            if ground_colonies > 0 { ground_modules as f64 / ground_colonies as f64 } else { 0.0 }
+                        );
                         println!(
                             "      Mars system: a Colony founded in {}/{seeds} seeds, median first turn {}; Antarctic Colonies founded {antarctic}",
                             mars_turns.len(),

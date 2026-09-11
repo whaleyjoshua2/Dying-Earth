@@ -2133,6 +2133,16 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             ui.separator();
         }
         ui.label(RichText::new("Build (hover a button for what it makes)").strong());
+        // Ticket #88: build it where you dig.
+        match game.working_mines(col) {
+            0 => {}
+            1 => {
+                ui.label(RichText::new(format!("One working Mine here: Modules cost x{} (never under half the row).", game.tables.in_situ.one_mine)).weak());
+            }
+            n => {
+                ui.label(RichText::new(format!("{n} working Mines here: Modules cost x{} (never under half the row).", game.tables.in_situ.two_mines)).weak());
+            }
+        }
         for mk in ModuleKind::BUILDABLE {
             // Ticket #80: a station holds a Shipyard, Habitats and Observatories.
             if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory) {

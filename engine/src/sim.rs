@@ -93,6 +93,11 @@ pub struct SimResult {
     pub stranded_at_end: [u32; 4],
     pub refuels: u32,
     pub stations_off_earth: u32,
+    /// Ticket #88: Colonies on the ground with two or more working Mines at the end, and Modules
+    /// standing at ground Colonies, all seats, so the batch can say whether Colonies deepen.
+    pub deep_colonies: u32,
+    pub ground_modules: u32,
+    pub ground_colonies: u32,
     /// Ticket #72: the Prospectors' Venture Capital Fund at the end.
     pub venture_fund_at_end: i64,
     /// Ticket #76: cards drawn over the game, and whether the deck ran dry.
@@ -377,6 +382,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         stranded_at_end: Seat::ALL.map(|s| game.ships.iter().filter(|sh| sh.seat == s && game.stranded(sh.id)).count() as u32),
         refuels: game.log.iter().filter(|l| l.contains(" refuels ")).count() as u32,
         stations_off_earth: game.colonies.iter().filter(|c| c.in_orbit && c.body != BodyId::Earth).count() as u32,
+        deep_colonies: game.colonies.iter().filter(|c| !c.in_orbit && game.working_mines(c) >= 2).count() as u32,
+        ground_modules: game.colonies.iter().filter(|c| !c.in_orbit).map(|c| c.modules.len() as u32).sum(),
+        ground_colonies: game.colonies.iter().filter(|c| !c.in_orbit).count() as u32,
         venture_fund_at_end: Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Prospectors).map(|s| game.seat(s).venture_fund).unwrap_or(0),
         cards_drawn: game.deck.drawn.len() as u32,
         deck_empty: game.deck.cards.is_empty(),

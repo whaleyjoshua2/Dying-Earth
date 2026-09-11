@@ -1122,6 +1122,28 @@ impl Game {
         (base * self.tables.faction(self.kind(seat)).module_materials_multiplier).floor() as i64
     }
 
+    /// Ticket #88 (version 0.06.0): the working Mines a Colony holds (not mothballed, not still
+    /// building).
+    pub fn working_mines(&self, c: &Colony) -> usize {
+        c.modules.iter().filter(|m| m.kind == ModuleKind::Mine && m.working()).count()
+    }
+
+    /// Ticket #88: what a Module costs this seat at this Colony: the row times the Faction's
+    /// multiplier, times the in-situ step for the Colony's working Mines, rounded down, never
+    /// below the floor of the row. Ships and stations never take it.
+    pub fn module_materials_at(&self, seat: Seat, colony: ColonyId, kind: ModuleKind) -> i64 {
+        let row = self.tables.module(kind).materials as f64;
+        let faction = self.tables.faction(self.kind(seat)).module_materials_multiplier;
+        let t = &self.tables.in_situ;
+        let step = match self.colony(colony).map(|c| self.working_mines(c)).unwrap_or(0) {
+            0 => 1.0,
+            1 => t.one_mine,
+            _ => t.two_mines,
+        };
+        let price = (row * faction * step).max(row * t.floor);
+        price.floor() as i64
+    }
+
     /// What a Space Station costs this seat in Materials, rounded down (ticket #51).
     /// Ticket #72 (version 0.05.5): what a Facility costs this seat in Materials: the row's figure
     /// times the Faction's multiplier (the Prospectors' 0.85), rounded down.

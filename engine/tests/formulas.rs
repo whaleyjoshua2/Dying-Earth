@@ -5876,3 +5876,42 @@ fn the_ai_refuels_at_its_station_and_orders_no_leg_its_tank_cannot_pay() {
     assert!(orders.iter().any(|o| matches!(o, Order::Refuel { ship: s } if *s == ship)), "no Refuel at the ISS: {orders:?}");
     assert!(!orders.iter().any(|o| matches!(o, Order::Transit { ship: s, .. } if *s == ship)), "3 in the tank flies nowhere: {orders:?}");
 }
+
+// ---------------------------------------------------------------- 0.06.0 ticket #88: build it where you dig
+
+/// Ticket #88: a Module at a Colony with one working Mine costs x0.75, with two or more x0.6,
+/// multiplicative with the Faction's discount, rounded down, floored at half the row; the
+/// Archive too; a mothballed or unfinished Mine counts for nothing; Antarctica counts; Ships and
+/// stations are untouched.
+#[test]
+fn modules_cost_less_at_a_colony_with_working_mines() {
+    let mut g = game();
+    let cus = Seat(0);
+    let moon = colony(&mut g, cus, BodyId::Moon, &[], 0);
+    let habitat = |c| Order::BuildModule { colony: c, kind: ModuleKind::Habitat };
+    assert_eq!(g.order_cost(cus, &habitat(moon)).materials, 25, "no Mine, the row");
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::Mine));
+    assert_eq!(g.order_cost(cus, &habitat(moon)).materials, 18, "one working Mine: 25 x 0.75 = 18.75");
+    g.colony_mut(moon).unwrap().modules.push(Module::new(ModuleKind::Mine));
+    assert_eq!(g.order_cost(cus, &habitat(moon)).materials, 15, "two: 25 x 0.6");
+    assert_eq!(g.order_cost(cus, &Order::BuildModuleWithDucats { colony: moon, kind: ModuleKind::Habitat }).ducats, 30, "the Ducat price follows: 15 x 2");
+    g.colony_mut(moon).unwrap().modules[1].mothballed = true;
+    assert_eq!(g.order_cost(cus, &habitat(moon)).materials, 18, "a mothballed Mine counts for nothing");
+    g.colony_mut(moon).unwrap().modules[1].mothballed = false;
+    // The Prospectors' 0.85 stacks; the Arkwrights' 0.75 x 0.6 would be 11.25, floored at half, 12.
+    let pro = Seat(1);
+    let theirs = colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Mine], 0);
+    assert_eq!(g.order_cost(pro, &habitat(theirs)).materials, 12, "25 x 0.85 x 0.6 = 12.75");
+    let ark = Seat(2);
+    let deep = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Mine, ModuleKind::Mine], 0);
+    assert_eq!(g.order_cost(ark, &habitat(deep)).materials, 12, "25 x 0.75 x 0.6 = 11.25, floored at 12.5");
+    // Antarctica counts; a Ship and a station do not take it.
+    let vostok = colony(&mut g, cus, BodyId::Earth, &[ModuleKind::Mine, ModuleKind::Shipyard], 0);
+    assert_eq!(g.order_cost(cus, &habitat(vostok)).materials, 18);
+    assert_eq!(g.order_cost(cus, &Order::BuildShip { site: Place::Colony(vostok), kind: UnitKind::Frigate }).materials, 25, "Ships untouched");
+    assert_eq!(g.order_cost(cus, &Order::BuildStation { body: BodyId::Moon, slot: 0 }).materials, 40, "stations untouched");
+    // The Archive at a Colony with two Mines: 50 x 0.6 = 30.
+    let arc = Seat(3);
+    let site = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Mine, ModuleKind::Mine, ModuleKind::Habitat], 4);
+    assert_eq!(g.order_cost(arc, &Order::BuildArchive { colony: site }).materials, 30);
+}

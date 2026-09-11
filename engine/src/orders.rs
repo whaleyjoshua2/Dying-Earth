@@ -209,7 +209,8 @@ impl Game {
             Order::BuildFacility { kind, .. } => Cost { materials: self.facility_materials(seat, *kind), ..Default::default() },
             Order::RaiseIndustry { .. } => Cost { materials: self.industry_cost(seat), ..Default::default() },
             // Ticket #51: a Faction's card may make its Modules and its Colony Ships cost less.
-            Order::BuildModule { kind, .. } => Cost { materials: self.module_materials(seat, *kind), ..Default::default() },
+            // Ticket #88: and the Colony's working Mines take more off.
+            Order::BuildModule { colony, kind } => Cost { materials: self.module_materials_at(seat, *colony, *kind), ..Default::default() },
             // Ticket #87: a Ship is built with a full tank, its Fuel paid at the build.
             Order::BuildShip { kind, .. } => Cost { materials: self.ship_materials(seat, *kind), fuel: t.unit(*kind).tank, ..Default::default() },
             Order::BuildArmy { .. } => Cost { materials: t.unit(UnitKind::Army).materials, ..Default::default() },
@@ -248,9 +249,10 @@ impl Game {
             }
             Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: self.market_price(seat, self.facility_materials(seat, *kind) * t.ducats.per_building_material), ..Default::default() },
             Order::BuildStation { .. } => Cost { materials: self.station_materials(seat), ..Default::default() },
-            Order::BuildModuleWithDucats { kind, .. } => Cost { ducats: self.market_price(seat, self.module_materials(seat, *kind) * t.ducats.per_building_material), ..Default::default() },
+            Order::BuildModuleWithDucats { colony, kind } => Cost { ducats: self.market_price(seat, self.module_materials_at(seat, *colony, *kind) * t.ducats.per_building_material), ..Default::default() },
             // Ticket #68: the Archive Module costs its row's Materials; the Research comes after.
-            Order::BuildArchive { .. } => Cost { materials: t.module(ModuleKind::Archive).materials, ..Default::default() },
+            // Ticket #88: the Archive is a Module, so its Colony's working Mines take off too.
+            Order::BuildArchive { colony } => Cost { materials: self.module_materials_at(seat, *colony, ModuleKind::Archive), ..Default::default() },
             // Ticket #52: Relief and Resettle are paid in Ducats.
             Order::Relief { .. } => Cost { ducats: t.unrest.relief_ducats, ..Default::default() },
             Order::Resettle { .. } => Cost { ducats: t.unrest.resettle_ducats, ..Default::default() },

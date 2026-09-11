@@ -226,3 +226,29 @@ builds forty stations off Earth and still strands eleven Ships** over twenty see
 station after the Ship has flown on, or over a Body its stranded Ship is not at. Both are the
 supply line the designer asked for, seen from the AI's chair; whether the Arkwright AI should
 build its forward station before the crossing is on the map.
+
+## Build it where you dig ([ticket #88](https://github.com/whaleyjoshua2/Dying-Earth/issues/88))
+
+- **dig-mars.png** — `shot:dig player:custodians observatory:16 turns:0`. The Mars card of a
+  Custodian Colony holding one working Mine. Under "Build" a new line reads **"One working Mine
+  here: Modules cost x0.75 (never under half the row)."** and every button carries the cut price:
+  **Mine 15, Generator 18, Refinery 15, Habitat 18, Shipyard 26, Barracks 15, Trade Post 18,
+  Relay 18, Observatory 21**, the Ducat prices following at twice each.
+
+### Measured, twenty seeds each (`sweep/in-situ.txt`)
+
+Read against `sweep/tanks.txt`.
+
+| Seat 0 | Wins by seat | Collapses | Colonists off Earth (median) | Ground Colonies with two or more working Mines at the end, over the batch | Modules per ground Colony |
+|---|---|---|---|---|---|
+| Custodians from East Asia | nobody (nobody) | 20/20 (20) | 18 (18) | 29 | 3.5 |
+| Arkwrights from East Asia | Custodians 19 (19) | 1/20 (1) | 40 (40) | 1 | 1.5 |
+
+**The price falls and the AI's play does not change.** Wins, Collapses and Colonists off Earth are
+the tank batch's figures to the digit: the AI takes the discount whenever it builds at a Colony
+with a Mine (the order's cost carries it), but it chooses what to build by weight, not price, so
+cheaper Modules did not become more Modules in twenty seeds. The two new figures are the first
+reading of how deep the AI's Colonies go: in the Custodian seating 29 Colonies over the batch
+hold two working Mines (most of them Antarctic, where the Mine yield is 1.75), with 3.5 Modules
+a Colony; in the Arkwright seating one, with 1.5. Whether the AI should weigh a cheap second
+build at a dug Colony is a design question, on the map with the rest of the AI's appetite.

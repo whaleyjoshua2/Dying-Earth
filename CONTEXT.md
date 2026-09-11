@@ -79,6 +79,10 @@ A Colony in orbit, built for Materials into an Orbital Slot with no crew, holdin
 The Fuel a Ship carries, since version 0.06.0: a figure per Ship type, filled at the Shipyard for Fuel paid at the build, spent by transits, and refilled only by a Refuel. A Ship whose Tank cannot pay any leg from where it stands, with no Space Station of its Faction there, is stranded until one is built in orbit there.
 _Avoid_: fuel tank, propellant, range, fuel level
 
+**Build Where You Dig**:
+The rule, since version 0.06.0, that a Module built at a Colony with a working Mine costs less: three quarters of its price with one Mine, three fifths with two or more, on top of the Faction's own discount and never below half the row. The Archive takes it; a Ship built at a Shipyard there and a Space Station built into orbit do not. A mothballed Mine, or one still building, counts for nothing.
+_Avoid_: in-situ discount, local build bonus, mining discount
+
 **Refuel**:
 The Orders-phase order that fills a Ship's Tank from the Stockpile, as far as the Stockpile can pay, at a Body where the Ship's Faction holds a Space Station.
 _Avoid_: resupply, top up, tanker

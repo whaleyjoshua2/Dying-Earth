@@ -104,3 +104,13 @@ produces = { resource = "research", amount = 2 }
 
 [observatory]
 research_per_colonist = 0.01
+
+# Ticket #88 (version 0.06.0): build it where you dig. A Module (the Archive included) built at a
+# Colony with one working Mine costs `one_mine` of its price, with two or more `two_mines`,
+# multiplicative with the Faction's own discount, rounded down, never below `floor` of the row.
+# A mothballed or unfinished Mine counts for nothing; Antarctica counts; Ships and stations do not
+# take it.
+[in_situ]
+one_mine = 0.75
+two_mines = 0.6
+floor = 0.5
