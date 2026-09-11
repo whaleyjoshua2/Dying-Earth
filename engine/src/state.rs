@@ -5,9 +5,10 @@ use crate::ids::*;
 pub use crate::report::*;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Stockpile {
     pub materials: i64,
     pub fuel: i64,
@@ -17,7 +18,7 @@ pub struct Stockpile {
 }
 
 /// A Nation State is neutral, controlled, or occupied (spec 8.1, 8.5).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Control {
     Neutral,
     Controlled(Seat),
@@ -47,7 +48,7 @@ impl Control {
 }
 
 /// Ticket #52: where a rise in Unrest comes from, which decides what damps it (rule 4).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UnrestSource {
     /// A population fall, build slots lost to Sea Level, or a Heatwave, Wildfire or Storm Surge.
     Climate,
@@ -58,7 +59,7 @@ pub enum UnrestSource {
 }
 
 /// Ticket #54 (version 0.05): what a Mothball, Restart or Decommission order does to a building.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BuildingChange {
     /// Free, lands at this Resolution: the building produces nothing, pays no Energy upkeep and
     /// emits nothing, and keeps its slot.
@@ -88,14 +89,14 @@ impl BuildingChange {
 }
 
 /// Ticket #54: a change ordered on one building and the turn its Resolution lands it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PendingChange {
     pub what: BuildingChange,
     pub due_turn: u32,
     pub seat: Seat,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Facility {
     pub kind: FacilityKind,
     /// Shut down this turn by the Energy shortfall rule, or knocked offline by a card.
@@ -129,7 +130,7 @@ impl Facility {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Module {
     pub kind: ModuleKind,
     pub online: bool,
@@ -153,7 +154,7 @@ impl Module {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BuildItem {
     Facility(FacilityKind),
     IndustryLevel,
@@ -172,7 +173,7 @@ impl BuildItem {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Build {
     pub item: BuildItem,
     pub seat: Seat,
@@ -182,7 +183,7 @@ pub struct Build {
     pub coastal: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NationState {
     pub id: StateId,
     pub population: f64,
@@ -260,7 +261,7 @@ pub fn triangular(u: f64, spread: f64) -> f64 {
 /// Ticket #57: one Colony Slot's own four yields, drawn when the game starts as its Body's figures
 /// times a factor from a triangular distribution centred on 1.0. Every yield a Module in a Colony
 /// reads is the slot's, not the Body's; the Body's figures are what the slot drew from.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct SlotYields {
     pub mine: f64,
     pub generator: f64,
@@ -291,7 +292,7 @@ impl SlotYields {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Colony {
     pub id: ColonyId,
     pub body: BodyId,
@@ -307,13 +308,13 @@ pub struct Colony {
     pub in_orbit: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ShipAt {
     Body(BodyId),
     Transit { from: BodyId, to: BodyId, turns_left: u32 },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Ship {
     pub id: ShipId,
     pub kind: UnitKind,
@@ -329,19 +330,19 @@ pub struct Ship {
     pub built_turn: u32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ArmyHome {
     State(StateId),
     Colony(ColonyId),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ArmyAt {
     Place(Place),
     Aboard(ShipId),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Army {
     pub id: ArmyId,
     pub home: ArmyHome,
@@ -354,7 +355,7 @@ pub struct Army {
     pub move_to: Option<StateId>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EmissionsBreakdown {
     pub state_industry: f64,
     pub factories: f64,
@@ -392,7 +393,7 @@ impl EmissionsBreakdown {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Climate {
     pub co2: f64,
     pub temperature: f64,
@@ -413,7 +414,7 @@ pub struct Climate {
     pub breaks_fired: Vec<bool>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Research {
     pub current: Option<TechId>,
     pub progress: i64,
@@ -436,12 +437,12 @@ impl Research {
 }
 
 /// A card in the deck. Since ticket #25 every card is an Event; there are no Calm Cards.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Card {
     Event(EventId),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deck {
     pub cards: Vec<Card>,
     pub drawn: Vec<Card>,
@@ -460,7 +461,7 @@ impl Deck {
 }
 
 /// A drawn card with its target and size, for the popup and the log.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DrawnEvent {
     pub card: Card,
     pub target: EventTarget,
@@ -468,7 +469,7 @@ pub struct DrawnEvent {
     pub text: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EventTarget {
     None,
     Everyone,
@@ -480,7 +481,7 @@ pub enum EventTarget {
 }
 
 /// A temporary effect from a Discovery card.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Discovery {
     pub body: BodyId,
     pub kind: ModuleKind,
@@ -488,7 +489,7 @@ pub struct Discovery {
     pub turns_left: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SeatState {
     pub kind: FactionKind,
     pub ai: bool,
@@ -522,7 +523,7 @@ pub struct SeatState {
     pub blame_removed: f64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Outcome {
     Win { seat: Seat, margin_note: String },
     Draw { note: String },
@@ -531,7 +532,7 @@ pub enum Outcome {
 
 /// One party in a Battle (ticket #50): a Battle is a melee of every Faction present, so the
 /// Battle Report lists each of them rather than an attacker and a defender.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BattleParty {
     /// None for a neutral state's own Armies.
     pub seat: Option<Seat>,
@@ -545,7 +546,7 @@ pub struct BattleParty {
 }
 
 /// One line of the Battle Report (spec 10.3), amended by ticket #50: every party present.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BattleLine {
     pub place: String,
     pub parties: Vec<BattleParty>,

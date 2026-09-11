@@ -1381,3 +1381,47 @@ written about.
   Permafrost Thaw headlines, **Builds and works** carries the Archivists' Archive fund, the
   Prospectors' Power Plant and the Arkwrights' Colony Ship -- three different Factions under one
   heading -- and **What the Factions did** runs to four paragraphs, the Custodians' among them.
+
+## #59: saves
+
+A **Save** is a turn start written to a file. The whole game goes into readable RON -- the seed, the
+generator's own state, the Event Deck in its shuffled order, every board and the log -- and the
+`Tables` do not, because the rules live in `assets/data/` and a save that carried its own copy could
+disagree with the executable it is loaded into. The file begins with a one-line header holding a
+`save_version` and the rules version it was written by; a file from another version is refused with
+a sentence naming both ("This save was written by version 0.04 of the rules; this is 0.05. It cannot
+be loaded."), and it is never migrated. Every save goes to
+**`%LOCALAPPDATA%\DyingEarth\data\saves`** -- on this machine
+`C:\Users\Josh\AppData\Local\DyingEarth\data\saves` -- written to a temporary file and renamed over
+the target, so a crash never leaves half a save where a good one used to be.
+
+The game **autosaves at the start of every third turn** and at game over, keeping the **last three
+per game**, and the **Save** button in the top bar takes a manual save whenever no order is pending:
+a save captures the beginning of a turn, never half-entered orders, and the button says so when it is
+dead. A spectated game saves the same way, with the spectator flag inside it.
+
+A turn-12 save of a played-out game (seed 11) is **296,556 bytes**, about two thirds of which is the
+log the designer asked to keep in the file. The engine's own check, run by the release binary in
+`shot:` mode, says so: `dying-earth.exe shot:rt turns:11 seed:11 save:1 savedir:<folder>` prints
+`save round trip ok: turn 12, 296556 bytes, ...\save-11-turn-12.ron`.
+
+Every picture below was taken headlessly with the game's own `shot:` mode
+(`dying-earth.exe shot:<prefix> ...`, the window off-screen) and opened before it was written about.
+
+![The title screen's Load list: three rows, each with a Faction or Spectating, a turn and month, a Temperature, a seed, the file's time and Load and Delete buttons, two of them marked autosave, over a bottom bar with Back, Open saves folder and the folder path](load-screen.png)
+
+- **load-screen.png** -- `shot:ls load:1 turns:6 seed:11 savedir:<folder>`. Three saves, newest
+  first: a spectated game's autosave at Turn 3, March 2030, +1.4 C, seed 12; the player's own
+  Custodian autosave at Turn 9, September 2030, +2.0 C, seed 11; and the manual save it came from at
+  Turn 7, July 2030, +1.8 C. Each row carries the file's own time in this machine's zone, a **Load**
+  and a **Delete** (which asks once before it removes anything), and the file name. The bottom bar
+  holds **Back**, **Open saves folder** -- which opens Explorer, the player's own file manager -- and
+  the folder's full path, so the designer can find a save without knowing what `%LOCALAPPDATA%`
+  means.
+
+![The Earth Map at Turn 9, September 2030, with the top bar's second row reading Tech Tree, Climate Panel, Victory, Trading, Save and a green "Saved." beside it](save-button.png)
+
+- **save-button.png** -- `shot:sb2 saved:1 turns:8 seed:11 panel:0 savedir:<folder>`. The top bar
+  after a Save: the **Save** button stands live between Trading and the map swap, and **Saved.**
+  stands beside it in green for four seconds. The save it wrote, `save-11-turn-9.ron`, is in the
+  folder. With an order pending the button goes dead and its hover says why.

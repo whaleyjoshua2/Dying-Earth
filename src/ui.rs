@@ -126,6 +126,14 @@ enum Action {
     Spectate,
     /// Ticket #64: the Auto box beside End Turn.
     SetAuto(bool),
+    /// Ticket #59: the Save button in the top bar.
+    Save,
+    /// Ticket #59: the Load button on the title screen.
+    OpenLoad,
+    LoadSave(std::path::PathBuf),
+    DeleteSave(std::path::PathBuf),
+    AskDelete(Option<std::path::PathBuf>),
+    OpenSavesFolder,
     ToTitle,
     Quit,
 }
@@ -285,6 +293,13 @@ pub fn draw(
     let mut actions: Vec<Action> = Vec::new();
     view.spin += time.delta_secs() * 0.25;
     let _ = window;
+    // Ticket #59: "Saved." stands in the top bar for a few seconds and then goes.
+    if let Some((_, left)) = &mut session.save_notice {
+        *left -= time.delta_secs();
+        if *left <= 0.0 {
+            session.save_notice = None;
+        }
+    }
     // Ticket #64: Auto runs a turn every three seconds. The clock stops while a Moment, the Report
     // or the game-over popup is up, and picks up again where it left off when the popup closes.
     if session.screen == Screen::Playing {
@@ -301,6 +316,7 @@ pub fn draw(
     }
     match session.screen.clone() {
         Screen::Title => title_screen(&mut root, &mut session, &mut actions),
+        Screen::Load => load_screen(&mut root, &session, &mut actions),
         Screen::ChooseFaction => faction_screen(&mut root, &session, &mut actions),
         Screen::ChooseStart { faction } => start_screen(&mut root, &session, faction, &mut actions),
         Screen::Playing | Screen::GameOver => {
@@ -393,6 +409,46 @@ pub fn draw(
                 let (lon, lat) = geo::state_lonlat(s);
                 view.yaw = geo::yaw_facing(lon, lat);
             }
+            Action::Save => {
+                session.save_now();
+            }
+            Action::OpenLoad => {
+                session.refresh_saves();
+                session.screen = Screen::Load;
+            }
+            Action::LoadSave(path) => match session.load_save(&path) {
+                Ok(()) => {
+                    *view = ViewState::default();
+                    // Ticket #59: a loaded game comes back where it was: the Earth Map, the Report
+                    // popup open, and the globe facing the Faction's own state.
+                    view.popup = Popup::Report;
+                    let start = session
+                        .game
+                        .as_ref()
+                        .and_then(|g| g.controlled_states(Seat(0)).first().copied())
+                        .unwrap_or(StateId::EastAsia);
+                    let (lon, lat) = geo::state_lonlat(start);
+                    view.yaw = geo::yaw_facing(lon, lat);
+                }
+                Err(e) => {
+                    session.last_error = Some(e);
+                }
+            },
+            Action::AskDelete(path) => {
+                session.confirm_delete = path;
+            }
+            Action::DeleteSave(path) => {
+                session.delete_save(&path);
+            }
+            Action::OpenSavesFolder => {
+                let result = match &session.saves {
+                    Ok(dir) => crate::saves::open_folder(dir),
+                    Err(e) => Err(e.clone()),
+                };
+                if let Err(e) = result {
+                    session.last_error = Some(e);
+                }
+            }
             Action::ToTitle => {
                 session.game = None;
                 session.pending.clear();
@@ -421,11 +477,113 @@ fn title_screen(root: &mut Ui, session: &mut Session, actions: &mut Vec<Action>)
                 session.screen = Screen::ChooseFaction;
             }
             ui.add_space(10.0);
+            // Ticket #59: every save this machine holds, newest first.
+            if ui.add(egui::Button::new(RichText::new("Load").size(22.0)).min_size(egui::vec2(220.0, 44.0))).clicked() {
+                actions.push(Action::OpenLoad);
+            }
+            ui.add_space(10.0);
             if ui.add(egui::Button::new(RichText::new("Quit").size(22.0)).min_size(egui::vec2(220.0, 44.0))).clicked() {
                 actions.push(Action::Quit);
             }
             ui.add_space(30.0);
             ui.label(RichText::new(format!("Seed {}", session.seed)).weak());
+        });
+    });
+}
+
+/// Ticket #59: the Load screen. Every save the folder holds, newest first, each row naming the
+/// Faction (or Spectating), the turn and its month, the Temperature, the seed and when it was
+/// written, with Load and Delete beside it. Delete asks once.
+fn load_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>) {
+    egui::Panel::bottom("load_bar").show(root, |ui| {
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            if ui.add(egui::Button::new(RichText::new("Back").size(17.0)).min_size(egui::vec2(120.0, 32.0))).clicked() {
+                actions.push(Action::ToTitle);
+            }
+            if ui.add(egui::Button::new(RichText::new("Open saves folder").size(17.0)).min_size(egui::vec2(200.0, 32.0))).clicked() {
+                actions.push(Action::OpenSavesFolder);
+            }
+            match &session.saves {
+                Ok(dir) => {
+                    ui.label(RichText::new(dir.display().to_string()).weak());
+                }
+                Err(e) => {
+                    ui.label(RichText::new(e).color(Color32::from_rgb(230, 130, 110)));
+                }
+            }
+        });
+        if let Some(e) = &session.last_error {
+            ui.label(RichText::new(e).color(Color32::from_rgb(230, 130, 110)));
+        }
+        ui.add_space(6.0);
+    });
+    egui::CentralPanel::default().show(root, |ui| {
+        ui.vertical_centered(|ui| {
+            ui.add_space(14.0);
+            ui.label(RichText::new("Load a game").size(30.0).strong());
+            ui.label(RichText::new("A save is the beginning of a turn. Loading one puts the game back exactly where it stood.").size(15.0));
+            ui.add_space(10.0);
+        });
+        if session.saves_list.is_empty() {
+            ui.vertical_centered(|ui| {
+                ui.add_space(40.0);
+                let text = match &session.saves {
+                    Ok(dir) if dir.exists() => "There are no saves in the folder yet. The game saves itself every three turns, and the Save button in the top bar takes one at any turn start.",
+                    Ok(_) => "The saves folder is not there yet. It is made the first time the game saves.",
+                    Err(_) => "The game has nowhere to save on this machine, so there is nothing to load.",
+                };
+                ui.label(RichText::new(text).size(16.0).weak());
+            });
+            return;
+        }
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            for entry in &session.saves_list {
+                let h = &entry.header;
+                egui::Frame::NONE.fill(Color32::from_gray(28)).inner_margin(8.0).outer_margin(egui::vec2(0.0, 3.0)).show(ui, |ui| {
+                    // A row is as wide as the list, so the saves read as a column of rows rather
+                    // than as blocks of whatever width their text happens to want.
+                    ui.set_width(ui.available_width());
+                    ui.horizontal_wrapped(|ui| {
+                        let colour = match session.tables.factions.iter().find(|f| f.name == h.faction) {
+                            Some(card) => rgb(card.colour),
+                            None => Color32::from_gray(200),
+                        };
+                        ui.label(RichText::new(&h.faction).strong().size(17.0).color(colour));
+                        ui.separator();
+                        ui.label(RichText::new(format!("Turn {}, {}", h.turn, h.date)).strong());
+                        ui.separator();
+                        ui.label(format!("{:+.1} C", h.temperature));
+                        ui.separator();
+                        ui.label(RichText::new(format!("Seed {}", h.seed)).weak());
+                        ui.separator();
+                        ui.label(RichText::new(crate::saves::when_text(entry.saved)).weak());
+                        if h.kind.is_autosave() {
+                            ui.separator();
+                            ui.label(RichText::new("autosave").weak().italics());
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        if session.confirm_delete.as_deref() == Some(entry.path.as_path()) {
+                            ui.label(RichText::new("Delete this save for good?").color(Color32::from_rgb(230, 160, 110)));
+                            if ui.button("Delete").clicked() {
+                                actions.push(Action::DeleteSave(entry.path.clone()));
+                            }
+                            if ui.button("Keep it").clicked() {
+                                actions.push(Action::AskDelete(None));
+                            }
+                        } else {
+                            if ui.add(egui::Button::new(RichText::new("Load").strong())).clicked() {
+                                actions.push(Action::LoadSave(entry.path.clone()));
+                            }
+                            if ui.button("Delete").clicked() {
+                                actions.push(Action::AskDelete(Some(entry.path.clone())));
+                            }
+                            ui.label(RichText::new(entry.path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()).weak().small());
+                        }
+                    });
+                });
+            }
         });
     });
 }
@@ -675,6 +833,17 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             }
             if !session.spectator && ui.button("Trading").clicked() {
                 view.show_trade = !view.show_trade;
+            }
+            // Ticket #59: a Save writes this turn start to a file. It is dead while an order is
+            // pending, because a save captures a turn start and never half-entered orders. A
+            // spectated game saves the same way.
+            let can_save = dying_earth_engine::save::can_save_now(session.pending.len()) && session.screen == Screen::Playing;
+            let save = ui.add_enabled(can_save, egui::Button::new("Save"));
+            if save.on_disabled_hover_text(dying_earth_engine::save::SAVE_PENDING_HOVER).on_hover_text("Write this turn start to a file. Load it again from the title screen.").clicked() {
+                actions.push(Action::Save);
+            }
+            if let Some((text, _)) = &session.save_notice {
+                ui.label(RichText::new(text).strong().color(Color32::from_rgb(140, 210, 150)));
             }
             let swap_text = match view.view {
                 View::Solar => format!("To {} (Tab)", game.tables.body(view.last_surface).name),

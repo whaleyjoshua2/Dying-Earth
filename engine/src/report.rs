@@ -5,14 +5,14 @@
 //! rest is grouped under, and the template renderer with its validation.
 
 use crate::ids::{BodyId, ColonyId, Place, Seat, StateId, TechId};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 // ---------------------------------------------------------------- where a line points
 
 /// Where a Report line takes the player when it is clicked. `Place` names a Nation State or a
 /// Colony; a Report line may also point at a Body with no Colony on it, so it has its own enum.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReportPlace {
     State(StateId),
     Colony(ColonyId),
@@ -33,7 +33,7 @@ impl From<Place> for ReportPlace {
 /// What one Report line is about. The kind decides two things: the line's place in the severity
 /// order the headline is chosen by (`headline_rank`), and which of the four headings it is grouped
 /// under (`section`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum LineKind {
     /// Turn 1 only: the sentence that explains the table. It always headlines.
     Seating,
@@ -65,7 +65,7 @@ pub enum LineKind {
 }
 
 /// The four headings the dispatch groups its lines under, in the order they are shown.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Section {
     InSpace,
     OnEarth,
@@ -137,7 +137,7 @@ impl LineKind {
 }
 
 /// One line of the dispatch: what it is about, where it points, and what it says.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReportLine {
     pub kind: LineKind,
     pub place: Option<ReportPlace>,
@@ -153,7 +153,7 @@ impl ReportLine {
 // ---------------------------------------------------------------- Moments
 
 /// The seven kinds of Moment: the short modal that stops the turn before the Report.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum MomentKind {
     ColonyFounded,
     ControlChanged,
@@ -216,7 +216,7 @@ impl MomentKind {
 }
 
 /// One Moment: a sentence, a number, and where it happened.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Moment {
     pub kind: MomentKind,
     pub text: String,
@@ -236,14 +236,14 @@ pub const MOMENTS_PER_TURN: usize = 2;
 /// Ticket #50, rebuilt by #58: what one AI seat did in a turn, in plain sentences taken from the
 /// orders it committed and what the Resolution made of them. The scored list it chose from is in
 /// the simulate log and nowhere else.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AiReport {
     pub seat: Seat,
     pub deeds: Vec<String>,
 }
 
 /// Everything the Report popup shows at the start of a turn (spec 17.5, ticket #58).
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Report {
     pub turn: u32,
     pub battles: Vec<crate::state::BattleLine>,

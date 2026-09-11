@@ -357,6 +357,10 @@ _Avoid_: popup, alert, notification, cutscene, interruption
 Someone watching a game they hold no seat in. The computer plays all four Factions and the interface gives no orders at all; in return every Faction's board, card and Standing is open to be read. End Turn advances one turn, and the turns can be set to run on their own.
 _Avoid_: observer, replay, demo
 
+**Save**:
+A turn start written to a file, holding everything about one game: the same seed, the same deck, the same board. The game writes one of its own every three turns and when the game ends, keeping the last three of a game, and the player may write one at any turn start where nothing has been ordered yet. Saves are loaded from the title screen, and one written by another version of the rules is refused rather than brought forward.
+_Avoid_: checkpoint, snapshot, savegame
+
 ### Combat
 
 **Battle**:

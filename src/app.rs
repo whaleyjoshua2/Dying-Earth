@@ -2,7 +2,9 @@
 
 pub use crate::textures::Textures;
 use bevy::prelude::*;
+use dying_earth_engine::save::{self, SaveKind};
 use dying_earth_engine::*;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -15,6 +17,8 @@ pub enum Mode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Screen {
     Title,
+    /// Ticket #59: the Load list, reached from the title screen.
+    Load,
     ChooseFaction,
     ChooseStart { faction: FactionKind },
     Playing,
@@ -66,7 +70,19 @@ pub struct Session {
     pub auto: bool,
     /// Seconds since the last turn Auto ran; it does not count while a popup is up.
     pub auto_elapsed: f32,
+    /// Ticket #59: the saves folder, or why there is not one. A game with nowhere to save keeps
+    /// playing and says so.
+    pub saves: Result<PathBuf, String>,
+    /// Ticket #59: what the top bar says after a save, and how many seconds it has left to say it.
+    pub save_notice: Option<(String, f32)>,
+    /// Ticket #59: the Load screen's list, read from the folder when the screen opens.
+    pub saves_list: Vec<SaveEntry>,
+    /// Ticket #59: a Delete asks once; this is the row it is asking about.
+    pub confirm_delete: Option<PathBuf>,
 }
+
+/// Ticket #59: how long "Saved." stands in the top bar.
+pub const SAVE_NOTICE_SECONDS: f32 = 4.0;
 
 /// Ticket #64: how long Auto waits between turns.
 pub const AUTO_INTERVAL: f32 = 3.0;
@@ -102,6 +118,7 @@ impl Session {
     }
 
     fn begin(&mut self, game: Game, spectator: bool) {
+        self.seed = game.seed;
         self.game = Some(game);
         self.pending.clear();
         self.screen = Screen::Playing;
@@ -109,6 +126,72 @@ impl Session {
         self.spectator = spectator;
         self.auto = false;
         self.auto_elapsed = 0.0;
+        self.save_notice = None;
+        self.confirm_delete = None;
+        self.last_error = None;
+    }
+
+    // ---------------------------------------------------------------- Ticket #59: saves
+
+    /// The Save button: a manual save of this turn start. It is dead while an order is pending, so
+    /// a save never holds half-entered orders.
+    pub fn save_now(&mut self) {
+        if !save::can_save_now(self.pending.len()) {
+            self.note(save::SAVE_PENDING_HOVER.to_string());
+            return;
+        }
+        let Some(game) = &self.game else { return };
+        let note = match &self.saves {
+            Err(e) => e.clone(),
+            Ok(dir) => match save::save_to(dir, game, SaveKind::Manual) {
+                Ok(_) => "Saved.".to_string(),
+                Err(e) => e,
+            },
+        };
+        self.note(note);
+    }
+
+    /// Ticket #59: the autosave this turn start earns, if it earns one. A folder that cannot be
+    /// written says so in the top bar and the game plays on.
+    fn autosave(&mut self) {
+        let Ok(dir) = self.saves.clone() else { return };
+        let Some(game) = &self.game else { return };
+        if let Some(Err(e)) = save::autosave(&dir, game) {
+            self.note(e);
+        }
+    }
+
+    fn note(&mut self, text: String) {
+        self.save_notice = Some((text, SAVE_NOTICE_SECONDS));
+    }
+
+    /// Read the saves folder afresh, newest first.
+    pub fn refresh_saves(&mut self) {
+        self.saves_list = match &self.saves {
+            Ok(dir) => save::list_saves(dir),
+            Err(_) => Vec::new(),
+        };
+        self.confirm_delete = None;
+        self.last_error = None;
+    }
+
+    /// Load a save: the game comes back exactly where it was at that turn start.
+    pub fn load_save(&mut self, path: &std::path::Path) -> Result<(), String> {
+        let game = save::load_from(path, self.tables.clone())?;
+        let spectator = game.spectator;
+        let over = game.is_over();
+        self.begin(game, spectator);
+        if over {
+            self.screen = Screen::GameOver;
+        }
+        Ok(())
+    }
+
+    pub fn delete_save(&mut self, path: &std::path::Path) {
+        if let Err(e) = std::fs::remove_file(path) {
+            self.last_error = Some(format!("{} could not be deleted: {e}", path.display()));
+        }
+        self.refresh_saves();
     }
 
     /// Try to add an order; on failure remember why so the panel can show it.
@@ -134,7 +217,11 @@ impl Session {
         all[0] = orders;
         game.end_turn(all);
         self.earth_dirty = true;
-        if game.is_over() {
+        let over = game.is_over();
+        // Ticket #59: the autosave is written at the start of the Report phase of every third turn,
+        // and at game over, which is where `end_turn` leaves the game.
+        self.autosave();
+        if over {
             self.screen = Screen::GameOver;
         }
     }

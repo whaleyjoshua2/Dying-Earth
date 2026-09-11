@@ -2,20 +2,21 @@
 
 use crate::ids::*;
 use crate::state::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UnitRef {
     Ship(ShipId),
     Army(ArmyId),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LoadSource {
     State(StateId),
     Colony(ColonyId),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UnloadTarget {
     /// Found a Colony into a free slot (spec 9.4).
     Slot(BodyId, u32),
@@ -25,7 +26,7 @@ pub enum UnloadTarget {
 
 /// Ticket #54 (version 0.05): one standing building, by its place and its position in that place's
 /// list. Orders are given and resolved inside one turn, so the position cannot move under them.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BuildingRef {
     Facility(StateId, usize),
     Module(ColonyId, usize),
@@ -40,7 +41,7 @@ impl BuildingRef {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Order {
     BuildFacility { state: StateId, kind: FacilityKind },
     RaiseIndustry { state: StateId },
@@ -117,7 +118,7 @@ impl Order {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Cost {
     pub materials: i64,
     pub fuel: i64,
@@ -169,7 +170,7 @@ fn fail<T>(msg: impl Into<String>) -> Result<T, OrderError> {
 }
 
 /// Things committed at End Turn that act later in Resolution.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Pending {
     pub repairs: Vec<(Seat, UnitRef, u32)>,
     pub cargo: Vec<(Seat, Order)>,

@@ -3,10 +3,12 @@
 //!   dying-earth.exe                     play
 //!   dying-earth.exe seed:<n>            play with a fixed seed
 //!   dying-earth.exe shot:<prefix>       headless screenshots of the four views, then exit
+//!   dying-earth.exe savedir:<path>      (ticket #59) saves go here instead of the local app-data folder
 //!   dying-earth.exe simulate:<seed> [--player=<faction>]   all four seats on the AI, headless log
 
 mod app;
 mod geo;
+mod saves;
 mod scene;
 mod shot;
 mod textures;
@@ -92,6 +94,12 @@ fn main() {
             spectator: false,
             auto: false,
             auto_elapsed: 0.0,
+            // Ticket #59: where this machine keeps the saves. A machine that will not say keeps
+            // the reason, and the interface shows it rather than failing quietly.
+            saves: saves::saves_dir(),
+            save_notice: None,
+            saves_list: Vec::new(),
+            confirm_delete: None,
         })
         .insert_resource(textures)
         .insert_resource(ViewState::default())

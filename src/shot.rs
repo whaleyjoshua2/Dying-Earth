@@ -50,6 +50,11 @@ pub struct ShotPlan {
     /// Ticket #58, a building aid (`moment:colony`, `moment:tech`): the Report picture of a
     /// `menus:1` run opens that Moment instead of the Report itself.
     pub moment: Option<MomentKind>,
+    /// Ticket #59, a building aid (`saved:1`): the top bar carries the notice a Save leaves, held
+    /// up for the whole run so a capture cannot miss it.
+    pub notice: Option<String>,
+    /// Ticket #59, a building aid (`load:1`): 0 nothing yet, 1 the Load screen is up, 2 captured.
+    pub load_step: u8,
 }
 
 /// Ticket #58: the Moment a `moment:` aid names.
@@ -386,7 +391,53 @@ fn build_board(session: &mut Session) {
     if session.game.as_ref().map(|g| g.is_over()).unwrap_or(false) {
         session.screen = Screen::GameOver;
     }
+    // `save:1` (a building aid, ticket #59): the release binary's own check that a save written to
+    // disk comes back the same game. It says what it found on stdout and in `<prefix>-save.txt`,
+    // because a release build has no console of its own.
+    if std::env::args().any(|a| a == "save:1") {
+        let line = save_round_trip(session);
+        println!("{line}");
+        let _ = std::fs::write(format!("{}-save.txt", session.shot_prefix), format!("{line}
+"));
+        if !line.starts_with("save round trip ok") {
+            eprintln!("{line}");
+            std::process::exit(3);
+        }
+    }
+    // `saved:1` (a building aid, ticket #59): a real Save is taken, so the top bar carries the
+    // notice it leaves and the picture shows the button as a player would have just used it.
+    if std::env::args().any(|a| a == "saved:1") {
+        session.save_now();
+    }
     session.earth_dirty = true;
+}
+
+/// Ticket #59, a building aid: write the board to the saves folder, read it back, and say whether
+/// the two are the same game.
+fn save_round_trip(session: &mut Session) -> String {
+    use dying_earth_engine::save::{self, SaveKind};
+    let Some(game) = session.game.as_ref() else { return "save round trip FAILED: there is no game".to_string() };
+    let dir = match &session.saves {
+        Ok(d) => d.clone(),
+        Err(e) => return format!("save round trip FAILED: {e}"),
+    };
+    let path = match save::save_to(&dir, game, SaveKind::Manual) {
+        Ok(p) => p,
+        Err(e) => return format!("save round trip FAILED: {e}"),
+    };
+    let loaded = match save::load_from(&path, session.tables.clone()) {
+        Ok(g) => g,
+        Err(e) => return format!("save round trip FAILED: {e}"),
+    };
+    let (a, b) = (save::to_text(game, SaveKind::Manual), save::to_text(&loaded, SaveKind::Manual));
+    match (a, b) {
+        (Ok(a), Ok(b)) if a == b => {
+            let bytes = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+            format!("save round trip ok: turn {}, {} bytes, {}", game.turn, bytes, path.display())
+        }
+        (Ok(_), Ok(_)) => "save round trip FAILED: the loaded game is not the game that was saved".to_string(),
+        _ => "save round trip FAILED: the board could not be written".to_string(),
+    }
 }
 
 /// A building aid (ticket #58): a four-way share of the Tech under research, so the top bar's
@@ -439,11 +490,67 @@ fn show_view(view: &mut ViewState, v: View) {
     view.show_tech = false;
 }
 
+/// Ticket #59, a building aid (`load:1`): three saves in the folder, so a picture of the Load list
+/// has something to show — a manual save of the player's own game, an autosave of it two turns on,
+/// and an autosave of a game nobody sits at. The AI never takes a manual save on its own.
+fn plant_saves(session: &mut Session) {
+    use dying_earth_engine::save::{self, SaveKind};
+    build_board(session);
+    let Ok(dir) = session.saves.clone() else { return };
+    if let Some(g) = &mut session.game {
+        save::save_to(&dir, g, SaveKind::Manual).ok();
+        g.seats[0].ai = true;
+        for _ in 0..2 {
+            if g.is_over() {
+                break;
+            }
+            g.end_turn(std::array::from_fn(|_| Vec::new()));
+        }
+        save::save_to(&dir, g, SaveKind::Autosave).ok();
+    }
+    let seed = session.seed.wrapping_add(1);
+    let mut watched = Game::spectate(session.tables.clone(), seed);
+    watched.start();
+    for _ in 0..2 {
+        if watched.is_over() {
+            break;
+        }
+        watched.end_turn(std::array::from_fn(|_| Vec::new()));
+    }
+    save::save_to(&dir, &watched, SaveKind::Autosave).ok();
+}
+
 pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: ResMut<Session>, mut view: ResMut<ViewState>, mut commands: Commands, mut exit: MessageWriter<AppExit>) {
     if session.mode != Mode::Shot {
         return;
     }
     let t = time.elapsed_secs();
+    // `saved:1` (a building aid, ticket #59): the Save notice is held up for the whole run, so the
+    // picture cannot be taken in the second after it has faded.
+    if let Some(text) = &plan.notice {
+        session.save_notice = Some((text.clone(), crate::app::SAVE_NOTICE_SECONDS));
+    }
+    // `load:1` (a building aid, ticket #59): a folder with three saves in it, one of them a manual
+    // save of the game in hand and two autosaves, and the title screen's Load list open over it.
+    if std::env::args().any(|a| a == "load:1") && plan.load_step < 2 {
+        if plan.load_step == 0 {
+            plant_saves(&mut session);
+            session.game = None;
+            session.refresh_saves();
+            session.screen = Screen::Load;
+            plan.load_step = 1;
+            plan.next_at = t + 2.0;
+            return;
+        }
+        if t < plan.next_at {
+            return;
+        }
+        let path = format!("{}-load.png", session.shot_prefix);
+        commands.spawn(Screenshot::primary_window()).observe(save_to_disk(path));
+        plan.load_step = 2;
+        plan.done_at = Some(t + 1.5);
+        return;
+    }
     if session.game.is_none() && !plan.menus {
         plan.menus = std::env::args().any(|a| a == "menus:1");
         if plan.menus {
@@ -543,6 +650,8 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             Some((lon.parse().ok()?, lat.parse().ok()?))
         });
         plan.climate_toggle = std::env::args().any(|a| a == "climate:toggle");
+        // Ticket #59: whatever the Save left in the top bar, held up for the rest of the run.
+        plan.notice = session.save_notice.as_ref().map(|(text, _)| text.clone());
         plan.no_panel = std::env::args().any(|a| a == "panel:0");
         apply_aids(&mut plan, &mut view);
         plan.next_at = t + 4.0;
