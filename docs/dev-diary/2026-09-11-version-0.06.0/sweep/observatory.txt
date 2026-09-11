@@ -1,0 +1,48 @@
+=== seat 0: custodians from east_asia
+seat 0: Custodians starting in EastAsia
+sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | temp at end (median) | wins by seat
+   6   300   4.0    4.0 | 15/20 |  19 (18..33) | +3.04 | [5, 0, 0, 0]
+        Custodians (seat 0):  5 win(s)
+       Prospectors (seat 1):  0 win(s)
+        Arkwrights (seat 2):  0 win(s)
+        Archivists (seat 3):  0 win(s)
+      draws 0, collapses 15/20, median collapse turn 19
+      median turn of first Colony 9
+      median Colonists off Earth at the end, all seats 16
+      Scrubbers 273, Leapfrogs 193, Constabularies 60, Sea Walls 270
+      Techs: median 9 completed, highest rung reached 3
+      Observatories standing at the end, all seeds, by seat [0, 0, 0, 0]; median Research made off Earth a game, by seat ["0", "0", "0", "0"]
+      Mars system: a Colony founded in 6/20 seeds, median first turn 23; Antarctic Colonies founded 60
+      The Archive: standing in 0/20 seeds (median turn -), complete in 0/20 (median turn -), median fund at the end 20
+      Neutral Labs paid a median 17 Research a game; Coastal Engineering complete in 20/20 seeds (median turn 13)
+      The sea: median 34 coastal slots lost a game, 24 Facilities drowned
+      The Prospectors' Venture Capital Fund at the end: median 385
+      The deck: median 13 cards drawn a game, empty at the end in 0/20 seeds
+      Emigrants: 1069 batches mustered, 60 Antarctic Colonies founded by sea
+      Seat 0 lost its start state in 0/20 seeds (median turn -)
+      Victory Conditions met outright: seed 3 Custodians (seat 0), seed 4 Custodians (seat 0), seed 13 Custodians (seat 0), seed 15 Custodians (seat 0), seed 18 Custodians (seat 0)
+      Breaks fired: Coral Die-off 20/20, Permafrost Thaw 20/20, The Sink Weakens 20/20, Ice Sheets Committed 20/20, Amazon Dieback 20/20
+=== seat 0: archivists from east_asia
+seat 0: Archivists starting in EastAsia
+sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | temp at end (median) | wins by seat
+   6   300   4.0    4.0 |  0/20 |   - (-) | +2.46 | [0, 20, 0, 0]
+        Archivists (seat 0):  0 win(s)
+        Custodians (seat 1): 20 win(s)
+       Prospectors (seat 2):  0 win(s)
+        Arkwrights (seat 3):  0 win(s)
+      draws 0, collapses 0/20, median collapse turn -
+      median turn of first Colony 10
+      median Colonists off Earth at the end, all seats 60
+      Scrubbers 590, Leapfrogs 262, Constabularies 2, Sea Walls 538
+      Techs: median 13 completed, highest rung reached 3
+      Observatories standing at the end, all seeds, by seat [0, 0, 0, 3]; median Research made off Earth a game, by seat ["0", "0", "0", "0"]
+      Mars system: a Colony founded in 19/20 seeds, median first turn 17; Antarctic Colonies founded 60
+      The Archive: standing in 0/20 seeds (median turn -), complete in 0/20 (median turn -), median fund at the end 20
+      Neutral Labs paid a median 15 Research a game; Coastal Engineering complete in 20/20 seeds (median turn 6)
+      The sea: median 30 coastal slots lost a game, 21 Facilities drowned
+      The Prospectors' Venture Capital Fund at the end: median 215
+      The deck: median 15 cards drawn a game, empty at the end in 0/20 seeds
+      Emigrants: 1324 batches mustered, 60 Antarctic Colonies founded by sea
+      Seat 0 lost its start state in 17/20 seeds (median turn 21)
+      Victory Conditions met outright: seed 1 Custodians (seat 1), seed 2 Custodians (seat 1), seed 3 Custodians (seat 1), seed 4 Custodians (seat 1), seed 5 Custodians (seat 1), seed 6 Custodians (seat 1), seed 7 Custodians (seat 1), seed 8 Custodians (seat 1), seed 9 Custodians (seat 1), seed 10 Custodians (seat 1), seed 11 Custodians (seat 1), seed 12 Custodians (seat 1), seed 13 Custodians (seat 1), seed 14 Custodians (seat 1), seed 15 Custodians (seat 1), seed 17 Custodians (seat 1), seed 18 Custodians (seat 1), seed 19 Custodians (seat 1), seed 20 Custodians (seat 1)
+      Breaks fired: Coral Die-off 20/20, Permafrost Thaw 20/20, The Sink Weakens 20/20, Ice Sheets Committed 20/20, Amazon Dieback 4/20

@@ -624,6 +624,9 @@ pub struct AiWeights {
     pub build_sea_wall: f64,
     pub raise_industry: f64,
     pub build_research_lab: f64,
+    /// Ticket #80 (version 0.06.0): an Observatory is offered, at the Research Lab weight, at a
+    /// Colony or station holding this many Colonists.
+    pub observatory_colonists: u32,
     pub build_habitat: f64,
     pub build_launch_site_or_shipyard: f64,
     pub build_colony_ship: f64,
@@ -801,10 +804,18 @@ pub struct ArchiveCard {
     pub banked_before_built: f64,
 }
 
+/// Ticket #80 (version 0.06.0): the Observatory's one figure beyond its row: the share of its
+/// Research each Colonist at its Colony adds (one per cent).
+#[derive(Debug, Clone, Deserialize)]
+pub struct ObservatoryCard {
+    pub research_per_colonist: f64,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct ModulesFile {
     module: Vec<ModuleCard>,
     archive: ArchiveCard,
+    observatory: ObservatoryCard,
 }
 #[derive(Debug, Clone, Deserialize)]
 struct UnitsFile {
@@ -874,6 +885,8 @@ pub struct Tables {
     pub modules: Vec<ModuleCard>,
     /// Ticket #51: the Archive's stages and their Research price.
     pub archive: ArchiveCard,
+    /// Ticket #80: the Observatory's Research per Colonist.
+    pub observatory: ObservatoryCard,
     pub units: Vec<UnitCard>,
     pub repair: RepairCard,
     pub techs: Vec<TechCard>,
@@ -944,6 +957,7 @@ impl Tables {
             scrubber: facilities.scrubber,
             mothball: facilities.mothball,
             archive: modules.archive,
+            observatory: modules.observatory,
             modules: modules.module,
             units: units.unit,
             repair: units.repair,

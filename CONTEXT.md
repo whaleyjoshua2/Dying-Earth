@@ -73,7 +73,7 @@ One of a fixed number of places in orbit around a Body where a Space Station can
 _Avoid_: dock, berth, orbit
 
 **Space Station**:
-A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard and Habitats. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with a bare one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom); the Arkwrights start with none, and build theirs at half price. Colonists on a station over Earth are still on Earth for Off-world Presence.
+A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard, Habitats and, since version 0.06.0, Observatories. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with a bare one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom); the Arkwrights start with none, and build theirs at half price. Colonists on a station over Earth are still on Earth for Off-world Presence.
 _Avoid_: base, platform, orbital, outpost
 
 **Trading window**:
@@ -160,8 +160,12 @@ _Avoid_: antenna, transmitter, beacon
 
 ### Pieces
 
+**Observatory**:
+The Module that makes Research away from Earth, since version 0.06.0: on a Colony, a Space Station or in Antarctica. It takes no Body yield; every Colonist living at its Colony adds one per cent to what it makes, and Public Science lifts it as it lifts a Research Lab. Its Research counts toward the Research Lead as a Lab's does.
+_Avoid_: lab, laboratory, research station, institute, science module
+
 **Module**:
-A building placed inside a Colony. Nine kinds since version 0.05: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay and the Archive, which only the Archivists raise, one to a Faction, from its own button.
+A building placed inside a Colony. Ten kinds since version 0.06.0: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, and the Archive, which only the Archivists raise, one to a Faction, from its own button. A Habitat holds eight Colonists since version 0.06.0.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:
@@ -323,7 +327,7 @@ The amount of Influence a Faction receives each turn, split freely across any nu
 _Avoid_: influence budget, diplomacy pool, action points
 
 **Research**:
-Points produced by Research Labs and spent only on Techs. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship. Since version 0.05.5 a Lab in a Nation State nobody holds, or one under Occupation, runs itself and pays half its yield into the Tech under research for no Faction; North America and South-East Asia begin with such a Lab.
+Points produced by Research Labs on Earth and, since version 0.06.0, by Observatories at Colonies and Space Stations, and spent only on Techs. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship. Since version 0.05.5 a Lab in a Nation State nobody holds, or one under Occupation, runs itself and pays half its yield into the Tech under research for no Faction; North America and South-East Asia begin with such a Lab.
 _Avoid_: science, research points, RP, fourth resource
 
 ### The turn

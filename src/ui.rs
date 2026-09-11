@@ -2110,7 +2110,8 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         }
         ui.label(RichText::new("Build (hover a button for what it makes)").strong());
         for mk in ModuleKind::BUILDABLE {
-            if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Habitat) {
+            // Ticket #80: a station holds a Shipyard, Habitats and Observatories.
+            if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory) {
                 continue;
             }
             let hover = game.module_yield(Seat(0), cid, mk).text();

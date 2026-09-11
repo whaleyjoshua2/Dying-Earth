@@ -530,6 +530,10 @@ pub struct SeatState {
     pub research_last_turn: i64,
     /// Ticket #50: all the Research this seat's own Labs have produced, counted at production.
     pub research_total: i64,
+    /// Ticket #80 (version 0.06.0): the part of it made by Observatories at Colonies and stations
+    /// not at Earth (Antarctica and a station over Earth are on Earth), for the measurement.
+    #[serde(default)]
+    pub research_off_earth_total: i64,
     pub income_last_turn: Stockpile,
     /// Last Income by source (ticket #31): "Factory in Asia", the resource, the amount; upkeep as negatives.
     pub income_sources: Vec<(String, Resource, i64)>,
@@ -675,6 +679,7 @@ impl Game {
             allotment: 0,
             research_last_turn: 0,
             research_total: 0,
+            research_off_earth_total: 0,
             income_last_turn: Stockpile::default(),
             income_sources: Vec::new(),
             archive_fund: 0,

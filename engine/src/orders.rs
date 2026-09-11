@@ -531,9 +531,9 @@ impl Game {
                 if *kind == ModuleKind::Archive {
                     return fail("the Archive is raised from its own button");
                 }
-                // Ticket #46: a station holds only a Shipyard and Habitats.
-                if col.in_orbit && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat) {
-                    return fail("a station holds only a Shipyard and Habitats");
+                // Ticket #46: a station holds only a Shipyard and Habitats; ticket #80: and Observatories.
+                if col.in_orbit && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory) {
+                    return fail("a station holds only a Shipyard, Habitats and Observatories");
                 }
                 if matches!(kind, ModuleKind::Shipyard | ModuleKind::Barracks) {
                     let has = col.modules.iter().any(|m| m.kind == *kind)

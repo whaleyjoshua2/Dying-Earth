@@ -77,6 +77,10 @@ pub struct SimResult {
     /// Coastal Engineering completed.
     pub neutral_research: i64,
     pub coastal_engineering_turn: Option<u32>,
+    /// Ticket #80 (version 0.06.0): Observatories standing at the end, per seat, and the Research
+    /// each seat's Observatories made away from Earth over the game.
+    pub observatories: [u32; 4],
+    pub research_off_earth: [i64; 4],
     /// Ticket #72: the Prospectors' Venture Capital Fund at the end.
     pub venture_fund_at_end: i64,
     /// Ticket #76: cards drawn over the game, and whether the deck ran dry.
@@ -233,15 +237,23 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         f + m
     });
     let colonists = Seat::ALL.map(|s| game.off_world_colonists(s));
+    // Ticket #80 (version 0.06.0): Observatories standing at the end, and the Research they made
+    // away from Earth over the game, per seat.
+    let observatories = Seat::ALL.map(|s| {
+        game.directed_colonies(s).iter().map(|c| game.colony(*c).unwrap().modules.iter().filter(|m| m.kind == ModuleKind::Observatory).count() as u32).sum::<u32>()
+    });
+    let research_off_earth = Seat::ALL.map(|s| game.seat(s).research_off_earth_total);
     game.log(format!(
-        "Summary: {} | last turn {} | first Colony {:?} | buildings {:?} | Colonists off Earth {:?} | temperature {:+.2} | collapse projected {:?}",
+        "Summary: {} | last turn {} | first Colony {:?} | buildings {:?} | Colonists off Earth {:?} | temperature {:+.2} | collapse projected {:?} | Observatories {:?} | Research off Earth {:?}",
         game.outcome_text(),
         game.turn,
         first_colony_turn,
         buildings,
         colonists,
         game.climate.temperature,
-        projected_collapse
+        projected_collapse,
+        observatories,
+        research_off_earth
     ));
     let influence_transfers = game.log.iter().filter(|l| !l.starts_with(' ') && l.ends_with("(Influence).")).count() as u32;
     // Ticket #52, read off the log the same way: throw-offs, Constabularies, Relief orders and the
@@ -333,6 +345,10 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         archive_fund_at_end: archivist.map(|a| game.seat(a).archive_fund).unwrap_or(0),
         neutral_research: game.research.neutral_total,
         coastal_engineering_turn,
+        observatories: Seat::ALL.map(|s| {
+            game.directed_colonies(s).iter().map(|c| game.colony(*c).unwrap().modules.iter().filter(|m| m.kind == ModuleKind::Observatory).count() as u32).sum::<u32>()
+        }),
+        research_off_earth: Seat::ALL.map(|s| game.seat(s).research_off_earth_total),
         venture_fund_at_end: Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Prospectors).map(|s| game.seat(s).venture_fund).unwrap_or(0),
         cards_drawn: game.deck.drawn.len() as u32,
         deck_empty: game.deck.cards.is_empty(),

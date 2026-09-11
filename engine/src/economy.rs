@@ -251,15 +251,25 @@ impl Game {
         // Ticket #57: the yield is the Colony Slot's own, not its Body's. The Body's figures are
         // what the slot drew from when the game started; a station in orbit keeps the Body's.
         if let Some(p) = &mc.produces {
-            let yield_ = self.colony_yields(col).of_module(kind);
-            let mut v = p.amount as f64 * yield_ * fac.output_multiplier * self.tech_output_multiplier_module(seat, kind);
-            for d in &self.discoveries {
-                if d.body == col.body && d.kind == kind {
-                    v *= d.multiplier;
+            if p.resource == Resource::Research {
+                // Ticket #80 (version 0.06.0): the Observatory. No Body yield and no output
+                // multiplier: its amount, plus one per cent for every Colonist at its Colony, times
+                // the Faction's Research multiplier and Public Science, rounded down, as a Lab is.
+                let per = t.observatory.research_per_colonist;
+                let mut r = p.amount as f64 * (1.0 + col.colonists as f64 * per) * fac.research_multiplier;
+                r *= self.tech_multiplier(seat, TechId::PublicScience);
+                y.research = r.floor() as i64;
+            } else {
+                let yield_ = self.colony_yields(col).of_module(kind);
+                let mut v = p.amount as f64 * yield_ * fac.output_multiplier * self.tech_output_multiplier_module(seat, kind);
+                for d in &self.discoveries {
+                    if d.body == col.body && d.kind == kind {
+                        v *= d.multiplier;
+                    }
                 }
+                y.resource = Some(p.resource);
+                y.amount = v.floor() as i64;
             }
-            y.resource = Some(p.resource);
-            y.amount = v.floor() as i64;
         }
         // Ticket #51: the Archive draws its Energy only once it is complete; ticket #68: that is
         // standing with its Research paid in full. Until then it costs nothing to run.
@@ -314,7 +324,8 @@ impl Game {
                     upkeep: y.upkeep,
                     output: y.resource.map(|r| (r, y.amount)),
                     extraction: matches!(m.kind, ModuleKind::Mine | ModuleKind::Refinery),
-                    research: 0,
+                    // Ticket #80: an Observatory's Research.
+                    research: y.research,
                     online: !col.grid_failed && !m.offline_until_resolution && !(m.kind == ModuleKind::Archive && occupied),
                 });
             }
@@ -424,6 +435,7 @@ impl Game {
         let (balance, shut) = self.apply_shortfall(seat, &mut producers);
         let mut gained = Stockpile::default();
         let mut research = 0;
+        let mut off_earth = 0;
         let mut extraction = 0;
         let mut sources: Vec<(String, Resource, i64)> = Vec::new();
         for p in &producers {
@@ -445,6 +457,12 @@ impl Game {
             research += p.research;
             if p.research > 0 {
                 sources.push((format!("{} in {}", p.name, where_), Resource::Research, p.research));
+                // Ticket #80: Research made off Earth, for the measurement.
+                if let ProducerPlace::Module(cid, _) = p.place
+                    && self.colony(cid).map(|c| c.body != BodyId::Earth).unwrap_or(false)
+                {
+                    off_earth += p.research;
+                }
             }
             if let Some((res, v)) = p.output {
                 match res {
@@ -503,6 +521,7 @@ impl Game {
             // Ticket #50: every seat keeps both running totals; a Faction's card says which one its
             // Victory Condition counts.
             s.research_total += research;
+            s.research_off_earth_total += off_earth;
             s.venture_fund += banked;
             s.venture_banked_last_turn = banked;
         }

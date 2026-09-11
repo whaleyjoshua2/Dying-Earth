@@ -34,7 +34,8 @@ name = "Habitat"
 materials = 25
 build_turns = 1
 energy_upkeep = 2
-holds_colonists = 4
+# Ticket #80 (version 0.06.0): 8, from 4 (the Arkwrights 12; Expanded Habitats still +2).
+holds_colonists = 8
 
 [[module]]
 id = "shipyard"
@@ -87,3 +88,19 @@ energy_upkeep = 12
 [archive]
 research = 80
 banked_before_built = 0.25
+
+# Ticket #80 (version 0.06.0): the Observatory, the one Module that makes Research, on a Colony, a
+# Space Station or in Antarctica. It takes no Body yield and no output multiplier: `amount`
+# Research a turn, plus `research_per_colonist` for every Colonist at its Colony (one per cent,
+# uncapped), times the Faction's Research multiplier and Public Science, rounded down, as a
+# Research Lab is.
+[[module]]
+id = "observatory"
+name = "Observatory"
+materials = 28
+build_turns = 2
+energy_upkeep = 3
+produces = { resource = "research", amount = 2 }
+
+[observatory]
+research_per_colonist = 0.01

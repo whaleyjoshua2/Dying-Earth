@@ -98,6 +98,9 @@ fn main() {
                     let (mut cards_drawn, mut deck_empty) = (Vec::new(), 0u32);
                     // Ticket #73: Emigrants.
                     let (mut emigrant_batches, mut by_sea) = (0u32, 0u32);
+                    // Ticket #80: Observatories and Research off Earth, per seat.
+                    let mut observatories = [0u32; 4];
+                    let mut research_off_earth: [Vec<u32>; 4] = Default::default();
                     // Ticket #75: seat 0's start state.
                     let mut home_lost = Vec::new();
                     for seed in 1..=seeds {
@@ -119,6 +122,11 @@ fn main() {
                         off_earth.push(r.colonists_off_earth.iter().sum::<u32>());
                         techs.push(r.techs_completed);
                         highest_rung = highest_rung.max(r.highest_rung);
+                        // Ticket #80: Observatories at the end and Research made off Earth, per seat.
+                        for s in 0..4 {
+                            observatories[s] += r.observatories[s];
+                            research_off_earth[s].push(r.research_off_earth[s].max(0) as u32);
+                        }
                         if let Some(t) = r.first_mars_colony_turn {
                             mars_turns.push(t);
                         }
@@ -179,6 +187,10 @@ fn main() {
                         println!("      median Colonists off Earth at the end, all seats {}", median_u(&mut off_earth));
                         println!("      Scrubbers {scrubbers}, Leapfrogs {leapfrogs}, Constabularies {constabularies}, Sea Walls {sea_walls}");
                         println!("      Techs: median {} completed, highest rung reached {highest_rung}", median_u(&mut techs));
+                        println!(
+                            "      Observatories standing at the end, all seeds, by seat {observatories:?}; median Research made off Earth a game, by seat {:?}",
+                            research_off_earth.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
+                        );
                         println!(
                             "      Mars system: a Colony founded in {}/{seeds} seeds, median first turn {}; Antarctic Colonies founded {antarctic}",
                             mars_turns.len(),

@@ -212,6 +212,25 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.energy = 60;
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
         }
+        // `observatory:<n>` (a building aid, ticket #80): seat 0 gets a Colony on Mars with three
+        // Habitats, a Generator, a Mine and an Observatory, n Colonists living there, and its card
+        // opens in the Mars picture so the Observatory's line and the build button can be seen.
+        if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("observatory:").and_then(|v| v.parse::<u32>().ok())) {
+            let slot = g.free_slots_on(BodyId::Mars).first().copied().unwrap_or(0);
+            let id = ColonyId(g.fresh_id());
+            let modules = vec![
+                Module::new(ModuleKind::Habitat),
+                Module::new(ModuleKind::Habitat),
+                Module::new(ModuleKind::Habitat),
+                Module::new(ModuleKind::Generator),
+                Module::new(ModuleKind::Mine),
+                Module::new(ModuleKind::Observatory),
+            ];
+            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: n, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.seats[0].stockpile.materials = 120;
+            g.seats[0].stockpile.energy = 60;
+            ARCHIVE_COLONY.with(|c| c.set(Some(id)));
+        }
         // `pressed:<n>` (a building aid, ticket #75): seat 0 holds North Africa (a short card) with a
         // Standing of n there, and seat 1 stands at n too, so the card's warning line shows.
         if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("pressed:").and_then(|v| v.parse::<i64>().ok())) {

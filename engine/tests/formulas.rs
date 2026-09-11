@@ -1174,10 +1174,12 @@ fn tech_hardened_hulls_adds_two_strength_to_every_ship_but_a_colony_ship_stays_a
 #[test]
 fn tech_expanded_habitats_holds_two_more() {
     let mut g = game();
+    // Ticket #80 (version 0.06.0): a Habitat holds 8; the Moon's Habitat yield is 1.1 (ticket #72),
+    // so 8.8 reads 8 and 11.0 reads 11.
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 0);
-    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 4);
+    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 8);
     with_tech(&mut g, TechId::ExpandedHabitats);
-    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 6);
+    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 11);
 }
 
 #[test]
@@ -1817,16 +1819,17 @@ fn an_arkwright_muster_takes_twice_the_population_out_of_its_state() {
 }
 
 #[test]
-fn an_arkwright_habitat_holds_six() {
+fn an_arkwright_habitat_holds_twelve() {
     let mut g = game();
-    // The Moon's Habitat yield is 1.0, so the Faction figure is all that separates them.
+    // Ticket #80 (version 0.06.0): a Habitat holds 8, the Arkwrights' 12. The Moon's Habitat yield
+    // is 1.1 (ticket #72): 8.8 reads 8, 13.2 reads 13, and with Expanded Habitats 11.0 and 16.5.
     let theirs = colony(&mut g, Seat(2), BodyId::Moon, &[ModuleKind::Habitat], 0);
     let mine = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 0);
-    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 4);
-    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 6, "half again for the Arkwrights");
+    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 8);
+    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 13, "half again for the Arkwrights");
     g.research.done.push(TechId::ExpandedHabitats);
-    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 6);
-    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 9, "(4 + 2) x 1.5");
+    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 11);
+    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 16, "(8 + 2) x 1.5 x 1.1");
 }
 
 #[test]
@@ -5224,4 +5227,64 @@ fn the_ai_spends_its_influence_on_neutral_states_while_any_are_worth_having() {
         assert!(on_held.is_empty(), "{seat:?} spent Influence on a held state with neutral ones on the board: {on_held:?}");
         assert!(orders.iter().any(|o| matches!(o, Order::Influence { target: Place::State(s), .. } if g.state(*s).control == Control::Neutral)), "{seat:?} spent nothing on a neutral state: {orders:?}");
     }
+}
+
+// ---------------------------------------------------------------- 0.06.0 ticket #80: the Observatory
+
+/// Ticket #80: an Observatory makes 2 Research, plus one per cent for every Colonist at its Colony,
+/// times the Faction's Research multiplier and Public Science, rounded down; no Body yield and no
+/// output multiplier touch it. The Archivists (x1.6) with none: 3; with 25: 2 x 1.25 x 1.6 = 4.
+#[test]
+fn observatory_makes_two_research_plus_a_per_cent_per_colonist() {
+    let mut g = game();
+    let ark = Seat(3);
+    let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Observatory, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 0);
+    let y = g.module_yield(ark, mars, ModuleKind::Observatory);
+    assert_eq!(y.resource, None, "Research is not a Stockpile resource");
+    assert_eq!(y.research, 3, "2 x 1.6 = 3.2 with no Colonists");
+    assert_eq!(y.upkeep, 3);
+    g.colony_mut(mars).unwrap().colonists = 25;
+    assert_eq!(g.module_yield(ark, mars, ModuleKind::Observatory).research, 4, "2 x 1.25 x 1.6 = 4.0 with 25 Colonists");
+    with_tech(&mut g, TechId::PublicScience);
+    assert_eq!(g.module_yield(ark, mars, ModuleKind::Observatory).research, 6, "x1.5 with Public Science");
+}
+
+/// Ticket #80: the Observatory's Research reaches the seat's Income, named by its Colony.
+#[test]
+fn observatory_research_flows_into_the_income() {
+    let mut g = game();
+    let ark = Seat(3);
+    g.seats[ark.index()].stockpile.energy = 100;
+    let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Observatory, ModuleKind::Generator], 0);
+    let before = g.seat(ark).research_last_turn;
+    g.income_phase();
+    let s = g.seat(ark);
+    assert!(s.research_last_turn >= before + 3, "3 Research from the Observatory, got {}", s.research_last_turn);
+    let name = g.place_name(Place::Colony(mars));
+    assert!(s.income_sources.iter().any(|(src, r, n)| src == &format!("Observatory in {name}") && *r == Resource::Research && *n == 3), "{:?}", s.income_sources);
+}
+
+/// Ticket #80: a Space Station holds a Shipyard, Habitats and Observatories; still no Barracks.
+#[test]
+fn observatory_stands_on_a_station_and_a_barracks_does_not() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 200;
+    let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the Custodians start with a station");
+    assert!(g.check_order(Seat(0), &[], &Order::BuildModule { colony: iss, kind: ModuleKind::Observatory }).is_ok());
+    assert!(g.check_order(Seat(0), &[], &Order::BuildModule { colony: iss, kind: ModuleKind::Barracks }).is_err());
+}
+
+/// Ticket #80: a Habitat holds 8, 12 for the Arkwrights, +2 with Expanded Habitats; read on a
+/// station, where no Body yield applies.
+#[test]
+fn a_habitat_holds_eight_and_twelve_for_the_arkwrights() {
+    let mut g = game();
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 8);
+    // The Arkwrights (seat 2) start with no station: hand them the ISS for the reading.
+    g.colony_mut(iss).unwrap().control = Control::Controlled(Seat(2));
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 12, "half again for the Arkwrights");
+    with_tech(&mut g, TechId::ExpandedHabitats);
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 15, "(8 + 2) x 1.5");
 }

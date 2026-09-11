@@ -139,10 +139,13 @@ pub enum ModuleKind {
     /// Version 0.05 (ticket #51): the Archive. Only the Archivists build it, from its own button and
     /// never through the ordinary Module build order; one Module since ticket #68 (version 0.05.5).
     Archive,
+    /// Version 0.06.0 (ticket #80): the Observatory, the one Module that makes Research, on a
+    /// Colony or a Space Station; each Colonist at its Colony adds one per cent.
+    Observatory,
 }
 
 impl ModuleKind {
-    pub const ALL: [ModuleKind; 9] = [
+    pub const ALL: [ModuleKind; 10] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -152,9 +155,10 @@ impl ModuleKind {
         ModuleKind::TradePost,
         ModuleKind::Relay,
         ModuleKind::Archive,
+        ModuleKind::Observatory,
     ];
     /// The Modules an ordinary build order may place (ticket #51: the Archive is not one of them).
-    pub const BUILDABLE: [ModuleKind; 8] = [
+    pub const BUILDABLE: [ModuleKind; 9] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -163,6 +167,7 @@ impl ModuleKind {
         ModuleKind::Barracks,
         ModuleKind::TradePost,
         ModuleKind::Relay,
+        ModuleKind::Observatory,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -175,6 +180,7 @@ impl ModuleKind {
             ModuleKind::TradePost => "Trade Post",
             ModuleKind::Relay => "Relay",
             ModuleKind::Archive => "The Archive",
+            ModuleKind::Observatory => "Observatory",
         }
     }
 }

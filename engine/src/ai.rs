@@ -664,10 +664,22 @@ impl Game {
             for mk in ModuleKind::BUILDABLE {
                 // Ticket #46: a station holds only a Shipyard and Habitats, and a Habitat over Earth
                 // houses nobody who counts as off Earth, so the AI builds none there.
-                if col.in_orbit && (mk != ModuleKind::Shipyard && (mk != ModuleKind::Habitat || col.body == BodyId::Earth)) {
+                // Ticket #80: a station holds an Observatory too.
+                if col.in_orbit && (mk != ModuleKind::Shipyard && mk != ModuleKind::Observatory && (mk != ModuleKind::Habitat || col.body == BodyId::Earth)) {
                     continue;
                 }
                 let (cat, mut base) = match mk {
+                    // Ticket #80: an Observatory once the Colony holds enough Colonists to make it worth
+                    // its keep (`observatory_colonists`), at the Research Lab's weight.
+                    ModuleKind::Observatory => {
+                        if col.colonists < self.tables.ai_weights(self.kind(seat)).observatory_colonists
+                            || col.modules.iter().any(|m| m.kind == ModuleKind::Observatory)
+                            || col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Observatory))
+                        {
+                            continue;
+                        }
+                        (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab))
+                    }
                     ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery | ModuleKind::TradePost => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                     ModuleKind::Relay => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
                     // Ticket #51: the Archive is never an ordinary Module build; it has its own order.
