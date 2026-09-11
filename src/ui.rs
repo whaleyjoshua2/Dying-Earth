@@ -1398,6 +1398,13 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
         if armies > 0 {
             text.push_str(&format!(", {armies} Army aboard"));
         }
+        // Ticket #87: the tanks, and a stack that cannot leave.
+        let fuel: i64 = ships.iter().map(|s| s.fuel).sum();
+        let tanks: i64 = ships.iter().map(|s| game.tables.unit(s.kind).tank).sum();
+        text.push_str(&format!(", tank {fuel}/{tanks}"));
+        if ships.iter().all(|s| game.stranded(s.id)) {
+            text.push_str(" - STRANDED: no leg affordable and no station of yours here");
+        }
         if marks && !ordered {
             text.push_str("  - no order");
         }
@@ -1483,6 +1490,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildArmy { place } => format!("Build Army at {}", game.place_name(*place)),
         Order::Repair { unit, points } => format!("Repair {} point(s) on {}", points, match unit { UnitRef::Ship(s) => s.to_string(), UnitRef::Army(a) => a.to_string() }),
         Order::Transit { ship, to } => format!("Send {} to {}", ship, game.tables.body(*to).name),
+        Order::Refuel { ship } => format!("Refuel {} ({} Fuel from the Stockpile)", ship, game.refuel_amount(Seat(0), *ship)),
         Order::ShipStance { body, stance } => format!("Ships at {}: {}", game.tables.body(*body).name, stance.name()),
         Order::ArmyStance { place, stance } => format!("Armies at {}: {}", game.place_name(*place), stance.name()),
         Order::MoveArmy { army, to } => format!("{} to {}", army, game.tables.state(*to).name),
@@ -2254,9 +2262,26 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         }
         let (turns, fuel) = game.transit_cost(body, to);
         ui.horizontal_wrapped(|ui| {
-            ui.label(format!("To {}: {} turn(s), {} Fuel each", game.tables.body(to).name, turns, fuel));
+            ui.label(format!("To {}: {} turn(s), {} Fuel each from the tank", game.tables.body(to).name, turns, fuel));
             for s in &ships {
-                cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to }, &format!("{} {}", s.kind.name(), s.id.0), actions);
+                // Ticket #87: the button reads the tank against the leg.
+                cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to }, &format!("{} {} ({}/{} in the tank)", s.kind.name(), s.id.0, s.fuel, game.tables.unit(s.kind).tank), actions);
+            }
+        });
+    }
+    // Ticket #87: a Refuel button per Ship at a Body with a station of yours, and a word for a
+    // Ship that is stranded.
+    ui.label(RichText::new("Tanks").strong());
+    for s in &ships {
+        let tank = game.tables.unit(s.kind).tank;
+        ui.horizontal_wrapped(|ui| {
+            ui.label(format!("{} {}: {}/{} Fuel", s.kind.name(), s.id.0, s.fuel, tank));
+            if game.own_station_at(Seat(0), body) {
+                cost_button(ui, game, &session.pending, Order::Refuel { ship: s.id }, "Refuel from the Stockpile", actions);
+            } else if game.stranded(s.id) {
+                ui.colored_label(Color32::from_rgb(230, 120, 90), "stranded: no leg it can pay, and no station of yours here to refuel at; a station built in orbit here rescues it");
+            } else {
+                ui.label("no station of yours here to refuel at");
             }
         });
     }

@@ -178,6 +178,9 @@ pub struct UnitCard {
     pub strength: i64,
     pub hit_points: u32,
     pub pursuit: u32,
+    /// Ticket #87 (version 0.06.0): the Fuel a Ship of this type carries; an Army none.
+    #[serde(default)]
+    pub tank: i64,
     pub carries_colonists: u32,
     pub carries_army: bool,
 }

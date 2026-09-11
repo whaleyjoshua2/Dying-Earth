@@ -1129,6 +1129,21 @@ impl Game {
             let ShipAt::Body(body) = s.at else { continue };
             let card = self.tables.unit(s.kind);
             let ship_name = format!("{} {}", s.kind.name(), s.id.0);
+            // Ticket #87: refuel at a station of its own whenever the tank is short and the
+            // Stockpile has Fuel; a leg the tank cannot pay is refused at the check, so the AI
+            // never flies on an empty tank.
+            if s.fuel < card.tank && self.own_station_at(seat, body) && self.seat(seat).stockpile.fuel > 0 {
+                push(
+                    vec![Order::Refuel { ship: s.id }],
+                    Cat::Transit,
+                    self.base_weight(seat, Cat::Transit),
+                    gap_for(Cat::Transit, None),
+                    1.0,
+                    1.0,
+                    format!("refuel {} at {} ({} of {} in the tank)", ship_name, self.tables.body(body).name, s.fuel, card.tank),
+                    None,
+                );
+            }
             if s.kind == UnitKind::ColonyShip {
                 // Ticket #86: behind on Off-world Presence, the AI lifts the crowded load at Earth;
                 // otherwise the safe one.
@@ -1406,10 +1421,12 @@ impl Game {
                     continue;
                 }
             }
-            // Ticket #57: the Fuel bank. Only the crossing it is held for may spend Fuel.
+            // Ticket #57: the Fuel bank. Only the crossing it is held for may spend Fuel. Ticket
+            // #87: and a Refuel, which is how the crossing's Fuel reaches the tank now.
             if let Some(note) = &fuel_held_for
                 && *note != c.note
                 && c.orders.iter().map(|o| self.order_cost(seat, o).fuel).sum::<i64>() > 0
+                && !c.orders.iter().any(|o| matches!(o, Order::Refuel { .. }))
             {
                 lines.push(format!("  save  {:6.1}  {} (banking Fuel for {})", c.score(), c.note, note));
                 continue;

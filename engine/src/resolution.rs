@@ -1139,6 +1139,8 @@ impl Game {
                     escaped: false,
                     arrived_this_turn: false,
                     built_turn: turn,
+                    // Ticket #87: built with a full tank, paid at the build.
+                    fuel: self.tables.unit(kind).tank,
                 });
             }
             _ => {}

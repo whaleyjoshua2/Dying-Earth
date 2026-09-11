@@ -12,6 +12,9 @@ pursuit = 0
 carries_colonists = 4
 # Version 0.04 (ticket #43): a Colony Ship carries Colonists only; the Carrier carries the Army.
 carries_army = false
+# Ticket #87 (version 0.06.0): every Ship carries its own Fuel in a tank of this size, filled at
+# the yard and refilled only by a Refuel order at a Body with a station of its own.
+tank = 30
 
 [[unit]]
 id = "frigate"
@@ -24,6 +27,7 @@ hit_points = 4
 pursuit = 4
 carries_colonists = 0
 carries_army = false
+tank = 30
 
 [[unit]]
 id = "battleship"
@@ -37,6 +41,7 @@ pursuit = 1
 carries_colonists = 0
 # Version 0.04 (ticket #43): a Battleship fights; it carries no Army.
 carries_army = false
+tank = 30
 
 # Version 0.04 (ticket #43): the transport for one Army and nothing else. Unarmed, so it needs an
 # escort, and a target for Intercept like a Colony Ship.
@@ -51,6 +56,7 @@ hit_points = 4
 pursuit = 0
 carries_colonists = 0
 carries_army = true
+tank = 30
 
 [[unit]]
 id = "army"

@@ -194,3 +194,35 @@ Presence lift the crowded load once the world passes +2.0 C, and about a Colonis
 it, all of them Custodians' and Prospectors' (the Arkwrights and Archivists, in seats 2 and 3, lose
 none: the Arkwrights carry eight safely and are seldom behind, the Archivists seldom fly). The
 Colonists who survive show as two more off Earth at the end in each seating. Nothing else moved.
+
+## Every Ship carries its own tank ([ticket #87](https://github.com/whaleyjoshua2/Dying-Earth/issues/87))
+
+- **tanks-solar.png** — `shot:tanks dry:1 stack:1 turns:0`. The Solar System Map with the
+  Custodians' Frigate at Mars selected, one Fuel in its tank and no station of theirs overhead.
+  The transit list reads **"To Phobos: 1 turn(s), 2 Fuel each from the tank"** with the button
+  **"Frigate 16 (1/30 in the tank)"** greyed for every leg, and the new **Tanks** section reads
+  **"Frigate 16: 1/30 Fuel — stranded: no leg it can pay, and no station of yours here to refuel
+  at; a station built in orbit here rescues it"** in red. (The greyed button says "(free)" because
+  nothing comes from the Stockpile; the tank's price is on the line above it.)
+
+### Measured, twenty seeds each, all four seatings (`sweep/tanks.txt`)
+
+Read against `sweep/gates.txt` (the crowding ticket ran only two seatings).
+
+| Seat 0 | Wins by seat | Collapses | Colonists off Earth (median) | First Mars Colony (seeds, median turn) | Refuel orders | Ships stranded at the end, by seat | Stations off Earth at the end |
+|---|---|---|---|---|---|---|---|
+| Custodians from East Asia | nobody (nobody) | 20/20 (20) | 18 (16) | 7/20, turn 13 (7, 13) | 43 | [0, 1, 0, 0] | 0 |
+| Prospectors from East Asia | Custodians 2 (2) | 18/20 (18) | 10 (12) | 20/20, turn 13 (20, 13) | 33 | [0, 0, 0, 0] | 0 |
+| Arkwrights from East Asia | Custodians 19 (18) | 1/20 (2) | 40 (39) | 17/20, **turn 25** (18, 19) | 79 | [0, 0, 0, 0] | 2 |
+| Archivists from East Asia | Custodians 16 (19) | 4/20 (1) | 53 (56) | 19/20, turn 15 (20, 15) | 114 | [0, 0, 0, **11**] | **40** |
+
+**The tank is paid for and the game goes on.** The AIs refuel at their stations 33 to 114 times a
+batch, almost nobody is stranded at the end, and Colonists off Earth, wins and Collapses hold
+within seed noise. Two things moved. **The Arkwrights' own seating founds on Mars six turns
+later** (a median turn 25 where it was 19): a Colony Ship that flies to Mars on 20 of its 30 Fuel
+cannot come home without a station over Mars, and the Arkwright AI, which starts with no station
+and has never built one off Earth, waits. **In the Archivist seating the Arkwright AI (seat 3)
+builds forty stations off Earth and still strands eleven Ships** over twenty seeds: it builds the
+station after the Ship has flown on, or over a Body its stranded Ship is not at. Both are the
+supply line the designer asked for, seen from the AI's chair; whether the Arkwright AI should
+build its forward station before the crossing is on the map.

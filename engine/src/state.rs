@@ -333,6 +333,10 @@ pub struct Ship {
     pub arrived_this_turn: bool,
     /// Turn this Ship was built, so an Army it carries can be told apart from one boarded later.
     pub built_turn: u32,
+    /// Ticket #87 (version 0.06.0): the Fuel in its tank. Filled at the yard, spent by transits,
+    /// refilled only by a Refuel order at a Body with a station of its own.
+    #[serde(default)]
+    pub fuel: i64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1052,6 +1056,39 @@ impl Game {
         let base = self.tables.unit(UnitKind::ColonyShip).carries_colonists as i64 + self.tech_addition(seat, TechId::ExpandedHabitats) + self.tech_addition(seat, TechId::GenerationShips);
         let m = self.tables.faction(self.kind(seat)).colony_ship_capacity_multiplier;
         (base.max(0) as f64 * m).floor().max(0.0) as u32
+    }
+
+    /// Ticket #87 (version 0.06.0): whether the seat holds a Space Station over this Body, where
+    /// its Ships may refuel.
+    pub fn own_station_at(&self, seat: Seat, body: BodyId) -> bool {
+        self.colonies.iter().any(|c| c.in_orbit && c.body == body && c.control.director() == Some(seat))
+    }
+
+    /// Ticket #87: what a Refuel order takes from the Stockpile: what the tank wants, as far as
+    /// the Stockpile can pay.
+    pub fn refuel_amount(&self, seat: Seat, ship: ShipId) -> i64 {
+        let Some(s) = self.ship(ship) else { return 0 };
+        let want = (self.tables.unit(s.kind).tank - s.fuel).max(0);
+        want.min(self.seat(seat).stockpile.fuel.max(0))
+    }
+
+    /// Ticket #87: the cheapest leg a seat's Ship can fly from this Body today, in Fuel.
+    pub fn cheapest_leg_from(&self, seat: Seat, body: BodyId) -> Option<i64> {
+        BodyId::ALL.into_iter().filter(|b| *b != body).map(|b| self.transit_cost_for(seat, body, b).1).min()
+    }
+
+    /// Ticket #87: a Ship at a Body whose tank cannot pay any leg from there, with no station of
+    /// its own to refuel at, is stranded until a station of its own stands in orbit there.
+    pub fn stranded(&self, ship: ShipId) -> bool {
+        let Some(s) = self.ship(ship) else { return false };
+        let ShipAt::Body(body) = s.at else { return false };
+        if self.own_station_at(s.seat, body) {
+            return false;
+        }
+        match self.cheapest_leg_from(s.seat, body) {
+            Some(cheapest) => s.fuel < cheapest,
+            None => false,
+        }
     }
 
     /// Ticket #86 (version 0.06.0): how many Colonists a Colony Ship at Earth may take beyond its

@@ -130,6 +130,8 @@ set_venture_share = "set the Venture Capital Fund to bank {share}% of its Materi
 draw_venture = "drew {n} Materials from the Venture Capital Fund"
 repair = "repaired {unit}"
 transit = "sent a {unit} to {body}"
+# Ticket #87 (version 0.06.0): the Refuel order.
+refuel = "refuelled {unit} at {body}"
 ship_stance = "set its Ships at {body} to {stance}"
 army_stance = "set its Armies at {place} to {stance}"
 move_army = "moved an Army into {state}"

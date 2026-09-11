@@ -87,6 +87,12 @@ pub struct SimResult {
     pub gate_turn: [Option<u32>; 4],
     /// Ticket #86: Colonists each seat lost in transit to crowding.
     pub lost_in_transit: [i64; 4],
+    /// Ticket #87: Ships stranded at the end (no leg their tank can pay, no station of their own
+    /// there), per seat; Refuel orders committed over the game; stations standing off Earth at
+    /// the end (a station over Earth is not one), all seats.
+    pub stranded_at_end: [u32; 4],
+    pub refuels: u32,
+    pub stations_off_earth: u32,
     /// Ticket #72: the Prospectors' Venture Capital Fund at the end.
     pub venture_fund_at_end: i64,
     /// Ticket #76: cards drawn over the game, and whether the deck ran dry.
@@ -368,6 +374,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         doubled_module_turns: Seat::ALL.map(|s| game.seat(s).doubled_module_turns),
         gate_turn,
         lost_in_transit: Seat::ALL.map(|s| game.seat(s).lost_in_transit),
+        stranded_at_end: Seat::ALL.map(|s| game.ships.iter().filter(|sh| sh.seat == s && game.stranded(sh.id)).count() as u32),
+        refuels: game.log.iter().filter(|l| l.contains(" refuels ")).count() as u32,
+        stations_off_earth: game.colonies.iter().filter(|c| c.in_orbit && c.body != BodyId::Earth).count() as u32,
         venture_fund_at_end: Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Prospectors).map(|s| game.seat(s).venture_fund).unwrap_or(0),
         cards_drawn: game.deck.drawn.len() as u32,
         deck_empty: game.deck.cards.is_empty(),

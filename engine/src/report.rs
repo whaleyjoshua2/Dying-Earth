@@ -475,6 +475,7 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("draw_venture", &["n"]),
     ("repair", &["unit"]),
     ("transit", &["unit", "body"]),
+    ("refuel", &["unit", "body"]),
     ("ship_stance", &["body", "stance"]),
     ("army_stance", &["place", "stance"]),
     ("move_army", &["state"]),

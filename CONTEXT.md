@@ -73,7 +73,15 @@ One of a fixed number of places in orbit around a Body where a Space Station can
 _Avoid_: dock, berth, orbit
 
 **Space Station**:
-A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard, Habitats and, since version 0.06.0, Observatories. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with a bare one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom); the Arkwrights start with none, and build theirs at half price. Since version 0.06.0 a station over Earth is off Earth: its Colonists count for Off-world Presence and it may hold the Archive.
+A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard, Habitats and, since version 0.06.0, Observatories. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with a bare one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom); the Arkwrights start with none, and build theirs at half price. Since version 0.06.0 a station over Earth is off Earth: its Colonists count for Off-world Presence and it may hold the Archive. A station is also the one place a Ship of its Faction can refuel.
+
+**Tank**:
+The Fuel a Ship carries, since version 0.06.0: a figure per Ship type, filled at the Shipyard for Fuel paid at the build, spent by transits, and refilled only by a Refuel. A Ship whose Tank cannot pay any leg from where it stands, with no Space Station of its Faction there, is stranded until one is built in orbit there.
+_Avoid_: fuel tank, propellant, range, fuel level
+
+**Refuel**:
+The Orders-phase order that fills a Ship's Tank from the Stockpile, as far as the Stockpile can pay, at a Body where the Ship's Faction holds a Space Station.
+_Avoid_: resupply, top up, tanker
 _Avoid_: base, platform, orbital, outpost
 
 **Trading window**:
@@ -127,7 +135,7 @@ Raw metal and ore, spent to build ships, habitats and mines.
 _Avoid_: minerals, supplies, ore
 
 **Fuel**:
-What is burned to move between Bodies. Launches and transits spend it; nothing else does.
+What is burned to move between Bodies. Since version 0.06.0 a transit spends it from the Ship's own Tank, which is filled at the Shipyard and refilled only by a Refuel order at a Body with a Space Station of the Ship's Faction; the Stockpile holds what Refineries make and the Trading window sells, and only a Refuel or a build moves it into a Tank. A lift from Earth spends none.
 _Avoid_: propellant, rocket fuel
 
 **Energy**:
@@ -135,7 +143,7 @@ What runs a mine, habitat or industry where it stands, drained every turn it ope
 _Avoid_: power, electricity
 
 **Stockpile**:
-The single shared pool holding all Materials, Fuel, Energy and, since version 0.03, Ducats. It is not divided by Body, so ore mined on Mars is immediately spendable on Earth.
+The single shared pool holding all Materials, Fuel, Energy and, since version 0.03, Ducats. It is not divided by Body, so ore mined on Mars is immediately spendable on Earth. Since version 0.06.0 its Fuel reaches a Ship only through a Refuel at a Space Station of the Ship's Faction, or at the build.
 _Avoid_: central bank, per-world stocks, inventory
 
 **Ducats**:
