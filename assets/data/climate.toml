@@ -51,7 +51,16 @@ degrees_per_ppm_step = 0.5
 # 35 and 34, ending at +3.0; at 300 only 2 and 4 of 20, ending at +2.9. 270 is the cell that keeps
 # the world hot to the last turn with Collapse a real threat and the late turns still seen. The build
 # ticket re-sweeps the whole cell over five seatings once every 0.05.5 change is in; that one counts.
-ppm_step = 270.0
+# Ticket #74 (version 0.05.5): the build ticket's re-sweep, every change of the version in, five
+# seatings (Custodians, Prospectors and Arkwrights in East Asia; Custodians and Archivists from
+# Europe), `ppm_step` {240, 270, 300, 330} x `natural_sink` {6, 8}, twenty seeds a cell, 800 games;
+# the tables are in the 0.05.5 dev diary. CHOSEN: step 300, the Sink at 6. At 300 four of the five
+# seatings end hot (+2.7 to +3.0) and their median Collapse turn is 22 to 34 of 36, with 9, 0, 7 and
+# 3 Collapses in 20; the Custodians in East Asia still collapse 15 of 20 at a median turn 19, as
+# they did at every step tried (13 of 20 at 330). At 270 three seatings collapse at a median turn
+# 18 to 22, cutting the game's second half; at 330 two boards finish comfortable at +2.4. No cell
+# fits every seating. THE DESIGNER MAY MOVE THIS: 270 for a hotter world, 330 for a kinder one.
+ppm_step = 300.0
 natural_sink = 6.0
 collapse_line = 3.0
 temperature_lag_fraction = 0.5

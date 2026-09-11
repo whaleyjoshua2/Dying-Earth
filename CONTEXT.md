@@ -5,7 +5,7 @@ A single-player, turn-based strategy game about colonizing the solar system befo
 ## Language
 
 **First Playable**:
-The small version of the game: twelve turns and two Factions as first built, twenty-four turns since version 0.02 and four Factions since version 0.05. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`, `docs/spec/version-0.03.md`, `docs/spec/version-0.04.md` and `docs/spec/version-0.05.md`.
+The small version of the game: twelve turns and two Factions as first built, twenty-four turns since version 0.02, four Factions since version 0.05 and thirty-six turns of two months since version 0.05.5. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`, `docs/spec/version-0.03.md`, `docs/spec/version-0.04.md`, `docs/spec/version-0.05.md` and `docs/spec/version-0.05.5.md`.
 _Avoid_: slice, MVP, demo, v1, prototype
 
 **Faction**:
@@ -161,7 +161,7 @@ _Avoid_: antenna, transmitter, beacon
 ### Pieces
 
 **Module**:
-A building placed inside a Colony. Nine kinds since version 0.05: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay and the Archive, which only the Archivists raise and only one stage at a time.
+A building placed inside a Colony. Nine kinds since version 0.05: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay and the Archive, which only the Archivists raise, one to a Faction, from its own button.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:
@@ -275,7 +275,7 @@ A build slot the sea never reaches: the start slots the coastal ones leave over,
 _Avoid_: safe slot, interior, highland
 
 **Coastal Exposure**:
-How much of a Nation State stands on the coast, a figure on its card. It sets how many Coastal Slots the state has, three per point, and how many of them each Sea Level threshold takes. A state with no Coastal Slots left loses no more of them, though the threshold still drives out its people and raises its Unrest.
+How much of a Nation State stands on the coast, a figure on its card. It sets how many Coastal Slots the state has, two per point since version 0.05.5 (three before), and how many of them each Sea Level threshold takes. A state with no Coastal Slots left loses no more of them, though the threshold still drives out its people and raises its Unrest.
 _Avoid_: coastline, vulnerability, flood risk
 
 **Sea Wall**:

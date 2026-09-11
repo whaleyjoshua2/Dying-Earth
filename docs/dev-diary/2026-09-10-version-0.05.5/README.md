@@ -565,3 +565,91 @@ Custodian AI puts into walls rather than Scrubbers (402 against 606 in its own s
 seeds collapse (14 against 9) and the fewer it wins (6 against 11). The wall is a trade against the
 Scrubber for the same Materials, and at no slot and 20 the AI takes it often. The designer's rule
 stands; the build ticket's re-sweep and balance report will show it in the whole.
+
+## #74: the build
+
+The last ticket on the map: the spec, the glossary, the README and the playtest note; the climate
+clock re-swept with every change in; eight batches of the four-way balance; the gates; the kits;
+the pull request. Nothing was re-tuned after the tickets closed except the climate step, which
+ticket #67 left provisional on purpose.
+
+### The climate re-sweep
+
+Five seatings (the Custodians, Prospectors and Arkwrights in East Asia; the Custodians and
+Archivists from Europe) by `ppm_step` {240, 270, 300, 330} by `natural_sink` {6, 8}, twenty seeds
+a cell, 800 games: [`sweep/climate-sweep.txt`](sweep/climate-sweep.txt). Run as
+
+```
+cargo run --release -q -p dying-earth-engine --example sweep -- 20 --player=<faction> --start=<state> --sinks=6,8 --steps=240,270,300,330
+```
+
+Chosen: **step 300, Sink 6**, and `climate.toml` carries the reasoning beside the figure. At 270
+(the provisional step) three of the five seatings collapse at a median turn 18 to 22, which cuts
+off the game's second half; at 330 two boards finish at +2.4, comfortable; at 300 four of five end
+hot (+2.7 to +3.0) with a median Collapse turn of 22 to 34 where they collapse at all. The
+Custodians in East Asia collapse at every step tried (15 of 20 at 300, 13 of 20 at 330); the Sink
+at 8 moves little. No cell fits every seating, as in 0.05, and the spec says so: 270 for a hotter
+world, 330 for a kinder one.
+
+| seating | 270 / 6 | **300 / 6** | 330 / 6 |
+| --- | --- | --- | --- |
+| Custodians in East Asia | 18/20 at 18, +3.11 | **15/20 at 19, +3.04** | 13/20 at 20, +3.03 |
+| Prospectors in East Asia | 16/20 at 21, +3.00 | **9/20 at 22, +2.79** | 9/20 at 23, +2.54 |
+| Arkwrights in East Asia | 9/20 at 30, +2.97 | **0/20, +2.74** | 0/20, +2.44 |
+| Custodians from Europe | 14/20 at 22, +3.01 | **7/20 at 29, +2.93** | 4/20 at 32, +2.78 |
+| Archivists from Europe | 7/20 at 31, +2.79 | **3/20 at 34, +2.37** | 1/20 at 34, +2.35 |
+
+### The four-way balance
+
+Eight batches at the chosen cell, seat 0 each Faction in East Asia and from Europe, twenty seeds
+each with `--balance`: [`sweep/balance.txt`](sweep/balance.txt), 160 games.
+
+| seat 0 | wins C / P / Ark / Arch | Collapses | Techs / rung | Sea Walls | Archive stood / complete | Colonists off Earth | Fund at the end | seat 0 lost its home |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Custodians in East Asia | 5 / 0 / 0 / 0 | 15/20 | 9 / 3 | 273 | 0 / 0 | 16 | 391 | 0/20 |
+| Prospectors in East Asia | 11 / 0 / 0 / 0 | 9/20 | 9 / 3 | 428 | 0 / 0 | 16 | 165 | 11/20 |
+| Arkwrights in East Asia | 19 / 0 / 1 / 0 | 0/20 | 13 / 3 | 372 | 0 / 0 | 50 | 160 | 20/20 |
+| Archivists in East Asia | 20 / 0 / 0 / 0 | 0/20 | 13 / 3 | 542 | 0 / 0 | 46 | 203 | 19/20 |
+| Custodians from Europe | 13 / 0 / 0 / 0 | 7/20 | 13 / 3 | 518 | 0 / 0 | 23 | 81 | 0/20 |
+| Prospectors from Europe | 1 / 0 / 0 / 0 | 19/20 | 13 / 3 | 414 | 0 / 0 | 20 | 498 | 12/20 |
+| Arkwrights from Europe | 20 / 0 / 0 / 0 | 0/20 | 12 / 3 | 631 | 0 / 0 | 48 | 124 | 20/20 |
+| Archivists from Europe | 14 / 0 / 2 / 1 | 3/20 | 13 / 3 | 873 | 6 / 5 | 66 | 141 | 14/20 |
+| **all eight** | **103 / 0 / 3 / 1** | **53/160** | | **4051** | **6 / 5** | | | |
+
+The headline, for the spec's "Open for the designer": 0.05's imbalance has turned over. The
+Prospectors won everything then and nothing now (the Fund ends at a median 81 to 498 of 750); the
+Custodians win 103 of 160 and met Stabilization outright in 97, which also answers the condition
+the designer set when dropping ticket #71 (the cards-and-Scrubber ticket stays dropped). The
+Archivists completed an Archive for the first time in any version, 5 of 20 from Europe at a median
+turn 25, and won one game. Seat 0 keeps its home in every seed as the Custodians and loses it in
+11 to 20 of 20 as anyone else, because the Custodian AI is the one Faction with the Influence to
+pass the threshold plus the margin. Techs run to a median 9 to 13 a game with rung 3 in every
+batch; the Mars system is reached in 6 to 20 of 20 seeds; the deck is never empty.
+
+### The documents
+
+- [`docs/spec/version-0.05.5.md`](../../spec/version-0.05.5.md): one section per ticket with its
+  numbers and files, the climate and balance tables, acceptance, "Open for the designer" and
+  every builder's call gathered.
+- `CONTEXT.md`: the Turn, the Archive, Project (retired), Research, Emigrant, Colonist, Steerage,
+  Facility, Sea Wall, Coastal Exposure (two slots a point), Event Deck, Influence, the Venture
+  Capital Fund, Extraction Total (retired), the Prospectors, Cheap Industry.
+- `README.md` and `docs/playtest/PLAYTEST.txt` for 0.05.5: thirty-six turns, what changed since
+  0.05 for a tester, and the rough edges from the balance report.
+
+### The gates
+
+`cargo clippy --workspace --all-targets -- -D warnings` clean; `cargo test --workspace`: 184
+formula tests, 6 save tests, 2 in the window crate, all passing; `cargo build --release`. The
+release binary run in `shot:` mode at turn 30 with the Victory panel open, looked at:
+[`build-earth.png`](build-earth.png) shows January 2035, turn 31 of 36, +2.7 C, the four
+conditions with the Custodians' Stabilization run at 1 of 3, the Fund at 168 of 750, and the
+Archive's fund held at 20 of 80 with no Archive standing.
+
+![The Victory panel at turn 31 of 36](build-earth.png)
+
+### The kits
+
+`dist/dying-earth-0.05.5/` (the release binary, `assets/`, `README.txt` = the playtest note) and
+`dist/dying-earth-0.05.5-playtest.zip` built here for Windows; the Linux kit from the
+`release-kits` workflow on GitHub's Ubuntu runner, downloaded to `dist/dying-earth-0.05.5-linux.zip`.
