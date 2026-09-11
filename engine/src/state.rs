@@ -198,6 +198,9 @@ pub struct NationState {
     pub thresholds_fired: Vec<bool>,
     /// Extra Emissions charged next Climate phase by a Wildfire.
     pub wildfire_emissions_next: f64,
+    /// Ticket #76 (version 0.05.5): a Drought landed here: its Facilities make half at the next Income.
+    #[serde(default)]
+    pub drought: bool,
     /// Ticket #52: Unrest, 0 to 10 (9 while the state is neutral). Ticket #53: it moves in halves.
     pub unrest: f64,
     /// Ticket #53: the state changed hands this turn, which is the one turn its Unrest does not
@@ -705,6 +708,7 @@ impl Game {
                 drowned: Vec::new(),
                 thresholds_fired: vec![false; tables.climate.sea_level_thresholds.len()],
                 wildfire_emissions_next: 0.0,
+                drought: false,
                 unrest: c.unrest,
                 changed_hands: false,
                 refugees_in: 0.0,

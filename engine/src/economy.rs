@@ -93,6 +93,10 @@ impl Game {
         }
         self.neutral_research();
         self.solar_maximum_next = false;
+        // Ticket #76: a Drought lasts one Income.
+        for s in &mut self.states {
+            s.drought = false;
+        }
         for d in &mut self.discoveries {
             d.turns_left = d.turns_left.saturating_sub(1);
         }
@@ -278,14 +282,17 @@ impl Game {
                     continue;
                 }
                 let y = self.facility_yield(seat, sid, f.kind);
+                // Ticket #76: a Drought halves what the state's Facilities make at this Income.
+                let dry = if st.drought { self.tables.events.drought_output_multiplier } else { 1.0 };
+                let halve = |v: i64| if st.drought { (v as f64 * dry).floor() as i64 } else { v };
                 out.push(Producer {
                     place: ProducerPlace::Facility(sid, i),
                     name: f.kind.name(),
                     is_module: false,
                     upkeep: y.upkeep,
-                    output: y.resource.map(|r| (r, y.amount)),
+                    output: y.resource.map(|r| (r, halve(y.amount))),
                     extraction: matches!(f.kind, FacilityKind::Factory | FacilityKind::Refinery),
-                    research: y.research,
+                    research: halve(y.research),
                     online: !f.offline_until_resolution,
                 });
             }

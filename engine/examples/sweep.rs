@@ -94,6 +94,8 @@ fn main() {
                     let (mut slots_lost, mut drowned) = (Vec::new(), Vec::new());
                     // Ticket #72: the Prospectors' Fund.
                     let mut venture = Vec::new();
+                    // Ticket #76: the deck.
+                    let (mut cards_drawn, mut deck_empty) = (Vec::new(), 0u32);
                     for seed in 1..=seeds {
                         let r = dying_earth_engine::sim::run_from(tables.clone(), seed, player, start);
                         match r.outcome {
@@ -128,6 +130,10 @@ fn main() {
                         slots_lost.push(r.coastal_slots_lost);
                         drowned.push(r.facilities_drowned);
                         venture.push(r.venture_fund_at_end.max(0) as u32);
+                        cards_drawn.push(r.cards_drawn);
+                        if r.deck_empty {
+                            deck_empty += 1;
+                        }
                         if let Some(t) = r.coastal_engineering_turn {
                             coastal_engineering.push(t);
                         }
@@ -185,6 +191,7 @@ fn main() {
                         );
                         println!("      The sea: median {} coastal slots lost a game, {} Facilities drowned", median_u(&mut slots_lost), median_u(&mut drowned));
                         println!("      The Prospectors' Venture Capital Fund at the end: median {}", median_u(&mut venture));
+                        println!("      The deck: median {} cards drawn a game, empty at the end in {deck_empty}/{seeds} seeds", median_u(&mut cards_drawn));
                         println!(
                             "      Victory Conditions met outright: {}",
                             if victory_met.is_empty() { "none in any seed".to_string() } else { victory_met.join(", ") }

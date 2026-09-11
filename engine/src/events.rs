@@ -1,5 +1,5 @@
-//! The Event Deck (spec 13, amended by ticket #25): thirty cards, no Calm Cards, a draw chance that
-//! rises with the Temperature, and eighteen Events.
+//! The Event Deck (spec 13, amended by ticket #25): no Calm Cards, a draw chance that rises with the
+//! Temperature, and twenty-two Events over forty cards since ticket #76 (version 0.05.5).
 
 use crate::data::Tables;
 use crate::ids::*;
@@ -122,14 +122,35 @@ impl Game {
                     None => (EventTarget::None, format!("{}: no Colony has a Generator, so nothing happens.", card.name)),
                 }
             }
-            EventId::DustStorm => {
-                if self.colonies.iter().any(|c| c.body == BodyId::Mars && !c.modules.is_empty()) {
-                    let what = if self.has_tech(TechId::ClosedLoopColonies) { "no effect (Closed-Loop Colonies)" } else { "every Module on Mars is offline until the next Resolution" };
-                    (EventTarget::Body(BodyId::Mars), format!("{}: {what}.", card.name))
+            // Ticket #76: a Moonquake is the Moon's Dust Storm.
+            EventId::DustStorm | EventId::Moonquake => {
+                let body = if id == EventId::DustStorm { BodyId::Mars } else { BodyId::Moon };
+                if self.colonies.iter().any(|c| c.body == body && !c.modules.is_empty()) {
+                    let what = if self.has_tech(TechId::ClosedLoopColonies) { "no effect (Closed-Loop Colonies)".to_string() } else { format!("every Module on {} is offline until the next Resolution", t.body(body).name) };
+                    (EventTarget::Body(body), format!("{}: {what}.", card.name))
                 } else {
-                    (EventTarget::None, format!("{}: nobody lives on Mars, so nothing happens.", card.name))
+                    (EventTarget::None, format!("{}: nobody lives on {}, so nothing happens.", card.name, t.body(body).name))
                 }
             }
+            // Ticket #76: a Helium-3 Vein is the Moon's Rich Seam, for its Generators.
+            EventId::HeliumVein => {
+                if self.colonies.iter().any(|c| c.body == BodyId::Moon && c.modules.iter().any(|m| m.kind == ModuleKind::Generator)) {
+                    let m = if self.has_tech(TechId::EfficientGrids) { t.events.discovery_multiplier_with_tech } else { t.events.discovery_multiplier };
+                    (EventTarget::Body(BodyId::Moon), format!("{}: the Moon's Generators produce x{} for {} turns.", card.name, m, t.events.discovery_turns))
+                } else {
+                    (EventTarget::None, format!("{}: no Generator stands on the Moon, so nothing happens.", card.name))
+                }
+            }
+            // Ticket #76: the one card that cools.
+            EventId::VolcanicEruption => (EventTarget::Everyone, format!("{}: {:.1} ppm leave the CO2 Stock at once (x{:.2} at this Temperature).", card.name, t.events.volcanic_co2 * scale, scale)),
+            // Ticket #76: a Drought halves a state's Facilities at the next Income.
+            EventId::Drought => match self.pick_state_by_population() {
+                Some(s) => {
+                    let what = if self.has_tech(TechId::GreenConsensus) { "no effect (Green Consensus)".to_string() } else { format!("its Facilities make half at the next Income, and its Unrest rises by {}", Game::unrest_figure(t.events.drought_unrest)) };
+                    (EventTarget::State(s), format!("{} in {}: {what}.", card.name, t.state(s).name))
+                }
+                None => (EventTarget::None, format!("{}: nobody lives anywhere, so nothing happens.", card.name)),
+            },
             EventId::RichSeam | EventId::IceDeposit => {
                 let kind = if id == EventId::RichSeam { ModuleKind::Mine } else { ModuleKind::Refinery };
                 let bodies: Vec<BodyId> = BodyId::ALL
@@ -216,6 +237,11 @@ impl Game {
     /// as a climate source, so the green Techs and a Constabulary damp it.
     fn climate_card_unrest(&mut self, s: StateId) {
         let n = self.tables.unrest.climate_card;
+        self.climate_unrest_by(s, n);
+    }
+
+    /// Ticket #76: the same rise by a card's own figure (a Drought's).
+    fn climate_unrest_by(&mut self, s: StateId, n: f64) {
         let rose = self.raise_unrest(s, n, UnrestSource::Climate);
         if rose > 0.0 {
             let line = format!("{}: Unrest rose by {} to {}.", self.tables.state(s).name, Game::unrest_figure(rose), self.unrest_text(s));
@@ -289,7 +315,7 @@ impl Game {
                     }
                 }
             }
-            (EventId::DustStorm, EventTarget::Body(b)) => {
+            (EventId::DustStorm, EventTarget::Body(b)) | (EventId::Moonquake, EventTarget::Body(b)) => {
                 if !self.has_tech(TechId::ClosedLoopColonies) {
                     for col in self.colonies.iter_mut().filter(|c| c.body == b) {
                         col.grid_failed = true;
@@ -304,6 +330,22 @@ impl Game {
                 let tech = if id == EventId::RichSeam { TechId::DeepMining } else { TechId::AutomatedRefining };
                 let m = if self.has_tech(tech) { t.events.discovery_multiplier_with_tech } else { t.events.discovery_multiplier };
                 self.discoveries.push(Discovery { body: b, kind, multiplier: m, turns_left: t.events.discovery_turns });
+            }
+            // Ticket #76: the Moon's Generators, as Rich Seam does for a Body's Mines.
+            (EventId::HeliumVein, EventTarget::Body(b)) => {
+                let m = if self.has_tech(TechId::EfficientGrids) { t.events.discovery_multiplier_with_tech } else { t.events.discovery_multiplier };
+                self.discoveries.push(Discovery { body: b, kind: ModuleKind::Generator, multiplier: m, turns_left: t.events.discovery_turns });
+            }
+            // Ticket #76: the one card that cools, scaled like every Climate card.
+            (EventId::VolcanicEruption, EventTarget::Everyone) => {
+                self.climate.co2 = (self.climate.co2 - t.events.volcanic_co2 * ev.scale).max(0.0);
+            }
+            // Ticket #76: a Drought, unless Green Consensus blunts it.
+            (EventId::Drought, EventTarget::State(s)) => {
+                if !self.has_tech(TechId::GreenConsensus) {
+                    self.state_mut(s).drought = true;
+                    self.climate_unrest_by(s, t.events.drought_unrest);
+                }
             }
             (EventId::Breakthrough, EventTarget::Tech) => {
                 let r = if self.has_tech(TechId::PublicScience) { t.events.breakthrough_research_public_science } else { t.events.breakthrough_research };

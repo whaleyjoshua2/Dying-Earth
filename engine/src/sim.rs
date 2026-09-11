@@ -79,6 +79,9 @@ pub struct SimResult {
     pub coastal_engineering_turn: Option<u32>,
     /// Ticket #72: the Prospectors' Venture Capital Fund at the end.
     pub venture_fund_at_end: i64,
+    /// Ticket #76: cards drawn over the game, and whether the deck ran dry.
+    pub cards_drawn: u32,
+    pub deck_empty: bool,
     /// Ticket #58: how many Moments the turns of this game earned, how many the cap of two and the
     /// defaults in `report.toml` actually showed, how many turns stopped for at least one, and the
     /// most any one turn showed.
@@ -321,6 +324,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         neutral_research: game.research.neutral_total,
         coastal_engineering_turn,
         venture_fund_at_end: Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Prospectors).map(|s| game.seat(s).venture_fund).unwrap_or(0),
+        cards_drawn: game.deck.drawn.len() as u32,
+        deck_empty: game.deck.cards.is_empty(),
         moments_earned,
         moments_shown,
         turns_with_moment,

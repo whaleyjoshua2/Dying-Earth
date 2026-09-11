@@ -1,7 +1,10 @@
-# Spec section 13, amended by ticket #25 (version 0.02) and #32 (0.03): no Calm Cards. The deck holds
-# twenty-eight cards: ten first-playable Events twice, and eight later ones once. Each turn a card is drawn with
-# draw_chance_base at +1.2 C, rising by draw_chance_per_step for every full draw_chance_step_degrees
-# above it (50% at +1.2, 72.5% at +3.0). The deck is never reshuffled.
+# Spec section 13, amended by ticket #25 (version 0.02) and #32 (0.03): no Calm Cards. Ticket #76
+# (version 0.05.5): the deck holds FORTY cards for a thirty-six-turn game: the twenty-eight of before
+# (ten first-playable Events twice, eight later ones once), a third copy of Heatwave, Wildfire, Rich
+# Seam and Solar Storm, a second copy of Unrest, Methane Burst, Labour Dispute and Dust Storm, and
+# four new Events once each (Drought, Volcanic Eruption, Moonquake, Helium-3 Vein). Each turn a card
+# is drawn with draw_chance_base at +1.2 C, rising by draw_chance_per_step for every full
+# draw_chance_step_degrees above it (50% at +1.2, 72.5% at +3.0). The deck is never reshuffled.
 # Climate cards still scale by 1 + (Temperature - 1.2) / 2.
 
 draw_chance_base = 0.5
@@ -23,6 +26,14 @@ discovery_turns = 2
 heatwave_loss = 0.05
 heatwave_loss_green_consensus = 0.025
 wildfire_emissions = 2.0
+# Ticket #76 (version 0.05.5): the four new Events' figures. A Drought halves a state's Facilities
+# at the next Income and raises its Unrest by this much (flat: the one Climate card the Temperature
+# scale does not reach, since a halving cannot scale); a Volcanic Eruption takes this many ppm from
+# the CO2 Stock at once, scaled like every Climate card; a Helium-3 Vein reads the discovery
+# figures above, as Rich Seam does.
+drought_output_multiplier = 0.5
+drought_unrest = 1.0
+volcanic_co2 = 5.0
 
 [[event]]
 id = "solar_storm"
@@ -31,7 +42,7 @@ kind = "solar"
 target = "everyone"
 effect = "No transit advances this turn"
 blunted_by = "efficient_transit"
-copies = 2
+copies = 3
 
 [[event]]
 id = "radiation_surge"
@@ -69,7 +80,7 @@ kind = "failure"
 target = "nation_state"
 effect = "Its Facilities make nothing at the next Income"
 blunted_by = "public_science"
-copies = 1
+copies = 2
 
 [[event]]
 id = "grid_failure"
@@ -87,7 +98,7 @@ kind = "discovery"
 target = "body"
 effect = "Its Mines produce x2 for two turns"
 blunted_by = "deep_mining"
-copies = 2
+copies = 3
 
 [[event]]
 id = "ice_deposit"
@@ -114,7 +125,7 @@ kind = "climate"
 target = "nation_state"
 effect = "Population -5% now"
 blunted_by = "green_consensus"
-copies = 2
+copies = 3
 
 [[event]]
 id = "wildfire"
@@ -123,7 +134,7 @@ kind = "climate"
 target = "nation_state"
 effect = "One Facility offline until next Resolution; +2.0 Emissions next turn"
 blunted_by = "clean_manufacturing"
-copies = 2
+copies = 3
 
 [[event]]
 id = "storm_surge"
@@ -160,7 +171,7 @@ kind = "failure"
 target = "mars"
 effect = "Every Module on Mars is offline until the next Resolution"
 blunted_by = "closed_loop_colonies"
-copies = 1
+copies = 2
 
 [[event]]
 id = "unrest"
@@ -168,7 +179,7 @@ name = "Unrest"
 kind = "failure"
 target = "nation_state"
 effect = "Its Unrest rises by 3"
-copies = 1
+copies = 2
 
 [[event]]
 id = "reactor_leak"
@@ -186,4 +197,41 @@ kind = "climate"
 target = "everyone"
 effect = "+2.5 Emissions next turn, scaled by the Temperature"
 blunted_by = "green_consensus"
+copies = 2
+
+# Ticket #76 (version 0.05.5): the four new Events, once each.
+
+[[event]]
+id = "drought"
+name = "Drought"
+kind = "climate"
+target = "nation_state"
+effect = "Its Facilities make half at the next Income; its Unrest rises by 1"
+blunted_by = "green_consensus"
+copies = 1
+
+[[event]]
+id = "volcanic_eruption"
+name = "Volcanic Eruption"
+kind = "climate"
+target = "everyone"
+effect = "5 ppm leave the CO2 Stock at once, scaled by the Temperature"
+copies = 1
+
+[[event]]
+id = "moonquake"
+name = "Moonquake"
+kind = "failure"
+target = "moon"
+effect = "Every Module on the Moon is offline until the next Resolution"
+blunted_by = "closed_loop_colonies"
+copies = 1
+
+[[event]]
+id = "helium_vein"
+name = "Helium-3 Vein"
+kind = "discovery"
+target = "moon"
+effect = "The Moon's Generators produce x2 for two turns"
+blunted_by = "efficient_grids"
 copies = 1

@@ -101,7 +101,7 @@ An unplanned occurrence drawn from the Event Deck after orders are committed and
 _Avoid_: incident, crisis, card
 
 **Event Deck**:
-The deck a card may be drawn from each turn, holding only Events: twenty-eight cards since version 0.03, ten of the First Playable's Events twice each and eight newer ones once. It is never reshuffled. Whether a card is drawn at all is the Draw Chance.
+The deck a card may be drawn from each turn, holding only Events: forty cards since version 0.05.5 for a game of thirty-six turns (twenty-eight before), twenty-two Events in one to three copies each. It is never reshuffled. Whether a card is drawn at all is the Draw Chance.
 _Avoid_: event pool, random table, encounter deck, calm card (retired in version 0.02)
 
 **Draw Chance**:

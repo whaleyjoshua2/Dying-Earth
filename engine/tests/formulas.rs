@@ -910,7 +910,24 @@ fn a_card_comes_on_about_half_the_turns_at_the_start_and_more_when_warm() {
 #[test]
 fn the_deck_is_twenty_six_cards_as_the_table_deals_them_and_no_calm() {
     let g = game();
-    assert_eq!(g.deck.cards.len(), 28, "ten first-playable Events twice, eight later ones once (#25, #32)");
+    // Ticket #76 (version 0.05.5): forty cards for thirty-six turns. The 28 of #25 and #32, a third
+    // copy of Heatwave, Wildfire, Rich Seam and Solar Storm, a second of Unrest, Methane Burst,
+    // Labour Dispute and Dust Storm, and four new Events once each.
+    assert_eq!(g.deck.cards.len(), 40, "forty cards for thirty-six turns (#76)");
+    let copies = |id: EventId| g.deck.cards.iter().filter(|c| **c == Card::Event(id)).count();
+    for id in [EventId::Heatwave, EventId::Wildfire, EventId::RichSeam, EventId::SolarStorm] {
+        assert_eq!(copies(id), 3, "{id:?} three times");
+    }
+    for id in [EventId::Unrest, EventId::MethaneBurst, EventId::LabourDispute, EventId::DustStorm] {
+        assert_eq!(copies(id), 2, "{id:?} twice");
+    }
+    for id in [EventId::RadiationSurge, EventId::CommsBlackout, EventId::GridFailure, EventId::IceDeposit, EventId::Breakthrough, EventId::StormSurge] {
+        assert_eq!(copies(id), 2, "{id:?} still twice");
+    }
+    for id in [EventId::LaunchPadFire, EventId::SolarMaximum, EventId::MeteorShower, EventId::ReactorLeak] {
+        assert_eq!(copies(id), 1, "{id:?} still once");
+    }
+    assert_eq!(EventId::ALL.len(), 22, "eighteen Events and the four of #76");
     for e in &g.tables.events.event {
         assert_eq!(g.deck.count(e.id), e.copies as usize, "{}", e.name);
     }
@@ -4913,4 +4930,92 @@ fn the_prospector_ai_sets_its_share_to_reach_the_fund_in_time_and_maxes_it_when_
     let orders = g.ai_orders(pro);
     let share = orders.iter().find_map(|o| if let Order::SetVentureShare { share } = o { Some(*share) } else { None });
     assert_eq!(share, Some(80), "{orders:?}");
+}
+
+// ---------------------------------------------------------------- Ticket #76 (version 0.05.5): the four new Events
+
+/// Ticket #76: a Drought halves a state's Facilities at the next Income, once, and raises its
+/// Unrest by 1 as a climate source; Green Consensus blunts it.
+#[test]
+fn a_drought_halves_a_states_facilities_at_the_next_income_and_raises_its_unrest_by_one() {
+    let mut g = game();
+    calm(&mut g);
+    g.take_control(StateId::Europe, Seat(0));
+    g.state_mut(StateId::Europe).facilities = vec![facility(FacilityKind::Factory)];
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 4, "a Custodian Factory makes 4");
+    drawn(&mut g, EventId::Drought, EventTarget::State(StateId::Europe));
+    g.apply_event_now();
+    assert_eq!(g.state(StateId::Europe).unrest, 1.0, "Unrest rose by 1");
+    assert!(g.state(StateId::Europe).drought);
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 2, "half of 4 at the next Income");
+    assert!(!g.state(StateId::Europe).drought, "and the Drought is spent");
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 4, "one Income only");
+    // Green Consensus blunts it entirely.
+    with_tech(&mut g, TechId::GreenConsensus);
+    drawn(&mut g, EventId::Drought, EventTarget::State(StateId::Europe));
+    g.apply_event_now();
+    assert!(!g.state(StateId::Europe).drought);
+    assert_eq!(g.state(StateId::Europe).unrest, 1.0, "no further rise");
+}
+
+/// Ticket #76: a Volcanic Eruption takes 5 ppm from the CO2 Stock at once, scaled like every
+/// Climate card (x1.00 at +1.2 C).
+#[test]
+fn a_volcanic_eruption_takes_five_ppm_from_the_co2_stock_at_once() {
+    let mut g = game();
+    let before = g.climate.co2;
+    drawn(&mut g, EventId::VolcanicEruption, EventTarget::Everyone);
+    g.apply_event_now();
+    assert!((before - g.climate.co2 - 5.0).abs() < 1e-9, "{} to {}", before, g.climate.co2);
+    // Hotter, it scales: at +2.2 the scale is x1.50, so 7.5 ppm.
+    hold_temperature(&mut g, 2.2);
+    let before = g.climate.co2;
+    drawn(&mut g, EventId::VolcanicEruption, EventTarget::Everyone);
+    g.apply_event_now();
+    assert!((before - g.climate.co2 - 7.5).abs() < 1e-9, "{} to {}", before, g.climate.co2);
+}
+
+/// Ticket #76: a Moonquake idles every Module on the Moon until the next Resolution and touches
+/// nothing on Mars; Closed-Loop Colonies makes it nothing.
+#[test]
+fn a_moonquake_idles_every_module_on_the_moon_and_nothing_on_mars() {
+    let mut g = game();
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Generator], 0);
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 0);
+    drawn(&mut g, EventId::Moonquake, EventTarget::Body(BodyId::Moon));
+    g.apply_event_now();
+    assert!(g.colony(moon).unwrap().modules.iter().all(|m| !m.online), "the Moon is dark");
+    assert!(g.colony(mars).unwrap().modules.iter().all(|m| m.online), "Mars is untouched");
+    // Closed-Loop Colonies: nothing.
+    for m in &mut g.colony_mut(moon).unwrap().modules {
+        m.online = true;
+    }
+    g.colony_mut(moon).unwrap().grid_failed = false;
+    with_tech(&mut g, TechId::ClosedLoopColonies);
+    drawn(&mut g, EventId::Moonquake, EventTarget::Body(BodyId::Moon));
+    g.apply_event_now();
+    assert!(g.colony(moon).unwrap().modules.iter().all(|m| m.online), "immune");
+}
+
+/// Ticket #76: a Helium-3 Vein doubles the Moon's Generators for two turns, as Rich Seam does for a
+/// Body's Mines, and Efficient Grids makes it x3.
+#[test]
+fn a_helium_three_vein_doubles_the_moons_generators_for_two_turns_and_triples_with_efficient_grids() {
+    let mut g = game();
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator], 0);
+    let _ = moon;
+    let plain = income_of(&mut g, Seat(0)).energy;
+    drawn(&mut g, EventId::HeliumVein, EventTarget::Body(BodyId::Moon));
+    g.apply_event_now();
+    assert_eq!(g.discoveries.len(), 1);
+    assert_eq!((g.discoveries[0].body, g.discoveries[0].kind, g.discoveries[0].multiplier), (BodyId::Moon, ModuleKind::Generator, 2.0));
+    // A Moon Generator makes 5 x 1.375 = 6 (rounded down); doubled, 13: seven more Energy.
+    let boosted = income_of(&mut g, Seat(0)).energy;
+    assert_eq!(boosted - plain, 7, "{plain} to {boosted}");
+    income_of(&mut g, Seat(0));
+    assert!(g.discoveries.is_empty(), "two Incomes and it is spent");
+    with_tech(&mut g, TechId::EfficientGrids);
+    drawn(&mut g, EventId::HeliumVein, EventTarget::Body(BodyId::Moon));
+    g.apply_event_now();
+    assert_eq!(g.discoveries[0].multiplier, 3.0, "x3 with Efficient Grids");
 }

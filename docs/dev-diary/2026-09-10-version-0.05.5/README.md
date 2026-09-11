@@ -313,3 +313,42 @@ seating on Stabilization. It is written up as its own ticket for the designer, b
   Victory panel with the Prospectors in seat 0: **"Venture Capital Fund: 120 of 750"**, the row of
   share buttons from 0% to 80% with **50% lit**, and **"Draw 10 from the Fund"**. The first take
   had the Climate Panel over the share row, and was retaken with `panel:0`.
+
+## #76: a deck for thirty-six turns
+
+[The ticket](https://github.com/whaleyjoshua2/Dying-Earth/issues/76), added by the designer while
+the map was worked: the 28-card deck was sized for twenty-four turns and a hot thirty-six-turn game
+could draw it dry. Now **40 cards**, never reshuffled, the draw chance unchanged: a third copy of
+Heatwave, Wildfire, Rich Seam and Solar Storm, a second of Unrest, Methane Burst, Labour Dispute and
+Dust Storm, and four new Events once each.
+
+| card | kind | target | effect | blunted by |
+| --- | --- | --- | --- | --- |
+| **Drought** | climate | a Nation State | its Facilities make half at the next Income; Unrest +1 | Green Consensus |
+| **Volcanic Eruption** | climate | everyone | 5 ppm leave the CO2 Stock at once, scaled by the Temperature | nothing |
+| **Moonquake** | failure | the Moon | every Module on the Moon offline until the next Resolution | Closed-Loop Colonies |
+| **Helium-3 Vein** | discovery | the Moon | the Moon's Generators x2 for two turns | Efficient Grids (x3) |
+
+**Builder's calls.** A Drought is the one Climate card the Temperature scale does not reach, since a
+halving cannot scale; its Unrest rise is a flat 1 as a climate source. A Volcanic Eruption scales, so
+it cools more when the world is hotter. A Moonquake shares the Dust Storm's arm with the Moon in
+place of Mars; a Helium-3 Vein is a discovery on Generators, as Rich Seam is on Mines. Figures in
+`events.toml`: `drought_output_multiplier` 0.5, `drought_unrest` 1.0, `volcanic_co2` 5.0.
+
+### Measured, twenty seeds each
+
+| seat 0 | cards drawn a game (median) | deck empty at the end |
+| --- | --- | --- |
+| Prospectors in East Asia | 11 | 0/20 |
+| Custodians from Europe | 17 | 0/20 |
+
+Both low because the Custodians win outright around turn 20 in every seed (the home-state finding);
+a game that runs its thirty-six turns hot would draw 22 to 26 of the 40.
+
+### Picture
+
+![The Climate Panel at turn 1 with the line "a card comes 50% of turns at this Temperature (40 cards left in the deck, 12 of them Climate)"](deck-earth.png)
+
+- **deck-earth.png** — `shot:deck turns:0`. The Climate Panel's penalties line at turn 1: **"40
+  cards left in the deck, 12 of them Climate"**, where 0.05 read 28 and 7. Twelve is three
+  Heatwaves, three Wildfires, two Storm Surges, two Methane Bursts, the Drought and the Eruption.

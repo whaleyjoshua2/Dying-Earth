@@ -242,6 +242,10 @@ pub struct EventsTable {
     pub heatwave_loss: f64,
     pub heatwave_loss_green_consensus: f64,
     pub wildfire_emissions: f64,
+    /// Ticket #76 (version 0.05.5): Drought, Volcanic Eruption; Helium-3 Vein reads the discovery figures.
+    pub drought_output_multiplier: f64,
+    pub drought_unrest: f64,
+    pub volcanic_co2: f64,
     pub event: Vec<EventCard>,
 }
 
