@@ -479,7 +479,8 @@ the weight to 1.0.
 
 The home holds for half the Prospector seeds now and for eleven turns where it held for seven, the
 Fund fills to a median 219 of 750, and the Custodians' wins fall by half in two seatings. The
-Archivists still lose East Asia in every seed, four turns later: a one-state Faction at Influence
-x1.0 beside a Custodian at x1.25 pouring 25 a turn in cannot hold the richest state on the board
-past turn 22 whatever it starts with. That, and the Sea Wall count back at 0 in these batches (the
+Archivists still lose East Asia in every seed, four turns later. No rule limits a Faction to one
+state (the Archivist AI took a second one fourteen times in a twenty-seed batch); in AI play they
+usually hold only their start state, at Influence x1.0 beside a Custodian at x1.25 pouring 25 a
+turn in, and cannot hold the richest state on the board past turn 22 whatever it starts with. That, and the Sea Wall count back at 0 in these batches (the
 AI's Allotment now goes to holds), are the build ticket's to report.
