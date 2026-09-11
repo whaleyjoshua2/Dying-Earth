@@ -3323,6 +3323,14 @@ fn h_committed_warming_is_the_temperature_the_stock_delivers_once_the_lag_catche
     assert!((g.climate.temperature - g.target_temperature()).abs() < 1e-9, "{} against {}", g.climate.temperature, g.target_temperature());
 }
 
+/// Ticket #60: the (i) paths below are worked examples in ppm, and every ppm figure in them is read
+/// against `ppm_step`, which is re-swept on every ticket that changes the board (150 on #53, 180 on
+/// #60). Scaling a figure with the step keeps the Temperature arithmetic -- and so the answer the
+/// example was written for -- exactly as it was, whatever the step becomes next.
+fn at_the_step(g: &Game, at_150: f64) -> f64 {
+    at_150 * g.tables.climate.ppm_step / 150.0
+}
+
 /// A constructed path: `gross` ppm of Emissions a turn against the Sink as it stands, at `temp`
 /// with the CO2 Stock `above` ppm over its starting figure.
 fn path(g: &mut Game, gross: f64, temp: f64, above: f64) {
@@ -3333,15 +3341,18 @@ fn path(g: &mut Game, gross: f64, temp: f64, above: f64) {
 }
 
 /// (i) The Last Turn, on a path whose answer can be worked out by hand. Turn 1 of 24, the Stock 405
-/// ppm above its start (target +2.55 C), the Temperature +1.5, and 20 ppm a turn going in. Cutting
-/// net Emissions to zero at turn k freezes the Stock at 405 + (k - 2) x 20 ppm above the start, and
-/// the Temperature then arrives at 1.2 + 0.5 x that / 150. At k = 8 that is 1.2 + 0.5 x 525 / 150 =
-/// +2.95 C, under the Collapse Line; at k = 9 it is +3.017 C, over it. So the answer is 8.
+/// ppm above its start at a step of 150 (target +2.55 C), the Temperature +1.5, and 20 ppm NET a
+/// turn going in. Cutting net Emissions to zero at turn k freezes the Stock at 405 + (k - 2) x 20
+/// ppm above the start, and the Temperature then arrives at 1.2 + 0.5 x that / 150. At k = 8 that is
+/// +2.95 C, under the Collapse Line; at k = 9 it is +3.02 C, over it. So the answer is 8. Both ppm
+/// figures are taken at the step in force (`at_the_step`), so every ratio in that arithmetic, and
+/// so the answer, is the same whatever the step is.
 #[test]
 fn i_a_the_last_turn_is_the_latest_turn_a_cut_still_avoids_collapse() {
     let mut g = game();
     calm(&mut g);
-    path(&mut g, 26.0, 1.5, 405.0);
+    let (net, above, sink) = (at_the_step(&g, 20.0), at_the_step(&g, 405.0), g.climate.natural_sink);
+    path(&mut g, net + sink, 1.5, above);
     assert_eq!(g.turn, 1);
     assert_eq!(g.last_turn_to_act(), LastTurn::Turn(8));
 }
@@ -3361,7 +3372,8 @@ fn i_b_the_last_turn_says_so_when_the_path_never_collapses() {
 fn i_c_the_last_turn_says_so_when_cuts_alone_no_longer_avoid_collapse() {
     let mut g = game();
     calm(&mut g);
-    path(&mut g, 6.0, 1.5, 600.0);
+    let (sink, above) = (g.climate.natural_sink, at_the_step(&g, 600.0));
+    path(&mut g, sink, 1.5, above);
     assert!((g.target_temperature() - 3.2).abs() < 1e-9, "committed to {:+.2}", g.target_temperature());
     assert_eq!(g.last_turn_to_act(), LastTurn::TooLate);
 }
@@ -3374,12 +3386,13 @@ fn i_c_the_last_turn_says_so_when_cuts_alone_no_longer_avoid_collapse() {
 fn i_d_a_break_on_the_path_brings_the_last_turn_forward() {
     let mut clear = game();
     calm(&mut clear);
-    path(&mut clear, 26.0, 1.5, 405.0);
+    let (net, above, sink) = (at_the_step(&clear, 20.0), at_the_step(&clear, 405.0), clear.climate.natural_sink);
+    path(&mut clear, net + sink, 1.5, above);
     let LastTurn::Turn(without) = clear.last_turn_to_act() else { panic!("the clear path has a Last Turn") };
 
     let mut ahead = game();
     calm(&mut ahead);
-    path(&mut ahead, 26.0, 1.5, 405.0);
+    path(&mut ahead, net + sink, 1.5, above);
     let i = break_at(&ahead, "permafrost_thaw");
     ahead.climate.breaks_fired[i] = false;
     let LastTurn::Turn(with) = ahead.last_turn_to_act() else { panic!("the path with the Break has a Last Turn") };

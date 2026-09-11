@@ -19,7 +19,30 @@ degrees_per_ppm_step = 0.5
 # collapses on turns 20 to 24, a Custodian starting in Europe on 22 to 24, and a Custodian in East
 # Asia survives 19 of 20 at +2.90. At 170 half the seatings finish comfortable. 150 keeps every
 # seating hot to the end, which is what #46 chose the step for.
-ppm_step = 150.0
+# Ticket #60 (version 0.05): the build ticket's re-sweep, with every climate rule of the version in
+# -- the Scrubber, per-person Emissions, Blame, neutral development, the sea, and above all the five
+# Breaks of #55, which #55 measured as taking every seating to 20 of 20 Collapses at a median turn
+# 17 to 22. Thirty-two cells a seating, twenty seeds a cell, over five seatings: `ppm_step` {150,
+# 180, 210, 240} x `natural_sink` {6, 8} x the Permafrost Thaw's `emissions_per_turn` {4.0, 2.5} x
+# the Sink Weakens' `sink_after` {4.0, 5.0}. The full tables are in the 0.05 dev diary.
+#
+# CHOSEN: step 180, the Sink at 6.0, and BOTH BREAK FIGURES LEFT WHERE #55 PUT THEM. At 180 every
+# one of the five seatings still ends at about +3.0 -- hot to the last turn, which is what #46 and
+# #53 chose the step for -- and every seating's median Collapse turn is 20 or later, against the 17
+# to 22 of #55. It is the cell closest to the target over all five seatings, tied on that measure
+# with (sink 6, step 180, sink_after 5.0); the tie went to this one because the two Break figures
+# are drawn from real-world warming (the research note on `research/tipping-points`) while
+# `ppm_step` is the game's own pacing knob, re-swept on every ticket that changed the board (#26,
+# #46, #50, #53). Moving a researched figure to pace the game is the wrong knob to reach for first.
+#
+# NO CELL MEETS THE TARGET FOR EVERY SEATING, and at this one three of the five miss it: the
+# Arkwrights in East Asia and the Archivists from Europe still collapse 20 of 20 (median turns 20
+# and 20), the Custodians from Europe 18 of 20 at 23, and the Custodians in East Asia 9 of 20 at 20
+# -- just under the half the target wants. Only the Prospectors in East Asia land inside it, 12 of
+# 20 at a median 24. THE DESIGNER MAY MOVE THIS: at 210 the Prospector and Europe boards fall to 0
+# or 1 Collapse in 20 and finish at +2.8, which is the next cell up; 150 is where it stood, at 19 or
+# 20 of 20 everywhere.
+ppm_step = 180.0
 natural_sink = 6.0
 collapse_line = 3.0
 temperature_lag_fraction = 0.5

@@ -88,6 +88,11 @@ fn main() {
     // Ticket #58: what the Moments did, over every seed.
     let (mut moments_earned, mut moments_shown, mut turns_with_moment, mut report_turns) = (0u32, 0u32, 0u32, 0u32);
     let mut most_in_a_turn = 0u32;
+    // Ticket #60: the Techs a game finished, the highest rung it reached, and every seat that met
+    // its Victory Condition outright rather than winning on the last turn's score.
+    let mut techs: Vec<u32> = Vec::new();
+    let mut highest_rung = 0u32;
+    let mut victory_met: Vec<String> = Vec::new();
     let mut kinds = [FactionKind::Custodians; SEAT_COUNT];
     for s in seed..seed + count {
         let r = dying_earth_engine::sim::run(tables.clone(), s, player);
@@ -146,6 +151,11 @@ fn main() {
         }
         off_earth_at_end.push(r.colonists_off_earth.iter().sum());
         window_turn = r.window_turn;
+        techs.push(r.techs_completed);
+        highest_rung = highest_rung.max(r.highest_rung);
+        if let Some((seat, kind)) = r.victory_met {
+            victory_met.push(format!("seed {} {} (seat {})", r.seed, kind.name(), seat.0));
+        }
         moments_earned += r.moments_earned;
         moments_shown += r.moments_shown;
         turns_with_moment += r.turns_with_moment;
@@ -286,6 +296,13 @@ fn main() {
         );
         println!("{:>12}         : median {}", "Colonists off Earth at the end, all seats", median(&mut off_earth_at_end));
         println!("{:>12}         : turn {}", "the Mars launch window", window_turn);
+        // Ticket #60.
+        println!("{:>12}         : median {} completed, highest rung reached {}", "Techs", median(&mut techs), highest_rung);
+        println!(
+            "{:>12}         : {}",
+            "Victory Conditions met outright",
+            if victory_met.is_empty() { "none in any seed".to_string() } else { victory_met.join(", ") }
+        );
         // Ticket #58.
         println!(
             "{:>12}         : {} earned, {} shown ({:.2} a turn over {} turns), {} of those turns stopped for one, most in a turn {}",

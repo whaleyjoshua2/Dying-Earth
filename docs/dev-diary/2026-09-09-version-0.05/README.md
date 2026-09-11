@@ -1428,3 +1428,400 @@ Every picture below was taken headlessly with the game's own `shot:` mode
   after a Save: the **Save** button stands live between Trading and the map swap, and **Saved.**
   stands beside it in green for four seconds. The save it wrote, `save-11-turn-9.ron`, is in the
   folder. With an order pending the button goes dead and its hover says why.
+## #60: the climate re-swept and the four-way balance
+
+The build ticket's half of the map: four small fixes the earlier tickets left on the board, then the
+climate clock re-swept with every rule of version 0.05 in it, and a four-way balance report at the
+numbers that came out.
+
+### The four small fixes
+
+Each was seen failing first, and each carries a formula test.
+
+- **A Wildfire on a neutral Nation State charged nothing.** Since ticket #24 the line
+  `b.cards += st.wildfire_emissions_next` sat inside the *directed* branch of `emissions_now`, an
+  accident of where that ticket's `continue` landed, so a fire in a state nobody holds burned
+  without any carbon. It is the world's card, so it now charges the cards line whether or not
+  anyone directs the state, and stays nobody's Blame either way. Red first at 0.0 against 2.0
+  (`a_wildfire_on_a_neutral_nation_state_charges_its_emissions_to_the_cards_line`). Eight of the
+  twelve states are neutral for most of a game, so this is a real, if small, addition to the world's
+  Emissions.
+- **The state card's "N now" for taking a held place ignored the challenge margin.** Ticket #41 put
+  the margin of 10 on a held place; the card kept ticket #33's `threshold.max(controller + 1)`, so
+  it printed a figure the Resolution would not honour -- 41 where the answer was 50. The whole
+  computation is now `Game::influence_needed_for(seat, place)` in the engine, and the Resolution,
+  the AI's Influence list and the card all read that one function, so the two cannot drift apart
+  again. Red first at 41 against 50
+  (`the_figure_for_taking_a_held_place_includes_the_challenge_margin`).
+- **The AI never built a Constabulary** -- 0 in every game logged from #52 to #57, for the reason
+  #52 measured: the victory-gap multiplier (x3 for most of a game) applies to producers and not to a
+  building that fixes nothing economic, so at a bare weight of 6 a Constabulary never won a build
+  slot. It now takes the victory-gap multiplier too from **Unrest 5** (which is the only Unrest at
+  which the candidate is offered at all), because a state at 7 halves every Facility's output *and*
+  its Emissions there, so calming it does advance whatever the seat is behind on; and it takes the
+  opportunity multiplier at **9**, where one more turn would throw the seat off, exactly as Relief
+  does at the same figure. Red first on the scored list: `skip 6.0 build Constabulary in East Asia`,
+  losing the last 25 Materials to a Research Lab at 8.0
+  (`a_custodian_ai_behind_on_pace_builds_a_constabulary_where_unrest_has_reached_seven`). The
+  balance report below is the first in this version's diary with Constabularies in it: **11 to 100 a
+  batch of twenty seeds**, against 0.
+- **The spectator's top bar wrapped its Temperature onto a second line at 1280 x 800.** The
+  Stockpile row carried a "Custodians:" prefix that a player's bar does not, and "+1.9" fell to a
+  fourth line. Whose figures they are is said on the seating line above instead, which had room to
+  spare, and "- the computer plays all four." went with it, since four Faction names under
+  "Spectating." say the same thing. Seen red as a picture and green as a picture, both taken
+  headlessly with `shot:spb spectate:1 turns:6 select:EastAsia seed:7` at the game's own 1280 x 800:
+  **spectate-board.png** above is the re-taken one, and the bar is now three rows of one line each.
+
+### The climate clock, re-swept for four seats, twelve states and the Breaks
+
+Ticket #55 put five Breaks on the curve and measured what they cost: **every seating collapsed 20 of
+20, at a median turn 17 to 22**, where #53 had chosen `ppm_step = 150` to keep every seating hot
+without making Collapse certain. #55 said plainly that its numbers were measurements and not a
+balance, and named the knobs. This is the ticket that turns them.
+
+**The target, restated** (it is the one #46 and #53 swept for, with Collapse made explicit):
+
+> Every seating stays hot to the end -- a median end Temperature of +2.5 to +2.9 C where it does not
+> collapse -- and Collapse is a real threat but not a certainty: roughly half to three quarters of
+> seeds collapsing, with a median Collapse turn of 19 or later. Measured over five seatings:
+> Custodians, Prospectors and Arkwrights in East Asia, and Custodians and Archivists from Europe.
+
+`engine/examples/sweep.rs` now takes `--permafrost=` and `--sink-after=` beside `--sinks=` and
+`--steps=`, so the two Break figures that actually move the clock can be swept with it: the
+Permafrost Thaw's `emissions_per_turn` (4.0 ppm every phase from about turn 6) and the Sink Weakens'
+`sink_after` (6.0 down to 4.0 from about turn 10). The other three Breaks' figures are left where
+`climate.toml` has them. Thirty-two cells a seating -- step {150, 180, 210, 240} x sink {6, 8} x
+permafrost {4.0, 2.5} x sink_after {4.0, 5.0} -- twenty seeds a cell, five seatings run as five
+concurrent processes: **3,200 games**.
+
+**Custodians in East Asia.** Twenty seeds a cell.
+
+| sink | step | permafrost | sink_after | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|---|---|---|
+| 6 | 150 | 4.0 | 4.0 | 17/20 | 17 (17..18) | +3.05 | 0 3 0 0 |
+| 6 | 150 | 4.0 | 5.0 | 14/20 | 17 (17..18) | +3.04 | 0 6 0 0 |
+| 6 | 150 | 2.5 | 4.0 | 10/20 | 18 (17..18) | +3.06 | 0 10 0 0 |
+| 6 | 150 | 2.5 | 5.0 | 10/20 | 18 (17..18) | +3.04 | 0 10 0 0 |
+| **6** | **180** | **4.0** | **4.0** | **9**/20 | 20 (19..20) | +3.03 | 0 11 0 0 |
+| 6 | 180 | 4.0 | 5.0 | 9/20 | 20 (20..21) | +3.02 | 0 11 0 0 |
+| 6 | 180 | 2.5 | 4.0 | 9/20 | 20 (20..21) | +3.01 | 0 11 0 0 |
+| 6 | 180 | 2.5 | 5.0 | 9/20 | 21 (20..21) | +3.01 | 0 11 0 0 |
+| 6 | 210 | 4.0 | 4.0 | 9/20 | 22 (22..23) | +2.83 | 0 11 0 0 |
+| 6 | 210 | 4.0 | 5.0 | 9/20 | 23 (22..23) | +2.82 | 0 11 0 0 |
+| 6 | 210 | 2.5 | 4.0 | 9/20 | 23 (22..24) | +2.82 | 0 11 0 0 |
+| 6 | 210 | 2.5 | 5.0 | 9/20 | 23 (22..24) | +2.80 | 0 11 0 0 |
+| 6 | 240 | 4.0 | 4.0 | 2/20 | 24 (24..24) | +2.69 | 0 18 0 0 |
+| 6 | 240 | 4.0 | 5.0 | 0/20 | - | +2.66 | 0 20 0 0 |
+| 6 | 240 | 2.5 | 4.0 | 0/20 | - | +2.63 | 0 20 0 0 |
+| 6 | 240 | 2.5 | 5.0 | 0/20 | - | +2.62 | 0 20 0 0 |
+| 8 | 150 | 4.0 | 4.0 | 10/20 | 18 (17..18) | +3.06 | 0 10 0 0 |
+| 8 | 150 | 4.0 | 5.0 | 9/20 | 18 (17..18) | +3.04 | 0 11 0 0 |
+| 8 | 150 | 2.5 | 4.0 | 8/20 | 18 (17..19) | +3.05 | 0 12 0 0 |
+| 8 | 150 | 2.5 | 5.0 | 8/20 | 18 (18..19) | +3.03 | 0 12 0 0 |
+| 8 | 180 | 4.0 | 4.0 | 8/20 | 20 (19..20) | +3.04 | 0 12 0 0 |
+| 8 | 180 | 4.0 | 5.0 | 8/20 | 20 (20..20) | +3.01 | 0 12 0 0 |
+| 8 | 180 | 2.5 | 4.0 | 8/20 | 21 (20..21) | +3.02 | 0 12 0 0 |
+| 8 | 180 | 2.5 | 5.0 | 8/20 | 21 (20..21) | +3.01 | 0 12 0 0 |
+| 8 | 210 | 4.0 | 4.0 | 9/20 | 23 (22..24) | +2.80 | 0 11 0 0 |
+| 8 | 210 | 4.0 | 5.0 | 9/20 | 23 (22..24) | +2.78 | 0 11 0 0 |
+| 8 | 210 | 2.5 | 4.0 | 9/20 | 24 (23..24) | +2.75 | 0 11 0 0 |
+| 8 | 210 | 2.5 | 5.0 | 9/20 | 24 (23..24) | +2.73 | 0 11 0 0 |
+| 8 | 240 | 4.0 | 4.0 | 0/20 | - | +2.61 | 0 20 0 0 |
+| 8 | 240 | 4.0 | 5.0 | 0/20 | - | +2.60 | 0 20 0 0 |
+| 8 | 240 | 2.5 | 4.0 | 0/20 | - | +2.58 | 0 20 0 0 |
+| 8 | 240 | 2.5 | 5.0 | 0/20 | - | +2.59 | 0 20 0 0 |
+
+**Prospectors in East Asia.** Twenty seeds a cell.
+
+| sink | step | permafrost | sink_after | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|---|---|---|
+| 6 | 150 | 4.0 | 4.0 | 19/20 | 19 (18..21) | +3.04 | 1 0 0 0 |
+| 6 | 150 | 4.0 | 5.0 | 19/20 | 20 (18..21) | +3.02 | 1 0 0 0 |
+| 6 | 150 | 2.5 | 4.0 | 19/20 | 20 (19..22) | +3.04 | 1 0 0 0 |
+| 6 | 150 | 2.5 | 5.0 | 19/20 | 21 (19..22) | +3.02 | 1 0 0 0 |
+| **6** | **180** | **4.0** | **4.0** | **12**/20 | 24 (22..24) | +3.01 | 8 0 0 0 |
+| 6 | 180 | 4.0 | 5.0 | 7/20 | 24 (23..24) | +2.99 | 13 0 0 0 |
+| 6 | 180 | 2.5 | 4.0 | 4/20 | 24 (23..24) | +2.95 | 16 0 0 0 |
+| 6 | 180 | 2.5 | 5.0 | 2/20 | 24 (24..24) | +2.91 | 18 0 0 0 |
+| 6 | 210 | 4.0 | 4.0 | 0/20 | - | +2.81 | 20 0 0 0 |
+| 6 | 210 | 4.0 | 5.0 | 0/20 | - | +2.79 | 20 0 0 0 |
+| 6 | 210 | 2.5 | 4.0 | 0/20 | - | +2.77 | 20 0 0 0 |
+| 6 | 210 | 2.5 | 5.0 | 0/20 | - | +2.74 | 20 0 0 0 |
+| 6 | 240 | 4.0 | 4.0 | 0/20 | - | +2.63 | 20 0 0 0 |
+| 6 | 240 | 4.0 | 5.0 | 0/20 | - | +2.62 | 20 0 0 0 |
+| 6 | 240 | 2.5 | 4.0 | 0/20 | - | +2.61 | 20 0 0 0 |
+| 6 | 240 | 2.5 | 5.0 | 0/20 | - | +2.59 | 20 0 0 0 |
+| 8 | 150 | 4.0 | 4.0 | 19/20 | 20 (19..22) | +3.04 | 1 0 0 0 |
+| 8 | 150 | 4.0 | 5.0 | 19/20 | 21 (19..22) | +3.02 | 1 0 0 0 |
+| 8 | 150 | 2.5 | 4.0 | 19/20 | 21 (20..23) | +3.03 | 1 0 0 0 |
+| 8 | 150 | 2.5 | 5.0 | 19/20 | 22 (20..24) | +3.03 | 1 0 0 0 |
+| 8 | 180 | 4.0 | 4.0 | 7/20 | 24 (23..24) | +2.97 | 13 0 0 0 |
+| 8 | 180 | 4.0 | 5.0 | 4/20 | 24 (24..24) | +2.96 | 16 0 0 0 |
+| 8 | 180 | 2.5 | 4.0 | 1/20 | 24 (24..24) | +2.93 | 19 0 0 0 |
+| 8 | 180 | 2.5 | 5.0 | 0/20 | - | +2.90 | 20 0 0 0 |
+| 8 | 210 | 4.0 | 4.0 | 0/20 | - | +2.78 | 20 0 0 0 |
+| 8 | 210 | 4.0 | 5.0 | 0/20 | - | +2.75 | 20 0 0 0 |
+| 8 | 210 | 2.5 | 4.0 | 0/20 | - | +2.75 | 20 0 0 0 |
+| 8 | 210 | 2.5 | 5.0 | 0/20 | - | +2.73 | 20 0 0 0 |
+| 8 | 240 | 4.0 | 4.0 | 0/20 | - | +2.62 | 20 0 0 0 |
+| 8 | 240 | 4.0 | 5.0 | 0/20 | - | +2.60 | 20 0 0 0 |
+| 8 | 240 | 2.5 | 4.0 | 0/20 | - | +2.58 | 20 0 0 0 |
+| 8 | 240 | 2.5 | 5.0 | 0/20 | - | +2.57 | 20 0 0 0 |
+
+**Arkwrights in East Asia.** Twenty seeds a cell.
+
+| sink | step | permafrost | sink_after | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|---|---|---|
+| 6 | 150 | 4.0 | 4.0 | 20/20 | 17 (16..18) | +3.04 | 0 0 0 0 |
+| 6 | 150 | 4.0 | 5.0 | 20/20 | 17 (16..18) | +3.04 | 0 0 0 0 |
+| 6 | 150 | 2.5 | 4.0 | 20/20 | 17 (16..19) | +3.04 | 0 0 0 0 |
+| 6 | 150 | 2.5 | 5.0 | 20/20 | 18 (16..19) | +3.03 | 0 0 0 0 |
+| **6** | **180** | **4.0** | **4.0** | **20**/20 | 20 (18..23) | +3.03 | 0 0 0 0 |
+| 6 | 180 | 4.0 | 5.0 | 20/20 | 21 (18..23) | +3.03 | 0 0 0 0 |
+| 6 | 180 | 2.5 | 4.0 | 20/20 | 21 (19..24) | +3.02 | 0 0 0 0 |
+| 6 | 180 | 2.5 | 5.0 | 20/20 | 22 (19..24) | +3.03 | 0 0 0 0 |
+| 6 | 210 | 4.0 | 4.0 | 9/20 | 24 (21..24) | +3.00 | 8 0 3 0 |
+| 6 | 210 | 4.0 | 5.0 | 7/20 | 24 (21..24) | +2.97 | 8 0 5 0 |
+| 6 | 210 | 2.5 | 4.0 | 5/20 | 24 (21..24) | +2.96 | 11 0 4 0 |
+| 6 | 210 | 2.5 | 5.0 | 2/20 | 24 (22..24) | +2.94 | 13 0 5 0 |
+| 6 | 240 | 4.0 | 4.0 | 1/20 | 24 (24..24) | +2.79 | 16 0 3 0 |
+| 6 | 240 | 4.0 | 5.0 | 0/20 | - | +2.77 | 16 0 4 0 |
+| 6 | 240 | 2.5 | 4.0 | 0/20 | - | +2.75 | 17 0 3 0 |
+| 6 | 240 | 2.5 | 5.0 | 0/20 | - | +2.73 | 17 0 3 0 |
+| 8 | 150 | 4.0 | 4.0 | 20/20 | 18 (16..19) | +3.05 | 0 0 0 0 |
+| 8 | 150 | 4.0 | 5.0 | 20/20 | 18 (16..19) | +3.04 | 0 0 0 0 |
+| 8 | 150 | 2.5 | 4.0 | 20/20 | 18 (16..19) | +3.02 | 0 0 0 0 |
+| 8 | 150 | 2.5 | 5.0 | 20/20 | 18 (16..20) | +3.03 | 0 0 0 0 |
+| 8 | 180 | 4.0 | 4.0 | 20/20 | 22 (19..24) | +3.03 | 0 0 0 0 |
+| 8 | 180 | 4.0 | 5.0 | 20/20 | 22 (19..24) | +3.02 | 0 0 0 0 |
+| 8 | 180 | 2.5 | 4.0 | 19/20 | 22 (19..24) | +3.03 | 0 0 1 0 |
+| 8 | 180 | 2.5 | 5.0 | 18/20 | 23 (20..24) | +3.03 | 1 0 1 0 |
+| 8 | 210 | 4.0 | 4.0 | 6/20 | 23 (22..24) | +2.97 | 11 0 3 0 |
+| 8 | 210 | 4.0 | 5.0 | 5/20 | 24 (21..24) | +2.94 | 11 0 4 0 |
+| 8 | 210 | 2.5 | 4.0 | 4/20 | 24 (21..24) | +2.92 | 12 0 4 0 |
+| 8 | 210 | 2.5 | 5.0 | 2/20 | 24 (22..24) | +2.89 | 12 0 6 0 |
+| 8 | 240 | 4.0 | 4.0 | 0/20 | - | +2.75 | 17 0 3 0 |
+| 8 | 240 | 4.0 | 5.0 | 0/20 | - | +2.73 | 17 0 3 0 |
+| 8 | 240 | 2.5 | 4.0 | 0/20 | - | +2.69 | 17 0 3 0 |
+| 8 | 240 | 2.5 | 5.0 | 0/20 | - | +2.67 | 17 0 3 0 |
+
+**Custodians from Europe.** Twenty seeds a cell.
+
+| sink | step | permafrost | sink_after | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|---|---|---|
+| 6 | 150 | 4.0 | 4.0 | 20/20 | 19 (18..20) | +3.04 | 0 0 0 0 |
+| 6 | 150 | 4.0 | 5.0 | 20/20 | 19 (18..21) | +3.03 | 0 0 0 0 |
+| 6 | 150 | 2.5 | 4.0 | 20/20 | 19 (18..21) | +3.02 | 0 0 0 0 |
+| 6 | 150 | 2.5 | 5.0 | 20/20 | 20 (19..22) | +3.03 | 0 0 0 0 |
+| **6** | **180** | **4.0** | **4.0** | **18**/20 | 23 (20..24) | +3.02 | 0 2 0 0 |
+| 6 | 180 | 4.0 | 5.0 | 14/20 | 24 (21..24) | +3.02 | 0 6 0 0 |
+| 6 | 180 | 2.5 | 4.0 | 9/20 | 23 (21..24) | +2.99 | 0 11 0 0 |
+| 6 | 180 | 2.5 | 5.0 | 7/20 | 24 (21..24) | +2.97 | 0 13 0 0 |
+| 6 | 210 | 4.0 | 4.0 | 1/20 | 23 (23..23) | +2.86 | 0 19 0 0 |
+| 6 | 210 | 4.0 | 5.0 | 1/20 | 24 (24..24) | +2.83 | 0 19 0 0 |
+| 6 | 210 | 2.5 | 4.0 | 0/20 | - | +2.79 | 0 20 0 0 |
+| 6 | 210 | 2.5 | 5.0 | 0/20 | - | +2.77 | 0 20 0 0 |
+| 6 | 240 | 4.0 | 4.0 | 0/20 | - | +2.69 | 0 20 0 0 |
+| 6 | 240 | 4.0 | 5.0 | 0/20 | - | +2.67 | 0 20 0 0 |
+| 6 | 240 | 2.5 | 4.0 | 0/20 | - | +2.62 | 0 20 0 0 |
+| 6 | 240 | 2.5 | 5.0 | 0/20 | - | +2.61 | 0 20 0 0 |
+| 8 | 150 | 4.0 | 4.0 | 20/20 | 19 (18..21) | +3.04 | 0 0 0 0 |
+| 8 | 150 | 4.0 | 5.0 | 20/20 | 20 (18..21) | +3.04 | 0 0 0 0 |
+| 8 | 150 | 2.5 | 4.0 | 20/20 | 20 (18..22) | +3.02 | 0 0 0 0 |
+| 8 | 150 | 2.5 | 5.0 | 20/20 | 21 (18..22) | +3.03 | 0 0 0 0 |
+| 8 | 180 | 4.0 | 4.0 | 11/20 | 23 (21..24) | +3.01 | 0 9 0 0 |
+| 8 | 180 | 4.0 | 5.0 | 9/20 | 24 (21..24) | +2.99 | 0 11 0 0 |
+| 8 | 180 | 2.5 | 4.0 | 3/20 | 24 (21..24) | +2.98 | 0 17 0 0 |
+| 8 | 180 | 2.5 | 5.0 | 1/20 | 22 (22..22) | +2.95 | 0 19 0 0 |
+| 8 | 210 | 4.0 | 4.0 | 0/20 | - | +2.81 | 0 20 0 0 |
+| 8 | 210 | 4.0 | 5.0 | 0/20 | - | +2.80 | 0 20 0 0 |
+| 8 | 210 | 2.5 | 4.0 | 0/20 | - | +2.76 | 0 20 0 0 |
+| 8 | 210 | 2.5 | 5.0 | 0/20 | - | +2.74 | 0 20 0 0 |
+| 8 | 240 | 4.0 | 4.0 | 0/20 | - | +2.65 | 0 20 0 0 |
+| 8 | 240 | 4.0 | 5.0 | 0/20 | - | +2.63 | 0 20 0 0 |
+| 8 | 240 | 2.5 | 4.0 | 0/20 | - | +2.60 | 0 20 0 0 |
+| 8 | 240 | 2.5 | 5.0 | 0/20 | - | +2.58 | 0 20 0 0 |
+
+**Archivists from Europe.** Twenty seeds a cell.
+
+| sink | step | permafrost | sink_after | collapses | collapse turn (median, range) | end temp (median) | wins by seat |
+|---|---|---|---|---|---|---|---|
+| 6 | 150 | 4.0 | 4.0 | 20/20 | 17 (16..18) | +3.05 | 0 0 0 0 |
+| 6 | 150 | 4.0 | 5.0 | 20/20 | 17 (17..18) | +3.04 | 0 0 0 0 |
+| 6 | 150 | 2.5 | 4.0 | 20/20 | 17 (17..18) | +3.05 | 0 0 0 0 |
+| 6 | 150 | 2.5 | 5.0 | 20/20 | 18 (17..18) | +3.06 | 0 0 0 0 |
+| **6** | **180** | **4.0** | **4.0** | **20**/20 | 20 (19..21) | +3.04 | 0 0 0 0 |
+| 6 | 180 | 4.0 | 5.0 | 20/20 | 20 (19..22) | +3.03 | 0 0 0 0 |
+| 6 | 180 | 2.5 | 4.0 | 20/20 | 21 (19..23) | +3.04 | 0 0 0 0 |
+| 6 | 180 | 2.5 | 5.0 | 20/20 | 21 (20..23) | +3.03 | 0 0 0 0 |
+| 6 | 210 | 4.0 | 4.0 | 19/20 | 24 (22..24) | +3.04 | 0 0 0 1 |
+| 6 | 210 | 4.0 | 5.0 | 18/20 | 24 (22..24) | +3.01 | 0 0 0 2 |
+| 6 | 210 | 2.5 | 4.0 | 12/20 | 24 (23..24) | +3.01 | 0 0 2 6 |
+| 6 | 210 | 2.5 | 5.0 | 8/20 | 24 (23..24) | +2.99 | 0 0 4 8 |
+| 6 | 240 | 4.0 | 4.0 | 0/20 | - | +2.87 | 0 0 1 19 |
+| 6 | 240 | 4.0 | 5.0 | 0/20 | - | +2.84 | 0 0 1 19 |
+| 6 | 240 | 2.5 | 4.0 | 0/20 | - | +2.82 | 0 0 1 19 |
+| 6 | 240 | 2.5 | 5.0 | 0/20 | - | +2.80 | 0 0 1 19 |
+| 8 | 150 | 4.0 | 4.0 | 20/20 | 18 (17..18) | +3.06 | 0 0 0 0 |
+| 8 | 150 | 4.0 | 5.0 | 20/20 | 18 (17..19) | +3.04 | 0 0 0 0 |
+| 8 | 150 | 2.5 | 4.0 | 20/20 | 18 (17..19) | +3.03 | 0 0 0 0 |
+| 8 | 150 | 2.5 | 5.0 | 20/20 | 19 (18..19) | +3.06 | 0 0 0 0 |
+| 8 | 180 | 4.0 | 4.0 | 20/20 | 21 (20..23) | +3.04 | 0 0 0 0 |
+| 8 | 180 | 4.0 | 5.0 | 20/20 | 21 (20..23) | +3.03 | 0 0 0 0 |
+| 8 | 180 | 2.5 | 4.0 | 20/20 | 21 (20..23) | +3.03 | 0 0 0 0 |
+| 8 | 180 | 2.5 | 5.0 | 20/20 | 21 (20..24) | +3.04 | 0 0 0 0 |
+| 8 | 210 | 4.0 | 4.0 | 12/20 | 24 (23..24) | +3.01 | 0 0 2 6 |
+| 8 | 210 | 4.0 | 5.0 | 8/20 | 24 (23..24) | +2.99 | 0 0 3 9 |
+| 8 | 210 | 2.5 | 4.0 | 5/20 | 24 (23..24) | +2.97 | 0 0 4 11 |
+| 8 | 210 | 2.5 | 5.0 | 4/20 | 24 (23..24) | +2.94 | 0 0 4 12 |
+| 8 | 240 | 4.0 | 4.0 | 0/20 | - | +2.83 | 0 0 3 17 |
+| 8 | 240 | 4.0 | 5.0 | 0/20 | - | +2.80 | 0 0 3 17 |
+| 8 | 240 | 2.5 | 4.0 | 0/20 | - | +2.81 | 0 0 3 17 |
+| 8 | 240 | 2.5 | 5.0 | 0/20 | - | +2.80 | 0 0 4 16 |
+
+### Chosen: `ppm_step = 180`, the Sink at 6.0, and both Break figures left where #55 put them
+
+At 180 every one of the five seatings still ends at about **+3.0 C** -- hot to the last turn, which
+is what #46 and #53 chose the step for -- and **every seating's median Collapse turn is 20 or
+later**, against #55's 17 to 22. It is the cell closest to the target over all five seatings. It
+ties on that measure with (sink 6, step 180, `sink_after` 5.0), and the tie went to this one for a
+reason that is not about the numbers: **the two Break figures are drawn from real-world warming**
+(the research note on the branch `research/tipping-points`), while `ppm_step` is the game's own
+abstract pacing knob and has been re-swept on every ticket that changed the board -- #26, #46, #50,
+#53. Reaching for a researched figure to pace the game is the wrong knob to reach for first. The
+choice and every word of this reasoning are in `climate.toml`'s comments beside the number.
+
+**No cell in the sweep meets the target for every seating, and at this one three of the five miss
+it.** What fails, exactly:
+
+| seating | collapses | median Collapse turn | end temp | on target? |
+|---|---|---|---|---|
+| Custodians in East Asia | 9/20 | 20 | +3.03 | one seed under the half the target wants |
+| Prospectors in East Asia | 12/20 | 24 | +3.01 | **yes** |
+| Arkwrights in East Asia | 20/20 | 20 | +3.03 | no: Collapse is certain |
+| Custodians from Europe | 18/20 | 23 | +3.02 | no: above three quarters |
+| Archivists from Europe | 20/20 | 20 | +3.04 | no: Collapse is certain |
+
+The shape of the sweep says why no cell can do better. The two seatings that collapse in every seed
+-- the Arkwrights in East Asia and the Archivists from Europe -- are the two whose seat 0 spends its
+Materials on something other than Earth's economy (Colony Ships and Habitats; the Archive), so the
+board they leave behind is run by three AIs who build industry and little else; they do not come off
+20 of 20 until step **210**, and at 210 the
+Prospector and Custodian boards fall to 0 or 1 Collapse in twenty and finish at +2.8. There is no
+step between the two. **That is a Faction-economy finding, not a climate one**, and the designer may
+well want the step here and the Arkwright and Archivist cards looked at instead; it is one line in
+`climate.toml` either way.
+
+### The four-way balance, at the chosen numbers
+
+`sim -- 1 --count=20 --player=<faction>` for each of the four Factions in seat 0 starting in East
+Asia, and `sweep -- 20 --player=<faction> --start=europe --sinks=6 --steps=180 --permafrost=4.0
+--sink-after=4.0 --balance` for each of the four starting in Europe. Twenty seeds each, eight
+batches, 160 games. **Nothing was re-tuned for this table beyond the climate cell above**; these are
+the figures as they came out.
+
+| seat 0 | wins | draws | collapses | median Collapse turn | median first Colony | Colonists off Earth at the end | Victory Condition met outright |
+|---|---|---|---|---|---|---|---|
+| Custodians in East Asia | Prospectors 11 (seat 1) | 0 | 9/20 | 20 | 9 | 12 | Prospectors, 11 seeds |
+| Prospectors in East Asia | Prospectors 8 | 0 | 12/20 | 24 | 7 | 16 | Prospectors, 2 seeds |
+| Arkwrights in East Asia | none | 0 | 20/20 | 20 | 7 | 16 | none |
+| Archivists in East Asia | none | 0 | 20/20 | 21 | 7 | 16 | none |
+| Custodians from Europe | Prospectors 2 (seat 1) | 0 | 18/20 | 23 | 7 | 15 | none |
+| Prospectors from Europe | Prospectors 12 | 0 | 8/20 | 20 | 9 | 12 | Prospectors, 12 seeds |
+| Arkwrights from Europe | none | 0 | 20/20 | 20 | 7 | 17 | none |
+| Archivists from Europe | none | 0 | 20/20 | 20 | 7 | 15 | none |
+
+What the seats built and finished over each batch of twenty:
+
+| seat 0 | Scrubbers | Leapfrogs | Constabularies | Sea Walls | Techs completed (median) | highest rung | Breaks fired |
+|---|---|---|---|---|---|---|---|
+| Custodians in East Asia | 40 | 0 | 34 | **0** | 1 | 1 | all five, 20/20 |
+| Prospectors in East Asia | 192 | 227 | 68 | **0** | 1 | 1 | all five, 20/20 |
+| Arkwrights in East Asia | 107 | 119 | 49 | **0** | 1 | 1 | all five, 20/20 |
+| Archivists in East Asia | 118 | 136 | 59 | **0** | 2 | 2 | all five, 20/20 |
+| Custodians from Europe | 163 | 224 | 76 | **0** | 1 | 1 | all five, 20/20 |
+| Prospectors from Europe | 40 | 0 | 16 | **0** | 1 | 1 | all five, 20/20 |
+| Arkwrights from Europe | 52 | 60 | 100 | **0** | 1 | 1 | all five, 20/20 |
+| Archivists from Europe | 46 | 0 | 11 | **0** | 8 | 2 | all five, 20/20 |
+
+The Breaks, by median turn, over the four East Asia batches: Coral Die-off 4, Permafrost Thaw 6 to
+7, The Sink Weakens 10 to 11, Ice Sheets Committed 11 to 12, Amazon Dieback 15 to 18. All five fire
+in every seed of all eight batches, as they did on #55.
+
+### What the 160 games say, as measured, not fixed
+
+**One Faction wins this game and it is the Prospectors.** Across eight batches and 160 games they
+take 33 wins and every other Faction takes none -- not one win for the Custodians, the Arkwrights or
+the Archivists in any seating, in their own seat or anyone else's. They are also the only Faction
+that has ever met a Victory Condition outright rather than winning on the last turn's score:
+Extraction Total is met in 25 of the 160 games, and Stabilization, Diaspora and the Archive in none.
+The reason is not subtle. Extraction Total is a running sum of what a Faction digs out of a dying
+world, and everything the world does -- the heat, the sea, the Unrest, the refugees, the Breaks --
+makes a Faction dig faster rather than slower. The other three ask the Faction to fix something, get
+somewhere, or finish something, on a clock that runs out at turn 17 to 24.
+
+**The Custodians' own Victory Condition is unreachable, and the report says so with a zero.** The
+longest Stabilization run any of the four seats held at any point in any of the eighty East Asia
+games is **0 turns** -- median 0, max 0, for all four seats in all four batches. The bar is the
+world's net counted Emissions under the Sink, and the world's net at turn 12 is +44 to +51 ppm and
+still +18 to +32 at the end. A Custodian player who reads their own card is being asked for
+something no board in this version has ever offered, and no amount of Scrubbers by one seat gets
+there while the other three build industry. That is the clearest single finding in the table.
+
+**The off-Earth game is the Moon and nothing else.** No Colony in the Mars system is founded in any
+seed of seven of the eight batches; only the Prospectors in East Asia reach one, in 9 of 20 seeds at
+a median turn 23, one turn from the end. **Every other Colony founded in these 160 games is a lunar
+one** -- the log of any seed is a run of "founded a Colony in slot N on the Moon" -- at a median turn
+7 to 9. That is #57's after-build fix doing exactly its job (a loaded Colony Ship weighs the flight
+and takes the Moon when Mars is a year away) and it has moved the off-Earth game off the ice: at #57
+every first Colony was Antarctic, and here Antarctica takes 0, 1, 7 and 14 Colonies over the four
+East Asia batches while the Moon takes the rest. The Colonists off Earth at the end sit at 12 to 17
+for the whole table -- the Arkwrights' Diaspora asks for 30 spread over three Bodies with 4 on each,
+and the Moon is one Body. The Mars window is turn 14 and the flight nine turns, which #57 already
+recorded as closing Mars; this table is that finding measured across all four Factions.
+
+**The Sea Wall has still never been built, in any game, by any Faction, in any version.** The reason
+is the one #56 found and it has not moved: Coastal Engineering is on Industry rung 2 and the world
+completes a median of **one** Tech a game and never leaves rung 1. The two Archivist batches are the
+only ones that reach rung 2 at all -- a median of 8 Techs from Europe, on Provisional Findings and
+Research Labs -- and even there no wall was raised. Meanwhile the sea takes all 49 coastal slots in
+the world and drowns 27 to 29 Facilities in the median game. The defence exists, is pinned by a
+formula test, and has never once been reachable in play.
+
+**The Constabulary fires now, and Unrest is still a ratchet at the top.** 11 to 100 a batch, against
+the 0 every batch since #52 has recorded, which is ticket #60's AI fix showing up in the sim. It has
+not made the Unrest picture calm: the median peak Unrest is still 10.0 in every one of the four East
+Asia batches, states threw off a controller 0 to 75 times a batch, and 286 to 297 population a batch
+still moves as refugees. What it
+has bought is that the seat holding a state at 7 now has an answer it will actually reach for.
+
+**What never fires, batch by batch.** The Sea Wall, everywhere, as above. The **Strip Permit** fires
+0 times in the Custodian-in-East-Asia batch and 32, 42 and 40 in the other three East Asia batches --
+which is #54's finding turned round: #54 measured 0 for a *seat-0* Prospector who is never behind its
+Extraction pace, and now it is the *seat-1* Prospector of the Custodian batch who is never behind,
+because that is the batch where the Prospectors run away with the board. **Leapfrog** is 0 in three of
+the eight batches -- the Custodians in East Asia, the Prospectors from Europe and the Archivists from
+Europe -- and 60 to 227 in the other five, the Custodians from Europe among them at 224.
+
+**And the Custodian-in-East-Asia zero was chased down, because it names something larger.** The
+Leapfrog candidate is never *offered* in that batch: the scored list carries no Leapfrog line in any
+turn of any seed. Its gate is "the 50 Ducats are within three turns of Ducat income", and **that
+Custodian is a one-state economy for the whole game** -- it ends with **4 to 6 buildings** while the
+Prospectors beside it end with **21 to 30**, its Income line reads `+6 Materials, +3 Fuel` from turn 1
+to the Collapse, and its Energy hovers between 1 and 5. The same Faction's AI in seat 1 of the
+Prospector batch reads `+12 to +48 Materials` with Energy over 100, clears the gate, and the log duly
+says `wait 10.0 Leapfrog Europe (affordable within three turns)`; and the Custodians starting from
+*Europe* Leapfrog 224 times. So Leapfrog is fine, and what is not fine is **the Custodian AI's opening
+in East Asia specifically**: given that state and three rivals spreading out from it, it never gets a
+second place to stand on. That is the thing most worth a ticket of its own out of this whole report,
+because it is also a large part of why the Custodians take 0 wins in 160 games. (The other two zero
+batches were not probed; they are both batches the Prospectors dominate, and the same small-economy
+explanation is the obvious first place to look.)
+
+**The Last Turn has stopped being a clock at the start of the game.** At turn 1 all twenty seeds of
+every East Asia batch now read "On this path Collapse is not reached", where at #55's step of 150
+the median board read turn 20 or 21. By turn 12 every seed reads turn 15 or 16. So the opening board
+is honestly not yet on a collapsing path at 180, and the eleven turns in between are where the game
+is lost -- which is a better shape for a game than #55's, where the player was told at turn 1 that
+the end was already dated.

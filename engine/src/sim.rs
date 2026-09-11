@@ -75,6 +75,13 @@ pub struct SimResult {
     pub moments_shown: u32,
     pub turns_with_moment: u32,
     pub most_moments_in_a_turn: u32,
+    /// Ticket #60: the Techs the world finished over the game and the highest rung any of them
+    /// stood on, which is what says whether a rung-2 Tech (Coastal Engineering, and so the Sea
+    /// Wall) was ever reachable; and whether any seat ever met its Victory Condition outright,
+    /// rather than winning on the last turn's score.
+    pub techs_completed: u32,
+    pub highest_rung: u32,
+    pub victory_met: Option<(Seat, FactionKind)>,
     pub log: Vec<String>,
 }
 
@@ -126,6 +133,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let mut guard = 0;
     // Ticket #58: what the Moments did over the game.
     let (mut moments_earned, mut moments_shown, mut turns_with_moment, mut most_moments_in_a_turn) = (0u32, 0u32, 0u32, 0u32);
+    // Ticket #60: the first seat to meet its Victory Condition outright, at any point in the game.
+    let mut victory_met: Option<(Seat, FactionKind)> = None;
     while !game.is_over() && guard < max_turns + 2 {
         guard += 1;
         game.end_turn(std::array::from_fn(|_| Vec::new()));
@@ -163,6 +172,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
             last_turn_at_twelve = Some(game.last_turn_to_act());
         }
         note_breaks(&game, &mut break_turns);
+        if victory_met.is_none() {
+            victory_met = Seat::ALL.into_iter().find(|s| game.progress(*s).met()).map(|s| (s, game.kind(s)));
+        }
         if antarctica_turn.is_none() && game.antarctica_open {
             antarctica_turn = Some(game.turn);
         }
@@ -218,6 +230,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let leapfrogs = game.log.iter().filter(|l| l.contains(" Leapfrogged ")).count() as u32;
     let strip_permits = game.log.iter().filter(|l| l.contains(" issued a Strip Permit in ")).count() as u32;
     let net_at_end = game.climate.last.net();
+    // Ticket #60: the Techs the world finished and the highest rung it reached.
+    let techs_completed = game.research.done.len() as u32;
+    let highest_rung = game.research.done.iter().map(|t| tables.tech(*t).rung).max().unwrap_or(0);
     // Ticket #56, read off the log as the #52 to #55 figures are.
     let sea_walls_built = game.log.iter().filter(|l| l.contains("completed Sea Wall at")).count() as u32;
     let sea_walls_spent = game.log.iter().filter(|l| l.contains("the Sea Wall in") && l.contains("was destroyed")).count() as u32;
@@ -278,6 +293,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         moments_shown,
         turns_with_moment,
         most_moments_in_a_turn,
+        techs_completed,
+        highest_rung,
+        victory_met,
         log: game.log,
     }
 }
