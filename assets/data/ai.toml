@@ -202,8 +202,11 @@ order = ["deep_mining", "efficient_grids", "automated_refining", "clean_propella
 last = "clean_power"
 never = "green_consensus"
 
+# Ticket #77 (version 0.05.5): Coastal Engineering second, so the Sea Wall (10 Research on rung 1
+# since ticket #69) arrives before the sea takes the coast around turn 13, not around turn 17 as
+# the cheapest Tech left.
 [tech_picks.custodians]
-order = ["public_science", "efficient_grids", "clean_power", "green_consensus", "clean_manufacturing"]
+order = ["public_science", "coastal_engineering", "efficient_grids", "clean_power", "green_consensus", "clean_manufacturing"]
 
 # Ticket #51: the Arkwrights want room, cheap upkeep and cheap transits.
 [tech_picks.arkwrights]
@@ -211,4 +214,4 @@ order = ["expanded_habitats", "closed_loop_colonies", "efficient_transit"]
 
 # Ticket #51: the Archivists want Research and a quiet world.
 [tech_picks.archivists]
-order = ["public_science", "efficient_grids", "green_consensus"]
+order = ["public_science", "efficient_grids", "coastal_engineering", "green_consensus"]

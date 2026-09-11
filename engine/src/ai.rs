@@ -524,14 +524,9 @@ impl Game {
                         // Ticket #54: a Scrubber has its own weight, its own cap and no build slot,
                         // so it is enumerated below rather than here.
                         FacilityKind::Scrubber => continue,
-                        // Ticket #56: a Sea Wall needs Coastal Engineering, a free COASTAL slot and
-                        // no wall standing already; it is worth its slot when a threshold is near.
-                        FacilityKind::SeaWall => {
-                            if self.free_coastal(sid) == 0 || self.sea_wall_committed(sid) {
-                                continue;
-                            }
-                            (Cat::SeaWall, self.base_weight(seat, Cat::SeaWall))
-                        }
+                        // Ticket #77: a Sea Wall takes no build slot, so it is enumerated below with
+                        // the Scrubber rather than here among the slot-takers.
+                        FacilityKind::SeaWall => continue,
                     };
                     let produces = self.tables.facility(fk).produces.as_ref().map(|p| p.resource);
                     if cat == Cat::Producer {
@@ -601,6 +596,16 @@ impl Game {
                     format!("build a Scrubber in {} ({} of {})", self.tables.state(sid).name, self.scrubbers_committed(sid) + 1, self.scrubber_cap(sid)),
                     None,
                 );
+            }
+            // Ticket #77 (version 0.05.5): a Sea Wall takes no build slot, as the Scrubber does, so it
+            // is offered whether or not a slot is free: with Coastal Engineering in, no wall standing
+            // or on order, and a coast still to protect. With the sea within 0.2 C it takes the
+            // victory-gap, threat and opportunity multipliers (ticket #70), so it competes with the
+            // Scrubber on even terms.
+            if self.has_tech(TechId::CoastalEngineering) && !self.sea_wall_committed(sid) && self.coastal_slots(sid) > 0 {
+                let close = self.sea_is_close(sid);
+                let (pull, sway, opp) = if close { (gap, m.threat, m.opportunity) } else { (1.0, 1.0, 1.0) };
+                push(vec![Order::BuildFacility { state: sid, kind: FacilityKind::SeaWall }], Cat::SeaWall, self.base_weight(seat, Cat::SeaWall), pull, sway, opp, format!("build Sea Wall in {}", self.tables.state(sid).name), None);
             }
             // Ticket #54: Leapfrog, the Custodians' other clause, on the most populous state they
             // hold once they have Ducats to spare.

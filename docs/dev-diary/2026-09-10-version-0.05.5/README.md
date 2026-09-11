@@ -487,3 +487,39 @@ walls are not the holds' doing (holds spend Influence, a wall spends Materials, 
 listed one): a wall needs a free coastal slot, most states have none to spare since the
 coastal-slots ticket, the sea's first two events take what there is by about turn 13, and
 Coastal Engineering arrives around turn 17. The designer's question, on the map.
+
+## #77: the Sea Wall takes no build slot, as the Scrubber does
+
+[The ticket](https://github.com/whaleyjoshua2/Dying-Earth/issues/77), opened from a question of the
+designer's about why no wall was built, and decided at once: "make the sea wall take no slot like
+the scrubber." The Sea Wall takes no build slot and stands in no row; it still needs Coastal
+Engineering, one per state, 35 Materials and two turns, and still absorbs the state's next Sea Level
+threshold and is destroyed doing it. It is offered to the AI only while the state has a coast left.
+
+### What moved
+
+| file | figure | was | is |
+| --- | --- | --- | --- |
+| `facilities.toml` | the Sea Wall | `coastal_only = true` | `no_slot = true` |
+| `ai.toml` | the Custodians' Tech picks | Public Science, Efficient Grids, ... | Public Science, **Coastal Engineering**, Efficient Grids, ... |
+| `ai.toml` | the Archivists' Tech picks | Public Science, Efficient Grids, Green Consensus | Public Science, Efficient Grids, **Coastal Engineering**, Green Consensus |
+
+**Builder's calls.** The slot alone changed nothing: with the wall offered only while a coast
+remains, and Coastal Engineering arriving around turn 17 as "the cheapest Tech left" on nobody's
+pick list, the sea had taken every coastal slot by turn 13 and the AI still listed no wall (the
+batch figures came back identical). So Coastal Engineering went onto the Custodians' pick list in
+second place and the Archivists' in third, the AI's own blind spot rather than a rule. The wall's
+candidate moved out of the slot-taking loop to sit beside the Scrubber's. Two ticket #56 tests
+changed sides: a wall is legal with every slot full and counts against none.
+
+### Measured, twenty seeds each
+
+| seat 0 | Sea Walls built | Coastal Engineering done (median turn) | coastal slots lost (median) | Facilities drowned | Custodian wins |
+| --- | --- | --- | --- | --- | --- |
+| Prospectors in East Asia | **220** (was 0) | 20/20, turn **9** (was 19) | 34 | 24 | 7/20 (was 10) |
+| Custodians from Europe | **372** (was 0) | 20/20, turn **6** (was 16) | **29** (was 34) | **19** (was 24) | 9/20 (was 12) |
+
+Eleven to eighteen walls a game where there were none, the Tech in by turn 6 to 9, and in the
+Custodian seating five coastal slots and five Facilities a game saved from the sea. Whether that
+many walls is too many, at 35 Materials each, is the designer's to judge from the build ticket's
+report; the count is in the sweep now.

@@ -1923,7 +1923,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         }
         if game.has_tech(TechId::CoastalEngineering) {
             ui.label(
-                RichText::new("A Sea Wall stands in a coastal slot and takes this state's next Sea Level threshold whole; it is destroyed doing it.")
+                RichText::new("A Sea Wall takes no build slot, as a Scrubber does, and takes this state's next Sea Level threshold whole; it is destroyed doing it.")
                     .weak(),
             );
         }
