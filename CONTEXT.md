@@ -113,7 +113,7 @@ An advance on the Tech Tree that changes an output, a capacity, an upkeep, a Shi
 _Avoid_: research, upgrade, invention
 
 **Tech Tree**:
-The single tree of Techs shared by all Factions, thirteen of them since version 0.05, in five branches: Industry, Propulsion, Off-world Living, Extraction, Society. A branch may hold more than one Tech on a rung. One Tech is under research at a time, worldwide.
+The single tree of Techs shared by all Factions, seventeen of them since version 0.06.0, in five branches: Industry, Propulsion, Off-world Living, Extraction, Society. A branch may hold more than one Tech on a rung. One Tech is under research at a time, worldwide. Four of the seventeen are Victory gates, one per Faction on rung 3: each is a Tech for everyone, and its Faction cannot win until it stands.
 _Avoid_: per-faction tree, research tree
 
 **Research Lead**:
@@ -417,7 +417,7 @@ _Avoid_: subdued, loyal, converted
 ### Winning
 
 **Victory Condition**:
-What one Faction must achieve to win. Each Faction has its own, and meeting it in an End phase wins the game at once; if more than one seat meets it in the same phase, the larger margin over its own bar wins and an exact tie is a draw. If no Faction has met its condition by the end of the last turn, the seats are ranked by the percentage of their own condition, then by Colonists off Earth, then by Colonies held.
+What one Faction must achieve to win. Each Faction has its own, and meeting it in an End phase wins the game at once; since version 0.06.0 it is not met until the Faction's Victory gate, a Tech of its own on the Tech Tree, stands, though every part of it accrues before that; if more than one seat meets it in the same phase, the larger margin over its own bar wins and an exact tie is a draw. If no Faction has met its condition by the end of the last turn, the seats are ranked by the percentage of their own condition, then by Colonists off Earth, then by Colonies held.
 _Avoid_: win condition, goal, objective, victory points
 
 **Extraction Total**:

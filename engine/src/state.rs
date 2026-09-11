@@ -1044,7 +1044,8 @@ impl Game {
     /// What one Colony Ship of this seat carries: the card figure, +2 with Expanded Habitats
     /// (version 0.04 section 4), times the Faction's own multiplier (Steerage doubles it).
     pub fn colony_ship_capacity(&self, seat: Seat) -> u32 {
-        let base = self.tables.unit(UnitKind::ColonyShip).carries_colonists as i64 + self.tech_addition(seat, TechId::ExpandedHabitats);
+        // Ticket #84: Generation Ships stacks on Expanded Habitats.
+        let base = self.tables.unit(UnitKind::ColonyShip).carries_colonists as i64 + self.tech_addition(seat, TechId::ExpandedHabitats) + self.tech_addition(seat, TechId::GenerationShips);
         let m = self.tables.faction(self.kind(seat)).colony_ship_capacity_multiplier;
         (base.max(0) as f64 * m).floor().max(0.0) as u32
     }

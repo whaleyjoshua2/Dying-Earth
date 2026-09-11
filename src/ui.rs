@@ -682,6 +682,11 @@ fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut
         ui.add_space(6.0);
         ui.label(RichText::new("Victory Condition").strong());
         ui.label(&card.victory);
+        // Ticket #84: the gate Tech it waits on.
+        if let Some(gate) = session.tables.victory_gate(kind) {
+            let t = session.tables.tech(gate);
+            ui.label(RichText::new(format!("Waits on {}, a rung-{} Tech ({} Research): {}.", t.name, t.rung, t.cost, t.effect)).weak());
+        }
         ui.add_space(10.0);
         if ui.add(egui::Button::new(RichText::new(format!("Play the {}", card.name)).size(17.0)).min_size(egui::vec2(190.0, 36.0))).clicked() {
             actions.push(Action::ChooseFaction(kind));
@@ -2502,7 +2507,12 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
         } else {
             (Color32::from_gray(60), "locked")
         };
-        painter.rect(r, 6.0, fill, egui::Stroke::new(1.0, Color32::from_gray(200)), egui::StrokeKind::Inside);
+        // Ticket #84: a Victory gate wears its Faction's colour as a thick border.
+        let stroke = match card.gate_for {
+            Some(k) => egui::Stroke::new(3.0, rgb(game.tables.faction(k).colour)),
+            None => egui::Stroke::new(1.0, Color32::from_gray(200)),
+        };
+        painter.rect(r, 6.0, fill, stroke, egui::StrokeKind::Inside);
         painter.text(r.center_top() + egui::vec2(0.0, 14.0), egui::Align2::CENTER_CENTER, &card.name, FontId::proportional(13.0), Color32::WHITE);
         painter.text(r.center_top() + egui::vec2(0.0, 32.0), egui::Align2::CENTER_CENTER, format!("cost {} - {}", card.cost, status), FontId::proportional(11.0), Color32::from_gray(230));
         let needs = if card.needs.is_empty() { "nothing".to_string() } else { card.needs.iter().map(|n| game.tables.tech(*n).name.clone()).collect::<Vec<_>>().join(" and ") };

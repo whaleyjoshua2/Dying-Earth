@@ -206,6 +206,10 @@ influence_step = 5
 # target list, as a share of a neutral one's worth. 0.6 until now; at 0.3 a held place is attacked
 # only when no neutral one is worth having.
 held_state_weight = 0.3
+# Ticket #84 (version 0.06.0): as Research Lead the AI picks its Victory gate once its first part
+# is past this fraction of its bar, or from this turn, whichever comes first.
+gate_pick_fraction = 0.5
+gate_pick_turn = 24
 
 # Tech picks as Research Lead (spec 16.4): `order` first, then the cheapest available that is not
 # `never`, and `last` only when nothing else is left.

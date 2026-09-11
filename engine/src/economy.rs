@@ -203,6 +203,8 @@ impl Game {
                     } else {
                         let mut r = p.amount as f64 * self.population_factor(sid) * card.education_level * fac.research_multiplier;
                         r *= self.tech_multiplier(seat, TechId::PublicScience);
+                        // Ticket #84: the Upload stacks on Public Science.
+                        r *= self.tech_multiplier(seat, TechId::TheUpload);
                         y.research = r.floor() as i64;
                     }
                 }
@@ -270,6 +272,8 @@ impl Game {
                 let research_multiplier = if self.off_earth(col) { fac.research_multiplier_off_earth.unwrap_or(fac.research_multiplier) } else { fac.research_multiplier };
                 let mut r = p.amount as f64 * (1.0 + col.colonists as f64 * per) * research_multiplier;
                 r *= self.tech_multiplier(seat, TechId::PublicScience);
+                // Ticket #84: the Upload stacks on Public Science.
+                r *= self.tech_multiplier(seat, TechId::TheUpload);
                 y.research = r.floor() as i64;
             } else {
                 let yield_ = self.colony_yields(col).of_module(kind);
@@ -431,7 +435,8 @@ impl Game {
         }
         match kind {
             ModuleKind::Generator => m *= self.tech_multiplier(seat, TechId::EfficientGrids),
-            ModuleKind::Mine => m *= self.tech_multiplier(seat, TechId::DeepMining),
+            // Ticket #84: the Extraction Charter stacks on Deep Mining.
+            ModuleKind::Mine => m *= self.tech_multiplier(seat, TechId::DeepMining) * self.tech_multiplier(seat, TechId::ExtractionCharter),
             ModuleKind::Refinery => m *= self.tech_multiplier(seat, TechId::AutomatedRefining),
             _ => {}
         }

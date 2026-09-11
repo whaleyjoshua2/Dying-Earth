@@ -249,6 +249,11 @@ impl Game {
         // Ticket #55: the live Sink, which the Sink Weakens Break lowers for good, and the
         // Permafrost line, which is the world's: nobody's Blame and outside `counted()`.
         b.sink = self.climate.natural_sink;
+        // Ticket #84 (version 0.06.0): Planetary Stewardship enlarges the Sink for the world once
+        // it stands; a whole Tech or none, so Provisional Findings has nothing to halve.
+        if self.has_tech(TechId::PlanetaryStewardship) {
+            b.sink += t.tech(TechId::PlanetaryStewardship).value;
+        }
         b.permafrost = self.climate.permafrost;
         // Ticket #54: the Scrubbers standing and online enlarge the Natural Sink this phase.
         b.scrubbers = self.scrubber_removal();

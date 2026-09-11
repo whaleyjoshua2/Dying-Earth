@@ -83,6 +83,8 @@ pub struct SimResult {
     pub research_off_earth: [i64; 4],
     /// Ticket #82 (version 0.06.0): Module-turns doubled by an idle Facility on Earth, per seat.
     pub doubled_module_turns: [i64; 4],
+    /// Ticket #84: the turn each seat's Victory gate completed, if it did.
+    pub gate_turn: [Option<u32>; 4],
     /// Ticket #72: the Prospectors' Venture Capital Fund at the end.
     pub venture_fund_at_end: i64,
     /// Ticket #76: cards drawn over the game, and whether the deck ran dry.
@@ -157,6 +159,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let mut archive_built_turn: Option<u32> = None;
     let mut archive_complete_turn: Option<u32> = None;
     let mut coastal_engineering_turn: Option<u32> = None;
+    // Ticket #84: the turn each seat's Victory gate completed, if it did.
+    let mut gate_turn: [Option<u32>; 4] = [None; 4];
     let home = game.controlled_states(Seat(0)).first().copied();
     let mut start_state_lost_turn: Option<u32> = None;
     let window_turn = game.next_window_turn(1);
@@ -223,6 +227,14 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         }
         if coastal_engineering_turn.is_none() && game.has_tech(crate::ids::TechId::CoastalEngineering) {
             coastal_engineering_turn = Some(game.turn);
+        }
+        for s in Seat::ALL {
+            if gate_turn[s.index()].is_none()
+                && let Some(gate) = game.tables.victory_gate(game.kind(s))
+                && game.has_tech(gate)
+            {
+                gate_turn[s.index()] = Some(game.turn);
+            }
         }
         if first_mars_colony_turn.is_none() {
             first_mars_colony_turn = game
@@ -352,6 +364,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         }),
         research_off_earth: Seat::ALL.map(|s| game.seat(s).research_off_earth_total),
         doubled_module_turns: Seat::ALL.map(|s| game.seat(s).doubled_module_turns),
+        gate_turn,
         venture_fund_at_end: Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Prospectors).map(|s| game.seat(s).venture_fund).unwrap_or(0),
         cards_drawn: game.deck.drawn.len() as u32,
         deck_empty: game.deck.cards.is_empty(),

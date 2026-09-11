@@ -836,6 +836,7 @@ fn a_faction_meeting_both_parts_wins_before_collapse_is_checked() {
     let mut g = game();
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     meet_first(&mut g, Seat(1));
+    open_gates(&mut g);
     g.climate.temperature = 3.2;
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })));
@@ -848,6 +849,7 @@ fn both_met_the_larger_margin_wins() {
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
     g.seats[0].stabilization_run = 3; // parts 1.0 and 1.0 -> margin 1.0
     g.seats[1].venture_fund = 900; // parts 1.2 and 1.25 -> margin 1.2
+    open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
 }
@@ -859,6 +861,7 @@ fn both_met_by_the_same_margin_is_a_draw() {
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     g.seats[0].stabilization_run = 3;
     g.seats[1].venture_fund = 900; // the lower fraction is the presence, 1.0, on both sides
+    open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Draw { .. })), "{:?}", g.outcome);
 }
@@ -1098,6 +1101,14 @@ fn reactor_leak_stops_generators_until_resolution_and_costs_five_energy() {
 
 fn with_tech(g: &mut Game, t: TechId) {
     g.research.done.push(t);
+}
+
+/// Ticket #84 (version 0.06.0): every Victory Condition waits on its gate Tech, so a test about
+/// winning opens all four first.
+fn open_gates(g: &mut Game) {
+    for t in [TechId::PlanetaryStewardship, TechId::ExtractionCharter, TechId::GenerationShips, TechId::TheUpload] {
+        g.research.done.push(t);
+    }
 }
 
 fn income_of(g: &mut Game, seat: Seat) -> Stockpile {
@@ -1577,6 +1588,7 @@ fn more_than_one_seat_meeting_its_condition_gives_the_game_to_the_larger_margin(
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
     g.seats[0].stabilization_run = 3; // parts 1.0 and 1.0 -> margin 1.0
     g.seats[1].venture_fund = 900; // parts 1.2 and 1.25 -> margin 1.2
+    open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
 }
@@ -1891,6 +1903,7 @@ fn diaspora_wants_three_bodies_with_four_colonists_each_and_counts_no_antarctic_
     assert!(!g.progress(Seat(2)).met(), "16 Colonists off Earth is not 30");
     g.colony_mut(ph).unwrap().colonists = 18;
     assert_eq!(g.progress(Seat(2)).first_value, 30.0);
+    open_gates(&mut g);
     assert!(g.progress(Seat(2)).met());
 }
 
@@ -2063,6 +2076,7 @@ fn the_archivists_win_with_the_archive_running_and_twelve_colonists_at_its_colon
     let mut g = game();
     let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 80, 12);
     let _ = cid;
+    open_gates(&mut g);
     g.seats[3].stockpile.energy = 200;
     g.income_phase();
     assert!(g.archive_online(Seat(3)));
@@ -3753,12 +3767,13 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
     assert_eq!(g.coastal_slots(sid), before - 2, "a mothballed Sea Wall absorbs nothing");
 }
 
-/// (f) Coastal Engineering is Industry rung 2, needs Efficient Grids, and the tree holds thirteen.
+/// (f) Coastal Engineering is Industry rung 2, needs Efficient Grids, and the tree holds thirteen;
+/// ticket #84 (version 0.06.0) adds the four Victory gates, so seventeen.
 #[test]
 fn f_coastal_engineering_is_the_thirteenth_tech() {
     let g = fresh();
-    assert_eq!(TechId::ALL.len(), 13, "thirteen Techs");
-    assert_eq!(g.tables.techs.len(), 13, "and thirteen rows in techs.toml");
+    assert_eq!(TechId::ALL.len(), 17, "thirteen Techs and the four gates");
+    assert_eq!(g.tables.techs.len(), 17, "and seventeen rows in techs.toml");
     let c = g.tables.tech(TechId::CoastalEngineering);
     assert_eq!(c.name, "Coastal Engineering");
     assert_eq!(c.branch, "Industry");
@@ -4942,6 +4957,7 @@ fn seven_hundred_and_fifty_in_the_fund_is_the_prospectors_first_part() {
     assert!((p.first_fraction() - 0.4).abs() < 1e-9);
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 12);
     g.seats[pro.index()].venture_fund = 750;
+    open_gates(&mut g);
     assert!(g.progress(pro).met());
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat, .. }) if seat == pro), "{:?}", g.outcome);
@@ -5513,4 +5529,90 @@ fn the_arkwrights_ships_cost_fifteen_per_cent_less() {
     assert_eq!(g.ship_materials(ark, UnitKind::Battleship), 42);
     assert_eq!(g.ship_materials(Seat(0), UnitKind::ColonyShip), 30);
     assert_eq!(g.ship_materials(Seat(0), UnitKind::Battleship), 50);
+}
+
+// ---------------------------------------------------------------- 0.06.0 ticket #84: every Victory Condition waits on a Tech
+
+/// Ticket #84: four new Techs on rung 3 at 40, each after its Faction's themed rung-2 Tech, each
+/// the gate for one Faction's Victory Condition; seventeen Techs in all.
+#[test]
+fn the_four_gates_stand_on_rung_three_at_forty_with_their_prerequisites() {
+    let g = game();
+    let gates = [
+        (FactionKind::Custodians, TechId::PlanetaryStewardship, vec![TechId::GreenConsensus]),
+        (FactionKind::Prospectors, TechId::ExtractionCharter, vec![TechId::AutomatedRefining]),
+        (FactionKind::Arkwrights, TechId::GenerationShips, vec![TechId::ClosedLoopColonies]),
+        (FactionKind::Archivists, TechId::TheUpload, vec![TechId::PublicScience, TechId::ExpandedHabitats]),
+    ];
+    for (kind, t, needs) in gates {
+        let card = g.tables.tech(t);
+        assert_eq!(card.rung, 3, "{t:?}");
+        assert_eq!(card.cost, 40, "{t:?}");
+        assert_eq!(card.gate_for, Some(kind), "{t:?}");
+        assert_eq!(card.needs, needs, "{t:?}");
+        assert_eq!(g.tables.victory_gate(kind), Some(t));
+    }
+    assert_eq!(TechId::ALL.len(), 17);
+}
+
+/// Ticket #84: with both parts at their bars the Custodians still do not win until Planetary
+/// Stewardship stands; the panel says why; progress accrues regardless.
+#[test]
+fn a_victory_condition_waits_on_its_gate() {
+    let mut g = game();
+    let cus = Seat(0);
+    colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
+    g.seats[0].stabilization_run = 3;
+    let p = g.progress(cus);
+    assert!(p.first_value >= p.first_bar && p.second_value >= p.second_bar, "both parts stand: {p:?}");
+    assert!(!p.met(), "the gate is not researched");
+    assert!(p.first_held_back.as_deref().unwrap_or("").contains("Planetary Stewardship"), "{:?}", p.first_held_back);
+    with_tech(&mut g, TechId::PlanetaryStewardship);
+    assert!(g.progress(cus).met());
+}
+
+/// Ticket #84: each gate is a Tech for everyone. The Charter: Mine x1.25 (4 x 1.65 x 1.25 = 8.25);
+/// the Upload: Observatory and Lab x1.25 (2 x 1.25 x 1.25 = 3.125 for a Custodian Observatory);
+/// Generation Ships: a Colony Ship carries 2 more (12 for the Arkwrights); Stewardship: the Sink
+/// grows by 1.0.
+#[test]
+fn the_gates_general_bonuses_are_for_everyone() {
+    let mut g = game();
+    let cus = Seat(0);
+    let moon = colony(&mut g, cus, BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Observatory], 0);
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::ResearchLab));
+    assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 6);
+    with_tech(&mut g, TechId::ExtractionCharter);
+    assert_eq!(g.module_yield(cus, moon, ModuleKind::Mine).amount, 8, "4 x 1.65 x 1.25 = 8.25");
+    assert_eq!(g.module_yield(cus, moon, ModuleKind::Observatory).research, 2, "2 x 1.25 = 2.5");
+    let lab_before = g.facility_yield(cus, StateId::EastAsia, FacilityKind::ResearchLab).research;
+    with_tech(&mut g, TechId::TheUpload);
+    assert_eq!(g.module_yield(cus, moon, ModuleKind::Observatory).research, 3, "2 x 1.25 x 1.25 = 3.125");
+    assert!(g.facility_yield(cus, StateId::EastAsia, FacilityKind::ResearchLab).research > lab_before, "a Lab makes more too");
+    assert_eq!(g.colony_ship_capacity(cus), 4);
+    with_tech(&mut g, TechId::GenerationShips);
+    assert_eq!(g.colony_ship_capacity(cus), 6);
+    assert_eq!(g.colony_ship_capacity(Seat(2)), 12, "(4 + 2) x 2 for the Arkwrights");
+    let sink = g.emissions_now().sink;
+    with_tech(&mut g, TechId::PlanetaryStewardship);
+    assert!((g.emissions_now().sink - sink - 1.0).abs() < 1e-9, "the Sink grows by 1.0: {} then {}", sink, g.emissions_now().sink);
+}
+
+/// Ticket #84: the Custodian AI, as Research Lead with the road to its gate open, picks Planetary
+/// Stewardship once its first part is past half or from turn 24, and its own list before that.
+#[test]
+fn the_ai_picks_its_gate_as_lead_once_past_half_or_from_turn_24() {
+    let mut g = game();
+    let cus = Seat(0);
+    for t in [TechId::PublicScience, TechId::CoastalEngineering, TechId::EfficientGrids, TechId::CleanPower, TechId::GreenConsensus] {
+        with_tech(&mut g, t);
+    }
+    g.turn = 5;
+    g.seats[0].stabilization_run = 0;
+    assert_ne!(g.ai_tech_pick(cus), TechId::PlanetaryStewardship, "too early: its list first");
+    g.seats[0].stabilization_run = 2;
+    assert_eq!(g.ai_tech_pick(cus), TechId::PlanetaryStewardship, "past half of its first part");
+    g.seats[0].stabilization_run = 0;
+    g.turn = 24;
+    assert_eq!(g.ai_tech_pick(cus), TechId::PlanetaryStewardship, "from turn 24");
 }

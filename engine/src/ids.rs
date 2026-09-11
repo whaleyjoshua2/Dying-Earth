@@ -253,10 +253,16 @@ pub enum TechId {
     /// Version 0.05 (ticket #56): the thirteenth Tech, Industry rung 2 beside Clean Power. It
     /// unlocks the Sea Wall and nothing else.
     CoastalEngineering,
+    /// Version 0.06.0 (ticket #84): the four gates, one per Faction, on rung 3. Each opens its
+    /// Faction's Victory Condition and is a Tech for everyone besides.
+    PlanetaryStewardship,
+    ExtractionCharter,
+    GenerationShips,
+    TheUpload,
 }
 
 impl TechId {
-    pub const ALL: [TechId; 13] = [
+    pub const ALL: [TechId; 17] = [
         TechId::EfficientGrids,
         TechId::CleanPower,
         TechId::CleanManufacturing,
@@ -270,6 +276,10 @@ impl TechId {
         TechId::PublicScience,
         TechId::GreenConsensus,
         TechId::CoastalEngineering,
+        TechId::PlanetaryStewardship,
+        TechId::ExtractionCharter,
+        TechId::GenerationShips,
+        TechId::TheUpload,
     ];
     pub fn index(self) -> usize {
         self as usize

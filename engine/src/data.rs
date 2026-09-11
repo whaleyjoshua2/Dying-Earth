@@ -199,6 +199,9 @@ pub struct TechCard {
     pub value: f64,
     #[serde(default)]
     pub influence_threshold_multiplier: Option<f64>,
+    /// Ticket #84 (version 0.06.0): the Faction whose Victory Condition this Tech opens, if any.
+    #[serde(default)]
+    pub gate_for: Option<FactionKind>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -720,6 +723,10 @@ pub struct AiThresholds {
     pub influence_step: i64,
     /// Ticket #75: a held state's worth on the Influence target list, as a share of a neutral one's.
     pub held_state_weight: f64,
+    /// Ticket #84 (version 0.06.0): as Research Lead the AI picks its Victory gate once its first
+    /// part is past this fraction of its bar, or from this turn, whichever comes first.
+    pub gate_pick_fraction: f64,
+    pub gate_pick_turn: u32,
 }
 
 /// Ticket #50: one pick list per Faction. `order` is tried first, then the cheapest available
@@ -1257,6 +1264,11 @@ impl Tables {
     }
     pub fn ai_tech_picks(&self, kind: FactionKind) -> &AiTechPicks {
         &self.ai.tech_picks[&kind]
+    }
+
+    /// Ticket #84 (version 0.06.0): the Tech that opens this Faction's Victory Condition, if one does.
+    pub fn victory_gate(&self, kind: FactionKind) -> Option<TechId> {
+        self.techs.iter().find(|t| t.gate_for == Some(kind)).map(|t| t.id)
     }
 }
 

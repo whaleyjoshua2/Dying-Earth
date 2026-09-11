@@ -128,3 +128,34 @@ Colonists off Earth, all seats, where 0.05.5 had 50; they lose East Asia in ever
 as before, and the Custodians beside them still win 18. What a cheaper Ship buys them is spent on
 the same shipping schedule; the bar that stops Diaspora is the three Bodies with four each, which
 the Venus and tank tickets will change more than a price does.
+
+## Every Victory Condition waits on a Tech ([ticket #84](https://github.com/whaleyjoshua2/Dying-Earth/issues/84))
+
+- **gates-earth.png** — `shot:gates tech:1 turns:0 panel:0`. The Tech Tree on turn 1 with the four
+  gates on rung 3, each bordered in its Faction's colour: **Generation Ships** (purple, Off-world
+  Living, after Closed-Loop Colonies), **The Extraction Charter** (orange, Extraction, after
+  Automated Refining), **Planetary Stewardship** (teal, Society, after Green Consensus) and **The
+  Upload** (pale blue, Society, after Public Science and Expanded Habitats), all at cost 40.
+
+### Measured, twenty seeds each, all four seatings (`sweep/gates.txt`)
+
+| Seat 0 | Wins by seat | Collapses | Techs (median) | Gates completed, seeds by seat | Gate median turn |
+|---|---|---|---|---|---|
+| Custodians from East Asia | nobody | 20/20 | 7 | [5, 2, 2, 1] | 28, 32, 33, 30 |
+| Prospectors from East Asia | Custodians 2 | 18/20 | 6 | [1, 2, 1, 1] | 27, 26, 27, 28 |
+| Arkwrights from East Asia | Custodians 18 | 2/20 | 15 | [9, **20**, 10, 10] | 32, **27**, 31, 32 |
+| Archivists from East Asia | Custodians 19 | 1/20 | **17** | [11, **20**, 15, 13] | 32, **27**, 31, 32 |
+
+**The gate opens late and the Custodians walk through it anyway.** In the two seatings where the
+world holds, the Custodian AI (seat 1) completes Planetary Stewardship in every seed at a median
+turn 27 and still wins 18 and 19 of 20 (18 and 15 before the gate): its Stabilization run and its
+twelve Colonists were already standing, and its Lead picks fetched the gate in time. The other
+three complete theirs in about half the seeds, at turns 31 to 32, with nothing else of their
+conditions met. In the two seatings that collapse around turn 19 to 21 almost no gate completes
+at all, and nobody wins where nobody won before. Techs completed rose to a median 15 and 17 in the
+calm seatings (13 before): with seventeen Techs on the tree and Research abundant late, the AIs
+research the whole of it.
+
+**The AI picks its gate as Lead** once its first part is past half or from turn 24
+(`ai.toml`, `gate_pick_fraction` and `gate_pick_turn`), the road standing; that timing is the
+builder's, and the median turn 27 for the Custodians says it fires about when it should.
