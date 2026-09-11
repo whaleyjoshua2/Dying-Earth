@@ -96,8 +96,12 @@ energy_zero = "{faction}: Energy fell to zero even with every producer off."
 attacks = " and attacks"
 cargo_aboard = " with {n} Colonists aboard"
 sea_unrest = " Unrest there rose by {rose} to {unrest}."
+# Ticket #85 (version 0.06.0): the count is an ordinal ("second", "twelfth", "13th"), and a
+# Colony founded in Antarctica has phrases of its own, since Antarctica is on Earth.
 first_colony = "their first Colony off Earth"
-more_colonies = "their {count} Colony off Earth"
+more_colonies = "their {ordinal} Colony off Earth"
+first_antarctic_colony = "their first Colony in Antarctica"
+more_antarctic_colonies = "their {ordinal} Colony in Antarctica"
 slot = "slot"
 slots = "slots"
 pick_first_choice = "The {faction} pick {tech}, their first choice."

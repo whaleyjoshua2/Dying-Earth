@@ -159,3 +159,15 @@ research the whole of it.
 **The AI picks its gate as Lead** once its first part is past half or from turn 24
 (`ai.toml`, `gate_pick_fraction` and `gate_pick_turn`), the road standing; that timing is the
 builder's, and the median turn 27 for the Custodians says it fires about when it should.
+
+## The Antarctic founding Moment ([ticket #85](https://github.com/whaleyjoshua2/Dying-Earth/issues/85))
+
+- **antarctic-report.png** — `shot:antarctic antarctic:2 moment:colony menus:1`. The Custodians
+  have sent four Emigrants by sea to each of the first two Antarctic slots on consecutive turns;
+  the Moment for the second reads **"The Custodians founded Lake Vostok on Earth, their second
+  Colony in Antarctica."** where it read "their 2 Colony off Earth". The roster beside it lists
+  both Antarctic Colonies, and its station line now reads "a Shipyard, Habitats and Observatories",
+  a text left behind by the Observatory ticket.
+
+No batch for this ticket: it changes four phrases and a count, seen red first in a test that founds
+twice in Antarctica and twice on the Moon and reads all four Moments.

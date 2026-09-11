@@ -5616,3 +5616,40 @@ fn the_ai_picks_its_gate_as_lead_once_past_half_or_from_turn_24() {
     g.turn = 24;
     assert_eq!(g.ai_tech_pick(cus), TechId::PlanetaryStewardship, "from turn 24");
 }
+
+// ---------------------------------------------------------------- 0.06.0 ticket #85: the Antarctic founding Moment
+
+/// Ticket #85: a Colony founded in Antarctica is announced as "their first Colony in Antarctica",
+/// then "their second Colony in Antarctica"; one founded off Earth as "their first Colony off
+/// Earth", then "their second Colony off Earth", the count an ordinal in words up to twelfth.
+#[test]
+fn the_founding_moment_names_antarctica_and_counts_in_ordinals() {
+    let mut g = game();
+    calm(&mut g);
+    g.antarctica_open = true;
+    g.take_control(StateId::Europe, Seat(0));
+    g.state_mut(StateId::Europe).emigrants = 8;
+    let slots = g.free_slots_on(BodyId::Earth);
+    for (i, expected) in [(0usize, "their first Colony in Antarctica"), (1, "their second Colony in Antarctica")] {
+        let send = Order::SendToAntarctica { state: StateId::Europe, n: 4, into: UnloadTarget::Slot(BodyId::Earth, slots[i]) };
+        g.commit_orders(Seat(0), std::slice::from_ref(&send));
+        g.resolution_phase();
+        g.turn += 1;
+        g.report.moments.clear();
+        g.resolution_phase();
+        let m = g.report.moments.iter().find(|m| m.kind == MomentKind::ColonyFounded).expect("a founding Moment");
+        assert!(m.text.contains(expected), "{}: {:?}", expected, m.text);
+        assert!(!m.text.contains("off Earth"), "Antarctica is on Earth: {:?}", m.text);
+    }
+    for expected in ["their first Colony off Earth", "their second Colony off Earth"] {
+        let (_, found) = colony_ship_ready(&mut g, BodyId::Moon);
+        g.commit_orders(Seat(0), std::slice::from_ref(&found));
+        g.report.moments.clear();
+        g.resolution_phase();
+        let m = g.report.moments.iter().find(|m| m.kind == MomentKind::ColonyFounded).expect("a founding Moment");
+        assert!(m.text.contains(expected), "{}: {:?}", expected, m.text);
+    }
+    assert_eq!(dying_earth_engine::report::ordinal(12), "twelfth");
+    assert_eq!(dying_earth_engine::report::ordinal(13), "13th");
+    assert_eq!(dying_earth_engine::report::ordinal(22), "22nd");
+}

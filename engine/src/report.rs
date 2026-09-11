@@ -415,13 +415,31 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("energy_zero", &["faction"]),
 ];
 
+/// Ticket #85 (version 0.06.0): a count as an ordinal, in words up to twelfth and as a figure
+/// with its suffix past that.
+pub fn ordinal(n: usize) -> String {
+    const WORDS: [&str; 12] = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth", "eleventh", "twelfth"];
+    if (1..=12).contains(&n) {
+        return WORDS[n - 1].to_string();
+    }
+    let suffix = match (n % 10, n % 100) {
+        (1, r) if r != 11 => "st",
+        (2, r) if r != 12 => "nd",
+        (3, r) if r != 13 => "rd",
+        _ => "th",
+    };
+    format!("{n}{suffix}")
+}
+
 /// The same for `[phrase]`.
 pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     ("attacks", &[]),
     ("cargo_aboard", &["n"]),
     ("sea_unrest", &["rose", "unrest"]),
     ("first_colony", &[]),
-    ("more_colonies", &["count"]),
+    ("more_colonies", &["ordinal"]),
+    ("first_antarctic_colony", &[]),
+    ("more_antarctic_colonies", &["ordinal"]),
     ("slot", &[]),
     ("slots", &[]),
     ("pick_first_choice", &["faction", "tech"]),

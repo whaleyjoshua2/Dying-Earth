@@ -1159,7 +1159,7 @@ fn stations_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             cost_button(ui, game, &session.pending, Order::BuildStation { body, slot }, &format!("Build {} here", game.station_name(body, slot)), actions);
         }
     }
-    ui.label(RichText::new("A station holds a Shipyard and Habitats. Ships are built only at a Shipyard.").weak());
+    ui.label(RichText::new("A station holds a Shipyard, Habitats and Observatories. Ships are built only at a Shipyard.").weak());
 }
 
 /// The Colony Slot within fourteen degrees of a point on a Body, nearest first.

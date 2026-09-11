@@ -1197,7 +1197,12 @@ impl Game {
         );
         self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(id)), text);
         let antarctic = self.colonies.iter().filter(|c| c.control.director() == Some(seat) && c.body == BodyId::Earth && !c.in_orbit).count();
-        let note = if antarctic <= 1 { self.phrase("first_colony", &[]) } else { self.phrase("more_colonies", &[("count", antarctic.to_string())]) };
+        // Ticket #85: Antarctica is on Earth, so its founding has phrases of its own, the count an ordinal.
+        let note = if antarctic <= 1 {
+            self.phrase("first_antarctic_colony", &[])
+        } else {
+            self.phrase("more_antarctic_colonies", &[("ordinal", crate::report::ordinal(antarctic))])
+        };
         self.moment(
             MomentKind::ColonyFounded,
             &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(id))), ("note", note), ("n", moved.to_string())],
@@ -1396,10 +1401,11 @@ impl Game {
                             self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(id)), text);
                             let off_earth =
                                 self.colonies.iter().filter(|c| c.control.director() == Some(seat) && c.body != BodyId::Earth && !c.in_orbit).count();
+                            // Ticket #85: the count is an ordinal.
                             let note = if off_earth <= 1 {
                                 self.phrase("first_colony", &[])
                             } else {
-                                self.phrase("more_colonies", &[("count", off_earth.to_string())])
+                                self.phrase("more_colonies", &[("ordinal", crate::report::ordinal(off_earth))])
                             };
                             self.moment(
                                 MomentKind::ColonyFounded,

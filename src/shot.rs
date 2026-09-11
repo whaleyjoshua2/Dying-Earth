@@ -243,6 +243,24 @@ fn build_board(session: &mut Session) {
                 g.state_mut(sid).facilities.push(f);
             }
         }
+        // `antarctic:2` (a building aid, ticket #85): the ice open, seat 0's start state sends four
+        // Emigrants to each of the first two Antarctic slots on consecutive turns, so the last
+        // Resolution's founding Moment reads "their second Colony in Antarctica" (with `moment:colony`).
+        if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("antarctic:").and_then(|v| v.parse::<usize>().ok()))
+            && let Some(sid) = g.controlled_states(Seat(0)).first().copied()
+        {
+            g.antarctica_open = true;
+            g.state_mut(sid).emigrants = 4 * n as u32;
+            let slots = g.free_slots_on(BodyId::Earth);
+            for slot in slots.into_iter().take(n) {
+                let send = Order::SendToAntarctica { state: sid, n: 4, into: UnloadTarget::Slot(BodyId::Earth, slot) };
+                g.commit_orders(Seat(0), std::slice::from_ref(&send));
+                g.resolution_phase();
+                g.turn += 1;
+            }
+            g.report.moments.clear();
+            g.resolution_phase();
+        }
         // `pressed:<n>` (a building aid, ticket #75): seat 0 holds North Africa (a short card) with a
         // Standing of n there, and seat 1 stands at n too, so the card's warning line shows.
         if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("pressed:").and_then(|v| v.parse::<i64>().ok())) {
@@ -385,7 +403,8 @@ fn build_board(session: &mut Session) {
         // `found:1` (a building aid, ticket #58): seat 0 lands a loaded Colony Ship at the Moon and
         // the turn runs, so the Report carries a real founding, its headline and its Moment. An AI
         // game founds one on a turn nobody can choose. `moment:colony` implies it.
-        if std::env::args().any(|a| a == "found:1" || a == "moment:colony") {
+        // Ticket #85: unless `antarctic:<n>` staged a founding of its own for the Moment.
+        if std::env::args().any(|a| a == "found:1" || a == "moment:colony") && !std::env::args().any(|a| a.starts_with("antarctic:")) {
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
             g.ships.push(Ship {
