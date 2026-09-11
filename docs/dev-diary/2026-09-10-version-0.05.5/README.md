@@ -482,5 +482,8 @@ Fund fills to a median 219 of 750, and the Custodians' wins fall by half in two 
 Archivists still lose East Asia in every seed, four turns later. No rule limits a Faction to one
 state (the Archivist AI took a second one fourteen times in a twenty-seed batch); in AI play they
 usually hold only their start state, at Influence x1.0 beside a Custodian at x1.25 pouring 25 a
-turn in, and cannot hold the richest state on the board past turn 22 whatever it starts with. That, and the Sea Wall count back at 0 in these batches (the
-AI's Allotment now goes to holds), are the build ticket's to report.
+turn in, and cannot hold the richest state on the board past turn 22 whatever it starts with. That, and the Sea Wall count back at 0 in these batches, are the build ticket's to report. The
+walls are not the holds' doing (holds spend Influence, a wall spends Materials, and the AI never
+listed one): a wall needs a free coastal slot, most states have none to spare since the
+coastal-slots ticket, the sea's first two events take what there is by about turn 13, and
+Coastal Engineering arrives around turn 17. The designer's question, on the map.
