@@ -211,7 +211,7 @@ _Avoid_: country, nation, territory, region, state, continent (some are, some ar
 ### Earth
 
 **Facility**:
-A building placed in a Nation State. Ten kinds since version 0.05: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, and the Sea Wall and the Scrubber, which take no build slot (the Sea Wall stood in a Coastal Slot until version 0.05.5). Since version 0.04 a Launch Site builds no Ship: it lifts Emigrants and Armies from its state into orbit, and each lift is a launch.
+A building placed in a Nation State. Ten kinds since version 0.05: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, the Sea Wall, which stands only in a Coastal Slot, and the Scrubber, which alone takes no build slot. Since version 0.04 a Launch Site builds no Ship: it lifts Emigrants and Armies from its state into orbit, and each lift is a launch.
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Cheap Industry**:
@@ -279,7 +279,7 @@ How much of a Nation State stands on the coast, a figure on its card. It sets ho
 _Avoid_: coastline, vulnerability, flood risk
 
 **Sea Wall**:
-The Facility that holds one threshold off: it takes no build slot (since version 0.05.5; a Coastal Slot before), at most one to a state, and while it is working the state's next Sea Level threshold of any kind takes no slots at all. The wall is destroyed absorbing it. It needs Coastal Engineering.
+The Facility that holds one threshold off: it stands in a Coastal Slot, at most one to a state, and while it is working the state's next Sea Level threshold of any kind takes no slots at all. The wall is destroyed absorbing it. It needs Coastal Engineering.
 _Avoid_: dyke, levee, barrier, flood defence
 
 **Coastal Engineering**:

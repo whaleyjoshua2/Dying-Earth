@@ -523,3 +523,21 @@ Eleven to eighteen walls a game where there were none, the Tech in by turn 6 to 
 Custodian seating five coastal slots and five Facilities a game saved from the sea. Whether that
 many walls is too many, at 35 Materials each, is the designer's to judge from the build ticket's
 report; the count is in the sweep now.
+
+### The second round: back in a coastal slot, at 20 Materials
+
+The designer, on seeing eleven to eighteen walls a game: "now that we've fixed the tech choice order
+let's see what happens if it takes up a slot. Let's also reduce the materials cost to 20." So the
+wall stands in a coastal slot again, as ticket #56 had it (read as the coastal slot, not any slot),
+at 20 Materials, and the early Tech pick stays. The tests changed sides again and were run.
+
+| seat 0 | Sea Walls built | Coastal Engineering (median turn) | coastal slots lost | Facilities drowned | Custodian wins |
+| --- | --- | --- | --- | --- | --- |
+| Prospectors in East Asia | **30** (no slot: 220; before the ticket: 0) | 9 | 34 | 24 | 6/20 |
+| Custodians from Europe | **48** (no slot: 372; before: 0) | 6 | 34 | 25 | 10/20 |
+
+One or two walls a game: the Tech now comes in time, but a wall needs a free coastal slot and few
+states have one (Europe, North America, Russia and the Middle East none), so most coasts go
+unwalled and the sea takes what it took. The two rounds are the designer's pair to choose from: a
+wall in a coastal slot at 20 Materials, one or two a game; or a wall taking no slot at 35, eleven to
+eighteen a game.

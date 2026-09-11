@@ -597,12 +597,12 @@ impl Game {
                     None,
                 );
             }
-            // Ticket #77 (version 0.05.5): a Sea Wall takes no build slot, as the Scrubber does, so it
-            // is offered whether or not a slot is free: with Coastal Engineering in, no wall standing
-            // or on order, and a coast still to protect. With the sea within 0.2 C it takes the
-            // victory-gap, threat and opportunity multipliers (ticket #70), so it competes with the
-            // Scrubber on even terms.
-            if self.has_tech(TechId::CoastalEngineering) && !self.sea_wall_committed(sid) && self.coastal_slots(sid) > 0 {
+            // Ticket #77 (version 0.05.5): a Sea Wall is offered beside the Scrubber rather than among
+            // the slot-takers, with Coastal Engineering in, no wall standing or on order, and a free
+            // coastal slot to stand in (it took none for one round of the ticket). With the sea
+            // within 0.2 C it takes the victory-gap, threat and opportunity multipliers (ticket #70),
+            // so it competes with the Scrubber on even terms.
+            if self.has_tech(TechId::CoastalEngineering) && !self.sea_wall_committed(sid) && self.free_coastal(sid) > 0 {
                 let close = self.sea_is_close(sid);
                 let (pull, sway, opp) = if close { (gap, m.threat, m.opportunity) } else { (1.0, 1.0, 1.0) };
                 push(vec![Order::BuildFacility { state: sid, kind: FacilityKind::SeaWall }], Cat::SeaWall, self.base_weight(seat, Cat::SeaWall), pull, sway, opp, format!("build Sea Wall in {}", self.tables.state(sid).name), None);
