@@ -1608,21 +1608,44 @@ fn the_ai_seats_take_start_states_not_adjacent_to_any_taken_one() {
 
 // ---------------------------------------------------------------- 8.3 a same-turn Influence tie
 
+/// Ticket #70 (version 0.05.5): two challengers at the same Standing on a NEUTRAL place draw lots,
+/// from the game's own generator so a seed replays the same draw; on a held place the holder keeps
+/// it, since a challenger is never tied with a holder and two tied challengers cancel out.
 #[test]
-fn two_challengers_at_the_same_standing_leave_the_place_where_it_was() {
+fn two_challengers_at_the_same_standing_draw_lots_for_a_neutral_place_and_a_held_one_stays() {
+    let claim = |g: &mut Game, seats: &[Seat], standing: i64| {
+        for seat in seats {
+            g.seats[seat.index()].influence.insert(Place::State(StateId::NorthAfrica), standing);
+            g.seats[seat.index()].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
+        }
+    };
+    // North Africa's threshold is 50. Two seats reach it in the same Resolution at the same Standing.
     let mut g = game();
-    // Africa's threshold is 50. Two seats reach it in the same Resolution at the same Standing.
-    for seat in [Seat(0), Seat(1)] {
-        g.seats[seat.index()].influence.insert(Place::State(StateId::NorthAfrica), 50);
-        g.seats[seat.index()].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
-    }
+    claim(&mut g, &[Seat(0), Seat(1)], 50);
     g.resolution_phase();
-    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Neutral, "an exact tie goes to nobody");
+    let winner = g.state(StateId::NorthAfrica).control.controller().expect("the lot fell to one of them");
+    assert!(matches!(winner, Seat(0) | Seat(1)), "one of the two claimants: {winner:?}");
+    assert!(g.log.to_vec().iter().any(|l| l.contains("the lot falls to")), "the log names the lot: {:?}", g.log.to_vec());
+    assert!(g.report.lines.iter().any(|l| l.text.contains("the lot falls to")), "and so does the Report: {:?}", g.report.lines);
+    // The same seed draws the same lot.
+    let mut again = game();
+    claim(&mut again, &[Seat(0), Seat(1)], 50);
+    again.resolution_phase();
+    assert_eq!(again.state(StateId::NorthAfrica).control, Control::Controlled(winner), "the draw comes from the game's own generator");
+    // A held place: two rivals both clear the holder's Standing plus the margin at the same figure,
+    // and it stays where it was.
+    let mut g = game();
+    g.state_mut(StateId::NorthAfrica).control = Control::Controlled(Seat(2));
+    g.seats[2].influence.insert(Place::State(StateId::NorthAfrica), 30);
+    claim(&mut g, &[Seat(0), Seat(1)], 60);
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(2)), "the holder keeps a place two rivals tie for");
+    assert!(g.log.to_vec().iter().any(|l| l.contains("it stays as it is")), "{:?}", g.log.to_vec());
     // One more point and the higher Standing takes it.
-    g.seats[0].influence.insert(Place::State(StateId::NorthAfrica), 51);
-    for seat in [Seat(0), Seat(1)] {
-        g.seats[seat.index()].influenced_this_turn.push(Place::State(StateId::NorthAfrica));
-    }
+    g.seats[0].influence.insert(Place::State(StateId::NorthAfrica), 61);
+    claim(&mut g, &[Seat(0), Seat(1)], 0);
+    g.seats[1].influence.insert(Place::State(StateId::NorthAfrica), 60);
+    g.seats[0].influence.insert(Place::State(StateId::NorthAfrica), 61);
     g.resolution_phase();
     assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(0)), "the higher Standing takes it");
 }
@@ -3321,10 +3344,12 @@ fn e_ice_sheets_committed_fires_a_threshold_out_of_sequence_and_the_scheduled_on
     assert_eq!(after_break, after_first - 2, "the Break took a threshold's worth of slots out of sequence");
     assert!(!g.state(StateId::EastAsia).thresholds_fired[1], "and it did not use up the scheduled +2.3");
 
-    // +2.3: the scheduled threshold, on its own turn.
+    // +2.3: the scheduled threshold, on its own turn. Ticket #70 (version 0.05.5): East Asia has
+    // four coastal slots now, not six, so by then the coast is gone and it fires and takes nothing.
     hold_temperature(&mut g, 2.35);
     g.climate_phase();
-    assert_eq!(g.build_slots(StateId::EastAsia), after_break - 2, "so the state loses slots twice between +2.2 and +2.3");
+    assert!(g.state(StateId::EastAsia).thresholds_fired[1], "the scheduled +2.3 still fires on its own turn");
+    assert_eq!(g.build_slots(StateId::EastAsia), after_break, "and finds no coastal slot left to take: the Break and +1.8 took all four");
 }
 
 /// (f) Amazon Dieback: 20 ppm into the CO2 Stock once, and South America's Baseline Emissions up by
@@ -3497,26 +3522,34 @@ fn a_every_state_has_three_more_build_slots() {
     assert_eq!(g.build_slots(StateId::Europe), before + 1, "a raise of the Industry Level adds a slot");
 }
 
-/// (b) Coastal slots are 3 x Coastal Exposure, capped at the start slots less one; the rest of the
-/// start slots are inland, and every slot a raise adds is inland.
+/// (b) Coastal slots are 2 x Coastal Exposure (3 until ticket #70 of version 0.05.5, which moved
+/// fifteen of the world's 49 inland), capped at the start slots less one; the rest of the start
+/// slots are inland, and every slot a raise adds is inland.
 #[test]
-fn b_coastal_slots_are_three_an_exposure_capped_and_a_raise_is_inland() {
+fn b_coastal_slots_are_two_an_exposure_capped_and_a_raise_is_inland() {
     let mut g = fresh();
-    assert_eq!(g.tables.coastal_per_exposure, 3, "three coastal slots per point of Coastal Exposure");
+    assert_eq!(g.tables.coastal_per_exposure, 2, "two coastal slots per point of Coastal Exposure");
+    let mut world = 0;
     for sid in StateId::ALL {
         let card = g.tables.state(sid);
         let start = card.size + card.industry_level + 3;
-        let want = (3 * card.coastal_exposure).min(start - 1);
+        let want = (2 * card.coastal_exposure).min(start - 1);
+        world += want;
         assert_eq!(g.start_slots(sid), start, "{}: start slots", card.name);
-        assert_eq!(g.coastal_slots(sid), want, "{}: 3 x Exposure {} capped at {} start slots less one", card.name, card.coastal_exposure, start);
+        assert_eq!(g.coastal_slots(sid), want, "{}: 2 x Exposure {} capped at {} start slots less one", card.name, card.coastal_exposure, start);
         assert_eq!(g.inland_slots(sid), start - want, "{}: the rest of the start slots are inland", card.name);
         assert_eq!(g.coastal_slots(sid) + g.inland_slots(sid), g.build_slots(sid), "{}: the two rows are the whole card", card.name);
     }
-    // Central America and the Caribbean is where the cap bites: Size 1, Industry Level 1, Coastal
-    // Exposure 2 -> 1 + 3 + 1 = 5 start slots, 3 x 2 = 6 coastal wanted, capped at 4.
+    assert_eq!(world, 34, "34 coastal slots in the world, fifteen fewer than the 49 of version 0.05");
+    // Ticket #70: Europe's Refinery and North America's Factory, third on their cards with an
+    // Exposure of 1, now stand inland from the first turn.
+    assert!(g.state(StateId::Europe).facilities.iter().any(|f| f.kind == FacilityKind::Refinery && !f.coastal), "Europe's Refinery went inland");
+    assert!(g.state(StateId::NorthAmerica).facilities.iter().any(|f| f.kind == FacilityKind::Factory && !f.coastal), "North America's Factory went inland");
+    // Central America and the Caribbean: Size 1, Industry Level 1, Coastal Exposure 2 -> 1 + 3 + 1
+    // = 5 start slots, 2 x 2 = 4 coastal, which the cap of four just lets stand.
     let ca = StateId::CentralAmerica;
     assert_eq!(g.start_slots(ca), 5, "Central America starts with five slots");
-    assert_eq!(g.coastal_slots(ca), 4, "six coastal wanted, capped at the start slots less one");
+    assert_eq!(g.coastal_slots(ca), 4, "four coastal, at the cap of the start slots less one");
     assert_eq!(g.inland_slots(ca), 1, "and one inland");
 
     // Every slot a raise adds is inland.
@@ -3560,7 +3593,8 @@ fn d_the_sea_takes_coastal_slots_only_oldest_first_and_then_nothing() {
     for s in &mut g.states {
         s.population = 0.0;
     }
-    // Australia and Oceania: Size 2, Industry Level 2, Exposure 2 -> 7 slots, 6 coastal, 1 inland.
+    // Australia and Oceania: Size 2, Industry Level 2, Exposure 2 -> 7 slots, 4 coastal (ticket
+    // #70: two an Exposure, where it was six of the seven), 3 inland.
     let sid = StateId::Australia;
     let st = g.state_mut(sid);
     st.control = Control::Controlled(Seat(0));
@@ -3570,22 +3604,15 @@ fn d_the_sea_takes_coastal_slots_only_oldest_first_and_then_nothing() {
         Facility::in_coastal_slot(FacilityKind::PowerPlant),
         Facility::new(FacilityKind::ResearchLab),
     ];
-    assert_eq!(g.coastal_slots(sid), 6);
-    assert_eq!(g.inland_slots(sid), 1);
+    assert_eq!(g.coastal_slots(sid), 4);
+    assert_eq!(g.inland_slots(sid), 3);
 
     g.apply_sea_threshold(sid, 0);
-    assert_eq!(g.coastal_slots(sid), 4, "Exposure 2 takes two coastal slots");
-    assert_eq!(g.inland_slots(sid), 1, "and no inland slot");
-    assert_eq!(
-        standing(&g, sid, true),
-        vec![FacilityKind::Factory, FacilityKind::Refinery, FacilityKind::PowerPlant],
-        "three coastal Facilities still fit four coastal slots"
-    );
+    assert_eq!(g.coastal_slots(sid), 2, "Exposure 2 takes two coastal slots");
+    assert_eq!(g.inland_slots(sid), 3, "and no inland slot");
+    assert_eq!(standing(&g, sid, true), vec![FacilityKind::Refinery, FacilityKind::PowerPlant], "the oldest coastal Facility went first: the Factory");
 
     g.apply_sea_threshold(sid, 1);
-    assert_eq!(g.coastal_slots(sid), 2, "two more");
-    assert_eq!(standing(&g, sid, true), vec![FacilityKind::Refinery, FacilityKind::PowerPlant], "the oldest coastal Facility went first: the Factory");
-    g.apply_sea_threshold(sid, 2);
     assert_eq!(g.coastal_slots(sid), 0, "the coast is gone");
     assert!(standing(&g, sid, true).is_empty(), "and everything that stood on it with it");
     assert_eq!(standing(&g, sid, false), vec![FacilityKind::ResearchLab], "the inland Research Lab never moved");
@@ -3780,6 +3807,26 @@ fn h_the_ai_raises_a_sea_wall_when_the_sea_is_close() {
     assert!(
         !orders.iter().any(|o| matches!(o, Order::BuildFacility { kind: FacilityKind::SeaWall, .. })),
         "no Coastal Engineering, no Sea Wall: {orders:?}"
+    );
+
+    // Ticket #70 (version 0.05.5): with the sea close the wall takes the victory-gap and threat
+    // multipliers, so a Custodian with Materials for one building or the other walls the coast
+    // rather than holding everything for a Scrubber, which is what 0.05.5's Research ticket found
+    // it doing in every seed.
+    let mut g = game();
+    calm(&mut g);
+    sea_ahead(&mut g);
+    directed(&mut g, sid);
+    assert_eq!(g.kind(Seat(0)), FactionKind::Custodians, "seat 0 is the Custodians in this fixture");
+    g.research.done.push(TechId::CoastalEngineering);
+    hold_temperature(&mut g, 1.65);
+    g.seats[0].stockpile.materials = 40;
+    g.seats[0].stockpile.energy = 200;
+    let orders = g.ai_orders(Seat(0));
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::BuildFacility { kind: FacilityKind::SeaWall, .. })),
+        "with 40 Materials, the sea 0.15 C away and a Scrubber on offer, a wall comes first: {orders:?}; the AI's list: {:#?}",
+        g.log.to_vec().iter().filter(|l| l.contains("Sea Wall") || l.contains("Scrubber")).collect::<Vec<_>>()
     );
 }
 

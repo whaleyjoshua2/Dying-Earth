@@ -90,6 +90,8 @@ fn main() {
                     let (mut archive_built, mut archive_complete, mut archive_funds) = (Vec::new(), Vec::new(), Vec::new());
                     // Ticket #69: the neutral Labs' Research and the Sea Wall's Tech.
                     let (mut neutral_research, mut coastal_engineering) = (Vec::new(), Vec::new());
+                    // Ticket #70: what the sea took.
+                    let (mut slots_lost, mut drowned) = (Vec::new(), Vec::new());
                     for seed in 1..=seeds {
                         let r = dying_earth_engine::sim::run_from(tables.clone(), seed, player, start);
                         match r.outcome {
@@ -121,6 +123,8 @@ fn main() {
                         }
                         archive_funds.push(r.archive_fund_at_end.max(0) as u32);
                         neutral_research.push(r.neutral_research.max(0) as u32);
+                        slots_lost.push(r.coastal_slots_lost);
+                        drowned.push(r.facilities_drowned);
                         if let Some(t) = r.coastal_engineering_turn {
                             coastal_engineering.push(t);
                         }
@@ -176,6 +180,7 @@ fn main() {
                             coastal_engineering.len(),
                             median_u(&mut coastal_engineering)
                         );
+                        println!("      The sea: median {} coastal slots lost a game, {} Facilities drowned", median_u(&mut slots_lost), median_u(&mut drowned));
                         println!(
                             "      Victory Conditions met outright: {}",
                             if victory_met.is_empty() { "none in any seed".to_string() } else { victory_met.join(", ") }

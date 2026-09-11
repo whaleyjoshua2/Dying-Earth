@@ -212,3 +212,48 @@ not. Reachable now, never chosen: an AI weighting for the build ticket.
 - **neutral-report.png** — `shot:neutral turns:1 menus:1`. Turn 2's dispatch, under **On Earth**:
   "The Labs of South-East Asia and North America, in no one's hands, added 2 Research to the Tech
   under research."
+
+## #70: Influence ties by lot, fifteen coastal slots moved inland, and the Sea Wall the AI now builds
+
+[The ticket](https://github.com/whaleyjoshua2/Dying-Earth/issues/70). Two challengers at the same
+Standing on a neutral place draw lots from the game's own generator; on a held place the holder
+keeps it. Coastal slots per point of Coastal Exposure go from 3 to 2, so the world holds 34 coastal
+slots where it held 49, and Europe's Refinery and North America's Factory stand inland from turn 1.
+While the sea is within 0.2 C a Sea Wall takes the victory-gap and threat multipliers, so it competes
+with the Scrubber.
+
+### What moved
+
+| file | figure | was | is |
+| --- | --- | --- | --- |
+| `nation_states.toml` | `coastal_per_exposure` | 3 | 2 |
+| `report.toml` | `claim_lot` (new) | | "{place} is claimed by {factions} at the same Standing; the lot falls to the {winner}." |
+
+**Builder's calls.** The lot is drawn with the same generator a contested orbital slot uses, so a
+seed replays the same draw. A Faction's Launch Site, added after the card's Facilities, now stands
+inland in Europe and North America because their two coastal slots are full. The Sea Wall's threat
+multiplier is the sea itself: the state is under threat, as it is from an Army next door. Three older
+tests moved with the count: East Asia has four coastal slots now, so the Ice Sheets Break and the
++1.8 threshold take them all and the scheduled +2.3 fires and finds nothing.
+
+### Measured, twenty seeds each
+
+| seat 0 | collapses | end Temperature | Sea Walls built | coastal slots lost (median) | Facilities drowned (median) | Custodian wins |
+| --- | --- | --- | --- | --- | --- | --- |
+| Prospectors in East Asia | 0/20 | +2.32 | **3** (was 0) | **34** (was 49) | **24** (was 27 to 29) | 20/20 |
+| Custodians from Europe | 0/20 | +2.25 | **5** (was 0) | **34** (was 49) | **24** | 20/20 |
+
+**The first Sea Walls ever built in any version**: three and five a batch, all by the Custodian AI,
+where every earlier batch of every version reported zero. The sea still takes every coastal slot the
+world has by the end of a game; there are fifteen fewer to take, and three to five fewer Facilities
+drown. The rest of the picture is the Research ticket's: no Collapse, the world at +2.3, the
+Custodians winning every seed on Stabilization.
+
+### Picture
+
+![The Europe card at turn 1, held by the Prospectors: "Coastal: Power Plant Factory", "Inland: Refinery Launch Site free free free free", and the Facilities list naming the Refinery and Launch Site as inland](coast-earth.png)
+
+- **coast-earth.png** — `shot:coast select:europe turns:0 look:15,50`. Europe at turn 1 as the
+  Prospectors' start state: **Coastal: Power Plant, Factory**; **Inland: Refinery, Launch Site**, and
+  four free inland slots. In 0.05 all three start Facilities and the Launch Site stood on the coast
+  (three coastal slots per point of Exposure), and the sea took the lot.

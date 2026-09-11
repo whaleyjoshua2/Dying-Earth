@@ -37,7 +37,9 @@
 # start slots minus one; the rest are inland, and every slot a raise of the Industry Level adds is
 # inland. The sea takes only coastal slots.
 base_slots = 3
-coastal_per_exposure = 3
+# Ticket #70 (version 0.05.5): 3 to 2, moving fifteen of the world's 49 coastal slots inland at the
+# start (34 remain); Europe's Refinery and North America's Factory stand inland from turn 1.
+coastal_per_exposure = 2
 
 [strip_permit]
 turns = 3

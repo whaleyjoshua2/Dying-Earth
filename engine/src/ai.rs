@@ -560,16 +560,23 @@ impl Game {
                     // within 0.2 C of the Temperature and the state still has a coast to lose.
                     // Ticket #60: and a Constabulary doubles at Unrest 9, where one more turn would
                     // throw the seat off the state, exactly as Relief doubles at the same figure.
-                    let seizes_the_moment = (fk == FacilityKind::SeaWall && self.sea_is_close(sid))
-                        || (fk == FacilityKind::Constabulary && self.state(sid).unrest >= 9.0);
+                    let sea_close = fk == FacilityKind::SeaWall && self.sea_is_close(sid);
+                    let seizes_the_moment = sea_close || (fk == FacilityKind::Constabulary && self.state(sid).unrest >= 9.0);
                     let opportunity = if seizes_the_moment { m.opportunity } else { 1.0 };
+                    // Ticket #70 (version 0.05.5): the rising sea is a threat to the state, so a Sea
+                    // Wall with the sea close takes the threat multiplier as well.
+                    let sway = if sea_close { m.threat } else { sway };
                     // Ticket #60: #52 and #53 measured no Constabulary in any AI game -- a building
                     // that fixes nothing economic never beat a producer under the victory-gap
                     // multiplier, so it never won a build slot while the gap was wide. From Unrest 5
                     // (the only Unrest at which the candidate is offered at all, above) it takes the
                     // multiplier too, because a state at 7 halves every Facility's output and every
                     // Facility's Emissions: calming it advances whatever the seat is behind on.
-                    let pull = if fk == FacilityKind::Constabulary { gap } else { gap_for(cat, Some(name)) };
+                    // Ticket #70: and the victory-gap multiplier, as the Constabulary does at Unrest
+                    // 5, so it competes with the Scrubber on even terms. The Research ticket of
+                    // 0.05.5 found Coastal Engineering done by turn 16 to 18 in every seed and no
+                    // Sea Wall ever built: the Custodian AI held its Materials for a Scrubber every time.
+                    let pull = if fk == FacilityKind::Constabulary || sea_close { gap } else { gap_for(cat, Some(name)) };
                     push(vec![Order::BuildFacility { state: sid, kind: fk }], cat, base, pull, sway, opportunity, format!("build {} in {}", name, self.tables.state(sid).name), None);
                 }
             }

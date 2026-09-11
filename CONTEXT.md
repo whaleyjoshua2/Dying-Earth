@@ -307,7 +307,7 @@ The CO2 a Faction is answerable for over the whole game: everything the sources 
 _Avoid_: carbon debt, guilt, pollution score, emissions total, footprint
 
 **Influence**:
-A Faction's claim on a Nation State or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold; a controlled place goes to a rival whose Standing is at least the controller's plus the challenge margin (10 since version 0.04) and at least the threshold, which since version 0.05 each Faction reads for itself, since its Blame raises it on every Nation State it does not hold.
+A Faction's claim on a Nation State or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold, and when two claimants reach it on the same turn at the same Standing the lot decides between them (since version 0.05.5); a controlled place goes to a rival whose Standing is at least the controller's plus the challenge margin (10 since version 0.04) and at least the threshold, which since version 0.05 each Faction reads for itself, since its Blame raises it on every Nation State it does not hold. A holder is never tied with a challenger, and keeps the place when two challengers tie.
 _Avoid_: diplomacy points, favour, reputation
 
 **Standing**:

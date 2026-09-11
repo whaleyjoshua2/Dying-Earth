@@ -719,7 +719,9 @@ impl Game {
                 })
                 .collect();
             // Ticket #50: among challengers who all qualify the same turn, the higher Standing takes
-            // the place; an exact tie goes to nobody and everything stays as it is until next turn.
+            // the place. Ticket #70 (version 0.05.5): an exact tie on a HELD place leaves it with
+            // its holder, as before; on a neutral place the lot decides, drawn from the game's own
+            // generator as a contested orbital slot is, so a seed replays the same draw.
             let winner = match qualifying.len() {
                 0 => continue,
                 1 => qualifying[0],
@@ -729,13 +731,22 @@ impl Game {
                     let leaders: Vec<Seat> = qualifying.iter().copied().filter(|s| standing(s) == top).collect();
                     if leaders.len() > 1 {
                         let names: Vec<String> = leaders.iter().map(|s| self.seat_name(*s)).collect();
-                        let line = format!("{} is claimed by {} at the same Standing; it stays as it is.", self.place_name(target), names.join(" and "));
+                        if controller.is_some() {
+                            let line = format!("{} is claimed by {} at the same Standing; it stays as it is.", self.place_name(target), names.join(" and "));
+                            self.log(line);
+                            let text = self.say("claim_tied", &[("place", self.place_name(target)), ("factions", names.join(" and "))]);
+                            self.report_line(LineKind::Note, Some(target.into()), text);
+                            continue;
+                        }
+                        let drawn = self.random_tie(&leaders);
+                        let line = format!("{} is claimed by {} at the same Standing; the lot falls to the {}.", self.place_name(target), names.join(" and "), self.seat_name(drawn));
                         self.log(line);
-                        let text = self.say("claim_tied", &[("place", self.place_name(target)), ("factions", names.join(" and "))]);
+                        let text = self.say("claim_lot", &[("place", self.place_name(target)), ("factions", names.join(" and ")), ("winner", self.seat_name(drawn))]);
                         self.report_line(LineKind::Note, Some(target.into()), text);
-                        continue;
+                        drawn
+                    } else {
+                        leaders[0]
                     }
-                    leaders[0]
                 }
             };
             self.transfer_control(target, winner, "Influence");
