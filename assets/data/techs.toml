@@ -1,4 +1,5 @@
-# Spec section 12.3. One tree shared by every Faction. Costs by rung: 15, 25, 40.
+# Spec section 12.3. One tree shared by every Faction. Costs by rung: 15, 25, 40 (Coastal
+# Engineering, 10 on rung 1 since ticket #69, is the one exception).
 # The engine reads each effect by the tech id; the numbers here are the values the rules use.
 
 [[tech]]
@@ -122,14 +123,16 @@ effect = "Per-person Emissions x0.5; Influence thresholds x0.75; Heatwave loss h
 value = 0.5
 influence_threshold_multiplier = 0.75
 
-# Ticket #56 (version 0.05): the thirteenth Tech, Industry rung 2 beside Clean Power. It unlocks the
-# Sea Wall and nothing else, so `value` carries no figure any rule reads.
+# Ticket #56 (version 0.05): the thirteenth Tech. It unlocks the Sea Wall and nothing else, so
+# `value` carries no figure any rule reads. Ticket #69 (version 0.05.5): moved from Industry rung 2
+# at 25 (never reached in any game, so no Sea Wall was ever built) to rung 1 at 10 with no
+# prerequisite, beside Efficient Grids; Clean Power still needs Efficient Grids alone.
 [[tech]]
 id = "coastal_engineering"
 name = "Coastal Engineering"
 branch = "Industry"
-rung = 2
-cost = 25
-needs = ["efficient_grids"]
+rung = 1
+cost = 10
+needs = []
 effect = "Unlocks the Sea Wall."
 value = 1.0

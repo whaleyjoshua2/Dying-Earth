@@ -1794,8 +1794,12 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         let figures = if f.mothballed {
             "mothballed: making nothing, paying no upkeep, emitting nothing, keeping its slot".to_string()
         } else {
+            // Ticket #69: a Lab in a state nobody holds, or under Occupation, works for the world.
+            let world_lab = f.kind == FacilityKind::ResearchLab && f.working() && !f.offline_until_resolution && matches!(game.state(sid).control, Control::Neutral | Control::Occupied { .. });
             match director {
+                Some(d) if world_lab => format!("{} (the Lab works for the world: {} Research a turn to the Tech under research)", game.facility_yield(d, sid, f.kind).text(), game.world_lab_yield(sid) / 2),
                 Some(d) => game.facility_yield(d, sid, f.kind).text(),
+                None if world_lab => format!("in no one's hands: {} Research a turn to the Tech under research", game.world_lab_yield(sid) / 2),
                 None => "idle, nobody directs this state".to_string(),
             }
         };

@@ -361,6 +361,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("station_built", &["faction", "station"]),
     ("antarctica_opens", &["n"]),
     ("archive_begun", &["faction", "colony"]),
+    ("neutral_research", &["states", "n"]),
     ("archive_built", &["faction", "place", "left"]),
     ("archive_complete", &["faction", "place"]),
     ("archive_destroyed", &["place", "faction"]),

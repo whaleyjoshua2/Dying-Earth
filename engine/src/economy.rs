@@ -91,6 +91,7 @@ impl Game {
         for seat in Seat::ALL {
             self.income_for(seat);
         }
+        self.neutral_research();
         self.solar_maximum_next = false;
         for d in &mut self.discoveries {
             d.turns_left = d.turns_left.saturating_sub(1);
@@ -100,6 +101,50 @@ impl Game {
             let allot = self.influence_allotment(seat);
             self.seat_mut(seat).allotment = allot;
         }
+    }
+
+    /// Ticket #69 (version 0.05.5): a Research Lab in a Nation State nobody holds, or one under
+    /// Occupation, runs itself, pays no Energy, and pays half its yield (rounded down, per Lab) into
+    /// the Tech under research, counting toward nobody's Research Lead, as a Breakthrough's Research
+    /// does. The yield is a Faction-less one: the row's figure by the state's people and schooling,
+    /// times Public Science once the world has it. A Lab idled by a Wildfire or mothballed pays nothing.
+    fn neutral_research(&mut self) {
+        let mut total = 0i64;
+        let mut names: Vec<String> = Vec::new();
+        for sid in StateId::ALL {
+            if !matches!(self.state(sid).control, Control::Neutral | Control::Occupied { .. }) {
+                continue;
+            }
+            let labs = self.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::ResearchLab && f.working() && !f.offline_until_resolution).count() as i64;
+            if labs == 0 {
+                continue;
+            }
+            let paid = labs * (self.world_lab_yield(sid) / 2);
+            if paid > 0 {
+                total += paid;
+                names.push(self.tables.state(sid).name.clone());
+            }
+        }
+        if total == 0 {
+            return;
+        }
+        self.add_research_unattributed(total);
+        self.research.neutral_total += total;
+        let states = names.join(" and ");
+        let line = format!("The Labs of {states}, in no one's hands, added {total} Research to the Tech under research.");
+        self.log(line);
+        let text = self.say("neutral_research", &[("states", states), ("n", total.to_string())]);
+        self.report_line(LineKind::Note, None, text);
+    }
+
+    /// Ticket #69: what one Research Lab in this state makes for the world, with no Faction's
+    /// multiplier: the row's figure x the population factor x the Education Level, x Public Science
+    /// once every Faction has it, rounded down.
+    pub fn world_lab_yield(&self, sid: StateId) -> i64 {
+        let t = &self.tables;
+        let base = t.facility(FacilityKind::ResearchLab).produces.as_ref().map(|p| p.amount).unwrap_or(0) as f64;
+        let public = if self.has_tech(TechId::PublicScience) { t.tech(TechId::PublicScience).value } else { 1.0 };
+        (base * self.population_factor(sid) * t.state(sid).education_level * public).floor() as i64
     }
 
     fn replenish_standing_armies(&mut self) {
@@ -138,9 +183,15 @@ impl Game {
         if let Some(p) = &fc.produces {
             match p.resource {
                 Resource::Research => {
-                    let mut r = p.amount as f64 * self.population_factor(sid) * card.education_level * fac.research_multiplier;
-                    r *= self.tech_multiplier(seat, TechId::PublicScience);
-                    y.research = r.floor() as i64;
+                    // Ticket #69: an Occupied state's Lab works for the world (`neutral_research`),
+                    // not for the occupier, who pays its upkeep and draws nothing.
+                    if self.state(sid).control.is_occupied() {
+                        y.research = 0;
+                    } else {
+                        let mut r = p.amount as f64 * self.population_factor(sid) * card.education_level * fac.research_multiplier;
+                        r *= self.tech_multiplier(seat, TechId::PublicScience);
+                        y.research = r.floor() as i64;
+                    }
                 }
                 Resource::Ducats => {
                     // A Bank (ticket #35): its amount times the state's gdp / 10.

@@ -73,6 +73,10 @@ pub struct SimResult {
     pub archive_built_turn: Option<u32>,
     pub archive_complete_turn: Option<u32>,
     pub archive_fund_at_end: i64,
+    /// Ticket #69: what the neutral Labs paid into the shared Tech over the game, and the turn
+    /// Coastal Engineering completed.
+    pub neutral_research: i64,
+    pub coastal_engineering_turn: Option<u32>,
     /// Ticket #58: how many Moments the turns of this game earned, how many the cap of two and the
     /// defaults in `report.toml` actually showed, how many turns stopped for at least one, and the
     /// most any one turn showed.
@@ -136,6 +140,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let archivist = Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Archivists);
     let mut archive_built_turn: Option<u32> = None;
     let mut archive_complete_turn: Option<u32> = None;
+    let mut coastal_engineering_turn: Option<u32> = None;
     let window_turn = game.next_window_turn(1);
     let max_turns = tables.victory.turns;
     let mut guard = 0;
@@ -194,6 +199,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
             if archive_complete_turn.is_none() && game.archive_complete(a) {
                 archive_complete_turn = Some(game.turn);
             }
+        }
+        if coastal_engineering_turn.is_none() && game.has_tech(crate::ids::TechId::CoastalEngineering) {
+            coastal_engineering_turn = Some(game.turn);
         }
         if first_mars_colony_turn.is_none() {
             first_mars_colony_turn = game
@@ -308,6 +316,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         archive_built_turn,
         archive_complete_turn,
         archive_fund_at_end: archivist.map(|a| game.seat(a).archive_fund).unwrap_or(0),
+        neutral_research: game.research.neutral_total,
+        coastal_engineering_turn,
         moments_earned,
         moments_shown,
         turns_with_moment,

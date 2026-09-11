@@ -142,3 +142,73 @@ Sea Wall, and four Custodian Stabilization wins outright in the East Asia batch,
   **"building, 2 turn(s) left"**, the fund at **"20 of 20 (a quarter of the 80 until the Archive
   stands)"**, and the Fund box **greyed out** at the cap, which is the refusal of the resolution's
   point 4 made visible.
+
+## #69: two start Labs, the neutral half, and the Sea Wall's Tech on rung 1
+
+[The ticket](https://github.com/whaleyjoshua2/Dying-Earth/issues/69). North America and South-East
+Asia each start with a Research Lab added to their start Facilities, standing inland. A Lab in a
+Nation State nobody holds, or one under Occupation, runs itself, pays no Energy, and pays half its
+yield (rounded down) into the Tech under research for no Faction; under Occupation the occupier pays
+the Lab's upkeep and draws nothing from it. A Faction starting in either state keeps its Lab whole.
+Coastal Engineering moves from Industry rung 2 at 25 to rung 1 at 10 with no prerequisite.
+
+### What moved
+
+| file | figure | was | is |
+| --- | --- | --- | --- |
+| `nation_states.toml` | North America's start Facilities | Refinery, Power Plant, Factory | + Research Lab |
+| `nation_states.toml` | South-East Asia's start Facilities | Refinery, Power Plant | + Research Lab |
+| `techs.toml` | Coastal Engineering | rung 2, cost 25, needs Efficient Grids | rung 1, cost 10, needs nothing |
+
+**Builder's calls.** A start Research Lab stands inland whatever the coastal count. The world's Lab
+yield is the row's figure by the state's people and schooling, times Public Science once every
+Faction has it, with no Faction multiplier: 3 in North America and 2 in South-East Asia, so 1 each a
+turn to the pool. A Lab idled by a Wildfire or mothballed pays nothing. The Report says it under On
+Earth on turns it is more than zero. The state card's Lab line says "in no one's hands: N Research a
+turn to the Tech under research" rather than the old "idle, nobody directs this state". Ticket #24's
+rule that start Facilities number as many as the Industry Level now reads "plus a start Lab".
+
+### Measured, twenty seeds each
+
+| seat 0 | collapses | end Temperature | Techs (median) | highest rung | Coastal Engineering done | Sea Walls | neutral Labs paid (median) | outright wins |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Prospectors in East Asia | **0/20** | +2.35 | **11** | 3 | 20/20, median turn 18 | **0** | 17 | Custodians 16/20 (Stabilization) |
+| Custodians from Europe | **0/20** | +2.28 | **12** | 3 | 20/20, median turn 16 | **0** | 17 | Custodians 20/20 (Stabilization) |
+
+After the calendar ticket the same seatings collapsed 15 and 17 of 20 at a median turn 34 to 35
+with the world at +3.0, and completed 2 or 3 Techs a game. **The Tech pace has quadrupled and the
+climate has turned over with it**: no seed collapses, the world ends at +2.3, and the Custodians
+meet Stabilization outright in 36 of 40 games where no Custodian had ever met it in any version.
+The neutral Labs' 17 Research a game is not the cause on its own; the two start Labs are a Faction's
+from turn 1 whenever a seat starts there, and the AI now reaches Clean Power and Green Consensus.
+The climate step (270, provisional) was chosen at the old pace; **the build ticket's re-sweep is
+where the clock is set**, and this is recorded on the map rather than re-tuned here.
+
+**Coastal Engineering is done by turn 16 to 18 in every seed, and still no Sea Wall is built.** The
+logged run says why: the Sea Wall is offered, and every time the AI holds its Materials for a
+Scrubber instead ("holding Materials for build a Scrubber in ..."), since only the Custodian AI
+considers coastal defence and the Scrubber advances its Victory Condition while a Sea Wall does
+not. Reachable now, never chosen: an AI weighting for the build ticket.
+
+### Pictures
+
+![The Tech Tree: Coastal Engineering "cost 10 - available" beside Efficient Grids on the Industry column's first rung, Clean Power alone on the second](tree-earth.png)
+
+- **tree-earth.png** — `shot:tree tech:1 turns:0 panel:0`. **Coastal Engineering on Industry rung 1
+  at "cost 10 - available"**, beside Efficient Grids, with Clean Power alone on rung 2 under
+  Efficient Grids and Clean Manufacturing under it. In 0.05's `tech-tree-thirteen.png` the same box
+  sat on rung 2 beside Clean Power at cost 25.
+
+![The North America card at turn 1: "Coastal: Refinery Power Plant Factory", "Inland: Research Lab free free free free free", and the Facilities list ending "Research Lab (inland): in no one's hands: 1 Research a turn to the Tech under research"](lab-earth.png)
+
+- **lab-earth.png** — `shot:lab select:northamerica turns:0 look:-100,40`. Neutral North America
+  with its four start Facilities: the three from ticket #24 on the coast and the **Research Lab
+  inland**, its line reading **"in no one's hands: 1 Research a turn to the Tech under research"**.
+  The first take of this picture showed the old "idle, nobody directs this state" line, which is
+  what the label fix above answered.
+
+![The Report of March 2030 with, under On Earth, "The Labs of South-East Asia and North America, in no one's hands, added 2 Research to the Tech under research."](neutral-report.png)
+
+- **neutral-report.png** — `shot:neutral turns:1 menus:1`. Turn 2's dispatch, under **On Earth**:
+  "The Labs of South-East Asia and North America, in no one's hands, added 2 Research to the Tech
+  under research."

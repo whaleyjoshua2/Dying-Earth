@@ -426,6 +426,10 @@ pub struct Research {
     /// Ticket #50: the turn each seat last picked a Tech, so a tie in contributions goes to the
     /// seat that has picked least recently. None means it has never picked, which counts as longest ago.
     pub last_picked_turn: [Option<u32>; SEAT_COUNT],
+    /// Ticket #69 (version 0.05.5): every point the Labs of neutral and Occupied states have paid
+    /// into the shared Tech over the game, for the simulation's report.
+    #[serde(default)]
+    pub neutral_total: i64,
 }
 
 impl Research {
@@ -672,6 +676,11 @@ impl Game {
                         .iter()
                         .copied()
                         .map(|k| {
+                            // Ticket #69 (version 0.05.5): a start Research Lab stands inland, so the
+                            // sea never takes the world's Research.
+                            if k == FacilityKind::ResearchLab {
+                                return Facility::new(k);
+                            }
                             if on_the_coast < coastal {
                                 on_the_coast += 1;
                                 Facility::in_coastal_slot(k)
@@ -737,6 +746,7 @@ impl Game {
                 awaiting_pick: Some(Seat(0)),
                 last_lead: None,
                 last_picked_turn: [None; SEAT_COUNT],
+                neutral_total: 0,
             },
             deck,
             discoveries: Vec::new(),

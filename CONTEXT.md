@@ -319,7 +319,7 @@ The amount of Influence a Faction receives each turn, split freely across any nu
 _Avoid_: influence budget, diplomacy pool, action points
 
 **Research**:
-Points produced by Research Labs and spent only on Techs. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship.
+Points produced by Research Labs and spent only on Techs. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship. Since version 0.05.5 a Lab in a Nation State nobody holds, or one under Occupation, runs itself and pays half its yield into the Tech under research for no Faction; North America and South-East Asia begin with such a Lab.
 _Avoid_: science, research points, RP, fourth resource
 
 ### The turn

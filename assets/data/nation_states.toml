@@ -135,7 +135,9 @@ education_level = 0.95
 size = 2
 coastal_exposure = 2
 neighbours = ["east_asia", "south_asia", "australia"]
-start_facilities = ["refinery", "power_plant"]
+# Ticket #69 (version 0.05.5): a Research Lab added to the start Facilities (as in North America),
+# standing inland; while the state is neutral it pays half its yield into the shared Tech.
+start_facilities = ["refinery", "power_plant", "research_lab"]
 influence = 1
 gdp = 3
 unrest = 0.0
@@ -184,7 +186,9 @@ education_level = 1.5
 size = 3
 coastal_exposure = 1
 neighbours = ["europe", "russia", "central_america"]
-start_facilities = ["refinery", "power_plant", "factory"]
+# Ticket #69 (version 0.05.5): a Research Lab added to the start Facilities (as in South-East Asia),
+# standing inland; while the state is neutral it pays half its yield into the shared Tech.
+start_facilities = ["refinery", "power_plant", "factory", "research_lab"]
 influence = 7
 gdp = 23
 unrest = 0.0

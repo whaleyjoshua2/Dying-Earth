@@ -1343,7 +1343,9 @@ fn every_state_starts_with_its_start_facilities_and_the_faction_states_add_a_lau
             want.push(FacilityKind::LaunchSite);
         }
         assert_eq!(have, want, "{}", card.name);
-        assert_eq!(card.start_facilities.len() as u32, card.industry_level, "{}: as many as the Industry Level", card.name);
+        // Ticket #69: North America and South-East Asia carry a Research Lab on top of the count.
+        let labs = card.start_facilities.iter().filter(|k| **k == FacilityKind::ResearchLab).count() as u32;
+        assert_eq!(card.start_facilities.len() as u32 - labs, card.industry_level, "{}: as many as the Industry Level, plus a start Lab", card.name);
     }
     assert_eq!(g.seats[0].stockpile, Stockpile { materials: 80, fuel: 20, energy: 20, ducats: 0 });
 }
@@ -2540,7 +2542,9 @@ fn twelve_nation_states_share_out_the_eight_they_came_from() {
     // Every state's start Facilities fit its slots with a Launch Site on top, and follow its Lean.
     for s in StateId::ALL {
         let c = card(s);
-        assert_eq!(c.start_facilities.len() as u32, c.industry_level, "{s:?} starts with as many Facilities as its Industry Level");
+        // Ticket #69: less the start Lab of North America and South-East Asia.
+        let labs = c.start_facilities.iter().filter(|k| **k == FacilityKind::ResearchLab).count() as u32;
+        assert_eq!(c.start_facilities.len() as u32 - labs, c.industry_level, "{s:?} starts with as many Facilities as its Industry Level, plus a start Lab");
         // Ticket #56: Size + Industry Level + base_slots, and the coastal row must leave one inland.
         assert!((c.start_facilities.len() as u32) < c.size + c.industry_level + g.tables.base_slots, "{s:?} has no room for a Launch Site");
         assert!(c.unrest == 0.0, "{s:?} starts calm");
@@ -3682,18 +3686,15 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     let c = g.tables.tech(TechId::CoastalEngineering);
     assert_eq!(c.name, "Coastal Engineering");
     assert_eq!(c.branch, "Industry");
-    assert_eq!(c.rung, 2, "rung 2, beside Clean Power");
-    assert_eq!(c.cost, 25);
-    assert_eq!(c.needs, vec![TechId::EfficientGrids], "it needs Efficient Grids");
+    // Ticket #69 (version 0.05.5): moved from rung 2 at 25 to rung 1 at 10 with no prerequisite.
+    assert_eq!(c.rung, 1, "rung 1, beside Efficient Grids");
+    assert_eq!(c.cost, 10);
+    assert!(c.needs.is_empty(), "it needs nothing");
     assert!(c.effect.contains("Sea Wall"), "its effect names the Sea Wall: {}", c.effect);
-    // Two boxes on Industry rung 2.
-    let rung_two: Vec<&str> = TechId::ALL
-        .into_iter()
-        .map(|t| g.tables.tech(t))
-        .filter(|t| t.branch == "Industry" && t.rung == 2)
-        .map(|t| t.name.as_str())
-        .collect();
-    assert_eq!(rung_two, vec!["Clean Power", "Coastal Engineering"], "two boxes on Industry rung 2");
+    // Two boxes on Industry rung 1, and Clean Power alone on rung 2.
+    let on_rung = |r: u32| -> Vec<&str> { TechId::ALL.into_iter().map(|t| g.tables.tech(t)).filter(|t| t.branch == "Industry" && t.rung == r).map(|t| t.name.as_str()).collect() };
+    assert_eq!(on_rung(1), vec!["Efficient Grids", "Coastal Engineering"], "two boxes on Industry rung 1");
+    assert_eq!(on_rung(2), vec!["Clean Power"]);
     // The Sea Wall's card names it as its unlock, and there are ten Facilities.
     assert_eq!(g.tables.facility(FacilityKind::SeaWall).needs_tech, Some(TechId::CoastalEngineering));
     assert_eq!(FacilityKind::ALL.len(), 10, "ten Facilities");
@@ -4669,4 +4670,77 @@ fn a_custodian_ai_behind_on_pace_builds_a_constabulary_where_unrest_has_reached_
         !orders.iter().any(|o| matches!(o, Order::BuildFacility { kind: FacilityKind::Constabulary, .. })),
         "a Constabulary in a calm state: {orders:?}"
     );
+}
+
+// ---------------------------------------------------------------- Ticket #69 (version 0.05.5): two start Labs, the neutral half, the Sea Wall's Tech on rung 1
+
+/// Ticket #69 (a): North America and South-East Asia begin with a Research Lab ADDED to their start
+/// Facilities, and a start Lab stands inland so the sea never takes the world's Research.
+#[test]
+fn north_america_and_south_east_asia_start_with_an_inland_research_lab() {
+    let g = fresh();
+    for sid in [StateId::NorthAmerica, StateId::SouthEastAsia] {
+        let st = g.state(sid);
+        let labs: Vec<&Facility> = st.facilities.iter().filter(|f| f.kind == FacilityKind::ResearchLab).collect();
+        assert_eq!(labs.len(), 1, "{sid:?} starts with one Lab: {:?}", st.facilities.iter().map(|f| f.kind).collect::<Vec<_>>());
+        assert!(!labs[0].coastal, "{sid:?}'s start Lab stands inland");
+    }
+    assert_eq!(g.state(StateId::NorthAmerica).facilities.iter().filter(|f| f.kind != FacilityKind::LaunchSite).count(), 4, "added to North America's three");
+    assert_eq!(g.state(StateId::SouthEastAsia).facilities.iter().filter(|f| f.kind != FacilityKind::LaunchSite).count(), 3, "added to South-East Asia's two");
+    for sid in StateId::ALL {
+        if !matches!(sid, StateId::NorthAmerica | StateId::SouthEastAsia) {
+            assert!(!g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::ResearchLab), "{sid:?} starts with no Lab");
+        }
+    }
+}
+
+/// Ticket #69 (b): a Lab in a state nobody holds runs itself, pays no Energy, and pays half its
+/// yield (rounded down) into the Tech under research, counting toward nobody's Research Lead; under
+/// Occupation the half still flows and the occupier pays the upkeep but draws no Research; held, the
+/// Lab is the holder's, whole.
+#[test]
+fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
+    let mut g = game();
+    g.pick_tech(Seat(0), TechId::PublicScience).unwrap();
+    // The only Lab in the world stands in a neutral North America.
+    for st in &mut g.states {
+        st.facilities.retain(|f| f.kind != FacilityKind::ResearchLab);
+    }
+    g.state_mut(StateId::NorthAmerica).control = Control::Neutral;
+    g.state_mut(StateId::NorthAmerica).facilities.push(facility(FacilityKind::ResearchLab));
+    // A Faction's Lab there makes 3 (2 x 1.076 x 1.5, rounded down); the world gets half of that: 1.
+    assert_eq!(g.facility_yield(Seat(2), StateId::NorthAmerica, FacilityKind::ResearchLab).research, 3, "the Arkwrights, at Research x1.0");
+    let before = g.research.progress;
+    g.income_phase();
+    assert_eq!(g.research.progress - before, 1, "half of one Lab, rounded down");
+    assert_eq!(g.research.contributions, [0; 4], "and nobody's Lead");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("North America") && l.text.contains("Research")), "the Report says so: {:?}", g.report.lines);
+    // Occupied: the half still flows; the occupier pays the 3 Energy and draws nothing from it.
+    g.state_mut(StateId::NorthAmerica).control = Control::Occupied { occupier: Seat(2), previous: None, turns: 1 };
+    let y = g.facility_yield(Seat(2), StateId::NorthAmerica, FacilityKind::ResearchLab);
+    assert_eq!((y.research, y.upkeep), (0, 3), "the occupier pays for a Lab that works for the world");
+    let before = g.research.progress;
+    g.income_phase();
+    assert_eq!(g.research.progress - before, 1);
+    assert_eq!(g.research.contributions[2], 0);
+    // Held: whole, and the holder's.
+    g.state_mut(StateId::NorthAmerica).control = Control::Controlled(Seat(2));
+    let before = g.research.progress;
+    g.income_phase();
+    assert_eq!(g.research.progress - before, 3);
+    assert_eq!(g.research.contributions[2], 3, "a held Lab counts toward the Lead as it always did");
+}
+
+/// Ticket #69 (c): Coastal Engineering on Industry rung 1 at 10 Research with no prerequisite, so
+/// the Sea Wall can be reached in time; Clean Power and the Sea Wall's own row are untouched.
+#[test]
+fn coastal_engineering_sits_on_rung_one_at_ten_research_with_no_prerequisite() {
+    let g = game();
+    let t = g.tables.tech(TechId::CoastalEngineering);
+    assert_eq!((t.rung, t.cost), (1, 10));
+    assert!(t.needs.is_empty(), "no prerequisite: {:?}", t.needs);
+    assert!(g.available_techs().contains(&TechId::CoastalEngineering), "pickable from the first turn");
+    assert_eq!(g.tables.tech(TechId::CleanPower).needs, vec![TechId::EfficientGrids]);
+    let w = g.tables.facility(FacilityKind::SeaWall);
+    assert_eq!((w.materials, w.build_turns), (35, 2));
 }

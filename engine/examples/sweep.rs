@@ -88,6 +88,8 @@ fn main() {
                     let (mut mars_turns, mut antarctic) = (Vec::new(), 0u32);
                     // Ticket #68: how far the Archivists' Archive gets.
                     let (mut archive_built, mut archive_complete, mut archive_funds) = (Vec::new(), Vec::new(), Vec::new());
+                    // Ticket #69: the neutral Labs' Research and the Sea Wall's Tech.
+                    let (mut neutral_research, mut coastal_engineering) = (Vec::new(), Vec::new());
                     for seed in 1..=seeds {
                         let r = dying_earth_engine::sim::run_from(tables.clone(), seed, player, start);
                         match r.outcome {
@@ -118,6 +120,10 @@ fn main() {
                             archive_complete.push(t);
                         }
                         archive_funds.push(r.archive_fund_at_end.max(0) as u32);
+                        neutral_research.push(r.neutral_research.max(0) as u32);
+                        if let Some(t) = r.coastal_engineering_turn {
+                            coastal_engineering.push(t);
+                        }
                         if let Some((seat, kind)) = r.victory_met {
                             victory_met.push(format!("seed {seed} {} (seat {})", kind.name(), seat.0));
                         }
@@ -163,6 +169,12 @@ fn main() {
                             archive_complete.len(),
                             median_u(&mut archive_complete),
                             median_u(&mut archive_funds)
+                        );
+                        println!(
+                            "      Neutral Labs paid a median {} Research a game; Coastal Engineering complete in {}/{seeds} seeds (median turn {})",
+                            median_u(&mut neutral_research),
+                            coastal_engineering.len(),
+                            median_u(&mut coastal_engineering)
                         );
                         println!(
                             "      Victory Conditions met outright: {}",
