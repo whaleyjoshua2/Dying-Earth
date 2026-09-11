@@ -5,7 +5,7 @@ A single-player, turn-based strategy game about colonizing the solar system befo
 ## Language
 
 **First Playable**:
-The small version of the game covering only the Moon and Mars, with three resources and two factions: twelve turns as first built, twenty-four since version 0.02. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`.
+The small version of the game: twelve turns and two Factions as first built, twenty-four turns since version 0.02 and four Factions since version 0.05. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`, `docs/spec/version-0.03.md`, `docs/spec/version-0.04.md` and `docs/spec/version-0.05.md`.
 _Avoid_: slice, MVP, demo, v1, prototype
 
 **Faction**:
@@ -73,13 +73,12 @@ One of a fixed number of places in orbit around a Body where a Space Station can
 _Avoid_: dock, berth, orbit
 
 **Space Station**:
-A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard and Habitats. Influence, Occupation and Battles work on it as on a Colony. Each Faction starts with one over Earth (the Custodians the ISS, the Prospectors Tiangong), bare. Colonists on a station over Earth are still on Earth for Off-world Presence.
+A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard and Habitats. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with a bare one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom); the Arkwrights start with none, and build theirs at half price. Colonists on a station over Earth are still on Earth for Off-world Presence.
 _Avoid_: base, platform, orbital, outpost
 
 **Trading window**:
 Where Ducats buy Influence, Materials, Fuel and Energy at table prices, spendable in the same turn's orders, and where Materials and Fuel sell back at half. A building can also be bought outright for Ducats from its own build button, at twice its Materials cost.
 _Avoid_: market, shop, exchange, store
-_Avoid_: site, plot, capacity
 
 **Body Surface Map**:
 The 3D view of one Body's surface, entered by clicking that Body on the Solar System Map. Every Body has one.
@@ -102,7 +101,7 @@ An unplanned occurrence drawn from the Event Deck after orders are committed and
 _Avoid_: incident, crisis, card
 
 **Event Deck**:
-The deck a card may be drawn from each turn, holding only Events: thirty cards in version 0.02, the twelve First Playable Events twice and six newer ones once. It is never reshuffled. Whether a card is drawn at all is the Draw Chance.
+The deck a card may be drawn from each turn, holding only Events: twenty-eight cards since version 0.03, ten of the First Playable's Events twice each and eight newer ones once. It is never reshuffled. Whether a card is drawn at all is the Draw Chance.
 _Avoid_: event pool, random table, encounter deck, calm card (retired in version 0.02)
 
 **Draw Chance**:
@@ -140,7 +139,7 @@ The single shared pool holding all Materials, Fuel, Energy and, since version 0.
 _Avoid_: central bank, per-world stocks, inventory
 
 **Ducats**:
-Money, the fourth resource since version 0.03. A controlled Nation State pays them from its GDP figure times its Industry Level; a Bank on Earth and a Trade Post in a Colony make more. They buy Influence at two for one, added to this turn's Allotment, and pay for a Leapfrog and for repair points in place of Materials.
+Money, the fourth resource since version 0.03. A controlled Nation State pays them from its GDP figure times its Industry Level; a Bank on Earth and a Trade Post in a Colony make more. They buy Influence at two for one, added to this turn's Allotment, and pay for Relief, Resettle, a Leapfrog and repair points in place of Materials.
 _Avoid_: Ducketts, credits, money, gold, cash
 
 **Bank**:
@@ -244,7 +243,7 @@ How built-up a Nation State is. Together with the state's size it sets how many 
 _Avoid_: development, tier, infrastructure
 
 **Neutral Development**:
-What a Nation State nobody holds does for itself: every sixth turn of unbroken neutrality it raises its own Industry Level by one and brings an idle Facility online, until it is as built-up as a neutral state gets. A world already too hot, or a population already too restive, stops it. The clock is the state's own and starts again whenever it is freed.
+What a Nation State nobody holds does for itself: every ninth turn of unbroken neutrality it raises its own Industry Level by one and wakes one of its own Facilities to run itself, emitting to nobody and making nothing for anyone, until it is as built-up as a neutral state gets. A world already too hot, or a population already too restive, stops it. The clock is the state's own, starts again whenever it is freed, and the states neutral at the start are staggered so they do not all step together.
 _Avoid_: growth, expansion, auto-build, industrialization, AI development
 
 **Education Level**:
@@ -284,7 +283,7 @@ The Industry Tech that unlocks the Sea Wall, and does nothing else.
 _Avoid_: sea defence, civil engineering, hydrology
 
 **Unrest**:
-How restive a Nation State's people are, a figure from 0 to 10 on its card. Heat, the rising sea, the Climate cards, Occupation and arriving Refugees raise it; it falls on its own in a quiet turn, and to Relief and a Constabulary. Past its first threshold the Standing Army stops replenishing, past its second the state's Facilities run at half, and at the top the state throws its controller off and goes neutral.
+How restive a Nation State's people are, a figure from 0 to 10 on its card, moving in halves. Heat, the rising sea, the Climate cards, Occupation and arriving Refugees raise it; it falls on its own every turn except the turn the state changed hands, so a rise and the fall net out, and it falls further to Relief, a Constabulary and a Scrubber. Past its first threshold the Standing Army stops replenishing, past its second the state's Facilities run at half, and at the top the state throws its controller off and goes neutral.
 _Avoid_: unhappiness, morale, stability, dissent, revolt meter
 
 **Relief**:
@@ -326,7 +325,7 @@ _Avoid_: science, research points, RP, fourth resource
 ### The turn
 
 **Turn**:
-One calendar month of game time, and the unit the whole game runs in. The game begins in January 2030, so turn 1 is January 2030 and the twenty-fourth is December 2031, and the top bar names the month. Both Factions order simultaneously against the same board, then the turn runs through its phases.
+One calendar month of game time, and the unit the whole game runs in. The game begins in January 2030, so turn 1 is January 2030 and the twenty-fourth is December 2031, and the top bar names the month. All four Factions order simultaneously against the same board, then the turn runs through its phases.
 _Avoid_: round, month, tick, cycle
 
 **Phase**:
@@ -364,7 +363,7 @@ _Avoid_: checkpoint, snapshot, savegame
 ### Combat
 
 **Battle**:
-A fight between opposed stacks at one Body, Nation State or Colony, resolved automatically in rounds during end-of-turn processing and always finished inside the turn. Each round each side rolls to land hits, biased by its share of the strength present.
+A melee at one Body, Nation State or Colony in which every Faction present is hostile to every other, resolved automatically in rounds during end-of-turn processing and always finished inside the turn. Each round a party's chance to hit is its share of the total strength present, and its hits are spread across the other parties in proportion to theirs.
 _Avoid_: fight, engagement, skirmish, encounter
 
 **Stance**:
@@ -400,13 +399,13 @@ The state of a Nation State or Colony whose defenders were beaten by an Army. Th
 _Avoid_: conquest, annexation, capture
 
 **Pacified**:
-An occupied population whose occupier's Influence, gained automatically each turn of Occupation, has passed the place's threshold. Control transfers at that moment.
+An occupied population whose occupier's Influence, gained automatically each turn of Occupation, has passed the place's threshold. The gain is halved while the state's Unrest is past its first threshold. Control transfers at the moment the threshold is passed.
 _Avoid_: subdued, loyal, converted
 
 ### Winning
 
 **Victory Condition**:
-What one Faction must achieve to win. Each Faction has its own, and meeting it in an End phase wins the game at once. If neither Faction has met its condition by the end of the last turn, the higher percentage of its own condition wins.
+What one Faction must achieve to win. Each Faction has its own, and meeting it in an End phase wins the game at once; if more than one seat meets it in the same phase, the larger margin over its own bar wins and an exact tie is a draw. If no Faction has met its condition by the end of the last turn, the seats are ranked by the percentage of their own condition, then by Colonists off Earth, then by Colonies held.
 _Avoid_: win condition, goal, objective, victory points
 
 **Extraction Total**:
