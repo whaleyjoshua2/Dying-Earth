@@ -327,3 +327,36 @@ exists before a driver stands. Every other figure is the Trade Post batch's to t
 player's side the rule works as the picture shows; on the AI's it is the first Tech-gated Module,
 and the AI's Tech picks do not yet know it exists. Whether Efficient Transit should sit on the
 Arkwrights' or Prospectors' pick list earlier is on the map.
+
+## Venus, a Body of orbits only ([ticket #93](https://github.com/whaleyjoshua2/Dying-Earth/issues/93))
+
+- **venus-solar.png** — `shot:venus hover:venus turns:0`. The Solar System Map on turn 1 with a
+  third ring inside Earth's and Venus on it, standing beside Earth where the real sky has it in
+  January 2030 (five days short of inferior conjunction, so the two labels overlap). The tooltip
+  reads **"Venus window: in 8 turns (May 2031). Flight now: 4 turns, 22 Fuel. At the window: 3
+  turns, 16 Fuel."**, the research note's turn 9.
+- **venus-venus.png** — the same run's Venus picture: the cloud globe drawn by the asset step,
+  **"In orbit around Venus, Orbital Control: nobody"**, and the sidebar's **"In orbit: 0 of 3
+  station slots"** with the buttons for Ishtar, Aphrodite and Lada greyed, since nothing of the
+  player's is there yet. No Colony Slot dot anywhere on it.
+
+### Measured, twenty seeds each, all four seatings (`sweep/venus.txt`)
+
+A sixth Body changes the order every game draws its slot yields in, so these are new games, not
+the tank batch's re-run; the comparison is loose.
+
+| Seat 0 | Wins by seat | Collapses | Colonists off Earth (median) | Venus stations at the end, over the batch | Colonists living at Venus |
+|---|---|---|---|---|---|
+| Custodians from East Asia | nobody | 20/20 | 16 | 0 | 0 |
+| Prospectors from East Asia | Custodians 2 | 18/20 | 12 | 0 | 0 |
+| Arkwrights from East Asia | Custodians 20 | 0/20 | 39 | 3 | 0 |
+| Archivists from East Asia | Custodians 20 | 0/20 | 39 | **15** | **0** |
+
+**Stations rise over Venus and nobody lives on them.** The Arkwright AI (seat 3 in the Archivist
+seating, seat 0 in its own) builds fifteen and three stations over Venus across the two calm
+seatings, from Ships it sends there, and lands no Colonist on any: its Colony Ships weigh Venus as
+a plain slot against Mars's and the Moon's real ones and fly there instead, and a station with no
+Habitat has no room in any case. The rule works on the player's side, as the pictures show; the
+AI's Venus is a station with nobody aboard. The Archivist seating also reads cooler and calmer
+(+2.51, no Collapse, Colonists off Earth 39 from 53), which is the re-rolled games rather than
+Venus, and the build ticket's eight batches will say which.

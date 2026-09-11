@@ -430,10 +430,20 @@ impl Game {
                 }
                 let foothold = match body {
                     BodyId::Earth => self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working())),
+                    // Ticket #93: at a Body with no Colony Slots (Venus) a station is built from a
+                    // Ship of the seat's in orbit there, since there is no ground to build from.
+                    b if self.tables.body(*b).colony_slots() == 0 => self.ships.iter().any(|s| s.seat == seat && s.at == ShipAt::Body(*b)),
                     b => self.colonies.iter().any(|c| !c.in_orbit && c.body == *b && c.control.director() == Some(seat)),
                 };
                 if !foothold {
-                    return fail(if *body == BodyId::Earth { "needs a Nation State of yours with a Launch Site" } else { "needs a Colony of yours on this Body" });
+                    return fail(if *body == BodyId::Earth {
+                        "needs a Nation State of yours with a Launch Site"
+                    } else if self.tables.body(*body).colony_slots() == 0 {
+                        // Ticket #93: Venus.
+                        "needs a Ship of yours in orbit here; there is no ground to build from"
+                    } else {
+                        "needs a Colony of yours on this Body"
+                    });
                 }
                 Ok(cost)
             }
@@ -681,6 +691,10 @@ impl Game {
                 let ShipAt::Body(from) = s.at else { return fail("already in transit") };
                 if from == *to {
                     return fail("already there");
+                }
+                // Ticket #93: no leg between Venus and the Mars system this version.
+                if !Self::leg_allowed(from, *to) {
+                    return fail("no leg runs between Venus and the Mars system; fly by Earth");
                 }
                 if s.arrived_this_turn {
                     return fail("arrived this turn; it may act next turn");

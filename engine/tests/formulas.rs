@@ -478,7 +478,8 @@ fn ducats_pay_for_a_leapfrog_and_repairs_at_the_table_rates() {
 fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard_and_habitats() {
     let mut g = game();
     let slots: Vec<u32> = BodyId::ALL.iter().map(|b| g.tables.body(*b).orbital_slots).collect();
-    assert_eq!(slots, vec![5, 2, 3, 1, 1], "ticket #50: five orbital slots over Earth");
+    // Ticket #93 (version 0.06.0): and three over Venus.
+    assert_eq!(slots, vec![5, 2, 3, 1, 1, 3], "ticket #50: five orbital slots over Earth");
     // The start (ticket #50): the Custodians' ISS, the Prospectors' Tiangong and the Archivists'
     // Axiom over Earth, bare; the Arkwrights start with no station, so two slots stand free.
     let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the Custodians start with a station");
@@ -551,7 +552,8 @@ fn ships_are_built_only_at_shipyards_and_lifts_need_a_launch_site() {
 #[test]
 fn phobos_and_deimos_are_small_different_bodies_one_hop_past_mars() {
     let g = game();
-    assert_eq!(BodyId::ALL.len(), 5);
+    // Ticket #93 (version 0.06.0): Venus is the sixth.
+    assert_eq!(BodyId::ALL.len(), 6);
     let ph = g.tables.body(BodyId::Phobos).clone();
     let de = g.tables.body(BodyId::Deimos).clone();
     assert_eq!(ph.name, "Phobos");
@@ -4325,7 +4327,8 @@ fn colony_ship_ready(g: &mut Game, body: BodyId) -> (ShipId, Order) {
         built_turn: turn,
         fuel: 30,
     });
-    let slot = g.free_slots_on(body)[0];
+    // Ticket #93: a Body with no Colony Slots (Venus) gets slot 0, an order the check will refuse.
+    let slot = g.free_slots_on(body).first().copied().unwrap_or(0);
     (id, Order::Unload { ship: id, colonists: 4, army: false, into: UnloadTarget::Slot(body, slot) })
 }
 
@@ -6122,4 +6125,73 @@ fn the_ai_offers_a_mass_driver_and_weighs_a_mine_higher_beside_one() {
     let after = score(&g, moon);
     let mars = score(&g, plain);
     assert!(after > before && after > mars, "a Mine beside a Mass Driver weighs more: {before} then {after}, Mars {mars}");
+}
+
+// ---------------------------------------------------------------- 0.06.0 ticket #93: Venus
+
+/// Ticket #93: Venus is the sixth Body, with no Colony Slots and three named Orbital Slots, three
+/// turns and 16 Fuel from Earth on its own window, its row on the sky; its windows fall at turns
+/// 9, 18 and 28; no leg runs between it and the Mars system.
+#[test]
+fn venus_is_a_body_of_orbits_only_with_its_own_window() {
+    let g = game();
+    assert_eq!(BodyId::ALL.len(), 6);
+    let card = g.tables.body(BodyId::Venus);
+    assert_eq!(card.colony_slots(), 0);
+    assert_eq!(card.orbital_slots, 3);
+    assert_eq!(card.stations, vec!["Ishtar", "Aphrodite", "Lada"]);
+    assert!(!card.low_gravity);
+    assert!((g.tables.planet(BodyId::Venus).a - 0.7233).abs() < 1e-3);
+    assert!((g.sun_factor(BodyId::Venus) - 1.911).abs() < 1e-2);
+    let w1 = g.next_venus_window_turn(1);
+    let w2 = g.next_venus_window_turn(w1 + 1);
+    let w3 = g.next_venus_window_turn(w2 + 1);
+    assert_eq!((w1, w2, w3), (9, 18, 28), "the research note's windows");
+    assert_eq!(g.transit_cost_at(BodyId::Earth, BodyId::Venus, w1), (3, 16), "three turns and the card's Fuel on the window");
+    let (turns_off, fuel_off) = g.transit_cost_at(BodyId::Earth, BodyId::Venus, w1 + 4);
+    assert!(turns_off > 3 && fuel_off > 16, "off the window both rise: {turns_off} turns, {fuel_off} Fuel");
+    assert!(g.crossing_offset(BodyId::Earth, BodyId::Venus, w1).is_some());
+    assert!(g.crossing_offset(BodyId::Venus, BodyId::Earth, w1).is_some());
+    assert!(g.crossing_offset(BodyId::Earth, BodyId::Mars, w1).is_some(), "Mars's window is untouched");
+    assert!(Game::leg_allowed(BodyId::Earth, BodyId::Venus));
+    assert!(!Game::leg_allowed(BodyId::Mars, BodyId::Venus));
+    assert!(!Game::leg_allowed(BodyId::Venus, BodyId::Phobos));
+}
+
+/// Ticket #93: a station at Venus is built from a Ship of the seat's in orbit there; a Colony Ship
+/// lands only into it; its Colonists count for Off-world Presence and it is Venus for Diaspora;
+/// no leg to Mars is accepted.
+#[test]
+fn a_venus_station_is_built_from_a_ship_in_orbit_and_its_colonists_are_off_earth() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 300;
+    let build = Order::BuildStation { body: BodyId::Venus, slot: 0 };
+    assert!(g.check_order(Seat(0), &[], &build).unwrap_err().0.contains("Ship"), "nothing of ours at Venus");
+    let (ship, found) = colony_ship_ready(&mut g, BodyId::Venus);
+    assert!(g.check_order(Seat(0), &[], &found).is_err(), "no ground to found on");
+    assert!(g.check_order(Seat(0), &[], &build).is_ok(), "a Ship in orbit is the foothold");
+    g.commit_orders(Seat(0), std::slice::from_ref(&build));
+    g.resolution_phase();
+    let station = g.colonies.iter().find(|c| c.body == BodyId::Venus && c.in_orbit).expect("Ishtar stands").id;
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    let land = Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Colony(station) };
+    assert!(g.check_order(Seat(0), &[], &land).is_ok());
+    g.commit_orders(Seat(0), std::slice::from_ref(&land));
+    g.resolution_phase();
+    assert_eq!(g.colony(station).unwrap().colonists, 4);
+    assert_eq!(g.off_world_colonists(Seat(0)), 4, "Venus is off Earth");
+    assert_eq!(g.bodies_settled(Seat(0), 4), 1, "and a Body for Diaspora");
+    assert!(g.check_order(Seat(0), &[], &Order::Transit { ship, to: BodyId::Mars }).unwrap_err().0.contains("Venus"));
+}
+
+/// Ticket #93: the AI raises a station at Venus when a Ship of its own stands there.
+#[test]
+fn the_ai_raises_a_station_at_venus_when_it_has_a_ship_there() {
+    let mut g = game();
+    calm(&mut g);
+    g.seats[0].stockpile.materials = 300;
+    g.seats[0].stockpile.energy = 300;
+    let _ = colony_ship_ready(&mut g, BodyId::Venus);
+    let orders = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::BuildStation { body: BodyId::Venus, .. })), "no station at Venus: {orders:?}");
 }

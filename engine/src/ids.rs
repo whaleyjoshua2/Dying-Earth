@@ -13,10 +13,13 @@ pub enum BodyId {
     /// Version 0.04 (ticket #45): the moons of Mars.
     Phobos,
     Deimos,
+    /// Version 0.06.0 (ticket #93): Venus, a Body of orbits only: no Colony Slots, three Orbital
+    /// Slots, its own Launch Window on the real sky.
+    Venus,
 }
 
 impl BodyId {
-    pub const ALL: [BodyId; 5] = [BodyId::Earth, BodyId::Moon, BodyId::Mars, BodyId::Phobos, BodyId::Deimos];
+    pub const ALL: [BodyId; 6] = [BodyId::Earth, BodyId::Moon, BodyId::Mars, BodyId::Phobos, BodyId::Deimos, BodyId::Venus];
     pub fn index(self) -> usize {
         self as usize
     }
@@ -27,6 +30,7 @@ impl BodyId {
             BodyId::Mars => "Mars",
             BodyId::Phobos => "Phobos",
             BodyId::Deimos => "Deimos",
+            BodyId::Venus => "Venus",
         }
     }
 }

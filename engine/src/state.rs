@@ -1733,10 +1733,10 @@ impl Game {
         // Ticket #57: a crossing between the two systems is not a fixed card any more. It costs the
         // Hohmann flight and the card's Fuel at the window, and more of both the further the phase
         // angle stands from it; the Faction multiplier and Efficient Transit apply after.
-        let (turns, fuel) = match self.crossing_offset(from, to, turn) {
+        // Ticket #93: the crossing names its own transfer table, Mars's or Venus's.
+        let (turns, fuel) = match self.crossing(from, to, turn) {
             None => (turns, fuel as f64),
-            Some(offset) => {
-                let tr = &t.transit;
+            Some((offset, tr)) => {
                 let days = tr.days_at_window + tr.days_per_degree * offset.abs();
                 let turns = ((days / tr.days_per_turn).ceil() as u32).clamp(1, tr.max_turns);
                 (turns, fuel as f64 * (1.0 + tr.fuel_per_degree * offset.abs()))
@@ -1801,8 +1801,19 @@ impl Game {
     /// A change of sign between the turn's two ends is a crossing only when the ends are near each
     /// other; a jump across the far side of the circle (+170 to -170) is not.
     fn span_offset(&self, turn: u32, angle: f64) -> f64 {
-        let start = crate::ephemeris::wrap_180(self.phase_angle(turn) - angle);
-        let end = crate::ephemeris::wrap_180(self.phase_angle(turn + 1) - angle);
+        self.span_offset_of(BodyId::Mars, turn, angle)
+    }
+
+    /// Ticket #93 (version 0.06.0): the phase angle of any planet against Earth, folded to
+    /// -180..180: Mars's for the Mars window, Venus's for Venus's.
+    pub fn phase_angle_of(&self, body: BodyId, turn: u32) -> f64 {
+        crate::ephemeris::wrap_180(self.heliocentric_longitude(body, turn) - self.heliocentric_longitude(BodyId::Earth, turn))
+    }
+
+    /// Ticket #93: `span_offset` for any planet's window.
+    fn span_offset_of(&self, body: BodyId, turn: u32, angle: f64) -> f64 {
+        let start = crate::ephemeris::wrap_180(self.phase_angle_of(body, turn) - angle);
+        let end = crate::ephemeris::wrap_180(self.phase_angle_of(body, turn + 1) - angle);
         if start.signum() != end.signum() && (start - end).abs() < 90.0 {
             0.0
         } else if start.abs() <= end.abs() {
@@ -1815,15 +1826,47 @@ impl Game {
     /// Which two systems a transit crosses, if it crosses at all, and the offset it pays. `None` for
     /// a hop inside the Earth system or inside the Mars system: those are unchanged.
     pub fn crossing_offset(&self, from: BodyId, to: BodyId, turn: u32) -> Option<f64> {
-        let system = |b: BodyId| match b {
+        self.crossing(from, to, turn).map(|(offset, _)| offset)
+    }
+
+    /// Which system a Body belongs to: 0 the Earth system, 1 the Mars system, 2 Venus (ticket #93).
+    pub fn system_of(body: BodyId) -> u8 {
+        match body {
             BodyId::Earth | BodyId::Moon => 0,
             BodyId::Mars | BodyId::Phobos | BodyId::Deimos => 1,
-        };
-        match (system(from), system(to)) {
-            (0, 1) => Some(self.window_offset(turn)),
-            (1, 0) => Some(self.return_window_offset(turn)),
+            BodyId::Venus => 2,
+        }
+    }
+
+    /// Ticket #93: whether a leg runs between two Bodies at all. Every leg runs but the one
+    /// between Venus and the Mars system, which this version does not offer: fly by Earth.
+    pub fn leg_allowed(from: BodyId, to: BodyId) -> bool {
+        let (a, b) = (Self::system_of(from), Self::system_of(to));
+        !matches!((a, b), (1, 2) | (2, 1))
+    }
+
+    /// Ticket #93: the crossing a transit makes, with its offset from the window and the transfer
+    /// table that prices it: Earth to Mars or back on the Mars sky, Earth to Venus or back on
+    /// Venus's. `None` for a hop inside a system.
+    pub fn crossing(&self, from: BodyId, to: BodyId, turn: u32) -> Option<(f64, &crate::data::TransitTable)> {
+        let t = &self.tables;
+        match (Self::system_of(from), Self::system_of(to)) {
+            (0, 1) => Some((self.window_offset(turn), &t.transit)),
+            (1, 0) => Some((self.return_window_offset(turn), &t.transit)),
+            (0, 2) => Some((self.span_offset_of(BodyId::Venus, turn, t.transit_venus.hohmann_angle), &t.transit_venus)),
+            (2, 0) => Some((self.span_offset_of(BodyId::Venus, turn, t.transit_venus.return_hohmann_angle), &t.transit_venus)),
             _ => None,
         }
+    }
+
+    /// Ticket #93: the turn Venus's window falls on, looked for from `from` forward over one of its
+    /// synodic cycles.
+    pub fn next_venus_window_turn(&self, from: u32) -> u32 {
+        let tr = &self.tables.transit_venus;
+        let cycle = (tr.synodic_days / tr.days_per_turn).ceil() as u32;
+        let from = from.max(1);
+        let off = |t: u32| self.span_offset_of(BodyId::Venus, t, tr.hohmann_angle).abs();
+        (from..=from + cycle).min_by(|a, b| off(*a).partial_cmp(&off(*b)).unwrap_or(std::cmp::Ordering::Equal)).unwrap_or(from)
     }
 
     /// The turn the Mars window falls on, looked for from `from` forward over one synodic cycle:
@@ -1840,7 +1883,8 @@ impl Game {
     /// The tooltip the Solar System Map shows over Mars, Phobos or Deimos (ticket #57).
     pub fn window_text(&self, body: BodyId) -> String {
         let name = self.tables.body(body).name.clone();
-        let window = self.next_window_turn(self.turn);
+        // Ticket #93: Venus has a window of its own.
+        let window = if body == BodyId::Venus { self.next_venus_window_turn(self.turn) } else { self.next_window_turn(self.turn) };
         let (now_turns, now_fuel) = self.transit_cost_at(BodyId::Earth, body, self.turn);
         let (win_turns, win_fuel) = self.transit_cost_at(BodyId::Earth, body, window);
         let when = match window.saturating_sub(self.turn) {

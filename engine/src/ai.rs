@@ -257,9 +257,16 @@ impl Game {
         let t = &self.tables;
         let turns_left = t.victory.turns.saturating_sub(self.turn).max(1) as f64;
         let flight = |b: BodyId| self.transit_cost_for(seat, BodyId::Earth, b).0 as f64;
+        // Ticket #93: Venus, with no Colony Slots, is a destination when the seat holds a station
+        // there with room, or when a slot is free in its orbit and the Stockpile could raise one.
+        let venus_open = |b: BodyId| {
+            b == BodyId::Venus
+                && (self.colonies.iter().any(|c| c.body == b && c.control.director() == Some(seat) && self.habitat_room(c) > c.colonists)
+                    || (!self.free_orbital_slots(b).is_empty() && self.seat(seat).stockpile.materials >= self.station_materials(seat)))
+        };
         let mut bodies: Vec<BodyId> = BodyId::ALL
             .into_iter()
-            .filter(|b| *b != BodyId::Earth && !self.free_slots_on(*b).is_empty() && flight(*b) < turns_left)
+            .filter(|b| *b != BodyId::Earth && (!self.free_slots_on(*b).is_empty() || venus_open(*b)) && flight(*b) < turns_left)
             .collect();
         if bodies.is_empty() {
             return BodyId::Moon;
@@ -269,7 +276,8 @@ impl Game {
         let each = t.faction(self.kind(seat)).victory_second.colonists_each;
         let spreading = each > 0 && BodyId::ALL.into_iter().any(|b| b != BodyId::Earth && self.colonists_at_body(seat, b) >= each);
         let key = |b: &BodyId| -> f64 {
-            let yields = self.best_slot_for(seat, *b, behind).map(|s| self.slot_worth(seat, self.slot_yields(*b, s), behind)).unwrap_or(0.0);
+            // Ticket #93: Venus has no slot to weigh; a station there is worth a plain slot.
+            let yields = self.best_slot_for(seat, *b, behind).map(|s| self.slot_worth(seat, self.slot_yields(*b, s), behind)).unwrap_or(if *b == BodyId::Venus { 1.0 } else { 0.0 });
             let fresh = if spreading && self.colonists_at_body(seat, *b) == 0 { 10.0 } else { 0.0 };
             (yields + fresh) * (1.0 - flight(*b) / turns_left)
         };
@@ -882,6 +890,9 @@ impl Game {
             let has_station = self.colonies.iter().any(|c| c.in_orbit && c.body == body && c.control.director() == Some(seat));
             let foothold = match body {
                 BodyId::Earth => self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working())),
+                // Ticket #93: at Venus, a Body of orbits only, a Ship of the seat's there is the
+                // foothold, and the station is what its Colonists land in.
+                b if self.tables.body(b).colony_slots() == 0 => self.ships.iter().any(|s| s.seat == seat && s.at == ShipAt::Body(b) && !s.arrived_this_turn),
                 _ => self.colonies.iter().any(|c| !c.in_orbit && c.body == body && c.control.director() == Some(seat) && c.modules.iter().any(|m| matches!(m.kind, ModuleKind::Mine | ModuleKind::Generator | ModuleKind::Refinery))),
             };
             if has_station || !foothold {

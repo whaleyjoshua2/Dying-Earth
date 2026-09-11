@@ -118,6 +118,8 @@ fn main() {
                     let mut trade_posts = 0u32;
                     // Ticket #92: Mass Drivers at the end, and Colonies on Phobos or Deimos.
                     let (mut mass_drivers, mut martian_moon_colonies) = (0u32, 0u32);
+                    // Ticket #93: stations at Venus at the end, and Colonists living there.
+                    let (mut venus_stations, mut venus_colonists) = (0u32, 0u32);
                     // Ticket #75: seat 0's start state.
                     let mut home_lost = Vec::new();
                     for seed in 1..=seeds {
@@ -159,6 +161,8 @@ fn main() {
                         trade_posts += r.trade_posts;
                         mass_drivers += r.mass_drivers;
                         martian_moon_colonies += r.martian_moon_colonies;
+                        venus_stations += r.venus_stations;
+                        venus_colonists += r.venus_colonists;
                         if let Some(t) = r.first_mars_colony_turn {
                             mars_turns.push(t);
                         }
@@ -239,6 +243,7 @@ fn main() {
                             if ground_colonies > 0 { ground_modules as f64 / ground_colonies as f64 } else { 0.0 }
                         );
                         println!("      Solar Arrays standing at the end over the batch: {solar_arrays}; Trade Posts {trade_posts}; Mass Drivers {mass_drivers}; Colonies on Phobos or Deimos {martian_moon_colonies}");
+                        println!("      Venus: {venus_stations} stations at the end over the batch, {venus_colonists} Colonists living there");
                         println!(
                             "      Mars system: a Colony founded in {}/{seeds} seeds, median first turn {}; Antarctic Colonies founded {antarctic}",
                             mars_turns.len(),

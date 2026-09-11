@@ -104,13 +104,14 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     }
 }
 
-const VIEWS: [(&str, View); 6] = [
+const VIEWS: [(&str, View); 7] = [
     ("solar", View::Solar),
     ("earth", View::Surface(BodyId::Earth)),
     ("moon", View::Surface(BodyId::Moon)),
     ("mars", View::Surface(BodyId::Mars)),
     ("phobos", View::Surface(BodyId::Phobos)),
     ("deimos", View::Surface(BodyId::Deimos)),
+    ("venus", View::Surface(BodyId::Venus)),
 ];
 
 const MENUS: [&str; 4] = ["title", "faction", "start", "report"];

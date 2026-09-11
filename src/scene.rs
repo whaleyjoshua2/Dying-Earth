@@ -62,6 +62,8 @@ pub fn setup_scene(
     let mars_material = textured(&mut images, &mut materials, &textures.mars);
     let phobos_material = textured(&mut images, &mut materials, &textures.phobos);
     let deimos_material = textured(&mut images, &mut materials, &textures.deimos);
+    // Ticket #93: Venus's clouds.
+    let venus_material = textured(&mut images, &mut materials, &textures.venus);
     let colours = session.colours();
     let mut flat = |c: [f32; 3], unlit: bool| {
         materials.add(StandardMaterial { base_color: Color::srgb(c[0], c[1], c[2]), unlit, double_sided: true, cull_mode: None, ..default() })
@@ -77,12 +79,15 @@ pub fn setup_scene(
     let flat_ring = Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2));
     let orbit_earth = meshes.add(Annulus::new(3.38, 3.42));
     let orbit_mars = meshes.add(Annulus::new(5.98, 6.02));
+    // Ticket #93: Venus's ring, inside Earth's.
+    let orbit_venus = meshes.add(Annulus::new(2.43, 2.47));
     commands
         .spawn((Transform::default(), Visibility::Hidden, SolarRoot))
         .with_children(|p| {
             p.spawn((Mesh3d(sphere.clone()), MeshMaterial3d(sun.clone()), Transform::from_scale(Vec3::splat(0.8))));
             p.spawn((Mesh3d(orbit_earth), MeshMaterial3d(orbit.clone()), flat_ring));
             p.spawn((Mesh3d(orbit_mars), MeshMaterial3d(orbit.clone()), flat_ring));
+            p.spawn((Mesh3d(orbit_venus), MeshMaterial3d(orbit.clone()), flat_ring));
             for body in BodyId::ALL {
                 let mat = match body {
                     BodyId::Earth => earth_material.clone(),
@@ -90,6 +95,7 @@ pub fn setup_scene(
                     BodyId::Mars => mars_material.clone(),
                     BodyId::Phobos => phobos_material.clone(),
                     BodyId::Deimos => deimos_material.clone(),
+                    BodyId::Venus => venus_material.clone(),
                 };
                 p.spawn((
                     Mesh3d(sphere.clone()),
@@ -120,6 +126,7 @@ pub fn setup_scene(
             BodyId::Mars => mars_material.clone(),
             BodyId::Phobos => phobos_material.clone(),
             BodyId::Deimos => deimos_material.clone(),
+            BodyId::Venus => venus_material.clone(),
         };
         commands
             .spawn((Transform::default(), Visibility::Hidden, SurfaceRoot(body)))

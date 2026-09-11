@@ -57,7 +57,7 @@ The small model of global warming the game runs: Emissions add to the CO2 Stock,
 _Avoid_: warming track, doom clock, countdown, timer, disaster meter
 
 **Body**:
-A place in the solar system that can hold a Colony or a Space Station. Five since version 0.04: Earth (its Colony Slots are Antarctica's, shut under the ice until +1.6 C), the Moon, Mars, Phobos and Deimos. A Body may be another's satellite, which sets how far apart they are.
+A place in the solar system that can hold a Colony or a Space Station. Six since version 0.06.0: Earth (its Colony Slots are Antarctica's, shut under the ice until +1.6 C), the Moon, Mars, Phobos, Deimos and Venus, a Body of orbits only, with no Colony Slots and three Orbital Slots. A Body may be another's satellite, which sets how far apart they are.
 _Avoid_: planet, world, site, location, node
 
 **Colony**:
@@ -105,7 +105,7 @@ The 3D view of the solar system, where Bodies, Ship stacks, transits and Orbital
 _Avoid_: space view, orbital map, star map
 
 **Launch Window**:
-The months in which the flight between the Earth system and the Mars system is cheap, because the two worlds stand where a minimum-energy transfer wants them. On the window a crossing takes the shortest flight there is and costs the Fuel on the card; away from it it takes longer and costs more, the further off the dearer, up to a limit. There is one window in the game. A hop inside the Earth system or inside the Mars system does not have one.
+The months in which the flight between the Earth system and the Mars system is cheap, because the two worlds stand where a minimum-energy transfer wants them. On the window a crossing takes the shortest flight there is and costs the Fuel on the card; away from it it takes longer and costs more, the further off the dearer, up to a limit. Since version 0.06.0 there are two windows in the game, Mars's and Venus's, each on its own sky; a hop inside the Earth system or inside the Mars system does not have one, and no leg runs between Venus and the Mars system.
 _Avoid_: transfer window, launch period, alignment, conjunction
 
 **Event**:

@@ -670,6 +670,8 @@ pub struct TransitTable {
 struct EphemerisFile {
     planet: Vec<PlanetElements>,
     transit: TransitTable,
+    /// Ticket #93 (version 0.06.0): the Earth-Venus transfer, the same shape.
+    transit_venus: TransitTable,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -961,6 +963,8 @@ pub struct Tables {
     /// Ticket #57: the Keplerian elements of Earth and Mars, and the transit table (`ephemeris.toml`).
     pub planets: Vec<PlanetElements>,
     pub transit: TransitTable,
+    /// Ticket #93 (version 0.06.0): the Earth-Venus transfer.
+    pub transit_venus: TransitTable,
     pub states: Vec<StateCard>,
     /// Ticket #53: how a neutral Nation State develops itself (`nation_states.toml`).
     pub development: DevelopmentTable,
@@ -1047,6 +1051,7 @@ impl Tables {
             slot_yield_spread: bodies.slot_yield_spread,
             planets: ephemeris.planet,
             transit: ephemeris.transit,
+            transit_venus: ephemeris.transit_venus,
             bodies: bodies.body,
             states: states.state,
             development: states.development,
@@ -1243,9 +1248,9 @@ impl Tables {
         if !(0.0..1.0).contains(&self.slot_yield_spread) {
             return Err(err("bodies.toml", format!("slot_yield_spread {} must be at least 0 and under 1", self.slot_yield_spread)));
         }
-        for id in [BodyId::Earth, BodyId::Mars] {
+        for id in [BodyId::Earth, BodyId::Mars, BodyId::Venus] {
             if !self.planets.iter().any(|p| p.id == id) {
-                return Err(err("ephemeris.toml", format!("no [[planet]] row for {}: the sky needs Earth's elements and Mars's", id.name())));
+                return Err(err("ephemeris.toml", format!("no [[planet]] row for {}: the sky needs Earth's elements, Mars's and Venus's", id.name())));
             }
         }
         for p in &self.planets {
