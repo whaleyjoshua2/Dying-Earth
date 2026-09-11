@@ -1879,7 +1879,7 @@ fn a_stage_of_the_archive_needs_its_research_banked_and_a_colony_off_earth() {
     assert_eq!(g.check_order(Seat(0), &[], &Order::BuildArchiveStage { colony: mine }).unwrap_err().0, "only the Archivists build the Archive");
     assert!(g.check_order(Seat(3), &[], &Order::BuildModule { colony: mars, kind: ModuleKind::Archive }).is_err());
     // Ordering spends the banked Research, and the next stage wants its own twenty.
-    g.commit_orders(Seat(3), &[order.clone()]);
+    g.commit_orders(Seat(3), std::slice::from_ref(&order));
     assert_eq!(g.seats[3].archive_fund, 0);
     // One stage at a time: while stage 1 is building, stage 2 cannot be ordered even with the Research banked.
     g.seats[3].archive_fund = 20;
@@ -2345,7 +2345,7 @@ fn i_resettle_routes_the_flow_and_adds_five_standing() {
     let order = Order::Resettle { state: StateId::SouthAmerica };
     assert_eq!(g.order_cost(Seat(0), &order).ducats, 20, "20 Ducats");
     assert!(g.check_order(Seat(0), &[], &order).is_ok());
-    assert!(g.check_order(Seat(0), &[order.clone()], &order).is_err(), "once a turn per Faction");
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&order), &order).is_err(), "once a turn per Faction");
     g.commit_orders(Seat(0), &[order]);
     g.resolve_unrest();
     assert_eq!(g.seats[0].influence.get(&Place::State(StateId::SouthAmerica)).copied(), Some(5), "+5 Standing on the chosen state");
@@ -2946,14 +2946,14 @@ fn d_leapfrog_is_custodian_only_and_never_goes_below_the_base() {
     let o = Order::Leapfrog { state: sid };
     assert_eq!(g.order_cost(Seat(0), &o).ducats, 50, "50 Ducats a Leapfrog");
     let before = g.population_coefficient(sid);
-    g.commit_orders(Seat(0), &[o.clone()]);
+    g.commit_orders(Seat(0), std::slice::from_ref(&o));
     assert_eq!(g.seats[0].stockpile.ducats, 450);
     assert!((g.population_coefficient(sid) - (before - per)).abs() < 1e-9, "one level's worth off");
     assert_eq!(g.leapfrogs(sid), 1, "Leapfrogged once");
     // East Asia at Industry Level 3 starts at 0.13, so three Leapfrogs reach the base and a fourth
     // is refused rather than taking 50 Ducats for nothing.
-    g.commit_orders(Seat(0), &[o.clone()]);
-    g.commit_orders(Seat(0), &[o.clone()]);
+    g.commit_orders(Seat(0), std::slice::from_ref(&o));
+    g.commit_orders(Seat(0), std::slice::from_ref(&o));
     assert!((g.population_coefficient(sid) - base).abs() < 1e-9, "the base, and no lower");
     assert!(g.check_order(Seat(0), &[], &o).is_err(), "a fourth Leapfrog buys nothing and is refused");
 }
@@ -3062,7 +3062,7 @@ fn f_a_strip_permit_doubles_output_for_three_turns_then_charges_its_price() {
     let baseline = g.baseline_emissions(sid);
     g.state_mut(sid).unrest = 2.0;
     g.state_mut(sid).unrest_reported = 2.0;
-    g.commit_orders(Seat(1), &[o.clone()]);
+    g.commit_orders(Seat(1), std::slice::from_ref(&o));
     assert!(g.state(sid).strip_permit_used, "one per state, ever");
     assert!(g.check_order(Seat(1), &[], &o).is_err(), "and never a second");
     // Three turns of Income at double output, then the price.
@@ -3118,7 +3118,7 @@ fn a_custodian_ai_behind_on_stabilization_leapfrogs_when_it_has_the_ducats() {
     g.seats[cust.index()].stockpile.ducats = 120;
     g.seats[cust.index()].stockpile.materials = 0;
     let orders = g.ai_orders(cust);
-    let scored: Vec<String> = g.log.iter().cloned().filter(|l| l.contains("Leapfrog") || l.contains("Scrubber") || l.contains("Ducats")).collect();
+    let scored: Vec<String> = g.log.iter().filter(|&l| l.contains("Leapfrog") || l.contains("Scrubber") || l.contains("Ducats")).cloned().collect();
     let probe = (g.controlled_states(cust), g.leapfrog_would_bite(StateId::EastAsia), g.population_coefficient(StateId::EastAsia), g.seats[cust.index()].stockpile.ducats, g.kind(cust));
     assert!(orders.iter().any(|o| matches!(o, Order::Leapfrog { .. })), "no Leapfrog among: {orders:?}
 scored: {scored:#?}
@@ -3752,7 +3752,7 @@ fn the_ai_holds_materials_four_turns_for_a_colony_ship_it_wants_more_than_a_fact
     g.seats[cust.index()].income_last_turn.energy = 20;
     let orders = g.ai_orders(cust);
     let spent: Vec<&Order> = orders.iter().filter(|o| g.order_cost(cust, o).materials > 0).collect();
-    let lines: Vec<String> = g.log.iter().cloned().filter(|l| l.contains("Colony Ship") || l.starts_with("  take")).collect();
+    let lines: Vec<String> = g.log.iter().filter(|&l| l.contains("Colony Ship") || l.starts_with("  take")).cloned().collect();
     assert!(lines.iter().any(|l| l.contains("wait") && l.contains("Colony Ship")), "the Colony Ship is waited for: {lines:#?}");
     assert!(spent.is_empty(), "and nothing cheaper takes the Materials meanwhile: {spent:?}");
 }
@@ -4047,7 +4047,7 @@ fn the_ai_banks_fuel_when_the_mars_window_is_within_two_turns() {
     // Two turns out: the bank is on.
     let mut near = board(window - 2);
     let orders = near.ai_orders(Seat(0));
-    let lines: Vec<String> = near.log.iter().cloned().collect();
+    let lines: Vec<String> = near.log.to_vec();
     assert!(lines.iter().any(|l| l.contains("banking Fuel for")), "the window is two turns off, so Fuel is banked: {lines:#?}");
     let crossings = orders
         .iter()
@@ -4058,7 +4058,7 @@ fn the_ai_banks_fuel_when_the_mars_window_is_within_two_turns() {
     // Three turns out, and the AI spends Fuel as it always did.
     let mut off = board(window - 3);
     off.ai_orders(Seat(0));
-    let lines: Vec<String> = off.log.iter().cloned().collect();
+    let lines: Vec<String> = off.log.to_vec();
     assert!(!lines.iter().any(|l| l.contains("banking Fuel for")), "three turns out the bank is off: {lines:#?}");
 }
 
@@ -4577,7 +4577,7 @@ fn a_custodian_ai_behind_on_pace_builds_a_constabulary_where_unrest_has_reached_
     g.state_mut(StateId::EastAsia).unrest = 7.0;
     assert!(g.free_slots(StateId::EastAsia) > 0, "a free slot to build it in");
     let orders = g.ai_orders(seat);
-    let scored: Vec<String> = g.log.iter().cloned().filter(|l| l.contains("take") || l.contains("skip")).take(12).collect();
+    let scored: Vec<String> = g.log.iter().filter(|&l| l.contains("take") || l.contains("skip")).take(12).cloned().collect();
     assert!(
         orders.iter().any(|o| matches!(o, Order::BuildFacility { state: StateId::EastAsia, kind: FacilityKind::Constabulary })),
         "no Constabulary where Unrest has reached 7: {orders:?}\nscored: {scored:#?}"
