@@ -653,3 +653,7 @@ Archive's fund held at 20 of 80 with no Archive standing.
 `dist/dying-earth-0.05.5/` (the release binary, `assets/`, `README.txt` = the playtest note) and
 `dist/dying-earth-0.05.5-playtest.zip` built here for Windows; the Linux kit from the
 `release-kits` workflow on GitHub's Ubuntu runner, downloaded to `dist/dying-earth-0.05.5-linux.zip`.
+The workflow run is [34619054221](https://github.com/whaleyjoshua2/Dying-Earth/actions/runs/34619054221),
+both jobs green; its Windows zip is kept beside the local one as
+`dist/dying-earth-0.05.5-windows-ci.zip`. The Linux zip unpacks to `dying-earth-0.05.5-linux/`
+with the stripped binary, `RUN-ON-LINUX.txt`, the 0.05.5 README and `assets/` at step 300.
