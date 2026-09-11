@@ -1,0 +1,98 @@
+# Builds the playtest kits on GitHub's runners: a Linux (Ubuntu) kit that this Windows machine
+# cannot build itself, and a Windows kit for parity. Run it by hand from the Actions tab (or
+# `gh workflow run release-kits.yml --ref <branch> -f version=0.05`); each kit lands as a
+# downloadable artifact named dying-earth-<version>-<os>. Suitable for uploading to itch.io as is.
+#
+# Optional: if the repository has a secret BUTLER_API_KEY and a variable ITCH_TARGET (for example
+# "whaleyjoshua2/dying-earth"), the Linux and Windows kits are also pushed to itch.io with butler,
+# to the channels "linux" and "windows".
+name: release-kits
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version label for the kit folder and zip (for example 0.05)"
+        required: true
+        default: "0.05"
+
+jobs:
+  linux:
+    name: Linux kit (Ubuntu 22.04)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: System libraries Bevy needs on Linux
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev \
+            libx11-dev libxcursor-dev libxi-dev libxrandr-dev zip
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release --locked
+      - name: Assemble the kit
+        run: |
+          set -eu
+          V="${{ github.event.inputs.version }}"
+          K="dying-earth-$V-linux"
+          rm -rf "$K" && mkdir -p "$K"
+          cp target/release/dying-earth "$K/dying-earth"
+          chmod +x "$K/dying-earth"
+          cp -r assets "$K/assets"
+          cp docs/playtest/PLAYTEST.txt "$K/README.txt"
+          cat > "$K/RUN-ON-LINUX.txt" <<'TXT'
+          Dying Earth on Linux
+          --------------------
+          1. Unzip the folder anywhere. Keep "dying-earth" and the "assets" folder together.
+          2. Open a terminal in the folder and run:   ./dying-earth
+             (If it says "Permission denied":   chmod +x dying-earth   then try again.)
+          3. Built on Ubuntu 22.04; needs a 64-bit Ubuntu 22.04 or newer (or another distribution
+             with glibc 2.35 or newer), a desktop session (X11 or Wayland), and a GPU with Vulkan.
+             If the window does not open, install:   sudo apt install libasound2 libudev1 libvulkan1
+          4. Saves go to ~/.local/share/DyingEarth/data/saves (there is a Load button on the title screen).
+          TXT
+          zip -r -q "$K.zip" "$K"
+          unzip -l "$K.zip" | tail -3
+          echo "KIT=$K" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.KIT }}
+          path: ${{ env.KIT }}.zip
+          if-no-files-found: error
+      - name: Push to itch.io (only if BUTLER_API_KEY and ITCH_TARGET are set)
+        if: ${{ env.BUTLER_API_KEY != '' && vars.ITCH_TARGET != '' }}
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          curl -L -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip && chmod +x butler
+          ./butler push "$KIT" "${{ vars.ITCH_TARGET }}:linux" --userversion "${{ github.event.inputs.version }}"
+
+  windows:
+    name: Windows kit
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release --locked
+      - name: Assemble the kit
+        shell: pwsh
+        run: |
+          $V = "${{ github.event.inputs.version }}"
+          $K = "dying-earth-$V-windows"
+          New-Item -ItemType Directory -Force $K | Out-Null
+          Copy-Item target/release/dying-earth.exe "$K/dying-earth.exe"
+          Copy-Item -Recurse assets "$K/assets"
+          Copy-Item docs/playtest/PLAYTEST.txt "$K/README.txt"
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          [System.IO.Compression.ZipFile]::CreateFromDirectory((Resolve-Path $K), "$PWD/$K.zip", 'Optimal', $true)
+          "KIT=$K" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.KIT }}
+          path: ${{ env.KIT }}.zip
+          if-no-files-found: error
