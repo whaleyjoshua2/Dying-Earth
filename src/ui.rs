@@ -1291,6 +1291,53 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
 
 #[allow(clippy::too_many_arguments)]
 /// Colony Slot labels on a Body's surface: Antarctica's on Earth since ticket #44.
+/// Ticket #113 (version 0.07.1): a Colony Slot's four yields, each figure behind the glyph of what
+/// that Module makes. It replaces `M 1.22 G 0.80 R 1.86 H 1.63` -- four bare capitals standing for
+/// Mine, Generator, Refinery and Habitat, which a player was never taught and could not look up on
+/// the map. The mapping is exactly one to one, so no new art was needed: a Mine makes Materials, a
+/// Generator Energy, a Refinery Fuel, and a Habitat people.
+///
+/// **Drawn at 14 points, not the 11 the rest of the label uses.** Rendered at 11 the bolt and the
+/// bust read but the mine cart is a blob and the jerrycan is mud; the fault is the size, not the
+/// glyph, and the size was ours to change.
+///
+/// The cost, measured rather than guessed: the line is about **forty per cent wider** than the
+/// capitals it replaces, because a 14-pixel glyph is wider than an 11-point capital. Charting
+/// expected the opposite and charting was wrong. No label on any Body overlaps another at that
+/// width, so it is paid and not a problem; dropping the figures to one decimal would buy most of it
+/// back if a later Body ever crowds.
+///
+/// Where a glyph has not loaded the whole line falls back to the capitals. A map label has no
+/// tooltip behind it -- it is the whole of what is shown -- so it must never be able to go mute.
+const SLOT_YIELD_SIZE: f32 = 14.0;
+
+fn slot_yield_label(painter: &egui::Painter, pos: Pos2, yields: &dying_earth_engine::SlotYields) {
+    let figures = [("materials", yields.mine), ("energy", yields.generator), ("fuel", yields.refinery), ("population", yields.habitat)];
+    let Some(glyphs) = figures.iter().map(|(key, _)| Icons::texture_from_ctx(painter.ctx(), key)).collect::<Option<Vec<_>>>() else {
+        label_at(painter, pos, &yields.text(), Color32::from_gray(170), 11.0);
+        return;
+    };
+    let font = FontId::proportional(SLOT_YIELD_SIZE);
+    let ink = Color32::from_gray(205);
+    let galleys: Vec<_> = figures.iter().map(|(_, v)| painter.layout_no_wrap(format!("{v:.2}"), font.clone(), ink)).collect();
+    let gap = 3.0;
+    let between = 9.0;
+    let width: f32 = galleys.iter().map(|g| SLOT_YIELD_SIZE + gap + g.size().x + between).sum::<f32>() - between;
+    let height = SLOT_YIELD_SIZE.max(galleys.iter().map(|g| g.size().y).fold(0.0, f32::max));
+    let rect = egui::Rect::from_center_size(pos, egui::vec2(width + 8.0, height + 4.0));
+    painter.rect_filled(rect, 3.0, Color32::from_black_alpha(170));
+    let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
+    let mut x = rect.min.x + 4.0;
+    for ((key, _), (glyph, galley)) in figures.iter().zip(glyphs.into_iter().zip(galleys)) {
+        let square = egui::Rect::from_min_size(egui::pos2(x, pos.y - SLOT_YIELD_SIZE / 2.0), egui::vec2(SLOT_YIELD_SIZE, SLOT_YIELD_SIZE));
+        painter.image(glyph, square, uv, crate::icons::fill(key));
+        x += SLOT_YIELD_SIZE + gap;
+        let w = galley.size().x;
+        painter.galley(egui::pos2(x, pos.y - galley.size().y / 2.0), galley, ink);
+        x += w + between;
+    }
+}
+
 fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: BodyId, visible: &dyn Fn(Vec3) -> Option<Pos2>, hotspots: &mut Vec<Hotspot>) {
     // Ticket #103 (version 0.07.0): Earth's three slots are Antarctica's, and nothing of them is
     // drawn until the ice opens -- no marker, no name, no yields. A player is told the ice EXISTS
@@ -1324,13 +1371,7 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                 // `label_at` centres its block on the point, so the figures clear half the name
                 // block above them and half their own line.
                 let lines = text.lines().count() as f32;
-                label_at(
-                    painter,
-                    p + egui::vec2(0.0, 24.0 + lines * 7.0 + 8.0),
-                    &game.slot_yields(body, slot).text(),
-                    Color32::from_gray(170),
-                    11.0,
-                );
+                slot_yield_label(painter, p + egui::vec2(0.0, 24.0 + lines * 7.0 + 10.0), &game.slot_yields(body, slot));
                 hotspots.push(Hotspot { pos: p, radius: 22.0, hit });
             }
 }

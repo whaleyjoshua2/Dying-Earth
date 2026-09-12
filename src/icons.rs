@@ -86,6 +86,14 @@ impl Icons {
         Some(egui::Image::new(egui::load::SizedTexture::from_handle(handle)).fit_to_exact_size(egui::vec2(size, size)).tint(fill(name)))
     }
 
+    /// Ticket #113 (version 0.07.1): the texture itself, for the Surface Maps. A map label is
+    /// painted straight onto the globe rather than laid out by a `Ui`, so it cannot take an
+    /// `egui::Image` and needs the id to hand to `Painter::image`.
+    pub fn texture_from_ctx(ctx: &egui::Context, name: &str) -> Option<egui::TextureId> {
+        let map: BTreeMap<String, egui::TextureHandle> = ctx.data(|d| d.get_temp(egui::Id::new("icons")))?;
+        Some(map.get(name)?.id())
+    }
+
     pub fn get(&self, name: &str) -> Option<&egui::TextureHandle> {
         self.loaded.get(name)
     }

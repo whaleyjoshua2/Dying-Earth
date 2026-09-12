@@ -334,3 +334,39 @@ there that does **not** change from turn to turn, so it was paying for width wit
 rereads. Nothing is lost: the name is on the hover, on the Tech Tree button an inch to its left, and
 in the research race bar's own tooltip. Roughly two hundred pixels come back, which is what the
 lower-right command cluster and the map icons are about to want.
+
+## The figures on the map wear their icons
+
+*"Resources on map should use icons."* Settled as: the **Colony Slot yields first and alone**, drawn
+larger so the glyphs survive, with the capitals kept as the fallback.
+
+![The Mars slot label before and after](map-slot-yields.png)
+
+**The finding that changed the question.** The four capitals are `M G R H` — Mine, Generator,
+Refinery, Habitat — which are *Modules*, not resources, and the ticket had flagged that as possibly
+needing four new glyphs. It does not: the mapping is exactly one to one, since a Mine makes
+Materials, a Generator Energy, a Refinery Fuel and a Habitat people. So the four glyphs already on
+the board carry it, with **no new art, no new credits, and nothing new for a player to learn**.
+
+**The constraint that decided the rest.** A map label is drawn at **11 points** where the top bar
+uses 16, and `icon_sheet` now takes its sizes so that could be looked at rather than assumed: at 11
+the bolt and the bust read, the mine cart is a blob with legs, and the jerrycan is mud. The fault is
+the size and the size was ours, so the yield line alone is drawn at **14**.
+
+![Three slots on the Moon](map-slot-yields-on-the-moon.png)
+
+**What it cost, measured rather than guessed.** The line is about **forty per cent wider** than the
+capitals it replaces — a 14-pixel glyph is wider than an 11-point capital. Charting expected the
+opposite and charting was wrong. Nothing overlaps at that width on Mars, the Moon, Venus, Phobos or
+Deimos; dropping the figures to one decimal would buy most of the width back if a later Body ever
+crowds.
+
+![The fallback, witnessed](map-slot-yields-fallback.png)
+
+**Antarctica does crowd — and not because of this.** Its three slots sit close together, and their
+labels overlap at the default zoom. The second picture is the same view with `assets/icons` moved
+off disk: the capitals come back, exactly as the fallback intends, and **the labels overlap
+identically**. The crowding is the three-line name blocks above the yields, and it predates this
+ticket. That run is also the witness for the fallback itself — a map label has no tooltip behind it,
+so it must never be able to go mute, and the only way to know it cannot is to take the art away and
+look.
