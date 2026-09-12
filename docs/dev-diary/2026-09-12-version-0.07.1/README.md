@@ -175,11 +175,20 @@ rather than learning it globally.
 **An icon's colour belongs to the icon.** The first build of this block let the glyph take its
 line's tint, so the chimney came out teal on the Custodians' line and orange on the Prospectors' —
 which quietly made an icon's colour mean *whose*, the exact collision this version is trying to end.
-The designer's correction: *"I wanted the glyphs a single fill color."* Every glyph in the game is
-now drawn in one fill, named once as `GLYPH_FILL`, whatever colour the text around it is; the
-Faction colour stays on the words and the figures, where it means what it has always meant. When the
-palette lands it replaces that one constant with one colour per figure, and still never borrows from
-the line.
+The designer's correction, and its scope: *"I wanted the glyphs a single fill color... I want all
+glyphs that are used to carry a single fill color everywhere they are used."*
+
+So the rule is not a convention the Blame block follows; it is enforced by the shape of the code.
+**Both icon constructors have lost their tint parameter.** A glyph's colour is now decided in one
+function, `icons::fill(name)`, by which figure it is, and no call site can pass one — the compiler
+refuses. Witnessed rather than assumed: putting `Color32::RED` back into a call site gives
+`error[E0061]: this method takes 2 arguments but 3 arguments were supplied`, and removing it builds
+clean again. The Faction colour stays on the words and the figures, where it has always meant
+*whose*.
+
+That function is also where the open half of this ticket lands. Today every figure answers the same
+neutral off-white; if the designer gives each figure a colour, it is `icons::fill` that grows the
+arms, and *one fill everywhere* holds unchanged.
 
 ![Net Emissions on the top bar](net-emissions-on-the-bar.png)
 

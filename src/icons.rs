@@ -80,22 +80,36 @@ impl Icons {
 
     /// Ticket #106: one icon, fetched from egui's own store rather than passed down. `None` where
     /// the art did not load, so every caller falls back to its words.
-    pub fn from_ctx(ctx: &egui::Context, name: &str, size: f32, tint: egui::Color32) -> Option<egui::Image<'static>> {
+    pub fn from_ctx(ctx: &egui::Context, name: &str, size: f32) -> Option<egui::Image<'static>> {
         let map: BTreeMap<String, egui::TextureHandle> = ctx.data(|d| d.get_temp(egui::Id::new("icons")))?;
         let handle = map.get(name)?;
-        Some(egui::Image::new(egui::load::SizedTexture::from_handle(handle)).fit_to_exact_size(egui::vec2(size, size)).tint(tint))
+        Some(egui::Image::new(egui::load::SizedTexture::from_handle(handle)).fit_to_exact_size(egui::vec2(size, size)).tint(fill(name)))
     }
 
     pub fn get(&self, name: &str) -> Option<&egui::TextureHandle> {
         self.loaded.get(name)
     }
 
-    /// The icon at `size`, tinted, ready to put in a row beside a label. `None` where the art did
-    /// not load, so every caller can fall back to its words.
-    pub fn image(&self, name: &str, size: f32, tint: egui::Color32) -> Option<egui::Image<'static>> {
+    /// The icon at `size`, in its own fill, ready to put in a row beside a label. `None` where the
+    /// art did not load, so every caller can fall back to its words.
+    pub fn image(&self, name: &str, size: f32) -> Option<egui::Image<'static>> {
         let handle = self.get(name)?;
-        Some(egui::Image::new(egui::load::SizedTexture::from_handle(handle)).fit_to_exact_size(egui::vec2(size, size)).tint(tint))
+        Some(egui::Image::new(egui::load::SizedTexture::from_handle(handle)).fit_to_exact_size(egui::vec2(size, size)).tint(fill(name)))
     }
+}
+
+/// Ticket #112 (version 0.07.1): **a figure's glyph carries one fill, everywhere it is drawn.** The
+/// colour is decided HERE, by which figure it is, and no caller can pass one -- the two
+/// constructors above took a tint until the Blame block used it to paint the chimney in each
+/// Faction's colour, which made an icon's colour mean "whose" on one screen and "which figure" on
+/// every other. The designer's rule is that an icon's colour belongs to the icon, so the parameter
+/// is gone and this function is the only place an answer exists.
+///
+/// Today every figure answers the same neutral off-white. The open half of ticket #112 is whether
+/// each figure takes a colour of its own; if it does, it is this match that grows the arms, and the
+/// rule above holds unchanged.
+pub fn fill(_name: &str) -> egui::Color32 {
+    egui::Color32::from_rgb(225, 220, 210)
 }
 
 /// One SVG to one egui image, with the black backing rectangle taken out first.
