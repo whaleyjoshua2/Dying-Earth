@@ -202,12 +202,17 @@ fn advance_popup(view: &mut ViewState, moments: usize) {
 /// Recompose the Earth Map whenever the board changed.
 pub fn recompose_earth(
     mut session: ResMut<Session>,
+    mut view: ResMut<ViewState>,
     textures: Res<Textures>,
     handles: Option<Res<SceneHandles>>,
     mut images: ResMut<Assets<Image>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    if !session.earth_dirty {
+    // Ticket #126 (version 0.07.2): on the start screen the globe is also recomposed when the lit
+    // Region -- chosen, else under the pointer -- changes, and only then; a recompose is two million
+    // pixels and a hover is not a reason to do it every frame.
+    let lit = if session.game.is_none() { view.start_selected.or(view.start_hover) } else { None };
+    if !session.earth_dirty && !(session.game.is_none() && lit != view.start_lit_drawn) {
         return;
     }
     let Some(handles) = handles else { return };
@@ -215,8 +220,9 @@ pub fn recompose_earth(
         Some(game) => textures.compose_earth(game, &session.colours()),
         // Ticket #126 (version 0.07.2): the start globe shows every Region in its own colour, with
         // its borders, so a player can choose one by clicking it.
-        None => textures.compose_regions(&session.tables),
+        None => textures.compose_regions(&session.tables, lit),
     };
+    view.start_lit_drawn = lit;
     let img = images.add(rgba.to_image());
     if let Some(mut m) = materials.get_mut(&handles.earth_material) {
         m.base_color_texture = Some(img);
@@ -350,7 +356,7 @@ pub fn draw(
         Screen::ChooseFaction => faction_screen(&mut root, &session, &mut actions),
         Screen::ChooseStart { faction } => {
             let cam = camera.single().ok();
-            start_screen(&mut root, &session, faction, &mut view, cam, &globes, &mut actions)
+            start_screen(&mut root, &session, faction, &mut view, cam, &globes, &textures, &mut actions)
         }
         Screen::Playing | Screen::GameOver => {
             let cam = camera.single().ok();
@@ -790,6 +796,13 @@ fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut
 }
 
 #[allow(clippy::too_many_arguments)]
+/// Ticket #126 (version 0.07.2): the start is chosen on the map. The designer: *"Starting location
+/// selection screen should display the regions and allow the player to choose by clicking map;
+/// retire the clickable list."* Every Region wears its own colour with its borders drawn, its name
+/// is painted on the globe where the game view paints it, the Region under the pointer lights up
+/// and its card appears in the panel, a click chooses it, and a Begin button starts the game -- the
+/// list of fourteen buttons is gone. A click chooses rather than starts because a globe of real
+/// borders has small Regions beside large ones and a mis-click on Japan should cost nothing.
 fn start_screen(
     root: &mut Ui,
     session: &Session,
@@ -797,6 +810,7 @@ fn start_screen(
     view: &mut ViewState,
     cam: Option<(&Camera, &GlobalTransform)>,
     globes: &Query<(&Globe, &GlobalTransform)>,
+    textures: &Textures,
     actions: &mut Vec<Action>,
 ) {
     // Ticket #100 (version 0.07.0): open the globe on this Faction's home, once. Aiming every frame
@@ -810,10 +824,12 @@ fn start_screen(
         view.zoom = 1.0;
         view.start_grabbed = false;
         view.start_aimed = Some(faction);
+        view.start_selected = None;
+        view.start_hover = None;
     }
-    egui::Panel::right("start_panel").default_size(320.0).show(root, |ui| {
+    egui::Panel::right("start_panel").default_size(340.0).show(root, |ui| {
         ui.add_space(10.0);
-        ui.label(RichText::new("Choose your starting continent").size(22.0).strong());
+        ui.label(RichText::new("Choose your starting Region").size(22.0).strong());
         ui.label(format!("You play the {}.", faction.name()));
         // Ticket #50: the three Factions not picked are played by the computer, in their own colours.
         ui.horizontal_wrapped(|ui| {
@@ -822,14 +838,35 @@ fn start_screen(
                 ui.label(RichText::new(k.name()).strong().color(rgb(session.tables.faction(k).colour)));
             }
         });
-        ui.label("Each computer Faction takes the uncontrolled continent with the highest Industry Level.");
-        ui.add_space(10.0);
-        for sid in StateId::ALL {
-            let c = session.tables.state(sid);
-            let text = format!("{}  (population {:.1}, Industry {}, leans {:?}, education {})", c.name, c.population, c.industry_level, c.resource_lean, c.education_level);
-            if ui.add(egui::Button::new(text).min_size(egui::vec2(300.0, 32.0))).clicked() {
-                actions.push(Action::NewGame(faction, sid));
+        ui.label("Each computer Faction takes the uncontrolled Region with the highest Industry Level.");
+        ui.add_space(14.0);
+        // Ticket #126: the card of the Region chosen, else of the one under the pointer, with the
+        // Nation's flag at the size the Region card uses; and Begin once one is chosen.
+        let shown = view.start_selected.or(view.start_hover);
+        match shown {
+            Some(sid) => {
+                let c = session.tables.state(sid);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 10.0;
+                    if let Some(flag) = Icons::flag_from_ctx(ui.ctx(), &c.flag, 32.0) {
+                        ui.add(flag);
+                    }
+                    ui.label(RichText::new(&c.name).size(32.0).strong());
+                });
+                ui.label(format!("Population {:.1} (hundreds of millions), Industry Level {}, leans {:?}", c.population, c.industry_level, c.resource_lean));
+                ui.label(format!("Education Level {}, Influence value {}, GDP {}", c.education_level, c.influence, c.gdp));
+                ui.label(RichText::new(if view.start_selected == Some(sid) { "Chosen. Begin, or click another Region." } else { "Click it to choose." }).weak());
             }
+            None => {
+                ui.label(RichText::new("Turn the globe and point at a Region to read it; click one to choose it.").weak());
+            }
+        }
+        ui.add_space(14.0);
+        let begin = egui::Button::new(RichText::new("Begin").size(18.0).strong()).min_size(egui::vec2(160.0, 36.0));
+        if ui.add_enabled(view.start_selected.is_some(), begin).on_disabled_hover_text("Choose a Region on the globe first.").clicked()
+            && let Some(sid) = view.start_selected
+        {
+            actions.push(Action::NewGame(faction, sid));
         }
         ui.add_space(20.0);
         ui.label(RichText::new("Antarctica has no people to govern: it is three Colony Slots, founded from a Colony Ship at Earth.").weak());
@@ -855,12 +892,34 @@ fn start_screen(
                 view.zoom = (view.zoom * (1.0 - scroll * 0.002)).clamp(0.45, 2.2);
             }
         }
+        // Ticket #126: the Region under the pointer lights up; a click chooses it; Begin starts.
+        view.start_hover = match (resp.hover_pos(), cam) {
+            (Some(pos), Some((camera, cam_gt))) if resp.hovered() => start_pick(pos, camera, cam_gt, globes, textures),
+            _ => None,
+        };
         if resp.clicked()
             && let Some(pos) = resp.interact_pointer_pos()
             && let Some((camera, cam_gt)) = cam
-            && let Some(sid) = start_pick(pos, camera, cam_gt, globes)
+            && let Some(sid) = start_pick(pos, camera, cam_gt, globes, textures)
         {
-            actions.push(Action::NewGame(faction, sid));
+            view.start_selected = Some(sid);
+        }
+        // The names, painted where the game view paints them: on the globe, lifted, over a plate.
+        if let (Some((camera, cam_gt)), Some((_, globe_gt))) = (cam, globes.iter().find(|(g, _)| g.0 == BodyId::Earth)) {
+            let painter = ui.painter();
+            let center = globe_gt.translation();
+            let cam_pos = cam_gt.translation();
+            for sid in StateId::ALL {
+                let (lon, lat) = geo::state_lonlat(sid);
+                let world = globe_gt.transform_point(geo::local_from_lonlat(lon, lat) * 1.01);
+                if (world - center).dot(cam_pos - center) < 0.25 * GLOBE_RADIUS * (cam_pos - center).length() {
+                    continue;
+                }
+                let Some(p) = camera.world_to_viewport(cam_gt, world).ok().map(|v| Pos2::new(v.x, v.y)) else { continue };
+                let card = session.tables.state(sid);
+                let lit = view.start_selected == Some(sid) || view.start_hover == Some(sid);
+                label_at(painter, p, &card.name, if lit { Color32::WHITE } else { rgb(card.colour) }, if lit { 15.0 } else { 13.0 });
+            }
         }
     });
 }
@@ -868,22 +927,17 @@ fn start_screen(
 /// Ticket #100 (version 0.07.0): which Region the pointer is over on the start screen's
 /// globe. The playing screen's picker reads a `Game`, and on this screen no game exists yet, so
 /// this walks the twelve cards' own longitudes and latitudes instead and takes the nearest.
-fn start_pick(pos: Pos2, camera: &Camera, cam_gt: &GlobalTransform, globes: &Query<(&Globe, &GlobalTransform)>) -> Option<StateId> {
+fn start_pick(pos: Pos2, camera: &Camera, cam_gt: &GlobalTransform, globes: &Query<(&Globe, &GlobalTransform)>, textures: &Textures) -> Option<StateId> {
     let ray = camera.viewport_to_world(cam_gt, Vec2::new(pos.x, pos.y)).ok()?;
     let (origin, dir) = (ray.origin, Vec3::from(ray.direction));
     let (_, globe_gt) = globes.iter().find(|(g, _)| g.0 == BodyId::Earth)?;
     let t = geo::ray_sphere(origin, dir, globe_gt.translation(), GLOBE_RADIUS)?;
     let local = globe_gt.affine().inverse().transform_point3(origin + dir * t);
     let (lon, lat) = geo::lonlat_from_local(local);
-    // The nearest card by great-circle-ish distance, longitude wrapped.
-    StateId::ALL.into_iter().min_by(|a, b| {
-        let d = |s: StateId| {
-            let (sl, sa) = geo::state_lonlat(s);
-            let dl = (((sl - lon) + 540.0) % 360.0) - 180.0;
-            dl * dl + (sa - lat) * (sa - lat)
-        };
-        d(*a).partial_cmp(&d(*b)).unwrap_or(std::cmp::Ordering::Equal)
-    })
+    // Ticket #126 (version 0.07.2): the Region under the point, by the mask. Until now this took the
+    // nearest label, which on a board of real borders gave Kazakhstan to Russia; the border a
+    // player sees is the border that answers.
+    textures.state_at_lonlat(lon, lat)
 }
 
 // ------------------------------------------------------------------ the game

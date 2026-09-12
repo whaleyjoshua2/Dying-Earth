@@ -287,6 +287,12 @@ pub struct ViewState {
     /// Ticket #114 (version 0.07.1): the last turn the standing Defence split was placed, so it is
     /// placed once a turn and not once a frame.
     pub defence_placed: Option<u32>,
+    /// Ticket #126 (version 0.07.2): on the start screen, the Region under the pointer, the Region
+    /// the player has clicked, and the one the globe was last composed with lit -- so the globe is
+    /// recomposed when the lit Region changes and not every frame.
+    pub start_hover: Option<StateId>,
+    pub start_selected: Option<StateId>,
+    pub start_lit_drawn: Option<StateId>,
 }
 
 impl Default for ViewState {
@@ -319,6 +325,9 @@ impl Default for ViewState {
             force_hover: None,
             roster_filter: [false; 4],
             defence_placed: None,
+            start_hover: None,
+            start_selected: None,
+            start_lit_drawn: None,
         }
     }
 }

@@ -83,6 +83,15 @@ impl Textures {
         Ok(Textures { earth, moon, mars, phobos, deimos, venus, mask: mask_img.into_raw() })
     }
 
+    /// Ticket #126 (version 0.07.2): the Region under a point on the globe, by the mask -- which is
+    /// the border a player sees -- and not by the nearest label, which on a board of real borders
+    /// gave Kazakhstan to Russia and the Nejd to Iran.
+    pub fn state_at_lonlat(&self, lon: f32, lat: f32) -> Option<StateId> {
+        let x = (((lon + 180.0) / 360.0 * self.earth.w as f32) as u32).min(self.earth.w - 1);
+        let y = (((90.0 - lat) / 180.0 * self.earth.h as f32) as u32).min(self.earth.h - 1);
+        self.state_at(x, y)
+    }
+
     pub fn state_at(&self, x: u32, y: u32) -> Option<StateId> {
         let v = self.mask[(y * self.earth.w + x) as usize];
         if v == 0 { None } else { MASK_STATES.get(v as usize - 1).copied().flatten() }
@@ -92,18 +101,18 @@ impl Textures {
     pub fn compose_earth(&self, game: &Game, colours: &[[f32; 3]]) -> Rgba {
         let warm = ((game.climate.temperature - game.tables.climate.base_temperature) / 1.8).clamp(0.0, 1.0) as f32;
         let fired: Vec<u32> = game.states.iter().map(|s| s.thresholds_fired.iter().filter(|f| **f).count() as u32).collect();
-        self.compose_with(&game.tables, warm, &fired, &|sid| game.state(sid).control, colours)
+        self.compose_with(&game.tables, warm, &fired, &|sid| game.state(sid).control, colours, None)
     }
 
     /// Ticket #126 (version 0.07.2): the start screen's globe, before there is a game. Every Region
     /// is neutral there, so every Region wears its own colour, and the borders are drawn -- which
     /// is what lets a player choose a Region by clicking it with no list to fall back on.
-    pub fn compose_regions(&self, tables: &Tables) -> Rgba {
+    pub fn compose_regions(&self, tables: &Tables, lit: Option<StateId>) -> Rgba {
         let fired = vec![0u32; StateId::ALL.len()];
-        self.compose_with(tables, 0.0, &fired, &|_| Control::Neutral, &[])
+        self.compose_with(tables, 0.0, &fired, &|_| Control::Neutral, &[], lit)
     }
 
-    fn compose_with(&self, tables: &Tables, warm: f32, fired: &[u32], control: &dyn Fn(StateId) -> Control, colours: &[[f32; 3]]) -> Rgba {
+    fn compose_with(&self, tables: &Tables, warm: f32, fired: &[u32], control: &dyn Fn(StateId) -> Control, colours: &[[f32; 3]], lit: Option<StateId>) -> Rgba {
         let (w, h) = (self.earth.w, self.earth.h);
         let mut out = self.earth.data.clone();
         let tint_of = |seat: Seat| -> [f32; 3] { colours.get(seat.index()).copied().unwrap_or([0.6, 0.6, 0.6]) };
@@ -150,7 +159,10 @@ impl Textures {
                     }
                 };
                 if let Some(t) = tint {
-                    let k = if held { 0.45 } else { 0.35 };
+                    // Ticket #126: the Region the start screen has lit -- under the pointer, or
+                    // chosen -- wears its colour at nearly full strength, so it stands out of the
+                    // fourteen at a glance.
+                    let k = if lit == Some(sid) { 0.7 } else if held { 0.45 } else { 0.35 };
                     r = r * (1.0 - k) + t[0] * k;
                     g = g * (1.0 - k) + t[1] * k;
                     b = b * (1.0 - k) + t[2] * k;

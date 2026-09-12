@@ -743,6 +743,19 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             3 => {
                 session.screen = Screen::ChooseStart { faction: FactionKind::Custodians };
                 session.earth_dirty = true;
+                // `start:<state>` (a building aid, not part of the spec): the start screen with that
+                // Region already chosen, since a click cannot be made in a headless picture. The
+                // enum name, case-insensitive, as `select:` takes it.
+                if let Some(sid) = std::env::args().find_map(|a| a.strip_prefix("start:").map(str::to_owned)).and_then(|name| StateId::ALL.into_iter().find(|s| format!("{s:?}").eq_ignore_ascii_case(&name))) {
+                    view.start_selected = Some(sid);
+                    view.start_aimed = Some(FactionKind::Custodians);
+                    let (lon, lat) = crate::geo::state_lonlat(sid);
+                    view.yaw = crate::geo::yaw_facing(lon, lat);
+                    view.spin = view.yaw;
+                    view.pitch = lat.to_radians().clamp(-1.3, 1.3);
+                    view.zoom = 1.0;
+                    view.start_grabbed = true;
+                }
             }
             4 => {
                 build_board(&mut session);
