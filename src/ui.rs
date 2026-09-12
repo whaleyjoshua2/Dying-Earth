@@ -260,7 +260,22 @@ fn shield(painter: &egui::Painter, centre: Pos2, fill: Color32, text: &str) {
     painter.text(centre + egui::vec2(0.0, -2.0), egui::Align2::CENTER_CENTER, text, FontId::proportional(12.0), Color32::BLACK);
 }
 
+/// Ticket #112 (version 0.07.1): a map label is lightened before it is drawn. A Faction's colour
+/// does two jobs -- it tints that Faction's territory on the globe AND prints the label that sits on
+/// top of it -- so a dark Faction colour costs its own labels their legibility. The Archivists moved
+/// from a pale blue-white of lightness L* 83 to a crimson of 55 and their labels all but vanished
+/// into their own land; the Arkwrights went from 48 to 39 in the same direction. Rather than forbid
+/// dark Faction colours, every map label is raised toward white by a fixed fraction, which also
+/// helps the Prospectors' orange-on-orange, a case that was already poor before this version.
+const MAP_LABEL_LIFT: f32 = 0.4;
+
+fn on_map(colour: Color32) -> Color32 {
+    let lift = |c: u8| (c as f32 + (255.0 - c as f32) * MAP_LABEL_LIFT) as u8;
+    Color32::from_rgb(lift(colour.r()), lift(colour.g()), lift(colour.b()))
+}
+
 fn label_at(painter: &egui::Painter, pos: Pos2, text: &str, colour: Color32, size: f32) {
+    let colour = on_map(colour);
     let galley = painter.layout_no_wrap(text.to_string(), FontId::proportional(size), colour);
     let rect = egui::Rect::from_center_size(pos, galley.size() + egui::vec2(8.0, 4.0));
     painter.rect_filled(rect, 3.0, Color32::from_black_alpha(170));
@@ -270,6 +285,8 @@ fn label_at(painter: &egui::Painter, pos: Pos2, text: &str, colour: Color32, siz
 /// The same, slid sideways so a long line stays on screen (ticket #57: the launch-window tooltip is
 /// wider than a Body's other labels, and Mars can stand at the edge of its ring).
 fn label_on_screen(painter: &egui::Painter, pos: Pos2, text: &str, colour: Color32, size: f32) {
+    // The galley here is only measured, never drawn; label_at below does the lifting and the
+    // drawing, so lifting a second time here would double it.
     let galley = painter.layout_no_wrap(text.to_string(), FontId::proportional(size), colour);
     let half = galley.size().x / 2.0 + 6.0;
     let clip = painter.clip_rect();

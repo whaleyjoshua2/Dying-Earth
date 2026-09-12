@@ -93,7 +93,7 @@ signature = "Steerage: a Colony Ship carries 8 Colonists (12 with Expanded Habit
 victory = "Diaspora: 30 Colonists living off Earth, on Colonies spread over at least three Bodies with at least 4 Colonists each (Antarctica and stations over Earth do not count)."
 victory_first = { kind = "colonists_off_earth", bar = 30 }
 victory_second = { kind = "colonies_on_bodies", bodies = 3, colonists_each = 4 }
-colour = [0.55, 0.35, 0.80]
+colour = [0.44, 0.275, 0.66]
 
 [[faction]]
 id = "archivists"
@@ -118,7 +118,7 @@ signature = "Provisional Findings: while their Research went to the shared Tech 
 victory = "Build the Archive at a Colony off Earth (50 Materials, three turns), pay 80 Research into it and keep it running, with 12 Colonists living at its Colony to be uploaded."
 victory_first = { kind = "archive_research", bar = 80 }
 victory_second = { kind = "colonists_at_archive", bar = 12 }
-colour = [0.75, 0.82, 0.92]
+colour = [0.871, 0.322, 0.439]
 
 # Ticket #54 (version 0.05): the [restoration] table is retired with the order; the Custodians'
 # signature rule is the Scrubber (facilities.toml) and Leapfrog (per_leapfrog below).

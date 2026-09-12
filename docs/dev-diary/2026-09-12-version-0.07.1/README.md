@@ -291,3 +291,32 @@ designer's: take the crimson lighter, to a rose at about L\* 69; keep it deep an
 Archivist labels are read from the shield markers and the panel rather than the map; or lighten
 **every** Faction's map-label text by a fixed amount, which would help the Prospectors too and is a
 small change to one function.
+
+### Built
+
+Row 3 and answer (c), in the designer's words: *"row 3 and c with the bright crimson."*
+
+![The top bar and a Nation State card as built](the-palette-as-built.png)
+
+![The board as built](the-board-as-built.png)
+
+- **The eight fills** are now the only answer `icons::fill` gives. The candidate tables and the
+  `palette:<n>` aid are gone with them; the pictures above this section are the record of how the
+  choice was made, which is what a dev diary is for.
+- **The Arkwrights darken** to `[0.44, 0.275, 0.66]` and **the Archivists become the bright crimson**
+  `[0.871, 0.322, 0.439]`, both in `factions.toml`, because every number lives in `assets/data`.
+- **Every map label is lifted toward white by four tenths** before it is drawn, in `label_at`, which
+  is the one function every label on every globe passes through.
+
+![The lifted labels at four times size](map-labels-lifted.png)
+
+The lift does its job: the Archivists' rose reads on the dark plate where the unlifted crimson did
+not, and the Prospectors' orange-on-orange, which was poor before this version and nobody had
+complained about, is better than it was. One honest caveat, visible at 1:1 rather than at four
+times: **the Archivists' label is still the weakest of the four**, and the reason is not the text
+colour but the plate behind it. That plate is black at alpha 170, so the land beneath leaks through,
+and the land beneath an Archivist label is that Faction's own pink tint — a lighter ground than any
+other Faction's. Taking the plate to alpha 210 would close it for every label at once, and is not
+done here because it was not asked for.
+
+Clippy clean with `-D warnings`, 251 tests passing.

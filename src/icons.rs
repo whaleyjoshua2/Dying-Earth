@@ -105,81 +105,24 @@ impl Icons {
 /// every other. The designer's rule is that an icon's colour belongs to the icon, so the parameter
 /// is gone and this function is the only place an answer exists.
 ///
-/// Today every figure answers the same neutral off-white. The open half of ticket #112 is whether
-/// each figure takes a colour of its own; `palette:<n>` (a building aid, not part of the spec)
-/// swaps in a candidate so the choice can be made off a picture of the real bar rather than off
-/// colour names in prose.
+/// Ticket #112 (version 0.07.1): the eight fills, decided off pictures of the real bar and a real
+/// Facility list and then measured. The route is in the dev diary for 2026-09-12: candidate 1
+/// "Natural" gave each figure the colour of the thing it names; the designer amended it -- Ducats
+/// to a green, the jerrycan redder, Emissions browner -- and the measurement caught two collisions
+/// the swatches hid.
 ///
-/// The eight rows of each candidate are in the order the top bar draws them.
-const NEUTRAL: [u8; 3] = [225, 220, 210];
-
-/// Candidate 1, **Natural**: each figure takes the colour of the thing it names. Amber Fuel, gold
-/// Ducats, cyan Research, violet Influence. Two of these sit in neighbouring hues to a Faction --
-/// Research beside the Custodians' teal, Influence beside the Arkwrights' purple -- which is the
-/// collision the ticket's fourth option retires a Faction hue to end.
-const NATURAL: [(&str, [u8; 3]); 8] = [
-    ("materials", [168, 176, 186]),
-    ("fuel", [232, 168, 72]),
-    ("energy", [245, 222, 92]),
-    ("research", [118, 206, 232]),
-    ("ducats", [224, 186, 84]),
-    ("population", [150, 206, 146]),
-    ("influence", [188, 146, 236]),
-    ("emissions", [216, 122, 104]),
-];
-
-/// Candidate 2, **Clear of the Factions**: every hue picked from the bands the four Factions leave
-/// empty -- yellows, greens, pinks and reds -- so no icon sits near teal, orange, purple or pale
-/// blue. The cost is that Fuel is no longer amber and Ducats no longer gold: the colours stop
-/// naming the thing and start being a code to learn.
-const CLEAR: [(&str, [u8; 3]); 8] = [
-    ("materials", [176, 174, 168]),
-    ("fuel", [236, 200, 80]),
-    ("energy", [198, 230, 100]),
-    ("research", [120, 214, 150]),
-    ("ducats", [238, 160, 170]),
-    ("population", [236, 224, 196]),
-    ("influence", [222, 128, 220]),
-    ("emissions", [226, 102, 86]),
-];
-
-/// Candidate 3, **Muted**: the natural hue of candidate 1 at a fraction of its saturation, so each
-/// glyph reads as a tinted white rather than as a colour. Nothing competes with a Faction chip
-/// because nothing is saturated enough to. Whether the hues survive at sixteen pixels at all is the
-/// question this candidate exists to answer, and the picture is the only way to answer it.
-const MUTED: [(&str, [u8; 3]); 8] = [
-    ("materials", [200, 202, 208]),
-    ("fuel", [230, 208, 172]),
-    ("energy", [234, 230, 186]),
-    ("research", [190, 214, 224]),
-    ("ducats", [226, 214, 178]),
-    ("population", [202, 218, 200]),
-    ("influence", [214, 202, 226]),
-    ("emissions", [222, 196, 190]),
-];
-
-/// Candidate 4, **the designer's**: candidate 1 with three changes asked for by name -- Ducats
-/// takes the green candidate 2 gave Research, the jerrycan shifts redder, and Emissions goes
-/// browner. Measured against the Faction colours it leaves two collisions, which candidate 5
-/// answers; this one exists so the two can be looked at side by side.
-const DESIGNERS: [(&str, [u8; 3]); 8] = [
-    ("materials", [168, 176, 186]),
-    ("fuel", [224, 112, 76]),
-    ("energy", [245, 222, 92]),
-    ("research", [118, 206, 232]),
-    ("ducats", [120, 214, 150]),
-    ("population", [150, 206, 146]),
-    ("influence", [188, 146, 236]),
-    ("emissions", [146, 110, 84]),
-];
-
-/// Candidate 5, **the designer's, with the two measured collisions cleared**. The green asked for
-/// for Ducats sits at a CIELAB distance of 12 from the population green it was to stand beside,
-/// which is inside the range two colours are mistaken for each other, so **population** moves to a
-/// warm tan -- a skin tone, which is what a bust of a person wants anyway -- and the green stays
-/// where it was asked for. The jerrycan shifted redder landed at a distance of 19 from the
-/// Prospectors' orange, nearer than it began, so it goes **further** red rather than part way.
-const DESIGNERS_CLEARED: [(&str, [u8; 3]); 8] = [
+/// **Ducats' green sat 12 from population's**, in CIELAB, which is inside the range two colours are
+/// mistaken for each other, and the two stand in the same Facility list. Population moved to a warm
+/// tan; a bust of a person wants a skin tone anyway, and the green stayed where it was asked for.
+///
+/// **The jerrycan shifted redder landed 19 from the Prospectors' orange** -- nearer than the amber
+/// it started as, because amber is at hue 36 degrees and the Prospectors at 28, so a partial shift
+/// red lands on top of them. It goes past them to hue 13 instead, which clears at 27.
+///
+/// The worst remaining pair on the whole board is Materials against Research at 25, which is
+/// comfortable. Every colour here is a fill and nothing else: see `fill` below for why no caller
+/// may override one.
+const FIGURES: [(&str, [u8; 3]); 8] = [
     ("materials", [168, 176, 186]),
     ("fuel", [226, 88, 62]),
     ("energy", [245, 222, 92]),
@@ -190,16 +133,12 @@ const DESIGNERS_CLEARED: [(&str, [u8; 3]); 8] = [
     ("emissions", [146, 110, 84]),
 ];
 
+/// The fallback where a figure has no colour of its own, and what every figure answered before this
+/// version gave them one.
+const NEUTRAL: [u8; 3] = [225, 220, 210];
+
 pub fn fill(name: &str) -> egui::Color32 {
-    let table = match std::env::args().find_map(|a| a.strip_prefix("palette:").and_then(|v| v.parse::<u32>().ok())) {
-        Some(1) => &NATURAL,
-        Some(2) => &CLEAR,
-        Some(3) => &MUTED,
-        Some(4) => &DESIGNERS,
-        Some(5) => &DESIGNERS_CLEARED,
-        _ => return rgb(NEUTRAL),
-    };
-    rgb(table.iter().find(|(figure, _)| *figure == name).map(|(_, c)| *c).unwrap_or(NEUTRAL))
+    rgb(FIGURES.iter().find(|(figure, _)| *figure == name).map(|(_, c)| *c).unwrap_or(NEUTRAL))
 }
 
 fn rgb(c: [u8; 3]) -> egui::Color32 {
