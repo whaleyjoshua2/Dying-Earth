@@ -224,6 +224,10 @@ pub struct NationState {
     pub leapfrog: f64,
     /// Ticket #54: what a spent Strip Permit added to the card's Baseline Emissions, for good.
     pub baseline_rise: f64,
+    /// Ticket #108 (version 0.07.0): what Leapfrog has taken off this state's Baseline Emissions,
+    /// for good. The Baseline never falls below nothing.
+    #[serde(default)]
+    pub baseline_cut: f64,
     /// Ticket #54: a Strip Permit has been taken here; one per state, ever.
     pub strip_permit_used: bool,
     /// Ticket #54: the last turn whose Income this state's Facilities double, while one runs.
@@ -767,6 +771,7 @@ impl Game {
                 neutral_since: Some(1),
                 leapfrog: 0.0,
                 baseline_rise: 0.0,
+                baseline_cut: 0.0,
                 strip_permit_used: false,
                 strip_permit_ends: None,
             })
@@ -1995,7 +2000,8 @@ impl Game {
     /// A Nation State's Baseline Emissions now: its card figure plus whatever a spent Strip Permit
     /// added for good.
     pub fn baseline_emissions(&self, s: StateId) -> f64 {
-        self.tables.state(s).baseline_emissions + self.state(s).baseline_rise
+        // Ticket #108: Leapfrog takes a bite out of it, and it never falls below nothing.
+        (self.tables.state(s).baseline_emissions + self.state(s).baseline_rise - self.state(s).baseline_cut).max(0.0)
     }
 
     /// Ticket #54: what one hundred million people in this state emit a turn, before Green Consensus

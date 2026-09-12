@@ -3105,12 +3105,20 @@ fn d_leapfrog_is_custodian_only_and_never_goes_below_the_base() {
     assert_eq!(g.seats[0].stockpile.ducats, 450);
     assert!((g.population_coefficient(sid) - (before - per)).abs() < 1e-9, "one level's worth off");
     assert_eq!(g.leapfrogs(sid), 1, "Leapfrogged once");
-    // East Asia at Industry Level 3 starts at 0.13, so three Leapfrogs reach the base and a fourth
-    // is refused rather than taking 50 Ducats for nothing.
+    // East Asia at Industry Level 3 starts at 0.13, so three Leapfrogs reach the base coefficient.
     g.commit_orders(Seat(0), std::slice::from_ref(&o));
     g.commit_orders(Seat(0), std::slice::from_ref(&o));
     assert!((g.population_coefficient(sid) - base).abs() < 1e-9, "the base, and no lower");
-    assert!(g.check_order(Seat(0), &[], &o).is_err(), "a fourth Leapfrog buys nothing and is refused");
+    // Ticket #108 (version 0.07.0): a Leapfrog buys two things now, so a fourth is still worth
+    // taking -- the coefficient is spent, but East Asia's Baseline of 0.5 is not.
+    assert!(g.check_order(Seat(0), &[], &o).is_ok(), "a fourth still buys Baseline");
+    let cut = g.tables.climate.leapfrog_baseline_cut;
+    assert!((g.baseline_emissions(sid) - (0.5 - 3.0 * cut)).abs() < 1e-9, "three Leapfrogs have taken 0.3 off it");
+    // Five in all take the Baseline to nothing, and only then is a Leapfrog refused.
+    g.commit_orders(Seat(0), std::slice::from_ref(&o));
+    g.commit_orders(Seat(0), std::slice::from_ref(&o));
+    assert_eq!(g.baseline_emissions(sid), 0.0, "the Baseline is spent as well");
+    assert!(g.check_order(Seat(0), &[], &o).is_err(), "now it buys nothing and is refused");
 }
 
 /// (e) A Scrubber takes no build slot, adds 3.0 ppm to the Sink while it is online, is capped by
@@ -6469,4 +6477,26 @@ fn the_shortlist_always_carries_the_leads_own_victory_gate() {
         }
     }
     assert!(seen_without, "a rival's gate can be left off");
+}
+
+/// Ticket #108 (version 0.07.0): a Leapfrog now takes a bite out of the state's Baseline Emissions
+/// as well as its people's coefficient. Leapfrog measured at about ten times a Scrubber's cost per
+/// ppm and was bought zero times in twelve playtested games; `baseline x Industry Level` was a floor
+/// nothing in the game could lower. This answers both.
+#[test]
+fn a_leapfrog_lowers_the_states_baseline_emissions_as_well() {
+    let mut g = game();
+    let sid = StateId::EastAsia;
+    g.state_mut(sid).control = Control::Controlled(Seat(0));
+    g.seats[0].stockpile.ducats = 500;
+    let before = g.baseline_emissions(sid);
+    assert!(before > 0.0, "East Asia has a Baseline of {before}");
+    g.commit_orders(Seat(0), &[Order::Leapfrog { state: sid }]);
+    let cut = g.tables.climate.leapfrog_baseline_cut;
+    assert!((g.baseline_emissions(sid) - (before - cut)).abs() < 1e-9, "one Leapfrog takes {cut} off the Baseline");
+    // It never goes below nothing, however many are bought.
+    for _ in 0..20 {
+        g.state_mut(sid).baseline_cut += cut;
+    }
+    assert_eq!(g.baseline_emissions(sid), 0.0, "a Baseline never falls below nothing");
 }

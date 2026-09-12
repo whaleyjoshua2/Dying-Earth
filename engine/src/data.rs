@@ -519,6 +519,8 @@ pub struct ClimateTable {
     pub population_loss_per_tenth_degree: f64,
     /// Ticket #54: Population Emissions per hundred million are `base + per_level x Industry Level`,
     /// less the state's own Leapfrog adjustment, never below `base`.
+    /// Ticket #108: what one Leapfrog takes off a Nation State's Baseline Emissions.
+    pub leapfrog_baseline_cut: f64,
     pub population_emissions_base: f64,
     pub population_emissions_per_level: f64,
     pub launch_emissions: f64,

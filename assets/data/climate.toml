@@ -73,6 +73,12 @@ population_loss_per_tenth_degree = 0.0015
 # total is 8.03 against the old 7.86, within a fiftieth. Green Consensus halves the whole line as
 # before, the Faction Emissions multiplier applies as before, and the Custodians' Leapfrog lowers a
 # state's own coefficient by one level's worth at a time, never below the base.
+# Ticket #108 (version 0.07.0): what one Leapfrog takes off the Nation State's Baseline Emissions,
+# as well as the 0.03 it takes off its people's coefficient. `baseline x Industry Level` was a floor
+# nothing in the game could lower, and Leapfrog cost about ten times a Scrubber per ppm and was
+# bought zero times in twelve playtested games; this answers both. A Baseline never falls below zero.
+leapfrog_baseline_cut = 0.1
+
 population_emissions_base = 0.04
 population_emissions_per_level = 0.03
 launch_emissions = 2.0

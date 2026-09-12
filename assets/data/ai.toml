@@ -34,8 +34,8 @@ build_constabulary = 5
 resettle = 2
 fund_archive = 0
 build_archive = 0
-build_producer = 8
-raise_industry = 9
+build_producer = 5
+raise_industry = 5
 build_research_lab = 8
 # Ticket #81 (version 0.06.0): the Observatory has its own weight, the Archivists' set high so
 # their AI chases its 1.75 off Earth.

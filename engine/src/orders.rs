@@ -1019,8 +1019,13 @@ impl Game {
                 let per = self.tables.climate.population_emissions_per_level;
                 let queued = pending.iter().filter(|o| matches!(o, Order::Leapfrog { state: s } if s == state)).count() as f64;
                 let base = self.tables.climate.population_emissions_base;
-                if self.population_coefficient(*state) - queued * per <= base + 1e-9 {
-                    return fail("its people already emit the base figure; a Leapfrog here would buy nothing");
+                let coefficient_spent = self.population_coefficient(*state) - queued * per <= base + 1e-9;
+                // Ticket #108: a Leapfrog now buys two things, so it is worthless only when it can
+                // buy neither: the coefficient at its base AND the Baseline already at nothing.
+                let cut = self.tables.climate.leapfrog_baseline_cut;
+                let baseline_spent = self.baseline_emissions(*state) - queued * cut <= 1e-9;
+                if coefficient_spent && baseline_spent {
+                    return fail("its people already emit the base figure and its Baseline is nothing; a Leapfrog here would buy nothing");
                 }
                 Ok(cost)
             }
@@ -1301,7 +1306,10 @@ impl Game {
                 }
                 Order::Leapfrog { state } => {
                     let per = self.tables.climate.population_emissions_per_level;
+                    // Ticket #108 (version 0.07.0): it bites the state's Baseline Emissions too.
+                    let cut = self.tables.climate.leapfrog_baseline_cut;
                     self.state_mut(*state).leapfrog += per;
+                    self.state_mut(*state).baseline_cut += cut;
                     let line = format!(
                         "The {} Leapfrogged {}: its people now emit {:.2} per hundred million.",
                         self.seat_name(seat),
