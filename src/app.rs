@@ -285,7 +285,9 @@ impl Default for ViewState {
             popup: Popup::None,
             show_tech: false,
             tech_prompted: false,
-            show_climate: true,
+            // Ticket #104 (version 0.07.0): a new game opens on a clear map. The Climate Panel is
+            // a keystroke (C) or a button away.
+            show_climate: false,
             climate_reopen: false,
             show_victory: false,
             show_trade: false,
@@ -350,4 +352,18 @@ mod tests {
         assert!(!auto_should_advance(true, false, 0.0));
         assert!(!auto_should_advance(true, false, AUTO_INTERVAL - 0.01));
     }
+
+    /// Ticket #104 (version 0.07.0): a new game opens on a clear map. This is guarded here rather
+    /// than in a picture because the screenshot harness forces the Climate Panel open for its Earth
+    /// picture (`shot.rs`: `view.show_climate = v == View::Surface(BodyId::Earth)`), so no capture
+    /// can ever show the default.
+    #[test]
+    fn a_new_game_opens_with_no_panel_showing() {
+        let view = ViewState::default();
+        assert!(!view.show_climate, "the Climate Panel waits for C or its button");
+        assert!(!view.show_tech, "and the Tech Tree waits to be asked for");
+        assert!(!view.show_trade);
+        assert!(!view.show_victory);
+    }
+
 }

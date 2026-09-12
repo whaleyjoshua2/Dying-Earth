@@ -2830,7 +2830,18 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         let bottom = ctx.viewport_rect().max.y;
         // Ticket #64: the spectator's card sits on the left, so the panel's home is clear of it.
         let home = (if session.spectator { 420.0 } else { 10.0 }, bottom - 400.0);
-        let mut window = egui::Window::new("Climate Panel").open(&mut open).default_pos(home).default_width(400.0);
+        // Ticket #104 (version 0.07.0): the panel could be dragged larger but not back down. Its
+        // content is not what held it: rendered at 230 wide everything wraps and nothing overflows.
+        // So the width is made authoritative -- an explicit floor it may be dragged to, and a scroll
+        // rather than unbounded growth, since the panel is taller than the screen on a small window.
+        let mut window = egui::Window::new("Climate Panel")
+            .open(&mut open)
+            .default_pos(home)
+            .default_width(400.0)
+            .resizable(true)
+            .min_width(230.0)
+            .min_height(140.0)
+            .vscroll(true);
         if view.climate_reopen {
             window = window.current_pos(home);
             view.climate_reopen = false;
