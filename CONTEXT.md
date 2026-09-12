@@ -136,6 +136,22 @@ _Avoid_: science leader, tech leader
 The three Techs the Research Lead chooses between, drawn when a Tech completes, since version 0.07.0. The Lead's own Victory gate is always on it where its prerequisites are met; the rest come from the game's own generator. An empty shortlist is a free choice of everything available, which is how the game opens.
 _Avoid_: options, candidates, draft, offer
 
+**Command Cluster**:
+The strip along the foot of the side panel, since version 0.07.1, holding the controls a player reaches for every turn: the Influence still unspent, Spend on whatever place is selected, Defence, and End Turn. It does not scroll: the card or the Roster scrolls above it. It is the only place End Turn stands.
+_Avoid_: action bar, toolbar, HUD, control panel
+
+**Defence**:
+The button in the Command Cluster, since version 0.07.1, that spreads the turn's unspent Influence across the places a rival could take. It funds the most threatened place to safe before any of the budget reaches the next, because taking a place is a threshold and not a race, and where the budget cannot cover a place in full it passes over it to one it can still save. A place no rival can reach needs nothing and gets nothing. **Every turn** makes it a standing order: it places the same split as ordinary orders at the start of each turn, to be read and cancelled like any other, and never spends unwatched. The computer players defend by the same rule.
+_Avoid_: auto-spend, garrison, fortify, budget split
+
+**Figure**:
+One of the eight things the board counts and draws a glyph for: Materials, Fuel, Energy, Research, Ducats, population, Influence and Emissions. A figure's glyph carries one fill wherever it is drawn, decided by which figure it is and never by the colour of the text around it, and a word is traded for its glyph only where it names a figure -- which is to say only directly after a number.
+_Avoid_: stat, counter, metric, indicator
+
+**Roster**:
+The list in the side panel of everything a Faction holds, since version 0.03 and organised in version 0.07.1: its Ships, Armies, Colonies and stations, and Nation States, each group in a stable order with the count of rows that still want an order on its heading. Clicking that count filters the group to those rows. An Army carries no such mark, since an Army keeps the stance it was last given until it is moved.
+_Avoid_: unit list, overview, empire panel
+
 ### Resources
 
 **Materials**:

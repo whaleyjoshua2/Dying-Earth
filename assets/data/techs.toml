@@ -1,3 +1,16 @@
+# Version 0.07.1 (ticket #117): every Tech costs a tenth more, rounded to the nearest -- the rungs
+# went 15, 25, 40 to 16, 28, 44, and Coastal Engineering, which is priced off the rungs, 10 to 11.
+# The whole tree went 450 Research to 495.
+#
+# It was measured before it was taken, and the measurement is the part worth keeping. At the old
+# costs the whole tree completed in 79 of 80 games with six to nine turns of the thirty-six left
+# over: Research constrained nothing. At a tenth more it completes in 75 of 80 and a median game
+# runs nought to three turns longer. That is a nudge and not a lever, and it was taken as one. The
+# finding that the tree completes everywhere with turns to spare belongs to the balance version that
+# already owes the Archivists a win and the Victory bars a fitting; so does the Prospectors' Lab
+# weight of 8, which is still provisional and was deliberately NOT re-fitted here, since fitting a
+# provisional number against a twenty-seed signal is how a number gets baked in wrong.
+
 # Ticket #98 (version 0.07.0): how many Techs the Research Lead may choose between once the game is
 # under way. Only the Lead picks, and before this a seat that held the Lead chose the whole tree and
 # had no reason ever to pick a rival's Victory gate: one playtested seat led 9 of 9 Techs, and a
@@ -19,7 +32,7 @@ id = "efficient_grids"
 name = "Efficient Grids"
 branch = "Industry"
 rung = 1
-cost = 15
+cost = 16
 needs = []
 effect = "Power Plant and Generator output x1.5"
 value = 1.5
@@ -29,7 +42,7 @@ id = "clean_power"
 name = "Clean Power"
 branch = "Industry"
 rung = 2
-cost = 25
+cost = 28
 needs = ["efficient_grids"]
 effect = "Power Plant Emissions x0.4"
 value = 0.4
@@ -39,7 +52,7 @@ id = "clean_manufacturing"
 name = "Clean Manufacturing"
 branch = "Industry"
 rung = 3
-cost = 40
+cost = 44
 needs = ["clean_power"]
 effect = "Factory and Refinery Emissions x0.4; Wildfire adds no Emissions"
 value = 0.4
@@ -49,7 +62,7 @@ id = "clean_propellant"
 name = "Clean Propellant"
 branch = "Propulsion"
 rung = 1
-cost = 15
+cost = 16
 needs = []
 effect = "Launch Emissions 0.8; a Launch Pad Fire closes no Launch Site"
 value = 0.8
@@ -59,7 +72,7 @@ id = "efficient_transit"
 name = "Efficient Transit"
 branch = "Propulsion"
 rung = 2
-cost = 25
+cost = 28
 needs = ["clean_propellant"]
 effect = "Transit Fuel x0.6; transits advance through Solar Storm"
 value = 0.6
@@ -69,7 +82,7 @@ id = "hardened_hulls"
 name = "Hardened Hulls"
 branch = "Propulsion"
 rung = 3
-cost = 40
+cost = 44
 needs = ["efficient_transit"]
 effect = "Every Ship +2 strength; immune to Radiation Surge"
 value = 2.0
@@ -79,7 +92,7 @@ id = "expanded_habitats"
 name = "Expanded Habitats"
 branch = "Off-world Living"
 rung = 1
-cost = 15
+cost = 16
 needs = []
 effect = "Each Habitat holds +2 Colonists"
 value = 2.0
@@ -89,7 +102,7 @@ id = "closed_loop_colonies"
 name = "Closed-Loop Colonies"
 branch = "Off-world Living"
 rung = 2
-cost = 25
+cost = 28
 needs = ["expanded_habitats", "clean_power"]
 effect = "Module Energy upkeep x0.5; immune to Grid Failure"
 value = 0.5
@@ -99,7 +112,7 @@ id = "deep_mining"
 name = "Deep Mining"
 branch = "Extraction"
 rung = 1
-cost = 15
+cost = 16
 needs = []
 effect = "Mine and Factory output x1.5; Rich Seam gives x3"
 value = 1.5
@@ -109,7 +122,7 @@ id = "automated_refining"
 name = "Automated Refining"
 branch = "Extraction"
 rung = 2
-cost = 25
+cost = 28
 needs = ["deep_mining", "efficient_grids"]
 effect = "Refinery output x1.5; Ice Deposit gives x3"
 value = 1.5
@@ -119,7 +132,7 @@ id = "public_science"
 name = "Public Science"
 branch = "Society"
 rung = 1
-cost = 15
+cost = 16
 needs = []
 effect = "Research Lab output x1.5; Breakthrough gives 25; stances hold through Comms Blackout; a Labour Dispute idles one Facility only"
 value = 1.5
@@ -129,7 +142,7 @@ id = "green_consensus"
 name = "Green Consensus"
 branch = "Society"
 rung = 2
-cost = 25
+cost = 28
 needs = ["public_science", "clean_power"]
 effect = "Per-person Emissions x0.5; Influence thresholds x0.75; Heatwave loss halved"
 value = 0.5
@@ -144,7 +157,7 @@ id = "coastal_engineering"
 name = "Coastal Engineering"
 branch = "Industry"
 rung = 1
-cost = 10
+cost = 11
 needs = []
 effect = "Unlocks the Sea Wall."
 value = 1.0
@@ -159,7 +172,7 @@ id = "planetary_stewardship"
 name = "Planetary Stewardship"
 branch = "Society"
 rung = 3
-cost = 40
+cost = 44
 needs = ["green_consensus"]
 effect = "Opens the Custodians' Victory Condition; the Natural Sink grows by 1.0 ppm a turn for the world"
 value = 1.0
@@ -170,7 +183,7 @@ id = "extraction_charter"
 name = "The Extraction Charter"
 branch = "Extraction"
 rung = 3
-cost = 40
+cost = 44
 needs = ["automated_refining"]
 effect = "Opens the Prospectors' Victory Condition; Mine output x1.25"
 value = 1.25
@@ -181,7 +194,7 @@ id = "generation_ships"
 name = "Generation Ships"
 branch = "Off-world Living"
 rung = 3
-cost = 40
+cost = 44
 needs = ["closed_loop_colonies"]
 effect = "Opens the Arkwrights' Victory Condition; a Colony Ship carries +2 Colonists"
 value = 2.0
@@ -192,7 +205,7 @@ id = "the_upload"
 name = "The Upload"
 branch = "Society"
 rung = 3
-cost = 40
+cost = 44
 needs = ["public_science", "expanded_habitats"]
 effect = "Opens the Archivists' Victory Condition; Research Lab and Observatory output x1.25"
 value = 1.25

@@ -3813,8 +3813,9 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     assert_eq!(c.name, "Coastal Engineering");
     assert_eq!(c.branch, "Industry");
     // Ticket #69 (version 0.05.5): moved from rung 2 at 25 to rung 1 at 10 with no prerequisite.
+    // Ticket #117 (version 0.07.1): 10 to 11, with every other cost, a tenth rounded to the nearest.
     assert_eq!(c.rung, 1, "rung 1, beside Efficient Grids");
-    assert_eq!(c.cost, 10);
+    assert_eq!(c.cost, 11);
     assert!(c.needs.is_empty(), "it needs nothing");
     assert!(c.effect.contains("Sea Wall"), "its effect names the Sea Wall: {}", c.effect);
     // Two boxes on Industry rung 1, and Clean Power alone on rung 2.
@@ -4920,13 +4921,16 @@ fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
     assert_eq!(g.research.contributions[2], 3, "a held Lab counts toward the Lead as it always did");
 }
 
-/// Ticket #69 (c): Coastal Engineering on Industry rung 1 at 10 Research with no prerequisite, so
-/// the Sea Wall can be reached in time; Clean Power and the Sea Wall's own row are untouched.
+/// Ticket #69 (c): Coastal Engineering on Industry rung 1, cheaper than the rung it stands on and
+/// with no prerequisite, so the Sea Wall can be reached in time; Clean Power and the Sea Wall's own
+/// row are untouched. Ticket #117 (version 0.07.1) raised every cost a tenth, 10 to 11, and the
+/// figure is pinned beside the relationship that is the actual point of it.
 #[test]
-fn coastal_engineering_sits_on_rung_one_at_ten_research_with_no_prerequisite() {
+fn coastal_engineering_sits_on_rung_one_below_its_rungs_cost_with_no_prerequisite() {
     let g = game();
     let t = g.tables.tech(TechId::CoastalEngineering);
-    assert_eq!((t.rung, t.cost), (1, 10));
+    assert_eq!((t.rung, t.cost), (1, 11));
+    assert!(t.cost < g.tables.tech(TechId::EfficientGrids).cost, "cheaper than the rung it shares, or the Sea Wall arrives too late");
     assert!(t.needs.is_empty(), "no prerequisite: {:?}", t.needs);
     assert!(g.available_techs().contains(&TechId::CoastalEngineering), "pickable from the first turn");
     assert_eq!(g.tables.tech(TechId::CleanPower).needs, vec![TechId::EfficientGrids]);
@@ -5257,26 +5261,48 @@ fn the_ai_musters_emigrants_then_lifts_them_or_sends_them_to_antarctica() {
 
 // ---------------------------------------------------------------- Ticket #75 (version 0.05.5): the undefended home state
 
-/// Ticket #75: an AI holder defends a place it holds the way challengers attack it: once a rival's
-/// Standing comes within two steps of its own it pushes as many holds as it takes to stand two steps
-/// clear of the rival plus the challenge margin, as many as its Allotment allows; a rival far below
-/// gets no answer.
+/// Ticket #75, **rewritten on ticket #114 (version 0.07.1)** and the rewrite is the point.
+///
+/// This test was written when the challenge margin was 10 and it encoded the AI's own arithmetic:
+/// a holder answered any rival within two Influence steps of its own Standing, and pushed until it
+/// stood two steps clear of that rival plus the margin. Version 0.07.1 gives the AI the same rule
+/// the player's Defence button splits by -- `defence_needs`, which asks the sharper question of
+/// whether a rival **can actually take the place**: they need their own threshold AND the holder's
+/// Standing plus the margin, which is 20 now, not 10.
+///
+/// Under the old arithmetic a holder at 30 answered a rival at 25 by spending 25, defending against
+/// somebody who needed 50 to take anything. That is not caution, it is Influence set on fire, and
+/// the AI's Influence comes out of the same Allotment it takes new places with.
+///
+/// What the ticket was really guarding -- that a holder does not sit still while a rival walks in --
+/// is what is asserted here, at the Standing where it matters.
 #[test]
-fn an_ai_holder_pushes_as_many_holds_as_it_takes_when_a_rival_comes_within_reach() {
+fn an_ai_holder_answers_a_rival_who_can_actually_take_the_place() {
     let mut g = game();
+    let here = Place::State(StateId::Europe);
     g.take_control(StateId::Europe, Seat(1));
-    g.seats[1].influence.insert(Place::State(StateId::Europe), 30);
-    g.seats[0].influence.insert(Place::State(StateId::Europe), 25);
-    g.seats[1].allotment = 20;
+    g.seats[1].allotment = 40;
     g.seats[1].stockpile.energy = 200;
     let held = |orders: &[Order]| -> i64 { orders.iter().map(|o| match o { Order::Influence { target: Place::State(StateId::Europe), amount } => *amount, _ => 0 }).sum() };
+
+    // A rival one push away: above their own threshold AND able to reach the take-point, which is
+    // the holder's Standing plus the challenge margin -- 30 and 20 here, so 50. Europe's own
+    // threshold is 40, so a rival at 45 is above the threshold and STILL cannot take it; that case
+    // is the last assertion below, and it is the whole difference between this rule and the old one.
+    let threshold = g.influence_threshold_for(Seat(0), here);
+    g.seats[1].influence.insert(here, 30);
+    g.seats[0].influence.insert(here, threshold.max(60));
+    let need = g.defence_needs(Seat(1)).into_iter().find(|(p, _)| *p == here).map(|(_, n)| n).unwrap();
+    assert!(need > 0, "a rival who can take it next turn is a threat");
     let orders = g.ai_orders(Seat(1));
-    // 25 + the margin of 10 + two steps of 5 - 30 = 15: three holds, within an Allotment of 20.
-    assert!(held(&orders) >= 15, "it held Europe with {} Influence: {orders:?}", held(&orders));
-    // A rival far below needs no answer.
-    g.seats[0].influence.insert(Place::State(StateId::Europe), 5);
-    let orders = g.ai_orders(Seat(1));
-    assert_eq!(held(&orders), 0, "{orders:?}");
+    assert!(held(&orders) >= need, "it held Europe with {} of the {need} it needed: {orders:?}", held(&orders));
+
+    // A rival far below gets no answer, and -- the change -- neither does one who is close in
+    // Standing but still cannot reach the take-point.
+    g.seats[0].influence.insert(here, 5);
+    assert_eq!(held(&g.ai_orders(Seat(1))), 0, "a rival far below needs no answer");
+    g.seats[0].influence.insert(here, 45);
+    assert_eq!(held(&g.ai_orders(Seat(1))), 0, "at 45 against 30 they still need 50 to take it: no answer is the right answer");
 }
 
 /// Ticket #75, second round: a Faction begins with a Standing on its start state equal to that
@@ -5592,7 +5618,7 @@ fn the_arkwrights_ships_cost_fifteen_per_cent_less() {
 /// Ticket #84: four new Techs on rung 3 at 40, each after its Faction's themed rung-2 Tech, each
 /// the gate for one Faction's Victory Condition; seventeen Techs in all.
 #[test]
-fn the_four_gates_stand_on_rung_three_at_forty_with_their_prerequisites() {
+fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     let g = game();
     let gates = [
         (FactionKind::Custodians, TechId::PlanetaryStewardship, vec![TechId::GreenConsensus]),
@@ -5600,10 +5626,15 @@ fn the_four_gates_stand_on_rung_three_at_forty_with_their_prerequisites() {
         (FactionKind::Arkwrights, TechId::GenerationShips, vec![TechId::ClosedLoopColonies]),
         (FactionKind::Archivists, TechId::TheUpload, vec![TechId::PublicScience, TechId::ExpandedHabitats]),
     ];
+    // Ticket #117 (version 0.07.1): rung 3 went 40 to 44, a tenth rounded to the nearest. What the
+    // ticket guards is that no Faction's gate is dearer than another's, so the figure is checked
+    // against the rung rather than against a literal repeated four times.
+    let rung_three = g.tables.tech(TechId::PlanetaryStewardship).cost;
+    assert_eq!(rung_three, 44, "rung 3 costs 44 since ticket #117");
     for (kind, t, needs) in gates {
         let card = g.tables.tech(t);
         assert_eq!(card.rung, 3, "{t:?}");
-        assert_eq!(card.cost, 40, "{t:?}");
+        assert_eq!(card.cost, rung_three, "every gate costs the same: {t:?}");
         assert_eq!(card.gate_for, Some(kind), "{t:?}");
         assert_eq!(card.needs, needs, "{t:?}");
         assert_eq!(g.tables.victory_gate(kind), Some(t));
@@ -6692,4 +6723,106 @@ fn research_banked_between_techs_keeps_its_owner() {
     assert_eq!(g.research.unattributed, 0);
     // So the Lead is the seat that actually did the work, not a draw among four zeroes.
     assert_eq!(g.research_lead_candidates(), vec![Seat(2)]);
+}
+
+// ---------------------------------------------------------------- Stances park
+
+/// Ticket #115 (version 0.07.1). The designer, looking at a roster where every Army was marked "no
+/// order" every turn: *"let's allow an armies orders to park them in that stance until otherwise
+/// moved - a army on defense should remain on defense unless told otherwise."*
+///
+/// The engine already did this and nothing guarded it, which is how a rule quietly becomes a bug.
+/// A stance is set once and survives every Resolution after it; only four things take it away, and
+/// each of them is a thing that happened TO the unit: a Comms Blackout, a Ship arriving out of
+/// transit, an Army landing from a Ship, and a state throwing off its controller.
+#[test]
+fn an_army_keeps_its_stance_through_resolution_until_something_happens_to_it() {
+    let mut g = game();
+    let id = ArmyId(g.fresh_id());
+    g.armies.push(Army {
+        id,
+        home: ArmyHome::State(StateId::EastAsia),
+        at: ArmyAt::Place(Place::State(StateId::EastAsia)),
+        damage: 0,
+        standing: false,
+        stance: Stance::Evade,
+        escaped: false,
+        move_to: None,
+    });
+    for turn in 1..=3 {
+        g.resolution_phase();
+        assert_eq!(g.army(id).unwrap().stance, Stance::Evade, "the stance was given once and should still hold after Resolution {turn}");
+    }
+    // And it is not that the field is frozen: a new stance takes, and then parks in its turn.
+    g.army_mut(id).unwrap().stance = Stance::Intercept;
+    g.resolution_phase();
+    assert_eq!(g.army(id).unwrap().stance, Stance::Intercept, "a stance given later parks the same way");
+}
+
+
+// ---------------------------------------------------------------- 8.3 The Defence split
+
+/// Ticket #114 (version 0.07.1). A place this seat holds is safe while its Standing plus the
+/// challenge margin stays above the best rival's, so Defence has to cover the shortfall AND the
+/// decay the place takes at Resolution. A rival still under their own threshold cannot take the
+/// place at any Standing, so a place nobody can reach needs nothing.
+#[test]
+fn defence_needs_covers_the_shortfall_and_the_decay_and_nothing_else() {
+    let mut g = game();
+    let margin = g.tables.influence.challenge_margin;
+    let decay = g.tables.influence.decay_controlled;
+    let here = Place::State(StateId::EastAsia);
+    g.state_mut(StateId::EastAsia).control = Control::Controlled(Seat(0));
+    let threshold = g.influence_threshold_for(Seat(1), here);
+
+    // A rival well above their threshold and well above this seat: the shortfall plus the decay.
+    g.seat_mut(Seat(0)).influence.insert(here, 30);
+    g.seat_mut(Seat(1)).influence.insert(here, threshold + 40);
+    let need = g.defence_needs(Seat(0)).into_iter().find(|(p, _)| *p == here).map(|(_, n)| n).unwrap();
+    assert_eq!(need, threshold + 40 + 1 - margin - 30 + decay, "the shortfall to out-stand them by one, and the decay on top");
+
+    // Spending exactly that much makes the place safe: after the decay the rival is still short.
+    g.seat_mut(Seat(0)).influence.insert(here, 30 + need);
+    assert!(g.defence_needs(Seat(0)).iter().all(|(p, _)| *p != here), "funded to safe, it drops off the list");
+
+    // A rival BELOW their own threshold cannot take it whatever their Standing beside this seat's.
+    g.seat_mut(Seat(0)).influence.insert(here, 0);
+    g.seat_mut(Seat(1)).influence.insert(here, threshold - 1);
+    assert!(g.defence_needs(Seat(0)).iter().all(|(p, _)| *p != here), "a rival under their threshold is not a threat");
+}
+
+/// The split spends the budget WHOLE on a place before any of it reaches the next, because taking a
+/// place is a threshold and not a race: a place funded most of the way is as lost as one funded not
+/// at all. Where the budget cannot cover the next place it walks past to one it can still save.
+#[test]
+fn the_defence_split_funds_places_to_safe_and_never_part_way() {
+    let mut g = game();
+    let margin = g.tables.influence.challenge_margin;
+    let big = Place::State(StateId::EastAsia);
+    let small = Place::State(StateId::SouthAsia);
+    for (place, sid) in [(big, StateId::EastAsia), (small, StateId::SouthAsia)] {
+        g.state_mut(sid).control = Control::Controlled(Seat(0));
+        g.seat_mut(Seat(0)).influence.insert(place, 0);
+        let _ = place;
+    }
+    // East Asia is the more threatened of the two; South Asia is cheap to save.
+    let big_rival = g.influence_threshold_for(Seat(1), big).max(margin + 60);
+    let small_rival = g.influence_threshold_for(Seat(1), small).max(margin + 5);
+    g.seat_mut(Seat(1)).influence.insert(big, big_rival);
+    g.seat_mut(Seat(1)).influence.insert(small, small_rival);
+    let needs = g.defence_needs(Seat(0));
+    assert_eq!(needs[0].0, big, "most threatened first");
+    let (big_need, small_need) = (needs[0].1, needs[1].1);
+    assert!(big_need > small_need);
+
+    // A budget that covers both funds both, to the point where each is safe and no further.
+    let both = g.defence_split(Seat(0), big_need + small_need);
+    assert_eq!(both, vec![(big, big_need), (small, small_need)]);
+
+    // A budget one short of the big one does NOT part-fund it: it walks past and saves the small one.
+    let past = g.defence_split(Seat(0), big_need - 1);
+    assert_eq!(past, vec![(small, small_need)], "no part-funding, and the money still saves what it can");
+
+    // A budget too small for either spends nothing rather than spending it uselessly.
+    assert!(g.defence_split(Seat(0), small_need - 1).is_empty());
 }

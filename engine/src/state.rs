@@ -584,6 +584,13 @@ pub struct SeatState {
     /// is set again.
     #[serde(default)]
     pub archive_funding: bool,
+    /// Ticket #114 (version 0.07.1): the Defence split is set to repeat. It is a STANDING ORDER and
+    /// not an automatic spend: the interface places this turn's split as ordinary pending orders
+    /// every turn while it is on, so the player sees exactly what it did and can cancel any of it
+    /// before ending the turn. The flag lives here rather than in the interface so it survives a
+    /// save, the way the Venture share and the Archive's funding do.
+    #[serde(default)]
+    pub defence_standing: bool,
     /// Ticket #51: Provisional Findings is in force this turn, because last turn's Research went to
     /// the shared Tech. True at the start of the game.
     pub provisional_findings: bool,
@@ -729,6 +736,7 @@ impl Game {
             archive_fund: 0,
             funding_archive: false,
             archive_funding: false,
+            defence_standing: false,
             provisional_findings: true,
             resettle_to: None,
             blame_emitted: 0.0,
@@ -1526,6 +1534,75 @@ impl Game {
             Some(c) => threshold.max(self.seat(c).influence.get(&target).copied().unwrap_or(0) + self.tables.influence.challenge_margin),
             None => threshold,
         }
+    }
+
+    /// Ticket #114 (version 0.07.1): **the Defence split.** Every place this seat holds, and what it
+    /// would have to spend on each to keep it out of every rival's reach for one more turn.
+    ///
+    /// A rival with Standing `R` takes a place this seat holds when `R` reaches BOTH that rival's own
+    /// threshold and this seat's Standing plus the challenge margin. So a place is safe while
+    /// `mine + margin > best rival`, and the shortfall is what Defence has to cover. Two things are
+    /// counted in besides: the **decay** a held place suffers at every Resolution, so the spend still
+    /// holds after it, and the **threshold arm** -- a rival below their own threshold cannot take the
+    /// place at any Standing, so a place no rival can reach needs nothing.
+    ///
+    /// What it does NOT do is guess at what a rival will spend this turn. It assumes their Standing
+    /// stays where it is, which makes the figure a floor rather than a promise, and is the honest
+    /// assumption: a rival's Allotment is not something this seat can see.
+    ///
+    /// The list comes back **most threatened first**, which is the order the budget is spent in.
+    pub fn defence_needs(&self, seat: Seat) -> Vec<(Target, i64)> {
+        let mut held: Vec<Target> = self.directed_states(seat).into_iter().map(Place::State).collect();
+        held.extend(self.directed_colonies(seat).into_iter().map(Place::Colony));
+        let margin = self.tables.influence.challenge_margin;
+        let mut out: Vec<(Target, i64)> = held
+            .into_iter()
+            .map(|place| {
+                let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
+                let need = seat
+                    .others()
+                    .into_iter()
+                    .map(|rival| {
+                        let theirs = self.seat(rival).influence.get(&place).copied().unwrap_or(0);
+                        // A rival below their own threshold cannot take this place at any Standing.
+                        if theirs < self.influence_threshold_for(rival, place) {
+                            return 0;
+                        }
+                        (theirs + 1 - margin - mine + self.tables.influence.decay_controlled).max(0)
+                    })
+                    .max()
+                    .unwrap_or(0);
+                (place, need)
+            })
+            .filter(|(_, need)| *need > 0)
+            .collect();
+        out.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        out
+    }
+
+    /// Ticket #114: the Defence split itself -- what to spend, and where, out of `budget`.
+    ///
+    /// The designer's rule: *"fill the most threatened place to safe, then the next, then the next,
+    /// and stop."* Taking a place is a **threshold and not a race**, so a place funded most of the
+    /// way is exactly as lost as one funded not at all; that is why the budget is spent whole on one
+    /// place before any of it reaches the next. Where the budget cannot cover the next place in full
+    /// this walks PAST it to the ones it can still save, rather than stopping dead: same money, more
+    /// places held, and every place it does fund is funded to safe.
+    ///
+    /// Whatever is left over is left unspent, and the caller decides what to say about it.
+    pub fn defence_split(&self, seat: Seat, budget: i64) -> Vec<(Target, i64)> {
+        let mut left = budget;
+        let mut out = Vec::new();
+        for (place, need) in self.defence_needs(seat) {
+            if need <= left {
+                left -= need;
+                out.push((place, need));
+            }
+            if left == 0 {
+                break;
+            }
+        }
+        out
     }
 
     /// Ticket #53: Blame raises this seat's threshold on a Nation State it does not control, and

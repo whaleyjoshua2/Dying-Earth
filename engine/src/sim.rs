@@ -286,6 +286,10 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         game.directed_colonies(s).iter().map(|c| game.colony(*c).unwrap().modules.iter().filter(|m| m.kind == ModuleKind::Observatory).count() as u32).sum::<u32>()
     });
     let research_off_earth = Seat::ALL.map(|s| game.seat(s).research_off_earth_total);
+    // Ticket #117 (version 0.07.1): how far the tech tree got, which is the figure the Research
+    // costs are being changed to move and which the summary could not report.
+    let techs_done = game.research.done.len();
+    game.log(format!("Techs: {} of {}", techs_done, game.tables.techs.len()));
     game.log(format!(
         "Summary: {} | last turn {} | first Colony {:?} | buildings {:?} | Colonists off Earth {:?} | temperature {:+.2} | collapse projected {:?} | Observatories {:?} | Research off Earth {:?}",
         game.outcome_text(),

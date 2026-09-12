@@ -922,21 +922,25 @@ impl Game {
         // rival's Standing plus the challenge margin, as many as the Allotment and the Ducats allow.
         // One hold a turn against a rival pouring its whole Allotment in lost seat 0's start state
         // on turn 7 in every seed of the Prospectors' batch.
-        let mut owned: Vec<Place> = self.controlled_states(seat).into_iter().map(Place::State).collect();
-        owned.extend(self.colonies.iter().filter(|c| c.control.controller() == Some(seat)).map(|c| Place::Colony(c.id)));
+        // Ticket #114 (version 0.07.1): the computer defends its holdings by the same rule the
+        // player's Defence button splits by -- `defence_needs`, which counts the shortfall to
+        // out-stand the best rival, the decay a held place takes at Resolution, and the threshold
+        // arm that makes a rival below their own threshold no threat at all. The AI had its own
+        // arithmetic here and it was close but not the same: it ignored the threshold arm, so it
+        // spent on places nobody could take, and it ignored decay, so it stopped one point short.
+        // A rule belongs in the engine and not in one caller; this is that lesson applied.
+        //
+        // What stays the AI's own is the WEIGHTING: the need decides how many step-sized orders are
+        // offered, and the usual weights decide which of them the seat can afford to take.
         let bought_steps = if per > 0 { ducats / per } else { 0 };
-        for place in owned {
+        for (place, need) in self.defence_needs(seat) {
             let rival = self.rival_standing(seat, place);
             let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
-            if rival > 0 && rival + 2 * step >= mine {
-                let margin = self.tables.influence.challenge_margin;
-                let need = (rival + margin + 2 * step - mine).max(step);
-                let can = ((allotment + bought_steps) / step).max(1);
-                let copies = ((need + step - 1) / step).clamp(1, can);
-                let opp = if rival + step >= mine { m.opportunity } else { 1.0 };
-                for _ in 0..copies {
-                    push(vec![Order::Influence { target: place, amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, m.threat, opp, format!("hold {} with {} Influence", self.place_name(place), step), None);
-                }
+            let can = ((allotment + bought_steps) / step).max(1);
+            let copies = ((need + step - 1) / step).clamp(1, can);
+            let opp = if rival + step >= mine { m.opportunity } else { 1.0 };
+            for _ in 0..copies {
+                push(vec![Order::Influence { target: place, amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, m.threat, opp, format!("hold {} with {} Influence", self.place_name(place), step), None);
             }
         }
 

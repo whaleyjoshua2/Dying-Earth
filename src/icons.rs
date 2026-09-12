@@ -31,12 +31,16 @@ pub struct Credit {
 
 /// The icons in use, their authors, and the names they carry at game-icons.net. Anything added to
 /// `assets/icons/` belongs here too: the credit is the licence's price, not a courtesy.
-pub const CREDITS: [Credit; 5] = [
-    Credit { resource: "Materials", icon: "Ore", author: "Faithtoken" },
+pub const CREDITS: [Credit; 8] = [
+    Credit { resource: "Materials", icon: "Mine Wagon", author: "Delapouite" },
     Credit { resource: "Fuel", icon: "Jerrycan", author: "Delapouite" },
     Credit { resource: "Energy", icon: "Electric", author: "Sbed" },
     Credit { resource: "Research", icon: "Microscope", author: "Lord Berandas" },
-    Credit { resource: "Ducats", icon: "Coins", author: "Delapouite" },
+    Credit { resource: "Ducats", icon: "Banknote", author: "Delapouite" },
+    // Ticket #112 (version 0.07.1): three figures that were words on the board.
+    Credit { resource: "Population", icon: "Character", author: "Delapouite" },
+    Credit { resource: "Influence", icon: "Megaphone", author: "Delapouite" },
+    Credit { resource: "Emissions", icon: "Chimney", author: "Delapouite" },
 ];
 
 #[derive(Resource, Default)]
@@ -76,22 +80,77 @@ impl Icons {
 
     /// Ticket #106: one icon, fetched from egui's own store rather than passed down. `None` where
     /// the art did not load, so every caller falls back to its words.
-    pub fn from_ctx(ctx: &egui::Context, name: &str, size: f32, tint: egui::Color32) -> Option<egui::Image<'static>> {
+    pub fn from_ctx(ctx: &egui::Context, name: &str, size: f32) -> Option<egui::Image<'static>> {
         let map: BTreeMap<String, egui::TextureHandle> = ctx.data(|d| d.get_temp(egui::Id::new("icons")))?;
         let handle = map.get(name)?;
-        Some(egui::Image::new(egui::load::SizedTexture::from_handle(handle)).fit_to_exact_size(egui::vec2(size, size)).tint(tint))
+        Some(egui::Image::new(egui::load::SizedTexture::from_handle(handle)).fit_to_exact_size(egui::vec2(size, size)).tint(fill(name)))
+    }
+
+    /// Ticket #113 (version 0.07.1): the texture itself, for the Surface Maps. A map label is
+    /// painted straight onto the globe rather than laid out by a `Ui`, so it cannot take an
+    /// `egui::Image` and needs the id to hand to `Painter::image`.
+    pub fn texture_from_ctx(ctx: &egui::Context, name: &str) -> Option<egui::TextureId> {
+        let map: BTreeMap<String, egui::TextureHandle> = ctx.data(|d| d.get_temp(egui::Id::new("icons")))?;
+        Some(map.get(name)?.id())
     }
 
     pub fn get(&self, name: &str) -> Option<&egui::TextureHandle> {
         self.loaded.get(name)
     }
 
-    /// The icon at `size`, tinted, ready to put in a row beside a label. `None` where the art did
-    /// not load, so every caller can fall back to its words.
-    pub fn image(&self, name: &str, size: f32, tint: egui::Color32) -> Option<egui::Image<'static>> {
+    /// The icon at `size`, in its own fill, ready to put in a row beside a label. `None` where the
+    /// art did not load, so every caller can fall back to its words.
+    pub fn image(&self, name: &str, size: f32) -> Option<egui::Image<'static>> {
         let handle = self.get(name)?;
-        Some(egui::Image::new(egui::load::SizedTexture::from_handle(handle)).fit_to_exact_size(egui::vec2(size, size)).tint(tint))
+        Some(egui::Image::new(egui::load::SizedTexture::from_handle(handle)).fit_to_exact_size(egui::vec2(size, size)).tint(fill(name)))
     }
+}
+
+/// Ticket #112 (version 0.07.1): **a figure's glyph carries one fill, everywhere it is drawn.** The
+/// colour is decided HERE, by which figure it is, and no caller can pass one -- the two
+/// constructors above took a tint until the Blame block used it to paint the chimney in each
+/// Faction's colour, which made an icon's colour mean "whose" on one screen and "which figure" on
+/// every other. The designer's rule is that an icon's colour belongs to the icon, so the parameter
+/// is gone and this function is the only place an answer exists.
+///
+/// Ticket #112 (version 0.07.1): the eight fills, decided off pictures of the real bar and a real
+/// Facility list and then measured. The route is in the dev diary for 2026-09-12: candidate 1
+/// "Natural" gave each figure the colour of the thing it names; the designer amended it -- Ducats
+/// to a green, the jerrycan redder, Emissions browner -- and the measurement caught two collisions
+/// the swatches hid.
+///
+/// **Ducats' green sat 12 from population's**, in CIELAB, which is inside the range two colours are
+/// mistaken for each other, and the two stand in the same Facility list. Population moved to a warm
+/// tan; a bust of a person wants a skin tone anyway, and the green stayed where it was asked for.
+///
+/// **The jerrycan shifted redder landed 19 from the Prospectors' orange** -- nearer than the amber
+/// it started as, because amber is at hue 36 degrees and the Prospectors at 28, so a partial shift
+/// red lands on top of them. It goes past them to hue 13 instead, which clears at 27.
+///
+/// The worst remaining pair on the whole board is Materials against Research at 25, which is
+/// comfortable. Every colour here is a fill and nothing else: see `fill` below for why no caller
+/// may override one.
+const FIGURES: [(&str, [u8; 3]); 8] = [
+    ("materials", [168, 176, 186]),
+    ("fuel", [226, 88, 62]),
+    ("energy", [245, 222, 92]),
+    ("research", [118, 206, 232]),
+    ("ducats", [120, 214, 150]),
+    ("population", [220, 186, 150]),
+    ("influence", [188, 146, 236]),
+    ("emissions", [146, 110, 84]),
+];
+
+/// The fallback where a figure has no colour of its own, and what every figure answered before this
+/// version gave them one.
+const NEUTRAL: [u8; 3] = [225, 220, 210];
+
+pub fn fill(name: &str) -> egui::Color32 {
+    rgb(FIGURES.iter().find(|(figure, _)| *figure == name).map(|(_, c)| *c).unwrap_or(NEUTRAL))
+}
+
+fn rgb(c: [u8; 3]) -> egui::Color32 {
+    egui::Color32::from_rgb(c[0], c[1], c[2])
 }
 
 /// One SVG to one egui image, with the black backing rectangle taken out first.

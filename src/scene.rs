@@ -214,6 +214,15 @@ pub fn sync_scene(
         for mut t in &mut camera {
             *t = Transform::from_xyz(0.0, 0.0, 6.0 * view.zoom).looking_at(Vec3::ZERO, Vec3::Y);
         }
+        // Ticket #103, missed there and reported by the designer: this early return sits BEFORE the
+        // loop that hides Antarctica's markers, so on the start screen they kept the visibility they
+        // were spawned with and the three sites showed on a globe belonging to no game at all.
+        // Before a game exists the ice is shut by definition.
+        for (m, _, _, mut vis) in &mut slots {
+            if m.body == BodyId::Earth && m.on_surface {
+                *vis = Visibility::Hidden;
+            }
+        }
         return;
     };
     for (m, mut t, mut mat, mut vis) in &mut slots {
