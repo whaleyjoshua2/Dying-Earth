@@ -1240,6 +1240,13 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
 #[allow(clippy::too_many_arguments)]
 /// Colony Slot labels on a Body's surface: Antarctica's on Earth since ticket #44.
 fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: BodyId, visible: &dyn Fn(Vec3) -> Option<Pos2>, hotspots: &mut Vec<Hotspot>) {
+    // Ticket #103 (version 0.07.0): Earth's three slots are Antarctica's, and nothing of them is
+    // drawn until the ice opens -- no marker, no name, no yields. A player is told the ice EXISTS
+    // and at what warmth it goes, on the Solar System Map and the Climate Panel, so an Antarctic
+    // Colony can still be planned for; what is hidden is which of the three is the best site.
+    if body == BodyId::Earth && !game.antarctica_open {
+        return;
+    }
             for slot in 0..game.tables.body(body).colony_slots() {
                 let (lon, lat) = geo::slot_lonlat(game.tables.body(body), slot);
         let name = &game.tables.body(body).slots[slot as usize].name;
@@ -1255,12 +1262,6 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                             Hit::Select(Selection::Colony(c.id)),
                         )
                     }
-                    // Ticket #56: Antarctica's slots lie under the ice until the world is warm enough.
-                    None if body == BodyId::Earth && !game.antarctica_open => (
-                        format!("{name}: under the ice\nopens at {:+.1} C", game.tables.climate.antarctica_opens_at),
-                        Color32::from_rgb(150, 195, 235),
-                        Hit::Select(Selection::Slot(body, slot)),
-                    ),
                     None => (format!("{name}: empty"), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot))),
                 };
                 label_at(painter, p + egui::vec2(0.0, 24.0), &text, colour, 12.0);

@@ -67,3 +67,25 @@ The credits screen exists because the licence is CC BY 3.0 and wants its authors
 player can see them. It is reachable from the title screen, it names each icon, its author and
 the licence, and the menus screenshot run now photographs it with every other menu, so a future
 change that breaks the attribution shows up in a picture.
+
+## Nothing to see under the ice
+
+![Antarctica before the ice opens: blank](antarctica-shut.png)
+
+![Antarctica once it opens: three named sites with their yields](antarctica-open.png)
+
+Ticket [#103](https://github.com/whaleyjoshua2/Dying-Earth/issues/103). Earth's three Colony
+Slots are Antarctica's, and they were drawn from turn 1 with their names and their four yields
+readable — so a player could shop for the best Antarctic site three degrees of warming before
+they could reach it. Now **nothing** of them is drawn until the ice opens: no marker, no name,
+no yields.
+
+What stays is the fact of it. The Solar System Map still reads "Antarctica: opens at +1.6 C",
+and the Climate Panel's coloured bar already carried an ice-blue notch at exactly that
+temperature — so the opening can still be planned for, and the grim trade the game is built on
+stays visible: your cheapest colony site is bought by wrecking the planet a little further.
+
+A Bevy query conflict came out of this, and neither the build nor the tests could see it: giving
+the slot markers a `Visibility` put that query in conflict with three others that also write
+`Visibility`, and the game panicked on the first frame. `cargo build` and `cargo clippy -D
+warnings` were both clean. Only running it found it.
