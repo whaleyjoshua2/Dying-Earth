@@ -929,6 +929,14 @@ pub struct CrowdingCard {
 #[derive(Debug, Clone, Deserialize)]
 struct TechsFile {
     tech: Vec<TechCard>,
+    shortlist: ShortlistCard,
+}
+
+/// Ticket #98 (version 0.07.0): how many Techs the Research Lead may choose between once the game
+/// is under way. The opening pick is not drawn.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ShortlistCard {
+    pub size: usize,
 }
 #[derive(Debug, Clone, Deserialize)]
 struct FactionsFile {
@@ -991,6 +999,8 @@ pub struct Tables {
     pub modules: Vec<ModuleCard>,
     /// Ticket #97: how many Modules a Colony or a Space Station may hold.
     pub slots: SlotsCard,
+    /// Ticket #98: how many Techs the Research Lead chooses between.
+    pub shortlist: ShortlistCard,
     /// Ticket #51: the Archive's stages and their Research price.
     pub archive: ArchiveCard,
     /// Ticket #80: the Observatory's Research per Colonist.
@@ -1084,6 +1094,7 @@ impl Tables {
             repair: units.repair,
             crowding: units.crowding,
             techs: techs.tech,
+            shortlist: techs.shortlist,
             events,
             factions: factions.faction,
             start: factions.start,
@@ -1250,6 +1261,9 @@ impl Tables {
         // Ticket #57: the game's first date, and the sky it opens on.
         if !(1..=12).contains(&self.victory.start_month) {
             return Err(err("victory.toml", format!("start_month {} is no month", self.victory.start_month)));
+        }
+        if self.shortlist.size < 2 {
+            return Err(err("techs.toml", "[shortlist] size must be at least 2: a list of one is not a choice"));
         }
         if self.slots.per_colonist == 0 {
             return Err(err("modules.toml", "[slots] per_colonist must be at least 1: a Colonist has to buy something"));

@@ -2665,7 +2665,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             if must_pick {
                 ui.colored_label(Color32::YELLOW, "You pick the next Tech: choose one below.");
             }
-            let available = game.available_techs();
+            // Ticket #98: the Lead chooses from the drawn shortlist, so that is what the tree offers.
+            let available = game.pickable_techs();
             tech_tree(ui, game, &available, must_pick, actions);
         });
         view.show_tech = open;
@@ -3002,7 +3003,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 if m.tech.is_some() {
                     ui.separator();
                     let must_pick = game.research.awaiting_pick == Some(Seat(0)) && game.research.current.is_none();
-                    let available = game.available_techs();
+                    let available = game.pickable_techs();
                     tech_tree(ui, game, &available, must_pick, actions);
                 }
                 ui.horizontal(|ui| {

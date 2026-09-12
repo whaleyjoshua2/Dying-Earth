@@ -414,8 +414,12 @@ fn print_board(g: &Game) {
         if g.research.done.is_empty() { "none".into() } else { g.research.done.iter().map(|x| t.tech(*x).name.clone()).collect::<Vec<_>>().join(", ") }
     );
     if g.research.awaiting_pick == Some(me) || g.research.current.is_none() {
-        println!("  *** YOU MUST PICK THE NEXT TECH (a `tech <name>` line). Available: ***");
-        for x in g.available_techs() {
+        let drawn = !g.research.shortlist.is_empty();
+        println!(
+            "  *** YOU MUST PICK THE NEXT TECH (a `tech <name>` line). {} ***",
+            if drawn { "The Research Lead's shortlist:" } else { "A free choice of everything available:" }
+        );
+        for x in g.pickable_techs() {
             let c = t.tech(x);
             println!("      {} ({} Research, rung {}): {}", c.name, c.cost, c.rung, c.effect);
         }

@@ -1,3 +1,15 @@
+# Ticket #98 (version 0.07.0): how many Techs the Research Lead may choose between once the game is
+# under way. Only the Lead picks, and before this a seat that held the Lead chose the whole tree and
+# had no reason ever to pick a rival's Victory gate: one playtested seat led 9 of 9 Techs, and a
+# Prospector AI finished on 0.99 of its own Victory Condition unable to win, because the Extraction
+# Charter was never researched.
+#
+# The draw always carries the Lead's OWN gate once its prerequisites are met, so a Faction can be
+# denied a rival's gate but never its own. The opening pick is not drawn: the first Tech of the game
+# is a free choice from the whole of rung 1.
+[shortlist]
+size = 3
+
 # Spec section 12.3. One tree shared by every Faction. Costs by rung: 15, 25, 40 (Coastal
 # Engineering, 10 on rung 1 since ticket #69, is the one exception).
 # The engine reads each effect by the tech id; the numbers here are the values the rules use.

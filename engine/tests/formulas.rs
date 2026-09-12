@@ -6408,3 +6408,65 @@ fn a_filled_habitat_always_hands_back_at_least_two_slots() {
         }
     }
 }
+
+/// Ticket #98 (version 0.07.0): the Research Lead picks from a drawn shortlist, not from everything
+/// available. Before this a seat holding the Lead chose the whole tree and had no reason ever to
+/// pick a rival's Victory gate: one playtested seat led 9 of 9 Techs, and a Prospector AI finished
+/// on 0.99 of its own Victory Condition unable to win, the Extraction Charter never researched.
+#[test]
+fn the_research_lead_picks_from_a_shortlist_of_three() {
+    let mut g = game();
+    // The opening is a free choice of the whole of rung 1: nothing is drawn for it.
+    assert!(g.research.shortlist.is_empty(), "the first Tech of the game is not drawn for");
+    assert_eq!(g.pickable_techs().len(), 6, "all six of rung 1");
+    g.pick_tech(Seat(0), TechId::PublicScience).unwrap();
+    // Seat 0 is the human here, and the only contributor, so it leads and is asked to pick.
+    let cost = g.tables.tech(TechId::PublicScience).cost;
+    g.accrue_research(Seat(0), cost);
+    assert!(g.research.done.contains(&TechId::PublicScience));
+    assert_eq!(g.research.awaiting_pick, Some(Seat(0)));
+    let list = g.research.shortlist.clone();
+    assert_eq!(list.len(), 3, "three, as techs.toml says: {list:?}");
+    assert_eq!(g.pickable_techs(), list, "the panel offers the list and nothing else");
+    for t in &list {
+        assert!(g.available_techs().contains(t), "{t:?} was drawn but is not available");
+    }
+    // A Tech that is available but off the list is refused.
+    let off = g.available_techs().into_iter().find(|t| !list.contains(t)).expect("something off the list");
+    assert!(g.pick_tech(Seat(0), off).is_err(), "{off:?} is off the shortlist {list:?}");
+    // One on it is taken, and taking it clears the list for the next completion.
+    assert!(g.pick_tech(Seat(0), list[0]).is_ok());
+    assert!(g.research.shortlist.is_empty(), "a pick clears the list");
+}
+
+/// Ticket #98: a Faction can be denied a rival's gate but never its own, so the Lead's own Victory
+/// gate is always drawn once its prerequisites are met.
+#[test]
+fn the_shortlist_always_carries_the_leads_own_victory_gate() {
+    let mut g = game();
+    let gate = g.tables.victory_gate(FactionKind::Custodians).expect("the Custodians have a gate");
+    // Open the gate's prerequisites so it is available to be drawn.
+    for need in g.tables.tech(gate).needs.clone() {
+        g.research.done.push(need);
+    }
+    assert!(g.available_techs().contains(&gate), "the gate is available");
+    assert!(g.available_techs().len() > 3, "and there is more available than the list holds");
+    // Seat 0 is the Custodians. Drawn many times over, the gate is on every list.
+    for _ in 0..25 {
+        g.draw_shortlist(Seat(0));
+        assert!(g.research.shortlist.contains(&gate), "the Lead's own gate is always drawn: {:?}", g.research.shortlist);
+    }
+    // A rival's gate is not owed the same courtesy.
+    let rival = g.tables.victory_gate(FactionKind::Prospectors).expect("the Prospectors have a gate");
+    for need in g.tables.tech(rival).needs.clone() {
+        g.research.done.push(need);
+    }
+    let mut seen_without = false;
+    for _ in 0..25 {
+        g.draw_shortlist(Seat(0));
+        if !g.research.shortlist.contains(&rival) {
+            seen_without = true;
+        }
+    }
+    assert!(seen_without, "a rival's gate can be left off");
+}

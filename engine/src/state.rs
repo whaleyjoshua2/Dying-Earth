@@ -433,6 +433,13 @@ pub struct Research {
     pub unallocated: i64,
     /// Who must pick the next Tech, when a human has to.
     pub awaiting_pick: Option<Seat>,
+    /// Ticket #98 (version 0.07.0): the Techs the Research Lead may choose between. Drawn when a
+    /// Tech completes, at `shortlist_size` from what is available, always carrying the Lead's own
+    /// Victory gate once its prerequisites are met. EMPTY means a free choice of everything
+    /// available, which is how the game opens: the first Tech of the game is picked from the whole
+    /// of rung 1.
+    #[serde(default)]
+    pub shortlist: Vec<TechId>,
     pub last_lead: Option<Seat>,
     /// Ticket #50: the turn each seat last picked a Tech, so a tie in contributions goes to the
     /// seat that has picked least recently. None means it has never picked, which counts as longest ago.
@@ -800,6 +807,9 @@ impl Game {
                 done: Vec::new(),
                 unallocated: 0,
                 awaiting_pick: Some(Seat(0)),
+                // Ticket #98: empty at the opening, so the first Tech of the game is a free choice
+                // from the whole of rung 1.
+                shortlist: Vec::new(),
                 last_lead: None,
                 last_picked_turn: [None; SEAT_COUNT],
                 neutral_total: 0,
