@@ -13,10 +13,13 @@ pub enum BodyId {
     /// Version 0.04 (ticket #45): the moons of Mars.
     Phobos,
     Deimos,
+    /// Version 0.06.0 (ticket #93): Venus, a Body of orbits only: no Colony Slots, three Orbital
+    /// Slots, its own Launch Window on the real sky.
+    Venus,
 }
 
 impl BodyId {
-    pub const ALL: [BodyId; 5] = [BodyId::Earth, BodyId::Moon, BodyId::Mars, BodyId::Phobos, BodyId::Deimos];
+    pub const ALL: [BodyId; 6] = [BodyId::Earth, BodyId::Moon, BodyId::Mars, BodyId::Phobos, BodyId::Deimos, BodyId::Venus];
     pub fn index(self) -> usize {
         self as usize
     }
@@ -27,6 +30,7 @@ impl BodyId {
             BodyId::Mars => "Mars",
             BodyId::Phobos => "Phobos",
             BodyId::Deimos => "Deimos",
+            BodyId::Venus => "Venus",
         }
     }
 }
@@ -139,10 +143,19 @@ pub enum ModuleKind {
     /// Version 0.05 (ticket #51): the Archive. Only the Archivists build it, from its own button and
     /// never through the ordinary Module build order; one Module since ticket #68 (version 0.05.5).
     Archive,
+    /// Version 0.06.0 (ticket #80): the Observatory, the one Module that makes Research, on a
+    /// Colony or a Space Station; each Colonist at its Colony adds one per cent.
+    Observatory,
+    /// Version 0.06.0 (ticket #89): the Solar Array, a Module only a Space Station holds, making
+    /// Energy that scales with the inverse square of its Body's distance from the Sun.
+    SolarArray,
+    /// Version 0.06.0 (ticket #92): the Mass Driver, a Module only a ground Colony on a low-gravity
+    /// Body holds, behind Efficient Transit: the owner's departures four Fuel cheaper, its Mines +1.
+    MassDriver,
 }
 
 impl ModuleKind {
-    pub const ALL: [ModuleKind; 9] = [
+    pub const ALL: [ModuleKind; 12] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -152,9 +165,12 @@ impl ModuleKind {
         ModuleKind::TradePost,
         ModuleKind::Relay,
         ModuleKind::Archive,
+        ModuleKind::Observatory,
+        ModuleKind::SolarArray,
+        ModuleKind::MassDriver,
     ];
     /// The Modules an ordinary build order may place (ticket #51: the Archive is not one of them).
-    pub const BUILDABLE: [ModuleKind; 8] = [
+    pub const BUILDABLE: [ModuleKind; 11] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -163,6 +179,9 @@ impl ModuleKind {
         ModuleKind::Barracks,
         ModuleKind::TradePost,
         ModuleKind::Relay,
+        ModuleKind::Observatory,
+        ModuleKind::SolarArray,
+        ModuleKind::MassDriver,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -175,6 +194,9 @@ impl ModuleKind {
             ModuleKind::TradePost => "Trade Post",
             ModuleKind::Relay => "Relay",
             ModuleKind::Archive => "The Archive",
+            ModuleKind::Observatory => "Observatory",
+            ModuleKind::SolarArray => "Solar Array",
+            ModuleKind::MassDriver => "Mass Driver",
         }
     }
 }
@@ -247,10 +269,16 @@ pub enum TechId {
     /// Version 0.05 (ticket #56): the thirteenth Tech, Industry rung 2 beside Clean Power. It
     /// unlocks the Sea Wall and nothing else.
     CoastalEngineering,
+    /// Version 0.06.0 (ticket #84): the four gates, one per Faction, on rung 3. Each opens its
+    /// Faction's Victory Condition and is a Tech for everyone besides.
+    PlanetaryStewardship,
+    ExtractionCharter,
+    GenerationShips,
+    TheUpload,
 }
 
 impl TechId {
-    pub const ALL: [TechId; 13] = [
+    pub const ALL: [TechId; 17] = [
         TechId::EfficientGrids,
         TechId::CleanPower,
         TechId::CleanManufacturing,
@@ -264,6 +292,10 @@ impl TechId {
         TechId::PublicScience,
         TechId::GreenConsensus,
         TechId::CoastalEngineering,
+        TechId::PlanetaryStewardship,
+        TechId::ExtractionCharter,
+        TechId::GenerationShips,
+        TechId::TheUpload,
     ];
     pub fn index(self) -> usize {
         self as usize

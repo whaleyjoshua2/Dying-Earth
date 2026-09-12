@@ -128,6 +128,50 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     // Ticket #53: redraw the borders from the earth.png already in the tree, no source JPEGs needed.
     let mask_only = args.iter().any(|a| a == "--mask-only");
+    // Ticket #93 (version 0.06.0): `--venus` draws Venus's clouds, since no NASA map is in the
+    // tree: a 1024 by 512 globe of cream and ochre bands with slow swirls, at the same size and
+    // softness as the Moon and Mars maps so it sits beside them as one of them.
+    if args.iter().any(|a| a == "--venus") {
+        let (w, h) = (1024u32, 512u32);
+        let out = Path::new("assets/textures");
+        std::fs::create_dir_all(out).expect("assets/textures");
+        let mut img: RgbImage = ImageBuffer::new(w, h);
+        // Layered sines stand in for noise: no dependency, and deterministic.
+        let noise = |x: f32, y: f32| -> f32 {
+            let mut v = 0.0;
+            let mut amp = 1.0;
+            let mut f = 1.0;
+            for k in 0..5 {
+                let px = x * f + k as f32 * 1.7;
+                let py = y * f * 0.6 + k as f32 * 0.9;
+                let tau = std::f32::consts::TAU;
+                v += amp * ((px * tau).sin() * (py * tau + (px * 3.1).cos()).cos());
+                amp *= 0.5;
+                f *= 2.1;
+            }
+            v
+        };
+        for y in 0..h {
+            for x in 0..w {
+                let u = x as f32 / w as f32;
+                let v = y as f32 / h as f32;
+                let lat = (v - 0.5) * 2.0;
+                // Bands run with latitude; the swirls drift east with height, as Venus's clouds do.
+                let band = ((v * 14.0 + noise(u * 0.5, v) * 0.8).sin() * 0.5 + 0.5) * 0.35;
+                let swirl = noise(u + lat * 0.15, v * 1.3) * 0.12;
+                let polar = (lat.abs().powi(3)) * 0.25;
+                let t = (0.55 + band + swirl - polar).clamp(0.0, 1.0);
+                // From deep ochre to pale cream.
+                let r = 205.0 + 45.0 * t;
+                let g = 165.0 + 65.0 * t;
+                let b = 95.0 + 95.0 * t;
+                img.put_pixel(x, y, Rgb([r.min(255.0) as u8, g.min(255.0) as u8, b.min(255.0) as u8]));
+            }
+        }
+        img.save(out.join("venus.png")).expect("save venus.png");
+        println!("wrote venus.png {w}x{h}");
+        return;
+    }
     let src = Path::new(args.first().filter(|a| !a.starts_with("--")).map(|s| s.as_str()).unwrap_or("."));
     let out = Path::new("assets/textures");
     std::fs::create_dir_all(out).expect("assets/textures");

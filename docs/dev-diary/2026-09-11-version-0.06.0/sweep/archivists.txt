@@ -1,0 +1,48 @@
+=== seat 0: archivists from east_asia
+seat 0: Archivists starting in EastAsia
+sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | temp at end (median) | wins by seat
+   6   300   4.0    4.0 |  1/20 |  34 (34..34) | +2.73 | [0, 18, 0, 1]
+        Archivists (seat 0):  0 win(s)
+        Custodians (seat 1): 18 win(s)
+       Prospectors (seat 2):  0 win(s)
+        Arkwrights (seat 3):  1 win(s)
+      draws 0, collapses 1/20, median collapse turn 34
+      median turn of first Colony 9
+      median Colonists off Earth at the end, all seats 58
+      Scrubbers 539, Leapfrogs 342, Constabularies 4, Sea Walls 539
+      Techs: median 13 completed, highest rung reached 3
+      Observatories standing at the end, all seeds, by seat [2, 7, 0, 0]; median Research made off Earth a game, by seat ["0", "0", "0", "0"]
+      Mars system: a Colony founded in 20/20 seeds, median first turn 15; Antarctic Colonies founded 60
+      The Archive: standing in 20/20 seeds (median turn 4), complete in 0/20 (median turn -), median fund at the end 20
+      Neutral Labs paid a median 15 Research a game; Coastal Engineering complete in 20/20 seeds (median turn 7)
+      The sea: median 28 coastal slots lost a game, 19 Facilities drowned
+      The Prospectors' Venture Capital Fund at the end: median 168
+      The deck: median 20 cards drawn a game, empty at the end in 0/20 seeds
+      Emigrants: 1087 batches mustered, 60 Antarctic Colonies founded by sea
+      Seat 0 lost its start state in 20/20 seeds (median turn 22)
+      Victory Conditions met outright: seed 1 Custodians (seat 1), seed 2 Custodians (seat 1), seed 3 Custodians (seat 1), seed 4 Custodians (seat 1), seed 5 Custodians (seat 1), seed 6 Custodians (seat 1), seed 7 Custodians (seat 1), seed 8 Custodians (seat 1), seed 10 Custodians (seat 1), seed 11 Custodians (seat 1), seed 12 Custodians (seat 1), seed 13 Custodians (seat 1), seed 15 Custodians (seat 1)
+      Breaks fired: Coral Die-off 20/20, Permafrost Thaw 20/20, The Sink Weakens 20/20, Ice Sheets Committed 20/20, Amazon Dieback 13/20
+=== seat 0: custodians from east_asia
+seat 0: Custodians starting in EastAsia
+sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | temp at end (median) | wins by seat
+   6   300   4.0    4.0 | 17/20 |  19 (18..32) | +3.02 | [3, 0, 0, 0]
+        Custodians (seat 0):  3 win(s)
+       Prospectors (seat 1):  0 win(s)
+        Arkwrights (seat 2):  0 win(s)
+        Archivists (seat 3):  0 win(s)
+      draws 0, collapses 17/20, median collapse turn 19
+      median turn of first Colony 9
+      median Colonists off Earth at the end, all seats 16
+      Scrubbers 173, Leapfrogs 171, Constabularies 80, Sea Walls 288
+      Techs: median 7 completed, highest rung reached 3
+      Observatories standing at the end, all seeds, by seat [0, 0, 0, 8]; median Research made off Earth a game, by seat ["0", "0", "0", "0"]
+      Mars system: a Colony founded in 9/20 seeds, median first turn 13; Antarctic Colonies founded 60
+      The Archive: standing in 20/20 seeds (median turn 4), complete in 0/20 (median turn -), median fund at the end 12
+      Neutral Labs paid a median 17 Research a game; Coastal Engineering complete in 13/20 seeds (median turn 7)
+      The sea: median 34 coastal slots lost a game, 24 Facilities drowned
+      The Prospectors' Venture Capital Fund at the end: median 389
+      The deck: median 13 cards drawn a game, empty at the end in 0/20 seeds
+      Emigrants: 1012 batches mustered, 60 Antarctic Colonies founded by sea
+      Seat 0 lost its start state in 0/20 seeds (median turn -)
+      Victory Conditions met outright: seed 3 Custodians (seat 0), seed 4 Custodians (seat 0), seed 15 Custodians (seat 0)
+      Breaks fired: Coral Die-off 20/20, Permafrost Thaw 20/20, The Sink Weakens 20/20, Ice Sheets Committed 20/20, Amazon Dieback 20/20

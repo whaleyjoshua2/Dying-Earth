@@ -1,10 +1,11 @@
 //! Quick headless runner (ticket #50: four seats, all AI):
-//! `cargo run -p dying-earth-engine --example sim -- <seed> [--player=<faction>] [--count=N] [--log]`
-//! Faction ids are the full names: custodians, prospectors, arkwrights, archivists.
+//! `cargo run -p dying-earth-engine --example sim -- <seed> [--player=<faction>] [--start=<state>] [--count=N] [--log]`
+//! Faction ids are the full names: custodians, prospectors, arkwrights, archivists; the start is a
+//! prefix of a Nation State's id (east, europe, ...), East Asia when left out (ticket #94).
 
 use dying_earth_engine::climate::LastTurn;
 use dying_earth_engine::data::{default_data_dir, Tables};
-use dying_earth_engine::ids::{FactionKind, Seat, SEAT_COUNT};
+use dying_earth_engine::ids::{FactionKind, Seat, StateId, SEAT_COUNT};
 use dying_earth_engine::state::Outcome;
 use std::sync::Arc;
 
@@ -40,6 +41,12 @@ fn main() {
             }
         },
     };
+    // Ticket #94: seat 0's start state, as the sweep takes it.
+    let start = args
+        .iter()
+        .find_map(|a| a.strip_prefix("--start="))
+        .and_then(|s| StateId::ALL.into_iter().find(|k| format!("{k:?}").to_lowercase().starts_with(s)))
+        .unwrap_or(StateId::EastAsia);
     let tables = Arc::new(Tables::load(&default_data_dir()).expect("tables"));
     let mut wins = [0u32; SEAT_COUNT];
     let mut draws = 0u32;
@@ -95,7 +102,7 @@ fn main() {
     let mut victory_met: Vec<String> = Vec::new();
     let mut kinds = [FactionKind::Custodians; SEAT_COUNT];
     for s in seed..seed + count {
-        let r = dying_earth_engine::sim::run(tables.clone(), s, player);
+        let r = dying_earth_engine::sim::run_from(tables.clone(), s, player, start);
         kinds = r.seat_kinds();
         if log {
             for l in &r.log {

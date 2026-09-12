@@ -2,15 +2,20 @@
 
 A single-player, turn-based strategy game about colonizing the solar system before ecological
 collapse overtakes Earth. This repository holds the **First Playable**: thirty-six turns of two
-months, **four Factions** at every table, **twelve Nation States**, five Bodies (Earth's Antarctica,
-the Moon, Mars, Phobos and Deimos), Space Stations, four resources, a climate with **Breaks** in it,
-**Emigrants**, the Prospectors' **Venture Capital Fund**, **saves** and a **spectator mode**. The
-rules are written down in [`docs/spec/first-playable.md`](docs/spec/first-playable.md) as amended by
+months, **four Factions** at every table, **twelve Nation States**, six Bodies (Earth's Antarctica,
+the Moon, Mars, Phobos, Deimos and Venus), Space Stations, four resources, a climate with **Breaks**
+in it, **Emigrants**, the Prospectors' **Venture Capital Fund**, **saves**, a **spectator mode** and,
+since 0.06.0, a space game with weight of its own: every Ship carries its own **Fuel tank**,
+**Venus** is a Body of orbits only, the small worlds have a **Mass Driver**, a station has a **Solar
+Array**, Research is made off Earth in the **Observatory**, and every Victory Condition waits on a
+Tech of its own. The rules are written down in [`docs/spec/first-playable.md`](docs/spec/first-playable.md)
+as amended by
 [`docs/spec/version-0.02.md`](docs/spec/version-0.02.md),
 [`docs/spec/version-0.03.md`](docs/spec/version-0.03.md),
 [`docs/spec/version-0.04.md`](docs/spec/version-0.04.md),
-[`docs/spec/version-0.05.md`](docs/spec/version-0.05.md) and
-[`docs/spec/version-0.05.5.md`](docs/spec/version-0.05.5.md), and the words in [`CONTEXT.md`](CONTEXT.md).
+[`docs/spec/version-0.05.md`](docs/spec/version-0.05.md),
+[`docs/spec/version-0.05.5.md`](docs/spec/version-0.05.5.md) and
+[`docs/spec/version-0.06.0.md`](docs/spec/version-0.06.0.md), and the words in [`CONTEXT.md`](CONTEXT.md).
 
 ## Running it
 
@@ -61,13 +66,14 @@ table stops the game with a message naming the file and the row.
 - `engine/` — the rules, with no window attached (`cargo test -p dying-earth-engine` runs the formula tests).
 - `src/` — the Bevy window: views, panels, popups, screenshot mode.
 - `assets/data/` — the tables. `assets/textures/` — NASA Blue Marble, LRO Moon and USGS Viking Mars
-  maps, plus the Nation State mask derived from the coastlines (`examples/prep_assets.rs` makes it).
+  maps, plus the Nation State mask derived from the coastlines (`examples/prep_assets.rs` makes it)
+  and, since 0.06.0, a made cloud map for Venus (`examples/prep_assets.rs --venus`).
 - `docs/` — the spec, the glossary's decisions (`docs/adr/`), agent notes and the dev diary.
 
 ## Kits for other systems
 
 This machine builds only the Windows kit. The GitHub Actions workflow `release-kits` (Actions tab,
-"Run workflow", or `gh workflow run release-kits.yml --ref <branch> -f version=0.05.5`) builds a Linux
+"Run workflow", or `gh workflow run release-kits.yml --ref <branch> -f version=0.06.0`) builds a Linux
 kit on an Ubuntu 22.04 runner and a Windows kit, each as a downloadable artifact zip ready for
 itch.io. With a repository secret `BUTLER_API_KEY` and a variable `ITCH_TARGET` set, it also pushes
 both to itch.io.

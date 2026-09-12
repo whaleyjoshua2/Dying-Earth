@@ -67,6 +67,7 @@ fn moment_from_id(name: &str) -> Option<MomentKind> {
         "battle" => Some(MomentKind::DecisiveBattle),
         "antarctica" => Some(MomentKind::Antarctica),
         "archive" => Some(MomentKind::ArchiveComplete),
+        "lost" => Some(MomentKind::LostInTransit),
         _ => None,
     }
 }
@@ -103,13 +104,14 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     }
 }
 
-const VIEWS: [(&str, View); 6] = [
+const VIEWS: [(&str, View); 7] = [
     ("solar", View::Solar),
     ("earth", View::Surface(BodyId::Earth)),
     ("moon", View::Surface(BodyId::Moon)),
     ("mars", View::Surface(BodyId::Mars)),
     ("phobos", View::Surface(BodyId::Phobos)),
     ("deimos", View::Surface(BodyId::Deimos)),
+    ("venus", View::Surface(BodyId::Venus)),
 ];
 
 const MENUS: [&str; 4] = ["title", "faction", "start", "report"];
@@ -162,7 +164,7 @@ fn build_board(session: &mut Session) {
             };
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
-            g.ships.push(Ship { id, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn });
+            g.ships.push(Ship { id, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30 });
         }
         // `battle:1` (a building aid): three seats bring a Frigate to Mars with Attack stances and
         // one more turn runs, so the Report carries a three-party Battle (ticket #50).
@@ -170,7 +172,7 @@ fn build_board(session: &mut Session) {
             for seat in [Seat(0), Seat(1), Seat(2)] {
                 let id = ShipId(g.fresh_id());
                 let built_turn = g.turn;
-                g.ships.push(Ship { id, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn });
+                g.ships.push(Ship { id, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30 });
             }
             for s in g.ships.iter_mut().filter(|s| s.at == ShipAt::Body(BodyId::Mars)) {
                 s.stance = Stance::Attack;
@@ -211,6 +213,120 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.materials = 120;
             g.seats[0].stockpile.energy = 60;
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
+        }
+        // `observatory:<n>` (a building aid, ticket #80): seat 0 gets a Colony on Mars with three
+        // Habitats, a Generator, a Mine and an Observatory, n Colonists living there, and its card
+        // opens in the Mars picture so the Observatory's line and the build button can be seen.
+        if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("observatory:").and_then(|v| v.parse::<u32>().ok())) {
+            let slot = g.free_slots_on(BodyId::Mars).first().copied().unwrap_or(0);
+            let id = ColonyId(g.fresh_id());
+            let mut modules = vec![
+                Module::new(ModuleKind::Habitat),
+                Module::new(ModuleKind::Habitat),
+                Module::new(ModuleKind::Habitat),
+                Module::new(ModuleKind::Generator),
+                Module::new(ModuleKind::Mine),
+                Module::new(ModuleKind::Observatory),
+            ];
+            // `post:1` (ticket #90): a Trade Post there too, so its network line can be pictured.
+            if std::env::args().any(|a| a == "post:1") {
+                modules.push(Module::new(ModuleKind::TradePost));
+            }
+            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: n, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.seats[0].stockpile.materials = 120;
+            g.seats[0].stockpile.energy = 60;
+            ARCHIVE_COLONY.with(|c| c.set(Some(id)));
+        }
+        // `idle:1` (a building aid, ticket #82): a Factory and a Research Lab stand mothballed in
+        // seat 0's start state, so a Custodian's Mars card (with `observatory:<n>`) shows its Mine
+        // and Observatory doubled by Production Moved.
+        if std::env::args().any(|a| a == "idle:1")
+            && let Some(sid) = g.controlled_states(Seat(0)).first().copied()
+        {
+            for k in [FacilityKind::Factory, FacilityKind::ResearchLab] {
+                let mut f = Facility::new(k);
+                f.mothballed = true;
+                g.state_mut(sid).facilities.push(f);
+            }
+        }
+        // `antarctic:2` (a building aid, ticket #85): the ice open, seat 0's start state sends four
+        // Emigrants to each of the first two Antarctic slots on consecutive turns, so the last
+        // Resolution's founding Moment reads "their second Colony in Antarctica" (with `moment:colony`).
+        if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("antarctic:").and_then(|v| v.parse::<usize>().ok()))
+            && let Some(sid) = g.controlled_states(Seat(0)).first().copied()
+        {
+            g.antarctica_open = true;
+            g.state_mut(sid).emigrants = 4 * n as u32;
+            let slots = g.free_slots_on(BodyId::Earth);
+            for slot in slots.into_iter().take(n) {
+                let send = Order::SendToAntarctica { state: sid, n: 4, into: UnloadTarget::Slot(BodyId::Earth, slot) };
+                g.commit_orders(Seat(0), std::slice::from_ref(&send));
+                g.resolution_phase();
+                g.turn += 1;
+            }
+            g.report.moments.clear();
+            g.resolution_phase();
+        }
+        // `crowded:1` (a building aid, ticket #86): the world at +2.6 C, and seat 0's Colony Ship
+        // arrives at the Moon with eight aboard, four beyond its capacity; the turn is rerun on the
+        // game's own dice until someone dies, so `moment:lost` has a Moment to show.
+        if std::env::args().any(|a| a == "crowded:1") {
+            g.climate.temperature = 2.6;
+            let id = ShipId(g.fresh_id());
+            let built_turn = g.turn;
+            g.ships.push(Ship {
+                id,
+                kind: UnitKind::ColonyShip,
+                seat: Seat(0),
+                damage: 0,
+                at: ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 1 },
+                colonists: 8,
+                army: None,
+                stance: Stance::Hold,
+                escaped: false,
+                arrived_this_turn: false,
+                built_turn,
+                fuel: 30,
+            });
+            for _ in 0..40 {
+                let before = g.clone();
+                g.report.moments.clear();
+                g.resolution_phase();
+                if g.report.moments.iter().any(|m| m.kind == MomentKind::LostInTransit) {
+                    break;
+                }
+                *g = before;
+                // Advance the dice one roll and try the same turn again.
+                dying_earth_engine::combat::Dice::chance(&mut g.rng, 0.5);
+            }
+        }
+        // `array:1` (a building aid, ticket #89): a Solar Array stands on seat 0's station over
+        // Earth and its card opens in the Earth picture, so the array's line and the button show.
+        if std::env::args().any(|a| a == "array:1")
+            && let Some(id) = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.id)
+        {
+            g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::SolarArray));
+            g.seats[0].stockpile.materials = 120;
+            ARCHIVE_COLONY.with(|c| c.set(Some(id)));
+        }
+        // `driver:1` (a building aid, ticket #92): Efficient Transit stands, and seat 0 holds a
+        // Colony on the Moon with a Mine and a Mass Driver, its card open in the Moon picture.
+        if std::env::args().any(|a| a == "driver:1") {
+            g.research.done.push(TechId::EfficientTransit);
+            let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
+            let id = ColonyId(g.fresh_id());
+            let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Mine), Module::new(ModuleKind::MassDriver)];
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.seats[0].stockpile.materials = 120;
+            g.seats[0].stockpile.energy = 60;
+            ARCHIVE_COLONY.with(|c| c.set(Some(id)));
+        }
+        // `dry:1` (a building aid, ticket #87): seat 0's Ships at Mars have one Fuel in the tank and
+        // no station of theirs overhead, so the stack reads stranded and its panel says why.
+        if std::env::args().any(|a| a == "dry:1") {
+            for s in g.ships.iter_mut().filter(|s| s.seat == Seat(0) && s.at == ShipAt::Body(BodyId::Mars)) {
+                s.fuel = 1;
+            }
         }
         // `pressed:<n>` (a building aid, ticket #75): seat 0 holds North Africa (a short card) with a
         // Standing of n there, and seat 1 stands at n too, so the card's warning line shows.
@@ -354,7 +470,8 @@ fn build_board(session: &mut Session) {
         // `found:1` (a building aid, ticket #58): seat 0 lands a loaded Colony Ship at the Moon and
         // the turn runs, so the Report carries a real founding, its headline and its Moment. An AI
         // game founds one on a turn nobody can choose. `moment:colony` implies it.
-        if std::env::args().any(|a| a == "found:1" || a == "moment:colony") {
+        // Ticket #85: unless `antarctic:<n>` staged a founding of its own for the Moment.
+        if std::env::args().any(|a| a == "found:1" || a == "moment:colony") && !std::env::args().any(|a| a.starts_with("antarctic:")) {
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
             g.ships.push(Ship {
@@ -369,6 +486,7 @@ fn build_board(session: &mut Session) {
                 escaped: false,
                 arrived_this_turn: false,
                 built_turn,
+                fuel: 30,
             });
             if let Some(slot) = g.free_slots_on(BodyId::Moon).first().copied() {
                 let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());

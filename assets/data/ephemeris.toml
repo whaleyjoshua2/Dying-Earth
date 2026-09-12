@@ -41,6 +41,23 @@ perihelion_longitude_rate = 0.44441088
 node_longitude = 49.55953891
 node_longitude_rate = -0.29257343
 
+# Ticket #93 (version 0.06.0): Venus, from the same JPL table (docs/research/venus-ephemeris.md,
+# checked against Horizons to 14 arcseconds at 2030-01-01).
+[[planet]]
+id = "venus"
+a = 0.72333566
+a_rate = 0.00000390
+e = 0.00677672
+e_rate = -0.00004107
+inclination = 3.39467605
+inclination_rate = -0.00078890
+mean_longitude = 181.97909950
+mean_longitude_rate = 58517.81538729
+perihelion_longitude = 131.60246718
+perihelion_longitude_rate = 0.00268329
+node_longitude = 76.67984255
+node_longitude_rate = -0.27769418
+
 # What a transit between the Earth system and the Mars system costs. The window offset is the
 # signed difference, in degrees, between the phase angle now (Mars's heliocentric longitude less
 # Earth's) and the Hohmann departure angle. At the window a transit costs the Hohmann flight and
@@ -68,3 +85,17 @@ days_per_turn = 60.0
 max_turns = 9
 # Earth and Mars come back to the same phase angle this often: the cycle a window is looked for in.
 synodic_days = 779.9
+
+# Ticket #93 (version 0.06.0): the same for a transit between the Earth system and Venus, from
+# docs/research/venus-ephemeris.md. The phase angle is Venus's heliocentric longitude less Earth's:
+# the flight out wants Venus 54 degrees behind Earth, the flight home Venus 36 degrees behind.
+# The Hohmann flight is 146 days, three turns of sixty; the windows fall at turns 9, 18 and 28.
+[transit_venus]
+days_at_window = 146.08
+hohmann_angle = -54.03
+return_hohmann_angle = -36.03
+days_per_degree = 1.5
+fuel_per_degree = 0.00833333
+days_per_turn = 60.0
+max_turns = 9
+synodic_days = 583.92

@@ -42,6 +42,8 @@ slots = [
 
 [[body]]
 id = "moon"
+# Ticket #92 (version 0.06.0): a small world, where a Mass Driver may stand.
+low_gravity = true
 name = "the Moon"
 parent = "earth"
 local_turns = 1
@@ -87,6 +89,7 @@ slots = [
 # 1 Fuel between them.
 [[body]]
 id = "phobos"
+low_gravity = true
 name = "Phobos"
 parent = "mars"
 local_turns = 1
@@ -106,6 +109,7 @@ slots = [
 
 [[body]]
 id = "deimos"
+low_gravity = true
 name = "Deimos"
 parent = "mars"
 local_turns = 1
@@ -121,3 +125,21 @@ stations = ["Deimos Gateway"]
 slots = [
     { name = "Swift", lon = -2.0, lat = 12.5 },
 ]
+
+# Version 0.06.0 (ticket #93): Venus, a Body of orbits only. Three turns and 16 Fuel from Earth on
+# its own Launch Window (ephemeris.toml, `[transit_venus]`); legs from the Earth system only. No
+# Colony Slots, so nothing lands and no Body yield is ever read; three Orbital Slots, Venus's three
+# highlands, where everything at Venus is built and held. Colonists on a station there are off
+# Earth for every rule, and a station there is Venus for the Arkwrights' Diaspora.
+[[body]]
+id = "venus"
+name = "Venus"
+transit_turns = 3
+transit_fuel = 16
+mine_yield = 1.0
+generator_yield = 1.0
+refinery_yield = 1.0
+habitat_yield = 1.0
+orbital_slots = 3
+stations = ["Ishtar", "Aphrodite", "Lada"]
+slots = []

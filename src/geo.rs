@@ -114,6 +114,8 @@ pub fn solar_position(body: BodyId, turn: u32, lon: f32) -> Vec3 {
         // Ticket #45: the moons of Mars, close in, drawn far larger than life to be clickable.
         BodyId::Phobos => solar_position(BodyId::Mars, turn, lon) + Vec3::new(0.7 * (t * 1.3).cos(), 0.0, 0.7 * (t * 1.3).sin()),
         BodyId::Deimos => solar_position(BodyId::Mars, turn, lon) + Vec3::new(1.05 * (t * 0.7 + 2.0).cos(), 0.0, 1.05 * (t * 0.7 + 2.0).sin()),
+        // Ticket #93: Venus on its own ring inside Earth's, at 0.72 of Earth's distance.
+        BodyId::Venus => on_ring(2.45),
     }
 }
 
@@ -129,5 +131,6 @@ pub fn solar_radius(body: BodyId) -> f32 {
         BodyId::Mars => 0.32,
         BodyId::Phobos => 0.1,
         BodyId::Deimos => 0.08,
+        BodyId::Venus => 0.40,
     }
 }

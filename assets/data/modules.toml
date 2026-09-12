@@ -34,7 +34,8 @@ name = "Habitat"
 materials = 25
 build_turns = 1
 energy_upkeep = 2
-holds_colonists = 4
+# Ticket #80 (version 0.06.0): 8, from 4 (the Arkwrights 12; Expanded Habitats still +2).
+holds_colonists = 8
 
 [[module]]
 id = "shipyard"
@@ -50,14 +51,28 @@ materials = 20
 build_turns = 1
 energy_upkeep = 2
 
-# Ticket #35 (version 0.03). Makes 3 Ducats x the Body's Habitat yield.
+# Ticket #35 (version 0.03): made 3 Ducats x the Body's Habitat yield. Ticket #90 (version 0.06.0):
+# trade is a network. It makes `amount` Ducats per Colonist of its Faction at its Body (stations
+# overhead included) plus `[trade_post] per_other_body` for every other Body where the Faction
+# holds a Colony, a station or, for Earth, a Nation State; no Habitat yield; the Faction's output
+# multiplier applies. One per Faction per Body, on a station or on the ground.
 [[module]]
 id = "trade_post"
 name = "Trade Post"
 materials = 25
 build_turns = 1
 energy_upkeep = 2
-produces = { resource = "ducats", amount = 3 }
+produces = { resource = "ducats", amount = 2 }
+
+[trade_post]
+per_other_body = 3
+
+# Ticket #92 (version 0.06.0): the Mass Driver's figures; its row is the last in the file, in the
+# engine's order.
+[mass_driver]
+fuel_off = 4
+fuel_min = 1
+mine_bonus = 1
 
 # Ticket #36 (version 0.03). Adds to its holder's Allotment and raises its Colony's standing each turn.
 [[module]]
@@ -87,3 +102,58 @@ energy_upkeep = 12
 [archive]
 research = 80
 banked_before_built = 0.25
+
+# Ticket #80 (version 0.06.0): the Observatory, the one Module that makes Research, on a Colony, a
+# Space Station or in Antarctica. It takes no Body yield and no output multiplier: `amount`
+# Research a turn, plus `research_per_colonist` for every Colonist at its Colony (one per cent,
+# uncapped), times the Faction's Research multiplier and Public Science, rounded down, as a
+# Research Lab is.
+[[module]]
+id = "observatory"
+name = "Observatory"
+materials = 28
+build_turns = 2
+energy_upkeep = 3
+produces = { resource = "research", amount = 2 }
+
+[observatory]
+research_per_colonist = 0.01
+
+# Ticket #89 (version 0.06.0): the Solar Array, a Module only a Space Station holds
+# (`station_only`). It makes `amount` Energy at Earth's distance from the Sun, scaled by the
+# inverse square of its Body's mean distance (`sun_scaled`: Earth and the Moon x1, Mars and its
+# moons x0.43, Venus x1.91), rounded to the nearest whole; no Body yield; Efficient Grids lifts it
+# and a Solar Storm turn silences it. Any number may stand on one station.
+[[module]]
+id = "solar_array"
+name = "Solar Array"
+materials = 25
+build_turns = 2
+energy_upkeep = 0
+produces = { resource = "energy", amount = 6 }
+station_only = true
+sun_scaled = true
+
+# Ticket #92 (version 0.06.0): the Mass Driver, a Module only a ground Colony on a low-gravity
+# Body (bodies.toml `low_gravity`: the Moon, Phobos, Deimos) holds, one per Colony, behind
+# `needs_tech`. While it is working, every transit the owner's Ships fly from that Body spends
+# `[mass_driver] fuel_off` less, after the Faction's and the Tech's multipliers, never below
+# `fuel_min`; and each Mine at its Colony makes `mine_bonus` more Materials, after everything.
+[[module]]
+id = "mass_driver"
+name = "Mass Driver"
+materials = 35
+build_turns = 2
+energy_upkeep = 4
+needs_tech = "efficient_transit"
+low_gravity_only = true
+
+# Ticket #88 (version 0.06.0): build it where you dig. A Module (the Archive included) built at a
+# Colony with one working Mine costs `one_mine` of its price, with two or more `two_mines`,
+# multiplicative with the Faction's own discount, rounded down, never below `floor` of the row.
+# A mothballed or unfinished Mine counts for nothing; Antarctica counts; Ships and stations do not
+# take it.
+[in_situ]
+one_mine = 0.75
+two_mines = 0.6
+floor = 0.5

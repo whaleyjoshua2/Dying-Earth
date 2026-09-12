@@ -15,10 +15,13 @@ struct Producer {
     extraction: bool,
     research: i64,
     online: bool,
+    /// Ticket #82: the Facility on Earth whose mothball doubles this Module, if one does.
+    doubled_by: Option<&'static str>,
 }
 
 /// One building's per-turn figures at today's multipliers, for the cards and the build buttons.
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// (Not `Copy` since ticket #90: the detail line is a String.)
+#[derive(Debug, Clone, PartialEq)]
 pub struct Yield {
     pub resource: Option<Resource>,
     pub amount: i64,
@@ -28,6 +31,12 @@ pub struct Yield {
     /// Ticket #36: Influence Allotment added while it stands, and standing raised each turn.
     pub allotment: i64,
     pub standing: i64,
+    /// Ticket #82 (version 0.06.0): the Facility on Earth whose mothball doubles this Module, if
+    /// one does (the Custodians' signature).
+    pub doubled_by: Option<&'static str>,
+    /// Ticket #90 (version 0.06.0): how the figure was reached, for the card ("2 x 12 Colonists +
+    /// 3 x 2 Bodies"), when a Module's arithmetic is worth showing.
+    pub detail: Option<String>,
 }
 
 impl Yield {
@@ -43,6 +52,14 @@ impl Yield {
         }
         if self.research > 0 {
             parts.push(format!("+{} Research", self.research));
+        }
+        // Ticket #90: the arithmetic, when a Module has one worth showing.
+        if let Some(d) = &self.detail {
+            parts.push(format!("({d})"));
+        }
+        // Ticket #82: the Custodians' Production Moved.
+        if let Some(f) = self.doubled_by {
+            parts.push(format!("doubled by an idle {f} on Earth"));
         }
         if self.allotment > 0 {
             parts.push(format!("+{} Influence Allotment", self.allotment));
@@ -183,7 +200,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let card = t.state(sid);
         let fc = t.facility(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn };
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None };
         if let Some(p) = &fc.produces {
             match p.resource {
                 Resource::Research => {
@@ -194,6 +211,8 @@ impl Game {
                     } else {
                         let mut r = p.amount as f64 * self.population_factor(sid) * card.education_level * fac.research_multiplier;
                         r *= self.tech_multiplier(seat, TechId::PublicScience);
+                        // Ticket #84: the Upload stacks on Public Science.
+                        r *= self.tech_multiplier(seat, TechId::TheUpload);
                         y.research = r.floor() as i64;
                     }
                 }
@@ -246,20 +265,62 @@ impl Game {
         let t = &self.tables;
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn };
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None };
         let Some(col) = self.colony(cid) else { return y };
         // Ticket #57: the yield is the Colony Slot's own, not its Body's. The Body's figures are
         // what the slot drew from when the game started; a station in orbit keeps the Body's.
         if let Some(p) = &mc.produces {
-            let yield_ = self.colony_yields(col).of_module(kind);
-            let mut v = p.amount as f64 * yield_ * fac.output_multiplier * self.tech_output_multiplier_module(seat, kind);
-            for d in &self.discoveries {
-                if d.body == col.body && d.kind == kind {
-                    v *= d.multiplier;
+            if kind == ModuleKind::TradePost {
+                // Ticket #90 (version 0.06.0): trade is a network. `amount` Ducats per Colonist of
+                // the Faction at this Body, plus `per_other_body` for every other Body the Faction
+                // holds; no Body yield; the Faction's output multiplier applies.
+                let here = self.colonists_at_body(seat, col.body) as i64;
+                let others = self.bodies_held(seat).into_iter().filter(|b| *b != col.body).count() as i64;
+                let per_other = t.trade_post.per_other_body;
+                let raw = p.amount * here + per_other * others;
+                y.resource = Some(Resource::Ducats);
+                y.amount = (raw as f64 * fac.output_multiplier).floor() as i64;
+                y.detail = Some(format!("{} x {here} Colonists + {per_other} x {others} Bodies", p.amount));
+            } else if p.resource == Resource::Research {
+                // Ticket #80 (version 0.06.0): the Observatory. No Body yield and no output
+                // multiplier: its amount, plus one per cent for every Colonist at its Colony, times
+                // the Faction's Research multiplier and Public Science, rounded down, as a Lab is.
+                let per = t.observatory.research_per_colonist;
+                // Ticket #81: a Faction may carry a second Research multiplier for off Earth (the
+                // Archivists' 1.75), a station over Earth counting as off and Antarctica as on.
+                let research_multiplier = if self.off_earth(col) { fac.research_multiplier_off_earth.unwrap_or(fac.research_multiplier) } else { fac.research_multiplier };
+                let mut r = p.amount as f64 * (1.0 + col.colonists as f64 * per) * research_multiplier;
+                r *= self.tech_multiplier(seat, TechId::PublicScience);
+                // Ticket #84: the Upload stacks on Public Science.
+                r *= self.tech_multiplier(seat, TechId::TheUpload);
+                y.research = r.floor() as i64;
+            } else {
+                // Ticket #89: a sun-scaled Module (the Solar Array) reads the sunlight where its
+                // Body stands instead of a Body yield, is silenced by a Solar Storm turn, and
+                // rounds to the nearest whole.
+                let yield_ = if mc.sun_scaled { self.sun_factor(col.body) } else { self.colony_yields(col).of_module(kind) };
+                let mut v = p.amount as f64 * yield_ * fac.output_multiplier * self.tech_output_multiplier_module(seat, kind);
+                for d in &self.discoveries {
+                    if d.body == col.body && d.kind == kind {
+                        v *= d.multiplier;
+                    }
+                }
+                if mc.sun_scaled && self.event_is(EventId::SolarStorm) {
+                    v = 0.0;
+                }
+                y.resource = Some(p.resource);
+                y.amount = if mc.sun_scaled { v.round() as i64 } else { v.floor() as i64 };
+                // Ticket #92: a working Mass Driver at the Colony gives each Mine there more, after
+                // everything.
+                if kind == ModuleKind::Mine && col.modules.iter().any(|m| m.kind == ModuleKind::MassDriver && m.working()) {
+                    y.amount += t.mass_driver.mine_bonus;
                 }
             }
-            y.resource = Some(p.resource);
-            y.amount = v.floor() as i64;
+        }
+        // Ticket #92: a Mass Driver makes nothing itself; the card says what it does.
+        if kind == ModuleKind::MassDriver {
+            let md = &t.mass_driver;
+            y.detail = Some(format!("departures from here {} Fuel cheaper, never under {}; each Mine here +{} Materials", md.fuel_off, md.fuel_min, md.mine_bonus));
         }
         // Ticket #51: the Archive draws its Energy only once it is complete; ticket #68: that is
         // standing with its Research paid in full. Until then it costs nothing to run.
@@ -268,6 +329,57 @@ impl Game {
             y.upkeep = if complete { mc.energy_upkeep } else { 0 };
         }
         y.upkeep = (y.upkeep as f64 * self.tech_multiplier(seat, TechId::ClosedLoopColonies)).floor() as i64;
+        y
+    }
+
+    /// Ticket #82 (version 0.06.0): the Modules a seat's mothballed Facilities on Earth double,
+    /// as (Colony, Module index), in the order they were paired.
+    pub fn doubled_modules(&self, seat: Seat) -> Vec<(ColonyId, usize)> {
+        let pairs = &self.tables.faction(self.kind(seat)).mothball_pairs;
+        let mut out = Vec::new();
+        if pairs.is_empty() {
+            return out;
+        }
+        for (fk, mk) in pairs {
+            // Ticket #82: one idle Facility of the kind doubles one Module of its pair, the most
+            // productive undoubled one off Earth first (a station over Earth is off Earth;
+            // Antarctica is not); with no idle Facility there is no bonus.
+            let idle = self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| f.kind == *fk && f.mothballed).count();
+            if idle == 0 {
+                continue;
+            }
+            let mut candidates: Vec<((ColonyId, usize), i64)> = Vec::new();
+            for cid in self.directed_colonies(seat) {
+                let col = self.colony(cid).unwrap();
+                if !self.off_earth(col) {
+                    continue;
+                }
+                for (i, m) in col.modules.iter().enumerate() {
+                    if m.kind == *mk && !m.mothballed {
+                        let y = self.module_yield(seat, cid, *mk);
+                        candidates.push(((cid, i), y.amount.max(y.research)));
+                    }
+                }
+            }
+            candidates.sort_by_key(|c| std::cmp::Reverse(c.1));
+            out.extend(candidates.into_iter().take(idle).map(|(k, _)| k));
+        }
+        out
+    }
+
+    /// Ticket #82: one Module's figures, the doubling applied on the final figure if it is one of
+    /// `doubled_modules`, named for the Facility whose mothball pays for it.
+    pub fn module_yield_at(&self, seat: Seat, cid: ColonyId, index: usize) -> Yield {
+        let Some(kind) = self.colony(cid).and_then(|c| c.modules.get(index)).map(|m| m.kind) else {
+            return Yield { resource: None, amount: 0, research: 0, upkeep: 0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None };
+        };
+        let mut y = self.module_yield(seat, cid, kind);
+        if self.doubled_modules(seat).contains(&(cid, index)) {
+            let pairs = &self.tables.faction(self.kind(seat)).mothball_pairs;
+            y.amount *= 2;
+            y.research *= 2;
+            y.doubled_by = pairs.iter().find(|(_, m)| **m == kind).map(|(f, _)| f.name());
+        }
         y
     }
 
@@ -294,6 +406,7 @@ impl Game {
                     extraction: matches!(f.kind, FacilityKind::Factory | FacilityKind::Refinery),
                     research: halve(y.research),
                     online: !f.offline_until_resolution,
+                    doubled_by: None,
                 });
             }
         }
@@ -306,7 +419,8 @@ impl Game {
                 if m.mothballed {
                     continue;
                 }
-                let y = self.module_yield(seat, cid, m.kind);
+                // Ticket #82: the doubling, if this Module has one, is on the figure.
+                let y = self.module_yield_at(seat, cid, i);
                 out.push(Producer {
                     place: ProducerPlace::Module(cid, i),
                     name: m.kind.name(),
@@ -314,8 +428,10 @@ impl Game {
                     upkeep: y.upkeep,
                     output: y.resource.map(|r| (r, y.amount)),
                     extraction: matches!(m.kind, ModuleKind::Mine | ModuleKind::Refinery),
-                    research: 0,
+                    // Ticket #80: an Observatory's Research.
+                    research: y.research,
                     online: !col.grid_failed && !m.offline_until_resolution && !(m.kind == ModuleKind::Archive && occupied),
+                    doubled_by: y.doubled_by,
                 });
             }
         }
@@ -349,12 +465,14 @@ impl Game {
 
     fn tech_output_multiplier_module(&self, seat: Seat, kind: ModuleKind) -> f64 {
         let mut m = 1.0;
-        if kind == ModuleKind::Generator {
+        // Ticket #89: a Solar Array reads the Sun as a Generator does.
+        if matches!(kind, ModuleKind::Generator | ModuleKind::SolarArray) {
             m *= self.solar_maximum_multiplier();
         }
         match kind {
-            ModuleKind::Generator => m *= self.tech_multiplier(seat, TechId::EfficientGrids),
-            ModuleKind::Mine => m *= self.tech_multiplier(seat, TechId::DeepMining),
+            ModuleKind::Generator | ModuleKind::SolarArray => m *= self.tech_multiplier(seat, TechId::EfficientGrids),
+            // Ticket #84: the Extraction Charter stacks on Deep Mining.
+            ModuleKind::Mine => m *= self.tech_multiplier(seat, TechId::DeepMining) * self.tech_multiplier(seat, TechId::ExtractionCharter),
             ModuleKind::Refinery => m *= self.tech_multiplier(seat, TechId::AutomatedRefining),
             _ => {}
         }
@@ -362,8 +480,11 @@ impl Game {
     }
 
     /// A controlled state's base Ducats a turn (ticket #35): gdp x Industry Level / 10, rounded down.
+    /// Ticket #83 (version 0.06.0): times its controller's `ducats_multiplier` (the Prospectors' 1.2).
     pub fn state_ducats(&self, sid: StateId) -> i64 {
-        (self.tables.state(sid).gdp * self.state(sid).industry_level as i64) / 10
+        let base = (self.tables.state(sid).gdp * self.state(sid).industry_level as i64) / 10;
+        let m = self.state(sid).control.controller().map(|s| self.tables.faction(self.kind(s)).ducats_multiplier).unwrap_or(1.0);
+        (base as f64 * m).floor() as i64
     }
 
     /// Upkeep of every Ship and non-standing Army of a seat; always paid first (spec 7.2).
@@ -424,6 +545,8 @@ impl Game {
         let (balance, shut) = self.apply_shortfall(seat, &mut producers);
         let mut gained = Stockpile::default();
         let mut research = 0;
+        let mut off_earth = 0;
+        let mut doubled_turns = 0;
         let mut extraction = 0;
         let mut sources: Vec<(String, Resource, i64)> = Vec::new();
         for p in &producers {
@@ -442,9 +565,23 @@ impl Game {
             if !p.online {
                 continue;
             }
+            // Ticket #82: a doubled Module says what doubled it, and is counted for the measurement.
+            let where_ = match p.doubled_by {
+                Some(f) => {
+                    doubled_turns += 1;
+                    format!("{where_} (doubled by an idle {f} on Earth)")
+                }
+                None => where_,
+            };
             research += p.research;
             if p.research > 0 {
                 sources.push((format!("{} in {}", p.name, where_), Resource::Research, p.research));
+                // Ticket #80: Research made off Earth, for the measurement.
+                if let ProducerPlace::Module(cid, _) = p.place
+                    && self.colony(cid).map(|c| self.off_earth(c)).unwrap_or(false)
+                {
+                    off_earth += p.research;
+                }
             }
             if let Some((res, v)) = p.output {
                 match res {
@@ -503,6 +640,8 @@ impl Game {
             // Ticket #50: every seat keeps both running totals; a Faction's card says which one its
             // Victory Condition counts.
             s.research_total += research;
+            s.research_off_earth_total += off_earth;
+            s.doubled_module_turns += doubled_turns;
             s.venture_fund += banked;
             s.venture_banked_last_turn = banked;
         }

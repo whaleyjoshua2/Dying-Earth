@@ -96,8 +96,12 @@ energy_zero = "{faction}: Energy fell to zero even with every producer off."
 attacks = " and attacks"
 cargo_aboard = " with {n} Colonists aboard"
 sea_unrest = " Unrest there rose by {rose} to {unrest}."
+# Ticket #85 (version 0.06.0): the count is an ordinal ("second", "twelfth", "13th"), and a
+# Colony founded in Antarctica has phrases of its own, since Antarctica is on Earth.
 first_colony = "their first Colony off Earth"
-more_colonies = "their {count} Colony off Earth"
+more_colonies = "their {ordinal} Colony off Earth"
+first_antarctic_colony = "their first Colony in Antarctica"
+more_antarctic_colonies = "their {ordinal} Colony in Antarctica"
 slot = "slot"
 slots = "slots"
 pick_first_choice = "The {faction} pick {tech}, their first choice."
@@ -126,6 +130,8 @@ set_venture_share = "set the Venture Capital Fund to bank {share}% of its Materi
 draw_venture = "drew {n} Materials from the Venture Capital Fund"
 repair = "repaired {unit}"
 transit = "sent a {unit} to {body}"
+# Ticket #87 (version 0.06.0): the Refuel order.
+refuel = "refuelled {unit} at {body}"
 ship_stance = "set its Ships at {body} to {stance}"
 army_stance = "set its Armies at {place} to {stance}"
 move_army = "moved an Army into {state}"
@@ -169,6 +175,12 @@ figure = "{figure}"
 on = true
 text = "A Battle at {place}: {result}"
 figure = "{figure}"
+
+# Ticket #86 (version 0.06.0): Colonists lost to crowding on a Colony Ship's arrival.
+[moments.lost_in_transit]
+on = true
+text = "{n} of the {of} crowded aboard the {faction}' {ship} died on the way to {body}."
+figure = "{n} lost"
 
 [moments.tech_complete]
 on = true

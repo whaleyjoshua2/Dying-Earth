@@ -158,6 +158,18 @@ impl Game {
     pub fn ai_tech_pick_with_reason(&self, seat: Seat) -> (TechId, &'static str) {
         let picks = self.tables.ai_tech_picks(self.kind(seat));
         let available = self.available_techs();
+        // Ticket #84 (version 0.06.0): as Research Lead, the AI opens its own door once its first
+        // part is past `gate_pick_fraction` of its bar or from `gate_pick_turn`, whichever comes
+        // first, the road to the gate standing.
+        if let Some(gate) = self.tables.victory_gate(self.kind(seat))
+            && available.contains(&gate)
+        {
+            let th = &self.tables.ai.thresholds;
+            let p = self.progress(seat);
+            if p.first_fraction() >= th.gate_pick_fraction || self.turn >= th.gate_pick_turn {
+                return (gate, "pick_first_choice");
+            }
+        }
         for t in &picks.order {
             if available.contains(t) {
                 return (*t, "pick_first_choice");

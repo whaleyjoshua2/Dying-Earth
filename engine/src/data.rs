@@ -56,6 +56,9 @@ pub struct BodyCard {
     pub local_fuel: i64,
     pub transit_turns: u32,
     pub transit_fuel: i64,
+    /// Ticket #92 (version 0.06.0): a small world, where a Mass Driver may stand.
+    #[serde(default)]
+    pub low_gravity: bool,
     pub mine_yield: f64,
     pub generator_yield: f64,
     pub refinery_yield: f64,
@@ -166,6 +169,28 @@ pub struct ModuleCard {
     /// Version 0.04 (ticket #44): what the Module emits on Earth, as its counterpart Facility does.
     #[serde(default)]
     pub earth_emissions: f64,
+    /// Ticket #89 (version 0.06.0): only a Space Station holds it.
+    #[serde(default)]
+    pub station_only: bool,
+    /// Ticket #89: its output scales with the inverse square of its Body's mean distance from the
+    /// Sun instead of a Body yield, and a Solar Storm turn silences it.
+    #[serde(default)]
+    pub sun_scaled: bool,
+    /// Ticket #92 (version 0.06.0): the Tech that must stand before it can be built, if any.
+    #[serde(default)]
+    pub needs_tech: Option<TechId>,
+    /// Ticket #92: only a ground Colony on a low-gravity Body holds it.
+    #[serde(default)]
+    pub low_gravity_only: bool,
+}
+
+/// Ticket #92 (version 0.06.0): the Mass Driver's figures: the Fuel it takes off the owner's
+/// departures (never below the minimum) and what each Mine at its Colony makes more.
+#[derive(Debug, Clone, Deserialize)]
+pub struct MassDriverCard {
+    pub fuel_off: i64,
+    pub fuel_min: i64,
+    pub mine_bonus: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -178,6 +203,9 @@ pub struct UnitCard {
     pub strength: i64,
     pub hit_points: u32,
     pub pursuit: u32,
+    /// Ticket #87 (version 0.06.0): the Fuel a Ship of this type carries; an Army none.
+    #[serde(default)]
+    pub tank: i64,
     pub carries_colonists: u32,
     pub carries_army: bool,
 }
@@ -199,6 +227,9 @@ pub struct TechCard {
     pub value: f64,
     #[serde(default)]
     pub influence_threshold_multiplier: Option<f64>,
+    /// Ticket #84 (version 0.06.0): the Faction whose Victory Condition this Tech opens, if any.
+    #[serde(default)]
+    pub gate_for: Option<FactionKind>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -257,7 +288,16 @@ pub struct FactionCard {
     pub output_multiplier: f64,
     pub emissions_multiplier: f64,
     pub research_multiplier: f64,
+    /// Ticket #81 (version 0.06.0): the Research multiplier for an Observatory off Earth (a station
+    /// over Earth included, Antarctica not); absent, the one figure serves both.
+    #[serde(default)]
+    pub research_multiplier_off_earth: Option<f64>,
     pub influence_multiplier: f64,
+    /// Ticket #82 (version 0.06.0): the Custodians' Production Moved. While a Facility of the key's
+    /// kind in a state they direct is mothballed, one Module of the value's kind off Earth makes
+    /// double. Empty on every other card.
+    #[serde(default)]
+    pub mothball_pairs: std::collections::BTreeMap<FacilityKind, ModuleKind>,
     pub signature: String,
     /// The Victory Condition in prose, for the cards and the panel.
     pub victory: String,
@@ -287,6 +327,19 @@ pub struct FactionCard {
     /// Steerage: what a Colony Ship costs, in place of the units.toml figure.
     #[serde(default)]
     pub colony_ship_materials: Option<i64>,
+    /// Ticket #83 (version 0.06.0): every Ship's Materials, times this, rounded down (the
+    /// Arkwrights' 0.85).
+    #[serde(default = "one_f64")]
+    pub ship_materials_multiplier: f64,
+    /// Ticket #83: a controlled Nation State's own GDP income, times this, rounded down (the
+    /// Prospectors' 1.2). Banks and Trade Posts take the general output multiplier instead.
+    #[serde(default = "one_f64")]
+    pub ducats_multiplier: f64,
+    /// Ticket #83: what the Trading window charges this Faction for a lot of Materials, Fuel or
+    /// Energy, or a building bought outright, times this, rounded down (the Prospectors' 0.85).
+    /// Influence and selling are untouched.
+    #[serde(default = "one_f64")]
+    pub market_multiplier: f64,
     /// A Space Station's Materials, times this.
     #[serde(default = "one_f64")]
     pub station_materials_multiplier: f64,
@@ -396,7 +449,9 @@ pub struct DucatsCard {
     pub sell_divisor: i64,
     pub per_building_material: i64,
     pub bank_per_gdp_tenth: f64,
-    pub trade_post_base: f64,
+    /// Ticket #90 (version 0.06.0): retired; kept optional so an old table still loads.
+    #[serde(default)]
+    pub trade_post_base: Option<f64>,
 }
 
 /// Ticket #55 (version 0.05): what one Break does when it fires. The figures each kind reads sit
@@ -615,6 +670,8 @@ pub struct TransitTable {
 struct EphemerisFile {
     planet: Vec<PlanetElements>,
     transit: TransitTable,
+    /// Ticket #93 (version 0.06.0): the Earth-Venus transfer, the same shape.
+    transit_venus: TransitTable,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -624,6 +681,11 @@ pub struct AiWeights {
     pub build_sea_wall: f64,
     pub raise_industry: f64,
     pub build_research_lab: f64,
+    /// Ticket #80 (version 0.06.0): an Observatory is offered, at the Research Lab weight, at a
+    /// Colony or station holding this many Colonists.
+    pub observatory_colonists: u32,
+    /// Ticket #81: the Observatory's own weight, apart from the Lab's.
+    pub build_observatory: f64,
     pub build_habitat: f64,
     pub build_launch_site_or_shipyard: f64,
     pub build_colony_ship: f64,
@@ -693,6 +755,10 @@ pub struct AiThresholds {
     pub influence_step: i64,
     /// Ticket #75: a held state's worth on the Influence target list, as a share of a neutral one's.
     pub held_state_weight: f64,
+    /// Ticket #84 (version 0.06.0): as Research Lead the AI picks its Victory gate once its first
+    /// part is past this fraction of its bar, or from this turn, whichever comes first.
+    pub gate_pick_fraction: f64,
+    pub gate_pick_turn: u32,
 }
 
 /// Ticket #50: one pick list per Faction. `order` is tried first, then the cheapest available
@@ -801,15 +867,55 @@ pub struct ArchiveCard {
     pub banked_before_built: f64,
 }
 
+/// Ticket #80 (version 0.06.0): the Observatory's one figure beyond its row: the share of its
+/// Research each Colonist at its Colony adds (one per cent).
+#[derive(Debug, Clone, Deserialize)]
+pub struct ObservatoryCard {
+    pub research_per_colonist: f64,
+}
+
+/// Ticket #88 (version 0.06.0): build it where you dig. A Module at a Colony with one working
+/// Mine costs `one_mine` of its price, with two or more `two_mines`, never below `floor` of the row.
+#[derive(Debug, Clone, Deserialize)]
+pub struct InSituCard {
+    pub one_mine: f64,
+    pub two_mines: f64,
+    pub floor: f64,
+}
+
+/// Ticket #90 (version 0.06.0): the Trade Post's network figure, Ducats for every other Body the
+/// Faction holds; the per-Colonist figure is the row's `produces.amount`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct TradePostCard {
+    pub per_other_body: i64,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct ModulesFile {
     module: Vec<ModuleCard>,
     archive: ArchiveCard,
+    observatory: ObservatoryCard,
+    in_situ: InSituCard,
+    trade_post: TradePostCard,
+    mass_driver: MassDriverCard,
 }
 #[derive(Debug, Clone, Deserialize)]
 struct UnitsFile {
     unit: Vec<UnitCard>,
     repair: RepairCard,
+    crowding: CrowdingCard,
+}
+
+/// Ticket #86 (version 0.06.0): a warming Earth fills the Colony Ships. `per_step` Colonists
+/// beyond capacity for every full `step` degrees above `above`, at most `cap`; at arrival each
+/// extra dies with a chance of `death_chance_per_extra` times the number of extras.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CrowdingCard {
+    pub above: f64,
+    pub step: f64,
+    pub per_step: u32,
+    pub cap: u32,
+    pub death_chance_per_extra: f64,
 }
 #[derive(Debug, Clone, Deserialize)]
 struct TechsFile {
@@ -857,6 +963,8 @@ pub struct Tables {
     /// Ticket #57: the Keplerian elements of Earth and Mars, and the transit table (`ephemeris.toml`).
     pub planets: Vec<PlanetElements>,
     pub transit: TransitTable,
+    /// Ticket #93 (version 0.06.0): the Earth-Venus transfer.
+    pub transit_venus: TransitTable,
     pub states: Vec<StateCard>,
     /// Ticket #53: how a neutral Nation State develops itself (`nation_states.toml`).
     pub development: DevelopmentTable,
@@ -874,8 +982,18 @@ pub struct Tables {
     pub modules: Vec<ModuleCard>,
     /// Ticket #51: the Archive's stages and their Research price.
     pub archive: ArchiveCard,
+    /// Ticket #80: the Observatory's Research per Colonist.
+    pub observatory: ObservatoryCard,
+    /// Ticket #88: the discount a Colony's working Mines give its Modules.
+    pub in_situ: InSituCard,
+    /// Ticket #90: the Trade Post's network figure.
+    pub trade_post: TradePostCard,
+    /// Ticket #92: the Mass Driver's Fuel cut and Mine bonus.
+    pub mass_driver: MassDriverCard,
     pub units: Vec<UnitCard>,
     pub repair: RepairCard,
+    /// Ticket #86: the crowd a warming Earth puts aboard a Colony Ship, and what it risks.
+    pub crowding: CrowdingCard,
     pub techs: Vec<TechCard>,
     pub events: EventsTable,
     pub factions: Vec<FactionCard>,
@@ -933,6 +1051,7 @@ impl Tables {
             slot_yield_spread: bodies.slot_yield_spread,
             planets: ephemeris.planet,
             transit: ephemeris.transit,
+            transit_venus: ephemeris.transit_venus,
             bodies: bodies.body,
             states: states.state,
             development: states.development,
@@ -944,9 +1063,14 @@ impl Tables {
             scrubber: facilities.scrubber,
             mothball: facilities.mothball,
             archive: modules.archive,
+            observatory: modules.observatory,
+            in_situ: modules.in_situ,
+            trade_post: modules.trade_post,
+            mass_driver: modules.mass_driver,
             modules: modules.module,
             units: units.unit,
             repair: units.repair,
+            crowding: units.crowding,
             techs: techs.tech,
             events,
             factions: factions.faction,
@@ -1124,9 +1248,9 @@ impl Tables {
         if !(0.0..1.0).contains(&self.slot_yield_spread) {
             return Err(err("bodies.toml", format!("slot_yield_spread {} must be at least 0 and under 1", self.slot_yield_spread)));
         }
-        for id in [BodyId::Earth, BodyId::Mars] {
+        for id in [BodyId::Earth, BodyId::Mars, BodyId::Venus] {
             if !self.planets.iter().any(|p| p.id == id) {
-                return Err(err("ephemeris.toml", format!("no [[planet]] row for {}: the sky needs Earth's elements and Mars's", id.name())));
+                return Err(err("ephemeris.toml", format!("no [[planet]] row for {}: the sky needs Earth's elements, Mars's and Venus's", id.name())));
             }
         }
         for p in &self.planets {
@@ -1219,6 +1343,11 @@ impl Tables {
     }
     pub fn ai_tech_picks(&self, kind: FactionKind) -> &AiTechPicks {
         &self.ai.tech_picks[&kind]
+    }
+
+    /// Ticket #84 (version 0.06.0): the Tech that opens this Faction's Victory Condition, if one does.
+    pub fn victory_gate(&self, kind: FactionKind) -> Option<TechId> {
+        self.techs.iter().find(|t| t.gate_for == Some(kind)).map(|t| t.id)
     }
 }
 

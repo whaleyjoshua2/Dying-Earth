@@ -13,7 +13,7 @@ A competing power with its own multipliers, signature rule and victory condition
 _Avoid_: side, team, empire
 
 **Custodians**:
-The Faction that colonizes the solar system while limiting ecological damage to Earth. Their signature rule is the Scrubber and Leapfrog, and they win only if Earth is still habitable.
+The Faction that colonizes the solar system while limiting ecological damage to Earth. Their signature rules are the Scrubber, Leapfrog and, since version 0.06.0, Production Moved, and they win only if Earth is still habitable.
 _Avoid_: Stewards (the retired name), environmentalists, greens, moderates, eco-terrorists
 
 **Prospectors**:
@@ -33,7 +33,7 @@ The Arkwrights' signature rule: their Colony Ships carry twice the Colonists and
 _Avoid_: mass transit, cattle class, overcrowding, packing them in
 
 **Diaspora**:
-The Arkwrights' Victory Condition: thirty Colonists living off Earth, spread over at least three Bodies with at least four Colonists on each. Antarctica and the stations over Earth count toward neither part.
+The Arkwrights' Victory Condition: thirty Colonists living off Earth, spread over at least three Bodies with at least four Colonists on each. Antarctica counts toward neither part; since version 0.06.0 Colonists on a station over Earth count toward the thirty, but Earth is never one of the three Bodies.
 _Avoid_: spread, expansion, exodus, colonization score
 
 **Project**:
@@ -57,7 +57,7 @@ The small model of global warming the game runs: Emissions add to the CO2 Stock,
 _Avoid_: warming track, doom clock, countdown, timer, disaster meter
 
 **Body**:
-A place in the solar system that can hold a Colony or a Space Station. Five since version 0.04: Earth (its Colony Slots are Antarctica's, shut under the ice until +1.6 C), the Moon, Mars, Phobos and Deimos. A Body may be another's satellite, which sets how far apart they are.
+A place in the solar system that can hold a Colony or a Space Station. Six since version 0.06.0: Earth (its Colony Slots are Antarctica's, shut under the ice until +1.6 C), the Moon, Mars, Phobos, Deimos and Venus, a Body of orbits only, with no Colony Slots and three Orbital Slots. A Body may be another's satellite, which sets how far apart they are.
 _Avoid_: planet, world, site, location, node
 
 **Colony**:
@@ -73,7 +73,19 @@ One of a fixed number of places in orbit around a Body where a Space Station can
 _Avoid_: dock, berth, orbit
 
 **Space Station**:
-A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard and Habitats. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with a bare one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom); the Arkwrights start with none, and build theirs at half price. Colonists on a station over Earth are still on Earth for Off-world Presence.
+A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard, Habitats and, since version 0.06.0, Observatories and Solar Arrays. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with a bare one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom); the Arkwrights start with none, and build theirs at half price. Since version 0.06.0 a station over Earth is off Earth: its Colonists count for Off-world Presence and it may hold the Archive. A station is also the one place a Ship of its Faction can refuel.
+
+**Tank**:
+The Fuel a Ship carries, since version 0.06.0: a figure per Ship type, filled at the Shipyard for Fuel paid at the build, spent by transits, and refilled only by a Refuel. A Ship whose Tank cannot pay any leg from where it stands, with no Space Station of its Faction there, is stranded until one is built in orbit there.
+_Avoid_: fuel tank, propellant, range, fuel level
+
+**Build Where You Dig**:
+The rule, since version 0.06.0, that a Module built at a Colony with a working Mine costs less: three quarters of its price with one Mine, three fifths with two or more, on top of the Faction's own discount and never below half the row. The Archive takes it; a Ship built at a Shipyard there and a Space Station built into orbit do not. A mothballed Mine, or one still building, counts for nothing.
+_Avoid_: in-situ discount, local build bonus, mining discount
+
+**Refuel**:
+The Orders-phase order that fills a Ship's Tank from the Stockpile, as far as the Stockpile can pay, at a Body where the Ship's Faction holds a Space Station.
+_Avoid_: resupply, top up, tanker
 _Avoid_: base, platform, orbital, outpost
 
 **Trading window**:
@@ -93,7 +105,7 @@ The 3D view of the solar system, where Bodies, Ship stacks, transits and Orbital
 _Avoid_: space view, orbital map, star map
 
 **Launch Window**:
-The months in which the flight between the Earth system and the Mars system is cheap, because the two worlds stand where a minimum-energy transfer wants them. On the window a crossing takes the shortest flight there is and costs the Fuel on the card; away from it it takes longer and costs more, the further off the dearer, up to a limit. There is one window in the game. A hop inside the Earth system or inside the Mars system does not have one.
+The months in which the flight between the Earth system and the Mars system is cheap, because the two worlds stand where a minimum-energy transfer wants them. On the window a crossing takes the shortest flight there is and costs the Fuel on the card; away from it it takes longer and costs more, the further off the dearer, up to a limit. Since version 0.06.0 there are two windows in the game, Mars's and Venus's, each on its own sky; a hop inside the Earth system or inside the Mars system does not have one, and no leg runs between Venus and the Mars system.
 _Avoid_: transfer window, launch period, alignment, conjunction
 
 **Event**:
@@ -113,7 +125,7 @@ An advance on the Tech Tree that changes an output, a capacity, an upkeep, a Shi
 _Avoid_: research, upgrade, invention
 
 **Tech Tree**:
-The single tree of Techs shared by all Factions, thirteen of them since version 0.05, in five branches: Industry, Propulsion, Off-world Living, Extraction, Society. A branch may hold more than one Tech on a rung. One Tech is under research at a time, worldwide.
+The single tree of Techs shared by all Factions, seventeen of them since version 0.06.0, in five branches: Industry, Propulsion, Off-world Living, Extraction, Society. A branch may hold more than one Tech on a rung. One Tech is under research at a time, worldwide. Four of the seventeen are Victory gates, one per Faction on rung 3: each is a Tech for everyone, and its Faction cannot win until it stands.
 _Avoid_: per-faction tree, research tree
 
 **Research Lead**:
@@ -127,7 +139,7 @@ Raw metal and ore, spent to build ships, habitats and mines.
 _Avoid_: minerals, supplies, ore
 
 **Fuel**:
-What is burned to move between Bodies. Launches and transits spend it; nothing else does.
+What is burned to move between Bodies. Since version 0.06.0 a transit spends it from the Ship's own Tank, which is filled at the Shipyard and refilled only by a Refuel order at a Body with a Space Station of the Ship's Faction; the Stockpile holds what Refineries make and the Trading window sells, and only a Refuel or a build moves it into a Tank. A lift from Earth spends none.
 _Avoid_: propellant, rocket fuel
 
 **Energy**:
@@ -135,7 +147,7 @@ What runs a mine, habitat or industry where it stands, drained every turn it ope
 _Avoid_: power, electricity
 
 **Stockpile**:
-The single shared pool holding all Materials, Fuel, Energy and, since version 0.03, Ducats. It is not divided by Body, so ore mined on Mars is immediately spendable on Earth.
+The single shared pool holding all Materials, Fuel, Energy and, since version 0.03, Ducats. It is not divided by Body, so ore mined on Mars is immediately spendable on Earth. Since version 0.06.0 its Fuel reaches a Ship only through a Refuel at a Space Station of the Ship's Faction, or at the build.
 _Avoid_: central bank, per-world stocks, inventory
 
 **Ducats**:
@@ -147,7 +159,7 @@ The Facility that makes Ducats in a Nation State, in proportion to the state's G
 _Avoid_: treasury, mint, exchange
 
 **Trade Post**:
-The Module that makes Ducats in a Colony, in proportion to the Body's Habitat yield: trade goes where people live.
+The Module that makes Ducats off Earth. Since version 0.06.0 trade is a network: a Trade Post pays for every Colonist of its Faction at its Body and for every other Body where the Faction holds a Colony, a Space Station or, on Earth, a Nation State, so it pays for the shape of an empire rather than its size. One per Faction per Body, on the ground or on a station.
 _Avoid_: market, exchange, shop
 
 **Embassy**:
@@ -160,8 +172,20 @@ _Avoid_: antenna, transmitter, beacon
 
 ### Pieces
 
+**Observatory**:
+The Module that makes Research away from Earth, since version 0.06.0: on a Colony, a Space Station or in Antarctica. It takes no Body yield; every Colonist living at its Colony adds one per cent to what it makes, and Public Science lifts it as it lifts a Research Lab. Its Research counts toward the Research Lead as a Lab's does.
+_Avoid_: lab, laboratory, research station, institute, science module
+
+**Solar Array**:
+The Module only a Space Station holds, since version 0.06.0. It makes Energy that follows the sunlight where the station is: six a turn at Earth's distance, less than half that over Mars, nearly twice it over Venus, by the inverse square of the Body's mean distance from the Sun. Efficient Grids lifts it as it lifts a Generator, a Solar Storm turn silences it, and any number may stand on one station.
+_Avoid_: solar panel, power satellite, collector
+
+**Mass Driver**:
+The Module only a ground Colony on a small world (the Moon, Phobos, Deimos) holds, since version 0.06.0, one to a Colony, behind Efficient Transit. While it works, every transit its owner's Ships fly from that Body spends four Fuel less, after every multiplier and never below one, and each Mine at its Colony makes one Materials more.
+_Avoid_: catapult, launcher, railgun, launch loop
+
 **Module**:
-A building placed inside a Colony. Nine kinds since version 0.05: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay and the Archive, which only the Archivists raise, one to a Faction, from its own button.
+A building placed inside a Colony. Twelve kinds since version 0.06.0: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, the Solar Array (a Space Station's alone), the Mass Driver (a small world's alone), and the Archive, which only the Archivists raise, one to a Faction, from its own button. A Habitat holds eight Colonists since version 0.06.0.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:
@@ -169,8 +193,12 @@ A persistent piece that travels between Bodies. It is one of four types since ve
 _Avoid_: vessel, rocket, fleet, expedition
 
 **Colony Ship**:
-The Ship type that carries Colonists, and nothing else since version 0.04. It cannot attack and is weak if caught.
+The Ship type that carries Colonists, and nothing else since version 0.04. It cannot attack and is weak if caught. Since version 0.06.0 a warming Earth crowds it: lifting at Earth it may take Colonists beyond its capacity, one for every fifth of a degree the Temperature stands above +1.8, at most four, and each of those crowded aboard may die when it arrives.
 _Avoid_: transport, colony (that is the settlement), settler ship
+
+**Crowding**:
+The extra Colonists a warming Earth puts aboard a Colony Ship lifting at Earth, beyond its capacity, since version 0.06.0, and the risk they run: rolled once at arrival, each crowded Colonist dies with a chance that grows with the size of the crowd. The player chooses whether to take them; the sea to Antarctica carries no crowd.
+_Avoid_: overloading, steerage (that is the Arkwrights' rule), refugees aboard
 
 **Carrier**:
 The Ship type that carries one Army and nothing else, since version 0.04. Unarmed, it needs an escort and is a target for Intercept like a Colony Ship. Every landing needs one.
@@ -237,6 +265,10 @@ _Avoid_: licence, boom, overdrive, exploitation
 **Mothball**:
 The Orders-phase order that stands a Facility or a Module down. A mothballed building produces nothing, pays no Energy upkeep, emits nothing, is online for no rule, and keeps its slot. It is free, it takes effect at the Resolution, it raises the Unrest of a Nation State it happens in, and only a Restart brings the building back, for Materials and a turn.
 _Avoid_: pause, disable, switch off, idle, shut down (that is the Energy shortfall rule)
+
+**Production Moved**:
+The Custodians' third signature rule, since version 0.06.0. While a Factory, Power Plant, Refinery or Research Lab of theirs on Earth is mothballed, one Mine, Generator, Refinery or Observatory of theirs off Earth makes double, one Facility for one Module, the most productive undoubled Module first, on its final figure. A Restart ends it; with no idle Facility of the pair there is no bonus.
+_Avoid_: offshoring, relocation bonus, the mothball bonus
 
 **Decommission**:
 The Orders-phase order that takes a Facility or a Module down for good: a turn later half its Materials come back, its slot is free, and it is gone. In a Nation State it raises Unrest more than a Mothball does; in a Colony it raises none.
@@ -323,7 +355,7 @@ The amount of Influence a Faction receives each turn, split freely across any nu
 _Avoid_: influence budget, diplomacy pool, action points
 
 **Research**:
-Points produced by Research Labs and spent only on Techs. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship. Since version 0.05.5 a Lab in a Nation State nobody holds, or one under Occupation, runs itself and pays half its yield into the Tech under research for no Faction; North America and South-East Asia begin with such a Lab.
+Points produced by Research Labs on Earth and, since version 0.06.0, by Observatories at Colonies and Space Stations, and spent only on Techs. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship. Since version 0.05.5 a Lab in a Nation State nobody holds, or one under Occupation, runs itself and pays half its yield into the Tech under research for no Faction; North America and South-East Asia begin with such a Lab.
 _Avoid_: science, research points, RP, fourth resource
 
 ### The turn
@@ -353,7 +385,7 @@ The phase that opens a turn for the player, and the dated dispatch it shows. It 
 _Avoid_: summary, news, digest
 
 **Moment**:
-A short modal that stops the turn before the Report, for one sentence and one number: a Colony founded, a Break or the sea rising, a Battle that cost a unit, a place changing hands, a Tech completed, Antarctica opening, or the Archive finished. At most two a turn, the most serious first, and every kind can be switched off.
+A short modal that stops the turn before the Report, for one sentence and one number: a Colony founded, a Break or the sea rising, a Battle that cost a unit, a place changing hands, a Tech completed, Antarctica opening, the Archive finished, or Colonists lost in transit. At most two a turn, the most serious first, and every kind can be switched off.
 _Avoid_: popup, alert, notification, cutscene, interruption
 
 **Spectator**:
@@ -409,7 +441,7 @@ _Avoid_: subdued, loyal, converted
 ### Winning
 
 **Victory Condition**:
-What one Faction must achieve to win. Each Faction has its own, and meeting it in an End phase wins the game at once; if more than one seat meets it in the same phase, the larger margin over its own bar wins and an exact tie is a draw. If no Faction has met its condition by the end of the last turn, the seats are ranked by the percentage of their own condition, then by Colonists off Earth, then by Colonies held.
+What one Faction must achieve to win. Each Faction has its own, and meeting it in an End phase wins the game at once; since version 0.06.0 it is not met until the Faction's Victory gate, a Tech of its own on the Tech Tree, stands, though every part of it accrues before that; if more than one seat meets it in the same phase, the larger margin over its own bar wins and an exact tie is a draw. If no Faction has met its condition by the end of the last turn, the seats are ranked by the percentage of their own condition, then by Colonists off Earth, then by Colonies held.
 _Avoid_: win condition, goal, objective, victory points
 
 **Extraction Total**:
@@ -425,7 +457,7 @@ The Custodians' measure: net Emissions held under the Natural Sink, counting eve
 _Avoid_: carbon neutral, balance, equilibrium
 
 **Off-world Presence**:
-The number of Colonists living away from Earth, required by the Custodians' and the Prospectors' Victory Conditions. No Faction can win on Earth alone. Colonists in Antarctica or on a station over Earth are still on Earth.
+The number of Colonists living away from Earth, required by the Custodians' and the Prospectors' Victory Conditions. No Faction can win on Earth alone. Colonists in Antarctica are still on Earth; since version 0.06.0 those on a station over Earth are off it, as is everything else that asks "off Earth": the Archive's place and the Archivists' Research.
 _Avoid_: population off Earth, colony size, settlers
 
 ### Climate

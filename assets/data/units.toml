@@ -12,6 +12,9 @@ pursuit = 0
 carries_colonists = 4
 # Version 0.04 (ticket #43): a Colony Ship carries Colonists only; the Carrier carries the Army.
 carries_army = false
+# Ticket #87 (version 0.06.0): every Ship carries its own Fuel in a tank of this size, filled at
+# the yard and refilled only by a Refuel order at a Body with a station of its own.
+tank = 30
 
 [[unit]]
 id = "frigate"
@@ -24,6 +27,7 @@ hit_points = 4
 pursuit = 4
 carries_colonists = 0
 carries_army = false
+tank = 30
 
 [[unit]]
 id = "battleship"
@@ -37,6 +41,7 @@ pursuit = 1
 carries_colonists = 0
 # Version 0.04 (ticket #43): a Battleship fights; it carries no Army.
 carries_army = false
+tank = 30
 
 # Version 0.04 (ticket #43): the transport for one Army and nothing else. Unarmed, so it needs an
 # escort, and a target for Intercept like a Colony Ship.
@@ -51,6 +56,7 @@ hit_points = 4
 pursuit = 0
 carries_colonists = 0
 carries_army = true
+tank = 30
 
 [[unit]]
 id = "army"
@@ -66,3 +72,15 @@ carries_army = false
 
 [repair]
 materials_per_point = 5
+
+# Ticket #86 (version 0.06.0): a warming Earth fills the Colony Ships. A Colony Ship lifting at
+# Earth may take `per_step` Colonist beyond its capacity for every full `step` degrees the
+# Temperature stands above `above`, at most `cap` extra, the same for every Faction. At arrival
+# each Colonist above the safe capacity dies with a chance of `death_chance_per_extra` times the
+# number of extras, rolled once. Antarctica by sea carries no crowd.
+[crowding]
+above = 1.8
+step = 0.2
+per_step = 1
+cap = 4
+death_chance_per_extra = 0.05

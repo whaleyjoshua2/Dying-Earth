@@ -77,6 +77,38 @@ pub struct SimResult {
     /// Coastal Engineering completed.
     pub neutral_research: i64,
     pub coastal_engineering_turn: Option<u32>,
+    /// Ticket #80 (version 0.06.0): Observatories standing at the end, per seat, and the Research
+    /// each seat's Observatories made away from Earth over the game.
+    pub observatories: [u32; 4],
+    pub research_off_earth: [i64; 4],
+    /// Ticket #82 (version 0.06.0): Module-turns doubled by an idle Facility on Earth, per seat.
+    pub doubled_module_turns: [i64; 4],
+    /// Ticket #84: the turn each seat's Victory gate completed, if it did.
+    pub gate_turn: [Option<u32>; 4],
+    /// Ticket #86: Colonists each seat lost in transit to crowding.
+    pub lost_in_transit: [i64; 4],
+    /// Ticket #87: Ships stranded at the end (no leg their tank can pay, no station of their own
+    /// there), per seat; Refuel orders committed over the game; stations standing off Earth at
+    /// the end (a station over Earth is not one), all seats.
+    pub stranded_at_end: [u32; 4],
+    pub refuels: u32,
+    pub stations_off_earth: u32,
+    /// Ticket #88: Colonies on the ground with two or more working Mines at the end, and Modules
+    /// standing at ground Colonies, all seats, so the batch can say whether Colonies deepen.
+    pub deep_colonies: u32,
+    pub ground_modules: u32,
+    pub ground_colonies: u32,
+    /// Ticket #89: Solar Arrays standing at the end, all seats.
+    pub solar_arrays: u32,
+    /// Ticket #90: Trade Posts standing at the end, all seats.
+    pub trade_posts: u32,
+    /// Ticket #92: Mass Drivers standing at the end, all seats, and Colonies founded on Phobos or
+    /// Deimos over the game.
+    pub mass_drivers: u32,
+    pub martian_moon_colonies: u32,
+    /// Ticket #93: stations at Venus at the end, all seats, and Colonists living there.
+    pub venus_stations: u32,
+    pub venus_colonists: u32,
     /// Ticket #72: the Prospectors' Venture Capital Fund at the end.
     pub venture_fund_at_end: i64,
     /// Ticket #76: cards drawn over the game, and whether the deck ran dry.
@@ -151,6 +183,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let mut archive_built_turn: Option<u32> = None;
     let mut archive_complete_turn: Option<u32> = None;
     let mut coastal_engineering_turn: Option<u32> = None;
+    // Ticket #84: the turn each seat's Victory gate completed, if it did.
+    let mut gate_turn: [Option<u32>; 4] = [None; 4];
     let home = game.controlled_states(Seat(0)).first().copied();
     let mut start_state_lost_turn: Option<u32> = None;
     let window_turn = game.next_window_turn(1);
@@ -218,6 +252,14 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         if coastal_engineering_turn.is_none() && game.has_tech(crate::ids::TechId::CoastalEngineering) {
             coastal_engineering_turn = Some(game.turn);
         }
+        for s in Seat::ALL {
+            if gate_turn[s.index()].is_none()
+                && let Some(gate) = game.tables.victory_gate(game.kind(s))
+                && game.has_tech(gate)
+            {
+                gate_turn[s.index()] = Some(game.turn);
+            }
+        }
         if first_mars_colony_turn.is_none() {
             first_mars_colony_turn = game
                 .colonies
@@ -233,15 +275,23 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         f + m
     });
     let colonists = Seat::ALL.map(|s| game.off_world_colonists(s));
+    // Ticket #80 (version 0.06.0): Observatories standing at the end, and the Research they made
+    // away from Earth over the game, per seat.
+    let observatories = Seat::ALL.map(|s| {
+        game.directed_colonies(s).iter().map(|c| game.colony(*c).unwrap().modules.iter().filter(|m| m.kind == ModuleKind::Observatory).count() as u32).sum::<u32>()
+    });
+    let research_off_earth = Seat::ALL.map(|s| game.seat(s).research_off_earth_total);
     game.log(format!(
-        "Summary: {} | last turn {} | first Colony {:?} | buildings {:?} | Colonists off Earth {:?} | temperature {:+.2} | collapse projected {:?}",
+        "Summary: {} | last turn {} | first Colony {:?} | buildings {:?} | Colonists off Earth {:?} | temperature {:+.2} | collapse projected {:?} | Observatories {:?} | Research off Earth {:?}",
         game.outcome_text(),
         game.turn,
         first_colony_turn,
         buildings,
         colonists,
         game.climate.temperature,
-        projected_collapse
+        projected_collapse,
+        observatories,
+        research_off_earth
     ));
     let influence_transfers = game.log.iter().filter(|l| !l.starts_with(' ') && l.ends_with("(Influence).")).count() as u32;
     // Ticket #52, read off the log the same way: throw-offs, Constabularies, Relief orders and the
@@ -333,6 +383,25 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         archive_fund_at_end: archivist.map(|a| game.seat(a).archive_fund).unwrap_or(0),
         neutral_research: game.research.neutral_total,
         coastal_engineering_turn,
+        observatories: Seat::ALL.map(|s| {
+            game.directed_colonies(s).iter().map(|c| game.colony(*c).unwrap().modules.iter().filter(|m| m.kind == ModuleKind::Observatory).count() as u32).sum::<u32>()
+        }),
+        research_off_earth: Seat::ALL.map(|s| game.seat(s).research_off_earth_total),
+        doubled_module_turns: Seat::ALL.map(|s| game.seat(s).doubled_module_turns),
+        gate_turn,
+        lost_in_transit: Seat::ALL.map(|s| game.seat(s).lost_in_transit),
+        stranded_at_end: Seat::ALL.map(|s| game.ships.iter().filter(|sh| sh.seat == s && game.stranded(sh.id)).count() as u32),
+        refuels: game.log.iter().filter(|l| l.contains(" refuels ")).count() as u32,
+        stations_off_earth: game.colonies.iter().filter(|c| c.in_orbit && c.body != BodyId::Earth).count() as u32,
+        deep_colonies: game.colonies.iter().filter(|c| !c.in_orbit && game.working_mines(c) >= 2).count() as u32,
+        ground_modules: game.colonies.iter().filter(|c| !c.in_orbit).map(|c| c.modules.len() as u32).sum(),
+        ground_colonies: game.colonies.iter().filter(|c| !c.in_orbit).count() as u32,
+        solar_arrays: game.colonies.iter().map(|c| c.modules.iter().filter(|m| m.kind == ModuleKind::SolarArray).count() as u32).sum(),
+        trade_posts: game.colonies.iter().map(|c| c.modules.iter().filter(|m| m.kind == ModuleKind::TradePost).count() as u32).sum(),
+        mass_drivers: game.colonies.iter().map(|c| c.modules.iter().filter(|m| m.kind == ModuleKind::MassDriver).count() as u32).sum(),
+        martian_moon_colonies: game.colonies.iter().filter(|c| !c.in_orbit && matches!(c.body, BodyId::Phobos | BodyId::Deimos)).count() as u32,
+        venus_stations: game.colonies.iter().filter(|c| c.body == BodyId::Venus).count() as u32,
+        venus_colonists: game.colonies.iter().filter(|c| c.body == BodyId::Venus).map(|c| c.colonists).sum(),
         venture_fund_at_end: Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Prospectors).map(|s| game.seat(s).venture_fund).unwrap_or(0),
         cards_drawn: game.deck.drawn.len() as u32,
         deck_empty: game.deck.cards.is_empty(),

@@ -1,0 +1,50 @@
+=== seat 0: prospectors from east_asia
+seat 0: Prospectors starting in EastAsia
+sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | temp at end (median) | wins by seat
+   6   300   4.0    4.0 | 18/20 |  21 (18..23) | +3.04 | [0, 2, 0, 0]
+       Prospectors (seat 0):  0 win(s)
+        Custodians (seat 1):  2 win(s)
+        Arkwrights (seat 2):  0 win(s)
+        Archivists (seat 3):  0 win(s)
+      draws 0, collapses 18/20, median collapse turn 21
+      median turn of first Colony 9
+      median Colonists off Earth at the end, all seats 12
+      Scrubbers 109, Leapfrogs 163, Constabularies 73, Sea Walls 452
+      Techs: median 6 completed, highest rung reached 3
+      Observatories standing at the end, all seeds, by seat [0, 0, 0, 0]; median Research made off Earth a game, by seat ["0", "0", "0", "0"]
+      Production Moved: median Module-turns doubled by an idle Facility a game, by seat ["0", "0", "0", "0"]
+      Mars system: a Colony founded in 20/20 seeds, median first turn 13; Antarctic Colonies founded 60
+      The Archive: standing in 20/20 seeds (median turn 4), complete in 0/20 (median turn -), median fund at the end 36
+      Neutral Labs paid a median 22 Research a game; Coastal Engineering complete in 20/20 seeds (median turn 9)
+      The sea: median 34 coastal slots lost a game, 22 Facilities drowned
+      The Prospectors' Venture Capital Fund at the end: median 437
+      The deck: median 13 cards drawn a game, empty at the end in 0/20 seeds
+      Emigrants: 1011 batches mustered, 60 Antarctic Colonies founded by sea
+      Seat 0 lost its start state in 3/20 seeds (median turn 11)
+      Victory Conditions met outright: seed 12 Custodians (seat 1), seed 20 Custodians (seat 1)
+      Breaks fired: Coral Die-off 20/20, Permafrost Thaw 20/20, The Sink Weakens 20/20, Ice Sheets Committed 20/20, Amazon Dieback 19/20
+=== seat 0: arkwrights from east_asia
+seat 0: Arkwrights starting in EastAsia
+sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | temp at end (median) | wins by seat
+   6   300   4.0    4.0 |  2/20 |  35 (35..35) | +2.83 | [0, 18, 0, 0]
+        Arkwrights (seat 0):  0 win(s)
+        Custodians (seat 1): 18 win(s)
+       Prospectors (seat 2):  0 win(s)
+        Archivists (seat 3):  0 win(s)
+      draws 0, collapses 2/20, median collapse turn 35
+      median turn of first Colony 9
+      median Colonists off Earth at the end, all seats 36
+      Scrubbers 425, Leapfrogs 305, Constabularies 19, Sea Walls 270
+      Techs: median 13 completed, highest rung reached 3
+      Observatories standing at the end, all seeds, by seat [0, 6, 0, 1]; median Research made off Earth a game, by seat ["0", "0", "0", "0"]
+      Production Moved: median Module-turns doubled by an idle Facility a game, by seat ["0", "0", "0", "0"]
+      Mars system: a Colony founded in 17/20 seeds, median first turn 18; Antarctic Colonies founded 60
+      The Archive: standing in 20/20 seeds (median turn 4), complete in 0/20 (median turn -), median fund at the end 20
+      Neutral Labs paid a median 16 Research a game; Coastal Engineering complete in 20/20 seeds (median turn 10)
+      The sea: median 34 coastal slots lost a game, 25 Facilities drowned
+      The Prospectors' Venture Capital Fund at the end: median 176
+      The deck: median 18 cards drawn a game, empty at the end in 0/20 seeds
+      Emigrants: 1137 batches mustered, 60 Antarctic Colonies founded by sea
+      Seat 0 lost its start state in 20/20 seeds (median turn 23)
+      Victory Conditions met outright: seed 1 Custodians (seat 1), seed 3 Custodians (seat 1), seed 4 Custodians (seat 1), seed 5 Custodians (seat 1), seed 6 Custodians (seat 1), seed 8 Custodians (seat 1), seed 9 Custodians (seat 1), seed 10 Custodians (seat 1), seed 13 Custodians (seat 1), seed 14 Custodians (seat 1), seed 15 Custodians (seat 1), seed 16 Custodians (seat 1), seed 17 Custodians (seat 1), seed 18 Custodians (seat 1), seed 19 Custodians (seat 1)
+      Breaks fired: Coral Die-off 20/20, Permafrost Thaw 20/20, The Sink Weakens 20/20, Ice Sheets Committed 20/20, Amazon Dieback 15/20

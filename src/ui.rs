@@ -657,6 +657,16 @@ fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut
         if let Some(m) = card.colony_ship_materials {
             extras.push(format!("a Colony Ship {m} Materials"));
         }
+        // Ticket #83: the Arkwrights' Ships, the Prospectors' Ducats and market.
+        if card.ship_materials_multiplier != 1.0 {
+            extras.push(format!("every Ship x{} Materials", card.ship_materials_multiplier));
+        }
+        if card.ducats_multiplier != 1.0 {
+            extras.push(format!("a state's Ducats x{}", card.ducats_multiplier));
+        }
+        if card.market_multiplier != 1.0 {
+            extras.push(format!("the Trading window's prices x{}", card.market_multiplier));
+        }
         if card.station_materials_multiplier != 1.0 {
             extras.push(format!("a Space Station x{} Materials", card.station_materials_multiplier));
         }
@@ -672,6 +682,11 @@ fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut
         ui.add_space(6.0);
         ui.label(RichText::new("Victory Condition").strong());
         ui.label(&card.victory);
+        // Ticket #84: the gate Tech it waits on.
+        if let Some(gate) = session.tables.victory_gate(kind) {
+            let t = session.tables.tech(gate);
+            ui.label(RichText::new(format!("Waits on {}, a rung-{} Tech ({} Research): {}.", t.name, t.rung, t.cost, t.effect)).weak());
+        }
         ui.add_space(10.0);
         if ui.add(egui::Button::new(RichText::new(format!("Play the {}", card.name)).size(17.0)).min_size(egui::vec2(190.0, 36.0))).clicked() {
             actions.push(Action::ChooseFaction(kind));
@@ -1144,7 +1159,7 @@ fn stations_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             cost_button(ui, game, &session.pending, Order::BuildStation { body, slot }, &format!("Build {} here", game.station_name(body, slot)), actions);
         }
     }
-    ui.label(RichText::new("A station holds a Shipyard and Habitats. Ships are built only at a Shipyard.").weak());
+    ui.label(RichText::new("A station holds a Shipyard, Habitats, Observatories, Solar Arrays and a Trade Post. Ships are built only at a Shipyard.").weak());
 }
 
 /// The Colony Slot within fourteen degrees of a point on a Body, nearest first.
@@ -1383,6 +1398,13 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
         if armies > 0 {
             text.push_str(&format!(", {armies} Army aboard"));
         }
+        // Ticket #87: the tanks, and a stack that cannot leave.
+        let fuel: i64 = ships.iter().map(|s| s.fuel).sum();
+        let tanks: i64 = ships.iter().map(|s| game.tables.unit(s.kind).tank).sum();
+        text.push_str(&format!(", tank {fuel}/{tanks}"));
+        if ships.iter().all(|s| game.stranded(s.id)) {
+            text.push_str(" - STRANDED: no leg affordable and no station of yours here");
+        }
         if marks && !ordered {
             text.push_str("  - no order");
         }
@@ -1468,6 +1490,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildArmy { place } => format!("Build Army at {}", game.place_name(*place)),
         Order::Repair { unit, points } => format!("Repair {} point(s) on {}", points, match unit { UnitRef::Ship(s) => s.to_string(), UnitRef::Army(a) => a.to_string() }),
         Order::Transit { ship, to } => format!("Send {} to {}", ship, game.tables.body(*to).name),
+        Order::Refuel { ship } => format!("Refuel {} ({} Fuel from the Stockpile)", ship, game.refuel_amount(Seat(0), *ship)),
         Order::ShipStance { body, stance } => format!("Ships at {}: {}", game.tables.body(*body).name, stance.name()),
         Order::ArmyStance { place, stance } => format!("Armies at {}: {}", game.place_name(*place), stance.name()),
         Order::MoveArmy { army, to } => format!("{} to {}", army, game.tables.state(*to).name),
@@ -2036,7 +2059,8 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             "mothballed: making nothing and paying no upkeep".to_string()
         } else {
             match director {
-                Some(d) => game.module_yield(d, cid, m.kind).text(),
+                // Ticket #82: this Module's own figure, its doubling included.
+                Some(d) => game.module_yield_at(d, cid, mi).text(),
                 None => "idle".to_string(),
             }
         };
@@ -2109,8 +2133,23 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             ui.separator();
         }
         ui.label(RichText::new("Build (hover a button for what it makes)").strong());
+        // Ticket #88: build it where you dig.
+        match game.working_mines(col) {
+            0 => {}
+            1 => {
+                ui.label(RichText::new(format!("One working Mine here: Modules cost x{} (never under half the row).", game.tables.in_situ.one_mine)).weak());
+            }
+            n => {
+                ui.label(RichText::new(format!("{n} working Mines here: Modules cost x{} (never under half the row).", game.tables.in_situ.two_mines)).weak());
+            }
+        }
         for mk in ModuleKind::BUILDABLE {
-            if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Habitat) {
+            // Ticket #80: a station holds a Shipyard, Habitats and Observatories; ticket #89: and
+            // Solar Arrays, which stand nowhere else.
+            if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost) {
+                continue;
+            }
+            if !col.in_orbit && game.tables.module(mk).station_only {
                 continue;
             }
             let hover = game.module_yield(Seat(0), cid, mk).text();
@@ -2235,22 +2274,51 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         if to == body {
             continue;
         }
-        let (turns, fuel) = game.transit_cost(body, to);
+        // Ticket #92: the player's own figure, with the Faction's and the Tech's multipliers and a
+        // Mass Driver's cut on it.
+        let (turns, fuel) = game.transit_cost_for(Seat(0), body, to);
         ui.horizontal_wrapped(|ui| {
-            ui.label(format!("To {}: {} turn(s), {} Fuel each", game.tables.body(to).name, turns, fuel));
+            ui.label(format!("To {}: {} turn(s), {} Fuel each from the tank", game.tables.body(to).name, turns, fuel));
             for s in &ships {
-                cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to }, &format!("{} {}", s.kind.name(), s.id.0), actions);
+                // Ticket #87: the button reads the tank against the leg.
+                cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to }, &format!("{} {} ({}/{} in the tank)", s.kind.name(), s.id.0, s.fuel, game.tables.unit(s.kind).tank), actions);
+            }
+        });
+    }
+    // Ticket #87: a Refuel button per Ship at a Body with a station of yours, and a word for a
+    // Ship that is stranded.
+    ui.label(RichText::new("Tanks").strong());
+    for s in &ships {
+        let tank = game.tables.unit(s.kind).tank;
+        ui.horizontal_wrapped(|ui| {
+            ui.label(format!("{} {}: {}/{} Fuel", s.kind.name(), s.id.0, s.fuel, tank));
+            if game.own_station_at(Seat(0), body) {
+                cost_button(ui, game, &session.pending, Order::Refuel { ship: s.id }, "Refuel from the Stockpile", actions);
+            } else if game.stranded(s.id) {
+                ui.colored_label(Color32::from_rgb(230, 120, 90), "stranded: no leg it can pay, and no station of yours here to refuel at; a station built in orbit here rescues it");
+            } else {
+                ui.label("no station of yours here to refuel at");
             }
         });
     }
     ui.label(RichText::new("Load and unload").strong());
     for s in &ships {
         let card = game.tables.unit(s.kind);
-        let capacity = if s.kind == UnitKind::ColonyShip { game.colony_ship_capacity(Seat(0)) } else { card.carries_colonists };
+        // Ticket #86: at Earth a warming world crowds a Colony Ship beyond its safe capacity.
+        let safe = if s.kind == UnitKind::ColonyShip { game.colony_ship_capacity(Seat(0)) } else { card.carries_colonists };
+        let crowd = if s.kind == UnitKind::ColonyShip && body == BodyId::Earth { game.crowd_extra() } else { 0 };
+        let capacity = safe + crowd;
         if capacity == 0 && !card.carries_army {
             continue;
         }
         ui.label(format!("{} {}:", s.kind.name(), s.id.0));
+        if crowd > 0 {
+            let p = game.tables.crowding.death_chance_per_extra * 100.0;
+            ui.colored_label(
+                Color32::from_rgb(230, 170, 90),
+                format!("+{:.1} C: {safe} ride safely, up to {capacity} may board; each one beyond {safe} risks {:.0}% per extra aboard on arrival.", game.climate.temperature, p),
+            );
+        }
         if capacity > s.colonists {
             let n = capacity - s.colonists;
             match body {
@@ -2367,7 +2435,11 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             };
             ui.label(name);
             let sells = matches!(res, Some(dying_earth_engine::Resource::Materials) | Some(dying_earth_engine::Resource::Fuel));
-            ui.label(if sells { format!("{per} Ducats each; sells for {:.1}", per as f64 / game.tables.ducats.sell_divisor.max(1) as f64) } else { format!("{per} Ducats each") });
+            // Ticket #83: the Prospectors' 15% off is taken over the lot, so the button's figure is
+            // the price; the line says so.
+            let off = game.tables.faction(game.kind(Seat(0))).market_multiplier;
+            let discount = if res.is_some() && off != 1.0 { format!(" (x{off} for you, over the lot)") } else { String::new() };
+            ui.label(if sells { format!("{per} Ducats each; sells for {:.1}{discount}", per as f64 / game.tables.ducats.sell_divisor.max(1) as f64) } else { format!("{per} Ducats each{discount}") });
             ui.add(egui::DragValue::new(&mut view.trade_amounts[i]).range(1..=999).speed(1.0));
             let n = view.trade_amounts[i].max(1);
             let buy = match res {
@@ -2486,7 +2558,12 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
         } else {
             (Color32::from_gray(60), "locked")
         };
-        painter.rect(r, 6.0, fill, egui::Stroke::new(1.0, Color32::from_gray(200)), egui::StrokeKind::Inside);
+        // Ticket #84: a Victory gate wears its Faction's colour as a thick border.
+        let stroke = match card.gate_for {
+            Some(k) => egui::Stroke::new(3.0, rgb(game.tables.faction(k).colour)),
+            None => egui::Stroke::new(1.0, Color32::from_gray(200)),
+        };
+        painter.rect(r, 6.0, fill, stroke, egui::StrokeKind::Inside);
         painter.text(r.center_top() + egui::vec2(0.0, 14.0), egui::Align2::CENTER_CENTER, &card.name, FontId::proportional(13.0), Color32::WHITE);
         painter.text(r.center_top() + egui::vec2(0.0, 32.0), egui::Align2::CENTER_CENTER, format!("cost {} - {}", card.cost, status), FontId::proportional(11.0), Color32::from_gray(230));
         let needs = if card.needs.is_empty() { "nothing".to_string() } else { card.needs.iter().map(|n| game.tables.tech(*n).name.clone()).collect::<Vec<_>>().join(" and ") };

@@ -1,0 +1,124 @@
+=== seat 0: custodians from east_asia
+seat 0: Custodians starting in EastAsia
+sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | temp at end (median) | wins by seat
+   6   300   4.0    4.0 | 20/20 |  19 (18..27) | +3.06 | [0, 0, 0, 0]
+        Custodians (seat 0):  0 win(s)
+       Prospectors (seat 1):  0 win(s)
+        Arkwrights (seat 2):  0 win(s)
+        Archivists (seat 3):  0 win(s)
+      draws 0, collapses 20/20, median collapse turn 19
+      median turn of first Colony 9
+      median Colonists off Earth at the end, all seats 16
+      Scrubbers 15, Leapfrogs 77, Constabularies 122, Sea Walls 296
+      Techs: median 7 completed, highest rung reached 3
+      Observatories standing at the end, all seeds, by seat [0, 0, 0, 8]; median Research made off Earth a game, by seat ["0", "0", "0", "0"]
+      Production Moved: median Module-turns doubled by an idle Facility a game, by seat ["0", "0", "0", "0"]
+      Victory gates: completed in [0, 0, 0, 0] seeds by seat, median turn ["-", "-", "-", "-"]
+      Crowded ships: Colonists lost in transit over the batch, by seat [4, 15, 0, 0]
+      Tanks: Ships stranded at the end over the batch, by seat [0, 0, 0, 0]; 36 Refuel orders; 0 stations standing off Earth at the end
+      Build it where you dig: 25 ground Colonies with two or more working Mines at the end over the batch; 2.7 Modules per ground Colony
+      Solar Arrays standing at the end over the batch: 211; Trade Posts 56; Mass Drivers 0; Colonies on Phobos or Deimos 0
+      Venus: 0 stations at the end over the batch, 0 Colonists living there
+      Mars system: a Colony founded in 7/20 seeds, median first turn 24; Antarctic Colonies founded 60
+      The Archive: standing in 20/20 seeds (median turn 4), complete in 0/20 (median turn -), median fund at the end 11
+      Neutral Labs paid a median 18 Research a game; Coastal Engineering complete in 11/20 seeds (median turn 7)
+      The sea: median 34 coastal slots lost a game, 25 Facilities drowned
+      The Prospectors' Venture Capital Fund at the end: median 393
+      The deck: median 12 cards drawn a game, empty at the end in 0/20 seeds
+      Emigrants: 965 batches mustered, 55 Antarctic Colonies founded by sea
+      Seat 0 lost its start state in 1/20 seeds (median turn 18)
+      Victory Conditions met outright: none in any seed
+      Breaks fired: Coral Die-off 20/20, Permafrost Thaw 20/20, The Sink Weakens 20/20, Ice Sheets Committed 20/20, Amazon Dieback 20/20
+=== seat 0: prospectors from east_asia
+seat 0: Prospectors starting in EastAsia
+sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | temp at end (median) | wins by seat
+   6   300   4.0    4.0 | 18/20 |  20 (18..21) | +3.05 | [0, 2, 0, 0]
+       Prospectors (seat 0):  0 win(s)
+        Custodians (seat 1):  2 win(s)
+        Arkwrights (seat 2):  0 win(s)
+        Archivists (seat 3):  0 win(s)
+      draws 0, collapses 18/20, median collapse turn 20
+      median turn of first Colony 9
+      median Colonists off Earth at the end, all seats 12
+      Scrubbers 101, Leapfrogs 152, Constabularies 138, Sea Walls 410
+      Techs: median 6 completed, highest rung reached 3
+      Observatories standing at the end, all seeds, by seat [0, 0, 0, 0]; median Research made off Earth a game, by seat ["0", "0", "0", "0"]
+      Production Moved: median Module-turns doubled by an idle Facility a game, by seat ["0", "0", "0", "0"]
+      Victory gates: completed in [0, 2, 0, 0] seeds by seat, median turn ["-", "24", "-", "-"]
+      Crowded ships: Colonists lost in transit over the batch, by seat [1, 2, 0, 0]
+      Tanks: Ships stranded at the end over the batch, by seat [0, 0, 0, 0]; 40 Refuel orders; 1 stations standing off Earth at the end
+      Build it where you dig: 57 ground Colonies with two or more working Mines at the end over the batch; 7.0 Modules per ground Colony
+      Solar Arrays standing at the end over the batch: 303; Trade Posts 54; Mass Drivers 0; Colonies on Phobos or Deimos 0
+      Venus: 0 stations at the end over the batch, 0 Colonists living there
+      Mars system: a Colony founded in 20/20 seeds, median first turn 13; Antarctic Colonies founded 60
+      The Archive: standing in 20/20 seeds (median turn 4), complete in 0/20 (median turn -), median fund at the end 36
+      Neutral Labs paid a median 21 Research a game; Coastal Engineering complete in 20/20 seeds (median turn 9)
+      The sea: median 34 coastal slots lost a game, 23 Facilities drowned
+      The Prospectors' Venture Capital Fund at the end: median 437
+      The deck: median 12 cards drawn a game, empty at the end in 0/20 seeds
+      Emigrants: 976 batches mustered, 58 Antarctic Colonies founded by sea
+      Seat 0 lost its start state in 2/20 seeds (median turn 11)
+      Victory Conditions met outright: seed 12 Custodians (seat 1), seed 20 Custodians (seat 1)
+      Breaks fired: Coral Die-off 20/20, Permafrost Thaw 20/20, The Sink Weakens 20/20, Ice Sheets Committed 20/20, Amazon Dieback 18/20
+=== seat 0: arkwrights from east_asia
+seat 0: Arkwrights starting in EastAsia
+sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | temp at end (median) | wins by seat
+   6   300   4.0    4.0 |  0/20 |   - (-) | +2.67 | [0, 20, 0, 0]
+        Arkwrights (seat 0):  0 win(s)
+        Custodians (seat 1): 20 win(s)
+       Prospectors (seat 2):  0 win(s)
+        Archivists (seat 3):  0 win(s)
+      draws 0, collapses 0/20, median collapse turn -
+      median turn of first Colony 10
+      median Colonists off Earth at the end, all seats 39
+      Scrubbers 438, Leapfrogs 306, Constabularies 0, Sea Walls 291
+      Techs: median 11 completed, highest rung reached 3
+      Observatories standing at the end, all seeds, by seat [0, 5, 0, 5]; median Research made off Earth a game, by seat ["0", "0", "0", "0"]
+      Production Moved: median Module-turns doubled by an idle Facility a game, by seat ["0", "0", "0", "0"]
+      Victory gates: completed in [0, 20, 0, 1] seeds by seat, median turn ["-", "27", "-", "31"]
+      Crowded ships: Colonists lost in transit over the batch, by seat [3, 3, 0, 0]
+      Tanks: Ships stranded at the end over the batch, by seat [0, 0, 0, 0]; 77 Refuel orders; 3 stations standing off Earth at the end
+      Build it where you dig: 0 ground Colonies with two or more working Mines at the end over the batch; 1.4 Modules per ground Colony
+      Solar Arrays standing at the end over the batch: 98; Trade Posts 1; Mass Drivers 0; Colonies on Phobos or Deimos 0
+      Venus: 3 stations at the end over the batch, 0 Colonists living there
+      Mars system: a Colony founded in 20/20 seeds, median first turn 16; Antarctic Colonies founded 60
+      The Archive: standing in 20/20 seeds (median turn 4), complete in 0/20 (median turn -), median fund at the end 20
+      Neutral Labs paid a median 15 Research a game; Coastal Engineering complete in 20/20 seeds (median turn 10)
+      The sea: median 32 coastal slots lost a game, 23 Facilities drowned
+      The Prospectors' Venture Capital Fund at the end: median 196
+      The deck: median 17 cards drawn a game, empty at the end in 0/20 seeds
+      Emigrants: 1216 batches mustered, 55 Antarctic Colonies founded by sea
+      Seat 0 lost its start state in 20/20 seeds (median turn 23)
+      Victory Conditions met outright: seed 1 Custodians (seat 1), seed 2 Custodians (seat 1), seed 3 Custodians (seat 1), seed 4 Custodians (seat 1), seed 5 Custodians (seat 1), seed 6 Custodians (seat 1), seed 7 Custodians (seat 1), seed 8 Custodians (seat 1), seed 9 Custodians (seat 1), seed 10 Custodians (seat 1), seed 11 Custodians (seat 1), seed 12 Custodians (seat 1), seed 13 Custodians (seat 1), seed 14 Custodians (seat 1), seed 15 Custodians (seat 1), seed 16 Custodians (seat 1), seed 17 Custodians (seat 1), seed 18 Custodians (seat 1), seed 19 Custodians (seat 1)
+      Breaks fired: Coral Die-off 20/20, Permafrost Thaw 20/20, The Sink Weakens 20/20, Ice Sheets Committed 20/20, Amazon Dieback 14/20
+=== seat 0: archivists from east_asia
+seat 0: Archivists starting in EastAsia
+sink  step  perm  after | collapses/20 | collapse turns (median, min..max) | temp at end (median) | wins by seat
+   6   300   4.0    4.0 |  0/20 |   - (-) | +2.51 | [0, 20, 0, 0]
+        Archivists (seat 0):  0 win(s)
+        Custodians (seat 1): 20 win(s)
+       Prospectors (seat 2):  0 win(s)
+        Arkwrights (seat 3):  0 win(s)
+      draws 0, collapses 0/20, median collapse turn -
+      median turn of first Colony 10
+      median Colonists off Earth at the end, all seats 39
+      Scrubbers 483, Leapfrogs 384, Constabularies 0, Sea Walls 385
+      Techs: median 12 completed, highest rung reached 3
+      Observatories standing at the end, all seeds, by seat [4, 6, 0, 6]; median Research made off Earth a game, by seat ["0", "0", "0", "0"]
+      Production Moved: median Module-turns doubled by an idle Facility a game, by seat ["0", "0", "0", "0"]
+      Victory gates: completed in [1, 20, 1, 2] seeds by seat, median turn ["28", "28", "29", "31"]
+      Crowded ships: Colonists lost in transit over the batch, by seat [0, 8, 0, 8]
+      Tanks: Ships stranded at the end over the batch, by seat [0, 0, 0, 0]; 103 Refuel orders; 39 stations standing off Earth at the end
+      Build it where you dig: 19 ground Colonies with two or more working Mines at the end over the batch; 3.3 Modules per ground Colony
+      Solar Arrays standing at the end over the batch: 107; Trade Posts 39; Mass Drivers 9; Colonies on Phobos or Deimos 0
+      Venus: 15 stations at the end over the batch, 0 Colonists living there
+      Mars system: a Colony founded in 20/20 seeds, median first turn 15; Antarctic Colonies founded 60
+      The Archive: standing in 20/20 seeds (median turn 4), complete in 0/20 (median turn -), median fund at the end 18
+      Neutral Labs paid a median 15 Research a game; Coastal Engineering complete in 20/20 seeds (median turn 7)
+      The sea: median 31 coastal slots lost a game, 22 Facilities drowned
+      The Prospectors' Venture Capital Fund at the end: median 236
+      The deck: median 17 cards drawn a game, empty at the end in 0/20 seeds
+      Emigrants: 1078 batches mustered, 59 Antarctic Colonies founded by sea
+      Seat 0 lost its start state in 20/20 seeds (median turn 23)
+      Victory Conditions met outright: seed 1 Custodians (seat 1), seed 2 Custodians (seat 1), seed 3 Custodians (seat 1), seed 4 Custodians (seat 1), seed 5 Custodians (seat 1), seed 6 Custodians (seat 1), seed 7 Custodians (seat 1), seed 8 Custodians (seat 1), seed 9 Custodians (seat 1), seed 10 Custodians (seat 1), seed 11 Custodians (seat 1), seed 12 Custodians (seat 1), seed 13 Custodians (seat 1), seed 14 Custodians (seat 1), seed 15 Custodians (seat 1), seed 16 Custodians (seat 1), seed 17 Custodians (seat 1), seed 18 Custodians (seat 1), seed 19 Custodians (seat 1), seed 20 Custodians (seat 1)
+      Breaks fired: Coral Die-off 20/20, Permafrost Thaw 20/20, The Sink Weakens 20/20, Ice Sheets Committed 20/20, Amazon Dieback 2/20

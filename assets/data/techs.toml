@@ -136,3 +136,52 @@ cost = 10
 needs = []
 effect = "Unlocks the Sea Wall."
 value = 1.0
+
+# Ticket #84 (version 0.06.0): the four gates. Each opens one Faction's Victory Condition
+# (`gate_for`): with both parts at their bars, that Faction does not win until the Tech stands.
+# Progress accrues regardless, the end-of-game ranking is unchanged, and Provisional Findings
+# opens nothing. Each is a Tech for everyone besides, its `value` read by the rule named.
+
+[[tech]]
+id = "planetary_stewardship"
+name = "Planetary Stewardship"
+branch = "Society"
+rung = 3
+cost = 40
+needs = ["green_consensus"]
+effect = "Opens the Custodians' Victory Condition; the Natural Sink grows by 1.0 ppm a turn for the world"
+value = 1.0
+gate_for = "custodians"
+
+[[tech]]
+id = "extraction_charter"
+name = "The Extraction Charter"
+branch = "Extraction"
+rung = 3
+cost = 40
+needs = ["automated_refining"]
+effect = "Opens the Prospectors' Victory Condition; Mine output x1.25"
+value = 1.25
+gate_for = "prospectors"
+
+[[tech]]
+id = "generation_ships"
+name = "Generation Ships"
+branch = "Off-world Living"
+rung = 3
+cost = 40
+needs = ["closed_loop_colonies"]
+effect = "Opens the Arkwrights' Victory Condition; a Colony Ship carries +2 Colonists"
+value = 2.0
+gate_for = "arkwrights"
+
+[[tech]]
+id = "the_upload"
+name = "The Upload"
+branch = "Society"
+rung = 3
+cost = 40
+needs = ["public_science", "expanded_habitats"]
+effect = "Opens the Archivists' Victory Condition; Research Lab and Observatory output x1.25"
+value = 1.25
+gate_for = "archivists"

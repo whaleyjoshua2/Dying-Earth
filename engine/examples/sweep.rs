@@ -98,6 +98,28 @@ fn main() {
                     let (mut cards_drawn, mut deck_empty) = (Vec::new(), 0u32);
                     // Ticket #73: Emigrants.
                     let (mut emigrant_batches, mut by_sea) = (0u32, 0u32);
+                    // Ticket #80: Observatories and Research off Earth, per seat.
+                    let mut observatories = [0u32; 4];
+                    let mut research_off_earth: [Vec<u32>; 4] = Default::default();
+                    // Ticket #82: Module-turns doubled by an idle Facility on Earth, per seat.
+                    let mut doubled_turns: [Vec<u32>; 4] = Default::default();
+                    // Ticket #84: the turn each seat's Victory gate completed, over the seeds it did.
+                    let mut gate_turns: [Vec<u32>; 4] = Default::default();
+                    // Ticket #86: Colonists lost in transit to crowding, per seat, over the batch.
+                    let mut lost_in_transit = [0i64; 4];
+                    // Ticket #87: stranded Ships at the end, Refuel orders and stations off Earth.
+                    let mut stranded = [0u32; 4];
+                    let (mut refuels, mut stations_off_earth) = (0u32, 0u32);
+                    // Ticket #88: Colonies with two or more working Mines, and Modules per ground Colony.
+                    let (mut deep_colonies, mut ground_modules, mut ground_colonies) = (0u32, 0u32, 0u32);
+                    // Ticket #89: Solar Arrays standing at the end over the batch.
+                    let mut solar_arrays = 0u32;
+                    // Ticket #90: Trade Posts standing at the end over the batch.
+                    let mut trade_posts = 0u32;
+                    // Ticket #92: Mass Drivers at the end, and Colonies on Phobos or Deimos.
+                    let (mut mass_drivers, mut martian_moon_colonies) = (0u32, 0u32);
+                    // Ticket #93: stations at Venus at the end, and Colonists living there.
+                    let (mut venus_stations, mut venus_colonists) = (0u32, 0u32);
                     // Ticket #75: seat 0's start state.
                     let mut home_lost = Vec::new();
                     for seed in 1..=seeds {
@@ -119,6 +141,28 @@ fn main() {
                         off_earth.push(r.colonists_off_earth.iter().sum::<u32>());
                         techs.push(r.techs_completed);
                         highest_rung = highest_rung.max(r.highest_rung);
+                        // Ticket #80: Observatories at the end and Research made off Earth, per seat.
+                        for s in 0..4 {
+                            observatories[s] += r.observatories[s];
+                            research_off_earth[s].push(r.research_off_earth[s].max(0) as u32);
+                            doubled_turns[s].push(r.doubled_module_turns[s].max(0) as u32);
+                            if let Some(t) = r.gate_turn[s] {
+                                gate_turns[s].push(t);
+                            }
+                            lost_in_transit[s] += r.lost_in_transit[s];
+                            stranded[s] += r.stranded_at_end[s];
+                        }
+                        refuels += r.refuels;
+                        stations_off_earth += r.stations_off_earth;
+                        deep_colonies += r.deep_colonies;
+                        ground_modules += r.ground_modules;
+                        ground_colonies += r.ground_colonies;
+                        solar_arrays += r.solar_arrays;
+                        trade_posts += r.trade_posts;
+                        mass_drivers += r.mass_drivers;
+                        martian_moon_colonies += r.martian_moon_colonies;
+                        venus_stations += r.venus_stations;
+                        venus_colonists += r.venus_colonists;
                         if let Some(t) = r.first_mars_colony_turn {
                             mars_turns.push(t);
                         }
@@ -179,6 +223,27 @@ fn main() {
                         println!("      median Colonists off Earth at the end, all seats {}", median_u(&mut off_earth));
                         println!("      Scrubbers {scrubbers}, Leapfrogs {leapfrogs}, Constabularies {constabularies}, Sea Walls {sea_walls}");
                         println!("      Techs: median {} completed, highest rung reached {highest_rung}", median_u(&mut techs));
+                        println!(
+                            "      Observatories standing at the end, all seeds, by seat {observatories:?}; median Research made off Earth a game, by seat {:?}",
+                            research_off_earth.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
+                        );
+                        println!(
+                            "      Production Moved: median Module-turns doubled by an idle Facility a game, by seat {:?}",
+                            doubled_turns.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
+                        );
+                        println!(
+                            "      Victory gates: completed in {:?} seeds by seat, median turn {:?}",
+                            gate_turns.iter().map(|v| v.len()).collect::<Vec<_>>(),
+                            gate_turns.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
+                        );
+                        println!("      Crowded ships: Colonists lost in transit over the batch, by seat {lost_in_transit:?}");
+                        println!("      Tanks: Ships stranded at the end over the batch, by seat {stranded:?}; {refuels} Refuel orders; {stations_off_earth} stations standing off Earth at the end");
+                        println!(
+                            "      Build it where you dig: {deep_colonies} ground Colonies with two or more working Mines at the end over the batch; {:.1} Modules per ground Colony",
+                            if ground_colonies > 0 { ground_modules as f64 / ground_colonies as f64 } else { 0.0 }
+                        );
+                        println!("      Solar Arrays standing at the end over the batch: {solar_arrays}; Trade Posts {trade_posts}; Mass Drivers {mass_drivers}; Colonies on Phobos or Deimos {martian_moon_colonies}");
+                        println!("      Venus: {venus_stations} stations at the end over the batch, {venus_colonists} Colonists living there");
                         println!(
                             "      Mars system: a Colony founded in {}/{seeds} seeds, median first turn {}; Antarctic Colonies founded {antarctic}",
                             mars_turns.len(),

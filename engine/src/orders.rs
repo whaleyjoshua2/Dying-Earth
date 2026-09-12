@@ -50,6 +50,9 @@ pub enum Order {
     BuildArmy { place: Place },
     Repair { unit: UnitRef, points: u32 },
     Transit { ship: ShipId, to: BodyId },
+    /// Version 0.06.0 (ticket #87): fill a Ship's tank from the Stockpile at a Body where its
+    /// Faction holds a Space Station, as far as the Stockpile can pay.
+    Refuel { ship: ShipId },
     ShipStance { body: BodyId, stance: Stance },
     ArmyStance { place: Place, stance: Stance },
     MoveArmy { army: ArmyId, to: StateId },
@@ -206,19 +209,18 @@ impl Game {
             Order::BuildFacility { kind, .. } => Cost { materials: self.facility_materials(seat, *kind), ..Default::default() },
             Order::RaiseIndustry { .. } => Cost { materials: self.industry_cost(seat), ..Default::default() },
             // Ticket #51: a Faction's card may make its Modules and its Colony Ships cost less.
-            Order::BuildModule { kind, .. } => Cost { materials: self.module_materials(seat, *kind), ..Default::default() },
-            Order::BuildShip { kind, .. } => Cost { materials: self.ship_materials(seat, *kind), ..Default::default() },
+            // Ticket #88: and the Colony's working Mines take more off.
+            Order::BuildModule { colony, kind } => Cost { materials: self.module_materials_at(seat, *colony, *kind), ..Default::default() },
+            // Ticket #87: a Ship is built with a full tank, its Fuel paid at the build.
+            Order::BuildShip { kind, .. } => Cost { materials: self.ship_materials(seat, *kind), fuel: t.unit(*kind).tank, ..Default::default() },
             Order::BuildArmy { .. } => Cost { materials: t.unit(UnitKind::Army).materials, ..Default::default() },
             Order::Repair { points, .. } => {
                 Cost { materials: t.repair.materials_per_point * *points as i64, ..Default::default() }
             }
-            Order::Transit { ship, to } => {
-                let from = match self.ship(*ship).map(|s| s.at) {
-                    Some(ShipAt::Body(b)) => b,
-                    _ => BodyId::Earth,
-                };
-                Cost { fuel: self.transit_cost_for(seat, from, *to).1, ..Default::default() }
-            }
+            // Ticket #87: a transit spends the Ship's tank, not the Stockpile; a Refuel takes from
+            // the Stockpile what the tank wants and the Stockpile can pay.
+            Order::Transit { .. } => Cost::default(),
+            Order::Refuel { ship } => Cost { fuel: self.refuel_amount(seat, *ship), ..Default::default() },
             Order::Influence { amount, .. } => Cost { influence: *amount, ..Default::default() },
             // Ticket #54: a Mothball and a Strip Permit are free; a Restart costs Materials and a
             // Leapfrog Ducats; a Decommission pays Materials back, which arrive at its Resolution.
@@ -228,7 +230,8 @@ impl Game {
             // A purchase is a negative cost in the resource bought, so `remaining` and `commit_orders`
             // add it without a special case; a sale is the mirror, with a negative Ducat cost.
             Order::Buy { resource, amount } => {
-                let ducats = self.trade_price(*resource).unwrap_or(0) * *amount;
+                // Ticket #83: the lot's price, times the seat's market multiplier, rounded down.
+                let ducats = self.market_price(seat, self.trade_price(*resource).unwrap_or(0) * *amount);
                 match resource {
                     Resource::Materials => Cost { materials: -*amount, ducats, ..Default::default() },
                     Resource::Fuel => Cost { fuel: -*amount, ducats, ..Default::default() },
@@ -244,11 +247,12 @@ impl Game {
                     _ => Cost::default(),
                 }
             }
-            Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: self.facility_materials(seat, *kind) * t.ducats.per_building_material, ..Default::default() },
+            Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: self.market_price(seat, self.facility_materials(seat, *kind) * t.ducats.per_building_material), ..Default::default() },
             Order::BuildStation { .. } => Cost { materials: self.station_materials(seat), ..Default::default() },
-            Order::BuildModuleWithDucats { kind, .. } => Cost { ducats: self.module_materials(seat, *kind) * t.ducats.per_building_material, ..Default::default() },
+            Order::BuildModuleWithDucats { colony, kind } => Cost { ducats: self.market_price(seat, self.module_materials_at(seat, *colony, *kind) * t.ducats.per_building_material), ..Default::default() },
             // Ticket #68: the Archive Module costs its row's Materials; the Research comes after.
-            Order::BuildArchive { .. } => Cost { materials: t.module(ModuleKind::Archive).materials, ..Default::default() },
+            // Ticket #88: the Archive is a Module, so its Colony's working Mines take off too.
+            Order::BuildArchive { colony } => Cost { materials: self.module_materials_at(seat, *colony, ModuleKind::Archive), ..Default::default() },
             // Ticket #52: Relief and Resettle are paid in Ducats.
             Order::Relief { .. } => Cost { ducats: t.unrest.relief_ducats, ..Default::default() },
             Order::Resettle { .. } => Cost { ducats: t.unrest.resettle_ducats, ..Default::default() },
@@ -267,6 +271,12 @@ impl Game {
             Resource::Energy => Some(d.per_energy),
             _ => None,
         }
+    }
+
+    /// Ticket #83 (version 0.06.0): what the window charges this seat for a lot priced at `ducats`:
+    /// times the Faction's market multiplier (the Prospectors' 0.85), rounded down.
+    pub fn market_price(&self, seat: Seat, ducats: i64) -> i64 {
+        (ducats as f64 * self.tables.faction(self.kind(seat)).market_multiplier).floor() as i64
     }
 
     /// Ticket #42: what the window pays for a lot, or None for what it does not buy back.
@@ -394,7 +404,7 @@ impl Game {
                     return fail("you do not direct this Colony");
                 }
                 if !self.may_hold_archive(col) {
-                    return fail("the Archive stands at a Colony off Earth; Antarctica and a station over Earth will not do");
+                    return fail("the Archive stands at a Colony off Earth; Antarctica will not do");
                 }
                 // At most one Archive per Faction, wherever it stands.
                 if let Some(home) = self.archive_colony(seat)
@@ -420,10 +430,20 @@ impl Game {
                 }
                 let foothold = match body {
                     BodyId::Earth => self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working())),
+                    // Ticket #93: at a Body with no Colony Slots (Venus) a station is built from a
+                    // Ship of the seat's in orbit there, since there is no ground to build from.
+                    b if self.tables.body(*b).colony_slots() == 0 => self.ships.iter().any(|s| s.seat == seat && s.at == ShipAt::Body(*b)),
                     b => self.colonies.iter().any(|c| !c.in_orbit && c.body == *b && c.control.director() == Some(seat)),
                 };
                 if !foothold {
-                    return fail(if *body == BodyId::Earth { "needs a Nation State of yours with a Launch Site" } else { "needs a Colony of yours on this Body" });
+                    return fail(if *body == BodyId::Earth {
+                        "needs a Nation State of yours with a Launch Site"
+                    } else if self.tables.body(*body).colony_slots() == 0 {
+                        // Ticket #93: Venus.
+                        "needs a Ship of yours in orbit here; there is no ground to build from"
+                    } else {
+                        "needs a Colony of yours on this Body"
+                    });
                 }
                 Ok(cost)
             }
@@ -531,11 +551,32 @@ impl Game {
                 if *kind == ModuleKind::Archive {
                     return fail("the Archive is raised from its own button");
                 }
-                // Ticket #46: a station holds only a Shipyard and Habitats.
-                if col.in_orbit && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat) {
-                    return fail("a station holds only a Shipyard and Habitats");
+                // Ticket #46: a station holds only a Shipyard and Habitats; ticket #80: and Observatories;
+                // ticket #89: and Solar Arrays, which stand nowhere else.
+                // Ticket #90: and a Trade Post.
+                if col.in_orbit && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost) {
+                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays and a Trade Post");
                 }
-                if matches!(kind, ModuleKind::Shipyard | ModuleKind::Barracks) {
+                if !col.in_orbit && self.tables.module(*kind).station_only {
+                    return fail(format!("a {} stands only on a station", kind.name()));
+                }
+                // Ticket #90: one Trade Post per Faction per Body, on the ground or in orbit.
+                if *kind == ModuleKind::TradePost
+                    && (self.trade_post_at_body(seat, col.body) || pending.iter().any(|o| o.build_module().map(|(c, k)| k == ModuleKind::TradePost && self.colony(c).map(|x| x.body == col.body).unwrap_or(false)).unwrap_or(false)))
+                {
+                    return fail(format!("you already hold a Trade Post at {}; one per Body", self.tables.body(col.body).name));
+                }
+                // Ticket #92: the Mass Driver waits on its Tech, stands only on a ground Colony of
+                // a low-gravity Body, and once per Colony.
+                if let Some(t) = self.tables.module(*kind).needs_tech
+                    && !self.has_tech(t)
+                {
+                    return fail(format!("a {} needs {} first", kind.name(), self.tables.tech(t).name));
+                }
+                if self.tables.module(*kind).low_gravity_only && (col.in_orbit || !self.tables.body(col.body).low_gravity) {
+                    return fail(format!("a {} stands only on the ground of a low-gravity Body (the Moon, Phobos, Deimos)", kind.name()));
+                }
+                if matches!(kind, ModuleKind::Shipyard | ModuleKind::Barracks | ModuleKind::MassDriver) {
                     let has = col.modules.iter().any(|m| m.kind == *kind)
                         || col.queue.iter().any(|b| b.item == BuildItem::Module(*kind))
                         || pending.iter().any(|o| o.build_module() == Some((*colony, *kind)));
@@ -651,10 +692,39 @@ impl Game {
                 if from == *to {
                     return fail("already there");
                 }
+                // Ticket #93: no leg between Venus and the Mars system this version.
+                if !Self::leg_allowed(from, *to) {
+                    return fail("no leg runs between Venus and the Mars system; fly by Earth");
+                }
                 if s.arrived_this_turn {
                     return fail("arrived this turn; it may act next turn");
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } if x == ship)) {
+                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } if x == ship)) {
+                    return fail("this Ship already has an order");
+                }
+                // Ticket #87: the leg is paid from the tank.
+                let (_, fuel) = self.transit_cost_for(seat, from, *to);
+                if s.fuel < fuel {
+                    return fail(format!("the tank holds {} Fuel of {}; this leg needs {fuel}", s.fuel, self.tables.unit(s.kind).tank));
+                }
+                Ok(cost)
+            }
+            Order::Refuel { ship } => {
+                let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
+                if s.seat != seat {
+                    return fail("not your Ship");
+                }
+                let ShipAt::Body(body) = s.at else { return fail("in transit") };
+                if !self.own_station_at(seat, body) {
+                    return fail(format!("no station of yours over {} to refuel at", self.tables.body(body).name));
+                }
+                if s.fuel >= self.tables.unit(s.kind).tank {
+                    return fail("the tank is full");
+                }
+                if cost.fuel <= 0 {
+                    return fail("no Fuel in the Stockpile to fill it with");
+                }
+                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Refuel { ship: x } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 Ok(cost)
@@ -700,7 +770,12 @@ impl Game {
                 let card = self.tables.unit(s.kind);
                 // Ticket #51: what a Colony Ship carries is a Faction figure (Steerage doubles it)
                 // and rises with Expanded Habitats; nothing else carries Colonists.
-                let capacity = if s.kind == UnitKind::ColonyShip { self.colony_ship_capacity(seat) } else { card.carries_colonists };
+                // Ticket #86: at Earth a warming world crowds a Colony Ship beyond its capacity.
+                let capacity = if s.kind == UnitKind::ColonyShip {
+                    if body == BodyId::Earth { self.colony_ship_crowded_capacity(seat) } else { self.colony_ship_capacity(seat) }
+                } else {
+                    card.carries_colonists
+                };
                 if *colonists == 0 && army.is_none() {
                     return fail("nothing to load");
                 }
@@ -1061,11 +1136,23 @@ impl Game {
                         _ => continue,
                     };
                     let (turns, _) = self.transit_cost(from, *to);
+                    // Ticket #87: the leg's Fuel, with the Faction's and the Tech's multipliers, from the tank.
+                    let (_, fuel) = self.transit_cost_for(seat, from, *to);
                     let name = self.tables.body(*to).name.clone();
                     if let Some(s) = self.ship_mut(*ship) {
                         s.at = ShipAt::Transit { from, to: *to, turns_left: turns };
+                        s.fuel = (s.fuel - fuel).max(0);
                     }
-                    self.log(format!("{} launches {} toward {} ({} turns).", self.seat_name(seat), ship, name, turns));
+                    self.log(format!("{} launches {} toward {} ({} turns, {} Fuel from the tank).", self.seat_name(seat), ship, name, turns, fuel));
+                }
+                // Ticket #87: the Fuel came out of the Stockpile with the order's cost; it goes into the tank.
+                Order::Refuel { ship } => {
+                    let amount = cost.fuel;
+                    let tank = self.ship(*ship).map(|s| self.tables.unit(s.kind).tank).unwrap_or(0);
+                    if let Some(s) = self.ship_mut(*ship) {
+                        s.fuel = (s.fuel + amount).min(tank);
+                    }
+                    self.log(format!("{} refuels {} with {} Fuel.", self.seat_name(seat), ship, amount));
                 }
                 Order::ShipStance { body, stance } => {
                     for s in self.ships.iter_mut().filter(|s| s.seat == seat && s.at == ShipAt::Body(*body)) {
@@ -1323,6 +1410,14 @@ impl Game {
             Order::BuildShip { site, kind } => r("build_ship", &[("unit", kind.name().to_string()), ("place", place(*site))]),
             Order::BuildArmy { place: p } => r("build_army", &[("place", place(*p))]),
             Order::BuildStation { body, .. } => r("build_station", &[("body", self.tables.body(*body).name.clone())]),
+            // Ticket #87.
+            Order::Refuel { ship } => {
+                let body = self.ship(*ship).and_then(|s| match s.at {
+                    ShipAt::Body(b) => Some(self.tables.body(b).name.clone()),
+                    _ => None,
+                });
+                r("refuel", &[("unit", unit_of(UnitRef::Ship(*ship))), ("body", body.unwrap_or_else(|| "space".to_string()))])
+            }
             Order::BuildArchive { colony } => r("build_archive", &[("colony", place(Place::Colony(*colony)))]),
             Order::FundArchive => r("fund_archive", &[]),
             Order::Repair { unit, .. } | Order::RepairWithDucats { unit, .. } => r("repair", &[("unit", unit_of(*unit))]),

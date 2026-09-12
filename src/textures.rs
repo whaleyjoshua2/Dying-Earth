@@ -39,6 +39,8 @@ pub struct Textures {
     /// Ticket #45: the moons of Mars, USGS and Stooke maps on spheres (`examples/prep_moons.rs`).
     pub phobos: Rgba,
     pub deimos: Rgba,
+    /// Ticket #93 (version 0.06.0): Venus's clouds, made by `examples/prep_assets.rs --venus`.
+    pub venus: Rgba,
     /// 0 = water, 1..13 = the mask value of a Nation State (see `examples/prep_assets.rs`).
     pub mask: Vec<u8>,
 }
@@ -74,7 +76,8 @@ impl Textures {
         }
         let phobos = Rgba::load(&dir.join("phobos.png"))?;
         let deimos = Rgba::load(&dir.join("deimos.png"))?;
-        Ok(Textures { earth, moon, mars, phobos, deimos, mask: mask_img.into_raw() })
+        let venus = Rgba::load(&dir.join("venus.png"))?;
+        Ok(Textures { earth, moon, mars, phobos, deimos, venus, mask: mask_img.into_raw() })
     }
 
     pub fn state_at(&self, x: u32, y: u32) -> Option<StateId> {

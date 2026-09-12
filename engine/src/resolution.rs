@@ -85,6 +85,49 @@ impl Game {
             let text = self.say("solar_storm", &[]);
             self.report_line(LineKind::Ship, None, text);
         }
+        // Ticket #86 (version 0.06.0): a crowded Colony Ship rolls for its extras once, at arrival:
+        // each Colonist above the safe capacity dies with a chance of `death_chance_per_extra`
+        // times the number of extras. Nothing but the Report and the Moment counts them.
+        for (seat, body, id) in &arrivals {
+            let Some((kind, aboard)) = self.ship(*id).map(|s| (s.kind, s.colonists)) else { continue };
+            if kind != UnitKind::ColonyShip {
+                continue;
+            }
+            let safe = self.colony_ship_capacity(*seat);
+            let extras = aboard.saturating_sub(safe);
+            if extras == 0 {
+                continue;
+            }
+            let p = (self.tables.crowding.death_chance_per_extra * extras as f64).clamp(0.0, 1.0);
+            let mut lost = 0u32;
+            for _ in 0..extras {
+                if self.rng.chance(p) {
+                    lost += 1;
+                }
+            }
+            if lost == 0 {
+                continue;
+            }
+            let ship_name = format!("{} {}", kind.name(), id.0);
+            if let Some(s) = self.ship_mut(*id) {
+                s.colonists -= lost;
+            }
+            self.seat_mut(*seat).lost_in_transit += lost as i64;
+            let line = format!("{} {}: {} of the {} crowded aboard died on the way to {}.", self.seat_name(*seat), ship_name, lost, extras, self.tables.body(*body).name);
+            self.log(line.clone());
+            self.report_line(LineKind::Ship, None, line);
+            self.moment(
+                MomentKind::LostInTransit,
+                &[
+                    ("faction", self.seat_name(*seat)),
+                    ("ship", ship_name),
+                    ("body", self.tables.body(*body).name.clone()),
+                    ("n", lost.to_string()),
+                    ("of", extras.to_string()),
+                ],
+                None,
+            );
+        }
         for (seat, body, id) in &arrivals {
             let kind = self.ship(*id).map(|s| s.kind.name()).unwrap_or("Ship").to_string();
             let line = format!("{} {} arrived at {}.", self.seat_name(*seat), kind, self.tables.body(*body).name);
@@ -1096,6 +1139,8 @@ impl Game {
                     escaped: false,
                     arrived_this_turn: false,
                     built_turn: turn,
+                    // Ticket #87: built with a full tank, paid at the build.
+                    fuel: self.tables.unit(kind).tank,
                 });
             }
             _ => {}
@@ -1197,7 +1242,12 @@ impl Game {
         );
         self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(id)), text);
         let antarctic = self.colonies.iter().filter(|c| c.control.director() == Some(seat) && c.body == BodyId::Earth && !c.in_orbit).count();
-        let note = if antarctic <= 1 { self.phrase("first_colony", &[]) } else { self.phrase("more_colonies", &[("count", antarctic.to_string())]) };
+        // Ticket #85: Antarctica is on Earth, so its founding has phrases of its own, the count an ordinal.
+        let note = if antarctic <= 1 {
+            self.phrase("first_antarctic_colony", &[])
+        } else {
+            self.phrase("more_antarctic_colonies", &[("ordinal", crate::report::ordinal(antarctic))])
+        };
         self.moment(
             MomentKind::ColonyFounded,
             &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(id))), ("note", note), ("n", moved.to_string())],
@@ -1396,10 +1446,11 @@ impl Game {
                             self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(id)), text);
                             let off_earth =
                                 self.colonies.iter().filter(|c| c.control.director() == Some(seat) && c.body != BodyId::Earth && !c.in_orbit).count();
+                            // Ticket #85: the count is an ordinal.
                             let note = if off_earth <= 1 {
                                 self.phrase("first_colony", &[])
                             } else {
-                                self.phrase("more_colonies", &[("count", off_earth.to_string())])
+                                self.phrase("more_colonies", &[("ordinal", crate::report::ordinal(off_earth))])
                             };
                             self.moment(
                                 MomentKind::ColonyFounded,

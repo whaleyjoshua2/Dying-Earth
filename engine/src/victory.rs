@@ -73,12 +73,20 @@ impl Game {
                 format!("{} of {:.0} Colonists living at the Archive's Colony", self.colonists_at_archive(seat), second.bar),
             ),
         };
-        let first_held_back = match card.kind {
+        let mut first_held_back = match card.kind {
             VictoryFirstKind::ArchiveResearch if self.archive_complete(seat) && !self.archive_online(seat) => {
                 Some("the Archive is complete but not running".to_string())
             }
             _ => None,
         };
+        // Ticket #84 (version 0.06.0): the Faction's gate Tech must stand before it can win.
+        // Progress accrues regardless; Provisional Findings opens nothing.
+        if first_held_back.is_none()
+            && let Some(gate) = self.tables.victory_gate(self.kind(seat))
+            && !self.has_tech(gate)
+        {
+            first_held_back = Some(format!("needs {}, not yet researched", self.tables.tech(gate).name));
+        }
         Progress {
             first_name: card.kind.name().to_string(),
             first_value,
