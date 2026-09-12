@@ -5,7 +5,7 @@ A single-player, turn-based strategy game about colonizing the solar system befo
 ## Language
 
 **First Playable**:
-The small version of the game: twelve turns and two Factions as first built, twenty-four turns since version 0.02, four Factions since version 0.05 and thirty-six turns of two months since version 0.05.5. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`, `docs/spec/version-0.03.md`, `docs/spec/version-0.04.md`, `docs/spec/version-0.05.md` and `docs/spec/version-0.05.5.md`.
+The small version of the game: twelve turns and two Factions as first built, twenty-four turns since version 0.02, four Factions since version 0.05 and thirty-six turns of two months since version 0.05.5. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`, `docs/spec/version-0.03.md`, `docs/spec/version-0.04.md`, `docs/spec/version-0.05.md` `docs/spec/version-0.05.5.md`, `docs/spec/version-0.06.0.md` and `docs/spec/version-0.07.0.md`.
 _Avoid_: slice, MVP, demo, v1, prototype
 
 **Faction**:
@@ -61,7 +61,7 @@ A place in the solar system that can hold a Colony or a Space Station. Six since
 _Avoid_: planet, world, site, location, node
 
 **Colony**:
-A permanent settlement a Faction holds on a Body, founded when a Colony Ship unloads Colonists into a free Colony Slot. It takes the name of its slot ("Tycho on the Moon"). None exist when the game starts.
+A permanent settlement a Faction holds on a Body, founded when a Colony Ship unloads Colonists into a free Colony Slot. It takes the name of its slot ("Tycho on the Moon"). None exist when the game starts. Since version 0.07.0 it holds three Modules free and one more for every Colonist living there: people gate industry, as Size and Industry Level gate a Nation State's build slots. The Archive is exempt; a mothballed Module keeps its slot and one building reserves one; a cap fallen below what already stands destroys nothing and simply leaves no room.
 _Avoid_: base, outpost, settlement
 
 **Colony Slot**:
@@ -73,7 +73,7 @@ One of a fixed number of places in orbit around a Body where a Space Station can
 _Avoid_: dock, berth, orbit
 
 **Space Station**:
-A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard, Habitats and, since version 0.06.0, Observatories and Solar Arrays. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with a bare one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom); the Arkwrights start with none, and build theirs at half price. Since version 0.06.0 a station over Earth is off Earth: its Colonists count for Off-world Presence and it may hold the Archive. A station is also the one place a Ship of its Faction can refuel.
+A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard, Habitats and, since version 0.06.0, Observatories and Solar Arrays. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with a bare one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom); the Arkwrights start with none, and build theirs at half price. Since version 0.06.0 a station over Earth is off Earth: its Colonists count for Off-world Presence and it may hold the Archive. A station is also the one place a Ship of its Faction can refuel. It reads the Colony's Module cap since version 0.07.0, so one founded bare holds three and grows only as its people arrive.
 
 **Tank**:
 The Fuel a Ship carries, since version 0.06.0: a figure per Ship type, filled at the Shipyard for Fuel paid at the build, spent by transits, and refilled only by a Refuel. A Ship whose Tank cannot pay any leg from where it stands, with no Space Station of its Faction there, is stranded until one is built in orbit there.
@@ -129,8 +129,12 @@ The single tree of Techs shared by all Factions, seventeen of them since version
 _Avoid_: per-faction tree, research tree
 
 **Research Lead**:
-The Faction that contributed the most Research to the Tech that just completed. It chooses the next Tech. Decided afresh for every Tech, and the race for it stands in the top bar as one bar of the four Factions' contributions in their own colours.
+The Faction that contributed the most Research to the Tech that just completed. It chooses the next Tech, from version 0.07.0 out of a drawn shortlist of three rather than out of everything available; the draw always carries the Lead's own Victory gate once its prerequisites are met, so a Faction can be denied a rival's gate but never its own. The first Tech of the game is not drawn for: it is a free choice from the whole of rung 1. Decided afresh for every Tech, and the race for it stands in the top bar as one bar of the four Factions' contributions in their own colours. Since version 0.07.0 the turn cannot end while a human Lead owes the table a Tech, and Research banked while nothing is under research keeps its owner.
 _Avoid_: science leader, tech leader
+
+**Shortlist**:
+The three Techs the Research Lead chooses between, drawn when a Tech completes, since version 0.07.0. The Lead's own Victory gate is always on it where its prerequisites are met; the rest come from the game's own generator. An empty shortlist is a free choice of everything available, which is how the game opens.
+_Avoid_: options, candidates, draft, offer
 
 ### Resources
 

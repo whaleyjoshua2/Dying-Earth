@@ -89,3 +89,25 @@ A Bevy query conflict came out of this, and neither the build nor the tests coul
 the slot markers a `Visibility` put that query in conflict with three others that also write
 `Visibility`, and the game panicked on the first frame. `cargo build` and `cargo clippy -D
 warnings` were both clean. Only running it found it.
+
+## The sweep at the end of the version
+
+Four seatings, twenty seeds each. Seat 0 is named first.
+
+| seat 0 | Collapses | wins by seat |
+|---|---|---|
+| Custodians from Europe | 0/20 | **Custodians 20**, Prospectors 0, Arkwrights 0, Archivists 0 |
+| Prospectors from North America | 7/20 | **Prospectors 9**, Custodians 1, **Arkwrights 3**, Archivists 0 |
+| Arkwrights from South Asia | 2/20 | Arkwrights 1, **Custodians 17**, Prospectors 0, Archivists 0 |
+| Archivists from Sub-Saharan Africa | 7/20 | Archivists 0, **Custodians 11**, **Prospectors 2**, Arkwrights 0 |
+
+**The computer plays now.** In 0.06.0 no AI seat won a single one of the twelve playtested
+games. AI seats take **34 of the 80** here, in three of the four seatings.
+
+**The Custodians are the standing imbalance**, at 49 of 80 from any seat and 20 of 20 from
+their own. Their Victory Condition went from unreachable to met in every seed of their own
+seating in one change, which is very likely too far the other way. The **Archivists win none**
+of the 80, though the Archive itself now completes.
+
+Collapses went from 60 of 80 before the climate ticket to **16**, and the world's net Emissions
+at the end from +111.8 to **−2.7**.
