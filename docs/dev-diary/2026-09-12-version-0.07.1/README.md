@@ -21,3 +21,44 @@ nothing. The designer would have seen the markers only after dragging the globe 
 [the globe ticket](https://github.com/whaleyjoshua2/Dying-Earth/issues/100) made possible in
 the same version. Standing the camera where a dragging player stands is what produced the
 picture above: three markers without the fix, none with it.
+
+## Looking at the icons at the size they are actually drawn
+
+The designer, reading the top bar: *"currently I don't know what materials is; fuel is jerry can,
+energy lightning bolt, and duckets looks like some mineral; tech is a microscope."*
+
+![The five icons as they stand](icons-as-they-stand.png)
+
+Confirmed, and four of the five readings were exact. Left to right that sheet is **ducats,
+energy, fuel, materials, research**. Fuel, Energy and Research read correctly. The two that
+fail are the two the designer flagged, and they fail symmetrically: **Materials is drawn as
+sparkling faceted gems** and reads as treasure, while **Ducats is drawn as a dozen stacked
+coins** which, shrunk to the 16 pixels the bar draws, flatten into a lumpy mass — a mineral.
+The glyph that looks like money is labelled Materials and the glyph that looks like a mineral
+is labelled Ducats.
+
+That vindicates the designer's line *"current ducket icon becomes materials and add new ducats
+icon"*, which the charting round had flagged as possibly backwards. It was not backwards; the
+charting was reading the filenames rather than the art.
+
+### Candidates, rendered at both sizes
+
+`cargo run --release --example icon_sheet -- out.png [folder]` renders any folder of SVGs twice:
+large, and **at the 16 pixels the top bar actually uses**, magnified without smoothing. The
+second row is the only one that decides anything.
+
+![Materials candidates](candidates-materials.png)
+
+*anvil, brick-pile, cubes, metal-bar, mine-wagon, packed-planks, rock, stone-pile.* Surviving
+16px: **anvil, metal-bar, mine-wagon, packed-planks**. Dissolving: brick-pile, stone-pile (the
+same failure as the current ore), rock, cubes.
+
+![Ducats candidates](candidates-ducats.png)
+
+*banknote, cash, gold-stack, money-stack, profit, purse, two-coins, wallet.* Surviving 16px:
+**banknote, purse, two-coins, wallet**. Dissolving: gold-stack (the worst of the eight),
+cash, money-stack; profit reads as an arrow rather than as money.
+
+**The rule both sheets prove, and the one to hold the three new icons to:** a glyph made of
+many small repeated shapes does not survive 16 pixels. Population and Emissions will both tempt
+an artist toward lots of little things.
