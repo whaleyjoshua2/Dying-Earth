@@ -857,15 +857,10 @@ fn game_screen(
     actions: &mut Vec<Action>,
 ) {
     let Some(game) = session.game.as_ref() else { return };
-    // Open the Tech Tree once when the player must pick.
-    let must_pick = game.research.awaiting_pick == Some(Seat(0)) && !game.available_techs().is_empty();
-    if must_pick && !view.tech_prompted {
-        view.show_tech = true;
-        view.tech_prompted = true;
-    }
-    if !must_pick {
-        view.tech_prompted = false;
-    }
+    // Ticket #104 (version 0.07.0): NOTHING opens itself. The Tech Tree used to throw itself up
+    // whenever a pick was owed, which at turn 1 is always, so a new game began behind two panels.
+    // The nudge that replaces it is the yellow line in the top bar, and the turn cannot be ended
+    // with a pick outstanding (ticket #105), so a panel that opens itself buys nothing.
     top_bar(root, session, game, view, icons, actions);
     side_panel(root, session, game, view, actions);
     // The 3D area: drag turns, wheel zooms, click picks.
@@ -966,6 +961,15 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 Some(t) => format!("Research {} / {} toward {}", game.research.progress, game.tables.tech(t).cost, game.tables.tech(t).name),
                 None => format!("Research: no Tech chosen ({} waiting)", game.research.unallocated),
             };
+            // Ticket #104 (version 0.07.0): the Tech Tree no longer opens itself, so the bar has to
+            // say when a pick is owed. End Turn is disabled until one is made, but that only shows
+            // on a hover, and a player who does not know to look will not find it.
+            if game.research.awaiting_pick == Some(Seat(0)) && game.research.current.is_none() && !game.available_techs().is_empty() && !session.spectator {
+                if ui.button(RichText::new("Pick a Tech").color(Color32::BLACK).strong()).on_hover_text("The Research Lead is yours: choose what the world researches next. The turn cannot end until you do.").clicked() {
+                    view.show_tech = true;
+                }
+                ui.separator();
+            }
             // Ticket #109: Research joins the others, its word replaced by its glyph on the bar.
             match icons.image("research", 16.0, Color32::from_rgb(225, 220, 210)) {
                 Some(image) => {
