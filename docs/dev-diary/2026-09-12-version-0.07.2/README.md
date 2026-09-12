@@ -354,3 +354,50 @@ text box has focus, as before, so nothing types into the spend box.
 
 Clippy clean with `-D warnings`, 255 tests passing; the change is all interface, and the pictures are
 its check.
+
+## The amendments written, the baseline restarted, and the kit built
+
+Ticket [#129](https://github.com/whaleyjoshua2/Dying-Earth/issues/129), the last on the map. The
+spec is [`docs/spec/version-0.07.2.md`](../../spec/version-0.07.2.md), one section per decision,
+written from the resolution comments; the playtest note is
+[`docs/playtest/PLAYTEST.txt`](../../playtest/PLAYTEST.txt), rewritten for 0.07.2.
+
+![The Earth Map at the end of the version](final-earth.png)
+
+**The sweep baseline restarts here**, on fourteen Regions, and reproduces the figure ticket #125
+recorded when the map landed, to the game — nothing after it touched a rule:
+
+| seat 0 | wins | Collapses | tree completes |
+|---|---|---|---|
+| Custodians | Custodians 12 | 8 | 20 of 20 |
+| Prospectors | Custodians 20 | 0 | 20 of 20 |
+| Arkwrights | Custodians 19, Arkwrights 1 | 0 | 13 of 20 |
+| Archivists | Custodians 19, Archivists 1 | 0 | 20 of 20 |
+| **totals** | **Custodians 70**, Arkwrights 1, Archivists 1 | **8** | **73 of 80** |
+
+The instrument seats seat 0 in China every time and spreads the computer players by the highest
+untouched Industry, which on the new graph puts the third of them in Saudi Arabia. Nothing measured
+before this table is comparable to it. (A first run used the climate-knob `sweep` example by mistake,
+which reports Collapses at every step of its grid and wins for nobody; it measures something else and
+was discarded. The standing instrument is `simulate:<seed> --player=<faction>`.)
+
+**A whole game from seat 0**, headless through the `play` example, seed 11, Custodians from Europe,
+giving no order but the owed Tech picks: 29 turn commands, none refused, a Collapse at +3.0 C on
+turn 29 with nobody winning — the idle Custodians build no Scrubber — and ten Techs done. The same
+shape as the 0.07.1 run, on the new board.
+
+![The start screen at the end of the version](final-start.png)
+
+![The Solar System Map at the end of the version](final-solar.png)
+
+![The credits: thirteen icons and fourteen flags](final-credits.png)
+
+The rest of the final set — every Body and every screen — is filed beside these as `final-*.png`.
+
+**The kit**: `dist/dying-earth-0.07.2/` — `dying-earth.exe` (static CRT, 109.6 MB), `assets/` with the
+fourteen flags, thirteen icons, the new mask and fifteen data tables, and the playtest note as
+`README.txt` — zipped to `dist/dying-earth-0.07.2-playtest.zip`, 39.2 MB, its contents listed back out
+of the zip and counted. Windows only, at the designer's word; `dist/` is gitignored.
+
+The suite is 255 tests, clippy clean with `-D warnings`. The pull request is opened from
+`version-0.07.2` against `main`.
