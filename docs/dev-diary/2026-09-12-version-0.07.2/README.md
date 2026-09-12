@@ -219,3 +219,36 @@ pixels, and a hover is not a reason to do it every frame; the system remembers w
 
 `start:<state>` is a new building aid — the start screen with that Region already chosen — since a
 click cannot be made in a headless picture. Clippy clean with `-D warnings`, 254 tests passing.
+
+## The roster's glyphs: candidates on a sheet
+
+Ticket [#127](https://github.com/whaleyjoshua2/Dying-Earth/issues/127). *"Lets get a set of icons
+denoting ships (one for military one for colony ship) than one for stations and one for colonies and
+one for nation states to place in front of their text. keep these off white."*
+
+Candidates from game-icons.net, each sheet large on top and then at 14 and 16 pixels magnified —
+the sizes a roster row uses — since an emblem that reads at 512 can dissolve at 16. Names run left
+to right.
+
+![Warship candidates](roster-glyph-candidates-warship.png)
+
+**Warship:** interceptor-ship, missile-swarm, rocket, rocket-flight, space-shuttle, spaceship,
+starfighter.
+
+![Colony Ship candidates](roster-glyph-candidates-colonyship.png)
+
+**Colony Ship:** cryo-chamber, rocket, rocket-thruster, spaceship, ufo.
+
+![Station candidates](roster-glyph-candidates-station.png)
+
+**Station:** defense-satellite, lunar-module, observatory, orbital, satellite, solar-system,
+space-needle.
+
+![Colony candidates](roster-glyph-candidates-colony.png)
+
+**Colony:** base-dome, family-house, greenhouse, habitat-dome, igloo, moon-orbit, village.
+
+![Region candidates](roster-glyph-candidates-region.png)
+
+**Region:** castle, earth-africa-europe, earth-asia-oceania, factory, flag-objective, flying-flag,
+globe, modern-city, tower-flag.
