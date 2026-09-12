@@ -243,3 +243,51 @@ removes the worst collision and leaves the Prospectors' one. The other half of t
 the icon colours rather than the Faction ones — Fuel toward straw and Materials toward a warm grey
 cost nothing, because no player has learned them yet, whereas a Faction colour is something they
 read on the map every turn.
+
+### The designer's palette, checked before it is nailed down
+
+The designer's amendment to candidate 1: *"let's go natural but make duckets the green of the
+research icon in the clear of factions pallet, shift the jerry can redder and the emissions browner.
+As for factions slightly darken the arkwrights purple and replace the archivists with crimson.
+Please check these don't conflict."*
+
+![The designer's palette against the Factions, measured](palette-designers-against-the-factions.png)
+
+Checked by measuring, in CIELAB, the distance between every pair of colours on the board — icon
+against icon and icon against Faction. Below about 15 the eye mistakes two colours for each other;
+25 and up is comfortable. **Two pairs came back too close, and neither is visible on a swatch row
+until it is measured:**
+
+- **Ducats against population, ΔE 12.** The green asked for for Ducats is all but the same colour as
+  the green candidate 1 gave population — RGB (120,214,150) against (150,206,146). They would stand
+  in the same Facility list.
+- **Fuel against the Prospectors, ΔE 19.** Shifting the jerrycan *redder* from amber moved it
+  **toward** the Prospectors' orange rather than away: amber sits at hue 36 degrees, the Prospectors
+  at 28, so a partial shift red lands on top of them. Going *further* red, past them to hue 13,
+  clears it again at ΔE 27.
+
+Row 3 clears both: **population moves to a warm tan**, which a bust of a person wants anyway and
+which leaves the asked-for green exactly where it was asked for, and **the jerrycan goes further
+red** rather than part way. The worst remaining pair is Materials against Research at 25.
+
+Everything else the designer asked for measured clean. Darkening the Arkwrights' purple *does* open
+the gap to Influence's lilac, from the 12 that made it candidate 1's worst collision out to 30.
+
+![The two on the real bar and in a real Facility list](palette-designers-on-the-board.png)
+
+### What the swatches could not show: crimson on the map
+
+![The proposed Faction colours on the globe](palette-designers-factions-on-the-board.png)
+
+A Faction's colour does two jobs: it tints that Faction's territory on the globe **and** prints the
+label drawn on top of it. The Archivists' pale blue-white had a lightness of **L\* 83** and so read
+against anything. Crimson is dark by definition — L\* 41 deep, 55 bright — and in the picture above
+the Archivists' own labels nearly vanish into their own pink land, at the *bright* value. The
+Custodians and Prospectors sit at L\* 62 and read; the Arkwrights are being taken from 48 down to 39,
+in the same direction.
+
+This is not an argument against crimson. It is a choice between three answers, and it is the
+designer's: take the crimson lighter, to a rose at about L\* 69; keep it deep and accept that
+Archivist labels are read from the shield markers and the panel rather than the map; or lighten
+**every** Faction's map-label text by a fixed amount, which would help the Prospectors too and is a
+small change to one function.

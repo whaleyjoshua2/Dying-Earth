@@ -158,11 +158,45 @@ const MUTED: [(&str, [u8; 3]); 8] = [
     ("emissions", [222, 196, 190]),
 ];
 
+/// Candidate 4, **the designer's**: candidate 1 with three changes asked for by name -- Ducats
+/// takes the green candidate 2 gave Research, the jerrycan shifts redder, and Emissions goes
+/// browner. Measured against the Faction colours it leaves two collisions, which candidate 5
+/// answers; this one exists so the two can be looked at side by side.
+const DESIGNERS: [(&str, [u8; 3]); 8] = [
+    ("materials", [168, 176, 186]),
+    ("fuel", [224, 112, 76]),
+    ("energy", [245, 222, 92]),
+    ("research", [118, 206, 232]),
+    ("ducats", [120, 214, 150]),
+    ("population", [150, 206, 146]),
+    ("influence", [188, 146, 236]),
+    ("emissions", [146, 110, 84]),
+];
+
+/// Candidate 5, **the designer's, with the two measured collisions cleared**. The green asked for
+/// for Ducats sits at a CIELAB distance of 12 from the population green it was to stand beside,
+/// which is inside the range two colours are mistaken for each other, so **population** moves to a
+/// warm tan -- a skin tone, which is what a bust of a person wants anyway -- and the green stays
+/// where it was asked for. The jerrycan shifted redder landed at a distance of 19 from the
+/// Prospectors' orange, nearer than it began, so it goes **further** red rather than part way.
+const DESIGNERS_CLEARED: [(&str, [u8; 3]); 8] = [
+    ("materials", [168, 176, 186]),
+    ("fuel", [226, 88, 62]),
+    ("energy", [245, 222, 92]),
+    ("research", [118, 206, 232]),
+    ("ducats", [120, 214, 150]),
+    ("population", [220, 186, 150]),
+    ("influence", [188, 146, 236]),
+    ("emissions", [146, 110, 84]),
+];
+
 pub fn fill(name: &str) -> egui::Color32 {
     let table = match std::env::args().find_map(|a| a.strip_prefix("palette:").and_then(|v| v.parse::<u32>().ok())) {
         Some(1) => &NATURAL,
         Some(2) => &CLEAR,
         Some(3) => &MUTED,
+        Some(4) => &DESIGNERS,
+        Some(5) => &DESIGNERS_CLEARED,
         _ => return rgb(NEUTRAL),
     };
     rgb(table.iter().find(|(figure, _)| *figure == name).map(|(_, c)| *c).unwrap_or(NEUTRAL))
