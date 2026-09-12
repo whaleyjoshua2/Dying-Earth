@@ -70,12 +70,24 @@ pub enum Order {
     /// Version 0.04 (ticket #46): a Space Station in an orbital slot, built for Materials from a
     /// Nation State with a Launch Site (over Earth) or a Colony of the seat's (elsewhere).
     BuildStation { body: BodyId, slot: u32 },
-    /// Version 0.05 (ticket #51): the next stage of the Archive, at a Colony off Earth. Paid in
-    /// Materials from the Stockpile and Research already banked in the Archive fund.
-    BuildArchiveStage { colony: ColonyId },
+    /// Version 0.05 (ticket #51): the Archive, at a Colony off Earth. Version 0.05.5 (ticket #68):
+    /// one Module, paid in Materials from the Stockpile; its Research is paid into the fund after.
+    BuildArchive { colony: ColonyId },
     /// Version 0.05 (ticket #51): this turn's Research from the Archivists' Labs goes into the
     /// Archive fund instead of the shared Tech, and counts nothing toward the Research Lead.
     FundArchive,
+    /// Version 0.05.5 (ticket #73): muster Emigrants, the built Colonists, in a Nation State the
+    /// seat directs: up to four a turn per Faction, in one state, at a tenth of a person each.
+    BuildEmigrants { state: StateId, n: u32 },
+    /// Version 0.05.5 (ticket #73): send waiting Emigrants to Antarctica by sea, into a free slot
+    /// (founding a Colony) or the seat's own Colony there; a turn to arrive, no launch.
+    SendToAntarctica { state: StateId, n: u32, into: UnloadTarget },
+    /// Version 0.05.5 (ticket #72): the Prospectors set the share of their Materials output the
+    /// Venture Capital Fund banks each Income, in whole percent (a step of 10, 0 to 80).
+    SetVentureShare { share: u32 },
+    /// Version 0.05.5 (ticket #72): the Prospectors take Materials back out of the Fund, nine
+    /// tenths of them returning to the Stockpile.
+    DrawVenture { amount: i64 },
     /// Version 0.05 (ticket #52): Relief. Ducats spent on a Nation State you direct, lowering its
     /// Unrest by one. Any number of times a turn, cancellable like any order.
     Relief { state: StateId },
@@ -190,7 +202,8 @@ impl Game {
     pub fn order_cost(&self, seat: Seat, order: &Order) -> Cost {
         let t = &self.tables;
         match order {
-            Order::BuildFacility { kind, .. } => Cost { materials: t.facility(*kind).materials, ..Default::default() },
+            // Ticket #72: the Faction's own Facility price (the Prospectors' 15% off).
+            Order::BuildFacility { kind, .. } => Cost { materials: self.facility_materials(seat, *kind), ..Default::default() },
             Order::RaiseIndustry { .. } => Cost { materials: self.industry_cost(seat), ..Default::default() },
             // Ticket #51: a Faction's card may make its Modules and its Colony Ships cost less.
             Order::BuildModule { kind, .. } => Cost { materials: self.module_materials(seat, *kind), ..Default::default() },
@@ -231,12 +244,11 @@ impl Game {
                     _ => Cost::default(),
                 }
             }
-            Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: t.facility(*kind).materials * t.ducats.per_building_material, ..Default::default() },
+            Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: self.facility_materials(seat, *kind) * t.ducats.per_building_material, ..Default::default() },
             Order::BuildStation { .. } => Cost { materials: self.station_materials(seat), ..Default::default() },
             Order::BuildModuleWithDucats { kind, .. } => Cost { ducats: self.module_materials(seat, *kind) * t.ducats.per_building_material, ..Default::default() },
-            // Ticket #51: a stage of the Archive costs Materials here and Research from the fund,
-            // which is not part of the Stockpile and so is checked in the legality rules below.
-            Order::BuildArchiveStage { .. } => Cost { materials: t.module(ModuleKind::Archive).materials, ..Default::default() },
+            // Ticket #68: the Archive Module costs its row's Materials; the Research comes after.
+            Order::BuildArchive { .. } => Cost { materials: t.module(ModuleKind::Archive).materials, ..Default::default() },
             // Ticket #52: Relief and Resettle are paid in Ducats.
             Order::Relief { .. } => Cost { ducats: t.unrest.relief_ducats, ..Default::default() },
             Order::Resettle { .. } => Cost { ducats: t.unrest.resettle_ducats, ..Default::default() },
@@ -362,9 +374,18 @@ impl Game {
                 if pending.iter().any(|o| matches!(o, Order::FundArchive)) {
                     return fail("the Archive is already being funded this turn");
                 }
+                // Ticket #68: at the cap a turn of funding is refused, and the Research stays with
+                // the shared Tech; until the Module stands the cap is a quarter of the requirement.
+                if self.seat(seat).archive_fund >= self.archive_fund_cap(seat) {
+                    return if self.archive_built(seat) {
+                        fail("the Archive's Research is paid in full")
+                    } else {
+                        fail(format!("the Archive fund holds its quarter ({}) until the Archive stands at a Colony off Earth", self.archive_fund_cap(seat)))
+                    };
+                }
                 Ok(cost)
             }
-            Order::BuildArchiveStage { colony } => {
+            Order::BuildArchive { colony } => {
                 if self.kind(seat) != FactionKind::Archivists {
                     return fail("only the Archivists build the Archive");
                 }
@@ -381,25 +402,12 @@ impl Game {
                 {
                     return fail(format!("the Archive already stands at {}", self.place_name(Place::Colony(home))));
                 }
-                let stages = self.tables.archive.stages;
-                let committed = self.archive_stages_committed(seat)
-                    + pending.iter().filter(|o| matches!(o, Order::BuildArchiveStage { .. })).count() as u32;
-                if committed >= stages {
-                    return fail("every stage of the Archive is built or on order");
+                // Ticket #68: one Module, built once.
+                if self.archive_built(seat) {
+                    return fail("the Archive already stands");
                 }
-                // One stage at a time: four stages of two turns are eight turns of building.
-                let building = self.colonies.iter().flat_map(|c| c.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Archive))
-                    || pending.iter().any(|o| matches!(o, Order::BuildArchiveStage { .. }));
-                if building {
-                    return fail("a stage of the Archive is already building; one stage at a time");
-                }
-                // The Research must already be banked: a stage ordered this turn cannot be paid out
-                // of this turn's funding, which has not happened yet.
-                let per = self.tables.archive.research_per_stage;
-                let spent = pending.iter().filter(|o| matches!(o, Order::BuildArchiveStage { .. })).count() as i64 * per;
-                let banked = self.seat(seat).archive_fund - spent;
-                if enforce_cost && banked < per {
-                    return fail(format!("stage {} needs {} Research banked in the Archive fund, {} there", committed + 1, per, banked.max(0)));
+                if self.archive_ordered(seat) || pending.iter().any(|o| matches!(o, Order::BuildArchive { .. })) {
+                    return fail("the Archive is already building");
                 }
                 Ok(cost)
             }
@@ -521,7 +529,7 @@ impl Game {
                 }
                 // Ticket #51: the Archive is never placed by an ordinary build order.
                 if *kind == ModuleKind::Archive {
-                    return fail("the Archive is raised one stage at a time, from its own button");
+                    return fail("the Archive is raised from its own button");
                 }
                 // Ticket #46: a station holds only a Shipyard and Habitats.
                 if col.in_orbit && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat) {
@@ -715,10 +723,10 @@ impl Game {
                             if !self.state(*st).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()) {
                                 return fail("a lift to orbit needs a working Launch Site there");
                             }
-                            // Ticket #51, Steerage: a lift may cost the state more than one tenth
-                            // of a person per Colonist.
-                            if self.state(*st).population < self.lift_population(seat, *colonists) {
-                                return fail("not enough people there");
+                            // Ticket #73: a Launch Site lifts only the Emigrants waiting there; the
+                            // population was paid when they mustered.
+                            if self.state(*st).emigrants < *colonists {
+                                return fail(format!("only {} Emigrants are waiting there", self.state(*st).emigrants));
                             }
                         }
                         LoadSource::Colony(c) => {
@@ -828,6 +836,81 @@ impl Game {
             // Ticket #54: Mothball, Restart and Decommission.
             Order::Change { building, what } => self.check_change(seat, pending, *building, *what).map(|_| cost),
             // Ticket #54: Leapfrog, the Custodians only, on a state they control.
+            // Ticket #73: Emigrants muster four a turn per Faction, in one state it directs.
+            Order::BuildEmigrants { state, n } => {
+                if self.state(*state).control.director() != Some(seat) {
+                    return fail("you do not direct that Nation State");
+                }
+                let cap = self.emigrants_per_turn(seat);
+                if *n == 0 || *n > cap {
+                    return fail(format!("up to {cap} Emigrants a turn"));
+                }
+                if pending.iter().any(|o| matches!(o, Order::BuildEmigrants { .. })) {
+                    return fail("Emigrants are already mustering this turn: one state a turn");
+                }
+                if self.state(*state).population < self.lift_population(seat, *n) {
+                    return fail("not enough people there");
+                }
+                Ok(cost)
+            }
+            // Ticket #73: waiting Emigrants go to Antarctica by sea, from any state the seat directs.
+            Order::SendToAntarctica { state, n, into } => {
+                if self.state(*state).control.director() != Some(seat) {
+                    return fail("you do not direct that Nation State");
+                }
+                if !self.antarctica_open {
+                    return fail(format!("the Antarctic ice has not opened: it opens at {:+.1} C", self.tables.climate.antarctica_opens_at));
+                }
+                let sending: u32 = pending.iter().map(|o| if let Order::SendToAntarctica { state: s, n, .. } = o { if s == state { *n } else { 0 } } else { 0 }).sum();
+                let waiting = self.state(*state).emigrants.saturating_sub(sending);
+                if *n == 0 || *n > waiting {
+                    return fail(format!("{waiting} Emigrants are waiting there"));
+                }
+                match into {
+                    UnloadTarget::Slot(b, slot) => {
+                        if *b != BodyId::Earth || !self.free_slots_on(BodyId::Earth).contains(slot) {
+                            return fail("that Antarctic slot is not free");
+                        }
+                        if pending.iter().any(|o| matches!(o, Order::SendToAntarctica { into: UnloadTarget::Slot(_, s), .. } if s == slot)) {
+                            return fail("Emigrants are already bound for that slot this turn");
+                        }
+                    }
+                    UnloadTarget::Colony(c) => {
+                        let Some(col) = self.colony(*c) else { return fail("no such Colony") };
+                        if col.body != BodyId::Earth || col.in_orbit || col.control.director() != Some(seat) {
+                            return fail("that is not your Colony in Antarctica");
+                        }
+                    }
+                }
+                Ok(cost)
+            }
+            // Ticket #72: the Venture Capital Fund's two orders, the Prospectors only.
+            Order::SetVentureShare { share } => {
+                if self.kind(seat) != FactionKind::Prospectors {
+                    return fail("only the Prospectors have a Venture Capital Fund");
+                }
+                let v = &self.tables.venture;
+                let step = (v.share_step * 100.0).round() as u32;
+                let max = (v.max_share * 100.0).round() as u32;
+                if step == 0 || share % step != 0 || *share > max {
+                    return fail(format!("the share moves in steps of {step}% from 0% to {max}%"));
+                }
+                if pending.iter().any(|o| matches!(o, Order::SetVentureShare { .. })) {
+                    return fail("the share is already being set this turn");
+                }
+                Ok(cost)
+            }
+            Order::DrawVenture { amount } => {
+                if self.kind(seat) != FactionKind::Prospectors {
+                    return fail("only the Prospectors have a Venture Capital Fund");
+                }
+                let drawn: i64 = pending.iter().map(|o| if let Order::DrawVenture { amount } = o { *amount } else { 0 }).sum();
+                let fund = self.seat(seat).venture_fund - drawn;
+                if *amount <= 0 || *amount > fund {
+                    return fail(format!("the Fund holds {}", fund.max(0)));
+                }
+                Ok(cost)
+            }
             Order::Leapfrog { state } => {
                 if self.kind(seat) != FactionKind::Custodians {
                     return fail("only the Custodians Leapfrog");
@@ -1010,22 +1093,16 @@ impl Game {
                 }
                 Order::Load { .. } | Order::Unload { .. } => self.pending.cargo.push((seat, order.clone())),
                 Order::BuildStation { body, slot } => self.pending.stations.push((seat, *body, *slot)),
-                Order::BuildArchiveStage { colony } => {
-                    // Ticket #51: the Research leaves the fund now, with the Materials; the stage
-                    // itself rises in the Colony's queue like any other build.
-                    let per = self.tables.archive.research_per_stage;
-                    self.seat_mut(seat).archive_fund -= per;
+                Order::BuildArchive { colony } => {
+                    // Ticket #68: the Module rises in the Colony's queue like any other build, three
+                    // turns from its own row; the Research is paid into the fund once it stands.
                     let due = turn + self.tables.module(ModuleKind::Archive).build_turns - 1;
                     if let Some(c) = self.colony_mut(*colony) {
                         c.queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat, due_turn: due, coastal: false });
                     }
-                    let stage = self.archive_stages_committed(seat);
-                    let line = format!("The {} began stage {} of the Archive at {}.", self.seat_name(seat), stage, self.place_name(Place::Colony(*colony)));
+                    let line = format!("The {} began the Archive at {}.", self.seat_name(seat), self.place_name(Place::Colony(*colony)));
                     self.log(line);
-                    let text = self.say(
-                        "archive_stage_begun",
-                        &[("faction", self.seat_name(seat)), ("stage", stage.to_string()), ("colony", self.place_name(Place::Colony(*colony)))],
-                    );
+                    let text = self.say("archive_begun", &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(*colony)))]);
                     self.report_line(LineKind::Archive, Some(ReportPlace::Colony(*colony)), text);
                 }
                 Order::FundArchive => self.fund_archive(seat),
@@ -1062,6 +1139,49 @@ impl Game {
                 }
                 // Ticket #54: Leapfrog is permanent and takes hold at once, before the next Climate
                 // phase reads the state's coefficient.
+                // Ticket #73: Emigrants muster now, at the population's cost, and calm the state;
+                // nothing lifts them before next turn, which is the turn to muster.
+                Order::BuildEmigrants { state, n } => {
+                    let cost = self.lift_population(seat, *n);
+                    {
+                        let st = self.state_mut(*state);
+                        st.population = (st.population - cost).max(0.0);
+                        st.emigrants += n;
+                    }
+                    let fell = self.lower_unrest(*state, self.tables.emigrants.unrest_fall);
+                    let line = format!("{} Emigrants mustered in {} for the {}; its Unrest fell by {} to {}.", n, self.tables.state(*state).name, self.seat_name(seat), Game::unrest_figure(fell), self.unrest_text(*state));
+                    self.log(line);
+                    let text = self.say(
+                        "emigrants_mustered",
+                        &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone()), ("fell", Game::unrest_figure(fell).to_string()), ("unrest", self.unrest_text(*state))],
+                    );
+                    self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::State(*state)), text);
+                }
+                // Ticket #73: Emigrants leave for Antarctica by sea, and land a turn later.
+                Order::SendToAntarctica { state, n, into } => {
+                    let left = self.state(*state).emigrants.saturating_sub(*n);
+                    self.state_mut(*state).emigrants = left;
+                    let due = turn + self.tables.emigrants.antarctica_turns;
+                    self.antarctic_sends.push(AntarcticSend { seat, from: *state, n: *n, into: *into, due_turn: due });
+                    let line = format!("{} Emigrants left {} for Antarctica by sea, for the {}.", n, self.tables.state(*state).name, self.seat_name(seat));
+                    self.log(line);
+                }
+                // Ticket #72: the Fund's orders land now; the share is read at the next Income.
+                Order::SetVentureShare { share } => {
+                    self.seat_mut(seat).venture_share = *share as f64 / 100.0;
+                    let line = format!("The {} set the Venture Capital Fund to bank {}% of their Materials output.", self.seat_name(seat), share);
+                    self.log(line);
+                }
+                Order::DrawVenture { amount } => {
+                    let back = (*amount as f64 * self.tables.venture.draw_return).floor() as i64;
+                    {
+                        let s = self.seat_mut(seat);
+                        s.venture_fund -= amount;
+                        s.stockpile.materials += back;
+                    }
+                    let line = format!("The {} drew {} Materials from the Venture Capital Fund; {} came back to the Stockpile.", self.seat_name(seat), amount, back);
+                    self.log(line);
+                }
                 Order::Leapfrog { state } => {
                     let per = self.tables.climate.population_emissions_per_level;
                     self.state_mut(*state).leapfrog += per;
@@ -1203,7 +1323,7 @@ impl Game {
             Order::BuildShip { site, kind } => r("build_ship", &[("unit", kind.name().to_string()), ("place", place(*site))]),
             Order::BuildArmy { place: p } => r("build_army", &[("place", place(*p))]),
             Order::BuildStation { body, .. } => r("build_station", &[("body", self.tables.body(*body).name.clone())]),
-            Order::BuildArchiveStage { colony } => r("build_archive_stage", &[("colony", place(Place::Colony(*colony)))]),
+            Order::BuildArchive { colony } => r("build_archive", &[("colony", place(Place::Colony(*colony)))]),
             Order::FundArchive => r("fund_archive", &[]),
             Order::Repair { unit, .. } | Order::RepairWithDucats { unit, .. } => r("repair", &[("unit", unit_of(*unit))]),
             Order::Transit { ship, to } => {
@@ -1247,6 +1367,10 @@ impl Game {
                 };
                 r(key, &[("building", building(*b)), ("place", place(b.place()))])
             }
+            Order::BuildEmigrants { state, n } => r("build_emigrants", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone())]),
+            Order::SendToAntarctica { state, n, .. } => r("send_antarctica", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone())]),
+            Order::SetVentureShare { share } => r("set_venture_share", &[("share", share.to_string())]),
+            Order::DrawVenture { amount } => r("draw_venture", &[("n", amount.to_string())]),
             Order::Leapfrog { state } => r("leapfrog", &[("state", self.tables.state(*state).name.clone())]),
             Order::StripPermit { state } => r("strip_permit", &[("state", self.tables.state(*state).name.clone())]),
         }

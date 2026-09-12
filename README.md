@@ -1,15 +1,16 @@
 # Dying Earth
 
 A single-player, turn-based strategy game about colonizing the solar system before ecological
-collapse overtakes Earth. This repository holds the **First Playable**: twenty-four turns, **four
-Factions** at every table, **twelve Nation States**, five Bodies (Earth's Antarctica, the Moon,
-Mars, Phobos and Deimos), Space Stations, four resources, a climate with **Breaks** in it, **saves**
-and a **spectator mode**. The rules are written down in
-[`docs/spec/first-playable.md`](docs/spec/first-playable.md) as amended by
+collapse overtakes Earth. This repository holds the **First Playable**: thirty-six turns of two
+months, **four Factions** at every table, **twelve Nation States**, five Bodies (Earth's Antarctica,
+the Moon, Mars, Phobos and Deimos), Space Stations, four resources, a climate with **Breaks** in it,
+**Emigrants**, the Prospectors' **Venture Capital Fund**, **saves** and a **spectator mode**. The
+rules are written down in [`docs/spec/first-playable.md`](docs/spec/first-playable.md) as amended by
 [`docs/spec/version-0.02.md`](docs/spec/version-0.02.md),
 [`docs/spec/version-0.03.md`](docs/spec/version-0.03.md),
-[`docs/spec/version-0.04.md`](docs/spec/version-0.04.md) and
-[`docs/spec/version-0.05.md`](docs/spec/version-0.05.md), and the words in [`CONTEXT.md`](CONTEXT.md).
+[`docs/spec/version-0.04.md`](docs/spec/version-0.04.md),
+[`docs/spec/version-0.05.md`](docs/spec/version-0.05.md) and
+[`docs/spec/version-0.05.5.md`](docs/spec/version-0.05.5.md), and the words in [`CONTEXT.md`](CONTEXT.md).
 
 ## Running it
 
@@ -36,7 +37,7 @@ takes one and the computer takes the other three, or Spectate hands it all four.
 ```
 cargo run --release -p dying-earth-engine --example sim -- 1 --player=custodians --count=20
 cargo run --release -p dying-earth-engine --example sweep -- 20 --player=custodians --start=europe \
-    --sinks=6 --steps=180 --permafrost=4.0 --sink-after=4.0 --balance
+    --sinks=6 --steps=300 --permafrost=4.0 --sink-after=4.0 --balance
 ```
 
 `sim` plays twenty seeds in a row and prints one summary line each; `sweep` plays a cell of the
@@ -66,7 +67,7 @@ table stops the game with a message naming the file and the row.
 ## Kits for other systems
 
 This machine builds only the Windows kit. The GitHub Actions workflow `release-kits` (Actions tab,
-"Run workflow", or `gh workflow run release-kits.yml --ref <branch> -f version=0.05`) builds a Linux
+"Run workflow", or `gh workflow run release-kits.yml --ref <branch> -f version=0.05.5`) builds a Linux
 kit on an Ubuntu 22.04 runner and a Windows kit, each as a downloadable artifact zip ready for
 itch.io. With a repository secret `BUTLER_API_KEY` and a variable `ITCH_TARGET` set, it also pushes
 both to itch.io.

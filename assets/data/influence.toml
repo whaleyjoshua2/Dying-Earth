@@ -9,8 +9,10 @@ decay = 2
 # needs a standing above the controller's and at least the threshold.
 decay_controlled = 1
 # Version 0.04 (ticket #41): a challenger needs the controller's standing plus this margin, so a
-# contested place changes hands after a push of a few turns rather than every turn.
-challenge_margin = 10
+# contested place changes hands after a push of a few turns rather than every turn. Ticket #75
+# (version 0.05.5): 10 to 20, beside a start Standing on every Faction's home state equal to its
+# threshold, after the Custodian AI took seat 0's start state on turn 7 in every seed.
+challenge_margin = 20
 # Version 0.04 (ticket #46): a station's threshold starts here, plus the per-Colonist figure.
 station_threshold_base = 20
 occupation_turns = 3

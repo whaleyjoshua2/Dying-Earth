@@ -38,6 +38,7 @@ impl Game {
         self.resolve_builds(); // (e)
         self.resolve_repairs(); // (f)
         self.resolve_cargo(); // (g)
+        self.resolve_antarctic(); // (g), ticket #73: Emigrants by sea land a turn after they left
         self.apply_event_now(); // (h)
         self.resolve_strip_permits(); // (h), ticket #54: a permit that ran out charges its price
         self.resolve_unrest(); // (i), ticket #52
@@ -719,7 +720,9 @@ impl Game {
                 })
                 .collect();
             // Ticket #50: among challengers who all qualify the same turn, the higher Standing takes
-            // the place; an exact tie goes to nobody and everything stays as it is until next turn.
+            // the place. Ticket #70 (version 0.05.5): an exact tie on a HELD place leaves it with
+            // its holder, as before; on a neutral place the lot decides, drawn from the game's own
+            // generator as a contested orbital slot is, so a seed replays the same draw.
             let winner = match qualifying.len() {
                 0 => continue,
                 1 => qualifying[0],
@@ -729,13 +732,22 @@ impl Game {
                     let leaders: Vec<Seat> = qualifying.iter().copied().filter(|s| standing(s) == top).collect();
                     if leaders.len() > 1 {
                         let names: Vec<String> = leaders.iter().map(|s| self.seat_name(*s)).collect();
-                        let line = format!("{} is claimed by {} at the same Standing; it stays as it is.", self.place_name(target), names.join(" and "));
+                        if controller.is_some() {
+                            let line = format!("{} is claimed by {} at the same Standing; it stays as it is.", self.place_name(target), names.join(" and "));
+                            self.log(line);
+                            let text = self.say("claim_tied", &[("place", self.place_name(target)), ("factions", names.join(" and "))]);
+                            self.report_line(LineKind::Note, Some(target.into()), text);
+                            continue;
+                        }
+                        let drawn = self.random_tie(&leaders);
+                        let line = format!("{} is claimed by {} at the same Standing; the lot falls to the {}.", self.place_name(target), names.join(" and "), self.seat_name(drawn));
                         self.log(line);
-                        let text = self.say("claim_tied", &[("place", self.place_name(target)), ("factions", names.join(" and "))]);
+                        let text = self.say("claim_lot", &[("place", self.place_name(target)), ("factions", names.join(" and ")), ("winner", self.seat_name(drawn))]);
                         self.report_line(LineKind::Note, Some(target.into()), text);
-                        continue;
+                        drawn
+                    } else {
+                        leaders[0]
                     }
-                    leaders[0]
                 }
             };
             self.transfer_control(target, winner, "Influence");
@@ -1032,51 +1044,24 @@ impl Game {
             (Place::State(s), BuildItem::IndustryLevel) => {
                 self.state_mut(s).industry_level += 1;
             }
-            // Ticket #51: a stage of the Archive raises the one that stands rather than adding another.
+            // Ticket #68 (version 0.05.5): the Archive Module stands. If its Research is already paid
+            // (a fund kept from a destroyed Archive) it is complete at once; otherwise it says what
+            // it still wants.
             (Place::Colony(c), BuildItem::Module(ModuleKind::Archive)) => {
-                let stages = self.tables.archive.stages;
-                let stage = if let Some(col) = self.colony_mut(c) {
-                    match col.modules.iter_mut().find(|m| m.kind == ModuleKind::Archive) {
-                        Some(m) => {
-                            m.stage += 1;
-                            m.stage
-                        }
-                        None => {
-                            let mut m = Module::new(ModuleKind::Archive);
-                            m.stage = 1;
-                            col.modules.push(m);
-                            1
-                        }
-                    }
+                if let Some(col) = self.colony_mut(c)
+                    && !col.modules.iter().any(|m| m.kind == ModuleKind::Archive)
+                {
+                    col.modules.push(Module::new(ModuleKind::Archive));
+                }
+                let research = self.tables.archive.research;
+                let left = (research - self.seat(b.seat).archive_fund).max(0);
+                if left == 0 {
+                    self.archive_completed(b.seat);
                 } else {
-                    0
-                };
-                let line = if stage >= stages {
-                    format!("The {} completed the Archive at {}: every stage stands.", self.seat_name(b.seat), self.place_name(place))
-                } else {
-                    format!("The {} completed stage {} of {} of the Archive at {}.", self.seat_name(b.seat), stage, stages, self.place_name(place))
-                };
-                self.log(line);
-                let text = if stage >= stages {
-                    self.say("archive_complete", &[("faction", self.seat_name(b.seat)), ("place", self.place_name(place))])
-                } else {
-                    self.say(
-                        "archive_stage_complete",
-                        &[
-                            ("faction", self.seat_name(b.seat)),
-                            ("stage", stage.to_string()),
-                            ("stages", stages.to_string()),
-                            ("place", self.place_name(place)),
-                        ],
-                    )
-                };
-                self.report_line(LineKind::Archive, Some(place.into()), text);
-                if stage >= stages {
-                    self.moment(
-                        MomentKind::ArchiveComplete,
-                        &[("faction", self.seat_name(b.seat)), ("place", self.place_name(place)), ("stages", stages.to_string())],
-                        Some(place.into()),
-                    );
+                    let line = format!("The {} raised the Archive at {}; it wants {} more Research.", self.seat_name(b.seat), self.place_name(place), left);
+                    self.log(line);
+                    let text = self.say("archive_built", &[("faction", self.seat_name(b.seat)), ("place", self.place_name(place)), ("left", left.to_string())]);
+                    self.report_line(LineKind::Archive, Some(place.into()), text);
                 }
                 return;
             }
@@ -1145,6 +1130,104 @@ impl Game {
 
     // ------------------------------------------------------------------ (g)
 
+    /// Ticket #73 (version 0.05.5): Emigrants sent by sea land in Antarctica the turn after they
+    /// left: into the free slot they were bound for, founding a Colony, or into the Faction's own
+    /// Colony there while it has room. If the slot was taken meanwhile they try the Faction's own
+    /// Antarctic Colony; if nothing has room they come home to the state they left.
+    fn resolve_antarctic(&mut self) {
+        let turn = self.turn;
+        let due: Vec<AntarcticSend> = self.antarctic_sends.iter().filter(|s| s.due_turn <= turn).cloned().collect();
+        self.antarctic_sends.retain(|s| s.due_turn > turn);
+        for s in due {
+            let landed = match s.into {
+                UnloadTarget::Slot(_, slot) if self.antarctica_open && self.free_slots_on(BodyId::Earth).contains(&slot) => {
+                    self.found_antarctic_colony(s.seat, slot, s.n, s.from);
+                    true
+                }
+                UnloadTarget::Colony(c) => self.join_antarctic_colony(s.seat, c, s.n, s.from),
+                UnloadTarget::Slot(..) => {
+                    let own = self
+                        .colonies
+                        .iter()
+                        .find(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(s.seat) && self.habitat_room(c) > c.colonists)
+                        .map(|c| c.id);
+                    match own {
+                        Some(c) => self.join_antarctic_colony(s.seat, c, s.n, s.from),
+                        None => false,
+                    }
+                }
+            };
+            if !landed {
+                self.state_mut(s.from).emigrants += s.n;
+                let line = format!("{} Emigrants from {} found no room in Antarctica and came home.", s.n, self.tables.state(s.from).name);
+                self.log(line);
+                let text = self.say("emigrants_returned", &[("n", s.n.to_string()), ("state", self.tables.state(s.from).name.clone())]);
+                self.report_line_of(s.seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::State(s.from)), text);
+            }
+        }
+    }
+
+    /// Ticket #73: Emigrants found a Colony in a free Antarctic slot, as a Colony Ship's unload does.
+    fn found_antarctic_colony(&mut self, seat: Seat, slot: u32, n: u32, from: StateId) {
+        let id = ColonyId(self.fresh_id());
+        self.colonies.push(Colony {
+            id,
+            body: BodyId::Earth,
+            slot,
+            control: Control::Controlled(seat),
+            modules: vec![Module::new(ModuleKind::Habitat)],
+            colonists: 0,
+            queue: Vec::new(),
+            grid_failed: false,
+            founded_turn: self.turn,
+            in_orbit: false,
+        });
+        let room = self.habitat_room(self.colony(id).unwrap());
+        let moved = n.min(room);
+        self.colony_mut(id).unwrap().colonists = moved;
+        if moved < n {
+            self.state_mut(from).emigrants += n - moved;
+        }
+        let slot_name = self.tables.body(BodyId::Earth).slots[slot as usize].name.clone();
+        let line = format!("The {} founded a Colony at {} in Antarctica with {} Emigrants from {}.", self.seat_name(seat), slot_name, moved, self.tables.state(from).name);
+        self.log(line);
+        let text = self.say(
+            "colony_founded",
+            &[("faction", self.seat_name(seat)), ("slot", (slot + 1).to_string()), ("body", self.tables.body(BodyId::Earth).name.clone()), ("n", moved.to_string())],
+        );
+        self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(id)), text);
+        let antarctic = self.colonies.iter().filter(|c| c.control.director() == Some(seat) && c.body == BodyId::Earth && !c.in_orbit).count();
+        let note = if antarctic <= 1 { self.phrase("first_colony", &[]) } else { self.phrase("more_colonies", &[("count", antarctic.to_string())]) };
+        self.moment(
+            MomentKind::ColonyFounded,
+            &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(id))), ("note", note), ("n", moved.to_string())],
+            Some(ReportPlace::Colony(id)),
+        );
+        self.ai_deed(seat, "founded", &[("colony", self.place_name(Place::Colony(id)))]);
+    }
+
+    /// Ticket #73: Emigrants join the seat's own Antarctic Colony while it has room; the rest go home.
+    fn join_antarctic_colony(&mut self, seat: Seat, c: ColonyId, n: u32, from: StateId) -> bool {
+        let Some(col) = self.colony(c) else { return false };
+        if col.body != BodyId::Earth || col.in_orbit || col.control.director() != Some(seat) {
+            return false;
+        }
+        let room = self.habitat_room(col).saturating_sub(col.colonists);
+        let moved = n.min(room);
+        if moved == 0 {
+            return false;
+        }
+        self.colony_mut(c).unwrap().colonists += moved;
+        if moved < n {
+            self.state_mut(from).emigrants += n - moved;
+        }
+        let line = format!("{} Emigrants from {} landed in Antarctica and joined {}.", moved, self.tables.state(from).name, self.place_name(Place::Colony(c)));
+        self.log(line);
+        let text = self.say("emigrants_arrived", &[("n", moved.to_string()), ("state", self.tables.state(from).name.clone()), ("colony", self.place_name(Place::Colony(c)))]);
+        self.report_line(LineKind::Antarctica, Some(ReportPlace::Colony(c)), text);
+        true
+    }
+
     fn resolve_cargo(&mut self) {
         let cargo = std::mem::take(&mut self.pending.cargo);
         // Ticket #46: stations ordered this turn, one per orbital slot. Ticket #50: more than one
@@ -1212,10 +1295,12 @@ impl Game {
                                 if self.state(st).control.director() != Some(seat) {
                                     continue;
                                 }
-                                // Ticket #51, Steerage: the population a lift takes is a Faction figure.
-                                let cost = self.lift_population(seat, colonists);
-                                let p = &mut self.state_mut(st).population;
-                                *p = (*p - cost).max(0.0);
+                                // Ticket #73: the lift takes the Emigrants waiting there; the
+                                // population was paid when they mustered.
+                                if self.state(st).emigrants < colonists {
+                                    continue;
+                                }
+                                self.state_mut(st).emigrants -= colonists;
                             }
                             LoadSource::Colony(c) => {
                                 let Some(col) = self.colony_mut(c) else { continue };

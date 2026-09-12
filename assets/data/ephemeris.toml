@@ -60,8 +60,11 @@ return_hohmann_angle = 75.0
 days_per_degree = 1.5
 fuel_per_degree = 0.00833333
 # A Turn is a calendar month; the flight is charged in months of this length.
-days_per_turn = 30.0
+# Ticket #67 (version 0.05.5): a Turn is two calendar months, so sixty days; the Hohmann flight of
+# 259 days is five turns and the window cycle of 780 days thirteen.
+days_per_turn = 60.0
 # However far from the window, a transit is never longer than this.
-max_turns = 18
+# Ticket #67: the same cap of a year and a half, nine turns of sixty where it was eighteen of thirty.
+max_turns = 9
 # Earth and Mars come back to the same phase angle this often: the cycle a window is looked for in.
 synodic_days = 779.9

@@ -91,7 +91,12 @@ impl Game {
         for seat in Seat::ALL {
             self.income_for(seat);
         }
+        self.neutral_research();
         self.solar_maximum_next = false;
+        // Ticket #76: a Drought lasts one Income.
+        for s in &mut self.states {
+            s.drought = false;
+        }
         for d in &mut self.discoveries {
             d.turns_left = d.turns_left.saturating_sub(1);
         }
@@ -100,6 +105,50 @@ impl Game {
             let allot = self.influence_allotment(seat);
             self.seat_mut(seat).allotment = allot;
         }
+    }
+
+    /// Ticket #69 (version 0.05.5): a Research Lab in a Nation State nobody holds, or one under
+    /// Occupation, runs itself, pays no Energy, and pays half its yield (rounded down, per Lab) into
+    /// the Tech under research, counting toward nobody's Research Lead, as a Breakthrough's Research
+    /// does. The yield is a Faction-less one: the row's figure by the state's people and schooling,
+    /// times Public Science once the world has it. A Lab idled by a Wildfire or mothballed pays nothing.
+    fn neutral_research(&mut self) {
+        let mut total = 0i64;
+        let mut names: Vec<String> = Vec::new();
+        for sid in StateId::ALL {
+            if !matches!(self.state(sid).control, Control::Neutral | Control::Occupied { .. }) {
+                continue;
+            }
+            let labs = self.state(sid).facilities.iter().filter(|f| f.kind == FacilityKind::ResearchLab && f.working() && !f.offline_until_resolution).count() as i64;
+            if labs == 0 {
+                continue;
+            }
+            let paid = labs * (self.world_lab_yield(sid) / 2);
+            if paid > 0 {
+                total += paid;
+                names.push(self.tables.state(sid).name.clone());
+            }
+        }
+        if total == 0 {
+            return;
+        }
+        self.add_research_unattributed(total);
+        self.research.neutral_total += total;
+        let states = names.join(" and ");
+        let line = format!("The Labs of {states}, in no one's hands, added {total} Research to the Tech under research.");
+        self.log(line);
+        let text = self.say("neutral_research", &[("states", states), ("n", total.to_string())]);
+        self.report_line(LineKind::Note, None, text);
+    }
+
+    /// Ticket #69: what one Research Lab in this state makes for the world, with no Faction's
+    /// multiplier: the row's figure x the population factor x the Education Level, x Public Science
+    /// once every Faction has it, rounded down.
+    pub fn world_lab_yield(&self, sid: StateId) -> i64 {
+        let t = &self.tables;
+        let base = t.facility(FacilityKind::ResearchLab).produces.as_ref().map(|p| p.amount).unwrap_or(0) as f64;
+        let public = if self.has_tech(TechId::PublicScience) { t.tech(TechId::PublicScience).value } else { 1.0 };
+        (base * self.population_factor(sid) * t.state(sid).education_level * public).floor() as i64
     }
 
     fn replenish_standing_armies(&mut self) {
@@ -138,9 +187,15 @@ impl Game {
         if let Some(p) = &fc.produces {
             match p.resource {
                 Resource::Research => {
-                    let mut r = p.amount as f64 * self.population_factor(sid) * card.education_level * fac.research_multiplier;
-                    r *= self.tech_multiplier(seat, TechId::PublicScience);
-                    y.research = r.floor() as i64;
+                    // Ticket #69: an Occupied state's Lab works for the world (`neutral_research`),
+                    // not for the occupier, who pays its upkeep and draws nothing.
+                    if self.state(sid).control.is_occupied() {
+                        y.research = 0;
+                    } else {
+                        let mut r = p.amount as f64 * self.population_factor(sid) * card.education_level * fac.research_multiplier;
+                        r *= self.tech_multiplier(seat, TechId::PublicScience);
+                        y.research = r.floor() as i64;
+                    }
                 }
                 Resource::Ducats => {
                     // A Bank (ticket #35): its amount times the state's gdp / 10.
@@ -206,10 +261,10 @@ impl Game {
             y.resource = Some(p.resource);
             y.amount = v.floor() as i64;
         }
-        // Ticket #51: the Archive draws its Energy only once every stage stands; while it is
-        // rising it costs nothing to run.
+        // Ticket #51: the Archive draws its Energy only once it is complete; ticket #68: that is
+        // standing with its Research paid in full. Until then it costs nothing to run.
         if kind == ModuleKind::Archive {
-            let complete = col.modules.iter().any(|m| m.kind == ModuleKind::Archive && m.stage >= t.archive.stages);
+            let complete = self.seat(seat).archive_fund >= t.archive.research;
             y.upkeep = if complete { mc.energy_upkeep } else { 0 };
         }
         y.upkeep = (y.upkeep as f64 * self.tech_multiplier(seat, TechId::ClosedLoopColonies)).floor() as i64;
@@ -227,14 +282,17 @@ impl Game {
                     continue;
                 }
                 let y = self.facility_yield(seat, sid, f.kind);
+                // Ticket #76: a Drought halves what the state's Facilities make at this Income.
+                let dry = if st.drought { self.tables.events.drought_output_multiplier } else { 1.0 };
+                let halve = |v: i64| if st.drought { (v as f64 * dry).floor() as i64 } else { v };
                 out.push(Producer {
                     place: ProducerPlace::Facility(sid, i),
                     name: f.kind.name(),
                     is_module: false,
                     upkeep: y.upkeep,
-                    output: y.resource.map(|r| (r, y.amount)),
+                    output: y.resource.map(|r| (r, halve(y.amount))),
                     extraction: matches!(f.kind, FacilityKind::Factory | FacilityKind::Refinery),
-                    research: y.research,
+                    research: halve(y.research),
                     online: !f.offline_until_resolution,
                 });
             }
@@ -397,7 +455,8 @@ impl Game {
                     Resource::Research => {}
                 }
                 sources.push((format!("{} in {}", p.name, where_), res, v));
-                if p.extraction && matches!(res, Resource::Materials | Resource::Fuel) {
+                // Ticket #72: the Materials output the Venture Capital Fund takes its share of.
+                if p.extraction && res == Resource::Materials {
                     extraction += v;
                 }
             }
@@ -416,6 +475,14 @@ impl Game {
                 gained.ducats += v;
                 sources.push((format!("Economy of {}", self.tables.state(sid).name), Resource::Ducats, v));
             }
+        }
+        // Ticket #72 (version 0.05.5): the Venture Capital Fund takes its share of the Materials the
+        // seat's Factories and Mines paid, rounded down, before the Stockpile sees them.
+        let share = self.seat(seat).venture_share;
+        let banked = if share > 0.0 { (extraction as f64 * share).floor() as i64 } else { 0 };
+        if banked > 0 {
+            gained.materials -= banked;
+            sources.push(("Venture Capital Fund (banked)".to_string(), Resource::Materials, -banked));
         }
         self.seat_mut(seat).income_sources = sources;
         let before = self.seat(seat).stockpile;
@@ -436,7 +503,8 @@ impl Game {
             // Ticket #50: every seat keeps both running totals; a Faction's card says which one its
             // Victory Condition counts.
             s.research_total += research;
-            s.extraction_total += extraction;
+            s.venture_fund += banked;
+            s.venture_banked_last_turn = banked;
         }
         if !shut.is_empty() {
             let line = format!("{}: Energy ran short; shut down {}.", self.seat_name(seat), shut.join(", "));

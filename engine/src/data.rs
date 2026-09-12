@@ -242,6 +242,10 @@ pub struct EventsTable {
     pub heatwave_loss: f64,
     pub heatwave_loss_green_consensus: f64,
     pub wildfire_emissions: f64,
+    /// Ticket #76 (version 0.05.5): Drought, Volcanic Eruption; Helium-3 Vein reads the discovery figures.
+    pub drought_output_multiplier: f64,
+    pub drought_unrest: f64,
+    pub volcanic_co2: f64,
     pub event: Vec<EventCard>,
 }
 
@@ -289,6 +293,12 @@ pub struct FactionCard {
     /// A Colony Module's Materials, times this.
     #[serde(default = "one_f64")]
     pub module_materials_multiplier: f64,
+    /// Ticket #72 (version 0.05.5): a Facility's Materials, times this (the Prospectors' 0.85).
+    #[serde(default = "one_f64")]
+    pub facility_materials_multiplier: f64,
+    /// Ticket #73 (version 0.05.5): Emigrants mustered a turn, times this (Steerage's 2.0).
+    #[serde(default = "one_f64")]
+    pub emigrants_multiplier: f64,
 }
 
 fn one_f64() -> f64 {
@@ -299,22 +309,26 @@ fn one_f64() -> f64 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum VictoryFirstKind {
-    ExtractionTotal,
+    /// Ticket #72 (version 0.05.5): Materials banked in the Prospectors' Venture Capital Fund; the
+    /// running Extraction Total it replaces is retired.
+    VentureFund,
     StabilizationRun,
     ColonistsOffEarth,
     ResearchProduced,
-    /// Ticket #51: stages of the Archive complete; complete counts only while it is online.
-    ArchiveStages,
+    /// Ticket #51: the Archive. Ticket #68 (version 0.05.5): counted as the Research paid into it,
+    /// which the fund holds only a quarter of until the Module stands; the bar only tells while the
+    /// Archive is running.
+    ArchiveResearch,
 }
 
 impl VictoryFirstKind {
     pub fn name(self) -> &'static str {
         match self {
-            VictoryFirstKind::ExtractionTotal => "Extraction Total",
+            VictoryFirstKind::VentureFund => "Venture Capital Fund",
             VictoryFirstKind::StabilizationRun => "Stabilization run",
             VictoryFirstKind::ColonistsOffEarth => "Colonists off Earth",
             VictoryFirstKind::ResearchProduced => "Research produced",
-            VictoryFirstKind::ArchiveStages => "The Archive",
+            VictoryFirstKind::ArchiveResearch => "The Archive",
         }
     }
 }
@@ -534,21 +548,26 @@ pub struct UnrestTable {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct VictoryTable {
-    pub extraction_total: i64,
     pub stabilization_turns: u32,
     pub off_world_presence: u32,
     pub turns: u32,
-    /// Ticket #57: the game begins on the first of this month, and a Turn is a calendar month.
+    /// Ticket #57: the game begins on the first of this month. Ticket #67 (version 0.05.5): a Turn
+    /// is `months_per_turn` calendar months, two since 0.05.5, and is named by its first month.
     #[serde(default = "twenty_thirty")]
     pub start_year: i64,
     #[serde(default = "january")]
     pub start_month: i64,
+    #[serde(default = "one_month")]
+    pub months_per_turn: i64,
 }
 
 fn twenty_thirty() -> i64 {
     2030
 }
 fn january() -> i64 {
+    1
+}
+fn one_month() -> i64 {
     1
 }
 
@@ -614,8 +633,8 @@ pub struct AiWeights {
     pub build_influence: f64,
     /// Ticket #51: divert this turn's Research into the Archive fund.
     pub fund_archive: f64,
-    /// Ticket #51: order the next stage of the Archive.
-    pub build_archive_stage: f64,
+    /// Ticket #51: build the Archive. Ticket #68: one Module, from its own button.
+    pub build_archive: f64,
     /// Ticket #52: pay Relief on a state the seat directs.
     pub relief: f64,
     /// Ticket #52: raise a Constabulary in a restive state.
@@ -672,6 +691,8 @@ pub struct AiThresholds {
     pub attack_odds: f64,
     pub evade_damage_fraction: f64,
     pub influence_step: i64,
+    /// Ticket #75: a held state's worth on the Influence target list, as a share of a neutral one's.
+    pub held_state_weight: f64,
 }
 
 /// Ticket #50: one pick list per Faction. `order` is tried first, then the cheapest available
@@ -771,12 +792,13 @@ struct FacilitiesFile {
     scrubber: ScrubberCard,
     mothball: MothballCard,
 }
-/// Ticket #51: the Archive, the first Project. Its Materials, build turns and Energy upkeep sit on
-/// its Module row; how many stages it has and what each costs in Research live here.
+/// Ticket #51: the Archive. Its Materials, build turns and Energy upkeep sit on its Module row.
+/// Ticket #68 (version 0.05.5): the Research it requires in all, and the share of it the fund may
+/// hold before the Module stands.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ArchiveCard {
-    pub stages: u32,
-    pub research_per_stage: i64,
+    pub research: i64,
+    pub banked_before_built: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -798,6 +820,28 @@ struct FactionsFile {
     faction: Vec<FactionCard>,
     start: StartCard,
     ducats: DucatsCard,
+    venture_capital: VentureCard,
+    emigrants: EmigrantsCard,
+}
+
+/// Ticket #73 (version 0.05.5): Emigrants, the built Colonists: how many a Faction musters a turn,
+/// the population each takes, what a batch takes off the state's Unrest, and how many turns the sea
+/// crossing to Antarctica takes.
+#[derive(Debug, Clone, Deserialize)]
+pub struct EmigrantsCard {
+    pub per_turn: u32,
+    pub population_each: f64,
+    pub unrest_fall: f64,
+    pub antarctica_turns: u32,
+}
+
+/// Ticket #72 (version 0.05.5): the Prospectors' Venture Capital Fund: the largest share of their
+/// Materials output that may be banked a turn, the step the share moves in, and what a draw returns.
+#[derive(Debug, Clone, Deserialize)]
+pub struct VentureCard {
+    pub max_share: f64,
+    pub share_step: f64,
+    pub draw_return: f64,
 }
 
 /// Every table, loaded and checked.
@@ -837,6 +881,8 @@ pub struct Tables {
     pub factions: Vec<FactionCard>,
     pub start: StartCard,
     pub ducats: DucatsCard,
+    pub venture: VentureCard,
+    pub emigrants: EmigrantsCard,
     pub climate: ClimateTable,
     pub influence: InfluenceTable,
     /// Ticket #52: `unrest.toml`.
@@ -906,6 +952,8 @@ impl Tables {
             factions: factions.faction,
             start: factions.start,
             ducats: factions.ducats,
+            venture: factions.venture_capital,
+            emigrants: factions.emigrants,
             climate,
             influence,
             unrest,
@@ -1047,9 +1095,6 @@ impl Tables {
                 return Err(err("climate.toml", format!("[[break]] {}: its effect kind has no figures to act on", b.id)));
             }
         }
-        if self.archive.stages == 0 || self.archive.research_per_stage <= 0 {
-            return Err(err("modules.toml", "[archive] needs stages and research_per_stage above zero"));
-        }
         // Ticket #52: the Unrest ladder must be in order and every start value on it.
         let u = &self.unrest;
         if !(u.army_threshold < u.facility_threshold && u.facility_threshold < u.throw_off_threshold && u.throw_off_threshold <= u.max) {
@@ -1069,6 +1114,12 @@ impl Tables {
         // Ticket #57: the game's first date, and the sky it opens on.
         if !(1..=12).contains(&self.victory.start_month) {
             return Err(err("victory.toml", format!("start_month {} is no month", self.victory.start_month)));
+        }
+        if self.archive.research <= 0 || !(0.0..=1.0).contains(&self.archive.banked_before_built) {
+            return Err(err("modules.toml", "[archive] needs research above zero and banked_before_built from 0 to 1"));
+        }
+        if !(1..=12).contains(&self.victory.months_per_turn) {
+            return Err(err("victory.toml", format!("months_per_turn {} must be from 1 to 12", self.victory.months_per_turn)));
         }
         if !(0.0..1.0).contains(&self.slot_yield_spread) {
             return Err(err("bodies.toml", format!("slot_yield_spread {} must be at least 0 and under 1", self.slot_yield_spread)));

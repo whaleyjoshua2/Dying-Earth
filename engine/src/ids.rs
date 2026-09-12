@@ -136,8 +136,8 @@ pub enum ModuleKind {
     TradePost,
     /// Version 0.03 (ticket #36): raises Influence off Earth.
     Relay,
-    /// Version 0.05 (ticket #51): the Archive, the first Project. Only the Archivists build it, one
-    /// stage at a time, and never through the ordinary Module build order.
+    /// Version 0.05 (ticket #51): the Archive. Only the Archivists build it, from its own button and
+    /// never through the ordinary Module build order; one Module since ticket #68 (version 0.05.5).
     Archive,
 }
 
@@ -295,10 +295,15 @@ pub enum EventId {
     // Ticket #55 (version 0.05): the Permafrost Thaw card became the Methane Burst, so the name is
     // free for the Break that thaws the permafrost for good.
     MethaneBurst,
+    // Ticket #76 (version 0.05.5): four more, for a deck of forty over thirty-six turns.
+    Drought,
+    VolcanicEruption,
+    Moonquake,
+    HeliumVein,
 }
 
 impl EventId {
-    pub const ALL: [EventId; 18] = [
+    pub const ALL: [EventId; 22] = [
         EventId::SolarStorm,
         EventId::RadiationSurge,
         EventId::CommsBlackout,
@@ -317,8 +322,12 @@ impl EventId {
         EventId::Unrest,
         EventId::ReactorLeak,
         EventId::MethaneBurst,
+        EventId::Drought,
+        EventId::VolcanicEruption,
+        EventId::Moonquake,
+        EventId::HeliumVein,
     ];
-    pub const CLIMATE: [EventId; 4] = [EventId::Heatwave, EventId::Wildfire, EventId::StormSurge, EventId::MethaneBurst];
+    pub const CLIMATE: [EventId; 6] = [EventId::Heatwave, EventId::Wildfire, EventId::StormSurge, EventId::MethaneBurst, EventId::Drought, EventId::VolcanicEruption];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]

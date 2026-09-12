@@ -5,7 +5,7 @@ A single-player, turn-based strategy game about colonizing the solar system befo
 ## Language
 
 **First Playable**:
-The small version of the game: twelve turns and two Factions as first built, twenty-four turns since version 0.02 and four Factions since version 0.05. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`, `docs/spec/version-0.03.md`, `docs/spec/version-0.04.md` and `docs/spec/version-0.05.md`.
+The small version of the game: twelve turns and two Factions as first built, twenty-four turns since version 0.02, four Factions since version 0.05 and thirty-six turns of two months since version 0.05.5. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`, `docs/spec/version-0.03.md`, `docs/spec/version-0.04.md`, `docs/spec/version-0.05.md` and `docs/spec/version-0.05.5.md`.
 _Avoid_: slice, MVP, demo, v1, prototype
 
 **Faction**:
@@ -17,7 +17,7 @@ The Faction that colonizes the solar system while limiting ecological damage to 
 _Avoid_: Stewards (the retired name), environmentalists, greens, moderates, eco-terrorists
 
 **Prospectors**:
-The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry and the Strip Permit, and they win on extraction and expansion.
+The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry and the Strip Permit, and since version 0.05.5 they win on a hoard: 750 Materials in their Venture Capital Fund, and expansion.
 _Avoid_: Extractors (the retired name), capitalists, industrialists, exploiters
 
 **Arkwrights**:
@@ -29,7 +29,7 @@ The Faction that means to save what humanity knows, and as many of its people as
 _Avoid_: scholars, librarians, scientists, the Academy
 
 **Steerage**:
-The Arkwrights' signature rule: their Colony Ships carry twice the Colonists and cost less to build, but every Colonist lifted from a Launch Site costs their Nation State twice the population.
+The Arkwrights' signature rule: their Colony Ships carry twice the Colonists and cost less to build, and they muster eight Emigrants a turn where others muster four, but every Emigrant costs their Nation State twice the population.
 _Avoid_: mass transit, cattle class, overcrowding, packing them in
 
 **Diaspora**:
@@ -37,15 +37,15 @@ The Arkwrights' Victory Condition: thirty Colonists living off Earth, spread ove
 _Avoid_: spread, expansion, exodus, colonization score
 
 **Project**:
-A construction raised in stages, each stage paid in both Research and Materials and taking more than one turn to build once paid. The Archive is the first.
-_Avoid_: megaproject, wonder, great work, campaign
+Retired in version 0.05.5. The word named a construction raised in stages, each paid in Research and Materials; the Archive was the only one, and it is a Module now.
+_Avoid_: project, megaproject, wonder, great work, campaign, stage
 
 **The Archive**:
-The first Project: a Module only the Archivists build, at one Colony off Earth and at most one per Faction. Complete, it takes a great deal of Energy to keep running, and it is destroyed outright if its Colony changes hands.
-_Avoid_: library, vault, monument, database
+A Module only the Archivists build, at one Colony off Earth and at most one per Faction, three turns to raise from its own button. Standing, it still wants its Research, paid into the Archive fund at any pace; complete, with every point paid, it takes a great deal of Energy to keep running. It is destroyed outright if its Colony changes hands, and the fund is kept.
+_Avoid_: library, vault, monument, database, stage
 
 **Fund the Archive**:
-The Archivists' Orders-phase order, which sends a turn's Research from their own Labs into their Archive fund instead of the shared Tech, where it counts nothing toward the Research Lead.
+The Archivists' Orders-phase order, which sends a turn's Research from their own Labs into their Archive fund instead of the shared Tech, where it counts nothing toward the Research Lead. Until the Archive stands the fund holds only a quarter of what the Archive requires, and at that cap the order is refused.
 _Avoid_: donate, invest, bank research, save up
 
 **Provisional Findings**:
@@ -101,7 +101,7 @@ An unplanned occurrence drawn from the Event Deck after orders are committed and
 _Avoid_: incident, crisis, card
 
 **Event Deck**:
-The deck a card may be drawn from each turn, holding only Events: twenty-eight cards since version 0.03, ten of the First Playable's Events twice each and eight newer ones once. It is never reshuffled. Whether a card is drawn at all is the Draw Chance.
+The deck a card may be drawn from each turn, holding only Events: forty cards since version 0.05.5 for a game of thirty-six turns (twenty-eight before), twenty-two Events in one to three copies each. It is never reshuffled. Whether a card is drawn at all is the Draw Chance.
 _Avoid_: event pool, random table, encounter deck, calm card (retired in version 0.02)
 
 **Draw Chance**:
@@ -161,7 +161,7 @@ _Avoid_: antenna, transmitter, beacon
 ### Pieces
 
 **Module**:
-A building placed inside a Colony. Nine kinds since version 0.05: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay and the Archive, which only the Archivists raise and only one stage at a time.
+A building placed inside a Colony. Nine kinds since version 0.05: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay and the Archive, which only the Archivists raise, one to a Faction, from its own button.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:
@@ -197,7 +197,11 @@ The Module that lets a Colony hold and build a defensive Army. A Colony without 
 _Avoid_: fort, garrison, base
 
 **Colonist**:
-A person counted in the population of a Colony or Nation State. Colonists are carried by Ships and held by Habitats; they are never spent as a resource.
+A person counted in the population of a Colony or Nation State. Since version 0.05.5 Colonists are built: they muster in a Nation State as Emigrants, are carried by Ships and held by Habitats, and are never spent as a resource.
+
+**Emigrant**:
+A Colonist mustered in a Nation State and not yet gone: up to four a turn per Faction (eight for the Arkwrights), in one state the Faction directs, at a tenth of a person each, on the state's card at End Turn. A batch takes half a point off the state's Unrest. A working Launch Site lifts Emigrants onto a Ship, and once the Antarctic ice is open the sea takes them to Antarctica in a turn with no launch. They are people of their state until they leave it.
+_Avoid_: settler, recruit, migrant, passenger, colonist-in-waiting
 _Avoid_: settler, crew, worker, population resource
 
 **Nation State**:
@@ -207,11 +211,11 @@ _Avoid_: country, nation, territory, region, state, continent (some are, some ar
 ### Earth
 
 **Facility**:
-A building placed in a Nation State. Ten kinds since version 0.05: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, the Sea Wall, which stands only in a Coastal Slot, and the Scrubber, which alone takes no build slot. Since version 0.04 a Launch Site builds no Ship: it lifts Colonists and Armies from its state into orbit, and each lift is a launch.
+A building placed in a Nation State. Ten kinds since version 0.05: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, and the Sea Wall and the Scrubber, which take no build slot (the Sea Wall stood in a Coastal Slot until version 0.05.5). Since version 0.04 a Launch Site builds no Ship: it lifts Emigrants and Armies from its state into orbit, and each lift is a launch.
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Cheap Industry**:
-The first clause of the Prospectors' signature rule: raising a Nation State's Industry Level costs them half. The second is the Strip Permit.
+The first clause of the Prospectors' signature rule: raising a Nation State's Industry Level costs them half, and since version 0.05.5 every Facility and Colony Module costs them 15% less. The second is the Strip Permit.
 _Avoid_: industry discount, cheap building
 
 **Restoration**:
@@ -271,11 +275,11 @@ A build slot the sea never reaches: the start slots the coastal ones leave over,
 _Avoid_: safe slot, interior, highland
 
 **Coastal Exposure**:
-How much of a Nation State stands on the coast, a figure on its card. It sets how many Coastal Slots the state has, three per point, and how many of them each Sea Level threshold takes. A state with no Coastal Slots left loses no more of them, though the threshold still drives out its people and raises its Unrest.
+How much of a Nation State stands on the coast, a figure on its card. It sets how many Coastal Slots the state has, two per point since version 0.05.5 (three before), and how many of them each Sea Level threshold takes. A state with no Coastal Slots left loses no more of them, though the threshold still drives out its people and raises its Unrest.
 _Avoid_: coastline, vulnerability, flood risk
 
 **Sea Wall**:
-The Facility that holds one threshold off: it stands in a Coastal Slot, at most one to a state, and while it is working the state's next Sea Level threshold of any kind takes no slots at all. The wall is destroyed absorbing it. It needs Coastal Engineering.
+The Facility that holds one threshold off: it takes no build slot (since version 0.05.5; a Coastal Slot before), at most one to a state, and while it is working the state's next Sea Level threshold of any kind takes no slots at all. The wall is destroyed absorbing it. It needs Coastal Engineering.
 _Avoid_: dyke, levee, barrier, flood defence
 
 **Coastal Engineering**:
@@ -307,7 +311,7 @@ The CO2 a Faction is answerable for over the whole game: everything the sources 
 _Avoid_: carbon debt, guilt, pollution score, emissions total, footprint
 
 **Influence**:
-A Faction's claim on a Nation State or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold; a controlled place goes to a rival whose Standing is at least the controller's plus the challenge margin (10 since version 0.04) and at least the threshold, which since version 0.05 each Faction reads for itself, since its Blame raises it on every Nation State it does not hold.
+A Faction's claim on a Nation State or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold, and when two claimants reach it on the same turn at the same Standing the lot decides between them (since version 0.05.5); a controlled place goes to a rival whose Standing is at least the controller's plus the challenge margin (20 since version 0.05.5, 10 from version 0.04) and at least the threshold, which since version 0.05 each Faction reads for itself, since its Blame raises it on every Nation State it does not hold. A holder is never tied with a challenger, and keeps the place when two challengers tie. Since version 0.05.5 every Faction begins with a Standing on its start state equal to that state's threshold: a claim on its home from turn 1.
 _Avoid_: diplomacy points, favour, reputation
 
 **Standing**:
@@ -319,13 +323,13 @@ The amount of Influence a Faction receives each turn, split freely across any nu
 _Avoid_: influence budget, diplomacy pool, action points
 
 **Research**:
-Points produced by Research Labs and spent only on Techs. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship.
+Points produced by Research Labs and spent only on Techs. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship. Since version 0.05.5 a Lab in a Nation State nobody holds, or one under Occupation, runs itself and pays half its yield into the Tech under research for no Faction; North America and South-East Asia begin with such a Lab.
 _Avoid_: science, research points, RP, fourth resource
 
 ### The turn
 
 **Turn**:
-One calendar month of game time, and the unit the whole game runs in. The game begins in January 2030, so turn 1 is January 2030 and the twenty-fourth is December 2031, and the top bar names the month. All four Factions order simultaneously against the same board, then the turn runs through its phases.
+Two calendar months of game time since version 0.05.5 (one before), and the unit the whole game runs in. The game begins in January 2030 and runs thirty-six turns, so turn 1 is January 2030, turn 2 March 2030 and the thirty-sixth November 2035; a turn is named by its first month alone, and the top bar names it. All four Factions order simultaneously against the same board, then the turn runs through its phases.
 _Avoid_: round, month, tick, cycle
 
 **Phase**:
@@ -409,8 +413,12 @@ What one Faction must achieve to win. Each Faction has its own, and meeting it i
 _Avoid_: win condition, goal, objective, victory points
 
 **Extraction Total**:
-The Prospectors' measure: all the Materials and Fuel their Mines, Refineries and Factories have produced across the whole game. It is counted cumulatively and never spent down.
-_Avoid_: production score, output total, wealth
+Retired in version 0.05.5 for the Venture Capital Fund. It was the Prospectors' measure: all the Materials and Fuel their Mines, Refineries and Factories had produced across the whole game, counted cumulatively and never spent down.
+_Avoid_: extraction total, production score, output total, wealth
+
+**Venture Capital Fund**:
+The Prospectors' own pool beside the Stockpile, and their measure since version 0.05.5: 750 Materials in it is the first part of their Victory Condition. On any turn they set the share of their Factories' and Mines' Materials output that goes into it at Income, from nothing to four fifths in steps of a tenth; Materials bought, refunded or found are not output. A draw takes Materials back out at a tenth's loss.
+_Avoid_: the pool, savings, treasury, war chest, bank
 
 **Stabilization**:
 The Custodians' measure: net Emissions held under the Natural Sink, counting every Scrubber, for a run of consecutive turns. One turn over the Sink resets the run.

@@ -1,5 +1,5 @@
-DYING EARTH - playtest build, version 0.05
-==========================================
+DYING EARTH - playtest build, version 0.05.5
+============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
 the solar system before global warming wrecks Earth. It is unfinished and unbalanced on
@@ -16,6 +16,33 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
+   (There is a separate Linux zip: unzip it, then run ./dying-earth from the folder.)
+
+WHAT CHANGED SINCE 0.05
+-----------------------
+- The game is now THIRTY-SIX turns, and each turn is two months (January 2030 to
+  November 2035). Nothing got slower to build or fly; there are just more turns.
+- Mars is reachable. There are three launch windows (around turns 7, 20 and 33) and the
+  flight takes five turns. Hover Mars on the Solar System Map to see the next window.
+- Colonists are built, not scooped up. On any country's card, "Muster Emigrants" builds
+  up to four a turn; they wait on that card until a Launch Site lifts them into a ship,
+  or (once the ice is open) a "Send to Antarctica" button ships them south with no
+  rocket at all. Building a batch calms the country a little.
+- The Prospectors have a Venture Capital Fund: on the Victory panel, set what share of
+  your mines' and factories' output goes into it (0-80%, change it any turn). Reaching
+  750 in the Fund is now the first half of their win. Their buildings cost 15% less.
+- The Archivists' Archive is a building of its own on a colony (three turns, 50
+  Materials), and the 80 Research it needs can only be a quarter paid until it stands.
+- Two countries start with a Research Lab (North America and South-East Asia); a Lab
+  nobody controls pays half its research to whatever the world is researching.
+- Coastal Engineering is a first-row tech at 10 Research, and the Sea Wall it unlocks
+  costs 20 Materials and takes no building space, like the Scrubber. Build one and the
+  country's next flood takes nothing from it.
+- Fewer coastal building slots (two per point of coastal exposure, was three).
+- Every side starts with a claim on its home country, and a rival needs 20 more Standing
+  than you to take a country off you. The card warns you in orange when one is close.
+- The event deck is 40 cards, with four new events: Drought, Volcanic Eruption,
+  Moonquake and a Helium-3 Vein on the Moon.
 
 HOW TO PLAY, IN ONE MINUTE
 --------------------------
@@ -26,29 +53,29 @@ HOW TO PLAY, IN ONE MINUTE
   Drag to turn the globe, mouse wheel to zoom. Tab switches to the Solar System Map;
   Esc goes back.
 - Build things with the buttons on a card. Hover a build button to see what it makes.
-- Spend Influence on other countries to win them over.
-- Every country now has an "Unrest" number. Heat, floods and refugees push it up. At 4 its
+- Spend Influence on other countries to win them over. Your home country starts held.
+- Every country has an "Unrest" number. Heat, floods and refugees push it up. At 4 its
   army stops growing, at 7 its factories work at half speed, and at 10 the country throws
-  you out. Pay Relief, or build a Constabulary (a police station), to push it back down.
+  you out. Pay Relief, build a Constabulary, or muster Emigrants to push it back down.
 - If you are the Custodians, build Scrubbers: they cost no building space, they pull carbon
   back out of the air, and they calm the country they stand in.
 - Open the Climate Panel (the C key). The coloured bar across it marks five points where
   the world changes for good - the reefs die, the permafrost thaws, and so on. Under it,
   "Last turn to act" is the last turn on which stopping all emissions would still save you.
 - Getting off Earth: you start with a space station over Earth (except the Arkwrights, who
-  build one). Put a Shipyard on it first - ships are only built at a Shipyard. The Moon is
-  one turn away and is where most colonies go. Mars is only cheap to reach in the one month
-  the two planets line up, February 2031 (turn 14), and the flight still takes nine turns,
-  so in a twenty-four turn game Mars is very hard to reach. Hover Mars to see the window.
+  build one). Put a Shipyard on it first - ships are only built at a Shipyard. Muster
+  Emigrants in a country with a Launch Site, lift them, and load them on a Colony Ship.
+  The Moon is one turn away and is where most colonies go. Mars is cheap only in a launch
+  window; hover Mars to see when.
 - Antarctica has three colony sites on Earth itself, but they stay under the ice until the
-  world has warmed to +1.6 C.
+  world has warmed to +1.6 C. After that, Emigrants can be sent there by sea.
 - The game saves itself every three turns and when it ends, and there is a Save button in
   the top bar you can press at the start of any turn. Saves live in
   %LOCALAPPDATA%\DyingEarth\data\saves - the Load screen has a button that opens that
-  folder for you. Load a game from the title screen.
+  folder for you. Load a game from the title screen. A 0.05 save will not load.
 - Some turns stop for a "Moment": one big sentence about something that just happened. At
   the bottom of each turn's Report there are tick boxes to switch any of them off.
-- End Turn (top left, red). Twenty-four turns. Watch the temperature in the top bar:
+- End Turn (top left, red). Thirty-six turns. Watch the temperature in the top bar:
   at +3.0 C the world collapses and nobody wins.
 - The Tech Tree, Climate Panel, Victory and Trading buttons open panels that explain the rest.
 
@@ -58,14 +85,17 @@ Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
 - A rule you could not find explained anywhere.
-- The turn the game got boring, if it did.
+- The turn the game got boring, if it did. Thirty-six turns is new: did it drag?
 - The turn you felt you had lost, and why.
-- The turn you first understood what one of the five climate "Breaks" was, and whether
-  anything told you clearly enough before it happened.
+- Did you get anyone to Mars? Was the launch window clear enough to plan around?
+- Did the Emigrants make sense - where they wait, how they get on a ship, the send to
+  Antarctica?
+- If you played the Prospectors: did the Fund's share feel like a real choice?
+- Did you lose your home country to the computer, and did the orange warning give you
+  time to do anything about it?
 - Whether the big line at the top of each turn's Report was the right thing to put there,
   or whether something more important was buried below it.
 - Whether the Moments interrupted too much, and whether you switched any of them off.
-- Whether you found the saves: did you notice the game saving, and could you load one?
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.
 
@@ -73,16 +103,16 @@ Screenshots help. Print Screen, then paste into a message.
 
 KNOWN ROUGH EDGES
 -----------------
-- Mars is effectively out of reach. There is one launch window, on turn 14, the flight
-  takes nine turns, and most games are over before a ship could land. The number of turns
-  in a game will change in a later version.
-- The sides are not balanced against each other. In our own test games the Prospectors win
-  and nobody else ever does, and the Custodians' own win condition - holding emissions
-  below the world's natural absorption for three turns running - has never once been
-  reached by anybody.
-- Research is very slow. In test games the world finishes about one technology per game
-  and never gets past the first row of the tech tree, so the Sea Wall and the other
-  second-row things are never available.
-- Countries still grind up to maximum Unrest and stay there in the second half of a game.
-- The computer opponent is simple and does not build some of the newer buildings.
+- The sides are not balanced against each other. In our own computer-only test games
+  the Custodians now win almost every game (103 of 160) and reach their own win
+  condition often; the Prospectors never reach 750 in the Fund, and the Archivists
+  finished the Archive in only a handful of games. It was the other way round in 0.05.
+- The computer Custodians take other sides' home countries in most games, around turn
+  11 to 22, and nobody takes theirs.
+- The computer builds a great many Sea Walls when it has the tech, sometimes instead of
+  Scrubbers, and its own games collapse more often for it.
+- Some seatings run hot: starting as the Custodians in East Asia, the world collapsed in
+  15 of 20 computer-only games.
+- The computer opponent is simple, and the Prospector and Arkwright sides take Coastal
+  Engineering late.
 - No sound, no tutorial beyond the first Report.

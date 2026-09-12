@@ -796,6 +796,12 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 if lines.is_empty() { "No income from buildings last turn.".to_string() } else { format!("Last Income:\n{}", lines.join("\n")) }
             };
             ui.label(RichText::new(format!("Materials {} ({})", left.materials, signed(inc.materials))).strong()).on_hover_text(sources(dying_earth_engine::Resource::Materials));
+            // Ticket #72: the Prospectors' Fund beside their Materials.
+            if game.kind(Seat(0)) == FactionKind::Prospectors {
+                let s = game.seat(Seat(0));
+                ui.label(RichText::new(format!("Fund {} ({}%)", s.venture_fund, (s.venture_share * 100.0).round() as u32)).strong())
+                    .on_hover_text("The Venture Capital Fund: Materials banked toward the 750 your Victory Condition asks for, and the share of your Factories' and Mines' output going in each turn. Set it on the Victory panel.");
+            }
             ui.separator();
             ui.label(RichText::new(format!("Fuel {} ({})", left.fuel, signed(inc.fuel))).strong()).on_hover_text(sources(dying_earth_engine::Resource::Fuel));
             ui.separator();
@@ -817,7 +823,8 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             let influence = if bought > 0 { format!("Influence {} of {} ({} free + {} bought)", influence_left, s.allotment + bought, s.allotment, bought) } else { format!("Influence {} of {}", influence_left, s.allotment) };
             ui.label(influence).on_hover_text("The Allotment is what your places and buildings give each turn; bought Influence comes from the Trading window at 2 Ducats each.");
             ui.separator();
-            // Ticket #57: a Turn is a calendar month from January 2030, so the bar names the month.
+            // Ticket #57: the bar names the turn's month. Ticket #67 (version 0.05.5): a Turn is two months,
+            // named by its first alone, so turn 2 reads March 2030.
             ui.label(RichText::new(format!("Turn {} / {}, {}", game.turn, game.tables.victory.turns, game.date_text())).strong());
             ui.separator();
             ui.label(format!("{:+.1} C, heading to {:+.1}", game.climate.temperature, game.target_temperature()));
@@ -1477,8 +1484,21 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildFacilityWithDucats { state, kind } => format!("Build {} in {} for Ducats", kind.name(), game.tables.state(*state).name),
         Order::BuildModuleWithDucats { colony, kind } => format!("Build {} at {} for Ducats", kind.name(), game.place_name(Place::Colony(*colony))),
         Order::BuildStation { body, slot } => format!("Build {} over {}", game.station_name(*body, *slot), game.tables.body(*body).name),
-        Order::BuildArchiveStage { colony } => format!("Raise a stage of the Archive at {}", game.place_name(Place::Colony(*colony))),
+        Order::BuildArchive { colony } => format!("Build the Archive at {}", game.place_name(Place::Colony(*colony))),
         Order::FundArchive => "Fund the Archive with this turn's Research".to_string(),
+        // Ticket #73.
+        Order::BuildEmigrants { state, n } => format!("Muster {n} Emigrants in {}", game.tables.state(*state).name),
+        Order::SendToAntarctica { state, n, into } => format!(
+            "Send {n} Emigrants from {} to {} by sea",
+            game.tables.state(*state).name,
+            match into {
+                UnloadTarget::Slot(_, slot) => game.tables.body(BodyId::Earth).slots[*slot as usize].name.clone(),
+                UnloadTarget::Colony(c) => game.place_name(Place::Colony(*c)),
+            }
+        ),
+        // Ticket #72.
+        Order::SetVentureShare { share } => format!("Bank {share}% of Materials output in the Venture Capital Fund"),
+        Order::DrawVenture { amount } => format!("Draw {amount} Materials from the Venture Capital Fund"),
         // Ticket #52.
         Order::Relief { state } => format!("Relief in {}: Unrest -1", game.tables.state(*state).name),
         Order::Resettle { state } => format!("Resettle this turn's refugees in {}", game.tables.state(*state).name),
@@ -1763,6 +1783,30 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             Color32::LIGHT_GREEN
         };
         ui.colored_label(colour, format!("Unrest {}: {}", game.unrest_text(sid), game.unrest_note(sid)));
+        // Ticket #75: a rival's Standing within two steps of the player's own, at the top of the
+        // card where it is seen, not in the Influence section below the fold.
+        if game.place_control(Place::State(sid)).controller() == Some(Seat(0)) {
+            let target = Place::State(sid);
+            let mine = game.seat(Seat(0)).influence.get(&target).copied().unwrap_or(0);
+            let step = game.tables.ai.thresholds.influence_step;
+            let pressing = Seat(0).others().iter().map(|s| (*s, game.seat(*s).influence.get(&target).copied().unwrap_or(0))).max_by_key(|(_, n)| *n).filter(|(_, n)| *n > 0 && *n + 2 * step >= mine);
+            if let Some((rival, standing)) = pressing {
+                ui.label(
+                    RichText::new(format!(
+                        "The {} stand at {} here against your {}: they take it at {}. Spend here to stay ahead.",
+                        game.seat_name(rival),
+                        standing,
+                        mine,
+                        mine + game.tables.influence.challenge_margin
+                    ))
+                    .color(Color32::from_rgb(255, 160, 60)),
+                );
+            }
+        }
+        // Ticket #73: Emigrants waiting here for a lift or the sea.
+        if st.emigrants > 0 {
+            ui.label(format!("Emigrants waiting: {}", st.emigrants)).on_hover_text("Mustered here and not yet lifted or sent: a working Launch Site lifts them onto a Ship, or, once the ice is open, the sea takes them to Antarctica.");
+        }
         if game.constabulary_online(sid) {
             ui.label(RichText::new("A Constabulary here takes 1 off every turn and damps what the climate and the refugees add.").weak());
         }
@@ -1793,8 +1837,12 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         let figures = if f.mothballed {
             "mothballed: making nothing, paying no upkeep, emitting nothing, keeping its slot".to_string()
         } else {
+            // Ticket #69: a Lab in a state nobody holds, or under Occupation, works for the world.
+            let world_lab = f.kind == FacilityKind::ResearchLab && f.working() && !f.offline_until_resolution && matches!(game.state(sid).control, Control::Neutral | Control::Occupied { .. });
             match director {
+                Some(d) if world_lab => format!("{} (the Lab works for the world: {} Research a turn to the Tech under research)", game.facility_yield(d, sid, f.kind).text(), game.world_lab_yield(sid) / 2),
                 Some(d) => game.facility_yield(d, sid, f.kind).text(),
+                None if world_lab => format!("in no one's hands: {} Research a turn to the Tech under research", game.world_lab_yield(sid) / 2),
                 None => "idle, nobody directs this state".to_string(),
             }
         };
@@ -1875,13 +1923,38 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         }
         if game.has_tech(TechId::CoastalEngineering) {
             ui.label(
-                RichText::new("A Sea Wall stands in a coastal slot and takes this state's next Sea Level threshold whole; it is destroyed doing it.")
+                RichText::new("A Sea Wall takes no build slot, as a Scrubber does, and takes this state's next Sea Level threshold whole; it is destroyed doing it.")
                     .weak(),
             );
         }
         cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
         ui.label(RichText::new("Raising the Industry Level adds an inland slot, which the sea never reaches.").weak());
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
+        // Ticket #73: muster Emigrants here, and send them to Antarctica by sea once the ice is open.
+        ui.label(RichText::new("Emigrants").strong());
+        let per = game.emigrants_per_turn(Seat(0));
+        cost_button_with_hover(
+            ui,
+            game,
+            &session.pending,
+            Order::BuildEmigrants { state: sid, n: per },
+            &format!("Muster {per} Emigrants"),
+            Some(format!(
+                "{:.1} population, on the card at End Turn, and {} off this state's Unrest. A working Launch Site lifts them onto a Ship; once the ice is open the sea takes them to Antarctica.",
+                game.lift_population(Seat(0), per),
+                Game::unrest_figure(game.tables.emigrants.unrest_fall)
+            )),
+            actions,
+        );
+        if game.antarctica_open && st.emigrants > 0 {
+            let n = st.emigrants;
+            for slot in game.free_slots_on(BodyId::Earth) {
+                cost_button(ui, game, &session.pending, Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) }, &format!("Send {n} to {} by sea", game.tables.body(BodyId::Earth).slots[slot as usize].name), actions);
+            }
+            for c in game.colonies.iter().filter(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(Seat(0))) {
+                cost_button(ui, game, &session.pending, Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Colony(c.id) }, &format!("Send {n} to {} by sea", game.place_name(Place::Colony(c.id))), actions);
+            }
+        }
         // Ticket #52: Relief and Resettle, with their prices on the buttons.
         ui.label(RichText::new("Unrest").strong());
         ui.horizontal(|ui| {
@@ -1944,20 +2017,18 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     ui.label(RichText::new("Modules").strong());
     let director = col.control.director();
     let colony_mine = !session.spectator && col.control.director() == Some(Seat(0));
-    let stages = game.tables.archive.stages;
+    let research = game.tables.archive.research;
     for (mi, m) in col.modules.iter().enumerate() {
-        // Ticket #51: the Archive reads as a Project, by stage, not as a yield.
+        // Ticket #51: the Archive reads by its Research paid, not as a yield (ticket #68: one Module).
         if m.kind == ModuleKind::Archive {
-            let building = col.queue.iter().find(|b| b.item == BuildItem::Module(ModuleKind::Archive));
-            let state = if let Some(b) = building {
-                format!("building, {} turn(s) left", (b.due_turn + 1).saturating_sub(game.turn))
-            } else if m.stage >= stages {
+            let fund = director.map(|d| game.seat(d).archive_fund).unwrap_or(0);
+            let state = if fund >= research {
                 let running = m.online && !col.control.is_occupied();
                 format!("complete, {}", if running { "online" } else { "offline" })
             } else {
-                "waiting for its next stage".to_string()
+                format!("standing, {fund} of {research} Research paid")
             };
-            ui.label(format!("  The Archive: stage {} of {}, {}", m.stage, stages, state));
+            ui.label(format!("  The Archive: {state}"));
             continue;
         }
         // Ticket #54: a mothballed Module says so, and carries the same three buttons.
@@ -1975,11 +2046,11 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             change_row(ui, game, &session.pending, BuildingRef::Module(cid, mi), m.mothballed, m.change, actions);
         }
     }
-    // Ticket #51: a stage on order shows before its Module does.
+    // Ticket #51: the Archive on order shows before its Module does.
     if !col.modules.iter().any(|m| m.kind == ModuleKind::Archive)
         && let Some(b) = col.queue.iter().find(|b| b.item == BuildItem::Module(ModuleKind::Archive))
     {
-        ui.label(format!("  The Archive: stage 1 of {}, building, {} turn(s) left", stages, (b.due_turn + 1).saturating_sub(game.turn)));
+        ui.label(format!("  The Archive: building, {} turn(s) left", (b.due_turn + 1).saturating_sub(game.turn)));
     }
     for b in col.queue.iter().filter(|b| b.item != BuildItem::Module(ModuleKind::Archive)) {
         ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
@@ -1992,31 +2063,42 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     ui.separator();
     let mine = !session.spectator && col.control.director() == Some(Seat(0));
     if mine {
-        // Ticket #51: the Archive, the first Project, has its own orders on an Archivist's card.
+        // Ticket #51: the Archive has its own orders on an Archivist's card. Ticket #68: one Module
+        // from its own button, and a fund that holds a quarter of the Research until it stands.
         if game.kind(Seat(0)) == FactionKind::Archivists {
-            let per = game.tables.archive.research_per_stage;
             let fund = game.seat(Seat(0)).archive_fund;
-            let next = game.archive_stages_committed(Seat(0)) + 1;
+            let cap = game.archive_fund_cap(Seat(0));
             ui.separator();
             ui.label(RichText::new("The Archive").strong());
-            ui.label(format!("Archive fund {} of {}", fund, per));
+            let built = game.archive_built(Seat(0));
+            let fund_line = if built {
+                format!("Archive fund {fund} of {research}")
+            } else {
+                format!("Archive fund {fund} of {cap} (a quarter of the {research} until the Archive stands)")
+            };
+            ui.label(fund_line);
             let funding = game.seat(Seat(0)).funding_archive || session.pending.iter().any(|o| matches!(o, Order::FundArchive));
             let mut on = funding;
-            if ui.checkbox(&mut on, "Fund the Archive this turn (your Labs' Research goes to the fund, not the shared Tech)").changed() {
+            let may_fund = game.check_order(Seat(0), &session.pending, &Order::FundArchive).is_ok() || funding;
+            let box_ = ui.add_enabled(may_fund, egui::Checkbox::new(&mut on, "Fund the Archive this turn (your Labs' Research goes to the fund, not the shared Tech)"));
+            if !may_fund {
+                box_.clone().on_disabled_hover_text("The fund is at its cap; this turn's Research goes to the shared Tech.");
+            }
+            if box_.changed() {
                 if on {
                     actions.push(Action::Place(Order::FundArchive));
                 } else if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::FundArchive)) {
                     actions.push(Action::Cancel(i));
                 }
             }
-            if next <= stages {
-                let order = Order::BuildArchiveStage { colony: cid };
+            if !built && !game.archive_ordered(Seat(0)) {
+                let order = Order::BuildArchive { colony: cid };
                 let materials = game.order_cost(Seat(0), &order).materials;
                 let check = game.check_order(Seat(0), &session.pending, &order);
-                let label = format!("Build stage {next} ({materials} Materials, {per} Research)");
+                let label = format!("Build the Archive ({materials} Materials)");
                 let resp = ui
                     .add_enabled(check.is_ok(), egui::Button::new(label))
-                    .on_hover_text(format!("{} turn(s) to raise once paid", game.tables.module(ModuleKind::Archive).build_turns));
+                    .on_hover_text(format!("{} turns to raise; then the fund opens to the full {research} Research", game.tables.module(ModuleKind::Archive).build_turns));
                 if let Err(e) = &check {
                     resp.clone().on_disabled_hover_text(&e.0);
                 }
@@ -2185,7 +2267,9 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                                     }
                                 }
                             });
-                            cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: n, from: LoadSource::State(chosen), army: None }, &format!("Load {n} Colonists"), actions);
+                            // Ticket #73: a Launch Site lifts the Emigrants waiting there, no more.
+                            let lift = n.min(game.state(chosen).emigrants).max(1);
+                            cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(chosen), army: None }, &format!("Load {lift} Emigrants"), actions);
                         });
                     }
                 }
@@ -2607,6 +2691,35 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // Ticket #51: the second part in the words its own card uses.
                 ui.label(format!("{}: {}", p.second_name, p.second_text));
                 ui.add(egui::ProgressBar::new(p.second_fraction() as f32));
+                // Ticket #72: the Prospectors set their Venture Capital Fund's share here, and draw.
+                if seat == Seat(0) && !session.spectator && game.kind(Seat(0)) == FactionKind::Prospectors {
+                    let v = game.tables.venture.clone();
+                    let now = (game.seat(Seat(0)).venture_share * 100.0).round() as u32;
+                    let pending_share = session.pending.iter().find_map(|o| if let Order::SetVentureShare { share } = o { Some(*share) } else { None });
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(format!("Banking {now}% of Materials output{}:", pending_share.map(|p| format!(" ({p}% from next turn)")).unwrap_or_default()));
+                        let step = (v.share_step * 100.0).round().max(1.0) as u32;
+                        let max = (v.max_share * 100.0).round() as u32;
+                        let mut pct = 0u32;
+                        while pct <= max {
+                            if ui.selectable_label(pending_share.unwrap_or(now) == pct, format!("{pct}%")).clicked() {
+                                if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetVentureShare { .. })) {
+                                    actions.push(Action::Cancel(i));
+                                }
+                                if pct != now {
+                                    actions.push(Action::Place(Order::SetVentureShare { share: pct }));
+                                }
+                            }
+                            pct += step;
+                        }
+                    });
+                    let draw = Order::DrawVenture { amount: 10 };
+                    let ok = game.check_order(Seat(0), &session.pending, &draw).is_ok();
+                    let back = (10.0 * v.draw_return).floor() as i64;
+                    if ui.add_enabled(ok, egui::Button::new("Draw 10 from the Fund")).on_hover_text(format!("{back} Materials come back to the Stockpile; a tenth is lost.")).clicked() {
+                        actions.push(Action::Place(draw));
+                    }
+                }
                 ui.add_space(8.0);
             }
             ui.label(format!("Collapse Line +{:.1} C; the Temperature is {:+.1}.", game.tables.climate.collapse_line, game.climate.temperature));

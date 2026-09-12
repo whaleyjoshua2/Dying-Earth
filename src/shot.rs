@@ -186,27 +186,54 @@ fn build_board(session: &mut Session) {
                 g.seats[seat.index()].ai = true;
             }
         }
-        // `archive:<stage>` (a building aid, ticket #51): seat 0 gets a Colony on Mars with the
-        // Archive at that stage, the next stage building, a part-filled fund and Colonists in its
-        // Habitats, since an AI Archivist rarely has all of that in six turns.
-        if let Some(stage) = std::env::args().find_map(|a| a.strip_prefix("archive:").and_then(|v| v.parse::<u32>().ok())) {
-            let stages = g.tables.archive.stages;
+        // `archive:<n>` (a building aid, ticket #51, reshaped by #68): seat 0 gets a Colony on Mars
+        // with Colonists in its Habitats and the Archive at one of three points: 0, the Module on
+        // order with the fund at its quarter; 1, the Module standing and the fund half paid; 2,
+        // complete. An AI Archivist rarely has any of that in six turns.
+        if let Some(point) = std::env::args().find_map(|a| a.strip_prefix("archive:").and_then(|v| v.parse::<u32>().ok())) {
+            let research = g.tables.archive.research;
             let slot = g.free_slots_on(BodyId::Mars).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
             let mut modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Mine)];
-            let mut archive = Module::new(ModuleKind::Archive);
-            archive.stage = stage.min(stages);
-            modules.push(archive);
             let turn = g.turn;
             let mut queue = Vec::new();
-            if stage < stages {
-                queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat: Seat(0), due_turn: turn, coastal: false });
+            if point == 0 {
+                queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat: Seat(0), due_turn: turn + 1, coastal: false });
+            } else {
+                modules.push(Module::new(ModuleKind::Archive));
             }
             g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: 8, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
-            g.seats[0].archive_fund = 14;
+            g.seats[0].archive_fund = match point {
+                0 => (research as f64 * g.tables.archive.banked_before_built) as i64,
+                1 => research / 2,
+                _ => research,
+            };
             g.seats[0].stockpile.materials = 120;
             g.seats[0].stockpile.energy = 60;
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
+        }
+        // `pressed:<n>` (a building aid, ticket #75): seat 0 holds North Africa (a short card) with a
+        // Standing of n there, and seat 1 stands at n too, so the card's warning line shows.
+        if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("pressed:").and_then(|v| v.parse::<i64>().ok())) {
+            let sid = StateId::NorthAfrica;
+            g.take_control(sid, Seat(0));
+            g.seats[0].influence.insert(Place::State(sid), n);
+            g.seats[1].influence.insert(Place::State(sid), n);
+        }
+        // `emigrants:<n>` (a building aid, ticket #73): n Emigrants wait in seat 0's start state.
+        if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("emigrants:").and_then(|v| v.parse::<u32>().ok())) {
+            let start = g.controlled_states(Seat(0)).first().copied();
+            if let Some(sid) = start {
+                g.state_mut(sid).emigrants = n;
+            }
+        }
+        // `venture:<n>` (a building aid, ticket #72): seat 0 as the Prospectors holds n Materials in
+        // the Venture Capital Fund and banks half its output.
+        if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("venture:").and_then(|v| v.parse::<i64>().ok()))
+            && g.kind(Seat(0)) == FactionKind::Prospectors
+        {
+            g.seats[0].venture_fund = n;
+            g.seats[0].venture_share = 0.5;
         }
         // `unrest:<n>` (a building aid, ticket #52): a spread of Unrest over three states on the
         // face the Earth picture shows, so one card, the map labels and the thresholds are all
@@ -319,7 +346,7 @@ fn build_board(session: &mut Session) {
             if let Some(i) = g.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::Bank) {
                 g.state_mut(sid).facilities.remove(i);
             }
-            g.state_mut(sid).facilities.push(Facility::in_coastal_slot(FacilityKind::SeaWall));
+            g.state_mut(sid).facilities.push(Facility::new(FacilityKind::SeaWall));
             g.seats[0].stockpile.materials = 300;
             g.seats[0].stockpile.energy = 400;
             g.seats[0].stockpile.ducats = 300;

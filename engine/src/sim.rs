@@ -68,6 +68,25 @@ pub struct SimResult {
     /// launch window falls on, which the ephemeris fixes and no seed moves.
     pub first_mars_colony_turn: Option<u32>,
     pub window_turn: u32,
+    /// Ticket #68: the turn the Archive Module first stood, the turn the Archive was complete, and
+    /// the Archivists' fund at the end.
+    pub archive_built_turn: Option<u32>,
+    pub archive_complete_turn: Option<u32>,
+    pub archive_fund_at_end: i64,
+    /// Ticket #69: what the neutral Labs paid into the shared Tech over the game, and the turn
+    /// Coastal Engineering completed.
+    pub neutral_research: i64,
+    pub coastal_engineering_turn: Option<u32>,
+    /// Ticket #72: the Prospectors' Venture Capital Fund at the end.
+    pub venture_fund_at_end: i64,
+    /// Ticket #76: cards drawn over the game, and whether the deck ran dry.
+    pub cards_drawn: u32,
+    pub deck_empty: bool,
+    /// Ticket #73: Emigrant batches mustered over the game, and Antarctic Colonies founded by sea.
+    pub emigrant_batches: u32,
+    pub antarctic_by_sea: u32,
+    /// Ticket #75: the turn seat 0 first lost the Nation State it started in, None if never.
+    pub start_state_lost_turn: Option<u32>,
     /// Ticket #58: how many Moments the turns of this game earned, how many the cap of two and the
     /// defaults in `report.toml` actually showed, how many turns stopped for at least one, and the
     /// most any one turn showed.
@@ -128,6 +147,12 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let mut antarctic_colonies = 0u32;
     // Ticket #57: the first Colony anywhere in the Mars system, and the turn the window falls on.
     let mut first_mars_colony_turn: Option<u32> = None;
+    let archivist = Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Archivists);
+    let mut archive_built_turn: Option<u32> = None;
+    let mut archive_complete_turn: Option<u32> = None;
+    let mut coastal_engineering_turn: Option<u32> = None;
+    let home = game.controlled_states(Seat(0)).first().copied();
+    let mut start_state_lost_turn: Option<u32> = None;
     let window_turn = game.next_window_turn(1);
     let max_turns = tables.victory.turns;
     let mut guard = 0;
@@ -179,6 +204,20 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
             antarctica_turn = Some(game.turn);
         }
         antarctic_colonies = antarctic_colonies.max(game.colonies.iter().filter(|c| c.body == BodyId::Earth && !c.in_orbit).count() as u32);
+        if let Some(a) = archivist {
+            if archive_built_turn.is_none() && game.archive_built(a) {
+                archive_built_turn = Some(game.turn);
+            }
+            if archive_complete_turn.is_none() && game.archive_complete(a) {
+                archive_complete_turn = Some(game.turn);
+            }
+        }
+        if start_state_lost_turn.is_none() && home.map(|h| game.state(h).control.controller() != Some(Seat(0))).unwrap_or(false) {
+            start_state_lost_turn = Some(game.turn);
+        }
+        if coastal_engineering_turn.is_none() && game.has_tech(crate::ids::TechId::CoastalEngineering) {
+            coastal_engineering_turn = Some(game.turn);
+        }
         if first_mars_colony_turn.is_none() {
             first_mars_colony_turn = game
                 .colonies
@@ -289,6 +328,17 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         antarctic_colonies,
         first_mars_colony_turn,
         window_turn,
+        archive_built_turn,
+        archive_complete_turn,
+        archive_fund_at_end: archivist.map(|a| game.seat(a).archive_fund).unwrap_or(0),
+        neutral_research: game.research.neutral_total,
+        coastal_engineering_turn,
+        venture_fund_at_end: Seat::ALL.into_iter().find(|s| game.kind(*s) == FactionKind::Prospectors).map(|s| game.seat(s).venture_fund).unwrap_or(0),
+        cards_drawn: game.deck.drawn.len() as u32,
+        deck_empty: game.deck.cards.is_empty(),
+        start_state_lost_turn,
+        emigrant_batches: game.log.iter().filter(|l| l.contains("Emigrants mustered in")).count() as u32,
+        antarctic_by_sea: game.log.iter().filter(|l| l.contains("in Antarctica with")).count() as u32,
         moments_earned,
         moments_shown,
         turns_with_moment,

@@ -69,17 +69,21 @@ energy_upkeep = 2
 influence_allotment = 1
 standing_per_turn = 2
 
-# Ticket #51 (version 0.05): the Archive, the first Project. It is never placed by an ordinary build
-# order: the Archivists order one stage at a time, each stage `materials` Materials and
-# `[archive] research_per_stage` Research from the Archive fund, `build_turns` turns to raise. Its
-# Energy upkeep is charged only once every stage is done.
+# Ticket #51 (version 0.05): the Archive, which only the Archivists build, at one Colony off Earth,
+# never through the ordinary Module build order. Ticket #68 (version 0.05.5): it is one Module,
+# `materials` Materials and `build_turns` turns from its own button; the four stages are retired.
+# Its Energy upkeep is charged only once it is complete: standing, with `[archive] research`
+# Research paid into the fund.
 [[module]]
 id = "archive"
 name = "The Archive"
-materials = 30
-build_turns = 2
+materials = 50
+build_turns = 3
 energy_upkeep = 12
 
+# Ticket #68: the Research the Archive requires in all, paid into the Archive fund at any pace once
+# the Module stands; and the share of it the fund may hold BEFORE the Module stands (a quarter: 20).
+# At that cap a turn of funding is refused, and the Research stays with the shared Tech.
 [archive]
-stages = 4
-research_per_stage = 20
+research = 80
+banked_before_built = 0.25

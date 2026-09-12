@@ -83,6 +83,23 @@ fn main() {
                     let mut breaks_fired = vec![0u32; tables.climate.breaks.len()];
                     let mut highest_rung = 0u32;
                     let mut victory_met: Vec<String> = Vec::new();
+                    // Ticket #67 (version 0.05.5): whether the Mars system is reached now that the
+                    // game holds three windows, and how many Antarctic Colonies are founded.
+                    let (mut mars_turns, mut antarctic) = (Vec::new(), 0u32);
+                    // Ticket #68: how far the Archivists' Archive gets.
+                    let (mut archive_built, mut archive_complete, mut archive_funds) = (Vec::new(), Vec::new(), Vec::new());
+                    // Ticket #69: the neutral Labs' Research and the Sea Wall's Tech.
+                    let (mut neutral_research, mut coastal_engineering) = (Vec::new(), Vec::new());
+                    // Ticket #70: what the sea took.
+                    let (mut slots_lost, mut drowned) = (Vec::new(), Vec::new());
+                    // Ticket #72: the Prospectors' Fund.
+                    let mut venture = Vec::new();
+                    // Ticket #76: the deck.
+                    let (mut cards_drawn, mut deck_empty) = (Vec::new(), 0u32);
+                    // Ticket #73: Emigrants.
+                    let (mut emigrant_batches, mut by_sea) = (0u32, 0u32);
+                    // Ticket #75: seat 0's start state.
+                    let mut home_lost = Vec::new();
                     for seed in 1..=seeds {
                         let r = dying_earth_engine::sim::run_from(tables.clone(), seed, player, start);
                         match r.outcome {
@@ -102,6 +119,33 @@ fn main() {
                         off_earth.push(r.colonists_off_earth.iter().sum::<u32>());
                         techs.push(r.techs_completed);
                         highest_rung = highest_rung.max(r.highest_rung);
+                        if let Some(t) = r.first_mars_colony_turn {
+                            mars_turns.push(t);
+                        }
+                        antarctic += r.antarctic_colonies;
+                        if let Some(t) = r.archive_built_turn {
+                            archive_built.push(t);
+                        }
+                        if let Some(t) = r.archive_complete_turn {
+                            archive_complete.push(t);
+                        }
+                        archive_funds.push(r.archive_fund_at_end.max(0) as u32);
+                        neutral_research.push(r.neutral_research.max(0) as u32);
+                        slots_lost.push(r.coastal_slots_lost);
+                        drowned.push(r.facilities_drowned);
+                        venture.push(r.venture_fund_at_end.max(0) as u32);
+                        cards_drawn.push(r.cards_drawn);
+                        if r.deck_empty {
+                            deck_empty += 1;
+                        }
+                        emigrant_batches += r.emigrant_batches;
+                        by_sea += r.antarctic_by_sea;
+                        if let Some(t) = r.start_state_lost_turn {
+                            home_lost.push(t);
+                        }
+                        if let Some(t) = r.coastal_engineering_turn {
+                            coastal_engineering.push(t);
+                        }
                         if let Some((seat, kind)) = r.victory_met {
                             victory_met.push(format!("seed {seed} {} (seat {})", kind.name(), seat.0));
                         }
@@ -135,6 +179,30 @@ fn main() {
                         println!("      median Colonists off Earth at the end, all seats {}", median_u(&mut off_earth));
                         println!("      Scrubbers {scrubbers}, Leapfrogs {leapfrogs}, Constabularies {constabularies}, Sea Walls {sea_walls}");
                         println!("      Techs: median {} completed, highest rung reached {highest_rung}", median_u(&mut techs));
+                        println!(
+                            "      Mars system: a Colony founded in {}/{seeds} seeds, median first turn {}; Antarctic Colonies founded {antarctic}",
+                            mars_turns.len(),
+                            median_u(&mut mars_turns)
+                        );
+                        println!(
+                            "      The Archive: standing in {}/{seeds} seeds (median turn {}), complete in {}/{seeds} (median turn {}), median fund at the end {}",
+                            archive_built.len(),
+                            median_u(&mut archive_built),
+                            archive_complete.len(),
+                            median_u(&mut archive_complete),
+                            median_u(&mut archive_funds)
+                        );
+                        println!(
+                            "      Neutral Labs paid a median {} Research a game; Coastal Engineering complete in {}/{seeds} seeds (median turn {})",
+                            median_u(&mut neutral_research),
+                            coastal_engineering.len(),
+                            median_u(&mut coastal_engineering)
+                        );
+                        println!("      The sea: median {} coastal slots lost a game, {} Facilities drowned", median_u(&mut slots_lost), median_u(&mut drowned));
+                        println!("      The Prospectors' Venture Capital Fund at the end: median {}", median_u(&mut venture));
+                        println!("      The deck: median {} cards drawn a game, empty at the end in {deck_empty}/{seeds} seeds", median_u(&mut cards_drawn));
+                        println!("      Emigrants: {emigrant_batches} batches mustered, {by_sea} Antarctic Colonies founded by sea");
+                        println!("      Seat 0 lost its start state in {}/{seeds} seeds (median turn {})", home_lost.len(), median_u(&mut home_lost));
                         println!(
                             "      Victory Conditions met outright: {}",
                             if victory_met.is_empty() { "none in any seed".to_string() } else { victory_met.join(", ") }

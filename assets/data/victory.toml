@@ -1,14 +1,19 @@
 # Spec section 15.
 # Ticket #50: each Faction's first Victory part and its bar now live on its own card in
-# factions.toml (victory_first). These two are kept as the reference figures the Custodian and
-# Prospector cards quote; the engine reads the cards.
-extraction_total = 500
+# factions.toml (victory_first). This one is kept as the reference figure the Custodian card quotes;
+# the engine reads the cards. Ticket #72 (version 0.05.5): the Extraction Total is retired for the
+# Prospectors' Venture Capital Fund (750 on their card).
 stabilization_turns = 3
 # Off-world Presence is the same bar for every Faction.
 off_world_presence = 12
-# Ticket #27 (version 0.02): twenty-four turns of one month.
-turns = 24
-# Ticket #57 (version 0.05): the game begins on 1 January 2030 and a Turn is a calendar month, so
-# turn 1 is January 2030 and turn 24 December 2031.
+# Ticket #27 (version 0.02): twenty-four turns of one month. Ticket #67 (version 0.05.5): thirty-six
+# turns of two months, so the game runs six years; every build time, transit time and per-turn
+# figure stays what it was in turns.
+turns = 36
+# Ticket #57 (version 0.05): the game begins on 1 January 2030. Ticket #67: a Turn is
+# `months_per_turn` calendar months and is named by its first month alone, so turn 1 is January
+# 2030, turn 2 March 2030 and turn 36 November 2035; each turn's sky is read at the first instant
+# of its first month.
 start_year = 2030
 start_month = 1
+months_per_turn = 2

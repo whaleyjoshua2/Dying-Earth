@@ -24,8 +24,8 @@ enum Cat {
     Resettle,
     /// Ticket #51: divert this turn's Research into the Archive fund.
     FundArchive,
-    /// Ticket #51: order the next stage of the Archive.
-    ArchiveStage,
+    /// Ticket #51: build the Archive; one Module since ticket #68.
+    BuildArchive,
     Influence,
     Transit,
     LoadUnload,
@@ -92,7 +92,7 @@ impl Game {
             Cat::Relief => w.relief,
             Cat::Resettle => w.resettle,
             Cat::FundArchive => w.fund_archive,
-            Cat::ArchiveStage => w.build_archive_stage,
+            Cat::BuildArchive => w.build_archive,
             Cat::Influence => w.influence,
             Cat::Transit => w.transit,
             Cat::LoadUnload => w.load_unload,
@@ -230,9 +230,9 @@ impl Game {
         match behind {
             Behind::Presence => y.habitat,
             Behind::First => match self.first_kind(seat) {
-                VictoryFirstKind::ExtractionTotal => y.mine + y.refinery,
+                VictoryFirstKind::VentureFund => y.mine + y.refinery,
                 VictoryFirstKind::ColonistsOffEarth => y.habitat,
-                VictoryFirstKind::StabilizationRun | VictoryFirstKind::ResearchProduced | VictoryFirstKind::ArchiveStages => y.generator + y.habitat,
+                VictoryFirstKind::StabilizationRun | VictoryFirstKind::ResearchProduced | VictoryFirstKind::ArchiveResearch => y.generator + y.habitat,
             },
         }
     }
@@ -381,7 +381,7 @@ impl Game {
     }
 
     /// The highest Standing any other seat has on a place (ticket #50).
-    fn rival_standing(&self, seat: Seat, place: Place) -> i64 {
+    pub fn rival_standing(&self, seat: Seat, place: Place) -> i64 {
         seat.others().iter().map(|s| self.seat(*s).influence.get(&place).copied().unwrap_or(0)).max().unwrap_or(0)
     }
 
@@ -438,9 +438,10 @@ impl Game {
             self.state(sid).facilities.iter().filter(|f| !f.mothballed).map(|f| self.facility_yield(seat, sid, f.kind).amount).sum()
         };
         let highest_output = self.controlled_states(seat).into_iter().filter(|s| !self.state(*s).strip_permit_used).max_by_key(|s| output_of(*s));
-        // Ticket #54: behind on the Extraction pace itself, whichever part the seat is furthest
-        // behind on overall: the Strip Permit is bought against the Extraction schedule.
-        let behind_on_extraction = first_kind == VictoryFirstKind::ExtractionTotal && {
+        // Ticket #54: behind on the first part's pace itself, whichever part the seat is furthest
+        // behind on overall: the Strip Permit is bought against that schedule (ticket #72: the
+        // Venture Capital Fund's).
+        let behind_on_extraction = first_kind == VictoryFirstKind::VentureFund && {
             let pace = self.tables.ai_pace(kind);
             let want = Self::expected(&pace.first, self.turn);
             want > 0.0 && (self.progress(seat).first_value) < want
@@ -454,7 +455,7 @@ impl Game {
         // What advances the Faction's own first Victory part (ticket #50).
         let advances_first = |cat: Cat, item: Option<&str>| -> bool {
             match first_kind {
-                VictoryFirstKind::ExtractionTotal => {
+                VictoryFirstKind::VentureFund => {
                     cat == Cat::Producer && item.map(|i| i != "Power Plant" && i != "Generator").unwrap_or(false)
                         || cat == Cat::RaiseIndustry
                         // Ticket #54: a Strip Permit is three turns of double Extraction.
@@ -464,10 +465,13 @@ impl Game {
                 VictoryFirstKind::StabilizationRun => cat == Cat::Scrubber || cat == Cat::Leapfrog || cat == Cat::ResearchLab,
                 VictoryFirstKind::ColonistsOffEarth => matches!(cat, Cat::Habitat | Cat::ColonyShip | Cat::FoundColony | Cat::LoadUnload | Cat::Transit),
                 VictoryFirstKind::ResearchProduced => cat == Cat::ResearchLab,
-                // Ticket #51: the Archive wants Research, a fund and stages, and a Colony off Earth
-                // to stand at, which the Colony Ship, the transit and the founding provide.
-                VictoryFirstKind::ArchiveStages => {
-                    matches!(cat, Cat::ArchiveStage | Cat::FundArchive | Cat::ResearchLab | Cat::ColonyShip | Cat::FoundColony | Cat::Transit | Cat::LoadUnload)
+                // Ticket #51: the Archive wants Research, a fund and a Colony off Earth to stand at,
+                // which the Colony Ship, the transit and the founding provide. Ticket #68: and the
+                // Launch Site and Shipyard before them, which #51 left out, so an Archivist AI with
+                // neither (its station starts bare) spent every turn on Influence and never left
+                // Earth in twenty seeds of thirty-six turns.
+                VictoryFirstKind::ArchiveResearch => {
+                    matches!(cat, Cat::BuildArchive | Cat::FundArchive | Cat::ResearchLab | Cat::ColonyShip | Cat::FoundColony | Cat::Transit | Cat::LoadUnload | Cat::LaunchSiteOrShipyard | Cat::Habitat)
                 }
             }
         };
@@ -520,14 +524,9 @@ impl Game {
                         // Ticket #54: a Scrubber has its own weight, its own cap and no build slot,
                         // so it is enumerated below rather than here.
                         FacilityKind::Scrubber => continue,
-                        // Ticket #56: a Sea Wall needs Coastal Engineering, a free COASTAL slot and
-                        // no wall standing already; it is worth its slot when a threshold is near.
-                        FacilityKind::SeaWall => {
-                            if self.free_coastal(sid) == 0 || self.sea_wall_committed(sid) {
-                                continue;
-                            }
-                            (Cat::SeaWall, self.base_weight(seat, Cat::SeaWall))
-                        }
+                        // Ticket #77: a Sea Wall takes no build slot, so it is enumerated below with
+                        // the Scrubber rather than here among the slot-takers.
+                        FacilityKind::SeaWall => continue,
                     };
                     let produces = self.tables.facility(fk).produces.as_ref().map(|p| p.resource);
                     if cat == Cat::Producer {
@@ -557,16 +556,23 @@ impl Game {
                     // within 0.2 C of the Temperature and the state still has a coast to lose.
                     // Ticket #60: and a Constabulary doubles at Unrest 9, where one more turn would
                     // throw the seat off the state, exactly as Relief doubles at the same figure.
-                    let seizes_the_moment = (fk == FacilityKind::SeaWall && self.sea_is_close(sid))
-                        || (fk == FacilityKind::Constabulary && self.state(sid).unrest >= 9.0);
+                    let sea_close = fk == FacilityKind::SeaWall && self.sea_is_close(sid);
+                    let seizes_the_moment = sea_close || (fk == FacilityKind::Constabulary && self.state(sid).unrest >= 9.0);
                     let opportunity = if seizes_the_moment { m.opportunity } else { 1.0 };
+                    // Ticket #70 (version 0.05.5): the rising sea is a threat to the state, so a Sea
+                    // Wall with the sea close takes the threat multiplier as well.
+                    let sway = if sea_close { m.threat } else { sway };
                     // Ticket #60: #52 and #53 measured no Constabulary in any AI game -- a building
                     // that fixes nothing economic never beat a producer under the victory-gap
                     // multiplier, so it never won a build slot while the gap was wide. From Unrest 5
                     // (the only Unrest at which the candidate is offered at all, above) it takes the
                     // multiplier too, because a state at 7 halves every Facility's output and every
                     // Facility's Emissions: calming it advances whatever the seat is behind on.
-                    let pull = if fk == FacilityKind::Constabulary { gap } else { gap_for(cat, Some(name)) };
+                    // Ticket #70: and the victory-gap multiplier, as the Constabulary does at Unrest
+                    // 5, so it competes with the Scrubber on even terms. The Research ticket of
+                    // 0.05.5 found Coastal Engineering done by turn 16 to 18 in every seed and no
+                    // Sea Wall ever built: the Custodian AI held its Materials for a Scrubber every time.
+                    let pull = if fk == FacilityKind::Constabulary || sea_close { gap } else { gap_for(cat, Some(name)) };
                     push(vec![Order::BuildFacility { state: sid, kind: fk }], cat, base, pull, sway, opportunity, format!("build {} in {}", name, self.tables.state(sid).name), None);
                 }
             }
@@ -590,6 +596,16 @@ impl Game {
                     format!("build a Scrubber in {} ({} of {})", self.tables.state(sid).name, self.scrubbers_committed(sid) + 1, self.scrubber_cap(sid)),
                     None,
                 );
+            }
+            // Ticket #77 (version 0.05.5): a Sea Wall takes no build slot, as the Scrubber does, so it
+            // is offered whether or not a slot is free: with Coastal Engineering in, no wall standing
+            // or on order, and a coast still to protect. With the sea within 0.2 C it takes the
+            // victory-gap, threat and opportunity multipliers (ticket #70), so it competes with the
+            // Scrubber on even terms.
+            if self.has_tech(TechId::CoastalEngineering) && !self.sea_wall_committed(sid) && self.coastal_slots(sid) > 0 {
+                let close = self.sea_is_close(sid);
+                let (pull, sway, opp) = if close { (gap, m.threat, m.opportunity) } else { (1.0, 1.0, 1.0) };
+                push(vec![Order::BuildFacility { state: sid, kind: FacilityKind::SeaWall }], Cat::SeaWall, self.base_weight(seat, Cat::SeaWall), pull, sway, opp, format!("build Sea Wall in {}", self.tables.state(sid).name), None);
             }
             // Ticket #54: Leapfrog, the Custodians' other clause, on the most populous state they
             // hold once they have Ducats to spare.
@@ -731,7 +747,9 @@ impl Game {
             let near = card.neighbours.iter().any(|n| my_states.contains(n));
             // Ticket #34: the state's Influence value plus its Industry Level, closest first.
             let value = (self.state_influence_value(sid) + st.industry_level as i64) as f64 + if near { 2.0 } else { 0.0 };
-            let neutral_bonus = if st.control == Control::Neutral { 1.0 } else { 0.6 };
+            // Ticket #75: a held place counts a fraction of a neutral one (0.3), so it is attacked
+            // only when no neutral one is worth having.
+            let neutral_bonus = if st.control == Control::Neutral { 1.0 } else { th.held_state_weight };
             targets.push((Place::State(sid), value * neutral_bonus));
         }
         // Ticket #50: any rival's Colony, the fewest Colonists first.
@@ -772,14 +790,25 @@ impl Game {
             }
         }
         // Hold own places where a rival's standing approaches yours (ticket #33: spending raises your standing).
+        // Ticket #75 (version 0.05.5): as many steps as it takes to stand two steps clear of the
+        // rival's Standing plus the challenge margin, as many as the Allotment and the Ducats allow.
+        // One hold a turn against a rival pouring its whole Allotment in lost seat 0's start state
+        // on turn 7 in every seed of the Prospectors' batch.
         let mut owned: Vec<Place> = self.controlled_states(seat).into_iter().map(Place::State).collect();
         owned.extend(self.colonies.iter().filter(|c| c.control.controller() == Some(seat)).map(|c| Place::Colony(c.id)));
+        let bought_steps = if per > 0 { ducats / per } else { 0 };
         for place in owned {
             let rival = self.rival_standing(seat, place);
             let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
             if rival > 0 && rival + 2 * step >= mine {
+                let margin = self.tables.influence.challenge_margin;
+                let need = (rival + margin + 2 * step - mine).max(step);
+                let can = ((allotment + bought_steps) / step).max(1);
+                let copies = ((need + step - 1) / step).clamp(1, can);
                 let opp = if rival + step >= mine { m.opportunity } else { 1.0 };
-                push(vec![Order::Influence { target: place, amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, m.threat, opp, format!("hold {} with {} Influence", self.place_name(place), step), None);
+                for _ in 0..copies {
+                    push(vec![Order::Influence { target: place, amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, m.threat, opp, format!("hold {} with {} Influence", self.place_name(place), step), None);
+                }
             }
         }
 
@@ -804,29 +833,22 @@ impl Game {
             }
         }
 
-        // --- The Archive (ticket #51). The Archivist AI funds it whenever the next stage still
-        // wants Research, from turn one if it likes, and otherwise contributes to the shared Tech;
-        // it raises the Archive at the first Colony off Earth it took, one stage at a time.
+        // --- The Archive (ticket #51). The Archivist AI funds it whenever the fund has room under
+        // its cap, from turn one if it likes, and otherwise contributes to the shared Tech. Ticket
+        // #68: it builds the one Module at the first Colony off Earth it took, and the fund's cap
+        // is a quarter until that Module stands, so the Module is what opens the rest.
         if kind == FactionKind::Archivists {
-            let home = self.archive_colony(seat).or_else(|| {
-                self.colonies
-                    .iter()
-                    .filter(|c| c.control.director() == Some(seat) && self.may_hold_archive(c))
-                    .min_by_key(|c| (c.founded_turn, c.id.0))
-                    .map(|c| c.id)
-            });
-            let per = self.tables.archive.research_per_stage;
             let fund = self.seat(seat).archive_fund;
-            let left = self.archive_fund_cap(seat);
-            if left > 0 && fund < left && self.seat(seat).research_last_turn > 0 {
-                let opp = if fund + self.seat(seat).research_last_turn >= per { m.opportunity } else { 1.0 };
+            let cap = self.archive_fund_cap(seat);
+            if fund < cap && self.seat(seat).research_last_turn > 0 {
+                let opp = if fund + self.seat(seat).research_last_turn >= cap { m.opportunity } else { 1.0 };
                 push(vec![Order::FundArchive], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, opp, format!("fund the Archive with this turn's {} Research", self.seat(seat).research_last_turn), None);
             }
-            if let Some(cid) = home
-                && fund >= per
-            {
-                let next = self.archive_stages_committed(seat) + 1;
-                push(vec![Order::BuildArchiveStage { colony: cid }], Cat::ArchiveStage, self.base_weight(seat, Cat::ArchiveStage), gap_for(Cat::ArchiveStage, None), 1.0, m.opportunity, format!("raise stage {} of the Archive at {}", next, self.place_name(Place::Colony(cid))), None);
+            if !self.archive_built(seat) && !self.archive_ordered(seat) {
+                let home = self.colonies.iter().filter(|c| c.control.director() == Some(seat) && self.may_hold_archive(c)).min_by_key(|c| (c.founded_turn, c.id.0)).map(|c| c.id);
+                if let Some(cid) = home {
+                    push(vec![Order::BuildArchive { colony: cid }], Cat::BuildArchive, self.base_weight(seat, Cat::BuildArchive), gap_for(Cat::BuildArchive, None), 1.0, m.opportunity, format!("build the Archive at {}", self.place_name(Place::Colony(cid))), None);
+                }
             }
         }
 
@@ -986,9 +1008,52 @@ impl Game {
             }
         }
 
+        // --- Ticket #73: Emigrants. Colonists are built now, so before a Colony Ship can be loaded
+        // or Antarctica settled a batch must muster in a state the seat directs: the one with a
+        // working Launch Site, or, with the ice open, the most populous. It musters while fewer
+        // wait than two Ship loads (and one more while the ice is open), and never for nothing.
+        let presence_needed = self.tables.victory.off_world_presence.saturating_sub(self.off_world_colonists(seat));
+        {
+            let per = self.emigrants_per_turn(seat);
+            let capacity = self.colony_ship_capacity(seat);
+            let waiting: u32 = self.directed_states(seat).iter().map(|s| self.state(*s).emigrants).sum();
+            let has_ship_or_yard = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip)
+                || self.colonies.iter().any(|c| c.control.director() == Some(seat) && c.modules.iter().any(|m| m.kind == ModuleKind::Shipyard));
+            let want = if has_ship_or_yard { capacity * 2 } else { 0 } + if self.antarctica_open { capacity } else { 0 };
+            if per > 0 && waiting < want {
+                let by_population = |a: &StateId, b: &StateId| self.state(*a).population.partial_cmp(&self.state(*b).population).unwrap_or(std::cmp::Ordering::Equal);
+                let with_site = self
+                    .directed_states(seat)
+                    .into_iter()
+                    .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()))
+                    .max_by(by_population);
+                let target = with_site.or_else(|| if self.antarctica_open { self.directed_states(seat).into_iter().max_by(by_population) } else { None });
+                if let Some(st) = target {
+                    let opp = if presence_needed > 0 && waiting == 0 { m.opportunity } else { 1.0 };
+                    push(vec![Order::BuildEmigrants { state: st, n: per }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("muster {} Emigrants in {}", per, self.tables.state(st).name), None);
+                }
+            }
+            // With the ice open, waiting Emigrants go to Antarctica by sea: a free slot first, else
+            // a Colony of the seat's with room. A foothold, not Presence: half weight and no gap,
+            // as a Ship's unload there.
+            if self.antarctica_open {
+                for sid in self.directed_states(seat) {
+                    let n = self.state(sid).emigrants;
+                    if n == 0 {
+                        continue;
+                    }
+                    if let Some(slot) = self.best_slot_for(seat, BodyId::Earth, behind) {
+                        push(vec![Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, format!("send {} Emigrants from {} to {} by sea", n, self.tables.state(sid).name, self.tables.body(BodyId::Earth).slots[slot as usize].name), None);
+                    } else if let Some(c) = self.colonies.iter().find(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(seat) && self.habitat_room(c) > c.colonists) {
+                        let k = n.min(self.habitat_room(c) - c.colonists);
+                        push(vec![Order::SendToAntarctica { state: sid, n: k, into: UnloadTarget::Colony(c.id) }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload) * 0.5, 1.0, 1.0, 1.0, format!("send {} Emigrants from {} to {} by sea", k, self.tables.state(sid).name, self.place_name(Place::Colony(c.id))), None);
+                    }
+                }
+            }
+        }
+
         // --- Ships: load, unload, found, transit
         let ships: Vec<Ship> = self.ships.iter().filter(|s| s.seat == seat && matches!(s.at, ShipAt::Body(_)) && !s.arrived_this_turn).cloned().collect();
-        let presence_needed = self.tables.victory.off_world_presence.saturating_sub(self.off_world_colonists(seat));
         for s in &ships {
             let ShipAt::Body(body) = s.at else { continue };
             let card = self.tables.unit(s.kind);
@@ -996,15 +1061,15 @@ impl Game {
             if s.kind == UnitKind::ColonyShip {
                 let capacity = self.colony_ship_capacity(seat);
                 if body == BodyId::Earth && s.colonists < capacity {
-                    // Load from the most populous directed state.
+                    // Load from the directed state with the most Emigrants waiting (ticket #73).
                     // Ticket #46: only a state with a working Launch Site lifts them.
                     let from = self
                         .directed_states(seat)
                         .into_iter()
-                        .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()))
-                        .max_by(|a, b| self.state(*a).population.partial_cmp(&self.state(*b).population).unwrap());
+                        .filter(|s| self.state(*s).emigrants > 0 && self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()))
+                        .max_by_key(|s| self.state(*s).emigrants);
                     if let Some(st) = from {
-                        let n = capacity - s.colonists;
+                        let n = (capacity - s.colonists).min(self.state(st).emigrants);
                         let opp = if presence_needed <= n { m.opportunity } else { 1.0 };
                         push(vec![Order::Load { ship: s.id, colonists: n, from: LoadSource::State(st), army: None }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("load {} Colonists onto {}", n, ship_name), None);
                     }
@@ -1283,8 +1348,12 @@ impl Game {
                     continue;
                 }
                 let (left, _) = self.remaining(seat, &chosen);
+                // Ticket #68: an Archivist on four Materials a turn never has a 50-Materials Module
+                // or a 35-Materials Shipyard within four turns of income, so for the steps of the
+                // Archive's own path the horizon is twelve turns.
+                let horizon = if first_kind == VictoryFirstKind::ArchiveResearch && advances_first(c.cat, None) { 12 } else { 4 };
                 if materials_cost > left.materials
-                    && materials_cost <= left.materials + 4 * materials_income
+                    && materials_cost <= left.materials + horizon * materials_income
                     && c.orders.iter().all(|o| self.check_order_legality(seat, &chosen, o).is_ok())
                 {
                     reserve = Some(c.note.clone());
@@ -1327,6 +1396,39 @@ impl Game {
                 lines.push(format!("  take  {:6.1}  {}", c.score(), c.note));
                 chosen = trial;
                 stacks_done.push(key);
+            }
+        }
+        // Ticket #72 (version 0.05.5): the Venture Capital Fund's share, played as the designer put
+        // it: "an AI/player may set it at 50% for five turns then down to 0% if they're trying to
+        // save; end game might try to max at 80% to reach the victory condition before others."
+        // So: 0% until the pace's first waypoint (it builds first), then the smallest step that
+        // reaches the bar by the pace's last turn at the current output, and the most it may when
+        // nothing less will. (A first cut zeroed the share whenever Materials were being held for
+        // a build, which is nearly every turn, so nothing was ever banked.)
+        if first_kind == VictoryFirstKind::VentureFund {
+            let v = self.tables.venture.clone();
+            let bar = self.tables.faction(kind).victory_first.bar;
+            let pace = self.tables.ai_pace(kind);
+            let first_waypoint = pace.first.first().map(|p| p[0]).unwrap_or(0) as u32;
+            let last = pace.first.last().map(|p| p[0]).unwrap_or(self.tables.victory.turns as i64) as u32;
+            let turns_to = last.saturating_sub(self.turn).max(1) as f64;
+            let s0 = self.seat(seat);
+            let gross = (s0.income_last_turn.materials + s0.venture_banked_last_turn).max(0) as f64;
+            let need = (bar - s0.venture_fund as f64).max(0.0);
+            let share = if self.turn < first_waypoint || need <= 0.0 {
+                0.0
+            } else {
+                let mut sh = 0.0;
+                while sh < v.max_share - 1e-9 && sh * gross * turns_to < need {
+                    sh += v.share_step;
+                }
+                sh.min(v.max_share)
+            };
+            let pct = (share * 100.0).round() as u32;
+            let now = (s0.venture_share * 100.0).round() as u32;
+            if pct != now {
+                lines.push(format!("  take          set the Venture Capital Fund to {pct}% (was {now}%; {need:.0} still wanted over {turns_to:.0} turns at {gross:.0} a turn)"));
+                chosen.push(Order::SetVentureShare { share: pct });
             }
         }
         self.log(format!("AI {} scored {} actions (gap x{:.2} on {:?}):", self.seat_name(seat), cands.len(), gap, behind));

@@ -137,8 +137,6 @@ pub struct Module {
     /// Knocked offline by a card until the next Resolution (Reactor Leak).
     #[allow(dead_code)]
     pub offline_until_resolution: bool,
-    /// Ticket #51: how many stages of the Archive stand here. 0 for every other Module.
-    pub stage: u32,
     /// Ticket #54: mothballed, exactly as a Facility is.
     pub mothballed: bool,
     pub change: Option<PendingChange>,
@@ -146,7 +144,7 @@ pub struct Module {
 
 impl Module {
     pub fn new(kind: ModuleKind) -> Module {
-        Module { kind, online: true, offline_until_resolution: false, stage: 0, mothballed: false, change: None }
+        Module { kind, online: true, offline_until_resolution: false, mothballed: false, change: None }
     }
     /// Ticket #54: standing, running and not mothballed.
     pub fn working(&self) -> bool {
@@ -200,6 +198,13 @@ pub struct NationState {
     pub thresholds_fired: Vec<bool>,
     /// Extra Emissions charged next Climate phase by a Wildfire.
     pub wildfire_emissions_next: f64,
+    /// Ticket #76 (version 0.05.5): a Drought landed here: its Facilities make half at the next Income.
+    #[serde(default)]
+    pub drought: bool,
+    /// Ticket #73 (version 0.05.5): Emigrants waiting here, mustered and not yet lifted or sent.
+    /// They are people of this state until they leave it: a new holder gets them.
+    #[serde(default)]
+    pub emigrants: u32,
     /// Ticket #52: Unrest, 0 to 10 (9 while the state is neutral). Ticket #53: it moves in halves.
     pub unrest: f64,
     /// Ticket #53: the state changed hands this turn, which is the one turn its Unrest does not
@@ -428,6 +433,10 @@ pub struct Research {
     /// Ticket #50: the turn each seat last picked a Tech, so a tie in contributions goes to the
     /// seat that has picked least recently. None means it has never picked, which counts as longest ago.
     pub last_picked_turn: [Option<u32>; SEAT_COUNT],
+    /// Ticket #69 (version 0.05.5): every point the Labs of neutral and Occupied states have paid
+    /// into the shared Tech over the game, for the simulation's report.
+    #[serde(default)]
+    pub neutral_total: i64,
 }
 
 impl Research {
@@ -480,6 +489,16 @@ pub enum EventTarget {
     Tech,
 }
 
+/// Ticket #73 (version 0.05.5): Emigrants on the sea to Antarctica, landing on `due_turn`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AntarcticSend {
+    pub seat: Seat,
+    pub from: StateId,
+    pub n: u32,
+    pub into: crate::orders::UnloadTarget,
+    pub due_turn: u32,
+}
+
 /// A temporary effect from a Discovery card.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Discovery {
@@ -494,7 +513,15 @@ pub struct SeatState {
     pub kind: FactionKind,
     pub ai: bool,
     pub stockpile: Stockpile,
-    pub extraction_total: i64,
+    /// Ticket #72 (version 0.05.5): Materials banked in the Venture Capital Fund (the Prospectors'
+    /// first Victory part), the share of Materials output banked each Income, and what last
+    /// Income banked. The running Extraction Total this replaces is retired.
+    #[serde(default)]
+    pub venture_fund: i64,
+    #[serde(default)]
+    pub venture_share: f64,
+    #[serde(default)]
+    pub venture_banked_last_turn: i64,
     pub stabilization_run: u32,
     pub influence: BTreeMap<Target, i64>,
     /// Targets that received Influence this turn (spent or gained by Occupation), so they do not decay.
@@ -596,6 +623,8 @@ pub struct Game {
     pub research: Research,
     pub deck: Deck,
     pub discoveries: Vec<Discovery>,
+    /// Ticket #73: Emigrants on the sea to Antarctica.
+    pub antarctic_sends: Vec<AntarcticSend>,
     /// Solar Maximum: every Power Plant and Generator makes more at the next Income.
     pub solar_maximum_next: bool,
     pub last_event: Option<DrawnEvent>,
@@ -637,7 +666,9 @@ impl Game {
             kind,
             ai,
             stockpile: start,
-            extraction_total: 0,
+            venture_fund: 0,
+            venture_share: 0.0,
+            venture_banked_last_turn: 0,
             stabilization_run: 0,
             influence: BTreeMap::new(),
             influenced_this_turn: Vec::new(),
@@ -674,6 +705,11 @@ impl Game {
                         .iter()
                         .copied()
                         .map(|k| {
+                            // Ticket #69 (version 0.05.5): a start Research Lab stands inland, so the
+                            // sea never takes the world's Research.
+                            if k == FacilityKind::ResearchLab {
+                                return Facility::new(k);
+                            }
                             if on_the_coast < coastal {
                                 on_the_coast += 1;
                                 Facility::in_coastal_slot(k)
@@ -688,6 +724,8 @@ impl Game {
                 drowned: Vec::new(),
                 thresholds_fired: vec![false; tables.climate.sea_level_thresholds.len()],
                 wildfire_emissions_next: 0.0,
+                drought: false,
+                emigrants: 0,
                 unrest: c.unrest,
                 changed_hands: false,
                 refugees_in: 0.0,
@@ -739,9 +777,11 @@ impl Game {
                 awaiting_pick: Some(Seat(0)),
                 last_lead: None,
                 last_picked_turn: [None; SEAT_COUNT],
+                neutral_total: 0,
             },
             deck,
             discoveries: Vec::new(),
+            antarctic_sends: Vec::new(),
             solar_maximum_next: false,
             last_event: None,
             report: Report::default(),
@@ -778,6 +818,12 @@ impl Game {
         for (sid, seat) in taken.iter().zip(Seat::ALL) {
             game.take_control(*sid, seat);
             game.add_start_facility(*sid, FacilityKind::LaunchSite);
+            // Ticket #75 (version 0.05.5): a claim on its home from turn 1. The seat's Standing on its
+            // start state begins at the state's threshold, so a challenger needs the threshold plus
+            // the margin at once and the holder's spending counts from a real footing; with nothing
+            // there, a richer rival took seat 0's start state on turn 7 in every seed.
+            let claim = game.influence_threshold(Place::State(*sid));
+            game.seats[seat.index()].influence.insert(Place::State(*sid), claim);
         }
         let places: Vec<String> = Seat::ALL
             .into_iter()
@@ -926,7 +972,7 @@ impl Game {
 
     // ---------------------------------------------------------------- Ticket #51: the Archive
 
-    /// The Colony holding this seat's Archive, at whatever stage.
+    /// The Colony holding this seat's Archive Module.
     pub fn archive_colony(&self, seat: Seat) -> Option<ColonyId> {
         self.colonies
             .iter()
@@ -934,35 +980,26 @@ impl Game {
             .map(|c| c.id)
     }
 
-    /// Stages of this seat's Archive already standing (0 with no Archive).
-    pub fn archive_stage(&self, seat: Seat) -> u32 {
-        self.archive_colony(seat)
-            .and_then(|c| self.colony(c))
-            .and_then(|c| c.modules.iter().find(|m| m.kind == ModuleKind::Archive))
-            .map(|m| m.stage)
-            .unwrap_or(0)
+    /// Ticket #68 (version 0.05.5): the Archive Module stands at a Colony of this seat's.
+    pub fn archive_built(&self, seat: Seat) -> bool {
+        self.archive_colony(seat).is_some()
     }
 
-    /// Stages already standing plus any stage in the Colony's queue: what the next order would raise.
-    pub fn archive_stages_committed(&self, seat: Seat) -> u32 {
-        let queued: u32 = self
-            .colonies
-            .iter()
-            .flat_map(|c| c.queue.iter())
-            .filter(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Archive))
-            .count() as u32;
-        self.archive_stage(seat) + queued
+    /// Ticket #68: the Archive Module is in a Colony's build queue for this seat.
+    pub fn archive_ordered(&self, seat: Seat) -> bool {
+        self.colonies.iter().flat_map(|c| c.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Archive))
     }
 
-    /// Research the Archive still wants: the stages neither standing nor ordered, times the price.
+    /// Ticket #68: what the Archive fund may hold. The whole requirement once the Module stands;
+    /// only `banked_before_built` of it (a quarter) until then.
     pub fn archive_fund_cap(&self, seat: Seat) -> i64 {
-        let left = self.tables.archive.stages.saturating_sub(self.archive_stages_committed(seat)) as i64;
-        left * self.tables.archive.research_per_stage
+        let a = &self.tables.archive;
+        if self.archive_built(seat) { a.research } else { (a.research as f64 * a.banked_before_built).floor() as i64 }
     }
 
-    /// Every stage is standing.
+    /// Ticket #68: the Archive Module stands and every point of its Research is paid.
     pub fn archive_complete(&self, seat: Seat) -> bool {
-        self.archive_stage(seat) >= self.tables.archive.stages
+        self.archive_built(seat) && self.seat(seat).archive_fund >= self.tables.archive.research
     }
 
     /// The Archive is complete, its Colony is not Occupied, and the Module is online: the state the
@@ -988,6 +1025,11 @@ impl Game {
 
     // ---------------------------------------------------------------- Ticket #51: Steerage and the rest
 
+    /// Ticket #73: how many Emigrants this seat may muster in a turn (Steerage doubles it).
+    pub fn emigrants_per_turn(&self, seat: Seat) -> u32 {
+        (self.tables.emigrants.per_turn as f64 * self.tables.faction(self.kind(seat)).emigrants_multiplier).floor() as u32
+    }
+
     /// What one Colony Ship of this seat carries: the card figure, +2 with Expanded Habitats
     /// (version 0.04 section 4), times the Faction's own multiplier (Steerage doubles it).
     pub fn colony_ship_capacity(&self, seat: Seat) -> u32 {
@@ -998,7 +1040,8 @@ impl Game {
 
     /// The population a lift from a Launch Site takes for this many Colonists (Steerage doubles it).
     pub fn lift_population(&self, seat: Seat, colonists: u32) -> f64 {
-        0.1 * colonists as f64 * self.tables.faction(self.kind(seat)).lift_population_multiplier
+        // Ticket #73: paid when the Emigrants muster, not when a Ship lifts them.
+        self.tables.emigrants.population_each * colonists as f64 * self.tables.faction(self.kind(seat)).lift_population_multiplier
     }
 
     /// What a Colony Module costs this seat in Materials, rounded down (ticket #51).
@@ -1008,6 +1051,13 @@ impl Game {
     }
 
     /// What a Space Station costs this seat in Materials, rounded down (ticket #51).
+    /// Ticket #72 (version 0.05.5): what a Facility costs this seat in Materials: the row's figure
+    /// times the Faction's multiplier (the Prospectors' 0.85), rounded down.
+    pub fn facility_materials(&self, seat: Seat, kind: FacilityKind) -> i64 {
+        let base = self.tables.facility(kind).materials as f64;
+        (base * self.tables.faction(self.kind(seat)).facility_materials_multiplier).floor() as i64
+    }
+
     pub fn station_materials(&self, seat: Seat) -> i64 {
         let base = self.tables.station_materials as f64;
         (base * self.tables.faction(self.kind(seat)).station_materials_multiplier).floor() as i64
@@ -1554,10 +1604,11 @@ impl Game {
     // ---------------------------------------------- Ticket #57: the calendar and the real sky
 
     /// The year and month of a turn. Turn 1 is the game's start month, January 2030 (`victory.toml`),
-    /// and a Turn is one calendar month after it.
+    /// and each Turn is `months_per_turn` calendar months after the last (two since ticket #67,
+    /// version 0.05.5), named by its first month alone: turn 2 is March 2030.
     pub fn date(&self, turn: u32) -> Date {
         let v = &self.tables.victory;
-        let months = v.start_month - 1 + (turn.max(1) - 1) as i64;
+        let months = v.start_month - 1 + (turn.max(1) - 1) as i64 * v.months_per_turn;
         Date { year: v.start_year + months.div_euclid(12), month: (months.rem_euclid(12) + 1) as u32 }
     }
 
@@ -1586,13 +1637,34 @@ impl Game {
 
     /// The window offset for a departure at a turn: the signed difference in degrees between the
     /// phase angle and the Hohmann departure angle. Zero is the launch window.
+    ///
+    /// Ticket #67 (version 0.05.5): a turn spans two months, over which the phase angle moves
+    /// nearly thirty degrees, so the offset is the nearest the angle comes to the window ANYWHERE
+    /// in the turn, from its first instant to the next turn's: zero when it crosses the window
+    /// inside the turn, else the nearer end. Read at the first instant alone, no turn would ever
+    /// stand at the window and every "window" crossing would pay a little over the card.
     pub fn window_offset(&self, turn: u32) -> f64 {
-        crate::ephemeris::wrap_180(self.phase_angle(turn) - self.tables.transit.hohmann_angle)
+        self.span_offset(turn, self.tables.transit.hohmann_angle)
     }
 
     /// The same for the flight home, which wants Earth ahead of Mars instead.
     pub fn return_window_offset(&self, turn: u32) -> f64 {
-        crate::ephemeris::wrap_180(self.phase_angle(turn) - self.tables.transit.return_hohmann_angle)
+        self.span_offset(turn, self.tables.transit.return_hohmann_angle)
+    }
+
+    /// The signed offset of the phase angle from `angle` over the span of a turn (see `window_offset`).
+    /// A change of sign between the turn's two ends is a crossing only when the ends are near each
+    /// other; a jump across the far side of the circle (+170 to -170) is not.
+    fn span_offset(&self, turn: u32, angle: f64) -> f64 {
+        let start = crate::ephemeris::wrap_180(self.phase_angle(turn) - angle);
+        let end = crate::ephemeris::wrap_180(self.phase_angle(turn + 1) - angle);
+        if start.signum() != end.signum() && (start - end).abs() < 90.0 {
+            0.0
+        } else if start.abs() <= end.abs() {
+            start
+        } else {
+            end
+        }
     }
 
     /// Which two systems a transit crosses, if it crosses at all, and the offset it pays. `None` for
