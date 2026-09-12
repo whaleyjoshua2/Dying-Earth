@@ -3122,7 +3122,8 @@ fn e_a_scrubber_enlarges_the_sink_and_is_capped_destroyed_and_calming() {
     calm(&mut g);
     let sid = StateId::EastAsia;
     let card = g.tables.facility(FacilityKind::Scrubber);
-    assert_eq!((card.materials, card.build_turns, card.energy_upkeep, card.emissions), (30, 2, 4, 0.0));
+    // Version 0.07.0: the Scrubber runs on 3 Energy, down from 4.
+    assert_eq!((card.materials, card.build_turns, card.energy_upkeep, card.emissions), (30, 2, 3, 0.0));
     assert!(card.no_slot, "a Scrubber takes no build slot");
     // The cap: half the population in hundreds of millions, between 2 and 10.
     assert_eq!(g.scrubber_cap(StateId::Russia), 2, "Russia at 1.5 takes the floor");
