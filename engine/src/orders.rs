@@ -85,6 +85,10 @@ pub enum Order {
     /// nothing toward the Research Lead. Set once, it holds until it is set again, and it is read
     /// at the next Income; it never moves Research that Income has already paid out.
     SetArchiveFunding { on: bool },
+    /// Version 0.07.1 (ticket #114): the Defence split repeats every turn until it is switched off.
+    /// Free, and it spends nothing by itself: what it sets is whether the interface places next
+    /// turn's split for the player to look at.
+    SetDefenceStanding { on: bool },
     /// Version 0.05.5 (ticket #73): muster Emigrants, the built Colonists, in a Nation State the
     /// seat directs: up to four a turn per Faction, in one state, at a tenth of a person each.
     BuildEmigrants { state: StateId, n: u32 },
@@ -382,6 +386,15 @@ impl Game {
             Order::BuildModuleWithDucats { colony, kind } => {
                 let materials_form = Order::BuildModule { colony: *colony, kind: *kind };
                 self.check_order_inner(seat, pending, &materials_form, false).map(|_| cost)
+            }
+            Order::SetDefenceStanding { on } => {
+                if pending.iter().any(|o| matches!(o, Order::SetDefenceStanding { .. })) {
+                    return fail("Defence is already set this turn");
+                }
+                if *on == self.seat(seat).defence_standing {
+                    return fail(if *on { "Defence already repeats every turn" } else { "Defence does not repeat" });
+                }
+                Ok(cost)
             }
             Order::SetArchiveFunding { on } => {
                 if self.kind(seat) != FactionKind::Archivists {
@@ -1240,6 +1253,15 @@ impl Game {
                     let text = self.say("archive_begun", &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(*colony)))]);
                     self.report_line(LineKind::Archive, Some(ReportPlace::Colony(*colony)), text);
                 }
+                Order::SetDefenceStanding { on } => {
+                    self.seat_mut(seat).defence_standing = *on;
+                    let line = if *on {
+                        format!("The {} will split their Influence across the places they hold every turn.", self.seat_name(seat))
+                    } else {
+                        format!("The {} will place their Influence by hand again.", self.seat_name(seat))
+                    };
+                    self.log(line);
+                }
                 Order::SetArchiveFunding { on } => {
                     self.seat_mut(seat).archive_funding = *on;
                     let line = if *on {
@@ -1479,6 +1501,7 @@ impl Game {
             }
             Order::BuildArchive { colony } => r("build_archive", &[("colony", place(Place::Colony(*colony)))]),
             Order::SetArchiveFunding { on } => r(if *on { "fund_archive" } else { "unfund_archive" }, &[]),
+            Order::SetDefenceStanding { on } => r(if *on { "defence_on" } else { "defence_off" }, &[]),
             Order::Repair { unit, .. } | Order::RepairWithDucats { unit, .. } => r("repair", &[("unit", unit_of(*unit))]),
             Order::Transit { ship, to, .. } => {
                 let unit = self.ship(*ship).map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into());

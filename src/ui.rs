@@ -1082,13 +1082,12 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 view.selection = Selection::None;
             }
             if session.screen == Screen::Playing {
-                let must_pick = !session.spectator && game.research.awaiting_pick == Some(Seat(0)) && !game.available_techs().is_empty();
-                let button = egui::Button::new(RichText::new("End Turn").strong().size(16.0)).fill(Color32::from_rgb(120, 40, 30));
-                if ui.add_enabled(!must_pick && view.popup == Popup::None, button).on_disabled_hover_text("Pick a Tech first").clicked() {
-                    let (_, influence_left) = game.remaining(Seat(0), &session.pending);
-                    if !session.spectator && influence_left > 0 && game.seat(Seat(0)).allotment > 0 {
-                        view.popup = Popup::ConfirmEndTurn;
-                    } else {
+                // Ticket #114 (version 0.07.1): End Turn moved into the command cluster at the foot
+                // of the side panel, where the rest of the every-turn controls now are. A spectator
+                // has no cluster -- they give no orders -- so theirs stays here beside the Auto box.
+                if session.spectator {
+                    let button = egui::Button::new(RichText::new("End Turn").strong().size(16.0)).fill(Color32::from_rgb(120, 40, 30));
+                    if ui.add_enabled(view.popup == Popup::None, button).clicked() {
                         actions.push(Action::EndTurn);
                     }
                 }
@@ -1497,6 +1496,132 @@ fn apply_hit(hit: Hit, view: &mut ViewState) {
     }
 }
 
+// ------------------------------------------------------------------ the command cluster
+
+/// Ticket #114 (version 0.07.1): **the command cluster**, a strip along the foot of the side panel
+/// that never scrolls away. The designer asked for a corner like the one CK3 and other 4X games put
+/// their standing controls in: *"add influence spend button to bottom right ... with a second button
+/// called something like defense to automatically split your budget across all held facilities."*
+///
+/// Two departures from that line, both the designer's own:
+///
+/// **There is no dropdown of countries.** *"Let's axe the dropdown it will be to unwieldy."* Twelve
+/// Nation States plus every Colony and station is a long list to open for one number, and the game
+/// already has a way of naming a place: click it. So Spend acts on **whatever is selected**, and
+/// with nothing selected it says so instead of offering a menu.
+///
+/// **"Facilities" meant places.** Influence is never spent on a Facility -- that word is a building
+/// inside a Nation State -- and the designer confirmed the split covers **every place held**: Nation
+/// States, Colonies and stations alike.
+///
+/// End Turn moved here from the row of buttons under the top bar. It is the one control pressed
+/// every single turn, and the cluster is where a hand already is.
+fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    if session.spectator || session.screen != Screen::Playing {
+        return;
+    }
+    let (_, influence_left) = game.remaining(Seat(0), &session.pending);
+    let s = game.seat(Seat(0));
+    ui.add_space(4.0);
+    // The Allotment, at the size the designer asked for: "much higher and more prominent".
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 5.0;
+        if let Some(image) = Icons::from_ctx(ui.ctx(), "influence", 20.0) {
+            ui.add(image);
+        }
+        ui.label(RichText::new(format!("{influence_left}")).size(22.0).strong())
+            .on_hover_text("Influence still unspent this turn. It is lost at End Turn: the Allotment does not carry over.");
+        ui.label(RichText::new(format!("of {} left", s.allotment)).size(15.0));
+    });
+
+    // Spend, on whatever is selected.
+    let target = match view.selection {
+        Selection::State(sid) => Some((Place::State(sid), game.tables.state(sid).name.clone())),
+        Selection::Colony(cid) => Some((Place::Colony(cid), game.place_name(Place::Colony(cid)))),
+        _ => None,
+    };
+    ui.horizontal(|ui| {
+        match &target {
+            Some((place, name)) => {
+                let most = influence_left.max(0);
+                ui.add(egui::DragValue::new(&mut view.influence_amount).range(0..=most.max(1)));
+                let order = Order::Influence { target: *place, amount: view.influence_amount };
+                let check = game.check_order(Seat(0), &session.pending, &order);
+                let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Spend on {name}")));
+                if let Err(e) = &check {
+                    resp.clone().on_disabled_hover_text(&e.0);
+                }
+                if resp.on_hover_text(format!("Raise your Standing on {name}. Its card shows what it would take to hold or take it.")).clicked() {
+                    actions.push(Action::Place(order));
+                }
+            }
+            None => {
+                ui.label(RichText::new("Click a Nation State or a Colony to spend on it").weak());
+            }
+        }
+    });
+
+    // Defence, and whether it repeats.
+    let needs = game.defence_needs(Seat(0));
+    let split = game.defence_split(Seat(0), influence_left);
+    let total: i64 = split.iter().map(|(_, n)| *n).sum();
+    let hover = if needs.is_empty() {
+        "Nothing you hold is within reach of a rival this turn, so there is nothing for Defence to do.".to_string()
+    } else if split.is_empty() {
+        format!("{} of your places are within reach, and none can be made safe with the Influence left. Defence never part-funds a place: taking one is a threshold, not a race, so a place funded most of the way is as lost as one funded not at all.", needs.len())
+    } else {
+        let named: Vec<String> = split.iter().map(|(p, n)| format!("{} {}", n, game.place_name(*p))).collect();
+        format!(
+            "Spend {} of your {} on the places a rival could take, most threatened first, each funded to safe or not at all: {}.{}",
+            total,
+            influence_left,
+            named.join(", "),
+            if split.len() < needs.len() { format!(" {} more are within reach and out of budget.", needs.len() - split.len()) } else { String::new() }
+        )
+    };
+    ui.horizontal(|ui| {
+        let label = if needs.is_empty() { "Defence".to_string() } else { format!("Defence ({} of {})", split.len(), needs.len()) };
+        let button = egui::Button::new(RichText::new(label).strong());
+        if ui.add_enabled(!split.is_empty(), button).on_hover_text(&hover).on_disabled_hover_text(&hover).clicked() {
+            for (place, amount) in &split {
+                actions.push(Action::Place(Order::Influence { target: *place, amount: *amount }));
+            }
+        }
+        // The standing order, on the shape the Archive's funding already uses: a pending order that
+        // sets a seat flag, so it survives a save and shows in the turn's order list like anything
+        // else. It never spends by itself -- next turn it places the split as pending orders, which
+        // the player can read and cancel.
+        let pending_flip = session.pending.iter().find_map(|o| match o {
+            Order::SetDefenceStanding { on } => Some(*on),
+            _ => None,
+        });
+        let mut on = pending_flip.unwrap_or(s.defence_standing);
+        if ui
+            .checkbox(&mut on, "every turn")
+            .on_hover_text("Place the Defence split at the start of every turn from now on. It is placed as ordinary orders you can read and cancel before ending the turn, never spent behind your back.")
+            .changed()
+        {
+            if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetDefenceStanding { .. })) {
+                actions.push(Action::Cancel(i));
+            } else {
+                actions.push(Action::Place(Order::SetDefenceStanding { on }));
+            }
+        }
+    });
+
+    // End Turn, where a hand already is.
+    let must_pick = game.research.awaiting_pick == Some(Seat(0)) && !game.available_techs().is_empty();
+    let button = egui::Button::new(RichText::new("End Turn").strong().size(16.0)).fill(Color32::from_rgb(120, 40, 30));
+    if ui.add_enabled(!must_pick && view.popup == Popup::None, button).on_disabled_hover_text("Pick a Tech first").clicked() {
+        if influence_left > 0 && s.allotment > 0 {
+            view.popup = Popup::ConfirmEndTurn;
+        } else {
+            actions.push(Action::EndTurn);
+        }
+    }
+    ui.add_space(4.0);
+}
+
 // ------------------------------------------------------------------ the side panel
 
 fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
@@ -1513,6 +1638,23 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         return;
     }
     egui::Panel::right("side").default_size(360.0).resizable(true).show(root, |ui| {
+        // Ticket #114: the standing order, applied here, once a turn, before anything is drawn. It
+        // places ordinary pending orders rather than spending anything, so the split arrives in the
+        // turn's order list where it can be read and cancelled like any other order. It is applied
+        // only on a turn the player has not already placed Influence, so it never fights a hand.
+        if !session.spectator && game.seat(Seat(0)).defence_standing && view.defence_placed != Some(game.turn) {
+            view.defence_placed = Some(game.turn);
+            if !session.pending.iter().any(|o| matches!(o, Order::Influence { .. })) {
+                let (_, influence_left) = game.remaining(Seat(0), &session.pending);
+                for (place, amount) in game.defence_split(Seat(0), influence_left) {
+                    actions.push(Action::Place(Order::Influence { target: place, amount }));
+                }
+            }
+        }
+        // Ticket #114: the cluster is shown BEFORE the scrolling column, so it reserves its strip
+        // at the foot of the panel and the card or the roster scrolls above it rather than pushing
+        // it off the bottom. That is the whole point of a command cluster: it is always there.
+        egui::Panel::bottom("command_cluster").show(ui, |ui| command_cluster(ui, session, game, view, actions));
         egui::ScrollArea::vertical().show(ui, |ui| {
             selection_card(ui, session, game, view, actions);
             if view.selection == Selection::None {
@@ -1831,6 +1973,8 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildModuleWithDucats { colony, kind } => format!("Build {} at {} for Ducats", kind.name(), game.place_name(Place::Colony(*colony))),
         Order::BuildStation { body, slot } => format!("Build {} over {}", game.station_name(*body, *slot), game.tables.body(*body).name),
         Order::BuildArchive { colony } => format!("Build the Archive at {}", game.place_name(Place::Colony(*colony))),
+        Order::SetDefenceStanding { on: true } => "Split your Influence across the places you hold, every turn".to_string(),
+        Order::SetDefenceStanding { on: false } => "Place your Influence by hand again".to_string(),
         Order::SetArchiveFunding { on: true } => "Pay your Labs into the Archive fund from the next Income".to_string(),
         Order::SetArchiveFunding { on: false } => "Pay your Labs into the shared Tech from the next Income".to_string(),
         // Ticket #73.
@@ -2273,6 +2417,16 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 );
             }
         }
+        // Ticket #114 (version 0.07.1): Influence is the card's FIRST business, not its last. The
+        // designer: "Influence spend should be much higher and more prominent in the side bar when
+        // countries are selected as well." It used to sit under the Facility list, the Army orders
+        // and two paragraphs of help -- below the fold on every card with more than a few buildings,
+        // which is every card by the middle of a game. It is the reason a player clicked the
+        // country; it goes where their eye lands.
+        ui.separator();
+        icon_word(ui, "influence", "Influence");
+        influence_row(ui, game, session, view, Place::State(sid), actions);
+        ui.separator();
         // Ticket #73: Emigrants waiting here for a lift or the sea.
         if st.emigrants > 0 {
             ui.label(format!("Emigrants waiting: {}", st.emigrants)).on_hover_text("Mustered here and not yet lifted or sent: a working Launch Site lifts them onto a Ship, or, once the ice is open, the sea takes them to Antarctica.");
@@ -2476,10 +2630,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 }
             }
         }
-    } else {
-        icon_word(ui, "influence", "Influence");
     }
-    influence_row(ui, game, session, view, Place::State(sid), actions);
 }
 
 fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, cid: ColonyId, actions: &mut Vec<Action>) {

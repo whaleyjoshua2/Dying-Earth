@@ -356,6 +356,22 @@ fn build_board(session: &mut Session) {
         // `unrest:<n>` (a building aid, ticket #52): a spread of Unrest over three states on the
         // face the Earth picture shows, so one card, the map labels and the thresholds are all
         // visible at once. The AI seldom leaves a state of the player's this restive.
+        // `threat:1` (a building aid, not part of the spec): a rival is stood within reach of every
+        // Nation State seat 0 holds, so the Defence button in the command cluster has work to do and
+        // can be photographed doing it. In an ordinary headless run all four seats are the computer
+        // and the computer now defends its own holdings, so nothing is ever under threat to look at.
+        if std::env::args().any(|a| a == "threat:1") {
+            let margin = g.tables.influence.challenge_margin;
+            let held: Vec<StateId> = g.directed_states(Seat(0));
+            for (i, sid) in held.iter().enumerate() {
+                let place = Place::State(*sid);
+                let mine = g.seat(Seat(0)).influence.get(&place).copied().unwrap_or(0);
+                let threshold = g.influence_threshold_for(Seat(1), place);
+                // Each one a little further gone than the last, so the split has an order to find.
+                let theirs = threshold.max(mine + margin + 5 + 4 * i as i64);
+                g.seat_mut(Seat(1)).influence.insert(place, theirs);
+            }
+        }
         if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("unrest:").and_then(|v| v.parse::<f64>().ok())) {
             for (sid, off) in [(StateId::EastAsia, 0.0), (StateId::Europe, 1.0), (StateId::NorthAfrica, 3.0)] {
                 let v = (n - off).clamp(0.0, 10.0);

@@ -284,6 +284,9 @@ pub struct ViewState {
     /// that still want an order. Off by default, so the roster is an index of what you own and
     /// becomes a to-do list only when you ask it to, one group at a time.
     pub roster_filter: [bool; 4],
+    /// Ticket #114 (version 0.07.1): the last turn the standing Defence split was placed, so it is
+    /// placed once a turn and not once a frame.
+    pub defence_placed: Option<u32>,
 }
 
 impl Default for ViewState {
@@ -315,6 +318,7 @@ impl Default for ViewState {
             moments_on: None,
             force_hover: None,
             roster_filter: [false; 4],
+            defence_placed: None,
         }
     }
 }

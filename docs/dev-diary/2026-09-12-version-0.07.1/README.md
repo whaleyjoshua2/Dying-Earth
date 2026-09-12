@@ -417,3 +417,98 @@ sorting, the shorter rows, the marks, the counts — are what to read from them,
 Armies.
 
 `roster:filter` is a new building aid, since a click cannot be reached in a headless picture.
+
+## The command cluster
+
+![A Nation State card, with Influence moved to the top and the cluster at the foot](the-command-cluster.png)
+
+The largest change in the version, and the one with the least precedent in the game. Two departures
+from the designer's original line, both the designer's own.
+
+**No dropdown.** *"Let's axe the dropdown it will be to unwieldy."* Twelve Nation States plus every
+Colony and station is a long list to open for one number, and the game already has a way of naming a
+place: click it. **Spend acts on whatever is selected**, and with nothing selected it says so instead
+of offering a menu.
+
+**"Facilities" meant places.** A **Facility** is a defined word here — a building inside a Nation
+State — and Influence is never spent on one. It is spent on a **place**. Confirmed with the
+designer: Defence covers **every place held**, Nation States, Colonies and stations alike, since all
+three are taken and decay the same way.
+
+### What Defence splits by
+
+A rival takes a place you hold when their Standing reaches **both** their own threshold **and** your
+Standing plus the challenge margin. So a place is safe while `yours + margin > theirs`, and the
+shortfall is what Defence covers, plus the **decay** a held place takes at every Resolution so the
+spend still holds after it. A rival below their own threshold cannot take the place at any Standing,
+so a place nobody can reach needs nothing at all.
+
+What it does **not** do is guess what a rival will spend this turn: it assumes their Standing stays
+put, which makes the figure a floor rather than a promise, and is the honest assumption, since a
+rival's Allotment is not something you can see.
+
+The budget is then spent **most threatened first, and whole**. Taking a place is a *threshold, not a
+race*, so a place funded most of the way is exactly as lost as one funded not at all — which is why
+no part of the budget reaches the second place until the first is safe. Where the budget cannot cover
+the next place in full it walks **past** it to ones it can still save: same money, more places held.
+
+![Defence with work to do, and with none](the-defence-button.png)
+
+The button labels itself `Defence (2 of 5)` — five places within reach, two of them saveable with the
+Influence left — and its hover names each one and what it would cost. With nothing in reach it goes
+quiet rather than pretending.
+
+### Three tests, each witnessed red
+
+`defence_needs_covers_the_shortfall_and_the_decay_and_nothing_else` fails with `left: 41, right: 42`
+when the decay is left out of the sum. `the_defence_split_funds_places_to_safe_and_never_part_way`
+fails with `left: [(EastAsia, 61)], right: [(SouthAsia, 22)]` when the split is allowed to part-fund
+a place it cannot save. Both restore green.
+
+### The computer defends by the same rule, and a test had to be rewritten
+
+The AI had its own arithmetic for holding a place, and it was close but not the same: it ignored the
+threshold arm, so it spent on places **nobody could take**, and it ignored decay, so it stopped a
+point short. A rule belongs in the engine and not in one caller, so the AI now calls `defence_needs`
+too; what stays its own is the weighting that decides how much of the offered spend it can afford.
+
+That broke a test from ticket #75, and the break is worth reading. It asserted that a holder at 30
+answers a rival at 25 by spending 25 — written when the challenge margin was **10**, which ticket #75
+itself then raised to **20**. At a margin of 20 that rival needs 50 to take anything, so the old
+behaviour was not caution, it was Influence set on fire, out of the same Allotment the seat takes new
+places with. The test is rewritten to guard what it *meant* to guard — that a holder does not sit
+still while a rival walks in — at the Standing where that is actually true.
+
+**Measured, twenty seeds in each of four seatings, before and after the AI change:**
+
+| seat 0 | before | after |
+|---|---|---|
+| Custodians | Custodians 13, Prospectors 2, **Collapse 5** | Custodians 10, Prospectors 7, Archivists 1, **Collapse 2** |
+| Prospectors | Custodians 20 | Custodians 20 |
+| Arkwrights | Custodians 19, Arkwrights 1 | Custodians 17, Arkwrights 3 |
+| Archivists | Custodians 19, Archivists 1 | Custodians 20 |
+
+Custodian wins **71 of 80 → 67 of 80** and Collapses **5 → 2**. The board did not go static, which was
+the risk worth measuring: a computer that never loses a place would show up as fewer control changes,
+and instead the wins spread slightly. The Archivists going 1 → 0 is the problem version 0.07.0 named
+and this version deliberately does not address.
+
+### The rest of it
+
+**Influence is the card's first business now**, not its last: *"Influence spend should be much higher
+and more prominent in the side bar when countries are selected as well."* It used to sit under the
+Facility list, the Army orders and two paragraphs of help — below the fold on every card with more
+than a few buildings, which is every card by the middle of a game.
+
+**End Turn moved into the cluster** and left the top-bar row, so there is one of it and it is where a
+hand already is. A spectator keeps theirs beside the Auto box, having no cluster and no orders.
+
+**"Every turn" is a standing order, not an automatic spend.** It is a pending order that sets a seat
+flag, so it survives a save the way the Venture share and the Archive's funding do; each turn the
+interface then places that turn's split as **ordinary orders you can read and cancel** before ending
+the turn. Nothing is ever spent behind your back, and it stands aside on any turn you have already
+placed Influence by hand.
+
+`threat:1` is a new building aid that stands a rival within reach of every state seat 0 holds — in an
+ordinary headless run all four seats are the computer, and the computer now defends its own holdings,
+so nothing is ever under threat to photograph.
