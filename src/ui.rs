@@ -1769,8 +1769,42 @@ fn change_row(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, mothb
     });
 }
 
+/// Ticket #106 (version 0.07.0): hover text with the resource words replaced by their glyphs. The
+/// designer's rule is that the icons are used EXCLUSIVELY on mouse-overs -- the words stay
+/// everywhere a player reads at a glance, and the tooltips, which are the wordiest thing in the
+/// interface, trade them for pictures. Where an icon is missing the word comes straight back.
+fn hover_with_icons(ui: &mut Ui, text: &str) {
+    const WORDS: [(&str, &str); 5] =
+        [("Materials", "materials"), ("Fuel", "fuel"), ("Energy", "energy"), ("Research", "research"), ("Ducats", "ducats")];
+    ui.set_max_width(360.0);
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 3.0;
+        for token in text.split(' ') {
+            // Keep whatever punctuation rides on the word, so "30 Materials," still reads.
+            let bare = token.trim_end_matches([',', '.', ';', ':']);
+            let tail = &token[bare.len()..];
+            match WORDS.iter().find(|(w, _)| *w == bare).and_then(|(_, key)| Icons::from_ctx(ui.ctx(), key, 14.0, Color32::from_rgb(225, 220, 210))) {
+                Some(image) => {
+                    ui.add(image);
+                    if !tail.is_empty() {
+                        ui.label(tail);
+                    }
+                }
+                None => {
+                    ui.label(token);
+                }
+            }
+        }
+    });
+}
+
 fn cost_button(ui: &mut Ui, game: &Game, pending: &[Order], order: Order, label: &str, actions: &mut Vec<Action>) {
     cost_button_with_hover(ui, game, pending, order, label, None, actions);
+}
+
+/// Ticket #106: the cost of an order, spelled for a tooltip, so the hover can draw it with glyphs.
+fn cost_hover(game: &Game, order: &Order) -> String {
+    format!("Costs {}.", game.order_cost(Seat(0), order).text())
 }
 
 /// A build button: cost in the label, and on hover what the building would make each turn (#22).
@@ -1780,8 +1814,19 @@ fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Or
     let text = format!("{} ({})", label, cost.text());
     let button = egui::Button::new(text);
     let mut resp = ui.add_enabled(check.is_ok(), button);
+    // Ticket #106 (version 0.07.0): the cost reads in glyphs on the hover, words on the button.
+    let priced = cost_hover(game, &order);
     if let Some(h) = &hover {
-        resp = resp.on_hover_text(format!("Once it stands: {h}")).on_disabled_hover_text(format!("Once it stands: {h}"));
+        let whole = format!("{priced} Once it stands: {h}");
+        let (a, b) = (whole.clone(), whole);
+        resp = resp
+            .on_hover_ui(move |ui| hover_with_icons(ui, &a))
+            .on_disabled_hover_ui(move |ui| hover_with_icons(ui, &b));
+    } else {
+        let (a, b) = (priced.clone(), priced);
+        resp = resp
+            .on_hover_ui(move |ui| hover_with_icons(ui, &a))
+            .on_disabled_hover_ui(move |ui| hover_with_icons(ui, &b));
     }
     if let Err(e) = &check {
         resp.clone().on_disabled_hover_text(&e.0);

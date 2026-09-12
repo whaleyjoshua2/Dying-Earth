@@ -4485,8 +4485,9 @@ fn a_rivals_paragraph_names_its_visible_orders_and_none_of_its_scores() {
         Order::Repair { unit: UnitRef::Ship(ship), points: 1 },
         Order::RepairWithDucats { unit: UnitRef::Ship(ship), points: 1 },
         Order::Transit { ship, to: BodyId::Moon, slot: None },
-        Order::ShipStance { body: BodyId::Earth, stance: Stance::Hold },
-        Order::ArmyStance { place: Place::State(StateId::EastAsia), stance: Stance::Hold },
+        // Ticket #106 (version 0.07.0): a stance that is NOT the default still earns a sentence.
+        Order::ShipStance { body: BodyId::Earth, stance: Stance::Attack },
+        Order::ArmyStance { place: Place::State(StateId::EastAsia), stance: Stance::Attack },
         Order::MoveArmy { army: ArmyId(0), to: StateId::Europe },
         Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::EastAsia), army: None },
         Order::Load { ship, colonists: 0, from: LoadSource::State(StateId::EastAsia), army: Some(ArmyId(0)) },
@@ -4511,6 +4512,12 @@ fn a_rivals_paragraph_names_its_visible_orders_and_none_of_its_scores() {
         let text = deed.unwrap();
         assert!(!text.starts_with('['), "{o:?} fell through to a missing template: {text}");
     }
+    // Ticket #106 (version 0.07.0): a rival's paragraph does not report defaults. Hold is what a
+    // stack does when nobody tells it otherwise, so it earns no sentence at all -- five of the nine
+    // clauses in one sampled paragraph were "set its Armies at X to Hold", and cutting them took
+    // 38% off the rival paragraphs of a whole game and 13% off the Report entire.
+    assert!(g.rival_deed(seat, &Order::ShipStance { body: BodyId::Earth, stance: Stance::Hold }).is_none());
+    assert!(g.rival_deed(seat, &Order::ArmyStance { place: Place::State(StateId::EastAsia), stance: Stance::Hold }).is_none());
 
     // And a real AI turn's paragraph says what it did, with none of the scored list in it.
     let mut g = game();

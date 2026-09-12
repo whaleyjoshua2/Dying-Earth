@@ -67,6 +67,19 @@ impl Icons {
                 self.loaded.insert(name, handle);
             }
         }
+        // Ticket #106 (version 0.07.0): the icons are also put where any tooltip can reach them.
+        // A hover is drawn deep inside a panel, and threading the set through thirty-seven call
+        // sites to draw a glyph would be a worse cure than the disease.
+        let loaded = self.loaded.clone();
+        ctx.data_mut(|d| d.insert_temp(egui::Id::new("icons"), loaded));
+    }
+
+    /// Ticket #106: one icon, fetched from egui's own store rather than passed down. `None` where
+    /// the art did not load, so every caller falls back to its words.
+    pub fn from_ctx(ctx: &egui::Context, name: &str, size: f32, tint: egui::Color32) -> Option<egui::Image<'static>> {
+        let map: BTreeMap<String, egui::TextureHandle> = ctx.data(|d| d.get_temp(egui::Id::new("icons")))?;
+        let handle = map.get(name)?;
+        Some(egui::Image::new(egui::load::SizedTexture::from_handle(handle)).fit_to_exact_size(egui::vec2(size, size)).tint(tint))
     }
 
     pub fn get(&self, name: &str) -> Option<&egui::TextureHandle> {

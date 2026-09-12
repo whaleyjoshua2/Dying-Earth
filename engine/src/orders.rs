@@ -1484,6 +1484,11 @@ impl Game {
                 let unit = self.ship(*ship).map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into());
                 r("transit", &[("unit", unit), ("body", self.tables.body(*to).name.clone())])
             }
+            // Ticket #106 (version 0.07.0): a rival's paragraph does not report defaults. Hold is
+            // what a stack does when nobody tells it otherwise, so "set its Armies at X to Hold" is
+            // the computer announcing that it did nothing. Five of the nine clauses in one sampled
+            // paragraph were exactly that.
+            Order::ShipStance { stance: Stance::Hold, .. } | Order::ArmyStance { stance: Stance::Hold, .. } => None,
             Order::ShipStance { body, stance } => {
                 r("ship_stance", &[("body", self.tables.body(*body).name.clone()), ("stance", stance.name().to_string())])
             }
