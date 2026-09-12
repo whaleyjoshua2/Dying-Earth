@@ -370,3 +370,50 @@ identically**. The crowding is the three-line name blocks above the yields, and 
 ticket. That run is also the witness for the fallback itself — a map label has no tooltip behind it,
 so it must never be able to go mute, and the only way to know it cannot is to take the art away and
 look.
+
+## "organize liners" was the roster
+
+The designer, asked which of four places the line pointed at: *"the roster - I had meant anytime the
+side bar is populated but let's limit this pass just the roster."* The wider reading is on the map as
+fog so it is not lost.
+
+![The roster before, after, and filtered](the-roster-organised.png)
+
+**What the before picture showed, counted rather than felt:** twelve Army rows, ten of them wrapping
+to two lines, **every one marked "no order"**, two of them word-for-word identical, and Colonies and
+Nation States pushed below the fold. Armies were in the order they were raised; nothing else was
+sorted at all.
+
+**An index with a count, not a to-do list.** Each heading carries the number of rows that still want
+an order and clicking it filters that group down to them. The filter is off by default and works one
+group at a time, because a panel that re-sorts itself every turn is disorienting and a panel that
+never says what is outstanding makes you read twelve rows to find one.
+
+**Armies park, and the rule was already there.** *"Let's allow an armies orders to park them in that
+stance until otherwise moved — a army on defense should remain on defense unless told otherwise."*
+The engine already did exactly this: a stance is set once and survives every Resolution, and only
+four things take it away, each of them something that happened *to* the unit — a Comms Blackout, a
+Ship arriving out of transit, an Army landing from a Ship, and a state throwing off its controller.
+**Nothing guarded it**, which is how a rule quietly becomes a bug, so `formulas.rs` now does. It was
+witnessed red rather than trusted: resetting every stance at Resolution makes it fail with
+`left: Hold, right: Evade`, and restoring makes it pass.
+
+So an Army standing where it was put is **attended by definition**, and the mark had been firing on
+twelve rows out of twelve — which says exactly as much as firing on none. Armies no longer carry it.
+The row shows **the stance it is parked in** instead, so "until otherwise moved" is something a
+player can see rather than something they have to trust.
+
+**The rows got shorter.** `Standing Army at East Asia: strength 4, damage 0  - no order` is now
+`East Asia: strength 4  (Hold)`. The heading already says Armies, and `damage 0` is true of almost
+every Army almost always. Ten of twelve rows wrapped before; none do now, and the whole roster fits
+on screen where it used to run off the bottom.
+
+**Colonies and Nation States take the mark**, counting this turn's orders alone — a Colony with a
+Module three turns from done is attended, not neglected. The empty-group teaching lines stay.
+
+One thing worth saying plainly: the before and after pictures are **different games**, because the
+roster's contents are random and a fresh headless run reseeds. The structural claims above — the
+sorting, the shorter rows, the marks, the counts — are what to read from them, not the particular
+Armies.
+
+`roster:filter` is a new building aid, since a click cannot be reached in a headless picture.
