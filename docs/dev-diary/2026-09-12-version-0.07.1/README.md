@@ -76,3 +76,36 @@ On the bar at its own size: Materials was a cluster of gem shards nobody could n
 a laden cart with wheels; Ducats was the lumpy mass that read as a mineral and is now
 unmistakably a note. Fuel, Energy and Research are untouched, having read correctly all along.
 The Credits screen follows the art, since the licence credits the icon actually used.
+
+### Candidates for the three figures that have no icon
+
+Population, Influence and Emissions are words on the board today. Eight candidates each, rendered
+the same way: large above, and at the sixteen pixels the top bar draws, magnified, below. Only the
+second row decides anything.
+
+![Population candidates](candidates-population.png)
+
+*character, family-house, family-tree, human-pyramid, meeple, person, player-base, village.*
+Surviving: **person, meeple, character, player-base**. Dissolving: family-tree (a diagram, and the
+wrong register), human-pyramid and village — both the many-small-shapes failure again.
+**Recommended: person**, since population here counts people in a country rather than households
+or settlements. **meeple** is the bolder glyph and would suit a game that means to feel like a
+board game.
+
+![Influence candidates](candidates-influence.png)
+
+*conversation, crown, megaphone, public-speaker, ribbon-medal, shaking-hands, star-flag, vote.*
+Surviving: **megaphone, star-flag, crown, shaking-hands**. Dissolving: conversation (two bubbles
+smear into one), public-speaker (the figure vanishes into the podium), vote, ribbon-medal.
+**Recommended: megaphone** — Influence is spent to win countries over, which is projection rather
+than diplomacy between equals. **shaking-hands** reads as diplomacy if that is wanted; **crown**
+implies you already rule the place.
+
+![Emissions candidates](candidates-emissions.png)
+
+*barrel-leak, chimney, cloud, coal-pile, coal-wagon, factory, gas-pump, smoking-volcano.*
+Surviving: **factory, gas-pump, cloud, chimney**. Dissolving: barrel-leak, coal-pile.
+**Recommended: factory**, the most legible on the sheet, and it names the source — the game's
+Emissions are literally industry. **chimney** if the smoke is wanted rather than the thing making
+it. **coal-wagon is out regardless**: Materials is a mine cart now and the two would be twins at
+sixteen pixels.
