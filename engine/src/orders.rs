@@ -589,6 +589,23 @@ impl Game {
                         return fail(format!("this Colony already has a {}", kind.name()));
                     }
                 }
+                // Ticket #97 (version 0.07.0): the Module cap. Standing and building Modules both
+                // count, as do the ones already ordered this turn; the Archive counts on neither
+                // side. A cap that has fallen below what stands destroys nothing: there is simply
+                // no room until Colonists arrive.
+                let ordered = pending
+                    .iter()
+                    .filter(|o| matches!(o.build_module(), Some((c, k)) if c == *colony && k != ModuleKind::Archive))
+                    .count() as u32;
+                if self.module_slots_used(col) + ordered >= self.module_slots(col) {
+                    return fail(format!(
+                        "{} holds {} Modules already, all it has room for: {} free and one for each of its {} Colonists",
+                        self.place_name(Place::Colony(*colony)),
+                        self.module_slots_used(col) + ordered,
+                        self.tables.slots.base,
+                        col.colonists
+                    ));
+                }
                 Ok(cost)
             }
             Order::BuildShip { site, kind } => {

@@ -2038,6 +2038,15 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     };
     ui.label(owner);
     ui.label(format!("Colonists {} of {} Habitat room", col.colonists, game.habitat_room(col)));
+    // Ticket #97 (version 0.07.0): the Module cap, shown beside the Colonists that buy it, so a
+    // player meets it on the card rather than as a refusal.
+    let (used, cap) = (game.module_slots_used(col), game.module_slots(col));
+    let line = format!("Modules {used} of {cap} ({} free, one for each Colonist)", game.tables.slots.base);
+    if used >= cap {
+        ui.colored_label(Color32::YELLOW, format!("{line} - no room for another until more Colonists live here"));
+    } else {
+        ui.label(line);
+    }
     ui.label(RichText::new("Modules").strong());
     let director = col.control.director();
     let colony_mine = !session.spectator && col.control.director() == Some(Seat(0));

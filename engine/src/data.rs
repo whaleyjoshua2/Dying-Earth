@@ -861,6 +861,14 @@ struct FacilitiesFile {
 /// Ticket #51: the Archive. Its Materials, build turns and Energy upkeep sit on its Module row.
 /// Ticket #68 (version 0.05.5): the Research it requires in all, and the share of it the fund may
 /// hold before the Module stands.
+/// Ticket #97 (version 0.07.0): the Modules a Colony or a Space Station may hold: `base` free, and
+/// one more for every `per_colonist` Colonists living there.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SlotsCard {
+    pub base: u32,
+    pub per_colonist: u32,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct ArchiveCard {
     pub research: i64,
@@ -893,6 +901,7 @@ pub struct TradePostCard {
 #[derive(Debug, Clone, Deserialize)]
 struct ModulesFile {
     module: Vec<ModuleCard>,
+    slots: SlotsCard,
     archive: ArchiveCard,
     observatory: ObservatoryCard,
     in_situ: InSituCard,
@@ -980,6 +989,8 @@ pub struct Tables {
     pub scrubber: ScrubberCard,
     pub mothball: MothballCard,
     pub modules: Vec<ModuleCard>,
+    /// Ticket #97: how many Modules a Colony or a Space Station may hold.
+    pub slots: SlotsCard,
     /// Ticket #51: the Archive's stages and their Research price.
     pub archive: ArchiveCard,
     /// Ticket #80: the Observatory's Research per Colonist.
@@ -1062,6 +1073,7 @@ impl Tables {
             industry_level: facilities.industry_level,
             scrubber: facilities.scrubber,
             mothball: facilities.mothball,
+            slots: modules.slots,
             archive: modules.archive,
             observatory: modules.observatory,
             in_situ: modules.in_situ,
@@ -1238,6 +1250,9 @@ impl Tables {
         // Ticket #57: the game's first date, and the sky it opens on.
         if !(1..=12).contains(&self.victory.start_month) {
             return Err(err("victory.toml", format!("start_month {} is no month", self.victory.start_month)));
+        }
+        if self.slots.per_colonist == 0 {
+            return Err(err("modules.toml", "[slots] per_colonist must be at least 1: a Colonist has to buy something"));
         }
         if self.archive.research <= 0 || !(0.0..=1.0).contains(&self.archive.banked_before_built) {
             return Err(err("modules.toml", "[archive] needs research above zero and banked_before_built from 0 to 1"));

@@ -6316,3 +6316,94 @@ fn funding_the_archive_pays_even_when_the_turn_completes_a_tech() {
     assert!(made > 0, "the Lab made {made} Research");
     assert_eq!(g.seats[3].archive_fund, made, "every point the Labs made is in the fund");
 }
+
+/// Version 0.07.0 (ticket #97): a Colony or a Space Station holds `base` Modules free and one more
+/// for every Colonist living there. Before this rule a Colony had no ceiling at all, and Build Where
+/// You Dig made each further Module cheaper than the last: one playtested Moon Colony reached 51
+/// Mines and 28 Generators on about twelve Colonists, extracting 775 Materials a turn by turn 13.
+#[test]
+fn a_colony_holds_three_modules_free_and_one_more_for_each_colonist() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 2000;
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[], 2);
+    // Three free and one for each of two Colonists.
+    assert_eq!(g.module_slots(g.colony(c).unwrap()), 5);
+    assert_eq!(g.free_module_slots(g.colony(c).unwrap()), 5);
+    for _ in 0..5 {
+        g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::Mine));
+    }
+    let order = Order::BuildModule { colony: c, kind: ModuleKind::Mine };
+    assert!(g.check_order(Seat(0), &[], &order).is_err(), "a Colony of two Colonists holds five Modules, not six");
+    // A Colonist buys exactly one more.
+    g.colony_mut(c).unwrap().colonists = 3;
+    assert_eq!(g.module_slots(g.colony(c).unwrap()), 6);
+    assert!(g.check_order(Seat(0), &[], &order).is_ok(), "the third Colonist bought a sixth");
+    // An order already given this turn takes its room, so a cap of six cannot be filled twice over.
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&order), &order).is_err(), "the pending order took the last slot");
+    // A mothballed Module keeps its slot, as a mothballed Facility does in a Nation State.
+    g.colony_mut(c).unwrap().modules[0].mothballed = true;
+    assert!(g.check_order(Seat(0), &[], &order).is_ok(), "mothballing frees Energy, never room");
+    assert_eq!(g.module_slots_used(g.colony(c).unwrap()), 5);
+    // One under construction reserves its slot.
+    let due = g.turn + 1;
+    g.colony_mut(c).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), due_turn: due, coastal: false });
+    assert_eq!(g.module_slots_used(g.colony(c).unwrap()), 6);
+    assert!(g.check_order(Seat(0), &[], &order).is_err(), "the one building holds the last slot");
+    // The Archive is exempt, and counted on neither side of the sum.
+    g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::Archive));
+    assert_eq!(g.module_slots_used(g.colony(c).unwrap()), 6, "the Archive is not counted");
+}
+
+/// Ticket #97: a Space Station reads the same rule, so one founded bare holds the free allowance and
+/// grows only as its people arrive. Three is exactly the Shipyard, Solar Array and Observatory that
+/// a station over Earth is actually built with.
+#[test]
+fn a_bare_space_station_holds_the_free_allowance_and_grows_with_its_people() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 2000;
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("a station over Earth");
+    assert_eq!(g.colony(station).unwrap().colonists, 0, "it starts bare");
+    assert_eq!(g.module_slots(g.colony(station).unwrap()), 3, "three free, and no people yet");
+    for k in [ModuleKind::Shipyard, ModuleKind::SolarArray, ModuleKind::Observatory] {
+        g.colony_mut(station).unwrap().modules.push(Module::new(k));
+    }
+    let habitat = Order::BuildModule { colony: station, kind: ModuleKind::Habitat };
+    assert!(g.check_order(Seat(0), &[], &habitat).is_err(), "a bare station is full at three");
+    // People arriving buy the room, one slot each.
+    g.colony_mut(station).unwrap().colonists = 2;
+    assert_eq!(g.module_slots(g.colony(station).unwrap()), 5);
+    assert!(g.check_order(Seat(0), &[], &habitat).is_ok());
+}
+
+/// Ticket #97: the designer's constraint on the ratio -- a filled Habitat must always hand back at
+/// least two slots after paying for its own -- holds on the poorest Colony Slot in the game. Phobos
+/// and Deimos have a Habitat yield of 0.5, so a Habitat there holds three.
+#[test]
+fn a_filled_habitat_always_hands_back_at_least_two_slots() {
+    let mut g = game();
+    for body in BodyId::ALL {
+        for slot in g.free_slots_on(body) {
+            let c = Colony {
+                id: ColonyId(g.fresh_id()),
+                body,
+                slot,
+                control: Control::Controlled(Seat(0)),
+                modules: vec![Module::new(ModuleKind::Habitat)],
+                colonists: 0,
+                queue: Vec::new(),
+                grid_failed: false,
+                founded_turn: 1,
+                in_orbit: false,
+            };
+            let holds = g.habitat_room(&c);
+            let filled = Colony { colonists: holds, ..c.clone() };
+            // What the Habitat earns, less the one slot the Habitat itself takes.
+            let net = g.module_slots(&filled) as i64 - g.module_slots(&c) as i64 - 1;
+            assert!(
+                net >= 2,
+                "a full Habitat at {} slot {slot} holds {holds} and hands back {net} slots, not two",
+                body.name()
+            );
+        }
+    }
+}

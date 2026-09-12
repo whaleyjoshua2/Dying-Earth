@@ -711,6 +711,11 @@ impl Game {
         for cid in self.directed_colonies(seat) {
             let col = self.colony(cid).unwrap().clone();
             let threat = if self.enemy_present_or_inbound(seat, col.body) || self.enemy_army_near(seat, Place::Colony(cid)) { m.threat } else { 1.0 };
+            // Ticket #97 (version 0.07.0): no room, nothing to enumerate. Without this the AI scores
+            // Modules it cannot build, spends its list on them and has them dropped at commit.
+            if self.free_module_slots(&col) == 0 {
+                continue;
+            }
             for mk in ModuleKind::BUILDABLE {
                 // Ticket #46: a station holds only a Shipyard and Habitats; ticket #80: and an
                 // Observatory. Ticket #81: a Habitat over Earth now houses people who count as off

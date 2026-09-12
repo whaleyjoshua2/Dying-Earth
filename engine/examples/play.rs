@@ -521,13 +521,15 @@ fn print_board(g: &Game) {
         let q: Vec<String> = c.queue.iter().map(|b| format!("{} due t{}", b.item.name(), b.due_turn)).collect();
         let name = if c.in_orbit { g.station_name(c.body, c.slot) } else { slot_name(g, c.body, c.slot) };
         println!(
-            "colony {:<3} {:<22} {:<7} {:<30} colonists {} (room {}) | yields {}",
+            "colony {:<3} {:<22} {:<7} {:<30} colonists {} (room {}) | Modules {}/{} | yields {}",
             c.id.0,
             name,
             if c.in_orbit { "orbit" } else { "ground" },
             control_text(g, c.control),
             c.colonists,
             g.habitat_room(c),
+            g.module_slots_used(c),
+            g.module_slots(c),
             g.colony_yields(c).text()
         );
         println!(

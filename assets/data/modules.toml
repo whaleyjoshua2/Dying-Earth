@@ -99,6 +99,19 @@ energy_upkeep = 12
 # Ticket #68: the Research the Archive requires in all, paid into the Archive fund at any pace once
 # the Module stands; and the share of it the fund may hold BEFORE the Module stands (a quarter: 20).
 # At that cap a turn of funding is refused, and the Research stays with the shared Tech.
+# Ticket #97 (version 0.07.0): how many Modules a Colony or a Space Station may hold. `base` free,
+# and one more for every `per_colonist` Colonists living there. The Archive is exempt and never
+# counted. A mothballed Module keeps its slot and one under construction reserves one, exactly as a
+# Facility does in a Nation State.
+#
+# `per_colonist = 1` is not a taste: the designer's rule is that a filled Habitat must always hand
+# back at least two slots after paying for its own. The poorest Habitat in the game holds three
+# (Phobos and Deimos, Habitat yield 0.5), so one slot per Colonist is the simplest ratio that keeps
+# that promise on every Colony Slot. At one per two it would hand back nothing there.
+[slots]
+base = 3
+per_colonist = 1
+
 [archive]
 research = 80
 banked_before_built = 0.25

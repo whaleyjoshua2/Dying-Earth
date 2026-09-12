@@ -1396,6 +1396,35 @@ impl Game {
         1.0 + self.state(s).population / 50.0
     }
 
+    /// Ticket #97 (version 0.07.0): the Modules this Colony or Space Station may hold: the table's
+    /// free allowance, and one more for every `per_colonist` Colonists living there. One formula
+    /// for the ground and for orbit, so a Space Station founded bare holds the allowance and grows
+    /// only as its people arrive.
+    pub fn module_slots(&self, c: &Colony) -> u32 {
+        let s = &self.tables.slots;
+        s.base + c.colonists / s.per_colonist.max(1)
+    }
+
+    /// Ticket #97: the Modules standing or building here that count against the cap. A mothballed
+    /// Module keeps its slot and one under construction reserves one, exactly as a Facility does in
+    /// a Nation State; the Archive is exempt and counted on neither side.
+    pub fn module_slots_used(&self, c: &Colony) -> u32 {
+        let standing = c.modules.iter().filter(|m| m.kind != ModuleKind::Archive).count() as u32;
+        let building = c
+            .queue
+            .iter()
+            .filter(|b| matches!(b.item, BuildItem::Module(k) if k != ModuleKind::Archive))
+            .count() as u32;
+        standing + building
+    }
+
+    /// Ticket #97: the room left. A cap that has fallen below what already stands (Colonists lost
+    /// to crowding, a Habitat destroyed, the place changing hands) destroys nothing and mothballs
+    /// nothing: it simply leaves no room until the count is back under.
+    pub fn free_module_slots(&self, c: &Colony) -> u32 {
+        self.module_slots(c).saturating_sub(self.module_slots_used(c))
+    }
+
     pub fn habitat_room(&self, c: &Colony) -> u32 {
         // Ticket #51: Expanded Habitats and the Faction's own Habitat capacity are read for whoever
         // holds the Colony, since Provisional Findings gives the Archivists half the Tech early.
