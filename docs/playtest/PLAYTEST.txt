@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.05.5
+DYING EARTH - playtest build, version 0.06.0
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -18,31 +18,36 @@ HOW TO RUN
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
    (There is a separate Linux zip: unzip it, then run ./dying-earth from the folder.)
 
-WHAT CHANGED SINCE 0.05
------------------------
-- The game is now THIRTY-SIX turns, and each turn is two months (January 2030 to
-  November 2035). Nothing got slower to build or fly; there are just more turns.
-- Mars is reachable. There are three launch windows (around turns 7, 20 and 33) and the
-  flight takes five turns. Hover Mars on the Solar System Map to see the next window.
-- Colonists are built, not scooped up. On any country's card, "Muster Emigrants" builds
-  up to four a turn; they wait on that card until a Launch Site lifts them into a ship,
-  or (once the ice is open) a "Send to Antarctica" button ships them south with no
-  rocket at all. Building a batch calms the country a little.
-- The Prospectors have a Venture Capital Fund: on the Victory panel, set what share of
-  your mines' and factories' output goes into it (0-80%, change it any turn). Reaching
-  750 in the Fund is now the first half of their win. Their buildings cost 15% less.
-- The Archivists' Archive is a building of its own on a colony (three turns, 50
-  Materials), and the 80 Research it needs can only be a quarter paid until it stands.
-- Two countries start with a Research Lab (North America and South-East Asia); a Lab
-  nobody controls pays half its research to whatever the world is researching.
-- Coastal Engineering is a first-row tech at 10 Research, and the Sea Wall it unlocks
-  costs 20 Materials and takes no building space, like the Scrubber. Build one and the
-  country's next flood takes nothing from it.
-- Fewer coastal building slots (two per point of coastal exposure, was three).
-- Every side starts with a claim on its home country, and a rival needs 20 more Standing
-  than you to take a country off you. The card warns you in orange when one is close.
-- The event deck is 40 cards, with four new events: Drought, Volcanic Eruption,
-  Moonquake and a Helium-3 Vein on the Moon.
+WHAT CHANGED SINCE 0.05.5
+-------------------------
+This is the space version. The big one first:
+- Every ship now carries its own FUEL TANK (30). A ship is built with it full, a flight
+  spends from it, and it is refilled only by a "Refuel" order at a body where you have a
+  space station. A ship whose tank cannot pay any flight is stranded until you build a
+  station in orbit there. The Solar System Map shows "tank 20/30" on every stack.
+- VENUS is on the map: no ground to land on, three station slots, three turns and 16 Fuel
+  from Earth on its own launch window (hover Venus to see it). Everything at Venus is
+  built and held in orbit, and people living on a Venus station count as off Earth.
+- Stations over Earth now count as off Earth too: people living on the ISS count for
+  Off-world Presence, and the Archive may stand there.
+- New buildings: the OBSERVATORY makes Research on a colony or station (1% more per
+  colonist living there); the SOLAR ARRAY on a station makes Energy that follows the
+  sunlight (twice Earth's at Venus, under half at Mars); the MASS DRIVER on the Moon,
+  Phobos or Deimos (needs Efficient Transit) makes your departures 4 Fuel cheaper and
+  its mines richer. Habitats hold 8 people now.
+- Modules are cheaper at a colony that already has a working mine (x0.75 with one,
+  x0.6 with two or more). A Trade Post pays for the shape of your empire: 2 Ducats per
+  colonist at its body plus 3 for every other body you hold, one per body.
+- The hotter Earth gets, the more a Colony Ship will take beyond its capacity (one more
+  per 0.2 C above +1.8, up to four), and each of those extra people may die on the way.
+  The Load panel tells you the safe load and the crowded one.
+- Every side's win now waits on a rung-3 tech of its own (Planetary Stewardship, the
+  Extraction Charter, Generation Ships, the Upload), each also a real tech for everyone.
+- The sides were retuned: the Custodians' Influence eases to 1.2 and an idle factory of
+  theirs on Earth doubles a mine of theirs off it (Production Moved); the Prospectors'
+  countries pay a fifth more Ducats and the market sells to them at 15% off; the
+  Arkwrights' ships cost 15% less; the Archivists lost their output penalty and research
+  at 1.5 on Earth and 1.75 off it.
 
 HOW TO PLAY, IN ONE MINUTE
 --------------------------
@@ -104,15 +109,20 @@ Screenshots help. Print Screen, then paste into a message.
 KNOWN ROUGH EDGES
 -----------------
 - The sides are not balanced against each other. In our own computer-only test games
-  the Custodians now win almost every game (103 of 160) and reach their own win
-  condition often; the Prospectors never reach 750 in the Fund, and the Archivists
-  finished the Archive in only a handful of games. It was the other way round in 0.05.
+  the Custodians win almost every game that does not collapse (96 of 160) and reach their
+  own win around turn 27; the Prospectors never reach 750 in the Fund (they get to about
+  450); the Archivists finished the Archive in a handful of games and won one.
 - The computer Custodians take other sides' home countries in most games, around turn
-  11 to 22, and nobody takes theirs.
-- The computer builds a great many Sea Walls when it has the tech, sometimes instead of
-  Scrubbers, and its own games collapse more often for it.
-- Some seatings run hot: starting as the Custodians in East Asia, the world collapsed in
-  15 of 20 computer-only games.
-- The computer opponent is simple, and the Prospector and Arkwright sides take Coastal
-  Engineering late.
+  19 to 23, and nobody takes theirs.
+- Some seatings run hot: starting as the Custodians in East Asia, or as the Prospectors
+  from either continent, the world collapsed in 18 to 20 of 20 computer-only games. From
+  Europe the Custodians hold it.
+- The computer builds Solar Arrays over Earth by the dozen, and Sea Walls when it has the
+  tech, sometimes instead of Scrubbers.
+- The computer never researches Efficient Transit on purpose, so you will rarely see it
+  build a Mass Driver; the computer Prospectors never fly to Venus; and a computer side
+  sometimes flies a loaded ship to Venus before its station there is up, and the ship sits
+  stranded until it is.
+- A ship stranded far from any station of yours is stranded for good unless you build one
+  there. Check the tank before you fly.
 - No sound, no tutorial beyond the first Report.

@@ -240,6 +240,26 @@ impl Game {
         }
     }
 
+    /// Ticket #82, the 0.06.0 AI sweep (ticket #94): a Module off Earth whose kind an idle Facility
+    /// of the seat's would double (Production Moved) is worth twice its base while the seat holds
+    /// more Facilities of the paired kind than Modules already doubled. Until the sweep the
+    /// Custodian AI never built a Module off Earth in eight batches of twenty seeds: Earth's
+    /// Facilities outscored them at the same base and the Materials reserve starved the rest.
+    fn production_moved_boost(&self, seat: Seat, col: &Colony, mk: ModuleKind) -> f64 {
+        if !self.off_earth(col) {
+            return 1.0;
+        }
+        let pairs = &self.tables.faction(self.kind(seat)).mothball_pairs;
+        let Some((fk, _)) = pairs.iter().find(|(_, m)| **m == mk) else { return 1.0 };
+        let facilities = self.directed_states(seat).iter().flat_map(|s| self.state(*s).facilities.iter()).filter(|f| f.kind == *fk).count();
+        let doubled = self.doubled_modules(seat).iter().filter(|(cid, i)| self.colony(*cid).and_then(|c| c.modules.get(*i)).map(|m| m.kind == mk).unwrap_or(false)).count();
+        if facilities > doubled {
+            2.0
+        } else {
+            1.0
+        }
+    }
+
     /// Spec 16.4, as ticket #57 leaves it: the free Colony Slot on a Body whose own yields best
     /// serve the part the AI is furthest behind on.
     pub fn best_slot_for(&self, seat: Seat, body: BodyId, behind: Behind) -> Option<u32> {
@@ -257,6 +277,11 @@ impl Game {
         let t = &self.tables;
         let turns_left = t.victory.turns.saturating_sub(self.turn).max(1) as f64;
         let flight = |b: BodyId| self.transit_cost_for(seat, BodyId::Earth, b).0 as f64;
+        // The 0.06.0 AI sweep (ticket #94): a leg no tank could pay (Mars off its window can ask
+        // 47 Fuel of a 30 tank) is not a destination either; before this the AI named it as its
+        // one choice, the Transit was refused at the check, and the Ship sat at Earth.
+        let tank = t.units.iter().map(|u| u.tank).max().unwrap_or(0);
+        let payable = |b: BodyId| self.transit_cost_for(seat, BodyId::Earth, b).1 <= tank;
         // Ticket #93: Venus, with no Colony Slots, is a destination when the seat holds a station
         // there with room, or when a slot is free in its orbit and the Stockpile could raise one.
         let venus_open = |b: BodyId| {
@@ -266,7 +291,7 @@ impl Game {
         };
         let mut bodies: Vec<BodyId> = BodyId::ALL
             .into_iter()
-            .filter(|b| *b != BodyId::Earth && (!self.free_slots_on(*b).is_empty() || venus_open(*b)) && flight(*b) < turns_left)
+            .filter(|b| *b != BodyId::Earth && (!self.free_slots_on(*b).is_empty() || venus_open(*b)) && flight(*b) < turns_left && payable(*b))
             .collect();
         if bodies.is_empty() {
             return BodyId::Moon;
@@ -277,7 +302,12 @@ impl Game {
         let spreading = each > 0 && BodyId::ALL.into_iter().any(|b| b != BodyId::Earth && self.colonists_at_body(seat, b) >= each);
         let key = |b: &BodyId| -> f64 {
             // Ticket #93: Venus has no slot to weigh; a station there is worth a plain slot.
-            let yields = self.best_slot_for(seat, *b, behind).map(|s| self.slot_worth(seat, self.slot_yields(*b, s), behind)).unwrap_or(if *b == BodyId::Venus { 1.0 } else { 0.0 });
+            // The 0.06.0 AI sweep (ticket #94): a station at Venus is worth what a slot with the
+            // Body's own yields would be, so Venus competes with the Moon and Mars on the same scale.
+            let yields = self
+                .best_slot_for(seat, *b, behind)
+                .map(|s| self.slot_worth(seat, self.slot_yields(*b, s), behind))
+                .unwrap_or(if *b == BodyId::Venus { self.slot_worth(seat, SlotYields::of_body(self.tables.body(*b)), behind) } else { 0.0 });
             let fresh = if spreading && self.colonists_at_body(seat, *b) == 0 { 10.0 } else { 0.0 };
             (yields + fresh) * (1.0 - flight(*b) / turns_left)
         };
@@ -701,8 +731,9 @@ impl Game {
                         {
                             continue;
                         }
-                        // Ticket #81: at its own weight.
-                        (Cat::Observatory, self.base_weight(seat, Cat::Observatory))
+                        // Ticket #81: at its own weight; ticket #82: twice it when an idle Research
+                        // Lab of the seat's would double it.
+                        (Cat::Observatory, self.base_weight(seat, Cat::Observatory) * self.production_moved_boost(seat, &col, mk))
                     }
                     // Ticket #90: a Trade Post pays for the network, so it is worth half again once
                     // the seat holds two Bodies or more.
@@ -727,7 +758,7 @@ impl Game {
                         (Cat::Producer, self.base_weight(seat, Cat::Producer) * 1.5)
                     }
                     ModuleKind::Mine => {
-                        let mut w = self.base_weight(seat, Cat::Producer);
+                        let mut w = self.base_weight(seat, Cat::Producer) * self.production_moved_boost(seat, &col, mk);
                         if col.modules.iter().any(|m| m.kind == ModuleKind::MassDriver && m.working()) {
                             // The yield here already carries the bonus; weigh it against the bare figure.
                             let with = self.module_yield(seat, cid, ModuleKind::Mine).amount as f64;
@@ -736,7 +767,7 @@ impl Game {
                         }
                         (Cat::Producer, w)
                     }
-                    ModuleKind::Generator | ModuleKind::Refinery => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
+                    ModuleKind::Generator | ModuleKind::Refinery => (Cat::Producer, self.base_weight(seat, Cat::Producer) * self.production_moved_boost(seat, &col, mk)),
                     ModuleKind::Relay => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
                     // Ticket #51: the Archive is never an ordinary Module build; it has its own order.
                     ModuleKind::Archive => continue,
@@ -1077,7 +1108,9 @@ impl Game {
                         }
                         let y = self.facility_yield(seat, sid, f.kind);
                         let out = y.amount.max(y.research);
-                        if out < best {
+                        // The 0.06.0 AI sweep (ticket #94): an even trade is a win for the Custodians,
+                        // since the idled Facility's Emissions leave Earth with the output.
+                        if out <= best {
                             push(
                                 vec![Order::Change { building: BuildingRef::Facility(sid, i), what: BuildingChange::Mothball }],
                                 Cat::Mothball,
@@ -1233,13 +1266,26 @@ impl Game {
                     if let Some(slot) = self.best_slot_for(seat, BodyId::Earth, behind).filter(|_| self.antarctica_open) {
                         push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, format!("found a Colony at {}", self.tables.body(BodyId::Earth).slots[slot as usize].name), None);
                     }
-                    // Ticket #46: Colonists on a station over Earth are still on Earth for Presence; never park them there.
-                    for c in self.colonies.iter().filter(|c| c.body == body && c.body != BodyId::Earth && c.control.director() == Some(seat)) {
+                }
+                // The 0.06.0 AI sweep (ticket #94): a loaded Colony Ship disembarks into a Colony or
+                // station of the seat's own with room at the Body it stands at, wherever that is.
+                // Until this sweep the branch sat inside the at-Earth case and then asked for a Body
+                // that was not Earth, so it could never run: a second load never joined a Colony and
+                // nothing ever lived on a station at Venus. Antarctica's ground is still no place to
+                // park them (a foothold, founded above). A station over Earth is off Earth since
+                // ticket #81, so its Habitats count for Presence; offered at full weight the AI
+                // parked every load there and Mars went unfounded (3 of 20 seeds, from 20), so over
+                // Earth the landing is a foothold like Antarctica's: half weight, no gap, taken when
+                // the Ship cannot go anywhere better.
+                if s.colonists > 0 {
+                    for c in self.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(seat) && (c.in_orbit || c.body != BodyId::Earth)) {
                         let room = self.habitat_room(c).saturating_sub(c.colonists);
                         if room > 0 {
                             let n = room.min(s.colonists);
-                            let opp = if presence_needed <= n { m.opportunity } else { 1.0 };
-                            push(vec![Order::Unload { ship: s.id, colonists: n, army: false, into: UnloadTarget::Colony(c.id) }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("disembark {} Colonists into {}", n, self.place_name(Place::Colony(c.id))), None);
+                            let over_earth = body == BodyId::Earth;
+                            let opp = if presence_needed <= n && !over_earth { m.opportunity } else { 1.0 };
+                            let (weight, gap) = if over_earth { (self.base_weight(seat, Cat::LoadUnload) * 0.5, 1.0) } else { (self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None)) };
+                            push(vec![Order::Unload { ship: s.id, colonists: n, army: false, into: UnloadTarget::Colony(c.id) }], Cat::LoadUnload, weight, gap, 1.0, opp, format!("disembark {} Colonists into {}", n, self.place_name(Place::Colony(c.id))), None);
                         }
                     }
                 }
@@ -1248,8 +1294,9 @@ impl Game {
                     let own_room = self.colonies.iter().any(|c| c.control.director() == Some(seat) && self.habitat_room(c) > c.colonists);
                     let mut dests = vec![dest];
                     if own_room {
+                        // The 0.06.0 AI sweep (ticket #94): not the Body the Ship is at.
                         for c in &self.colonies {
-                            if c.control.director() == Some(seat) && !dests.contains(&c.body) {
+                            if c.control.director() == Some(seat) && c.body != body && !dests.contains(&c.body) {
                                 dests.push(c.body);
                             }
                         }

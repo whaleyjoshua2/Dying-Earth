@@ -360,3 +360,72 @@ Habitat has no room in any case. The rule works on the player's side, as the pic
 AI's Venus is a station with nobody aboard. The Archivist seating also reads cooler and calmer
 (+2.51, no Collapse, Colonists off Earth 39 from 53), which is the re-rolled games rather than
 Venus, and the build ticket's eight batches will say which.
+
+## The build ticket: the AI sweep, the balance, the kit ([ticket #94](https://github.com/whaleyjoshua2/Dying-Earth/issues/94))
+
+- **build-solar.png** — `shot:build turns:30 victory:1`: the four AIs play thirty turns, then the
+  Solar System Map with the Victory panel open. Every Faction's first part now reads its gate:
+  "Venture Capital Fund: 354 of 750 - needs The Extraction Charter, not yet researched",
+  "Colonists off Earth: 0 of 30 - needs Generation Ships", "The Archive: 20 of 80 - needs The
+  Upload"; the Custodians stand at 100% with Planetary Stewardship researched. The roster shows
+  the tank on every stack ("Frigate (strength 3), tank 30/30") and, at Venus, two Colony Ships
+  with twelve Colonists aboard on "tank 4/60 - STRANDED: no leg affordable and no station of yours
+  here": the Prospector AI flew them there on the strength of being able to raise a station, and
+  is holding Materials for it. The sidebar lists Colonies and stations across four Bodies.
+
+### The AI sweep
+
+The designer asked for the AI's decision trees and weights to be read whole. The tree is one
+list a turn: every order the seat could give, scored by a base weight from `ai.toml` times the
+victory gap, a threat figure and an opportunity figure, sorted, and taken greedily with Materials
+held for a higher-scored build within four turns of income. Five things were changed, each seen
+red first and each rerun through the eight balance batches:
+
+1. **The disembark branch was dead code.** A loaded Colony Ship was meant to land into a Colony or
+   station of its own with room at the Body it stood at; the branch sat inside the at-Earth case
+   and then asked for a Body that was not Earth, so it never ran. Fixed, and measured at full
+   weight first: the AI parked every load on the ISS's Habitats (off Earth since ticket #81) and
+   Mars went unfounded in 11 to 20 seeds of 20 per seating, Venus's stations back to none
+   (`sweep/balance-iss-parked.txt`). **Over Earth the landing is now a foothold at half weight
+   with no gap, like Antarctica's**, and Mars is founded in 18 to 20 seeds again.
+2. **Venus is worth a slot with its own yields** to a Colony Ship choosing a Body, not a flat 1.
+3. **The Custodians idle a Facility for an even trade**, not only a better one.
+4. **A leg no tank can pay is not a destination.** Mars off its window asks 47 Fuel of a 30 tank;
+   the AI named it as its one choice, the check refused it, and the loaded Ship sat at Earth.
+5. **A Module off Earth an idle Facility could double is worth twice its base.** The Custodian AI
+   had never built a Module off Earth: seed 3 from Europe reads "save 6.0 build Mine at Valles
+   Marineris on Mars (holding Materials for build Power Plant in Europe)" every turn at +58
+   Materials a turn of income. Production Moved now fires: a median 30 to 55 doubled Module-turns
+   a game for the Custodian seat wherever the world holds.
+
+The `sim` example gained `--start=<state>` so a logged game can be read from any seat. Left as
+found and written to the spec's section 17: the Materials reserve starving the other three
+Factions' off-Earth Modules; the Prospector AI never flying to Venus; Efficient Transit on no pick
+list; the Arkwright forward station.
+
+### Measured, twenty seeds each, all eight seatings (`sweep/balance.txt`)
+
+| Seat 0 | Wins by seat | Collapses | End Temperature | Colonists off Earth (median) | Mars founded (seeds) | Venus stations / Colonists | Doubled Module-turns (Custodians) |
+|---|---|---|---|---|---|---|---|
+| Custodians from East Asia | nobody | 20/20 | +3.06 | 16 | 6 | 0 / 0 | 0 |
+| Custodians from Europe | Custodians 19 | 1/20 | +2.70 | 31 | 19 | 0 / 0 | 55 |
+| Prospectors from East Asia | Custodians 2 | 18/20 | +3.05 | 12 | 20 | 0 / 0 | 0 |
+| Prospectors from Europe | nobody | 20/20 | +3.06 | 26 | 13 | 0 / 0 | 0 |
+| Arkwrights from East Asia | Custodians 20 | 0/20 | +2.73 | 42 | 19 | 1 / 0 | 30 |
+| Arkwrights from Europe | Custodians 20 | 0/20 | +2.47 | 40 | 18 | 0 / 0 | 39 |
+| Archivists from East Asia | Custodians 20 | 0/20 | +2.68 | 43 | 20 | 15 / 69 | 31 |
+| Archivists from Europe | Custodians 15, Archivists 1 | 4/20 | +2.46 | 73 | 18 | 28 / 218 | 33 |
+
+**The Custodians win 96 of 160 (103 in 0.05.5), the Archivists 1, nobody else; 63 Collapses (53).**
+The climate cell holds where the Custodian AI holds its Scrubbers (560 over the batch from
+Europe, one Collapse) and fails where it does not (10 from East Asia, twenty Collapses; 86 and 39
+beside the Prospectors, 18 and 20): Influence 1.2 seen from every chair. Reported, not retuned.
+Nobody strands any more to speak of (4 Ships at the end over 160 games); the Archivists live at
+Venus in their hundreds; the Mass Driver stands only where the whole tree is researched (13 and
+26 in the Archivist seatings).
+
+### The kit
+
+`dist/dying-earth-0.06.0/` (the release exe, `assets/`, and `README.txt`, which is the playtest
+note) and `dist/dying-earth-0.06.0-playtest.zip`, built on this machine; the `release-kits`
+workflow was run on the branch for the Linux and CI Windows kits.

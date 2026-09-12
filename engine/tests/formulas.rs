@@ -6195,3 +6195,100 @@ fn the_ai_raises_a_station_at_venus_when_it_has_a_ship_there() {
     let orders = g.ai_orders(Seat(0));
     assert!(orders.iter().any(|o| matches!(o, Order::BuildStation { body: BodyId::Venus, .. })), "no station at Venus: {orders:?}");
 }
+
+// ---------------------------------------------------------------- 0.06.0 ticket #94: the AI sweep
+
+/// The AI sweep: a loaded Colony Ship disembarks into a Colony or station of its own with room at
+/// the Body it stands at: a station at Venus with a Habitat, and the ISS over Earth (off Earth
+/// since ticket #81). Until the sweep this branch could never run. Over Earth the landing is a
+/// foothold at half weight, so a flight to the Moon outscores it while one is on offer.
+#[test]
+fn the_ai_disembarks_into_its_own_station_with_room_at_venus_and_over_earth() {
+    let mut g = game();
+    calm(&mut g);
+    g.seats[0].stockpile.materials = 300;
+    g.seats[0].stockpile.energy = 300;
+    let venus = station_at(&mut g, Seat(0), BodyId::Venus);
+    g.colony_mut(venus).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Venus);
+    let orders = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::Unload { ship: s, into: UnloadTarget::Colony(c), .. } if *s == ship && *c == venus)), "no landing into the Venus station: {orders:?}");
+    let mut g = game();
+    calm(&mut g);
+    g.seats[0].stockpile.materials = 300;
+    g.seats[0].stockpile.energy = 300;
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    g.ai_orders(Seat(0));
+    let score = |needle: &str| -> f64 {
+        let l = g.log.iter().find(|l| l.contains(needle)).unwrap_or_else(|| panic!("no scored line {needle:?}: {:#?}", g.log.iter().filter(|l| l.starts_with("  ")).collect::<Vec<_>>()));
+        l.split_whitespace().nth(1).and_then(|n| n.parse().ok()).unwrap_or_else(|| panic!("no score on {l:?}"))
+    };
+    let park = score("disembark 4 Colonists into ISS");
+    let fly = score("to the Moon");
+    assert!(park > 0.0 && park < fly, "parking on the ISS ({park}) should be a foothold below the flight to the Moon ({fly})");
+    let _ = ship;
+}
+
+/// The AI sweep: Venus weighs as a slot with the Body's own yields when the seat holds a station
+/// there with room, so a loaded Colony Ship at Earth is offered the flight to Venus.
+#[test]
+fn the_ai_offers_a_loaded_colony_ship_the_flight_to_a_venus_station_with_room() {
+    let mut g = game();
+    calm(&mut g);
+    g.turn = g.next_venus_window_turn(1);
+    g.seats[0].stockpile.materials = 300;
+    g.seats[0].stockpile.energy = 300;
+    g.seats[0].stockpile.fuel = 100;
+    let venus = station_at(&mut g, Seat(0), BodyId::Venus);
+    g.colony_mut(venus).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    let (_, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    g.ai_orders(Seat(0));
+    assert!(g.log.iter().any(|l| l.contains("to Venus")), "Venus never offered as a destination: {:#?}", g.log.iter().filter(|l| l.contains("send")).collect::<Vec<_>>());
+}
+
+/// The AI sweep: a Custodian Mine off Earth is worth twice its base while a Factory of theirs on
+/// Earth could be idled to double it (Production Moved, ticket #82); with no Factory to idle it is
+/// worth its base, as every other seat's Mine is. Until the sweep the Custodian AI never built a
+/// Module off Earth in eight batches of twenty seeds: Earth's Facilities outscored them at the same
+/// base and the Materials reserve starved the rest.
+#[test]
+fn the_custodian_ai_weighs_a_mine_off_earth_by_the_doubling_an_idle_factory_would_give() {
+    let score_of_moon_mine = |factory: bool| -> f64 {
+        let mut g = game();
+        calm(&mut g);
+        g.seats[0].stockpile.energy = 500;
+        g.seats[0].stockpile.materials = 500;
+        colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Generator], 4);
+        for st in &mut g.states {
+            st.facilities.retain(|f| f.kind != FacilityKind::Factory);
+        }
+        if factory {
+            g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Factory));
+        }
+        g.ai_orders(Seat(0));
+        let l = g.log.iter().find(|l| l.contains("build Mine at") && l.contains("on the Moon")).unwrap_or_else(|| panic!("no Moon Mine scored: {:#?}", g.log.iter().filter(|l| l.contains("Moon")).collect::<Vec<_>>())).clone();
+        l.split_whitespace().nth(1).and_then(|n| n.parse().ok()).unwrap()
+    };
+    let (with, without) = (score_of_moon_mine(true), score_of_moon_mine(false));
+    assert!(without > 0.0 && (with - 2.0 * without).abs() < 1e-6, "a Moon Mine with a Factory to idle should score twice one without: {with} vs {without}");
+}
+
+/// The AI sweep: the Custodian AI idles a Factory for an even trade too, since the Emissions leave
+/// Earth with the output. East Asia's Factory makes 6 (a Materials lean); a Moon Mine makes 6.
+#[test]
+fn the_custodian_ai_idles_a_factory_for_an_even_trade() {
+    let mut g = game();
+    calm(&mut g);
+    g.seats[0].stockpile.energy = 500;
+    g.seats[0].stockpile.materials = 10;
+    colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine, ModuleKind::Generator], 0);
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Factory));
+    let i = g.state(StateId::EastAsia).facilities.len() - 1;
+    let orders = g.ai_orders(Seat(0));
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::Change { building: BuildingRef::Facility(StateId::EastAsia, j), what: BuildingChange::Mothball } if *j == i)),
+        "an even trade (6 for 6) is taken: {orders:?}"
+    );
+}
