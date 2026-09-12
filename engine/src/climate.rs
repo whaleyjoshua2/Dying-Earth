@@ -439,6 +439,12 @@ impl Game {
             let n = if big { u.population_fall_big } else { u.population_fall };
             let rose = self.raise_unrest(sid, n, UnrestSource::Climate);
             if rose > 0.0 {
+                // Ticket #106 (version 0.07.0): a fall that rounds to nothing has nothing to say.
+                // Late in a game twelve of these arrived a turn, most of them reading "population
+                // fell 0.0%", which is a line spent to report that a country was fine. The Unrest
+                // it raised is still told, by the shorter sentence.
+                let percent = 100.0 * lost / before;
+                let nothing_to_see = percent < 0.05;
                 let line = format!(
                     "{}: population fell {:.1}% to {:.1}; Unrest rose by {} to {}.",
                     self.tables.state(sid).name,
@@ -449,10 +455,10 @@ impl Game {
                 );
                 self.log(line);
                 let text = self.say(
-                    "heat_population",
+                    if nothing_to_see { "heat_unrest_only" } else { "heat_population" },
                     &[
                         ("state", self.tables.state(sid).name.clone()),
-                        ("percent", format!("{:.1}", 100.0 * lost / before)),
+                        ("percent", format!("{percent:.1}")),
                         ("after", format!("{after:.1}")),
                         ("rose", Game::unrest_figure(rose).to_string()),
                         ("unrest", self.unrest_text(sid)),

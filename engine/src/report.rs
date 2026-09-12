@@ -412,6 +412,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("sea_took", &["n", "slots", "state", "temperature"]),
     ("sea_took_destroying", &["n", "slots", "state", "temperature", "destroyed"]),
     ("heat_population", &["state", "percent", "after", "rose", "unrest"]),
+    ("heat_unrest_only", &["state", "rose", "unrest"]),
     ("development", &["state", "level"]),
     ("development_woke", &["state", "level", "building"]),
     ("scrubbers_destroyed", &["n", "state", "why"]),
