@@ -6693,3 +6693,37 @@ fn research_banked_between_techs_keeps_its_owner() {
     // So the Lead is the seat that actually did the work, not a draw among four zeroes.
     assert_eq!(g.research_lead_candidates(), vec![Seat(2)]);
 }
+
+// ---------------------------------------------------------------- Stances park
+
+/// Ticket #115 (version 0.07.1). The designer, looking at a roster where every Army was marked "no
+/// order" every turn: *"let's allow an armies orders to park them in that stance until otherwise
+/// moved - a army on defense should remain on defense unless told otherwise."*
+///
+/// The engine already did this and nothing guarded it, which is how a rule quietly becomes a bug.
+/// A stance is set once and survives every Resolution after it; only four things take it away, and
+/// each of them is a thing that happened TO the unit: a Comms Blackout, a Ship arriving out of
+/// transit, an Army landing from a Ship, and a state throwing off its controller.
+#[test]
+fn an_army_keeps_its_stance_through_resolution_until_something_happens_to_it() {
+    let mut g = game();
+    let id = ArmyId(g.fresh_id());
+    g.armies.push(Army {
+        id,
+        home: ArmyHome::State(StateId::EastAsia),
+        at: ArmyAt::Place(Place::State(StateId::EastAsia)),
+        damage: 0,
+        standing: false,
+        stance: Stance::Evade,
+        escaped: false,
+        move_to: None,
+    });
+    for turn in 1..=3 {
+        g.resolution_phase();
+        assert_eq!(g.army(id).unwrap().stance, Stance::Evade, "the stance was given once and should still hold after Resolution {turn}");
+    }
+    // And it is not that the field is frozen: a new stance takes, and then parks in its turn.
+    g.army_mut(id).unwrap().stance = Stance::Intercept;
+    g.resolution_phase();
+    assert_eq!(g.army(id).unwrap().stance, Stance::Intercept, "a stance given later parks the same way");
+}

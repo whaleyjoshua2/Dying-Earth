@@ -1583,12 +1583,12 @@ fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
         for seat in Seat::ALL {
             ui.add_space(6.0);
             ui.label(RichText::new(game.seat_name(seat)).size(17.0).strong().color(seat_colour(session, seat)));
-            roster_of(ui, session, game, seat, false, &mut jump);
+                roster_of(ui, session, game, view, seat, false, &mut jump);
         }
     } else {
         ui.label(RichText::new("Your roster").size(18.0).strong());
         ui.label(RichText::new("Click a row to select it and go there. \"no order\" marks what still waits.").weak());
-        roster_of(ui, session, game, Seat(0), true, &mut jump);
+        roster_of(ui, session, game, view, Seat(0), true, &mut jump);
     }
     if let Some((v, sel)) = jump {
         match v {
@@ -1610,23 +1610,76 @@ fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
 /// mark, which only a seat that gives orders can owe; where it is off, four Factions share the
 /// panel, so each group is named on its own rows rather than over a heading, and an empty group is
 /// left out instead of saying so.
-fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: bool, jump: &mut Option<(View, Selection)>) {
-    let pending = &session.pending;
-    let heading = |ui: &mut Ui, text: &str| {
+/// Ticket #115 (version 0.07.1): one row of the roster, gathered before any of it is drawn so a
+/// group can be counted, sorted and filtered before it goes on screen.
+struct RosterRow {
+    text: String,
+    /// This row still wants a decision from the player this turn. Only a seat that gives orders can
+    /// owe one, so it is always false where `marks` is off.
+    wants: bool,
+    jump: Option<(View, Selection)>,
+}
+
+/// A roster group: its heading, its rows, and the line shown when it is empty.
+///
+/// The heading carries the count of rows that still want an order, and clicking it filters the
+/// group down to those. The filter is **off by default and per group**: the designer's answer to
+/// what the roster is for was "an index, with a needs-an-order count on each heading you can click
+/// to filter down to just those", because a panel that re-sorts itself every turn is disorienting
+/// and a panel that never says what is outstanding makes you read twelve rows to find one.
+/// Which group this is: its slot in the filter array, its heading, and the line it shows when it
+/// holds nothing. Bundled because the four travel together and a function wants fewer hands.
+struct RosterGroup {
+    index: usize,
+    name: &'static str,
+    empty: &'static str,
+}
+
+fn roster_group(ui: &mut Ui, view: &mut ViewState, group: RosterGroup, rows: Vec<RosterRow>, marks: bool, jump: &mut Option<(View, Selection)>) {
+    let RosterGroup { index, name, empty } = group;
+    let wanting = rows.iter().filter(|r| r.wants).count();
+    if marks {
+        ui.horizontal(|ui| {
+            ui.label(RichText::new(name).strong());
+            if wanting > 0 {
+                let on = view.roster_filter[index];
+                let label = if on { format!("showing {wanting} that want an order") } else { format!("{wanting} want an order") };
+                if ui
+                    .small_button(RichText::new(label).color(Color32::from_rgb(250, 210, 130)))
+                    .on_hover_text("Show only the rows that still want an order from you this turn. Click again for the whole group.")
+                    .clicked()
+                {
+                    view.roster_filter[index] = !on;
+                }
+            }
+        });
+    }
+    if rows.is_empty() {
         if marks {
-            ui.label(RichText::new(text).strong());
+            ui.label(RichText::new(empty).weak());
         }
-    };
+        return;
+    }
+    let filtered = marks && view.roster_filter[index] && wanting > 0;
+    for row in rows.iter().filter(|r| !filtered || r.wants) {
+        let text = if row.wants && marks { format!("{}  - no order", row.text) } else { row.text.clone() };
+        if ui.button(text).clicked() {
+            *jump = row.jump;
+        }
+    }
+}
+
+fn roster_of(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, seat: Seat, marks: bool, jump: &mut Option<(View, Selection)>) {
+    let pending = &session.pending;
     let tag = |text: &str| if marks { String::new() } else { format!("{text}: ") };
-    // Ships, one row per stack, then those in transit.
-    heading(ui, "Ships");
-    let mut any_ship = false;
+
+    // Ships, one row per stack at a Body, then those in transit.
+    let mut ships_rows: Vec<RosterRow> = Vec::new();
     for body in BodyId::ALL {
         let ships: Vec<&Ship> = game.ships.iter().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)).collect();
         if ships.is_empty() {
             continue;
         }
-        any_ship = true;
         let ordered = ships.iter().all(|s| {
             pending.iter().any(|o| matches!(o, Order::Transit { ship, .. } | Order::Load { ship, .. } | Order::Unload { ship, .. } | Order::Repair { unit: UnitRef::Ship(ship), .. } if *ship == s.id))
         }) || pending.iter().any(|o| matches!(o, Order::ShipStance { body: b, .. } if *b == body));
@@ -1649,81 +1702,104 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
         if ships.iter().all(|s| game.stranded(s.id)) {
             text.push_str(" - STRANDED: no leg affordable and no station of yours here");
         }
-        if marks && !ordered {
-            text.push_str("  - no order");
-        }
-        if ui.button(text).clicked() {
-            *jump = Some((View::Solar, Selection::ShipStack(body, seat)));
-        }
+        ships_rows.push(RosterRow { text, wants: marks && !ordered, jump: Some((View::Solar, Selection::ShipStack(body, seat))) });
     }
     for s in game.ships.iter().filter(|s| s.seat == seat) {
         if let ShipAt::Transit { to, turns_left, .. } = s.at {
-            any_ship = true;
-            let text = format!("{}{} in transit to {}, {} turn(s) left", tag("Ship"), s.kind.name(), game.tables.body(to).name, turns_left);
-            if ui.button(text).clicked() {
-                *jump = Some((View::Solar, Selection::None));
-            }
+            // A Ship in transit is not waiting on anybody: it arrives when it arrives.
+            ships_rows.push(RosterRow {
+                text: format!("{}{} in transit to {}, {} turn(s) left", tag("Ship"), s.kind.name(), game.tables.body(to).name, turns_left),
+                wants: false,
+                jump: Some((View::Solar, Selection::None)),
+            });
         }
     }
-    if !any_ship && marks {
-        ui.label(RichText::new("  none; a Shipyard on a station or Colony builds them").weak());
-    }
-    // Armies.
-    heading(ui, "Armies");
-    let mut any_army = false;
+    roster_group(ui, view, RosterGroup { index: 0, name: "Ships", empty: "  none; a Shipyard on a station or Colony builds them" }, ships_rows, marks, jump);
+
+    // Armies, sorted by where they stand rather than by when they were raised.
+    //
+    // Ticket #115: an Army does NOT carry the "no order" mark. The designer: "let's allow an armies
+    // orders to park them in that stance until otherwise moved - a army on defense should remain on
+    // defense unless told otherwise." The engine already worked that way and now a test guards it,
+    // so an Army standing where it was put is attended by definition, and the mark had been firing
+    // on twelve rows out of twelve, which says exactly as much as firing on none. What the row
+    // shows in its place is the stance it is parked in, so "until otherwise moved" is something a
+    // player can SEE.
+    let mut army_rows: Vec<(String, RosterRow)> = Vec::new();
     for a in game.armies.iter().filter(|a| game.army_seat(a) == Some(seat) && !game.army_stands_down(a)) {
-        any_army = true;
-        let ordered = pending.iter().any(|o| match o {
-            Order::MoveArmy { army, .. } | Order::Repair { unit: UnitRef::Army(army), .. } | Order::Load { army: Some(army), .. } => *army == a.id,
-            Order::ArmyStance { place, .. } => a.at == ArmyAt::Place(*place),
-            _ => false,
-        });
         let (where_, target) = match a.at {
             ArmyAt::Place(Place::State(s)) => (game.tables.state(s).name.clone(), Some((View::Surface(BodyId::Earth), Selection::State(s)))),
             ArmyAt::Place(Place::Colony(c)) => (game.place_name(Place::Colony(c)), game.colony(c).map(|col| (View::Surface(col.body), Selection::Colony(c)))),
             ArmyAt::Aboard(ship) => (format!("aboard {ship}"), game.ship(ship).map(|s| match s.at { ShipAt::Body(b) => (View::Solar, Selection::ShipStack(b, seat)), _ => (View::Solar, Selection::None) })),
         };
-        let mut text = format!("{}{} at {}: strength {}, damage {}", tag("Army"), if a.standing { "Standing Army" } else { "Army" }, where_, game.army_strength(a), a.damage);
-        if marks && !ordered && !matches!(a.at, ArmyAt::Aboard(_)) {
-            text.push_str("  - no order");
+        // Ticket #115: the heading already says "Armies", so every row repeating the word was pure
+        // width, and "damage 0" is true of almost every Army almost always.
+        let mut text = format!("{}{}: strength {}", tag("Army"), where_, game.army_strength(a));
+        if a.damage > 0 {
+            text.push_str(&format!(", damage {}", a.damage));
         }
-        if ui.button(text).clicked() {
-            *jump = target;
+        if !a.standing {
+            text.push_str(", raised");
         }
+        if !matches!(a.at, ArmyAt::Aboard(_)) {
+            text.push_str(&format!("  ({})", a.stance.name()));
+        }
+        army_rows.push((where_, RosterRow { text, wants: false, jump: target }));
     }
-    if !any_army && marks {
-        ui.label(RichText::new("  none").weak());
-    }
-    // Colonies.
-    heading(ui, "Colonies and stations");
-    let mut any_colony = false;
+    army_rows.sort_by(|a, b| a.0.cmp(&b.0));
+    roster_group(ui, view, RosterGroup { index: 1, name: "Armies", empty: "  none" }, army_rows.into_iter().map(|(_, r)| r).collect(), marks, jump);
+
+    // Colonies and stations.
+    //
+    // Ticket #115: these DO carry the mark, on the designer's answer, and it counts this turn's
+    // orders alone -- a Colony with a Module three turns from done is attended, not neglected.
+    let mut colony_rows: Vec<RosterRow> = Vec::new();
     for c in game.colonies.iter().filter(|c| c.control.director() == Some(seat)) {
-        any_colony = true;
         let building = c.queue.len();
+        let ordered = building > 0 || pending.iter().any(|o| roster_order_touches_colony(o, c.id));
         let text = format!("{}{}: {} Colonists, {} Modules{}", tag("Colony"), game.place_name(Place::Colony(c.id)), c.colonists, c.modules.len(), if building > 0 { format!(", {building} building") } else { String::new() });
-        if ui.button(text).clicked() {
-            *jump = Some((View::Surface(c.body), Selection::Colony(c.id)));
-        }
+        colony_rows.push(RosterRow { text, wants: marks && !ordered, jump: Some((View::Surface(c.body), Selection::Colony(c.id))) });
     }
-    if !any_colony && marks {
-        ui.label(RichText::new("  none; a Colony Ship founds one").weak());
-    }
-    // Nation States.
-    heading(ui, "Nation States");
-    let states = game.directed_states(seat);
-    if states.is_empty() && marks {
-        ui.label(RichText::new("  none").weak());
-    }
-    for sid in states {
+    roster_group(ui, view, RosterGroup { index: 2, name: "Colonies and stations", empty: "  none; a Colony Ship founds one" }, colony_rows, marks, jump);
+
+    // Nation States, on the same rule as the Colonies.
+    let mut state_rows: Vec<RosterRow> = Vec::new();
+    for sid in game.directed_states(seat) {
         let st = game.state(sid);
         let building = st.queue.len();
+        let ordered = building > 0 || pending.iter().any(|o| roster_order_touches_state(o, sid));
         let text = format!("{}{}: {} Facilities, {} free slot(s){}", tag("State"), game.tables.state(sid).name, st.facilities.len(), game.free_slots(sid), if building > 0 { format!(", {building} building") } else { String::new() });
-        if ui.button(text).clicked() {
-            *jump = Some((View::Surface(BodyId::Earth), Selection::State(sid)));
-        }
+        state_rows.push(RosterRow { text, wants: marks && !ordered, jump: Some((View::Surface(BodyId::Earth), Selection::State(sid))) });
+    }
+    roster_group(ui, view, RosterGroup { index: 3, name: "Nation States", empty: "  none" }, state_rows, marks, jump);
+}
+
+/// Ticket #115: does this pending order do anything to that Colony this turn? It decides only
+/// whether the roster marks the row, so a near miss costs a mark and nothing else.
+fn roster_order_touches_colony(o: &Order, cid: ColonyId) -> bool {
+    match o {
+        Order::BuildModule { colony, .. } | Order::BuildModuleWithDucats { colony, .. } | Order::BuildArchive { colony } => *colony == cid,
+        Order::BuildArmy { place } | Order::Influence { target: place, .. } => *place == Place::Colony(cid),
+        Order::BuildShip { site, .. } => *site == Place::Colony(cid),
+        Order::Unload { into: UnloadTarget::Colony(c), .. } => *c == cid,
+        Order::Change { building, .. } => matches!(building, BuildingRef::Module(c, _) if *c == cid),
+        Order::ArmyStance { place, .. } => *place == Place::Colony(cid),
+        _ => false,
     }
 }
 
+/// The same for a Nation State.
+fn roster_order_touches_state(o: &Order, sid: StateId) -> bool {
+    match o {
+        Order::BuildFacility { state, .. } | Order::BuildFacilityWithDucats { state, .. } | Order::RaiseIndustry { state } => *state == sid,
+        Order::BuildArmy { place } | Order::Influence { target: place, .. } => *place == Place::State(sid),
+        Order::BuildShip { site, .. } => *site == Place::State(sid),
+        Order::MoveArmy { to, .. } => *to == sid,
+        Order::Change { building, .. } => matches!(building, BuildingRef::Facility(s, _) if *s == sid),
+        Order::ArmyStance { place, .. } => *place == Place::State(sid),
+        _ => false,
+    }
+}
 
 fn order_text(game: &Game, o: &Order) -> String {
     match o {

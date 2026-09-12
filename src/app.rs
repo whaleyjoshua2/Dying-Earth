@@ -280,6 +280,10 @@ pub struct ViewState {
     /// Ticket #57, a building aid (`hover:<body id>`): the Solar System Map draws that Body's launch
     /// window tooltip as though the pointer were on it, so a picture can be taken of it.
     pub force_hover: Option<BodyId>,
+    /// Ticket #115 (version 0.07.1): which of the roster's four groups are filtered down to the rows
+    /// that still want an order. Off by default, so the roster is an index of what you own and
+    /// becomes a to-do list only when you ask it to, one group at a time.
+    pub roster_filter: [bool; 4],
 }
 
 impl Default for ViewState {
@@ -310,6 +314,7 @@ impl Default for ViewState {
             attack_preview: false,
             moments_on: None,
             force_hover: None,
+            roster_filter: [false; 4],
         }
     }
 }

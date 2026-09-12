@@ -790,6 +790,12 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         show_view(&mut view, VIEWS[0].1);
         // `select:<state id>` (a building aid) opens that Nation State's card in the Earth picture.
         plan.select = std::env::args().find_map(|a| a.strip_prefix("select:").map(str::to_owned));
+        // `roster:filter` (a building aid, not part of the spec): every roster group filtered down
+        // to the rows that still want an order, which is otherwise a click and so unreachable in a
+        // headless picture.
+        if std::env::args().any(|a| a == "roster:filter") {
+            view.roster_filter = [true; 4];
+        }
         plan.tech = std::env::args().any(|a| a == "tech:1");
         plan.trade = std::env::args().any(|a| a == "trade:1");
         plan.victory = std::env::args().any(|a| a == "victory:1");
