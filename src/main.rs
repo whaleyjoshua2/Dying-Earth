@@ -3,6 +3,7 @@
 //!   dying-earth.exe                     play
 //!   dying-earth.exe seed:<n>            play with a fixed seed
 //!   dying-earth.exe shot:<prefix>       headless screenshots of the four views, then exit
+//!   dying-earth.exe window:<w>x<h>      the off-screen window's size, for photographing tall panels
 //!   dying-earth.exe savedir:<path>      (ticket #59) saves go here instead of the local app-data folder
 //!   dying-earth.exe simulate:<seed> [--player=<faction>]   all four seats on the AI, headless log
 
@@ -75,9 +76,19 @@ fn main() {
     };
     let mode = if shot.is_some() { Mode::Shot } else { Mode::Play };
     let position = if mode == Mode::Shot { WindowPosition::At(IVec2::new(-5000, -5000)) } else { WindowPosition::Automatic };
+    // `window:<w>x<h>` (a building aid, not part of the spec): a taller off-screen window, so a
+    // picture can be taken of a panel longer than the default 800 rows. The Climate Panel scrolls,
+    // and a scrolled panel cannot be scrolled headlessly, so without this its lower half -- the
+    // Blame block among it -- could only be checked by reading the code.
+    let (width, height) = std::env::args()
+        .find_map(|a| {
+            let (w, h) = a.strip_prefix("window:")?.split_once('x')?;
+            Some((w.parse().ok()?, h.parse().ok()?))
+        })
+        .unwrap_or((1280, 800));
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window { title: "Dying Earth".into(), resolution: (1280, 800).into(), position, ..default() }),
+            primary_window: Some(Window { title: "Dying Earth".into(), resolution: (width, height).into(), position, ..default() }),
             ..default()
         }))
         .add_plugins(EguiPlugin::default())

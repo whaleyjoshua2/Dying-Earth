@@ -143,3 +143,54 @@ The rule the designer set for the resources — *"use the same way"* — is appl
 
 The Credits screen carries all eight, and its heading is no longer "Resource icons", since three of
 the eight are not resources.
+
+### The glyphs come down into the lists, and Emissions joins the top bar
+
+The designer's answer to *what does the Emissions glyph label*: everywhere it appears — the dense
+lists, the Blame block, **and a new figure on the top bar**.
+
+![A Nation State's Facility list](facility-lines-with-glyphs.png)
+
+`Factory (coastal): +7 Materials, 2 Energy upkeep, 1.2 Emissions` is now
+`Factory (coastal): +7 🛒, 2 ⚡ upkeep, 1.2 🏭`. This is the line a player compares two buildings
+across, and the words were most of its width.
+
+**The first attempt was wrong and the picture caught it.** Version 0.07.0's tooltip renderer swaps a
+word for its glyph *anywhere* it appears, and pointed at a list that ate the word out of a
+building's own name: `Research Lab (inland): +2 Research` came out as `🔬 Lab (inland): +2 🔬`. The
+rule for a list is therefore narrower than the rule for prose — **a word is traded for its glyph
+only directly after a number**, since that is what makes it a figure rather than a name. Tooltips
+keep the old rule, because a tooltip is prose. A second, smaller fault in the same picture: the
+commas floated a space away from their glyphs, because egui applies item spacing *after* a widget,
+so the gap to close is the one the image leaves behind rather than the one before the punctuation.
+
+![The Blame block, each ppm figure marked](blame-block-with-glyphs.png)
+
+Every Blame figure is in ppm and so every one of them carries the glyph; *share* and *thresholds*
+are not ppm and keep their words. `ppm` means Emissions **here and nowhere else** — four lines above
+this block the same three letters are the CO2 Stock and a Scrubber's pull on the Natural Sink, and a
+chimney against either of those would be a lie — so the renderer takes that word as a local extra
+rather than learning it globally.
+
+Note what the picture shows about **colour**, which is the question still open on this ticket: the
+chimneys in the Blame block are already **Faction-coloured**, because the line takes the seat's
+colour and the glyph takes the line's tint. Colour on an icon already means *whose* in at least one
+place.
+
+![Net Emissions on the top bar](net-emissions-on-the-bar.png)
+
+`🏭 +47.5 ppm` sits after the Temperature. Until now the only way to learn whether the world went
+over or under the Natural Sink this turn was to open the Climate Panel; the Temperature beside it
+moves far too slowly to answer that question.
+
+### Two building aids this needed
+
+Photographing the Blame block turned out to be impossible, and the reason is a finding in itself.
+The Climate Panel settles at about **400 rows tall whatever room it is given**, scrolls the rest,
+and a scroll cannot be driven headlessly — so **the Blame block is below the fold for a player at
+1280x800 too**, until they scroll or drag the panel. That is pre-existing, from ticket #53, and not
+something this ticket introduced, but it is worth writing down.
+
+Two aids now exist, neither part of the spec: `window:<w>x<h>` sets the off-screen window's size,
+and `climate:top` opens the Climate Panel at the top of the window at full height. Together they
+photograph a panel taller than the screen.

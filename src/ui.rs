@@ -1004,6 +1004,18 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             ui.label(RichText::new(format!("Turn {} / {}, {}", game.turn, game.tables.victory.turns, game.date_text())).strong());
             ui.separator();
             ui.label(format!("{:+.1} C, heading to {:+.1}", game.climate.temperature, game.target_temperature()));
+            ui.separator();
+            // Ticket #112 (version 0.07.1): net Emissions join the bar. Until now the only way to
+            // learn whether the world went over or under the Natural Sink this turn was to open the
+            // Climate Panel; the Temperature beside it moves too slowly to answer that question.
+            bar_resource(
+                ui,
+                icons,
+                "emissions",
+                "Emissions",
+                format!("{:+.1} ppm", game.climate.last.net()),
+                "Net Emissions at the last Resolution: everything the world emitted less the Natural Sink and any Scrubbers. Above zero the CO2 Stock rose and the Temperature will follow; below zero it fell. The Climate Panel breaks it into its sources.".to_string(),
+            );
         });
         ui.horizontal_wrapped(|ui| {
             if ui.button("Tech Tree").clicked() {
@@ -1796,38 +1808,82 @@ fn icon_word(ui: &mut Ui, key: &str, text: impl Into<String>) {
 /// everywhere a player reads at a glance, and the tooltips, which are the wordiest thing in the
 /// interface, trade them for pictures. Where an icon is missing the word comes straight back.
 fn hover_with_icons(ui: &mut Ui, text: &str) {
-    // Ticket #112 (version 0.07.1): population, Influence and Emissions join the five resources,
-    // used the same way -- the glyph stands for the word inside a tooltip.
-    const WORDS: [(&str, &str); 10] = [
-        ("Materials", "materials"),
-        ("Fuel", "fuel"),
-        ("Energy", "energy"),
-        ("Research", "research"),
-        ("Ducats", "ducats"),
-        ("Population", "population"),
-        ("Influence", "influence"),
-        ("Emissions", "emissions"),
-        // The prose capitalises the five resources and Influence, but writes the other two in
-        // lower case mid-sentence, so both spellings have to be looked for.
-        ("population", "population"),
-        ("emissions", "emissions"),
-    ];
     ui.set_max_width(360.0);
+    text_with_icons(ui, text, 14.0, Color32::from_rgb(225, 220, 210));
+}
+
+/// The eight figures that have a glyph, in both the spellings the game's prose uses. The five
+/// resources and Influence are capitalised as defined terms; population and emissions are written
+/// in lower case mid-sentence, so both forms have to be looked for.
+const ICON_WORDS: [(&str, &str); 10] = [
+    ("Materials", "materials"),
+    ("Fuel", "fuel"),
+    ("Energy", "energy"),
+    ("Research", "research"),
+    ("Ducats", "ducats"),
+    ("Population", "population"),
+    ("Influence", "influence"),
+    ("Emissions", "emissions"),
+    ("population", "population"),
+    ("emissions", "emissions"),
+];
+
+/// Ticket #112 (version 0.07.1): a line of text with every figure's word traded for its glyph.
+/// Version 0.07.0 used this on tooltips alone; the designer has now pointed it at the two densest
+/// lists in the game -- a Nation State's Facilities and a Colony's Modules -- where `+16 Energy, 2
+/// Energy upkeep, 1.9 Emissions` is the line a player actually compares two buildings across, and
+/// where the words are most of the width. Where an icon is missing the word comes straight back, so
+/// a failed load costs legibility and nothing else.
+fn text_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32) {
+    draw_with_icons(ui, text, size, tint, &[], false);
+}
+
+/// A dense list line, where a word is traded for its glyph ONLY where it names a figure -- which is
+/// to say only directly after a number. The first picture of the Facility list showed why: the
+/// plain rule turned "Research Lab (inland): +2 Research" into "[microscope] Lab (inland): +2
+/// [microscope]", eating the word out of the building's own NAME. A tooltip is prose and still
+/// swaps everywhere; a list is figures and swaps only on the figures.
+///
+/// `extra` carries words that mean a figure HERE and nowhere else. The Blame block is the whole
+/// reason it exists: there "ppm" is the Emissions a Faction is answerable for, while four lines
+/// higher the same three letters are the CO2 Stock and a Scrubber's pull on the Natural Sink, and a
+/// chimney against either of those would be a lie.
+fn figures_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(&str, &str)]) {
+    draw_with_icons(ui, text, size, tint, extra, true);
+}
+
+fn draw_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(&str, &str)], after_numbers_only: bool) {
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 3.0;
+        let mut previous_was_a_figure = false;
         for token in text.split(' ') {
             // Keep whatever punctuation rides on the word, so "30 Materials," still reads.
             let bare = token.trim_end_matches([',', '.', ';', ':']);
             let tail = &token[bare.len()..];
-            match WORDS.iter().find(|(w, _)| *w == bare).and_then(|(_, key)| Icons::from_ctx(ui.ctx(), key, 14.0, Color32::from_rgb(225, 220, 210))) {
+            let allowed = !after_numbers_only || previous_was_a_figure;
+            previous_was_a_figure = bare.ends_with(|c: char| c.is_ascii_digit());
+            match ICON_WORDS
+                .iter()
+                .chain(extra.iter())
+                .find(|(w, _)| allowed && *w == bare)
+                .and_then(|(_, key)| Icons::from_ctx(ui.ctx(), key, size, tint))
+            {
                 Some(image) => {
-                    ui.add(image);
-                    if !tail.is_empty() {
-                        ui.label(tail);
+                    if tail.is_empty() {
+                        ui.add(image);
+                    } else {
+                        // The comma belongs to the glyph and must hug it. egui applies item_spacing
+                        // AFTER a widget, so the gap to close is the one the IMAGE leaves behind,
+                        // not the one before the punctuation -- the first attempt set it the other
+                        // way round and produced "+16 [bolt] ,1.9".
+                        ui.spacing_mut().item_spacing.x = 0.0;
+                        ui.add(image);
+                        ui.spacing_mut().item_spacing.x = 3.0;
+                        ui.colored_label(tint, tail);
                     }
                 }
                 None => {
-                    ui.label(token);
+                    ui.colored_label(tint, token);
                 }
             }
         }
@@ -2115,16 +2171,24 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             }
         };
         let colour = if f.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
-        ui.colored_label(
-            colour,
-            format!(
-                "  {} ({}): {}{}",
-                f.kind.name(),
-                if f.coastal { "coastal" } else { "inland" },
-                figures,
-                if f.online || f.mothballed { "" } else { " (offline, making nothing)" }
-            ),
-        );
+        // Ticket #112 (version 0.07.1): the glyphs come down into the Facility list, where the
+        // figures are compared building against building and the words are most of the width.
+        ui.horizontal(|ui| {
+            ui.add_space(8.0);
+            figures_with_icons(
+                ui,
+                &format!(
+                    "{} ({}): {}{}",
+                    f.kind.name(),
+                    if f.coastal { "coastal" } else { "inland" },
+                    figures,
+                    if f.online || f.mothballed { "" } else { " (offline, making nothing)" }
+                ),
+                14.0,
+                colour,
+                &[],
+            );
+        });
         if mine {
             change_row(ui, game, &session.pending, BuildingRef::Facility(sid, i), f.mothballed, f.change, actions);
         }
@@ -2319,7 +2383,10 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             }
         };
         let colour = if m.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
-        ui.colored_label(colour, format!("  {}: {}{}", m.kind.name(), figures, if m.online || m.mothballed { "" } else { " (offline, making nothing)" }));
+        ui.horizontal(|ui| {
+            ui.add_space(8.0);
+            figures_with_icons(ui, &format!("{}: {}{}", m.kind.name(), figures, if m.online || m.mothballed { "" } else { " (offline, making nothing)" }), 14.0, colour, &[]);
+        });
         if colony_mine {
             change_row(ui, game, &session.pending, BuildingRef::Module(cid, mi), m.mothballed, m.change, actions);
         }
@@ -2919,7 +2986,13 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         let mut open = true;
         let bottom = ctx.viewport_rect().max.y;
         // Ticket #64: the spectator's card sits on the left, so the panel's home is clear of it.
-        let home = (if session.spectator { 420.0 } else { 10.0 }, bottom - 400.0);
+        // `climate:top` (a building aid, not part of the spec): the panel opens at the top of the
+        // window instead of 400 rows off the bottom, so a tall window can photograph the whole of
+        // it. The panel is otherwise always about 400 rows tall and scrolls, and a scroll cannot be
+        // driven headlessly -- which also means the Blame block at its foot is below the fold for a
+        // player at 1280x800 until they scroll.
+        let top = std::env::args().any(|a| a == "climate:top");
+        let home = (if session.spectator { 420.0 } else { 10.0 }, if top { 10.0 } else { bottom - 400.0 });
         // Ticket #104 (version 0.07.0): the panel could be dragged larger but not back down. Its
         // content is not what held it: rendered at 230 wide everything wraps and nothing overflows.
         // So the width is made authoritative -- an explicit floor it may be dragged to, and a scroll
@@ -2928,6 +3001,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             .open(&mut open)
             .default_pos(home)
             .default_width(400.0)
+            // The aid also has to force the height: with a scroll area inside, the window settles
+            // at about 400 rows whatever room it is given, which is the fold the block sits below.
+            .default_height(if top { 1300.0 } else { 400.0 })
             .resizable(true)
             .min_width(230.0)
             .min_height(140.0)
@@ -3010,7 +3086,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 let credit = game.blame_credit(seat);
                 let line = if credit > 0.0 {
                     format!(
-                        "{}: emitted {:.0} ppm, removed {:.0}, Blame 0, credit {:.0} ppm, share {:.2}, thresholds x{:.2}",
+                        "{}: emitted {:.0} ppm, removed {:.0} ppm, Blame 0 ppm, credit {:.0} ppm, share {:.2}, thresholds x{:.2}",
                         game.seat_name(seat),
                         s.blame_emitted,
                         s.blame_removed,
@@ -3020,7 +3096,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                     )
                 } else {
                     format!(
-                        "{}: emitted {:.0} ppm, removed {:.0}, Blame {:.0}, share {:.2}, thresholds x{:.2}",
+                        "{}: emitted {:.0} ppm, removed {:.0} ppm, Blame {:.0} ppm, share {:.2}, thresholds x{:.2}",
                         game.seat_name(seat),
                         s.blame_emitted,
                         s.blame_removed,
@@ -3029,7 +3105,11 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         game.blame_threshold_multiplier(seat)
                     )
                 };
-                ui.label(RichText::new(line).color(seat_colour(session, seat)));
+                // Ticket #112 (version 0.07.1): each Faction's ppm figures wear the Emissions
+                // glyph, so the figure a Faction is answerable for is marked as the same thing the
+                // Facility lists and the top bar count. "share" and "thresholds" are not ppm and
+                // keep their words.
+                figures_with_icons(ui, &line, 14.0, seat_colour(session, seat), &[("ppm", "emissions")]);
             }
             ui.label(RichText::new("A share above a fair quarter raises that Faction's Influence thresholds on every Nation State it does not hold, up to half again.").weak());
         });
