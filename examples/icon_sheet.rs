@@ -21,6 +21,15 @@ fn main() {
     // A second argument points the sheet at any folder of SVGs, so candidates can be judged before
     // they are adopted.
     let from = std::env::args().nth(2).unwrap_or_else(|| "assets/icons".to_string());
+    // A third argument gives the small sizes to magnify, one row each. Ticket #113 asks whether a
+    // glyph survives a MAP label, which is drawn at 11 points where the top bar uses 16, so the
+    // question is answered by rendering the sizes actually used rather than by one of them.
+    let smalls: Vec<u32> = std::env::args()
+        .nth(3)
+        .unwrap_or_else(|| "16".to_string())
+        .split(',')
+        .filter_map(|v| v.trim().parse().ok())
+        .collect();
     let dir = Path::new(&from);
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .expect("assets/icons")
@@ -32,7 +41,7 @@ fn main() {
 
     let cols = names.len().max(1) as u32;
     let width = cols * (CELL + PAD) + PAD;
-    let height = CELL + LABEL + PAD * 3 + CELL;
+    let height = CELL + LABEL + PAD * 2 + smalls.len() as u32 * (CELL + PAD);
     let mut sheet = image::RgbaImage::from_pixel(width, height, image::Rgba([26, 26, 32, 255]));
 
     for (i, name) in names.iter().enumerate() {
@@ -58,26 +67,28 @@ fn main() {
                 image::Rgba([blend(p.red(), under[0]), blend(p.green(), under[1]), blend(p.blue(), under[2]), 255]),
             );
         }
-        // THE DECIDING VIEW: the same glyph rendered at the 16 pixels the top bar draws it at, then
-        // blown up without smoothing. A glyph made of many small repeated shapes survives the first
-        // row and dissolves here, which is exactly how the coins came to read as a mineral.
-        let small = 16u32;
-        let mut tiny = resvg::tiny_skia::Pixmap::new(small, small).expect("pixmap");
-        let s2 = (small as f32 / size.width()).min(small as f32 / size.height());
-        resvg::render(&tree, resvg::tiny_skia::Transform::from_scale(s2, s2), &mut tiny.as_mut());
-        let zoom = CELL / small;
-        let y0 = PAD * 2 + CELL + LABEL;
-        for (x, y, p) in tiny.pixels().iter().enumerate().map(|(n, p)| (n as u32 % small, n as u32 / small, p)) {
-            let a = p.alpha() as f32 / 255.0;
-            for dx in 0..zoom {
-                for dy in 0..zoom {
-                    let (px, py) = (x0 + x * zoom + dx, y0 + y * zoom + dy);
-                    if px >= width || py >= height {
-                        continue;
+        // THE DECIDING VIEW: the same glyph rendered at the pixel size the interface actually draws
+        // it at, then blown up without smoothing. A glyph made of many small repeated shapes
+        // survives the first row and dissolves here, which is exactly how the coins came to read as
+        // a mineral -- and the smaller the row, the sooner it goes.
+        for (row, small) in smalls.iter().copied().enumerate() {
+            let mut tiny = resvg::tiny_skia::Pixmap::new(small, small).expect("pixmap");
+            let s2 = (small as f32 / size.width()).min(small as f32 / size.height());
+            resvg::render(&tree, resvg::tiny_skia::Transform::from_scale(s2, s2), &mut tiny.as_mut());
+            let zoom = CELL / small;
+            let y0 = PAD * 2 + CELL + LABEL + row as u32 * (CELL + PAD);
+            for (x, y, p) in tiny.pixels().iter().enumerate().map(|(n, p)| (n as u32 % small, n as u32 / small, p)) {
+                let a = p.alpha() as f32 / 255.0;
+                for dx in 0..zoom {
+                    for dy in 0..zoom {
+                        let (px, py) = (x0 + x * zoom + dx, y0 + y * zoom + dy);
+                        if px >= width || py >= height {
+                            continue;
+                        }
+                        let under = *sheet.get_pixel(px, py);
+                        let blend = |c: u8, u: u8| ((c as f32) + (u as f32) * (1.0 - a)) as u8;
+                        sheet.put_pixel(px, py, image::Rgba([blend(p.red(), under[0]), blend(p.green(), under[1]), blend(p.blue(), under[2]), 255]));
                     }
-                    let under = *sheet.get_pixel(px, py);
-                    let blend = |c: u8, u: u8| ((c as f32) + (u as f32) * (1.0 - a)) as u8;
-                    sheet.put_pixel(px, py, image::Rgba([blend(p.red(), under[0]), blend(p.green(), under[1]), blend(p.blue(), under[2]), 255]));
                 }
             }
         }
