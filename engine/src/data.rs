@@ -79,6 +79,11 @@ pub struct StateCard {
     /// `assets/flags/`. Empty where a Region has none, and the card then draws no flag.
     #[serde(default)]
     pub flag: String,
+    /// Version 0.07.2 (ticket #126): the Region's own colour, worn on the globe while nobody holds
+    /// it and on the start screen, where nothing is held yet. Zero where a card has none, and the
+    /// composer then leaves the photograph bare, as it did before this version.
+    #[serde(default)]
+    pub colour: [f32; 3],
     pub population: f64,
     pub industry_level: u32,
     pub resource_lean: Resource,

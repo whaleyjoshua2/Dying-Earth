@@ -213,7 +213,9 @@ pub fn recompose_earth(
     let Some(handles) = handles else { return };
     let rgba = match &session.game {
         Some(game) => textures.compose_earth(game, &session.colours()),
-        None => crate::textures::Rgba { w: textures.earth.w, h: textures.earth.h, data: textures.earth.data.clone() },
+        // Ticket #126 (version 0.07.2): the start globe shows every Region in its own colour, with
+        // its borders, so a player can choose one by clicking it.
+        None => textures.compose_regions(&session.tables),
     };
     let img = images.add(rgba.to_image());
     if let Some(mut m) = materials.get_mut(&handles.earth_material) {
