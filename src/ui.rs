@@ -2125,7 +2125,12 @@ fn rule_tip(response: egui::Response, text: String) -> egui::Response {
     if let Some(word) = std::env::args().find_map(|a| a.strip_prefix("tip:").map(str::to_owned))
         && text.contains(&word)
     {
-        {
+        // Once a frame: a card of twelve build buttons all match "Ready", and twelve tooltips at
+        // once is a picture of nothing.
+        let pass = response.ctx.cumulative_pass_nr();
+        let fired: Option<u64> = response.ctx.data(|d| d.get_temp(egui::Id::new("tip_fired")));
+        if fired != Some(pass) {
+            response.ctx.data_mut(|d| d.insert_temp(egui::Id::new("tip_fired"), pass));
             response.show_tooltip_ui(|ui| hover_with_icons(ui, &text));
             return response;
         }
@@ -2258,31 +2263,89 @@ fn cost_button(ui: &mut Ui, game: &Game, pending: &[Order], order: Order, label:
     cost_button_with_hover(ui, game, pending, order, label, None, actions);
 }
 
-/// Ticket #106: the cost of an order, spelled for a tooltip, so the hover can draw it with glyphs.
-fn cost_hover(game: &Game, order: &Order) -> String {
-    format!("Costs {}.", game.order_cost(Seat(0), order).text())
+/// Ticket #121 (version 0.07.2): a button whose price is **figures and glyphs**, not words in
+/// parentheses -- `Factory  25 [cart]` where it read `Factory (25 Materials)` -- and whose price is
+/// simply absent when there is none, so a Mothball is a plain verb and not `Mothball (free)`. The
+/// designer: *"no (25 materials) just 25 ICON"* and *"remove '(free)' in all cases that don't
+/// refer to build slots."* The figure carries **no sign**: every other figure on the card is
+/// unsigned and the glyph already says it is a cost.
+///
+/// egui's own `Button` cannot hold an image mid-text, so a priced button is a clickable group drawn
+/// in the button's own visuals -- `UiBuilder::sense` gives the group a response and the style's
+/// `interact` gives it the hover and press colours a button has -- and a free one is a plain
+/// `Button`, which is exactly what it should look like.
+fn priced_button(ui: &mut Ui, enabled: bool, label: &str, cost: &dying_earth_engine::Cost) -> egui::Response {
+    let parts: Vec<(&str, i64)> = [("materials", cost.materials), ("fuel", cost.fuel), ("energy", cost.energy), ("influence", cost.influence), ("ducats", cost.ducats)]
+        .into_iter()
+        .filter(|(_, n)| *n > 0)
+        .collect();
+    if parts.is_empty() {
+        return ui.add_enabled(enabled, egui::Button::new(label));
+    }
+    ui.add_enabled_ui(enabled, |ui| {
+        ui.scope_builder(egui::UiBuilder::new().sense(egui::Sense::click()), |ui| {
+            let resp = ui.response();
+            let visuals = *ui.style().interact(&resp);
+            egui::Frame::new()
+                .inner_margin(egui::Margin::symmetric(6, 3))
+                .corner_radius(visuals.corner_radius)
+                .fill(visuals.weak_bg_fill)
+                .stroke(visuals.bg_stroke)
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 4.0;
+                        ui.label(RichText::new(label).color(visuals.text_color()));
+                        for (key, n) in &parts {
+                            ui.label(RichText::new(n.to_string()).color(visuals.text_color()));
+                            match Icons::from_ctx(ui.ctx(), key, 14.0) {
+                                Some(image) => {
+                                    ui.add(image);
+                                }
+                                None => {
+                                    ui.label(RichText::new(*key).color(visuals.text_color()));
+                                }
+                            }
+                        }
+                    });
+                });
+        })
+        .response
+    })
+    .inner
 }
 
-/// A build button: cost in the label, and on hover what the building would make each turn (#22).
+/// Ticket #121 (version 0.07.2): how long a building takes, for the hover, where the game's data
+/// says. `None` for an order that builds nothing -- a Mothball, a Relief -- which then gets no
+/// "ready" line at all.
+fn build_turns_for(game: &Game, order: &Order) -> Option<u32> {
+    match order {
+        Order::BuildFacility { kind, .. } | Order::BuildFacilityWithDucats { kind, .. } => Some(game.tables.facility(*kind).build_turns),
+        Order::BuildModule { kind, .. } | Order::BuildModuleWithDucats { kind, .. } => Some(game.tables.module(*kind).build_turns),
+        Order::BuildShip { kind, .. } => Some(game.tables.unit(*kind).build_turns),
+        Order::BuildArchive { .. } => Some(game.tables.module(ModuleKind::Archive).build_turns),
+        _ => None,
+    }
+}
+
+/// A build button: the price on it in glyphs, and on hover how long it takes and what it would
+/// make each turn (#22). Ticket #121 (version 0.07.2): the hover no longer repeats the price --
+/// *"that's already stated"* -- and *"Once it stands"* became the turn count: `Ready next turn:` or
+/// `Ready in 2 turns:`, from the building's own card. Eight of the ten Facilities take one turn.
 fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Order, label: &str, hover: Option<String>, actions: &mut Vec<Action>) {
     let cost = game.order_cost(Seat(0), &order);
     let check = game.check_order(Seat(0), pending, &order);
-    let text = format!("{} ({})", label, cost.text());
-    let button = egui::Button::new(text);
-    let mut resp = ui.add_enabled(check.is_ok(), button);
-    // Ticket #106 (version 0.07.0): the cost reads in glyphs on the hover, words on the button.
-    let priced = cost_hover(game, &order);
-    if let Some(h) = &hover {
-        let whole = format!("{priced} Once it stands: {h}");
-        let (a, b) = (whole.clone(), whole);
-        resp = resp
-            .on_hover_ui(move |ui| hover_with_icons(ui, &a))
-            .on_disabled_hover_ui(move |ui| hover_with_icons(ui, &b));
-    } else {
-        let (a, b) = (priced.clone(), priced);
-        resp = resp
-            .on_hover_ui(move |ui| hover_with_icons(ui, &a))
-            .on_disabled_hover_ui(move |ui| hover_with_icons(ui, &b));
+    let mut resp = priced_button(ui, check.is_ok(), label, &cost);
+    let ready = build_turns_for(game, &order).map(|t| if t <= 1 { "Ready next turn:".to_string() } else { format!("Ready in {t} turns:") });
+    let whole = match (&ready, &hover) {
+        (Some(r), Some(h)) => Some(format!("{r} {h}")),
+        (None, Some(h)) => Some(h.clone()),
+        (Some(r), None) => Some(r.trim_end_matches(':').to_string()),
+        (None, None) => None,
+    };
+    if let Some(whole) = whole {
+        // Through rule_tip, so the tip:<word> aid can photograph a build hover too.
+        let b = whole.clone();
+        resp = rule_tip(resp, whole).on_disabled_hover_ui(move |ui| hover_with_icons(ui, &b));
     }
     if let Err(e) = &check {
         resp.clone().on_disabled_hover_text(&e.0);
@@ -2315,7 +2378,13 @@ fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make
     });
 }
 
-fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewState, target: Place, actions: &mut Vec<Action>) {
+/// `controls` says whether the spend box, the Spend button and the Trading-window button are drawn.
+/// Ticket #121 (version 0.07.2): a Nation State card passes `false` -- *"remove buttons to buy/spend
+/// influence from nation card"* -- since the Command Cluster spends on the selected place and the
+/// card's controls had become a second copy. The Standings, the threshold and the Blame note stay:
+/// they are the figures a player reads before pressing Spend in the corner, and the reason they
+/// clicked the country. A Colony's card keeps its controls, that not being what was asked.
+fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewState, target: Place, controls: bool, actions: &mut Vec<Action>) {
     // Ticket #64: a spectator reads every Faction's Standing here and spends nothing.
     if session.spectator {
         standings_row(ui, game, session, target);
@@ -2330,21 +2399,23 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
         };
         return;
     }
-    ui.horizontal(|ui| {
-        ui.label("Influence:");
-        ui.add(egui::DragValue::new(&mut view.influence_amount).range(1..=100));
-        let order = Order::Influence { target, amount: view.influence_amount };
-        let ok = game.check_order(Seat(0), &session.pending, &order);
-        if ui.add_enabled(ok.is_ok(), egui::Button::new("Spend")).clicked() {
-            actions.push(Action::Place(order));
+    if controls {
+        ui.horizontal(|ui| {
+            ui.label("Influence:");
+            ui.add(egui::DragValue::new(&mut view.influence_amount).range(1..=100));
+            let order = Order::Influence { target, amount: view.influence_amount };
+            let ok = game.check_order(Seat(0), &session.pending, &order);
+            if ui.add_enabled(ok.is_ok(), egui::Button::new("Spend")).clicked() {
+                actions.push(Action::Place(order));
+            }
+            if let Err(e) = ok {
+                ui.label(RichText::new(e.0).weak());
+            }
+        });
+        // Ticket #42: buying Influence lives in the Trading window now.
+        if ui.small_button("Buy more Influence in the Trading window").clicked() {
+            view.show_trade = true;
         }
-        if let Err(e) = ok {
-            ui.label(RichText::new(e.0).weak());
-        }
-    });
-    // Ticket #42: buying Influence lives in the Trading window now.
-    if ui.small_button("Buy more Influence in the Trading window").clicked() {
-        view.show_trade = true;
     }
     // Ticket #53: the threshold shown is the player's own, since Blame raises it seat by seat.
     let threshold = game.influence_threshold_for(Seat(0), target);
@@ -2515,7 +2586,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         // country; it goes where their eye lands.
         ui.separator();
         icon_word(ui, "influence", "Influence");
-        influence_row(ui, game, session, view, Place::State(sid), actions);
+        influence_row(ui, game, session, view, Place::State(sid), false, actions);
         ui.separator();
         // Ticket #73: Emigrants waiting here for a lift or the sea.
         if st.emigrants > 0 {
@@ -2933,7 +3004,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             }
         }
     }
-    influence_row(ui, game, session, view, Place::Colony(cid), actions);
+    influence_row(ui, game, session, view, Place::Colony(cid), true, actions);
 }
 
 fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u32, actions: &mut Vec<Action>) {
@@ -3160,7 +3231,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         icon_word(ui, "influence", "Influence on Colonies here");
         for c in game.colonies.iter().filter(|c| c.body == body) {
             ui.label(game.place_name(Place::Colony(c.id)));
-            influence_row(ui, game, session, view, Place::Colony(c.id), actions);
+            influence_row(ui, game, session, view, Place::Colony(c.id), true, actions);
         }
     }
 }
