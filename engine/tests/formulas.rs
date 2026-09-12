@@ -3813,8 +3813,9 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     assert_eq!(c.name, "Coastal Engineering");
     assert_eq!(c.branch, "Industry");
     // Ticket #69 (version 0.05.5): moved from rung 2 at 25 to rung 1 at 10 with no prerequisite.
+    // Ticket #117 (version 0.07.1): 10 to 11, with every other cost, a tenth rounded to the nearest.
     assert_eq!(c.rung, 1, "rung 1, beside Efficient Grids");
-    assert_eq!(c.cost, 10);
+    assert_eq!(c.cost, 11);
     assert!(c.needs.is_empty(), "it needs nothing");
     assert!(c.effect.contains("Sea Wall"), "its effect names the Sea Wall: {}", c.effect);
     // Two boxes on Industry rung 1, and Clean Power alone on rung 2.
@@ -4920,13 +4921,16 @@ fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
     assert_eq!(g.research.contributions[2], 3, "a held Lab counts toward the Lead as it always did");
 }
 
-/// Ticket #69 (c): Coastal Engineering on Industry rung 1 at 10 Research with no prerequisite, so
-/// the Sea Wall can be reached in time; Clean Power and the Sea Wall's own row are untouched.
+/// Ticket #69 (c): Coastal Engineering on Industry rung 1, cheaper than the rung it stands on and
+/// with no prerequisite, so the Sea Wall can be reached in time; Clean Power and the Sea Wall's own
+/// row are untouched. Ticket #117 (version 0.07.1) raised every cost a tenth, 10 to 11, and the
+/// figure is pinned beside the relationship that is the actual point of it.
 #[test]
-fn coastal_engineering_sits_on_rung_one_at_ten_research_with_no_prerequisite() {
+fn coastal_engineering_sits_on_rung_one_below_its_rungs_cost_with_no_prerequisite() {
     let g = game();
     let t = g.tables.tech(TechId::CoastalEngineering);
-    assert_eq!((t.rung, t.cost), (1, 10));
+    assert_eq!((t.rung, t.cost), (1, 11));
+    assert!(t.cost < g.tables.tech(TechId::EfficientGrids).cost, "cheaper than the rung it shares, or the Sea Wall arrives too late");
     assert!(t.needs.is_empty(), "no prerequisite: {:?}", t.needs);
     assert!(g.available_techs().contains(&TechId::CoastalEngineering), "pickable from the first turn");
     assert_eq!(g.tables.tech(TechId::CleanPower).needs, vec![TechId::EfficientGrids]);
@@ -5614,7 +5618,7 @@ fn the_arkwrights_ships_cost_fifteen_per_cent_less() {
 /// Ticket #84: four new Techs on rung 3 at 40, each after its Faction's themed rung-2 Tech, each
 /// the gate for one Faction's Victory Condition; seventeen Techs in all.
 #[test]
-fn the_four_gates_stand_on_rung_three_at_forty_with_their_prerequisites() {
+fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     let g = game();
     let gates = [
         (FactionKind::Custodians, TechId::PlanetaryStewardship, vec![TechId::GreenConsensus]),
@@ -5622,10 +5626,15 @@ fn the_four_gates_stand_on_rung_three_at_forty_with_their_prerequisites() {
         (FactionKind::Arkwrights, TechId::GenerationShips, vec![TechId::ClosedLoopColonies]),
         (FactionKind::Archivists, TechId::TheUpload, vec![TechId::PublicScience, TechId::ExpandedHabitats]),
     ];
+    // Ticket #117 (version 0.07.1): rung 3 went 40 to 44, a tenth rounded to the nearest. What the
+    // ticket guards is that no Faction's gate is dearer than another's, so the figure is checked
+    // against the rung rather than against a literal repeated four times.
+    let rung_three = g.tables.tech(TechId::PlanetaryStewardship).cost;
+    assert_eq!(rung_three, 44, "rung 3 costs 44 since ticket #117");
     for (kind, t, needs) in gates {
         let card = g.tables.tech(t);
         assert_eq!(card.rung, 3, "{t:?}");
-        assert_eq!(card.cost, 40, "{t:?}");
+        assert_eq!(card.cost, rung_three, "every gate costs the same: {t:?}");
         assert_eq!(card.gate_for, Some(kind), "{t:?}");
         assert_eq!(card.needs, needs, "{t:?}");
         assert_eq!(g.tables.victory_gate(kind), Some(t));
