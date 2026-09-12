@@ -170,3 +170,52 @@ designer may not want for the oil state.
 `serde_json` joined `Cargo.toml` as a dev-dependency so the example can read the GeoJSON; it was
 already in the lock through bevy, and nothing new enters the shipped game. Clippy clean with
 `-D warnings`, 254 tests passing.
+
+## The start is chosen on the map, and every Region has a colour of its own
+
+Ticket [#126](https://github.com/whaleyjoshua2/Dying-Earth/issues/126). *"Starting location selection
+screen should display the regions and allow the player to choose by clicking map; retire the
+clickable list."* And, arriving mid-ticket while the designer looked at the mask preview: *"i'd like
+neutral countries the default colors in this latest mask test. shown on the start screen and on the
+globe."*
+
+![The start screen with Saudi Arabia chosen](start-screen-final-palette.png)
+
+**Every Region carries a colour of its own now**, on its card in `nation_states.toml`. A Region
+nobody holds wears it on the globe at 0.35 strength; a held Region wears its holder's Faction colour
+at 0.45 as before, so the two still read apart; the light coastline stays a mark of a held Region.
+On the start screen, where nothing is held, all fourteen wear their colours with their borders drawn
+— it had shown the bare photograph. The mask generator's preview reads the same numbers from the
+same cards, so the picture it draws and the board a player sees agree to within a rounding of two in
+255.
+
+**Six of the colours collided with a Faction, measured before they were shown.** In CIELAB, Brazil's
+orange sat 8 from the Prospectors' — the same colour — and Iran, Australia, Saudi Arabia, China and
+Egypt sat within 25 of one Faction or another, so a neutral Region could read as a held one. A search
+over candidate hues found six that clear every Faction by 29 or more and their own neighbours by 30
+or more; the designer took them as proposed: Brazil to salmon, Iran to cream, Australia to lavender,
+the Arabian Peninsula to a blue-violet (still violet, as asked, pushed off the Arkwrights' purple),
+China to brick, Egypt to pale rose. India and the United States are both green, 11 apart, and were
+left — opposite sides of the globe, and clear of every Faction.
+
+![The Regions' names on the start globe, no list](start-screen-no-list.png)
+
+**The list of fourteen buttons is gone.** In its place: every Region's name painted on the globe in
+its own colour, where the game view paints it; the Region under the pointer lit at 0.7 strength with
+its card in the panel — flag at thirty-two, name to match, population, Industry, lean, education,
+Influence value, GDP; a click that **chooses** rather than starts, since a globe of real borders has
+small Regions beside large ones and a mis-click on Japan should cost nothing; and a **Begin** button.
+The flag lives in the card and not on the globe, the research having measured that a flag at label
+size is a smudge for half the fourteen.
+
+**A click answers by the border you see.** The old picker took the *nearest label* — on a board of
+straight lines that was close enough, and on a board of real borders it gave Kazakhstan to Russia
+and the Nejd to Iran. It reads the mask now, the same mask the borders are drawn from.
+
+**The globe is recomposed when the lit Region changes and only then.** A recompose is two million
+pixels, and a hover is not a reason to do it every frame; the system remembers what it last drew lit.
+
+![The Americas with the final palette](globe-final-palette-americas.png)
+
+`start:<state>` is a new building aid — the start screen with that Region already chosen — since a
+click cannot be made in a headless picture. Clippy clean with `-D warnings`, 254 tests passing.

@@ -4,6 +4,14 @@
 # colour on the Earth Map and every Region is on the start screen, where nothing is held yet; a held
 # Region wears its controller's Faction colour as before. The preview reads these same numbers, so
 # the picture the generator draws and the board a player sees agree.
+#
+# Six of the preview's colours sat within a CIELAB distance of 25 of a Faction's -- Brazil against
+# the Prospectors at 8 was the same orange -- so a neutral Region could read as a held one. Those six
+# were moved, at the designer's word, to hues that clear every Faction by 29 or more and their own
+# neighbours by 30 or more: Brazil to salmon, Iran to cream, Australia to lavender, the Arabian
+# Peninsula to a blue-violet (still violet, as asked, pushed off the Arkwrights' purple), China to
+# brick, Egypt to pale rose. India and the United States are both green, 11 apart, and were left,
+# being on opposite sides of the globe and clear of every Faction.
 # Version 0.07.2 (ticket #122): every Region is named for its Nation -- the power that leads it --
 # and carries that Nation's flag as a two-letter code into assets/flags/. The geographic names the
 # twelve were charted under stay in the comment above each block, since they still say what ground
@@ -92,7 +100,7 @@ unrest = 0.0
 id = "north_africa"
 name = "Egypt"
 flag = "eg"
-colour = [0.98, 0.47, 0.67]
+colour = [0.94, 0.71, 0.78]
 population = 2.6
 industry_level = 1
 resource_lean = "fuel"
@@ -115,7 +123,7 @@ unrest = 0.0
 id = "east_asia"
 name = "China"
 flag = "cn"
-colour = [0.86, 0.31, 0.31]
+colour = [0.71, 0.24, 0.16]
 population = 14.4
 industry_level = 3
 resource_lean = "materials"
@@ -175,7 +183,7 @@ unrest = 0.0
 id = "australia"
 name = "Australia"
 flag = "au"
-colour = [0.63, 0.35, 0.78]
+colour = [0.78, 0.67, 0.94]
 population = 0.5
 industry_level = 2
 resource_lean = "energy"
@@ -252,7 +260,7 @@ unrest = 0.0
 id = "south_america"
 name = "Brazil"
 flag = "br"
-colour = [0.90, 0.51, 0.16]
+colour = [0.94, 0.59, 0.51]
 population = 4.5
 industry_level = 1
 resource_lean = "fuel"
@@ -295,7 +303,7 @@ unrest = 0.0
 id = "middle_east"
 name = "Iran"
 flag = "ir"
-colour = [0.24, 0.78, 0.78]
+colour = [0.92, 0.88, 0.71]
 population = 2.5
 industry_level = 2
 resource_lean = "fuel"
@@ -347,7 +355,7 @@ unrest = 0.0
 id = "arabian_peninsula"
 name = "Saudi Arabia"
 flag = "sa"
-colour = [0.51, 0.27, 0.78]
+colour = [0.59, 0.43, 1.00]
 population = 1.0
 industry_level = 2
 resource_lean = "fuel"
