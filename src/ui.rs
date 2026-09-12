@@ -1508,7 +1508,8 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildModuleWithDucats { colony, kind } => format!("Build {} at {} for Ducats", kind.name(), game.place_name(Place::Colony(*colony))),
         Order::BuildStation { body, slot } => format!("Build {} over {}", game.station_name(*body, *slot), game.tables.body(*body).name),
         Order::BuildArchive { colony } => format!("Build the Archive at {}", game.place_name(Place::Colony(*colony))),
-        Order::FundArchive => "Fund the Archive with this turn's Research".to_string(),
+        Order::SetArchiveFunding { on: true } => "Pay your Labs into the Archive fund from the next Income".to_string(),
+        Order::SetArchiveFunding { on: false } => "Pay your Labs into the shared Tech from the next Income".to_string(),
         // Ticket #73.
         Order::BuildEmigrants { state, n } => format!("Muster {n} Emigrants in {}", game.tables.state(*state).name),
         Order::SendToAntarctica { state, n, into } => format!(
@@ -2101,20 +2102,37 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                 format!("Archive fund {fund} of {cap} (a quarter of the {research} until the Archive stands)")
             };
             ui.label(fund_line);
-            let funding = game.seat(Seat(0)).funding_archive || session.pending.iter().any(|o| matches!(o, Order::FundArchive));
-            let mut on = funding;
-            let may_fund = game.check_order(Seat(0), &session.pending, &Order::FundArchive).is_ok() || funding;
-            let box_ = ui.add_enabled(may_fund, egui::Checkbox::new(&mut on, "Fund the Archive this turn (your Labs' Research goes to the fund, not the shared Tech)"));
-            if !may_fund {
-                box_.clone().on_disabled_hover_text("The fund is at its cap; this turn's Research goes to the shared Tech.");
+            // Version 0.07.0: a standing declaration, read at the next Income, not a per-turn order.
+            let declared = game.seat(Seat(0)).archive_funding;
+            let pending_set = session.pending.iter().find_map(|o| match o {
+                Order::SetArchiveFunding { on } => Some(*on),
+                _ => None,
+            });
+            let mut on = pending_set.unwrap_or(declared);
+            let flip = Order::SetArchiveFunding { on: !on };
+            let may_flip = pending_set.is_some() || game.check_order(Seat(0), &session.pending, &flip).is_ok();
+            let box_ = ui.add_enabled(
+                may_flip,
+                egui::Checkbox::new(&mut on, "Pay your Labs into the Archive fund (from the next Income, until you set it back)"),
+            );
+            if !may_flip {
+                box_.clone().on_disabled_hover_text("The fund is at its cap; your Labs' Research goes to the shared Tech.");
             }
             if box_.changed() {
-                if on {
-                    actions.push(Action::Place(Order::FundArchive));
-                } else if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::FundArchive)) {
+                if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetArchiveFunding { .. })) {
                     actions.push(Action::Cancel(i));
+                } else {
+                    actions.push(Action::Place(Order::SetArchiveFunding { on }));
                 }
             }
+            ui.label(
+                egui::RichText::new(if on {
+                    "Your Labs pay the fund from the next Income."
+                } else {
+                    "Your Labs pay the shared Tech."
+                })
+                .weak(),
+            );
             if !built && !game.archive_ordered(Seat(0)) {
                 let order = Order::BuildArchive { colony: cid };
                 let materials = game.order_cost(Seat(0), &order).materials;
@@ -2630,8 +2648,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         }
                     ),
                 );
-                if session.pending.iter().any(|o| matches!(o, Order::FundArchive)) {
-                    ui.colored_label(Color32::YELLOW, "You are funding the Archive this turn: Provisional Findings is off next turn.");
+                if game.seat(Seat(0)).archive_funding || session.pending.iter().any(|o| matches!(o, Order::SetArchiveFunding { on: true })) {
+                    ui.colored_label(Color32::YELLOW, "Your Labs pay the Archive fund: the turn after they next pay it, Provisional Findings is off.");
                 }
             }
             let must_pick = game.research.awaiting_pick == Some(Seat(0)) && game.research.current.is_none();

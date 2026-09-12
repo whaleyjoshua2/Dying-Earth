@@ -469,6 +469,7 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("build_station", &["body"]),
     ("build_archive", &["colony"]),
     ("fund_archive", &[]),
+    ("unfund_archive", &[]),
     ("build_emigrants", &["n", "state"]),
     ("send_antarctica", &["n", "state"]),
     ("set_venture_share", &["share"]),

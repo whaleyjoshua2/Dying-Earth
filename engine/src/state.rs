@@ -551,8 +551,14 @@ pub struct SeatState {
     /// Ticket #51: Research banked for the Archive, capped at what its remaining stages still need.
     pub archive_fund: i64,
     /// Ticket #51: Fund the Archive was ordered this turn, so this turn's Lab Research went to the
-    /// fund and contributed nothing to the Research Lead.
+    /// fund and contributed nothing to the Research Lead. Version 0.07.0: set at Income by
+    /// `bank_archive_research`, and true only when a point was actually banked.
     pub funding_archive: bool,
+    /// Version 0.07.0: the Archivists' standing declaration that their Labs pay the Archive fund
+    /// rather than the shared Tech. Set by an order, read at the NEXT Income, and it holds until it
+    /// is set again.
+    #[serde(default)]
+    pub archive_funding: bool,
     /// Ticket #51: Provisional Findings is in force this turn, because last turn's Research went to
     /// the shared Tech. True at the start of the game.
     pub provisional_findings: bool,
@@ -697,6 +703,7 @@ impl Game {
             income_sources: Vec::new(),
             archive_fund: 0,
             funding_archive: false,
+            archive_funding: false,
             provisional_findings: true,
             resettle_to: None,
             blame_emitted: 0.0,

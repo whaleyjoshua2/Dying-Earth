@@ -657,7 +657,11 @@ impl Game {
             let text = self.say("energy_zero", &[("faction", self.seat_name(seat))]);
             self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
         }
-        self.accrue_research(seat, research);
+        // Version 0.07.0: the Archivists' standing declaration is read here, before a point of
+        // Research reaches the shared Tech. What the fund has room for never enters the Tech at
+        // all, so a turn that completes a Tech can no longer swallow the whole payment.
+        let banked = self.bank_archive_research(seat, research);
+        self.accrue_research(seat, research - banked);
         self.log(format!(
             "Income {}: +{} Materials, +{} Fuel, Energy {} -> {}, Research {}.",
             self.seat_name(seat),

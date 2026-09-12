@@ -45,7 +45,7 @@ A Module only the Archivists build, at one Colony off Earth and at most one per 
 _Avoid_: library, vault, monument, database, stage
 
 **Fund the Archive**:
-The Archivists' Orders-phase order, which sends a turn's Research from their own Labs into their Archive fund instead of the shared Tech, where it counts nothing toward the Research Lead. Until the Archive stands the fund holds only a quarter of what the Archive requires, and at that cap the order is refused.
+The Archivists' standing declaration that the Research their own Labs make goes into their Archive fund instead of the shared Tech, where it counts nothing toward the Research Lead. Since version 0.07.0 it is set by an order and read at the next Income, before a point of Research reaches the Tech, and it holds until it is set again; the Research is never paid to the Tech and taken back. Until the Archive stands the fund holds only a quarter of what the Archive requires; what the fund has no room for goes on to the shared Tech, and at the cap the declaration is refused.
 _Avoid_: donate, invest, bank research, save up
 
 **Provisional Findings**:

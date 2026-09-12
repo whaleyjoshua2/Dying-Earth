@@ -1922,43 +1922,43 @@ fn funding_the_archive_banks_this_turns_research_and_contributes_nothing_to_the_
     g.state_mut(StateId::Europe).control = Control::Controlled(Seat(3));
     g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
     g.pick_tech(Seat(0), TechId::PublicScience).unwrap();
+    // Version 0.07.0: the declaration is made before Income and read by the next one. Nothing is
+    // taken back out of the shared Tech, because nothing of the Archivists' ever goes in.
+    g.commit_orders(Seat(3), &[Order::SetArchiveFunding { on: true }]);
+    assert!(g.seats[3].archive_funding, "the declaration stands");
+    assert_eq!(g.seats[3].archive_fund, 0, "and banks nothing until Income");
     g.income_phase();
     let made = g.seats[3].research_last_turn;
     assert!(made > 0 && made < g.tables.tech(TechId::PublicScience).cost, "one Lab makes {made}");
-    assert_eq!(g.research.contributions[3], made, "Income paid it into the shared Tech");
-    let before = g.research.progress;
-    g.commit_orders(Seat(3), &[Order::FundArchive]);
     assert_eq!(g.seats[3].archive_fund, made, "the whole turn's Research is banked");
-    assert_eq!(g.research.contributions[3], 0, "and counts nothing toward the Research Lead");
-    assert_eq!(g.research.progress, before - made, "the shared Tech gives it back");
+    assert_eq!(g.research.contributions[3], 0, "and none of it reached the shared Tech");
     assert!(g.funding_archive(Seat(3)));
     assert!(g.report.lines.iter().any(|l| l.text.contains("Archivists are funding the Archive")), "{:?}", g.report.lines);
     // Nobody else may.
-    assert_eq!(g.check_order(Seat(0), &[], &Order::FundArchive).unwrap_err().0, "only the Archivists fund the Archive");
+    assert_eq!(g.check_order(Seat(0), &[], &Order::SetArchiveFunding { on: true }).unwrap_err().0, "only the Archivists fund the Archive");
     // Ticket #68: until the Module stands the fund holds a quarter of the 80, and what it has no
-    // room for stays with the shared Tech rather than being wasted.
+    // room for goes on to the shared Tech rather than being wasted.
     assert_eq!(g.archive_fund_cap(Seat(3)), 20, "a quarter of 80 before the Archive stands");
     g.seats[3].archive_fund = 17;
-    g.seats[3].research_last_turn = 8;
-    g.research.contributions[3] = 8;
-    g.research.progress += 8;
-    let before = g.research.progress;
-    g.commit_orders(Seat(3), &[Order::FundArchive]);
+    g.research.contributions = [0; 4];
+    g.income_phase();
+    let made = g.seats[3].research_last_turn;
+    assert!(made > 3, "the Lab makes more than the three the fund still has room for: {made}");
     assert_eq!(g.seats[3].archive_fund, 20, "only the room under the cap is banked");
-    assert_eq!(g.research.progress, before - 3, "the other five stay with the shared Tech");
-    assert_eq!(g.research.contributions[3], 5, "and still count toward the Lead");
-    // At the cap a turn of funding is refused outright.
+    assert_eq!(g.research.contributions[3], made - 3, "the rest counts toward the Lead as usual");
+    // At the cap the declaration is refused outright.
+    g.seats[3].archive_funding = false;
     assert_eq!(
-        g.check_order(Seat(3), &[], &Order::FundArchive).unwrap_err().0,
+        g.check_order(Seat(3), &[], &Order::SetArchiveFunding { on: true }).unwrap_err().0,
         "the Archive fund holds its quarter (20) until the Archive stands at a Colony off Earth"
     );
     // Once the Module stands the fund opens to the whole 80, and is refused again only when full.
     let mars = colony(&mut g, Seat(3), BodyId::Mars, &[ModuleKind::Habitat], 4);
     g.colony_mut(mars).unwrap().modules.push(Module::new(ModuleKind::Archive));
     assert_eq!(g.archive_fund_cap(Seat(3)), 80);
-    assert!(g.check_order(Seat(3), &[], &Order::FundArchive).is_ok());
+    assert!(g.check_order(Seat(3), &[], &Order::SetArchiveFunding { on: true }).is_ok());
     g.seats[3].archive_fund = 80;
-    assert_eq!(g.check_order(Seat(3), &[], &Order::FundArchive).unwrap_err().0, "the Archive's Research is paid in full");
+    assert_eq!(g.check_order(Seat(3), &[], &Order::SetArchiveFunding { on: true }).unwrap_err().0, "the Archive's Research is paid in full");
 }
 
 /// Ticket #68 (version 0.05.5): the Archive is one Module of 50 Materials and three turns, built
@@ -2005,11 +2005,10 @@ fn the_archive_is_one_module_of_fifty_materials_and_three_turns_built_once_off_e
     // No upkeep until it is complete; the payment that fills the fund completes it, with its Moment.
     assert_eq!(g.module_yield(Seat(3), mars, ModuleKind::Archive).upkeep, 0);
     g.seats[3].archive_fund = 76;
-    g.seats[3].research_last_turn = 10;
-    g.research.unallocated = 10;
-    g.commit_orders(Seat(3), &[Order::FundArchive]);
-    assert_eq!(g.seats[3].archive_fund, 80, "only the four still owed are banked");
-    assert_eq!(g.research.unallocated, 6, "the other six stay with the shared Tech");
+    g.seats[3].archive_funding = true;
+    let banked = g.bank_archive_research(Seat(3), 10);
+    assert_eq!(banked, 4, "only the four still owed are banked");
+    assert_eq!(g.seats[3].archive_fund, 80);
     assert!(g.archive_complete(Seat(3)));
     assert_eq!(g.module_yield(Seat(3), mars, ModuleKind::Archive).upkeep, 12);
     assert!(g.log.to_vec().iter().any(|l| l.contains("completed the Archive at")), "{:?}", g.log.to_vec());
@@ -2028,8 +2027,14 @@ fn provisional_findings_halves_the_tech_under_research_and_goes_off_the_turn_aft
     // An addition of +2 reads +1, and an immunity does not carry at all.
     assert_eq!(g.tech_addition(Seat(3), TechId::ExpandedHabitats), 0, "only the Tech under research");
     let with = g.facility_yield(Seat(3), StateId::Europe, FacilityKind::ResearchLab).research;
-    // A turn of funding switches it off for the turn after.
-    g.commit_orders(Seat(3), &[Order::FundArchive]);
+    // Version 0.07.0: the declaration is made in one turn and paid at the next Income, so it is
+    // that Income which funds, and the Income after it that finds Provisional Findings gone.
+    g.commit_orders(Seat(3), &[Order::SetArchiveFunding { on: true }]);
+    g.income_phase();
+    assert!(g.funding_archive(Seat(3)), "this Income paid the fund");
+    assert!(g.provisional_findings(Seat(3)), "and the turn that funds still has it");
+    // Back to the shared Tech, so the Income after this one restores it.
+    g.commit_orders(Seat(3), &[Order::SetArchiveFunding { on: false }]);
     g.income_phase();
     assert!(!g.provisional_findings(Seat(3)), "they funded last turn");
     assert_eq!(g.tech_multiplier(Seat(3), TechId::PublicScience), 1.0);
@@ -2126,7 +2131,7 @@ fn the_archivist_ai_funds_the_archive_before_it_holds_a_colony() {
     assert!(g.colonies.iter().all(|c| c.in_orbit || c.control.director() != Some(arc)));
     g.seats[arc.index()].research_last_turn = 6;
     let orders = g.ai_orders(arc);
-    assert!(orders.iter().any(|o| matches!(o, Order::FundArchive)), "no funding order: {orders:?}");
+    assert!(orders.iter().any(|o| matches!(o, Order::SetArchiveFunding { on: true })), "no funding order: {orders:?}");
 }
 
 /// Ticket #68 (version 0.05.5): the Archivist AI builds its way off Earth before the Archive. With
@@ -4453,7 +4458,7 @@ fn a_rivals_paragraph_names_its_visible_orders_and_none_of_its_scores() {
         Order::BuildArmy { place: Place::State(StateId::EastAsia) },
         Order::BuildStation { body: BodyId::Mars, slot: 0 },
         Order::BuildArchive { colony },
-        Order::FundArchive,
+        Order::SetArchiveFunding { on: true },
         Order::Repair { unit: UnitRef::Ship(ship), points: 1 },
         Order::RepairWithDucats { unit: UnitRef::Ship(ship), points: 1 },
         Order::Transit { ship, to: BodyId::Moon },
@@ -6291,4 +6296,23 @@ fn the_custodian_ai_idles_a_factory_for_an_even_trade() {
         orders.iter().any(|o| matches!(o, Order::Change { building: BuildingRef::Facility(StateId::EastAsia, j), what: BuildingChange::Mothball } if *j == i)),
         "an even trade (6 for 6) is taken: {orders:?}"
     );
+}
+
+/// Version 0.07.0: Fund the Archive is decided BEFORE Income, so a turn whose Research completes
+/// the shared Tech still pays the fund. Under 0.06.0 the order ran in the Orders phase and clawed
+/// the Research back out of `research.contributions`, which a completion had already zeroed, so the
+/// Archivists banked nothing and the Report said they had funded the Archive.
+#[test]
+fn funding_the_archive_pays_even_when_the_turn_completes_a_tech() {
+    let mut g = game();
+    g.state_mut(StateId::Europe).control = Control::Controlled(Seat(3));
+    g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+    g.pick_tech(Seat(0), TechId::CoastalEngineering).unwrap();
+    // One point short, so this turn's Research would finish the Tech during Income.
+    g.research.progress = g.tables.tech(TechId::CoastalEngineering).cost - 1;
+    g.commit_orders(Seat(3), &[Order::SetArchiveFunding { on: true }]);
+    g.income_phase();
+    let made = g.seats[3].research_last_turn;
+    assert!(made > 0, "the Lab made {made} Research");
+    assert_eq!(g.seats[3].archive_fund, made, "every point the Labs made is in the fund");
 }

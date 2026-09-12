@@ -149,7 +149,8 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   send-antarctica <state> <n> colony <n>
   change facility <state> <index> <mothball|restart|decommission>
   change module <colony> <index> <mothball|restart|decommission>
-  fund-archive                         the Archivists only
+  fund-archive                         the Archivists only: pay the Labs into the Archive fund
+  unfund-archive                       the Archivists only: pay them back into the shared Tech
   venture-share <percent>              the Prospectors only, a step of 10, 0 to 80
   draw-venture <amount>                the Prospectors only
   leapfrog <state>                     the Custodians only
@@ -234,7 +235,8 @@ fn parse_line(line: &str) -> Result<Line, String> {
             };
             Order::Change { building, what: change }
         }
-        "fund-archive" => Order::FundArchive,
+        "fund-archive" => Order::SetArchiveFunding { on: true },
+        "unfund-archive" => Order::SetArchiveFunding { on: false },
         "venture-share" => Order::SetVentureShare { share: count(at(1)?)? },
         "draw-venture" => Order::DrawVenture { amount: number(at(1)?)? },
         "leapfrog" => Order::Leapfrog { state: pick(&StateId::ALL, at(1)?)? },

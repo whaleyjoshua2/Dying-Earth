@@ -189,42 +189,45 @@ impl Game {
 
     // ---------------------------------------------------------------- Ticket #51: the Archive fund
 
-    /// Fund the Archive (ticket #51). This turn's Research from the seat's own Labs was paid into
-    /// the shared Tech at Income; funding takes it back out and banks it, so it contributes nothing
-    /// to the Research Lead for the turn. Ticket #68 (version 0.05.5): only what the fund has room
-    /// for under its cap is taken; the rest stays with the shared Tech, nothing is wasted, and the
-    /// point that fills the fund with the Module standing completes the Archive.
-    pub fn fund_archive(&mut self, seat: Seat) {
+    /// Fund the Archive (ticket #51, rebuilt for version 0.07.0). The Archivists declare where
+    /// their Labs' Research goes, and the declaration is read HERE, at Income, before a single
+    /// point reaches the shared Tech. What the fund has room for under its cap never enters the
+    /// Tech at all, so it contributes nothing to the Research Lead; the rest goes on to the Tech,
+    /// and nothing is wasted. The payment that fills the fund with the Module standing completes
+    /// the Archive. Answers how much was taken, which the caller keeps back from `accrue_research`.
+    ///
+    /// Version 0.06.0 ran this as an Orders-phase order that clawed the Research back out of the
+    /// shared Tech after Income had already paid it in. A turn whose Research completed a Tech
+    /// zeroed every seat's contribution first, so there was nothing left to claw back: the
+    /// Archivists banked nothing while the Report still said they had funded the Archive. Measured
+    /// in playtest at about 32 of the Archive's 80 Research lost over one game.
+    pub fn bank_archive_research(&mut self, seat: Seat, research: i64) -> i64 {
+        if research <= 0 || !self.seat(seat).archive_funding || self.kind(seat) != FactionKind::Archivists {
+            return 0;
+        }
         let cap = self.archive_fund_cap(seat);
         let before = self.seat(seat).archive_fund;
-        let amount = self.seat(seat).research_last_turn.max(0).min((cap - before).max(0));
-        // Take it back out of wherever Income put it.
-        let moved = if self.research.current.is_some() {
-            let have = self.research.contributions[seat.index()].min(amount);
-            self.research.contributions[seat.index()] -= have;
-            self.research.progress -= have;
-            have
-        } else {
-            let have = self.research.unallocated.min(amount);
-            self.research.unallocated -= have;
-            have
-        };
-        let after = (before + moved).min(cap).max(0);
+        let banked = research.min((cap - before).max(0));
+        if banked <= 0 {
+            return 0;
+        }
+        let after = before + banked;
         {
             let s = self.seat_mut(seat);
             s.archive_fund = after;
             s.funding_archive = true;
         }
-        let line = format!("The {} are funding the Archive: {} Research banked, {} of {} in the fund.", self.seat_name(seat), moved, after, cap);
+        let line = format!("The {} are funding the Archive: {} Research banked, {} of {} in the fund.", self.seat_name(seat), banked, after, cap);
         self.log(line);
-        let args = vec![("faction", self.seat_name(seat)), ("banked", moved.to_string()), ("fund", after.to_string()), ("cap", cap.to_string())];
+        let args = vec![("faction", self.seat_name(seat)), ("banked", banked.to_string()), ("fund", after.to_string()), ("cap", cap.to_string())];
         let text = self.say("archive_funded", &args);
         self.report_line_of(seat, LineKind::YourWorks, LineKind::Archive, None, text);
         // Ticket #68: the payment that fills the fund with the Module standing completes the Archive.
-        let research = self.tables.archive.research;
-        if self.archive_built(seat) && before < research && after >= research {
+        let required = self.tables.archive.research;
+        if self.archive_built(seat) && before < required && after >= required {
             self.archive_completed(seat);
         }
+        banked
     }
 
     /// Ticket #68: the Archive is complete, whether the last Research or the Module came last.

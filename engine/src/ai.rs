@@ -942,9 +942,9 @@ impl Game {
         if kind == FactionKind::Archivists {
             let fund = self.seat(seat).archive_fund;
             let cap = self.archive_fund_cap(seat);
-            if fund < cap && self.seat(seat).research_last_turn > 0 {
+            if fund < cap && self.seat(seat).research_last_turn > 0 && !self.seat(seat).archive_funding {
                 let opp = if fund + self.seat(seat).research_last_turn >= cap { m.opportunity } else { 1.0 };
-                push(vec![Order::FundArchive], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, opp, format!("fund the Archive with this turn's {} Research", self.seat(seat).research_last_turn), None);
+                push(vec![Order::SetArchiveFunding { on: true }], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, opp, format!("pay the Labs into the Archive fund from the next Income, {} Research a turn", self.seat(seat).research_last_turn), None);
             }
             if !self.archive_built(seat) && !self.archive_ordered(seat) {
                 let home = self.colonies.iter().filter(|c| c.control.director() == Some(seat) && self.may_hold_archive(c)).min_by_key(|c| (c.founded_turn, c.id.0)).map(|c| c.id);

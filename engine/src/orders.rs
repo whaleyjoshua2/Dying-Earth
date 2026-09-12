@@ -76,9 +76,11 @@ pub enum Order {
     /// Version 0.05 (ticket #51): the Archive, at a Colony off Earth. Version 0.05.5 (ticket #68):
     /// one Module, paid in Materials from the Stockpile; its Research is paid into the fund after.
     BuildArchive { colony: ColonyId },
-    /// Version 0.05 (ticket #51): this turn's Research from the Archivists' Labs goes into the
-    /// Archive fund instead of the shared Tech, and counts nothing toward the Research Lead.
-    FundArchive,
+    /// Version 0.05 (ticket #51), rebuilt for 0.07.0: the Archivists' standing declaration that
+    /// their Labs' Research goes into the Archive fund instead of the shared Tech, where it counts
+    /// nothing toward the Research Lead. Set once, it holds until it is set again, and it is read
+    /// at the next Income; it never moves Research that Income has already paid out.
+    SetArchiveFunding { on: bool },
     /// Version 0.05.5 (ticket #73): muster Emigrants, the built Colonists, in a Nation State the
     /// seat directs: up to four a turn per Faction, in one state, at a tenth of a person each.
     BuildEmigrants { state: StateId, n: u32 },
@@ -377,16 +379,19 @@ impl Game {
                 let materials_form = Order::BuildModule { colony: *colony, kind: *kind };
                 self.check_order_inner(seat, pending, &materials_form, false).map(|_| cost)
             }
-            Order::FundArchive => {
+            Order::SetArchiveFunding { on } => {
                 if self.kind(seat) != FactionKind::Archivists {
                     return fail("only the Archivists fund the Archive");
                 }
-                if pending.iter().any(|o| matches!(o, Order::FundArchive)) {
-                    return fail("the Archive is already being funded this turn");
+                if pending.iter().any(|o| matches!(o, Order::SetArchiveFunding { .. })) {
+                    return fail("the Archive's funding is already set this turn");
                 }
-                // Ticket #68: at the cap a turn of funding is refused, and the Research stays with
+                if *on == self.seat(seat).archive_funding {
+                    return fail(if *on { "the Archive is already being funded" } else { "the Archive is not being funded" });
+                }
+                // Ticket #68: at the cap there is nothing to declare, and the Research stays with
                 // the shared Tech; until the Module stands the cap is a quarter of the requirement.
-                if self.seat(seat).archive_fund >= self.archive_fund_cap(seat) {
+                if *on && self.seat(seat).archive_fund >= self.archive_fund_cap(seat) {
                     return if self.archive_built(seat) {
                         fail("the Archive's Research is paid in full")
                     } else {
@@ -1192,7 +1197,15 @@ impl Game {
                     let text = self.say("archive_begun", &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(*colony)))]);
                     self.report_line(LineKind::Archive, Some(ReportPlace::Colony(*colony)), text);
                 }
-                Order::FundArchive => self.fund_archive(seat),
+                Order::SetArchiveFunding { on } => {
+                    self.seat_mut(seat).archive_funding = *on;
+                    let line = if *on {
+                        format!("The {} will pay their Labs into the Archive fund from the next Income.", self.seat_name(seat))
+                    } else {
+                        format!("The {} will pay their Labs into the shared Tech from the next Income.", self.seat_name(seat))
+                    };
+                    self.log(line);
+                }
                 // Ticket #52: both act at Resolution; Resettle also steers the next Climate phase's
                 // refugee flows, which is the first flow after these orders are given.
                 Order::Relief { state } => self.pending.relief.push((seat, *state)),
@@ -1419,7 +1432,7 @@ impl Game {
                 r("refuel", &[("unit", unit_of(UnitRef::Ship(*ship))), ("body", body.unwrap_or_else(|| "space".to_string()))])
             }
             Order::BuildArchive { colony } => r("build_archive", &[("colony", place(Place::Colony(*colony)))]),
-            Order::FundArchive => r("fund_archive", &[]),
+            Order::SetArchiveFunding { on } => r(if *on { "fund_archive" } else { "unfund_archive" }, &[]),
             Order::Repair { unit, .. } | Order::RepairWithDucats { unit, .. } => r("repair", &[("unit", unit_of(*unit))]),
             Order::Transit { ship, to } => {
                 let unit = self.ship(*ship).map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into());
