@@ -372,6 +372,13 @@ fn build_board(session: &mut Session) {
                 g.seat_mut(Seat(1)).influence.insert(place, theirs);
             }
         }
+        // Ticket #127 (version 0.07.2): `attend:1` (a building aid, not part of the spec) turns the
+        // standing Defence order on for seat 0, so the side panel places Influence orders on the
+        // threatened Regions and their roster rings can be photographed FILLED. Wants `threat:1`,
+        // or there is nothing to defend and no order is placed.
+        if std::env::args().any(|a| a == "attend:1") {
+            g.seat_mut(Seat(0)).defence_standing = true;
+        }
         if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("unrest:").and_then(|v| v.parse::<f64>().ok())) {
             for (sid, off) in [(StateId::EastAsia, 0.0), (StateId::Europe, 1.0), (StateId::NorthAfrica, 3.0)] {
                 let v = (n - off).clamp(0.0, 10.0);
@@ -819,12 +826,6 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         show_view(&mut view, VIEWS[0].1);
         // `select:<state id>` (a building aid) opens that Region's card in the Earth picture.
         plan.select = std::env::args().find_map(|a| a.strip_prefix("select:").map(str::to_owned));
-        // `roster:filter` (a building aid, not part of the spec): every roster group filtered down
-        // to the rows that still want an order, which is otherwise a click and so unreachable in a
-        // headless picture.
-        if std::env::args().any(|a| a == "roster:filter") {
-            view.roster_filter = [true; 4];
-        }
         plan.tech = std::env::args().any(|a| a == "tech:1");
         plan.trade = std::env::args().any(|a| a == "trade:1");
         plan.victory = std::env::args().any(|a| a == "victory:1");

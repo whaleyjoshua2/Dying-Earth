@@ -149,8 +149,12 @@ One of the eight things the board counts and draws a glyph for: Materials, Fuel,
 _Avoid_: stat, counter, metric, indicator
 
 **Roster**:
-The list in the side panel of everything a Faction holds, since version 0.03 and organised in version 0.07.1: its Ships, Armies, Colonies and stations, and Regions, each group in a stable order with the count of rows that still want an order on its heading. Clicking that count filters the group to those rows. An Army carries no such mark, since an Army keeps the stance it was last given until it is moved.
+The list in the side panel of everything a Faction holds, since version 0.03 and organised in version 0.07.1: its Ships, Armies, Colonies and stations, and Regions, each group in a stable order. Since version 0.07.2 every row wears its Kind Glyph in front of its name and, where the row can want an order, a ring at its end: open while an order is still wanted this turn, filled once one is given. An Army carries no ring, since an Army keeps the stance it was last given until it is moved. (Version 0.07.1's count on the heading, clickable to filter the group, lasted one version.)
 _Avoid_: unit list, overview, empire panel
+
+**Kind Glyph**:
+The small off-white mark, since version 0.07.2, drawn in front of a thing's name wherever the interface names it — a Roster row, a card's title, a map label, a Report line — saying what kind of thing it is: a warship, a Colony Ship (a Carrier wears the same), a station, a Colony, a Region, or an Army, whose glyph is the shield the Earth Map draws for it. Always off-white and never a colour of its own: on the board a colour says whose a thing is, and the glyph says what it is. A Figure's glyph, by contrast, says how much of something.
+_Avoid_: unit icon, type icon, category marker
 
 ### Resources
 

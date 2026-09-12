@@ -254,6 +254,82 @@ fn rivals_text(game: &Game, rivals: &[(Seat, i64)]) -> String {
     }
 }
 
+/// Ticket #127 (version 0.07.2): the kind of thing a name belongs to, which decides the glyph drawn
+/// in front of it. The designer asked for five -- "one for military one for colony ship, than one
+/// for stations and one for colonies and one for nation states ... keep these off white" -- and,
+/// asked about Armies, took the shield the Earth Map already draws for one. Every glyph is
+/// off-white: on this board a colour says WHOSE, and a kind glyph says WHAT.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Kind {
+    Warship,
+    ColonyShip,
+    Station,
+    Colony,
+    Region,
+    Army,
+}
+
+/// The side of a kind glyph in a row of text at the panel's ordinary size.
+const KIND_GLYPH: f32 = 16.0;
+
+impl Kind {
+    /// The icon's name in `assets/icons/`. The Army has none: its shield is drawn.
+    fn icon(self) -> Option<&'static str> {
+        match self {
+            Kind::Warship => Some("warship"),
+            Kind::ColonyShip => Some("colony_ship"),
+            Kind::Station => Some("station"),
+            Kind::Colony => Some("colony"),
+            Kind::Region => Some("region"),
+            Kind::Army => None,
+        }
+    }
+
+    fn of_colony(c: &Colony) -> Kind {
+        if c.in_orbit { Kind::Station } else { Kind::Colony }
+    }
+
+    /// A stack with one warship in it is a warship stack; a stack of transports is not. A Carrier
+    /// is a transport, so it wears the Colony Ship's glyph, the designer having named two kinds
+    /// of Ship and not three.
+    fn of_ships<'a>(ships: impl IntoIterator<Item = &'a Ship>) -> Kind {
+        if ships.into_iter().any(|s| s.kind.is_warship()) { Kind::Warship } else { Kind::ColonyShip }
+    }
+
+    fn of_unit(kind: UnitKind) -> Kind {
+        if kind.is_warship() { Kind::Warship } else { Kind::ColonyShip }
+    }
+
+    fn image(self, ctx: &egui::Context, size: f32) -> Option<egui::Image<'static>> {
+        Icons::from_ctx(ctx, self.icon()?, size)
+    }
+}
+
+/// The kind glyph in a `Ui` row, at `size`: the icon where one is loaded, the Army's drawn shield,
+/// and nothing at all where the art is missing, so a name is never pushed about by a hole.
+fn kind_glyph(ui: &mut Ui, kind: Kind, size: f32) {
+    if kind == Kind::Army {
+        let (rect, _) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::hover());
+        shield_glyph(ui.painter(), rect);
+    } else if let Some(image) = kind.image(ui.ctx(), size) {
+        ui.add(image);
+    }
+}
+
+/// The Army's shield as a kind glyph: the Earth Map's shape, in the kind fill, with no number on it.
+fn shield_glyph(painter: &egui::Painter, rect: egui::Rect) {
+    let (w, h) = (rect.width() * 0.8, rect.height() * 0.95);
+    let centre = rect.center();
+    let pts = vec![
+        centre + egui::vec2(-w / 2.0, -h / 2.0),
+        centre + egui::vec2(w / 2.0, -h / 2.0),
+        centre + egui::vec2(w / 2.0, 0.0),
+        centre + egui::vec2(0.0, h / 2.0),
+        centre + egui::vec2(-w / 2.0, 0.0),
+    ];
+    painter.add(egui::Shape::convex_polygon(pts, crate::icons::kind_fill(), egui::Stroke::NONE));
+}
+
 /// A shield with a number on it: the Army icon of the Earth Map.
 fn shield(painter: &egui::Painter, centre: Pos2, fill: Color32, text: &str) {
     let (w, h) = (20.0, 24.0);
@@ -288,6 +364,26 @@ fn label_at(painter: &egui::Painter, pos: Pos2, text: &str, colour: Color32, siz
     let rect = egui::Rect::from_center_size(pos, galley.size() + egui::vec2(8.0, 4.0));
     painter.rect_filled(rect, 3.0, Color32::from_black_alpha(170));
     painter.galley(rect.min + egui::vec2(4.0, 2.0), galley, colour);
+}
+
+/// Ticket #127 (version 0.07.2): a map label wearing its kind glyph at the left, in the kind fill and
+/// sized to a line of the text. Where there is no art for it the bare label is drawn, so the map
+/// never goes mute; the whole of glyph and text is centred on `pos`, as the bare label is.
+fn label_kind_at(painter: &egui::Painter, pos: Pos2, kind: Option<Kind>, text: &str, colour: Color32, size: f32) {
+    let texture = kind.and_then(Kind::icon).and_then(|name| Icons::texture_from_ctx(painter.ctx(), name));
+    let Some(texture) = texture else {
+        label_at(painter, pos, text, colour, size);
+        return;
+    };
+    let colour = on_map(colour);
+    let galley = painter.layout_no_wrap(text.to_string(), FontId::proportional(size), colour);
+    let glyph = size + 2.0;
+    let gap = 4.0;
+    let rect = egui::Rect::from_center_size(pos, galley.size() + egui::vec2(8.0 + glyph + gap, 4.0));
+    painter.rect_filled(rect, 3.0, Color32::from_black_alpha(170));
+    let glyph_rect = egui::Rect::from_min_size(rect.min + egui::vec2(4.0, 2.0), egui::vec2(glyph, glyph));
+    painter.image(texture, glyph_rect, egui::Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), crate::icons::kind_fill());
+    painter.galley(rect.min + egui::vec2(4.0 + glyph + gap, 2.0), galley, colour);
 }
 
 /// The same, slid sideways so a long line stays on screen (ticket #57: the launch-window tooltip is
@@ -557,7 +653,7 @@ fn credits_screen(root: &mut Ui, session: &mut Session, icons: &Icons) {
                 ui.horizontal(|ui| {
                     ui.add_space(ui.available_width() / 2.0 - 190.0);
                     ui.spacing_mut().item_spacing.x = 8.0;
-                    if let Some(image) = icons.image(&c.resource.to_lowercase(), 22.0) {
+                    if let Some(image) = icons.image(&c.key(), 22.0) {
                         ui.add(image);
                     }
                     ui.label(RichText::new(format!("{}: \"{}\" by {}", c.resource, c.icon, c.author)).size(15.0));
@@ -918,7 +1014,7 @@ fn start_screen(
                 let Some(p) = camera.world_to_viewport(cam_gt, world).ok().map(|v| Pos2::new(v.x, v.y)) else { continue };
                 let card = session.tables.state(sid);
                 let lit = view.start_selected == Some(sid) || view.start_hover == Some(sid);
-                label_at(painter, p, &card.name, if lit { Color32::WHITE } else { rgb(card.colour) }, if lit { 15.0 } else { 13.0 });
+                label_kind_at(painter, p, Some(Kind::Region), &card.name, if lit { Color32::WHITE } else { rgb(card.colour) }, if lit { 15.0 } else { 13.0 });
             }
         }
     });
@@ -1257,7 +1353,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     let Some(p) = head else { continue };
                     let text = format!("{} x{}  str {}", game.seat_name(seat), ships.len(), game.ship_stack_strength(seat, body));
                     let at = p - egui::vec2(0.0, 58.0 + row * 16.0);
-                    label_at(painter, at, &text, seat_colour(session, seat), 12.0);
+                    label_kind_at(painter, at, Some(Kind::of_ships(ships.iter().filter_map(|id| game.ship(*id)))), &text, seat_colour(session, seat), 12.0);
                     hotspots.push(Hotspot { pos: at, radius: 14.0, hit: Hit::Select(Selection::ShipStack(body, seat)) });
                     row += 1.0;
                 }
@@ -1267,7 +1363,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     let a = geo::solar_place(game, from);
                     let b = geo::solar_place(game, to);
                     if let Some(p) = project(a.lerp(b, 0.5) + Vec3::Y * 0.2) {
-                        label_at(painter, p, &format!("{} {}: {} turn(s)", game.seat_name(s.seat), s.kind.name(), turns_left), seat_colour(session, s.seat), 12.0);
+                        label_kind_at(painter, p, Some(Kind::of_unit(s.kind)), &format!("{} {}: {} turn(s)", game.seat_name(s.seat), s.kind.name(), turns_left), seat_colour(session, s.seat), 12.0);
                     }
                 }
             }
@@ -1301,7 +1397,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         };
                         let _ = armies;
                         let text = format!("{}\n{}\n{} Facilities, {} free slot(s)", game.tables.state(sid).name, owner, st.facilities.len(), game.free_slots(sid));
-                        label_at(painter, p, &text, colour, 12.0);
+                        label_kind_at(painter, p, Some(Kind::Region), &text, colour, 12.0);
                         // Ticket #52: the Unrest figure once it bites, red once Facilities run at half.
                         let army_line = game.tables.unrest.army_threshold;
                         if st.unrest >= army_line {
@@ -1336,27 +1432,28 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     slot_labels(painter, session, game, body, &visible, hotspots);
                     // The band along the top: Ship stacks in orbit and Orbital Control. Ticket #50:
                     // four seats will not fit on one line, so each takes its own in its own colour.
-                    let mut band: Vec<(String, Color32)> = Vec::new();
+                    let mut band: Vec<(String, Color32, Option<Kind>)> = Vec::new();
                     for seat in Seat::ALL {
-                        let n = game.ships_at(seat, body).len();
-                        if n > 0 {
-                            band.push((format!("{}: {} Ship(s), strength {}", game.seat_name(seat), n, game.ship_stack_strength(seat, body)), seat_colour(session, seat)));
+                        let ids = game.ships_at(seat, body);
+                        if !ids.is_empty() {
+                            let kind = Kind::of_ships(ids.iter().filter_map(|id| game.ship(*id)));
+                            band.push((format!("{}: {} Ship(s), strength {}", game.seat_name(seat), ids.len(), game.ship_stack_strength(seat, body)), seat_colour(session, seat), Some(kind)));
                         }
                     }
                     for c in game.colonies.iter().filter(|c| c.in_orbit && c.body == body) {
                         let who = c.control.director();
                         let name = who.map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".into());
-                        band.push((format!("{} ({})", game.station_name(body, c.slot), name), who.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY)));
+                        band.push((format!("{} ({})", game.station_name(body, c.slot), name), who.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY), Some(Kind::Station)));
                     }
                     band.push(match game.orbital_control(body) {
-                        Some(s) => (format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s)),
-                        None => ("Orbital Control: nobody".to_string(), Color32::LIGHT_GRAY),
+                        Some(s) => (format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s), None),
+                        None => ("Orbital Control: nobody".to_string(), Color32::LIGHT_GRAY, None),
                     });
                     let rect = painter.clip_rect();
                     let x = rect.center().x - 120.0;
                     label_at(painter, Pos2::new(x, rect.min.y + 50.0), &format!("In orbit around {}", game.tables.body(body).name), Color32::WHITE, 13.0);
-                    for (i, (text, colour)) in band.iter().enumerate() {
-                        label_at(painter, Pos2::new(x, rect.min.y + 70.0 + 18.0 * i as f32), text, *colour, 12.0);
+                    for (i, (text, colour, kind)) in band.iter().enumerate() {
+                        label_kind_at(painter, Pos2::new(x, rect.min.y + 70.0 + 18.0 * i as f32), *kind, text, *colour, 12.0);
                     }
                 }
             }
@@ -1425,7 +1522,7 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                 let (lon, lat) = geo::slot_lonlat(game.tables.body(body), slot);
         let name = &game.tables.body(body).slots[slot as usize].name;
                 let Some(p) = visible(geo::local_from_lonlat(lon, lat) * 1.03) else { continue };
-                let (text, colour, hit) = match game.colony_at(body, slot) {
+                let (text, colour, hit, kind) = match game.colony_at(body, slot) {
                     Some(c) => {
                         let mods: Vec<String> = c.modules.iter().map(|m| format!("{}{}", m.kind.name(), if m.online { "" } else { " (offline)" })).collect();
                         let army = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(c.id))).count();
@@ -1434,11 +1531,12 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                             format!("{}: {}\n{} Colonists\n{}{}", name, owner, c.colonists, mods.join(", "), if army > 0 { format!("\nArmies: {army}") } else { String::new() }),
                             c.control.director().map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY),
                             Hit::Select(Selection::Colony(c.id)),
+                            Some(Kind::of_colony(c)),
                         )
                     }
-                    None => (format!("{name}: empty"), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot))),
+                    None => (format!("{name}: empty"), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot)), None),
                 };
-                label_at(painter, p + egui::vec2(0.0, 24.0), &text, colour, 12.0);
+                label_kind_at(painter, p + egui::vec2(0.0, 24.0), kind, &text, colour, 12.0);
                 // Ticket #57: every slot carries its own four yields under its name, filled or free;
                 // a free slot's figures are what a Colony founded there would get. TO BE REVISITED
                 // WHEN BOARD LENSES ARRIVE: this is on the map always, and once the player can turn
@@ -1809,12 +1907,13 @@ fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
         for seat in Seat::ALL {
             ui.add_space(6.0);
             ui.label(RichText::new(game.seat_name(seat)).size(17.0).strong().color(seat_colour(session, seat)));
-                roster_of(ui, session, game, view, seat, false, &mut jump);
+                roster_of(ui, session, game, seat, false, &mut jump);
         }
     } else {
         ui.label(RichText::new("Your roster").size(18.0).strong());
-        ui.label(RichText::new("Click a row to select it and go there. \"no order\" marks what still waits.").weak());
-        roster_of(ui, session, game, view, Seat(0), true, &mut jump);
+        // Ticket #127 (version 0.07.2): the ring, in place of 0.07.1's "no order" and its filter.
+        ui.label(RichText::new("Click a row to select it and go there. An open ring marks a row that still wants an order; it fills once the order is given.").weak());
+        roster_of(ui, session, game, Seat(0), true, &mut jump);
     }
     if let Some((v, sel)) = jump {
         match v {
@@ -1839,48 +1938,35 @@ fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
 /// Ticket #115 (version 0.07.1): one row of the roster, gathered before any of it is drawn so a
 /// group can be counted, sorted and filtered before it goes on screen.
 struct RosterRow {
+    /// Ticket #127 (version 0.07.2): what kind of thing the row names, for the glyph in front of it.
+    kind: Kind,
     text: String,
     /// Ticket #116 (version 0.07.1): the rule behind the row's figures, where one governs them.
     tip: Option<String>,
-    /// This row still wants a decision from the player this turn. Only a seat that gives orders can
-    /// owe one, so it is always false where `marks` is off.
-    wants: bool,
+    /// Ticket #127 (version 0.07.2): the ring at the row's end. `Some(true)` is a row that still
+    /// wants a decision from the player this turn, drawn open; `Some(false)` a row that has its
+    /// order, drawn filled; `None` a row that cannot want one -- a Ship in transit, an Army, or any
+    /// row of a seat that gives no orders -- and it wears no ring at all.
+    mark: Option<bool>,
     jump: Option<(View, Selection)>,
 }
 
-/// A roster group: its heading, its rows, and the line shown when it is empty.
+/// A roster group: its heading and the line shown when it is empty.
 ///
-/// The heading carries the count of rows that still want an order, and clicking it filters the
-/// group down to those. The filter is **off by default and per group**: the designer's answer to
-/// what the roster is for was "an index, with a needs-an-order count on each heading you can click
-/// to filter down to just those", because a panel that re-sorts itself every turn is disorienting
-/// and a panel that never says what is outstanding makes you read twelve rows to find one.
-/// Which group this is: its slot in the filter array, its heading, and the line it shows when it
-/// holds nothing. Bundled because the four travel together and a function wants fewer hands.
+/// Ticket #127 (version 0.07.2): the heading carried a count of the rows that still wanted an
+/// order, clickable to filter the group down to them, for one version. The designer replaced it:
+/// "Rather than a button to filter I want an icon displayed to the right of the item indicating an
+/// order is needed" -- and no count either, since the rings say it row by row. The heading is a
+/// heading again; the filter, its state and its building aid are gone.
 struct RosterGroup {
-    index: usize,
     name: &'static str,
     empty: &'static str,
 }
 
-fn roster_group(ui: &mut Ui, view: &mut ViewState, group: RosterGroup, rows: Vec<RosterRow>, marks: bool, jump: &mut Option<(View, Selection)>) {
-    let RosterGroup { index, name, empty } = group;
-    let wanting = rows.iter().filter(|r| r.wants).count();
+fn roster_group(ui: &mut Ui, group: RosterGroup, rows: Vec<RosterRow>, marks: bool, jump: &mut Option<(View, Selection)>) {
+    let RosterGroup { name, empty } = group;
     if marks {
-        ui.horizontal(|ui| {
-            ui.label(RichText::new(name).strong());
-            if wanting > 0 {
-                let on = view.roster_filter[index];
-                let label = if on { format!("showing {wanting} that want an order") } else { format!("{wanting} want an order") };
-                if ui
-                    .small_button(RichText::new(label).color(Color32::from_rgb(250, 210, 130)))
-                    .on_hover_text("Show only the rows that still want an order from you this turn. Click again for the whole group.")
-                    .clicked()
-                {
-                    view.roster_filter[index] = !on;
-                }
-            }
-        });
+        ui.label(RichText::new(name).strong());
     }
     if rows.is_empty() {
         if marks {
@@ -1888,20 +1974,51 @@ fn roster_group(ui: &mut Ui, view: &mut ViewState, group: RosterGroup, rows: Vec
         }
         return;
     }
-    let filtered = marks && view.roster_filter[index] && wanting > 0;
-    for row in rows.iter().filter(|r| !filtered || r.wants) {
-        let text = if row.wants && marks { format!("{}  - no order", row.text) } else { row.text.clone() };
-        let mut resp = ui.button(text);
-        if let Some(tip) = &row.tip {
-            resp = rule_tip(resp, tip.clone());
-        }
-        if resp.clicked() {
-            *jump = row.jump;
-        }
+    for row in &rows {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 6.0;
+            // Ticket #127: the kind glyph rides inside the button where there is art for it; the
+            // Army's shield is drawn beside the button, a drawn shape having no way into one.
+            let mut resp = match row.kind.image(ui.ctx(), KIND_GLYPH) {
+                Some(image) => ui.add(egui::Button::image_and_text(image, &row.text)),
+                None => {
+                    kind_glyph(ui, row.kind, KIND_GLYPH);
+                    ui.button(&row.text)
+                }
+            };
+            if let Some(tip) = &row.tip {
+                resp = rule_tip(resp, tip.clone());
+            }
+            if resp.clicked() {
+                *jump = row.jump;
+            }
+            if let Some(wants) = row.mark {
+                order_ring(ui, wants);
+            }
+        });
     }
 }
 
-fn roster_of(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, seat: Seat, marks: bool, jump: &mut Option<(View, Selection)>) {
+/// The ring's colours: open in the warm amber 0.07.1's count wore, since it means the same thing;
+/// filled in a quiet grey, so an attended row is marked as attended and asks for nothing.
+const RING_WANTS: Color32 = Color32::from_rgb(250, 210, 130);
+const RING_ATTENDED: Color32 = Color32::from_rgb(150, 150, 150);
+
+/// Ticket #127 (version 0.07.2): the ring at the end of a roster row -- open while the row still
+/// wants an order this turn, filled once it has one. A mark on the row itself, at the designer's
+/// word, in place of a control on the heading.
+fn order_ring(ui: &mut Ui, wants: bool) {
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(12.0, 12.0), egui::Sense::hover());
+    let (centre, radius) = (rect.center(), 4.5);
+    if wants {
+        ui.painter().circle_stroke(centre, radius, egui::Stroke::new(1.5, RING_WANTS));
+    } else {
+        ui.painter().circle_filled(centre, radius, RING_ATTENDED);
+    }
+    resp.on_hover_text(if wants { "Still wants an order from you this turn." } else { "Has its order for this turn." });
+}
+
+fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: bool, jump: &mut Option<(View, Selection)>) {
     let pending = &session.pending;
     let tag = |text: &str| if marks { String::new() } else { format!("{text}: ") };
 
@@ -1941,20 +2058,21 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             "Tank {} of {}. Fuel goes on transits, and a leg costs least at a launch window.\nRefuelling needs a station or Colony of yours where the Ship sits, so a Ship is STRANDED with no leg it can afford and nowhere to fill up.",
             fuel, tanks
         );
-        ships_rows.push(RosterRow { text, tip: Some(tip), wants: marks && !ordered, jump: Some((View::Solar, Selection::ShipStack(body, seat))) });
+        ships_rows.push(RosterRow { kind: Kind::of_ships(ships.iter().copied()), text, tip: Some(tip), mark: marks.then_some(!ordered), jump: Some((View::Solar, Selection::ShipStack(body, seat))) });
     }
     for s in game.ships.iter().filter(|s| s.seat == seat) {
         if let ShipAt::Transit { to, turns_left, .. } = s.at {
             // A Ship in transit is not waiting on anybody: it arrives when it arrives.
             ships_rows.push(RosterRow {
+                kind: Kind::of_unit(s.kind),
                 text: format!("{}{} in transit to {}, {} turn(s) left", tag("Ship"), s.kind.name(), game.tables.body(to).name, turns_left),
                 tip: Some("A Ship in transit cannot be ordered and cannot be intercepted. It arrives at its Resolution, Holding, with whatever Fuel it has left.".to_string()),
-                wants: false,
+                mark: None,
                 jump: Some((View::Solar, Selection::None)),
             });
         }
     }
-    roster_group(ui, view, RosterGroup { index: 0, name: "Ships", empty: "  none; a Shipyard on a station or Colony builds them" }, ships_rows, marks, jump);
+    roster_group(ui, RosterGroup { name: "Ships", empty: "  none; a Shipyard on a station or Colony builds them" }, ships_rows, marks, jump);
 
     // Armies, sorted by where they stand rather than by when they were raised.
     //
@@ -1994,10 +2112,10 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             },
             game.tables.unrest.army_threshold
         );
-        army_rows.push((where_, RosterRow { text, tip: Some(tip), wants: false, jump: target }));
+        army_rows.push((where_, RosterRow { kind: Kind::Army, text, tip: Some(tip), mark: None, jump: target }));
     }
     army_rows.sort_by(|a, b| a.0.cmp(&b.0));
-    roster_group(ui, view, RosterGroup { index: 1, name: "Armies", empty: "  none" }, army_rows.into_iter().map(|(_, r)| r).collect(), marks, jump);
+    roster_group(ui, RosterGroup { name: "Armies", empty: "  none" }, army_rows.into_iter().map(|(_, r)| r).collect(), marks, jump);
 
     // Colonies and stations.
     //
@@ -2007,10 +2125,11 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
     for c in game.colonies.iter().filter(|c| c.control.director() == Some(seat)) {
         let building = c.queue.len();
         let ordered = building > 0 || pending.iter().any(|o| roster_order_touches_colony(o, c.id));
-        let text = format!("{}{}: {} Colonists, {} Modules{}", tag("Colony"), game.place_name(Place::Colony(c.id)), c.colonists, c.modules.len(), if building > 0 { format!(", {building} building") } else { String::new() });
-        colony_rows.push(RosterRow { text, tip: None, wants: marks && !ordered, jump: Some((View::Surface(c.body), Selection::Colony(c.id))) });
+        // Ticket #127: the spectator's word tag agrees with the glyph, so a station is not a "Colony:".
+        let text = format!("{}{}: {} Colonists, {} Modules{}", tag(if c.in_orbit { "Station" } else { "Colony" }), game.place_name(Place::Colony(c.id)), c.colonists, c.modules.len(), if building > 0 { format!(", {building} building") } else { String::new() });
+        colony_rows.push(RosterRow { kind: Kind::of_colony(c), text, tip: None, mark: marks.then_some(!ordered), jump: Some((View::Surface(c.body), Selection::Colony(c.id))) });
     }
-    roster_group(ui, view, RosterGroup { index: 2, name: "Colonies and stations", empty: "  none; a Colony Ship founds one" }, colony_rows, marks, jump);
+    roster_group(ui, RosterGroup { name: "Colonies and stations", empty: "  none; a Colony Ship founds one" }, colony_rows, marks, jump);
 
     // Regions, on the same rule as the Colonies.
     let mut state_rows: Vec<RosterRow> = Vec::new();
@@ -2018,10 +2137,10 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
         let st = game.state(sid);
         let building = st.queue.len();
         let ordered = building > 0 || pending.iter().any(|o| roster_order_touches_state(o, sid));
-        let text = format!("{}{}: {} Facilities, {} free slot(s){}", tag("State"), game.tables.state(sid).name, st.facilities.len(), game.free_slots(sid), if building > 0 { format!(", {building} building") } else { String::new() });
-        state_rows.push(RosterRow { text, tip: None, wants: marks && !ordered, jump: Some((View::Surface(BodyId::Earth), Selection::State(sid))) });
+        let text = format!("{}{}: {} Facilities, {} free slot(s){}", tag("Region"), game.tables.state(sid).name, st.facilities.len(), game.free_slots(sid), if building > 0 { format!(", {building} building") } else { String::new() });
+        state_rows.push(RosterRow { kind: Kind::Region, text, tip: None, mark: marks.then_some(!ordered), jump: Some((View::Surface(BodyId::Earth), Selection::State(sid))) });
     }
-    roster_group(ui, view, RosterGroup { index: 3, name: "Regions", empty: "  none" }, state_rows, marks, jump);
+    roster_group(ui, RosterGroup { name: "Regions", empty: "  none" }, state_rows, marks, jump);
 }
 
 /// Ticket #115: does this pending order do anything to that Colony this turn? It decides only
@@ -2901,7 +3020,12 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
 
 fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, cid: ColonyId, actions: &mut Vec<Action>) {
     let Some(col) = game.colony(cid) else { return };
-    ui.label(RichText::new(game.place_name(Place::Colony(cid))).size(22.0).strong());
+    // Ticket #127 (version 0.07.2): the kind glyph in front of the name, as on the roster.
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 8.0;
+        kind_glyph(ui, Kind::of_colony(col), 22.0);
+        ui.label(RichText::new(game.place_name(Place::Colony(cid))).size(22.0).strong());
+    });
     let owner = match col.control {
         Control::Neutral => "Nobody's".to_string(),
         Control::Controlled(s) => format!("Held by the {}", game.seat_name(s)),
@@ -3123,7 +3247,11 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
 
 fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, body: BodyId, seat: Seat, actions: &mut Vec<Action>) {
     let ships: Vec<&Ship> = game.ships.iter().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)).collect();
-    ui.label(RichText::new(format!("{} Ships at {}", game.seat_name(seat), game.tables.body(body).name)).size(22.0).strong());
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 8.0;
+        kind_glyph(ui, Kind::of_ships(ships.iter().copied()), 22.0);
+        ui.label(RichText::new(format!("{} Ships at {}", game.seat_name(seat), game.tables.body(body).name)).size(22.0).strong());
+    });
     for s in &ships {
         let card = game.tables.unit(s.kind);
         let mut extra = Vec::new();
@@ -3857,7 +3985,18 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         for l in lines {
                             match l.place {
                                 Some(place) => {
-                                    if ui.add(egui::Button::new(&l.text).frame(false)).on_hover_text("Go there").clicked() {
+                                    // Ticket #127 (version 0.07.2): a line that points somewhere wears
+                                    // the glyph of what it points to. A Body is no one kind of thing.
+                                    let kind = match place {
+                                        dying_earth_engine::report::ReportPlace::State(_) => Some(Kind::Region),
+                                        dying_earth_engine::report::ReportPlace::Colony(c) => game.colony(c).map(Kind::of_colony),
+                                        dying_earth_engine::report::ReportPlace::Body(_) => None,
+                                    };
+                                    let button = match kind.and_then(|k| k.image(ui.ctx(), 14.0)) {
+                                        Some(image) => egui::Button::image_and_text(image, &l.text),
+                                        None => egui::Button::new(&l.text),
+                                    };
+                                    if ui.add(button.frame(false)).on_hover_text("Go there").clicked() {
                                         actions.push(Action::GoTo(place));
                                     }
                                 }

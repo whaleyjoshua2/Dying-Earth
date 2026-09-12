@@ -252,3 +252,65 @@ space-needle.
 
 **Region:** castle, earth-africa-europe, earth-asia-oceania, factory, flag-objective, flying-flag,
 globe, modern-city, tower-flag.
+
+## The roster marks what wants an order, and everything wears the glyph of its kind
+
+Ticket [#127](https://github.com/whaleyjoshua2/Dying-Earth/issues/127). *"Rather than a button to
+filter I want an icon displayed to the right of the item indicating an order is needed. Lets get a
+set of icons denoting ships (one for military one for colony ship) than one for stations and one for
+colonies and one for nation states to place in front of their text. keep these off white."*
+
+![The roster: a glyph in front of every row, an open ring after the ones that want an order](roster-glyphs-and-open-rings.png)
+
+**The filter lasted one version.** 0.07.1 put a count on each heading, clickable to show only the
+rows that still wanted an order; the designer replaced it with a mark on the row itself, and took no
+count either. The heading is a heading again, and the filter's state and its `roster:filter` aid
+went with it. In its place, **a ring at the end of every row that can want an order**: open, in the
+warm amber the count wore, while the row still wants one this turn; filled, in a quiet grey, once
+the order is given. A Ship in transit and an Army wear no ring, since neither can want anything —
+the Army because it keeps the stance it was last given, as 0.07.1 decided.
+
+![Two rows magnified: the Colony Ship's rocket and the Frigate's warship, each with its ring](roster-rows-magnified.png)
+
+![After Defence has placed 7 Influence on China, China's ring is filled](roster-ring-filled-after-an-order.png)
+
+**Five kinds, chosen off the sixteen-pixel row of the sheets** filed above: the **warship** is
+Delapouite's *Spaceship*, the arrowhead with wings; the **Colony Ship** is Lorc's *Rocket*, which
+cannot be mistaken for it; the **station** Delapouite's *Defense Satellite*, the dish on a ring; the
+**Colony** Delapouite's *Habitat Dome*; the **Region** Delapouite's *Modern City*, the designer's
+pick over the globe and the flag. Asked about Armies, the designer gave them the **shield the Earth
+Map already draws** for one — drawn, not loaded, so it needs no art and no credit. All six wear one
+fill, a named **kind** entry in the palette (`icons::fill` maps the five names to it), so "off white"
+is one number in one place and cannot drift if the neutral fallback is ever retuned for something
+else. A Carrier, being a transport, wears the Colony Ship's glyph: the designer named two kinds of
+Ship and not three.
+
+**Everywhere a thing is named, at the designer's word — (c).** The map labels first:
+
+![Region labels on the Earth Map, each with the city glyph](earth-labels-with-region-glyph.png)
+
+![Ship stack labels on the Solar System Map: a rocket for a stack of transports, a warship for the Custodians' Frigate](solar-labels-with-ship-glyphs.png)
+
+![The start globe, every Region's name with its glyph](start-globe-names-with-glyph.png)
+
+A map label is painted, not laid out, so the glyph is painted beside the text in the same box and
+the pair is centred where the bare label was; where the art has not loaded the bare label is drawn,
+so the map cannot go mute. The Report, where a line that points somewhere wears the glyph of what
+it points to; and the card titles:
+
+![The Report: lines about a Region wear the city, the line about the ISS wears the station](report-lines-with-glyphs.png)
+
+![The stack card's title with the warship glyph](stack-card-title-with-glyph.png)
+
+**The Region card keeps its flag and takes no glyph** — a builder's call, for the designer to veto:
+a flag at thirty-two beside a name at thirty-two is already the card's mark, and a city glyph as a
+third item in the title row read as clutter. Everywhere else a Region is named it wears the city.
+A Report line that points at a Body wears nothing, a Body being no one kind of thing.
+
+![The credits, thirteen icons](credits-thirteen-icons.png)
+
+**Five credits**, and a test that the credits and the folder agree: every SVG in `assets/icons/`
+must have its line and every line its file. Witnessed red with `region.svg` hidden — *left: [..12
+names without "region"] right: [..13 names]* — and green restored. `attend:1` is a new building aid
+(the standing Defence order switched on for seat 0, so a filled ring can be photographed; wants
+`threat:1` to have anything to defend). Clippy clean with `-D warnings`, 255 tests passing.
