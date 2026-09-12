@@ -501,10 +501,19 @@ impl Game {
                         || cat == Cat::RaiseIndustry
                         // Ticket #54: a Strip Permit is three turns of double Extraction.
                         || cat == Cat::StripPermit
+                        // Version 0.07.0: ticket #84 put every Victory Condition behind a Tech, so
+                        // Research advances this part too. Without this the Prospector AI built 0
+                        // Research Labs in 20 seeds and never reached the Extraction Charter.
+                        || cat == Cat::ResearchLab
+                        || cat == Cat::Observatory
                 }
                 // Ticket #54: a Scrubber is what a Custodian buys Stabilization with now.
                 VictoryFirstKind::StabilizationRun => cat == Cat::Scrubber || cat == Cat::Leapfrog || cat == Cat::ResearchLab || cat == Cat::Observatory,
-                VictoryFirstKind::ColonistsOffEarth => matches!(cat, Cat::Habitat | Cat::ColonyShip | Cat::FoundColony | Cat::LoadUnload | Cat::Transit),
+                // Version 0.07.0: the Research Lab and Observatory join the list for the same
+                // reason as the Venture Fund's: Generation Ships gates this win.
+                VictoryFirstKind::ColonistsOffEarth => {
+                    matches!(cat, Cat::Habitat | Cat::ColonyShip | Cat::FoundColony | Cat::LoadUnload | Cat::Transit | Cat::ResearchLab | Cat::Observatory)
+                }
                 VictoryFirstKind::ResearchProduced => cat == Cat::ResearchLab || cat == Cat::Observatory,
                 // Ticket #51: the Archive wants Research, a fund and a Colony off Earth to stand at,
                 // which the Colony Ship, the transit and the founding provide. Ticket #68: and the
