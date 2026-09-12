@@ -31,7 +31,7 @@ pub struct Credit {
 
 /// The icons in use, their authors, and the names they carry at game-icons.net. Anything added to
 /// `assets/icons/` belongs here too: the credit is the licence's price, not a courtesy.
-pub const CREDITS: [Credit; 8] = [
+pub const CREDITS: [Credit; 13] = [
     Credit { resource: "Materials", icon: "Mine Wagon", author: "Delapouite" },
     Credit { resource: "Fuel", icon: "Jerrycan", author: "Delapouite" },
     Credit { resource: "Energy", icon: "Electric", author: "Sbed" },
@@ -41,13 +41,32 @@ pub const CREDITS: [Credit; 8] = [
     Credit { resource: "Population", icon: "Character", author: "Delapouite" },
     Credit { resource: "Influence", icon: "Megaphone", author: "Delapouite" },
     Credit { resource: "Emissions", icon: "Chimney", author: "Delapouite" },
+    // Ticket #127 (version 0.07.2): the five kinds of thing, worn in front of a name. Chosen off a
+    // sheet at fourteen and sixteen pixels, since that is where a roster row draws them.
+    Credit { resource: "Warship", icon: "Spaceship", author: "Delapouite" },
+    Credit { resource: "Colony Ship", icon: "Rocket", author: "Lorc" },
+    Credit { resource: "Station", icon: "Defense Satellite", author: "Delapouite" },
+    Credit { resource: "Colony", icon: "Habitat Dome", author: "Delapouite" },
+    Credit { resource: "Region", icon: "Modern City", author: "Delapouite" },
 ];
+
+impl Credit {
+    /// The file stem in `assets/icons/` this credit is for: the name, lower-cased, spaces to
+    /// underscores ("Colony Ship" is `colony_ship.svg`).
+    pub fn key(&self) -> String {
+        self.resource.to_lowercase().replace(' ', "_")
+    }
+}
 
 #[derive(Resource, Default)]
 pub struct Icons {
     loaded: BTreeMap<String, egui::TextureHandle>,
     /// Tried and failed, so the attempt is not repeated every frame.
     tried: bool,
+    /// Ticket #122 (version 0.07.2): the Nations' flags, by two-letter code. A flag is neither
+    /// square nor tintable, so it is a second set with its own renderer and its own fetch.
+    flags: BTreeMap<String, egui::TextureHandle>,
+    tried_flags: bool,
 }
 
 impl Icons {
@@ -76,6 +95,44 @@ impl Icons {
         // sites to draw a glyph would be a worse cure than the disease.
         let loaded = self.loaded.clone();
         ctx.data_mut(|d| d.insert_temp(egui::Id::new("icons"), loaded));
+    }
+
+    /// Ticket #122 (version 0.07.2): read every SVG in `dir` as a **flag** -- rendered at four by
+    /// three, never tinted, keyed by its two-letter file stem -- and put the set where any card can
+    /// reach it. The art is flag-icons (github.com/lipis/flag-icons) under the MIT licence, whose
+    /// text ships beside the files; the research on ticket #123 measured that a tricolour survives
+    /// sixteen pixels and an emblem does not, which is why the card draws these at thirty-two.
+    pub fn load_flags(&mut self, ctx: &egui::Context, dir: &Path) {
+        if self.tried_flags {
+            return;
+        }
+        self.tried_flags = true;
+        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("svg") {
+                continue;
+            }
+            let Some(code) = path.file_stem().and_then(|s| s.to_str()).map(|s| s.to_string()) else { continue };
+            let Ok(text) = std::fs::read_to_string(&path) else { continue };
+            if let Some(image) = render_flag(&text) {
+                let handle = ctx.load_texture(format!("flag:{code}"), image, egui::TextureOptions::LINEAR);
+                self.flags.insert(code, handle);
+            }
+        }
+        let flags = self.flags.clone();
+        ctx.data_mut(|d| d.insert_temp(egui::Id::new("flags"), flags));
+    }
+
+    /// A Nation's flag at `height`, four by three, in its own colours. `None` where there is no
+    /// such flag, and the card then draws the name alone.
+    pub fn flag_from_ctx(ctx: &egui::Context, code: &str, height: f32) -> Option<egui::Image<'static>> {
+        if code.is_empty() {
+            return None;
+        }
+        let map: BTreeMap<String, egui::TextureHandle> = ctx.data(|d| d.get_temp(egui::Id::new("flags")))?;
+        let handle = map.get(code)?;
+        Some(egui::Image::new(egui::load::SizedTexture::from_handle(handle)).fit_to_exact_size(egui::vec2(height * 4.0 / 3.0, height)))
     }
 
     /// Ticket #106: one icon, fetched from egui's own store rather than passed down. `None` where
@@ -130,7 +187,11 @@ impl Icons {
 /// The worst remaining pair on the whole board is Materials against Research at 25, which is
 /// comfortable. Every colour here is a fill and nothing else: see `fill` below for why no caller
 /// may override one.
-const FIGURES: [(&str, [u8; 3]); 8] = [
+///
+/// Ticket #127 (version 0.07.2): a ninth entry, **kind**, is the one fill every kind glyph wears --
+/// "keep these off white," the designer said of the five -- named here rather than left to fall
+/// through to NEUTRAL, so that retuning the fallback for some later glyph cannot move them.
+const FIGURES: [(&str, [u8; 3]); 9] = [
     ("materials", [168, 176, 186]),
     ("fuel", [226, 88, 62]),
     ("energy", [245, 222, 92]),
@@ -139,13 +200,26 @@ const FIGURES: [(&str, [u8; 3]); 8] = [
     ("population", [220, 186, 150]),
     ("influence", [188, 146, 236]),
     ("emissions", [146, 110, 84]),
+    ("kind", [236, 232, 224]),
 ];
+
+/// Ticket #127 (version 0.07.2): the glyphs that say WHAT a thing is -- a warship, a Colony Ship, a
+/// station, a Colony, a Region -- as against the figures above, which say how much of something.
+/// On this board a colour means whose, so these carry the one off-white fill and never a colour
+/// of their own. The Army's shield is drawn, not loaded, and takes the same fill.
+pub const KINDS: [&str; 5] = ["warship", "colony_ship", "station", "colony", "region"];
+
+/// The fill every kind glyph wears, for the shapes that are drawn rather than loaded.
+pub fn kind_fill() -> egui::Color32 {
+    fill("kind")
+}
 
 /// The fallback where a figure has no colour of its own, and what every figure answered before this
 /// version gave them one.
 const NEUTRAL: [u8; 3] = [225, 220, 210];
 
 pub fn fill(name: &str) -> egui::Color32 {
+    let name = if KINDS.contains(&name) { "kind" } else { name };
     rgb(FIGURES.iter().find(|(figure, _)| *figure == name).map(|(_, c)| *c).unwrap_or(NEUTRAL))
 }
 
@@ -154,6 +228,20 @@ fn rgb(c: [u8; 3]) -> egui::Color32 {
 }
 
 /// One SVG to one egui image, with the black backing rectangle taken out first.
+/// A flag: four by three, at a size the card's thirty-two pixels can be drawn from cleanly, and
+/// with nothing stripped -- the black backing rectangle is a game-icons habit, not a flag's.
+fn render_flag(text: &str) -> Option<egui::ColorImage> {
+    const W: u32 = 128;
+    const H: u32 = 96;
+    let tree = resvg::usvg::Tree::from_str(text, &resvg::usvg::Options::default()).ok()?;
+    let mut pixmap = resvg::tiny_skia::Pixmap::new(W, H)?;
+    let size = tree.size();
+    let transform = resvg::tiny_skia::Transform::from_scale(W as f32 / size.width(), H as f32 / size.height());
+    resvg::render(&tree, transform, &mut pixmap.as_mut());
+    let pixels = pixmap.pixels().iter().map(|p| egui::Color32::from_rgba_premultiplied(p.red(), p.green(), p.blue(), p.alpha())).collect();
+    Some(egui::ColorImage { size: [W as usize, H as usize], source_size: egui::vec2(W as f32, H as f32), pixels })
+}
+
 fn render(text: &str) -> Option<egui::ColorImage> {
     let cleaned = text.replace(BACKGROUND_RECT, "");
     let tree = resvg::usvg::Tree::from_str(&cleaned, &resvg::usvg::Options::default()).ok()?;
@@ -170,4 +258,35 @@ fn render(text: &str) -> Option<egui::ColorImage> {
         .collect();
     let side = RENDER_SIZE as usize;
     Some(egui::ColorImage { size: [side, side], source_size: egui::vec2(RENDER_SIZE as f32, RENDER_SIZE as f32), pixels })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Ticket #127 (version 0.07.2): every SVG in `assets/icons/` has its credit and every credit
+    /// names an SVG that is there. The credit is the licence's price, so it is checked rather than
+    /// remembered; and a kind glyph with no file would leave a row wearing nothing without a word.
+    #[test]
+    fn every_icon_is_credited_and_every_credit_has_its_icon() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/icons");
+        let mut on_disk: Vec<String> = std::fs::read_dir(&dir)
+            .expect("assets/icons")
+            .flatten()
+            .filter_map(|e| {
+                let p = e.path();
+                if p.extension().and_then(|x| x.to_str()) != Some("svg") {
+                    return None;
+                }
+                p.file_stem().and_then(|s| s.to_str()).map(str::to_owned)
+            })
+            .collect();
+        on_disk.sort();
+        let mut credited: Vec<String> = CREDITS.iter().map(Credit::key).collect();
+        credited.sort();
+        assert_eq!(on_disk, credited, "left: the SVGs in assets/icons; right: the keys CREDITS names");
+        for kind in KINDS {
+            assert!(credited.iter().any(|k| k == kind), "kind glyph {kind} has no credit");
+        }
+    }
 }

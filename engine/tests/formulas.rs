@@ -391,17 +391,18 @@ fn occupation_transfer_keeps_the_old_controllers_standing() {
 fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction_multiplier() {
     let mut g = game();
     // Ticket #54 (g): the Custodians' multiplier is 1.25, not 1.3; ticket #82 (version 0.06.0):
-    // 1.2. They hold East Asia (4): (10 + 4) x 1.2 = 16.8 -> 16. Europe is still 5, and the
-    // Prospectors are still x1.0.
+    // 1.2. They hold East Asia -- China since ticket #122 -- whose value went 4 to 3 when ticket
+    // #125 (version 0.07.2) cut Japan and Korea out of it: (10 + 3) x 1.2 = 15.6 -> 15. Europe
+    // is still 5, and the Prospectors are still x1.0.
     assert_eq!(g.tables.faction(FactionKind::Custodians).influence_multiplier, 1.2);
-    assert_eq!(g.influence_allotment(Seat(0)), 16);
+    assert_eq!(g.influence_allotment(Seat(0)), 15);
     assert_eq!(g.influence_allotment(Seat(1)), 15);
     g.state_mut(StateId::NorthAmerica).control = Control::Controlled(Seat(1));
     assert_eq!(g.influence_allotment(Seat(1)), 22, "North America adds 7");
     // Raising East Asia's Industry Level adds one to its value.
     g.state_mut(StateId::EastAsia).industry_level += 1;
-    assert_eq!(g.state_influence_value(StateId::EastAsia), 5);
-    assert_eq!(g.influence_allotment(Seat(0)), 18, "(10 + 5) x 1.25 = 18.75");
+    assert_eq!(g.state_influence_value(StateId::EastAsia), 4);
+    assert_eq!(g.influence_allotment(Seat(0)), 16, "(10 + 4) x 1.2 = 16.8");
     // Ticket #53: twelve states share out the eight states' figures exactly, so the total stands.
     let total: i64 = StateId::ALL.iter().map(|s| g.tables.state(*s).influence).sum();
     assert_eq!(total, 34, "7 + 5 + 4 + 4 + 4 + 2 + 2 + 2 + 1 + 1 + 1 + 1, as the eight totalled 34");
@@ -412,17 +413,19 @@ fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction
 #[test]
 fn a_controlled_state_pays_ducats_from_gdp_times_industry_and_a_bank_adds_more() {
     let mut g = game();
-    // Ticket #53: East Asia gdp 23 x Industry 3 / 10 = 6 a turn; Europe 20 x 3 / 10 = 6, and
+    // Ticket #53: East Asia gdp 23 x Industry 3 / 10 = 6 a turn; ticket #125 (version 0.07.2)
+    // took 6 of that gdp to Japan and Korea, so 17 x 3 / 10 = 5. Europe 20 x 3 / 10 = 6, and
     // ticket #83 (version 0.06.0): x1.2 for the Prospectors who hold it, 7.
-    assert_eq!(g.state_ducats(StateId::EastAsia), 6);
+    assert_eq!(g.state_ducats(StateId::EastAsia), 5);
     assert_eq!(g.state_ducats(StateId::Europe), 7);
     let paid = income_of(&mut g, Seat(0));
-    assert_eq!(paid.ducats, 6);
-    // A Bank in East Asia adds 4 x 23 / 10 = 9; in North Africa (gdp 1) it would add nothing.
+    assert_eq!(paid.ducats, 5);
+    // A Bank in East Asia adds 4 x 17 / 10 = 6 (it was 4 x 23 / 10 = 9 before ticket #125 took 6 of
+    // the gdp to Japan and Korea); in North Africa (gdp 1) it would add nothing.
     g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Bank));
-    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Bank).amount, 9);
+    assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Bank).amount, 6);
     assert_eq!(g.facility_yield(Seat(0), StateId::NorthAfrica, FacilityKind::Bank).amount, 0);
-    assert_eq!(income_of(&mut g, Seat(0)).ducats, 15);
+    assert_eq!(income_of(&mut g, Seat(0)).ducats, 11);
     // A Trade Post followed the Habitat yield; ticket #90 (version 0.06.0): it pays 2 per Colonist
     // at its Body plus 3 per other Body held. Empty Colonies on the Moon and Mars, with Earth held:
     // each sees two other Bodies, so 6.
@@ -630,7 +633,7 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
     // Ticket #56 re-cut them: abundant ore and Fuel under the ice.
     assert_eq!((earth.mine_yield, earth.generator_yield, earth.refinery_yield, earth.habitat_yield), (1.75, 0.75, 2.0, 1.0));
     assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3);
-    assert_eq!(StateId::ALL.len(), 12, "twelve Nation States since ticket #53, and Antarctica is none of them");
+    assert_eq!(StateId::ALL.len(), 14, "fourteen Regions since ticket #125, and Antarctica is none of them");
     let m = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
     let before = g.emissions_now();
     colony(&mut g, Seat(0), BodyId::Earth, &[ModuleKind::Habitat, ModuleKind::Mine, ModuleKind::Refinery, ModuleKind::Generator], 4);
@@ -748,15 +751,16 @@ fn selling_materials_or_fuel_returns_half_the_buying_price() {
 fn embassies_and_relays_add_to_the_allotment_and_raise_their_places_standing_each_turn() {
     let mut g = game();
     // Ticket #54: the Custodians' multiplier is 1.25; ticket #82 (version 0.06.0): 1.2. In East
-    // Asia: (10 + 4) x 1.2 = 16. Two Embassies (they stack) add 4: (10 + 4 + 4) x 1.2 = 21.6 -> 21.
-    assert_eq!(g.influence_allotment(Seat(0)), 16);
+    // Asia, value 3 since ticket #125: (10 + 3) x 1.2 = 15. Two Embassies (they stack) add 4:
+    // (10 + 3 + 4) x 1.2 = 20.4 -> 20.
+    assert_eq!(g.influence_allotment(Seat(0)), 15);
     g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Embassy));
     g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Embassy));
     assert_eq!(g.building_allotment(Seat(0)), 4);
-    assert_eq!(g.influence_allotment(Seat(0)), 21);
+    assert_eq!(g.influence_allotment(Seat(0)), 20);
     // A Relay in a Colony adds 1 more.
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Relay], 4);
-    assert_eq!(g.influence_allotment(Seat(0)), 22, "(10 + 4 + 5) x 1.2 = 22.8");
+    assert_eq!(g.influence_allotment(Seat(0)), 21, "(10 + 3 + 5) x 1.2 = 21.6");
     // Each Resolution the standing rises by the buildings' figures and does not decay. Ticket #75:
     // the start state begins at its threshold, so the rises are counted from there.
     let claim = g.seats[0].influence[&Place::State(StateId::EastAsia)];
@@ -1650,12 +1654,15 @@ fn the_ai_seats_take_start_states_not_adjacent_to_any_taken_one() {
     // Europe touches North America, North Africa, Russia and the Middle East, so the first AI seat
     // takes the highest Industry Level among what is left untouched: East Asia at 3.
     assert_eq!(held(Seat(1)), vec![StateId::EastAsia]);
-    // East Asia adds Russia, South Asia and South-East Asia to the adjacent set; Australia is the
-    // highest Industry Level still untouched, at 2.
-    assert_eq!(held(Seat(2)), vec![StateId::Australia]);
+    // East Asia adds Russia, South Asia, South-East Asia and Japan to the adjacent set. Two
+    // untouched Regions stand at Industry 2, Australia and -- since ticket #125 (version 0.07.2)
+    // -- the Arabian Peninsula, and the tie goes to the more populous: the peninsula at 1.0
+    // against Australia at 0.5.
+    assert_eq!(held(Seat(2)), vec![StateId::ArabianPeninsula]);
     // Then the untouched states are all at Industry 1, so the tie goes to the most populous:
     // Sub-Saharan Africa at 11.4.
-    assert_eq!(held(Seat(3)), vec![StateId::SubSaharanAfrica]);
+    // The peninsula's neighbours join the adjacent set; Australia is the last at Industry 2.
+    assert_eq!(held(Seat(3)), vec![StateId::Australia]);
     // The fallback, when every free state touches a taken one: the highest Industry Level free
     // state, ties by population. With everything above taken, North America at 3 wins.
     let taken = [StateId::Europe, StateId::EastAsia, StateId::Australia, StateId::SubSaharanAfrica, StateId::SouthAmerica, StateId::CentralAmerica];
@@ -2266,6 +2273,8 @@ fn b_a_sea_level_threshold_raises_two_a_slot_and_displaces_five_percent_an_expos
     g.state_mut(StateId::Russia).industry_level = 3;
     g.state_mut(StateId::SouthAsia).industry_level = 1;
     g.state_mut(StateId::SouthEastAsia).industry_level = 0;
+    // Ticket #125 (version 0.07.2): Japan and Korea border East Asia too, and take none here.
+    g.state_mut(StateId::Japan).industry_level = 0;
     g.apply_sea_threshold(StateId::EastAsia, 0);
     assert_eq!(g.unrest(StateId::EastAsia), 2.0, "one per build slot, and Asia is exposed 2");
     let displaced = pop * 0.05 * 2.0;
@@ -2292,6 +2301,8 @@ fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_half_a_person()
     g.state_mut(StateId::Russia).industry_level = 2;
     g.state_mut(StateId::SouthAsia).industry_level = 0;
     g.state_mut(StateId::SouthEastAsia).industry_level = 0;
+    // Ticket #125 (version 0.07.2): Japan and Korea border East Asia too, and take none here.
+    g.state_mut(StateId::Japan).industry_level = 0;
     hold_temperature(&mut g, 3.0);
     assert!(g.population_growth_rate() < 0.0);
     g.climate_phase();
@@ -2300,7 +2311,7 @@ fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_half_a_person()
     assert!(arrived > 0.5 && arrived < 1.0, "the flow is worth exactly one point of Unrest: {arrived}");
     assert!((g.state(StateId::Russia).population - arrived).abs() < 1e-6, "Russia took the flow: {}", g.state(StateId::Russia).population);
     assert!(
-        g.report.lines.iter().any(|l| l.text.contains("left East Asia for") && l.text.contains("Russia")),
+        g.report.lines.iter().any(|l| l.text.contains("left China for") && l.text.contains("Russia")),
         "a refugee line naming where they went: {:?}",
         g.report.lines
     );
@@ -2622,10 +2633,11 @@ fn the_ai_pays_relief_and_raises_a_constabulary_where_unrest_has_taken_hold() {
 fn twelve_nation_states_share_out_the_eight_they_came_from() {
     let g = game();
     let t = &g.tables;
-    assert_eq!(StateId::ALL.len(), 12);
+    assert_eq!(StateId::ALL.len(), 14);
     let card = |s: StateId| t.state(s);
-    // Asia's 30 GDP and 7 Influence go to East Asia, South Asia and South-East Asia.
-    let asia = [StateId::EastAsia, StateId::SouthAsia, StateId::SouthEastAsia];
+    // Asia's 30 GDP and 7 Influence go to East Asia, South Asia and South-East Asia -- and since
+    // ticket #125 (version 0.07.2) to Japan and Korea, cut out of East Asia with 6 and 1 of them.
+    let asia = [StateId::EastAsia, StateId::SouthAsia, StateId::SouthEastAsia, StateId::Japan];
     assert_eq!(asia.iter().map(|s| card(*s).gdp).sum::<i64>(), 30, "Asia's GDP share");
     assert_eq!(asia.iter().map(|s| card(*s).influence).sum::<i64>(), 7, "Asia's Influence value");
     // Africa's 3 and 2 split at the Sahara.
@@ -3085,13 +3097,14 @@ fn c_population_emissions_follow_the_industry_level() {
     let new: f64 = StateId::ALL.iter().map(|s| g.population_coefficient(*s) * g.state(*s).population).sum();
     let old: f64 = StateId::ALL.iter().map(|s| 0.1 * g.state(*s).population).sum();
     assert!((new - old).abs() / old < 0.10, "the world's people emit {new:.2} where the flat 0.1 gave {old:.2}");
-    // And the Climate phase reads it: one more Industry Level in East Asia is 0.03 x 16.4 more.
+    // And the Climate phase reads it: one more Industry Level in East Asia is 0.03 x 14.4 more,
+    // 14.4 being what ticket #125 (version 0.07.2) left it after Japan and Korea took 2.0.
     let mut g = g;
     let before = g.emissions_now().population;
     let mult = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
     g.state_mut(StateId::EastAsia).industry_level += 1;
     let rise = g.emissions_now().population - before;
-    assert!((rise - 0.03 * 16.4 * mult).abs() < 1e-9, "the population line rose {rise:.3}");
+    assert!((rise - 0.03 * 14.4 * mult).abs() < 1e-9, "the population line rose {rise:.3}");
 }
 
 /// (d) Leapfrog is the Custodians' alone, costs 50 Ducats, takes one level's worth off the state's
@@ -3214,7 +3227,7 @@ fn e_a_scrubber_enlarges_the_sink_and_is_capped_destroyed_and_calming() {
     // Destroyed when the state changes hands.
     g.transfer_control(Place::State(sid), Seat(1), "Influence");
     assert_eq!(g.scrubbers_online(sid), 0, "the Scrubbers do not pass to whoever takes the state");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("Scrubber(s) in East Asia were destroyed")), "and the Report says so");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Scrubber(s) in China were destroyed")), "and the Report says so");
 }
 
 /// (f) A Strip Permit doubles a state's Facility output for three turns, then raises its Baseline
@@ -3635,7 +3648,9 @@ fn b_coastal_slots_are_two_an_exposure_capped_and_a_raise_is_inland() {
         assert_eq!(g.inland_slots(sid), start - want, "{}: the rest of the start slots are inland", card.name);
         assert_eq!(g.coastal_slots(sid) + g.inland_slots(sid), g.build_slots(sid), "{}: the two rows are the whole card", card.name);
     }
-    assert_eq!(world, 34, "34 coastal slots in the world, fifteen fewer than the 49 of version 0.05");
+    // Ticket #125 (version 0.07.2): Japan and Korea (Exposure 2, four slots) and the Arabian
+    // Peninsula (Exposure 1, two) bring six to the 34 of before.
+    assert_eq!(world, 40, "40 coastal slots in the world: the 34 of version 0.05.5 and six on the two new Regions");
     // Ticket #70: Europe's Refinery and North America's Factory, third on their cards with an
     // Exposure of 1, now stand inland from the first turn.
     assert!(g.state(StateId::Europe).facilities.iter().any(|f| f.kind == FacilityKind::Refinery && !f.coastal), "Europe's Refinery went inland");
@@ -3713,7 +3728,7 @@ fn d_the_sea_takes_coastal_slots_only_oldest_first_and_then_nothing() {
     assert!(standing(&g, sid, true).is_empty(), "and everything that stood on it with it");
     assert_eq!(standing(&g, sid, false), vec![FacilityKind::ResearchLab], "the inland Research Lab never moved");
     assert!(
-        g.report.lines.iter().any(|l| l.text.contains("The sea took 2 coastal slots from Australia and Oceania")),
+        g.report.lines.iter().any(|l| l.text.contains("The sea took 2 coastal slots from Australia")),
         "the Report names what the sea took: {:?}",
         g.report.lines
     );
@@ -4654,7 +4669,7 @@ fn the_first_reports_headline_is_the_seating_explanation() {
     assert_eq!(head.kind, LineKind::Seating);
     assert_eq!(
         head.text,
-        "January 2030. You play the Custodians from East Asia; the computer plays the Prospectors, the Arkwrights and the Archivists."
+        "January 2030. You play the Custodians from China; the computer plays the Prospectors, the Arkwrights and the Archivists."
     );
     // It headlines over everything else the first turn wrote down.
     assert!(g.report.lines.len() > 1, "and there are other lines under it");
@@ -4683,7 +4698,9 @@ fn a_spectated_game_seats_four_computers_and_deals_seat_zero_by_the_spreading_ru
         let pick = t.ai_start_state(&taken);
         taken.push(pick);
     }
-    assert_eq!(taken, vec![StateId::EastAsia, StateId::Europe, StateId::Australia, StateId::SubSaharanAfrica]);
+    // Ticket #125 (version 0.07.2): the Arabian Peninsula, untouched at Industry 2 and more populous
+    // than Australia, is the third pick now; Australia is the fourth.
+    assert_eq!(taken, vec![StateId::EastAsia, StateId::Europe, StateId::ArabianPeninsula, StateId::Australia]);
     for seat in Seat::ALL {
         assert_eq!(g.controlled_states(seat), vec![taken[seat.index()]], "{seat:?} starts where the rule put it");
     }
@@ -4904,7 +4921,7 @@ fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
     g.income_phase();
     assert_eq!(g.research.progress - before, 1, "half of one Lab, rounded down");
     assert_eq!(g.research.contributions, [0; 4], "and nobody's Lead");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("North America") && l.text.contains("Research")), "the Report says so: {:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("The United States") && l.text.contains("Research")), "the Report says so: {:?}", g.report.lines);
     // Occupied: the half still flows; the occupier pays the 3 Energy and draws nothing from it.
     g.state_mut(StateId::NorthAmerica).control = Control::Occupied { occupier: Seat(2), previous: None, turns: 1 };
     let y = g.facility_yield(Seat(2), StateId::NorthAmerica, FacilityKind::ResearchLab);
@@ -5171,7 +5188,7 @@ fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_a_tenth_of_populatio
     assert_eq!(g.state(StateId::EastAsia).emigrants, 4, "on the card at End Turn");
     assert!((pop - g.state(StateId::EastAsia).population - 0.4).abs() < 1e-9, "a tenth of a person each");
     assert_eq!(g.state(StateId::EastAsia).unrest, 2.5, "the batch took 0.5 off");
-    assert!(g.log.to_vec().iter().any(|l| l.contains("Emigrants mustered in East Asia")), "{:?}", g.log.to_vec());
+    assert!(g.log.to_vec().iter().any(|l| l.contains("Emigrants mustered in China")), "{:?}", g.log.to_vec());
     // Steerage: eight a turn at twice the population.
     assert_eq!(g.emigrants_per_turn(Seat(0)), 4);
     assert_eq!(g.emigrants_per_turn(Seat(2)), 8, "the Arkwrights muster eight");
@@ -5224,7 +5241,7 @@ fn emigrants_go_to_antarctica_by_sea_from_any_state_and_arrive_a_turn_later() {
     g.resolution_phase();
     let col = g.colonies.iter().find(|c| c.body == BodyId::Earth && !c.in_orbit).expect("founded").clone();
     assert_eq!((col.slot, col.colonists, col.control), (slot, 4, Control::Controlled(Seat(0))));
-    assert!(g.log.to_vec().iter().any(|l| l.contains("in Antarctica with 4 Emigrants from Europe")), "{:?}", g.log.to_vec());
+    assert!(g.log.to_vec().iter().any(|l| l.contains("in Antarctica with 4 Emigrants from The European Union")), "{:?}", g.log.to_vec());
     // The last two join it, once it has room.
     g.colony_mut(col.id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     g.commit_orders(Seat(0), &[Order::SendToAntarctica { state: StateId::Europe, n: 2, into: UnloadTarget::Colony(col.id) }]);
@@ -5819,8 +5836,13 @@ fn the_sea_crossing_to_antarctica_carries_no_crowd_and_loses_nobody() {
     g.resolution_phase();
     g.turn += 1;
     g.resolution_phase();
-    let col = g.colonies.iter().find(|c| c.body == BodyId::Earth && !c.in_orbit).expect("founded");
-    assert_eq!(col.colonists, 8);
+    let col = g.colonies.iter().find(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(Seat(0))).expect("founded");
+    // Ticket #125 (version 0.07.2): a fresh Colony takes min(n, room), and room is the slot's own
+    // Habitat yield, drawn from the seed at the start -- fourteen Regions shift that stream, so
+    // the first free slot's room is 7 on this seed where it was 8. The claim under test is that
+    // NOBODY IS LOST, not that eight land: whoever finds no room comes home, and the sum is eight.
+    assert!(col.colonists >= 1);
+    assert_eq!(col.colonists + g.state(StateId::Europe).emigrants, 8, "everyone who sailed either landed or came home");
     assert_eq!(g.seat(Seat(0)).lost_in_transit, 0);
 }
 

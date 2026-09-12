@@ -1,3 +1,25 @@
+# Ticket #126 (version 0.07.2): every Region carries a colour of its own. The designer, looking at
+# the mask generator's preview: "i'd like neutral countries the default colors in this latest mask
+# test. shown on the start screen and on the globe." So a Region nobody holds is tinted in its own
+# colour on the Earth Map and every Region is on the start screen, where nothing is held yet; a held
+# Region wears its controller's Faction colour as before. The preview reads these same numbers, so
+# the picture the generator draws and the board a player sees agree.
+#
+# Six of the preview's colours sat within a CIELAB distance of 25 of a Faction's -- Brazil against
+# the Prospectors at 8 was the same orange -- so a neutral Region could read as a held one. Those six
+# were moved, at the designer's word, to hues that clear every Faction by 29 or more and their own
+# neighbours by 30 or more: Brazil to salmon, Iran to cream, Australia to lavender, the Arabian
+# Peninsula to a blue-violet (still violet, as asked, pushed off the Arkwrights' purple), China to
+# brick, Egypt to pale rose. India and the United States are both green, 11 apart, and were left,
+# being on opposite sides of the globe and clear of every Faction.
+# Version 0.07.2 (ticket #122): every Region is named for its Nation -- the power that leads it --
+# and carries that Nation's flag as a two-letter code into assets/flags/. The geographic names the
+# twelve were charted under stay in the comment above each block, since they still say what ground
+# a Region covers, and ticket #125 is about to redraw that ground along real borders. The choice of
+# Nation is the designer's: China, India, the United States, Brazil, Russia, Australia, the European
+# Union, Iran, Egypt, Nigeria, Indonesia and Mexico. Ids are unchanged: south_asia is still the id
+# of the Region now called India, so nothing that names a Region by id -- saves, tests, the shot
+# aids -- moved.
 # Spec section 4.2, amended by ticket #26 (version 0.02) and ticket #53 (version 0.05): twelve
 # Nation States. Africa is split at the Sahara; Asia becomes East Asia, South Asia and South-East
 # Asia; Central America and the Caribbean are cut out of North America. Antarctica stays off the
@@ -56,7 +78,9 @@ stops_at_temperature = 2.5
 # the youngest population on the map and the least schooling.
 [[state]]
 id = "sub_saharan_africa"
-name = "Sub-Saharan Africa"
+name = "Nigeria"
+flag = "ng"
+colour = [0.90, 0.71, 0.24]
 population = 11.4
 industry_level = 1
 resource_lean = "materials"
@@ -64,7 +88,7 @@ baseline_emissions = 0.3
 education_level = 0.7
 size = 3
 coastal_exposure = 1
-neighbours = ["north_africa", "middle_east"]
+neighbours = ["north_africa", "arabian_peninsula"]
 start_facilities = ["factory"]
 influence = 1
 gdp = 2
@@ -74,7 +98,9 @@ unrest = 0.0
 # the Mediterranean, the Nile delta exposed to the sea.
 [[state]]
 id = "north_africa"
-name = "North Africa"
+name = "Egypt"
+flag = "eg"
+colour = [0.94, 0.71, 0.78]
 population = 2.6
 industry_level = 1
 resource_lean = "fuel"
@@ -82,35 +108,42 @@ baseline_emissions = 0.4
 education_level = 0.85
 size = 2
 coastal_exposure = 1
-neighbours = ["sub_saharan_africa", "europe", "middle_east"]
+neighbours = ["sub_saharan_africa", "europe", "middle_east", "arabian_peninsula"]
 start_facilities = ["refinery"]
 influence = 1
 gdp = 1
 unrest = 0.0
 
-# East Asia: China, Mongolia, the Koreas, Japan, Taiwan and Central Asia. The workshop of the world,
-# the dirtiest industry per unit on the map alongside the Middle East, and vast coastal cities.
+# East Asia: China, Mongolia, Taiwan and Central Asia (Kazakhstan whole, since version 0.07.2). The
+# workshop of the world, the dirtiest industry per unit on the map alongside the Middle East, and
+# vast coastal cities. Ticket #125 cut Japan and Korea out of it and shared the figures by the rule
+# ticket #53 set -- a split hands out its parent's figure exactly -- so 16.4, 23 and 4 became
+# 14.4 + 2.0, 17 + 6 and 3 + 1.
 [[state]]
 id = "east_asia"
-name = "East Asia"
-population = 16.4
+name = "China"
+flag = "cn"
+colour = [0.71, 0.24, 0.16]
+population = 14.4
 industry_level = 3
 resource_lean = "materials"
 baseline_emissions = 0.5
 education_level = 1.1
 size = 3
 coastal_exposure = 2
-neighbours = ["russia", "south_asia", "south_east_asia"]
+neighbours = ["russia", "south_asia", "south_east_asia", "japan"]
 start_facilities = ["factory", "power_plant", "refinery"]
-influence = 4
-gdp = 23
+influence = 3
+gdp = 17
 unrest = 0.0
 
 # South Asia: India, Pakistan, Bangladesh, Nepal, Sri Lanka and Afghanistan. The most people of any
 # state on the map, the least schooling outside Africa, and deltas the sea will take first.
 [[state]]
 id = "south_asia"
-name = "South Asia"
+name = "India"
+flag = "in"
+colour = [0.47, 0.86, 0.47]
 population = 19.4
 industry_level = 2
 resource_lean = "materials"
@@ -128,7 +161,9 @@ unrest = 0.0
 # and gas offshore, and more coastline than anywhere.
 [[state]]
 id = "south_east_asia"
-name = "South-East Asia"
+name = "Indonesia"
+flag = "id"
+colour = [0.71, 0.47, 0.94]
 population = 6.8
 industry_level = 2
 resource_lean = "fuel"
@@ -146,7 +181,9 @@ unrest = 0.0
 
 [[state]]
 id = "australia"
-name = "Australia and Oceania"
+name = "Australia"
+flag = "au"
+colour = [0.78, 0.67, 0.94]
 population = 0.5
 industry_level = 2
 resource_lean = "energy"
@@ -162,7 +199,9 @@ unrest = 0.0
 
 [[state]]
 id = "europe"
-name = "Europe"
+name = "The European Union"
+flag = "eu"
+colour = [0.27, 0.51, 0.86]
 population = 6.0
 industry_level = 3
 resource_lean = "energy"
@@ -179,7 +218,9 @@ unrest = 0.0
 # North America: the United States and Canada, about 375 million people.
 [[state]]
 id = "north_america"
-name = "North America"
+name = "The United States"
+flag = "us"
+colour = [0.31, 0.75, 0.35]
 population = 3.8
 industry_level = 3
 resource_lean = "fuel"
@@ -199,7 +240,9 @@ unrest = 0.0
 # people. Small, poor beside its northern neighbour, and all coast.
 [[state]]
 id = "central_america"
-name = "Central America and the Caribbean"
+name = "Mexico"
+flag = "mx"
+colour = [0.98, 0.86, 0.47]
 population = 2.2
 industry_level = 1
 resource_lean = "materials"
@@ -215,7 +258,9 @@ unrest = 0.0
 
 [[state]]
 id = "south_america"
-name = "South America"
+name = "Brazil"
+flag = "br"
+colour = [0.94, 0.59, 0.51]
 population = 4.5
 industry_level = 1
 resource_lean = "fuel"
@@ -234,6 +279,8 @@ unrest = 0.0
 [[state]]
 id = "russia"
 name = "Russia"
+flag = "ru"
+colour = [0.78, 0.78, 0.35]
 population = 1.5
 industry_level = 2
 resource_lean = "fuel"
@@ -241,26 +288,83 @@ baseline_emissions = 0.4
 education_level = 1.35
 size = 3
 coastal_exposure = 1
-neighbours = ["europe", "east_asia", "north_america"]
+neighbours = ["europe", "east_asia", "north_america", "japan"]
 start_facilities = ["refinery", "power_plant"]
 influence = 4
 gdp = 3
 unrest = 0.0
 
-# The Middle East: Turkey to Iran and the Arabian Peninsula, about 350 million people, oil, the
-# highest Emissions per unit of industry on the map, Gulf coasts exposed.
+# The Middle East: Turkey to Iran, the Levant, Iraq and the Caucasus, about 250 million people
+# since ticket #125 cut the Arabian Peninsula out of it and shared the figures by ticket #53's rule
+# -- 3.5, 5 and 4 became 2.5 + 1.0, 3 + 2 and 2 + 2. Still among the highest Emissions per unit of
+# industry on the map. It borders Africa only through the Sinai now; the strait to the Horn went
+# with the peninsula.
 [[state]]
 id = "middle_east"
-name = "The Middle East"
-population = 3.5
+name = "Iran"
+flag = "ir"
+colour = [0.92, 0.88, 0.71]
+population = 2.5
 industry_level = 2
 resource_lean = "fuel"
 baseline_emissions = 0.5
 education_level = 1.0
 size = 2
 coastal_exposure = 1
-neighbours = ["europe", "north_africa", "sub_saharan_africa", "south_asia"]
+neighbours = ["europe", "north_africa", "south_asia", "arabian_peninsula"]
 start_facilities = ["refinery", "power_plant"]
-influence = 4
-gdp = 5
+influence = 2
+gdp = 3
+unrest = 0.0
+
+# Japan and Korea: Japan, South Korea and North Korea, about 200 million people, the second rich
+# Pacific power, an island Region with the most exposed coast on the map. Cut out of East Asia on
+# ticket #125 (version 0.07.2) with a 2.0 / 6 / 1 share of its parent's population, GDP and
+# Influence. The rest of its card is set by hand and written here for the designer to veto: the
+# Industry Level is China's, the Education Level is the highest on the map after Europe and North
+# America, it leans Energy since it has no ore or oil of its own, and it starts with two Factories
+# and a Power Plant -- as many start Facilities as its Industry Level, the rule every card obeys,
+# and no start Lab, since ticket #69 gave those to North America and South-East Asia alone.
+[[state]]
+id = "japan"
+name = "Japan"
+flag = "jp"
+colour = [0.39, 0.71, 0.94]
+population = 2.0
+industry_level = 3
+resource_lean = "energy"
+baseline_emissions = 0.3
+education_level = 1.5
+size = 1
+coastal_exposure = 2
+neighbours = ["east_asia", "russia"]
+start_facilities = ["factory", "power_plant", "factory"]
+influence = 1
+gdp = 6
+unrest = 0.0
+
+# The Arabian Peninsula: Saudi Arabia, the Emirates, Oman, Yemen, Qatar, Bahrain and Kuwait, about
+# 100 million people and the oil. Cut out of the Middle East on ticket #125 (version 0.07.2) with
+# a 1.0 / 2 / 2 share of its parent's population, GDP and Influence -- the Influence split evenly,
+# since the peninsula's weight in the region was never its people. The rest of its card is set by
+# hand for the designer to veto: it leans Fuel and starts with a Refinery and a Power Plant,
+# its Baseline Emissions are the Middle East's, and its Gulf coast is exposed. It borders the Middle
+# East across the Gulf and Iraq, North Africa across the Red Sea at the Sinai, and Sub-Saharan
+# Africa across the strait to the Horn, which is the adjacency the Middle East used to hold.
+[[state]]
+id = "arabian_peninsula"
+name = "Saudi Arabia"
+flag = "sa"
+colour = [0.59, 0.43, 1.00]
+population = 1.0
+industry_level = 2
+resource_lean = "fuel"
+baseline_emissions = 0.5
+education_level = 1.0
+size = 2
+coastal_exposure = 1
+neighbours = ["middle_east", "north_africa", "sub_saharan_africa"]
+start_facilities = ["refinery", "power_plant"]
+influence = 2
+gdp = 2
 unrest = 0.0

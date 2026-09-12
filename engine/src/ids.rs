@@ -54,10 +54,15 @@ pub enum StateId {
     // Version 0.02 (ticket #26): cut from Europe and Asia.
     Russia,
     MiddleEast,
+    // Version 0.07.2 (ticket #125): Japan and Korea cut out of East Asia, the Arabian Peninsula out
+    // of the Middle East. The Regions are named for their Nations since ticket #122 -- the id keeps
+    // the ground it covers, the card carries the name -- so these read `japan` and `arabian_peninsula`.
+    Japan,
+    ArabianPeninsula,
 }
 
 impl StateId {
-    pub const ALL: [StateId; 12] = [
+    pub const ALL: [StateId; 14] = [
         StateId::SubSaharanAfrica,
         StateId::NorthAfrica,
         StateId::EastAsia,
@@ -70,6 +75,8 @@ impl StateId {
         StateId::SouthAmerica,
         StateId::Russia,
         StateId::MiddleEast,
+        StateId::Japan,
+        StateId::ArabianPeninsula,
     ];
     pub fn index(self) -> usize {
         self as usize
