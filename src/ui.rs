@@ -2803,7 +2803,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // Ticket #55: what the Stock already commits the world to, and how long cutting can
             // still avoid the Collapse Line.
             ui.label(
-                RichText::new(format!("Committed: {:+.1} C even if net Emissions stopped today", game.target_temperature()))
+                RichText::new(format!("Already locked in: {:+.1} C even if net Emissions stopped today", game.target_temperature()))
                     .size(15.0)
                     .color(Color32::from_rgb(240, 180, 140)),
             )
