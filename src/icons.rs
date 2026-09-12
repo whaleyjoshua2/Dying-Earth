@@ -31,12 +31,16 @@ pub struct Credit {
 
 /// The icons in use, their authors, and the names they carry at game-icons.net. Anything added to
 /// `assets/icons/` belongs here too: the credit is the licence's price, not a courtesy.
-pub const CREDITS: [Credit; 5] = [
+pub const CREDITS: [Credit; 8] = [
     Credit { resource: "Materials", icon: "Mine Wagon", author: "Delapouite" },
     Credit { resource: "Fuel", icon: "Jerrycan", author: "Delapouite" },
     Credit { resource: "Energy", icon: "Electric", author: "Sbed" },
     Credit { resource: "Research", icon: "Microscope", author: "Lord Berandas" },
     Credit { resource: "Ducats", icon: "Banknote", author: "Delapouite" },
+    // Ticket #112 (version 0.07.1): three figures that were words on the board.
+    Credit { resource: "Population", icon: "Character", author: "Delapouite" },
+    Credit { resource: "Influence", icon: "Megaphone", author: "Delapouite" },
+    Credit { resource: "Emissions", icon: "Chimney", author: "Delapouite" },
 ];
 
 #[derive(Resource, Default)]

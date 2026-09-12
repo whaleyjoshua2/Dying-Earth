@@ -524,7 +524,7 @@ fn credits_screen(root: &mut Ui, session: &mut Session, icons: &Icons) {
             ui.add_space(60.0);
             ui.label(RichText::new("Credits").size(40.0).strong());
             ui.add_space(24.0);
-            ui.label(RichText::new("Resource icons").size(20.0).strong());
+            ui.label(RichText::new("Icons").size(20.0).strong());
             ui.label(RichText::new("From game-icons.net, used under Creative Commons BY 3.0.").size(15.0));
             ui.add_space(10.0);
             for c in crate::icons::CREDITS.iter() {
@@ -994,8 +994,10 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             ui.separator();
             // Ticket #42: the turn's Allotment and what the trading window added, shown apart.
             let bought: i64 = session.pending.iter().map(|o| if let Order::BuyInfluence { amount } = o { *amount } else { 0 }).sum();
-            let influence = if bought > 0 { format!("Influence {} of {} ({} free + {} bought)", influence_left, s.allotment + bought, s.allotment, bought) } else { format!("Influence {} of {}", influence_left, s.allotment) };
-            ui.label(influence).on_hover_text("The Allotment is what your places and buildings give each turn; bought Influence comes from the Trading window at 2 Ducats each.");
+            let influence = if bought > 0 { format!("{} of {} ({} free + {} bought)", influence_left, s.allotment + bought, s.allotment, bought) } else { format!("{} of {}", influence_left, s.allotment) };
+            // Ticket #112 (version 0.07.1): Influence now has a glyph, so on the bar it follows the
+            // same rule the five resources do -- the picture stands in place of the word.
+            bar_resource(ui, icons, "influence", "Influence", influence, "The Allotment is what your places and buildings give each turn; bought Influence comes from the Trading window at 2 Ducats each.".to_string());
             ui.separator();
             // Ticket #57: the bar names the turn's month. Ticket #67 (version 0.05.5): a Turn is two months,
             // named by its first alone, so turn 2 reads March 2030.
@@ -1769,13 +1771,47 @@ fn change_row(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, mothb
     });
 }
 
+/// Ticket #112 (version 0.07.1): a figure's glyph BESIDE its word, which is the rule everywhere
+/// except the top bar. It reaches the art through the egui context, so a call site deep in a panel
+/// does not have to be handed an `Icons` to draw one. Where the art is missing the line is
+/// unchanged, so nothing is ever lost -- only unillustrated.
+fn icon_word(ui: &mut Ui, key: &str, text: impl Into<String>) {
+    let text = text.into();
+    match Icons::from_ctx(ui.ctx(), key, 15.0, Color32::from_rgb(225, 220, 210)) {
+        Some(image) => {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 4.0;
+                ui.add(image);
+                ui.label(text);
+            });
+        }
+        None => {
+            ui.label(text);
+        }
+    }
+}
+
 /// Ticket #106 (version 0.07.0): hover text with the resource words replaced by their glyphs. The
 /// designer's rule is that the icons are used EXCLUSIVELY on mouse-overs -- the words stay
 /// everywhere a player reads at a glance, and the tooltips, which are the wordiest thing in the
 /// interface, trade them for pictures. Where an icon is missing the word comes straight back.
 fn hover_with_icons(ui: &mut Ui, text: &str) {
-    const WORDS: [(&str, &str); 5] =
-        [("Materials", "materials"), ("Fuel", "fuel"), ("Energy", "energy"), ("Research", "research"), ("Ducats", "ducats")];
+    // Ticket #112 (version 0.07.1): population, Influence and Emissions join the five resources,
+    // used the same way -- the glyph stands for the word inside a tooltip.
+    const WORDS: [(&str, &str); 10] = [
+        ("Materials", "materials"),
+        ("Fuel", "fuel"),
+        ("Energy", "energy"),
+        ("Research", "research"),
+        ("Ducats", "ducats"),
+        ("Population", "population"),
+        ("Influence", "influence"),
+        ("Emissions", "emissions"),
+        // The prose capitalises the five resources and Influence, but writes the other two in
+        // lower case mid-sentence, so both spellings have to be looked for.
+        ("population", "population"),
+        ("emissions", "emissions"),
+    ];
     ui.set_max_width(360.0);
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 3.0;
@@ -1959,10 +1995,10 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     let mult = st.control.director().map(|s| game.tables.faction(game.kind(s)).emissions_multiplier).unwrap_or(1.0);
     let industry_em = card.baseline_emissions * st.industry_level as f64 * mult;
     let fac_em: f64 = st.facilities.iter().filter(|f| f.working()).map(|f| game.tables.facility(f.kind).emissions * mult).sum();
-    ui.label(format!("Population {:.1} (hundreds of millions), Industry Level {}, leans {:?}", st.population, st.industry_level, card.resource_lean));
-    ui.label(format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid)));
+    icon_word(ui, "population", format!("Population {:.1} (hundreds of millions), Industry Level {}, leans {:?}", st.population, st.industry_level, card.resource_lean));
+    icon_word(ui, "influence", format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid)));
     ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 10); a Bank here would add {}", card.gdp, game.state_ducats(sid), (game.tables.facility(FacilityKind::Bank).produces.as_ref().map(|p| p.amount).unwrap_or(0) * card.gdp) / 10));
-    ui.label(format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult));
+    icon_word(ui, "emissions", format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult));
     // Ticket #54: the per-person line, its formula, and what Leapfrog has taken off it.
     {
         let c = &game.tables.climate;
@@ -2231,7 +2267,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             }
         }
     } else {
-        ui.label(RichText::new("Influence").strong());
+        icon_word(ui, "influence", "Influence");
     }
     influence_row(ui, game, session, view, Place::State(sid), actions);
 }
@@ -2637,7 +2673,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         }
     }
     if body != BodyId::Earth {
-        ui.label(RichText::new("Influence on Colonies here").strong());
+        icon_word(ui, "influence", "Influence on Colonies here");
         for c in game.colonies.iter().filter(|c| c.body == body) {
             ui.label(game.place_name(Place::Colony(c.id)));
             influence_row(ui, game, session, view, Place::Colony(c.id), actions);
@@ -2908,7 +2944,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // Ticket #55: the Temperature bar, with every notch the game turns on.
             temperature_bar(ui, game);
             ui.separator();
-            ui.label(RichText::new("Emissions this turn, by source").strong());
+            icon_word(ui, "emissions", "Emissions this turn, by source");
             ui.label(format!("Nation State industry {:.1}", e.state_industry));
             ui.label(format!("Factories {:.1}", e.factories));
             ui.label(format!("Power Plants {:.1}", e.power_plants));

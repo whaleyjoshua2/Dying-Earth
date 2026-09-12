@@ -109,3 +109,37 @@ Surviving: **factory, gas-pump, cloud, chimney**. Dissolving: barrel-leak, coal-
 Emissions are literally industry. **chimney** if the smoke is wanted rather than the thing making
 it. **coal-wagon is out regardless**: Materials is a mine cart now and the two would be twins at
 sixteen pixels.
+
+### The three chosen, and in place
+
+The designer chose **the head-and-shoulders bust for population** (`character`), **the megaphone for
+Influence**, and **the chimney for Emissions** — all three Delapouite's, all three from the surviving
+half of their sheets. Two of the three went against the recommendation above, and both departures
+are defensible: `character` is the same silhouette as `person` with a heavier shoulder line, which
+is what makes it hold at sixteen pixels; and `chimney` names the smoke rather than the building,
+which is the more honest label for a figure that counts eight sources and a sink rather than
+factories.
+
+![All eight, large above and at sixteen pixels below](icons-all-eight.png)
+
+Left to right: **ducats, emissions, energy, fuel, influence, materials, population, research**. The
+bottom row is the deciding one. The bust is the cleanest of the eight at size. The chimney is the
+weakest: its smoke plume takes most of the sixteen pixels and the brick stack below narrows to a
+couple of columns, so it reads as *smoke* rather than as *chimney* — which, for a figure named
+Emissions, is arguably the right failure.
+
+![The Influence figure on the bar; population, Influence and Emissions on a Nation State's card](three-figures-in-place.png)
+
+The rule the designer set for the resources — *"use the same way"* — is applied without exception:
+
+- **On the top bar the glyph replaces the word.** Only Influence appears there, and it now reads
+  `🕪 16 of 16` where it read `Influence 16 of 16`.
+- **Everywhere else the glyph sits beside the words**, which is the Nation State card's population,
+  Influence and Emissions lines, the card's Influence section, the Colony panel's Influence
+  section, and the Climate Panel's Emissions block.
+- **Inside a tooltip the glyph stands in for the word**, as it already did for the five resources.
+  Population and Emissions needed their lower-case spellings added to that table as well, since the
+  game's prose capitalises the five resources and Influence but writes those two mid-sentence.
+
+The Credits screen carries all eight, and its heading is no longer "Resource icons", since three of
+the eight are not resources.
