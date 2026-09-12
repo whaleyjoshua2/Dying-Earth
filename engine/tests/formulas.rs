@@ -2300,7 +2300,7 @@ fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_half_a_person()
     assert!(arrived > 0.5 && arrived < 1.0, "the flow is worth exactly one point of Unrest: {arrived}");
     assert!((g.state(StateId::Russia).population - arrived).abs() < 1e-6, "Russia took the flow: {}", g.state(StateId::Russia).population);
     assert!(
-        g.report.lines.iter().any(|l| l.text.contains("left East Asia for") && l.text.contains("Russia")),
+        g.report.lines.iter().any(|l| l.text.contains("left China for") && l.text.contains("Russia")),
         "a refugee line naming where they went: {:?}",
         g.report.lines
     );
@@ -3214,7 +3214,7 @@ fn e_a_scrubber_enlarges_the_sink_and_is_capped_destroyed_and_calming() {
     // Destroyed when the state changes hands.
     g.transfer_control(Place::State(sid), Seat(1), "Influence");
     assert_eq!(g.scrubbers_online(sid), 0, "the Scrubbers do not pass to whoever takes the state");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("Scrubber(s) in East Asia were destroyed")), "and the Report says so");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Scrubber(s) in China were destroyed")), "and the Report says so");
 }
 
 /// (f) A Strip Permit doubles a state's Facility output for three turns, then raises its Baseline
@@ -3713,7 +3713,7 @@ fn d_the_sea_takes_coastal_slots_only_oldest_first_and_then_nothing() {
     assert!(standing(&g, sid, true).is_empty(), "and everything that stood on it with it");
     assert_eq!(standing(&g, sid, false), vec![FacilityKind::ResearchLab], "the inland Research Lab never moved");
     assert!(
-        g.report.lines.iter().any(|l| l.text.contains("The sea took 2 coastal slots from Australia and Oceania")),
+        g.report.lines.iter().any(|l| l.text.contains("The sea took 2 coastal slots from Australia")),
         "the Report names what the sea took: {:?}",
         g.report.lines
     );
@@ -4654,7 +4654,7 @@ fn the_first_reports_headline_is_the_seating_explanation() {
     assert_eq!(head.kind, LineKind::Seating);
     assert_eq!(
         head.text,
-        "January 2030. You play the Custodians from East Asia; the computer plays the Prospectors, the Arkwrights and the Archivists."
+        "January 2030. You play the Custodians from China; the computer plays the Prospectors, the Arkwrights and the Archivists."
     );
     // It headlines over everything else the first turn wrote down.
     assert!(g.report.lines.len() > 1, "and there are other lines under it");
@@ -4904,7 +4904,7 @@ fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
     g.income_phase();
     assert_eq!(g.research.progress - before, 1, "half of one Lab, rounded down");
     assert_eq!(g.research.contributions, [0; 4], "and nobody's Lead");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("North America") && l.text.contains("Research")), "the Report says so: {:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("The United States") && l.text.contains("Research")), "the Report says so: {:?}", g.report.lines);
     // Occupied: the half still flows; the occupier pays the 3 Energy and draws nothing from it.
     g.state_mut(StateId::NorthAmerica).control = Control::Occupied { occupier: Seat(2), previous: None, turns: 1 };
     let y = g.facility_yield(Seat(2), StateId::NorthAmerica, FacilityKind::ResearchLab);
@@ -5171,7 +5171,7 @@ fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_a_tenth_of_populatio
     assert_eq!(g.state(StateId::EastAsia).emigrants, 4, "on the card at End Turn");
     assert!((pop - g.state(StateId::EastAsia).population - 0.4).abs() < 1e-9, "a tenth of a person each");
     assert_eq!(g.state(StateId::EastAsia).unrest, 2.5, "the batch took 0.5 off");
-    assert!(g.log.to_vec().iter().any(|l| l.contains("Emigrants mustered in East Asia")), "{:?}", g.log.to_vec());
+    assert!(g.log.to_vec().iter().any(|l| l.contains("Emigrants mustered in China")), "{:?}", g.log.to_vec());
     // Steerage: eight a turn at twice the population.
     assert_eq!(g.emigrants_per_turn(Seat(0)), 4);
     assert_eq!(g.emigrants_per_turn(Seat(2)), 8, "the Arkwrights muster eight");
@@ -5224,7 +5224,7 @@ fn emigrants_go_to_antarctica_by_sea_from_any_state_and_arrive_a_turn_later() {
     g.resolution_phase();
     let col = g.colonies.iter().find(|c| c.body == BodyId::Earth && !c.in_orbit).expect("founded").clone();
     assert_eq!((col.slot, col.colonists, col.control), (slot, 4, Control::Controlled(Seat(0))));
-    assert!(g.log.to_vec().iter().any(|l| l.contains("in Antarctica with 4 Emigrants from Europe")), "{:?}", g.log.to_vec());
+    assert!(g.log.to_vec().iter().any(|l| l.contains("in Antarctica with 4 Emigrants from The European Union")), "{:?}", g.log.to_vec());
     // The last two join it, once it has room.
     g.colony_mut(col.id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     g.commit_orders(Seat(0), &[Order::SendToAntarctica { state: StateId::Europe, n: 2, into: UnloadTarget::Colony(col.id) }]);

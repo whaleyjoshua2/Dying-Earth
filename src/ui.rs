@@ -313,6 +313,7 @@ pub fn draw(
     // Ticket #109 (version 0.07.0): the resource icons are rendered from SVG once, on the first
     // frame that has an egui context to hand them to.
     icons.load(ctx, &crate::assets_root().join("icons"));
+    icons.load_flags(ctx, &crate::assets_root().join("flags"));
     let icons = &*icons;
     // Ticket #100 (version 0.07.0): the start globe turns on its own only until a hand is put on it.
     if !view.start_grabbed {
@@ -556,6 +557,25 @@ fn credits_screen(root: &mut Ui, session: &mut Session, icons: &Icons) {
             }
             ui.add_space(12.0);
             ui.label(RichText::new("https://game-icons.net").size(14.0).weak());
+            // Ticket #122 (version 0.07.2): the Nations' flags. MIT asks nothing on screen; they are
+            // named here anyway, since a player who wonders where the art came from should not
+            // have to open a folder to find out, and the provenance caveat the research raised is
+            // worth a line.
+            ui.add_space(18.0);
+            ui.label(RichText::new("Flags").size(20.0).strong());
+            ui.label(RichText::new("From flag-icons (github.com/lipis/flag-icons), under the MIT licence.").size(15.0));
+            ui.label(RichText::new("Its licence text ships beside the flags, in assets/flags.").size(14.0).weak());
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                ui.add_space(ui.available_width() / 2.0 - 6.0 * 40.0);
+                ui.spacing_mut().item_spacing.x = 10.0;
+                for sid in StateId::ALL {
+                    let card = session.tables.state(sid);
+                    if let Some(flag) = Icons::flag_from_ctx(ui.ctx(), &card.flag, 24.0) {
+                        ui.add(flag).on_hover_text(&card.name);
+                    }
+                }
+            });
             ui.add_space(30.0);
             if ui.add(egui::Button::new(RichText::new("Back").size(20.0)).min_size(egui::vec2(180.0, 38.0))).clicked() {
                 session.screen = Screen::Title;
@@ -843,7 +863,7 @@ fn start_screen(
     });
 }
 
-/// Ticket #100 (version 0.07.0): which Nation State the pointer is over on the start screen's
+/// Ticket #100 (version 0.07.0): which Region the pointer is over on the start screen's
 /// globe. The playing screen's picker reads a `Game`, and on this screen no game exists yet, so
 /// this walks the twelve cards' own longitudes and latitudes instead and takes the nearest.
 fn start_pick(pos: Pos2, camera: &Camera, cam_gt: &GlobalTransform, globes: &Query<(&Globe, &GlobalTransform)>) -> Option<StateId> {
@@ -1468,7 +1488,7 @@ fn pick(pos: Pos2, session: &Session, game: &Game, view: &mut ViewState, camera:
             let (lon, lat) = geo::lonlat_from_local(local);
             match body {
                 BodyId::Earth => {
-                    // Ticket #44: a Colony Slot in Antarctica first, else the Nation State under the click.
+                    // Ticket #44: a Colony Slot in Antarctica first, else the Region under the click.
                     view.selection = match nearest_slot(game, body, lon, lat) {
                         Some(slot) => match game.colony_at(body, slot) {
                             Some(c) => Selection::Colony(c.id),
@@ -1514,12 +1534,12 @@ fn apply_hit(hit: Hit, view: &mut ViewState) {
 /// Two departures from that line, both the designer's own:
 ///
 /// **There is no dropdown of countries.** *"Let's axe the dropdown it will be to unwieldy."* Twelve
-/// Nation States plus every Colony and station is a long list to open for one number, and the game
+/// Regions plus every Colony and station is a long list to open for one number, and the game
 /// already has a way of naming a place: click it. So Spend acts on **whatever is selected**, and
 /// with nothing selected it says so instead of offering a menu.
 ///
 /// **"Facilities" meant places.** Influence is never spent on a Facility -- that word is a building
-/// inside a Nation State -- and the designer confirmed the split covers **every place held**: Nation
+/// inside a Region -- and the designer confirmed the split covers **every place held**: Nation
 /// States, Colonies and stations alike.
 ///
 /// End Turn moved here from the row of buttons under the top bar. It is the one control pressed
@@ -1564,7 +1584,7 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
                 }
             }
             None => {
-                ui.label(RichText::new("Click a Nation State or a Colony to spend on it").weak());
+                ui.label(RichText::new("Click a Region or a Colony to spend on it").weak());
             }
         }
     });
@@ -1703,8 +1723,8 @@ fn selection_card(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             ui.label(match (view.view, session.spectator) {
                 (View::Solar, false) => "Click a Body to enter its surface. Click a Ship stack for orders.",
                 (View::Solar, true) => "Click a Body to enter its surface. Click a Ship stack to read it.",
-                (View::Surface(BodyId::Earth), false) => "Click a Nation State for its card and orders. Drag to turn, wheel to zoom.",
-                (View::Surface(BodyId::Earth), true) => "Click a Nation State for its card. Drag to turn, wheel to zoom.",
+                (View::Surface(BodyId::Earth), false) => "Click a Region for its card and orders. Drag to turn, wheel to zoom.",
+                (View::Surface(BodyId::Earth), true) => "Click a Region for its card. Drag to turn, wheel to zoom.",
                 (View::Surface(_), false) => "Click a Colony Slot or Colony for its card and orders.",
                 (View::Surface(_), true) => "Click a Colony Slot or Colony for its card.",
             });
@@ -1721,7 +1741,7 @@ fn selection_card(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
     }
 }
 
-/// The roster (#23): every Ship stack, Army, Colony and Nation State the player directs, each row a
+/// The roster (#23): every Ship stack, Army, Colony and Region the player directs, each row a
 /// button that selects it and jumps to its view, with a mark on anything that has no order this turn.
 /// Ticket #64: a spectator directs nothing, so their roster deals all four Factions, each under its
 /// own heading in its own colour, and marks nothing, since nobody owes an order.
@@ -1756,7 +1776,7 @@ fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
     }
 }
 
-/// One seat's Ships, Armies, Colonies and stations and Nation States. `marks` writes the "no order"
+/// One seat's Ships, Armies, Colonies and stations and Regions. `marks` writes the "no order"
 /// mark, which only a seat that gives orders can owe; where it is off, four Factions share the
 /// panel, so each group is named on its own rows rather than over a heading, and an empty group is
 /// left out instead of saying so.
@@ -1936,7 +1956,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
     }
     roster_group(ui, view, RosterGroup { index: 2, name: "Colonies and stations", empty: "  none; a Colony Ship founds one" }, colony_rows, marks, jump);
 
-    // Nation States, on the same rule as the Colonies.
+    // Regions, on the same rule as the Colonies.
     let mut state_rows: Vec<RosterRow> = Vec::new();
     for sid in game.directed_states(seat) {
         let st = game.state(sid);
@@ -1945,7 +1965,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
         let text = format!("{}{}: {} Facilities, {} free slot(s){}", tag("State"), game.tables.state(sid).name, st.facilities.len(), game.free_slots(sid), if building > 0 { format!(", {building} building") } else { String::new() });
         state_rows.push(RosterRow { text, tip: None, wants: marks && !ordered, jump: Some((View::Surface(BodyId::Earth), Selection::State(sid))) });
     }
-    roster_group(ui, view, RosterGroup { index: 3, name: "Nation States", empty: "  none" }, state_rows, marks, jump);
+    roster_group(ui, view, RosterGroup { index: 3, name: "Regions", empty: "  none" }, state_rows, marks, jump);
 }
 
 /// Ticket #115: does this pending order do anything to that Colony this turn? It decides only
@@ -1962,7 +1982,7 @@ fn roster_order_touches_colony(o: &Order, cid: ColonyId) -> bool {
     }
 }
 
-/// The same for a Nation State.
+/// The same for a Region.
 fn roster_order_touches_state(o: &Order, sid: StateId) -> bool {
     match o {
         Order::BuildFacility { state, .. } | Order::BuildFacilityWithDucats { state, .. } | Order::RaiseIndustry { state } => *state == sid,
@@ -2045,7 +2065,7 @@ fn building_name(game: &Game, b: BuildingRef) -> String {
 }
 
 /// Ticket #54: the Mothball / Restart / Decommission row under one standing building.
-/// Ticket #56: the two rows of a Nation State's build slots, Coastal and Inland, each slot named by
+/// Ticket #56: the two rows of a Region's build slots, Coastal and Inland, each slot named by
 /// what stands or builds in it, or "free". The coastal slots the sea has taken stand at the end of
 /// the coastal row, struck through in the sea's own blue.
 fn slot_rows(ui: &mut Ui, game: &Game, sid: StateId) {
@@ -2185,7 +2205,7 @@ const ICON_WORDS: [(&str, &str); 10] = [
 
 /// Ticket #112 (version 0.07.1): a line of text with every figure's word traded for its glyph.
 /// Version 0.07.0 used this on tooltips alone; the designer has now pointed it at the two densest
-/// lists in the game -- a Nation State's Facilities and a Colony's Modules -- where `+16 Energy, 2
+/// lists in the game -- a Region's Facilities and a Colony's Modules -- where `+16 Energy, 2
 /// Energy upkeep, 1.9 Emissions` is the line a player actually compares two buildings across, and
 /// where the words are most of the width. Where an icon is missing the word comes straight back, so
 /// a failed load costs legibility and nothing else.
@@ -2379,7 +2399,7 @@ fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make
 }
 
 /// `controls` says whether the spend box, the Spend button and the Trading-window button are drawn.
-/// Ticket #121 (version 0.07.2): a Nation State card passes `false` -- *"remove buttons to buy/spend
+/// Ticket #121 (version 0.07.2): a Region card passes `false` -- *"remove buttons to buy/spend
 /// influence from nation card"* -- since the Command Cluster spends on the selected place and the
 /// card's controls had become a second copy. The Standings, the threshold and the Blame note stay:
 /// they are the figures a player reads before pressing Spend in the corner, and the reason they
@@ -2421,7 +2441,7 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
     let threshold = game.influence_threshold_for(Seat(0), target);
     standings_row(ui, game, session, target);
     ui.label(format!("Threshold {}; a place already held changes hands only at the holder's Standing plus the challenge margin of {}.", threshold, game.tables.influence.challenge_margin));
-    // Ticket #53: on every Nation State the player does not hold, what its Blame is costing it here.
+    // Ticket #53: on every Region the player does not hold, what its Blame is costing it here.
     let blame_mult = game.blame_threshold_multiplier_on(Seat(0), target);
     if blame_mult > 1.0 {
         ui.label(
@@ -2485,7 +2505,16 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place) {
 fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, sid: StateId, actions: &mut Vec<Action>) {
     let card = game.tables.state(sid);
     let st = game.state(sid);
-    ui.label(RichText::new(&card.name).size(22.0).strong());
+    // Ticket #122 (version 0.07.2): the Nation's flag beside the Region's name, both at thirty-two
+    // pixels -- the size the flag research found brings an emblem back, and the designer asked for
+    // the name to match it. Where there is no flag the name stands alone at the same size.
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 10.0;
+        if let Some(flag) = Icons::flag_from_ctx(ui.ctx(), &card.flag, 32.0) {
+            ui.add(flag);
+        }
+        ui.label(RichText::new(&card.name).size(32.0).strong());
+    });
     let owner = match st.control {
         Control::Neutral => "Neutral".to_string(),
         Control::Controlled(s) => format!("Controlled by the {}", game.seat_name(s)),
@@ -3244,7 +3273,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
 fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
     let (left, _) = game.remaining(Seat(0), &session.pending);
     ui.label(RichText::new(format!("Ducats {} to spend this turn (+{} last Income).", left.ducats, game.seat(Seat(0)).income_last_turn.ducats)).strong());
-    ui.label("What you buy is yours at once, for this turn's orders. Ducats come from your Nation States' economies, Banks and Trade Posts.");
+    ui.label("What you buy is yours at once, for this turn's orders. Ducats come from your Regions' economies, Banks and Trade Posts.");
     ui.separator();
     let lines: [(usize, Option<dying_earth_engine::Resource>, &str); 4] = [(0, None, "Influence"), (1, Some(dying_earth_engine::Resource::Materials), "Materials"), (2, Some(dying_earth_engine::Resource::Fuel), "Fuel"), (3, Some(dying_earth_engine::Resource::Energy), "Energy")];
     egui::Grid::new("trade_grid").num_columns(5).spacing((12.0, 6.0)).show(ui, |ui| {
@@ -3299,7 +3328,7 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
         }
     });
     ui.separator();
-    ui.label(format!("Buildings: every build button on a Nation State or Colony card has an \"or\" beside it that buys the building outright for Ducats, at {} times its Materials cost.", game.tables.ducats.per_building_material));
+    ui.label(format!("Buildings: every build button on a Region or Colony card has an \"or\" beside it that buys the building outright for Ducats, at {} times its Materials cost.", game.tables.ducats.per_building_material));
     let trades: Vec<String> = session.pending.iter().filter(|o| matches!(o, Order::Buy { .. } | Order::Sell { .. } | Order::BuyInfluence { .. } | Order::BuildFacilityWithDucats { .. } | Order::BuildModuleWithDucats { .. })).map(|o| order_text(game, o)).collect();
     if !trades.is_empty() {
         ui.separator();
@@ -3509,7 +3538,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             temperature_bar(ui, game);
             ui.separator();
             icon_word(ui, "emissions", "Emissions this turn, by source");
-            ui.label(format!("Nation State industry {:.1}", e.state_industry));
+            ui.label(format!("Region industry {:.1}", e.state_industry));
             ui.label(format!("Factories {:.1}", e.factories));
             ui.label(format!("Power Plants {:.1}", e.power_plants));
             ui.label(format!("Refineries {:.1}", e.refineries));
@@ -3599,7 +3628,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // keep their words.
                 figures_with_icons(ui, &line, 14.0, seat_colour(session, seat), &[("ppm", "emissions")]);
             }
-            ui.label(RichText::new("A share above a fair quarter raises that Faction's Influence thresholds on every Nation State it does not hold, up to half again.").weak());
+            ui.label(RichText::new("A share above a fair quarter raises that Faction's Influence thresholds on every Region it does not hold, up to half again.").weak());
         });
         view.show_climate = open;
     }

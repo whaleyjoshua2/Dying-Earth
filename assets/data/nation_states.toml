@@ -1,3 +1,11 @@
+# Version 0.07.2 (ticket #122): every Region is named for its Nation -- the power that leads it --
+# and carries that Nation's flag as a two-letter code into assets/flags/. The geographic names the
+# twelve were charted under stay in the comment above each block, since they still say what ground
+# a Region covers, and ticket #125 is about to redraw that ground along real borders. The choice of
+# Nation is the designer's: China, India, the United States, Brazil, Russia, Australia, the European
+# Union, Iran, Egypt, Nigeria, Indonesia and Mexico. Ids are unchanged: south_asia is still the id
+# of the Region now called India, so nothing that names a Region by id -- saves, tests, the shot
+# aids -- moved.
 # Spec section 4.2, amended by ticket #26 (version 0.02) and ticket #53 (version 0.05): twelve
 # Nation States. Africa is split at the Sahara; Asia becomes East Asia, South Asia and South-East
 # Asia; Central America and the Caribbean are cut out of North America. Antarctica stays off the
@@ -56,7 +64,8 @@ stops_at_temperature = 2.5
 # the youngest population on the map and the least schooling.
 [[state]]
 id = "sub_saharan_africa"
-name = "Sub-Saharan Africa"
+name = "Nigeria"
+flag = "ng"
 population = 11.4
 industry_level = 1
 resource_lean = "materials"
@@ -74,7 +83,8 @@ unrest = 0.0
 # the Mediterranean, the Nile delta exposed to the sea.
 [[state]]
 id = "north_africa"
-name = "North Africa"
+name = "Egypt"
+flag = "eg"
 population = 2.6
 industry_level = 1
 resource_lean = "fuel"
@@ -92,7 +102,8 @@ unrest = 0.0
 # the dirtiest industry per unit on the map alongside the Middle East, and vast coastal cities.
 [[state]]
 id = "east_asia"
-name = "East Asia"
+name = "China"
+flag = "cn"
 population = 16.4
 industry_level = 3
 resource_lean = "materials"
@@ -110,7 +121,8 @@ unrest = 0.0
 # state on the map, the least schooling outside Africa, and deltas the sea will take first.
 [[state]]
 id = "south_asia"
-name = "South Asia"
+name = "India"
+flag = "in"
 population = 19.4
 industry_level = 2
 resource_lean = "materials"
@@ -128,7 +140,8 @@ unrest = 0.0
 # and gas offshore, and more coastline than anywhere.
 [[state]]
 id = "south_east_asia"
-name = "South-East Asia"
+name = "Indonesia"
+flag = "id"
 population = 6.8
 industry_level = 2
 resource_lean = "fuel"
@@ -146,7 +159,8 @@ unrest = 0.0
 
 [[state]]
 id = "australia"
-name = "Australia and Oceania"
+name = "Australia"
+flag = "au"
 population = 0.5
 industry_level = 2
 resource_lean = "energy"
@@ -162,7 +176,8 @@ unrest = 0.0
 
 [[state]]
 id = "europe"
-name = "Europe"
+name = "The European Union"
+flag = "eu"
 population = 6.0
 industry_level = 3
 resource_lean = "energy"
@@ -179,7 +194,8 @@ unrest = 0.0
 # North America: the United States and Canada, about 375 million people.
 [[state]]
 id = "north_america"
-name = "North America"
+name = "The United States"
+flag = "us"
 population = 3.8
 industry_level = 3
 resource_lean = "fuel"
@@ -199,7 +215,8 @@ unrest = 0.0
 # people. Small, poor beside its northern neighbour, and all coast.
 [[state]]
 id = "central_america"
-name = "Central America and the Caribbean"
+name = "Mexico"
+flag = "mx"
 population = 2.2
 industry_level = 1
 resource_lean = "materials"
@@ -215,7 +232,8 @@ unrest = 0.0
 
 [[state]]
 id = "south_america"
-name = "South America"
+name = "Brazil"
+flag = "br"
 population = 4.5
 industry_level = 1
 resource_lean = "fuel"
@@ -234,6 +252,7 @@ unrest = 0.0
 [[state]]
 id = "russia"
 name = "Russia"
+flag = "ru"
 population = 1.5
 industry_level = 2
 resource_lean = "fuel"
@@ -251,7 +270,8 @@ unrest = 0.0
 # highest Emissions per unit of industry on the map, Gulf coasts exposed.
 [[state]]
 id = "middle_east"
-name = "The Middle East"
+name = "Iran"
+flag = "ir"
 population = 3.5
 industry_level = 2
 resource_lean = "fuel"

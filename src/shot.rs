@@ -357,7 +357,7 @@ fn build_board(session: &mut Session) {
         // face the Earth picture shows, so one card, the map labels and the thresholds are all
         // visible at once. The AI seldom leaves a state of the player's this restive.
         // `threat:1` (a building aid, not part of the spec): a rival is stood within reach of every
-        // Nation State seat 0 holds, so the Defence button in the command cluster has work to do and
+        // Region seat 0 holds, so the Defence button in the command cluster has work to do and
         // can be photographed doing it. In an ordinary headless run all four seats are the computer
         // and the computer now defends its own holdings, so nothing is ever under threat to look at.
         if std::env::args().any(|a| a == "threat:1") {
@@ -385,7 +385,7 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.ducats = 200;
         }
         // `blame:1` (a building aid, ticket #53, rebuilt on #54 now Restoration is retired): the
-        // Custodian in seat 0 takes every Nation State and fills each with its cap of Scrubbers, so
+        // Custodian in seat 0 takes every Region and fills each with its cap of Scrubbers, so
         // one Climate phase takes back more CO2 than it has emitted all game and the Climate Panel's
         // Blame section shows a removal credit beside three Factions carrying Blame.
         if std::env::args().any(|a| a == "blame:1") && g.kind(Seat(0)) == FactionKind::Custodians {
@@ -542,7 +542,7 @@ fn build_board(session: &mut Session) {
         if std::env::args().any(|a| a == "race:1") {
             race_spread(g);
         }
-        // `tints:1` (a building aid): one Nation State per seat on the face the Earth picture shows,
+        // `tints:1` (a building aid): one Region per seat on the face the Earth picture shows,
         // so all four Faction tints are in one picture. The AI seldom leaves four controllers alive.
         if std::env::args().any(|a| a == "tints:1") {
             for (sid, seat) in [(StateId::SouthAmerica, Seat(0)), (StateId::Europe, Seat(1)), (StateId::MiddleEast, Seat(2)), (StateId::SubSaharanAfrica, Seat(3))] {
@@ -804,7 +804,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         view.popup = Popup::None;
         view.tech_prompted = true;
         show_view(&mut view, VIEWS[0].1);
-        // `select:<state id>` (a building aid) opens that Nation State's card in the Earth picture.
+        // `select:<state id>` (a building aid) opens that Region's card in the Earth picture.
         plan.select = std::env::args().find_map(|a| a.strip_prefix("select:").map(str::to_owned));
         // `roster:filter` (a building aid, not part of the spec): every roster group filtered down
         // to the rows that still want an order, which is otherwise a click and so unreachable in a

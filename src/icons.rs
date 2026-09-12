@@ -48,6 +48,10 @@ pub struct Icons {
     loaded: BTreeMap<String, egui::TextureHandle>,
     /// Tried and failed, so the attempt is not repeated every frame.
     tried: bool,
+    /// Ticket #122 (version 0.07.2): the Nations' flags, by two-letter code. A flag is neither
+    /// square nor tintable, so it is a second set with its own renderer and its own fetch.
+    flags: BTreeMap<String, egui::TextureHandle>,
+    tried_flags: bool,
 }
 
 impl Icons {
@@ -76,6 +80,44 @@ impl Icons {
         // sites to draw a glyph would be a worse cure than the disease.
         let loaded = self.loaded.clone();
         ctx.data_mut(|d| d.insert_temp(egui::Id::new("icons"), loaded));
+    }
+
+    /// Ticket #122 (version 0.07.2): read every SVG in `dir` as a **flag** -- rendered at four by
+    /// three, never tinted, keyed by its two-letter file stem -- and put the set where any card can
+    /// reach it. The art is flag-icons (github.com/lipis/flag-icons) under the MIT licence, whose
+    /// text ships beside the files; the research on ticket #123 measured that a tricolour survives
+    /// sixteen pixels and an emblem does not, which is why the card draws these at thirty-two.
+    pub fn load_flags(&mut self, ctx: &egui::Context, dir: &Path) {
+        if self.tried_flags {
+            return;
+        }
+        self.tried_flags = true;
+        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("svg") {
+                continue;
+            }
+            let Some(code) = path.file_stem().and_then(|s| s.to_str()).map(|s| s.to_string()) else { continue };
+            let Ok(text) = std::fs::read_to_string(&path) else { continue };
+            if let Some(image) = render_flag(&text) {
+                let handle = ctx.load_texture(format!("flag:{code}"), image, egui::TextureOptions::LINEAR);
+                self.flags.insert(code, handle);
+            }
+        }
+        let flags = self.flags.clone();
+        ctx.data_mut(|d| d.insert_temp(egui::Id::new("flags"), flags));
+    }
+
+    /// A Nation's flag at `height`, four by three, in its own colours. `None` where there is no
+    /// such flag, and the card then draws the name alone.
+    pub fn flag_from_ctx(ctx: &egui::Context, code: &str, height: f32) -> Option<egui::Image<'static>> {
+        if code.is_empty() {
+            return None;
+        }
+        let map: BTreeMap<String, egui::TextureHandle> = ctx.data(|d| d.get_temp(egui::Id::new("flags")))?;
+        let handle = map.get(code)?;
+        Some(egui::Image::new(egui::load::SizedTexture::from_handle(handle)).fit_to_exact_size(egui::vec2(height * 4.0 / 3.0, height)))
     }
 
     /// Ticket #106: one icon, fetched from egui's own store rather than passed down. `None` where
@@ -154,6 +196,20 @@ fn rgb(c: [u8; 3]) -> egui::Color32 {
 }
 
 /// One SVG to one egui image, with the black backing rectangle taken out first.
+/// A flag: four by three, at a size the card's thirty-two pixels can be drawn from cleanly, and
+/// with nothing stripped -- the black backing rectangle is a game-icons habit, not a flag's.
+fn render_flag(text: &str) -> Option<egui::ColorImage> {
+    const W: u32 = 128;
+    const H: u32 = 96;
+    let tree = resvg::usvg::Tree::from_str(text, &resvg::usvg::Options::default()).ok()?;
+    let mut pixmap = resvg::tiny_skia::Pixmap::new(W, H)?;
+    let size = tree.size();
+    let transform = resvg::tiny_skia::Transform::from_scale(W as f32 / size.width(), H as f32 / size.height());
+    resvg::render(&tree, transform, &mut pixmap.as_mut());
+    let pixels = pixmap.pixels().iter().map(|p| egui::Color32::from_rgba_premultiplied(p.red(), p.green(), p.blue(), p.alpha())).collect();
+    Some(egui::ColorImage { size: [W as usize, H as usize], source_size: egui::vec2(W as f32, H as f32), pixels })
+}
+
 fn render(text: &str) -> Option<egui::ColorImage> {
     let cleaned = text.replace(BACKGROUND_RECT, "");
     let tree = resvg::usvg::Tree::from_str(&cleaned, &resvg::usvg::Options::default()).ok()?;

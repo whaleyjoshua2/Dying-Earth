@@ -75,6 +75,10 @@ impl BodyCard {
 pub struct StateCard {
     pub id: StateId,
     pub name: String,
+    /// Version 0.07.2 (ticket #122): the two-letter code of the Nation's flag, a file in
+    /// `assets/flags/`. Empty where a Region has none, and the card then draws no flag.
+    #[serde(default)]
+    pub flag: String,
     pub population: f64,
     pub industry_level: u32,
     pub resource_lean: Resource,
