@@ -572,3 +572,45 @@ The designer, on the rebus left standing above: *"narrow it as suggested."*
 The rule arrived in two halves and this is the second. Version 0.07.0 swapped a resource word anywhere, which was right for the tooltips it was written for; ticket #112 pointed that at the Facility list and it ate the word out of a building's own name; ticket #116 found the same fault in prose. There is now one rule and no flag.
 
 Clippy clean with `-D warnings`, 254 tests passing.
+
+## What a tenth on Research actually does, measured before it is decided
+
+The costs live in `techs.toml`, so a tenth is a file edit and a re-run rather than a build: the whole
+question could be answered with evidence before anybody was asked anything. The simulation summary
+gained one line to make it answerable — **`Techs: n of 17`**, how far the tree got, which it could not
+report before.
+
+**Where it starts.** Rung 1 is 15 across five Techs, rung 2 is 25 across five, rung 3 is 40 across
+six, and Coastal Engineering is priced off the rungs at 10. The whole tree is **450 Research**.
+
+**Today, twenty seeds in each of four seatings:**
+
+| seat 0 | tree completes | median last turn |
+|---|---|---|
+| Custodians | 20 of 20 | 30 |
+| Prospectors | 20 of 20 | 30 |
+| Arkwrights | 19 of 20 | 27 |
+| Archivists | 20 of 20 | 28 |
+
+**The whole tree completes in 79 of 80 games, with six to nine turns of the thirty-six left over.**
+Research is not a constraint on anything at present; it finishes and then the game goes on without it.
+
+**At a tenth more** (rounded to the nearest: 16, 28, 44, and Coastal Engineering 11):
+
+| | today | +10% |
+|---|---|---|
+| tree completes | 79 of 80 | **75 of 80** |
+| median last turn, by seating | 30, 30, 27, 28 | 32, 33, 28, 28 |
+| Custodian wins | 67 of 80 | 69 of 80 |
+| Collapses | 2 of 80 | 4 of 80 |
+| Prospector wins | 7 | 4 |
+| Arkwright wins | 3 | 3 |
+| Archivist wins | 0 | 0 |
+
+**What that says, plainly.** A tenth costs the tree **four completions out of eighty** and adds
+**nought to three turns** to a median game. It is a real effect and a small one. The win figures move
+by amounts a twenty-seed sample cannot separate from noise, and the two that moved most — Custodian
+wins up two, Collapses up two — moved in the direction nobody wants, which is worth saying out loud
+rather than filing under "within noise" and moving on.
+
+Nothing is decided from this; it is what the designer was asked to decide against.
