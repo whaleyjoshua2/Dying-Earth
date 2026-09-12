@@ -243,6 +243,15 @@ impl Session {
     }
 }
 
+/// Ticket #128 (version 0.07.2): a shortcut the keyboard system cannot act on by itself, because
+/// acting needs the game and the action list the interface owns. The keyboard records it here and
+/// the interface takes it on its next frame, so a key does exactly what its button does.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum HotKey {
+    Save,
+    EndTurn,
+}
+
 #[derive(Resource)]
 pub struct ViewState {
     pub view: View,
@@ -283,6 +292,8 @@ pub struct ViewState {
     /// Ticket #114 (version 0.07.1): the last turn the standing Defence split was placed, so it is
     /// placed once a turn and not once a frame.
     pub defence_placed: Option<u32>,
+    /// Ticket #128 (version 0.07.2): a shortcut pressed and not yet acted on.
+    pub hotkey: Option<HotKey>,
     /// Ticket #126 (version 0.07.2): on the start screen, the Region under the pointer, the Region
     /// the player has clicked, and the one the globe was last composed with lit -- so the globe is
     /// recomposed when the lit Region changes and not every frame.
@@ -320,6 +331,7 @@ impl Default for ViewState {
             moments_on: None,
             force_hover: None,
             defence_placed: None,
+            hotkey: None,
             start_hover: None,
             start_selected: None,
             start_lit_drawn: None,

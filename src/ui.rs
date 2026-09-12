@@ -158,12 +158,40 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mu
     if contexts.map(|c| c.wants_keyboard_input()).unwrap_or(false) {
         return;
     }
-    if keys.just_pressed(KeyCode::Tab) {
-        view.swap();
-    }
-    // Ticket #41: C toggles the Climate Panel, a second way back once it is closed.
-    if keys.just_pressed(KeyCode::KeyC) {
-        toggle_climate(&mut view);
+    // Ticket #128 (version 0.07.2): while a popup is up, Escape is the one key that does anything --
+    // it closes the popup -- with one exception: Enter on the End Turn confirmation confirms it,
+    // being the same key that raised it, asked the same question. Tab and C used to fire from
+    // behind the Report; an Enter that ended the turn from there would have been an accident.
+    if view.popup != Popup::None {
+        if keys.just_pressed(KeyCode::Enter) && view.popup == Popup::ConfirmEndTurn {
+            view.hotkey = Some(HotKey::EndTurn);
+        }
+    } else {
+        if keys.just_pressed(KeyCode::Tab) {
+            view.swap();
+        }
+        // Ticket #41: C toggles the Climate Panel, a second way back once it is closed.
+        if keys.just_pressed(KeyCode::KeyC) {
+            toggle_climate(&mut view);
+        }
+        // Ticket #128: a key for every button on the bar. Each toggles its window as the button
+        // does; Save takes Ctrl, since a bare key that writes a file is a hazard; Enter is End Turn.
+        if keys.just_pressed(KeyCode::KeyT) {
+            view.show_tech = !view.show_tech;
+        }
+        if keys.just_pressed(KeyCode::KeyV) {
+            view.show_victory = !view.show_victory;
+        }
+        if keys.just_pressed(KeyCode::KeyR) && !session.spectator {
+            view.show_trade = !view.show_trade;
+        }
+        let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
+        if ctrl && keys.just_pressed(KeyCode::KeyS) {
+            view.hotkey = Some(HotKey::Save);
+        }
+        if keys.just_pressed(KeyCode::Enter) {
+            view.hotkey = Some(HotKey::EndTurn);
+        }
     }
     if keys.just_pressed(KeyCode::Escape) {
         // Ticket #64: Escape unticks Auto, so a spectator can always stop the clock.
@@ -443,6 +471,21 @@ pub fn draw(
         if crate::app::auto_should_advance(session.auto, blocked, session.auto_elapsed) {
             session.auto_elapsed = 0.0;
             actions.push(Action::EndTurn);
+        }
+    }
+    // Ticket #128 (version 0.07.2): a shortcut the keyboard recorded is acted on here, with the
+    // game and the action list in hand, and by the same function its button calls.
+    if let Some(key) = view.hotkey.take()
+        && session.screen == Screen::Playing
+        && let Some(game) = session.game.as_ref()
+    {
+        match key {
+            HotKey::Save => {
+                if dying_earth_engine::save::can_save_now(session.pending.len()) {
+                    actions.push(Action::Save);
+                }
+            }
+            HotKey::EndTurn => press_end_turn(&session, game, &mut view, &mut actions),
         }
     }
     match session.screen.clone() {
@@ -1110,6 +1153,18 @@ fn bar_resource(ui: &mut Ui, icons: &Icons, key: &str, word: &str, value: String
     });
 }
 
+/// The Influence figure's hover, lifted out of the bar when ticket #128 moved the figure.
+const INFLUENCE_HOVER: &str = "The Allotment is what your places and buildings give each turn; bought Influence comes from the Trading window at 2 Ducats each.";
+
+/// Ticket #128 (version 0.07.2): a button of the bar's second row, one step larger than egui's
+/// default -- "make buttons slightly larger" -- and naming its key in parentheses as the text.
+fn bar_button(text: impl Into<String>) -> egui::Button<'static> {
+    egui::Button::new(RichText::new(text).size(BAR_BUTTON_TEXT))
+}
+
+const BAR_BUTTON_TEXT: f32 = 15.0;
+const BAR_BUTTON_PADDING: egui::Vec2 = egui::vec2(10.0, 5.0);
+
 fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, icons: &Icons, actions: &mut Vec<Action>) {
     egui::Panel::top("top_bar").show(root, |ui| {
         // Ticket #64: the spectator's bar names the table instead of a Faction of their own, and
@@ -1151,6 +1206,17 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             ui.separator();
             bar_resource(ui, icons, "ducats", "Ducats", format!("{} ({})", left.ducats, signed(inc.ducats)), sources(dying_earth_engine::Resource::Ducats));
             ui.separator();
+            // Ticket #128 (version 0.07.2): Influence stands before Research, at the designer's
+            // word; the race bar and the Pick a Tech button are Research's and travel with it.
+            {
+                // Ticket #42: the turn's Allotment and what the trading window added, shown apart.
+                let bought: i64 = session.pending.iter().map(|o| if let Order::BuyInfluence { amount } = o { *amount } else { 0 }).sum();
+                let influence = if bought > 0 { format!("{} of {} ({} free + {} bought)", influence_left, s.allotment + bought, s.allotment, bought) } else { format!("{} of {}", influence_left, s.allotment) };
+                // Ticket #112 (version 0.07.1): Influence now has a glyph, so on the bar it follows the
+                // same rule the five resources do -- the picture stands in place of the word.
+                bar_resource(ui, icons, "influence", "Influence", influence, INFLUENCE_HOVER.to_string());
+                ui.separator();
+            }
             // Ticket #112 (version 0.07.1): the bar carries the FIGURE and the hover carries the
             // name. The Tech's title was the longest thing on the bar by a wide margin -- "39 / 40
             // toward Clean Manufacturing" against "14 (+6)" for a resource -- and it is the one
@@ -1193,13 +1259,6 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             // Tech under research, in Faction colours and in proportion.
             research_race_bar(ui, session, game);
             ui.separator();
-            // Ticket #42: the turn's Allotment and what the trading window added, shown apart.
-            let bought: i64 = session.pending.iter().map(|o| if let Order::BuyInfluence { amount } = o { *amount } else { 0 }).sum();
-            let influence = if bought > 0 { format!("{} of {} ({} free + {} bought)", influence_left, s.allotment + bought, s.allotment, bought) } else { format!("{} of {}", influence_left, s.allotment) };
-            // Ticket #112 (version 0.07.1): Influence now has a glyph, so on the bar it follows the
-            // same rule the five resources do -- the picture stands in place of the word.
-            bar_resource(ui, icons, "influence", "Influence", influence, "The Allotment is what your places and buildings give each turn; bought Influence comes from the Trading window at 2 Ducats each.".to_string());
-            ui.separator();
             // Ticket #57: the bar names the turn's month. Ticket #67 (version 0.05.5): a Turn is two months,
             // named by its first alone, so turn 2 reads March 2030.
             ui.label(RichText::new(format!("Turn {} / {}, {}", game.turn, game.tables.victory.turns, game.date_text())).strong());
@@ -1219,23 +1278,26 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             );
         });
         ui.horizontal_wrapped(|ui| {
-            if ui.button("Tech Tree").clicked() {
+            // Ticket #128 (version 0.07.2): one step larger, and every button names its key. The
+            // keys themselves are read in `keyboard`, and each does what its button does.
+            ui.spacing_mut().button_padding = BAR_BUTTON_PADDING;
+            if ui.add(bar_button("Tech Tree (T)")).clicked() {
                 view.show_tech = !view.show_tech;
             }
-            if ui.button(if view.show_climate { "Hide Climate Panel (C)" } else { "Climate Panel (C)" }).clicked() {
+            if ui.add(bar_button(if view.show_climate { "Hide Climate Panel (C)" } else { "Climate Panel (C)" })).clicked() {
                 toggle_climate(view);
             }
-            if ui.button("Victory").clicked() {
+            if ui.add(bar_button("Victory (V)")).clicked() {
                 view.show_victory = !view.show_victory;
             }
-            if !session.spectator && ui.button("Trading").clicked() {
+            if !session.spectator && ui.add(bar_button("Trading (R)")).clicked() {
                 view.show_trade = !view.show_trade;
             }
             // Ticket #59: a Save writes this turn start to a file. It is dead while an order is
             // pending, because a save captures a turn start and never half-entered orders. A
             // spectated game saves the same way.
             let can_save = dying_earth_engine::save::can_save_now(session.pending.len()) && session.screen == Screen::Playing;
-            let save = ui.add_enabled(can_save, egui::Button::new("Save"));
+            let save = ui.add_enabled(can_save, bar_button("Save (Ctrl+S)"));
             if save.on_disabled_hover_text(dying_earth_engine::save::SAVE_PENDING_HOVER).on_hover_text("Write this turn start to a file. Load it again from the title screen.").clicked() {
                 actions.push(Action::Save);
             }
@@ -1246,10 +1308,10 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 View::Solar => format!("To {} (Tab)", game.tables.body(view.last_surface).name),
                 View::Surface(_) => "Solar System Map (Tab)".to_string(),
             };
-            if ui.button(swap_text).clicked() {
+            if ui.add(bar_button(swap_text)).clicked() {
                 view.swap();
             }
-            if matches!(view.view, View::Surface(_)) && ui.button("Back (Esc)").clicked() {
+            if matches!(view.view, View::Surface(_)) && ui.add(bar_button("Back (Esc)")).clicked() {
                 view.view = View::Solar;
                 view.selection = Selection::None;
             }
@@ -1258,9 +1320,9 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 // of the side panel, where the rest of the every-turn controls now are. A spectator
                 // has no cluster -- they give no orders -- so theirs stays here beside the Auto box.
                 if session.spectator {
-                    let button = egui::Button::new(RichText::new("End Turn").strong().size(16.0)).fill(Color32::from_rgb(120, 40, 30));
+                    let button = egui::Button::new(RichText::new("End Turn (Enter)").strong().size(16.0)).fill(Color32::from_rgb(120, 40, 30));
                     if ui.add_enabled(view.popup == Popup::None, button).clicked() {
-                        actions.push(Action::EndTurn);
+                        press_end_turn(session, game, view, actions);
                     }
                 }
                 // Ticket #64: Auto runs a turn every three seconds until it is unticked; the clock
@@ -1791,17 +1853,39 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
         }
     });
 
-    // End Turn, where a hand already is.
-    let must_pick = game.research.awaiting_pick == Some(Seat(0)) && !game.available_techs().is_empty();
-    let button = egui::Button::new(RichText::new("End Turn").strong().size(16.0)).fill(Color32::from_rgb(120, 40, 30));
-    if ui.add_enabled(!must_pick && view.popup == Popup::None, button).on_disabled_hover_text("Pick a Tech first").clicked() {
-        if influence_left > 0 && s.allotment > 0 {
-            view.popup = Popup::ConfirmEndTurn;
-        } else {
-            actions.push(Action::EndTurn);
-        }
+    // End Turn, where a hand already is. Ticket #128 (version 0.07.2): named for its key.
+    let button = egui::Button::new(RichText::new("End Turn (Enter)").strong().size(16.0)).fill(Color32::from_rgb(120, 40, 30));
+    if ui.add_enabled(can_end_turn(game, view), button).on_disabled_hover_text("Pick a Tech first").clicked() {
+        press_end_turn(session, game, view, actions);
     }
     ui.add_space(4.0);
+}
+
+/// End Turn is dead while a Tech pick is owed and while a popup is up.
+fn can_end_turn(game: &Game, view: &ViewState) -> bool {
+    let must_pick = game.research.awaiting_pick == Some(Seat(0)) && !game.available_techs().is_empty();
+    !must_pick && view.popup == Popup::None
+}
+
+/// Ticket #128 (version 0.07.2): what pressing End Turn does, whether by the button or by Enter,
+/// so the key can never do more than the button. Unspent Influence raises the confirmation rather
+/// than ending the turn; on that confirmation, pressing again confirms. A spectator has no
+/// Influence to lose and no confirmation.
+fn press_end_turn(session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    if view.popup == Popup::ConfirmEndTurn {
+        view.popup = Popup::None;
+        actions.push(Action::EndTurn);
+        return;
+    }
+    if !can_end_turn(game, view) {
+        return;
+    }
+    let (_, influence_left) = game.remaining(Seat(0), &session.pending);
+    if !session.spectator && influence_left > 0 && game.seat(Seat(0)).allotment > 0 {
+        view.popup = Popup::ConfirmEndTurn;
+    } else {
+        actions.push(Action::EndTurn);
+    }
 }
 
 // ------------------------------------------------------------------ the side panel
@@ -3935,7 +4019,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.label(RichText::new("Influence unspent").size(20.0).strong());
                 ui.label(format!("{influence_left} Influence is unspent; it is lost at End Turn. End the turn anyway?"));
                 ui.horizontal(|ui| {
-                    if ui.button("End Turn").clicked() {
+                    if ui.button("End Turn (Enter)").clicked() {
                         view.popup = Popup::None;
                         actions.push(Action::EndTurn);
                     }

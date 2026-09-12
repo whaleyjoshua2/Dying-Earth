@@ -314,3 +314,43 @@ must have its line and every line its file. Witnessed red with `region.svg` hidd
 names without "region"] right: [..13 names]* — and green restored. `attend:1` is a new building aid
 (the standing Defence order switched on for seat 0, so a filled ring can be photographed; wants
 `threat:1` to have anything to defend). Clippy clean with `-D warnings`, 255 tests passing.
+
+## The top bar: Influence before Research, larger buttons, and every key named
+
+Ticket [#128](https://github.com/whaleyjoshua2/Dying-Earth/issues/128). *"swap influence and science
+locations / make buttons slightly larger and place all short cut keys in () in the text."*
+
+![The bar: Influence stands before Research and its race bar; every button names its key](top-bar-influence-before-research-keys-named.png)
+
+**The swap.** Influence stands left of Research now, and the race bar and the **Pick a Tech**
+button — which appears only when the Research Lead owes a pick — went with Research, being its
+furniture. The figures are otherwise as 0.07.1 left them.
+
+**One step larger.** The buttons' text went from egui's 14 to 15 and their padding from 4×1 to
+10×5; the figures above them did not grow, being sized to their glyphs already. The row is still
+one row at 1280 wide.
+
+**A key for every button**, named in parentheses in its text: `Tech Tree (T)`, `Climate Panel (C)`,
+`Victory (V)`, `Trading (R)`, `Save (Ctrl+S)`, `To Earth (Tab)` / `Solar System Map (Tab)`,
+`Back (Esc)`. Each key toggles its window as the button does. Save takes Ctrl, since a bare key that
+writes a file over the last save is a hazard; and the key honours the same rule the button does —
+no save while an order is pending. In the Command Cluster, **End Turn (Enter)**, and nothing else
+there names a key, at the designer's word; the spectator's End Turn on the bar says the same.
+
+![The Command Cluster: End Turn (Enter)](command-cluster-end-turn-enter.png)
+
+![The spectator's bar, with End Turn (Enter) beside Auto](top-bar-spectator-end-turn-enter.png)
+
+**Enter goes through the button's door.** Pressing End Turn — by button or by key — is one function
+now: dead while a Tech pick is owed or a popup is up; with Influence unspent it raises the
+confirmation rather than ending the turn; and on that confirmation, Enter again confirms it, being
+the same key asked the same question. A key can never do more than its button.
+
+**Nothing fires from behind a popup.** `Tab` and `C` used to work while the Report or a Moment was
+showing; an `Enter` that ended the turn from behind the Report would have been an accident waiting
+to happen, so while a popup is up `Esc` is the one key that does anything — it closes the popup —
+with the End Turn confirmation's Enter as the sole exception. Every key still stands down while a
+text box has focus, as before, so nothing types into the spend box.
+
+Clippy clean with `-D warnings`, 255 tests passing; the change is all interface, and the pictures are
+its check.
