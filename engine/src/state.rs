@@ -224,6 +224,10 @@ pub struct NationState {
     pub leapfrog: f64,
     /// Ticket #54: what a spent Strip Permit added to the card's Baseline Emissions, for good.
     pub baseline_rise: f64,
+    /// Ticket #108 (version 0.07.0): what Leapfrog has taken off this state's Baseline Emissions,
+    /// for good. The Baseline never falls below nothing.
+    #[serde(default)]
+    pub baseline_cut: f64,
     /// Ticket #54: a Strip Permit has been taken here; one per state, ever.
     pub strip_permit_used: bool,
     /// Ticket #54: the last turn whose Income this state's Facilities double, while one runs.
@@ -337,6 +341,11 @@ pub struct Ship {
     /// refilled only by a Refuel order at a Body with a station of its own.
     #[serde(default)]
     pub fuel: i64,
+    /// Ticket #99 (version 0.07.0): the Orbital Slot this Ship sits in, chosen with the leg that
+    /// brought it. A warship in a slot blockades that slot; `None` is the Body at large, which
+    /// blockades nothing. A Ship built at a Shipyard starts at the Body at large.
+    #[serde(default)]
+    pub slot: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -429,10 +438,26 @@ pub struct Research {
     pub progress: i64,
     pub contributions: [i64; SEAT_COUNT],
     pub done: Vec<TechId>,
-    /// Research produced while no Tech was chosen; flows into the next one.
-    pub unallocated: i64,
+    /// Research produced while no Tech was chosen; flows into the next one. Ticket #105 (version
+    /// 0.07.0): PER SEAT, so Research banked between Techs still counts toward the Research Lead
+    /// when it lands. Before this it was one pool and arrived unattributed, which produced Lead
+    /// lines reading "the Prospectors led (Archivists 0, Custodians 0, Prospectors 0, Arkwrights 0)"
+    /// -- arithmetically right and unreadable as anything but a bug.
+    #[serde(default)]
+    pub unallocated: [i64; SEAT_COUNT],
+    /// Ticket #105: Research nobody produced (a Breakthrough card), waiting for a Tech to pour into.
+    /// It is genuinely nobody's and counts toward no seat's Lead.
+    #[serde(default)]
+    pub unattributed: i64,
     /// Who must pick the next Tech, when a human has to.
     pub awaiting_pick: Option<Seat>,
+    /// Ticket #98 (version 0.07.0): the Techs the Research Lead may choose between. Drawn when a
+    /// Tech completes, at `shortlist_size` from what is available, always carrying the Lead's own
+    /// Victory gate once its prerequisites are met. EMPTY means a free choice of everything
+    /// available, which is how the game opens: the first Tech of the game is picked from the whole
+    /// of rung 1.
+    #[serde(default)]
+    pub shortlist: Vec<TechId>,
     pub last_lead: Option<Seat>,
     /// Ticket #50: the turn each seat last picked a Tech, so a tie in contributions goes to the
     /// seat that has picked least recently. None means it has never picked, which counts as longest ago.
@@ -551,8 +576,14 @@ pub struct SeatState {
     /// Ticket #51: Research banked for the Archive, capped at what its remaining stages still need.
     pub archive_fund: i64,
     /// Ticket #51: Fund the Archive was ordered this turn, so this turn's Lab Research went to the
-    /// fund and contributed nothing to the Research Lead.
+    /// fund and contributed nothing to the Research Lead. Version 0.07.0: set at Income by
+    /// `bank_archive_research`, and true only when a point was actually banked.
     pub funding_archive: bool,
+    /// Version 0.07.0: the Archivists' standing declaration that their Labs pay the Archive fund
+    /// rather than the shared Tech. Set by an order, read at the NEXT Income, and it holds until it
+    /// is set again.
+    #[serde(default)]
+    pub archive_funding: bool,
     /// Ticket #51: Provisional Findings is in force this turn, because last turn's Research went to
     /// the shared Tech. True at the start of the game.
     pub provisional_findings: bool,
@@ -697,6 +728,7 @@ impl Game {
             income_sources: Vec::new(),
             archive_fund: 0,
             funding_archive: false,
+            archive_funding: false,
             provisional_findings: true,
             resettle_to: None,
             blame_emitted: 0.0,
@@ -753,6 +785,7 @@ impl Game {
                 neutral_since: Some(1),
                 leapfrog: 0.0,
                 baseline_rise: 0.0,
+                baseline_cut: 0.0,
                 strip_permit_used: false,
                 strip_permit_ends: None,
             })
@@ -791,8 +824,12 @@ impl Game {
                 progress: 0,
                 contributions: [0; SEAT_COUNT],
                 done: Vec::new(),
-                unallocated: 0,
+                unallocated: [0; SEAT_COUNT],
+                unattributed: 0,
                 awaiting_pick: Some(Seat(0)),
+                // Ticket #98: empty at the opening, so the first Tech of the game is a free choice
+                // from the whole of rung 1.
+                shortlist: Vec::new(),
                 last_lead: None,
                 last_picked_turn: [None; SEAT_COUNT],
                 neutral_total: 0,
@@ -1389,6 +1426,35 @@ impl Game {
         1.0 + self.state(s).population / 50.0
     }
 
+    /// Ticket #97 (version 0.07.0): the Modules this Colony or Space Station may hold: the table's
+    /// free allowance, and one more for every `per_colonist` Colonists living there. One formula
+    /// for the ground and for orbit, so a Space Station founded bare holds the allowance and grows
+    /// only as its people arrive.
+    pub fn module_slots(&self, c: &Colony) -> u32 {
+        let s = &self.tables.slots;
+        s.base + c.colonists / s.per_colonist.max(1)
+    }
+
+    /// Ticket #97: the Modules standing or building here that count against the cap. A mothballed
+    /// Module keeps its slot and one under construction reserves one, exactly as a Facility does in
+    /// a Nation State; the Archive is exempt and counted on neither side.
+    pub fn module_slots_used(&self, c: &Colony) -> u32 {
+        let standing = c.modules.iter().filter(|m| m.kind != ModuleKind::Archive).count() as u32;
+        let building = c
+            .queue
+            .iter()
+            .filter(|b| matches!(b.item, BuildItem::Module(k) if k != ModuleKind::Archive))
+            .count() as u32;
+        standing + building
+    }
+
+    /// Ticket #97: the room left. A cap that has fallen below what already stands (Colonists lost
+    /// to crowding, a Habitat destroyed, the place changing hands) destroys nothing and mothballs
+    /// nothing: it simply leaves no room until the count is back under.
+    pub fn free_module_slots(&self, c: &Colony) -> u32 {
+        self.module_slots(c).saturating_sub(self.module_slots_used(c))
+    }
+
     pub fn habitat_room(&self, c: &Colony) -> u32 {
         // Ticket #51: Expanded Habitats and the Faction's own Habitat capacity are read for whoever
         // holds the Colony, since Provisional Findings gives the Archivists half the Tech early.
@@ -1661,14 +1727,58 @@ impl Game {
         }
     }
 
-    /// Whether a seat may land Armies and Colonists at a Body (spec 9.3).
+    /// Whether a seat may land Armies and Colonists on the GROUND of a Body (spec 9.3).
+    ///
+    /// Ticket #99 (version 0.07.0): only a rival holding Orbital Control outright shuts the surface.
+    /// Before this, any enemy warship present shut the whole Body to everyone else, so a single
+    /// frigate in Earth orbit locked a Faction out of its own Space Station for nine turns, and two
+    /// rivals' warships present punished the bystander hardest by denying everybody. A blockade is
+    /// now the business of one Orbital Slot: see `slot_blockaded_against`.
     pub fn may_land(&self, seat: Seat, body: BodyId) -> bool {
         match self.orbital_control(body) {
             Some(s) => s == seat,
-            None => {
-                // Nobody holds it: allowed only if nobody contests it, meaning no enemy warship present.
-                !self.ships.iter().any(|s| s.seat != seat && s.at == ShipAt::Body(body) && s.kind.is_warship() && !s.escaped)
-            }
+            None => true,
+        }
+    }
+
+    /// Ticket #99 (version 0.07.0): a rival warship sitting in this Orbital Slot blockades it. The
+    /// blockade stops Colonists and Armies being unloaded into the station standing there, and stops
+    /// that station refuelling a Ship; it reaches no further, and never touches the ground.
+    pub fn slot_blockaded_against(&self, seat: Seat, body: BodyId, slot: u32) -> bool {
+        self.ships
+            .iter()
+            .any(|s| s.seat != seat && s.kind.is_warship() && !s.escaped && s.at == ShipAt::Body(body) && s.slot == Some(slot))
+    }
+
+    /// Ticket #99: the seats blockading this slot, for the card and the Report.
+    pub fn slot_blockaders(&self, body: BodyId, slot: u32) -> Vec<Seat> {
+        let mut v: Vec<Seat> = self
+            .ships
+            .iter()
+            .filter(|s| s.kind.is_warship() && !s.escaped && s.at == ShipAt::Body(body) && s.slot == Some(slot))
+            .map(|s| s.seat)
+            .collect();
+        v.sort();
+        v.dedup();
+        v
+    }
+
+    /// Ticket #99: a station of this seat's at this Body that a rival warship is not blockading, so
+    /// a Refuel has somewhere to draw from.
+    pub fn refuelling_station(&self, seat: Seat, body: BodyId) -> bool {
+        self.colonies.iter().any(|c| {
+            c.in_orbit && c.body == body && c.control.controller() == Some(seat) && !self.slot_blockaded_against(seat, body, c.slot)
+        })
+    }
+
+    /// Ticket #99: whether a Colony of this seat's can be reached at all -- a station in a
+    /// blockaded slot cannot, a Colony on the ground reads `may_land`.
+    pub fn may_unload_into(&self, seat: Seat, colony: ColonyId) -> bool {
+        let Some(c) = self.colony(colony) else { return false };
+        if c.in_orbit {
+            !self.slot_blockaded_against(seat, c.body, c.slot)
+        } else {
+            self.may_land(seat, c.body)
         }
     }
 
@@ -1949,7 +2059,8 @@ impl Game {
     /// A Nation State's Baseline Emissions now: its card figure plus whatever a spent Strip Permit
     /// added for good.
     pub fn baseline_emissions(&self, s: StateId) -> f64 {
-        self.tables.state(s).baseline_emissions + self.state(s).baseline_rise
+        // Ticket #108: Leapfrog takes a bite out of it, and it never falls below nothing.
+        (self.tables.state(s).baseline_emissions + self.state(s).baseline_rise - self.state(s).baseline_cut).max(0.0)
     }
 
     /// Ticket #54: what one hundred million people in this state emit a turn, before Green Consensus

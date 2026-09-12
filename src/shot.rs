@@ -114,7 +114,9 @@ const VIEWS: [(&str, View); 7] = [
     ("venus", View::Surface(BodyId::Venus)),
 ];
 
-const MENUS: [&str; 4] = ["title", "faction", "start", "report"];
+// Ticket #109: the credits picture sits between the Faction cards and the start screen, so the
+// attribution the icons' licence requires is photographed with every other menu.
+const MENUS: [&str; 5] = ["title", "faction", "credits", "start", "report"];
 
 /// Ticket #57: the Body a `hover:` aid names, by the id its data row carries.
 fn body_from_id(name: &str) -> Option<BodyId> {
@@ -149,7 +151,7 @@ fn build_board(session: &mut Session) {
                 if g.is_over() {
                     break;
                 }
-                g.end_turn(std::array::from_fn(|_| Vec::new()));
+                g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
             }
             g.seats[0].ai = spectate;
         }
@@ -164,7 +166,7 @@ fn build_board(session: &mut Session) {
             };
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
-            g.ships.push(Ship { id, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30 });
+            g.ships.push(Ship { id, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
         }
         // `battle:1` (a building aid): three seats bring a Frigate to Mars with Attack stances and
         // one more turn runs, so the Report carries a three-party Battle (ticket #50).
@@ -172,7 +174,7 @@ fn build_board(session: &mut Session) {
             for seat in [Seat(0), Seat(1), Seat(2)] {
                 let id = ShipId(g.fresh_id());
                 let built_turn = g.turn;
-                g.ships.push(Ship { id, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30 });
+                g.ships.push(Ship { id, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
             }
             for s in g.ships.iter_mut().filter(|s| s.at == ShipAt::Body(BodyId::Mars)) {
                 s.stance = Stance::Attack;
@@ -183,7 +185,7 @@ fn build_board(session: &mut Session) {
             }
             let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
             orders[0] = vec![Order::ShipStance { body: BodyId::Mars, stance: Stance::Attack }];
-            g.end_turn(orders);
+            g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
             for seat in Seat::ALL.into_iter().skip(1) {
                 g.seats[seat.index()].ai = true;
             }
@@ -286,7 +288,7 @@ fn build_board(session: &mut Session) {
                 escaped: false,
                 arrived_this_turn: false,
                 built_turn,
-                fuel: 30,
+                fuel: 30, slot: None,
             });
             for _ in 0..40 {
                 let before = g.clone();
@@ -413,7 +415,7 @@ fn build_board(session: &mut Session) {
             g.seats[0].ai = false;
             let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
             orders[0] = vec![Order::StripPermit { state: sid }];
-            g.end_turn(orders);
+            g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
             g.seats[0].ai = true;
         }
         // `temp:<now>[,<committed>]` (a building aid, ticket #55): the Temperature is put at `now`
@@ -486,13 +488,13 @@ fn build_board(session: &mut Session) {
                 escaped: false,
                 arrived_this_turn: false,
                 built_turn,
-                fuel: 30,
+                fuel: 30, slot: None,
             });
             if let Some(slot) = g.free_slots_on(BodyId::Moon).first().copied() {
                 let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
                 orders[0] = vec![Order::Unload { ship: id, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Moon, slot) }];
                 g.seats[0].ai = false;
-                g.end_turn(orders);
+                g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
                 g.seats[0].ai = true;
             }
         }
@@ -616,7 +618,7 @@ fn fill_with_scrubbers(g: &mut Game, sid: StateId) {
 /// the board the aid just built.
 fn run_one_quiet_turn(g: &mut Game) {
     g.seats[0].ai = false;
-    g.end_turn(std::array::from_fn(|_| Vec::new()));
+    g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
     g.seats[0].ai = true;
 }
 
@@ -649,7 +651,7 @@ fn plant_saves(session: &mut Session) {
             if g.is_over() {
                 break;
             }
-            g.end_turn(std::array::from_fn(|_| Vec::new()));
+            g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
         }
         save::save_to(&dir, g, SaveKind::Autosave).ok();
     }
@@ -660,7 +662,7 @@ fn plant_saves(session: &mut Session) {
         if watched.is_over() {
             break;
         }
-        watched.end_turn(std::array::from_fn(|_| Vec::new()));
+        watched.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
     }
     save::save_to(&dir, &watched, SaveKind::Autosave).ok();
 }
@@ -719,11 +721,14 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         plan.menu_step += 1;
         match plan.menu_step {
             1 => session.screen = Screen::ChooseFaction,
-            2 => {
+            // Ticket #109: the credits, so the picture that proves the CC BY attribution is
+            // standing gets taken with every other menu picture.
+            2 => session.screen = Screen::Credits,
+            3 => {
                 session.screen = Screen::ChooseStart { faction: FactionKind::Custodians };
                 session.earth_dirty = true;
             }
-            3 => {
+            4 => {
                 build_board(&mut session);
                 plan.archive_colony = ARCHIVE_COLONY.with(|c| c.get());
                 plan.moment = std::env::args().find_map(|a| a.strip_prefix("moment:").and_then(moment_from_id));

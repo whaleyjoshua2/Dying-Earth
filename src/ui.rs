@@ -2,6 +2,7 @@
 
 use crate::app::*;
 use crate::geo;
+use crate::icons::Icons;
 use crate::scene::{Globe, MainCamera, SceneHandles, GLOBE_RADIUS};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
@@ -285,13 +286,21 @@ pub fn draw(
     globes: Query<(&Globe, &GlobalTransform)>,
     window: Query<&Window, With<PrimaryWindow>>,
     textures: Res<Textures>,
+    mut icons: ResMut<Icons>,
     time: Res<Time>,
     mut exit: MessageWriter<AppExit>,
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
     let mut root = Ui::new(ctx.clone(), "viewport".into(), egui::UiBuilder::new().layer_id(egui::LayerId::background()).max_rect(ctx.viewport_rect()));
     let mut actions: Vec<Action> = Vec::new();
-    view.spin += time.delta_secs() * 0.25;
+    // Ticket #109 (version 0.07.0): the resource icons are rendered from SVG once, on the first
+    // frame that has an egui context to hand them to.
+    icons.load(ctx, &crate::assets_root().join("icons"));
+    let icons = &*icons;
+    // Ticket #100 (version 0.07.0): the start globe turns on its own only until a hand is put on it.
+    if !view.start_grabbed {
+        view.spin += time.delta_secs() * 0.25;
+    }
     let _ = window;
     // Ticket #59: "Saved." stands in the top bar for a few seconds and then goes.
     if let Some((_, left)) = &mut session.save_notice {
@@ -317,11 +326,15 @@ pub fn draw(
     match session.screen.clone() {
         Screen::Title => title_screen(&mut root, &mut session, &mut actions),
         Screen::Load => load_screen(&mut root, &session, &mut actions),
+        Screen::Credits => credits_screen(&mut root, &mut session, icons),
         Screen::ChooseFaction => faction_screen(&mut root, &session, &mut actions),
-        Screen::ChooseStart { faction } => start_screen(&mut root, &session, faction, &mut actions),
+        Screen::ChooseStart { faction } => {
+            let cam = camera.single().ok();
+            start_screen(&mut root, &session, faction, &mut view, cam, &globes, &mut actions)
+        }
         Screen::Playing | Screen::GameOver => {
             let cam = camera.single().ok();
-            game_screen(&mut root, ctx, &session, &mut view, cam, &globes, &textures, &mut actions);
+            game_screen(&mut root, ctx, &session, &mut view, cam, &globes, &textures, icons, &mut actions);
         }
     }
     for a in actions {
@@ -341,6 +354,11 @@ pub fn draw(
             }
             Action::EndTurn => {
                 session.end_turn();
+                // Ticket #105: a refusal raises its own popup, every time, so the button never just
+                // does nothing.
+                if session.refusal.is_some() {
+                    view.popup = Popup::Refused;
+                }
                 view.selection = Selection::None;
                 let moments = session.game.as_ref().map(|g| view.moments_of(&session.tables, &g.report).len()).unwrap_or(0);
                 view.popup = if session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some() {
@@ -482,11 +500,49 @@ fn title_screen(root: &mut Ui, session: &mut Session, actions: &mut Vec<Action>)
                 actions.push(Action::OpenLoad);
             }
             ui.add_space(10.0);
+            // Ticket #109 (version 0.07.0): the resource icons are CC BY 3.0, and their licence
+            // wants their authors named somewhere a player can see them.
+            if ui.add(egui::Button::new(RichText::new("Credits").size(22.0)).min_size(egui::vec2(220.0, 44.0))).clicked() {
+                session.screen = Screen::Credits;
+            }
+            ui.add_space(10.0);
             if ui.add(egui::Button::new(RichText::new("Quit").size(22.0)).min_size(egui::vec2(220.0, 44.0))).clicked() {
                 actions.push(Action::Quit);
             }
             ui.add_space(30.0);
             ui.label(RichText::new(format!("Seed {}", session.seed)).weak());
+        });
+    });
+}
+
+/// Ticket #109 (version 0.07.0): the credits. It exists because the resource icons are
+/// game-icons.net's under CC BY 3.0, whose one condition is that the authors are credited; this is
+/// where anything else the game owes a credit to goes as it grows.
+fn credits_screen(root: &mut Ui, session: &mut Session, icons: &Icons) {
+    egui::CentralPanel::default().show(root, |ui| {
+        ui.vertical_centered(|ui| {
+            ui.add_space(60.0);
+            ui.label(RichText::new("Credits").size(40.0).strong());
+            ui.add_space(24.0);
+            ui.label(RichText::new("Resource icons").size(20.0).strong());
+            ui.label(RichText::new("From game-icons.net, used under Creative Commons BY 3.0.").size(15.0));
+            ui.add_space(10.0);
+            for c in crate::icons::CREDITS.iter() {
+                ui.horizontal(|ui| {
+                    ui.add_space(ui.available_width() / 2.0 - 190.0);
+                    ui.spacing_mut().item_spacing.x = 8.0;
+                    if let Some(image) = icons.image(&c.resource.to_lowercase(), 22.0, Color32::from_rgb(225, 220, 210)) {
+                        ui.add(image);
+                    }
+                    ui.label(RichText::new(format!("{}: \"{}\" by {}", c.resource, c.icon, c.author)).size(15.0));
+                });
+            }
+            ui.add_space(12.0);
+            ui.label(RichText::new("https://game-icons.net").size(14.0).weak());
+            ui.add_space(30.0);
+            if ui.add(egui::Button::new(RichText::new("Back").size(20.0)).min_size(egui::vec2(180.0, 38.0))).clicked() {
+                session.screen = Screen::Title;
+            }
         });
     });
 }
@@ -694,7 +750,28 @@ fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut
     });
 }
 
-fn start_screen(root: &mut Ui, session: &Session, faction: FactionKind, actions: &mut Vec<Action>) {
+#[allow(clippy::too_many_arguments)]
+fn start_screen(
+    root: &mut Ui,
+    session: &Session,
+    faction: FactionKind,
+    view: &mut ViewState,
+    cam: Option<(&Camera, &GlobalTransform)>,
+    globes: &Query<(&Globe, &GlobalTransform)>,
+    actions: &mut Vec<Action>,
+) {
+    // Ticket #100 (version 0.07.0): open the globe on this Faction's home, once. Aiming every frame
+    // would undo a drag as fast as the player made it.
+    if view.start_aimed != Some(faction) {
+        let (lon, lat) = geo::state_lonlat(session.tables.faction(faction).home);
+        view.spin = geo::yaw_facing(lon, lat);
+        view.yaw = view.spin;
+        // Tilt to the home's latitude as well, or a northern continent sits on the limb.
+        view.pitch = (lat.to_radians()).clamp(-1.3, 1.3);
+        view.zoom = 1.0;
+        view.start_grabbed = false;
+        view.start_aimed = Some(faction);
+    }
     egui::Panel::right("start_panel").default_size(320.0).show(root, |ui| {
         ui.add_space(10.0);
         ui.label(RichText::new("Choose your starting continent").size(22.0).strong());
@@ -719,8 +796,55 @@ fn start_screen(root: &mut Ui, session: &Session, faction: FactionKind, actions:
         ui.label(RichText::new("Antarctica has no people to govern: it is three Colony Slots, founded from a Colony Ship at Earth.").weak());
     });
     egui::CentralPanel::default().frame(egui::Frame::NONE).show(root, |ui| {
-        ui.allocate_exact_size(ui.available_size(), egui::Sense::hover());
+        let (_, resp) = ui.allocate_exact_size(ui.available_size(), egui::Sense::click_and_drag());
+        // Ticket #100: dragging turns the globe, the wheel zooms it, and a click picks the continent
+        // under the pointer. The first drag stops the spin for good: a spin that carried the
+        // Faction's home back out of view would undo the point of opening on it.
+        let d = resp.drag_motion();
+        if d != egui::Vec2::ZERO {
+            if !view.start_grabbed {
+                // Take the angle the spin had reached, so the globe does not jump when grabbed.
+                view.yaw = view.spin;
+                view.start_grabbed = true;
+            }
+            view.yaw += d.x * 0.008;
+            view.pitch = (view.pitch + d.y * 0.008).clamp(-1.3, 1.3);
+        }
+        if resp.hovered() {
+            let scroll = ui.input(|i| i.smooth_scroll_delta.y);
+            if scroll.abs() > 0.0 {
+                view.zoom = (view.zoom * (1.0 - scroll * 0.002)).clamp(0.45, 2.2);
+            }
+        }
+        if resp.clicked()
+            && let Some(pos) = resp.interact_pointer_pos()
+            && let Some((camera, cam_gt)) = cam
+            && let Some(sid) = start_pick(pos, camera, cam_gt, globes)
+        {
+            actions.push(Action::NewGame(faction, sid));
+        }
     });
+}
+
+/// Ticket #100 (version 0.07.0): which Nation State the pointer is over on the start screen's
+/// globe. The playing screen's picker reads a `Game`, and on this screen no game exists yet, so
+/// this walks the twelve cards' own longitudes and latitudes instead and takes the nearest.
+fn start_pick(pos: Pos2, camera: &Camera, cam_gt: &GlobalTransform, globes: &Query<(&Globe, &GlobalTransform)>) -> Option<StateId> {
+    let ray = camera.viewport_to_world(cam_gt, Vec2::new(pos.x, pos.y)).ok()?;
+    let (origin, dir) = (ray.origin, Vec3::from(ray.direction));
+    let (_, globe_gt) = globes.iter().find(|(g, _)| g.0 == BodyId::Earth)?;
+    let t = geo::ray_sphere(origin, dir, globe_gt.translation(), GLOBE_RADIUS)?;
+    let local = globe_gt.affine().inverse().transform_point3(origin + dir * t);
+    let (lon, lat) = geo::lonlat_from_local(local);
+    // The nearest card by great-circle-ish distance, longitude wrapped.
+    StateId::ALL.into_iter().min_by(|a, b| {
+        let d = |s: StateId| {
+            let (sl, sa) = geo::state_lonlat(s);
+            let dl = (((sl - lon) + 540.0) % 360.0) - 180.0;
+            dl * dl + (sa - lat) * (sa - lat)
+        };
+        d(*a).partial_cmp(&d(*b)).unwrap_or(std::cmp::Ordering::Equal)
+    })
 }
 
 // ------------------------------------------------------------------ the game
@@ -734,19 +858,15 @@ fn game_screen(
     cam: Option<(&Camera, &GlobalTransform)>,
     globes: &Query<(&Globe, &GlobalTransform)>,
     textures: &Textures,
+    icons: &Icons,
     actions: &mut Vec<Action>,
 ) {
     let Some(game) = session.game.as_ref() else { return };
-    // Open the Tech Tree once when the player must pick.
-    let must_pick = game.research.awaiting_pick == Some(Seat(0)) && !game.available_techs().is_empty();
-    if must_pick && !view.tech_prompted {
-        view.show_tech = true;
-        view.tech_prompted = true;
-    }
-    if !must_pick {
-        view.tech_prompted = false;
-    }
-    top_bar(root, session, game, view, actions);
+    // Ticket #104 (version 0.07.0): NOTHING opens itself. The Tech Tree used to throw itself up
+    // whenever a pick was owed, which at turn 1 is always, so a new game began behind two panels.
+    // The nudge that replaces it is the yellow line in the top bar, and the turn cannot be ended
+    // with a pick outstanding (ticket #105), so a panel that opens itself buys nothing.
+    top_bar(root, session, game, view, icons, actions);
     side_panel(root, session, game, view, actions);
     // The 3D area: drag turns, wheel zooms, click picks.
     let mut hotspots: Vec<Hotspot> = Vec::new();
@@ -783,7 +903,25 @@ fn game_screen(
     popups(ctx, session, game, view, actions);
 }
 
-fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+/// Ticket #109 (version 0.07.0): one resource on the top bar. The icon REPLACES the word there,
+/// since the bar is cramped and the glyphs are learned in a turn or two; everywhere else the icon
+/// sits beside its words. Where the art did not load the word comes back, so the bar is never mute.
+fn bar_resource(ui: &mut Ui, icons: &Icons, key: &str, word: &str, value: String, hover: String) {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        match icons.image(key, 16.0, Color32::from_rgb(225, 220, 210)) {
+            Some(image) => {
+                ui.add(image).on_hover_text(format!("{word}. {hover}"));
+                ui.label(RichText::new(value).strong()).on_hover_text(format!("{word}. {hover}"));
+            }
+            None => {
+                ui.label(RichText::new(format!("{word} {value}")).strong()).on_hover_text(hover);
+            }
+        }
+    });
+}
+
+fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, icons: &Icons, actions: &mut Vec<Action>) {
     egui::Panel::top("top_bar").show(root, |ui| {
         // Ticket #64: the spectator's bar names the table instead of a Faction of their own, and
         // says whose Stockpile the numbers beside it are.
@@ -810,7 +948,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 let lines: Vec<String> = s.income_sources.iter().filter(|(_, r, _)| *r == res).map(|(name, _, v)| format!("{v:+}  {name}")).collect();
                 if lines.is_empty() { "No income from buildings last turn.".to_string() } else { format!("Last Income:\n{}", lines.join("\n")) }
             };
-            ui.label(RichText::new(format!("Materials {} ({})", left.materials, signed(inc.materials))).strong()).on_hover_text(sources(dying_earth_engine::Resource::Materials));
+            bar_resource(ui, icons, "materials", "Materials", format!("{} ({})", left.materials, signed(inc.materials)), sources(dying_earth_engine::Resource::Materials));
             // Ticket #72: the Prospectors' Fund beside their Materials.
             if game.kind(Seat(0)) == FactionKind::Prospectors {
                 let s = game.seat(Seat(0));
@@ -818,17 +956,38 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                     .on_hover_text("The Venture Capital Fund: Materials banked toward the 750 your Victory Condition asks for, and the share of your Factories' and Mines' output going in each turn. Set it on the Victory panel.");
             }
             ui.separator();
-            ui.label(RichText::new(format!("Fuel {} ({})", left.fuel, signed(inc.fuel))).strong()).on_hover_text(sources(dying_earth_engine::Resource::Fuel));
+            bar_resource(ui, icons, "fuel", "Fuel", format!("{} ({})", left.fuel, signed(inc.fuel)), sources(dying_earth_engine::Resource::Fuel));
             ui.separator();
-            ui.label(RichText::new(format!("Energy {} ({})", left.energy, signed(inc.energy))).strong()).on_hover_text(sources(dying_earth_engine::Resource::Energy));
+            bar_resource(ui, icons, "energy", "Energy", format!("{} ({})", left.energy, signed(inc.energy)), sources(dying_earth_engine::Resource::Energy));
             ui.separator();
-            ui.label(RichText::new(format!("Ducats {} ({})", left.ducats, signed(inc.ducats))).strong()).on_hover_text(sources(dying_earth_engine::Resource::Ducats));
+            bar_resource(ui, icons, "ducats", "Ducats", format!("{} ({})", left.ducats, signed(inc.ducats)), sources(dying_earth_engine::Resource::Ducats));
             ui.separator();
             let research = match game.research.current {
                 Some(t) => format!("Research {} / {} toward {}", game.research.progress, game.tables.tech(t).cost, game.tables.tech(t).name),
-                None => format!("Research: no Tech chosen ({} waiting)", game.research.unallocated),
+                None => format!("Research: no Tech chosen ({} waiting)", game.research.unallocated.iter().sum::<i64>() + game.research.unattributed),
             };
-            ui.label(research);
+            // Ticket #104 (version 0.07.0): the Tech Tree no longer opens itself, so the bar has to
+            // say when a pick is owed. End Turn is disabled until one is made, but that only shows
+            // on a hover, and a player who does not know to look will not find it.
+            if game.research.awaiting_pick == Some(Seat(0)) && game.research.current.is_none() && !game.available_techs().is_empty() && !session.spectator {
+                if ui.button(RichText::new("Pick a Tech").color(Color32::BLACK).strong()).on_hover_text("The Research Lead is yours: choose what the world researches next. The turn cannot end until you do.").clicked() {
+                    view.show_tech = true;
+                }
+                ui.separator();
+            }
+            // Ticket #109: Research joins the others, its word replaced by its glyph on the bar.
+            match icons.image("research", 16.0, Color32::from_rgb(225, 220, 210)) {
+                Some(image) => {
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 4.0;
+                        ui.add(image).on_hover_text("Research");
+                        ui.label(research.trim_start_matches("Research").trim_start_matches(':').trim().to_string());
+                    });
+                }
+                None => {
+                    ui.label(research);
+                }
+            }
             // Ticket #58: the Research race, as a bar of the four Factions' contributions to the
             // Tech under research, in Faction colours and in proportion.
             research_race_bar(ui, session, game);
@@ -1090,6 +1249,13 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
 #[allow(clippy::too_many_arguments)]
 /// Colony Slot labels on a Body's surface: Antarctica's on Earth since ticket #44.
 fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: BodyId, visible: &dyn Fn(Vec3) -> Option<Pos2>, hotspots: &mut Vec<Hotspot>) {
+    // Ticket #103 (version 0.07.0): Earth's three slots are Antarctica's, and nothing of them is
+    // drawn until the ice opens -- no marker, no name, no yields. A player is told the ice EXISTS
+    // and at what warmth it goes, on the Solar System Map and the Climate Panel, so an Antarctic
+    // Colony can still be planned for; what is hidden is which of the three is the best site.
+    if body == BodyId::Earth && !game.antarctica_open {
+        return;
+    }
             for slot in 0..game.tables.body(body).colony_slots() {
                 let (lon, lat) = geo::slot_lonlat(game.tables.body(body), slot);
         let name = &game.tables.body(body).slots[slot as usize].name;
@@ -1105,12 +1271,6 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                             Hit::Select(Selection::Colony(c.id)),
                         )
                     }
-                    // Ticket #56: Antarctica's slots lie under the ice until the world is warm enough.
-                    None if body == BodyId::Earth && !game.antarctica_open => (
-                        format!("{name}: under the ice\nopens at {:+.1} C", game.tables.climate.antarctica_opens_at),
-                        Color32::from_rgb(150, 195, 235),
-                        Hit::Select(Selection::Slot(body, slot)),
-                    ),
                     None => (format!("{name}: empty"), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot))),
                 };
                 label_at(painter, p + egui::vec2(0.0, 24.0), &text, colour, 12.0);
@@ -1489,7 +1649,10 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildShip { site, kind } => format!("Build {} at {}", kind.name(), game.place_name(*site)),
         Order::BuildArmy { place } => format!("Build Army at {}", game.place_name(*place)),
         Order::Repair { unit, points } => format!("Repair {} point(s) on {}", points, match unit { UnitRef::Ship(s) => s.to_string(), UnitRef::Army(a) => a.to_string() }),
-        Order::Transit { ship, to } => format!("Send {} to {}", ship, game.tables.body(*to).name),
+        Order::Transit { ship, to, slot } => match slot {
+            Some(n) => format!("Send {} to {}, into Orbital Slot {}", ship, game.tables.body(*to).name, n),
+            None => format!("Send {} to {}", ship, game.tables.body(*to).name),
+        },
         Order::Refuel { ship } => format!("Refuel {} ({} Fuel from the Stockpile)", ship, game.refuel_amount(Seat(0), *ship)),
         Order::ShipStance { body, stance } => format!("Ships at {}: {}", game.tables.body(*body).name, stance.name()),
         Order::ArmyStance { place, stance } => format!("Armies at {}: {}", game.place_name(*place), stance.name()),
@@ -1508,7 +1671,8 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildModuleWithDucats { colony, kind } => format!("Build {} at {} for Ducats", kind.name(), game.place_name(Place::Colony(*colony))),
         Order::BuildStation { body, slot } => format!("Build {} over {}", game.station_name(*body, *slot), game.tables.body(*body).name),
         Order::BuildArchive { colony } => format!("Build the Archive at {}", game.place_name(Place::Colony(*colony))),
-        Order::FundArchive => "Fund the Archive with this turn's Research".to_string(),
+        Order::SetArchiveFunding { on: true } => "Pay your Labs into the Archive fund from the next Income".to_string(),
+        Order::SetArchiveFunding { on: false } => "Pay your Labs into the shared Tech from the next Income".to_string(),
         // Ticket #73.
         Order::BuildEmigrants { state, n } => format!("Muster {n} Emigrants in {}", game.tables.state(*state).name),
         Order::SendToAntarctica { state, n, into } => format!(
@@ -1605,8 +1769,42 @@ fn change_row(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, mothb
     });
 }
 
+/// Ticket #106 (version 0.07.0): hover text with the resource words replaced by their glyphs. The
+/// designer's rule is that the icons are used EXCLUSIVELY on mouse-overs -- the words stay
+/// everywhere a player reads at a glance, and the tooltips, which are the wordiest thing in the
+/// interface, trade them for pictures. Where an icon is missing the word comes straight back.
+fn hover_with_icons(ui: &mut Ui, text: &str) {
+    const WORDS: [(&str, &str); 5] =
+        [("Materials", "materials"), ("Fuel", "fuel"), ("Energy", "energy"), ("Research", "research"), ("Ducats", "ducats")];
+    ui.set_max_width(360.0);
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 3.0;
+        for token in text.split(' ') {
+            // Keep whatever punctuation rides on the word, so "30 Materials," still reads.
+            let bare = token.trim_end_matches([',', '.', ';', ':']);
+            let tail = &token[bare.len()..];
+            match WORDS.iter().find(|(w, _)| *w == bare).and_then(|(_, key)| Icons::from_ctx(ui.ctx(), key, 14.0, Color32::from_rgb(225, 220, 210))) {
+                Some(image) => {
+                    ui.add(image);
+                    if !tail.is_empty() {
+                        ui.label(tail);
+                    }
+                }
+                None => {
+                    ui.label(token);
+                }
+            }
+        }
+    });
+}
+
 fn cost_button(ui: &mut Ui, game: &Game, pending: &[Order], order: Order, label: &str, actions: &mut Vec<Action>) {
     cost_button_with_hover(ui, game, pending, order, label, None, actions);
+}
+
+/// Ticket #106: the cost of an order, spelled for a tooltip, so the hover can draw it with glyphs.
+fn cost_hover(game: &Game, order: &Order) -> String {
+    format!("Costs {}.", game.order_cost(Seat(0), order).text())
 }
 
 /// A build button: cost in the label, and on hover what the building would make each turn (#22).
@@ -1616,8 +1814,19 @@ fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Or
     let text = format!("{} ({})", label, cost.text());
     let button = egui::Button::new(text);
     let mut resp = ui.add_enabled(check.is_ok(), button);
+    // Ticket #106 (version 0.07.0): the cost reads in glyphs on the hover, words on the button.
+    let priced = cost_hover(game, &order);
     if let Some(h) = &hover {
-        resp = resp.on_hover_text(format!("Once it stands: {h}")).on_disabled_hover_text(format!("Once it stands: {h}"));
+        let whole = format!("{priced} Once it stands: {h}");
+        let (a, b) = (whole.clone(), whole);
+        resp = resp
+            .on_hover_ui(move |ui| hover_with_icons(ui, &a))
+            .on_disabled_hover_ui(move |ui| hover_with_icons(ui, &b));
+    } else {
+        let (a, b) = (priced.clone(), priced);
+        resp = resp
+            .on_hover_ui(move |ui| hover_with_icons(ui, &a))
+            .on_disabled_hover_ui(move |ui| hover_with_icons(ui, &b));
     }
     if let Err(e) = &check {
         resp.clone().on_disabled_hover_text(&e.0);
@@ -2037,6 +2246,15 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     };
     ui.label(owner);
     ui.label(format!("Colonists {} of {} Habitat room", col.colonists, game.habitat_room(col)));
+    // Ticket #97 (version 0.07.0): the Module cap, shown beside the Colonists that buy it, so a
+    // player meets it on the card rather than as a refusal.
+    let (used, cap) = (game.module_slots_used(col), game.module_slots(col));
+    let line = format!("Modules {used} of {cap} ({} free, one for each Colonist)", game.tables.slots.base);
+    if used >= cap {
+        ui.colored_label(Color32::YELLOW, format!("{line} - no room for another until more Colonists live here"));
+    } else {
+        ui.label(line);
+    }
     ui.label(RichText::new("Modules").strong());
     let director = col.control.director();
     let colony_mine = !session.spectator && col.control.director() == Some(Seat(0));
@@ -2101,20 +2319,37 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                 format!("Archive fund {fund} of {cap} (a quarter of the {research} until the Archive stands)")
             };
             ui.label(fund_line);
-            let funding = game.seat(Seat(0)).funding_archive || session.pending.iter().any(|o| matches!(o, Order::FundArchive));
-            let mut on = funding;
-            let may_fund = game.check_order(Seat(0), &session.pending, &Order::FundArchive).is_ok() || funding;
-            let box_ = ui.add_enabled(may_fund, egui::Checkbox::new(&mut on, "Fund the Archive this turn (your Labs' Research goes to the fund, not the shared Tech)"));
-            if !may_fund {
-                box_.clone().on_disabled_hover_text("The fund is at its cap; this turn's Research goes to the shared Tech.");
+            // Version 0.07.0: a standing declaration, read at the next Income, not a per-turn order.
+            let declared = game.seat(Seat(0)).archive_funding;
+            let pending_set = session.pending.iter().find_map(|o| match o {
+                Order::SetArchiveFunding { on } => Some(*on),
+                _ => None,
+            });
+            let mut on = pending_set.unwrap_or(declared);
+            let flip = Order::SetArchiveFunding { on: !on };
+            let may_flip = pending_set.is_some() || game.check_order(Seat(0), &session.pending, &flip).is_ok();
+            let box_ = ui.add_enabled(
+                may_flip,
+                egui::Checkbox::new(&mut on, "Pay your Labs into the Archive fund (from the next Income, until you set it back)"),
+            );
+            if !may_flip {
+                box_.clone().on_disabled_hover_text("The fund is at its cap; your Labs' Research goes to the shared Tech.");
             }
             if box_.changed() {
-                if on {
-                    actions.push(Action::Place(Order::FundArchive));
-                } else if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::FundArchive)) {
+                if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetArchiveFunding { .. })) {
                     actions.push(Action::Cancel(i));
+                } else {
+                    actions.push(Action::Place(Order::SetArchiveFunding { on }));
                 }
             }
+            ui.label(
+                egui::RichText::new(if on {
+                    "Your Labs pay the fund from the next Income."
+                } else {
+                    "Your Labs pay the shared Tech."
+                })
+                .weak(),
+            );
             if !built && !game.archive_ordered(Seat(0)) {
                 let order = Order::BuildArchive { colony: cid };
                 let materials = game.order_cost(Seat(0), &order).materials;
@@ -2281,7 +2516,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             ui.label(format!("To {}: {} turn(s), {} Fuel each from the tank", game.tables.body(to).name, turns, fuel));
             for s in &ships {
                 // Ticket #87: the button reads the tank against the leg.
-                cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to }, &format!("{} {} ({}/{} in the tank)", s.kind.name(), s.id.0, s.fuel, game.tables.unit(s.kind).tank), actions);
+                cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: None }, &format!("{} {} ({}/{} in the tank)", s.kind.name(), s.id.0, s.fuel, game.tables.unit(s.kind).tank), actions);
             }
         });
     }
@@ -2613,7 +2848,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         egui::Window::new("Tech Tree").open(&mut open).resizable(false).show(ctx, |ui| {
             ui.label(match game.research.current {
                 Some(t) => format!("Under research: {} ({} of {}). {}", game.tables.tech(t).name, game.research.progress, game.tables.tech(t).cost, game.research_lead_text()),
-                None => format!("No Tech under research. {} Research waiting.", game.research.unallocated),
+                None => format!("No Tech under research. {} Research waiting.", game.research.unallocated.iter().sum::<i64>() + game.research.unattributed),
             });
             // Ticket #51: an Archivist player is told whether Provisional Findings is in force.
             if game.kind(Seat(0)) == FactionKind::Archivists {
@@ -2630,15 +2865,16 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         }
                     ),
                 );
-                if session.pending.iter().any(|o| matches!(o, Order::FundArchive)) {
-                    ui.colored_label(Color32::YELLOW, "You are funding the Archive this turn: Provisional Findings is off next turn.");
+                if game.seat(Seat(0)).archive_funding || session.pending.iter().any(|o| matches!(o, Order::SetArchiveFunding { on: true })) {
+                    ui.colored_label(Color32::YELLOW, "Your Labs pay the Archive fund: the turn after they next pay it, Provisional Findings is off.");
                 }
             }
             let must_pick = game.research.awaiting_pick == Some(Seat(0)) && game.research.current.is_none();
             if must_pick {
                 ui.colored_label(Color32::YELLOW, "You pick the next Tech: choose one below.");
             }
-            let available = game.available_techs();
+            // Ticket #98: the Lead chooses from the drawn shortlist, so that is what the tree offers.
+            let available = game.pickable_techs();
             tech_tree(ui, game, &available, must_pick, actions);
         });
         view.show_tech = open;
@@ -2648,7 +2884,18 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         let bottom = ctx.viewport_rect().max.y;
         // Ticket #64: the spectator's card sits on the left, so the panel's home is clear of it.
         let home = (if session.spectator { 420.0 } else { 10.0 }, bottom - 400.0);
-        let mut window = egui::Window::new("Climate Panel").open(&mut open).default_pos(home).default_width(400.0);
+        // Ticket #104 (version 0.07.0): the panel could be dragged larger but not back down. Its
+        // content is not what held it: rendered at 230 wide everything wraps and nothing overflows.
+        // So the width is made authoritative -- an explicit floor it may be dragged to, and a scroll
+        // rather than unbounded growth, since the panel is taller than the screen on a small window.
+        let mut window = egui::Window::new("Climate Panel")
+            .open(&mut open)
+            .default_pos(home)
+            .default_width(400.0)
+            .resizable(true)
+            .min_width(230.0)
+            .min_height(140.0)
+            .vscroll(true);
         if view.climate_reopen {
             window = window.current_pos(home);
             view.climate_reopen = false;
@@ -2698,7 +2945,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // Ticket #55: what the Stock already commits the world to, and how long cutting can
             // still avoid the Collapse Line.
             ui.label(
-                RichText::new(format!("Committed: {:+.1} C even if net Emissions stopped today", game.target_temperature()))
+                RichText::new(format!("Already locked in: {:+.1} C even if net Emissions stopped today", game.target_temperature()))
                     .size(15.0)
                     .color(Color32::from_rgb(240, 180, 140)),
             )
@@ -2825,6 +3072,26 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         view.show_victory = open;
     }
     match view.popup {
+        // Ticket #105 (version 0.07.0): the engine refused to end the turn, and says why. The rule
+        // is worth nothing if the player is left wondering why the button did nothing.
+        Popup::Refused => {
+            let why = session.refusal.clone().unwrap_or_else(|| "The turn cannot end yet.".to_string());
+            egui::Modal::new("refused".into()).show(ctx, |ui| {
+                ui.set_width(460.0);
+                ui.label(RichText::new("The turn did not end").size(20.0).strong());
+                ui.label(why);
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    if ui.button("Pick a Tech").clicked() {
+                        view.popup = Popup::None;
+                        view.show_tech = true;
+                    }
+                    if ui.button("Back").clicked() {
+                        view.popup = Popup::None;
+                    }
+                });
+            });
+        }
         Popup::Event => {
             let text = game.last_event.as_ref().map(|e| e.text.clone()).unwrap_or_default();
             egui::Modal::new("event".into()).show(ctx, |ui| {
@@ -2975,7 +3242,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 if m.tech.is_some() {
                     ui.separator();
                     let must_pick = game.research.awaiting_pick == Some(Seat(0)) && game.research.current.is_none();
-                    let available = game.available_techs();
+                    let available = game.pickable_techs();
                     tech_tree(ui, game, &available, must_pick, actions);
                 }
                 ui.horizontal(|ui| {

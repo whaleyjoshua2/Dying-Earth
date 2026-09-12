@@ -35,9 +35,13 @@ impl Game {
         self.resolve_occupation(); // (c)
         self.resolve_influence(); // (d)
         self.resolve_changes(); // (e), ticket #54: a decommission frees its slot before a build wants it
+        // Ticket #99 (version 0.07.0): cargo lands BEFORE the yards finish, so winning the battle
+        // for an orbit wins the turn. The other way round, a warship the loser's Shipyard completed
+        // in this same Resolution denied a landing to the seat that had just won the orbit -- which
+        // cost a playtested Archivist the turn they had fought three ships for.
+        self.resolve_cargo(); // (g)
         self.resolve_builds(); // (e)
         self.resolve_repairs(); // (f)
-        self.resolve_cargo(); // (g)
         self.resolve_antarctic(); // (g), ticket #73: Emigrants by sea land a turn after they left
         self.apply_event_now(); // (h)
         self.resolve_strip_permits(); // (h), ticket #54: a permit that ran out charges its price
@@ -1129,6 +1133,8 @@ impl Game {
                 let id = ShipId(self.fresh_id());
                 self.ships.push(Ship {
                     id,
+                    // Ticket #99: a Ship built at a Shipyard starts at the Body at large.
+                    slot: None,
                     kind,
                     seat: b.seat,
                     damage: 0,
@@ -1395,7 +1401,14 @@ impl Game {
                     }
                     let Some(s) = self.ship(ship) else { continue };
                     let ShipAt::Body(body) = s.at else { continue };
-                    if !self.may_land(seat, body) {
+                    // Ticket #99 (version 0.07.0): the ground answers to Orbital Control, a station
+                    // only to a warship sitting in its own Orbital Slot. A Faction is never shut out
+                    // of a place it holds by a ship that never touched it.
+                    let barred = match into {
+                        UnloadTarget::Colony(cid) => !self.may_unload_into(seat, cid),
+                        UnloadTarget::Slot(_, _) => !self.may_land(seat, body),
+                    };
+                    if barred {
                         let line = format!("{} could not land at {}: the orbit is contested.", self.seat_name(seat), self.tables.body(body).name);
                         self.log(line);
                         let text = self.say("landing_contested", &[("faction", self.seat_name(seat)), ("body", self.tables.body(body).name.clone())]);

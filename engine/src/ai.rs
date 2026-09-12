@@ -78,6 +78,21 @@ pub enum Behind {
 }
 
 impl Game {
+    /// Ticket #99 (version 0.07.0): the Orbital Slot a warship of this seat should arrive into at
+    /// `body`: the slot of the richest rival station there, by Modules standing, and nothing for a
+    /// Ship that is not a warship or a Body where no rival keeps a station. The slot is chosen with
+    /// the leg, so this reads the board as it stands when the Ship departs.
+    pub fn ai_blockade_slot(&self, seat: Seat, body: BodyId, kind: UnitKind) -> Option<u32> {
+        if !kind.is_warship() {
+            return None;
+        }
+        self.colonies
+            .iter()
+            .filter(|c| c.in_orbit && c.body == body && c.control.controller().is_some_and(|o| o != seat))
+            .max_by_key(|c| (c.modules.len(), c.colonists))
+            .map(|c| c.slot)
+    }
+
     fn base_weight(&self, seat: Seat, cat: Cat) -> f64 {
         let w = self.tables.ai_weights(self.kind(seat));
         match cat {
@@ -501,10 +516,19 @@ impl Game {
                         || cat == Cat::RaiseIndustry
                         // Ticket #54: a Strip Permit is three turns of double Extraction.
                         || cat == Cat::StripPermit
+                        // Version 0.07.0: ticket #84 put every Victory Condition behind a Tech, so
+                        // Research advances this part too. Without this the Prospector AI built 0
+                        // Research Labs in 20 seeds and never reached the Extraction Charter.
+                        || cat == Cat::ResearchLab
+                        || cat == Cat::Observatory
                 }
                 // Ticket #54: a Scrubber is what a Custodian buys Stabilization with now.
                 VictoryFirstKind::StabilizationRun => cat == Cat::Scrubber || cat == Cat::Leapfrog || cat == Cat::ResearchLab || cat == Cat::Observatory,
-                VictoryFirstKind::ColonistsOffEarth => matches!(cat, Cat::Habitat | Cat::ColonyShip | Cat::FoundColony | Cat::LoadUnload | Cat::Transit),
+                // Version 0.07.0: the Research Lab and Observatory join the list for the same
+                // reason as the Venture Fund's: Generation Ships gates this win.
+                VictoryFirstKind::ColonistsOffEarth => {
+                    matches!(cat, Cat::Habitat | Cat::ColonyShip | Cat::FoundColony | Cat::LoadUnload | Cat::Transit | Cat::ResearchLab | Cat::Observatory)
+                }
                 VictoryFirstKind::ResearchProduced => cat == Cat::ResearchLab || cat == Cat::Observatory,
                 // Ticket #51: the Archive wants Research, a fund and a Colony off Earth to stand at,
                 // which the Colony Ship, the transit and the founding provide. Ticket #68: and the
@@ -702,6 +726,11 @@ impl Game {
         for cid in self.directed_colonies(seat) {
             let col = self.colony(cid).unwrap().clone();
             let threat = if self.enemy_present_or_inbound(seat, col.body) || self.enemy_army_near(seat, Place::Colony(cid)) { m.threat } else { 1.0 };
+            // Ticket #97 (version 0.07.0): no room, nothing to enumerate. Without this the AI scores
+            // Modules it cannot build, spends its list on them and has them dropped at commit.
+            if self.free_module_slots(&col) == 0 {
+                continue;
+            }
             for mk in ModuleKind::BUILDABLE {
                 // Ticket #46: a station holds only a Shipyard and Habitats; ticket #80: and an
                 // Observatory. Ticket #81: a Habitat over Earth now houses people who count as off
@@ -942,9 +971,9 @@ impl Game {
         if kind == FactionKind::Archivists {
             let fund = self.seat(seat).archive_fund;
             let cap = self.archive_fund_cap(seat);
-            if fund < cap && self.seat(seat).research_last_turn > 0 {
+            if fund < cap && self.seat(seat).research_last_turn > 0 && !self.seat(seat).archive_funding {
                 let opp = if fund + self.seat(seat).research_last_turn >= cap { m.opportunity } else { 1.0 };
-                push(vec![Order::FundArchive], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, opp, format!("fund the Archive with this turn's {} Research", self.seat(seat).research_last_turn), None);
+                push(vec![Order::SetArchiveFunding { on: true }], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, opp, format!("pay the Labs into the Archive fund from the next Income, {} Research a turn", self.seat(seat).research_last_turn), None);
             }
             if !self.archive_built(seat) && !self.archive_ordered(seat) {
                 let home = self.colonies.iter().filter(|c| c.control.director() == Some(seat) && self.may_hold_archive(c)).min_by_key(|c| (c.founded_turn, c.id.0)).map(|c| c.id);
@@ -1306,16 +1335,16 @@ impl Game {
                         // it the flight is longer and dearer, so the candidate is worth less --
                         // unless the seat is behind on its pace, where the gap multiplier says go.
                         let window = self.window_preference(seat, body, d);
-                        push(vec![Order::Transit { ship: s.id, to: d }], Cat::Transit, self.base_weight(seat, Cat::Transit) * window, gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
+                        push(vec![Order::Transit { ship: s.id, to: d, slot: self.ai_blockade_slot(seat, d, s.kind) }], Cat::Transit, self.base_weight(seat, Cat::Transit) * window, gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
                     }
                 }
                 if s.colonists == 0 && body != BodyId::Earth {
-                    push(vec![Order::Transit { ship: s.id, to: BodyId::Earth }], Cat::Transit, self.base_weight(seat, Cat::Transit) * 0.8, gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} back to Earth", ship_name), None);
+                    push(vec![Order::Transit { ship: s.id, to: BodyId::Earth, slot: self.ai_blockade_slot(seat, BodyId::Earth, s.kind) }], Cat::Transit, self.base_weight(seat, Cat::Transit) * 0.8, gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} back to Earth", ship_name), None);
                 }
             }
             // Ticket #43: an empty Carrier away from Earth goes home for an Army.
             if s.kind == UnitKind::Carrier && s.army.is_none() && body != BodyId::Earth {
-                push(vec![Order::Transit { ship: s.id, to: BodyId::Earth }], Cat::Transit, self.base_weight(seat, Cat::Transit) * 0.8, 1.0, 1.0, 1.0, format!("send {} back to Earth", ship_name), None);
+                push(vec![Order::Transit { ship: s.id, to: BodyId::Earth, slot: self.ai_blockade_slot(seat, BodyId::Earth, s.kind) }], Cat::Transit, self.base_weight(seat, Cat::Transit) * 0.8, 1.0, 1.0, 1.0, format!("send {} back to Earth", ship_name), None);
             }
             if s.kind.is_warship() || s.army.is_some() {
                 // Warships go where the Faction has or wants Colonies, or where a rival is: any
@@ -1330,7 +1359,7 @@ impl Game {
                 for d in dests {
                     let threat = if self.enemy_present_or_inbound(seat, d) { m.threat } else { 1.0 };
                     let base = self.base_weight(seat, Cat::Transit) * if kind == FactionKind::Prospectors { 0.9 } else { 0.6 };
-                    push(vec![Order::Transit { ship: s.id, to: d }], Cat::Transit, base, 1.0, threat, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
+                    push(vec![Order::Transit { ship: s.id, to: d, slot: self.ai_blockade_slot(seat, d, s.kind) }], Cat::Transit, base, 1.0, threat, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
                 }
                 // Load an Army aboard a Carrier at Earth for an attack on a rival Colony (ticket #43).
                 if card.carries_army && s.army.is_none() && body == BodyId::Earth && kind == FactionKind::Prospectors {
@@ -1490,7 +1519,7 @@ impl Game {
                 .iter()
                 .find(|c| {
                     c.orders.iter().any(|o| match o {
-                        Order::Transit { ship, to } => {
+                        Order::Transit { ship, to, .. } => {
                             let from = self.ships.iter().find(|s| s.id == *ship).and_then(|s| match s.at {
                                 ShipAt::Body(b) => Some(b),
                                 _ => None,

@@ -127,7 +127,8 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   build archive <colony>               the Archivists only
   industry <state>                     raise the Industry Level
 
-  transit <ship> <body>                fly; spends the ship's own tank
+  transit <ship> <body> [slot]         fly; spends the ship's own tank. A warship arriving into an
+                                       Orbital Slot blockades that slot and nothing else.
   refuel <ship>                        fill the tank where you hold a station
   load <ship> <n> from <place> [army <army>]
   unload <ship> <n> [army] into slot <body> <slot>
@@ -149,7 +150,8 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   send-antarctica <state> <n> colony <n>
   change facility <state> <index> <mothball|restart|decommission>
   change module <colony> <index> <mothball|restart|decommission>
-  fund-archive                         the Archivists only
+  fund-archive                         the Archivists only: pay the Labs into the Archive fund
+  unfund-archive                       the Archivists only: pay them back into the shared Tech
   venture-share <percent>              the Prospectors only, a step of 10, 0 to 80
   draw-venture <amount>                the Prospectors only
   leapfrog <state>                     the Custodians only
@@ -185,7 +187,15 @@ fn parse_line(line: &str) -> Result<Line, String> {
             }
         }
         "industry" => Order::RaiseIndustry { state: pick(&StateId::ALL, at(1)?)? },
-        "transit" => Order::Transit { ship: ship_id(at(1)?)?, to: pick(&BodyId::ALL, at(2)?)? },
+        "transit" => Order::Transit {
+            ship: ship_id(at(1)?)?,
+            to: pick(&BodyId::ALL, at(2)?)?,
+            // Ticket #99: an optional Orbital Slot to arrive into; a warship there blockades it.
+            slot: match w.get(3) {
+                None => None,
+                Some(v) => Some(count(v)?),
+            },
+        },
         "refuel" => Order::Refuel { ship: ship_id(at(1)?)? },
         "load" => {
             let ship = ship_id(at(1)?)?;
@@ -234,7 +244,8 @@ fn parse_line(line: &str) -> Result<Line, String> {
             };
             Order::Change { building, what: change }
         }
-        "fund-archive" => Order::FundArchive,
+        "fund-archive" => Order::SetArchiveFunding { on: true },
+        "unfund-archive" => Order::SetArchiveFunding { on: false },
         "venture-share" => Order::SetVentureShare { share: count(at(1)?)? },
         "draw-venture" => Order::DrawVenture { amount: number(at(1)?)? },
         "leapfrog" => Order::Leapfrog { state: pick(&StateId::ALL, at(1)?)? },
@@ -412,8 +423,12 @@ fn print_board(g: &Game) {
         if g.research.done.is_empty() { "none".into() } else { g.research.done.iter().map(|x| t.tech(*x).name.clone()).collect::<Vec<_>>().join(", ") }
     );
     if g.research.awaiting_pick == Some(me) || g.research.current.is_none() {
-        println!("  *** YOU MUST PICK THE NEXT TECH (a `tech <name>` line). Available: ***");
-        for x in g.available_techs() {
+        let drawn = !g.research.shortlist.is_empty();
+        println!(
+            "  *** YOU MUST PICK THE NEXT TECH (a `tech <name>` line). {} ***",
+            if drawn { "The Research Lead's shortlist:" } else { "A free choice of everything available:" }
+        );
+        for x in g.pickable_techs() {
             let c = t.tech(x);
             println!("      {} ({} Research, rung {}): {}", c.name, c.cost, c.rung, c.effect);
         }
@@ -519,15 +534,24 @@ fn print_board(g: &Game) {
         let q: Vec<String> = c.queue.iter().map(|b| format!("{} due t{}", b.item.name(), b.due_turn)).collect();
         let name = if c.in_orbit { g.station_name(c.body, c.slot) } else { slot_name(g, c.body, c.slot) };
         println!(
-            "colony {:<3} {:<22} {:<7} {:<30} colonists {} (room {}) | yields {}",
+            "colony {:<3} {:<22} {:<7} {:<30} colonists {} (room {}) | Modules {}/{} | yields {}",
             c.id.0,
             name,
             if c.in_orbit { "orbit" } else { "ground" },
             control_text(g, c.control),
             c.colonists,
             g.habitat_room(c),
+            g.module_slots_used(c),
+            g.module_slots(c),
             g.colony_yields(c).text()
         );
+        if c.in_orbit {
+            let by = g.slot_blockaders(c.body, c.slot);
+            let rivals: Vec<String> = by.iter().filter(|s| **s != me).map(|s| g.seat_name(*s)).collect();
+            if !rivals.is_empty() {
+                println!("    *** BLOCKADED by the {} : no unloading here, and it refuels nothing ***", rivals.join(" and the "));
+            }
+        }
         println!(
             "    your Standing {}, {}",
             g.seat(me).influence.get(&Place::Colony(c.id)).copied().unwrap_or(0),
@@ -559,11 +583,12 @@ fn print_board(g: &Game) {
     }
     for sh in &g.ships {
         println!(
-            "ship {:<3} {:<12} seat {} at {:<26} tank {}/{} | colonists {} | army {:?} | hp {} | {}{}",
+            "ship {:<3} {:<12} seat {} at {:<26} slot {:<4} tank {}/{} | colonists {} | army {:?} | hp {} | {}{}",
             sh.id.0,
             sh.kind.name(),
             sh.seat.0,
             ship_at_text(sh.at),
+            sh.slot.map(|n| n.to_string()).unwrap_or_else(|| "-".into()),
             sh.fuel,
             t.unit(sh.kind).tank,
             sh.colonists,
@@ -761,7 +786,13 @@ fn main() {
             }
             let mut all: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
             all[0] = kept;
-            game.end_turn(all);
+            // Ticket #105 (version 0.07.0): the engine owns the rule, so the driver is bound by it
+            // too. This is the whole point: what the driver measures is what the game does.
+            if let Err(why) = game.end_turn(all) {
+                eprintln!("
+The turn did NOT end: {why}");
+                std::process::exit(1);
+            }
             store(&game, &path);
             print_report(&game);
             print_board(&game);

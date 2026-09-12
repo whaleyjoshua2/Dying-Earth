@@ -196,7 +196,12 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let mut victory_met: Option<(Seat, FactionKind)> = None;
     while !game.is_over() && guard < max_turns + 2 {
         guard += 1;
-        game.end_turn(std::array::from_fn(|_| Vec::new()));
+        // Ticket #105: every seat here is an AI, which picks the moment it leads, so the refusal
+        // cannot fire. If it ever did, the loop would spin, so it stops.
+        if let Err(why) = game.end_turn(std::array::from_fn(|_| Vec::new())) {
+            game.log(format!("simulate stopped: {why}"));
+            break;
+        }
         moments_earned += game.report.moments.len() as u32;
         let shown = game.report.moments_shown(&|k| tables.report.moment_on(k)).len() as u32;
         moments_shown += shown;

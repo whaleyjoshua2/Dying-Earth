@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.06.0
+DYING EARTH - playtest build, version 0.07.0
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,73 +16,75 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-   (There is a separate Linux zip: unzip it, then run ./dying-earth from the folder.)
+   (Windows only this time; there is no Linux zip for 0.07.0.)
 
-WHAT CHANGED SINCE 0.05.5
+WHAT CHANGED SINCE 0.06.0
 -------------------------
-This is the space version. The big one first:
-- Every ship now carries its own FUEL TANK (30). A ship is built with it full, a flight
-  spends from it, and it is refilled only by a "Refuel" order at a body where you have a
-  space station. A ship whose tank cannot pay any flight is stranded until you build a
-  station in orbit there. The Solar System Map shows "tank 20/30" on every stack.
-- VENUS is on the map: no ground to land on, three station slots, three turns and 16 Fuel
-  from Earth on its own launch window (hover Venus to see it). Everything at Venus is
-  built and held in orbit, and people living on a Venus station count as off Earth.
-- Stations over Earth now count as off Earth too: people living on the ISS count for
-  Off-world Presence, and the Archive may stand there.
-- New buildings: the OBSERVATORY makes Research on a colony or station (1% more per
-  colonist living there); the SOLAR ARRAY on a station makes Energy that follows the
-  sunlight (twice Earth's at Venus, under half at Mars); the MASS DRIVER on the Moon,
-  Phobos or Deimos (needs Efficient Transit) makes your departures 4 Fuel cheaper and
-  its mines richer. Habitats hold 8 people now.
-- Modules are cheaper at a colony that already has a working mine (x0.75 with one,
-  x0.6 with two or more). A Trade Post pays for the shape of your empire: 2 Ducats per
-  colonist at its body plus 3 for every other body you hold, one per body.
-- The hotter Earth gets, the more a Colony Ship will take beyond its capacity (one more
-  per 0.2 C above +1.8, up to four), and each of those extra people may die on the way.
-  The Load panel tells you the safe load and the crowded one.
-- Every side's win now waits on a rung-3 tech of its own (Planetary Stewardship, the
-  Extraction Charter, Generation Ships, the Upload), each also a real tech for everyone.
-- The sides were retuned: the Custodians' Influence eases to 1.2 and an idle factory of
-  theirs on Earth doubles a mine of theirs off it (Production Moved); the Prospectors'
-  countries pay a fifth more Ducats and the market sells to them at 15% off; the
-  Arkwrights' ships cost 15% less; the Archivists lost their output penalty and research
-  at 1.5 on Earth and 1.75 off it.
+This version came out of twelve games played against 0.06.0 by computer players told to
+try to win. They found the game could be broken, so most of this is repair.
+
+- COLONIES AND STATIONS NOW HAVE A SIZE. A colony or station holds 3 buildings free and
+  one more for every colonist living there. Before this there was no limit at all, and a
+  single Moon colony could grow to 79 mines and generators and out-earn a whole planet.
+  People now gate industry, so habitats matter: a full one always pays for itself and
+  more.
+- THE COMPUTER RESEARCHES NOW. It built almost no laboratories before, which meant it
+  never reached the technology its own victory needs. It does now, and computer players
+  win about a third of games instead of none.
+- THE TECH CHOICE IS A CHOICE OF THREE. Whoever leads research picks the next technology
+  from three, not from everything - and YOUR OWN victory technology is always one of the
+  three once you can reach it, so nobody can lock you out of your own win. The first
+  technology of the game is still a free pick from all of rung 1.
+- THE TURN WILL NOT END until you have picked a technology when it is your turn to. A
+  box tells you why, with a button to the tech tree.
+- WARSHIPS BLOCKADE ONE ORBITAL SLOT, NOT A WHOLE WORLD. Give a slot when you fly -
+  "send to Mars, slot 2" - and a warship sitting there shuts that one station: nobody
+  else may unload into it, refuel from it, or build there. Everything else at that world
+  carries on, and nobody can ever shut you out of a place you hold. The ground is only
+  closed to you if a rival holds the orbit outright and uncontested.
+- THE START SCREEN'S GLOBE WORKS. Drag to turn it, wheel to zoom, click a continent to
+  take it. It opens on your side's home: the Custodians in Europe, the Prospectors in
+  East Asia, the Arkwrights in South Asia, the Archivists in North America. That is only
+  where the globe starts; you may still take any of the twelve.
+- ANTARCTICA IS NOT ON THE MAP until the ice opens. You are still told it is coming and
+  at what temperature, on the system map and the climate bar - you just cannot see which
+  of the three sites is the good one until you can go there.
+- NOTHING OPENS ITSELF. A new game starts on a clear map; the tech tree and climate panel
+  wait to be asked for. The climate panel can be dragged smaller again, and says "Already
+  locked in" where it used to say "Committed".
+- THE RESOURCES HAVE PICTURES, on the top bar and in the hover text. They come from
+  game-icons.net; the Credits button on the title screen names their authors.
+- LEAPFROG IS WORTH BUYING. It now lowers a country's baseline pollution as well as its
+  people's, so it is no longer ten times the price of a scrubber for the same good. The
+  scrubber also runs on 3 energy instead of 4.
+- THE REPORT IS SHORTER by about an eighth, all of it cut from the computer telling you
+  it had done nothing.
 
 HOW TO PLAY, IN ONE MINUTE
 --------------------------
-- New Game > pick one of the four sides > pick a starting continent. The computer plays
-  the other three. There is also a Spectate button under the cards: the computer plays
-  all four and you just watch, which is a quick way to see what a whole game looks like.
+- New Game > pick one of the four sides > pick a starting continent, from the list or by
+  clicking the globe. The computer plays the other three. There is also a Spectate button
+  under the cards: the computer plays all four and you just watch.
 - You are looking at the Earth Map. Click a country for its card and orders on the right.
   Drag to turn the globe, mouse wheel to zoom. Tab switches to the Solar System Map;
   Esc goes back.
-- Build things with the buttons on a card. Hover a build button to see what it makes.
+- Build things with the buttons on a card. Hover a build button to see the cost and what
+  it makes.
 - Spend Influence on other countries to win them over. Your home country starts held.
 - Every country has an "Unrest" number. Heat, floods and refugees push it up. At 4 its
   army stops growing, at 7 its factories work at half speed, and at 10 the country throws
   you out. Pay Relief, build a Constabulary, or muster Emigrants to push it back down.
-- If you are the Custodians, build Scrubbers: they cost no building space, they pull carbon
-  back out of the air, and they calm the country they stand in.
-- Open the Climate Panel (the C key). The coloured bar across it marks five points where
-  the world changes for good - the reefs die, the permafrost thaws, and so on. Under it,
-  "Last turn to act" is the last turn on which stopping all emissions would still save you.
-- Getting off Earth: you start with a space station over Earth (except the Arkwrights, who
-  build one). Put a Shipyard on it first - ships are only built at a Shipyard. Muster
-  Emigrants in a country with a Launch Site, lift them, and load them on a Colony Ship.
-  The Moon is one turn away and is where most colonies go. Mars is cheap only in a launch
-  window; hover Mars to see when.
-- Antarctica has three colony sites on Earth itself, but they stay under the ice until the
-  world has warmed to +1.6 C. After that, Emigrants can be sent there by sea.
-- The game saves itself every three turns and when it ends, and there is a Save button in
-  the top bar you can press at the start of any turn. Saves live in
-  %LOCALAPPDATA%\DyingEarth\data\saves - the Load screen has a button that opens that
-  folder for you. Load a game from the title screen. A 0.05 save will not load.
-- Some turns stop for a "Moment": one big sentence about something that just happened. At
-  the bottom of each turn's Report there are tick boxes to switch any of them off.
+- If you are the Custodians, build Scrubbers: they cost no building space, they pull
+  carbon back out of the air, and they calm the country they stand in. Leapfrog is worth
+  a look now too.
+- Open the Climate Panel (the C key). The coloured bar marks every point where the world
+  changes for good, including where Antarctica opens.
+- Getting off Earth: put a Shipyard on your station first - ships are only built at a
+  Shipyard. Muster Emigrants in a country with a Launch Site, lift them, and load them on
+  a Colony Ship. The Moon is one turn away. Mars is cheap only in a launch window; hover
+  Mars to see when. Remember a colony's size limit: land people before you plan buildings.
 - End Turn (top left, red). Thirty-six turns. Watch the temperature in the top bar:
   at +3.0 C the world collapses and nobody wins.
-- The Tech Tree, Climate Panel, Victory and Trading buttons open panels that explain the rest.
 
 WHAT WE WANT TO KNOW
 --------------------
@@ -90,17 +92,16 @@ Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
 - A rule you could not find explained anywhere.
-- The turn the game got boring, if it did. Thirty-six turns is new: did it drag?
-- The turn you felt you had lost, and why.
-- Did you get anyone to Mars? Was the launch window clear enough to plan around?
-- Did the Emigrants make sense - where they wait, how they get on a ship, the send to
-  Antarctica?
-- If you played the Prospectors: did the Fund's share feel like a real choice?
-- Did you lose your home country to the computer, and did the orange warning give you
-  time to do anything about it?
-- Whether the big line at the top of each turn's Report was the right thing to put there,
-  or whether something more important was buried below it.
-- Whether the Moments interrupted too much, and whether you switched any of them off.
+- DOES THE COLONY SIZE LIMIT FEEL RIGHT? Three free and one per colonist. Too tight, too
+  loose, or about right? It is the biggest change in this version.
+- Did you ever want to blockade someone, and did picking the slot when you fly make
+  sense, or did you want to move a ship between slots after it arrived?
+- Did the shortlist of three technologies feel like a real choice or a lottery?
+- CAN YOU DRAG THE CLIMATE PANEL SMALLER? We could not test that automatically, so it is
+  the one change nobody has actually watched work.
+- Do the resource pictures in the hover text read clearly, or would you rather have the
+  words back?
+- The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.
 
@@ -108,21 +109,16 @@ Screenshots help. Print Screen, then paste into a message.
 
 KNOWN ROUGH EDGES
 -----------------
-- The sides are not balanced against each other. In our own computer-only test games
-  the Custodians win almost every game that does not collapse (96 of 160) and reach their
-  own win around turn 27; the Prospectors never reach 750 in the Fund (they get to about
-  450); the Archivists finished the Archive in a handful of games and won one.
-- The computer Custodians take other sides' home countries in most games, around turn
-  19 to 23, and nobody takes theirs.
-- Some seatings run hot: starting as the Custodians in East Asia, or as the Prospectors
-  from either continent, the world collapsed in 18 to 20 of 20 computer-only games. From
-  Europe the Custodians hold it.
-- The computer builds Solar Arrays over Earth by the dozen, and Sea Walls when it has the
-  tech, sometimes instead of Scrubbers.
-- The computer never researches Efficient Transit on purpose, so you will rarely see it
-  build a Mass Driver; the computer Prospectors never fly to Venus; and a computer side
-  sometimes flies a loaded ship to Venus before its station there is up, and the ship sits
-  stranded until it is.
-- A ship stranded far from any station of yours is stranded for good unless you build one
-  there. Check the tank before you fly.
+- THE CUSTODIANS ARE TOO STRONG. Over eighty computer-only games they win 49, from any
+  seat, and 20 of 20 from Europe. Their win was impossible before this version and is now
+  close to certain; that is the next thing to fix.
+- THE ARCHIVISTS WIN NOTHING in those eighty, though the Archive itself now gets built
+  and finished. Getting twelve people to live at it is the part that fails.
+- Every side's victory target was set against a computer that never competed for it, so
+  the numbers are all suspect. A player who tries can clear three of the four well before
+  turn 36.
+- The world still collapses in about a fifth of games, more from some starting continents
+  than others. Some of that is meant to be there.
+- The Climate Panel's drag-smaller and the pictures in the hover text are the two changes
+  that could not be tested without a person; if either misbehaves, please say.
 - No sound, no tutorial beyond the first Report.

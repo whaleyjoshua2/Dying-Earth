@@ -8,6 +8,7 @@
 
 mod app;
 mod geo;
+mod icons;
 mod saves;
 mod scene;
 mod shot;
@@ -91,6 +92,7 @@ fn main() {
             shot_prefix: shot.unwrap_or_default(),
             earth_dirty: false,
             last_error: None,
+            refusal: None,
             spectator: false,
             auto: false,
             auto_elapsed: 0.0,
@@ -104,6 +106,8 @@ fn main() {
         .insert_resource(textures)
         .insert_resource(ViewState::default())
         .insert_resource(shot::ShotPlan::default())
+        // Ticket #109: the resource icons, rendered from SVG on the first frame that draws them.
+        .insert_resource(icons::Icons::default())
         .add_systems(Startup, scene::setup_scene)
         .add_systems(Update, (ui::keyboard, ui::recompose_earth, scene::sync_scene, shot::shot_system).chain())
         .add_systems(EguiPrimaryContextPass, ui::draw)

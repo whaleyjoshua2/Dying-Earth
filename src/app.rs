@@ -20,6 +20,9 @@ pub enum Screen {
     /// Ticket #59: the Load list, reached from the title screen.
     Load,
     ChooseFaction,
+    /// Ticket #109 (version 0.07.0): the credits, reached from the title screen. The resource icons
+    /// are CC BY 3.0 and their licence wants their authors named where a player can see them.
+    Credits,
     ChooseStart { faction: FactionKind },
     Playing,
     GameOver,
@@ -49,6 +52,9 @@ pub enum Popup {
     Report,
     /// End Turn pressed with Influence unspent (ticket #31): ask once.
     ConfirmEndTurn,
+    /// Ticket #105 (version 0.07.0): the turn was refused, and this says why. A rule nobody can see
+    /// refused by is as bad as no rule, so the refusal always speaks.
+    Refused,
 }
 
 #[derive(Resource)]
@@ -63,6 +69,8 @@ pub struct Session {
     /// The Earth Map must be recomposed (control, occupation or the sea changed).
     pub earth_dirty: bool,
     pub last_error: Option<String>,
+    /// Ticket #105 (version 0.07.0): why the last End Turn was refused, shown once in its own popup.
+    pub refusal: Option<String>,
     /// Ticket #64: nobody is playing this game. All four seats are the computer's, the interface
     /// gives no orders, and every Faction's board is open to be read.
     pub spectator: bool,
@@ -215,7 +223,15 @@ impl Session {
         let orders = std::mem::take(&mut self.pending);
         let mut all: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
         all[0] = orders;
-        game.end_turn(all);
+        // Ticket #105: the engine owns the rule now. If it refuses, nothing was committed and the
+        // orders go back where they came from, so nothing the player typed is lost.
+        let kept = all[0].clone();
+        if let Err(why) = game.end_turn(all) {
+            self.refusal = Some(why);
+            self.pending = kept;
+            return;
+        }
+        self.refusal = None;
         self.earth_dirty = true;
         let over = game.is_over();
         // Ticket #59: the autosave is written at the start of the Report phase of every third turn,
@@ -236,6 +252,12 @@ pub struct ViewState {
     pub solar_yaw: f32,
     pub zoom: f32,
     pub spin: f32,
+    /// Ticket #100 (version 0.07.0): the start-screen globe has been taken hold of, so it stops
+    /// spinning for good and answers the pointer from here on.
+    pub start_grabbed: bool,
+    /// Ticket #100: the Faction the start globe was last aimed for, so the opening view is set once
+    /// and a drag is never undone by the next frame.
+    pub start_aimed: Option<FactionKind>,
     pub selection: Selection,
     pub popup: Popup,
     pub show_tech: bool,
@@ -270,11 +292,15 @@ impl Default for ViewState {
             solar_yaw: 0.0,
             zoom: 1.0,
             spin: 0.0,
+            start_grabbed: false,
+            start_aimed: None,
             selection: Selection::None,
             popup: Popup::None,
             show_tech: false,
             tech_prompted: false,
-            show_climate: true,
+            // Ticket #104 (version 0.07.0): a new game opens on a clear map. The Climate Panel is
+            // a keystroke (C) or a button away.
+            show_climate: false,
             climate_reopen: false,
             show_victory: false,
             show_trade: false,
@@ -339,4 +365,18 @@ mod tests {
         assert!(!auto_should_advance(true, false, 0.0));
         assert!(!auto_should_advance(true, false, AUTO_INTERVAL - 0.01));
     }
+
+    /// Ticket #104 (version 0.07.0): a new game opens on a clear map. This is guarded here rather
+    /// than in a picture because the screenshot harness forces the Climate Panel open for its Earth
+    /// picture (`shot.rs`: `view.show_climate = v == View::Surface(BodyId::Earth)`), so no capture
+    /// can ever show the default.
+    #[test]
+    fn a_new_game_opens_with_no_panel_showing() {
+        let view = ViewState::default();
+        assert!(!view.show_climate, "the Climate Panel waits for C or its button");
+        assert!(!view.show_tech, "and the Tech Tree waits to be asked for");
+        assert!(!view.show_trade);
+        assert!(!view.show_victory);
+    }
+
 }

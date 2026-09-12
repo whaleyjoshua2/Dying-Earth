@@ -91,11 +91,36 @@ impl Game {
         }
     }
 
+    /// Ticket #105 (version 0.07.0): why the turn cannot end yet, or `None`. The rule lives HERE
+    /// rather than in an interface, so every caller is bound by it -- the game, the headless driver,
+    /// and anything built later.
+    ///
+    /// It used to live in one `add_enabled` in the interface, and the headless driver added this
+    /// same version did not know about it: twelve playtest games were played in which declining to
+    /// pick froze the tech tree for good, and that was reported as "the strongest strategy in the
+    /// game". It was the harness, not the game. A rule only one caller enforces is a habit.
+    pub fn end_turn_refusal(&self) -> Option<String> {
+        let owed = self.research.awaiting_pick?;
+        if self.seat(owed).ai || self.available_techs().is_empty() {
+            return None;
+        }
+        Some(format!(
+            "The {} hold the Research Lead and owe the table a Tech. Choose what the world researches next; the turn cannot end until you do.",
+            self.seat_name(owed)
+        ))
+    }
+
     /// End Turn: the player's orders are committed, the AI orders, and the turn runs to the next Orders phase.
     /// `orders[i]` is used for a human seat; an AI seat computes its own.
-    pub fn end_turn(&mut self, orders: [Vec<Order>; SEAT_COUNT]) {
+    ///
+    /// Ticket #105: refuses, and says why, while a human Lead owes a pick. Nothing is committed and
+    /// nothing advances when it refuses.
+    pub fn end_turn(&mut self, orders: [Vec<Order>; SEAT_COUNT]) -> Result<(), String> {
+        if let Some(why) = self.end_turn_refusal() {
+            return Err(why);
+        }
         if self.is_over() {
-            return;
+            return Ok(());
         }
         self.log("Phase 4: Orders");
         let mut all: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
@@ -142,7 +167,7 @@ impl Game {
         self.log("Phase 7: End");
         self.end_phase();
         if self.is_over() {
-            return;
+            return Ok(());
         }
         self.turn += 1;
         self.log(format!("--- Turn {} ---", self.turn));
@@ -152,5 +177,6 @@ impl Game {
         self.climate_phase();
         self.log("Phase 3: Report");
         self.report_phase();
+        Ok(())
     }
 }

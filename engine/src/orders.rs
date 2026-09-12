@@ -49,7 +49,11 @@ pub enum Order {
     BuildShip { site: Place, kind: UnitKind },
     BuildArmy { place: Place },
     Repair { unit: UnitRef, points: u32 },
-    Transit { ship: ShipId, to: BodyId },
+    /// Ticket #99 (version 0.07.0): a Ship may name the Orbital Slot it arrives into. A warship
+    /// sitting in a slot blockades that slot and nothing else; `None` arrives at the Body at large,
+    /// blockading nothing. The slot is chosen with the leg, so it is chosen before the Ship can see
+    /// who will be there when it lands.
+    Transit { ship: ShipId, to: BodyId, slot: Option<u32> },
     /// Version 0.06.0 (ticket #87): fill a Ship's tank from the Stockpile at a Body where its
     /// Faction holds a Space Station, as far as the Stockpile can pay.
     Refuel { ship: ShipId },
@@ -76,9 +80,11 @@ pub enum Order {
     /// Version 0.05 (ticket #51): the Archive, at a Colony off Earth. Version 0.05.5 (ticket #68):
     /// one Module, paid in Materials from the Stockpile; its Research is paid into the fund after.
     BuildArchive { colony: ColonyId },
-    /// Version 0.05 (ticket #51): this turn's Research from the Archivists' Labs goes into the
-    /// Archive fund instead of the shared Tech, and counts nothing toward the Research Lead.
-    FundArchive,
+    /// Version 0.05 (ticket #51), rebuilt for 0.07.0: the Archivists' standing declaration that
+    /// their Labs' Research goes into the Archive fund instead of the shared Tech, where it counts
+    /// nothing toward the Research Lead. Set once, it holds until it is set again, and it is read
+    /// at the next Income; it never moves Research that Income has already paid out.
+    SetArchiveFunding { on: bool },
     /// Version 0.05.5 (ticket #73): muster Emigrants, the built Colonists, in a Nation State the
     /// seat directs: up to four a turn per Faction, in one state, at a tenth of a person each.
     BuildEmigrants { state: StateId, n: u32 },
@@ -377,16 +383,19 @@ impl Game {
                 let materials_form = Order::BuildModule { colony: *colony, kind: *kind };
                 self.check_order_inner(seat, pending, &materials_form, false).map(|_| cost)
             }
-            Order::FundArchive => {
+            Order::SetArchiveFunding { on } => {
                 if self.kind(seat) != FactionKind::Archivists {
                     return fail("only the Archivists fund the Archive");
                 }
-                if pending.iter().any(|o| matches!(o, Order::FundArchive)) {
-                    return fail("the Archive is already being funded this turn");
+                if pending.iter().any(|o| matches!(o, Order::SetArchiveFunding { .. })) {
+                    return fail("the Archive's funding is already set this turn");
                 }
-                // Ticket #68: at the cap a turn of funding is refused, and the Research stays with
+                if *on == self.seat(seat).archive_funding {
+                    return fail(if *on { "the Archive is already being funded" } else { "the Archive is not being funded" });
+                }
+                // Ticket #68: at the cap there is nothing to declare, and the Research stays with
                 // the shared Tech; until the Module stands the cap is a quarter of the requirement.
-                if self.seat(seat).archive_fund >= self.archive_fund_cap(seat) {
+                if *on && self.seat(seat).archive_fund >= self.archive_fund_cap(seat) {
                     return if self.archive_built(seat) {
                         fail("the Archive's Research is paid in full")
                     } else {
@@ -444,6 +453,10 @@ impl Game {
                     } else {
                         "needs a Colony of yours on this Body"
                     });
+                }
+                // Ticket #99 (version 0.07.0): a rival warship sitting in the slot denies it.
+                if self.slot_blockaded_against(seat, *body, *slot) {
+                    return fail(format!("a rival warship holds Orbital Slot {slot} over {}", self.tables.body(*body).name));
                 }
                 Ok(cost)
             }
@@ -584,6 +597,23 @@ impl Game {
                         return fail(format!("this Colony already has a {}", kind.name()));
                     }
                 }
+                // Ticket #97 (version 0.07.0): the Module cap. Standing and building Modules both
+                // count, as do the ones already ordered this turn; the Archive counts on neither
+                // side. A cap that has fallen below what stands destroys nothing: there is simply
+                // no room until Colonists arrive.
+                let ordered = pending
+                    .iter()
+                    .filter(|o| matches!(o.build_module(), Some((c, k)) if c == *colony && k != ModuleKind::Archive))
+                    .count() as u32;
+                if self.module_slots_used(col) + ordered >= self.module_slots(col) {
+                    return fail(format!(
+                        "{} holds {} Modules already, all it has room for: {} free and one for each of its {} Colonists",
+                        self.place_name(Place::Colony(*colony)),
+                        self.module_slots_used(col) + ordered,
+                        self.tables.slots.base,
+                        col.colonists
+                    ));
+                }
                 Ok(cost)
             }
             Order::BuildShip { site, kind } => {
@@ -683,7 +713,7 @@ impl Game {
                 }
                 Ok(cost)
             }
-            Order::Transit { ship, to } => {
+            Order::Transit { ship, to, slot } => {
                 let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
                 if s.seat != seat {
                     return fail("not your Ship");
@@ -702,6 +732,13 @@ impl Game {
                 if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
+                // Ticket #99 (version 0.07.0): the Orbital Slot it arrives into, chosen with the leg.
+                if let Some(n) = slot {
+                    let slots = self.tables.body(*to).orbital_slots;
+                    if *n >= slots {
+                        return fail(format!("{} has {} Orbital Slots, numbered 0 to {}", self.tables.body(*to).name, slots, slots.saturating_sub(1)));
+                    }
+                }
                 // Ticket #87: the leg is paid from the tank.
                 let (_, fuel) = self.transit_cost_for(seat, from, *to);
                 if s.fuel < fuel {
@@ -717,6 +754,10 @@ impl Game {
                 let ShipAt::Body(body) = s.at else { return fail("in transit") };
                 if !self.own_station_at(seat, body) {
                     return fail(format!("no station of yours over {} to refuel at", self.tables.body(body).name));
+                }
+                // Ticket #99 (version 0.07.0): a blockaded station fuels nothing.
+                if !self.refuelling_station(seat, body) {
+                    return fail(format!("every station of yours over {} is blockaded", self.tables.body(body).name));
                 }
                 if s.fuel >= self.tables.unit(s.kind).tank {
                     return fail("the tank is full");
@@ -997,8 +1038,13 @@ impl Game {
                 let per = self.tables.climate.population_emissions_per_level;
                 let queued = pending.iter().filter(|o| matches!(o, Order::Leapfrog { state: s } if s == state)).count() as f64;
                 let base = self.tables.climate.population_emissions_base;
-                if self.population_coefficient(*state) - queued * per <= base + 1e-9 {
-                    return fail("its people already emit the base figure; a Leapfrog here would buy nothing");
+                let coefficient_spent = self.population_coefficient(*state) - queued * per <= base + 1e-9;
+                // Ticket #108: a Leapfrog now buys two things, so it is worthless only when it can
+                // buy neither: the coefficient at its base AND the Baseline already at nothing.
+                let cut = self.tables.climate.leapfrog_baseline_cut;
+                let baseline_spent = self.baseline_emissions(*state) - queued * cut <= 1e-9;
+                if coefficient_spent && baseline_spent {
+                    return fail("its people already emit the base figure and its Baseline is nothing; a Leapfrog here would buy nothing");
                 }
                 Ok(cost)
             }
@@ -1130,7 +1176,7 @@ impl Game {
                     }
                 }
                 Order::Repair { unit, points } => self.pending.repairs.push((seat, *unit, *points)),
-                Order::Transit { ship, to } => {
+                Order::Transit { ship, to, slot } => {
                     let from = match self.ship(*ship).map(|s| s.at) {
                         Some(ShipAt::Body(b)) => b,
                         _ => continue,
@@ -1142,6 +1188,8 @@ impl Game {
                     if let Some(s) = self.ship_mut(*ship) {
                         s.at = ShipAt::Transit { from, to: *to, turns_left: turns };
                         s.fuel = (s.fuel - fuel).max(0);
+                        // Ticket #99: it arrives into the slot the leg named, or the Body at large.
+                        s.slot = *slot;
                     }
                     self.log(format!("{} launches {} toward {} ({} turns, {} Fuel from the tank).", self.seat_name(seat), ship, name, turns, fuel));
                 }
@@ -1192,7 +1240,15 @@ impl Game {
                     let text = self.say("archive_begun", &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(*colony)))]);
                     self.report_line(LineKind::Archive, Some(ReportPlace::Colony(*colony)), text);
                 }
-                Order::FundArchive => self.fund_archive(seat),
+                Order::SetArchiveFunding { on } => {
+                    self.seat_mut(seat).archive_funding = *on;
+                    let line = if *on {
+                        format!("The {} will pay their Labs into the Archive fund from the next Income.", self.seat_name(seat))
+                    } else {
+                        format!("The {} will pay their Labs into the shared Tech from the next Income.", self.seat_name(seat))
+                    };
+                    self.log(line);
+                }
                 // Ticket #52: both act at Resolution; Resettle also steers the next Climate phase's
                 // refugee flows, which is the first flow after these orders are given.
                 Order::Relief { state } => self.pending.relief.push((seat, *state)),
@@ -1271,7 +1327,10 @@ impl Game {
                 }
                 Order::Leapfrog { state } => {
                     let per = self.tables.climate.population_emissions_per_level;
+                    // Ticket #108 (version 0.07.0): it bites the state's Baseline Emissions too.
+                    let cut = self.tables.climate.leapfrog_baseline_cut;
                     self.state_mut(*state).leapfrog += per;
+                    self.state_mut(*state).baseline_cut += cut;
                     let line = format!(
                         "The {} Leapfrogged {}: its people now emit {:.2} per hundred million.",
                         self.seat_name(seat),
@@ -1419,12 +1478,17 @@ impl Game {
                 r("refuel", &[("unit", unit_of(UnitRef::Ship(*ship))), ("body", body.unwrap_or_else(|| "space".to_string()))])
             }
             Order::BuildArchive { colony } => r("build_archive", &[("colony", place(Place::Colony(*colony)))]),
-            Order::FundArchive => r("fund_archive", &[]),
+            Order::SetArchiveFunding { on } => r(if *on { "fund_archive" } else { "unfund_archive" }, &[]),
             Order::Repair { unit, .. } | Order::RepairWithDucats { unit, .. } => r("repair", &[("unit", unit_of(*unit))]),
-            Order::Transit { ship, to } => {
+            Order::Transit { ship, to, .. } => {
                 let unit = self.ship(*ship).map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into());
                 r("transit", &[("unit", unit), ("body", self.tables.body(*to).name.clone())])
             }
+            // Ticket #106 (version 0.07.0): a rival's paragraph does not report defaults. Hold is
+            // what a stack does when nobody tells it otherwise, so "set its Armies at X to Hold" is
+            // the computer announcing that it did nothing. Five of the nine clauses in one sampled
+            // paragraph were exactly that.
+            Order::ShipStance { stance: Stance::Hold, .. } | Order::ArmyStance { stance: Stance::Hold, .. } => None,
             Order::ShipStance { body, stance } => {
                 r("ship_stance", &[("body", self.tables.body(*body).name.clone()), ("stance", stance.name().to_string())])
             }

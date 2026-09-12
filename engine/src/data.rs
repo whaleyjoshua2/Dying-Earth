@@ -306,6 +306,9 @@ pub struct FactionCard {
     /// Ticket #51: the second part, generalised the way #50 generalised the first.
     pub victory_second: VictorySecondCard,
     pub colour: [f32; 3],
+    /// Ticket #100 (version 0.07.0): the continent the start screen opens its globe on. It changes
+    /// no starting position: any of the twelve may still be chosen.
+    pub home: StateId,
     /// Ticket #46: the station over Earth the Faction starts with, by name in bodies.toml.
     /// Ticket #50: the Arkwrights start with none, so this is optional.
     #[serde(default)]
@@ -519,6 +522,8 @@ pub struct ClimateTable {
     pub population_loss_per_tenth_degree: f64,
     /// Ticket #54: Population Emissions per hundred million are `base + per_level x Industry Level`,
     /// less the state's own Leapfrog adjustment, never below `base`.
+    /// Ticket #108: what one Leapfrog takes off a Nation State's Baseline Emissions.
+    pub leapfrog_baseline_cut: f64,
     pub population_emissions_base: f64,
     pub population_emissions_per_level: f64,
     pub launch_emissions: f64,
@@ -861,6 +866,14 @@ struct FacilitiesFile {
 /// Ticket #51: the Archive. Its Materials, build turns and Energy upkeep sit on its Module row.
 /// Ticket #68 (version 0.05.5): the Research it requires in all, and the share of it the fund may
 /// hold before the Module stands.
+/// Ticket #97 (version 0.07.0): the Modules a Colony or a Space Station may hold: `base` free, and
+/// one more for every `per_colonist` Colonists living there.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SlotsCard {
+    pub base: u32,
+    pub per_colonist: u32,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct ArchiveCard {
     pub research: i64,
@@ -893,6 +906,7 @@ pub struct TradePostCard {
 #[derive(Debug, Clone, Deserialize)]
 struct ModulesFile {
     module: Vec<ModuleCard>,
+    slots: SlotsCard,
     archive: ArchiveCard,
     observatory: ObservatoryCard,
     in_situ: InSituCard,
@@ -920,6 +934,14 @@ pub struct CrowdingCard {
 #[derive(Debug, Clone, Deserialize)]
 struct TechsFile {
     tech: Vec<TechCard>,
+    shortlist: ShortlistCard,
+}
+
+/// Ticket #98 (version 0.07.0): how many Techs the Research Lead may choose between once the game
+/// is under way. The opening pick is not drawn.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ShortlistCard {
+    pub size: usize,
 }
 #[derive(Debug, Clone, Deserialize)]
 struct FactionsFile {
@@ -980,6 +1002,10 @@ pub struct Tables {
     pub scrubber: ScrubberCard,
     pub mothball: MothballCard,
     pub modules: Vec<ModuleCard>,
+    /// Ticket #97: how many Modules a Colony or a Space Station may hold.
+    pub slots: SlotsCard,
+    /// Ticket #98: how many Techs the Research Lead chooses between.
+    pub shortlist: ShortlistCard,
     /// Ticket #51: the Archive's stages and their Research price.
     pub archive: ArchiveCard,
     /// Ticket #80: the Observatory's Research per Colonist.
@@ -1062,6 +1088,7 @@ impl Tables {
             industry_level: facilities.industry_level,
             scrubber: facilities.scrubber,
             mothball: facilities.mothball,
+            slots: modules.slots,
             archive: modules.archive,
             observatory: modules.observatory,
             in_situ: modules.in_situ,
@@ -1072,6 +1099,7 @@ impl Tables {
             repair: units.repair,
             crowding: units.crowding,
             techs: techs.tech,
+            shortlist: techs.shortlist,
             events,
             factions: factions.faction,
             start: factions.start,
@@ -1238,6 +1266,12 @@ impl Tables {
         // Ticket #57: the game's first date, and the sky it opens on.
         if !(1..=12).contains(&self.victory.start_month) {
             return Err(err("victory.toml", format!("start_month {} is no month", self.victory.start_month)));
+        }
+        if self.shortlist.size < 2 {
+            return Err(err("techs.toml", "[shortlist] size must be at least 2: a list of one is not a choice"));
+        }
+        if self.slots.per_colonist == 0 {
+            return Err(err("modules.toml", "[slots] per_colonist must be at least 1: a Colonist has to buy something"));
         }
         if self.archive.research <= 0 || !(0.0..=1.0).contains(&self.archive.banked_before_built) {
             return Err(err("modules.toml", "[archive] needs research above zero and banked_before_built from 0 to 1"));

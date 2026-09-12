@@ -158,8 +158,8 @@ pub fn setup_scene(
 type RootQuery<'w, 's> = Query<'w, 's, (&'static mut Visibility, Option<&'static SolarRoot>, Option<&'static SurfaceRoot>), Or<(With<SolarRoot>, With<SurfaceRoot>)>>;
 type GlobeQuery<'w, 's> = Query<'w, 's, (&'static Globe, &'static mut Transform), (Without<SolarBody>, Without<MainCamera>)>;
 type BodyQuery<'w, 's> = Query<'w, 's, (&'static SolarBody, &'static mut Transform), (Without<Globe>, Without<MainCamera>)>;
-type SlotQuery<'w, 's> = Query<'w, 's, (&'static SlotMarker, &'static mut Transform, &'static mut MeshMaterial3d<StandardMaterial>), (Without<Globe>, Without<SolarBody>, Without<MainCamera>)>;
-type StackQuery<'w, 's> = Query<'w, 's, (&'static StackMarker, &'static mut Transform, &'static mut Visibility), (Without<Globe>, Without<SolarBody>, Without<SlotMarker>, Without<SolarRoot>, Without<SurfaceRoot>, Without<MainCamera>)>;
+type SlotQuery<'w, 's> = Query<'w, 's, (&'static SlotMarker, &'static mut Transform, &'static mut MeshMaterial3d<StandardMaterial>, &'static mut Visibility), (Without<Globe>, Without<SolarBody>, Without<MainCamera>, Without<SolarRoot>, Without<SurfaceRoot>, Without<StackMarker>, Without<ControlRing>)>;
+type StackQuery<'w, 's> = Query<'w, 's, (&'static StackMarker, &'static mut Transform, &'static mut Visibility), (Without<Globe>, Without<SolarBody>, Without<SlotMarker>, Without<ControlRing>, Without<SolarRoot>, Without<SurfaceRoot>, Without<MainCamera>)>;
 type RingQuery<'w, 's> = Query<'w, 's, (&'static ControlRing, &'static mut Transform, &'static mut Visibility, &'static mut MeshMaterial3d<StandardMaterial>), (Without<Globe>, Without<SolarBody>, Without<SlotMarker>, Without<StackMarker>, Without<SolarRoot>, Without<SurfaceRoot>, Without<MainCamera>)>;
 
 /// Every frame: show the right root, place bodies and markers, colour them from the board.
@@ -197,7 +197,10 @@ pub fn sync_scene(
     };
     // Globes turn under the pointer; the start-screen Earth spins on its own.
     for (globe, mut t) in &mut globes {
-        let yaw = if matches!(session.screen, Screen::ChooseStart { .. }) { view.spin } else { view.yaw };
+        // Ticket #100 (version 0.07.0): the start globe follows its own spin only until the player
+        // takes hold of it; from then on it follows the pointer, like every other globe.
+        let spinning = matches!(session.screen, Screen::ChooseStart { .. }) && !view.start_grabbed;
+        let yaw = if spinning { view.spin } else { view.yaw };
         t.rotation = Quat::from_rotation_x(view.pitch) * Quat::from_rotation_y(yaw) * geo::upright();
         let _ = globe;
     }
@@ -206,13 +209,19 @@ pub fn sync_scene(
         t.rotation = Quat::from_rotation_y(turn as f32 * 0.3) * geo::upright();
     }
     let Some(game) = session.game.as_ref() else {
+        // Ticket #100: no game yet, so this is the start screen. Its globe zooms on the wheel, as
+        // the Earth Map does once the game is running.
         for mut t in &mut camera {
-            *t = Transform::from_xyz(0.0, 0.0, 6.0).looking_at(Vec3::ZERO, Vec3::Y);
+            *t = Transform::from_xyz(0.0, 0.0, 6.0 * view.zoom).looking_at(Vec3::ZERO, Vec3::Y);
         }
         return;
     };
-    for (m, mut t, mut mat) in &mut slots {
+    for (m, mut t, mut mat, mut vis) in &mut slots {
         let owner = game.colony_at(m.body, m.slot).and_then(|c| c.control.director());
+        // Ticket #103 (version 0.07.0): Earth's ground slots are Antarctica's, and there is nothing
+        // to see there until the ice opens.
+        let under_ice = m.body == BodyId::Earth && m.on_surface && !game.antarctica_open;
+        *vis = if under_ice { Visibility::Hidden } else { Visibility::Inherited };
         let want = match owner {
             Some(s) => handles.flat[s.index()].clone(),
             None => handles.grey.clone(),

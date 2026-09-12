@@ -19,7 +19,8 @@ impl Game {
             return;
         }
         if self.research.current.is_none() {
-            self.research.unallocated += amount;
+            // Ticket #105: it waits under its owner's name, so it counts toward the Lead when it lands.
+            self.research.unallocated[seat.index()] += amount;
             return;
         }
         self.research.progress += amount;
@@ -30,7 +31,7 @@ impl Game {
     /// Research nobody produced (a Breakthrough).
     pub fn add_research_unattributed(&mut self, amount: i64) {
         if self.research.current.is_none() {
-            self.research.unallocated += amount;
+            self.research.unattributed += amount;
             return;
         }
         self.research.progress += amount;
@@ -74,7 +75,9 @@ impl Game {
             self.research.current = None;
             self.research.progress = 0;
             self.research.contributions = [0; SEAT_COUNT];
-            self.research.unallocated += overflow;
+            // Ticket #105: the spill past a Tech's cost belongs to nobody in particular, so it
+            // waits unattributed rather than being credited to a seat by accident.
+            self.research.unattributed += overflow;
             self.research.last_lead = Some(lead);
             let shares: Vec<String> = Seat::ALL.into_iter().map(|s| format!("{} {}", self.seat_name(s), c[s.index()])).collect();
             let line = format!(
@@ -106,8 +109,11 @@ impl Game {
             }
             if self.available_techs().is_empty() {
                 self.research.awaiting_pick = None;
+                self.research.shortlist = Vec::new();
                 return;
             }
+            // Ticket #98: the Lead chooses from a drawn shortlist, not from everything.
+            self.draw_shortlist(lead);
             if self.seat(lead).ai {
                 let (pick, why) = self.ai_tech_pick_with_reason(lead);
                 let note = self.phrase(why, &[("faction", self.seat_name(lead)), ("tech", self.tables.tech(pick).name.clone())]);
@@ -126,6 +132,44 @@ impl Game {
         }
     }
 
+    /// Ticket #98 (version 0.07.0): draw the Techs this Lead may choose between. The Lead's OWN
+    /// Victory gate is always on the list once its prerequisites are met, so a Faction can be
+    /// denied a rival's gate but never its own; the rest are drawn from what is available, from the
+    /// game's own generator. Fewer available than the list holds means the list is all of them,
+    /// which is the same free choice an empty list gives.
+    pub fn draw_shortlist(&mut self, lead: Seat) {
+        let available = self.available_techs();
+        let size = self.tables.shortlist.size;
+        if available.len() <= size {
+            self.research.shortlist = Vec::new();
+            return;
+        }
+        let mut drawn: Vec<TechId> = Vec::new();
+        if let Some(gate) = self.tables.victory_gate(self.kind(lead))
+            && available.contains(&gate)
+        {
+            drawn.push(gate);
+        }
+        let mut rest: Vec<TechId> = available.into_iter().filter(|t| !drawn.contains(t)).collect();
+        while drawn.len() < size && !rest.is_empty() {
+            let i = crate::combat::Dice::pick(&mut self.rng, rest.len());
+            drawn.push(rest.remove(i));
+        }
+        // In tree order, so the panel reads the same way twice running.
+        drawn.sort_by_key(|t| t.index());
+        self.research.shortlist = drawn;
+    }
+
+    /// Ticket #98: the Techs `seat` may pick right now. An empty shortlist is a free choice of
+    /// everything available, which is how the game opens.
+    pub fn pickable_techs(&self) -> Vec<TechId> {
+        if self.research.shortlist.is_empty() {
+            self.available_techs()
+        } else {
+            self.research.shortlist.clone()
+        }
+    }
+
     /// Set the Tech under research. Unallocated Research flows in at once.
     pub fn pick_tech(&mut self, seat: Seat, tech: TechId) -> Result<(), String> {
         if self.research.current.is_some() {
@@ -134,10 +178,24 @@ impl Game {
         if !self.available_techs().contains(&tech) {
             return Err("that Tech is not available yet".into());
         }
+        // Ticket #98 (version 0.07.0): the Lead chooses from the drawn shortlist. An empty list is
+        // a free choice of everything available, which is how the game opens.
+        if !self.research.shortlist.is_empty() && !self.research.shortlist.contains(&tech) {
+            let names: Vec<String> = self.research.shortlist.iter().map(|t| self.tables.tech(*t).name.clone()).collect();
+            return Err(format!("that Tech is not on this turn's shortlist: {}", names.join(", ")));
+        }
         self.research.current = Some(tech);
         self.research.awaiting_pick = None;
+        self.research.shortlist = Vec::new();
         self.research.last_picked_turn[seat.index()] = Some(self.turn);
-        let carried = std::mem::take(&mut self.research.unallocated);
+        // Ticket #105: everything banked since the last Tech pours in, each seat's share landing
+        // under its own name so the Lead line tells the truth.
+        let banked = std::mem::take(&mut self.research.unallocated);
+        let loose = std::mem::take(&mut self.research.unattributed);
+        let carried: i64 = banked.iter().sum::<i64>() + loose;
+        for s in Seat::ALL {
+            self.research.contributions[s.index()] += banked[s.index()];
+        }
         self.research.progress = 0;
         let line = format!("{} chose {} as the next Tech.", self.seat_name(seat), self.tables.tech(tech).name);
         self.log(line);
@@ -157,7 +215,8 @@ impl Game {
     /// Faction's own first choice off its list, the cheapest left, or the one it leaves until last.
     pub fn ai_tech_pick_with_reason(&self, seat: Seat) -> (TechId, &'static str) {
         let picks = self.tables.ai_tech_picks(self.kind(seat));
-        let available = self.available_techs();
+        // Ticket #98: the AI is held to the same shortlist a human Lead is.
+        let available = self.pickable_techs();
         // Ticket #84 (version 0.06.0): as Research Lead, the AI opens its own door once its first
         // part is past `gate_pick_fraction` of its bar or from `gate_pick_turn`, whichever comes
         // first, the road to the gate standing.
@@ -189,42 +248,45 @@ impl Game {
 
     // ---------------------------------------------------------------- Ticket #51: the Archive fund
 
-    /// Fund the Archive (ticket #51). This turn's Research from the seat's own Labs was paid into
-    /// the shared Tech at Income; funding takes it back out and banks it, so it contributes nothing
-    /// to the Research Lead for the turn. Ticket #68 (version 0.05.5): only what the fund has room
-    /// for under its cap is taken; the rest stays with the shared Tech, nothing is wasted, and the
-    /// point that fills the fund with the Module standing completes the Archive.
-    pub fn fund_archive(&mut self, seat: Seat) {
+    /// Fund the Archive (ticket #51, rebuilt for version 0.07.0). The Archivists declare where
+    /// their Labs' Research goes, and the declaration is read HERE, at Income, before a single
+    /// point reaches the shared Tech. What the fund has room for under its cap never enters the
+    /// Tech at all, so it contributes nothing to the Research Lead; the rest goes on to the Tech,
+    /// and nothing is wasted. The payment that fills the fund with the Module standing completes
+    /// the Archive. Answers how much was taken, which the caller keeps back from `accrue_research`.
+    ///
+    /// Version 0.06.0 ran this as an Orders-phase order that clawed the Research back out of the
+    /// shared Tech after Income had already paid it in. A turn whose Research completed a Tech
+    /// zeroed every seat's contribution first, so there was nothing left to claw back: the
+    /// Archivists banked nothing while the Report still said they had funded the Archive. Measured
+    /// in playtest at about 32 of the Archive's 80 Research lost over one game.
+    pub fn bank_archive_research(&mut self, seat: Seat, research: i64) -> i64 {
+        if research <= 0 || !self.seat(seat).archive_funding || self.kind(seat) != FactionKind::Archivists {
+            return 0;
+        }
         let cap = self.archive_fund_cap(seat);
         let before = self.seat(seat).archive_fund;
-        let amount = self.seat(seat).research_last_turn.max(0).min((cap - before).max(0));
-        // Take it back out of wherever Income put it.
-        let moved = if self.research.current.is_some() {
-            let have = self.research.contributions[seat.index()].min(amount);
-            self.research.contributions[seat.index()] -= have;
-            self.research.progress -= have;
-            have
-        } else {
-            let have = self.research.unallocated.min(amount);
-            self.research.unallocated -= have;
-            have
-        };
-        let after = (before + moved).min(cap).max(0);
+        let banked = research.min((cap - before).max(0));
+        if banked <= 0 {
+            return 0;
+        }
+        let after = before + banked;
         {
             let s = self.seat_mut(seat);
             s.archive_fund = after;
             s.funding_archive = true;
         }
-        let line = format!("The {} are funding the Archive: {} Research banked, {} of {} in the fund.", self.seat_name(seat), moved, after, cap);
+        let line = format!("The {} are funding the Archive: {} Research banked, {} of {} in the fund.", self.seat_name(seat), banked, after, cap);
         self.log(line);
-        let args = vec![("faction", self.seat_name(seat)), ("banked", moved.to_string()), ("fund", after.to_string()), ("cap", cap.to_string())];
+        let args = vec![("faction", self.seat_name(seat)), ("banked", banked.to_string()), ("fund", after.to_string()), ("cap", cap.to_string())];
         let text = self.say("archive_funded", &args);
         self.report_line_of(seat, LineKind::YourWorks, LineKind::Archive, None, text);
         // Ticket #68: the payment that fills the fund with the Module standing completes the Archive.
-        let research = self.tables.archive.research;
-        if self.archive_built(seat) && before < research && after >= research {
+        let required = self.tables.archive.research;
+        if self.archive_built(seat) && before < required && after >= required {
             self.archive_completed(seat);
         }
+        banked
     }
 
     /// Ticket #68: the Archive is complete, whether the last Research or the Module came last.
