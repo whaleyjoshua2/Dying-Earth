@@ -106,10 +106,70 @@ impl Icons {
 /// is gone and this function is the only place an answer exists.
 ///
 /// Today every figure answers the same neutral off-white. The open half of ticket #112 is whether
-/// each figure takes a colour of its own; if it does, it is this match that grows the arms, and the
-/// rule above holds unchanged.
-pub fn fill(_name: &str) -> egui::Color32 {
-    egui::Color32::from_rgb(225, 220, 210)
+/// each figure takes a colour of its own; `palette:<n>` (a building aid, not part of the spec)
+/// swaps in a candidate so the choice can be made off a picture of the real bar rather than off
+/// colour names in prose.
+///
+/// The eight rows of each candidate are in the order the top bar draws them.
+const NEUTRAL: [u8; 3] = [225, 220, 210];
+
+/// Candidate 1, **Natural**: each figure takes the colour of the thing it names. Amber Fuel, gold
+/// Ducats, cyan Research, violet Influence. Two of these sit in neighbouring hues to a Faction --
+/// Research beside the Custodians' teal, Influence beside the Arkwrights' purple -- which is the
+/// collision the ticket's fourth option retires a Faction hue to end.
+const NATURAL: [(&str, [u8; 3]); 8] = [
+    ("materials", [168, 176, 186]),
+    ("fuel", [232, 168, 72]),
+    ("energy", [245, 222, 92]),
+    ("research", [118, 206, 232]),
+    ("ducats", [224, 186, 84]),
+    ("population", [150, 206, 146]),
+    ("influence", [188, 146, 236]),
+    ("emissions", [216, 122, 104]),
+];
+
+/// Candidate 2, **Clear of the Factions**: every hue picked from the bands the four Factions leave
+/// empty -- yellows, greens, pinks and reds -- so no icon sits near teal, orange, purple or pale
+/// blue. The cost is that Fuel is no longer amber and Ducats no longer gold: the colours stop
+/// naming the thing and start being a code to learn.
+const CLEAR: [(&str, [u8; 3]); 8] = [
+    ("materials", [176, 174, 168]),
+    ("fuel", [236, 200, 80]),
+    ("energy", [198, 230, 100]),
+    ("research", [120, 214, 150]),
+    ("ducats", [238, 160, 170]),
+    ("population", [236, 224, 196]),
+    ("influence", [222, 128, 220]),
+    ("emissions", [226, 102, 86]),
+];
+
+/// Candidate 3, **Muted**: the natural hue of candidate 1 at a fraction of its saturation, so each
+/// glyph reads as a tinted white rather than as a colour. Nothing competes with a Faction chip
+/// because nothing is saturated enough to. Whether the hues survive at sixteen pixels at all is the
+/// question this candidate exists to answer, and the picture is the only way to answer it.
+const MUTED: [(&str, [u8; 3]); 8] = [
+    ("materials", [200, 202, 208]),
+    ("fuel", [230, 208, 172]),
+    ("energy", [234, 230, 186]),
+    ("research", [190, 214, 224]),
+    ("ducats", [226, 214, 178]),
+    ("population", [202, 218, 200]),
+    ("influence", [214, 202, 226]),
+    ("emissions", [222, 196, 190]),
+];
+
+pub fn fill(name: &str) -> egui::Color32 {
+    let table = match std::env::args().find_map(|a| a.strip_prefix("palette:").and_then(|v| v.parse::<u32>().ok())) {
+        Some(1) => &NATURAL,
+        Some(2) => &CLEAR,
+        Some(3) => &MUTED,
+        _ => return rgb(NEUTRAL),
+    };
+    rgb(table.iter().find(|(figure, _)| *figure == name).map(|(_, c)| *c).unwrap_or(NEUTRAL))
+}
+
+fn rgb(c: [u8; 3]) -> egui::Color32 {
+    egui::Color32::from_rgb(c[0], c[1], c[2])
 }
 
 /// One SVG to one egui image, with the black backing rectangle taken out first.

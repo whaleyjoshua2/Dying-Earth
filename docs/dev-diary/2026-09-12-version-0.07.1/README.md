@@ -207,3 +207,39 @@ something this ticket introduced, but it is worth writing down.
 Two aids now exist, neither part of the spec: `window:<w>x<h>` sets the off-screen window's size,
 and `climate:top` opens the Climate Panel at the top of the window at full height. Together they
 photograph a panel taller than the screen.
+
+### Palette candidates
+
+Rendered on the real bar and the real Facility list rather than mocked, by a building aid
+`palette:<n>` that swaps what `icons::fill` answers. Nothing is decided here; these are for looking
+at.
+
+![Four candidates on the top bar](palette-candidates-top-bar.png)
+
+![The same four in a Facility list](palette-candidates-in-the-lists.png)
+
+**What the pictures say.** In the *lists* colour does real work: with candidate 1 or 2 the question
+"which of these buildings emits?" is answerable without reading a word, because the red chimneys
+pick themselves out of the row. With candidate 0 or 3 it is not. **Candidate 3 (Muted) is very
+nearly candidate 0** — at sixteen pixels the desaturated hues are almost invisible, so it buys the
+cost of a second colour language and delivers almost none of the benefit. Candidate 2 pays a
+different price: a *pink* banknote and a *green* microscope do not name anything, so the colours
+become a code to learn rather than a reminder of what the figure is.
+
+![The candidate palette against the four Faction colours](palette-candidates-against-the-factions.png)
+
+**Where the two schemes actually collide**, which is what the ticket's fourth option exists to fix.
+Against candidate 1 there are four near-neighbours and they are not equally bad:
+
+- **Influence's lilac against the Arkwrights' purple** — the worst by a distance, effectively the
+  same hue at different lightness.
+- **Fuel's amber and Ducats' gold against the Prospectors' orange** — close, and there are two of
+  them.
+- **Materials' steel grey against the Archivists' pale blue** — both desaturated and light.
+- **Research's cyan against the Custodians' teal** — the mildest; cyan is markedly lighter and bluer.
+
+So retiring **one** Faction hue does not clear the board on its own: moving the Arkwrights off purple
+removes the worst collision and leaves the Prospectors' one. The other half of the answer is to nudge
+the icon colours rather than the Faction ones — Fuel toward straw and Materials toward a warm grey
+cost nothing, because no player has learned them yet, whereas a Faction colour is something they
+read on the map every turn.
