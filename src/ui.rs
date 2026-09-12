@@ -979,9 +979,21 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             ui.separator();
             bar_resource(ui, icons, "ducats", "Ducats", format!("{} ({})", left.ducats, signed(inc.ducats)), sources(dying_earth_engine::Resource::Ducats));
             ui.separator();
-            let research = match game.research.current {
-                Some(t) => format!("Research {} / {} toward {}", game.research.progress, game.tables.tech(t).cost, game.tables.tech(t).name),
-                None => format!("Research: no Tech chosen ({} waiting)", game.research.unallocated.iter().sum::<i64>() + game.research.unattributed),
+            // Ticket #112 (version 0.07.1): the bar carries the FIGURE and the hover carries the
+            // name. The Tech's title was the longest thing on the bar by a wide margin -- "39 / 40
+            // toward Clean Manufacturing" against "14 (+6)" for a resource -- and it is the one
+            // thing there that does not change from turn to turn, so it was paying for width with
+            // nothing a player rereads. Nothing is lost: the name is on the hover, on the Tech Tree
+            // button beside it, and in the race bar's own tooltip.
+            let (research, research_hover) = match game.research.current {
+                Some(t) => (
+                    format!("{} / {}", game.research.progress, game.tables.tech(t).cost),
+                    format!("Research: {} of {} toward {}.", game.research.progress, game.tables.tech(t).cost, game.tables.tech(t).name),
+                ),
+                None => {
+                    let waiting = game.research.unallocated.iter().sum::<i64>() + game.research.unattributed;
+                    (format!("- ({waiting} waiting)"), format!("Research: no Tech is chosen, and {waiting} Research is waiting for one."))
+                }
             };
             // Ticket #104 (version 0.07.0): the Tech Tree no longer opens itself, so the bar has to
             // say when a pick is owed. End Turn is disabled until one is made, but that only shows
@@ -997,12 +1009,12 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 Some(image) => {
                     ui.horizontal(|ui| {
                         ui.spacing_mut().item_spacing.x = 4.0;
-                        ui.add(image).on_hover_text("Research");
-                        ui.label(research.trim_start_matches("Research").trim_start_matches(':').trim().to_string());
+                        ui.add(image).on_hover_text(&research_hover);
+                        ui.label(research).on_hover_text(&research_hover);
                     });
                 }
                 None => {
-                    ui.label(research);
+                    ui.label(format!("Research {research}")).on_hover_text(&research_hover);
                 }
             }
             // Ticket #58: the Research race, as a bar of the four Factions' contributions to the

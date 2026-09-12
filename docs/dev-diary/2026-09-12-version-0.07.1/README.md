@@ -320,3 +320,17 @@ other Faction's. Taking the plate to alpha 210 would close it for every label at
 done here because it was not asked for.
 
 Clippy clean with `-D warnings`, 251 tests passing.
+
+### The Tech's name comes off the top bar
+
+The designer, once the bar was full: *"remove the name of the tech being researched from the top
+bar."*
+
+![The bar before and after](tech-name-off-the-bar.png)
+
+`39 / 40 toward Clean Manufacturing` becomes `10 / 40`. It was the longest thing on the bar by a
+wide margin — a whole Tech title against `14 (+6)` for a resource — and it is the one figure up
+there that does **not** change from turn to turn, so it was paying for width with nothing a player
+rereads. Nothing is lost: the name is on the hover, on the Tech Tree button an inch to its left, and
+in the research race bar's own tooltip. Roughly two hundred pixels come back, which is what the
+lower-right command cluster and the map icons are about to want.
