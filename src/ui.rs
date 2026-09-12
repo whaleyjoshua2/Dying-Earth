@@ -1384,7 +1384,15 @@ fn stations_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
     }
     ui.separator();
     let count = game.colonies.iter().filter(|c| c.in_orbit && c.body == body).count();
-    ui.label(RichText::new(format!("In orbit: {} of {} station slots", count, card.orbital_slots)).strong());
+    // Ticket #116 (version 0.07.1): what an orbital slot is for, and what a Warship in one does.
+    rule_tip(
+        ui.label(RichText::new(format!("In orbit: {} of {} station slots", count, card.orbital_slots)).strong()),
+        format!(
+            "{} has room for {} stations in orbit, and a station taken is a station gone: nobody else builds there.
+A station is where Ships refuel and where a Shipyard can stand, and a Warship holding a slot blockades that slot alone, not the whole world.",
+            card.name, card.orbital_slots
+        ),
+    );
     for c in game.colonies.iter().filter(|c| c.in_orbit && c.body == body) {
         let owner = match c.control {
             Control::Neutral => "nobody's".to_string(),
@@ -1756,6 +1764,8 @@ fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
 /// group can be counted, sorted and filtered before it goes on screen.
 struct RosterRow {
     text: String,
+    /// Ticket #116 (version 0.07.1): the rule behind the row's figures, where one governs them.
+    tip: Option<String>,
     /// This row still wants a decision from the player this turn. Only a seat that gives orders can
     /// owe one, so it is always false where `marks` is off.
     wants: bool,
@@ -1805,7 +1815,11 @@ fn roster_group(ui: &mut Ui, view: &mut ViewState, group: RosterGroup, rows: Vec
     let filtered = marks && view.roster_filter[index] && wanting > 0;
     for row in rows.iter().filter(|r| !filtered || r.wants) {
         let text = if row.wants && marks { format!("{}  - no order", row.text) } else { row.text.clone() };
-        if ui.button(text).clicked() {
+        let mut resp = ui.button(text);
+        if let Some(tip) = &row.tip {
+            resp = rule_tip(resp, tip.clone());
+        }
+        if resp.clicked() {
             *jump = row.jump;
         }
     }
@@ -1844,13 +1858,21 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
         if ships.iter().all(|s| game.stranded(s.id)) {
             text.push_str(" - STRANDED: no leg affordable and no station of yours here");
         }
-        ships_rows.push(RosterRow { text, wants: marks && !ordered, jump: Some((View::Solar, Selection::ShipStack(body, seat))) });
+        // Ticket #116 (version 0.07.1): what the tank is for, and what being stranded means. A Ship
+        // with no leg it can afford and no station of its own is the one piece in the game that can
+        // become permanently useless, and the roster said so in four words and explained none of it.
+        let tip = format!(
+            "Tank {} of {}. Fuel goes on transits, and a leg costs least at a launch window.\nRefuelling needs a station or Colony of yours where the Ship sits, so a Ship is STRANDED with no leg it can afford and nowhere to fill up.",
+            fuel, tanks
+        );
+        ships_rows.push(RosterRow { text, tip: Some(tip), wants: marks && !ordered, jump: Some((View::Solar, Selection::ShipStack(body, seat))) });
     }
     for s in game.ships.iter().filter(|s| s.seat == seat) {
         if let ShipAt::Transit { to, turns_left, .. } = s.at {
             // A Ship in transit is not waiting on anybody: it arrives when it arrives.
             ships_rows.push(RosterRow {
                 text: format!("{}{} in transit to {}, {} turn(s) left", tag("Ship"), s.kind.name(), game.tables.body(to).name, turns_left),
+                tip: Some("A Ship in transit cannot be ordered and cannot be intercepted. It arrives at its Resolution, Holding, with whatever Fuel it has left.".to_string()),
                 wants: false,
                 jump: Some((View::Solar, Selection::None)),
             });
@@ -1886,7 +1908,17 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
         if !matches!(a.at, ArmyAt::Aboard(_)) {
             text.push_str(&format!("  ({})", a.stance.name()));
         }
-        army_rows.push((where_, RosterRow { text, wants: false, jump: target }));
+        let tip = format!(
+            "An Army keeps the stance it was last given until it is moved or given another; it is never reset at a Resolution.\n{} A Standing Army replenishes where it stands, unless its state's Unrest has passed {:.0}.",
+            match a.stance {
+                Stance::Hold => "Holding, it stands and fights where it is.",
+                Stance::Attack => "On Attack, it strikes at the place it was sent to.",
+                Stance::Intercept => "On Intercept, it meets what arrives.",
+                Stance::Evade => "Evading, it avoids battle where it can.",
+            },
+            game.tables.unrest.army_threshold
+        );
+        army_rows.push((where_, RosterRow { text, tip: Some(tip), wants: false, jump: target }));
     }
     army_rows.sort_by(|a, b| a.0.cmp(&b.0));
     roster_group(ui, view, RosterGroup { index: 1, name: "Armies", empty: "  none" }, army_rows.into_iter().map(|(_, r)| r).collect(), marks, jump);
@@ -1900,7 +1932,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
         let building = c.queue.len();
         let ordered = building > 0 || pending.iter().any(|o| roster_order_touches_colony(o, c.id));
         let text = format!("{}{}: {} Colonists, {} Modules{}", tag("Colony"), game.place_name(Place::Colony(c.id)), c.colonists, c.modules.len(), if building > 0 { format!(", {building} building") } else { String::new() });
-        colony_rows.push(RosterRow { text, wants: marks && !ordered, jump: Some((View::Surface(c.body), Selection::Colony(c.id))) });
+        colony_rows.push(RosterRow { text, tip: None, wants: marks && !ordered, jump: Some((View::Surface(c.body), Selection::Colony(c.id))) });
     }
     roster_group(ui, view, RosterGroup { index: 2, name: "Colonies and stations", empty: "  none; a Colony Ship founds one" }, colony_rows, marks, jump);
 
@@ -1911,7 +1943,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
         let building = st.queue.len();
         let ordered = building > 0 || pending.iter().any(|o| roster_order_touches_state(o, sid));
         let text = format!("{}{}: {} Facilities, {} free slot(s){}", tag("State"), game.tables.state(sid).name, st.facilities.len(), game.free_slots(sid), if building > 0 { format!(", {building} building") } else { String::new() });
-        state_rows.push(RosterRow { text, wants: marks && !ordered, jump: Some((View::Surface(BodyId::Earth), Selection::State(sid))) });
+        state_rows.push(RosterRow { text, tip: None, wants: marks && !ordered, jump: Some((View::Surface(BodyId::Earth), Selection::State(sid))) });
     }
     roster_group(ui, view, RosterGroup { index: 3, name: "Nation States", empty: "  none" }, state_rows, marks, jump);
 }
@@ -2073,6 +2105,34 @@ fn change_row(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, mothb
     });
 }
 
+/// Ticket #116 (version 0.07.1): the rule for what gets a tooltip, so the next person has a test
+/// to apply rather than a list to extend. The designer: *"increase the use of mouse over tooltips."*
+///
+/// **Anything showing a bare number that a rule governs earns a tooltip naming the rule.** Not
+/// restating the number, which is already on screen -- naming the rule behind it: what sets it, what
+/// it does at its thresholds, what happens if it runs out. A figure with no rule behind it (a name,
+/// a count of things you can see) earns nothing, and a rule with no figure on screen belongs in the
+/// prose, not under the pointer.
+///
+/// **A tooltip may run to a short list and no further.** Six lines is the ceiling; the Income
+/// breakdown is about that long and still works. Anything longer covers the thing it explains, which
+/// makes it a worse tooltip than none, and belongs on the card.
+fn rule_tip(response: egui::Response, text: String) -> egui::Response {
+    // `tip:<word>` (a building aid, not part of the spec): the first tooltip whose text contains
+    // that word is shown WITHOUT a hover, so a headless picture can be taken of one. A tooltip is
+    // otherwise unreachable in a shot: the window sits off-screen and no pointer ever enters it,
+    // which would leave every tooltip in the game unlooked-at.
+    if let Some(word) = std::env::args().find_map(|a| a.strip_prefix("tip:").map(str::to_owned))
+        && text.contains(&word)
+    {
+        {
+            response.show_tooltip_ui(|ui| hover_with_icons(ui, &text));
+            return response;
+        }
+    }
+    response.on_hover_ui(|ui| hover_with_icons(ui, &text))
+}
+
 /// Ticket #112 (version 0.07.1): a figure's glyph BESIDE its word, which is the rule everywhere
 /// except the top bar. It reaches the art through the egui context, so a call site deep in a panel
 /// does not have to be handed an `Icons` to draw one. Where the art is missing the line is
@@ -2124,8 +2184,8 @@ const ICON_WORDS: [(&str, &str); 10] = [
 /// Energy upkeep, 1.9 Emissions` is the line a player actually compares two buildings across, and
 /// where the words are most of the width. Where an icon is missing the word comes straight back, so
 /// a failed load costs legibility and nothing else.
-fn text_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32) {
-    draw_with_icons(ui, text, size, tint, &[], false);
+fn text_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32) -> egui::Response {
+    draw_with_icons(ui, text, size, tint, &[], false)
 }
 
 /// A dense list line, where a word is traded for its glyph ONLY where it names a figure -- which is
@@ -2138,11 +2198,13 @@ fn text_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32) {
 /// reason it exists: there "ppm" is the Emissions a Faction is answerable for, while four lines
 /// higher the same three letters are the CO2 Stock and a Scrubber's pull on the Natural Sink, and a
 /// chimney against either of those would be a lie.
-fn figures_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(&str, &str)]) {
-    draw_with_icons(ui, text, size, tint, extra, true);
+fn figures_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(&str, &str)]) -> egui::Response {
+    draw_with_icons(ui, text, size, tint, extra, true)
 }
 
-fn draw_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(&str, &str)], after_numbers_only: bool) {
+fn draw_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(&str, &str)], after_numbers_only: bool) -> egui::Response {
+    // Ticket #116 (version 0.07.1): the row's own response comes back, so a caller can hang a
+    // tooltip on a whole line of glyphs and figures.
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 3.0;
         let mut previous_was_a_figure = false;
@@ -2177,7 +2239,8 @@ fn draw_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(
                 }
             }
         }
-    });
+    })
+    .response
 }
 
 fn cost_button(ui: &mut Ui, game: &Game, pending: &[Order], order: Order, label: &str, actions: &mut Vec<Action>) {
@@ -2312,7 +2375,16 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
 /// a Standing to show. Ticket #64: the spectator's cards carry the same row.
 fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place) {
     ui.horizontal_wrapped(|ui| {
-        ui.label("Standings:");
+        // Ticket #116 (version 0.07.1): what a Standing IS, which the row shows four of and never
+        // explains. The decay figures are the reason a Standing left alone slides, and the reason
+        // holding a place costs less than taking one.
+        rule_tip(
+            ui.label("Standings:"),
+            format!(
+                "Standing is the Influence a Faction has built up here. It persists, and is never wiped when the place changes hands.\nLeft alone it decays {} a turn for the controller and {} a turn for everybody else, so a claim you stop paying for slides faster than the holder's.",
+                game.tables.influence.decay_controlled, game.tables.influence.decay
+            ),
+        );
         let mut any = false;
         for s in Seat::ALL {
             let v = game.seat(s).influence.get(&target).copied().unwrap_or(0);
@@ -2396,7 +2468,14 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         } else {
             Color32::LIGHT_GREEN
         };
-        ui.colored_label(colour, format!("Unrest {}: {}", game.unrest_text(sid), game.unrest_note(sid)));
+        let u = &game.tables.unrest;
+        rule_tip(
+            ui.colored_label(colour, format!("Unrest {}: {}", game.unrest_text(sid), game.unrest_note(sid))),
+            format!(
+                "Unrest runs 0 to {:.0}, in halves, with three thresholds:\nat {:.0} the Standing Army stops replenishing,\nat {:.0} every Facility here runs at half,\nat {:.0} the state throws its controller off.\nIt falls {:.1} a turn on its own, except the turn the state changed hands.",
+                u.max, u.army_threshold, u.facility_threshold, u.max, u.natural_fall
+            ),
+        );
         // Ticket #75: a rival's Standing within two steps of the player's own, at the top of the
         // card where it is seen, not in the Influence section below the fold.
         if game.place_control(Place::State(sid)).controller() == Some(Seat(0)) {
@@ -2452,7 +2531,16 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     }
     // Ticket #56: the two rows of slots, with what stands in each and what the sea has taken.
     slot_rows(ui, game, sid);
-    ui.label(RichText::new(format!("Facilities ({} of {} slots free)", game.free_slots(sid), game.build_slots(sid))).strong());
+    rule_tip(
+        ui.label(RichText::new(format!("Facilities ({} of {} slots free)", game.free_slots(sid), game.build_slots(sid))).strong()),
+        format!(
+            "Slots: Size {} plus {} plus the Industry Level {} it started at, and one more for every raise since, always inland.\n{} are coastal, and the sea takes those first, oldest Facility with them; a Sea Wall holds one threshold off.\nMothballed and building each keep a slot.",
+            game.tables.state(sid).size,
+            game.tables.base_slots,
+            game.tables.state(sid).industry_level,
+            game.coastal_slots(sid)
+        ),
+    );
     let director = st.control.director();
     // Ticket #64: a spectator reads every card and orders on none of them.
     let mine = !session.spectator && st.control.director() == Some(Seat(0));
@@ -2475,7 +2563,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         // figures are compared building against building and the words are most of the width.
         ui.horizontal(|ui| {
             ui.add_space(8.0);
-            figures_with_icons(
+            let resp = figures_with_icons(
                 ui,
                 &format!(
                     "{} ({}): {}{}",
@@ -2487,6 +2575,17 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 14.0,
                 colour,
                 &[],
+            );
+            // Ticket #116 (version 0.07.1): what the two figures on the line actually DO. Upkeep and
+            // Emissions are the numbers a player weighs a building by, and neither said what it cost
+            // to fail to pay them.
+            rule_tip(
+                resp,
+                format!(
+                    "{}\nEnergy upkeep is paid at Income first; short of Energy, buildings go offline in order until the bill is met, and an offline one makes nothing and keeps its slot.\nIts Emissions go on the CO2 Stock every turn and on its controller's Blame.{}",
+                    f.kind.name(),
+                    if f.coastal { "\nOn the coast, the sea can take it at a threshold." } else { "" }
+                ),
             );
         });
         if mine {
@@ -2647,11 +2746,21 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // player meets it on the card rather than as a refusal.
     let (used, cap) = (game.module_slots_used(col), game.module_slots(col));
     let line = format!("Modules {used} of {cap} ({} free, one for each Colonist)", game.tables.slots.base);
-    if used >= cap {
-        ui.colored_label(Color32::YELLOW, format!("{line} - no room for another until more Colonists live here"));
+    let resp = if used >= cap {
+        ui.colored_label(Color32::YELLOW, format!("{line} - no room for another until more Colonists live here"))
     } else {
-        ui.label(line);
-    }
+        ui.label(line)
+    };
+    // Ticket #116 (version 0.07.1): the rule behind the cap, which ticket #97 put in the engine and
+    // nowhere on the card.
+    rule_tip(
+        resp,
+        format!(
+            "{} slots from the day it is founded, and one more for every {} Colonist living here: a Colony grows by filling its Habitats first.\nMothballed keeps a slot, building reserves one. The Archive counts on neither side.",
+            game.tables.slots.base,
+            game.tables.slots.per_colonist
+        ),
+    );
     ui.label(RichText::new("Modules").strong());
     let director = col.control.director();
     let colony_mine = !session.spectator && col.control.director() == Some(Seat(0));

@@ -512,3 +512,47 @@ placed Influence by hand.
 `threat:1` is a new building aid that stands a rival within reach of every state seat 0 holds — in an
 ordinary headless run all four seats are the computer, and the computer now defends its own holdings,
 so nothing is ever under threat to photograph.
+
+## More of the board explains itself under the pointer
+
+![Five figures on one card that say nothing](what-is-silent-on-a-card.png)
+
+Counted before anything was written: **27 hover texts against 231 labels**. The picture marks five
+figures on a *single* Nation State card that a rule governs and that said nothing under the pointer.
+
+**The rule, which is the actual answer:** *anything showing a bare number that a rule governs earns a
+tooltip naming the rule.* Not restating the number, which is already on screen — naming what sets it,
+what it does at its thresholds, what happens when it runs out. A figure with no rule behind it earns
+nothing, and a rule with no figure on screen belongs in the prose. It lives as a doc comment on
+`rule_tip`, so the next person has a test to apply rather than a list to extend.
+
+**And a ceiling: six lines.** The Income breakdown is about that long and still works; a tooltip big
+enough to cover the thing it explains is worse than none. The first draft of the Unrest tooltip ran
+to **ten** wrapped lines and had to be cut — which is exactly why the ceiling is worth having, and
+why it was the picture that enforced it rather than the writing.
+
+![Three of the new tooltips](tooltips-that-name-the-rule.png)
+
+Nine figures gained one: **build slots** (Size plus the base plus the Industry Level it started at,
+and which of them the sea can reach), **Unrest** (its three thresholds, and the fall that nets out an
+ordinary rise), **Standing** (that it persists, and the two decay rates that make holding cheaper
+than taking), **every Facility figure** (what unpaid upkeep does, and where the Emissions go), a
+**Colony's Module cap**, a **Ship stack's tank and what stranded means**, an **Army's stance**, and a
+Body's **orbital slots**. Hovers went from 27 to 35.
+
+### A tooltip could not be photographed, so a way was made
+
+The window sits off-screen in a shot and no pointer ever enters it, which would have left every
+tooltip in the game written and unlooked-at — the exact failure version 0.07.0 met four times.
+`tip:<word>` shows the first tooltip whose text contains that word without a hover. Every picture
+above came from it, and the ten-line Unrest draft was caught by it.
+
+### One thing worth the designer's eye
+
+Version 0.07.0's rule that **resource words become glyphs inside tooltips** was written for figures —
+`30 Materials` — and it fires on the word wherever it stands. In a sentence where the resource is the
+*subject* it now reads as a rebus: *"Fuel goes on transits"* comes out as *"🥫 goes on transits"*, and
+*"Standing is the Influence a Faction has built up"* as *"Standing is the 🕪 a Faction has built up"*.
+The dense lists already solved this, on ticket #112, by swapping a word **only directly after a
+number**; applying the same narrowing to tooltips would fix it. That is a change to a rule the
+designer set, so it is on the map rather than done here.
