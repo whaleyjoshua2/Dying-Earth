@@ -98,3 +98,75 @@ Report text** ("Emigrants mustered in East Asia", "You play the Custodians from 
 the new ones; nothing they test changed.
 
 Clippy clean with `-D warnings`, 254 tests passing.
+
+## The Earth Map redrawn along real borders, and two more Regions
+
+Ticket [#125](https://github.com/whaleyjoshua2/Dying-Earth/issues/125). The largest change in the
+version: the borders stop being lines and become countries, and twelve Regions become fourteen.
+
+![The mask, drawn from Natural Earth](mask-fourteen-regions.png)
+
+**The borders are countries now.** `examples/prep_assets.rs` had drawn every border as a line of
+longitude or latitude — its own words were *"a board, not an atlas."* It now reads Natural Earth's
+Admin 0 countries at 1:50m (public domain; the research on [#124](https://github.com/whaleyjoshua2/Dying-Earth/issues/124)
+found it and measured that World Bank totals over a country-by-country assignment reproduce the
+game's own figures), fills each country polygon into the 2048-by-1024 grid, keeps the coastline from
+the photograph as it always did, and floods the land the polygons miss — 44,721 pixels, 3.6 % of the
+land — from the nearest Region. 242 countries went in; four Antarctic and Indian Ocean territories
+had no Region and took the nearest by the flood, which is right for them.
+
+**A country belongs whole to one Region, and an island belongs to its country.** The designer took the
+research's block of flagged cases as recommended, with one exception — **Cyprus to the European
+Union** — and kept **Greenland with the United States'** Region. So Kazakhstan, the one country the
+old lines split, goes whole to China's Region; all of Indonesia goes to Indonesia's, with the real
+border across New Guinea at 141° E; Hawaii goes with the United States and the Canaries with Spain.
+One consequence is written down rather than hidden: Natural Earth keeps **French Guiana, Réunion and
+Mayotte inside France's feature**, so under this rule they are the European Union's — French Guiana is
+the blue notch on South America's north coast in the preview.
+
+**Two Regions were added, and the designer split the difference between the research's two pairs.**
+*Japan and Korea* out of China's Region, from the economy-first pair, and *the Arabian Peninsula* out
+of Iran's, from the geography-first pair. Their Nations are **Japan** and **Saudi Arabia**. The figures
+follow the rule ticket #53 set — a split hands out its parent's figure exactly — so China went 16.4 /
+23 / 4 to 14.4 / 17 / 3 with Japan taking 2.0 / 6 / 1, and Iran went 3.5 / 5 / 4 to 2.5 / 3 / 2 with
+the peninsula taking 1.0 / 2 / 2. The rest of each new card is set by hand and written beside it in
+`nation_states.toml` for the designer to veto: Japan leans Energy, has the most exposed coast on the
+map and the highest Education Level after Europe and North America; the peninsula leans Fuel and
+inherits the Middle East's Emissions figure. No Faction's home moved.
+
+![Japan's and Saudi Arabia's cards](two-new-cards.png)
+
+![The globe over East Asia](globe-east-asia.png)
+
+**Fourteen tests broke, and every one of them was pinning the old world.** Allotments that assumed
+China at Influence 4, Ducats that assumed GDP 23, the coastal-slot count of the world, the spreading
+rule's start picks, refugee flows into a neighbour set that now includes Japan, and a share-out test
+whose Asia had three members. Each was moved to the new figure with the reason written beside it.
+Two were more interesting. **The start-Facility rule caught a hand-set card**: every card starts with
+as many Facilities as its Industry Level and only two carry a Lab (#69), and the first draft of Japan
+had three plus a Lab; the rule won, and Japan starts with two Factories and a Power Plant. And **the
+sea-crossing test had been asserting a coincidence**: a fresh Antarctic Colony holds `min(n, room)`,
+room is the slot's Habitat yield, and that yield is *drawn from the seed* — fourteen Regions shift the
+stream, so the slot's room is 7 on that seed where it was 8. The test's claim is that nobody is lost,
+not that eight land; it now asserts that.
+
+**The sweep baseline restarts here.** Twenty seeds in each of four seatings, on fourteen Regions:
+
+| seat 0 | wins | Collapses | tree completes |
+|---|---|---|---|
+| Custodians | Custodians 12 | 8 | 20 of 20 |
+| Prospectors | Custodians 20 | 0 | 20 of 20 |
+| Arkwrights | Custodians 19, Arkwrights 1 | 0 | 13 of 20 |
+| Archivists | Custodians 19, Archivists 1 | 0 | 20 of 20 |
+
+**Custodians 70 of 80, Collapses 8, Prospectors 0.** Nothing measured before this is comparable — the
+board itself changed — and the honest reading is that the standing imbalance came through the redraw
+untouched, which is what a map version should expect. Two things to carry forward: the spreading rule
+now seats the third computer player in **Saudi Arabia** rather than Sub-Saharan Africa, since the
+peninsula is untouched at Industry 2 and more populous than Australia; and **Saudi Arabia pays no
+Ducats** — GDP 2 × Industry 2 / 10 rounds to nothing — which the sharing rule produced and which the
+designer may not want for the oil state.
+
+`serde_json` joined `Cargo.toml` as a dev-dependency so the example can read the GeoJSON; it was
+already in the lock through bevy, and nothing new enters the shipped game. Clippy clean with
+`-D warnings`, 254 tests passing.

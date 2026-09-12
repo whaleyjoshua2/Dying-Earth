@@ -2623,6 +2623,7 @@ dependencies = [
  "dying-earth-engine",
  "image",
  "resvg",
+ "serde_json",
 ]
 
 [[package]]

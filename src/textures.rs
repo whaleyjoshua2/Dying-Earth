@@ -45,11 +45,11 @@ pub struct Textures {
     pub mask: Vec<u8>,
 }
 
-/// The mask's values, 1 to 13, in the order the file was painted (`examples/prep_assets.rs`).
-/// Antarctica keeps value 2 though it is no longer a Nation State (ticket #44), and ticket #53's
-/// four new states were appended rather than renumbered, so an old mask still reads correctly for
-/// the states that did not move.
-const MASK_STATES: [Option<StateId>; 13] = [
+/// The mask's values, 1 to 15, in the order the file was painted (`examples/prep_assets.rs`).
+/// Antarctica keeps value 2 though it is no longer a Region (ticket #44); ticket #53's four new
+/// Regions and ticket #125's two (Japan and Korea, the Arabian Peninsula) were appended rather than
+/// renumbered, so an old mask still reads correctly for the Regions that did not move.
+const MASK_STATES: [Option<StateId>; 15] = [
     Some(StateId::SubSaharanAfrica),
     None,
     Some(StateId::EastAsia),
@@ -63,6 +63,8 @@ const MASK_STATES: [Option<StateId>; 13] = [
     Some(StateId::SouthAsia),
     Some(StateId::SouthEastAsia),
     Some(StateId::CentralAmerica),
+    Some(StateId::Japan),
+    Some(StateId::ArabianPeninsula),
 ];
 
 impl Textures {
