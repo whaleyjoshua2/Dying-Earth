@@ -2185,24 +2185,31 @@ const ICON_WORDS: [(&str, &str); 10] = [
 /// where the words are most of the width. Where an icon is missing the word comes straight back, so
 /// a failed load costs legibility and nothing else.
 fn text_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32) -> egui::Response {
-    draw_with_icons(ui, text, size, tint, &[], false)
+    draw_with_icons(ui, text, size, tint, &[])
 }
 
-/// A dense list line, where a word is traded for its glyph ONLY where it names a figure -- which is
-/// to say only directly after a number. The first picture of the Facility list showed why: the
-/// plain rule turned "Research Lab (inland): +2 Research" into "[microscope] Lab (inland): +2
-/// [microscope]", eating the word out of the building's own NAME. A tooltip is prose and still
-/// swaps everywhere; a list is figures and swaps only on the figures.
+/// A dense list line. It reads the same rule every other line does -- see `draw_with_icons` -- and
+/// exists only to carry the `extra` words below.
 ///
 /// `extra` carries words that mean a figure HERE and nowhere else. The Blame block is the whole
 /// reason it exists: there "ppm" is the Emissions a Faction is answerable for, while four lines
 /// higher the same three letters are the CO2 Stock and a Scrubber's pull on the Natural Sink, and a
 /// chimney against either of those would be a lie.
 fn figures_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(&str, &str)]) -> egui::Response {
-    draw_with_icons(ui, text, size, tint, extra, true)
+    draw_with_icons(ui, text, size, tint, extra)
 }
 
-fn draw_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(&str, &str)], after_numbers_only: bool) -> egui::Response {
+/// **The one rule for turning a word into a glyph, everywhere in the game.** A word is traded for
+/// its glyph ONLY where it names a figure, which is to say only directly after a number.
+///
+/// It arrived in two halves. Version 0.07.0 swapped a resource word anywhere it stood, which was
+/// right for the tooltips it was written for; ticket #112 pointed that at the Facility list and it
+/// ate the word out of a building's own NAME -- "Research Lab (inland): +2 Research" came out as
+/// "[microscope] Lab (inland): +2 [microscope]" -- so lists took a narrower rule and prose kept the
+/// old one. Ticket #116 then found the other half of the same fault: in prose where a resource is a
+/// sentence's SUBJECT, "Fuel goes on transits" came out as a jerrycan and a verb. The designer's
+/// answer was to narrow everything to the list rule, so there is now one rule and no flag.
+fn draw_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(&str, &str)]) -> egui::Response {
     // Ticket #116 (version 0.07.1): the row's own response comes back, so a caller can hang a
     // tooltip on a whole line of glyphs and figures.
     ui.horizontal_wrapped(|ui| {
@@ -2212,8 +2219,12 @@ fn draw_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(
             // Keep whatever punctuation rides on the word, so "30 Materials," still reads.
             let bare = token.trim_end_matches([',', '.', ';', ':']);
             let tail = &token[bare.len()..];
-            let allowed = !after_numbers_only || previous_was_a_figure;
-            previous_was_a_figure = bare.ends_with(|c: char| c.is_ascii_digit());
+            let allowed = previous_was_a_figure;
+            // A figure is a token ending in a digit that does NOT end its sentence. The full stop is
+            // what separates "1.9 Emissions" in a Facility list, where the glyph belongs, from "Tank
+            // 9 of 30. Fuel goes on transits", where it would leave a jerrycan standing as the
+            // subject of a verb.
+            previous_was_a_figure = bare.ends_with(|c: char| c.is_ascii_digit()) && !token.ends_with(['.', ';', ':']);
             match ICON_WORDS
                 .iter()
                 .chain(extra.iter())

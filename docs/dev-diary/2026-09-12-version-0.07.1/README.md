@@ -556,3 +556,19 @@ Version 0.07.0's rule that **resource words become glyphs inside tooltips** was 
 The dense lists already solved this, on ticket #112, by swapping a word **only directly after a
 number**; applying the same narrowing to tooltips would fix it. That is a change to a rule the
 designer set, so it is on the map rather than done here.
+
+### One rule for the glyphs, everywhere
+
+The designer, on the rebus left standing above: *"narrow it as suggested."*
+
+![Before and after](one-rule-for-the-glyphs.png)
+
+**A word is traded for its glyph only where it names a figure — only directly after a number — everywhere in the game.** Tooltips now read the same rule the dense lists have used since ticket #112, and `draw_with_icons` has lost the flag that let the two disagree.
+
+*"Standing is the Influence a Faction has built up here"* and *"Tank 17 of 30. Fuel goes on transits"* both read as sentences again. The Facility lists are untouched: `+7 🛒, 2 ⚡ upkeep, 1.2 🏭` is exactly what the narrow rule was written for.
+
+**One thing the narrowing needed that the list rule did not.** A full stop ends a figure. `Tank 9 of 30. Fuel goes on transits` has a digit immediately before `Fuel`, so the plain "after a number" test would have swapped it anyway and left the jerrycan standing as the subject of a verb. A figure is now a token ending in a digit that does **not** end its sentence — which costs the lists nothing, since a figure there is followed by a comma or by nothing.
+
+The rule arrived in two halves and this is the second. Version 0.07.0 swapped a resource word anywhere, which was right for the tooltips it was written for; ticket #112 pointed that at the Facility list and it ate the word out of a building's own name; ticket #116 found the same fault in prose. There is now one rule and no flag.
+
+Clippy clean with `-D warnings`, 254 tests passing.
