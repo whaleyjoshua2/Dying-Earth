@@ -172,10 +172,14 @@ this block the same three letters are the CO2 Stock and a Scrubber's pull on the
 chimney against either of those would be a lie — so the renderer takes that word as a local extra
 rather than learning it globally.
 
-Note what the picture shows about **colour**, which is the question still open on this ticket: the
-chimneys in the Blame block are already **Faction-coloured**, because the line takes the seat's
-colour and the glyph takes the line's tint. Colour on an icon already means *whose* in at least one
-place.
+**An icon's colour belongs to the icon.** The first build of this block let the glyph take its
+line's tint, so the chimney came out teal on the Custodians' line and orange on the Prospectors' —
+which quietly made an icon's colour mean *whose*, the exact collision this version is trying to end.
+The designer's correction: *"I wanted the glyphs a single fill color."* Every glyph in the game is
+now drawn in one fill, named once as `GLYPH_FILL`, whatever colour the text around it is; the
+Faction colour stays on the words and the figures, where it means what it has always meant. When the
+palette lands it replaces that one constant with one colour per figure, and still never borrows from
+the line.
 
 ![Net Emissions on the top bar](net-emissions-on-the-bar.png)
 

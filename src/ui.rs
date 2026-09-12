@@ -531,7 +531,7 @@ fn credits_screen(root: &mut Ui, session: &mut Session, icons: &Icons) {
                 ui.horizontal(|ui| {
                     ui.add_space(ui.available_width() / 2.0 - 190.0);
                     ui.spacing_mut().item_spacing.x = 8.0;
-                    if let Some(image) = icons.image(&c.resource.to_lowercase(), 22.0, Color32::from_rgb(225, 220, 210)) {
+                    if let Some(image) = icons.image(&c.resource.to_lowercase(), 22.0, GLYPH_FILL) {
                         ui.add(image);
                     }
                     ui.label(RichText::new(format!("{}: \"{}\" by {}", c.resource, c.icon, c.author)).size(15.0));
@@ -909,7 +909,7 @@ fn game_screen(
 fn bar_resource(ui: &mut Ui, icons: &Icons, key: &str, word: &str, value: String, hover: String) {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 4.0;
-        match icons.image(key, 16.0, Color32::from_rgb(225, 220, 210)) {
+        match icons.image(key, 16.0, GLYPH_FILL) {
             Some(image) => {
                 ui.add(image).on_hover_text(format!("{word}. {hover}"));
                 ui.label(RichText::new(value).strong()).on_hover_text(format!("{word}. {hover}"));
@@ -976,7 +976,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 ui.separator();
             }
             // Ticket #109: Research joins the others, its word replaced by its glyph on the bar.
-            match icons.image("research", 16.0, Color32::from_rgb(225, 220, 210)) {
+            match icons.image("research", 16.0, GLYPH_FILL) {
                 Some(image) => {
                     ui.horizontal(|ui| {
                         ui.spacing_mut().item_spacing.x = 4.0;
@@ -1789,7 +1789,7 @@ fn change_row(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, mothb
 /// unchanged, so nothing is ever lost -- only unillustrated.
 fn icon_word(ui: &mut Ui, key: &str, text: impl Into<String>) {
     let text = text.into();
-    match Icons::from_ctx(ui.ctx(), key, 15.0, Color32::from_rgb(225, 220, 210)) {
+    match Icons::from_ctx(ui.ctx(), key, 15.0, GLYPH_FILL) {
         Some(image) => {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 4.0;
@@ -1809,8 +1809,15 @@ fn icon_word(ui: &mut Ui, key: &str, text: impl Into<String>) {
 /// interface, trade them for pictures. Where an icon is missing the word comes straight back.
 fn hover_with_icons(ui: &mut Ui, text: &str) {
     ui.set_max_width(360.0);
-    text_with_icons(ui, text, 14.0, Color32::from_rgb(225, 220, 210));
+    text_with_icons(ui, text, 14.0, GLYPH_FILL);
 }
+
+/// Ticket #112 (version 0.07.1): every glyph is drawn in ONE fill, whatever the colour of the text
+/// around it. The first build of the Blame block let the glyph take its line's tint, so the chimney
+/// came out teal on the Custodians' line and orange on the Prospectors', which made an icon's colour
+/// mean "whose" -- the exact collision this version is trying to end. An icon's colour belongs to
+/// the icon.
+const GLYPH_FILL: Color32 = Color32::from_rgb(225, 220, 210);
 
 /// The eight figures that have a glyph, in both the spellings the game's prose uses. The five
 /// resources and Influence are capitalised as defined terms; population and emissions are written
@@ -1866,7 +1873,7 @@ fn draw_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(
                 .iter()
                 .chain(extra.iter())
                 .find(|(w, _)| allowed && *w == bare)
-                .and_then(|(_, key)| Icons::from_ctx(ui.ctx(), key, size, tint))
+                .and_then(|(_, key)| Icons::from_ctx(ui.ctx(), key, size, GLYPH_FILL))
             {
                 Some(image) => {
                     if tail.is_empty() {
