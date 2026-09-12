@@ -180,13 +180,21 @@ Both were made on the designer's direct instruction before the map was charted, 
 - **Section 9:** an AI Lead is never asked, so simulate mode is untouched; the refusal's sentence names the Faction.
 - **Section 10:** the shortened heat sentence is its own template (`heat_unrest_only`) rather than a conditional clause.
 
-## 14. What was measured
+## 14. The kit
+
+The Windows kit is `dist/dying-earth-0.07.0/` and `dist/dying-earth-0.07.0-playtest.zip` (37.3 MB), built from the release profile, whose `.cargo/config.toml` links the C runtime statically so the exe runs on a machine with no Visual C++ runtime installed. The tester's note is `docs/playtest/PLAYTEST.txt`, copied into the kit as `README.txt`.
+
+**Asserted rather than assumed:** the kit's own exe was run from the kit folder in `shot:` mode and produced its pictures, so the folder carries everything it needs — the new `assets/icons/` included.
+
+**No Linux kit**, at the designer's word; the `release-kits` workflow was not run.
+
+## 15. What was measured
 
 Every figure in this document came from a run, not an estimate. The four-seating twenty-seed sweep is the standing instrument; new in this version is a **headless driver for seat 0** (`cargo run -p dying-earth-engine --example play`), which plays a whole game from the outside and is what the twelve playtests used.
 
 **A caution the driver earned:** it did not enforce the Tech pick (section 9), and twelve playtest games drew a false conclusion from it. What a tool measures is only as good as its fidelity to the game, which is the argument for rules living in the engine.
 
-## 15. The sweep at the end of the version
+## 16. The sweep at the end of the version
 
 Four seatings, twenty seeds each, the standing instrument. Seat 0 is named first.
 
@@ -203,7 +211,7 @@ Four seatings, twenty seeds each, the standing instrument. Seat 0 is named first
 
 **The Archivists win nothing** in these 80, from any seat, though the Archive itself now completes (section 12). Their Colonists-at-the-Archive half is the half to look at.
 
-## 16. What is left open
+## 17. What is left open
 
 - **The Victory bars want re-fitting.** Every one was set against an AI that never contested them, and three of four were cleared before turn 17 by a player who was trying. Nothing here re-fits them.
 - **The Custodians win 49 of 80 games across the four seatings** and 20 of 20 from their own, having been unable to meet their condition at all before section 11 (see section 15). The first thing the next version should measure.
