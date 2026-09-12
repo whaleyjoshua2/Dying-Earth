@@ -461,7 +461,7 @@ fn ducats_pay_for_a_leapfrog_and_repairs_at_the_table_rates() {
     g.commit_orders(Seat(0), &[r]);
     assert_eq!(g.seats[0].stockpile.ducats, 10);
     // A repair: 10 Ducats a point, same legality as a Materials repair.
-    g.ships.push(Ship { id: ShipId(1), kind: UnitKind::Frigate, seat: Seat(0), damage: 1, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30 });
+    g.ships.push(Ship { id: ShipId(1), kind: UnitKind::Frigate, seat: Seat(0), damage: 1, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
     let fix = Order::RepairWithDucats { unit: UnitRef::Ship(ShipId(1)), points: 1 };
     assert_eq!(g.order_cost(Seat(0), &fix).ducats, 10);
     assert!(g.check_order(Seat(0), &[], &fix).is_ok());
@@ -530,7 +530,7 @@ fn ships_are_built_only_at_shipyards_and_lifts_need_a_launch_site() {
     assert!(g.check_order(Seat(0), &[], &frigate(Place::Colony(iss))).is_ok());
     // Lifts: a Ship at Earth loads Colonists only from a state with a Launch Site, and each lift is a launch.
     let ship = ShipId(g.fresh_id());
-    g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30 });
+    g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
     g.state_mut(StateId::NorthAfrica).control = Control::Controlled(Seat(0));
     g.state_mut(StateId::NorthAfrica).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
     // Ticket #73: a lift takes Emigrants already mustered, so both states hold some.
@@ -543,7 +543,7 @@ fn ships_are_built_only_at_shipyards_and_lifts_need_a_launch_site() {
     g.commit_orders(Seat(0), &[from_asia]);
     assert_eq!(g.climate.launches_pending[0], 1, "a lift is a launch");
     // Leaving orbit is no launch: the Ship is already up.
-    g.commit_orders(Seat(0), &[Order::Transit { ship, to: BodyId::Moon }]);
+    g.commit_orders(Seat(0), &[Order::Transit { ship, to: BodyId::Moon, slot: None }]);
     assert_eq!(g.climate.launches_pending[0], 1);
 }
 
@@ -642,7 +642,7 @@ fn only_a_carrier_carries_an_army_and_a_colony_ship_carries_only_colonists() {
     let mut g = game();
     let army = ArmyId(g.fresh_id());
     g.armies.push(Army { id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
-    let ship = |id: u32, kind: UnitKind| Ship { id: ShipId(id), kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30 };
+    let ship = |id: u32, kind: UnitKind| Ship { id: ShipId(id), kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None };
     g.ships.extend([ship(101, UnitKind::ColonyShip), ship(102, UnitKind::Battleship), ship(103, UnitKind::Carrier)]);
     let load_army = |s: u32| Order::Load { ship: ShipId(s), colonists: 0, from: LoadSource::State(StateId::EastAsia), army: Some(army) };
     assert!(g.check_order(Seat(0), &[], &load_army(101)).is_err(), "a Colony Ship carries Colonists only");
@@ -963,7 +963,7 @@ fn launch_pad_fire_closes_a_launch_site_unless_clean_propellant_is_known() {
     g.resolution_phase();
     assert!(!g.state(StateId::EastAsia).facilities.iter().find(|f| f.kind == FacilityKind::LaunchSite).unwrap().online, "the Launch Site is offline");
     let ship = ShipId(g.fresh_id());
-    g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30 });
+    g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
     assert!(g.check_order(Seat(0), &[], &Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::EastAsia), army: None }).is_err(), "nothing lifts from a closed Launch Site");
     // With Clean Propellant the Launch Site stays open.
     let mut g = game();
@@ -1052,7 +1052,7 @@ fn the_methane_burst_adds_scaled_emissions_next_turn_that_do_not_count_against_s
 #[test]
 fn meteor_shower_hits_ships_in_orbit_not_in_transit_and_hardened_hulls_shrug() {
     let mut g = game();
-    let mk = |id: u32, at: ShipAt| Ship { id: ShipId(id), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at, colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30 };
+    let mk = |id: u32, at: ShipAt| Ship { id: ShipId(id), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at, colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None };
     g.ships.push(mk(1, ShipAt::Body(BodyId::Earth)));
     g.ships.push(mk(2, ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 2 }));
     drawn(&mut g, EventId::MeteorShower, EventTarget::Everyone);
@@ -1182,7 +1182,7 @@ fn tech_efficient_transit_cuts_fuel() {
 #[test]
 fn tech_hardened_hulls_adds_two_strength_to_every_ship_but_a_colony_ship_stays_at_zero() {
     let mut g = game();
-    let f = Ship { id: ShipId(1), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30 };
+    let f = Ship { id: ShipId(1), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None };
     let c = Ship { kind: UnitKind::ColonyShip, ..f.clone() };
     assert_eq!(g.ship_strength(&f), 3);
     with_tech(&mut g, TechId::HardenedHulls);
@@ -1306,7 +1306,7 @@ fn colony_attack_turns(seed: u64) -> Option<u32> {
         let attacker = ArmyId(g.fresh_id());
         let ship = ShipId(g.fresh_id());
         g.armies.push(Army { id: attacker, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
-        g.ships.push(Ship { id: ship, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, army: Some(attacker), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30 });
+        g.ships.push(Ship { id: ship, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, army: Some(attacker), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
         attackers.push(attacker);
         ships.push(ship);
     }
@@ -1452,7 +1452,7 @@ fn only_climate_cards_scale_with_the_temperature() {
     }
     assert_eq!(seen, 4);
     // And a Meteor Shower does one damage at +3.0 as at +1.2.
-    let mk = |id: u32| Ship { id: ShipId(id), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30 };
+    let mk = |id: u32| Ship { id: ShipId(id), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None };
     g.ships.push(mk(1));
     drawn(&mut g, EventId::MeteorShower, EventTarget::Everyone);
     g.apply_event_now();
@@ -1566,7 +1566,7 @@ fn orbital_control_needs_the_only_engaged_warship_at_the_body() {
         escaped: false,
         arrived_this_turn: false,
         built_turn: 1,
-        fuel: 30,
+        fuel: 30, slot: None,
     };
     assert_eq!(g.orbital_control(BodyId::Mars), None, "nobody is there");
     g.ships.push(warship(201, Seat(0)));
@@ -1755,7 +1755,7 @@ fn a_tie_between_seats_is_drawn_from_the_seed_and_is_the_same_every_replay() {
         escaped: false,
         arrived_this_turn: false,
         built_turn: 1,
-        fuel: 30,
+        fuel: 30, slot: None,
     });
     for _ in 0..8 {
         assert_eq!(g.tiebreak_at_body(BodyId::Mars, &[Seat(0), Seat(1)]), Seat(1), "the stronger stack takes it");
@@ -1779,7 +1779,7 @@ fn a_colony_ship(g: &mut Game, seat: Seat, body: BodyId) -> ShipId {
         escaped: false,
         arrived_this_turn: false,
         built_turn: 1,
-        fuel: 30,
+        fuel: 30, slot: None,
     });
     id
 }
@@ -3839,7 +3839,7 @@ fn g_antarctica_opens_at_one_point_six_and_stays_open() {
         escaped: false,
         arrived_this_turn: false,
         built_turn: turn,
-        fuel: 30,
+        fuel: 30, slot: None,
     });
     let found = Order::Unload { ship: id, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Earth, 0) };
     let refused = g.check_order(Seat(0), &[], &found).unwrap_err();
@@ -4264,7 +4264,7 @@ fn the_ai_banks_fuel_when_the_mars_window_is_within_two_turns() {
                 escaped: false,
                 arrived_this_turn: false,
                 built_turn: 1,
-                fuel: 30,
+                fuel: 30, slot: None,
             });
         }
         g
@@ -4308,12 +4308,12 @@ fn a_loaded_colony_ship_goes_to_the_moon_when_mars_is_a_year_away() {
     let (mars_turns, _) = g.transit_cost_for(cust, BodyId::Earth, BodyId::Mars);
     assert!(mars_turns >= 8, "off the window Mars is far: {mars_turns} turns");
     let ship = ShipId(900);
-    g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: cust, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30 });
+    g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: cust, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
     g.seats[cust.index()].stockpile.fuel = 100;
     g.seats[cust.index()].stockpile.energy = 200;
     let orders = g.ai_orders(cust);
     let dest = orders.iter().find_map(|o| match o {
-        Order::Transit { ship: s, to } if *s == ship => Some(*to),
+        Order::Transit { ship: s, to, .. } if *s == ship => Some(*to),
         _ => None,
     });
     assert_eq!(dest, Some(BodyId::Moon), "the Moon, not a year-long flight: {orders:?}");
@@ -4339,7 +4339,7 @@ fn colony_ship_ready(g: &mut Game, body: BodyId) -> (ShipId, Order) {
         escaped: false,
         arrived_this_turn: false,
         built_turn: turn,
-        fuel: 30,
+        fuel: 30, slot: None,
     });
     // Ticket #93: a Body with no Colony Slots (Venus) gets slot 0, an order the check will refuse.
     let slot = g.free_slots_on(body).first().copied().unwrap_or(0);
@@ -4454,7 +4454,7 @@ fn a_rivals_paragraph_names_its_visible_orders_and_none_of_its_scores() {
         escaped: false,
         arrived_this_turn: false,
         built_turn: turn,
-        fuel: 30,
+        fuel: 30, slot: None,
     });
     // One order of every visible kind: each must have its own sentence.
     let every: Vec<Order> = vec![
@@ -4470,7 +4470,7 @@ fn a_rivals_paragraph_names_its_visible_orders_and_none_of_its_scores() {
         Order::SetArchiveFunding { on: true },
         Order::Repair { unit: UnitRef::Ship(ship), points: 1 },
         Order::RepairWithDucats { unit: UnitRef::Ship(ship), points: 1 },
-        Order::Transit { ship, to: BodyId::Moon },
+        Order::Transit { ship, to: BodyId::Moon, slot: None },
         Order::ShipStance { body: BodyId::Earth, stance: Stance::Hold },
         Order::ArmyStance { place: Place::State(StateId::EastAsia), stance: Stance::Hold },
         Order::MoveArmy { army: ArmyId(0), to: StateId::Europe },
@@ -5837,7 +5837,7 @@ fn a_transit_spends_the_tank_and_is_refused_when_the_tank_cannot_pay() {
     let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
     g.ship_mut(ship).unwrap().fuel = 30;
     g.seats[0].stockpile.fuel = 0;
-    let to_mars = Order::Transit { ship, to: BodyId::Mars };
+    let to_mars = Order::Transit { ship, to: BodyId::Mars, slot: None };
     assert_eq!(g.order_cost(Seat(0), &to_mars).fuel, 0, "the Stockpile pays nothing");
     assert!(g.check_order(Seat(0), &[], &to_mars).is_ok(), "20 of the 30 in the tank");
     g.commit_orders(Seat(0), std::slice::from_ref(&to_mars));
@@ -5845,9 +5845,9 @@ fn a_transit_spends_the_tank_and_is_refused_when_the_tank_cannot_pay() {
     assert_eq!(g.seats[0].stockpile.fuel, 0);
     let (poor, _) = colony_ship_ready(&mut g, BodyId::Earth);
     g.ship_mut(poor).unwrap().fuel = 5;
-    let err = g.check_order(Seat(0), &[], &Order::Transit { ship: poor, to: BodyId::Mars }).unwrap_err().0;
+    let err = g.check_order(Seat(0), &[], &Order::Transit { ship: poor, to: BodyId::Mars, slot: None }).unwrap_err().0;
     assert!(err.contains("tank"), "{err}");
-    assert!(g.check_order(Seat(0), &[], &Order::Transit { ship: poor, to: BodyId::Moon }).is_err(), "6 needed, 5 in the tank");
+    assert!(g.check_order(Seat(0), &[], &Order::Transit { ship: poor, to: BodyId::Moon, slot: None }).is_err(), "6 needed, 5 in the tank");
 }
 
 /// Ticket #87: Refuel is an order at a Body where the Ship's Faction holds a station, filling from
@@ -6195,7 +6195,7 @@ fn a_venus_station_is_built_from_a_ship_in_orbit_and_its_colonists_are_off_earth
     assert_eq!(g.colony(station).unwrap().colonists, 4);
     assert_eq!(g.off_world_colonists(Seat(0)), 4, "Venus is off Earth");
     assert_eq!(g.bodies_settled(Seat(0), 4), 1, "and a Body for Diaspora");
-    assert!(g.check_order(Seat(0), &[], &Order::Transit { ship, to: BodyId::Mars }).unwrap_err().0.contains("Venus"));
+    assert!(g.check_order(Seat(0), &[], &Order::Transit { ship, to: BodyId::Mars, slot: None }).unwrap_err().0.contains("Venus"));
 }
 
 /// Ticket #93: the AI raises a station at Venus when a Ship of its own stands there.
@@ -6499,4 +6499,118 @@ fn a_leapfrog_lowers_the_states_baseline_emissions_as_well() {
         g.state_mut(sid).baseline_cut += cut;
     }
     assert_eq!(g.baseline_emissions(sid), 0.0, "a Baseline never falls below nothing");
+}
+
+
+/// Ticket #99 (version 0.07.0): a blockade is the business of ONE Orbital Slot. A playtested
+/// Archivist had the Archive complete at 80 of 80 on turn 19 and could not put Colonists into their
+/// OWN Space Station for nine turns, because a single rival Frigate sat in Earth orbit and the old
+/// rule shut the whole Body to everyone but its holder.
+#[test]
+fn a_warship_blockades_the_orbital_slot_it_sits_in_and_nothing_more() {
+    let mut g = game();
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("a station over Earth");
+    let (body, slot) = { let c = g.colony(station).unwrap(); (c.body, c.slot) };
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    // A rival Frigate arrives at the Body at large: it blockades nothing.
+    let rival = ShipId(g.fresh_id());
+    g.ships.push(Ship {
+        id: rival, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, army: None,
+        stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
+    });
+    // A warship of ours contests the orbit, so nobody holds Orbital Control and the ground is open:
+    // that isolates the slot rule from the ground rule.
+    let mine = ShipId(g.fresh_id());
+    g.ships.push(Ship {
+        id: mine, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, army: None,
+        stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
+    });
+    assert_eq!(g.orbital_control(body), None, "contested, so nobody holds it");
+    assert!(!g.slot_blockaded_against(Seat(0), body, slot), "a Ship at the Body at large blockades nothing");
+    assert!(g.may_unload_into(Seat(0), station), "your own station is reachable");
+    assert!(g.may_land(Seat(0), body), "and so is the ground");
+    // It moves into the station's own slot: now that one slot is shut, and only that one.
+    g.ship_mut(rival).unwrap().slot = Some(slot);
+    assert!(g.slot_blockaded_against(Seat(0), body, slot));
+    assert!(!g.may_unload_into(Seat(0), station), "the station in the blockaded slot is shut");
+    assert!(g.may_land(Seat(0), body), "the ground is untouched by a slot blockade");
+    assert_eq!(g.slot_blockaders(body, slot), vec![Seat(1)]);
+    // Another station of another slot at the same Body is untouched.
+    let other = g.colonies.iter().find(|c| c.in_orbit && c.body == body && c.slot != slot).map(|c| c.id).expect("a second station");
+    let other_seat = g.colony(other).unwrap().control.controller().unwrap();
+    assert!(g.may_unload_into(other_seat, other), "a blockade reaches no further than its slot");
+    // And the blockader itself may still use the slot it holds.
+    assert!(!g.slot_blockaded_against(Seat(1), body, slot), "it does not blockade itself");
+}
+
+/// Ticket #99: the ground answers to Orbital Control alone, and only a RIVAL holding it outright
+/// shuts the surface. Two rivals' warships present used to deny everybody, punishing the bystander.
+#[test]
+fn only_a_rival_holding_orbital_control_shuts_the_ground() {
+    let mut g = game();
+    let body = BodyId::Moon;
+    let push = |g: &mut Game, seat: Seat| {
+        let id = ShipId(g.fresh_id());
+        g.ships.push(Ship {
+            id, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, army: None,
+            stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
+        });
+    };
+    assert!(g.may_land(Seat(0), body), "an empty orbit lands anyone");
+    push(&mut g, Seat(1));
+    assert_eq!(g.orbital_control(body), Some(Seat(1)));
+    assert!(!g.may_land(Seat(0), body), "a rival holding the orbit outright shuts the ground");
+    assert!(g.may_land(Seat(1), body), "its holder lands freely");
+    // A second rival contests it: nobody holds it, so nobody is shut out.
+    push(&mut g, Seat(2));
+    assert_eq!(g.orbital_control(body), None);
+    assert!(g.may_land(Seat(0), body), "a contested orbit no longer punishes the bystander");
+}
+
+/// Ticket #99: a Refuel needs a station of yours that is not blockaded, and a rival warship sitting
+/// in an empty Orbital Slot denies that slot to a builder.
+#[test]
+fn a_blockade_stops_refuelling_and_holds_an_empty_slot_against_a_builder() {
+    let mut g = game();
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("a station");
+    let (body, slot) = { let c = g.colony(station).unwrap(); (c.body, c.slot) };
+    g.seats[0].stockpile.fuel = 100;
+    g.seats[0].stockpile.materials = 500;
+    let mine = ShipId(g.fresh_id());
+    g.ships.push(Ship {
+        id: mine, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, army: None,
+        stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 5, slot: None,
+    });
+    assert!(g.check_order(Seat(0), &[], &Order::Refuel { ship: mine }).is_ok(), "an unblockaded station fuels it");
+    let rival = ShipId(g.fresh_id());
+    g.ships.push(Ship {
+        id: rival, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, army: None,
+        stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(slot),
+    });
+    let err = g.check_order(Seat(0), &[], &Order::Refuel { ship: mine }).unwrap_err().0;
+    assert!(err.contains("blockaded"), "a blockaded station fuels nothing: {err}");
+    // An empty slot a rival warship sits in cannot be built into.
+    let free = g.free_orbital_slots(body).first().copied().expect("a free orbital slot over Earth");
+    g.ship_mut(rival).unwrap().slot = Some(free);
+    let err = g.check_order(Seat(0), &[], &Order::BuildStation { body, slot: free }).unwrap_err().0;
+    assert!(err.contains("rival warship"), "a warship in an empty slot denies it: {err}");
+}
+
+/// Ticket #99: a transit names the Orbital Slot it arrives into, and refuses a slot the Body has not
+/// got. The choice is made with the leg, so it is made before the Ship can see who will be there.
+#[test]
+fn a_transit_names_the_slot_it_arrives_into() {
+    let mut g = game();
+    let ship = ShipId(g.fresh_id());
+    g.ships.push(Ship {
+        id: ship, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None,
+        stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
+    });
+    let slots = g.tables.body(BodyId::Moon).orbital_slots;
+    let err = g.check_order(Seat(0), &[], &Order::Transit { ship, to: BodyId::Moon, slot: Some(slots) }).unwrap_err().0;
+    assert!(err.contains("Orbital Slots"), "a slot the Body has not got is refused: {err}");
+    let o = Order::Transit { ship, to: BodyId::Moon, slot: Some(0) };
+    assert!(g.check_order(Seat(0), &[], &o).is_ok());
+    g.commit_orders(Seat(0), std::slice::from_ref(&o));
+    assert_eq!(g.ship(ship).unwrap().slot, Some(0), "the leg carries the choice");
 }

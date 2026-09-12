@@ -164,7 +164,7 @@ fn build_board(session: &mut Session) {
             };
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
-            g.ships.push(Ship { id, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30 });
+            g.ships.push(Ship { id, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
         }
         // `battle:1` (a building aid): three seats bring a Frigate to Mars with Attack stances and
         // one more turn runs, so the Report carries a three-party Battle (ticket #50).
@@ -172,7 +172,7 @@ fn build_board(session: &mut Session) {
             for seat in [Seat(0), Seat(1), Seat(2)] {
                 let id = ShipId(g.fresh_id());
                 let built_turn = g.turn;
-                g.ships.push(Ship { id, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30 });
+                g.ships.push(Ship { id, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
             }
             for s in g.ships.iter_mut().filter(|s| s.at == ShipAt::Body(BodyId::Mars)) {
                 s.stance = Stance::Attack;
@@ -286,7 +286,7 @@ fn build_board(session: &mut Session) {
                 escaped: false,
                 arrived_this_turn: false,
                 built_turn,
-                fuel: 30,
+                fuel: 30, slot: None,
             });
             for _ in 0..40 {
                 let before = g.clone();
@@ -486,7 +486,7 @@ fn build_board(session: &mut Session) {
                 escaped: false,
                 arrived_this_turn: false,
                 built_turn,
-                fuel: 30,
+                fuel: 30, slot: None,
             });
             if let Some(slot) = g.free_slots_on(BodyId::Moon).first().copied() {
                 let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());

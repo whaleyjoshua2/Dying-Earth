@@ -78,6 +78,21 @@ pub enum Behind {
 }
 
 impl Game {
+    /// Ticket #99 (version 0.07.0): the Orbital Slot a warship of this seat should arrive into at
+    /// `body`: the slot of the richest rival station there, by Modules standing, and nothing for a
+    /// Ship that is not a warship or a Body where no rival keeps a station. The slot is chosen with
+    /// the leg, so this reads the board as it stands when the Ship departs.
+    pub fn ai_blockade_slot(&self, seat: Seat, body: BodyId, kind: UnitKind) -> Option<u32> {
+        if !kind.is_warship() {
+            return None;
+        }
+        self.colonies
+            .iter()
+            .filter(|c| c.in_orbit && c.body == body && c.control.controller().is_some_and(|o| o != seat))
+            .max_by_key(|c| (c.modules.len(), c.colonists))
+            .map(|c| c.slot)
+    }
+
     fn base_weight(&self, seat: Seat, cat: Cat) -> f64 {
         let w = self.tables.ai_weights(self.kind(seat));
         match cat {
@@ -1320,16 +1335,16 @@ impl Game {
                         // it the flight is longer and dearer, so the candidate is worth less --
                         // unless the seat is behind on its pace, where the gap multiplier says go.
                         let window = self.window_preference(seat, body, d);
-                        push(vec![Order::Transit { ship: s.id, to: d }], Cat::Transit, self.base_weight(seat, Cat::Transit) * window, gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
+                        push(vec![Order::Transit { ship: s.id, to: d, slot: self.ai_blockade_slot(seat, d, s.kind) }], Cat::Transit, self.base_weight(seat, Cat::Transit) * window, gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
                     }
                 }
                 if s.colonists == 0 && body != BodyId::Earth {
-                    push(vec![Order::Transit { ship: s.id, to: BodyId::Earth }], Cat::Transit, self.base_weight(seat, Cat::Transit) * 0.8, gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} back to Earth", ship_name), None);
+                    push(vec![Order::Transit { ship: s.id, to: BodyId::Earth, slot: self.ai_blockade_slot(seat, BodyId::Earth, s.kind) }], Cat::Transit, self.base_weight(seat, Cat::Transit) * 0.8, gap_for(Cat::Transit, None), 1.0, 1.0, format!("send {} back to Earth", ship_name), None);
                 }
             }
             // Ticket #43: an empty Carrier away from Earth goes home for an Army.
             if s.kind == UnitKind::Carrier && s.army.is_none() && body != BodyId::Earth {
-                push(vec![Order::Transit { ship: s.id, to: BodyId::Earth }], Cat::Transit, self.base_weight(seat, Cat::Transit) * 0.8, 1.0, 1.0, 1.0, format!("send {} back to Earth", ship_name), None);
+                push(vec![Order::Transit { ship: s.id, to: BodyId::Earth, slot: self.ai_blockade_slot(seat, BodyId::Earth, s.kind) }], Cat::Transit, self.base_weight(seat, Cat::Transit) * 0.8, 1.0, 1.0, 1.0, format!("send {} back to Earth", ship_name), None);
             }
             if s.kind.is_warship() || s.army.is_some() {
                 // Warships go where the Faction has or wants Colonies, or where a rival is: any
@@ -1344,7 +1359,7 @@ impl Game {
                 for d in dests {
                     let threat = if self.enemy_present_or_inbound(seat, d) { m.threat } else { 1.0 };
                     let base = self.base_weight(seat, Cat::Transit) * if kind == FactionKind::Prospectors { 0.9 } else { 0.6 };
-                    push(vec![Order::Transit { ship: s.id, to: d }], Cat::Transit, base, 1.0, threat, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
+                    push(vec![Order::Transit { ship: s.id, to: d, slot: self.ai_blockade_slot(seat, d, s.kind) }], Cat::Transit, base, 1.0, threat, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
                 }
                 // Load an Army aboard a Carrier at Earth for an attack on a rival Colony (ticket #43).
                 if card.carries_army && s.army.is_none() && body == BodyId::Earth && kind == FactionKind::Prospectors {
@@ -1504,7 +1519,7 @@ impl Game {
                 .iter()
                 .find(|c| {
                     c.orders.iter().any(|o| match o {
-                        Order::Transit { ship, to } => {
+                        Order::Transit { ship, to, .. } => {
                             let from = self.ships.iter().find(|s| s.id == *ship).and_then(|s| match s.at {
                                 ShipAt::Body(b) => Some(b),
                                 _ => None,

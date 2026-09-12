@@ -1489,7 +1489,10 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildShip { site, kind } => format!("Build {} at {}", kind.name(), game.place_name(*site)),
         Order::BuildArmy { place } => format!("Build Army at {}", game.place_name(*place)),
         Order::Repair { unit, points } => format!("Repair {} point(s) on {}", points, match unit { UnitRef::Ship(s) => s.to_string(), UnitRef::Army(a) => a.to_string() }),
-        Order::Transit { ship, to } => format!("Send {} to {}", ship, game.tables.body(*to).name),
+        Order::Transit { ship, to, slot } => match slot {
+            Some(n) => format!("Send {} to {}, into Orbital Slot {}", ship, game.tables.body(*to).name, n),
+            None => format!("Send {} to {}", ship, game.tables.body(*to).name),
+        },
         Order::Refuel { ship } => format!("Refuel {} ({} Fuel from the Stockpile)", ship, game.refuel_amount(Seat(0), *ship)),
         Order::ShipStance { body, stance } => format!("Ships at {}: {}", game.tables.body(*body).name, stance.name()),
         Order::ArmyStance { place, stance } => format!("Armies at {}: {}", game.place_name(*place), stance.name()),
@@ -2308,7 +2311,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             ui.label(format!("To {}: {} turn(s), {} Fuel each from the tank", game.tables.body(to).name, turns, fuel));
             for s in &ships {
                 // Ticket #87: the button reads the tank against the leg.
-                cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to }, &format!("{} {} ({}/{} in the tank)", s.kind.name(), s.id.0, s.fuel, game.tables.unit(s.kind).tank), actions);
+                cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: None }, &format!("{} {} ({}/{} in the tank)", s.kind.name(), s.id.0, s.fuel, game.tables.unit(s.kind).tank), actions);
             }
         });
     }

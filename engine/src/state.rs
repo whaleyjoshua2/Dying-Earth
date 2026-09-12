@@ -341,6 +341,11 @@ pub struct Ship {
     /// refilled only by a Refuel order at a Body with a station of its own.
     #[serde(default)]
     pub fuel: i64,
+    /// Ticket #99 (version 0.07.0): the Orbital Slot this Ship sits in, chosen with the leg that
+    /// brought it. A warship in a slot blockades that slot; `None` is the Body at large, which
+    /// blockades nothing. A Ship built at a Shipyard starts at the Body at large.
+    #[serde(default)]
+    pub slot: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1712,14 +1717,58 @@ impl Game {
         }
     }
 
-    /// Whether a seat may land Armies and Colonists at a Body (spec 9.3).
+    /// Whether a seat may land Armies and Colonists on the GROUND of a Body (spec 9.3).
+    ///
+    /// Ticket #99 (version 0.07.0): only a rival holding Orbital Control outright shuts the surface.
+    /// Before this, any enemy warship present shut the whole Body to everyone else, so a single
+    /// frigate in Earth orbit locked a Faction out of its own Space Station for nine turns, and two
+    /// rivals' warships present punished the bystander hardest by denying everybody. A blockade is
+    /// now the business of one Orbital Slot: see `slot_blockaded_against`.
     pub fn may_land(&self, seat: Seat, body: BodyId) -> bool {
         match self.orbital_control(body) {
             Some(s) => s == seat,
-            None => {
-                // Nobody holds it: allowed only if nobody contests it, meaning no enemy warship present.
-                !self.ships.iter().any(|s| s.seat != seat && s.at == ShipAt::Body(body) && s.kind.is_warship() && !s.escaped)
-            }
+            None => true,
+        }
+    }
+
+    /// Ticket #99 (version 0.07.0): a rival warship sitting in this Orbital Slot blockades it. The
+    /// blockade stops Colonists and Armies being unloaded into the station standing there, and stops
+    /// that station refuelling a Ship; it reaches no further, and never touches the ground.
+    pub fn slot_blockaded_against(&self, seat: Seat, body: BodyId, slot: u32) -> bool {
+        self.ships
+            .iter()
+            .any(|s| s.seat != seat && s.kind.is_warship() && !s.escaped && s.at == ShipAt::Body(body) && s.slot == Some(slot))
+    }
+
+    /// Ticket #99: the seats blockading this slot, for the card and the Report.
+    pub fn slot_blockaders(&self, body: BodyId, slot: u32) -> Vec<Seat> {
+        let mut v: Vec<Seat> = self
+            .ships
+            .iter()
+            .filter(|s| s.kind.is_warship() && !s.escaped && s.at == ShipAt::Body(body) && s.slot == Some(slot))
+            .map(|s| s.seat)
+            .collect();
+        v.sort();
+        v.dedup();
+        v
+    }
+
+    /// Ticket #99: a station of this seat's at this Body that a rival warship is not blockading, so
+    /// a Refuel has somewhere to draw from.
+    pub fn refuelling_station(&self, seat: Seat, body: BodyId) -> bool {
+        self.colonies.iter().any(|c| {
+            c.in_orbit && c.body == body && c.control.controller() == Some(seat) && !self.slot_blockaded_against(seat, body, c.slot)
+        })
+    }
+
+    /// Ticket #99: whether a Colony of this seat's can be reached at all -- a station in a
+    /// blockaded slot cannot, a Colony on the ground reads `may_land`.
+    pub fn may_unload_into(&self, seat: Seat, colony: ColonyId) -> bool {
+        let Some(c) = self.colony(colony) else { return false };
+        if c.in_orbit {
+            !self.slot_blockaded_against(seat, c.body, c.slot)
+        } else {
+            self.may_land(seat, c.body)
         }
     }
 

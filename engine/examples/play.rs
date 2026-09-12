@@ -127,7 +127,8 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   build archive <colony>               the Archivists only
   industry <state>                     raise the Industry Level
 
-  transit <ship> <body>                fly; spends the ship's own tank
+  transit <ship> <body> [slot]         fly; spends the ship's own tank. A warship arriving into an
+                                       Orbital Slot blockades that slot and nothing else.
   refuel <ship>                        fill the tank where you hold a station
   load <ship> <n> from <place> [army <army>]
   unload <ship> <n> [army] into slot <body> <slot>
@@ -186,7 +187,15 @@ fn parse_line(line: &str) -> Result<Line, String> {
             }
         }
         "industry" => Order::RaiseIndustry { state: pick(&StateId::ALL, at(1)?)? },
-        "transit" => Order::Transit { ship: ship_id(at(1)?)?, to: pick(&BodyId::ALL, at(2)?)? },
+        "transit" => Order::Transit {
+            ship: ship_id(at(1)?)?,
+            to: pick(&BodyId::ALL, at(2)?)?,
+            // Ticket #99: an optional Orbital Slot to arrive into; a warship there blockades it.
+            slot: match w.get(3) {
+                None => None,
+                Some(v) => Some(count(v)?),
+            },
+        },
         "refuel" => Order::Refuel { ship: ship_id(at(1)?)? },
         "load" => {
             let ship = ship_id(at(1)?)?;
@@ -536,6 +545,13 @@ fn print_board(g: &Game) {
             g.module_slots(c),
             g.colony_yields(c).text()
         );
+        if c.in_orbit {
+            let by = g.slot_blockaders(c.body, c.slot);
+            let rivals: Vec<String> = by.iter().filter(|s| **s != me).map(|s| g.seat_name(*s)).collect();
+            if !rivals.is_empty() {
+                println!("    *** BLOCKADED by the {} : no unloading here, and it refuels nothing ***", rivals.join(" and the "));
+            }
+        }
         println!(
             "    your Standing {}, {}",
             g.seat(me).influence.get(&Place::Colony(c.id)).copied().unwrap_or(0),
@@ -567,11 +583,12 @@ fn print_board(g: &Game) {
     }
     for sh in &g.ships {
         println!(
-            "ship {:<3} {:<12} seat {} at {:<26} tank {}/{} | colonists {} | army {:?} | hp {} | {}{}",
+            "ship {:<3} {:<12} seat {} at {:<26} slot {:<4} tank {}/{} | colonists {} | army {:?} | hp {} | {}{}",
             sh.id.0,
             sh.kind.name(),
             sh.seat.0,
             ship_at_text(sh.at),
+            sh.slot.map(|n| n.to_string()).unwrap_or_else(|| "-".into()),
             sh.fuel,
             t.unit(sh.kind).tank,
             sh.colonists,

@@ -49,7 +49,11 @@ pub enum Order {
     BuildShip { site: Place, kind: UnitKind },
     BuildArmy { place: Place },
     Repair { unit: UnitRef, points: u32 },
-    Transit { ship: ShipId, to: BodyId },
+    /// Ticket #99 (version 0.07.0): a Ship may name the Orbital Slot it arrives into. A warship
+    /// sitting in a slot blockades that slot and nothing else; `None` arrives at the Body at large,
+    /// blockading nothing. The slot is chosen with the leg, so it is chosen before the Ship can see
+    /// who will be there when it lands.
+    Transit { ship: ShipId, to: BodyId, slot: Option<u32> },
     /// Version 0.06.0 (ticket #87): fill a Ship's tank from the Stockpile at a Body where its
     /// Faction holds a Space Station, as far as the Stockpile can pay.
     Refuel { ship: ShipId },
@@ -450,6 +454,10 @@ impl Game {
                         "needs a Colony of yours on this Body"
                     });
                 }
+                // Ticket #99 (version 0.07.0): a rival warship sitting in the slot denies it.
+                if self.slot_blockaded_against(seat, *body, *slot) {
+                    return fail(format!("a rival warship holds Orbital Slot {slot} over {}", self.tables.body(*body).name));
+                }
                 Ok(cost)
             }
             Order::BuildFacility { state, kind } => {
@@ -705,7 +713,7 @@ impl Game {
                 }
                 Ok(cost)
             }
-            Order::Transit { ship, to } => {
+            Order::Transit { ship, to, slot } => {
                 let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
                 if s.seat != seat {
                     return fail("not your Ship");
@@ -724,6 +732,13 @@ impl Game {
                 if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
+                // Ticket #99 (version 0.07.0): the Orbital Slot it arrives into, chosen with the leg.
+                if let Some(n) = slot {
+                    let slots = self.tables.body(*to).orbital_slots;
+                    if *n >= slots {
+                        return fail(format!("{} has {} Orbital Slots, numbered 0 to {}", self.tables.body(*to).name, slots, slots.saturating_sub(1)));
+                    }
+                }
                 // Ticket #87: the leg is paid from the tank.
                 let (_, fuel) = self.transit_cost_for(seat, from, *to);
                 if s.fuel < fuel {
@@ -739,6 +754,10 @@ impl Game {
                 let ShipAt::Body(body) = s.at else { return fail("in transit") };
                 if !self.own_station_at(seat, body) {
                     return fail(format!("no station of yours over {} to refuel at", self.tables.body(body).name));
+                }
+                // Ticket #99 (version 0.07.0): a blockaded station fuels nothing.
+                if !self.refuelling_station(seat, body) {
+                    return fail(format!("every station of yours over {} is blockaded", self.tables.body(body).name));
                 }
                 if s.fuel >= self.tables.unit(s.kind).tank {
                     return fail("the tank is full");
@@ -1157,7 +1176,7 @@ impl Game {
                     }
                 }
                 Order::Repair { unit, points } => self.pending.repairs.push((seat, *unit, *points)),
-                Order::Transit { ship, to } => {
+                Order::Transit { ship, to, slot } => {
                     let from = match self.ship(*ship).map(|s| s.at) {
                         Some(ShipAt::Body(b)) => b,
                         _ => continue,
@@ -1169,6 +1188,8 @@ impl Game {
                     if let Some(s) = self.ship_mut(*ship) {
                         s.at = ShipAt::Transit { from, to: *to, turns_left: turns };
                         s.fuel = (s.fuel - fuel).max(0);
+                        // Ticket #99: it arrives into the slot the leg named, or the Body at large.
+                        s.slot = *slot;
                     }
                     self.log(format!("{} launches {} toward {} ({} turns, {} Fuel from the tank).", self.seat_name(seat), ship, name, turns, fuel));
                 }
@@ -1459,7 +1480,7 @@ impl Game {
             Order::BuildArchive { colony } => r("build_archive", &[("colony", place(Place::Colony(*colony)))]),
             Order::SetArchiveFunding { on } => r(if *on { "fund_archive" } else { "unfund_archive" }, &[]),
             Order::Repair { unit, .. } | Order::RepairWithDucats { unit, .. } => r("repair", &[("unit", unit_of(*unit))]),
-            Order::Transit { ship, to } => {
+            Order::Transit { ship, to, .. } => {
                 let unit = self.ship(*ship).map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into());
                 r("transit", &[("unit", unit), ("body", self.tables.body(*to).name.clone())])
             }

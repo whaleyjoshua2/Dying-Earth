@@ -427,8 +427,12 @@ The account of every Battle from the last end-of-turn processing, read at the st
 _Avoid_: combat log, after-action report
 
 **Orbital Control**:
-Held at a Body by a Faction that has a Frigate or Battleship there with no enemy warship still engaged. Armies and Colonists can land only where their Faction holds it or nobody contests it.
+Held at a Body by a Faction that has a Frigate or Battleship there with no enemy warship still engaged. Since version 0.07.0 it governs the GROUND alone: Armies and Colonists land freely unless a rival holds it outright, so an orbit two Factions contest shuts out neither. What a station suffers is a Blockade, which is a different thing.
 _Avoid_: blockade, orbital supremacy, space superiority
+
+**Blockade**:
+What a warship does by sitting in an Orbital Slot, since version 0.07.0. A Ship chooses the Slot it arrives into when its leg is ordered, before it can see who will be there; a Frigate or Battleship sitting in one shuts that Slot to every other Faction, and nothing else. Nobody may unload Colonists or Armies into the station standing there, nobody may refuel from it, and an empty Slot under blockade cannot be built into. It never touches the ground, never reaches another Slot at the same Body, and never shuts a Faction out of a place no warship is sitting on.
+_Avoid_: siege, embargo, interdiction, orbital control
 
 **Occupation**:
 The state of a Nation State or Colony whose defenders were beaten by an Army. The occupier chooses build orders but does not direct its Armies; control transfers after the lesser of three turns or the population being Pacified.
