@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.07.0
+DYING EARTH - playtest build, version 0.07.1
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,49 +16,49 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-   (Windows only this time; there is no Linux zip for 0.07.0.)
+   (Windows only again; there is no Linux zip for 0.07.1.)
 
-WHAT CHANGED SINCE 0.06.0
+WHAT CHANGED SINCE 0.07.0
 -------------------------
-This version came out of twelve games played against 0.06.0 by computer players told to
-try to win. They found the game could be broken, so most of this is repair.
+This one is almost all about reading the board and reaching its controls. Nothing about
+how the game is won has changed, and only one number moved.
 
-- COLONIES AND STATIONS NOW HAVE A SIZE. A colony or station holds 3 buildings free and
-  one more for every colonist living there. Before this there was no limit at all, and a
-  single Moon colony could grow to 79 mines and generators and out-earn a whole planet.
-  People now gate industry, so habitats matter: a full one always pays for itself and
-  more.
-- THE COMPUTER RESEARCHES NOW. It built almost no laboratories before, which meant it
-  never reached the technology its own victory needs. It does now, and computer players
-  win about a third of games instead of none.
-- THE TECH CHOICE IS A CHOICE OF THREE. Whoever leads research picks the next technology
-  from three, not from everything - and YOUR OWN victory technology is always one of the
-  three once you can reach it, so nobody can lock you out of your own win. The first
-  technology of the game is still a free pick from all of rung 1.
-- THE TURN WILL NOT END until you have picked a technology when it is your turn to. A
-  box tells you why, with a button to the tech tree.
-- WARSHIPS BLOCKADE ONE ORBITAL SLOT, NOT A WHOLE WORLD. Give a slot when you fly -
-  "send to Mars, slot 2" - and a warship sitting there shuts that one station: nobody
-  else may unload into it, refuel from it, or build there. Everything else at that world
-  carries on, and nobody can ever shut you out of a place you hold. The ground is only
-  closed to you if a rival holds the orbit outright and uncontested.
-- THE START SCREEN'S GLOBE WORKS. Drag to turn it, wheel to zoom, click a continent to
-  take it. It opens on your side's home: the Custodians in Europe, the Prospectors in
-  East Asia, the Arkwrights in South Asia, the Archivists in North America. That is only
-  where the globe starts; you may still take any of the twelve.
-- ANTARCTICA IS NOT ON THE MAP until the ice opens. You are still told it is coming and
-  at what temperature, on the system map and the climate bar - you just cannot see which
-  of the three sites is the good one until you can go there.
-- NOTHING OPENS ITSELF. A new game starts on a clear map; the tech tree and climate panel
-  wait to be asked for. The climate panel can be dragged smaller again, and says "Already
-  locked in" where it used to say "Committed".
-- THE RESOURCES HAVE PICTURES, on the top bar and in the hover text. They come from
-  game-icons.net; the Credits button on the title screen names their authors.
-- LEAPFROG IS WORTH BUYING. It now lowers a country's baseline pollution as well as its
-  people's, so it is no longer ten times the price of a scrubber for the same good. The
-  scrubber also runs on 3 energy instead of 4.
-- THE REPORT IS SHORTER by about an eighth, all of it cut from the computer telling you
-  it had done nothing.
+- EVERYTHING THE GAME COUNTS NOW HAS A PICTURE, AND THE PICTURES HAVE COLOURS. People,
+  influence and pollution had none; they are now a person, a megaphone and a chimney.
+  Materials and Ducats swapped pictures, because the old ones were the wrong way round:
+  the "money" one was labelled Materials and the "mineral" one was labelled Ducats. All
+  eight now have a colour of their own, so you can pick a figure out of a line without
+  reading it - the red jerrycan is fuel, the brown chimney is pollution.
+- THE CONTROLS YOU USE EVERY TURN NOW LIVE IN ONE CORNER. Bottom right, under the panel:
+  how much Influence you have left, a Spend button for whatever you have clicked,
+  a Defence button, and End Turn. End Turn has MOVED there from the top of the screen.
+- THE DEFENCE BUTTON spreads your unspent Influence across the places a rival could
+  actually take, most threatened first. It funds a place all the way to safe or not at
+  all, because holding a place is a threshold and not a race - half-defending two places
+  loses both. Tick "every turn" and it does the same each turn, as ordinary orders you
+  can read and cancel before you end the turn. It never spends behind your back. The
+  computer players defend the same way now.
+- INFLUENCE IS THE FIRST THING ON A COUNTRY'S CARD, not the last. It used to be below
+  the buildings, the armies and two paragraphs of help.
+- THE ROSTER ON THE RIGHT IS SORTED AND SHORTER. Each heading says how many rows still
+  want an order from you, and clicking that number hides everything else in that group.
+  Armies no longer nag: an army keeps the stance you gave it until you move it, and the
+  row now shows which stance that is.
+- THE COLONY SITE NUMBERS ON A WORLD MAP ARE PICTURES NOW. "M 1.22 G 0.80 R 1.86 H 1.63"
+  was four letters nobody was ever taught; it is now a cart, a bolt, a can and a person,
+  which is what a mine, a generator, a refinery and a habitat would make there.
+- NINE MORE THINGS EXPLAIN THEMSELVES WHEN YOU POINT AT THEM. The rule is: if the game
+  shows you a bare number that a rule governs, pointing at it tells you the rule. Unrest
+  and its three thresholds; what a Standing is and how fast it fades; how a country's
+  building slots are set; what a building's upkeep and pollution actually do; a colony's
+  size limit; a ship's tank and what "stranded" means.
+- TWO SIDES CHANGED COLOUR. The Arkwrights are a darker purple and the Archivists are
+  crimson instead of pale blue. This was to keep side colours and figure colours from
+  being confused with each other. Map labels are also drawn lighter, so they read against
+  their own territory.
+- RESEARCH COSTS A TENTH MORE. The only balance change. It is a nudge: measured over
+  eighty computer-only games it costs the tech tree four completions out of eighty and
+  makes a game two or three turns longer.
 
 HOW TO PLAY, IN ONE MINUTE
 --------------------------
@@ -69,38 +69,43 @@ HOW TO PLAY, IN ONE MINUTE
   Drag to turn the globe, mouse wheel to zoom. Tab switches to the Solar System Map;
   Esc goes back.
 - Build things with the buttons on a card. Hover a build button to see the cost and what
-  it makes.
+  it makes. Hover almost any number now: if a rule sets it, the rule is there.
 - Spend Influence on other countries to win them over. Your home country starts held.
+  Click a country and use the Spend button in the bottom-right corner, or the one on its
+  card. Press Defence to spread what is left over the places you might lose.
 - Every country has an "Unrest" number. Heat, floods and refugees push it up. At 4 its
   army stops growing, at 7 its factories work at half speed, and at 10 the country throws
   you out. Pay Relief, build a Constabulary, or muster Emigrants to push it back down.
 - If you are the Custodians, build Scrubbers: they cost no building space, they pull
-  carbon back out of the air, and they calm the country they stand in. Leapfrog is worth
-  a look now too.
+  carbon back out of the air, and they calm the country they stand in.
 - Open the Climate Panel (the C key). The coloured bar marks every point where the world
-  changes for good, including where Antarctica opens.
+  changes for good, including where Antarctica opens. The top bar now also shows this
+  turn's net pollution beside the temperature, so you can see at a glance whether the
+  world went over or under the natural sink.
 - Getting off Earth: put a Shipyard on your station first - ships are only built at a
   Shipyard. Muster Emigrants in a country with a Launch Site, lift them, and load them on
   a Colony Ship. The Moon is one turn away. Mars is cheap only in a launch window; hover
   Mars to see when. Remember a colony's size limit: land people before you plan buildings.
-- End Turn (top left, red). Thirty-six turns. Watch the temperature in the top bar:
-  at +3.0 C the world collapses and nobody wins.
+- End Turn - BOTTOM RIGHT now, red. Thirty-six turns. Watch the temperature in the top
+  bar: at +3.0 C the world collapses and nobody wins.
 
 WHAT WE WANT TO KNOW
 --------------------
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- A rule you could not find explained anywhere.
-- DOES THE COLONY SIZE LIMIT FEEL RIGHT? Three free and one per colonist. Too tight, too
-  loose, or about right? It is the biggest change in this version.
-- Did you ever want to blockade someone, and did picking the slot when you fly make
-  sense, or did you want to move a ship between slots after it arrived?
-- Did the shortlist of three technologies feel like a real choice or a lottery?
-- CAN YOU DRAG THE CLIMATE PANEL SMALLER? We could not test that automatically, so it is
-  the one change nobody has actually watched work.
-- Do the resource pictures in the hover text read clearly, or would you rather have the
-  words back?
+- A rule you could not find explained anywhere - there should be far fewer of those now.
+- DO THE PICTURES READ? Can you tell the eight apart at a glance, in the top bar and in a
+  list of buildings? Is any one of them a puzzle? The chimney is the one we are least
+  sure of: at the size the bar draws it, you mostly see the smoke.
+- DID YOU FIND THE BOTTOM-RIGHT CORNER? End Turn moved there. Did you look for it at the
+  top first, and for how long?
+- DOES DEFENCE DO WHAT YOU EXPECT? It deliberately does nothing when nobody can take
+  anything from you, and it deliberately refuses to half-fund a place. Did it ever leave
+  Influence unspent when you wanted it used?
+- Did "every turn" feel safe, or did you want to see what it was going to do first?
+- CAN YOU DRAG THE CLIMATE PANEL SMALLER? Still the one change nobody has watched work.
+- Two sides changed colour. If you played 0.07.0, did that trip you up?
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.
@@ -109,16 +114,17 @@ Screenshots help. Print Screen, then paste into a message.
 
 KNOWN ROUGH EDGES
 -----------------
-- THE CUSTODIANS ARE TOO STRONG. Over eighty computer-only games they win 49, from any
-  seat, and 20 of 20 from Europe. Their win was impossible before this version and is now
-  close to certain; that is the next thing to fix.
-- THE ARCHIVISTS WIN NOTHING in those eighty, though the Archive itself now gets built
-  and finished. Getting twelve people to live at it is the part that fails.
+- THE CUSTODIANS ARE TOO STRONG. Over eighty computer-only games they win 69, from any
+  seat. That is the next thing to fix and this version deliberately did not touch it.
+- THE ARCHIVISTS WIN NOTHING in those eighty, though the Archive itself gets built and
+  finished. Getting twelve people to live at it is the part that fails.
 - Every side's victory target was set against a computer that never competed for it, so
-  the numbers are all suspect. A player who tries can clear three of the four well before
-  turn 36.
-- The world still collapses in about a fifth of games, more from some starting continents
-  than others. Some of that is meant to be there.
-- The Climate Panel's drag-smaller and the pictures in the hover text are the two changes
-  that could not be tested without a person; if either misbehaves, please say.
+  the numbers are all suspect.
+- RESEARCH IS NOT A CONSTRAINT. The whole tech tree gets finished in 75 of 80 games with
+  six turns or more to spare. Whether it should is a question for the next version.
+- DEFENCE ONLY REACTS AT THE LAST MOMENT. It answers a rival who could take a place next
+  turn, and nobody sooner - so somebody who jumps a long way in one turn is never
+  answered in time. Known, and not yet decided what to do about it.
+- Antarctica's three colony sites have labels that overlap each other when you are zoomed
+  out. That is older than this version, and not caused by the new pictures.
 - No sound, no tutorial beyond the first Report.
