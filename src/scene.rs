@@ -197,7 +197,10 @@ pub fn sync_scene(
     };
     // Globes turn under the pointer; the start-screen Earth spins on its own.
     for (globe, mut t) in &mut globes {
-        let yaw = if matches!(session.screen, Screen::ChooseStart { .. }) { view.spin } else { view.yaw };
+        // Ticket #100 (version 0.07.0): the start globe follows its own spin only until the player
+        // takes hold of it; from then on it follows the pointer, like every other globe.
+        let spinning = matches!(session.screen, Screen::ChooseStart { .. }) && !view.start_grabbed;
+        let yaw = if spinning { view.spin } else { view.yaw };
         t.rotation = Quat::from_rotation_x(view.pitch) * Quat::from_rotation_y(yaw) * geo::upright();
         let _ = globe;
     }
@@ -206,8 +209,10 @@ pub fn sync_scene(
         t.rotation = Quat::from_rotation_y(turn as f32 * 0.3) * geo::upright();
     }
     let Some(game) = session.game.as_ref() else {
+        // Ticket #100: no game yet, so this is the start screen. Its globe zooms on the wheel, as
+        // the Earth Map does once the game is running.
         for mut t in &mut camera {
-            *t = Transform::from_xyz(0.0, 0.0, 6.0).looking_at(Vec3::ZERO, Vec3::Y);
+            *t = Transform::from_xyz(0.0, 0.0, 6.0 * view.zoom).looking_at(Vec3::ZERO, Vec3::Y);
         }
         return;
     };

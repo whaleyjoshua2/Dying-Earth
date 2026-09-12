@@ -236,6 +236,12 @@ pub struct ViewState {
     pub solar_yaw: f32,
     pub zoom: f32,
     pub spin: f32,
+    /// Ticket #100 (version 0.07.0): the start-screen globe has been taken hold of, so it stops
+    /// spinning for good and answers the pointer from here on.
+    pub start_grabbed: bool,
+    /// Ticket #100: the Faction the start globe was last aimed for, so the opening view is set once
+    /// and a drag is never undone by the next frame.
+    pub start_aimed: Option<FactionKind>,
     pub selection: Selection,
     pub popup: Popup,
     pub show_tech: bool,
@@ -270,6 +276,8 @@ impl Default for ViewState {
             solar_yaw: 0.0,
             zoom: 1.0,
             spin: 0.0,
+            start_grabbed: false,
+            start_aimed: None,
             selection: Selection::None,
             popup: Popup::None,
             show_tech: false,

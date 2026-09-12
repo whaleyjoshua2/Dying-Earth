@@ -2,6 +2,10 @@
 
 [[faction]]
 id = "custodians"
+# Ticket #100 (version 0.07.0): the continent the start screen opens the globe on for this
+# Faction. It changes nothing else: no starting position, and any of the twelve may still be
+# chosen. Energy-lean for the Scrubbers, education 1.45 for the Research their Stabilization run leans on.
+home = "europe"
 name = "Custodians"
 # Version 0.04 (ticket #46): the bare station over Earth the Faction starts with (named in bodies.toml).
 start_station = "ISS"
@@ -24,6 +28,10 @@ colour = [0.15, 0.65, 0.6]
 
 [[faction]]
 id = "prospectors"
+# Ticket #100 (version 0.07.0): the continent the start screen opens the globe on for this
+# Faction. It changes nothing else: no starting position, and any of the twelve may still be
+# chosen. Materials-lean at Industry 3 and GDP 23: the extraction engine their whole game is.
+home = "east_asia"
 name = "Prospectors"
 start_station = "Tiangong"
 blurb = "Maximize extraction regardless of ecological cost."
@@ -52,6 +60,10 @@ colour = [0.85, 0.5, 0.2]
 
 [[faction]]
 id = "arkwrights"
+# Ticket #100 (version 0.07.0): the continent the start screen opens the globe on for this
+# Faction. It changes nothing else: no starting position, and any of the twelve may still be
+# chosen. Population 19.4, the largest on Earth, and Steerage musters eight a turn at twice the population cost.
+home = "south_asia"
 name = "Arkwrights"
 # The Arkwrights start with no station over Earth (ticket #50): they leave from the ground.
 blurb = "Leave Earth: the diaspora is the point."
@@ -85,6 +97,10 @@ colour = [0.55, 0.35, 0.80]
 
 [[faction]]
 id = "archivists"
+# Ticket #100 (version 0.07.0): the continent the start screen opens the globe on for this
+# Faction. It changes nothing else: no starting position, and any of the twelve may still be
+# chosen. Education 1.5, the highest there is, and GDP 23 to pay for the Archive.
+home = "north_america"
 name = "Archivists"
 start_station = "Axiom"
 blurb = "Build the Archive and upload everyone."

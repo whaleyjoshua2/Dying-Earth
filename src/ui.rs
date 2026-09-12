@@ -291,7 +291,10 @@ pub fn draw(
     let ctx = contexts.ctx_mut()?;
     let mut root = Ui::new(ctx.clone(), "viewport".into(), egui::UiBuilder::new().layer_id(egui::LayerId::background()).max_rect(ctx.viewport_rect()));
     let mut actions: Vec<Action> = Vec::new();
-    view.spin += time.delta_secs() * 0.25;
+    // Ticket #100 (version 0.07.0): the start globe turns on its own only until a hand is put on it.
+    if !view.start_grabbed {
+        view.spin += time.delta_secs() * 0.25;
+    }
     let _ = window;
     // Ticket #59: "Saved." stands in the top bar for a few seconds and then goes.
     if let Some((_, left)) = &mut session.save_notice {
@@ -318,7 +321,10 @@ pub fn draw(
         Screen::Title => title_screen(&mut root, &mut session, &mut actions),
         Screen::Load => load_screen(&mut root, &session, &mut actions),
         Screen::ChooseFaction => faction_screen(&mut root, &session, &mut actions),
-        Screen::ChooseStart { faction } => start_screen(&mut root, &session, faction, &mut actions),
+        Screen::ChooseStart { faction } => {
+            let cam = camera.single().ok();
+            start_screen(&mut root, &session, faction, &mut view, cam, &globes, &mut actions)
+        }
         Screen::Playing | Screen::GameOver => {
             let cam = camera.single().ok();
             game_screen(&mut root, ctx, &session, &mut view, cam, &globes, &textures, &mut actions);
@@ -694,7 +700,28 @@ fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut
     });
 }
 
-fn start_screen(root: &mut Ui, session: &Session, faction: FactionKind, actions: &mut Vec<Action>) {
+#[allow(clippy::too_many_arguments)]
+fn start_screen(
+    root: &mut Ui,
+    session: &Session,
+    faction: FactionKind,
+    view: &mut ViewState,
+    cam: Option<(&Camera, &GlobalTransform)>,
+    globes: &Query<(&Globe, &GlobalTransform)>,
+    actions: &mut Vec<Action>,
+) {
+    // Ticket #100 (version 0.07.0): open the globe on this Faction's home, once. Aiming every frame
+    // would undo a drag as fast as the player made it.
+    if view.start_aimed != Some(faction) {
+        let (lon, lat) = geo::state_lonlat(session.tables.faction(faction).home);
+        view.spin = geo::yaw_facing(lon, lat);
+        view.yaw = view.spin;
+        // Tilt to the home's latitude as well, or a northern continent sits on the limb.
+        view.pitch = (lat.to_radians()).clamp(-1.3, 1.3);
+        view.zoom = 1.0;
+        view.start_grabbed = false;
+        view.start_aimed = Some(faction);
+    }
     egui::Panel::right("start_panel").default_size(320.0).show(root, |ui| {
         ui.add_space(10.0);
         ui.label(RichText::new("Choose your starting continent").size(22.0).strong());
@@ -719,8 +746,55 @@ fn start_screen(root: &mut Ui, session: &Session, faction: FactionKind, actions:
         ui.label(RichText::new("Antarctica has no people to govern: it is three Colony Slots, founded from a Colony Ship at Earth.").weak());
     });
     egui::CentralPanel::default().frame(egui::Frame::NONE).show(root, |ui| {
-        ui.allocate_exact_size(ui.available_size(), egui::Sense::hover());
+        let (_, resp) = ui.allocate_exact_size(ui.available_size(), egui::Sense::click_and_drag());
+        // Ticket #100: dragging turns the globe, the wheel zooms it, and a click picks the continent
+        // under the pointer. The first drag stops the spin for good: a spin that carried the
+        // Faction's home back out of view would undo the point of opening on it.
+        let d = resp.drag_motion();
+        if d != egui::Vec2::ZERO {
+            if !view.start_grabbed {
+                // Take the angle the spin had reached, so the globe does not jump when grabbed.
+                view.yaw = view.spin;
+                view.start_grabbed = true;
+            }
+            view.yaw += d.x * 0.008;
+            view.pitch = (view.pitch + d.y * 0.008).clamp(-1.3, 1.3);
+        }
+        if resp.hovered() {
+            let scroll = ui.input(|i| i.smooth_scroll_delta.y);
+            if scroll.abs() > 0.0 {
+                view.zoom = (view.zoom * (1.0 - scroll * 0.002)).clamp(0.45, 2.2);
+            }
+        }
+        if resp.clicked()
+            && let Some(pos) = resp.interact_pointer_pos()
+            && let Some((camera, cam_gt)) = cam
+            && let Some(sid) = start_pick(pos, camera, cam_gt, globes)
+        {
+            actions.push(Action::NewGame(faction, sid));
+        }
     });
+}
+
+/// Ticket #100 (version 0.07.0): which Nation State the pointer is over on the start screen's
+/// globe. The playing screen's picker reads a `Game`, and on this screen no game exists yet, so
+/// this walks the twelve cards' own longitudes and latitudes instead and takes the nearest.
+fn start_pick(pos: Pos2, camera: &Camera, cam_gt: &GlobalTransform, globes: &Query<(&Globe, &GlobalTransform)>) -> Option<StateId> {
+    let ray = camera.viewport_to_world(cam_gt, Vec2::new(pos.x, pos.y)).ok()?;
+    let (origin, dir) = (ray.origin, Vec3::from(ray.direction));
+    let (_, globe_gt) = globes.iter().find(|(g, _)| g.0 == BodyId::Earth)?;
+    let t = geo::ray_sphere(origin, dir, globe_gt.translation(), GLOBE_RADIUS)?;
+    let local = globe_gt.affine().inverse().transform_point3(origin + dir * t);
+    let (lon, lat) = geo::lonlat_from_local(local);
+    // The nearest card by great-circle-ish distance, longitude wrapped.
+    StateId::ALL.into_iter().min_by(|a, b| {
+        let d = |s: StateId| {
+            let (sl, sa) = geo::state_lonlat(s);
+            let dl = (((sl - lon) + 540.0) % 360.0) - 180.0;
+            dl * dl + (sa - lat) * (sa - lat)
+        };
+        d(*a).partial_cmp(&d(*b)).unwrap_or(std::cmp::Ordering::Equal)
+    })
 }
 
 // ------------------------------------------------------------------ the game
