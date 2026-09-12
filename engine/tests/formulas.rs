@@ -32,6 +32,16 @@ fn with_seed(seed: u64) -> Game {
     Game::new(tables(), NewGame { seed, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia })
 }
 
+/// Ticket #105 (version 0.07.0): `end_turn` now refuses while a human Research Lead owes a Tech, so
+/// a test that drives turns has to pick one first, exactly as a player does.
+fn pick_a_tech(g: &mut Game) {
+    if g.research.current.is_none()
+        && let Some(t) = g.pickable_techs().first().copied()
+    {
+        g.pick_tech(Seat(0), t).ok();
+    }
+}
+
 fn facility(kind: FacilityKind) -> Facility {
     Facility::new(kind)
 }
@@ -1320,7 +1330,8 @@ fn colony_attack_turns(seed: u64) -> Option<u32> {
         } else if !g.armies_of_seat_at(Seat(0), Place::Colony(cid)).is_empty() {
             orders.push(Order::ArmyStance { place: Place::Colony(cid), stance: Stance::Attack });
         }
-        g.end_turn([orders, Vec::new(), Vec::new(), Vec::new()]);
+        pick_a_tech(&mut g);
+        g.end_turn([orders, Vec::new(), Vec::new(), Vec::new()]).expect("the turn should end");
         if g.colony(cid).map(|c| c.control == Control::Controlled(Seat(0))).unwrap_or(false) {
             return Some(turn);
         }
@@ -3662,8 +3673,9 @@ fn c_start_facilities_are_coastal_first_and_a_new_build_is_inland_first() {
     // A new build takes an inland slot while one is free.
     directed(&mut g, sid);
     let orders = vec![Order::BuildFacility { state: sid, kind: FacilityKind::Bank }];
-    g.end_turn([orders, Vec::new(), Vec::new(), Vec::new()]);
-    g.end_turn(std::array::from_fn(|_| Vec::new()));
+    pick_a_tech(&mut g);
+    g.end_turn([orders, Vec::new(), Vec::new(), Vec::new()]).expect("the turn should end");
+    g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
     assert!(standing(&g, sid, false).contains(&FacilityKind::Bank), "the Bank went inland: {:?}", standing(&g, sid, false));
 }
 
@@ -4355,7 +4367,8 @@ fn the_headline_takes_the_most_severe_line_whatever_order_it_came_in() {
     let (_, found) = colony_ship_ready(&mut g, BodyId::Moon);
     let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
     orders[0] = vec![found];
-    g.end_turn(orders);
+    pick_a_tech(&mut g);
+    g.end_turn(orders).expect("the turn should end");
     let founded = g.report.lines.iter().position(|l| l.kind == LineKind::ColonyFounded).expect("a Colony was founded");
     // The Tech completes after the founding, so only the severity order can put the Colony first.
     g.research.current = Some(TechId::EfficientGrids);
@@ -4402,7 +4415,8 @@ fn every_report_line_carries_its_kind_and_place_and_falls_under_the_right_headin
     breaks_ahead(&mut g);
     let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
     orders[0] = vec![found];
-    g.end_turn(orders);
+    pick_a_tech(&mut g);
+    g.end_turn(orders).expect("the turn should end");
 
     let founded = g.report.lines.iter().find(|l| l.kind == LineKind::ColonyFounded).expect("a Colony was founded");
     assert!(matches!(founded.place, Some(ReportPlace::Colony(_))), "the founding points at its Colony: {:?}", founded.place);
@@ -4500,7 +4514,8 @@ fn a_rivals_paragraph_names_its_visible_orders_and_none_of_its_scores() {
 
     // And a real AI turn's paragraph says what it did, with none of the scored list in it.
     let mut g = game();
-    g.end_turn(std::array::from_fn(|_| Vec::new()));
+    pick_a_tech(&mut g);
+    g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
     let entry = g.report.ai_lines.iter().find(|e| e.seat == Seat(1)).expect("the Prospectors ordered");
     assert!(!entry.deeds.is_empty(), "and the Report keeps what they did");
     let para = g.rival_paragraph(Seat(1)).expect("a paragraph");
@@ -4671,7 +4686,7 @@ fn a_spectated_game_seats_four_computers_and_deals_seat_zero_by_the_spreading_ru
     assert_ne!(g.controlled_states(Seat(0)), handed.controlled_states(Seat(0)), "the spectated game took no handed-in start");
     // End Turn with empty orders runs all four seats and advances the turn.
     let turn = g.turn;
-    g.end_turn(std::array::from_fn(|_| Vec::new()));
+    g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
     assert_eq!(g.turn, turn + 1, "the turn advanced");
     assert_eq!(g.report.ai_lines.len(), SEAT_COUNT, "all four seats ordered");
     for (i, entry) in g.report.ai_lines.iter().enumerate() {
@@ -4700,7 +4715,8 @@ fn the_spectators_dispatch_carries_every_factions_works_and_all_four_paragraphs(
     g.start();
     let mut found: Option<(Seat, String)> = None;
     for _ in 0..12 {
-        g.end_turn(std::array::from_fn(|_| Vec::new()));
+        pick_a_tech(&mut g);
+        g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
         let works: Vec<&ReportLine> = g.report.sections().into_iter().find(|(s, _)| *s == Section::YourWorks).map(|(_, l)| l).unwrap_or_default();
         for seat in Seat::ALL.into_iter().skip(1) {
             let name = g.seat_name(seat);
@@ -4725,7 +4741,8 @@ fn the_spectators_dispatch_carries_every_factions_works_and_all_four_paragraphs(
     // A player's game still tells only the three rivals.
     let mut p = with_seed(7);
     p.start();
-    p.end_turn(std::array::from_fn(|_| Vec::new()));
+    pick_a_tech(&mut p);
+    p.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
     assert!(p.faction_paragraphs().iter().all(|(s, _)| *s != Seat(0)), "a player's Report keeps seat 0 out of the rivals");
 }
 // ---------------------------------------------------------------- Ticket #60: four small fixes
@@ -6613,4 +6630,59 @@ fn a_transit_names_the_slot_it_arrives_into() {
     assert!(g.check_order(Seat(0), &[], &o).is_ok());
     g.commit_orders(Seat(0), std::slice::from_ref(&o));
     assert_eq!(g.ship(ship).unwrap().slot, Some(0), "the leg carries the choice");
+}
+
+/// Ticket #105 (version 0.07.0): the turn will not end while a human Research Lead owes the table a
+/// Tech, and the rule lives in the ENGINE so every caller is bound by it. It used to live in one
+/// `add_enabled` in the interface, and the headless driver added in this same version did not know
+/// about it: twelve playtest games were played in which declining to pick froze the tech tree for
+/// good, and that was written up as "the strongest strategy in the game". It was the harness.
+#[test]
+fn the_turn_will_not_end_while_a_human_lead_owes_a_tech() {
+    let mut g = game();
+    assert_eq!(g.research.awaiting_pick, Some(Seat(0)), "the first Tech of the game is seat 0's to pick");
+    let why = g.end_turn_refusal().expect("a pick is owed, so the turn is refused");
+    assert!(why.contains("Research Lead"), "and it says why: {why}");
+    let before = g.turn;
+    assert_eq!(g.end_turn(std::array::from_fn(|_| Vec::new())), Err(why), "the turn refuses with the same words");
+    assert_eq!(g.turn, before, "and nothing advanced");
+    // Picking clears it.
+    pick_a_tech(&mut g);
+    assert!(g.end_turn_refusal().is_none());
+    assert!(g.end_turn(std::array::from_fn(|_| Vec::new())).is_ok());
+    assert_eq!(g.turn, before + 1);
+    // An AI Lead is never asked: it picks the moment it leads, so simulate mode is untouched.
+    let mut s = Game::spectate(tables(), 7);
+    s.start();
+    assert!(s.end_turn_refusal().is_none(), "every seat is an AI here");
+}
+
+/// Ticket #105 (version 0.07.0): Research banked while no Tech is under research keeps its owner,
+/// so it counts toward the Research Lead when it lands. Before this it was one unattributed pool,
+/// which produced Lead lines like "the Prospectors led (Archivists 0, Custodians 0, Prospectors 0,
+/// Arkwrights 0)": arithmetically right, and unreadable as anything but a bug.
+#[test]
+fn research_banked_between_techs_keeps_its_owner() {
+    let mut g = game();
+    g.research.current = None;
+    g.research.contributions = [0; 4];
+    // Two seats bank while nothing is under research, and a Breakthrough adds what is nobody's.
+    g.accrue_research(Seat(2), 5);
+    g.accrue_research(Seat(3), 2);
+    g.add_research_unattributed(1);
+    assert_eq!(g.research.unallocated[2], 5);
+    assert_eq!(g.research.unallocated[3], 2);
+    assert_eq!(g.research.unattributed, 1, "a Breakthrough belongs to nobody");
+    // Choosing a Tech pours it all in, each share under its own name. Public Science costs 15, so
+    // the eight banked points land without completing it and resetting what we are measuring.
+    g.research.shortlist = Vec::new();
+    g.pick_tech(Seat(0), TechId::PublicScience).unwrap();
+    assert_eq!(g.research.contributions[2], 5, "seat 2's banked Research is still seat 2's");
+    assert_eq!(g.research.contributions[3], 2);
+    assert_eq!(g.research.contributions[0], 0, "picking a Tech earns nothing");
+    assert_eq!(g.research.progress, 8, "and every point arrived, the Breakthrough included");
+    assert_eq!(g.research.unallocated, [0; 4], "the bank is emptied");
+    assert_eq!(g.research.unattributed, 0);
+    // So the Lead is the seat that actually did the work, not a draw among four zeroes.
+    assert_eq!(g.research_lead_candidates(), vec![Seat(2)]);
 }

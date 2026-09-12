@@ -786,7 +786,13 @@ fn main() {
             }
             let mut all: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
             all[0] = kept;
-            game.end_turn(all);
+            // Ticket #105 (version 0.07.0): the engine owns the rule, so the driver is bound by it
+            // too. This is the whole point: what the driver measures is what the game does.
+            if let Err(why) = game.end_turn(all) {
+                eprintln!("
+The turn did NOT end: {why}");
+                std::process::exit(1);
+            }
             store(&game, &path);
             print_report(&game);
             print_board(&game);

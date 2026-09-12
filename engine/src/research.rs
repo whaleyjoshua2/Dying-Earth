@@ -19,7 +19,8 @@ impl Game {
             return;
         }
         if self.research.current.is_none() {
-            self.research.unallocated += amount;
+            // Ticket #105: it waits under its owner's name, so it counts toward the Lead when it lands.
+            self.research.unallocated[seat.index()] += amount;
             return;
         }
         self.research.progress += amount;
@@ -30,7 +31,7 @@ impl Game {
     /// Research nobody produced (a Breakthrough).
     pub fn add_research_unattributed(&mut self, amount: i64) {
         if self.research.current.is_none() {
-            self.research.unallocated += amount;
+            self.research.unattributed += amount;
             return;
         }
         self.research.progress += amount;
@@ -74,7 +75,9 @@ impl Game {
             self.research.current = None;
             self.research.progress = 0;
             self.research.contributions = [0; SEAT_COUNT];
-            self.research.unallocated += overflow;
+            // Ticket #105: the spill past a Tech's cost belongs to nobody in particular, so it
+            // waits unattributed rather than being credited to a seat by accident.
+            self.research.unattributed += overflow;
             self.research.last_lead = Some(lead);
             let shares: Vec<String> = Seat::ALL.into_iter().map(|s| format!("{} {}", self.seat_name(s), c[s.index()])).collect();
             let line = format!(
@@ -185,7 +188,14 @@ impl Game {
         self.research.awaiting_pick = None;
         self.research.shortlist = Vec::new();
         self.research.last_picked_turn[seat.index()] = Some(self.turn);
-        let carried = std::mem::take(&mut self.research.unallocated);
+        // Ticket #105: everything banked since the last Tech pours in, each seat's share landing
+        // under its own name so the Lead line tells the truth.
+        let banked = std::mem::take(&mut self.research.unallocated);
+        let loose = std::mem::take(&mut self.research.unattributed);
+        let carried: i64 = banked.iter().sum::<i64>() + loose;
+        for s in Seat::ALL {
+            self.research.contributions[s.index()] += banked[s.index()];
+        }
         self.research.progress = 0;
         let line = format!("{} chose {} as the next Tech.", self.seat_name(seat), self.tables.tech(tech).name);
         self.log(line);

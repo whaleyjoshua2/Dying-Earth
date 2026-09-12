@@ -438,8 +438,17 @@ pub struct Research {
     pub progress: i64,
     pub contributions: [i64; SEAT_COUNT],
     pub done: Vec<TechId>,
-    /// Research produced while no Tech was chosen; flows into the next one.
-    pub unallocated: i64,
+    /// Research produced while no Tech was chosen; flows into the next one. Ticket #105 (version
+    /// 0.07.0): PER SEAT, so Research banked between Techs still counts toward the Research Lead
+    /// when it lands. Before this it was one pool and arrived unattributed, which produced Lead
+    /// lines reading "the Prospectors led (Archivists 0, Custodians 0, Prospectors 0, Arkwrights 0)"
+    /// -- arithmetically right and unreadable as anything but a bug.
+    #[serde(default)]
+    pub unallocated: [i64; SEAT_COUNT],
+    /// Ticket #105: Research nobody produced (a Breakthrough card), waiting for a Tech to pour into.
+    /// It is genuinely nobody's and counts toward no seat's Lead.
+    #[serde(default)]
+    pub unattributed: i64,
     /// Who must pick the next Tech, when a human has to.
     pub awaiting_pick: Option<Seat>,
     /// Ticket #98 (version 0.07.0): the Techs the Research Lead may choose between. Drawn when a
@@ -815,7 +824,8 @@ impl Game {
                 progress: 0,
                 contributions: [0; SEAT_COUNT],
                 done: Vec::new(),
-                unallocated: 0,
+                unallocated: [0; SEAT_COUNT],
+                unattributed: 0,
                 awaiting_pick: Some(Seat(0)),
                 // Ticket #98: empty at the opening, so the first Tech of the game is a free choice
                 // from the whole of rung 1.

@@ -151,7 +151,7 @@ fn build_board(session: &mut Session) {
                 if g.is_over() {
                     break;
                 }
-                g.end_turn(std::array::from_fn(|_| Vec::new()));
+                g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
             }
             g.seats[0].ai = spectate;
         }
@@ -185,7 +185,7 @@ fn build_board(session: &mut Session) {
             }
             let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
             orders[0] = vec![Order::ShipStance { body: BodyId::Mars, stance: Stance::Attack }];
-            g.end_turn(orders);
+            g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
             for seat in Seat::ALL.into_iter().skip(1) {
                 g.seats[seat.index()].ai = true;
             }
@@ -415,7 +415,7 @@ fn build_board(session: &mut Session) {
             g.seats[0].ai = false;
             let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
             orders[0] = vec![Order::StripPermit { state: sid }];
-            g.end_turn(orders);
+            g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
             g.seats[0].ai = true;
         }
         // `temp:<now>[,<committed>]` (a building aid, ticket #55): the Temperature is put at `now`
@@ -494,7 +494,7 @@ fn build_board(session: &mut Session) {
                 let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
                 orders[0] = vec![Order::Unload { ship: id, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Moon, slot) }];
                 g.seats[0].ai = false;
-                g.end_turn(orders);
+                g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
                 g.seats[0].ai = true;
             }
         }
@@ -618,7 +618,7 @@ fn fill_with_scrubbers(g: &mut Game, sid: StateId) {
 /// the board the aid just built.
 fn run_one_quiet_turn(g: &mut Game) {
     g.seats[0].ai = false;
-    g.end_turn(std::array::from_fn(|_| Vec::new()));
+    g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
     g.seats[0].ai = true;
 }
 
@@ -651,7 +651,7 @@ fn plant_saves(session: &mut Session) {
             if g.is_over() {
                 break;
             }
-            g.end_turn(std::array::from_fn(|_| Vec::new()));
+            g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
         }
         save::save_to(&dir, g, SaveKind::Autosave).ok();
     }
@@ -662,7 +662,7 @@ fn plant_saves(session: &mut Session) {
         if watched.is_over() {
             break;
         }
-        watched.end_turn(std::array::from_fn(|_| Vec::new()));
+        watched.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
     }
     save::save_to(&dir, &watched, SaveKind::Autosave).ok();
 }

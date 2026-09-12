@@ -354,6 +354,11 @@ pub fn draw(
             }
             Action::EndTurn => {
                 session.end_turn();
+                // Ticket #105: a refusal raises its own popup, every time, so the button never just
+                // does nothing.
+                if session.refusal.is_some() {
+                    view.popup = Popup::Refused;
+                }
                 view.selection = Selection::None;
                 let moments = session.game.as_ref().map(|g| view.moments_of(&session.tables, &g.report).len()).unwrap_or(0);
                 view.popup = if session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some() {
@@ -959,7 +964,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             ui.separator();
             let research = match game.research.current {
                 Some(t) => format!("Research {} / {} toward {}", game.research.progress, game.tables.tech(t).cost, game.tables.tech(t).name),
-                None => format!("Research: no Tech chosen ({} waiting)", game.research.unallocated),
+                None => format!("Research: no Tech chosen ({} waiting)", game.research.unallocated.iter().sum::<i64>() + game.research.unattributed),
             };
             // Ticket #104 (version 0.07.0): the Tech Tree no longer opens itself, so the bar has to
             // say when a pick is owed. End Turn is disabled until one is made, but that only shows
@@ -2798,7 +2803,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         egui::Window::new("Tech Tree").open(&mut open).resizable(false).show(ctx, |ui| {
             ui.label(match game.research.current {
                 Some(t) => format!("Under research: {} ({} of {}). {}", game.tables.tech(t).name, game.research.progress, game.tables.tech(t).cost, game.research_lead_text()),
-                None => format!("No Tech under research. {} Research waiting.", game.research.unallocated),
+                None => format!("No Tech under research. {} Research waiting.", game.research.unallocated.iter().sum::<i64>() + game.research.unattributed),
             });
             // Ticket #51: an Archivist player is told whether Provisional Findings is in force.
             if game.kind(Seat(0)) == FactionKind::Archivists {
@@ -3022,6 +3027,26 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         view.show_victory = open;
     }
     match view.popup {
+        // Ticket #105 (version 0.07.0): the engine refused to end the turn, and says why. The rule
+        // is worth nothing if the player is left wondering why the button did nothing.
+        Popup::Refused => {
+            let why = session.refusal.clone().unwrap_or_else(|| "The turn cannot end yet.".to_string());
+            egui::Modal::new("refused".into()).show(ctx, |ui| {
+                ui.set_width(460.0);
+                ui.label(RichText::new("The turn did not end").size(20.0).strong());
+                ui.label(why);
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    if ui.button("Pick a Tech").clicked() {
+                        view.popup = Popup::None;
+                        view.show_tech = true;
+                    }
+                    if ui.button("Back").clicked() {
+                        view.popup = Popup::None;
+                    }
+                });
+            });
+        }
         Popup::Event => {
             let text = game.last_event.as_ref().map(|e| e.text.clone()).unwrap_or_default();
             egui::Modal::new("event".into()).show(ctx, |ui| {

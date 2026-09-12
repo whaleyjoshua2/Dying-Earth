@@ -16,7 +16,7 @@ fn played_to(seed: u64, turn: u32) -> Game {
     let mut g = Game::spectate(tables(), seed);
     g.start();
     while g.turn < turn && !g.is_over() {
-        g.end_turn(std::array::from_fn(|_| Vec::new()));
+        g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
     }
     assert_eq!(g.turn, turn, "the game reached turn {turn}");
     g
@@ -92,10 +92,10 @@ fn a_loaded_game_plays_on_exactly_as_the_unsaved_one_would() {
     let mut loaded = save::load_from(&path, tables()).expect("the save is read back");
 
     while original.turn < 12 && !original.is_over() {
-        original.end_turn(std::array::from_fn(|_| Vec::new()));
+        original.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
     }
     while loaded.turn < 12 && !loaded.is_over() {
-        loaded.end_turn(std::array::from_fn(|_| Vec::new()));
+        loaded.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
     }
 
     assert_eq!(loaded.turn, original.turn, "both games stand on the same turn");
@@ -153,7 +153,7 @@ fn the_game_autosaves_every_third_turn_and_keeps_the_last_three() {
     g.start();
     let mut written: Vec<u32> = Vec::new();
     while g.turn < 12 && !g.is_over() {
-        g.end_turn(std::array::from_fn(|_| Vec::new()));
+        g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
         if save::autosave(dir.path(), &g).transpose().expect("the autosave is written").is_some() {
             written.push(g.turn);
         }

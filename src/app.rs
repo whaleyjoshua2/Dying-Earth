@@ -52,6 +52,9 @@ pub enum Popup {
     Report,
     /// End Turn pressed with Influence unspent (ticket #31): ask once.
     ConfirmEndTurn,
+    /// Ticket #105 (version 0.07.0): the turn was refused, and this says why. A rule nobody can see
+    /// refused by is as bad as no rule, so the refusal always speaks.
+    Refused,
 }
 
 #[derive(Resource)]
@@ -66,6 +69,8 @@ pub struct Session {
     /// The Earth Map must be recomposed (control, occupation or the sea changed).
     pub earth_dirty: bool,
     pub last_error: Option<String>,
+    /// Ticket #105 (version 0.07.0): why the last End Turn was refused, shown once in its own popup.
+    pub refusal: Option<String>,
     /// Ticket #64: nobody is playing this game. All four seats are the computer's, the interface
     /// gives no orders, and every Faction's board is open to be read.
     pub spectator: bool,
@@ -218,7 +223,15 @@ impl Session {
         let orders = std::mem::take(&mut self.pending);
         let mut all: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
         all[0] = orders;
-        game.end_turn(all);
+        // Ticket #105: the engine owns the rule now. If it refuses, nothing was committed and the
+        // orders go back where they came from, so nothing the player typed is lost.
+        let kept = all[0].clone();
+        if let Err(why) = game.end_turn(all) {
+            self.refusal = Some(why);
+            self.pending = kept;
+            return;
+        }
+        self.refusal = None;
         self.earth_dirty = true;
         let over = game.is_over();
         // Ticket #59: the autosave is written at the start of the Report phase of every third turn,
