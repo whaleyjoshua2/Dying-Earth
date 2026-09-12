@@ -261,6 +261,23 @@ fn ship_at_text(at: ShipAt) -> String {
     }
 }
 
+/// What it would take this seat to take `target` as it stands, which on a held place is the
+/// greater of its own threshold and the holder's Standing plus the challenge margin. The bare
+/// threshold is NOT the bar on a held place, and printing it understates what a push costs.
+fn standing_note(g: &Game, seat: Seat, target: Target) -> String {
+    let need = g.influence_needed_for(seat, target);
+    let mine = g.seat(seat).influence.get(&target).copied().unwrap_or(0);
+    match g.place_control(target).controller() {
+        Some(c) if c == seat => {
+            // A rival's own bar is its threshold or this Standing plus the margin, whichever is
+            // greater; the threshold half is the rival's to know, so only the margin is named.
+            format!("you hold it on {} Standing, over which a rival must climb by the challenge margin", mine)
+        }
+        Some(c) => format!("{} needed to take it from the {}", need, g.seat_name(c)),
+        None => format!("{need} needed to take it"),
+    }
+}
+
 fn slot_name(g: &Game, body: BodyId, slot: u32) -> String {
     g.tables.body(body).slots.get(slot as usize).map(|s| s.name.clone()).unwrap_or_else(|| format!("slot {slot}"))
 }
@@ -456,7 +473,7 @@ fn print_board(g: &Game) {
         let q: Vec<String> = st.queue.iter().map(|b| format!("{} due t{}", b.item.name(), b.due_turn)).collect();
         let inf = g.seat(me).influence.get(&Place::State(st.id)).copied().unwrap_or(0);
         println!(
-            "{:<16} {:<30} pop {:.1} ind {} unrest {} | free slots {}/{} (coastal {}) | your Influence {}/{} | emigrants {}",
+            "{:<16} {:<30} pop {:.1} ind {} unrest {} | free slots {}/{} (coastal {}) | your Standing {}, {} | emigrants {}",
             format!("{:?}", st.id),
             control_text(g, st.control),
             st.population,
@@ -466,7 +483,7 @@ fn print_board(g: &Game) {
             g.build_slots(st.id),
             g.free_coastal(st.id),
             inf,
-            g.influence_threshold_for(me, Place::State(st.id)),
+            standing_note(g, me, Place::State(st.id)),
             st.emigrants
         );
         println!(
@@ -510,6 +527,11 @@ fn print_board(g: &Game) {
             c.colonists,
             g.habitat_room(c),
             g.colony_yields(c).text()
+        );
+        println!(
+            "    your Standing {}, {}",
+            g.seat(me).influence.get(&Place::Colony(c.id)).copied().unwrap_or(0),
+            standing_note(g, me, Place::Colony(c.id))
         );
         println!(
             "    at {} | modules: {}{}",
