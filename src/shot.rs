@@ -114,7 +114,9 @@ const VIEWS: [(&str, View); 7] = [
     ("venus", View::Surface(BodyId::Venus)),
 ];
 
-const MENUS: [&str; 4] = ["title", "faction", "start", "report"];
+// Ticket #109: the credits picture sits between the Faction cards and the start screen, so the
+// attribution the icons' licence requires is photographed with every other menu.
+const MENUS: [&str; 5] = ["title", "faction", "credits", "start", "report"];
 
 /// Ticket #57: the Body a `hover:` aid names, by the id its data row carries.
 fn body_from_id(name: &str) -> Option<BodyId> {
@@ -719,11 +721,14 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         plan.menu_step += 1;
         match plan.menu_step {
             1 => session.screen = Screen::ChooseFaction,
-            2 => {
+            // Ticket #109: the credits, so the picture that proves the CC BY attribution is
+            // standing gets taken with every other menu picture.
+            2 => session.screen = Screen::Credits,
+            3 => {
                 session.screen = Screen::ChooseStart { faction: FactionKind::Custodians };
                 session.earth_dirty = true;
             }
-            3 => {
+            4 => {
                 build_board(&mut session);
                 plan.archive_colony = ARCHIVE_COLONY.with(|c| c.get());
                 plan.moment = std::env::args().find_map(|a| a.strip_prefix("moment:").and_then(moment_from_id));

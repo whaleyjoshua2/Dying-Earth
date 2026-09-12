@@ -41,3 +41,29 @@ two rows down — "At this rate, +2.4 C by turn 36; Collapse at +3.0 not reached
 was removed rather than shipped as a duplicate. Three numbers now sit together and each is said
 once: what is already locked in, whether cutting can still avoid Collapse, and where the course
 ends.
+
+## The resources have faces, and the icons have a credit
+
+![The top bar, each resource's word replaced by its glyph](resource-icons.png)
+
+![The credits screen the licence requires](credits-screen.png)
+
+Ticket [#109](https://github.com/whaleyjoshua2/Dying-Earth/issues/109). Five icons from
+game-icons.net — Ore, Jerrycan, Electric, Microscope, Coins — fetched unmodified into
+`assets/icons/` and rendered **from SVG at runtime**, the designer's call over baking PNGs, so
+any future icon is a drop-in and every one comes out crisp at whatever size is asked for.
+`tiny-skia`, which does the rasterising, was already in the tree; `resvg` joins it.
+
+On the top bar the icon **replaces** the word, since the bar is cramped and five glyphs are
+learned in a turn or two. Everywhere else it sits beside the words. Where the art fails to load
+the words come back, so the bar is never mute.
+
+Two things only the pictures showed. Every game-icons SVG opens with a **full-canvas black
+rectangle** behind its white glyph, which draws as a black square in the middle of the interface;
+it is stripped before the tree is parsed. And Research was left as a word on the first pass,
+sitting oddly among four glyphs — it now carries the microscope like the rest.
+
+The credits screen exists because the licence is CC BY 3.0 and wants its authors named where a
+player can see them. It is reachable from the title screen, it names each icon, its author and
+the licence, and the menus screenshot run now photographs it with every other menu, so a future
+change that breaks the attribution shows up in a picture.

@@ -17,6 +17,11 @@ image = "0.25"
 # Ticket #59: the saves folder, %LOCALAPPDATA%\DyingEarth\data\saves, found the way Microsoft's
 # own guidance for game developers asks for it rather than beside the executable.
 directories = "6"
+# Ticket #109 (version 0.07.0): the resource icons are game-icons.net SVGs, rendered at runtime so
+# any future icon is a drop-in and every one scales to whatever size the interface asks for. Chosen
+# by the designer over baking PNGs at build time, to make later interface work easier. tiny-skia,
+# which does the rasterising, was already in the tree.
+resvg = "0.45"
 
 [profile.release]
 opt-level = 3

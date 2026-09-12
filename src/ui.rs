@@ -2,6 +2,7 @@
 
 use crate::app::*;
 use crate::geo;
+use crate::icons::Icons;
 use crate::scene::{Globe, MainCamera, SceneHandles, GLOBE_RADIUS};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
@@ -285,12 +286,17 @@ pub fn draw(
     globes: Query<(&Globe, &GlobalTransform)>,
     window: Query<&Window, With<PrimaryWindow>>,
     textures: Res<Textures>,
+    mut icons: ResMut<Icons>,
     time: Res<Time>,
     mut exit: MessageWriter<AppExit>,
 ) -> Result {
     let ctx = contexts.ctx_mut()?;
     let mut root = Ui::new(ctx.clone(), "viewport".into(), egui::UiBuilder::new().layer_id(egui::LayerId::background()).max_rect(ctx.viewport_rect()));
     let mut actions: Vec<Action> = Vec::new();
+    // Ticket #109 (version 0.07.0): the resource icons are rendered from SVG once, on the first
+    // frame that has an egui context to hand them to.
+    icons.load(ctx, &crate::assets_root().join("icons"));
+    let icons = &*icons;
     // Ticket #100 (version 0.07.0): the start globe turns on its own only until a hand is put on it.
     if !view.start_grabbed {
         view.spin += time.delta_secs() * 0.25;
@@ -320,6 +326,7 @@ pub fn draw(
     match session.screen.clone() {
         Screen::Title => title_screen(&mut root, &mut session, &mut actions),
         Screen::Load => load_screen(&mut root, &session, &mut actions),
+        Screen::Credits => credits_screen(&mut root, &mut session, icons),
         Screen::ChooseFaction => faction_screen(&mut root, &session, &mut actions),
         Screen::ChooseStart { faction } => {
             let cam = camera.single().ok();
@@ -327,7 +334,7 @@ pub fn draw(
         }
         Screen::Playing | Screen::GameOver => {
             let cam = camera.single().ok();
-            game_screen(&mut root, ctx, &session, &mut view, cam, &globes, &textures, &mut actions);
+            game_screen(&mut root, ctx, &session, &mut view, cam, &globes, &textures, icons, &mut actions);
         }
     }
     for a in actions {
@@ -488,11 +495,49 @@ fn title_screen(root: &mut Ui, session: &mut Session, actions: &mut Vec<Action>)
                 actions.push(Action::OpenLoad);
             }
             ui.add_space(10.0);
+            // Ticket #109 (version 0.07.0): the resource icons are CC BY 3.0, and their licence
+            // wants their authors named somewhere a player can see them.
+            if ui.add(egui::Button::new(RichText::new("Credits").size(22.0)).min_size(egui::vec2(220.0, 44.0))).clicked() {
+                session.screen = Screen::Credits;
+            }
+            ui.add_space(10.0);
             if ui.add(egui::Button::new(RichText::new("Quit").size(22.0)).min_size(egui::vec2(220.0, 44.0))).clicked() {
                 actions.push(Action::Quit);
             }
             ui.add_space(30.0);
             ui.label(RichText::new(format!("Seed {}", session.seed)).weak());
+        });
+    });
+}
+
+/// Ticket #109 (version 0.07.0): the credits. It exists because the resource icons are
+/// game-icons.net's under CC BY 3.0, whose one condition is that the authors are credited; this is
+/// where anything else the game owes a credit to goes as it grows.
+fn credits_screen(root: &mut Ui, session: &mut Session, icons: &Icons) {
+    egui::CentralPanel::default().show(root, |ui| {
+        ui.vertical_centered(|ui| {
+            ui.add_space(60.0);
+            ui.label(RichText::new("Credits").size(40.0).strong());
+            ui.add_space(24.0);
+            ui.label(RichText::new("Resource icons").size(20.0).strong());
+            ui.label(RichText::new("From game-icons.net, used under Creative Commons BY 3.0.").size(15.0));
+            ui.add_space(10.0);
+            for c in crate::icons::CREDITS.iter() {
+                ui.horizontal(|ui| {
+                    ui.add_space(ui.available_width() / 2.0 - 190.0);
+                    ui.spacing_mut().item_spacing.x = 8.0;
+                    if let Some(image) = icons.image(&c.resource.to_lowercase(), 22.0, Color32::from_rgb(225, 220, 210)) {
+                        ui.add(image);
+                    }
+                    ui.label(RichText::new(format!("{}: \"{}\" by {}", c.resource, c.icon, c.author)).size(15.0));
+                });
+            }
+            ui.add_space(12.0);
+            ui.label(RichText::new("https://game-icons.net").size(14.0).weak());
+            ui.add_space(30.0);
+            if ui.add(egui::Button::new(RichText::new("Back").size(20.0)).min_size(egui::vec2(180.0, 38.0))).clicked() {
+                session.screen = Screen::Title;
+            }
         });
     });
 }
@@ -808,6 +853,7 @@ fn game_screen(
     cam: Option<(&Camera, &GlobalTransform)>,
     globes: &Query<(&Globe, &GlobalTransform)>,
     textures: &Textures,
+    icons: &Icons,
     actions: &mut Vec<Action>,
 ) {
     let Some(game) = session.game.as_ref() else { return };
@@ -820,7 +866,7 @@ fn game_screen(
     if !must_pick {
         view.tech_prompted = false;
     }
-    top_bar(root, session, game, view, actions);
+    top_bar(root, session, game, view, icons, actions);
     side_panel(root, session, game, view, actions);
     // The 3D area: drag turns, wheel zooms, click picks.
     let mut hotspots: Vec<Hotspot> = Vec::new();
@@ -857,7 +903,25 @@ fn game_screen(
     popups(ctx, session, game, view, actions);
 }
 
-fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+/// Ticket #109 (version 0.07.0): one resource on the top bar. The icon REPLACES the word there,
+/// since the bar is cramped and the glyphs are learned in a turn or two; everywhere else the icon
+/// sits beside its words. Where the art did not load the word comes back, so the bar is never mute.
+fn bar_resource(ui: &mut Ui, icons: &Icons, key: &str, word: &str, value: String, hover: String) {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        match icons.image(key, 16.0, Color32::from_rgb(225, 220, 210)) {
+            Some(image) => {
+                ui.add(image).on_hover_text(format!("{word}. {hover}"));
+                ui.label(RichText::new(value).strong()).on_hover_text(format!("{word}. {hover}"));
+            }
+            None => {
+                ui.label(RichText::new(format!("{word} {value}")).strong()).on_hover_text(hover);
+            }
+        }
+    });
+}
+
+fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, icons: &Icons, actions: &mut Vec<Action>) {
     egui::Panel::top("top_bar").show(root, |ui| {
         // Ticket #64: the spectator's bar names the table instead of a Faction of their own, and
         // says whose Stockpile the numbers beside it are.
@@ -884,7 +948,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 let lines: Vec<String> = s.income_sources.iter().filter(|(_, r, _)| *r == res).map(|(name, _, v)| format!("{v:+}  {name}")).collect();
                 if lines.is_empty() { "No income from buildings last turn.".to_string() } else { format!("Last Income:\n{}", lines.join("\n")) }
             };
-            ui.label(RichText::new(format!("Materials {} ({})", left.materials, signed(inc.materials))).strong()).on_hover_text(sources(dying_earth_engine::Resource::Materials));
+            bar_resource(ui, icons, "materials", "Materials", format!("{} ({})", left.materials, signed(inc.materials)), sources(dying_earth_engine::Resource::Materials));
             // Ticket #72: the Prospectors' Fund beside their Materials.
             if game.kind(Seat(0)) == FactionKind::Prospectors {
                 let s = game.seat(Seat(0));
@@ -892,17 +956,29 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                     .on_hover_text("The Venture Capital Fund: Materials banked toward the 750 your Victory Condition asks for, and the share of your Factories' and Mines' output going in each turn. Set it on the Victory panel.");
             }
             ui.separator();
-            ui.label(RichText::new(format!("Fuel {} ({})", left.fuel, signed(inc.fuel))).strong()).on_hover_text(sources(dying_earth_engine::Resource::Fuel));
+            bar_resource(ui, icons, "fuel", "Fuel", format!("{} ({})", left.fuel, signed(inc.fuel)), sources(dying_earth_engine::Resource::Fuel));
             ui.separator();
-            ui.label(RichText::new(format!("Energy {} ({})", left.energy, signed(inc.energy))).strong()).on_hover_text(sources(dying_earth_engine::Resource::Energy));
+            bar_resource(ui, icons, "energy", "Energy", format!("{} ({})", left.energy, signed(inc.energy)), sources(dying_earth_engine::Resource::Energy));
             ui.separator();
-            ui.label(RichText::new(format!("Ducats {} ({})", left.ducats, signed(inc.ducats))).strong()).on_hover_text(sources(dying_earth_engine::Resource::Ducats));
+            bar_resource(ui, icons, "ducats", "Ducats", format!("{} ({})", left.ducats, signed(inc.ducats)), sources(dying_earth_engine::Resource::Ducats));
             ui.separator();
             let research = match game.research.current {
                 Some(t) => format!("Research {} / {} toward {}", game.research.progress, game.tables.tech(t).cost, game.tables.tech(t).name),
                 None => format!("Research: no Tech chosen ({} waiting)", game.research.unallocated),
             };
-            ui.label(research);
+            // Ticket #109: Research joins the others, its word replaced by its glyph on the bar.
+            match icons.image("research", 16.0, Color32::from_rgb(225, 220, 210)) {
+                Some(image) => {
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 4.0;
+                        ui.add(image).on_hover_text("Research");
+                        ui.label(research.trim_start_matches("Research").trim_start_matches(':').trim().to_string());
+                    });
+                }
+                None => {
+                    ui.label(research);
+                }
+            }
             // Ticket #58: the Research race, as a bar of the four Factions' contributions to the
             // Tech under research, in Faction colours and in proportion.
             research_race_bar(ui, session, game);

@@ -20,6 +20,9 @@ pub enum Screen {
     /// Ticket #59: the Load list, reached from the title screen.
     Load,
     ChooseFaction,
+    /// Ticket #109 (version 0.07.0): the credits, reached from the title screen. The resource icons
+    /// are CC BY 3.0 and their licence wants their authors named where a player can see them.
+    Credits,
     ChooseStart { faction: FactionKind },
     Playing,
     GameOver,
