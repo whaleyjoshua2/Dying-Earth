@@ -328,7 +328,9 @@ fn main() {
         let colours: [[u8; 3]; VALUES] = [
             [0, 0, 0], [230, 180, 60], [240, 240, 240], [220, 80, 80], [160, 90, 200], [70, 130, 220], [80, 190, 90],
             [230, 130, 40], [200, 200, 90], [60, 200, 200], [250, 120, 170], [120, 220, 120], [180, 120, 240], [250, 220, 120],
-            [255, 90, 140], [90, 230, 170],
+            // Ticket #125: Japan and Korea a sky blue, the Arabian Peninsula a violet, at the
+            // designer's word -- and only here: on the board a Region wears its controller's colour.
+            [100, 180, 240], [130, 70, 200],
         ];
         let mut img: RgbImage = ImageBuffer::new(w, h);
         for y in 0..h {
