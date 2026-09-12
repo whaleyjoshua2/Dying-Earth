@@ -62,3 +62,17 @@ cash, money-stack; profit reads as an arrow rather than as money.
 **The rule both sheets prove, and the one to hold the three new icons to:** a glyph made of
 many small repeated shapes does not survive 16 pixels. Population and Emissions will both tempt
 an artist toward lots of little things.
+
+### The two replaced
+
+![The top bar, before and above, after and below](top-bar-before-and-after.png)
+
+The designer chose **the mine cart for Materials** and **the banknote for Ducats**, both
+Delapouite's, both from the surviving half of their sheets.
+
+![All five after the swap](icons-after-the-swap.png)
+
+On the bar at its own size: Materials was a cluster of gem shards nobody could name and is now
+a laden cart with wheels; Ducats was the lumpy mass that read as a mineral and is now
+unmistakably a note. Fuel, Energy and Research are untouched, having read correctly all along.
+The Credits screen follows the art, since the licence credits the icon actually used.
