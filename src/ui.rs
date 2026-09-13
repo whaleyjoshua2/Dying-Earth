@@ -3711,14 +3711,17 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
     }
 }
 
-/// Ticket #41: the Tech Tree drawn as a tree. One column per branch, one row per rung, a line from
-/// every Tech to each Tech that needs it, each box coloured by its state.
+/// Ticket #41: the Tech Tree drawn as a tree, a line from every Tech to each Tech that needs it,
+/// each box coloured by its state. Ticket #133 (version 0.07.3) transposed it: **one row per
+/// branch, one column per rung**, so time runs left to right the way a tree is read, the branch
+/// names as row headings down the left edge. The designer's line: *"Transpose tech tree."*
 fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, actions: &mut Vec<Action>) {
-    const COL: f32 = 156.0;
+    const COL: f32 = 160.0;
     const ROW: f32 = 96.0;
-    const BOX_W: f32 = 140.0;
+    const BOX_W: f32 = 136.0;
     const BOX_H: f32 = 64.0;
-    const HEAD: f32 = 26.0;
+    /// The row-heading column on the left, wide enough for "Off-world Living".
+    const HEAD_W: f32 = 128.0;
     let mut branches: Vec<String> = Vec::new();
     for t in TechId::ALL {
         let b = &game.tables.tech(t).branch;
@@ -3726,11 +3729,12 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
             branches.push(b.clone());
         }
     }
-    let rungs = TechId::ALL.iter().map(|t| game.tables.tech(*t).rung).max().unwrap_or(1).max(1);
-    // Ticket #56: a branch may hold more than one Tech on a rung (Clean Power and Coastal
-    // Engineering both sit on Industry 2), so a branch's column is as many columns wide as its
-    // busiest rung, and the Techs on a rung share that width between them.
-    let cell: Vec<Vec<TechId>> = (0..branches.len() * rungs as usize)
+    let rungs = TechId::ALL.iter().map(|t| game.tables.tech(*t).rung).max().unwrap_or(1).max(1) as usize;
+    // Ticket #56: a branch may hold more than one Tech on a rung (Efficient Grids and Coastal
+    // Engineering both sit on Industry 1). Ticket #133: they sit SIDE BY SIDE, so a rung's column
+    // is as many columns wide as its busiest branch and the Techs on it share that width; stacked,
+    // the tree would be seven rows and would not fit under the top bar.
+    let cell: Vec<Vec<TechId>> = (0..branches.len() * rungs)
         .map(|i| {
             let (b, r) = (i % branches.len(), i / branches.len());
             TechId::ALL
@@ -3742,12 +3746,10 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
                 .collect()
         })
         .collect();
-    let span: Vec<f32> = (0..branches.len())
-        .map(|b| (0..rungs as usize).map(|r| cell[r * branches.len() + b].len()).max().unwrap_or(1).max(1) as f32)
-        .collect();
-    let left: Vec<f32> = (0..branches.len()).map(|b| span[..b].iter().sum::<f32>() * COL).collect();
-    let width: f32 = span.iter().sum::<f32>() * COL;
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, HEAD + ROW * rungs as f32), egui::Sense::hover());
+    let span: Vec<f32> = (0..rungs).map(|r| (0..branches.len()).map(|b| cell[r * branches.len() + b].len()).max().unwrap_or(1).max(1) as f32).collect();
+    let left: Vec<f32> = (0..rungs).map(|r| HEAD_W + span[..r].iter().sum::<f32>() * COL).collect();
+    let width: f32 = HEAD_W + span.iter().sum::<f32>() * COL;
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, ROW * branches.len() as f32), egui::Sense::hover());
     let painter = ui.painter_at(rect);
     let box_of = |t: TechId| -> egui::Rect {
         let card = game.tables.tech(t);
@@ -3755,21 +3757,52 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
         let r = card.rung.max(1) as usize - 1;
         let here = &cell[r * branches.len() + b];
         let i = here.iter().position(|x| *x == t).unwrap_or(0) as f32;
-        let each = span[b] * COL / here.len().max(1) as f32;
-        let centre = left[b] + each * (i + 0.5);
-        let min = rect.min + egui::vec2(centre - BOX_W / 2.0, HEAD + r as f32 * ROW + (ROW - BOX_H) / 2.0);
+        let each = span[r] * COL / here.len().max(1) as f32;
+        let centre = left[r] + each * (i + 0.5);
+        let min = rect.min + egui::vec2(centre - BOX_W / 2.0, b as f32 * ROW + (ROW - BOX_H) / 2.0);
         egui::Rect::from_min_size(min, egui::vec2(BOX_W, BOX_H))
     };
     for (i, b) in branches.iter().enumerate() {
-        painter.text(rect.min + egui::vec2(left[i] + span[i] * COL / 2.0, HEAD / 2.0), egui::Align2::CENTER_CENTER, b, FontId::proportional(14.0), Color32::WHITE);
+        painter.text(rect.min + egui::vec2(HEAD_W - 12.0, (i as f32 + 0.5) * ROW), egui::Align2::RIGHT_CENTER, b, FontId::proportional(14.0), Color32::WHITE);
     }
     // Lines first, so the boxes sit on top of them. A line is green once the Tech it comes from is done.
+    // Ticket #133: a line is ELBOWED -- it leaves the needed box, runs along the gap to the left of
+    // the needing box's column, and enters the needing box's left edge -- so it never crosses a
+    // box. A Tech that needs one on its own rung (Closed-Loop Colonies needs Clean Power) is
+    // reached the same way: out of the needed box's LEFT edge, down that same gap, and in.
     for t in TechId::ALL {
         for n in &game.tables.tech(t).needs {
-            let from = box_of(*n).center_bottom();
-            let to = box_of(t).center_top();
+            let to_box = box_of(t);
+            let from_box = box_of(*n);
+            let to = to_box.left_center();
+            // Each source row takes its own lane in the gap, or every line into a column merges
+            // into one trunk and nobody can tell which Tech feeds which (the first picture).
+            let lane = branches.iter().position(|x| *x == game.tables.tech(*n).branch).unwrap_or(0) as f32;
+            let gap_x = to_box.min.x - 4.0 - lane * 3.5;
             let colour = if game.research.done.contains(n) { Color32::from_rgb(120, 200, 120) } else { Color32::from_gray(150) };
-            painter.line_segment([from, to], egui::Stroke::new(2.0, colour));
+            let stroke = egui::Stroke::new(2.0, colour);
+            // A box standing between the needed box and the lane (Coastal Engineering beside
+            // Efficient Grids) would have the line run behind it and seem to feed the target
+            // itself; so the line leaves that box's bottom instead, runs along the row gap, and
+            // only then climbs the lane.
+            let between = TechId::ALL.iter().any(|o| {
+                let ob = box_of(*o);
+                *o != *n && ob.min.x >= from_box.max.x && ob.max.x <= gap_x && (ob.center().y - from_box.center().y).abs() < 1.0
+            });
+            let from = if between {
+                let start = from_box.center_bottom();
+                let row_gap_y = from_box.max.y + (ROW - BOX_H) / 4.0;
+                painter.line_segment([start, Pos2::new(start.x, row_gap_y)], stroke);
+                painter.line_segment([Pos2::new(start.x, row_gap_y), Pos2::new(gap_x, row_gap_y)], stroke);
+                Pos2::new(gap_x, row_gap_y)
+            } else if from_box.max.x < gap_x {
+                from_box.right_center()
+            } else {
+                from_box.left_center()
+            };
+            painter.line_segment([from, Pos2::new(gap_x, from.y)], stroke);
+            painter.line_segment([Pos2::new(gap_x, from.y), Pos2::new(gap_x, to.y)], stroke);
+            painter.line_segment([Pos2::new(gap_x, to.y), to], stroke);
             painter.circle_filled(to, 3.5, colour);
         }
     }

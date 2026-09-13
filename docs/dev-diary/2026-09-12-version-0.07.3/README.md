@@ -51,6 +51,35 @@ read, so the ticket that changes the formula changes one line.
 
 Clippy clean with `-D warnings`, 255 tests passing.
 
+## The Tech Tree transposed
+
+Ticket [#133](https://github.com/whaleyjoshua2/Dying-Earth/issues/133). The designer's line: *"Transpose
+tech tree."* Decided in one round: branch names as row headings on the left; two Techs on one rung
+side by side; no rung headings; elbowed prerequisite lines; the effect staying on hover.
+
+![Before: branches as columns](tech-tree-before.png)
+
+**One row per branch, one column per rung**, so time runs left to right the way a tree is read.
+Industry and Society each hold two Techs on one rung; they sit **side by side** and the column widens
+for that rung, because stacked the tree would be seven box-rows tall (about 700 pixels) and would
+not fit under the top bar, where side by side keeps it five rows and about 640 wide.
+
+![After: branches as rows](tech-tree-transposed.png)
+
+**The lines are elbowed.** A line leaves the needed box, runs along the gap to the left of the
+needing box's column, and enters the needing box's left edge, so it never crosses a box; a Tech that
+needs one on its own rung (Closed-Loop Colonies needs Clean Power) is reached the same way, out of
+the needed box's left edge and down the same gap. Two things the first pictures caught that the
+decision had not said: **every line into a column merged into one trunk**, so nobody could tell
+which Tech fed which, and **a line from Efficient Grids to Clean Power ran behind Coastal
+Engineering**, which then seemed to be the source. Each source row now takes its own lane in the
+gap, and a line whose source has a neighbour in the way leaves the box's bottom, runs along the
+row gap, and only then climbs the lane.
+
+![The first try: one trunk](tech-tree-first-try-one-trunk.png)
+
+Clippy clean with `-D warnings`.
+
 ## Building art: candidate sheets (research, ticket #144)
 
 Sixty-two game-icons.net candidates for the twenty-two building kinds, drawn with the game's own
