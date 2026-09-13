@@ -192,6 +192,45 @@ credit but must still exist, and the credits test now checks both -- and names t
 
 Clippy clean with `-D warnings`, 253 tests passing.
 
+## Orbital Slots drawn as orbits round their Bodies
+
+Ticket [#136](https://github.com/whaleyjoshua2/Dying-Earth/issues/136). The designer's lines: *"Want to
+see icons representative of orbitals orbiting their parent bodies each slot a separate orbit"* and
+*"List orbital slots in the body card."* Decided in one round, every answer (a): both maps; an empty
+slot a dashed ring; glyphs fixed; tilted rings in the 3D scene; a blockading warship drawn on its
+ring; the Solar System Map's label listing every slot by name and holder.
+
+![Earth: three stations on their rings, two empty rings dashed](orbits-round-earth.png)
+
+**One ring per Orbital Slot round the globe** on a Body Surface Map, a step further out and a little
+more inclined than the last, the part behind the globe not drawn. A built station wears the drawn
+panels glyph at a fixed point on its ring in its holder's colour, with its name beneath, and is
+clickable; an empty slot is a dashed ring; a warship blockading a slot is drawn beside the station's
+place in its Faction's colour -- the first time Blockade has been visible on a map.
+
+![The Moon: two empty rings](orbits-round-the-moon-empty.png)
+
+**The first picture caught the rings edge-on.** They were drawn in the globe's own equatorial frame,
+which from where this camera sits is a line, so five near-vertical lines ran off the screen. The
+rings now live in the **camera's frame**, not the globe's: an orbit is not fixed to the ground (the
+ISS does not turn with China), and drawn this way every ring is an ellipse round the globe whatever
+the globe's spin. That is a refinement of the decision's "turn with the globe", made by the picture.
+
+![The first try: rings edge-on](orbits-first-try-edge-on.png)
+
+**On the Solar System Map** each Body has **one orbit**, dashed while nothing is in it, carrying the
+station glyphs at spaced positions -- five rings will not fit round an eighteen-pixel Earth without
+swallowing the Moon. **The slot list on the label unfolds while the Body is under the pointer**
+(`ISS: Custodians · Tiangong: Prospectors · Axiom: Archivists · Orbital Reef: free · Starlab: free`);
+always open, Earth's six lines lay over the Moon and Mars's over its moons in the first picture, so
+the resting label keeps its count and the list is one hover away. The `hover:<body>` aid photographs it.
+
+![The Solar System Map with Earth hovered](orbits-on-the-solar-map-earth-hovered.png)
+
+![The first try: the open list over the Moon](orbits-first-try-label-over-the-moon.png)
+
+Clippy clean with `-D warnings`, 253 tests passing.
+
 ## Building art: candidate sheets (research, ticket #144)
 
 Sixty-two game-icons.net candidates for the twenty-two building kinds, drawn with the game's own

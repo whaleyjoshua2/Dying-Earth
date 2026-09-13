@@ -414,6 +414,104 @@ fn label_kind_at(painter: &egui::Painter, pos: Pos2, kind: Option<Kind>, text: &
     painter.galley(rect.min + egui::vec2(4.0 + glyph + gap, 2.0), galley, colour);
 }
 
+/// Ticket #136 (version 0.07.3): an orbit as a projected polyline. `points` are the ring's samples
+/// in order, `None` where a sample is hidden behind the globe or off screen; a **dashed** ring is
+/// an empty orbit, drawn three samples on and three off, so room to build is visible without a card.
+fn orbit_polyline(painter: &egui::Painter, points: &[Option<Pos2>], dashed: bool, colour: Color32) {
+    let n = points.len();
+    for i in 0..n {
+        let (Some(a), Some(b)) = (points[i], points[(i + 1) % n]) else { continue };
+        if dashed && (i / 3) % 2 == 1 {
+            continue;
+        }
+        painter.line_segment([a, b], egui::Stroke::new(1.2, colour));
+    }
+}
+
+/// Ticket #136: a kind glyph painted at a point in a colour, on a dark disc so it reads over a
+/// photograph. On the orbit rings the colour is the holder's, since on a map a colour says whose.
+fn glyph_at(painter: &egui::Painter, kind: Kind, centre: Pos2, size: f32, tint: Color32) {
+    if let Some(texture) = kind.icon().and_then(|name| Icons::texture_from_ctx(painter.ctx(), name)) {
+        painter.circle_filled(centre, size * 0.72, Color32::from_black_alpha(170));
+        let rect = egui::Rect::from_center_size(centre, egui::vec2(size, size));
+        painter.image(texture, rect, egui::Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), tint);
+    }
+}
+
+/// The warship sitting in an Orbital Slot, if one is: a Frigate or Battleship at the Body that chose
+/// that slot when its leg was ordered (Blockade, version 0.07.0).
+fn warship_in_slot(game: &Game, body: BodyId, slot: u32) -> Option<&Ship> {
+    game.ships.iter().find(|s| s.at == ShipAt::Body(body) && s.slot == Some(slot) && matches!(s.kind, UnitKind::Frigate | UnitKind::Battleship))
+}
+
+/// Ticket #136 (version 0.07.3): **one ring per Orbital Slot round the globe** on a Body Surface
+/// Map. The designer: *"Want to see icons representative of orbitals orbiting their parent bodies
+/// each slot a separate orbit."* Each ring is a circle in the globe's own frame, a step further out
+/// and at a slightly different tilt than the last, so it turns with the globe and five rings do not
+/// stack into one line seen edge-on; the part behind the globe is not drawn. A built station wears
+/// its glyph at a fixed point on its ring, in its holder's colour, with its name beneath, and is
+/// clickable; an empty slot is a dashed ring; a warship blockading the slot is drawn beside the
+/// station's place in its Faction's colour, which is the first time Blockade has been visible on a map.
+#[allow(clippy::too_many_arguments)]
+fn orbit_rings_on_globe(
+    painter: &egui::Painter,
+    session: &Session,
+    game: &Game,
+    body: BodyId,
+    globe_gt: &GlobalTransform,
+    cam_pos: Vec3,
+    cam_right: Vec3,
+    project: &dyn Fn(Vec3) -> Option<Pos2>,
+    hotspots: &mut Vec<Hotspot>,
+) {
+    let n = game.tables.body(body).orbital_slots;
+    if n == 0 {
+        return;
+    }
+    let center = globe_gt.translation();
+    let Some(c2) = project(center) else { return };
+    let rim = project(center + cam_right * GLOBE_RADIUS).map(|r| (r - c2).length()).unwrap_or(0.0);
+    let to_cam = cam_pos - center;
+    let hidden = |world: Vec3, screen: Pos2| (world - center).dot(to_cam) < 0.0 && (screen - c2).length() < rim;
+    // The rings live in the camera's frame, not the globe's: an orbit is not fixed to the ground
+    // (the ISS does not turn with China), and a ring in the globe's equatorial plane is edge-on from
+    // where this camera sits -- the first picture had five near-vertical lines running off the
+    // screen. Each ring is inclined a little more than the last, so it reads as an ellipse round
+    // the globe, and the part behind the globe is not drawn.
+    let fwd = (center - cam_pos).normalize();
+    let up = fwd.cross(cam_right).normalize();
+    for slot in 0..n {
+        let radius = GLOBE_RADIUS * (1.12 + 0.045 * slot as f32);
+        let incline = 0.36 + 0.06 * slot as f32;
+        let (ci, si) = (incline.cos(), incline.sin());
+        let world_at = |a: f32| center + radius * (a.cos() * cam_right + a.sin() * (ci * fwd + si * up));
+        let samples = 128;
+        let points: Vec<Option<Pos2>> = (0..samples)
+            .map(|i| {
+                let a = i as f32 / samples as f32 * std::f32::consts::TAU;
+                let w = world_at(a);
+                project(w).filter(|p| !hidden(w, *p))
+            })
+            .collect();
+        let station = game.colonies.iter().find(|c| c.in_orbit && c.body == body && c.slot == slot);
+        let colour = station.and_then(|c| c.control.director()).map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
+        orbit_polyline(painter, &points, station.is_none(), colour.gamma_multiply(0.8));
+        // The glyph sits at a fixed point on the near side of its ring, each ring a step further
+        // round, so five glyphs fan out along the front arc rather than lining up.
+        let a = std::f32::consts::PI * (1.18 + 0.14 * slot as f32);
+        let w = world_at(a);
+        let Some(p) = project(w).filter(|p| !hidden(w, *p)) else { continue };
+        if let Some(c) = station {
+            glyph_at(painter, Kind::Station, p, 18.0, colour);
+            label_at(painter, p + egui::vec2(0.0, 17.0), &game.station_name(body, slot), colour, 11.0);
+            hotspots.push(Hotspot { pos: p, radius: 12.0, hit: Hit::Select(Selection::Colony(c.id)) });
+        }
+        if let Some(s) = warship_in_slot(game, body, slot) {
+            glyph_at(painter, Kind::Warship, p + egui::vec2(20.0, 0.0), 16.0, seat_colour(session, s.seat));
+        }
+    }
+}
+
 /// The same, slid sideways so a long line stays on screen (ticket #57: the launch-window tooltip is
 /// wider than a Body's other labels, and Mars can stand at the edge of its ring).
 fn label_on_screen(painter: &egui::Painter, pos: Pos2, text: &str, colour: Color32, size: f32) {
@@ -1445,12 +1543,52 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     let filled = game.colonies.iter().filter(|c| c.body == body && !c.in_orbit).count();
                     let orbital = game.tables.body(body).orbital_slots;
                     let stations = game.colonies.iter().filter(|c| c.body == body && c.in_orbit).count();
+                    let hovering = view.force_hover == Some(body)
+                        || painter.ctx().pointer_latest_pos().map(|q| (q - p).length() < 40.0).unwrap_or(false);
                     let mut text = format!("{name}  {filled}/{slots} slots, {stations}/{orbital} stations");
+                    // Ticket #136 (version 0.07.3): every Orbital Slot by name and holder. The
+                    // designer: *"List orbital slots in the body card."* The list unfolds while the
+                    // Body is under the pointer: always open, Earth's six lines lay over the Moon
+                    // and Mars's over its moons in the first picture, since the three stand a few
+                    // pixels apart on this map.
+                    let mut lines = 0;
+                    if hovering {
+                        for slot in 0..orbital {
+                            let holder = match game.colonies.iter().find(|c| c.in_orbit && c.body == body && c.slot == slot) {
+                                Some(c) => c.control.director().map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".to_string()),
+                                None => "free".to_string(),
+                            };
+                            let blockade = warship_in_slot(game, body, slot).map(|s| format!(", a {} warship in it", game.seat_name(s.seat))).unwrap_or_default();
+                            text.push_str(&format!("\n{}: {holder}{blockade}", game.station_name(body, slot)));
+                            lines += 1;
+                        }
+                    }
                     // Ticket #56: Earth says when its Antarctic slots open, until they do.
                     if body == BodyId::Earth && !game.antarctica_open {
                         text.push_str(&format!("\nAntarctica: opens at {:+.1} C", game.tables.climate.antarctica_opens_at));
                     }
-                    label_at(painter, p - egui::vec2(0.0, 22.0), &text, Color32::WHITE, 13.0);
+                    label_at(painter, p - egui::vec2(0.0, 22.0 + 7.5 * lines as f32), &text, Color32::WHITE, 13.0);
+                    // Ticket #136: one orbit per Body, the stations on it at spaced positions, dashed
+                    // while nothing is in orbit. Five rings will not fit round an eighteen-pixel Earth
+                    // without swallowing the Moon, so on this map the slots share one ring; each has
+                    // its own on the Surface Map.
+                    if orbital > 0 {
+                        let r = geo::solar_radius(body) * 1.9;
+                        let at = |a: f32| pos + Vec3::new(a.cos() * r, 0.0, a.sin() * r);
+                        let samples = 64;
+                        let points: Vec<Option<Pos2>> = (0..samples).map(|i| project(at(i as f32 / samples as f32 * std::f32::consts::TAU))).collect();
+                        orbit_polyline(painter, &points, stations == 0, Color32::from_gray(140));
+                        for slot in 0..orbital {
+                            let Some(q) = project(at(slot as f32 / orbital as f32 * std::f32::consts::TAU + 0.3)) else { continue };
+                            if let Some(c) = game.colonies.iter().find(|c| c.in_orbit && c.body == body && c.slot == slot) {
+                                let colour = c.control.director().map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY);
+                                glyph_at(painter, Kind::Station, q, 14.0, colour);
+                            }
+                            if let Some(s) = warship_in_slot(game, body, slot) {
+                                glyph_at(painter, Kind::Warship, q + egui::vec2(12.0, 0.0), 12.0, seat_colour(session, s.seat));
+                            }
+                        }
+                    }
                     hotspots.push(Hotspot { pos: p, radius: 40.0, hit: Hit::Enter(body) });
                     // Ticket #57: hovering a Body across the gulf says when its launch window is and
                     // what the flight costs now against what it costs then. TO BE REVISITED: these
@@ -1458,8 +1596,6 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // Mars, one line for one departure point will no longer be the whole truth, and
                     // how this is presented has to be settled again.
                     let far = game.crossing_offset(BodyId::Earth, body, game.turn).is_some();
-                    let hovering = view.force_hover == Some(body)
-                        || painter.ctx().pointer_latest_pos().map(|q| (q - p).length() < 40.0).unwrap_or(false);
                     if far && hovering {
                         label_on_screen(painter, p + egui::vec2(0.0, 96.0), &game.window_text(body), Color32::from_rgb(255, 220, 140), 13.0);
                     }
@@ -1505,6 +1641,8 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                 }
                 project(world)
             };
+            // Ticket #136 (version 0.07.3): one ring per Orbital Slot round the globe.
+            orbit_rings_on_globe(painter, session, game, body, globe_gt, cam_pos, *cam_gt.right(), &project, hotspots);
             match body {
                 BodyId::Earth => {
                     for sid in StateId::ALL {
