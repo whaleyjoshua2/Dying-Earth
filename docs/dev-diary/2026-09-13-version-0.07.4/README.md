@@ -169,3 +169,39 @@ its right edge, and the tree is 768 wide -- inside the Moment popup with no chan
 
 First try had Clean Power on the Industry band's top row while Clean Manufacturing stood at its
 middle; now every lone box is centred in its band.
+
+## The amendments written, the baseline kept, and the kit built
+
+Ticket [#157](https://github.com/whaleyjoshua2/Dying-Earth/issues/157), the last on the map. The
+spec is [`docs/spec/version-0.07.4.md`](../../spec/version-0.07.4.md), one section per decision,
+written from the resolution comments; the playtest note is
+[`docs/playtest/PLAYTEST.txt`](../../playtest/PLAYTEST.txt), rewritten for 0.07.4; `CONTEXT.md`
+gains the **Emissions history** (and its sibling the Temperature history) and amends **Orbital
+Slot**, **Build Slot**, **Hab View**, **Solar System Map**, **Tech Tree** and **Climate Panel**.
+
+![The Earth Map at the end of the version, the Emissions history's first point on the panel](final-earth.png)
+
+**The sweep baseline stands.** Nothing on this map changed a rule, a price or a yield, and the
+sweep says so: twenty seeds in each of four seatings reproduce the 0.07.3 table to the game --
+Custodians 36, Archivists 21, Arkwrights 6, Prospectors 1, Collapses 14, draws 2, 68 trees of 80,
+every cell the same. The balance version that follows reads against it.
+
+**A whole game from seat 0**, headless through the `play` example, seed 11, Custodians from Europe,
+giving no order but the owed Tech pick: 23 turn commands, none refused, one pick owed, and the game
+over on turn 23 with **the Archivists winning on their Victory Condition**, all seventeen Techs done,
+the world at +2.78 C -- the 0.07.3 run of the same seed, turn for turn. (The driver wants a Tech's
+id, `efficient_grids`, not its name with a space; the loop that drove it learned that on its first
+command.)
+
+![The Solar System Map at the end of the version](final-solar.png)
+
+![The start screen at the end of the version](final-start.png)
+
+The rest of the final set -- every Body and every screen -- is filed beside these as `final-*.png`.
+
+**The kit**: `dist/dying-earth-0.07.4/` -- `dying-earth.exe` (static CRT), `assets/` and the
+playtest note as `README.txt` -- zipped to `dist/dying-earth-0.07.4-playtest.zip`. Windows only;
+`dist/` is gitignored.
+
+The suite is 254 tests, clippy clean with `-D warnings`. The pull request is opened from
+`version-0.07.4` against `main`.
