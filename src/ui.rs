@@ -484,12 +484,17 @@ fn warship_in_slot(game: &Game, body: BodyId, slot: u32) -> Option<&Ship> {
 
 /// Ticket #136 (version 0.07.3): **one ring per Orbital Slot round the globe** on a Body Surface
 /// Map. The designer: *"Want to see icons representative of orbitals orbiting their parent bodies
-/// each slot a separate orbit."* Each ring is a circle in the globe's own frame, a step further out
-/// and at a slightly different tilt than the last, so it turns with the globe and five rings do not
-/// stack into one line seen edge-on; the part behind the globe is not drawn. A built station wears
-/// its glyph at a fixed point on its ring, in its holder's colour, with its name beneath, and is
-/// clickable; an empty slot is a dashed ring; a warship blockading the slot is drawn beside the
-/// station's place in its Faction's colour, which is the first time Blockade has been visible on a map.
+/// each slot a separate orbit."* Ticket #151 (version 0.07.4) redrew them: *"each should be on
+/// slightly different orbital plane and should rotate with the globe allow them to move slowly so
+/// they can be clicked."* Each ring is a circle in the globe's own frame -- so it turns with a drag
+/// -- on a plane of its own, leaning thirty to sixty degrees from the equator with its own heading,
+/// so the five cross one another rather than stack, and at most one is near edge-on at any turn
+/// of the globe; the part behind the globe is not drawn. A built station's glyph **travels slowly
+/// round its ring** (one revolution in about a minute and a half, each slot's period its own),
+/// in its holder's colour with its name beneath, clickable as it goes; in `shot:` mode the clock
+/// is stopped so the pictures are reproducible. An empty slot is a dashed ring; a warship
+/// blockading the slot is drawn beside the station in its Faction's colour, which is the first
+/// time Blockade has been visible on a map.
 #[allow(clippy::too_many_arguments)]
 fn orbit_rings_on_globe(
     painter: &egui::Painter,
@@ -511,18 +516,23 @@ fn orbit_rings_on_globe(
     let rim = project(center + cam_right * GLOBE_RADIUS).map(|r| (r - c2).length()).unwrap_or(0.0);
     let to_cam = cam_pos - center;
     let hidden = |world: Vec3, screen: Pos2| (world - center).dot(to_cam) < 0.0 && (screen - c2).length() < rim;
-    // The rings live in the camera's frame, not the globe's: an orbit is not fixed to the ground
-    // (the ISS does not turn with China), and a ring in the globe's equatorial plane is edge-on from
-    // where this camera sits -- the first picture had five near-vertical lines running off the
-    // screen. Each ring is inclined a little more than the last, so it reads as an ellipse round
-    // the globe, and the part behind the globe is not drawn.
-    let fwd = (center - cam_pos).normalize();
-    let up = fwd.cross(cam_right).normalize();
+    // The rings live in the globe's upright frame (its pole up, before the mesh's own correction),
+    // so a drag turns them with it. Version 0.07.3 had pinned them to the camera because rings in
+    // the equatorial plane were edge-on from where this camera sits, five near-vertical lines; a
+    // ring leaning well off the equator, on a heading of its own, is an ellipse from almost every
+    // side and edge-on only for a moment as the globe turns past its line of nodes.
+    let rot = globe_gt.rotation() * geo::upright().inverse();
+    // The clock the stations travel by. Stopped in `shot:` mode, so a picture is the same twice.
+    let clock = if session.shot_prefix.is_empty() { painter.ctx().input(|i| i.time) as f32 } else { 0.0 };
     for slot in 0..n {
         let radius = GLOBE_RADIUS * (1.12 + 0.045 * slot as f32);
-        let incline = 0.36 + 0.06 * slot as f32;
-        let (ci, si) = (incline.cos(), incline.sin());
-        let world_at = |a: f32| center + radius * (a.cos() * cam_right + a.sin() * (ci * fwd + si * up));
+        // Each slot's own plane: a lean from the equator of 32 to 61 degrees, and a heading for
+        // the line of nodes a good step round from the last slot's.
+        let incline = 0.55 + 0.13 * slot as f32;
+        let node = 1.3 * slot as f32;
+        let u = Vec3::new(node.cos(), 0.0, node.sin());
+        let v = Vec3::new(-node.sin() * incline.cos(), incline.sin(), node.cos() * incline.cos());
+        let world_at = |a: f32| center + rot * (radius * (a.cos() * u + a.sin() * v));
         let samples = 128;
         let points: Vec<Option<Pos2>> = (0..samples)
             .map(|i| {
@@ -534,15 +544,19 @@ fn orbit_rings_on_globe(
         let station = game.colonies.iter().find(|c| c.in_orbit && c.body == body && c.slot == slot);
         let colour = station.and_then(|c| c.control.director()).map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
         orbit_polyline(painter, &points, station.is_none(), colour.gamma_multiply(0.8));
-        // The glyph sits at a fixed point on the near side of its ring, each ring a step further
-        // round, so five glyphs fan out along the front arc rather than lining up.
-        let a = std::f32::consts::PI * (1.18 + 0.14 * slot as f32);
+        // The glyph starts a step further round its ring than the last slot's, so five glyphs fan
+        // out rather than line up, and travels on from there: one revolution in ninety seconds
+        // for the first slot and eight seconds longer for each after it, so they drift apart.
+        let period = 90.0 + 8.0 * slot as f32;
+        let a = std::f32::consts::PI * (1.18 + 0.14 * slot as f32) + clock * std::f32::consts::TAU / period;
         let w = world_at(a);
         let Some(p) = project(w).filter(|p| !hidden(w, *p)) else { continue };
         if let Some(c) = station {
             glyph_at(painter, Kind::Station, p, 18.0, colour);
             label_at(painter, p + egui::vec2(0.0, 17.0), &game.station_name(body, slot), colour, 11.0);
-            hotspots.push(Hotspot { pos: p, radius: 12.0, hit: Hit::Select(Selection::Colony(c.id)) });
+            // A moving target: the circle is wider than a fixed glyph's, and the click is taken
+            // where the mouse was pressed, so a station cannot slip out from under its own click.
+            hotspots.push(Hotspot { pos: p, radius: 16.0, hit: Hit::Select(Selection::Colony(c.id)) });
         }
         if let Some(s) = warship_in_slot(game, body, slot) {
             glyph_at(painter, Kind::Warship, p + egui::vec2(20.0, 0.0), 16.0, seat_colour(session, s.seat));
@@ -1333,7 +1347,9 @@ fn game_screen(
                     view.zoom = (view.zoom * (1.0 - scroll * 0.002)).clamp(0.45, 2.2);
                 }
             }
-            let click = if resp.clicked() { resp.interact_pointer_pos().filter(|p| rect.contains(*p)) } else { None };
+            // Ticket #151 (version 0.07.4): a click lands where the mouse was PRESSED, not where it
+            // was released, so a station travelling its ring is caught by the click that began on it.
+            let click = if resp.clicked() { ui.input(|i| i.pointer.press_origin()).or(resp.interact_pointer_pos()).filter(|p| rect.contains(*p)) } else { None };
             if let (Some(pos), Some((camera, cam_gt))) = (click, cam) {
                 pick(pos, session, game, view, camera, cam_gt, globes, textures, &hotspots);
             }
