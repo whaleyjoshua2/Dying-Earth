@@ -838,28 +838,34 @@ fn credits_screen(root: &mut Ui, session: &mut Session, icons: &Icons) {
             ui.label(RichText::new("Icons").size(20.0).strong());
             ui.label(RichText::new("From game-icons.net, used under Creative Commons BY 3.0.").size(15.0));
             ui.add_space(10.0);
-            for c in crate::icons::CREDITS.iter() {
-                ui.horizontal(|ui| {
-                    ui.add_space(ui.available_width() / 2.0 - 190.0);
-                    ui.spacing_mut().item_spacing.x = 8.0;
-                    if let Some(image) = icons.image(&c.key(), 22.0) {
-                        ui.add(image);
-                    }
-                    ui.label(RichText::new(format!("{}: \"{}\" by {}", c.resource, c.icon, c.author)).size(15.0));
-                });
-            }
+            // Ticket #146 (version 0.07.3): thirty-two credits and a drawing no longer fit one column
+            // in an 800-pixel window -- the first picture of this screen ran off its bottom -- so
+            // the list is two columns, the figures and kinds on the left and the buildings on the
+            // right, each row an icon at 22 pixels beside its line.
+            let mut rows: Vec<(String, String)> = crate::icons::CREDITS.iter().map(|c| (c.key(), format!("{}: \"{}\" by {}", c.resource, c.icon, c.author))).collect();
             // Ticket #135 (version 0.07.3): the game's own drawings, named so the list is complete.
             for d in crate::icons::DRAWN {
-                ui.horizontal(|ui| {
-                    ui.add_space(ui.available_width() / 2.0 - 190.0);
-                    ui.spacing_mut().item_spacing.x = 8.0;
-                    if let Some(image) = icons.image(d, 22.0) {
-                        ui.add(image);
-                    }
-                    let name = format!("{}{}", d[..1].to_uppercase(), &d[1..]);
-                    ui.label(RichText::new(format!("{name}: drawn for Dying Earth, no credit owed")).size(15.0));
-                });
+                let name = format!("{}{}", d[..1].to_uppercase(), &d[1..]);
+                rows.push((d.to_string(), format!("{name}: drawn for Dying Earth, no credit owed")));
             }
+            let half = rows.len().div_ceil(2);
+            ui.horizontal_top(|ui| {
+                ui.add_space(ui.available_width() / 2.0 - 400.0);
+                for column in [&rows[..half], &rows[half..]] {
+                    ui.vertical(|ui| {
+                        ui.set_width(390.0);
+                        for (key, line) in column {
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing.x = 8.0;
+                                if let Some(image) = icons.image(key, 20.0) {
+                                    ui.add(image);
+                                }
+                                ui.label(RichText::new(line).size(13.0));
+                            });
+                        }
+                    });
+                }
+            });
             ui.add_space(12.0);
             ui.label(RichText::new("https://game-icons.net").size(14.0).weak());
             // Ticket #122 (version 0.07.2): the Nations' flags. MIT asks nothing on screen; they are

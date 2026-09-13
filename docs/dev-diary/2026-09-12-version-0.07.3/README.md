@@ -539,6 +539,61 @@ Module's file. The `walls:1` aid, which floods two of China's slots and stands a
 
 Clippy clean with `-D warnings`, 254 tests passing.
 
+## The amendments written, the baseline restarted, and the kit built
+
+Ticket [#147](https://github.com/whaleyjoshua2/Dying-Earth/issues/147), the last on the map. The
+spec is [`docs/spec/version-0.07.3.md`](../../spec/version-0.07.3.md), one section per decision,
+written from the resolution comments; the playtest note is
+[`docs/playtest/PLAYTEST.txt`](../../playtest/PLAYTEST.txt), rewritten for 0.07.3.
+
+![The Earth Map at the end of the version](final-earth.png)
+
+**The sweep baseline restarts here.** The unit of population, the Ducats formula, the Body yields,
+the Emigrant lift and the Tech prices all moved this version, each measured on its ticket as it
+landed; this table, twenty seeds in each of four seatings on the finished tree, reproduces the last
+of those to the game -- nothing after it touched a rule:
+
+| seat 0 | wins | Collapses | draws | tree completes |
+|---|---|---|---|---|
+| Custodians | Archivists 6, Custodians 3 | **11** | 0 | 20 of 20 |
+| Prospectors | Custodians 16, Archivists 2, Prospectors 1 | 1 | 0 | 20 of 20 |
+| Arkwrights | Archivists 8, Arkwrights 6, Custodians 4 | 2 | 0 | 19 of 20 |
+| Archivists | Custodians 13, Archivists 5 | 0 | 2 | 9 of 20 |
+| **totals** | **Custodians 36**, Archivists 21, Arkwrights 6, Prospectors 1 | **14** | **2** | **68 of 80** |
+
+**For the first time every Faction wins games.** The 0.07.2 baseline was Custodians 70, Arkwrights 1,
+Archivists 1, Prospectors 0, Collapses 8. Nothing measured before this table is comparable to it.
+
+**A whole game from seat 0**, headless through the `play` example, seed 11, Custodians from Europe,
+giving no order but the owed Tech picks: 23 turn commands, none refused, one pick owed (the opening
+free choice; the computer Leads picked the rest), and the game over on turn 23 with **the Archivists
+winning on their Victory Condition**, all seventeen Techs done, the world at +2.78 C and four turns
+from Collapse. The 0.07.2 run of the same seed reached turn 29 with ten Techs done and nobody
+winning. One fault found and fixed on the way: the `play` board printed *you must pick the next
+Tech* with nothing under it once the tree was complete, and the driver that trusted it wrote a
+`tech` line that could not parse; the marker now waits for a Tech to be available.
+
+![The credits, two columns now](final-credits.png)
+
+**The Credits screen is two columns.** Thirty-two credits and a drawing ran off the bottom of an
+800-pixel window in the first final picture; the figures and kinds stand on the left and the
+buildings on the right, and the flags and the Back button are back in view.
+
+![The start screen at the end of the version](final-start.png)
+
+![The Solar System Map at the end of the version](final-solar.png)
+
+The rest of the final set -- every Body and every screen -- is filed beside these as `final-*.png`.
+
+**The kit**: `dist/dying-earth-0.07.3/` -- `dying-earth.exe` (static CRT, 109.8 MB), `assets/` with
+the fourteen flags, thirty-three icons (the twenty building pictures among them; the research's
+sixty-two candidates left out), the textures and fifteen data tables, and the playtest note as
+`README.txt` -- zipped to `dist/dying-earth-0.07.3-playtest.zip`, 39.3 MB, seventy-two entries
+listed back out of the zip. Windows only, at the designer's word; `dist/` is gitignored.
+
+The suite is 254 tests, clippy clean with `-D warnings`. The pull request is opened from
+`version-0.07.3` against `main`.
+
 ## Building art: candidate sheets (research, ticket #144)
 
 Sixty-two game-icons.net candidates for the twenty-two building kinds, drawn with the game's own

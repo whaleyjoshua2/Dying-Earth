@@ -5,7 +5,7 @@ A single-player, turn-based strategy game about colonizing the solar system befo
 ## Language
 
 **First Playable**:
-The small version of the game: twelve turns and two Factions as first built, twenty-four turns since version 0.02, four Factions since version 0.05 and thirty-six turns of two months since version 0.05.5. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`, `docs/spec/version-0.03.md`, `docs/spec/version-0.04.md`, `docs/spec/version-0.05.md` `docs/spec/version-0.05.5.md`, `docs/spec/version-0.06.0.md` and `docs/spec/version-0.07.0.md`.
+The small version of the game: twelve turns and two Factions as first built, twenty-four turns since version 0.02, four Factions since version 0.05 and thirty-six turns of two months since version 0.05.5. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`, `docs/spec/version-0.03.md`, `docs/spec/version-0.04.md`, `docs/spec/version-0.05.md`, `docs/spec/version-0.05.5.md`, `docs/spec/version-0.06.0.md`, `docs/spec/version-0.07.0.md`, `docs/spec/version-0.07.1.md`, `docs/spec/version-0.07.2.md` and `docs/spec/version-0.07.3.md`.
 _Avoid_: slice, MVP, demo, v1, prototype
 
 **Faction**:
