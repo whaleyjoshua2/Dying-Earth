@@ -5167,11 +5167,15 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // Ticket #153 (version 0.07.4): the same history, at the panel's width.
             ui.add_space(4.0);
             emissions_history(ui, game, egui::vec2(ui.available_width(), 110.0));
+            // Ticket #175 (version 0.07.6): the population history stood here, above the growth rate
+            // that drives it, until the designer took it off: *"remove pop graph from climate
+            // window."* It keeps the top bar's Population hover, where it now has the picture to
+            // itself. **The Emissions history stays**, at the designer's word and for the reason the
+            // ticket gave: this is the page about emissions, and that chart is the page's own
+            // subject over time, where the population chart was a guest. Nothing fills the space and
+            // the Emissions chart keeps the height it had; a chart that grows because a neighbour
+            // left is a chart sized by accident.
             ui.separator();
-            // Ticket #166 (version 0.07.5): the population history stands with the growth rate that
-            // drives it, as the Emissions history stands under the sources that drive it.
-            population_history(ui, game, egui::vec2(ui.available_width(), 96.0));
-            ui.add_space(4.0);
             let growth = game.population_growth_rate() * 100.0;
             ui.label(format!(
                 "Penalties in force: population growth {:+.2}% per turn; a card comes {:.0}% of turns at this Temperature ({} cards left in the deck, {} of them Climate).",

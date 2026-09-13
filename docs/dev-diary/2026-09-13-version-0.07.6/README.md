@@ -84,3 +84,30 @@ witnessed red before it was believed green. **256 tests pass; clippy clean.**
 
 The headless harness gained `tutorialtick:1`, which stands the tick up for a picture, since a
 headless run cannot click it.
+
+## The population graph comes off the Climate Panel
+
+Ticket [#175](https://github.com/whaleyjoshua2/Dying-Earth/issues/175). The designer's line: *"remove
+pop graph from climate window."*
+
+Version 0.07.5 drew the population history twice: small, in the top bar's Population hover, and at
+full width on the Climate Panel above the growth rate that drives it. The panel keeps one chart now.
+
+![The Climate Panel, from the CO2 Stock to the Blame block, with one chart on it](climate-panel-without-the-population-graph.png)
+
+The population history keeps its hover, where it now has the picture to itself.
+
+![The Population hover, still drawing the history](population-history-keeps-its-hover.png)
+
+**Decided by the designer** on the ticket:
+
+- **The Emissions history stays on the panel.** The same argument would have taken it off -- it is
+  on the Emissions figure's hover too -- but the panel is the page about emissions and that chart is
+  the page's own subject over time, where the population chart was a guest.
+- **Nothing fills the space**, and the Emissions chart keeps the height it had. A chart that grows
+  because its neighbour left is a chart sized by accident.
+- **The growth-rate line is left alone.** It already carries three facts, and the hover is one
+  pointer-move away.
+
+The panel is shorter by about a hundred pixels, which at the full-height start decided in version
+0.07.5 means the Blame block sits inside the window with room to spare.
