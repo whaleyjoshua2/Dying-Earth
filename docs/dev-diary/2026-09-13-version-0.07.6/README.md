@@ -159,3 +159,70 @@ turn at a time.
 One new test, `the_report_says_one_net_migration_line_per_region_and_only_when_it_is_worth_saying`,
 pins the whole rule, and the old refugee test is repinned with its reason written in. Witnessed red
 before green. **247 tests pass; clippy clean.**
+
+## What the version measured, and the one figure that moved
+
+Ticket [#177](https://github.com/whaleyjoshua2/Dying-Earth/issues/177), the last on the map, which
+decided nothing and shipped everything.
+
+**The suite is 247 tests**, clippy clean with `-D warnings`. Two are new and four were repinned, each
+with its reason written beside it. Every new rule was witnessed red before it was believed green.
+
+**A whole game from seat 0**, headless through the `play` driver, seed 11, Custodians from Europe,
+giving no order but the owed Tech picks and one deliberate change of pick on turn 1: **27 turns, none
+refused**, and the world collapsed on turn 27 at +3.0 C.
+
+**Twenty seeds in each of four seatings**, against the standing 0.07.5 baseline:
+
+| seat 0 | wins | Collapses | draws | tree completes |
+|---|---|---|---|---|
+| Custodians | Archivists 8, Custodians 1 | **11** | 0 | 19 of 20 |
+| Prospectors | Archivists 11, Custodians 3 | 6 | 0 | 19 of 20 |
+| Arkwrights | Archivists 11, Custodians 8, Arkwrights 1 | 0 | 0 | 7 of 20 |
+| Archivists | Archivists 16, Custodians 4 | 0 | 0 | **4 of 20** |
+| **totals** | **Archivists 46**, Custodians 16, Arkwrights 1, Prospectors 0 | **17** | **0** | **49 of 80** |
+
+**Every win and every Collapse reproduces the baseline to the cell.** One figure moved: the completed
+trees, 50 of 80 to **49**.
+
+The map said a figure that moves is a defect to find, not a new baseline, so it was run down. The seed
+is **3 of the Archivist seating**: 15 Techs, ending turn 21, where version 0.07.5 finished 17 and ended
+turn 23. The other seventy-nine games are identical, Tech for Tech. Building version 0.07.5 in a
+worktree and reverting only the Provisional Findings freeze restores that seed exactly, which names the
+cause: **the freeze decided on the Tech-pick ticket**. The Archivists no longer get half the effect of a
+Tech picked mid-turn until the turn after, and in one game of eighty that cost two Techs. It is the
+decided rule doing what it says, and no Faction's win count moved.
+
+## The version, at the end
+
+![The title screen, New Game at the top](final-title.png)
+
+![The Faction screen, the tutorial tick at the foot of the Custodians' card](final-faction.png)
+
+![The start screen](final-start.png)
+
+![The Earth Map, the Climate Panel carrying one chart](final-earth.png)
+
+![A turn's Report](final-report.png)
+
+![The Solar System Map](final-solar.png)
+
+![The Moon](final-moon.png)
+
+![Mars](final-mars.png)
+
+![Venus](final-venus.png)
+
+![Phobos](final-phobos.png)
+
+![Deimos](final-deimos.png)
+
+![The Credits](final-credits.png)
+
+## One defect found on the way, and not fixed here
+
+[The last Report of every game is dated January 2030](https://github.com/whaleyjoshua2/Dying-Earth/issues/178).
+`end_turn` clears the Report for the coming turn and, on a finished game, returns before the turn is
+stamped on it, so the final Report carries turn 0 in its heading while the top bar beside it is right.
+Ten games out of ten. Found while photographing a hot turn's Report, filed rather than smuggled in, and
+named in the playtest note as a known rough edge.

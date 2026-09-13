@@ -5,7 +5,7 @@ A single-player, turn-based strategy game about colonizing the solar system befo
 ## Language
 
 **First Playable**:
-The small version of the game: twelve turns and two Factions as first built, twenty-four turns since version 0.02, four Factions since version 0.05 and thirty-six turns of two months since version 0.05.5. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`, `docs/spec/version-0.03.md`, `docs/spec/version-0.04.md`, `docs/spec/version-0.05.md`, `docs/spec/version-0.05.5.md`, `docs/spec/version-0.06.0.md`, `docs/spec/version-0.07.0.md`, `docs/spec/version-0.07.1.md`, `docs/spec/version-0.07.2.md` and `docs/spec/version-0.07.3.md`.
+The small version of the game: twelve turns and two Factions as first built, twenty-four turns since version 0.02, four Factions since version 0.05 and thirty-six turns of two months since version 0.05.5. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`, `docs/spec/version-0.03.md`, `docs/spec/version-0.04.md`, `docs/spec/version-0.05.md`, `docs/spec/version-0.05.5.md`, `docs/spec/version-0.06.0.md`, `docs/spec/version-0.07.0.md`, `docs/spec/version-0.07.1.md`, `docs/spec/version-0.07.2.md`, `docs/spec/version-0.07.3.md`, `docs/spec/version-0.07.4.md`, `docs/spec/version-0.07.5.md` and `docs/spec/version-0.07.6.md`.
 _Avoid_: slice, MVP, demo, v1, prototype
 
 **Faction**:
@@ -49,7 +49,7 @@ The Archivists' standing declaration that the Research their own Labs make goes 
 _Avoid_: donate, invest, bank research, save up
 
 **Provisional Findings**:
-The Archivists' signature rule: they already have half the effect of the Tech under research, so long as their Research went to the shared Tech last turn rather than to the Archive.
+The Archivists' signature rule: they already have half the effect of the Tech under research, so long as their Research went to the shared Tech last turn rather than to the Archive. Since version 0.07.6 the Tech it reads is the one standing at the **head of the turn**, not whatever is picked this instant, so a Research Lead changing a provisional pick cannot re-price orders already placed.
 _Avoid_: early access, preview, partial tech, head start
 
 **Climate Model**:
@@ -125,15 +125,15 @@ An advance on the Tech Tree that changes an output, a capacity, an upkeep, a Shi
 _Avoid_: research, upgrade, invention
 
 **Tech Tree**:
-The single tree of Techs shared by all Factions, seventeen of them since version 0.06.0, in five branches: Industry, Propulsion, Off-world Living, Extraction, Society. A branch may hold more than one Tech on a rung; since version 0.07.4 two such Techs stack in a taller branch row on every rung but the last, where they sit side by side, so every column is one box wide. One Tech is under research at a time, worldwide. Four of the seventeen are Victory gates, one per Faction on rung 3: each is a Tech for everyone, and its Faction cannot win until it stands.
+The single tree of Techs shared by all Factions, seventeen of them since version 0.06.0, in five branches: Industry, Propulsion, Off-world Living, Extraction, Society. A branch may hold more than one Tech on a rung; since version 0.07.4 two such Techs stack in a taller branch row on every rung but the last, where they sit side by side, so every column is one box wide. One Tech is under research at a time, worldwide. Four of the seventeen are Victory gates, one per Faction on rung 3: each is a Tech for everyone, and its Faction cannot win until it stands. Since version 0.07.6 a box chosen this turn but not yet committed wears a paler amber than the settled one, reads `chosen`, and has its own Pick button withdrawn.
 _Avoid_: per-faction tree, research tree
 
 **Research Lead**:
-The Faction that contributed the most Research to the Tech that just completed. It chooses the next Tech, from version 0.07.0 out of a drawn shortlist of three rather than out of everything available; the draw always carries the Lead's own Victory gate once its prerequisites are met, so a Faction can be denied a rival's gate but never its own. The first Tech of the game is not drawn for: it is a free choice from the whole of rung 1. Decided afresh for every Tech, and the race for it stands in the top bar as one bar of the four Factions' contributions in their own colours. Since version 0.07.0 the turn cannot end while a human Lead owes the table a Tech, and Research banked while nothing is under research keeps its owner.
+The Faction that contributed the most Research to the Tech that just completed. It chooses the next Tech, from version 0.07.0 out of a drawn shortlist of three rather than out of everything available; the draw always carries the Lead's own Victory gate once its prerequisites are met, so a Faction can be denied a rival's gate but never its own. The first Tech of the game is not drawn for: it is a free choice from the whole of rung 1. Decided afresh for every Tech, and the race for it stands in the top bar as one bar of the four Factions' contributions in their own colours. Since version 0.07.0 the turn cannot end while a human Lead owes the table a Tech, and Research banked while nothing is under research keeps its owner. Since version 0.07.6 a human Lead's pick is **provisional until the turn ends**: pressing a box records the choice and spends nothing, another box replaces it as often as the Lead likes, and ending the turn commits it -- at which point the Shortlist is thrown away, the banked Research pours in and the Tech may complete. A computer seat commits the instant it picks.
 _Avoid_: science leader, tech leader
 
 **Shortlist**:
-The three Techs the Research Lead chooses between, drawn when a Tech completes, since version 0.07.0. The Lead's own Victory gate is always on it where its prerequisites are met; the rest come from the game's own generator. An empty shortlist is a free choice of everything available, which is how the game opens.
+The three Techs the Research Lead chooses between, drawn when a Tech completes, since version 0.07.0. The Lead's own Victory gate is always on it where its prerequisites are met; the rest come from the game's own generator. An empty shortlist is a free choice of everything available, which is how the game opens. Since version 0.07.6 it is kept for as long as a human Lead's pick can still be changed and thrown away only when the pick is committed, since redrawing it on every change would be a free reroll.
 _Avoid_: options, candidates, draft, offer
 
 **Command Cluster**:
@@ -371,7 +371,7 @@ The Facility that holds a Region's Unrest down: while it stands and is online it
 _Avoid_: police, militia, garrison, barracks (that is the Colony word)
 
 **Refugees**:
-The people who leave a Region for its neighbours when the heat or the sea takes their homes, instead of simply being lost. They are added to the state that receives them, and their arrival raises its Unrest.
+The people who leave a Region for its neighbours when the heat or the sea takes their homes, instead of simply being lost. They are added to the state that receives them, and their arrival raises its Unrest, charged on everyone who arrived rather than on the net. Since version 0.07.6 the Report says one **net migration** line per Region rather than one per flow: a Region that gained says how many it took in and what its Unrest did, one that lost names the largest cause that drove them out, and one whose flows cancel says nothing at all. The game's log keeps the whole record, one line per flow.
 _Avoid_: migrants, displaced, evacuees, exodus, immigration
 
 **Resettle**:
@@ -425,11 +425,11 @@ The phase in which the turn actually happens: transits advance, arrivals land, B
 _Avoid_: processing, execution, upkeep phase
 
 **Report**:
-The phase that opens a turn for the player, and the dated dispatch it shows. It opens with a headline: the most serious thing that happened, chosen by a fixed order of severity. Everything else is grouped under four headings, In space, On Earth, The climate and Your works, and an empty heading is left out. Every line that is about somewhere is a way there. It ends with what each rival Faction did, told in plain sentences of what the board could see.
+The phase that opens a turn for the player, and the dated dispatch it shows. It opens with a headline: the most serious thing that happened, chosen by a fixed order of severity. Everything else is grouped under four headings, In space, On Earth, The climate and Your works, and an empty heading is left out. Every line that is about somewhere is a way there. It ends with what each rival Faction did, told in plain sentences of what the board could see. It speaks only of what is worth a line: since version 0.07.6 migration is reported **once per Region, in net**, and only where the net is worth at least half a person.
 _Avoid_: summary, news, digest
 
 **Tutorial**:
-The guided first turns, since version 0.07.5, begun from the title screen's own button and played as the Custodians at their home. It is an ordinary game on an ordinary board: nothing is forced and nothing is checked, and a **tutorial note** -- drawn as a Moment is drawn -- opens each of the first five turns to say what that turn is for. The last note says so and the tutorial ends itself; the game carries on with nothing thrown away. The game does not remember it has been played. Its words live in `assets/data/tutorial.toml`.
+The guided first turns, since version 0.07.5, asked for by the `Play Tutorial` tick at the foot of the Custodians' card on the Faction screen -- since version 0.07.6, which retired the title screen's button -- and played as the Custodians from a start the player chooses as in any other game. It is an ordinary game on an ordinary board: nothing is forced and nothing is checked, and a **tutorial note** -- drawn as a Moment is drawn -- opens each of the first five turns to say what that turn is for. The last note says so and the tutorial ends itself; the game carries on with nothing thrown away. The game does not remember it has been played. Its words live in `assets/data/tutorial.toml`.
 _Avoid_: walkthrough, onboarding, training mission, guided mode
 
 **Moment**:
@@ -555,5 +555,5 @@ The one Temperature at which the game ends with nobody winning, unless a Faction
 _Avoid_: threshold, tipping point, game over temperature
 
 **Climate Panel**:
-The screen showing the CO2 Stock, the Temperature and where it is heading, a Temperature bar notched with every Break, every Sea Level threshold and Antarctica's opening, this turn's Emissions by source, the sink and the net, since version 0.07.4 the Emissions history beneath them and since version 0.07.5 the population history above the growth rate, the penalties in force, the Committed Warming, the Last Turn, and a projection to the last turn.
+The screen showing the CO2 Stock, the Temperature and where it is heading, a Temperature bar notched with every Break, every Sea Level threshold and Antarctica's opening, this turn's Emissions by source, the sink and the net, since version 0.07.4 the Emissions history beneath them, the penalties in force, the Committed Warming, the Last Turn, and a projection to the last turn.
 _Avoid_: warming meter, climate HUD
