@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.07.5
+DYING EARTH - playtest build, version 0.07.6
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,43 +16,36 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-   (Windows only again; there is no Linux zip for 0.07.5.)
+   (Windows only again; there is no Linux zip for 0.07.6.)
 
-WHAT CHANGED SINCE 0.07.4
+WHAT CHANGED SINCE 0.07.5
 -------------------------
-One rule changed, and the rest is about reading the board. There is also a tutorial,
-the first this game has ever had.
+Four small things, three of them about changing your mind or seeing less of what you
+did not ask for.
 
-- A TUTORIAL. There is a Tutorial button on the title screen now. It starts an ordinary
-  game as the Custodians and puts a short note at the start of each of the first five
-  turns saying what that turn is for. Nothing is forced; the notes only say where to
-  look, and after the fifth the game carries on as normal. Fair warning: the Custodians
-  are the hardest of the four to win with. They are the side that teaches the climate.
-- EVERY COLONY AND STATION NOW COMES WITH A CORE MODULE. It holds four people and costs
-  one energy a turn, and it is what a place is founded with instead of a free habitat.
-  The catch: a place has ONE BUILD SLOT FOR EACH PERSON LIVING THERE AND NONE BEFORE.
-  A station you build this turn can hold four people at once but cannot build anything
-  until they arrive. This is the only rule change, and it moved the balance a long way.
-- MODULES ARE ON THE COLONY'S CARD NOW, drawn as tiles in the same grid a country's
-  build slots use. The separate window is gone. Click a tile for its figures and
-  buttons, an empty one to build. M no longer opens that window: it switches to the
-  Solar System Map, the job Tab used to do. Tab brings the roster back.
-- HOVER ANY WORD IN THE INFLUENCE SECTION of a country's card and it explains itself:
-  what influence is, what a standing is, what a threshold is and what raises it, what
-  blame is costing you, and how close your nearest rival is.
-- THE GAME OPENS FULL SIZE, and the Climate Panel opens tall enough to read. It used to
-  show about a third of itself.
-- A POPULATION GRAPH. Hover the population figure in the top bar for Earth's people and
-  space's, turn by turn. Every graph now labels its axis with dates rather than turn
-  numbers.
-- THE PICK A TECH BUTTON IS RED when it appears, like End Turn.
-- EACH SIDE HAS A SYMBOL on the faction selection screen.
+- A TECH CHOICE IS NO LONGER FINAL THE MOMENT YOU CLICK IT. Pick a tech, then pick a
+  different one, as often as you like; it locks in when you end the turn. The box you
+  have chosen is a paler amber and says so, and the line above the tree tells you it is
+  not settled yet. Nothing is spent until it locks in.
+- THE TUTORIAL MOVED. The button on the title screen is gone. The choice is a tick at
+  the bottom of the Custodians' card on the faction screen, reading "Play Tutorial".
+  Ticking it still lets you choose where you start, which the old button did not.
+- THE POPULATION GRAPH CAME OFF THE CLIMATE PANEL. It is still one pointer-move away,
+  on the population figure in the top bar. The panel keeps the emissions graph, which
+  is what the panel is about.
+- THE REPORT SAYS FAR LESS ABOUT REFUGEES. It used to print a line for every flow of
+  people out of every region, and another for every region that received any; a hot
+  turn could spend thirty-nine of its seventy-four lines on it, most of them moving a
+  fraction of a person. Now each region says one line, in net, and only when the net is
+  worth at least half a person. A region that both gained and lost people says nothing
+  at all.
 
 HOW TO PLAY, IN ONE MINUTE
 --------------------------
-- Tutorial if this is your first game: it starts one for you and talks you through the
-  first five turns. Otherwise New Game > pick one of the four sides > click a region on
-  the globe, then Begin. The computer plays the other three. There is also a Spectate
+- New Game > pick one of the four sides > click a region on the globe, then Begin. If
+  this is your first game, take the Custodians and tick "Play Tutorial" at the bottom of
+  their card: you still choose where you start, and a short note opens each of the first
+  five turns. The computer plays the other three. There is also a Spectate
   button under the cards: the computer plays all four and you just watch.
 - You are looking at the Earth Map. Click a region for its card and orders on the right.
   Drag to turn the globe, mouse wheel to zoom. M switches to the Solar System Map, Tab
@@ -86,12 +79,16 @@ WHAT WE WANT TO KNOW
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- THE TUTORIAL: did you use it? Did the five notes tell you enough to play on, or did
-  you still not know what to do on turn six?
+- THE TUTORIAL TICK: did you find it on the Custodians' card? Did the five notes tell
+  you enough to play on, or did you still not know what to do on turn six?
+- CHANGING A TECH PICK: did you notice you could change it? Was it clear the choice was
+  not settled until you ended the turn?
+- THE REPORT: is it readable now? Is there anything you used to learn from the refugee
+  lines that you now miss?
 - THE CORE MODULE: did "one build slot per person" make sense on the card, or did you
   find out by being refused?
 - THE INFLUENCE HOVERS: is there still a word in that section you could not explain?
-- THE POPULATION GRAPH: did the two scales confuse you?
+- THE POPULATION GRAPH: did you find it on the top bar, now that it is not on the panel?
 - THE POPULATION NUMBERS: did "Region population" make sense? Did it bother you that
   Nigeria's region says 1.14 billion (it is all of sub-Saharan Africa)?
 - THE LIFT TO A STATION: did you use it, and did it feel too easy?
@@ -122,4 +119,7 @@ KNOWN ROUGH EDGES
   the panel. Turn the globe a little.
 - Antarctica's three colony sites have labels that overlap each other when you are zoomed
   out. Older than this version.
-- No sound, no tutorial beyond the first Report.
+- THE LAST REPORT OF A GAME IS DATED WRONG. When the game ends, the report that comes
+  with it is headed January 2030 whatever year it actually is. The top bar beside it is
+  right. Known, and being fixed.
+- No sound.

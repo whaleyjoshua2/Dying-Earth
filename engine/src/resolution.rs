@@ -1520,33 +1520,79 @@ impl Game {
 
     // ------------------------------------------------------------------ (i), ticket #52
 
+    /// Ticket #176 (version 0.07.6): one line per Region, in **net**, spoken only when the net is
+    /// worth at least `report_net_floor` of a person. The designer: *"reduce report clutter by
+    /// reporting only net migration from refugees and only when migration occurs"*, and, asked how:
+    /// one line per Region, half a person as the floor, the drafted wording, and the largest cause
+    /// kept.
+    ///
+    /// Measured before the change, over ten computer-played games: the worst turn spent **39 of its
+    /// 74 Report lines** on refugees, the median turn 12, and refugees were **30% of the median
+    /// Report**. A Region spoke once per cause and once more for arriving, so one that lost people
+    /// to the sea and to the heat spoke twice, and one that took ten and sent ten away spoke twice
+    /// while netting nothing.
+    ///
+    /// `arrived` is the GROSS that came in and `rose` what Unrest did about it, both charged on the
+    /// gross by the rule. Where the gross differs from the net the line names it, because otherwise
+    /// the Unrest figure would be unexplained -- it is the one place the Report says why Unrest rose.
+    fn report_net_migration(&mut self, sid: StateId, arrived: f64, rose: f64) {
+        let left: f64 = self.state(sid).refugees_out.iter().map(|(_, n)| *n).sum();
+        let net = arrived - left;
+        if net.abs() < self.tables.unrest.report_net_floor {
+            return;
+        }
+        let state = self.tables.state(sid).name.clone();
+        let text = if net > 0.0 {
+            let n = format!("{net:.1}");
+            let gross = format!("{arrived:.1}");
+            match (rose > 0.0, (arrived - net).abs() >= self.tables.unrest.report_net_floor) {
+                // Unrest rose, and some of what arrived was cancelled by what left: name both, or
+                // the Unrest figure is charged on a number the line never gives.
+                (true, true) => self.say(
+                    "refugees_net_in_gross",
+                    &[("n", n), ("gross", gross), ("state", state), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(sid))],
+                ),
+                (true, false) => self.say(
+                    "refugees_net_in",
+                    &[("n", n), ("state", state), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(sid))],
+                ),
+                // Too few to move Unrest, or Unrest already at the ceiling: the arrival alone.
+                (false, _) => self.say("refugees_net_in_quiet", &[("n", n), ("state", state)]),
+            }
+        } else {
+            // The largest cause survives, at the designer's word: *why* is the most interesting word
+            // in the old line and the cheapest to keep. `mostly` only where there was more than one.
+            let out = &self.state(sid).refugees_out;
+            let why = out.iter().max_by(|a, b| a.1.total_cmp(&b.1)).map(|(c, _)| c.clone()).unwrap_or_default();
+            let key = if out.len() > 1 { "refugees_net_out_mostly" } else { "refugees_net_out" };
+            self.say(key, &[("n", format!("{:.1}", -net)), ("state", state), ("why", why)])
+        };
+        self.report_line(LineKind::Refugees, Some(ReportPlace::State(sid)), text);
+    }
+
     /// Unrest settles last, once every rise of the turn is in: the refugees the turn's flows
     /// brought, then the falls (Relief, a Constabulary, and the natural fall in a turn nothing
     /// raised it), then the throw-off, then the Report lines for crossing a threshold.
     pub fn resolve_unrest(&mut self) {
         let u = self.tables.unrest.clone();
         // The refugees the turn's flows brought, charged once so the per-turn cap counts them all.
+        // Ticket #176 (version 0.07.6): Unrest is charged on the GROSS arrivals, as the rule has
+        // always had it -- a Region that takes ten people and sends ten away has still absorbed ten
+        // people's worth of grievance -- and only the Report's line speaks in net.
         for sid in StateId::ALL {
             let arrived = self.state(sid).refugees_in;
-            if arrived <= 0.0 {
-                continue;
-            }
-            let want = (arrived / u.refugees_per).floor().min(u.refugees_max);
-            let rose = self.raise_unrest(sid, want, UnrestSource::Refugees);
-            if rose > 0.0 {
-                let line = format!("{:.1} people arrived in {}; Unrest rose by {} to {}.", arrived, self.tables.state(sid).name, Game::unrest_figure(rose), self.unrest_text(sid));
-                self.log(line);
-                let text = self.say(
-                    "refugees_arrived",
-                    &[
-                        ("n", format!("{arrived:.1}")),
-                        ("state", self.tables.state(sid).name.clone()),
-                        ("rose", Game::unrest_figure(rose).to_string()),
-                        ("unrest", self.unrest_text(sid)),
-                    ],
-                );
-                self.report_line(LineKind::Refugees, Some(ReportPlace::State(sid)), text);
-            }
+            let rose = if arrived > 0.0 {
+                let want = (arrived / u.refugees_per).floor().min(u.refugees_max);
+                let r = self.raise_unrest(sid, want, UnrestSource::Refugees);
+                if r > 0.0 {
+                    let line = format!("{:.1} people arrived in {}; Unrest rose by {} to {}.", arrived, self.tables.state(sid).name, Game::unrest_figure(r), self.unrest_text(sid));
+                    self.log(line);
+                }
+                r
+            } else {
+                0.0
+            };
+            self.report_net_migration(sid, arrived, rose);
         }
         // Resettle (rule 9): the Standing the chosen state gives its Faction.
         for (seat, sid) in std::mem::take(&mut self.pending.resettle) {

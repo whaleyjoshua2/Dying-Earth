@@ -170,9 +170,18 @@ impl Game {
         }
     }
 
-    /// Set the Tech under research. Unallocated Research flows in at once.
+    /// Set the Tech under research.
+    ///
+    /// Ticket #173 (version 0.07.6): a **human** Lead's pick is provisional -- the designer: *"tech
+    /// choice is not locked in until the turn is ended"* -- so this records the choice and stops
+    /// there, and the same seat may call it again to change its mind for as long as the turn lasts.
+    /// Nothing is spent, the shortlist is kept (redrawing it would be a free reroll), and the Tech
+    /// cannot complete. `commit_pick` at the head of `end_turn` does all of that. A **computer**
+    /// seat's pick commits in the same breath, since it never changes its mind and the loop that
+    /// finishes a Tech expects the next one to be standing.
     pub fn pick_tech(&mut self, seat: Seat, tech: TechId) -> Result<(), String> {
-        if self.research.current.is_some() {
+        // A committed Tech is settled; only an uncommitted pick of this seat's own may be replaced.
+        if self.research.current.is_some() && self.research.pick_committed {
             return Err("a Tech is already under research".into());
         }
         if !self.available_techs().contains(&tech) {
@@ -186,6 +195,32 @@ impl Game {
         }
         self.research.current = Some(tech);
         self.research.awaiting_pick = None;
+        self.research.pick_committed = false;
+        self.research.picked_by = Some(seat);
+        // Ticket #173: a computer seat never changes its mind, and the loop that finishes a Tech
+        // expects the next one standing, so its pick is committed here and now.
+        if self.seat(seat).ai {
+            self.commit_pick();
+        }
+        Ok(())
+    }
+
+    /// Ticket #173 (version 0.07.6): make a pick final. Everything that used to happen the instant
+    /// a Tech was chosen happens here instead: the shortlist is thrown away, the seat is stamped for
+    /// the Lead tie-break, the banked Research pours in under each seat's own name, the log line is
+    /// written, and only now may the Tech complete -- which, for a human Lead, means a Tech finished
+    /// by its banked Research lands with the turn's other Moments rather than in the middle of the
+    /// Orders phase. Runs at the head of `end_turn`, and for a computer seat inside `pick_tech`.
+    pub fn commit_pick(&mut self) {
+        if self.research.pick_committed {
+            return;
+        }
+        let Some(tech) = self.research.current else {
+            self.research.pick_committed = true;
+            return;
+        };
+        let seat = self.research.picked_by.unwrap_or(Seat(0));
+        self.research.pick_committed = true;
         self.research.shortlist = Vec::new();
         self.research.last_picked_turn[seat.index()] = Some(self.turn);
         // Ticket #105: everything banked since the last Tech pours in, each seat's share landing
@@ -203,7 +238,6 @@ impl Game {
             self.research.progress += carried;
             self.check_tech_complete();
         }
-        Ok(())
     }
 
     /// The AI's fixed pick order (spec 16.4), then the cheapest available.

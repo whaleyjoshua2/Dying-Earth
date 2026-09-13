@@ -679,6 +679,13 @@ fn run_one_quiet_turn(g: &mut Game) {
     g.seats[0].ai = true;
 }
 
+/// `tutorialtick:1` (a building aid, ticket #174, not part of the spec): the `Play Tutorial` tick at
+/// the foot of the Custodians' card stands ticked in the picture, since a headless run cannot click
+/// it. Off by default, as the screen opens for a player.
+fn tutorial_tick() -> bool {
+    std::env::args().any(|a| a == "tutorialtick:1")
+}
+
 fn show_view(view: &mut ViewState, v: View) {
     match v {
         View::Solar => {
@@ -777,7 +784,10 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         plan.captured = false;
         plan.menu_step += 1;
         match plan.menu_step {
-            1 => session.screen = Screen::ChooseFaction,
+            1 => {
+                session.screen = Screen::ChooseFaction;
+                session.tutorial_ticked = tutorial_tick();
+            }
             // Ticket #109: the credits, so the picture that proves the CC BY attribution is
             // standing gets taken with every other menu picture.
             2 => session.screen = Screen::Credits,
@@ -844,6 +854,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
     if session.game.is_none() && plan.factions_step < 2 {
         if plan.factions_step == 0 {
             session.screen = Screen::ChooseFaction;
+            session.tutorial_ticked = tutorial_tick();
             plan.factions_step = 1;
             plan.next_at = t + 2.0;
             return;

@@ -30,6 +30,9 @@ impl Game {
         // turn's rises and the falls are settled at the end of its Resolution.
         for s in &mut self.states {
             s.refugees_in = 0.0;
+            // Ticket #176 (version 0.07.6): what leaves is counted beside what arrives, so the
+            // Report can speak one NET line per Region instead of one per flow.
+            s.refugees_out.clear();
         }
         let t = self.tables.clone();
         let c = &t.climate;
@@ -533,13 +536,17 @@ impl Game {
             1 => names[0].clone(),
             n => format!("{} and {}", names[..n - 1].join(", "), names[n - 1]),
         };
+        // Ticket #176 (version 0.07.6): the LOG keeps the whole record, one line per flow, naming
+        // where the people went and why -- it is the developer's transcript and nobody reads it a
+        // turn at a time. The REPORT no longer speaks here: this is one flow of several, and the
+        // Report says one net line per Region once every flow of the turn is in (`resolve_unrest`).
         let line = format!("{:.1} population left {} for {} ({}).", amount, self.tables.state(from).name, list, why);
         self.log(line);
-        let text = self.say(
-            "refugees_left",
-            &[("n", format!("{amount:.1}")), ("state", self.tables.state(from).name.clone()), ("to", list), ("why", why.to_string())],
-        );
-        self.report_line(LineKind::Refugees, Some(ReportPlace::State(from)), text);
+        let st = self.state_mut(from);
+        match st.refugees_out.iter_mut().find(|(c, _)| c == why) {
+            Some((_, n)) => *n += amount,
+            None => st.refugees_out.push((why.to_string(), amount)),
+        }
     }
 
     /// Repeat the current net to the last turn (spec 11.5).

@@ -590,6 +590,9 @@ pub struct UnrestTable {
     pub per_decommission: f64,
     pub refugees_per: f64,
     pub refugees_max: f64,
+    /// Ticket #176 (version 0.07.6): the Report stays silent about a Region whose net migration is
+    /// smaller than this. Half a person, the figure Unrest itself rounds by.
+    pub report_net_floor: f64,
     pub occupation_start: f64,
     pub occupation_per_turn: f64,
     pub unrest_card: f64,
@@ -1289,8 +1292,8 @@ impl Tables {
         if !(u.army_threshold < u.facility_threshold && u.facility_threshold < u.throw_off_threshold && u.throw_off_threshold <= u.max) {
             return Err(err("unrest.toml", "the thresholds must rise: army_threshold < facility_threshold < throw_off_threshold <= max"));
         }
-        if u.neutral_max > u.max || u.refugees_per <= 0.0 {
-            return Err(err("unrest.toml", "neutral_max must not exceed max, and refugees_per must be positive"));
+        if u.neutral_max > u.max || u.refugees_per <= 0.0 || u.report_net_floor <= 0.0 {
+            return Err(err("unrest.toml", "neutral_max must not exceed max, and refugees_per and report_net_floor must be positive"));
         }
         for s in &self.states {
             if s.unrest < 0.0 || s.unrest > u.max {

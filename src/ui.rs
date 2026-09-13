@@ -319,7 +319,9 @@ enum Action {
     ChooseFaction(FactionKind),
     NewGame(FactionKind, StateId),
     /// Ticket #169 (version 0.07.5): the Tutorial button on the title screen.
-    StartTutorial,
+    /// Ticket #174 (version 0.07.6): the `Play Tutorial` tick at the foot of the Custodians' card
+    /// was pressed. The card is drawn from a read-only Session, so the tick travels as an action.
+    SetTutorialTick(bool),
     /// Ticket #169: the reader pressed on through a tutorial note.
     TutorialNoteRead,
     /// Ticket #64: Spectate, the fifth button on the choice screen.
@@ -967,24 +969,20 @@ pub fn draw(
                 session.earth_dirty = true;
             }
             Action::NewGame(f, s) => {
+                // Ticket #174 (version 0.07.6): the tutorial is asked for on the Custodians' card
+                // and read here, once the start has been chosen -- a ticked card still picks its own
+                // Region, at the designer's word. A tutorial game opens on its first note rather
+                // than on the Report, because the note says what the turn is for.
+                let tutorial = crate::app::tutorial_wanted(session.tutorial_ticked, f);
                 session.new_game(f, s);
+                session.tutorial = tutorial;
+                session.tutorial_ticked = false;
                 *view = ViewState::default();
-                view.popup = Popup::Report;
+                view.popup = if tutorial { Popup::Tutorial } else { Popup::Report };
                 let (lon, lat) = geo::state_lonlat(s);
                 view.yaw = geo::yaw_facing(lon, lat);
             }
-            // Ticket #169 (version 0.07.5): the Tutorial begins an ordinary game as the Custodians
-            // at their own home, and opens on its first note rather than on the Report.
-            Action::StartTutorial => {
-                let f = FactionKind::Custodians;
-                let s = session.tables.faction(f).home;
-                session.new_game(f, s);
-                session.tutorial = true;
-                *view = ViewState::default();
-                view.popup = Popup::Tutorial;
-                let (lon, lat) = geo::state_lonlat(s);
-                view.yaw = geo::yaw_facing(lon, lat);
-            }
+            Action::SetTutorialTick(on) => session.tutorial_ticked = on,
             // Ticket #169: on from a note to whatever the turn would have opened with. The tutorial
             // ends itself once the last note has been read, and the game carries on as any other.
             Action::TutorialNoteRead => {
@@ -1063,17 +1061,9 @@ fn title_screen(root: &mut Ui, session: &mut Session, actions: &mut Vec<Action>)
             ui.label(RichText::new("DYING EARTH").size(48.0).strong());
             ui.label(RichText::new("Colonize the solar system before ecological collapse overtakes Earth.").size(16.0));
             ui.add_space(40.0);
-            // Ticket #169 (version 0.07.5): the Tutorial, above New Game, where a new player looks
-            // first. It begins an ordinary game as the Custodians at their home, with a note at the
-            // head of each of its first turns; the Faction and the start are not asked for, since
-            // the whole point is to be playing within one click.
-            if ui
-                .add(egui::Button::new(RichText::new("Tutorial").size(22.0)).min_size(egui::vec2(220.0, 44.0)))
-                .on_hover_text("Play as the Custodians, with a note at the start of each of the first five turns saying what that turn is for. An ordinary game otherwise, and an ordinary game afterwards.")
-                .clicked()
-            {
-                actions.push(Action::StartTutorial);
-            }
+            // Ticket #174 (version 0.07.6): the Tutorial button stood here until the designer moved
+            // the choice onto the Custodians' card on the Faction screen, where the Faction it
+            // teaches is chosen. New Game is the top of the list again.
             if ui.add(egui::Button::new(RichText::new("New Game").size(22.0)).min_size(egui::vec2(220.0, 44.0))).clicked() {
                 session.screen = Screen::ChooseFaction;
             }
@@ -1403,6 +1393,23 @@ fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut
         ui.add_space(10.0);
         if ui.add(egui::Button::new(RichText::new(format!("Play the {}", card.name)).size(17.0)).min_size(egui::vec2(190.0, 36.0))).clicked() {
             actions.push(Action::ChooseFaction(kind));
+        }
+        // Ticket #174 (version 0.07.6): the tutorial is asked for here, at the foot of the one card
+        // it belongs to, and nowhere else. The designer: *"move tutorial choice to a radio box on
+        // custodian card during faction selection"*, placed at the bottom of the card and reading
+        // `Play Tutorial`. The other three cards stay quiet: a line about a thing this card cannot
+        // give you is clutter. The tick is remembered while the screen is open and read once the
+        // start has been chosen, since a ticked card still picks its own Region.
+        if kind == FactionKind::Custodians {
+            ui.add_space(6.0);
+            let mut on = session.tutorial_ticked;
+            if ui
+                .checkbox(&mut on, "Play Tutorial")
+                .on_hover_text("A note at the head of each of the first five turns, saying what that turn is for. Nothing is forced, and it stops after the fifth.")
+                .changed()
+            {
+                actions.push(Action::SetTutorialTick(on));
+            }
         }
     });
 }
@@ -4715,6 +4722,11 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
         let r = box_of(t);
         let (fill, status) = if game.research.done.contains(&t) {
             (Color32::from_rgb(50, 120, 60), "done")
+        } else if game.research.current == Some(t) && !game.research.pick_committed {
+            // Ticket #173 (version 0.07.6): picked this turn, and still changeable until the turn
+            // ends. A paler amber than the settled one. The caption stays one word because the box
+            // is only as wide as "cost 45 - locked"; the prompt above the tree carries the rest.
+            (Color32::from_rgb(120, 95, 35), "chosen")
         } else if game.research.current == Some(t) {
             (Color32::from_rgb(170, 130, 30), "under research")
         } else if available.contains(&t) {
@@ -4732,7 +4744,7 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
         painter.text(r.center_top() + egui::vec2(0.0, 32.0), egui::Align2::CENTER_CENTER, format!("cost {} - {}", card.cost, status), FontId::proportional(11.0), Color32::from_gray(230));
         let needs = if card.needs.is_empty() { "nothing".to_string() } else { card.needs.iter().map(|n| game.tables.tech(*n).name.clone()).collect::<Vec<_>>().join(" and ") };
         ui.interact(r, ui.id().with(format!("tech-{t:?}")), egui::Sense::hover()).on_hover_text(format!("{} (rung {}, cost {} Research)\n{}\nNeeds: {}", card.name, card.rung, card.cost, card.effect, needs));
-        if must_pick && available.contains(&t) {
+        if must_pick && available.contains(&t) && game.research.current != Some(t) {
             let b = egui::Rect::from_center_size(r.center_bottom() - egui::vec2(0.0, 11.0), egui::vec2(56.0, 18.0));
             if ui.put(b, egui::Button::new(RichText::new("Pick").size(11.0))).clicked() {
                 actions.push(Action::PickTech(t));
@@ -4740,7 +4752,9 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
         }
     }
     ui.horizontal(|ui| {
-        for (colour, label) in [(Color32::from_rgb(50, 120, 60), "done"), (Color32::from_rgb(170, 130, 30), "under research"), (Color32::from_rgb(40, 90, 160), "available"), (Color32::from_gray(60), "locked")] {
+        // Ticket #173 (version 0.07.6): the paler amber of a pick that can still change earns its own
+        // swatch, next to the settled amber it must be told apart from.
+        for (colour, label) in [(Color32::from_rgb(50, 120, 60), "done"), (Color32::from_rgb(170, 130, 30), "under research"), (Color32::from_rgb(120, 95, 35), "chosen this turn"), (Color32::from_rgb(40, 90, 160), "available"), (Color32::from_gray(60), "locked")] {
             let (sw, _) = ui.allocate_exact_size(egui::vec2(14.0, 14.0), egui::Sense::hover());
             ui.painter().rect_filled(sw, 3.0, colour);
             ui.label(label);
@@ -5060,9 +5074,15 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                     ui.colored_label(Color32::YELLOW, "Your Labs pay the Archive fund: the turn after they next pay it, Provisional Findings is off.");
                 }
             }
-            let must_pick = game.research.awaiting_pick == Some(Seat(0)) && game.research.current.is_none();
-            if must_pick {
+            // Ticket #173 (version 0.07.6): the tree keeps offering its Pick buttons while the
+            // choice can still be changed -- a Tech picked this turn is not locked in until the turn
+            // ends -- not only while none has been picked at all.
+            let must_pick = game.research.awaiting_pick == Some(Seat(0)) || !game.research.pick_committed;
+            if game.research.current.is_none() && must_pick {
                 ui.colored_label(Color32::YELLOW, "You pick the next Tech: choose one below.");
+            } else if !game.research.pick_committed {
+                // Ticket #173: the pick is made but not final; say so where the player is looking.
+                ui.colored_label(Color32::from_rgb(210, 190, 120), "Chosen for this turn. Press another box to change it; it is locked in when the turn ends.");
             }
             // Ticket #98: the Lead chooses from the drawn shortlist, so that is what the tree offers.
             let available = game.pickable_techs();
@@ -5147,11 +5167,15 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // Ticket #153 (version 0.07.4): the same history, at the panel's width.
             ui.add_space(4.0);
             emissions_history(ui, game, egui::vec2(ui.available_width(), 110.0));
+            // Ticket #175 (version 0.07.6): the population history stood here, above the growth rate
+            // that drives it, until the designer took it off: *"remove pop graph from climate
+            // window."* It keeps the top bar's Population hover, where it now has the picture to
+            // itself. **The Emissions history stays**, at the designer's word and for the reason the
+            // ticket gave: this is the page about emissions, and that chart is the page's own
+            // subject over time, where the population chart was a guest. Nothing fills the space and
+            // the Emissions chart keeps the height it had; a chart that grows because a neighbour
+            // left is a chart sized by accident.
             ui.separator();
-            // Ticket #166 (version 0.07.5): the population history stands with the growth rate that
-            // drives it, as the Emissions history stands under the sources that drive it.
-            population_history(ui, game, egui::vec2(ui.available_width(), 96.0));
-            ui.add_space(4.0);
             let growth = game.population_growth_rate() * 100.0;
             ui.label(format!(
                 "Penalties in force: population growth {:+.2}% per turn; a card comes {:.0}% of turns at this Temperature ({} cards left in the deck, {} of them Climate).",
@@ -5497,7 +5521,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // buttons when the player is the Research Lead.
                 if m.tech.is_some() {
                     ui.separator();
-                    let must_pick = game.research.awaiting_pick == Some(Seat(0)) && game.research.current.is_none();
+                    // Ticket #173: the same, in the Moment that a completed Tech opens.
+                    let must_pick = game.research.awaiting_pick == Some(Seat(0)) || !game.research.pick_committed;
                     let available = game.pickable_techs();
                     tech_tree(ui, game, &available, must_pick, actions);
                 }

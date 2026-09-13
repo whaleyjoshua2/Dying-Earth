@@ -213,6 +213,16 @@ pub struct NationState {
     /// Population that arrived here as refugees this turn; charged as Unrest once, at the end of
     /// Resolution, so the per-turn cap counts the whole turn's flows together.
     pub refugees_in: f64,
+    /// Ticket #176 (version 0.07.6): what LEFT here this turn, kept by the cause that drove them
+    /// out -- `the sea`, `the heat`, `the reefs`. Arrivals were counted per Region and departures
+    /// were not, so the Report could only speak per flow: a Region that lost people to two causes
+    /// spoke twice, and one that took ten and sent ten away spoke twice while netting nothing.
+    /// The designer: *"reduce report clutter by reporting only net migration from refugees and only
+    /// when migration occurs."* A net figure needs this counter beside `refugees_in`, and the cause
+    /// is kept with it because the largest one survives into the line. Zeroed where `refugees_in`
+    /// is, at the head of the Climate phase and again once Unrest has settled.
+    #[serde(default)]
+    pub refugees_out: Vec<(String, f64)>,
     /// The Unrest last named in the Report, so a crossing of 4, 7 or 10 is reported once.
     pub unrest_reported: f64,
     /// Ticket #53: the turn the state's current run of neutrality began, None while it is held or
@@ -495,6 +505,29 @@ pub struct Research {
     /// into the shared Tech over the game, for the simulation's report.
     #[serde(default)]
     pub neutral_total: i64,
+    /// Ticket #173 (version 0.07.6): whether `current` has been **committed**. A human Lead's pick
+    /// is provisional until the turn ends -- the designer: *"tech choice is not locked in until the
+    /// turn is ended"* -- so the pick is recorded here at once but the banked Research is not poured
+    /// into it, the shortlist is not thrown away, and the Tech cannot complete, until `commit_pick`
+    /// runs at the head of `end_turn`. A computer seat's pick commits in the same breath. False with
+    /// no Tech under research means nothing is owed.
+    #[serde(default = "crate::state::yes")]
+    pub pick_committed: bool,
+    /// Ticket #173: which seat made the pick that is waiting to be committed.
+    #[serde(default)]
+    pub picked_by: Option<Seat>,
+    /// Ticket #173: the Tech the Archivists' Provisional Findings reads for the whole of this turn,
+    /// frozen at the turn's head. Their signature gives them half the effect of the Tech under
+    /// research while the turn is still being ordered; with a pick that can change, reading `current`
+    /// live would re-price orders already placed, so the turn reads this instead.
+    #[serde(default)]
+    pub findings_tech: Option<TechId>,
+}
+
+/// Serde's default for `pick_committed`: a save written before ticket #173 has no provisional pick
+/// in it, so whatever Tech it carries is committed.
+pub fn yes() -> bool {
+    true
 }
 
 impl Research {
@@ -816,6 +849,7 @@ impl Game {
                 unrest: c.unrest,
                 changed_hands: false,
                 refugees_in: 0.0,
+                refugees_out: Vec::new(),
                 unrest_reported: c.unrest,
                 // Every state is neutral when the game opens; the clocks are staggered below, and
                 // `take_control` clears the four the Factions begin holding.
@@ -871,6 +905,10 @@ impl Game {
                 last_lead: None,
                 last_picked_turn: [None; SEAT_COUNT],
                 neutral_total: 0,
+                // Ticket #173: nothing picked yet, so nothing is waiting to be committed.
+                pick_committed: true,
+                picked_by: None,
+                findings_tech: None,
             },
             deck,
             discoveries: Vec::new(),
@@ -1034,8 +1072,13 @@ impl Game {
 
     /// True while this seat reads the Tech at half strength: it is not done, but it is the one under
     /// research and Provisional Findings is in force.
+    /// Ticket #173 (version 0.07.6): the Tech read here is the one **frozen at the turn's head**,
+    /// not whatever is under research this instant. A Lead may change its pick until the turn ends,
+    /// and a half-effect that moved with it would re-price orders already placed.
     fn reads_half(&self, seat: Seat, t: TechId) -> bool {
-        !self.has_tech(t) && self.research.current == Some(t) && self.provisional_findings(seat)
+        !self.has_tech(t)
+            && self.research.findings_tech == Some(t)
+            && self.provisional_findings(seat)
     }
 
     /// A multiplier Tech read for one seat: its full value once done, `1 + (value - 1) / 2` under
