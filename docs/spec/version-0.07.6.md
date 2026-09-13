@@ -163,9 +163,15 @@ win count moved.
 
 ## 7. The kit
 
-The **Windows kit** only: `dying-earth.exe` built with a statically linked CRT, `assets/`, and the
+The **Windows kit**: `dying-earth.exe` built with a statically linked CRT, `assets/`, and the
 playtest note as `README.txt`, zipped into `dist/dying-earth-0.07.6-playtest.zip`. `dist/` is
 gitignored, so the kit is an artifact on the machine and not a commit.
+
+An **Ubuntu kit** as well, the first since version 0.06.0. This machine has no WSL, no Docker and no
+cross-linker, and Bevy on Linux links against ALSA and udev, so a Linux binary cannot be built here;
+it is built on Ubuntu 22.04 by the repository's own `release-kits` workflow, which also carries the
+playtest note and a `RUN-ON-LINUX.txt` beside the binary. The playtest note has a Linux paragraph in
+its HOW TO RUN section from this version.
 
 ---
 

@@ -16,7 +16,10 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-   (Windows only again; there is no Linux zip for 0.07.6.)
+6. ON UBUNTU OR ANOTHER LINUX: take the "-linux" zip instead. There is no .exe in it;
+   open a terminal in the unzipped folder and run   ./dying-earth   . The file
+   RUN-ON-LINUX.txt beside it says what to do if the window does not open, and where
+   the saves go. It is built on Ubuntu 22.04 and wants 22.04 or newer.
 
 WHAT CHANGED SINCE 0.07.5
 -------------------------
