@@ -298,6 +298,14 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mu
         if keys.just_pressed(KeyCode::KeyM) {
             view.swap();
         }
+        // Ticket #163 (version 0.07.5): and Tab, freed by that move, brings the roster back. The
+        // panel shows the roster whenever nothing is selected, so clearing the selection is what
+        // "bring up the roster" means. The designer: *"should bring up the roster."*
+        if keys.just_pressed(KeyCode::Tab) {
+            view.selection = Selection::None;
+            view.slot_box = None;
+            view.hab_tile = None;
+        }
         // Ticket #41: C toggles the Climate Panel, a second way back once it is closed.
         if keys.just_pressed(KeyCode::KeyC) {
             toggle_climate(&mut view);
@@ -2457,7 +2465,9 @@ fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
                 roster_of(ui, session, game, seat, false, &mut jump);
         }
     } else {
-        ui.label(RichText::new("Your roster").size(18.0).strong());
+        // Ticket #163 (version 0.07.5): the roster has no button on the bar, so its heading names
+        // the key that brings it back, which is the rule every bar button follows.
+        ui.label(RichText::new("Your roster (Tab)").size(18.0).strong());
         // Ticket #127 (version 0.07.2): the ring, in place of 0.07.1's "no order" and its filter.
         ui.label(RichText::new("Click a row to select it and go there. An open ring marks a row that still wants an order; it fills once the order is given.").weak());
         roster_of(ui, session, game, Seat(0), true, &mut jump);

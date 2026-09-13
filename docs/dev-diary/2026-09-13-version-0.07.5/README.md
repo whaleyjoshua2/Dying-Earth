@@ -98,3 +98,10 @@ Tech Tree's own `Pick` buttons and its yellow prompt are left alone: six red but
 window is a wall rather than a signal. The red was written twice as a bare literal and is a named
 constant now, `TURN_RED`. A new `pick:0` picture aid leaves the opening Tech pick unmade, since the
 harness makes it so it can drive turns and the button could not otherwise be photographed.
+
+**Decided by the designer**: the End Turn red, the modal's button kept, the Tech Tree's own buttons
+left alone -- and **Tab, freed when M took the map, brings the roster back**. The panel shows the
+roster whenever nothing is selected, so Tab clears the selection; the heading names the key, which
+is the rule every button on the bar follows.
+
+![The roster's heading names its key](roster-comes-back-on-tab.png)
