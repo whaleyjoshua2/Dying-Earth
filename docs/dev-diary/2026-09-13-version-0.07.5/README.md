@@ -245,7 +245,7 @@ and a note at the head of each of its first five turns says what that turn is fo
 ![Turn five: the last note says so, and the game carries on](tutorial-note-the-last-one.png)
 
 The five notes are **read the board**, **build a Scrubber**, **spend your Influence** and **get off
-Earth**, after the first one which says what the Faction is for. The button on the title screen
+Earth**, after the first one which says what the Faction is for. The designer rewrote the last of them on reading it: it had named only the lift to a station, and a Colony Ship is the other way off Earth, so it now says *move them straight to your station over Earth or onto a Colony Ship*. The button on the title screen
 starts the game in one click -- as the Custodians at their own home, the Faction and the start not
 asked for -- and the last note ends the tutorial, after which it is an ordinary game on the same
 board with nothing thrown away.
