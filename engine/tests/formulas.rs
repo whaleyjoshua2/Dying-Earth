@@ -577,8 +577,8 @@ fn phobos_and_deimos_are_small_different_bodies_one_hop_past_mars() {
     assert_eq!(ph.name, "Phobos");
     assert_eq!(de.name, "Deimos");
     assert_eq!((ph.colony_slots(), de.colony_slots()), (2, 1));
-    assert_eq!((ph.mine_yield, ph.generator_yield, ph.refinery_yield, ph.habitat_yield), (1.75, 0.75, 0.5, 0.5));
-    assert_eq!((de.mine_yield, de.generator_yield, de.refinery_yield, de.habitat_yield), (1.0, 1.0, 0.25, 0.5));
+    assert_eq!((ph.mine_yield, ph.generator_yield, ph.refinery_yield, ph.research_yield), (1.75, 0.75, 0.5, 0.8));
+    assert_eq!((de.mine_yield, de.generator_yield, de.refinery_yield, de.research_yield), (1.0, 1.0, 0.25, 0.8));
     // Reach. Ticket #57 replaced the fixed card turns for a crossing between the Earth system and
     // the Mars system with the real flight: at the window it is the Hohmann 259 days, nine turns,
     // for the card's Fuel. The hops inside a system are untouched by it.
@@ -636,7 +636,7 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
     let earth = g.tables.body(BodyId::Earth).clone();
     assert_eq!(earth.colony_slots(), 3, "three Colony Slots on Earth, in Antarctica");
     // Ticket #56 re-cut them: abundant ore and Fuel under the ice.
-    assert_eq!((earth.mine_yield, earth.generator_yield, earth.refinery_yield, earth.habitat_yield), (1.75, 0.75, 2.0, 1.0));
+    assert_eq!((earth.mine_yield, earth.generator_yield, earth.refinery_yield, earth.research_yield), (1.75, 0.75, 2.0, 1.0));
     assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3);
     assert_eq!(StateId::ALL.len(), 14, "fourteen Regions since ticket #125, and Antarctica is none of them");
     let m = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
@@ -1212,12 +1212,13 @@ fn tech_hardened_hulls_adds_two_strength_to_every_ship_but_a_colony_ship_stays_a
 #[test]
 fn tech_expanded_habitats_holds_two_more() {
     let mut g = game();
-    // Ticket #80 (version 0.06.0): a Habitat holds 8; the Moon's Habitat yield is 1.1 (ticket #72),
-    // so 8.8 reads 8 and 11.0 reads 11.
+    // Ticket #80 (version 0.06.0): a Habitat holds 8. The Moon's Habitat yield of 1.1 made that
+    // 8.8 and 11.0 until ticket #140 (version 0.07.3) traded the yield for a Research one: flat 8
+    // and 10 everywhere now.
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 0);
     assert_eq!(g.habitat_room(g.colony(c).unwrap()), 8);
     with_tech(&mut g, TechId::ExpandedHabitats);
-    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 11);
+    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 10);
 }
 
 #[test]
@@ -1869,14 +1870,15 @@ fn an_arkwright_muster_takes_twice_the_population_out_of_its_state() {
 fn an_arkwright_habitat_holds_twelve() {
     let mut g = game();
     // Ticket #80 (version 0.06.0): a Habitat holds 8, the Arkwrights' 12. The Moon's Habitat yield
-    // is 1.1 (ticket #72): 8.8 reads 8, 13.2 reads 13, and with Expanded Habitats 11.0 and 16.5.
+    // of 1.1 made those 8 and 13 until ticket #140 (version 0.07.3) traded the yield away: a
+    // Habitat holds the same everywhere, so 8 and 12, and with Expanded Habitats 10 and 15.
     let theirs = colony(&mut g, Seat(2), BodyId::Moon, &[ModuleKind::Habitat], 0);
     let mine = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 0);
     assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 8);
-    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 13, "half again for the Arkwrights");
+    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 12, "half again for the Arkwrights");
     g.research.done.push(TechId::ExpandedHabitats);
-    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 11);
-    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 16, "(8 + 2) x 1.5 x 1.1");
+    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 10);
+    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 15, "(8 + 2) x 1.5");
 }
 
 #[test]
@@ -3898,7 +3900,7 @@ fn g_antarctica_opens_at_one_point_six_and_stays_open() {
     assert!((e.mine_yield - 1.75).abs() < 1e-9, "Mine 1.75: {}", e.mine_yield);
     assert!((e.refinery_yield - 2.0).abs() < 1e-9, "Refinery 2.0: {}", e.refinery_yield);
     assert!((e.generator_yield - 0.75).abs() < 1e-9, "Generator 0.75: {}", e.generator_yield);
-    assert!((e.habitat_yield - 1.0).abs() < 1e-9, "Habitat 1.0: {}", e.habitat_yield);
+    assert!((e.research_yield - 1.0).abs() < 1e-9, "Research 1.0 (the Habitat yield until ticket #140): {}", e.research_yield);
 }
 
 /// (h) The AI enumerates a Sea Wall once Coastal Engineering is in and a threshold is near.
@@ -4043,7 +4045,7 @@ fn every_colony_slot_draws_its_own_four_yields_within_a_quarter_of_its_bodys() {
                 ("Mine", y.mine, card.mine_yield),
                 ("Generator", y.generator, card.generator_yield),
                 ("Refinery", y.refinery, card.refinery_yield),
-                ("Habitat", y.habitat, card.habitat_yield),
+                ("Research", y.research, card.research_yield),
             ] {
                 let factor = drawn / base;
                 assert!(
@@ -4117,14 +4119,24 @@ fn a_modules_output_uses_its_own_slots_yield() {
     let poor_out = g.module_yield(Seat(0), poor_id, ModuleKind::Mine).amount;
     let rich_out = g.module_yield(Seat(0), rich_id, ModuleKind::Mine).amount;
     assert!(poor_out != rich_out || by_body != poor_out, "the two slots do not both read the Body's {by_body}: {poor_out} and {rich_out}");
-    // A Habitat's room follows the slot too, and a station over Earth still takes no Body yield.
+    // Ticket #140 (version 0.07.3): a Habitat holds the same everywhere -- the slot's fourth yield
+    // is Research now, and it is the Observatory that follows the slot, on the ground; a station's
+    // Observatory reads its Body's figure, the first Body yield a station has read.
     g.colony_mut(rich_id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     let per = g.tables.module(ModuleKind::Habitat).holds_colonists as f64;
-    let want = (per * g.slot_yields(BodyId::Mars, rich).habitat).floor() as u32;
-    assert_eq!(g.habitat_room(g.colony(rich_id).unwrap()), want, "the Habitat holds what its slot's Habitat yield says");
+    assert_eq!(g.habitat_room(g.colony(rich_id).unwrap()), per as u32, "a Habitat holds the same on every slot");
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
     g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Habitat));
-    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), per as u32, "a station's Habitats take no Body yield and no slot's either");
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), per as u32, "and the same in orbit");
+    let science = g.slot_yields(BodyId::Mars, rich).research;
+    assert!((g.research_yield_at(g.colony(rich_id).unwrap()) - science).abs() < 1e-9, "an Observatory on the ground reads its slot's Research yield");
+    assert!((g.research_yield_at(g.colony(iss).unwrap()) - g.tables.body(BodyId::Earth).research_yield).abs() < 1e-9, "a station's Observatory reads its Body's");
+    g.colony_mut(rich_id).unwrap().modules.push(Module::new(ModuleKind::Observatory));
+    let base = g.tables.module(ModuleKind::Observatory).produces.as_ref().map(|p| p.amount).unwrap_or(0) as f64;
+    let colonists = g.colony(rich_id).unwrap().colonists as f64;
+    let per_colonist = g.tables.observatory.research_per_colonist;
+    let want = (base * science * (1.0 + colonists * per_colonist) * g.tables.faction(g.kind(Seat(0))).research_multiplier_off_earth.unwrap_or(g.tables.faction(g.kind(Seat(0))).research_multiplier)).floor() as i64;
+    assert_eq!(g.module_yield(Seat(0), rich_id, ModuleKind::Observatory).research, want, "the Observatory's Research carries the slot's yield");
 }
 
 /// Ticket #57 (c), amended by ticket #67 (version 0.05.5): the game begins on 1 January 2030, runs
@@ -5050,7 +5062,7 @@ fn seven_hundred_and_fifty_in_the_fund_is_the_prospectors_first_part() {
 fn the_moons_four_yields_are_up_a_tenth() {
     let g = game();
     let m = g.tables.body(BodyId::Moon);
-    assert!((m.mine_yield - 1.65).abs() < 1e-9 && (m.generator_yield - 1.375).abs() < 1e-9 && (m.refinery_yield - 0.55).abs() < 1e-9 && (m.habitat_yield - 1.1).abs() < 1e-9, "{:?}", (m.mine_yield, m.generator_yield, m.refinery_yield, m.habitat_yield));
+    assert!((m.mine_yield - 1.65).abs() < 1e-9 && (m.generator_yield - 1.375).abs() < 1e-9 && (m.refinery_yield - 0.55).abs() < 1e-9 && (m.research_yield - 1.0).abs() < 1e-9, "{:?}", (m.mine_yield, m.generator_yield, m.refinery_yield, m.research_yield));
 }
 
 /// Ticket #72 (e): the Prospector AI plays the share as a strategy: nothing before the pace's first
@@ -5350,21 +5362,26 @@ fn the_ai_spends_its_influence_on_neutral_states_while_any_are_worth_having() {
 // ---------------------------------------------------------------- 0.06.0 ticket #80: the Observatory
 
 /// Ticket #80: an Observatory makes 2 Research, plus one per cent for every Colonist at its Colony,
-/// times the Faction's Research multiplier and Public Science, rounded down; no Body yield and no
-/// output multiplier touch it. The Archivists (x1.6) with none: 3; with 25: 2 x 1.25 x 1.6 = 4.
+/// times the Faction's Research multiplier and Public Science, rounded down; no output multiplier
+/// touches it. Ticket #140 (version 0.07.3): times its slot's Research yield too, which on Mars is
+/// drawn near 1.3, so the expected figures carry the drawn yield rather than a constant.
 #[test]
 fn observatory_makes_two_research_plus_a_per_cent_per_colonist() {
     let mut g = game();
     let ark = Seat(3);
     let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Observatory, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 0);
+    let science = g.research_yield_at(g.colony(mars).unwrap());
+    assert!(science > 1.0, "Mars is where the planetary science is: {science}");
+    let off = g.tables.faction(g.kind(ark)).research_multiplier_off_earth.unwrap_or(g.tables.faction(g.kind(ark)).research_multiplier);
     let y = g.module_yield(ark, mars, ModuleKind::Observatory);
     assert_eq!(y.resource, None, "Research is not a Stockpile resource");
-    assert_eq!(y.research, 3, "2 x 1.6 = 3.2 with no Colonists");
+    assert_eq!(y.research, (2.0 * science * off).floor() as i64, "2 x the slot's yield x the off-Earth multiplier with no Colonists");
     assert_eq!(y.upkeep, 3);
     g.colony_mut(mars).unwrap().colonists = 25;
-    assert_eq!(g.module_yield(ark, mars, ModuleKind::Observatory).research, 4, "2 x 1.25 x 1.6 = 4.0 with 25 Colonists");
+    assert_eq!(g.module_yield(ark, mars, ModuleKind::Observatory).research, (2.0 * science * 1.25 * off).floor() as i64, "x1.25 with 25 Colonists");
     with_tech(&mut g, TechId::PublicScience);
-    assert_eq!(g.module_yield(ark, mars, ModuleKind::Observatory).research, 6, "x1.5 with Public Science");
+    let public = g.tables.tech(TechId::PublicScience).value;
+    assert_eq!(g.module_yield(ark, mars, ModuleKind::Observatory).research, (2.0 * science * 1.25 * off * public).floor() as i64, "and Public Science on top");
 }
 
 /// Ticket #80: the Observatory's Research reaches the seat's Income, named by its Colony.
@@ -5374,12 +5391,15 @@ fn observatory_research_flows_into_the_income() {
     let ark = Seat(3);
     g.seats[ark.index()].stockpile.energy = 100;
     let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Observatory, ModuleKind::Generator], 0);
+    // Ticket #140 (version 0.07.3): the figure carries the slot's drawn Research yield.
+    let want = g.module_yield(ark, mars, ModuleKind::Observatory).research;
+    assert!(want >= 3, "at least 2 x 1.6 on Mars: {want}");
     let before = g.seat(ark).research_last_turn;
     g.income_phase();
     let s = g.seat(ark);
-    assert!(s.research_last_turn >= before + 3, "3 Research from the Observatory, got {}", s.research_last_turn);
+    assert!(s.research_last_turn >= before + want, "{want} Research from the Observatory, got {}", s.research_last_turn);
     let name = g.place_name(Place::Colony(mars));
-    assert!(s.income_sources.iter().any(|(src, r, n)| src == &format!("Observatory in {name}") && *r == Resource::Research && *n == 3), "{:?}", s.income_sources);
+    assert!(s.income_sources.iter().any(|(src, r, n)| src == &format!("Observatory in {name}") && *r == Resource::Research && *n == want), "{:?}", s.income_sources);
 }
 
 /// Ticket #80: a Space Station holds a Shipyard, Habitats and Observatories; still no Barracks.
@@ -5421,13 +5441,18 @@ fn archivists_research_is_one_and_a_half_on_earth_and_one_and_three_quarters_off
     let axiom = station_of(&g, ark, BodyId::Earth).expect("the Archivists start with Axiom");
     g.colony_mut(axiom).unwrap().modules.push(Module::new(ModuleKind::Observatory));
     g.colony_mut(axiom).unwrap().colonists = 50;
-    assert_eq!(g.module_yield(ark, axiom, ModuleKind::Observatory).research, 5, "a station over Earth is off Earth: 2 x 1.5 x 1.75 = 5.25");
+    // Ticket #140 (version 0.07.3): a station's Observatory reads its Body's Research yield, Earth's
+    // 1.0, so Axiom's figure is unchanged; a ground Observatory reads its slot's drawn yield.
+    assert_eq!(g.module_yield(ark, axiom, ModuleKind::Observatory).research, 5, "a station over Earth is off Earth: 2 x 1.0 x 1.5 x 1.75 = 5.25");
     let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Observatory, ModuleKind::Mine], 50);
-    assert_eq!(g.module_yield(ark, mars, ModuleKind::Observatory).research, 5, "2 x 1.5 x 1.75 = 5.25");
+    let mars_science = g.research_yield_at(g.colony(mars).unwrap());
+    assert_eq!(g.module_yield(ark, mars, ModuleKind::Observatory).research, (2.0 * mars_science * 1.5 * 1.75).floor() as i64, "2 x the slot's yield x 1.5 x 1.75");
     assert_eq!(g.module_yield(ark, mars, ModuleKind::Mine).amount, 5, "the output nerf is gone: 4 x 1.25 x 1.0");
     let vostok = colony(&mut g, ark, BodyId::Earth, &[ModuleKind::Observatory], 50);
+    let vostok_science = g.research_yield_at(g.colony(vostok).unwrap());
     with_tech(&mut g, TechId::PublicScience);
-    assert_eq!(g.module_yield(ark, vostok, ModuleKind::Observatory).research, 6, "Antarctica is Earth: 2 x 1.5 x 1.5 x 1.5 = 6.75");
+    let public = g.tables.tech(TechId::PublicScience).value;
+    assert_eq!(g.module_yield(ark, vostok, ModuleKind::Observatory).research, (2.0 * vostok_science * 1.5 * 1.5 * public).floor() as i64, "Antarctica is Earth: 2 x the slot's yield x 1.5 x 1.5 x Public Science");
 }
 
 /// Ticket #81: Colonists on a station over Earth count as off Earth for Off-world Presence and the

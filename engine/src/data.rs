@@ -62,7 +62,9 @@ pub struct BodyCard {
     pub mine_yield: f64,
     pub generator_yield: f64,
     pub refinery_yield: f64,
-    pub habitat_yield: f64,
+    /// Ticket #140 (version 0.07.3): the fourth yield is Research, multiplying an Observatory; it
+    /// was the Habitat yield, which multiplied a Habitat's room, until the designer traded it.
+    pub research_yield: f64,
 }
 
 impl BodyCard {

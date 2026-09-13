@@ -65,7 +65,7 @@ A permanent settlement a Faction holds on a Body, founded when a Colony Ship unl
 _Avoid_: base, outpost, settlement
 
 **Colony Slot**:
-One of a fixed number of places on a Body where a Colony can be founded, shared by all Factions. Since version 0.04 each is a real geological place, drawn at its position on the Surface Map and giving its Colony its name. Since version 0.05 each also has its own four yields, drawn when the game starts and never far from its Body's, so no two places on a world are equally worth settling; a free slot shows what a Colony there would get. A landing Colony Ship is founded into a chosen one. Earth's three, in Antarctica, are shut under the ice until the Temperature has stood at +1.6 C in a Climate phase; once open they stay open.
+One of a fixed number of places on a Body where a Colony can be founded, shared by all Factions. Since version 0.04 each is a real geological place, drawn at its position on the Surface Map and giving its Colony its name. Since version 0.05 each also has its own four yields, drawn when the game starts and never far from its Body's, so no two places on a world are equally worth settling; a free slot shows what a Colony there would get. The four are Materials, Energy, Fuel and, since version 0.07.3, Research: the fourth was the Habitat yield, which set how many Colonists a Habitat there held, until the designer traded it for one that multiplies an Observatory. A landing Colony Ship is founded into a chosen one. Earth's three, in Antarctica, are shut under the ice until the Temperature has stood at +1.6 C in a Climate phase; once open they stay open.
 _Avoid_: site, plot, capacity
 
 **Orbital Slot**:
@@ -201,7 +201,7 @@ _Avoid_: antenna, transmitter, beacon
 ### Pieces
 
 **Observatory**:
-The Module that makes Research away from Earth, since version 0.06.0: on a Colony, a Space Station or in Antarctica. It takes no Body yield; every Colonist living at its Colony adds one per cent to what it makes, and Public Science lifts it as it lifts a Research Lab. Its Research counts toward the Research Lead as a Lab's does.
+The Module that makes Research away from Earth, since version 0.06.0: on a Colony, a Space Station or in Antarctica. It took no Body yield until version 0.07.3; since then it is multiplied by its slot's Research yield on the ground and by its Body's on a station, the first Body yield a station has read. Every Colonist living at its Colony adds one per cent to what it makes, and Public Science lifts it as it lifts a Research Lab. Its Research counts toward the Research Lead as a Lab's does.
 _Avoid_: lab, laboratory, research station, institute, science module
 
 **Solar Array**:
@@ -213,7 +213,7 @@ The Module only a ground Colony on a small world (the Moon, Phobos, Deimos) hold
 _Avoid_: catapult, launcher, railgun, launch loop
 
 **Module**:
-A building placed inside a Colony. Twelve kinds since version 0.06.0: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, the Solar Array (a Space Station's alone), the Mass Driver (a small world's alone), and the Archive, which only the Archivists raise, one to a Faction, from its own button. A Habitat holds eight Colonists since version 0.06.0.
+A building placed inside a Colony. Twelve kinds since version 0.06.0: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, the Solar Array (a Space Station's alone), the Mass Driver (a small world's alone), and the Archive, which only the Archivists raise, one to a Faction, from its own button. A Habitat holds eight Colonists since version 0.06.0, and since version 0.07.3 the same eight everywhere: no world's slot makes it hold more or fewer.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:

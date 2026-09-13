@@ -275,13 +275,14 @@ pub struct SlotYields {
     pub mine: f64,
     pub generator: f64,
     pub refinery: f64,
-    pub habitat: f64,
+    /// Ticket #140 (version 0.07.3): Research, for an Observatory; the Habitat yield until then.
+    pub research: f64,
 }
 
 impl SlotYields {
     /// The Body's own figures, which a station in orbit and any slot off the table read.
     pub fn of_body(card: &crate::data::BodyCard) -> SlotYields {
-        SlotYields { mine: card.mine_yield, generator: card.generator_yield, refinery: card.refinery_yield, habitat: card.habitat_yield }
+        SlotYields { mine: card.mine_yield, generator: card.generator_yield, refinery: card.refinery_yield, research: card.research_yield }
     }
 
     pub fn of_module(&self, kind: ModuleKind) -> f64 {
@@ -289,15 +290,17 @@ impl SlotYields {
             ModuleKind::Mine => self.mine,
             ModuleKind::Generator => self.generator,
             ModuleKind::Refinery => self.refinery,
-            // A Trade Post (ticket #35) follows the Habitat yield: trade goes where people live.
-            ModuleKind::Habitat | ModuleKind::TradePost => self.habitat,
+            // Ticket #140 (version 0.07.3): the fourth yield is the Observatory's. A Habitat holds
+            // the same everywhere now, and a Trade Post (which followed the Habitat yield from
+            // ticket #35 until the network of ticket #90 stopped reading it) reads nothing.
+            ModuleKind::Observatory => self.research,
             _ => 1.0,
         }
     }
 
     /// "M 1.31 G 0.68 R 1.52 H 1.44", the figures the Surface Map writes under a slot's name.
     pub fn text(&self) -> String {
-        format!("M {:.2} G {:.2} R {:.2} H {:.2}", self.mine, self.generator, self.refinery, self.habitat)
+        format!("M {:.2} G {:.2} R {:.2} S {:.2}", self.mine, self.generator, self.refinery, self.research)
     }
 }
 
@@ -1470,11 +1473,18 @@ impl Game {
         let per = self.tables.module(ModuleKind::Habitat).holds_colonists as i64
             + seat.map(|s| self.tech_addition(s, TechId::ExpandedHabitats)).unwrap_or(0);
         let faction = seat.map(|s| self.tables.faction(self.kind(s)).habitat_capacity_multiplier).unwrap_or(1.0);
-        // A station's Habitats are built for orbit: no Body yield applies (ticket #46). On a surface
-        // it is the slot's own Habitat yield, not the Body's (ticket #57).
-        let yield_ = if c.in_orbit { 1.0 } else { self.slot_yields(c.body, c.slot).habitat };
+        // Ticket #140 (version 0.07.3): a Habitat holds the same everywhere. It read the slot's
+        // Habitat yield on a surface (ticket #57) and 1.0 in orbit (ticket #46) until the designer
+        // traded that yield for a Research one.
         let habitats = c.modules.iter().filter(|m| m.kind == ModuleKind::Habitat).count() as f64;
-        (habitats * per.max(0) as f64 * yield_ * faction).floor() as u32
+        (habitats * per.max(0) as f64 * faction).floor() as u32
+    }
+
+    /// Ticket #140 (version 0.07.3): what an Observatory here is multiplied by -- the slot's own
+    /// Research yield on a surface, and in orbit the Body's, since a station over Mars is doing
+    /// Mars science. The first Body yield a station has ever read.
+    pub fn research_yield_at(&self, c: &Colony) -> f64 {
+        if c.in_orbit { self.tables.body(c.body).research_yield } else { self.slot_yields(c.body, c.slot).research }
     }
 
     /// Ticket #51: the seat's Colonists at one Body, counting a station over it as being there.
@@ -1694,7 +1704,7 @@ impl Game {
                     mine: draw(card.mine_yield),
                     generator: draw(card.generator_yield),
                     refinery: draw(card.refinery_yield),
-                    habitat: draw(card.habitat_yield),
+                    research: draw(card.research_yield),
                 };
                 self.slot_yields.insert((body, slot), y);
             }

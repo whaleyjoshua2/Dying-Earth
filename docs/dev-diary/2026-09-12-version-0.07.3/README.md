@@ -314,6 +314,45 @@ rise is written on the map for the balance version.
 
 Clippy clean with `-D warnings`, 253 tests passing (two rewritten for the divisor and the floor).
 
+## Habitat yields become Research yields
+
+Ticket [#140](https://github.com/whaleyjoshua2/Dying-Earth/issues/140). The designer's line: *"Replace
+habitat bonuses with science bonuses."* Decided in one round: a Research yield per Body and per
+slot, drawn as the other three are, multiplying an Observatory; Habitat capacity flat at eight;
+the figures Earth 1.0, the Moon 1.0, Mars 1.3, Venus 1.3, Phobos and Deimos 0.8; a station reads
+its Body's figure; the computer weighs it for Observatories; measured before it was final.
+
+![Mars: the fourth figure on a slot label is Research](research-yield-on-mars-slot-labels.png)
+
+**The fourth yield is Research.** `habitat_yield` is `research_yield` in `bodies.toml` and on the
+card; a slot draws its own near the Body's as before; the slot label's fourth figure wears the
+flask where it wore the bust. An Observatory's Research is multiplied by its slot's yield on the
+ground and by its Body's on a station -- `Game::research_yield_at`, the first Body yield a station
+has ever read -- and the computer players multiply their Observatory weight by the same figure, so
+they build where the science is the way they dig where the ore is. A Habitat holds eight everywhere
+(ten with Expanded Habitats, half again for the Arkwrights): Mars lost its half-again room and the
+moons their halving. The computer lands by Energy now where it landed by room.
+
+**Measured before it was final**, twenty seeds in each of four seatings, on top of the two balance
+changes before it:
+
+| after | Custodian wins | other wins | Collapses | tree completes |
+|---|---|---|---|---|
+| the 0.07.2 baseline | 70 | Arkwrights 1, Archivists 1 | 8 | 73 of 80 |
+| Max replacing Defence | 70 | Arkwrights 1, Archivists 1 | 8 | 75 of 80 |
+| the Ducats formula | 62 | Arkwrights 2, Archivists 2 | 14 | 76 of 80 |
+| **Research yields** | **72** | **Arkwrights 1, Archivists 1** | **6** | **62 of 80** |
+
+Collapses fell from 14 to 6, every one out of the Prospectors' seating, and the Custodians took
+back what the Ducats change had cost them; the tree completed fourteen games less often. In 42 of
+the 80 games nobody built an Observatory and in 21 more only one Faction did, so the Research yield
+itself is barely exercised; the larger effect is the flat Habitat -- fewer people off Earth for
+everyone, the Colonist-driven Research bonus and the Archive slower, and the Prospectors' extra
+Ducats going into fewer, smaller Colonies rather than industry. Put to the designer; kept as decided,
+with this table for the balance version.
+
+Clippy clean with `-D warnings`, 253 tests passing (seven rewritten for the yield and the flat room).
+
 ## Building art: candidate sheets (research, ticket #144)
 
 Sixty-two game-icons.net candidates for the twenty-two building kinds, drawn with the game's own

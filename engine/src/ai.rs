@@ -245,12 +245,15 @@ impl Game {
     /// Ticket #57: what one Colony Slot's own yields are worth to the part the AI is furthest
     /// behind on. Every slot has its own four figures now, so the AI reads the slot, not the Body.
     fn slot_worth(&self, seat: Seat, y: SlotYields, behind: Behind) -> f64 {
+        // Ticket #140 (version 0.07.3): a Habitat holds the same everywhere now, so a slot is worth
+        // the same to Presence wherever it is, and the Energy that runs the Habitats decides; the
+        // fourth yield is Research, which the science-first Factions read.
         match behind {
-            Behind::Presence => y.habitat,
+            Behind::Presence => y.generator,
             Behind::First => match self.first_kind(seat) {
                 VictoryFirstKind::VentureFund => y.mine + y.refinery,
-                VictoryFirstKind::ColonistsOffEarth => y.habitat,
-                VictoryFirstKind::StabilizationRun | VictoryFirstKind::ResearchProduced | VictoryFirstKind::ArchiveResearch => y.generator + y.habitat,
+                VictoryFirstKind::ColonistsOffEarth => y.generator,
+                VictoryFirstKind::StabilizationRun | VictoryFirstKind::ResearchProduced | VictoryFirstKind::ArchiveResearch => y.generator + y.research,
             },
         }
     }
@@ -761,8 +764,10 @@ impl Game {
                             continue;
                         }
                         // Ticket #81: at its own weight; ticket #82: twice it when an idle Research
-                        // Lab of the seat's would double it.
-                        (Cat::Observatory, self.base_weight(seat, Cat::Observatory) * self.production_moved_boost(seat, &col, mk))
+                        // Lab of the seat's would double it. Ticket #140 (version 0.07.3): times the
+                        // Research yield here, so the computer builds its Observatories where the
+                        // science is, the way it digs where the ore is.
+                        (Cat::Observatory, self.base_weight(seat, Cat::Observatory) * self.production_moved_boost(seat, &col, mk) * self.research_yield_at(&col))
                     }
                     // Ticket #90: a Trade Post pays for the network, so it is worth half again once
                     // the seat holds two Bodies or more.

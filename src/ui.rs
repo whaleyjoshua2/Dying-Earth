@@ -1772,7 +1772,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
 const SLOT_YIELD_SIZE: f32 = 14.0;
 
 fn slot_yield_label(painter: &egui::Painter, pos: Pos2, yields: &dying_earth_engine::SlotYields) {
-    let figures = [("materials", yields.mine), ("energy", yields.generator), ("fuel", yields.refinery), ("population", yields.habitat)];
+    let figures = [("materials", yields.mine), ("energy", yields.generator), ("fuel", yields.refinery), ("research", yields.research)];
     let Some(glyphs) = figures.iter().map(|(key, _)| Icons::texture_from_ctx(painter.ctx(), key)).collect::<Option<Vec<_>>>() else {
         label_at(painter, pos, &yields.text(), Color32::from_gray(170), 11.0);
         return;
@@ -3644,11 +3644,11 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
     // Ticket #57: the slot's own four yields, drawn when the game started, beside its Body's.
     let card = game.tables.body(body);
     let y = game.slot_yields(body, slot);
-    ui.label(format!("Yields here: Mine x{:.2}, Generator x{:.2}, Refinery x{:.2}, Habitat x{:.2}", y.mine, y.generator, y.refinery, y.habitat));
+    ui.label(format!("Yields here: Mine x{:.2}, Generator x{:.2}, Refinery x{:.2}, Observatory x{:.2}", y.mine, y.generator, y.refinery, y.research));
     ui.label(
         RichText::new(format!(
-            "{} as a whole: Mine x{}, Generator x{}, Refinery x{}, Habitat x{}",
-            card.name, card.mine_yield, card.generator_yield, card.refinery_yield, card.habitat_yield
+            "{} as a whole: Mine x{}, Generator x{}, Refinery x{}, Observatory x{}",
+            card.name, card.mine_yield, card.generator_yield, card.refinery_yield, card.research_yield
         ))
         .weak(),
     );
