@@ -392,6 +392,31 @@ the reason the rules say: people who can reach orbit without a Ship colonise.
 
 Clippy clean with `-D warnings`, 254 tests passing (one new).
 
+## Research costs rounded to the nearest five, and Coastal Engineering 12
+
+Ticket [#142](https://github.com/whaleyjoshua2/Dying-Earth/issues/142). The ticket was charted as
+*"Another 10% increase to science rounded up to nearest 5 - costal engineering stays 12"*, which
+would have been 20 / 35 / 50 and a tree of 587. After the four balance changes before it the
+designer redirected it: *"with everything so balanced let's make coastal engineering 12 and just
+round everything else to the nearest 5."* No tenth is added: rung 1 **16 to 15**, rung 2 **28 to
+30**, rung 3 **44 to 45**, Coastal Engineering **11 to 12**; the whole tree **495 to 507**, up two
+per cent. Four lines in `techs.toml`, three tests repinned.
+
+![The tree with the rounded costs](tech-tree-costs-rounded.png)
+
+**Swept once after**, on top of everything before it:
+
+| after | Custodians | Archivists | Arkwrights | Prospectors | Collapses | draws | tree completes |
+|---|---|---|---|---|---|---|---|
+| the lift | 47 | 15 | 8 | 1 | 9 | 0 | 67 of 80 |
+| **the rounded costs** | **40** | **12** | **12** | **3** | **12** | **1** | **66 of 80** |
+
+The same shape as the lift left it, within the noise of twenty seeds: the four Factions all win
+games, the Custodians the most, and the tree completes about as often. This is the table the
+version's write-up will restart the baseline from.
+
+Clippy clean with `-D warnings`, 254 tests passing.
+
 ## Building art: candidate sheets (research, ticket #144)
 
 Sixty-two game-icons.net candidates for the twenty-two building kinds, drawn with the game's own

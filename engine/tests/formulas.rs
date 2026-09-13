@@ -3837,7 +3837,7 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     // Ticket #69 (version 0.05.5): moved from rung 2 at 25 to rung 1 at 10 with no prerequisite.
     // Ticket #117 (version 0.07.1): 10 to 11, with every other cost, a tenth rounded to the nearest.
     assert_eq!(c.rung, 1, "rung 1, beside Efficient Grids");
-    assert_eq!(c.cost, 11);
+    assert_eq!(c.cost, 12, "12 since ticket #142 (version 0.07.3); 11 from ticket #117, 10 before");
     assert!(c.needs.is_empty(), "it needs nothing");
     assert!(c.effect.contains("Sea Wall"), "its effect names the Sea Wall: {}", c.effect);
     // Two boxes on Industry rung 1, and Clean Power alone on rung 2.
@@ -4963,7 +4963,7 @@ fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
 fn coastal_engineering_sits_on_rung_one_below_its_rungs_cost_with_no_prerequisite() {
     let g = game();
     let t = g.tables.tech(TechId::CoastalEngineering);
-    assert_eq!((t.rung, t.cost), (1, 11));
+    assert_eq!((t.rung, t.cost), (1, 12), "12 since ticket #142");
     assert!(t.cost < g.tables.tech(TechId::EfficientGrids).cost, "cheaper than the rung it shares, or the Sea Wall arrives too late");
     assert!(t.needs.is_empty(), "no prerequisite: {:?}", t.needs);
     assert!(g.available_techs().contains(&TechId::CoastalEngineering), "pickable from the first turn");
@@ -5702,7 +5702,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     // ticket guards is that no Faction's gate is dearer than another's, so the figure is checked
     // against the rung rather than against a literal repeated four times.
     let rung_three = g.tables.tech(TechId::PlanetaryStewardship).cost;
-    assert_eq!(rung_three, 44, "rung 3 costs 44 since ticket #117");
+    assert_eq!(rung_three, 45, "rung 3 costs 45 since ticket #142 (version 0.07.3): 44 rounded to the nearest 5; 44 from ticket #117, 40 before");
     for (kind, t, needs) in gates {
         let card = g.tables.tech(t);
         assert_eq!(card.rung, 3, "{t:?}");
