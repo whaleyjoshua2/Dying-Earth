@@ -155,6 +155,27 @@ and today's) are not repeated; the site has nothing that draws an ISS truss. Rec
 designer: **5, the Double Ringed Orb**, the one that reads as a thing in orbit rather than a dish, a
 ship or a world, with Lorc already on the Credits screen.
 
+**A second set**, after the designer passed on all twelve: game-icons.net has no station drawn as a
+station, so this set comes from four other open sets and from three shapes drawn for the purpose,
+which, like the Army's shield, would need no art file and no credit. Left to right:
+
+![Station glyph candidates, second set](station-glyph-candidates-2.png)
+
+1. **Satellite**, Font Awesome Free (CC BY 4.0): a blob at 13.
+2. **Orbit**, Lucide (ISC): a ring with two moons; holds at 13.
+3. **Satellite**, Lucide (ISC): stroked and thin; fades at 13.
+4. **Orbit**, Material Design Icons (Apache 2.0): a ball inside a ring; clear at every size.
+5. **Satellite Variant**, Material Design Icons: a satellite with dish and panels; a blob with a tail at 13.
+6. **Space Station**, Material Design Icons: **the ISS truss** -- a core with panel pairs either side. Reads as a station at 20 and 16 and as an H-shaped truss at 13. The only icon in any of these sets that draws a station.
+7. **Satellite**, Tabler filled (MIT): a blob at 13.
+8. **Satellite**, Tabler outline (MIT): stroked; fades at 13.
+9. **Drawn: a rotating station**, a ring seen edge-on with an axis rod and a hub; clear at 13.
+10. **Drawn: panels**, two solar panels on a bar with a central module; clear at 13, the ISS reduced to its silhouette.
+11. **Drawn: a wheel station**, a ring with a hub and four spokes; clear at 13.
+
+Recommended to the designer: **6, Material Design's Space Station**, the one glyph that is the thing
+itself, with **10, the drawn panels**, as the runner-up if a silhouette that owes nothing is preferred.
+
 ## Building art: candidate sheets (research, ticket #144)
 
 Sixty-two game-icons.net candidates for the twenty-two building kinds, drawn with the game's own
