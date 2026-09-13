@@ -876,52 +876,68 @@ fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut
         ui.label(&card.blurb);
         ui.add_space(6.0);
         ui.label(RichText::new("Multipliers").strong());
-        ui.label(format!(
-            "Facility and Module output x{}; Emissions from Earth sources it controls x{}; Research x{}; Influence Allotment x{}",
-            card.output_multiplier, card.emissions_multiplier, card.research_multiplier, card.influence_multiplier
-        ));
+        // Ticket #132 (version 0.07.3): the four multipliers as a compact glyph row, every one shown
+        // (x1 included) so the same glyph sits in the same place on all four cards and the eye can
+        // compare Factions across the screen; the phrase each glyph replaced is on its hover.
+        let part = |before: &str, icon: Option<&'static str>, after: String, hover: &str| RowPart { before: before.to_string(), icon, after, hover: Some(hover.to_string()) };
+        glyph_row(
+            ui,
+            &[
+                part("Output", None, format!("x{}", card.output_multiplier), &format!("Facility and Module output x{}", card.output_multiplier)),
+                part("", Some("emissions"), format!("x{}", card.emissions_multiplier), &format!("Emissions from Earth sources it controls x{}", card.emissions_multiplier)),
+                part("", Some("research"), format!("x{}", card.research_multiplier), &format!("Research x{}", card.research_multiplier)),
+                part("", Some("influence"), format!("x{}", card.influence_multiplier), &format!("Influence Allotment x{}", card.influence_multiplier)),
+            ],
+            15.0,
+        );
         // Ticket #51: a card may carry figures of its own beyond the four; list only the ones it moved.
-        let mut extras: Vec<String> = Vec::new();
+        // Ticket #132: a mixed row -- only the eight Figures have glyphs; a Habitat or a Ship is a
+        // piece and stays a word.
+        let plain = |before: &str, icon: Option<&'static str>, after: String| RowPart { before: before.to_string(), icon, after, hover: None };
+        let mut extras: Vec<RowPart> = Vec::new();
         if card.habitat_capacity_multiplier != 1.0 {
-            extras.push(format!("Habitat capacity x{}", card.habitat_capacity_multiplier));
+            extras.push(plain("Habitat capacity", None, format!("x{}", card.habitat_capacity_multiplier)));
         }
         if card.transit_fuel_multiplier != 1.0 {
-            extras.push(format!("transit Fuel x{}", card.transit_fuel_multiplier));
+            extras.push(plain("transit", Some("fuel"), format!("x{}", card.transit_fuel_multiplier)));
         }
         if card.colony_ship_capacity_multiplier != 1.0 {
-            extras.push(format!("Colony Ship capacity x{}", card.colony_ship_capacity_multiplier));
+            extras.push(plain("Colony Ship capacity", None, format!("x{}", card.colony_ship_capacity_multiplier)));
         }
         if card.lift_population_multiplier != 1.0 {
-            extras.push(format!("population per lifted Colonist x{}", card.lift_population_multiplier));
+            extras.push(plain("", Some("population"), format!("per lifted Colonist x{}", card.lift_population_multiplier)));
         }
         if let Some(m) = card.colony_ship_materials {
-            extras.push(format!("a Colony Ship {m} Materials"));
+            extras.push(plain(&format!("a Colony Ship {m}"), Some("materials"), String::new()));
         }
         // Ticket #83: the Arkwrights' Ships, the Prospectors' Ducats and market.
         if card.ship_materials_multiplier != 1.0 {
-            extras.push(format!("every Ship x{} Materials", card.ship_materials_multiplier));
+            extras.push(plain(&format!("every Ship x{}", card.ship_materials_multiplier), Some("materials"), String::new()));
         }
         if card.ducats_multiplier != 1.0 {
-            extras.push(format!("a state's Ducats x{}", card.ducats_multiplier));
+            extras.push(plain("a state's", Some("ducats"), format!("x{}", card.ducats_multiplier)));
         }
         if card.market_multiplier != 1.0 {
-            extras.push(format!("the Trading window's prices x{}", card.market_multiplier));
+            extras.push(plain("the Trading window's prices", None, format!("x{}", card.market_multiplier)));
         }
         if card.station_materials_multiplier != 1.0 {
-            extras.push(format!("a Space Station x{} Materials", card.station_materials_multiplier));
+            extras.push(plain(&format!("a Space Station x{}", card.station_materials_multiplier), Some("materials"), String::new()));
         }
         if card.module_materials_multiplier != 1.0 {
-            extras.push(format!("a Colony Module x{} Materials", card.module_materials_multiplier));
+            extras.push(plain(&format!("a Colony Module x{}", card.module_materials_multiplier), Some("materials"), String::new()));
         }
         if !extras.is_empty() {
-            ui.label(extras.join("; "));
+            glyph_row(ui, &extras, 15.0);
         }
         ui.add_space(6.0);
+        // Ticket #132: every price in the paragraphs by the one glyph rule -- `30 [cart], 2 turns,
+        // 4 [bolt] upkeep`. `12 Colonists` stays words: Colonists are pieces, not the population figure.
+        let ink = ui.visuals().text_color();
         ui.label(RichText::new("Signature rule").strong());
-        ui.label(&card.signature);
+        draw_with_icons(ui, &card.signature, 14.0, ink, &[]);
         ui.add_space(6.0);
         ui.label(RichText::new("Victory Condition").strong());
-        ui.label(&card.victory);
+        draw_with_icons(ui, &card.victory, 14.0, ink, &[]);
         // Ticket #84: the gate Tech it waits on.
         if let Some(gate) = session.tables.victory_gate(kind) {
             let t = session.tables.tech(gate);
@@ -992,8 +1008,35 @@ fn start_screen(
                     }
                     ui.label(RichText::new(&c.name).size(32.0).strong());
                 });
-                ui.label(format!("Population {:.1} (hundreds of millions), Industry Level {}, leans {:?}", c.population, c.industry_level, c.resource_lean));
-                ui.label(format!("Education Level {}, Influence value {}, GDP {}", c.education_level, c.influence, c.gdp));
+                // Ticket #132 (version 0.07.3): the Region's lean as a glyph, and a second line of
+                // the three figures a start is chosen on -- Influence value, Ducats a turn and
+                // Emissions -- read from the cards, since no game exists yet.
+                let lean = format!("{:?}", c.resource_lean).to_lowercase();
+                let lean_key: &'static str = match lean.as_str() {
+                    "materials" => "materials",
+                    "fuel" => "fuel",
+                    _ => "energy",
+                };
+                glyph_row(
+                    ui,
+                    &[
+                        RowPart { before: String::new(), icon: Some("population"), after: format!("Population {:.1} (hundreds of millions)", c.population), hover: None },
+                        RowPart { before: format!("Industry Level {}", c.industry_level), icon: None, after: String::new(), hover: None },
+                        RowPart { before: "leans".to_string(), icon: Some(lean_key), after: String::new(), hover: Some(format!("Leans {:?}: the resource this Region is naturally good at producing.", c.resource_lean)) },
+                    ],
+                    15.0,
+                );
+                let ducats = session.tables.start_ducats(sid, faction);
+                glyph_row(
+                    ui,
+                    &[
+                        RowPart { before: String::new(), icon: Some("influence"), after: format!("{}", c.influence), hover: Some(format!("Influence value {}: what it adds to its controller's Allotment each turn.", c.influence)) },
+                        RowPart { before: String::new(), icon: Some("ducats"), after: format!("{ducats} a turn"), hover: Some(format!("GDP {}: its economy pays {} Ducats a turn (GDP x Industry Level / 10).", c.gdp, ducats)) },
+                        RowPart { before: String::new(), icon: Some("emissions"), after: format!("{:.1}", session.tables.start_emissions(sid, faction)), hover: Some("Emissions a turn as the game opens: its industry, its people and its start Facilities.".to_string()) },
+                        RowPart { before: format!("Education Level {}", c.education_level), icon: None, after: String::new(), hover: None },
+                    ],
+                    15.0,
+                );
                 ui.label(RichText::new(if view.start_selected == Some(sid) { "Chosen. Begin, or click another Region." } else { "Click it to choose." }).weak());
             }
             None => {
@@ -2437,6 +2480,65 @@ fn icon_word(ui: &mut Ui, key: &str, text: impl Into<String>) {
     }
 }
 
+/// Ticket #132 (version 0.07.3): one part of a `glyph_row` -- words before the glyph, the glyph,
+/// words after it, and the phrase the glyph replaced on hover.
+struct RowPart {
+    before: String,
+    icon: Option<&'static str>,
+    after: String,
+    hover: Option<String>,
+}
+
+/// Ticket #132 (version 0.07.3): a row of parts separated by a middle dot, each hugging its own
+/// glyph and carrying its own hover: `Output x1 · [chimney] x0.75 · [flask] x1.25 · [horn] x1.2`
+/// on a Faction card, `leans [cart]` on the start globe's Region panel. This is the one place the
+/// glyph rule bends: here the glyph HEADS a multiplier instead of following a number (see
+/// `draw_with_icons`), because four cards side by side are read by comparison, glyph under glyph,
+/// and `Research x1.25` under `Research x0.75` is a word to read where a glyph is a shape to match.
+/// The designer chose the compact row over the same line in words. Where the art is missing the
+/// part's words stand alone, so nothing is lost -- only unillustrated.
+fn glyph_row(ui: &mut Ui, parts: &[RowPart], size: f32) {
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 5.0;
+        let font = egui::TextStyle::Body.resolve(ui.style());
+        for (i, p) in parts.iter().enumerate() {
+            // A part wraps as ONE piece, its glyph hugging its words. A nested `horizontal` is
+            // laid out at the cursor and simply overruns the edge (the first picture had the
+            // Arkwrights' last part crossing into the Archivists' card), so the part is measured
+            // first and the row broken before it when it will not fit; a part that opens a new
+            // line takes no separator, since a dot at a line's start reads as a bullet.
+            let width = |s: &str| if s.is_empty() { 0.0 } else { ui.painter().layout_no_wrap(s.to_owned(), font.clone(), Color32::WHITE).size().x + 4.0 };
+            let need = width(&p.before) + width(&p.after) + if p.icon.is_some() { size + 4.0 } else { 0.0 } + if i > 0 { width("·") + 5.0 } else { 0.0 };
+            let mut separate = i > 0;
+            if i > 0 && need > ui.available_size_before_wrap().x {
+                ui.end_row();
+                separate = false;
+            }
+            if separate {
+                ui.label(RichText::new("·").weak());
+            }
+            let response = ui
+                .horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    if !p.before.is_empty() {
+                        ui.label(&p.before);
+                    }
+                    if let Some(image) = p.icon.and_then(|k| Icons::from_ctx(ui.ctx(), k, size)) {
+                        ui.add(image);
+                    }
+                    if !p.after.is_empty() {
+                        ui.label(&p.after);
+                    }
+                })
+                .response;
+            if let Some(h) = &p.hover {
+                // Through `rule_tip`, so the `tip:<word>` aid can photograph it.
+                rule_tip(response, h.clone());
+            }
+        }
+    });
+}
+
 /// Ticket #106 (version 0.07.0): hover text with the resource words replaced by their glyphs. The
 /// designer's rule is that the icons are used EXCLUSIVELY on mouse-overs -- the words stay
 /// everywhere a player reads at a glance, and the tooltips, which are the wordiest thing in the
@@ -2500,8 +2602,10 @@ fn draw_with_icons(ui: &mut Ui, text: &str, size: f32, tint: Color32, extra: &[(
         ui.spacing_mut().item_spacing.x = 3.0;
         let mut previous_was_a_figure = false;
         for token in text.split(' ') {
-            // Keep whatever punctuation rides on the word, so "30 Materials," still reads.
-            let bare = token.trim_end_matches([',', '.', ';', ':']);
+            // Keep whatever punctuation rides on the word, so "30 Materials," still reads. Ticket
+            // #132 (version 0.07.3): a closing bracket rides too, so "(44 Research)" on a Faction
+            // card and "(a Colony Ship 25 Materials)" take their glyphs.
+            let bare = token.trim_end_matches([',', '.', ';', ':', ')']);
             let tail = &token[bare.len()..];
             let allowed = previous_was_a_figure;
             // A figure is a token ending in a digit that does NOT end its sentence. The full stop is

@@ -479,10 +479,11 @@ impl Game {
         m
     }
 
-    /// A controlled state's base Ducats a turn (ticket #35): gdp x Industry Level / 10, rounded down.
+    /// A controlled state's base Ducats a turn (ticket #35): gdp x Industry Level / 10, rounded down,
+    /// the formula living in `Tables::base_ducats` since ticket #132 so the start screen reads the same one.
     /// Ticket #83 (version 0.06.0): times its controller's `ducats_multiplier` (the Prospectors' 1.2).
     pub fn state_ducats(&self, sid: StateId) -> i64 {
-        let base = (self.tables.state(sid).gdp * self.state(sid).industry_level as i64) / 10;
+        let base = self.tables.base_ducats(sid, self.state(sid).industry_level);
         let m = self.state(sid).control.controller().map(|s| self.tables.faction(self.kind(s)).ducats_multiplier).unwrap_or(1.0);
         (base as f64 * m).floor() as i64
     }
