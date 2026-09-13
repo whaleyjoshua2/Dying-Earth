@@ -85,6 +85,76 @@ fn emissions_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
     painter.text(Pos2::new(plot.right() + 3.0, y(end)), egui::Align2::LEFT_CENTER, format!("{end:+.1}"), FontId::proportional(11.0), NET);
 }
 
+/// Ticket #166 (version 0.07.5): **the population history**, the third of the top bar's charts. The
+/// designer: *"get a mouse over graph for the population as well."* Two lines on **two scales** --
+/// Earth read against the left of the chart and space against the right, each with its own ends
+/// written small at its own side -- because Earth is counted in the hundreds of units and space in
+/// single figures, and on one scale the space line lies flat on the floor for the whole game and
+/// says nothing. Drawn that way the chart says the thing worth seeing: Earth falling while space
+/// rises. The Breaks are ticked red on the turn axis, as on its two siblings, because the heat is
+/// what takes the people.
+fn population_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
+    const EARTH: Color32 = Color32::from_rgb(150, 190, 240);
+    const SPACE: Color32 = Color32::from_rgb(235, 235, 240);
+    const BREAK: Color32 = Color32::from_rgb(236, 88, 76);
+    let h = &game.climate.history;
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 6.0;
+        ui.label(RichText::new("Earth").color(EARTH).small());
+        ui.label(RichText::new("space").color(SPACE).small());
+        ui.label(RichText::new("on scales of their own; a red tick is a Break").weak().small());
+    });
+    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    let painter = ui.painter();
+    painter.rect_filled(rect, 3.0, Color32::from_rgb(38, 38, 44));
+    if h.is_empty() {
+        painter.text(rect.center(), egui::Align2::CENTER_CENTER, "No turn resolved yet.", FontId::proportional(12.0), Color32::from_gray(150));
+        return;
+    }
+    // Room at both sides for a scale's ends, and at the bottom for the turn axis.
+    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(34.0, 6.0), rect.max - egui::vec2(34.0, 16.0));
+    let (first, last) = (h[0].turn, h[h.len() - 1].turn);
+    let span = (last.max(first + 1) - first) as f32;
+    let x = |turn: u32| plot.left() + (turn - first) as f32 / span * plot.width();
+    // Each line on its own range, with a margin, so both are legible whatever the other does.
+    let scale = |lo: f64, hi: f64| {
+        let pad = ((hi - lo) * 0.15).max(0.5);
+        (lo - pad, hi + pad)
+    };
+    let (e_lo, e_hi) = {
+        let (lo, hi) = h.iter().fold((f64::MAX, f64::MIN), |(a, b), r| (a.min(r.earth_population), b.max(r.earth_population)));
+        scale(lo, hi)
+    };
+    let (s_lo, s_hi) = {
+        let (lo, hi) = h.iter().fold((f64::MAX, f64::MIN), |(a, b), r| (a.min(r.space_population as f64), b.max(r.space_population as f64)));
+        scale(lo, hi)
+    };
+    let y = |v: f64, lo: f64, hi: f64| plot.bottom() - (((v - lo) / (hi - lo)).clamp(0.0, 1.0) as f32) * plot.height();
+    let line = |values: Vec<Pos2>, colour: Color32| {
+        if values.len() == 1 {
+            painter.circle_filled(values[0], 3.0, colour);
+        } else {
+            painter.add(egui::Shape::line(values, egui::Stroke::new(2.0, colour)));
+        }
+    };
+    line(h.iter().map(|r| Pos2::new(x(r.turn), y(r.earth_population, e_lo, e_hi))).collect(), EARTH);
+    line(h.iter().map(|r| Pos2::new(x(r.turn), y(r.space_population as f64, s_lo, s_hi))).collect(), SPACE);
+    for r in h.iter().filter(|r| !r.breaks.is_empty()) {
+        let bx = x(r.turn);
+        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 9.0)], egui::Stroke::new(2.0, BREAK));
+    }
+    // Each scale's ends at its own side, in its own colour, in people rather than units.
+    let small = FontId::proportional(9.0);
+    painter.text(Pos2::new(plot.left() - 3.0, plot.top()), egui::Align2::RIGHT_TOP, Game::people_text(e_hi), small.clone(), EARTH);
+    painter.text(Pos2::new(plot.left() - 3.0, plot.bottom()), egui::Align2::RIGHT_BOTTOM, Game::people_text(e_lo.max(0.0)), small.clone(), EARTH);
+    painter.text(Pos2::new(plot.right() + 3.0, plot.top()), egui::Align2::LEFT_TOP, Game::people_text(s_hi), small.clone(), SPACE);
+    painter.text(Pos2::new(plot.right() + 3.0, plot.bottom()), egui::Align2::LEFT_BOTTOM, Game::people_text(s_lo.max(0.0)), small.clone(), SPACE);
+    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, format!("turn {first}"), small.clone(), Color32::from_gray(150));
+    if last > first {
+        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, format!("turn {last}"), small, Color32::from_gray(150));
+    }
+}
+
 /// Ticket #158 (version 0.07.4): **the Temperature history**, the Emissions history's sibling on
 /// the top bar's Temperature figure: the Temperature turn by turn on the data's own range (the
 /// designer's choice over the base-to-Collapse scale, for the detail); the Breaks' Temperatures
@@ -1683,13 +1753,25 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             bodies.sort_by_key(|(n, _)| std::cmp::Reverse(*n));
             let earth_lines: Vec<String> = regions.iter().map(|(p, n)| format!("{n} {}", Game::people_text(*p))).collect();
             let space_lines: Vec<String> = if bodies.is_empty() { vec!["nobody yet".to_string()] } else { bodies.iter().map(|(n, b)| format!("{} {}", b, Game::people_text(*n as f64))).collect() };
-            bar_resource(
+            // Ticket #166 (version 0.07.5): the figure's hover draws the population history under
+            // its sentence, as the Emissions figure's does.
+            let pop_sentence = format!(
+                "On Earth: {}.\nOff Earth: {}.\nOne Colonist is five million people; a station over Earth is off Earth and Antarctica is on it.\nEmigrants waiting on a card and Colonists aboard a Ship are in neither line.",
+                earth_lines.join(", "),
+                space_lines.join(", ")
+            );
+            bar_resource_with(
                 ui,
                 icons,
                 "population",
-                "Population",
+                "Population history",
                 format!("Earth {} · Space {}", Game::people_text(game.earth_population()), Game::people_text(game.space_population() as f64)),
-                format!("On Earth: {}.\nOff Earth: {}.\nOne Colonist is five million people; a station over Earth is off Earth and Antarctica is on it.", earth_lines.join(", "), space_lines.join(", ")),
+                |ui| {
+                    ui.set_max_width(300.0);
+                    ui.label(RichText::new("Population history").strong());
+                    ui.label(&pop_sentence);
+                    population_history(ui, game, egui::vec2(280.0, 96.0));
+                },
             );
         });
         ui.horizontal_wrapped(|ui| {
@@ -4980,6 +5062,10 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             ui.add_space(4.0);
             emissions_history(ui, game, egui::vec2(ui.available_width(), 110.0));
             ui.separator();
+            // Ticket #166 (version 0.07.5): the population history stands with the growth rate that
+            // drives it, as the Emissions history stands under the sources that drive it.
+            population_history(ui, game, egui::vec2(ui.available_width(), 96.0));
+            ui.add_space(4.0);
             let growth = game.population_growth_rate() * 100.0;
             ui.label(format!(
                 "Penalties in force: population growth {:+.2}% per turn; a card comes {:.0}% of turns at this Temperature ({} cards left in the deck, {} of them Climate).",

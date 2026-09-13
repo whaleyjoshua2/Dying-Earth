@@ -157,3 +157,27 @@ the card's. The happy accident is that *"a bare core module"*, the placeholder t
 have shown since version 0.04 when a station held nothing, is now literally what such a station has.
 
 ![The station list and the roster, with the Core Module left out of both](the-core-module-leaves-the-lists.png)
+
+## A population history on the top bar's hover
+
+Ticket [#166](https://github.com/whaleyjoshua2/Dying-Earth/issues/166). The designer's line: *"get a
+mouse over graph for the population as well."* Built as the ticket's recommendation: **two lines on
+two scales**, Earth read against the left of the chart and space against the right, each with its
+own ends written small at its own side.
+
+![The Population figure's hover at turn 17: Earth falling, space rising, on scales of their own](population-history-hover.png)
+
+![The same chart on the Climate Panel, above the growth rate that drives it](population-history-on-the-panel.png)
+
+One scale would not do: Earth is counted in the hundreds of units and space in single figures, so a
+shared axis lays the space line flat on the floor for the whole game. On scales of their own the
+chart says the thing worth seeing -- Earth falling while space rises -- which is the arc of the game.
+The Breaks are ticked red on the turn axis as on the other two charts, because the heat is what
+takes the people.
+
+Two pieces of engine work came with it. The record now carries **Earth's people and space's**, and
+**the record is written later in the Climate phase** than it was: it used to be pushed before the
+heat had taken its losses and the Refugees had moved, so a population read there would have lagged a
+turn behind the Emissions and Temperature on the same record. Nothing else on the record moves in
+between. The caption says what is in neither line: Emigrants waiting on a card and Colonists aboard
+a Ship belong to neither figure, exactly as they belong to neither figure on the bar.

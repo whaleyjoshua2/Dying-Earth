@@ -426,6 +426,14 @@ pub struct EmissionsRecord {
     pub temperature: f64,
     /// Indices into `climate.toml`'s Breaks of those that fired this phase.
     pub breaks: Vec<usize>,
+    /// Ticket #166 (version 0.07.5): Earth's people and space's, as the top bar counts them, read
+    /// AFTER the phase has settled the heat's losses and moved the Refugees. Emigrants waiting on a
+    /// card and Colonists aboard a Ship are in neither, exactly as they are in neither figure on the
+    /// bar. `#[serde(default)]` so a save written earlier in this version still loads.
+    #[serde(default)]
+    pub earth_population: f64,
+    #[serde(default)]
+    pub space_population: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
