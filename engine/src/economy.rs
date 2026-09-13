@@ -98,6 +98,22 @@ impl Game {
             s.funding_archive = false;
         }
         self.replenish_standing_armies();
+        // Ticket #134 (version 0.07.3): a standing Max order ends by itself when its place is no
+        // longer the seat's to spend on, and the Report says so.
+        for seat in Seat::ALL {
+            if let Some(place) = self.seat(seat).max_standing
+                && !self.directs(seat, place)
+            {
+                self.seat_mut(seat).max_standing = None;
+                let text = format!("The standing Max order on {} ends: it is no longer yours to spend on.", self.place_name(place));
+                self.log(text.clone());
+                let at = match place {
+                    Place::State(s) => ReportPlace::State(s),
+                    Place::Colony(c) => ReportPlace::Colony(c),
+                };
+                self.report_line(LineKind::Note, Some(at), text);
+            }
+        }
         for s in &mut self.ships {
             s.escaped = false;
             s.arrived_this_turn = false;

@@ -85,10 +85,12 @@ pub enum Order {
     /// nothing toward the Research Lead. Set once, it holds until it is set again, and it is read
     /// at the next Income; it never moves Research that Income has already paid out.
     SetArchiveFunding { on: bool },
-    /// Version 0.07.1 (ticket #114): the Defence split repeats every turn until it is switched off.
-    /// Free, and it spends nothing by itself: what it sets is whether the interface places next
-    /// turn's split for the player to look at.
-    SetDefenceStanding { on: bool },
+    /// Version 0.07.3 (ticket #134): Max repeats every turn on one place until it is switched off
+    /// -- `Some(place)` turns it on there, `None` turns it off. Free, and it spends nothing by
+    /// itself: what it sets is whether the interface places next turn's whole Allotment on that
+    /// place as an ordinary order for the player to look at. (Version 0.07.1's Defence split, the
+    /// standing order this replaces, lasted two versions.)
+    SetMaxStanding { target: Option<Target> },
     /// Version 0.05.5 (ticket #73): muster Emigrants, the built Colonists, in a Nation State the
     /// seat directs: up to four a turn per Faction, in one state, at a tenth of a person each.
     BuildEmigrants { state: StateId, n: u32 },
@@ -387,12 +389,17 @@ impl Game {
                 let materials_form = Order::BuildModule { colony: *colony, kind: *kind };
                 self.check_order_inner(seat, pending, &materials_form, false).map(|_| cost)
             }
-            Order::SetDefenceStanding { on } => {
-                if pending.iter().any(|o| matches!(o, Order::SetDefenceStanding { .. })) {
-                    return fail("Defence is already set this turn");
+            Order::SetMaxStanding { target } => {
+                if pending.iter().any(|o| matches!(o, Order::SetMaxStanding { .. })) {
+                    return fail("Max is already set this turn");
                 }
-                if *on == self.seat(seat).defence_standing {
-                    return fail(if *on { "Defence already repeats every turn" } else { "Defence does not repeat" });
+                if *target == self.seat(seat).max_standing {
+                    return fail(if target.is_some() { "Max already repeats every turn there" } else { "Max does not repeat" });
+                }
+                if let Some(place) = target
+                    && !self.directs(seat, *place)
+                {
+                    return fail("Max repeats only on a place you hold");
                 }
                 Ok(cost)
             }
@@ -1253,12 +1260,11 @@ impl Game {
                     let text = self.say("archive_begun", &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(*colony)))]);
                     self.report_line(LineKind::Archive, Some(ReportPlace::Colony(*colony)), text);
                 }
-                Order::SetDefenceStanding { on } => {
-                    self.seat_mut(seat).defence_standing = *on;
-                    let line = if *on {
-                        format!("The {} will split their Influence across the places they hold every turn.", self.seat_name(seat))
-                    } else {
-                        format!("The {} will place their Influence by hand again.", self.seat_name(seat))
+                Order::SetMaxStanding { target } => {
+                    self.seat_mut(seat).max_standing = *target;
+                    let line = match target {
+                        Some(place) => format!("The {} will spend their whole Allotment on {} every turn.", self.seat_name(seat), self.place_name(*place)),
+                        None => format!("The {} will place their Influence by hand again.", self.seat_name(seat)),
                     };
                     self.log(line);
                 }
@@ -1501,7 +1507,10 @@ impl Game {
             }
             Order::BuildArchive { colony } => r("build_archive", &[("colony", place(Place::Colony(*colony)))]),
             Order::SetArchiveFunding { on } => r(if *on { "fund_archive" } else { "unfund_archive" }, &[]),
-            Order::SetDefenceStanding { on } => r(if *on { "defence_on" } else { "defence_off" }, &[]),
+            Order::SetMaxStanding { target } => match target {
+                Some(p) => r("max_on", &[("place", place(*p))]),
+                None => r("max_off", &[]),
+            },
             Order::Repair { unit, .. } | Order::RepairWithDucats { unit, .. } => r("repair", &[("unit", unit_of(*unit))]),
             Order::Transit { ship, to, .. } => {
                 let unit = self.ship(*ship).map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into());

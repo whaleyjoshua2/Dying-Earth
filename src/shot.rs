@@ -373,11 +373,13 @@ fn build_board(session: &mut Session) {
             }
         }
         // Ticket #127 (version 0.07.2): `attend:1` (a building aid, not part of the spec) turns the
-        // standing Defence order on for seat 0, so the side panel places Influence orders on the
-        // threatened Regions and their roster rings can be photographed FILLED. Wants `threat:1`,
-        // or there is nothing to defend and no order is placed.
-        if std::env::args().any(|a| a == "attend:1") {
-            g.seat_mut(Seat(0)).defence_standing = true;
+        // standing order on for seat 0, so the side panel places an Influence order and a roster
+        // ring can be photographed FILLED. Since ticket #134 (version 0.07.3) the standing order is
+        // Max, on seat 0's start state.
+        if std::env::args().any(|a| a == "attend:1")
+            && let Some(home) = g.controlled_states(Seat(0)).first().copied()
+        {
+            g.seat_mut(Seat(0)).max_standing = Some(Place::State(home));
         }
         if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("unrest:").and_then(|v| v.parse::<f64>().ok())) {
             for (sid, off) in [(StateId::EastAsia, 0.0), (StateId::Europe, 1.0), (StateId::NorthAfrica, 3.0)] {

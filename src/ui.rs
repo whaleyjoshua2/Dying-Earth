@@ -509,6 +509,16 @@ pub fn draw(
             }
             Action::Cancel(i) => {
                 if i < session.pending.len() {
+                    // Ticket #134 (version 0.07.3): cancelling the Influence order the standing Max
+                    // placed ends the standing order too -- the designer's addition -- so a
+                    // cancelled Max is not placed again next turn behind the player's back.
+                    let standing = session.game.as_ref().and_then(|g| g.seat(Seat(0)).max_standing);
+                    if let (Some(place), Order::Influence { target, .. }) = (standing, &session.pending[i])
+                        && *target == place
+                        && !session.pending.iter().any(|o| matches!(o, Order::SetMaxStanding { .. }))
+                    {
+                        session.pending.push(Order::SetMaxStanding { target: None });
+                    }
                     session.pending.remove(i);
                     // Later orders may have leaned on the cancelled one; keep only what still checks.
                     let list = std::mem::take(&mut session.pending);
@@ -1848,50 +1858,57 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
         }
     });
 
-    // Defence, and whether it repeats.
-    let needs = game.defence_needs(Seat(0));
-    let split = game.defence_split(Seat(0), influence_left);
-    let total: i64 = split.iter().map(|(_, n)| *n).sum();
-    let hover = if needs.is_empty() {
-        "Nothing you hold is within reach of a rival this turn, so there is nothing for Defence to do.".to_string()
-    } else if split.is_empty() {
-        format!("{} of your places are within reach, and none can be made safe with the Influence left. Defence never part-funds a place: taking one is a threshold, not a race, so a place funded most of the way is as lost as one funded not at all.", needs.len())
-    } else {
-        let named: Vec<String> = split.iter().map(|(p, n)| format!("{} {}", n, game.place_name(*p))).collect();
-        format!(
-            "Spend {} of your {} on the places a rival could take, most threatened first, each funded to safe or not at all: {}.{}",
-            total,
-            influence_left,
-            named.join(", "),
-            if split.len() < needs.len() { format!(" {} more are within reach and out of budget.", needs.len() - split.len()) } else { String::new() }
-        )
-    };
+    // Ticket #134 (version 0.07.3): Max, exactly where Defence stood. The designer: *"Get rid of
+    // defense button replace with a max spend button that just say Max."* One press places one
+    // order spending everything left this turn on the selected place; greyed with a hint when
+    // nothing is selected.
     ui.horizontal(|ui| {
-        let label = if needs.is_empty() { "Defence".to_string() } else { format!("Defence ({} of {})", split.len(), needs.len()) };
-        let button = egui::Button::new(RichText::new(label).strong());
-        if ui.add_enabled(!split.is_empty(), button).on_hover_text(&hover).on_disabled_hover_text(&hover).clicked() {
-            for (place, amount) in &split {
-                actions.push(Action::Place(Order::Influence { target: *place, amount: *amount }));
+        let button = egui::Button::new(RichText::new("Max").strong());
+        match &target {
+            Some((place, name)) if influence_left > 0 => {
+                let order = Order::Influence { target: *place, amount: influence_left };
+                let check = game.check_order(Seat(0), &session.pending, &order);
+                let resp = ui.add_enabled(check.is_ok(), button);
+                if let Err(e) = &check {
+                    resp.clone().on_disabled_hover_text(&e.0);
+                }
+                if resp.on_hover_text(format!("Spend all {influence_left} left this turn on {name}.")).clicked() {
+                    actions.push(Action::Place(order));
+                }
+            }
+            Some(_) => {
+                ui.add_enabled(false, button).on_disabled_hover_text("Nothing left to spend this turn.");
+            }
+            None => {
+                ui.add_enabled(false, button).on_disabled_hover_text("Click a Region or a Colony to spend on it");
             }
         }
         // The standing order, on the shape the Archive's funding already uses: a pending order that
-        // sets a seat flag, so it survives a save and shows in the turn's order list like anything
-        // else. It never spends by itself -- next turn it places the split as pending orders, which
-        // the player can read and cancel.
+        // sets a seat field, so it survives a save and shows in the turn's order list like anything
+        // else. It never spends by itself -- next turn it places the whole Allotment on the place
+        // as a pending order, which the player can read and cancel; cancelling it ends the standing
+        // order too (the designer's addition), as does the place ceasing to be theirs.
         let pending_flip = session.pending.iter().find_map(|o| match o {
-            Order::SetDefenceStanding { on } => Some(*on),
+            Order::SetMaxStanding { target } => Some(*target),
             _ => None,
         });
-        let mut on = pending_flip.unwrap_or(s.defence_standing);
-        if ui
-            .checkbox(&mut on, "every turn")
-            .on_hover_text("Place the Defence split at the start of every turn from now on. It is placed as ordinary orders you can read and cancel before ending the turn, never spent behind your back.")
-            .changed()
-        {
-            if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetDefenceStanding { .. })) {
+        let standing = pending_flip.unwrap_or(s.max_standing);
+        let mut on = standing.is_some();
+        let label = match standing {
+            Some(place) => format!("every turn on {}", game.place_name(place)),
+            None => "every turn".to_string(),
+        };
+        let can_tick = on || target.is_some();
+        let resp = ui.add_enabled(can_tick, egui::Checkbox::new(&mut on, label));
+        let resp = resp
+            .on_hover_text("Spend your whole Allotment on this place at the start of every turn from now on. It is placed as an ordinary order you can read and cancel before ending the turn, never spent behind your back; cancelling it, or losing the place, ends it.")
+            .on_disabled_hover_text("Click a Region or a Colony first.");
+        if resp.changed() {
+            if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetMaxStanding { .. })) {
                 actions.push(Action::Cancel(i));
             } else {
-                actions.push(Action::Place(Order::SetDefenceStanding { on }));
+                let target = if on { target.as_ref().map(|(p, _)| *p) } else { None };
+                actions.push(Action::Place(Order::SetMaxStanding { target }));
             }
         }
     });
@@ -1947,16 +1964,20 @@ fn side_panel(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         return;
     }
     egui::Panel::right("side").default_size(360.0).resizable(true).show(root, |ui| {
-        // Ticket #114: the standing order, applied here, once a turn, before anything is drawn. It
-        // places ordinary pending orders rather than spending anything, so the split arrives in the
-        // turn's order list where it can be read and cancelled like any other order. It is applied
-        // only on a turn the player has not already placed Influence, so it never fights a hand.
-        if !session.spectator && game.seat(Seat(0)).defence_standing && view.defence_placed != Some(game.turn) {
-            view.defence_placed = Some(game.turn);
+        // Ticket #114, kept by ticket #134 for Max: the standing order, applied here, once a turn,
+        // before anything is drawn. It places an ordinary pending order rather than spending
+        // anything, so the spend arrives in the turn's order list where it can be read and
+        // cancelled like any other order. It is applied only on a turn the player has not already
+        // placed Influence, so it never fights a hand.
+        if !session.spectator
+            && let Some(place) = game.seat(Seat(0)).max_standing
+            && view.max_placed != Some(game.turn)
+        {
+            view.max_placed = Some(game.turn);
             if !session.pending.iter().any(|o| matches!(o, Order::Influence { .. })) {
                 let (_, influence_left) = game.remaining(Seat(0), &session.pending);
-                for (place, amount) in game.defence_split(Seat(0), influence_left) {
-                    actions.push(Action::Place(Order::Influence { target: place, amount }));
+                if influence_left > 0 {
+                    actions.push(Action::Place(Order::Influence { target: place, amount: influence_left }));
                 }
             }
         }
@@ -2327,8 +2348,8 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildModuleWithDucats { colony, kind } => format!("Build {} at {} for Ducats", kind.name(), game.place_name(Place::Colony(*colony))),
         Order::BuildStation { body, slot } => format!("Build {} over {}", game.station_name(*body, *slot), game.tables.body(*body).name),
         Order::BuildArchive { colony } => format!("Build the Archive at {}", game.place_name(Place::Colony(*colony))),
-        Order::SetDefenceStanding { on: true } => "Split your Influence across the places you hold, every turn".to_string(),
-        Order::SetDefenceStanding { on: false } => "Place your Influence by hand again".to_string(),
+        Order::SetMaxStanding { target: Some(p) } => format!("Spend your whole Allotment on {}, every turn", game.place_name(*p)),
+        Order::SetMaxStanding { target: None } => "Place your Influence by hand again".to_string(),
         Order::SetArchiveFunding { on: true } => "Pay your Labs into the Archive fund from the next Income".to_string(),
         Order::SetArchiveFunding { on: false } => "Pay your Labs into the shared Tech from the next Income".to_string(),
         // Ticket #73.

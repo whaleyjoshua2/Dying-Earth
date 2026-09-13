@@ -922,25 +922,28 @@ impl Game {
         // rival's Standing plus the challenge margin, as many as the Allotment and the Ducats allow.
         // One hold a turn against a rival pouring its whole Allotment in lost seat 0's start state
         // on turn 7 in every seed of the Prospectors' batch.
-        // Ticket #114 (version 0.07.1): the computer defends its holdings by the same rule the
-        // player's Defence button splits by -- `defence_needs`, which counts the shortfall to
-        // out-stand the best rival, the decay a held place takes at Resolution, and the threshold
-        // arm that makes a rival below their own threshold no threat at all. The AI had its own
-        // arithmetic here and it was close but not the same: it ignored the threshold arm, so it
-        // spent on places nobody could take, and it ignored decay, so it stopped one point short.
-        // A rule belongs in the engine and not in one caller; this is that lesson applied.
-        //
-        // What stays the AI's own is the WEIGHTING: the need decides how many step-sized orders are
-        // offered, and the usual weights decide which of them the seat can afford to take.
+        // Ticket #114 (version 0.07.1) had the computer defend by the same rule the player's Defence
+        // button split by. Ticket #134 (version 0.07.3) retired Defence, button and rule together --
+        // the designer's call: *"computer players lose it too"* -- and the AI is back on its own
+        // arithmetic from ticket #75: once a rival's Standing comes within two steps of its own it
+        // pushes as many holds as it takes to stand two steps clear of the rival plus the challenge
+        // margin. Cruder than the rule it had (it does not ask whether the rival is above their own
+        // threshold, nor count the decay), and measured by the sweep on the ticket.
+        let mut owned: Vec<Place> = self.controlled_states(seat).into_iter().map(Place::State).collect();
+        owned.extend(self.colonies.iter().filter(|c| c.control.controller() == Some(seat)).map(|c| Place::Colony(c.id)));
         let bought_steps = if per > 0 { ducats / per } else { 0 };
-        for (place, need) in self.defence_needs(seat) {
+        for place in owned {
             let rival = self.rival_standing(seat, place);
             let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
-            let can = ((allotment + bought_steps) / step).max(1);
-            let copies = ((need + step - 1) / step).clamp(1, can);
-            let opp = if rival + step >= mine { m.opportunity } else { 1.0 };
-            for _ in 0..copies {
-                push(vec![Order::Influence { target: place, amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, m.threat, opp, format!("hold {} with {} Influence", self.place_name(place), step), None);
+            if rival > 0 && rival + 2 * step >= mine {
+                let margin = self.tables.influence.challenge_margin;
+                let need = (rival + margin + 2 * step - mine).max(step);
+                let can = ((allotment + bought_steps) / step).max(1);
+                let copies = ((need + step - 1) / step).clamp(1, can);
+                let opp = if rival + step >= mine { m.opportunity } else { 1.0 };
+                for _ in 0..copies {
+                    push(vec![Order::Influence { target: place, amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, m.threat, opp, format!("hold {} with {} Influence", self.place_name(place), step), None);
+                }
             }
         }
 

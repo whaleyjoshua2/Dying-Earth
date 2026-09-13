@@ -137,12 +137,16 @@ The three Techs the Research Lead chooses between, drawn when a Tech completes, 
 _Avoid_: options, candidates, draft, offer
 
 **Command Cluster**:
-The strip along the foot of the side panel, since version 0.07.1, holding the controls a player reaches for every turn: the Influence still unspent, Spend on whatever place is selected, Defence, and End Turn. It does not scroll: the card or the Roster scrolls above it. It is the only place End Turn stands.
+The strip along the foot of the side panel, since version 0.07.1, holding the controls a player reaches for every turn: the Influence still unspent, Spend on whatever place is selected, Max (Defence until version 0.07.3), and End Turn. It does not scroll: the card or the Roster scrolls above it. It is the only place End Turn stands.
 _Avoid_: action bar, toolbar, HUD, control panel
 
+**Max**:
+The button in the Command Cluster, since version 0.07.3, that spends everything left of the turn's Allotment on the selected place in one press, as one order to be read and cancelled like any other; greyed out while nothing is selected. **Every turn** makes it a standing order on the place selected when it was ticked: at the start of each turn the whole Allotment is placed on that place as an ordinary order, never spent unwatched, until the box is unticked, the placed order is cancelled, or the place is no longer the player's.
+_Avoid_: all-in, spend all, auto-spend, Defence (the retired button)
+
 **Defence**:
-The button in the Command Cluster, since version 0.07.1, that spreads the turn's unspent Influence across the places a rival could take. It funds the most threatened place to safe before any of the budget reaches the next, because taking a place is a threshold and not a race, and where the budget cannot cover a place in full it passes over it to one it can still save. A place no rival can reach needs nothing and gets nothing. **Every turn** makes it a standing order: it places the same split as ordinary orders at the start of each turn, to be read and cancelled like any other, and never spends unwatched. The computer players defend by the same rule.
-_Avoid_: auto-spend, garrison, fortify, budget split
+Retired in version 0.07.3; see Max. It was the Command Cluster button, from version 0.07.1, that spread the turn's unspent Influence across the places a rival could take, most threatened first and each funded to safe or not at all, and the rule the computer players defended by; both went, and the computer players hold their places by their own arithmetic again.
+_Avoid_: using it for anything Max now does; auto-spend, garrison, fortify, budget split
 
 **Figure**:
 One of the eight things the board counts and draws a glyph for: Materials, Fuel, Energy, Research, Ducats, population, Influence and Emissions. A figure's glyph carries one fill wherever it is drawn, decided by which figure it is and never by the colour of the text around it, and a word is traded for its glyph only where it names a figure -- which is to say only directly after a number, or, since version 0.07.3, where it heads a multiplier (`[research] x1.25` on a Faction card, `leans [materials]` on the start globe), with the phrase the glyph replaced on its hover.

@@ -80,6 +80,55 @@ row gap, and only then climbs the lane.
 
 Clippy clean with `-D warnings`.
 
+## Defence gives way to Max
+
+Ticket [#134](https://github.com/whaleyjoshua2/Dying-Earth/issues/134). The designer's line: *"Get rid
+of defense button replace with a max spend button that just say Max."* Decided in two rounds: one
+press places the order; Max exactly where Defence stood; the computer players lose the rule too and
+go back to their own arithmetic; `every turn` survives as Max's standing order, ending on untick, on
+the placed order being cancelled, or on the place being lost; Defence retired from the vocabulary.
+
+![Before: the Defence row](command-cluster-defence-before.png)
+
+**Max, in Defence's row.** With a Region or Colony selected and Influence left, one press places one
+order spending all of it there; with nothing selected it is greyed out and its hover says to click a
+place. The Spend box and button stay above it for a lesser amount.
+
+![After: Max with China selected](command-cluster-max.png)
+
+**`every turn` is now Max's standing order.** Ticking it remembers the place selected at that moment
+(`every turn on China`), and at the start of each turn the whole Allotment is placed on that place as
+an ordinary pending order, readable and cancellable like any other. It ends when the box is unticked,
+**when the player cancels the placed order** (the designer's addition on the ticket), or when the place
+is no longer theirs to spend on, which the Report says. The order behind it is `SetMaxStanding`, with
+the place inside it, where `SetDefenceStanding` carried a flag.
+
+![The standing order on, at turn 1](command-cluster-max-every-turn.png)
+
+**The computer players lost the rule with the button.** Ticket #114 had given them `defence_needs`,
+the same rule the player's button split by; the designer's answer was *"computer players lose it too"*,
+and they are back on ticket #75's arithmetic -- once a rival's Standing comes within two steps of
+their own, push as many holds as it takes to stand two steps clear of the rival plus the margin.
+`defence_needs` and `defence_split` are gone from the engine with their two tests, and the ticket-#114
+AI test is the ticket-#75 one again.
+
+**Measured, twenty seeds in each of four seatings, after the change, against the 0.07.2 baseline:**
+
+| seat 0 | wins | Collapses | tree completes | 0.07.2 baseline |
+|---|---|---|---|---|
+| Custodians | Custodians 12 | 8 | 20 of 20 | Custodians 12, Collapses 8, 20 of 20 |
+| Prospectors | Custodians 19, Arkwrights 1 | 0 | 20 of 20 | Custodians 20, 20 of 20 |
+| Arkwrights | Custodians 20 | 0 | 15 of 20 | Custodians 19, Arkwrights 1, 13 of 20 |
+| Archivists | Custodians 19, Archivists 1 | 0 | 20 of 20 | Custodians 19, Archivists 1, 20 of 20 |
+| **totals** | **Custodians 70**, Arkwrights 1, Archivists 1 | **8** | **75 of 80** | Custodians 70, Arkwrights 1, Archivists 1, Collapses 8, 73 of 80 |
+
+Two games in eighty changed hands and the tree completed twice more: the cruder holding rule costs
+the computer nothing the sweep can see. The Custodians' seventy stays exactly seventy, which is the
+imbalance the map carries as out of scope, untouched. (The instrument is `simulate:<seed>
+--player=<faction>` on the dev build; a game runs in under a second.)
+
+Clippy clean with `-D warnings`, 253 tests passing.
+
 ## Building art: candidate sheets (research, ticket #144)
 
 Sixty-two game-icons.net candidates for the twenty-two building kinds, drawn with the game's own

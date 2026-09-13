@@ -289,9 +289,9 @@ pub struct ViewState {
     /// Ticket #57, a building aid (`hover:<body id>`): the Solar System Map draws that Body's launch
     /// window tooltip as though the pointer were on it, so a picture can be taken of it.
     pub force_hover: Option<BodyId>,
-    /// Ticket #114 (version 0.07.1): the last turn the standing Defence split was placed, so it is
+    /// Ticket #114 (version 0.07.1), Max since ticket #134: the last turn the standing order was placed, so it is
     /// placed once a turn and not once a frame.
-    pub defence_placed: Option<u32>,
+    pub max_placed: Option<u32>,
     /// Ticket #128 (version 0.07.2): a shortcut pressed and not yet acted on.
     pub hotkey: Option<HotKey>,
     /// Ticket #126 (version 0.07.2): on the start screen, the Region under the pointer, the Region
@@ -330,7 +330,7 @@ impl Default for ViewState {
             attack_preview: false,
             moments_on: None,
             force_hover: None,
-            defence_placed: None,
+            max_placed: None,
             hotkey: None,
             start_hover: None,
             start_selected: None,
