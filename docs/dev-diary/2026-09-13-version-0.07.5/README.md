@@ -82,3 +82,19 @@ Region's boxes live in *Build Slot*; and the Colony card's bottom header is **`O
 button for what it does)`**, matching the Nation card's since ticket #154.
 
 ![The bar: the map key is M now](the-map-key-is-now-m.png)
+
+## The Pick a Tech button is red
+
+Ticket [#163](https://github.com/whaleyjoshua2/Dying-Earth/issues/163). The designer's line: *"'Pick
+a tech' button when present should be red."* It was **black text on the default dark fill**, the
+only styled button on the bar and the least legible of the seven places the game asks for a Tech.
+Built as the ticket's recommendation: **the red End Turn wears**, since the two are the pair that
+gate a turn -- the turn cannot end until the pick is made -- with light text.
+
+![The bar's Pick a Tech button and the End Turn button below it, in one red](pick-a-tech-red.png)
+
+The refused modal's `Pick a Tech` button, the same words and the same job, takes the same red. The
+Tech Tree's own `Pick` buttons and its yellow prompt are left alone: six red buttons inside one
+window is a wall rather than a signal. The red was written twice as a bare literal and is a named
+constant now, `TURN_RED`. A new `pick:0` picture aid leaves the opening Tech pick unmade, since the
+harness makes it so it can drive turns and the button could not otherwise be photographed.

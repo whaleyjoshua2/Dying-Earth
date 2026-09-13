@@ -162,7 +162,11 @@ fn build_board(session: &mut Session) {
     }
     let turns: u32 = std::env::args().find_map(|a| a.strip_prefix("turns:").and_then(|v| v.parse().ok())).unwrap_or(0);
     if let Some(g) = &mut session.game {
-        if !spectate && let Some(first) = g.available_techs().first().copied() {
+        // `pick:0` (a building aid, ticket #163): the opening Tech pick is LEFT UNMADE, so the top
+        // bar carries its Pick a Tech button and the button can be photographed. It only makes
+        // sense with no turns driven: a turn cannot end while the pick is owed.
+        let leave_pick = std::env::args().any(|a| a == "pick:0");
+        if !spectate && !leave_pick && let Some(first) = g.available_techs().first().copied() {
             g.pick_tech(Seat(0), first).ok();
         }
         if turns > 0 {

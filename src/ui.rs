@@ -1611,7 +1611,11 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             // say when a pick is owed. End Turn is disabled until one is made, but that only shows
             // on a hover, and a player who does not know to look will not find it.
             if game.research.awaiting_pick == Some(Seat(0)) && game.research.current.is_none() && !game.available_techs().is_empty() && !session.spectator {
-                if ui.button(RichText::new("Pick a Tech").color(Color32::BLACK).strong()).on_hover_text("The Research Lead is yours: choose what the world researches next. The turn cannot end until you do.").clicked() {
+                // Ticket #163 (version 0.07.5): in the red End Turn wears, since the two are the
+                // pair that gate a turn. The designer: *"'Pick a tech' button when present should be
+                // red."* It was black text on the default dark fill, the least legible button on the bar.
+                let pick = egui::Button::new(RichText::new("Pick a Tech").strong()).fill(TURN_RED);
+                if ui.add(pick).on_hover_text("The Research Lead is yours: choose what the world researches next. The turn cannot end until you do.").clicked() {
                     view.show_tech = true;
                 }
                 ui.separator();
@@ -1723,7 +1727,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 // of the side panel, where the rest of the every-turn controls now are. A spectator
                 // has no cluster -- they give no orders -- so theirs stays here beside the Auto box.
                 if session.spectator {
-                    let button = egui::Button::new(RichText::new("End Turn (Enter)").strong().size(16.0)).fill(Color32::from_rgb(120, 40, 30));
+                    let button = egui::Button::new(RichText::new("End Turn (Enter)").strong().size(16.0)).fill(TURN_RED);
                     if ui.add_enabled(view.popup == Popup::None, button).clicked() {
                         press_end_turn(session, game, view, actions);
                     }
@@ -2309,7 +2313,7 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
     });
 
     // End Turn, where a hand already is. Ticket #128 (version 0.07.2): named for its key.
-    let button = egui::Button::new(RichText::new("End Turn (Enter)").strong().size(16.0)).fill(Color32::from_rgb(120, 40, 30));
+    let button = egui::Button::new(RichText::new("End Turn (Enter)").strong().size(16.0)).fill(TURN_RED);
     if ui.add_enabled(can_end_turn(game, view), button).on_disabled_hover_text("Pick a Tech first").clicked() {
         press_end_turn(session, game, view, actions);
     }
@@ -3494,6 +3498,11 @@ fn no_slot_section(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mi
         }
     }
 }
+
+/// Ticket #163 (version 0.07.5): the red the game puts on a button that gates the turn. End Turn
+/// has worn it since the first playable; the Pick a Tech button joins it, since the turn cannot end
+/// until the pick is made. Written twice as a literal before this; named once now.
+const TURN_RED: Color32 = Color32::from_rgb(120, 40, 30);
 
 /// The columns of slot boxes on a Region's card: six, since the card is a step wider than the Hab View.
 const SLOT_COLS: usize = 6;
@@ -5085,7 +5094,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.label(why);
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button("Pick a Tech").clicked() {
+                    // Ticket #163: the same words and the same job as the bar's, so the same red.
+                    if ui.add(egui::Button::new(RichText::new("Pick a Tech").strong()).fill(TURN_RED)).clicked() {
                         view.popup = Popup::None;
                         view.show_tech = true;
                     }
