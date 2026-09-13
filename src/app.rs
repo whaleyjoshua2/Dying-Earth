@@ -252,6 +252,13 @@ pub enum HotKey {
     EndTurn,
 }
 
+/// Ticket #145 (version 0.07.3): what is clicked in the Hab View.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum HabTile {
+    Module(usize),
+    Free,
+}
+
 #[derive(Resource)]
 pub struct ViewState {
     pub view: View,
@@ -279,6 +286,11 @@ pub struct ViewState {
     /// Ticket #42: the trading window, and the quantity on each of its four lines
     /// (Influence, Materials, Fuel, Energy).
     pub show_trade: bool,
+    /// Ticket #145 (version 0.07.3): the Hab View, open on one station or Colony, and the tile
+    /// clicked in it -- a standing Module by index, or a free slot, whose strip offers the build
+    /// buttons.
+    pub hab_view: Option<ColonyId>,
+    pub hab_tile: Option<HabTile>,
     pub trade_amounts: [i64; 4],
     pub load_state: Option<StateId>,
     pub influence_amount: i64,
@@ -324,6 +336,8 @@ impl Default for ViewState {
             climate_reopen: false,
             show_victory: false,
             show_trade: false,
+            hab_view: None,
+            hab_tile: None,
             trade_amounts: [5, 10, 10, 10],
             load_state: None,
             influence_amount: 5,

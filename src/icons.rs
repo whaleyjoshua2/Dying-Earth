@@ -31,7 +31,7 @@ pub struct Credit {
 
 /// The icons in use, their authors, and the names they carry at game-icons.net. Anything added to
 /// `assets/icons/` belongs here too: the credit is the licence's price, not a courtesy.
-pub const CREDITS: [Credit; 12] = [
+pub const CREDITS: [Credit; 23] = [
     Credit { resource: "Materials", icon: "Mine Wagon", author: "Delapouite" },
     Credit { resource: "Fuel", icon: "Jerrycan", author: "Delapouite" },
     Credit { resource: "Energy", icon: "Electric", author: "Sbed" },
@@ -49,7 +49,42 @@ pub const CREDITS: [Credit; 12] = [
     // it is in DRAWN below. (Delapouite's Defense Satellite wore the row for one version.)
     Credit { resource: "Colony", icon: "Habitat Dome", author: "Delapouite" },
     Credit { resource: "Region", icon: "Modern City", author: "Delapouite" },
+    // Ticket #145 (version 0.07.3): the Hab View's tiles, one picture per Module kind, the first
+    // candidate of each on ticket #144's sheets (Lorc's Mining for the Mine, since Gold Mine collides
+    // with the Materials' cart). The Habitat wears the Colony's dome above and needs no file. The
+    // slot-boxes ticket may swap any of these so the two drawings share one set.
+    Credit { resource: "Module Mine", icon: "Mining", author: "Lorc" },
+    Credit { resource: "Module Generator", icon: "Power Generator", author: "Delapouite" },
+    Credit { resource: "Module Refinery", icon: "Refinery", author: "Delapouite" },
+    Credit { resource: "Module Shipyard", icon: "Cargo Crane", author: "Lorc" },
+    Credit { resource: "Module Barracks", icon: "Barracks", author: "Delapouite" },
+    Credit { resource: "Module Trade Post", icon: "Trade", author: "Lorc" },
+    Credit { resource: "Module Relay", icon: "Radio Tower", author: "Delapouite" },
+    Credit { resource: "Module Observatory", icon: "Observatory", author: "Delapouite" },
+    Credit { resource: "Module Solar Array", icon: "Solar Power", author: "Skoll" },
+    Credit { resource: "Module Mass Driver", icon: "Mass Driver", author: "Sbed" },
+    Credit { resource: "Module Archive", icon: "Archive Register", author: "Delapouite" },
 ];
+
+/// Ticket #145 (version 0.07.3): the icon key a Module kind's tile wears in the Hab View. The
+/// Habitat wears the Colony's own dome, at the designer's word; every other kind has a file of its own.
+pub fn module_icon(kind: dying_earth_engine::ModuleKind) -> &'static str {
+    use dying_earth_engine::ModuleKind::*;
+    match kind {
+        Mine => "module_mine",
+        Generator => "module_generator",
+        Refinery => "module_refinery",
+        Habitat => "colony",
+        Shipyard => "module_shipyard",
+        Barracks => "module_barracks",
+        TradePost => "module_trade_post",
+        Relay => "module_relay",
+        Observatory => "module_observatory",
+        SolarArray => "module_solar_array",
+        MassDriver => "module_mass_driver",
+        Archive => "module_archive",
+    }
+}
 
 /// Ticket #135 (version 0.07.3): the SVGs in `assets/icons/` that are the game's own drawings, so
 /// they owe nobody a credit and the Credits screen does not list them. The station's glyph -- two

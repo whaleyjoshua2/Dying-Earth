@@ -21,6 +21,9 @@ pub struct ShotPlan {
     pub menus: bool,
     pub menu_step: usize,
     pub select: Option<String>,
+    /// `hab:1` (a building aid, ticket #145): the Hab View is open on seat 0's first station or Colony.
+    pub hab: bool,
+    pub hab_colony: Option<ColonyId>,
     /// `tech:1` (a building aid): the Tech Tree window is open in every picture.
     pub tech: bool,
     /// `climate:toggle` (a building aid): the Earth picture closes the Climate Panel and brings it
@@ -84,6 +87,14 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     }
     if plan.stack {
         view.selection = Selection::ShipStack(BodyId::Mars, Seat(0));
+    }
+    // Ticket #145: `hab:1` opens the Hab View on seat 0's first station or Colony (the ISS on a
+    // fresh board), on every picture, with nothing clicked in it.
+    if plan.hab && view.hab_view.is_none() {
+        view.hab_view = plan.hab_colony;
+        // `habtile:<n>` or `habtile:free` (a building aid): that tile is clicked, so the strip under
+        // the grid can be photographed with a Module's figures or the build buttons in it.
+        view.hab_tile = std::env::args().find_map(|a| a.strip_prefix("habtile:").map(str::to_owned)).and_then(|v| if v == "free" { Some(HabTile::Free) } else { v.parse::<usize>().ok().map(HabTile::Module) });
     }
     view.force_hover = plan.hover.filter(|_| view.view == View::Solar);
     // Ticket #51: `archive:<stage>` opens the Archive's Colony card in that Body's picture.
@@ -837,6 +848,8 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         // `select:<state id>` (a building aid) opens that Region's card in the Earth picture.
         plan.select = std::env::args().find_map(|a| a.strip_prefix("select:").map(str::to_owned));
         plan.tech = std::env::args().any(|a| a == "tech:1");
+        plan.hab = std::env::args().any(|a| a == "hab:1");
+        plan.hab_colony = session.game.as_ref().and_then(|g| g.colonies.iter().find(|c| c.control.director() == Some(Seat(0))).map(|c| c.id));
         plan.trade = std::env::args().any(|a| a == "trade:1");
         plan.victory = std::env::args().any(|a| a == "victory:1");
         plan.stack = std::env::args().any(|a| a == "stack:1");

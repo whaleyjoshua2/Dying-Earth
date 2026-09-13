@@ -470,6 +470,39 @@ the balance version. The four-way shape holds.
 
 Clippy clean with `-D warnings`, 254 tests passing (six repinned to the unit).
 
+## The Hab View
+
+Ticket [#145](https://github.com/whaleyjoshua2/Dying-Earth/issues/145). The designer's line: *"I would
+like a window popup showing the modules of the space stations and colonies similar the ones in
+terra invicta."* Decided in one round off three mocked pictures (`module-window-mock-*.png`): a
+popup; five columns; the tiles as mocked with the Habitat wearing the Colony's own dome; off-white;
+a click puts the tile's figures and controls in a strip under the grid; a free tile offers the
+build buttons; the name is the Hab View.
+
+![The ISS's Hab View at turn 13](hab-view-iss.png)
+
+**One tile per Module**, its picture on a dark tile with its name beneath; dimmed with the word for
+a mothballed one, hatched with the word for one building, dashed and empty for every free place
+under the cap, and the Archive on a row of its own outside the count. The pictures are the first
+candidate of each kind on ticket #144's sheets (Lorc's *Mining* for the Mine, since *Gold Mine*
+collides with the Materials' cart), eleven files in `assets/icons/` credited on the Credits screen,
+with the Habitat wearing the Colony glyph and needing no file; the slot-boxes ticket may swap any of
+them so the two drawings share one set. Opened from the card's `Modules (M)` button, by clicking a
+station's or Colony's roster row, or with `M` on the selected place; closed with Esc or its own
+cross, and Esc closes it before it leaves a Surface Map.
+
+![The Habitat clicked: its figures and buttons in the strip](hab-view-habitat-clicked.png)
+
+![A free tile clicked: the build buttons in the strip](hab-view-free-tile-clicked.png)
+
+**The card is shorter.** Its Module rows -- name, figures and the two buttons each, which ticket #138
+had only just put on one line -- have moved into the strip; the card keeps `Modules: Habitat,
+Shipyard` as a line, the button, and its own build buttons, which the strip draws through the same
+function so the two can never differ. A spectator opens a rival's Hab View and finds no buttons in
+it. `hab:1` and `habtile:<n>` / `habtile:free` are the aids that photographed it.
+
+Clippy clean with `-D warnings`, 244 engine tests and 254 in all passing.
+
 ## Building art: candidate sheets (research, ticket #144)
 
 Sixty-two game-icons.net candidates for the twenty-two building kinds, drawn with the game's own

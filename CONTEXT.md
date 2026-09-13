@@ -148,6 +148,10 @@ _Avoid_: all-in, spend all, auto-spend, Defence (the retired button)
 Retired in version 0.07.3; see Max. It was the Command Cluster button, from version 0.07.1, that spread the turn's unspent Influence across the places a rival could take, most threatened first and each funded to safe or not at all, and the rule the computer players defended by; both went, and the computer players hold their places by their own arithmetic again.
 _Avoid_: using it for anything Max now does; auto-spend, garrison, fortify, budget split
 
+**Hab View**:
+The window, since version 0.07.3, that shows a Space Station's or Colony's Modules as a grid of tiles: one tile per Module with its picture, dimmed while mothballed and hatched while building, a dashed empty tile for every free place under the Module cap, and the Archive on a tile of its own outside the count. Clicking a tile shows that Module's figures and its Mothball, Restart and Decommission buttons beneath the grid; clicking a free tile offers the build buttons there. Opened from the card's Modules button, from the Roster row, or with M; closed with Esc. Named after the habitat screen of Terra Invicta, the designer's reference.
+_Avoid_: module window, colony screen, base view, habitat panel
+
 **Figure**:
 One of the eight things the board counts and draws a glyph for: Materials, Fuel, Energy, Research, Ducats, population, Influence and Emissions. A figure's glyph carries one fill wherever it is drawn, decided by which figure it is and never by the colour of the text around it, and a word is traded for its glyph only where it names a figure -- which is to say only directly after a number, or, since version 0.07.3, where it heads a multiplier (`[research] x1.25` on a Faction card, `leans [materials]` on the start globe), with the phrase the glyph replaced on its hover.
 _Avoid_: stat, counter, metric, indicator
