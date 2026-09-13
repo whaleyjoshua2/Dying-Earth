@@ -129,6 +129,32 @@ imbalance the map carries as out of scope, untouched. (The instrument is `simula
 
 Clippy clean with `-D warnings`, 253 tests passing.
 
+## The station glyph is replaced: the candidates
+
+Ticket [#135](https://github.com/whaleyjoshua2/Dying-Earth/issues/135). The designer's line: *"Replace
+station icon."* Twelve columns from game-icons.net, rendered by the `icon_sheet` aid at full size and
+at 13, 16 and 20 pixels (the map label, the roster row and the card title), left to right:
+
+![Station glyph candidates](station-glyph-candidates.png)
+
+1. **Defense Satellite** (Delapouite), the glyph today, for comparison.
+2. **Apollo Capsule** (Delapouite): a capsule at every size, but a capsule is a ship.
+3. **Beam Satellite** (Delapouite): the panels dissolve at 13.
+4. **Death Star** (Delapouite): the strongest shape at 13, but it reads as a moon with a crater.
+5. **Double Ringed Orb** (Lorc): a body inside a tilted ring; survives at 13 and reads as a thing in orbit.
+6. **Mars Pathfinder** (Delapouite): a lander on legs, thin at 13.
+7. **Moon Orbit** (Delapouite): a planet with a small moon on a ring; clear at 13, mistakable for a Body.
+8. **Radar Dish** (Lorc): clear at 13, but a dish on the ground.
+9. **Satellite Communication** (Delapouite): the same dish family as today's; the waves go to mush.
+10. **Spoutnik** (Lorc): the antennae thin to nothing at 13.
+11. **Star Satellites** (Lorc): a ring round a sun, a blur at 13.
+12. **Transportation Rings** (Lorc): busy at every small size.
+
+The seven 0.07.2 offered (lunar module, observatory, orbital, satellite, solar system, space needle
+and today's) are not repeated; the site has nothing that draws an ISS truss. Recommended to the
+designer: **5, the Double Ringed Orb**, the one that reads as a thing in orbit rather than a dish, a
+ship or a world, with Lorc already on the Credits screen.
+
 ## Building art: candidate sheets (research, ticket #144)
 
 Sixty-two game-icons.net candidates for the twenty-two building kinds, drawn with the game's own
