@@ -130,3 +130,22 @@ Facilities header; and a no-slot row no longer says `(inland)` or, mothballed, `
 ![China as the Custodians with a Sea Wall standing, from `select:EastAsia walls:1`](build-list-folded-sea-wall-standing.png)
 
 ![The same card without one](build-list-folded-no-sea-wall.png)
+
+## The Solar System Map rescaled
+
+Ticket [#155](https://github.com/whaleyjoshua2/Dying-Earth/issues/155). The designer's line:
+*"adjust/rescale solar system view to keep Venus and earth from overlapping."* Measured before
+building: Venus's ring at 2.45 and Earth's at 3.4 were 0.95 apart, which the camera's forty-degree
+tilt squashed to 0.61 on screen, less than the two discs' radii together (0.82), so the discs
+overlapped by about fourteen pixels at every conjunction; the station rings drawn in 0.07.3 crossed
+whenever the two were within twenty-five degrees. Built as the ticket's recommendation for the
+designer to react to: **Venus's ring in to 1.7 and Earth's out to 3.8**, Mars staying at 6.0, the
+three read from one table (`geo::solar_ring`) by the Bodies' places and the drawn rings alike;
+**labels by Body**, Venus's and the satellites' hanging below their discs where a planet's stands
+above, so the two inner planets' words never meet and a moon's never lie over its planet's; the
+station rings unchanged. The worst conjunction of the game is turn 1 (three degrees apart) and the
+next turn 11 (seven), where the 0.07.3 picture caught it.
+
+![Turn 1, the worst conjunction: Venus clear of Earth, its label below](solar-rescaled-turn-1.png)
+
+![Turn 11, where 0.07.3's picture had Venus on Earth](solar-rescaled-turn-11.png)

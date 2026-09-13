@@ -1784,7 +1784,12 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
         View::Solar => {
             for body in BodyId::ALL {
                 let pos = geo::solar_place(game, body);
-                let head = project(pos + Vec3::Y * (geo::solar_radius(body) + 0.05));
+                // Ticket #155 (version 0.07.4): a label by Body -- Venus's and the satellites' hang
+                // BELOW their discs where a planet's stands above -- so the words of the two inner
+                // planets never meet at a conjunction, and a moon's never lie over its planet's.
+                let below = matches!(body, BodyId::Venus | BodyId::Moon | BodyId::Phobos | BodyId::Deimos);
+                let side = if below { -1.0 } else { 1.0 };
+                let head = project(pos + Vec3::Y * side * (geo::solar_radius(body) + 0.05));
                 if let Some(p) = head {
                     let name = game.tables.body(body).name.clone();
                     let slots = game.tables.body(body).colony_slots();
@@ -1815,7 +1820,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     if body == BodyId::Earth && !game.antarctica_open {
                         text.push_str(&format!("\nAntarctica: opens at {:+.1} C", game.tables.climate.antarctica_opens_at));
                     }
-                    label_at(painter, p - egui::vec2(0.0, 22.0 + 7.5 * lines as f32), &text, Color32::WHITE, 13.0);
+                    label_at(painter, p - egui::vec2(0.0, side * (22.0 + 7.5 * lines as f32)), &text, Color32::WHITE, 13.0);
                     // Ticket #136: one orbit per Body, the stations on it at spaced positions, dashed
                     // while nothing is in orbit. Five rings will not fit round an eighteen-pixel Earth
                     // without swallowing the Moon, so on this map the slots share one ring; each has
@@ -1849,7 +1854,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     }
                     // The Orbital Control flag in the holder's Faction colour.
                     if let Some(s) = game.orbital_control(body) {
-                        label_at(painter, p - egui::vec2(0.0, 40.0), &format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s), 12.0);
+                        label_at(painter, p - egui::vec2(0.0, side * 40.0), &format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s), 12.0);
                     }
                 }
                 // Ticket #50: up to four stacks at one Body. The markers sit at four fixed angles

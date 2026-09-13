@@ -112,14 +112,30 @@ pub fn solar_position(body: BodyId, turn: u32, lon: f32) -> Vec3 {
         Vec3::new(a.cos() * radius, 0.0, a.sin() * radius)
     };
     match body {
-        BodyId::Earth => on_ring(3.4),
+        BodyId::Earth => on_ring(solar_ring(BodyId::Earth)),
         BodyId::Moon => solar_position(BodyId::Earth, turn, lon) + Vec3::new((t * 0.9).cos(), 0.0, (t * 0.9).sin()),
-        BodyId::Mars => on_ring(6.0),
+        BodyId::Mars => on_ring(solar_ring(BodyId::Mars)),
         // Ticket #45: the moons of Mars, close in, drawn far larger than life to be clickable.
         BodyId::Phobos => solar_position(BodyId::Mars, turn, lon) + Vec3::new(0.7 * (t * 1.3).cos(), 0.0, 0.7 * (t * 1.3).sin()),
         BodyId::Deimos => solar_position(BodyId::Mars, turn, lon) + Vec3::new(1.05 * (t * 0.7 + 2.0).cos(), 0.0, 1.05 * (t * 0.7 + 2.0).sin()),
-        // Ticket #93: Venus on its own ring inside Earth's, at 0.72 of Earth's distance.
-        BodyId::Venus => on_ring(2.45),
+        BodyId::Venus => on_ring(solar_ring(BodyId::Venus)),
+    }
+}
+
+/// Ticket #155 (version 0.07.4): the radius of a planet's ring on the Solar System Map, the one
+/// table the Bodies' places and the drawn rings both read, so the two cannot drift apart. Venus's
+/// ring was 2.45 and Earth's 3.4 until this version: seen from the camera's forty-degree tilt the
+/// gap between them squashed to less than the two discs' radii together, and the two overlapped
+/// at every conjunction, about four times a game. The designer: *"adjust/rescale solar system view
+/// to keep Venus and earth from overlapping."* Venus is in and Earth out; Mars stays.
+pub fn solar_ring(body: BodyId) -> f32 {
+    match body {
+        BodyId::Venus => 1.7,
+        BodyId::Earth => 3.8,
+        BodyId::Mars => 6.0,
+        // The satellites have no ring of their own; they ride their planet's.
+        BodyId::Moon => solar_ring(BodyId::Earth),
+        BodyId::Phobos | BodyId::Deimos => solar_ring(BodyId::Mars),
     }
 }
 
