@@ -21,7 +21,9 @@ pub struct ShotPlan {
     pub menus: bool,
     pub menu_step: usize,
     pub select: Option<String>,
-    /// `hab:1` (a building aid, ticket #145): the Hab View is open on seat 0's first station or Colony.
+    /// `hab:1` (a building aid, ticket #145; ticket #162 in version 0.07.5): seat 0's first station
+    /// or Colony is SELECTED, so its card -- which carries the Module tiles since the Hab View
+    /// window retired -- is in every picture.
     pub hab: bool,
     pub hab_colony: Option<ColonyId>,
     /// `tech:1` (a building aid): the Tech Tree window is open in every picture.
@@ -88,13 +90,17 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     if plan.stack {
         view.selection = Selection::ShipStack(BodyId::Mars, Seat(0));
     }
-    // Ticket #145: `hab:1` opens the Hab View on seat 0's first station or Colony (the ISS on a
-    // fresh board), on every picture, with nothing clicked in it.
-    if plan.hab && view.hab_view.is_none() {
-        view.hab_view = plan.hab_colony;
-        // `habtile:<n>` or `habtile:free` (a building aid): that tile is clicked, so the strip under
-        // the grid can be photographed with a Module's figures or the build buttons in it.
-        view.hab_tile = std::env::args().find_map(|a| a.strip_prefix("habtile:").map(str::to_owned)).and_then(|v| if v == "free" { Some(HabTile::Free) } else { v.parse::<usize>().ok().map(HabTile::Module) });
+    // Ticket #162 (version 0.07.5): `hab:1` SELECTS seat 0's first station or Colony (the ISS on a
+    // fresh board), so its card and its Module tiles are in the picture; the window it used to open
+    // is gone.
+    if plan.hab && let Some(cid) = plan.hab_colony {
+        view.selection = Selection::Colony(cid);
+    }
+    // `habtile:<n>` or `habtile:free` (a building aid): that tile is clicked, so the strip under the
+    // grid can be photographed with a Module's figures or the build buttons in it. It stands on its
+    // own now, as `slotbox:` does on a selected Region.
+    if let Some(v) = std::env::args().find_map(|a| a.strip_prefix("habtile:").map(str::to_owned)) {
+        view.hab_tile = if v == "free" { Some(HabTile::Free) } else { v.parse::<usize>().ok().map(HabTile::Module) };
     }
     // `slotbox:<n>` or `slotbox:free` (a building aid, ticket #146): that slot box on the selected
     // Region's card is clicked, so the strip beneath the boxes can be photographed.

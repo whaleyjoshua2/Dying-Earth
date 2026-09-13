@@ -310,17 +310,8 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mu
         if keys.just_pressed(KeyCode::KeyR) && !session.spectator {
             view.show_trade = !view.show_trade;
         }
-        // Ticket #145 (version 0.07.3): M opens the Hab View for the selected station or Colony,
-        // and closes it if it is open.
-        if keys.just_pressed(KeyCode::KeyM) {
-            if view.hab_view.is_some() {
-                view.hab_view = None;
-                view.hab_tile = None;
-            } else if let Selection::Colony(cid) = view.selection {
-                view.hab_view = Some(cid);
-                view.hab_tile = None;
-            }
-        }
+        // Ticket #162 (version 0.07.5): M is free. It opened the Hab View, and the Modules are
+        // tiles on the card now, so there is no window to open.
         let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
         if ctrl && keys.just_pressed(KeyCode::KeyS) {
             view.hotkey = Some(HotKey::Save);
@@ -338,9 +329,9 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mu
         if view.popup != Popup::None {
             let moments = session.game.as_ref().map(|g| view.moments_of(&session.tables, &g.report).len()).unwrap_or(0);
             advance_popup(&mut view, moments);
-        } else if view.hab_view.is_some() {
-            // Ticket #145: Esc closes the Hab View before it leaves a Surface Map.
-            view.hab_view = None;
+        } else if view.hab_tile.is_some() {
+            // Ticket #162 (version 0.07.5): Esc clears a clicked Module tile before it leaves a
+            // Surface Map, as it closed the Hab View before the window retired.
             view.hab_tile = None;
         } else if matches!(view.view, View::Surface(_)) {
             view.view = View::Solar;
@@ -2479,9 +2470,10 @@ fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
         }
         view.selection = sel;
         view.attack_preview = false;
-        // Ticket #145 (version 0.07.3): a Colony's or station's roster row opens its Hab View too.
-        if let Selection::Colony(cid) = sel {
-            view.hab_view = Some(cid);
+        // Ticket #162 (version 0.07.5): selecting a Colony is enough -- its card carries the
+        // Module tiles now, so there is no window for the roster row to open. The clicked tile is
+        // cleared, as it was when the row opened a fresh window.
+        if matches!(sel, Selection::Colony(_)) {
             view.hab_tile = None;
         }
     }
@@ -3972,20 +3964,24 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             game.tables.slots.per_colonist
         ),
     );
-    ui.label(RichText::new("Modules").strong());
     let research = game.tables.archive.research;
-    // Ticket #145 (version 0.07.3): the Modules live in the Hab View now. The card keeps its
-    // summary line above, the Modules by name, and the button that opens the window; the rows
-    // with figures and buttons that stood here are the window's strip.
-    ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new("Modules:").strong());
-        let names: Vec<String> = col.modules.iter().map(|m| format!("{}{}", if m.kind == ModuleKind::Archive { "the Archive" } else { m.kind.name() }, if m.mothballed { " (mothballed)" } else { "" })).collect();
-        ui.label(if names.is_empty() { "none".to_string() } else { names.join(", ") });
-    });
-    if ui.button("Modules (M)").on_hover_text("Open the Hab View: every Module as a tile, with its figures and controls on a click.").clicked() {
-        view.hab_view = Some(cid);
-        view.hab_tile = None;
+    // Ticket #162 (version 0.07.5): the Modules are tiles on the card, where ticket #145 had put
+    // them in a window. The summary line above says the cap; the tiles say the rest, so the
+    // heading, the list of names and the button that opened the window are gone.
+    // Ticket #88: build it where you dig. Ticket #162 (version 0.07.5): the note stands above the
+    // tiles, where a free one is clicked to build, rather than under a Build header that no longer
+    // offers a Module.
+    match game.working_mines(col) {
+        0 => {}
+        1 => {
+            ui.label(RichText::new(format!("One working Mine here: Modules cost x{} (never under half the row).", game.tables.in_situ.one_mine)).weak());
+        }
+        n => {
+            ui.label(RichText::new(format!("{n} working Mines here: Modules cost x{} (never under half the row).", game.tables.in_situ.two_mines)).weak());
+        }
     }
+    let mine_here = !session.spectator && col.control.director() == Some(Seat(0));
+    module_boxes(ui, session, game, view, cid, mine_here, col.control.director(), actions);
     // Ticket #51: the Archive on order shows before its Module does.
     if !col.modules.iter().any(|m| m.kind == ModuleKind::Archive)
         && let Some(b) = col.queue.iter().find(|b| b.item == BuildItem::Module(ModuleKind::Archive))
@@ -4066,17 +4062,6 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             ui.separator();
         }
         ui.label(RichText::new("Build (hover a button for what it makes)").strong());
-        // Ticket #88: build it where you dig.
-        match game.working_mines(col) {
-            0 => {}
-            1 => {
-                ui.label(RichText::new(format!("One working Mine here: Modules cost x{} (never under half the row).", game.tables.in_situ.one_mine)).weak());
-            }
-            n => {
-                ui.label(RichText::new(format!("{n} working Mines here: Modules cost x{} (never under half the row).", game.tables.in_situ.two_mines)).weak());
-            }
-        }
-        module_build_buttons(ui, session, game, cid, actions);
         if !col.in_orbit {
             cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::Colony(cid) }, "Build Army (Barracks)", actions);
         }
@@ -4572,14 +4557,15 @@ fn moments_corner(ui: &mut Ui, session: &Session, view: &mut ViewState) {
 
 // ------------------------------------------------------------------ Ticket #145: the Hab View
 
-/// The side of a Hab View tile, the gap between tiles, and the columns in a row.
+/// The side of a Module or build-slot tile and the gap between tiles. Ticket #162 (version 0.07.5)
+/// retired `HAB_COLS`, the Hab View window's five: a Region's card sets its own column count in
+/// `SLOT_COLS` and a Colony's in `MODULE_COLS`.
 const HAB_TILE: f32 = 84.0;
 const HAB_GAP: f32 = 10.0;
-const HAB_COLS: usize = 5;
 /// Room under a tile for its name.
 const HAB_LABEL: f32 = 18.0;
 
-/// What a Hab View tile shows.
+/// What a tile shows.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum TileState {
     Standing,
@@ -4719,100 +4705,93 @@ fn module_rules(heading: &str) -> String {
     format!("{heading}\nEnergy upkeep is paid at Income first; short of Energy, Modules go offline in order until the bill is met, and an offline one makes nothing and keeps its place.\nMothballed, it makes nothing and pays nothing until it is restarted.")
 }
 
-fn hab_view_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
-    let Some(cid) = view.hab_view else { return };
-    let Some(col) = game.colony(cid) else {
-        view.hab_view = None;
-        return;
+/// The columns of Module tiles on a Colony's or station's card: three, which fits the side panel at
+/// its default width where the Hab View's window took five.
+const MODULE_COLS: usize = 6;
+
+/// Ticket #162 (version 0.07.5): **a Colony's or a station's Modules as boxes on its card**, in the
+/// language the Region card's build slots already speak. The designer: *"Move the station module
+/// grid to its in the card like nation states and retire the window."* One tile per Module standing
+/// (dimmed while mothballed), one hatched tile per Module building, one dashed tile per free place
+/// under the cap, and the Archive on a row of its own outside the count. A click puts that Module's
+/// figures and its Mothball, Restart and Decommission buttons in the strip beneath; a click on a
+/// free tile puts the build buttons there, which is the only place a Module is ordered -- as a
+/// Facility that takes a slot is ordered only from a free box on a Region's card (#154).
+#[allow(clippy::too_many_arguments)]
+fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, cid: ColonyId, mine: bool, director: Option<Seat>, actions: &mut Vec<Action>) {
+    let Some(col) = game.colony(cid) else { return };
+    let (used, cap) = (game.module_slots_used(col), game.module_slots(col));
+    // The tiles, in the order the cap counts them: standing (the Archive apart), building, free.
+    let standing: Vec<usize> = (0..col.modules.len()).filter(|i| col.modules[*i].kind != ModuleKind::Archive).collect();
+    let building: Vec<(ModuleKind, u32)> = col.queue.iter().filter_map(|b| if let BuildItem::Module(k) = b.item { if k == ModuleKind::Archive { None } else { Some((k, b.due_turn + 1)) } } else { None }).collect();
+    let free = cap.saturating_sub(used) as usize;
+    let total = standing.len() + building.len() + free;
+    let rows = total.div_ceil(MODULE_COLS).max(1);
+    let archive = col.modules.iter().position(|m| m.kind == ModuleKind::Archive);
+    let archive_rows = if archive.is_some() { 1 } else { 0 };
+    let grid_size = egui::vec2(MODULE_COLS as f32 * HAB_TILE + (MODULE_COLS as f32 - 1.0) * HAB_GAP, (rows + archive_rows) as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP));
+    let (grid, _) = ui.allocate_exact_size(grid_size, egui::Sense::hover());
+    let tile_rect = |i: usize| {
+        let (c, r) = (i % MODULE_COLS, i / MODULE_COLS);
+        egui::Rect::from_min_size(grid.min + egui::vec2(c as f32 * (HAB_TILE + HAB_GAP), r as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP)), egui::vec2(HAB_TILE, HAB_TILE))
     };
-    let mine = !session.spectator && col.control.director() == Some(Seat(0));
-    let director = col.control.director();
-    let mut open = true;
-    let title = game.place_name(Place::Colony(cid));
-    egui::Window::new(format!("{title} - Hab View")).id(egui::Id::new("hab_view")).open(&mut open).resizable(false).show(ctx, |ui| {
-        let holder = director.map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".to_string());
-        let (used, cap) = (game.module_slots_used(col), game.module_slots(col));
-        ui.label(RichText::new(format!("{holder} · {} Colonists · {} Module slots free from the start and one more for every {} Colonist", col.colonists, game.tables.slots.base, game.tables.slots.per_colonist)).weak());
-        ui.add_space(4.0);
-        // The tiles, in the order the cap counts them: standing (the Archive apart), building, free.
-        let standing: Vec<usize> = (0..col.modules.len()).filter(|i| col.modules[*i].kind != ModuleKind::Archive).collect();
-        let building: Vec<(ModuleKind, u32)> = col.queue.iter().filter_map(|b| if let BuildItem::Module(k) = b.item { if k == ModuleKind::Archive { None } else { Some((k, b.due_turn + 1)) } } else { None }).collect();
-        let free = cap.saturating_sub(used) as usize;
-        let total = standing.len() + building.len() + free;
-        let rows = total.div_ceil(HAB_COLS).max(1);
-        let archive = col.modules.iter().position(|m| m.kind == ModuleKind::Archive);
-        let archive_rows = if archive.is_some() { 1 } else { 0 };
-        let grid_size = egui::vec2(HAB_COLS as f32 * HAB_TILE + (HAB_COLS as f32 - 1.0) * HAB_GAP, (rows + archive_rows) as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP));
-        let (grid, _) = ui.allocate_exact_size(grid_size, egui::Sense::hover());
-        let tile_rect = |i: usize| {
-            let (c, r) = (i % HAB_COLS, i / HAB_COLS);
-            egui::Rect::from_min_size(grid.min + egui::vec2(c as f32 * (HAB_TILE + HAB_GAP), r as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP)), egui::vec2(HAB_TILE, HAB_TILE))
-        };
-        let mut i = 0usize;
-        for mi in standing {
+    let mut i = 0usize;
+    for mi in standing {
+        let m = &col.modules[mi];
+        let state = if m.mothballed { TileState::Mothballed } else { TileState::Standing };
+        let selected = view.hab_tile == Some(HabTile::Module(mi));
+        // Ticket #150 (version 0.07.4): the tile's hover -- the figures its strip line carries and
+        // the Module rules, which the old rows never had.
+        let tip = module_rules(&module_line(game, col, cid, mi, director));
+        if hab_tile(ui, tile_rect(i), ui.id().with(("hab", mi)), Some(crate::icons::module_icon(m.kind)), m.kind.name(), state, selected, None, tip).clicked() {
+            view.hab_tile = Some(HabTile::Module(mi));
+        }
+        i += 1;
+    }
+    for (bi, (kind, ready)) in building.iter().enumerate() {
+        let tip = format!("{}: building, ready turn {ready}.", kind.name());
+        hab_tile(ui, tile_rect(i), ui.id().with(("hab-building", bi)), Some(crate::icons::module_icon(*kind)), kind.name(), TileState::Building, false, None, tip);
+        i += 1;
+    }
+    for fi in 0..free {
+        // One free place is as good as another, so the first stands for the click.
+        let selected = fi == 0 && view.hab_tile == Some(HabTile::Free);
+        let tip = format!("Room for another Module: click it to build here.\n{} places are free from the start and one more for every {} Colonist.", game.tables.slots.base, game.tables.slots.per_colonist);
+        if hab_tile(ui, tile_rect(i), ui.id().with(("hab-free", fi)), None, "", TileState::Free, selected, None, tip).clicked() {
+            view.hab_tile = Some(HabTile::Free);
+        }
+        i += 1;
+    }
+    if let Some(ai) = archive {
+        // The Archive stands apart: a row of its own, outside the count.
+        let rect = egui::Rect::from_min_size(grid.min + egui::vec2(0.0, rows as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP)), egui::vec2(HAB_TILE, HAB_TILE));
+        let state = if col.modules[ai].mothballed { TileState::Mothballed } else { TileState::Standing };
+        let tip = format!("{}\nOutside the Module count. Its Research is paid into the Archive fund at any pace; complete, it takes a great deal of Energy to keep running. Destroyed outright if this Colony changes hands; the fund is kept.", module_line(game, col, cid, ai, director));
+        if hab_tile(ui, rect, ui.id().with("hab-archive"), Some(crate::icons::module_icon(ModuleKind::Archive)), "The Archive", state, view.hab_tile == Some(HabTile::Module(ai)), None, tip).clicked() {
+            view.hab_tile = Some(HabTile::Module(ai));
+        }
+    }
+    ui.add_space(4.0);
+    // The strip: the clicked tile's figures and controls, or the build buttons for a free one.
+    match view.hab_tile {
+        Some(HabTile::Module(mi)) if mi < col.modules.len() => {
             let m = &col.modules[mi];
-            let state = if m.mothballed { TileState::Mothballed } else { TileState::Standing };
-            let selected = view.hab_tile == Some(HabTile::Module(mi));
-            // Ticket #150 (version 0.07.4): the tile's hover -- the figures its strip line carries
-            // and the Module rules, which the old rows never had.
-            let tip = module_rules(&module_line(game, col, cid, mi, director));
-            if hab_tile(ui, tile_rect(i), ui.id().with(("hab", mi)), Some(crate::icons::module_icon(m.kind)), m.kind.name(), state, selected, None, tip).clicked() {
-                view.hab_tile = Some(HabTile::Module(mi));
-            }
-            i += 1;
-        }
-        for (bi, (kind, ready)) in building.iter().enumerate() {
-            let tip = format!("{}: building, ready turn {ready}.", kind.name());
-            hab_tile(ui, tile_rect(i), ui.id().with(("hab-building", bi)), Some(crate::icons::module_icon(*kind)), kind.name(), TileState::Building, false, None, tip);
-            i += 1;
-        }
-        for fi in 0..free {
-            // One free slot is as good as another, so the first stands for the click.
-            let selected = fi == 0 && view.hab_tile == Some(HabTile::Free);
-            let tip = format!("Room for another Module: click it to build here.\n{} places are free from the start and one more for every {} Colonist.", game.tables.slots.base, game.tables.slots.per_colonist);
-            if hab_tile(ui, tile_rect(i), ui.id().with(("hab-free", fi)), None, "", TileState::Free, selected, None, tip).clicked() {
-                view.hab_tile = Some(HabTile::Free);
-            }
-            i += 1;
-        }
-        if let Some(ai) = archive {
-            // The Archive stands apart: a row of its own, outside the count.
-            let row = rows;
-            let rect = egui::Rect::from_min_size(grid.min + egui::vec2(0.0, row as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP)), egui::vec2(HAB_TILE, HAB_TILE));
-            let state = if col.modules[ai].mothballed { TileState::Mothballed } else { TileState::Standing };
-            let tip = format!("{}\nOutside the Module count. Its Research is paid into the Archive fund at any pace; complete, it takes a great deal of Energy to keep running. Destroyed outright if this Colony changes hands; the fund is kept.", module_line(game, col, cid, ai, director));
-            if hab_tile(ui, rect, ui.id().with("hab-archive"), Some(crate::icons::module_icon(ModuleKind::Archive)), "The Archive", state, view.hab_tile == Some(HabTile::Module(ai)), None, tip).clicked() {
-                view.hab_tile = Some(HabTile::Module(ai));
+            let colour = if m.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
+            figures_with_icons(ui, &module_line(game, col, cid, mi, director), 14.0, colour, &[]);
+            if mine && m.kind != ModuleKind::Archive {
+                change_row(ui, game, &session.pending, BuildingRef::Module(cid, mi), m.mothballed, m.change, actions);
             }
         }
-        ui.add_space(6.0);
-        ui.separator();
-        // The strip: the clicked tile's figures and controls, or the build buttons for a free one.
-        match view.hab_tile {
-            Some(HabTile::Module(mi)) if mi < col.modules.len() => {
-                let m = &col.modules[mi];
-                let colour = if m.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
-                figures_with_icons(ui, &module_line(game, col, cid, mi, director), 14.0, colour, &[]);
-                if mine && m.kind != ModuleKind::Archive {
-                    change_row(ui, game, &session.pending, BuildingRef::Module(cid, mi), m.mothballed, m.change, actions);
-                }
-            }
-            Some(HabTile::Free) => {
-                if mine {
-                    ui.label(RichText::new("Build here (hover a button for what it makes)").strong());
-                    module_build_buttons(ui, session, game, cid, actions);
-                } else {
-                    ui.label(RichText::new("Room for another Module.").weak());
-                }
-            }
-            _ => {
-                ui.label(RichText::new(format!("{used} of {cap} Module slots. Click a tile for its figures and controls, a free tile to build. Esc closes.")).weak());
-            }
+        Some(HabTile::Free) if mine => {
+            ui.label(RichText::new("Build here (hover a button for what it makes)").strong());
+            module_build_buttons(ui, session, game, cid, actions);
         }
-    });
-    if !open {
-        view.hab_view = None;
-        view.hab_tile = None;
+        Some(HabTile::Free) => {
+            ui.label(RichText::new("Room for another Module.").weak());
+        }
+        _ => {
+            ui.label(RichText::new("Click a tile for its figures and controls, a free tile to build.").weak());
+        }
     }
 }
 
@@ -4838,7 +4817,6 @@ fn module_build_buttons(ui: &mut Ui, session: &Session, game: &Game, cid: Colony
 }
 
 fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
-    hab_view_window(ctx, session, game, view, actions);
     if view.show_trade && !session.spectator {
         let mut open = true;
         egui::Window::new("Trading").open(&mut open).default_width(470.0).show(ctx, |ui| trading_window(ui, session, game, view, actions));

@@ -297,7 +297,6 @@ pub struct ViewState {
     /// Ticket #145 (version 0.07.3): the Hab View, open on one station or Colony, and the tile
     /// clicked in it -- a standing Module by index, or a free slot, whose strip offers the build
     /// buttons.
-    pub hab_view: Option<ColonyId>,
     pub hab_tile: Option<HabTile>,
     /// Ticket #146 (version 0.07.3): the slot box clicked on the selected Region's card.
     pub slot_box: Option<SlotBox>,
@@ -346,7 +345,6 @@ impl Default for ViewState {
             climate_reopen: false,
             show_victory: false,
             show_trade: false,
-            hab_view: None,
             hab_tile: None,
             slot_box: None,
             trade_amounts: [5, 10, 10, 10],
