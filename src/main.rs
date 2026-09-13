@@ -103,6 +103,7 @@ fn main() {
             tables,
             game: None,
             pending: Vec::new(),
+            tutorial: false,
             screen: Screen::Title,
             seed,
             mode,

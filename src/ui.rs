@@ -318,6 +318,10 @@ enum Action {
     GoTo(ReportPlace),
     ChooseFaction(FactionKind),
     NewGame(FactionKind, StateId),
+    /// Ticket #169 (version 0.07.5): the Tutorial button on the title screen.
+    StartTutorial,
+    /// Ticket #169: the reader pressed on through a tutorial note.
+    TutorialNoteRead,
     /// Ticket #64: Spectate, the fifth button on the choice screen.
     Spectate,
     /// Ticket #64: the Auto box beside End Turn.
@@ -426,9 +430,20 @@ pub fn toggle_climate(view: &mut ViewState) {
     view.climate_reopen = view.show_climate;
 }
 
+/// Ticket #169 (version 0.07.5): the tutorial's note for a turn, if it has one. The notes are
+/// words and nothing else, so they live in `assets/data/tutorial.toml` with every other sentence
+/// the game says, and the turn they open is a field on the note rather than their order in the file.
+fn tutorial_note(tables: &Tables, turn: u32) -> Option<&dying_earth_engine::TutorialNote> {
+    tables.tutorial.note.iter().find(|n| n.turn == turn)
+}
+
 /// Ticket #58: Event, then the turn's Moments one after another, then the Report.
 fn advance_popup(view: &mut ViewState, moments: usize) {
     view.popup = match view.popup {
+        // Ticket #169 (version 0.07.5): the tutorial's note comes first and hands on to whatever
+        // the turn would have opened with.
+        Popup::Tutorial if moments > 0 => Popup::Moment(0),
+        Popup::Tutorial => Popup::Report,
         Popup::Event if moments > 0 => Popup::Moment(0),
         Popup::Event => Popup::Report,
         Popup::Moment(i) if i + 1 < moments => Popup::Moment(i + 1),
@@ -887,7 +902,12 @@ pub fn draw(
                 }
                 view.selection = Selection::None;
                 let moments = session.game.as_ref().map(|g| view.moments_of(&session.tables, &g.report).len()).unwrap_or(0);
-                view.popup = if session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some() {
+                // Ticket #169 (version 0.07.5): a tutorial game opens its first turns with a note
+                // saying what the turn is for, before the Event, the Moments and the Report.
+                let has_note = session.tutorial && session.game.as_ref().map(|g| tutorial_note(&session.tables, g.turn).is_some()).unwrap_or(false);
+                view.popup = if has_note {
+                    Popup::Tutorial
+                } else if session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some() {
                     Popup::Event
                 } else if moments > 0 {
                     Popup::Moment(0)
@@ -953,6 +973,32 @@ pub fn draw(
                 let (lon, lat) = geo::state_lonlat(s);
                 view.yaw = geo::yaw_facing(lon, lat);
             }
+            // Ticket #169 (version 0.07.5): the Tutorial begins an ordinary game as the Custodians
+            // at their own home, and opens on its first note rather than on the Report.
+            Action::StartTutorial => {
+                let f = FactionKind::Custodians;
+                let s = session.tables.faction(f).home;
+                session.new_game(f, s);
+                session.tutorial = true;
+                *view = ViewState::default();
+                view.popup = Popup::Tutorial;
+                let (lon, lat) = geo::state_lonlat(s);
+                view.yaw = geo::yaw_facing(lon, lat);
+            }
+            // Ticket #169: on from a note to whatever the turn would have opened with. The tutorial
+            // ends itself once the last note has been read, and the game carries on as any other.
+            Action::TutorialNoteRead => {
+                let turn = session.game.as_ref().map(|g| g.turn).unwrap_or(0);
+                if session.tables.tutorial.note.iter().map(|n| n.turn).max() == Some(turn) {
+                    session.tutorial = false;
+                }
+                let moments = session.game.as_ref().map(|g| view.moments_of(&session.tables, &g.report).len()).unwrap_or(0);
+                if session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some() {
+                    view.popup = Popup::Event;
+                } else {
+                    advance_popup(&mut view, moments);
+                }
+            }
             Action::Save => {
                 session.save_now();
             }
@@ -1017,6 +1063,17 @@ fn title_screen(root: &mut Ui, session: &mut Session, actions: &mut Vec<Action>)
             ui.label(RichText::new("DYING EARTH").size(48.0).strong());
             ui.label(RichText::new("Colonize the solar system before ecological collapse overtakes Earth.").size(16.0));
             ui.add_space(40.0);
+            // Ticket #169 (version 0.07.5): the Tutorial, above New Game, where a new player looks
+            // first. It begins an ordinary game as the Custodians at their home, with a note at the
+            // head of each of its first turns; the Faction and the start are not asked for, since
+            // the whole point is to be playing within one click.
+            if ui
+                .add(egui::Button::new(RichText::new("Tutorial").size(22.0)).min_size(egui::vec2(220.0, 44.0)))
+                .on_hover_text("Play as the Custodians, with a note at the start of each of the first five turns saying what that turn is for. An ordinary game otherwise, and an ordinary game afterwards.")
+                .clicked()
+            {
+                actions.push(Action::StartTutorial);
+            }
             if ui.add(egui::Button::new(RichText::new("New Game").size(22.0)).min_size(egui::vec2(220.0, 44.0))).clicked() {
                 session.screen = Screen::ChooseFaction;
             }
@@ -5397,6 +5454,28 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 if ui.button("Close").clicked() {
                     let moments = view.moments_of(&session.tables, &game.report).len();
                     advance_popup(view, moments);
+                }
+            });
+        }
+        Popup::Tutorial => {
+            // Ticket #169 (version 0.07.5): the tutorial's note for this turn. Drawn as a Moment is
+            // drawn, because it is the same thing to the player: the turn stops for one short
+            // thought. Nothing is forced and nothing is checked -- the note says where to look.
+            let Some(note) = tutorial_note(&session.tables, game.turn).cloned() else {
+                advance_popup(view, view.moments_of(&session.tables, &game.report).len());
+                return;
+            };
+            let last = session.tables.tutorial.note.iter().map(|n| n.turn).max() == Some(game.turn);
+            egui::Modal::new("tutorial".into()).show(ctx, |ui| {
+                ui.set_width(460.0);
+                ui.label(RichText::new(&note.figure).size(26.0).strong().color(Color32::from_rgb(255, 220, 150)));
+                ui.label(RichText::new(&note.text).size(17.0));
+                if let Some(line) = &note.note {
+                    ui.label(RichText::new(line).size(15.0).color(Color32::from_rgb(200, 220, 255)));
+                }
+                ui.add_space(8.0);
+                if ui.button(if last { "Play on" } else { "Go on" }).clicked() {
+                    actions.push(Action::TutorialNoteRead);
                 }
             });
         }

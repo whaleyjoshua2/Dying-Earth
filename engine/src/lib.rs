@@ -22,7 +22,7 @@ pub mod turn;
 pub mod victory;
 
 pub use climate::{LastTurn, Projection};
-pub use data::{DataError, Tables};
+pub use data::{DataError, Tables, TutorialNote};
 pub use economy::Yield;
 pub use ephemeris::Position;
 pub use ids::*;

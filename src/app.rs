@@ -47,6 +47,9 @@ pub enum Selection {
 pub enum Popup {
     None,
     Event,
+    /// Ticket #169 (version 0.07.5): a tutorial game's note for this turn, shown before everything
+    /// else, since it says what the turn is for.
+    Tutorial,
     /// Ticket #58: the nth Moment of this turn, shown before the Report.
     Moment(usize),
     Report,
@@ -71,6 +74,11 @@ pub struct Session {
     pub last_error: Option<String>,
     /// Ticket #105 (version 0.07.0): why the last End Turn was refused, shown once in its own popup.
     pub refusal: Option<String>,
+    /// Ticket #169 (version 0.07.5): this game was begun from the title screen's Tutorial button,
+    /// so a note opens each of its first turns. The designer chose a **guided free game** over a
+    /// scripted one: nothing is forced and nothing is checked, the notes only say where to look.
+    /// It goes false once the last note has been shown, and the game carries on as any other.
+    pub tutorial: bool,
     /// Ticket #64: nobody is playing this game. All four seats are the computer's, the interface
     /// gives no orders, and every Faction's board is open to be read.
     pub spectator: bool,

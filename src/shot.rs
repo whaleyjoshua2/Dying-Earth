@@ -816,6 +816,16 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
                     Some(i) => Popup::Moment(i),
                     None => Popup::Report,
                 };
+                // `tutorial:<turn>` (a building aid, ticket #169): the tutorial's note for that turn
+                // stands in the Report picture's place, so a note can be photographed. A tutorial
+                // game is an ordinary game otherwise, so nothing else about the board changes.
+                if let Some(turn) = std::env::args().find_map(|a| a.strip_prefix("tutorial:").and_then(|v| v.parse::<u32>().ok())) {
+                    session.tutorial = true;
+                    if let Some(g) = session.game.as_mut() {
+                        g.turn = turn;
+                    }
+                    view.popup = Popup::Tutorial;
+                }
                 view.show_climate = false;
             }
             _ => {

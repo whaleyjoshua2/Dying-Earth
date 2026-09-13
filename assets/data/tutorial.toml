@@ -1,0 +1,47 @@
+# Ticket #169 (version 0.07.5): the tutorial. The designer asked for "a quick tutorial where the
+# player plays as the custodians", and chose the shape: not a scripted panel that ticks itself off,
+# but **a guided free game** -- an ordinary game, on an ordinary board, with a note at the head of
+# each of its first turns saying what that turn is for. Nothing is forced, nothing is checked, and
+# the player may do as they please; the notes only say where to look.
+#
+# It is played as the Custodians, at the designer's word. Worth knowing while writing these: over
+# eighty computer-played games the Custodian seat wins 3 in 20 and collapses the world in 11, the
+# worst record of the four. It is the seat that teaches the climate, which is why it was chosen, so
+# these notes should not promise an easy win.
+#
+# One note a turn, in order, `turn` counting from 1. When the last one has been shown the tutorial
+# is over and the game carries on as an ordinary game on the same board. Every word a player reads
+# lives here, so they can be rewritten without a build.
+#
+# `figure` is the big line at the top of the note, `text` the sentence under it, and `note` the
+# quieter line under that.
+
+[[note]]
+turn = 1
+figure = "You are the Custodians"
+text = "Colonise the solar system without wrecking Earth doing it. You need three turns running where the world puts out less carbon than it takes back, and twelve Colonists living off Earth."
+note = "Nothing here is forced. Look where these notes point, then play as you like; they stop after the fifth turn."
+
+[[note]]
+turn = 2
+figure = "Read the board"
+text = "Click a Region on the globe for its card. Every figure on it explains itself: rest the pointer on a number and the rule behind it appears."
+note = "The bar along the top carries the world's figures. Hover the ppm and the temperature for their histories."
+
+[[note]]
+turn = 3
+figure = "Build a Scrubber"
+text = "The Scrubber is yours alone. It takes no building slot, it pulls carbon back out of the air, and it calms the state it stands in. Its button is under the build boxes on a Region you hold."
+note = "It is the only thing in the game that visibly moves the climate. You will want several."
+
+[[note]]
+turn = 4
+figure = "Spend your Influence"
+text = "Influence is your claim on a place. Click a Region, then spend from the corner in the lower right; Max spends everything left. What you do not spend by the end of the turn is lost."
+note = "A neutral Region goes to the first Faction whose Standing reaches its threshold."
+
+[[note]]
+turn = 5
+figure = "Get off Earth"
+text = "Muster Emigrants in a Region with a Launch Site, then lift them straight to your station over Earth. Twelve living off Earth is half your Victory Condition."
+note = "That is the last of these notes. The game carries on from here; press Enter to end a turn, and watch the temperature."

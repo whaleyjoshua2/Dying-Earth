@@ -983,6 +983,26 @@ pub struct VentureCard {
     pub draw_return: f64,
 }
 
+/// Ticket #169 (version 0.07.5): one note at the head of one turn of a tutorial game.
+#[derive(Debug, Clone, Deserialize)]
+pub struct TutorialNote {
+    /// The turn this note opens, counting from 1.
+    pub turn: u32,
+    /// The big line at the top of the note.
+    pub figure: String,
+    /// The sentence under it.
+    pub text: String,
+    /// The quieter line under that.
+    pub note: Option<String>,
+}
+
+/// Ticket #169: the tutorial's notes, in the order they are shown.
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct TutorialTable {
+    #[serde(default)]
+    pub note: Vec<TutorialNote>,
+}
+
 /// Every table, loaded and checked.
 #[derive(Debug, Clone)]
 pub struct Tables {
@@ -1046,6 +1066,10 @@ pub struct Tables {
     pub ai: AiTable,
     /// Ticket #58: every sentence the Report says (`report.toml`).
     pub report: crate::report::ReportTable,
+    /// Ticket #169 (version 0.07.5): the tutorial's notes (`tutorial.toml`), one at the head of each
+    /// of a tutorial game's first turns. They are words and nothing else -- no rule reads them -- but
+    /// they live here with every other sentence the game says, so they can be rewritten without a build.
+    pub tutorial: TutorialTable,
 }
 
 fn read<T: for<'de> Deserialize<'de>>(dir: &Path, file: &str) -> Result<T, DataError> {
@@ -1082,6 +1106,7 @@ impl Tables {
         let ai: AiTable = read(dir, "ai.toml")?;
         let ephemeris: EphemerisFile = read(dir, "ephemeris.toml")?;
         let report: crate::report::ReportTable = read(dir, "report.toml")?;
+        let tutorial: TutorialTable = read(dir, "tutorial.toml")?;
         let tables = Tables {
             sibling_transit: (bodies.sibling_turns, bodies.sibling_fuel),
             station_materials: bodies.station_materials,
@@ -1123,6 +1148,7 @@ impl Tables {
             victory,
             ai,
             report,
+            tutorial,
         };
         tables.validate()?;
         Ok(tables)

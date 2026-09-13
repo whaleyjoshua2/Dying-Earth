@@ -225,3 +225,36 @@ already on the Credits screen, so it gains four rows and no new name:
 is exactly a statement of whose, so the Faction card picks the tint itself, with the reason written
 where the bending happens. The symbols appear on the Faction screen and nowhere else: the roster,
 the map labels, the Report and the Victory screen keep their Faction colours and names.
+
+## A quick tutorial, played as the Custodians
+
+Ticket [#169](https://github.com/whaleyjoshua2/Dying-Earth/issues/169). The designer's line: *"Let's
+build a quick tutorial where the player plays as the custodians."* The game has never had one: the
+standing design has said *no tutorial beyond the first Report* since the first playable.
+
+**The designer chose the shape**, over the scripted step panel the ticket recommended: **a guided
+free game**. Nothing is forced and nothing is checked. It is an ordinary game on an ordinary board,
+and a note at the head of each of its first five turns says what that turn is for.
+
+![The Tutorial button, above New Game, where a new player looks first](tutorial-button-on-the-title-screen.png)
+
+![Turn one: what the Custodians are for, and that nothing here is forced](tutorial-note-turn-one.png)
+
+![Turn three: the Scrubber, the one tool that visibly moves the climate](tutorial-note-the-scrubber.png)
+
+![Turn five: the last note says so, and the game carries on](tutorial-note-the-last-one.png)
+
+The five notes are **read the board**, **build a Scrubber**, **spend your Influence** and **get off
+Earth**, after the first one which says what the Faction is for. The button on the title screen
+starts the game in one click -- as the Custodians at their own home, the Faction and the start not
+asked for -- and the last note ends the tutorial, after which it is an ordinary game on the same
+board with nothing thrown away.
+
+Every word lives in **`assets/data/tutorial.toml`** with every other sentence the game says, so the
+notes can be rewritten without a build, and the turn a note opens is a field on the note rather than
+its place in the file. A note is drawn the way a Moment is drawn, because it is the same thing to
+the player: the turn stops for one short thought. A `tutorial:<turn>` picture aid photographs one.
+
+**Written knowing the seat is the hard one.** Over eighty computer-played games the Custodian seat
+wins 3 in 20 and collapses the world in 11, the worst record of the four, which the designer chose
+anyway: it is the seat that teaches the climate. The notes do not promise an easy win.
