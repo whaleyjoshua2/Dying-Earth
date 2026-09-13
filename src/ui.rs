@@ -2941,16 +2941,13 @@ fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make
 fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewState, target: Place, controls: bool, actions: &mut Vec<Action>) {
     // Ticket #64: a spectator reads every Faction's Standing here and spends nothing.
     if session.spectator {
-        standings_row(ui, game, session, target);
-        ui.label(format!(
-            "Threshold {}; a place already held changes hands only at the holder's Standing plus the challenge margin of {}.",
-            game.influence_threshold(target),
-            game.tables.influence.challenge_margin
-        ));
-        match game.place_control(target).controller() {
-            Some(c) => ui.label(RichText::new(format!("Held by the {}.", game.seat_name(c))).weak()),
-            None => ui.label(RichText::new("Neutral. The first Standing at the threshold takes it; Standings decay 2 a turn when nothing is spent.").weak()),
+        let threshold = game.influence_threshold(target);
+        let margin = game.tables.influence.challenge_margin;
+        let explain = match game.place_control(target).controller() {
+            Some(c) => format!("Held by the {}. A rival needs their Standing plus {margin}, and at least the threshold. Decays {} a turn for the holder.", game.seat_name(c), game.tables.influence.decay_controlled),
+            None => format!("First to {threshold} takes it. Decays {} a turn.", game.tables.influence.decay),
         };
+        standings_row(ui, game, session, target, threshold, explain);
         return;
     }
     if controls {
@@ -2973,8 +2970,20 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
     }
     // Ticket #53: the threshold shown is the player's own, since Blame raises it seat by seat.
     let threshold = game.influence_threshold_for(Seat(0), target);
-    standings_row(ui, game, session, target);
-    ui.label(format!("Threshold {}; a place already held changes hands only at the holder's Standing plus the challenge margin of {}.", threshold, game.tables.influence.challenge_margin));
+    // Ticket #137 (version 0.07.3): the two sentences that explained the threshold are a hover on
+    // the Standings line, one sentence and a number per case. The designer: *"replace with mouse
+    // over that relays the same information in far fewer words."*
+    let margin = game.tables.influence.challenge_margin;
+    let explain = match game.place_control(target).controller() {
+        Some(Seat(0)) => format!(
+            "A rival needs {}: your Standing plus {margin}, and at least the threshold. Decays {} a turn.",
+            game.influence_needed_for(Seat(0), target),
+            game.tables.influence.decay_controlled
+        ),
+        Some(_) => format!("You need {}: their Standing plus {margin}, and at least your threshold. Decays {} a turn.", game.influence_needed_for(Seat(0), target), game.tables.influence.decay),
+        None => format!("First to {threshold} takes it. Decays {} a turn.", game.tables.influence.decay),
+    };
+    standings_row(ui, game, session, target, threshold, explain);
     // Ticket #53: on every Region the player does not hold, what its Blame is costing it here.
     let blame_mult = game.blame_threshold_multiplier_on(Seat(0), target);
     if blame_mult > 1.0 {
@@ -2989,28 +2998,15 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
             .color(Color32::from_rgb(255, 170, 120)),
         );
     }
-    match game.place_control(target).controller() {
-        Some(c) => {
-            // Ticket #60: the engine's own figure, which the Resolution and the AI read too. It
-            // was `threshold.max(standing + 1)` here, which ignored the challenge margin ticket #41
-            // put on a held place, so the card printed a figure the Resolution would not honour.
-            let need = game.influence_needed_for(Seat(0), target);
-            if c == Seat(0) {
-                ui.label(RichText::new(format!("Yours. A rival takes it with a standing above yours and at least the threshold: {need} now. Spending here raises your standing; it decays 1 a turn.")).weak());
-            } else {
-                ui.label(RichText::new(format!("Theirs. You take it with a standing above theirs and at least the threshold: {need} now.")).weak());
-            }
-        }
-        None => {
-            ui.label(RichText::new(format!("Neutral. The first standing at the threshold ({threshold}) takes it; standings decay 2 a turn when nothing is spent.")).weak());
-        }
-    }
 }
 
 /// Ticket #50: four seats, so the Standings are chips in Faction colours, and only where there is
-/// a Standing to show. Ticket #64: the spectator's cards carry the same row.
-fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place) {
-    ui.horizontal_wrapped(|ui| {
+/// a Standing to show. Ticket #64: the spectator's cards carry the same row. Ticket #137 (version
+/// 0.07.3): the row ends with `· Threshold N` and carries the whole explanation of what it takes to
+/// hold or take the place as a hover on the line -- the figure (ticket #60: the engine's own, which
+/// the Resolution and the AI read too) stays in view, and the reasoning is one hover away.
+fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, threshold: i64, explain: String) {
+    let row = ui.horizontal_wrapped(|ui| {
         // Ticket #116 (version 0.07.1): what a Standing IS, which the row shows four of and never
         // explains. The decay figures are the reason a Standing left alone slides, and the reason
         // holding a place costs less than taking one.
@@ -3033,7 +3029,10 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place) {
         if !any {
             ui.label(RichText::new("nobody has any yet").weak());
         }
+        ui.label(RichText::new("·").weak());
+        ui.label(format!("Threshold {threshold}"));
     });
+    rule_tip(row.response, explain);
 }
 
 fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, sid: StateId, actions: &mut Vec<Action>) {

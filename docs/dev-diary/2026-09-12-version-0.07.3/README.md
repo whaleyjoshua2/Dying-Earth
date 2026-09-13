@@ -231,6 +231,28 @@ the resting label keeps its count and the list is one hover away. The `hover:<bo
 
 Clippy clean with `-D warnings`, 253 tests passing.
 
+## The Nation card's Influence paragraph becomes a hover
+
+Ticket [#137](https://github.com/whaleyjoshua2/Dying-Earth/issues/137). The designer's line: *"remove
+this language from the nation cards … replace with mouse over that relays the same information in
+far fewer words."* Decided in one round: one line stays, the explanation is a hover on the whole
+line, one sentence and a number per case, and the Colony's card follows.
+
+![The threshold hover on China's card](threshold-hover-on-the-nation-card.png)
+
+**Two sentences became one line and a hover.** `Threshold 50; a place already held changes hands only
+at the holder's Standing plus the challenge margin of 20.` and `Yours. A rival takes it with a
+standing above yours and at least the threshold: 70 now. Spending here raises your standing; it
+decays 1 a turn.` are now `Standings: Custodians 50 · Threshold 50`, and under the pointer: *A rival
+needs 70: your Standing plus 20, and at least the threshold. Decays 1 a turn.* A Region held by a
+rival says *You need 70: their Standing plus 20, and at least your threshold. Decays 2 a turn*, and a
+neutral one *First to 50 takes it. Decays 2 a turn*. Every figure in the hover is the engine's own,
+as before; the red within-reach warning and the Blame note are untouched. The spectator's cards
+carry the same line with a hover that names the holder. A Colony's card goes through the same
+function, so it follows without a second change.
+
+Clippy clean with `-D warnings`, 253 tests passing.
+
 ## Building art: candidate sheets (research, ticket #144)
 
 Sixty-two game-icons.net candidates for the twenty-two building kinds, drawn with the game's own
