@@ -85,6 +85,53 @@ fn emissions_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
     painter.text(Pos2::new(plot.right() + 3.0, y(end)), egui::Align2::LEFT_CENTER, format!("{end:+.1}"), FontId::proportional(11.0), NET);
 }
 
+/// Ticket #158 (version 0.07.4): **the Temperature history**, the Emissions history's sibling on
+/// the top bar's Temperature figure: the Temperature turn by turn on the same base-to-Collapse
+/// scale the Climate Panel's bar runs, so the line never rescales as it climbs; the Breaks'
+/// Temperatures as faint lines across it and the Breaks fired ticked red on the turn axis; the last
+/// figure at the line's end. The heading-to figure is a projection, not a record, and is not drawn.
+fn temperature_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
+    const LINE: Color32 = Color32::from_rgb(235, 235, 240);
+    const BREAK: Color32 = Color32::from_rgb(236, 88, 76);
+    let h = &game.climate.history;
+    let c = &game.tables.climate;
+    ui.label(RichText::new("Temperature by turn, from the base to the Collapse line; red is a Break").weak().small());
+    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    let painter = ui.painter();
+    painter.rect_filled(rect, 3.0, Color32::from_rgb(38, 38, 44));
+    if h.is_empty() {
+        painter.text(rect.center(), egui::Align2::CENTER_CENTER, "No turn resolved yet.", FontId::proportional(12.0), Color32::from_gray(150));
+        return;
+    }
+    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(6.0, 6.0), rect.max - egui::vec2(44.0, 16.0));
+    let (lo, hi) = (c.base_temperature, c.collapse_line.max(h.iter().map(|r| r.temperature).fold(c.collapse_line, f64::max)));
+    let (first, last) = (h[0].turn, h[h.len() - 1].turn);
+    let span = (last.max(first + 1) - first) as f32;
+    let x = |turn: u32| plot.left() + (turn - first) as f32 / span * plot.width();
+    let y = |v: f64| plot.bottom() - (((v - lo) / (hi - lo)).clamp(0.0, 1.0) as f32) * plot.height();
+    for b in &c.breaks {
+        painter.line_segment([Pos2::new(plot.left(), y(b.temperature)), Pos2::new(plot.right(), y(b.temperature))], egui::Stroke::new(1.0, BREAK.gamma_multiply(0.35)));
+    }
+    painter.line_segment([Pos2::new(plot.left(), y(c.collapse_line)), Pos2::new(plot.right(), y(c.collapse_line))], egui::Stroke::new(1.0, Color32::from_gray(150)));
+    painter.text(Pos2::new(plot.right() + 3.0, y(c.collapse_line)), egui::Align2::LEFT_CENTER, format!("{:+.1}", c.collapse_line), FontId::proportional(10.0), Color32::from_gray(150));
+    let points: Vec<Pos2> = h.iter().map(|r| Pos2::new(x(r.turn), y(r.temperature))).collect();
+    if points.len() == 1 {
+        painter.circle_filled(points[0], 3.0, LINE);
+    } else {
+        painter.add(egui::Shape::line(points, egui::Stroke::new(2.0, LINE)));
+    }
+    for r in h.iter().filter(|r| !r.breaks.is_empty()) {
+        let bx = x(r.turn);
+        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 9.0)], egui::Stroke::new(2.0, BREAK));
+    }
+    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, format!("turn {first}"), FontId::proportional(10.0), Color32::from_gray(150));
+    if last > first {
+        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, format!("turn {last}"), FontId::proportional(10.0), Color32::from_gray(150));
+    }
+    let end = h[h.len() - 1].temperature;
+    painter.text(Pos2::new(plot.right() + 3.0, y(end)), egui::Align2::LEFT_CENTER, format!("{end:+.1}"), FontId::proportional(11.0), LINE);
+}
+
 fn temperature_bar(ui: &mut Ui, game: &Game) {
     const BREAK: Color32 = Color32::from_rgb(236, 88, 76);
     const SEA: Color32 = Color32::from_rgb(96, 156, 236);
@@ -1588,7 +1635,14 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             // named by its first alone, so turn 2 reads March 2030.
             ui.label(RichText::new(format!("Turn {} / {}, {}", game.turn, game.tables.victory.turns, game.date_text())).strong());
             ui.separator();
-            ui.label(format!("{:+.1} C, heading to {:+.1}", game.climate.temperature, game.target_temperature()));
+            // Ticket #158 (version 0.07.4): the Temperature figure's hover draws its history.
+            let temp = ui.label(format!("{:+.1} C, heading to {:+.1}", game.climate.temperature, game.target_temperature()));
+            rule_tip_ui(temp, "Temperature history", |ui| {
+                ui.set_max_width(300.0);
+                ui.label(RichText::new("Temperature history").strong());
+                ui.label("Where the heat stands, and where the CO2 Stock already in the air is taking it. The Climate Panel's bar shows what it has crossed and what is next.");
+                temperature_history(ui, game, egui::vec2(280.0, 96.0));
+            });
             ui.separator();
             // Ticket #112 (version 0.07.1): net Emissions join the bar. Until now the only way to
             // learn whether the world went over or under the Natural Sink this turn was to open the

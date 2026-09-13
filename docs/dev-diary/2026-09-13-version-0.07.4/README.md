@@ -95,3 +95,14 @@ lets the `tip:` aid photograph a hover that draws.
 
 First try had the zero line's `0` label colliding with `turn 13` while nothing had gone below zero;
 the label now appears only when the zero line stands clear of the turn axis.
+
+## A Temperature history on the top bar's hover
+
+Ticket [#158](https://github.com/whaleyjoshua2/Dying-Earth/issues/158), graduated from the map's fog
+when the designer said *yes, the same for Temperature* on ticket #153. Built as the ticket's
+recommendation for the designer to react to: the Temperature turn by turn on the same
+base-to-Collapse scale the Climate Panel's bar runs, the Breaks' Temperatures as faint red lines
+across it, the Collapse line labelled, the Breaks fired ticked red on the turn axis, the last figure
+at the line's end; the hover only. The heading-to figure is a projection and is not drawn.
+
+![The Temperature figure's hover at turn 13, from `turns:12 tip:Temperature`](temperature-history-hover.png)
