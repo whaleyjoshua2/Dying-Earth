@@ -88,7 +88,13 @@ impl Game {
         // Ticket #55: the Breaks, read off the Temperature the phase has just settled, before the
         // scheduled Sea Level check, so an Ice Sheets threshold and a scheduled one can both land
         // in the same phase.
+        let fired_before = self.climate.breaks_fired.clone();
         self.break_check();
+        // Ticket #153 (version 0.07.4): the turn goes into the Emissions history, with the Breaks
+        // it fired, once the phase has settled what it emitted and what the heat did.
+        let breaks = self.climate.breaks_fired.iter().zip(&fired_before).enumerate().filter(|(_, (now, before))| **now && !**before).map(|(i, _)| i).collect();
+        let record = EmissionsRecord { turn: self.turn, breakdown, co2: self.climate.co2, temperature: self.climate.temperature, breaks };
+        self.climate.history.push(record);
         // Ticket #56: the ice opens off the Temperature the phase has just settled, before the sea
         // takes its slots, so one Report reads the whole of what the heat did this turn.
         self.antarctica_check();

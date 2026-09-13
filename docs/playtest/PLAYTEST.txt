@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.07.3
+DYING EARTH - playtest build, version 0.07.4
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,48 +16,36 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-   (Windows only again; there is no Linux zip for 0.07.3.)
+   (Windows only again; there is no Linux zip for 0.07.4.)
 
-WHAT CHANGED SINCE 0.07.2
+WHAT CHANGED SINCE 0.07.3
 -------------------------
-This one gives places depth, counts people in real numbers, and moves four balance
-numbers. For the first time every one of the four sides wins games against the computer.
+Nothing in the rules. This one is seven fixes to how the last version looked and read,
+each asked for by the designer after playing it, plus one that grew out of them.
 
-- THE HAB VIEW. Click a station or colony in the roster, or press M with one selected,
-  and a window shows its modules as a grid of tiles with pictures: a dimmed tile is
-  mothballed, a hatched one is still building, a dashed empty one is room to build.
-  Click a tile for its figures and its Mothball / Decommission buttons; click an empty
-  tile to build there. Esc closes it.
-- BUILD SLOTS ARE BOXES on a region's card, drawn the same way. Coastal boxes have a
-  blue edge, inland ones grey. A slot the sea has taken sits three quarters under water
-  with the drowned building showing through. Click a box for its figures and buttons,
-  or an empty box to build.
-- ORBITS ARE DRAWN. On a planet or moon's surface view every station slot is a ring
-  round the globe, dashed while empty, with the station's picture on it once one is
-  built. On the Solar System Map each world has one orbit with its stations on it, and
-  pointing at a world lists its slots by name and who holds them.
-- POPULATION IN REAL NUMBERS. A region's card says "Region population 288.0 (1.44B)".
-  It is the whole region's people, not the main country's alone. The unit is five
-  million, and each Emigrant you muster is one of them. The top bar's right end counts
-  Earth and space: "Earth 7.86B - Space 20M".
-- EMIGRANTS CAN LIFT STRAIGHT TO YOUR STATION. A region with a Launch Site can send its
-  waiting Emigrants to a station of yours over Earth, as many as it has room for, with
-  no colony ship. It counts as a launch, so it pollutes.
-- MAX REPLACES DEFENCE. The button in the bottom-right corner spends everything you have
-  left on the selected place. "Every turn" makes it a standing order on that place until
-  you untick it, cancel the order it places, or lose the place. The computer no longer
-  defends by the old rule either.
-- EVERY REGION PAYS DUCATS NOW. The rich pay double what they did (the United States 13,
-  the European Union 12, China 10 a turn) and no region pays nothing.
-- SCIENCE YIELDS. The fourth number on a colony slot is now a Research yield that
-  multiplies an Observatory there (Mars and Venus 1.3, the Moon 1.0, the small moons
-  0.8), and a habitat holds eight people everywhere.
-- TECH PRICES: 15, 30 and 45 by rung, Coastal Engineering 12.
-- THE TECH TREE READS LEFT TO RIGHT, one row per branch.
-- SMALLER THINGS: the start screen's cards use resource pictures; the country card's
-  influence paragraph is one line with a hover; a building's Mothball and Decommission
-  buttons sit on its own line; the station picture is new (two solar panels on a bar);
-  the army's shield sits inside its roster button like the other pictures.
+- HOVER A BUILDING. Point at any box on a country's card or any tile in the Hab View and
+  it says what it makes, what it costs to run, and the rules behind those numbers. An
+  empty box says it is free, a hatched one says when it is ready, a drowned one says
+  what took it.
+- ORBITS TURN WITH THE GLOBE. On a planet or moon's surface view the station rings now
+  sit on their own tilted planes, cross each other, and turn when you drag the globe.
+  A station slides slowly round its ring (a lap every minute and a half) and you can
+  click it as it goes. An empty slot's ring is a plain grey line now.
+- THE START GLOBE IS SLOWER: one turn every 75 seconds instead of 25, and clicking a
+  region stops it.
+- POLLUTION HISTORY. Hover the ppm number in the top bar for a graph of every turn so
+  far: what the world put out, what the sink and the scrubbers took back, and the net.
+  Red ticks are the turns the world changed for good. The same graph sits on the
+  Climate Panel. Hover the temperature beside it for its own graph.
+- THE COUNTRY CARD IS SHORTER. The long list of build buttons at the bottom is gone;
+  build by clicking an empty box among the slots. Scrubbers and the Sea Wall, which
+  take no slot, sit just under the boxes with their own buttons. The header at the
+  bottom now says Orders.
+- VENUS AND EARTH NO LONGER OVERLAP on the Solar System Map; Venus's orbit is drawn
+  nearer the sun and Earth's further out, and Venus's and the moons' names hang below
+  them so no two labels meet.
+- THE TECH TREE lines up: Coastal Engineering sits under Efficient Grids instead of
+  beside it, so every column is one box wide.
 
 HOW TO PLAY, IN ONE MINUTE
 --------------------------
@@ -95,9 +83,10 @@ WHAT WE WANT TO KNOW
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- THE HAB VIEW AND THE SLOT BOXES: did you find them? Did the pictures tell you what
-  each building was without reading the name? Did the water read as water?
-- THE ORBITS: could you tell a built station from an empty slot on the globe?
+- THE HOVERS: did pointing at a box or a tile tell you what you wanted to know?
+- THE ORBITS: could you click a moving station? Did the crossing rings read as orbits,
+  or as clutter?
+- THE HISTORY GRAPHS: did you find them? Did they change what you did next?
 - THE POPULATION NUMBERS: did "Region population" make sense? Did it bother you that
   Nigeria's region says 1.14 billion (it is all of sub-Saharan Africa)?
 - THE LIFT TO A STATION: did you use it, and did it feel too easy?
@@ -118,6 +107,8 @@ KNOWN ROUGH EDGES
   the numbers are all suspect.
 - THE HAB VIEW'S AND SLOT BOXES' PICTURES ARE FIRST PICKS from a free icon set and may
   change; say which ones misled you.
+- A station ring can be edge-on for a moment as you turn the globe; it comes back as
+  you keep turning.
 - The list of station slots on the Solar System Map appears only while you point at
   the world, because open all the time it covered the Moon.
 - A region's name at the very edge of the globe on the start screen can sit half under

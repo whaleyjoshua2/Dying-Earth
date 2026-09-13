@@ -69,7 +69,7 @@ One of a fixed number of places on a Body where a Colony can be founded, shared 
 _Avoid_: site, plot, capacity
 
 **Orbital Slot**:
-One of a fixed number of places in orbit around a Body where a Space Station can be built, shared by all Factions, each with a station's name ready for it.
+One of a fixed number of places in orbit around a Body where a Space Station can be built, shared by all Factions, each with a station's name ready for it. Since version 0.07.3 each is drawn as its own ring round the globe on the Body Surface Map; since version 0.07.4 the rings lie in the globe's own frame on planes of their own, leaning thirty to sixty degrees from the equator with a heading each, so they turn with a drag and cross rather than stack, an empty slot's ring solid grey, and a station's glyph travels its ring, one revolution in about ninety seconds, its name riding beneath it, clickable as it goes.
 _Avoid_: dock, berth, orbit
 
 **Space Station**:
@@ -101,7 +101,7 @@ Earth's Body Surface Map, divided into Regions, where Earth-side building, Army 
 _Avoid_: home view, globe view, terrestrial map
 
 **Solar System Map**:
-The 3D view of the solar system, where Bodies, Ship stacks, transits and Orbital Control are seen and acted on. Transits, launches, Ship Stances and attacks are ordered here and nowhere else. Since version 0.05 the sky it draws is the real one: Earth and Mars stand on their rings where they truly stand in the month the turn is, so the distance between them, and the Launch Window, are things the player can see.
+The 3D view of the solar system, where Bodies, Ship stacks, transits and Orbital Control are seen and acted on. Transits, launches, Ship Stances and attacks are ordered here and nowhere else. Since version 0.05 the sky it draws is the real one: Earth and Mars stand on their rings where they truly stand in the month the turn is, so the distance between them, and the Launch Window, are things the player can see. The rings are drawn to be legible rather than to scale; since version 0.07.4 Venus's ring is at 1.7 and Earth's at 3.8 (Mars at 6.0), spaced so the two inner planets and their station rings never overlap at a conjunction, and a label stands above a planet but hangs below Venus and the satellites so no two ever meet.
 _Avoid_: space view, orbital map, star map
 
 **Launch Window**:
@@ -125,7 +125,7 @@ An advance on the Tech Tree that changes an output, a capacity, an upkeep, a Shi
 _Avoid_: research, upgrade, invention
 
 **Tech Tree**:
-The single tree of Techs shared by all Factions, seventeen of them since version 0.06.0, in five branches: Industry, Propulsion, Off-world Living, Extraction, Society. A branch may hold more than one Tech on a rung. One Tech is under research at a time, worldwide. Four of the seventeen are Victory gates, one per Faction on rung 3: each is a Tech for everyone, and its Faction cannot win until it stands.
+The single tree of Techs shared by all Factions, seventeen of them since version 0.06.0, in five branches: Industry, Propulsion, Off-world Living, Extraction, Society. A branch may hold more than one Tech on a rung; since version 0.07.4 two such Techs stack in a taller branch row on every rung but the last, where they sit side by side, so every column is one box wide. One Tech is under research at a time, worldwide. Four of the seventeen are Victory gates, one per Faction on rung 3: each is a Tech for everyone, and its Faction cannot win until it stands.
 _Avoid_: per-faction tree, research tree
 
 **Research Lead**:
@@ -149,7 +149,7 @@ Retired in version 0.07.3; see Max. It was the Command Cluster button, from vers
 _Avoid_: using it for anything Max now does; auto-spend, garrison, fortify, budget split
 
 **Hab View**:
-The window, since version 0.07.3, that shows a Space Station's or Colony's Modules as a grid of tiles: one tile per Module with its picture, dimmed while mothballed and hatched while building, a dashed empty tile for every free place under the Module cap, and the Archive on a tile of its own outside the count. Clicking a tile shows that Module's figures and its Mothball, Restart and Decommission buttons beneath the grid; clicking a free tile offers the build buttons there. Opened from the card's Modules button, from the Roster row, or with M; closed with Esc. Named after the habitat screen of Terra Invicta, the designer's reference.
+The window, since version 0.07.3, that shows a Space Station's or Colony's Modules as a grid of tiles: one tile per Module with its picture, dimmed while mothballed and hatched while building, a dashed empty tile for every free place under the Module cap, and the Archive on a tile of its own outside the count. Clicking a tile shows that Module's figures and its Mothball, Restart and Decommission buttons beneath the grid; clicking a free tile offers the build buttons there. Since version 0.07.4 a tile says its figures and the Module rules on hover, a free tile the room and the cap rule, a building tile the turn it is ready. Opened from the card's Modules button, from the Roster row, or with M; closed with Esc. Named after the habitat screen of Terra Invicta, the designer's reference.
 _Avoid_: module window, colony screen, base view, habitat panel
 
 **Figure**:
@@ -331,7 +331,7 @@ How dirty a Region's industry is before any Facility is built there.
 _Avoid_: pollution rating, carbon score
 
 **Build Slot**:
-One of the places a Facility occupies in a Region. A state has Size + Industry Level + three of them, and each is either a **Coastal Slot** or an **Inland Slot**: the sea takes only the first, and every slot a raise of the Industry Level adds is one of the second. Its start Facilities stand on the coast first; a later build fills an inland slot while one is free. Since version 0.07.3 the card draws them as boxes in the Hab View's language -- a picture on a dark box, dimmed while mothballed, hatched while building, dashed while free, a coastal box outlined in blue and an inland one in grey -- and a slot the sea has taken stands under water, three quarters flooded with the drowned building dimmed beneath.
+One of the places a Facility occupies in a Region. A state has Size + Industry Level + three of them, and each is either a **Coastal Slot** or an **Inland Slot**: the sea takes only the first, and every slot a raise of the Industry Level adds is one of the second. Its start Facilities stand on the coast first; a later build fills an inland slot while one is free. Since version 0.07.3 the card draws them as boxes in the Hab View's language -- a picture on a dark box, dimmed while mothballed, hatched while building, dashed while free, a coastal box outlined in blue and an inland one in grey -- and a slot the sea has taken stands under water, three quarters flooded with the drowned building dimmed beneath. Since version 0.07.4 every box says on hover what its row says -- the kind, its figures, and the upkeep, Emissions and coastal rules -- and a free, building or flooded box says what it is; the Scrubber and the Sea Wall, which take no slot, stand beneath the boxes with their build buttons, and a Facility that takes a slot is built by clicking a free box and nowhere else.
 _Avoid_: building slot, plot, space, capacity
 
 **Coastal Slot**:
@@ -514,6 +514,10 @@ _Avoid_: heat, warming percentage
 The CO2-equivalent a source adds to the CO2 Stock in a turn. Every source has its own figure and the Climate Panel shows them one by one before the sum; methane-heavy sources carry a heavier weight. Since version 0.05 a Region's people emit more the more built-up the state is, and a Leapfrog lowers that state's figure for good.
 _Avoid_: output, carbon, footprint
 
+**Emissions history**:
+Since version 0.07.4, the record the engine keeps of every Climate phase -- the breakdown by source, the CO2 Stock, the Temperature and the Breaks that fired -- saved with the game, and the chart drawn from it: what the world emitted, what the Natural Sink and the Scrubbers removed, and the net between them, turn by turn against a zero line, the Breaks ticked red on the turn axis. Drawn small on the top bar's Emissions hover and wide on the Climate Panel under the by-source list. Its sibling, the **Temperature history**, draws the Temperature turn by turn on the top bar's Temperature hover, on the data's own range with the Breaks' Temperatures as faint lines.
+_Avoid_: emissions total, emissions log, graph, chart (as names)
+
 **Natural Sink**:
 The amount of CO2 the oceans and forests remove from the CO2 Stock every turn. Net emissions below it stabilize the stock. Every Scrubber standing and online enlarges it while it stands, and since version 0.05 a Break can weaken it for good.
 _Avoid_: absorption, offset, carbon capture
@@ -539,5 +543,5 @@ The one Temperature at which the game ends with nobody winning, unless a Faction
 _Avoid_: threshold, tipping point, game over temperature
 
 **Climate Panel**:
-The screen showing the CO2 Stock, the Temperature and where it is heading, a Temperature bar notched with every Break, every Sea Level threshold and Antarctica's opening, this turn's Emissions by source, the sink and the net, the penalties in force, the Committed Warming, the Last Turn, and a projection to the last turn.
+The screen showing the CO2 Stock, the Temperature and where it is heading, a Temperature bar notched with every Break, every Sea Level threshold and Antarctica's opening, this turn's Emissions by source, the sink and the net, since version 0.07.4 the Emissions history beneath them, the penalties in force, the Committed Warming, the Last Turn, and a projection to the last turn.
 _Avoid_: warming meter, climate HUD

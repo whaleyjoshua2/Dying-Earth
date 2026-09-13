@@ -77,10 +77,12 @@ pub fn setup_scene(
 
     // --- Solar System Map
     let flat_ring = Transform::from_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2));
-    let orbit_earth = meshes.add(Annulus::new(3.38, 3.42));
-    let orbit_mars = meshes.add(Annulus::new(5.98, 6.02));
+    // Ticket #155 (version 0.07.4): the rings read the same table the Bodies' places read.
+    let mut annulus = |body: BodyId| meshes.add(Annulus::new(geo::solar_ring(body) - 0.02, geo::solar_ring(body) + 0.02));
+    let orbit_earth = annulus(BodyId::Earth);
+    let orbit_mars = annulus(BodyId::Mars);
     // Ticket #93: Venus's ring, inside Earth's.
-    let orbit_venus = meshes.add(Annulus::new(2.43, 2.47));
+    let orbit_venus = annulus(BodyId::Venus);
     commands
         .spawn((Transform::default(), Visibility::Hidden, SolarRoot))
         .with_children(|p| {

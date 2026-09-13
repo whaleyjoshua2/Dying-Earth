@@ -17,6 +17,131 @@ use egui::{Color32, FontId, Pos2, RichText, Ui};
 /// filled and the ones ahead are thin and dim; the Temperature now carries a filled marker and the
 /// Temperature the CO2 Stock has already committed the world to a hollow one, with the warming
 /// between them shaded; and the line beneath names the next Break ahead.
+/// Ticket #153 (version 0.07.4): **the Emissions history**, a hand-painted line chart of every
+/// Climate phase so far. The designer: *"mouse over on emissions on top bar should proc a history
+/// graph."* Three lines against a plain zero line: what the world emitted, what the Natural Sink and
+/// the Scrubbers removed, and the net between them, which is the top bar's figure and the CO2
+/// Stock's change each turn; a red tick on the turn axis where a Break fired; the last net figure
+/// written at the line's end. Drawn at whatever size the caller allots -- small in the bar's hover,
+/// wide on the Climate Panel -- with no charting crate, as the Temperature bar is drawn.
+fn emissions_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
+    const EMITTED: Color32 = Color32::from_rgb(232, 140, 90);
+    const REMOVED: Color32 = Color32::from_rgb(110, 190, 130);
+    const NET: Color32 = Color32::from_rgb(235, 235, 240);
+    const BREAK: Color32 = Color32::from_rgb(236, 88, 76);
+    let h = &game.climate.history;
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 6.0;
+        ui.label(RichText::new("emitted").color(EMITTED).small());
+        ui.label(RichText::new("removed").color(REMOVED).small());
+        ui.label(RichText::new("net").color(NET).small());
+        ui.label(RichText::new("ppm a turn; a red tick is a Break").weak().small());
+    });
+    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    let painter = ui.painter();
+    painter.rect_filled(rect, 3.0, Color32::from_rgb(38, 38, 44));
+    if h.is_empty() {
+        painter.text(rect.center(), egui::Align2::CENTER_CENTER, "No turn resolved yet.", FontId::proportional(12.0), Color32::from_gray(150));
+        return;
+    }
+    // Room at the right for the last figure and at the bottom for the turn axis.
+    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(6.0, 6.0), rect.max - egui::vec2(44.0, 16.0));
+    let emitted: Vec<f64> = h.iter().map(|r| r.breakdown.total()).collect();
+    let removed: Vec<f64> = h.iter().map(|r| r.breakdown.total_sink()).collect();
+    let net: Vec<f64> = h.iter().map(|r| r.breakdown.net()).collect();
+    let top = emitted.iter().chain(&removed).chain(&net).cloned().fold(0.0_f64, f64::max).max(1.0) * 1.08;
+    let bottom = net.iter().cloned().fold(0.0_f64, f64::min).min(0.0) * 1.08;
+    let (first, last) = (h[0].turn, h[h.len() - 1].turn);
+    let span = (last.max(first + 1) - first) as f32;
+    let x = |turn: u32| plot.left() + (turn - first) as f32 / span * plot.width();
+    let y = |v: f64| plot.bottom() - (((v - bottom) / (top - bottom)) as f32) * plot.height();
+    // The zero line is the point of the picture: above it the Stock rose, below it fell.
+    painter.line_segment([Pos2::new(plot.left(), y(0.0)), Pos2::new(plot.right(), y(0.0))], egui::Stroke::new(1.0, Color32::from_gray(150)));
+    // Its label only when the line stands clear of the turn axis, which it does not while nothing
+    // has yet gone below zero.
+    if plot.bottom() - y(0.0) > 10.0 {
+        painter.text(Pos2::new(plot.right() + 3.0, y(0.0)), egui::Align2::LEFT_CENTER, "0", FontId::proportional(10.0), Color32::from_gray(150));
+    }
+    let line = |values: &[f64], colour: Color32, width: f32| {
+        let points: Vec<Pos2> = h.iter().zip(values).map(|(r, v)| Pos2::new(x(r.turn), y(*v))).collect();
+        if points.len() == 1 {
+            painter.circle_filled(points[0], width + 1.0, colour);
+        } else {
+            painter.add(egui::Shape::line(points, egui::Stroke::new(width, colour)));
+        }
+    };
+    line(&emitted, EMITTED, 1.2);
+    line(&removed, REMOVED, 1.2);
+    line(&net, NET, 2.0);
+    for r in h.iter().filter(|r| !r.breaks.is_empty()) {
+        let bx = x(r.turn);
+        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 9.0)], egui::Stroke::new(2.0, BREAK));
+    }
+    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, format!("turn {first}"), FontId::proportional(10.0), Color32::from_gray(150));
+    if last > first {
+        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, format!("turn {last}"), FontId::proportional(10.0), Color32::from_gray(150));
+    }
+    let end = net[net.len() - 1];
+    painter.text(Pos2::new(plot.right() + 3.0, y(end)), egui::Align2::LEFT_CENTER, format!("{end:+.1}"), FontId::proportional(11.0), NET);
+}
+
+/// Ticket #158 (version 0.07.4): **the Temperature history**, the Emissions history's sibling on
+/// the top bar's Temperature figure: the Temperature turn by turn on the data's own range (the
+/// designer's choice over the base-to-Collapse scale, for the detail); the Breaks' Temperatures
+/// that fall in the range as faint lines across it, the Collapse line when it does, and the Breaks
+/// fired ticked red on the turn axis; the last figure at the line's end. The heading-to figure is
+/// a projection, not a record, and is not drawn.
+fn temperature_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
+    const LINE: Color32 = Color32::from_rgb(235, 235, 240);
+    const BREAK: Color32 = Color32::from_rgb(236, 88, 76);
+    let h = &game.climate.history;
+    let c = &game.tables.climate;
+    ui.label(RichText::new("Temperature by turn; red is a Break").weak().small());
+    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    let painter = ui.painter();
+    painter.rect_filled(rect, 3.0, Color32::from_rgb(38, 38, 44));
+    if h.is_empty() {
+        painter.text(rect.center(), egui::Align2::CENTER_CENTER, "No turn resolved yet.", FontId::proportional(12.0), Color32::from_gray(150));
+        return;
+    }
+    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(6.0, 6.0), rect.max - egui::vec2(44.0, 16.0));
+    // The data's own range, at the designer's word, with a margin above and below and never
+    // narrower than half a degree, so the first turns do not read as a cliff.
+    let (min, max) = h.iter().fold((f64::MAX, f64::MIN), |(lo, hi), r| (lo.min(r.temperature), hi.max(r.temperature)));
+    let pad = ((max - min) * 0.15).max(0.25);
+    let (lo, hi) = (min - pad, max + pad);
+    let (first, last) = (h[0].turn, h[h.len() - 1].turn);
+    let span = (last.max(first + 1) - first) as f32;
+    let x = |turn: u32| plot.left() + (turn - first) as f32 / span * plot.width();
+    let y = |v: f64| plot.bottom() - (((v - lo) / (hi - lo)).clamp(0.0, 1.0) as f32) * plot.height();
+    // The Breaks' Temperatures that fall in the range, faint, and the Collapse line if it does.
+    for b in c.breaks.iter().filter(|b| b.temperature > lo && b.temperature < hi) {
+        painter.line_segment([Pos2::new(plot.left(), y(b.temperature)), Pos2::new(plot.right(), y(b.temperature))], egui::Stroke::new(1.0, BREAK.gamma_multiply(0.35)));
+    }
+    if c.collapse_line > lo && c.collapse_line < hi {
+        painter.line_segment([Pos2::new(plot.left(), y(c.collapse_line)), Pos2::new(plot.right(), y(c.collapse_line))], egui::Stroke::new(1.0, Color32::from_gray(150)));
+        painter.text(Pos2::new(plot.right() + 3.0, y(c.collapse_line)), egui::Align2::LEFT_CENTER, format!("{:+.1}", c.collapse_line), FontId::proportional(10.0), Color32::from_gray(150));
+    }
+    painter.text(Pos2::new(plot.left() + 2.0, plot.bottom()), egui::Align2::LEFT_BOTTOM, format!("{lo:+.1}"), FontId::proportional(9.0), Color32::from_gray(120));
+    painter.text(Pos2::new(plot.left() + 2.0, plot.top()), egui::Align2::LEFT_TOP, format!("{hi:+.1}"), FontId::proportional(9.0), Color32::from_gray(120));
+    let points: Vec<Pos2> = h.iter().map(|r| Pos2::new(x(r.turn), y(r.temperature))).collect();
+    if points.len() == 1 {
+        painter.circle_filled(points[0], 3.0, LINE);
+    } else {
+        painter.add(egui::Shape::line(points, egui::Stroke::new(2.0, LINE)));
+    }
+    for r in h.iter().filter(|r| !r.breaks.is_empty()) {
+        let bx = x(r.turn);
+        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 9.0)], egui::Stroke::new(2.0, BREAK));
+    }
+    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, format!("turn {first}"), FontId::proportional(10.0), Color32::from_gray(150));
+    if last > first {
+        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, format!("turn {last}"), FontId::proportional(10.0), Color32::from_gray(150));
+    }
+    let end = h[h.len() - 1].temperature;
+    painter.text(Pos2::new(plot.right() + 3.0, y(end)), egui::Align2::LEFT_CENTER, format!("{end:+.1}"), FontId::proportional(11.0), LINE);
+}
+
 fn temperature_bar(ui: &mut Ui, game: &Game) {
     const BREAK: Color32 = Color32::from_rgb(236, 88, 76);
     const SEA: Color32 = Color32::from_rgb(96, 156, 236);
@@ -484,12 +609,17 @@ fn warship_in_slot(game: &Game, body: BodyId, slot: u32) -> Option<&Ship> {
 
 /// Ticket #136 (version 0.07.3): **one ring per Orbital Slot round the globe** on a Body Surface
 /// Map. The designer: *"Want to see icons representative of orbitals orbiting their parent bodies
-/// each slot a separate orbit."* Each ring is a circle in the globe's own frame, a step further out
-/// and at a slightly different tilt than the last, so it turns with the globe and five rings do not
-/// stack into one line seen edge-on; the part behind the globe is not drawn. A built station wears
-/// its glyph at a fixed point on its ring, in its holder's colour, with its name beneath, and is
-/// clickable; an empty slot is a dashed ring; a warship blockading the slot is drawn beside the
-/// station's place in its Faction's colour, which is the first time Blockade has been visible on a map.
+/// each slot a separate orbit."* Ticket #151 (version 0.07.4) redrew them: *"each should be on
+/// slightly different orbital plane and should rotate with the globe allow them to move slowly so
+/// they can be clicked."* Each ring is a circle in the globe's own frame -- so it turns with a drag
+/// -- on a plane of its own, leaning thirty to sixty degrees from the equator with its own heading,
+/// so the five cross one another rather than stack, and at most one is near edge-on at any turn
+/// of the globe; the part behind the globe is not drawn. A built station's glyph **travels slowly
+/// round its ring** (one revolution in about a minute and a half, each slot's period its own),
+/// in its holder's colour with its name beneath, clickable as it goes; in `shot:` mode the clock
+/// is stopped so the pictures are reproducible. An empty slot is a solid grey ring; a warship
+/// blockading the slot is drawn beside the station in its Faction's colour, which is the first
+/// time Blockade has been visible on a map.
 #[allow(clippy::too_many_arguments)]
 fn orbit_rings_on_globe(
     painter: &egui::Painter,
@@ -511,18 +641,25 @@ fn orbit_rings_on_globe(
     let rim = project(center + cam_right * GLOBE_RADIUS).map(|r| (r - c2).length()).unwrap_or(0.0);
     let to_cam = cam_pos - center;
     let hidden = |world: Vec3, screen: Pos2| (world - center).dot(to_cam) < 0.0 && (screen - c2).length() < rim;
-    // The rings live in the camera's frame, not the globe's: an orbit is not fixed to the ground
-    // (the ISS does not turn with China), and a ring in the globe's equatorial plane is edge-on from
-    // where this camera sits -- the first picture had five near-vertical lines running off the
-    // screen. Each ring is inclined a little more than the last, so it reads as an ellipse round
-    // the globe, and the part behind the globe is not drawn.
-    let fwd = (center - cam_pos).normalize();
-    let up = fwd.cross(cam_right).normalize();
+    // The rings live in the globe's upright frame (its pole up, before the mesh's own correction),
+    // so a drag turns them with it. Version 0.07.3 had pinned them to the camera because rings in
+    // the equatorial plane were edge-on from where this camera sits, five near-vertical lines; a
+    // ring leaning well off the equator, on a heading of its own, is an ellipse from almost every
+    // side and edge-on only for a moment as the globe turns past its line of nodes.
+    let rot = globe_gt.rotation() * geo::upright().inverse();
+    // The clock the stations travel by. Stopped in `shot:` mode, so a picture is the same twice.
+    let clock = if session.shot_prefix.is_empty() { painter.ctx().input(|i| i.time) as f32 } else { 0.0 };
     for slot in 0..n {
-        let radius = GLOBE_RADIUS * (1.12 + 0.045 * slot as f32);
-        let incline = 0.36 + 0.06 * slot as f32;
-        let (ci, si) = (incline.cos(), incline.sin());
-        let world_at = |a: f32| center + radius * (a.cos() * cam_right + a.sin() * (ci * fwd + si * up));
+        // A step tighter to the globe than the first try, at the designer's word ("just slightly
+        // tighter"), so the outer rings stay nearer the window at the default zoom.
+        let radius = GLOBE_RADIUS * (1.08 + 0.04 * slot as f32);
+        // Each slot's own plane: a lean from the equator of 32 to 61 degrees, and a heading for
+        // the line of nodes a good step round from the last slot's.
+        let incline = 0.55 + 0.13 * slot as f32;
+        let node = 1.3 * slot as f32;
+        let u = Vec3::new(node.cos(), 0.0, node.sin());
+        let v = Vec3::new(-node.sin() * incline.cos(), incline.sin(), node.cos() * incline.cos());
+        let world_at = |a: f32| center + rot * (radius * (a.cos() * u + a.sin() * v));
         let samples = 128;
         let points: Vec<Option<Pos2>> = (0..samples)
             .map(|i| {
@@ -533,16 +670,22 @@ fn orbit_rings_on_globe(
             .collect();
         let station = game.colonies.iter().find(|c| c.in_orbit && c.body == body && c.slot == slot);
         let colour = station.and_then(|c| c.control.director()).map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
-        orbit_polyline(painter, &points, station.is_none(), colour.gamma_multiply(0.8));
-        // The glyph sits at a fixed point on the near side of its ring, each ring a step further
-        // round, so five glyphs fan out along the front arc rather than lining up.
-        let a = std::f32::consts::PI * (1.18 + 0.14 * slot as f32);
+        // Ticket #151: an empty slot's ring is a solid line in the empty grey, no longer dashed --
+        // the designer: *"lets make them solid lines, same color."*
+        orbit_polyline(painter, &points, false, colour.gamma_multiply(0.8));
+        // The glyph starts a step further round its ring than the last slot's, so five glyphs fan
+        // out rather than line up, and travels on from there: one revolution in ninety seconds
+        // for the first slot and eight seconds longer for each after it, so they drift apart.
+        let period = 90.0 + 8.0 * slot as f32;
+        let a = std::f32::consts::PI * (1.18 + 0.14 * slot as f32) + clock * std::f32::consts::TAU / period;
         let w = world_at(a);
         let Some(p) = project(w).filter(|p| !hidden(w, *p)) else { continue };
         if let Some(c) = station {
             glyph_at(painter, Kind::Station, p, 18.0, colour);
             label_at(painter, p + egui::vec2(0.0, 17.0), &game.station_name(body, slot), colour, 11.0);
-            hotspots.push(Hotspot { pos: p, radius: 12.0, hit: Hit::Select(Selection::Colony(c.id)) });
+            // A moving target: the circle is wider than a fixed glyph's, and the click is taken
+            // where the mouse was pressed, so a station cannot slip out from under its own click.
+            hotspots.push(Hotspot { pos: p, radius: 16.0, hit: Hit::Select(Selection::Colony(c.id)) });
         }
         if let Some(s) = warship_in_slot(game, body, slot) {
             glyph_at(painter, Kind::Warship, p + egui::vec2(20.0, 0.0), 16.0, seat_colour(session, s.seat));
@@ -584,8 +727,10 @@ pub fn draw(
     icons.load_flags(ctx, &crate::assets_root().join("flags"));
     let icons = &*icons;
     // Ticket #100 (version 0.07.0): the start globe turns on its own only until a hand is put on it.
+    // Ticket #152 (version 0.07.4): once every 75 seconds, a third of the speed it opened at; the
+    // designer: *"slow the rotation of the earth in the territory select screen."*
     if !view.start_grabbed {
-        view.spin += time.delta_secs() * 0.25;
+        view.spin += time.delta_secs() * std::f32::consts::TAU / START_GLOBE_PERIOD_SECS;
     }
     let _ = window;
     // Ticket #59: "Saved." stands in the top bar for a few seconds and then goes.
@@ -1249,6 +1394,12 @@ fn start_screen(
             && let Some(sid) = start_pick(pos, camera, cam_gt, globes, textures)
         {
             view.start_selected = Some(sid);
+            // Ticket #152 (version 0.07.4): a click stops the spin for good as a drag does, so the
+            // Region chosen stays where it was chosen.
+            if !view.start_grabbed {
+                view.yaw = view.spin;
+                view.start_grabbed = true;
+            }
         }
         // The names, painted where the game view paints them: on the globe, lifted, over a plate.
         if let (Some((camera, cam_gt)), Some((_, globe_gt))) = (cam, globes.iter().find(|(g, _)| g.0 == BodyId::Earth)) {
@@ -1333,7 +1484,9 @@ fn game_screen(
                     view.zoom = (view.zoom * (1.0 - scroll * 0.002)).clamp(0.45, 2.2);
                 }
             }
-            let click = if resp.clicked() { resp.interact_pointer_pos().filter(|p| rect.contains(*p)) } else { None };
+            // Ticket #151 (version 0.07.4): a click lands where the mouse was PRESSED, not where it
+            // was released, so a station travelling its ring is caught by the click that began on it.
+            let click = if resp.clicked() { ui.input(|i| i.pointer.press_origin()).or(resp.interact_pointer_pos()).filter(|p| rect.contains(*p)) } else { None };
             if let (Some(pos), Some((camera, cam_gt))) = (click, cam) {
                 pick(pos, session, game, view, camera, cam_gt, globes, textures, &hotspots);
             }
@@ -1358,6 +1511,28 @@ fn bar_resource(ui: &mut Ui, icons: &Icons, key: &str, word: &str, value: String
             }
         }
     });
+}
+
+/// Ticket #153 (version 0.07.4): `bar_resource` for a figure whose hover draws something -- the
+/// Emissions figure and its history. One tooltip on the glyph and the label together, so the chart
+/// is never painted twice.
+fn bar_resource_with(ui: &mut Ui, icons: &Icons, key: &str, word: &str, value: String, add: impl Fn(&mut Ui)) {
+    let resp = ui
+        .horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            match icons.image(key, 16.0) {
+                Some(image) => {
+                    ui.add(image);
+                    ui.label(RichText::new(value).strong());
+                }
+                None => {
+                    ui.label(RichText::new(format!("{word} {value}")).strong());
+                }
+            }
+        })
+        .response
+        .interact(egui::Sense::hover());
+    rule_tip_ui(resp, word, add);
 }
 
 /// The Influence figure's hover, lifted out of the bar when ticket #128 moved the figure.
@@ -1470,19 +1645,25 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             // named by its first alone, so turn 2 reads March 2030.
             ui.label(RichText::new(format!("Turn {} / {}, {}", game.turn, game.tables.victory.turns, game.date_text())).strong());
             ui.separator();
-            ui.label(format!("{:+.1} C, heading to {:+.1}", game.climate.temperature, game.target_temperature()));
+            // Ticket #158 (version 0.07.4): the Temperature figure's hover draws its history.
+            let temp = ui.label(format!("{:+.1} C, heading to {:+.1}", game.climate.temperature, game.target_temperature()));
+            rule_tip_ui(temp, "Temperature history", |ui| {
+                ui.set_max_width(300.0);
+                ui.label(RichText::new("Temperature history").strong());
+                ui.label("Where the heat stands, and where the CO2 Stock already in the air is taking it. The Climate Panel's bar shows what it has crossed and what is next.");
+                temperature_history(ui, game, egui::vec2(280.0, 96.0));
+            });
             ui.separator();
             // Ticket #112 (version 0.07.1): net Emissions join the bar. Until now the only way to
             // learn whether the world went over or under the Natural Sink this turn was to open the
             // Climate Panel; the Temperature beside it moves too slowly to answer that question.
-            bar_resource(
-                ui,
-                icons,
-                "emissions",
-                "Emissions",
-                format!("{:+.1} ppm", game.climate.last.net()),
-                "Net Emissions at the last Resolution: everything the world emitted less the Natural Sink and any Scrubbers. Above zero the CO2 Stock rose and the Temperature will follow; below zero it fell. The Climate Panel breaks it into its sources.".to_string(),
-            );
+            // Ticket #153 (version 0.07.4): the hover draws the Emissions history under its sentence.
+            bar_resource_with(ui, icons, "emissions", "Emissions history", format!("{:+.1} ppm", game.climate.last.net()), |ui| {
+                ui.set_max_width(300.0);
+                ui.label(RichText::new("Emissions history").strong());
+                ui.label("Net Emissions at the last Resolution: everything the world emitted less the Natural Sink and any Scrubbers. Above zero the CO2 Stock rose and the Temperature will follow; below zero it fell. The Climate Panel breaks it into its sources.");
+                emissions_history(ui, game, egui::vec2(280.0, 96.0));
+            });
             ui.separator();
             // Ticket #143 (version 0.07.3): Earth's people and space's, in real numbers. The
             // designer: *"Please track earth and space populations on the top bar."* Earth is the
@@ -1603,7 +1784,12 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
         View::Solar => {
             for body in BodyId::ALL {
                 let pos = geo::solar_place(game, body);
-                let head = project(pos + Vec3::Y * (geo::solar_radius(body) + 0.05));
+                // Ticket #155 (version 0.07.4): a label by Body -- Venus's and the satellites' hang
+                // BELOW their discs where a planet's stands above -- so the words of the two inner
+                // planets never meet at a conjunction, and a moon's never lie over its planet's.
+                let below = matches!(body, BodyId::Venus | BodyId::Moon | BodyId::Phobos | BodyId::Deimos);
+                let side = if below { -1.0 } else { 1.0 };
+                let head = project(pos + Vec3::Y * side * (geo::solar_radius(body) + 0.05));
                 if let Some(p) = head {
                     let name = game.tables.body(body).name.clone();
                     let slots = game.tables.body(body).colony_slots();
@@ -1634,7 +1820,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     if body == BodyId::Earth && !game.antarctica_open {
                         text.push_str(&format!("\nAntarctica: opens at {:+.1} C", game.tables.climate.antarctica_opens_at));
                     }
-                    label_at(painter, p - egui::vec2(0.0, 22.0 + 7.5 * lines as f32), &text, Color32::WHITE, 13.0);
+                    label_at(painter, p - egui::vec2(0.0, side * (22.0 + 7.5 * lines as f32)), &text, Color32::WHITE, 13.0);
                     // Ticket #136: one orbit per Body, the stations on it at spaced positions, dashed
                     // while nothing is in orbit. Five rings will not fit round an eighteen-pixel Earth
                     // without swallowing the Moon, so on this map the slots share one ring; each has
@@ -1668,7 +1854,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     }
                     // The Orbital Control flag in the holder's Faction colour.
                     if let Some(s) = game.orbital_control(body) {
-                        label_at(painter, p - egui::vec2(0.0, 40.0), &format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s), 12.0);
+                        label_at(painter, p - egui::vec2(0.0, side * 40.0), &format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s), 12.0);
                     }
                 }
                 // Ticket #50: up to four stacks at one Body. The markers sit at four fixed angles
@@ -2674,6 +2860,24 @@ fn rule_tip(response: egui::Response, text: String) -> egui::Response {
     response.on_hover_ui(|ui| hover_with_icons(ui, &text))
 }
 
+/// Ticket #153 (version 0.07.4): `rule_tip` for a tooltip that DRAWS rather than says -- the
+/// Emissions history. `word` is what the `tip:` aid matches against, so the hover can be
+/// photographed headlessly like any other; the same once-a-frame guard applies.
+fn rule_tip_ui(response: egui::Response, word: &str, add: impl Fn(&mut Ui)) -> egui::Response {
+    if let Some(wanted) = std::env::args().find_map(|a| a.strip_prefix("tip:").map(str::to_owned))
+        && word.contains(&wanted)
+    {
+        let pass = response.ctx.cumulative_pass_nr();
+        let fired: Option<u64> = response.ctx.data(|d| d.get_temp(egui::Id::new("tip_fired")));
+        if fired != Some(pass) {
+            response.ctx.data_mut(|d| d.insert_temp(egui::Id::new("tip_fired"), pass));
+            response.show_tooltip_ui(|ui| add(ui));
+            return response;
+        }
+    }
+    response.on_hover_ui(|ui| add(ui))
+}
+
 /// Ticket #112 (version 0.07.1): a figure's glyph BESIDE its word, which is the rule everywhere
 /// except the top bar. It reaches the art through the egui context, so a call site deep in a panel
 /// does not have to be handed an `Icons` to draw one. Where the art is missing the line is
@@ -3083,21 +3287,38 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
 /// naming the rule, and the Mothball / Restart / Decommission buttons on the line (ticket #138).
 /// It was the body of the card's Facility loop; it is now the strip under the slot boxes for the
 /// box that was clicked, and the row a Facility that takes no slot (a Sea Wall, a Scrubber) keeps.
+/// The figures a Facility's line carries: what it makes, its upkeep and its Emissions, or the
+/// sentence a mothballed or undirected one shows instead. Read by the row and, since ticket #150
+/// (version 0.07.4), by the slot box's hover.
+fn facility_figures(game: &Game, sid: StateId, f: &Facility, director: Option<Seat>) -> String {
+    // Ticket #54: a mothballed Facility says so rather than showing figures it is not making.
+    if f.mothballed {
+        // Ticket #154 (version 0.07.4): a Scrubber or Sea Wall has no slot to keep.
+        return format!("mothballed: making nothing, paying no upkeep, emitting nothing{}", if game.takes_slot(f.kind) { ", keeping its slot" } else { "" });
+    }
+    // Ticket #69: a Lab in a state nobody holds, or under Occupation, works for the world.
+    let world_lab = f.kind == FacilityKind::ResearchLab && f.working() && !f.offline_until_resolution && matches!(game.state(sid).control, Control::Neutral | Control::Occupied { .. });
+    match director {
+        Some(d) if world_lab => format!("{} (the Lab works for the world: {} Research a turn to the Tech under research)", game.facility_yield(d, sid, f.kind).text(), game.world_lab_yield(sid) / 2),
+        Some(d) => game.facility_yield(d, sid, f.kind).text(),
+        None if world_lab => format!("in no one's hands: {} Research a turn to the Tech under research", game.world_lab_yield(sid) / 2),
+        None => "idle, nobody directs this state".to_string(),
+    }
+}
+
+/// Ticket #116 (version 0.07.1): what the two figures on a Facility's line actually DO. Upkeep
+/// and Emissions are the numbers a player weighs a building by, and neither said what it cost to
+/// fail to pay them. The first line is the heading the hover opens with.
+fn facility_rules(heading: &str, coastal: bool) -> String {
+    format!(
+        "{heading}\nEnergy upkeep is paid at Income first; short of Energy, buildings go offline in order until the bill is met, and an offline one makes nothing and keeps its slot.\nIts Emissions go on the CO2 Stock every turn and on its controller's Blame.{}",
+        if coastal { "\nOn the coast, the sea can take it at a threshold." } else { "" }
+    )
+}
+
 #[allow(clippy::too_many_arguments)]
 fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: usize, f: &Facility, mine: bool, director: Option<Seat>, actions: &mut Vec<Action>) {
-    // Ticket #54: a mothballed Facility says so rather than showing figures it is not making.
-    let figures = if f.mothballed {
-        "mothballed: making nothing, paying no upkeep, emitting nothing, keeping its slot".to_string()
-    } else {
-        // Ticket #69: a Lab in a state nobody holds, or under Occupation, works for the world.
-        let world_lab = f.kind == FacilityKind::ResearchLab && f.working() && !f.offline_until_resolution && matches!(game.state(sid).control, Control::Neutral | Control::Occupied { .. });
-        match director {
-            Some(d) if world_lab => format!("{} (the Lab works for the world: {} Research a turn to the Tech under research)", game.facility_yield(d, sid, f.kind).text(), game.world_lab_yield(sid) / 2),
-            Some(d) => game.facility_yield(d, sid, f.kind).text(),
-            None if world_lab => format!("in no one's hands: {} Research a turn to the Tech under research", game.world_lab_yield(sid) / 2),
-            None => "idle, nobody directs this state".to_string(),
-        }
-    };
+    let figures = facility_figures(game, sid, f, director);
     let colour = if f.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
     // Ticket #112 (version 0.07.1): the glyphs come down into the Facility list, where the
     // figures are compared building against building and the words are most of the width.
@@ -3107,30 +3328,17 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
     let mut inline = false;
     ui.horizontal(|ui| {
         ui.add_space(8.0);
+        // Ticket #154 (version 0.07.4): coastal or inland only where the building has a slot to be
+        // on; a Scrubber or Sea Wall is neither.
+        let side = if !game.takes_slot(f.kind) { "" } else if f.coastal { " (coastal)" } else { " (inland)" };
         let resp = figures_with_icons(
             ui,
-            &format!(
-                "{} ({}): {}{}",
-                f.kind.name(),
-                if f.coastal { "coastal" } else { "inland" },
-                figures,
-                if f.online || f.mothballed { "" } else { " (offline, making nothing)" }
-            ),
+            &format!("{}{}: {}{}", f.kind.name(), side, figures, if f.online || f.mothballed { "" } else { " (offline, making nothing)" }),
             14.0,
             colour,
             &[],
         );
-        // Ticket #116 (version 0.07.1): what the two figures on the line actually DO. Upkeep and
-        // Emissions are the numbers a player weighs a building by, and neither said what it cost
-        // to fail to pay them.
-        rule_tip(
-            resp,
-            format!(
-                "{}\nEnergy upkeep is paid at Income first; short of Energy, buildings go offline in order until the bill is met, and an offline one makes nothing and keeps its slot.\nIts Emissions go on the CO2 Stock every turn and on its controller's Blame.{}",
-                f.kind.name(),
-                if f.coastal { "\nOn the coast, the sea can take it at a threshold." } else { "" }
-            ),
-        );
+        rule_tip(resp, facility_rules(f.kind.name(), f.coastal));
         if mine && f.change.is_none() && ui.available_width() >= CHANGE_BUTTONS_WIDTH {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 change_buttons(ui, game, &session.pending, BuildingRef::Facility(sid, i), f.mothballed, true, actions);
@@ -3147,8 +3355,10 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
 /// Build section and in the strip under the slot boxes for a free box alike.
 fn facility_build_buttons(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, actions: &mut Vec<Action>) {
     for fk in FacilityKind::ALL {
-        // Ticket #54: the Scrubber has its own button, with the state's cap on it.
-        if fk == FacilityKind::Scrubber {
+        // Ticket #54: the Scrubber has its own button, with the state's cap on it. Ticket #154
+        // (version 0.07.4): so does the Sea Wall -- neither takes a slot, so neither is offered
+        // for a free box; both stand under the boxes in `no_slot_section`.
+        if !game.takes_slot(fk) {
             continue;
         }
         // Ticket #56: a Facility that waits on a Tech is not offered until the Tech is in.
@@ -3164,15 +3374,79 @@ fn facility_build_buttons(ui: &mut Ui, session: &Session, game: &Game, sid: Stat
     }
 }
 
+/// Ticket #154 (version 0.07.4): **the Facilities that take no slot** -- the Scrubber and the Sea
+/// Wall -- under the boxes, in the Facilities section: each a row when it stands, a line while it
+/// builds, and a build button pair when it may be built here. The designer: *"scrubber sea wall
+/// need to stay but put them in the same section as the tiles just below them."* The Scrubber's
+/// pair carries the state's cap; the Sea Wall's appears once Coastal Engineering is in and while
+/// none stands or builds, one being the most a state may hold.
+#[allow(clippy::too_many_arguments)]
+fn no_slot_section(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mine: bool, director: Option<Seat>, actions: &mut Vec<Action>) {
+    let st = game.state(sid);
+    for (i, f) in st.facilities.iter().enumerate() {
+        if !game.takes_slot(f.kind) {
+            facility_row(ui, session, game, sid, i, f, mine, director, actions);
+        }
+    }
+    for b in &st.queue {
+        if let BuildItem::Facility(k) = b.item
+            && !game.takes_slot(k)
+        {
+            ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
+        }
+    }
+    if !mine {
+        return;
+    }
+    if game.kind(Seat(0)) == FactionKind::Custodians {
+        let sink = game.tables.facility(FacilityKind::Scrubber).sink_per_turn;
+        ui.horizontal(|ui| {
+            cost_button_with_hover(
+                ui,
+                game,
+                &session.pending,
+                Order::BuildFacility { state: sid, kind: FacilityKind::Scrubber },
+                "Scrubber",
+                Some(format!("+{sink:.1} ppm on the Natural Sink and 1 off this state's Unrest a turn, no build slot, 4 Energy upkeep. Destroyed if this state changes hands.")),
+                actions,
+            );
+            cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::Scrubber }, "or", actions);
+            ui.label(RichText::new(format!("{} of {} this state may hold", game.scrubbers_committed(sid), game.scrubber_cap(sid))).weak());
+        });
+    }
+    if game.has_tech(TechId::CoastalEngineering) {
+        let standing = st.facilities.iter().any(|f| f.kind == FacilityKind::SeaWall);
+        let building = st.queue.iter().any(|b| matches!(b.item, BuildItem::Facility(FacilityKind::SeaWall)));
+        if !standing && !building {
+            let hover = game.facility_yield(Seat(0), sid, FacilityKind::SeaWall).text();
+            ui.horizontal(|ui| {
+                cost_button_with_hover(
+                    ui,
+                    game,
+                    &session.pending,
+                    Order::BuildFacility { state: sid, kind: FacilityKind::SeaWall },
+                    "Sea Wall",
+                    Some(format!("{hover}. No build slot, at most one to a state; while it works, this state's next Sea Level threshold takes no slots, and the wall is destroyed absorbing it.")),
+                    actions,
+                );
+                cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::SeaWall }, "or", actions);
+            });
+        }
+    }
+}
+
 /// The columns of slot boxes on a Region's card: six, since the card is a step wider than the Hab View.
 const SLOT_COLS: usize = 6;
+/// Ticket #152 (version 0.07.4): how long the start globe takes to turn once on its own.
+const START_GLOBE_PERIOD_SECS: f32 = 75.0;
 /// The coast's blue, a slot box's edge where the sea can reach it.
 const COAST_EDGE: Color32 = Color32::from_rgb(90, 150, 230);
 
 /// Ticket #146 (version 0.07.3): what one slot box on a Region's card shows.
 enum SlotBoxKind {
     Standing(usize),
-    Building(FacilityKind),
+    /// The kind building and the turn it is ready.
+    Building(FacilityKind, u32),
     Free,
     Flooded(Option<FacilityKind>),
 }
@@ -3199,7 +3473,7 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                 && b.coastal == coastal
                 && game.takes_slot(k)
             {
-                boxes.push((SlotBoxKind::Building(k), coastal));
+                boxes.push((SlotBoxKind::Building(k, b.due_turn + 1), coastal));
             }
         }
         let free = if coastal { game.coastal_slots(sid).saturating_sub(game.coastal_used(sid)) } else { game.inland_slots(sid).saturating_sub(game.inland_used(sid)) };
@@ -3220,25 +3494,37 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         let rect = egui::Rect::from_min_size(grid.min + egui::vec2(c as f32 * (HAB_TILE + HAB_GAP), r as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP)), egui::vec2(HAB_TILE, HAB_TILE));
         let edge = if *coastal { Some(COAST_EDGE) } else { None };
         let id = ui.id().with(("slot-box", n));
+        // Ticket #150 (version 0.07.4): every box says on hover what its row said -- the figures and
+        // the rules -- and the other states say what they are. The designer: *"mouse over
+        // information on buildings didn't xfer to icon grid."*
+        let side = if *coastal { "coastal" } else { "inland" };
         match kind {
             SlotBoxKind::Standing(i) => {
                 let f = &st.facilities[*i];
                 let state = if f.mothballed { TileState::Mothballed } else { TileState::Standing };
-                if hab_tile(ui, rect, id, Some(crate::icons::facility_icon(f.kind)), f.kind.name(), state, view.slot_box == Some(SlotBox::Facility(*i)), edge).clicked() {
+                let heading = format!("{} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), if f.online || f.mothballed { "" } else { " (offline, making nothing)" });
+                let tip = facility_rules(&heading, f.coastal);
+                if hab_tile(ui, rect, id, Some(crate::icons::facility_icon(f.kind)), f.kind.name(), state, view.slot_box == Some(SlotBox::Facility(*i)), edge, tip).clicked() {
                     view.slot_box = Some(SlotBox::Facility(*i));
                 }
             }
-            SlotBoxKind::Building(k) => {
-                hab_tile(ui, rect, id, Some(crate::icons::facility_icon(*k)), k.name(), TileState::Building, false, edge);
+            SlotBoxKind::Building(k, ready) => {
+                let tip = format!("{} ({side}): building, ready turn {ready}.{}", k.name(), if *coastal { "\nOn the coast, the sea can take it at a threshold." } else { "" });
+                hab_tile(ui, rect, id, Some(crate::icons::facility_icon(*k)), k.name(), TileState::Building, false, edge, tip);
             }
             SlotBoxKind::Free => {
                 let first_free = boxes.iter().position(|(k, _)| matches!(k, SlotBoxKind::Free)) == Some(n);
-                if hab_tile(ui, rect, id, None, "", TileState::Free, first_free && view.slot_box == Some(SlotBox::Free), edge).clicked() {
+                let tip = format!("Free {side} slot: click it to build here.{}", if *coastal { "\nOn the coast, the sea can take what stands here at a threshold." } else { "" });
+                if hab_tile(ui, rect, id, None, "", TileState::Free, first_free && view.slot_box == Some(SlotBox::Free), edge, tip).clicked() {
                     view.slot_box = Some(SlotBox::Free);
                 }
             }
             SlotBoxKind::Flooded(k) => {
-                hab_tile(ui, rect, id, k.map(crate::icons::facility_icon), k.map(|k| k.name()).unwrap_or(""), TileState::Flooded, false, edge);
+                let tip = format!(
+                    "{}lost to the sea: a Sea Level threshold took this coastal slot.\nA working Sea Wall holds the state's next threshold off, at most one to a state.",
+                    k.map(|k| format!("{}, ", k.name())).unwrap_or_else(|| "A slot ".to_string())
+                );
+                hab_tile(ui, rect, id, k.map(crate::icons::facility_icon), k.map(|k| k.name()).unwrap_or(""), TileState::Flooded, false, edge, tip);
             }
         }
     }
@@ -3328,7 +3614,8 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     } else if st.baseline_rise > 0.0 {
         ui.label(RichText::new(format!("A spent Strip Permit left its Baseline Emissions {:.1} higher, for good.", st.baseline_rise)).weak());
     }
-    ui.label(format!("Build slots: {} used of {} ({} free); Education Level {}", game.slots_used(sid), game.build_slots(sid), game.free_slots(sid), card.education_level));
+    // Ticket #154 (version 0.07.4): the slot count is said once, on the Facilities header.
+    ui.label(format!("Education Level {}", card.education_level));
     // Ticket #52: Unrest, and what it is doing here in words.
     {
         let u = &game.tables.unrest;
@@ -3416,20 +3703,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     let mine = !session.spectator && st.control.director() == Some(Seat(0));
     // Ticket #146 (version 0.07.3): the slots as boxes, with the clicked box's line beneath them.
     slot_boxes(ui, session, game, view, sid, mine, director, actions);
-    // The Facilities that take no slot -- a Sea Wall, a Scrubber -- keep their rows, as the designer
-    // asked: *"buildings that don't take slots can still be listed as they are now under the boxes."*
-    for (i, f) in st.facilities.iter().enumerate() {
-        if !game.takes_slot(f.kind) {
-            facility_row(ui, session, game, sid, i, f, mine, director, actions);
-        }
-    }
-    for b in &st.queue {
-        if let BuildItem::Facility(k) = b.item
-            && !game.takes_slot(k)
-        {
-            ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
-        }
-    }
+    no_slot_section(ui, session, game, sid, mine, director, actions);
     ui.label(RichText::new("Armies").strong());
     let armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid))).collect();
     for a in &armies {
@@ -3441,24 +3715,13 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     }
     ui.separator();
     if mine {
-        ui.label(RichText::new("Build (hover a button for what it makes)").strong());
-        // Ticket #54: the Custodians' Scrubber and Leapfrog, and the Prospectors' Strip Permit.
+        // Ticket #154 (version 0.07.4): the per-kind build list is gone from here -- a Facility is
+        // built by clicking a free box -- and the Scrubber and Sea Wall buttons stand under the
+        // boxes; what is left is orders, and the header says so. The designer: *"remove redundant
+        // build list from the region cards."*
+        ui.label(RichText::new("Orders (hover a button for what it does)").strong());
+        // Ticket #54: the Custodians' Leapfrog, and the Prospectors' Strip Permit.
         if game.kind(Seat(0)) == FactionKind::Custodians {
-            ui.label(RichText::new(format!("Scrubbers {} of {}", game.scrubbers_committed(sid), game.scrubber_cap(sid))).strong());
-            let sink = game.tables.facility(FacilityKind::Scrubber).sink_per_turn;
-            ui.horizontal(|ui| {
-                cost_button_with_hover(
-                    ui,
-                    game,
-                    &session.pending,
-                    Order::BuildFacility { state: sid, kind: FacilityKind::Scrubber },
-                    "Scrubber",
-                    Some(format!("+{sink:.1} ppm on the Natural Sink and 1 off this state's Unrest a turn, no build slot, 4 Energy upkeep")),
-                    actions,
-                );
-                cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::Scrubber }, "or", actions);
-            });
-            ui.label(RichText::new("A Scrubber takes no build slot and is destroyed if this state changes hands.").weak());
             ui.horizontal(|ui| {
                 cost_button(ui, game, &session.pending, Order::Leapfrog { state: sid }, "Leapfrog", actions);
                 ui.label(RichText::new(format!("lowers its people to {:.2} per hundred million, for good", (game.population_coefficient(sid) - game.tables.climate.population_emissions_per_level).max(game.tables.climate.population_emissions_base) * Game::UNITS_PER_HUNDRED_MILLION)).weak());
@@ -3470,13 +3733,6 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 cost_button(ui, game, &session.pending, Order::StripPermit { state: sid }, "Strip Permit", actions);
                 ui.label(RichText::new(format!("{} turns of double output here, then +{:.1} Baseline Emissions and +{} Unrest, for good", t.turns, t.baseline_rise, Game::unrest_figure(t.unrest))).weak());
             });
-        }
-        facility_build_buttons(ui, session, game, sid, actions);
-        if game.has_tech(TechId::CoastalEngineering) {
-            ui.label(
-                RichText::new("A Sea Wall takes no build slot, as a Scrubber does, and takes this state's next Sea Level threshold whole; it is destroyed doing it.")
-                    .weak(),
-            );
         }
         cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
         ui.label(RichText::new("Raising the Industry Level adds an inland slot, which the sea never reaches.").weak());
@@ -4061,9 +4317,12 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     }
     let rungs = TechId::ALL.iter().map(|t| game.tables.tech(*t).rung).max().unwrap_or(1).max(1) as usize;
     // Ticket #56: a branch may hold more than one Tech on a rung (Efficient Grids and Coastal
-    // Engineering both sit on Industry 1). Ticket #133: they sit SIDE BY SIDE, so a rung's column
-    // is as many columns wide as its busiest branch and the Techs on it share that width; stacked,
-    // the tree would be seven rows and would not fit under the top bar.
+    // Engineering both sit on Industry 1). Ticket #133: they sat SIDE BY SIDE. Ticket #156
+    // (version 0.07.4): they sit side by side only on the LAST rung, where nothing leaves them
+    // (Planetary Stewardship beside The Upload); on any earlier rung they are STACKED in a taller
+    // branch row, so every column is one box wide, every first-rung box lines up, and a line out
+    // of Efficient Grids leaves its right edge instead of running beneath Coastal Engineering.
+    // The designer: *"adjust costal engineering in the tech tree."*
     let cell: Vec<Vec<TechId>> = (0..branches.len() * rungs)
         .map(|i| {
             let (b, r) = (i % branches.len(), i / branches.len());
@@ -4076,10 +4335,15 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
                 .collect()
         })
         .collect();
-    let span: Vec<f32> = (0..rungs).map(|r| (0..branches.len()).map(|b| cell[r * branches.len() + b].len()).max().unwrap_or(1).max(1) as f32).collect();
+    let stacked = |r: usize| r + 1 < rungs;
+    let span: Vec<f32> = (0..rungs).map(|r| if stacked(r) { 1.0 } else { (0..branches.len()).map(|b| cell[r * branches.len() + b].len()).max().unwrap_or(1).max(1) as f32 }).collect();
     let left: Vec<f32> = (0..rungs).map(|r| HEAD_W + span[..r].iter().sum::<f32>() * COL).collect();
     let width: f32 = HEAD_W + span.iter().sum::<f32>() * COL;
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, ROW * branches.len() as f32), egui::Sense::hover());
+    // A branch's band is as many rows tall as its tallest stacked cell.
+    let rows: Vec<f32> = (0..branches.len()).map(|b| (0..rungs).filter(|r| stacked(*r)).map(|r| cell[r * branches.len() + b].len()).max().unwrap_or(1).max(1) as f32).collect();
+    let top: Vec<f32> = (0..branches.len()).map(|b| rows[..b].iter().sum::<f32>() * ROW).collect();
+    let height: f32 = rows.iter().sum::<f32>() * ROW;
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
     let painter = ui.painter_at(rect);
     let box_of = |t: TechId| -> egui::Rect {
         let card = game.tables.tech(t);
@@ -4087,13 +4351,17 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
         let r = card.rung.max(1) as usize - 1;
         let here = &cell[r * branches.len() + b];
         let i = here.iter().position(|x| *x == t).unwrap_or(0) as f32;
-        let each = span[r] * COL / here.len().max(1) as f32;
-        let centre = left[r] + each * (i + 0.5);
-        let min = rect.min + egui::vec2(centre - BOX_W / 2.0, b as f32 * ROW + (ROW - BOX_H) / 2.0);
-        egui::Rect::from_min_size(min, egui::vec2(BOX_W, BOX_H))
+        // A stack fills its band row by row; a lone box, on any rung, stands at the band's middle.
+        let (centre, y) = if stacked(r) && here.len() > 1 {
+            (left[r] + COL / 2.0, top[b] + i * ROW + (ROW - BOX_H) / 2.0)
+        } else {
+            let each = span[r] * COL / here.len().max(1) as f32;
+            (left[r] + each * (i + 0.5), top[b] + (rows[b] * ROW - BOX_H) / 2.0)
+        };
+        egui::Rect::from_min_size(rect.min + egui::vec2(centre - BOX_W / 2.0, y), egui::vec2(BOX_W, BOX_H))
     };
     for (i, b) in branches.iter().enumerate() {
-        painter.text(rect.min + egui::vec2(HEAD_W - 12.0, (i as f32 + 0.5) * ROW), egui::Align2::RIGHT_CENTER, b, FontId::proportional(14.0), Color32::WHITE);
+        painter.text(rect.min + egui::vec2(HEAD_W - 12.0, top[i] + rows[i] * ROW / 2.0), egui::Align2::RIGHT_CENTER, b, FontId::proportional(14.0), Color32::WHITE);
     }
     // Lines first, so the boxes sit on top of them. A line is green once the Tech it comes from is done.
     // Ticket #133: a line is ELBOWED -- it leaves the needed box, runs along the gap to the left of
@@ -4214,9 +4482,10 @@ enum TileState {
 
 /// Ticket #145 (version 0.07.3): one tile of the Hab View -- a picture on a dark tile with its name
 /// beneath: dimmed while mothballed, hatched while building, dashed and empty for a free slot. Returns
-/// the click response so the window can open the strip for it.
+/// the click response so the window can open the strip for it. Since ticket #150 (version 0.07.4)
+/// the tile carries a hover, `tip`, through `rule_tip` like every other tooltip in the game.
 #[allow(clippy::too_many_arguments)]
-fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name: &str, state: TileState, selected: bool, edge: Option<Color32>) -> egui::Response {
+fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name: &str, state: TileState, selected: bool, edge: Option<Color32>, tip: String) -> egui::Response {
     let resp = ui.interact(rect, id, egui::Sense::click());
     let painter = ui.painter();
     // Ticket #146: a slot box on a Region's card carries the coast's blue as its edge; a tile in
@@ -4300,7 +4569,7 @@ fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name
     if !name.is_empty() {
         ui.painter().text(rect.center_bottom() + egui::vec2(0.0, 3.0), egui::Align2::CENTER_TOP, name, FontId::proportional(12.0), Color32::from_gray(225));
     }
-    resp
+    if tip.is_empty() { resp } else { rule_tip(resp, tip) }
 }
 
 /// Ticket #145 (version 0.07.3): **the Hab View**, a station's or Colony's Modules as a grid of
@@ -4311,6 +4580,35 @@ fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name
 /// that Module's figures and its Mothball, Restart and Decommission buttons in the strip under the
 /// grid; a click on a free tile puts the build buttons there. The card keeps its summary line and
 /// its own build buttons; the text rows that stood there have moved in here.
+/// A Module's line: its name and figures, or the sentence a mothballed, idle or offline one shows
+/// instead, and the Archive's fund. Read by the Hab View's strip and, since ticket #150 (version
+/// 0.07.4), by its tiles' hovers.
+fn module_line(game: &Game, col: &Colony, cid: ColonyId, mi: usize, director: Option<Seat>) -> String {
+    let m = &col.modules[mi];
+    let figures = if m.kind == ModuleKind::Archive {
+        let research = game.tables.archive.research;
+        let fund = director.map(|d| game.seat(d).archive_fund).unwrap_or(0);
+        if fund >= research {
+            format!("complete, {}", if m.online && !col.control.is_occupied() { "online" } else { "offline" })
+        } else {
+            format!("standing, {fund} of {research} Research paid")
+        }
+    } else if m.mothballed {
+        "mothballed: making nothing and paying no upkeep".to_string()
+    } else {
+        match director {
+            Some(d) => game.module_yield_at(d, cid, mi).text(),
+            None => "idle".to_string(),
+        }
+    };
+    format!("{}: {}{}", m.kind.name(), figures, if m.online || m.mothballed { "" } else { " (offline, making nothing)" })
+}
+
+/// Ticket #150 (version 0.07.4): the Module rules under a tile, the counterpart of `facility_rules`.
+fn module_rules(heading: &str) -> String {
+    format!("{heading}\nEnergy upkeep is paid at Income first; short of Energy, Modules go offline in order until the bill is met, and an offline one makes nothing and keeps its place.\nMothballed, it makes nothing and pays nothing until it is restarted.")
+}
+
 fn hab_view_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
     let Some(cid) = view.hab_view else { return };
     let Some(col) = game.colony(cid) else {
@@ -4328,7 +4626,7 @@ fn hab_view_window(ctx: &egui::Context, session: &Session, game: &Game, view: &m
         ui.add_space(4.0);
         // The tiles, in the order the cap counts them: standing (the Archive apart), building, free.
         let standing: Vec<usize> = (0..col.modules.len()).filter(|i| col.modules[*i].kind != ModuleKind::Archive).collect();
-        let building: Vec<ModuleKind> = col.queue.iter().filter_map(|b| if let BuildItem::Module(k) = b.item { if k == ModuleKind::Archive { None } else { Some(k) } } else { None }).collect();
+        let building: Vec<(ModuleKind, u32)> = col.queue.iter().filter_map(|b| if let BuildItem::Module(k) = b.item { if k == ModuleKind::Archive { None } else { Some((k, b.due_turn + 1)) } } else { None }).collect();
         let free = cap.saturating_sub(used) as usize;
         let total = standing.len() + building.len() + free;
         let rows = total.div_ceil(HAB_COLS).max(1);
@@ -4345,19 +4643,24 @@ fn hab_view_window(ctx: &egui::Context, session: &Session, game: &Game, view: &m
             let m = &col.modules[mi];
             let state = if m.mothballed { TileState::Mothballed } else { TileState::Standing };
             let selected = view.hab_tile == Some(HabTile::Module(mi));
-            if hab_tile(ui, tile_rect(i), ui.id().with(("hab", mi)), Some(crate::icons::module_icon(m.kind)), m.kind.name(), state, selected, None).clicked() {
+            // Ticket #150 (version 0.07.4): the tile's hover -- the figures its strip line carries
+            // and the Module rules, which the old rows never had.
+            let tip = module_rules(&module_line(game, col, cid, mi, director));
+            if hab_tile(ui, tile_rect(i), ui.id().with(("hab", mi)), Some(crate::icons::module_icon(m.kind)), m.kind.name(), state, selected, None, tip).clicked() {
                 view.hab_tile = Some(HabTile::Module(mi));
             }
             i += 1;
         }
-        for (bi, kind) in building.iter().enumerate() {
-            hab_tile(ui, tile_rect(i), ui.id().with(("hab-building", bi)), Some(crate::icons::module_icon(*kind)), kind.name(), TileState::Building, false, None);
+        for (bi, (kind, ready)) in building.iter().enumerate() {
+            let tip = format!("{}: building, ready turn {ready}.", kind.name());
+            hab_tile(ui, tile_rect(i), ui.id().with(("hab-building", bi)), Some(crate::icons::module_icon(*kind)), kind.name(), TileState::Building, false, None, tip);
             i += 1;
         }
         for fi in 0..free {
             // One free slot is as good as another, so the first stands for the click.
             let selected = fi == 0 && view.hab_tile == Some(HabTile::Free);
-            if hab_tile(ui, tile_rect(i), ui.id().with(("hab-free", fi)), None, "", TileState::Free, selected, None).clicked() {
+            let tip = format!("Room for another Module: click it to build here.\n{} places are free from the start and one more for every {} Colonist.", game.tables.slots.base, game.tables.slots.per_colonist);
+            if hab_tile(ui, tile_rect(i), ui.id().with(("hab-free", fi)), None, "", TileState::Free, selected, None, tip).clicked() {
                 view.hab_tile = Some(HabTile::Free);
             }
             i += 1;
@@ -4367,7 +4670,8 @@ fn hab_view_window(ctx: &egui::Context, session: &Session, game: &Game, view: &m
             let row = rows;
             let rect = egui::Rect::from_min_size(grid.min + egui::vec2(0.0, row as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP)), egui::vec2(HAB_TILE, HAB_TILE));
             let state = if col.modules[ai].mothballed { TileState::Mothballed } else { TileState::Standing };
-            if hab_tile(ui, rect, ui.id().with("hab-archive"), Some(crate::icons::module_icon(ModuleKind::Archive)), "The Archive", state, view.hab_tile == Some(HabTile::Module(ai)), None).clicked() {
+            let tip = format!("{}\nOutside the Module count. Its Research is paid into the Archive fund at any pace; complete, it takes a great deal of Energy to keep running. Destroyed outright if this Colony changes hands; the fund is kept.", module_line(game, col, cid, ai, director));
+            if hab_tile(ui, rect, ui.id().with("hab-archive"), Some(crate::icons::module_icon(ModuleKind::Archive)), "The Archive", state, view.hab_tile == Some(HabTile::Module(ai)), None, tip).clicked() {
                 view.hab_tile = Some(HabTile::Module(ai));
             }
         }
@@ -4377,24 +4681,8 @@ fn hab_view_window(ctx: &egui::Context, session: &Session, game: &Game, view: &m
         match view.hab_tile {
             Some(HabTile::Module(mi)) if mi < col.modules.len() => {
                 let m = &col.modules[mi];
-                let figures = if m.kind == ModuleKind::Archive {
-                    let research = game.tables.archive.research;
-                    let fund = director.map(|d| game.seat(d).archive_fund).unwrap_or(0);
-                    if fund >= research {
-                        format!("complete, {}", if m.online && !col.control.is_occupied() { "online" } else { "offline" })
-                    } else {
-                        format!("standing, {fund} of {research} Research paid")
-                    }
-                } else if m.mothballed {
-                    "mothballed: making nothing and paying no upkeep".to_string()
-                } else {
-                    match director {
-                        Some(d) => game.module_yield_at(d, cid, mi).text(),
-                        None => "idle".to_string(),
-                    }
-                };
                 let colour = if m.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
-                figures_with_icons(ui, &format!("{}: {}{}", m.kind.name(), figures, if m.online || m.mothballed { "" } else { " (offline, making nothing)" }), 14.0, colour, &[]);
+                figures_with_icons(ui, &module_line(game, col, cid, mi, director), 14.0, colour, &[]);
                 if mine && m.kind != ModuleKind::Archive {
                     change_row(ui, game, &session.pending, BuildingRef::Module(cid, mi), m.mothballed, m.change, actions);
                 }
@@ -4548,6 +4836,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // Ticket #54: the Scrubbers stand beside the Natural Sink in the same line.
             ui.label(format!("Natural Sink -{:.1}{}", e.sink, if e.scrubbers > 0.0 { format!(" and Scrubbers -{:.1}", e.scrubbers) } else { String::new() }));
             ui.label(RichText::new(format!("Net {:+.1} ppm", e.net())).strong());
+            // Ticket #153 (version 0.07.4): the same history, at the panel's width.
+            ui.add_space(4.0);
+            emissions_history(ui, game, egui::vec2(ui.available_width(), 110.0));
             ui.separator();
             let growth = game.population_growth_rate() * 100.0;
             ui.label(format!(
