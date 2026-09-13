@@ -213,6 +213,16 @@ pub struct NationState {
     /// Population that arrived here as refugees this turn; charged as Unrest once, at the end of
     /// Resolution, so the per-turn cap counts the whole turn's flows together.
     pub refugees_in: f64,
+    /// Ticket #176 (version 0.07.6): what LEFT here this turn, kept by the cause that drove them
+    /// out -- `the sea`, `the heat`, `the reefs`. Arrivals were counted per Region and departures
+    /// were not, so the Report could only speak per flow: a Region that lost people to two causes
+    /// spoke twice, and one that took ten and sent ten away spoke twice while netting nothing.
+    /// The designer: *"reduce report clutter by reporting only net migration from refugees and only
+    /// when migration occurs."* A net figure needs this counter beside `refugees_in`, and the cause
+    /// is kept with it because the largest one survives into the line. Zeroed where `refugees_in`
+    /// is, at the head of the Climate phase and again once Unrest has settled.
+    #[serde(default)]
+    pub refugees_out: Vec<(String, f64)>,
     /// The Unrest last named in the Report, so a crossing of 4, 7 or 10 is reported once.
     pub unrest_reported: f64,
     /// Ticket #53: the turn the state's current run of neutrality began, None while it is held or
@@ -839,6 +849,7 @@ impl Game {
                 unrest: c.unrest,
                 changed_hands: false,
                 refugees_in: 0.0,
+                refugees_out: Vec::new(),
                 unrest_reported: c.unrest,
                 // Every state is neutral when the game opens; the clocks are staggered below, and
                 // `take_control` clears the four the Factions begin holding.

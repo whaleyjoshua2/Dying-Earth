@@ -390,8 +390,14 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("unrest_card", &["state", "rose", "unrest"]),
     ("unrest_threshold", &["state", "unrest", "note"]),
     ("relief", &["faction", "state", "fell", "unrest"]),
-    ("refugees_arrived", &["n", "state", "rose", "unrest"]),
-    ("refugees_left", &["n", "state", "to", "why"]),
+    // Ticket #176 (version 0.07.6): one net line per Region, in place of one per flow and one for
+    // arriving. `gross` appears only where what left cancelled some of what arrived, since Unrest
+    // is charged on everyone who came.
+    ("refugees_net_in", &["n", "state", "rose", "unrest"]),
+    ("refugees_net_in_gross", &["n", "gross", "state", "rose", "unrest"]),
+    ("refugees_net_in_quiet", &["n", "state"]),
+    ("refugees_net_out", &["n", "state", "why"]),
+    ("refugees_net_out_mostly", &["n", "state", "why"]),
     ("resettled", &["faction", "state", "standing"]),
     ("strip_permit", &["faction", "state", "turns"]),
     ("strip_permit_ended", &["state", "baseline", "rose", "unrest"]),

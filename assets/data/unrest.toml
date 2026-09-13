@@ -31,6 +31,12 @@ per_decommission = 2.0
 # the population a point of Unrest costs and cut the cap from 3 to 2.
 refugees_per = 0.5
 refugees_max = 2.0
+
+# Ticket #176 (version 0.07.6): the Report says one NET migration line per Region, and stays silent
+# under this much movement. Half a person, at the designer's word: it is the same figure Unrest
+# itself rounds by (`refugees_per`), so a Region the Report passes over in silence is one whose
+# movement changed nothing else either.
+report_net_floor = 0.5
 # Occupation: when it begins, and each turn it lasts. Unchanged: Occupation should hurt.
 occupation_start = 3.0
 occupation_per_turn = 1.0

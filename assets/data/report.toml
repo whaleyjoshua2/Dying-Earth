@@ -56,8 +56,16 @@ unrest_rose_state = "{state}: Unrest rose by {rose} to {unrest}."
 unrest_card = "Unrest in {state}: its Unrest rose by {rose} to {unrest}."
 unrest_threshold = "{state}: Unrest reached {unrest} - {note}."
 relief = "The {faction} paid Relief in {state}: Unrest fell by {fell} to {unrest}."
-refugees_arrived = "{n} people arrived in {state}; Unrest rose by {rose} to {unrest}."
-refugees_left = "{n} left {state} for {to} ({why})."
+# Ticket #176 (version 0.07.6): one NET line per Region, and only when the net is worth at least
+# half a person. What a Region lost to each cause and what it took in used to speak separately, so a
+# hot turn spent up to 39 lines of a 74-line Report on refugees. Unrest is still charged on everyone
+# who arrived, so where the gross differs from the net the line names both; otherwise the Unrest
+# figure would be charged on a number the line never gives.
+refugees_net_in = "{state} took in {n} people; Unrest rose by {rose} to {unrest}."
+refugees_net_in_gross = "{state} took in {n} people of {gross} arriving; Unrest rose by {rose} to {unrest}."
+refugees_net_in_quiet = "{state} took in {n} people."
+refugees_net_out = "{state} lost {n} people to its neighbours: {why}."
+refugees_net_out_mostly = "{state} lost {n} people to its neighbours: mostly {why}."
 resettled = "The {faction} resettled this turn's refugees in {state} (+{standing} Standing there)."
 strip_permit = "The {faction} issued a Strip Permit in {state}: every Facility there produces double for {turns} turns."
 strip_permit_ended = "The Strip Permit in {state} ran out: its Baseline Emissions stand at {baseline} for good, and its Unrest rose by {rose} to {unrest}."

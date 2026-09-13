@@ -2361,16 +2361,31 @@ fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_half_a_person()
     let arrived = lost * 0.5;
     assert!(arrived > 0.5 && arrived < 1.0, "the flow is worth exactly one point of Unrest: {arrived}");
     assert!((g.state(StateId::Russia).population - arrived).abs() < 1e-6, "Russia took the flow: {}", g.state(StateId::Russia).population);
+    // Ticket #176 (version 0.07.6): the Report no longer speaks per flow. The old line here read
+    // "0.8 left China for Russia (the heat)" and was written the moment the people moved; a Region
+    // losing people to two causes said it twice, and a hot turn spent up to 39 of a 74-line Report
+    // on refugees. The Report now says one NET line per Region once every flow of the turn is in,
+    // which is in `resolve_unrest`, so nothing is said yet.
     assert!(
-        g.report.lines.iter().any(|l| l.text.contains("left China for") && l.text.contains("Russia")),
-        "a refugee line naming where they went: {:?}",
+        !g.report.lines.iter().any(|l| l.kind == LineKind::Refugees),
+        "the moving itself says nothing now: {:?}",
         g.report.lines
     );
+    // The LOG keeps the whole record, one line per flow, naming where they went and why.
+    assert!(g.log.iter().any(|l| l.contains("left China for") && l.contains("Russia")), "the log still names the flow: {:?}", g.log);
     // Russia changed nothing and holds nobody, so the turn's fall of 1.5 nets against the rise.
     g.state_mut(StateId::Russia).changed_hands = true;
     g.resolve_unrest();
     let want = (arrived / 0.5).floor();
     assert_eq!(g.unrest(StateId::Russia), want.min(2.0), "one Unrest per half a person arriving");
+    // And now the two net lines: China lost them, naming the cause that drove them out, and Russia
+    // took them in, with the Unrest clause that is the one place the Report explains an Unrest rise.
+    let said = |s: &str| g.report.lines.iter().any(|l| l.kind == LineKind::Refugees && l.text.contains(s));
+    assert!(said("China lost"), "China's net loss: {:?}", g.report.lines);
+    assert!(said("the heat"), "the largest cause survives into the line: {:?}", g.report.lines);
+    assert!(said("Russia took in"), "Russia's net gain: {:?}", g.report.lines);
+    assert!(said("Unrest rose by 1"), "and why Russia's Unrest rose: {:?}", g.report.lines);
+    assert_eq!(g.report.lines.iter().filter(|l| l.kind == LineKind::Refugees).count(), 2, "one line each, and no more");
 
     // The cap: eight people arriving in a turn is still only two, where #52 allowed three.
     let mut g = game();
@@ -2379,6 +2394,68 @@ fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_half_a_person()
     g.state_mut(StateId::Russia).changed_hands = true;
     g.resolve_unrest();
     assert_eq!(g.unrest(StateId::Russia), 2.0, "at most two from refugees in a turn");
+}
+
+/// Ticket #176 (version 0.07.6): the Report says **one net migration line per Region**, and only
+/// when the net is worth at least half a person. The designer: *"reduce report clutter by reporting
+/// only net migration from refugees and only when migration occurs."* Measured before the change,
+/// over ten computer-played games: the worst turn spent 39 of its 74 Report lines on refugees, the
+/// median turn 12, and refugees were 30% of the median Report -- because a Region spoke once per
+/// cause that drove people out and once more for arrivals, so a Region that took ten people and
+/// sent ten away spoke twice while netting nothing.
+#[test]
+fn the_report_says_one_net_migration_line_per_region_and_only_when_it_is_worth_saying() {
+    let refugee_lines = |g: &Game| g.report.lines.iter().filter(|l| l.kind == LineKind::Refugees).map(|l| l.text.clone()).collect::<Vec<_>>();
+
+    // Flows that cancel say nothing at all: this is the case the designer's line is about.
+    let mut g = game();
+    calm(&mut g);
+    g.state_mut(StateId::Russia).refugees_in = 6.0;
+    g.state_mut(StateId::Russia).refugees_out = vec![("the heat".to_string(), 6.0)];
+    // Unrest falls by 1.5 in a turn that changed nothing, and this line stops that fall so the rise
+    // charged on the arrivals can be read on its own.
+    g.state_mut(StateId::Russia).changed_hands = true;
+    g.resolve_unrest();
+    assert!(refugee_lines(&g).is_empty(), "ten in and ten out is no migration to report: {:?}", refugee_lines(&g));
+    // Unrest is still charged on the GROSS arrivals, which is the rule and is unchanged: a Region
+    // that took six people absorbed six people's worth of grievance, whatever left afterwards.
+    assert_eq!(g.unrest(StateId::Russia), 2.0, "charged on everyone who arrived, up to the cap");
+
+    // Under half a person, in either direction: silence.
+    let mut g = game();
+    calm(&mut g);
+    g.state_mut(StateId::Russia).refugees_in = 0.4;
+    g.state_mut(StateId::SouthAsia).refugees_out = vec![("the sea".to_string(), 0.4)];
+    g.resolve_unrest();
+    assert!(refugee_lines(&g).is_empty(), "under the floor in both directions: {:?}", refugee_lines(&g));
+
+    // A net gain, with some of what arrived cancelled by what left: the line names both figures,
+    // because the Unrest clause is charged on the gross and would otherwise be unexplained.
+    let mut g = game();
+    calm(&mut g);
+    g.state_mut(StateId::Russia).refugees_in = 7.0;
+    g.state_mut(StateId::Russia).refugees_out = vec![("the heat".to_string(), 4.0)];
+    g.resolve_unrest();
+    let lines = refugee_lines(&g);
+    assert_eq!(lines.len(), 1, "one line for the Region, not one per flow: {lines:?}");
+    assert!(lines[0].contains("took in 3.0 people of 7.0 arriving"), "the net and the gross: {lines:?}");
+    assert!(lines[0].contains("Unrest rose by"), "and why its Unrest rose: {lines:?}");
+
+    // A net loss to two causes: the largest survives, with `mostly`.
+    let mut g = game();
+    calm(&mut g);
+    g.state_mut(StateId::Russia).refugees_out = vec![("the sea".to_string(), 2.0), ("the heat".to_string(), 5.0)];
+    g.resolve_unrest();
+    let lines = refugee_lines(&g);
+    assert_eq!(lines.len(), 1, "one line, two causes: {lines:?}");
+    assert_eq!(lines[0], "Russia lost 7.0 people to its neighbours: mostly the heat.", "the largest cause, and only it");
+
+    // A net loss to one cause says it plainly, without `mostly`.
+    let mut g = game();
+    calm(&mut g);
+    g.state_mut(StateId::Russia).refugees_out = vec![("the reefs".to_string(), 3.0)];
+    g.resolve_unrest();
+    assert_eq!(refugee_lines(&g)[0], "Russia lost 3.0 people to its neighbours: the reefs.");
 }
 
 /// (d) Occupation: +3 when it begins and +1 a turn after; the figure carries over when control
