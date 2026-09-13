@@ -45,7 +45,7 @@ fn emissions_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
         return;
     }
     // Room at the right for the last figure and at the bottom for the turn axis.
-    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(6.0, 6.0), rect.max - egui::vec2(44.0, 16.0));
+    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(6.0, 6.0), rect.max - egui::vec2(44.0, 20.0));
     let emitted: Vec<f64> = h.iter().map(|r| r.breakdown.total()).collect();
     let removed: Vec<f64> = h.iter().map(|r| r.breakdown.total_sink()).collect();
     let net: Vec<f64> = h.iter().map(|r| r.breakdown.net()).collect();
@@ -75,11 +75,11 @@ fn emissions_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
     line(&net, NET, 2.0);
     for r in h.iter().filter(|r| !r.breaks.is_empty()) {
         let bx = x(r.turn);
-        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 9.0)], egui::Stroke::new(2.0, BREAK));
+        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 6.0)], egui::Stroke::new(2.0, BREAK));
     }
-    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, format!("turn {first}"), FontId::proportional(10.0), Color32::from_gray(150));
+    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, game.date(first).text(), FontId::proportional(10.0), Color32::from_gray(150));
     if last > first {
-        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, format!("turn {last}"), FontId::proportional(10.0), Color32::from_gray(150));
+        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, game.date(last).text(), FontId::proportional(10.0), Color32::from_gray(150));
     }
     let end = net[net.len() - 1];
     painter.text(Pos2::new(plot.right() + 3.0, y(end)), egui::Align2::LEFT_CENTER, format!("{end:+.1}"), FontId::proportional(11.0), NET);
@@ -112,7 +112,7 @@ fn population_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
         return;
     }
     // Room at both sides for a scale's ends, and at the bottom for the turn axis.
-    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(34.0, 6.0), rect.max - egui::vec2(34.0, 16.0));
+    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(34.0, 6.0), rect.max - egui::vec2(34.0, 20.0));
     let (first, last) = (h[0].turn, h[h.len() - 1].turn);
     let span = (last.max(first + 1) - first) as f32;
     let x = |turn: u32| plot.left() + (turn - first) as f32 / span * plot.width();
@@ -141,7 +141,7 @@ fn population_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
     line(h.iter().map(|r| Pos2::new(x(r.turn), y(r.space_population as f64, s_lo, s_hi))).collect(), SPACE);
     for r in h.iter().filter(|r| !r.breaks.is_empty()) {
         let bx = x(r.turn);
-        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 9.0)], egui::Stroke::new(2.0, BREAK));
+        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 6.0)], egui::Stroke::new(2.0, BREAK));
     }
     // Each scale's ends at its own side, in its own colour, in people rather than units.
     let small = FontId::proportional(9.0);
@@ -149,9 +149,9 @@ fn population_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
     painter.text(Pos2::new(plot.left() - 3.0, plot.bottom()), egui::Align2::RIGHT_BOTTOM, Game::people_text(e_lo.max(0.0)), small.clone(), EARTH);
     painter.text(Pos2::new(plot.right() + 3.0, plot.top()), egui::Align2::LEFT_TOP, Game::people_text(s_hi), small.clone(), SPACE);
     painter.text(Pos2::new(plot.right() + 3.0, plot.bottom()), egui::Align2::LEFT_BOTTOM, Game::people_text(s_lo.max(0.0)), small.clone(), SPACE);
-    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, format!("turn {first}"), small.clone(), Color32::from_gray(150));
+    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, game.date(first).text(), small.clone(), Color32::from_gray(150));
     if last > first {
-        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, format!("turn {last}"), small, Color32::from_gray(150));
+        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, game.date(last).text(), small, Color32::from_gray(150));
     }
 }
 
@@ -174,7 +174,7 @@ fn temperature_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
         painter.text(rect.center(), egui::Align2::CENTER_CENTER, "No turn resolved yet.", FontId::proportional(12.0), Color32::from_gray(150));
         return;
     }
-    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(6.0, 6.0), rect.max - egui::vec2(44.0, 16.0));
+    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(6.0, 6.0), rect.max - egui::vec2(44.0, 20.0));
     // The data's own range, at the designer's word, with a margin above and below and never
     // narrower than half a degree, so the first turns do not read as a cliff.
     let (min, max) = h.iter().fold((f64::MAX, f64::MIN), |(lo, hi), r| (lo.min(r.temperature), hi.max(r.temperature)));
@@ -202,11 +202,11 @@ fn temperature_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
     }
     for r in h.iter().filter(|r| !r.breaks.is_empty()) {
         let bx = x(r.turn);
-        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 9.0)], egui::Stroke::new(2.0, BREAK));
+        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 6.0)], egui::Stroke::new(2.0, BREAK));
     }
-    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, format!("turn {first}"), FontId::proportional(10.0), Color32::from_gray(150));
+    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, game.date(first).text(), FontId::proportional(10.0), Color32::from_gray(150));
     if last > first {
-        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, format!("turn {last}"), FontId::proportional(10.0), Color32::from_gray(150));
+        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, game.date(last).text(), FontId::proportional(10.0), Color32::from_gray(150));
     }
     let end = h[h.len() - 1].temperature;
     painter.text(Pos2::new(plot.right() + 3.0, y(end)), egui::Align2::LEFT_CENTER, format!("{end:+.1}"), FontId::proportional(11.0), LINE);
@@ -1751,7 +1751,15 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 .filter(|(n, _)| *n > 0)
                 .collect();
             bodies.sort_by_key(|(n, _)| std::cmp::Reverse(*n));
-            let earth_lines: Vec<String> = regions.iter().map(|(p, n)| format!("{n} {}", Game::people_text(*p))).collect();
+            // Ticket #166 (version 0.07.5): the four largest and a count of the rest. All fourteen
+            // were listed, which buried the chart the player hovered for under a list they could
+            // read off the map.
+            const NAMED: usize = 4;
+            let mut earth_lines: Vec<String> = regions.iter().take(NAMED).map(|(p, n)| format!("{n} {}", Game::people_text(*p))).collect();
+            if regions.len() > NAMED {
+                let rest: f64 = regions.iter().skip(NAMED).map(|(p, _)| *p).sum();
+                earth_lines.push(format!("and {} more, {}", regions.len() - NAMED, Game::people_text(rest)));
+            }
             let space_lines: Vec<String> = if bodies.is_empty() { vec!["nobody yet".to_string()] } else { bodies.iter().map(|(n, b)| format!("{} {}", b, Game::people_text(*n as f64))).collect() };
             // Ticket #166 (version 0.07.5): the figure's hover draws the population history under
             // its sentence, as the Emissions figure's does.

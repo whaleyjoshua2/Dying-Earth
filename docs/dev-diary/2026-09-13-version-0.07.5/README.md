@@ -181,3 +181,12 @@ heat had taken its losses and the Refugees had moved, so a population read there
 turn behind the Emissions and Temperature on the same record. Nothing else on the record moves in
 between. The caption says what is in neither line: Emigrants waiting on a card and Colonists aboard
 a Ship belong to neither figure, exactly as they belong to neither figure on the bar.
+
+**Decided by the designer**: the two scales kept as pictured, the chart left above the growth rate
+on the Climate Panel, the hover's list of Regions cut to **the four largest and a count of the
+rest** (all fourteen were listed, which buried the chart the player hovered for), and one thing that
+reaches further than this ticket -- **a chart's time axis carries the date, not the turn number**,
+*"a rule for all charts."* All three now read `January 2030` to `September 2032` where they read
+`turn 1` to `turn 17`, which is the form the top bar has always used. The Break ticks were shortened
+and the plot floor lifted in the same pass, because a tick landing near the last turn sat on top of
+the label.
