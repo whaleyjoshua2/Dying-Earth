@@ -31,12 +31,19 @@ pub struct Credit {
 
 /// The icons in use, their authors, and the names they carry at game-icons.net. Anything added to
 /// `assets/icons/` belongs here too: the credit is the licence's price, not a courtesy.
-pub const CREDITS: [Credit; 32] = [
+pub const CREDITS: [Credit; 36] = [
     Credit { resource: "Materials", icon: "Mine Wagon", author: "Delapouite" },
     Credit { resource: "Fuel", icon: "Jerrycan", author: "Delapouite" },
     Credit { resource: "Energy", icon: "Electric", author: "Sbed" },
     Credit { resource: "Research", icon: "Microscope", author: "Lord Berandas" },
     Credit { resource: "Ducats", icon: "Banknote", author: "Delapouite" },
+    // Ticket #168 (version 0.07.5): a symbol for each Faction, worn on its card on the Faction
+    // screen and nowhere else. Both authors were already credited above, so the screen gains four
+    // rows and no new name.
+    Credit { resource: "Custodians", icon: "Ecology", author: "Delapouite" },
+    Credit { resource: "Prospectors", icon: "Mining Helmet", author: "Delapouite" },
+    Credit { resource: "Arkwrights", icon: "Moon Orbit", author: "Delapouite" },
+    Credit { resource: "Archivists", icon: "CPU", author: "Delapouite" },
     // Ticket #112 (version 0.07.1): three figures that were words on the board.
     Credit { resource: "Population", icon: "Character", author: "Delapouite" },
     Credit { resource: "Influence", icon: "Megaphone", author: "Delapouite" },
@@ -115,6 +122,25 @@ pub fn module_icon(kind: dying_earth_engine::ModuleKind) -> &'static str {
         SolarArray => "module_solar_array",
         MassDriver => "module_mass_driver",
         Archive => "module_archive",
+        // Ticket #164 (version 0.07.5): the Core Module wears the station glyph the game drew for
+        // itself on ticket #135 -- two solar panels on a bar with a module between them, which is
+        // what a core module is. It owes no credit. A ground Colony's Core Module wears it too,
+        // for want of a drawing of its own; the designer may want one.
+        Core => "station",
+    }
+}
+
+/// Ticket #168 (version 0.07.5): the icon key a Faction's symbol wears on its card. Nowhere else
+/// draws it: the roster, the map labels, the Report and the Victory screen keep their Faction
+/// colours and names, at the designer's word -- *"for now these symbols should only appear on the
+/// faction selection screen."*
+pub fn faction_symbol(kind: dying_earth_engine::FactionKind) -> &'static str {
+    use dying_earth_engine::FactionKind::*;
+    match kind {
+        Custodians => "custodians",
+        Prospectors => "prospectors",
+        Arkwrights => "arkwrights",
+        Archivists => "archivists",
     }
 }
 

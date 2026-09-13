@@ -536,7 +536,11 @@ impl Game {
             .sum();
         let upkeep: i64 = producers.iter().filter(|p| p.online).map(|p| p.upkeep).sum();
         let mut balance = self.seat(seat).stockpile.energy + energy_in - upkeep - self.unit_upkeep(seat);
-        let mut order: Vec<usize> = (0..producers.len()).filter(|i| producers[*i].online && producers[*i].upkeep > 0).collect();
+        // Ticket #164 (version 0.07.5): the Core Module is never shut for want of Energy. It is the
+        // walls of the place rather than a building in it -- it cannot be mothballed either -- so
+        // its upkeep is paid whatever else goes dark.
+        let mut order: Vec<usize> =
+            (0..producers.len()).filter(|i| producers[*i].online && producers[*i].upkeep > 0 && producers[*i].name != ModuleKind::Core.name()).collect();
         order.sort_by(|a, b| {
             let pa = &producers[*a];
             let pb = &producers[*b];

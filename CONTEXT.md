@@ -9,7 +9,7 @@ The small version of the game: twelve turns and two Factions as first built, twe
 _Avoid_: slice, MVP, demo, v1, prototype
 
 **Faction**:
-A competing power with its own multipliers, signature rule and victory condition. The finished game has six; the First Playable has four since version 0.05, the Custodians, the Prospectors, the Arkwrights and the Archivists, and all four sit at every table.
+A competing power with its own multipliers, signature rule and victory condition. The finished game has six; the First Playable has four since version 0.05, the Custodians, the Prospectors, the Arkwrights and the Archivists, and all four sit at every table. Since version 0.07.5 each also has a **symbol**, worn in place of its colour swatch on its card on the Faction screen and nowhere else, drawn in the Faction's own colour -- the one place a caller picks an icon's colour rather than reading it from the fill rule, since a Faction symbol is exactly a statement of whose.
 _Avoid_: side, team, empire
 
 **Custodians**:
@@ -73,7 +73,7 @@ One of a fixed number of places in orbit around a Body where a Space Station can
 _Avoid_: dock, berth, orbit
 
 **Space Station**:
-A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard, Habitats and, since version 0.06.0, Observatories and Solar Arrays. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with a bare one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom); the Arkwrights start with none, and build theirs at half price. Since version 0.06.0 a station over Earth is off Earth: its Colonists count for Off-world Presence and it may hold the Archive. A station is also the one place a Ship of its Faction can refuel. It reads the Colony's Module cap since version 0.07.0, so one founded bare holds three and grows only as its people arrive.
+A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard, Habitats and, since version 0.06.0, Observatories and Solar Arrays. Since version 0.07.5 it stands with a Core Module, so it holds four people from the turn it is built and can be settled at once; until then it was founded bare and could hold nobody. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with a bare one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom); the Arkwrights start with none, and build theirs at half price. Since version 0.06.0 a station over Earth is off Earth: its Colonists count for Off-world Presence and it may hold the Archive. A station is also the one place a Ship of its Faction can refuel. It reads the Colony's Module cap since version 0.07.0, so one founded bare holds three and grows only as its people arrive.
 
 **Tank**:
 The Fuel a Ship carries, since version 0.06.0: a figure per Ship type, filled at the Shipyard for Fuel paid at the build, spent by transits, and refilled only by a Refuel. A Ship whose Tank cannot pay any leg from where it stands, with no Space Station of its Faction there, is stranded until one is built in orbit there.
@@ -149,8 +149,8 @@ Retired in version 0.07.3; see Max. It was the Command Cluster button, from vers
 _Avoid_: using it for anything Max now does; auto-spend, garrison, fortify, budget split
 
 **Hab View**:
-The window, since version 0.07.3, that shows a Space Station's or Colony's Modules as a grid of tiles: one tile per Module with its picture, dimmed while mothballed and hatched while building, a dashed empty tile for every free place under the Module cap, and the Archive on a tile of its own outside the count. Clicking a tile shows that Module's figures and its Mothball, Restart and Decommission buttons beneath the grid; clicking a free tile offers the build buttons there. Since version 0.07.4 a tile says its figures and the Module rules on hover, a free tile the room and the cap rule, a building tile the turn it is ready. Opened from the card's Modules button, from the Roster row, or with M; closed with Esc. Named after the habitat screen of Terra Invicta, the designer's reference.
-_Avoid_: module window, colony screen, base view, habitat panel
+Retired in version 0.07.5; see Module. It was the window, from version 0.07.3, that showed a Space Station's or Colony's Modules as a grid of tiles. The tiles moved onto the place's own card, laid out in the same grid a Region's build slots use, and the window and its name went with the move: a Colony's tiles are simply its Modules, as a Region's boxes are simply its build slots.
+_Avoid_: using it for the tiles on a Colony's card, which have no name of their own; module window, colony screen, base view, habitat panel
 
 **Figure**:
 One of the eight things the board counts and draws a glyph for: Materials, Fuel, Energy, Research, Ducats, population, Influence and Emissions. A figure's glyph carries one fill wherever it is drawn, decided by which figure it is and never by the colour of the text around it, and a word is traded for its glyph only where it names a figure -- which is to say only directly after a number, or, since version 0.07.3, where it heads a multiplier (`[research] x1.25` on a Faction card, `leans [materials]` on the start globe), with the phrase the glyph replaced on its hover.
@@ -216,8 +216,12 @@ _Avoid_: solar panel, power satellite, collector
 The Module only a ground Colony on a small world (the Moon, Phobos, Deimos) holds, since version 0.06.0, one to a Colony, behind Efficient Transit. While it works, every transit its owner's Ships fly from that Body spends four Fuel less, after every multiplier and never below one, and each Mine at its Colony makes one Materials more.
 _Avoid_: catapult, launcher, railgun, launch loop
 
+**Core Module**:
+The Module, since version 0.07.5, that every Colony and every Space Station is founded with, and the whole of what a founding gives. It holds four Colonists -- a flat four, which neither Expanded Habitats nor the Arkwrights' capacity multiplier reaches -- draws a little Energy, and is never ordered, never mothballed, never decommissioned and never shut for want of Energy: it is the walls of the place rather than a building in it. It stands outside the Module count as the Archive does, and it replaced the free Habitat a ground Colony used to be founded with. Because it holds people from the day a place stands, a station can be settled the turn it is built, which ended the deadlock whereby a bare station needed a Habitat to hold anybody and Colonists to earn the slot to build one.
+_Avoid_: hub, base, the core, starter module, command module
+
 **Module**:
-A building placed inside a Colony. Twelve kinds since version 0.06.0: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, the Solar Array (a Space Station's alone), the Mass Driver (a small world's alone), and the Archive, which only the Archivists raise, one to a Faction, from its own button. A Habitat holds eight Colonists since version 0.06.0, and since version 0.07.3 the same eight everywhere: no world's slot makes it hold more or fewer.
+A building placed inside a Colony. Thirteen kinds since version 0.07.5, when the Core Module joined the twelve of version 0.06.0: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, the Solar Array (a Space Station's alone), the Mass Driver (a small world's alone), and the Archive, which only the Archivists raise, one to a Faction, from its own button. A Habitat holds eight Colonists since version 0.06.0, and since version 0.07.3 the same eight everywhere: no world's slot makes it hold more or fewer. Since version 0.07.5 a Colony's Modules are drawn on its own card as a grid of tiles in the same shape a Region's build slots use -- one tile per Module with its picture, dimmed while mothballed and hatched while building, a dashed tile for every free place under the cap, and the Archive on a row of its own outside the count. Clicking a tile puts that Module's figures and its Mothball, Restart and Decommission buttons in the strip beneath; clicking a free tile puts the build buttons there, and that is the only place a Module is ordered.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:
@@ -331,7 +335,7 @@ How dirty a Region's industry is before any Facility is built there.
 _Avoid_: pollution rating, carbon score
 
 **Build Slot**:
-One of the places a Facility occupies in a Region. A state has Size + Industry Level + three of them, and each is either a **Coastal Slot** or an **Inland Slot**: the sea takes only the first, and every slot a raise of the Industry Level adds is one of the second. Its start Facilities stand on the coast first; a later build fills an inland slot while one is free. Since version 0.07.3 the card draws them as boxes in the Hab View's language -- a picture on a dark box, dimmed while mothballed, hatched while building, dashed while free, a coastal box outlined in blue and an inland one in grey -- and a slot the sea has taken stands under water, three quarters flooded with the drowned building dimmed beneath. Since version 0.07.4 every box says on hover what its row says -- the kind, its figures, and the upkeep, Emissions and coastal rules -- and a free, building or flooded box says what it is; the Scrubber and the Sea Wall, which take no slot, stand beneath the boxes with their build buttons, and a Facility that takes a slot is built by clicking a free box and nowhere else.
+One of the places a Facility occupies in a Region. A state has Size + Industry Level + three of them, and each is either a **Coastal Slot** or an **Inland Slot**: the sea takes only the first, and every slot a raise of the Industry Level adds is one of the second. Its start Facilities stand on the coast first; a later build fills an inland slot while one is free. Since version 0.07.3 the card draws them as boxes -- a picture on a dark box, dimmed while mothballed, hatched while building, dashed while free, a coastal box outlined in blue and an inland one in grey -- and a slot the sea has taken stands under water, three quarters flooded with the drowned building dimmed beneath. Since version 0.07.4 every box says on hover what its row says -- the kind, its figures, and the upkeep, Emissions and coastal rules -- and a free, building or flooded box says what it is; the Scrubber and the Sea Wall, which take no slot, stand beneath the boxes with their build buttons, and a Facility that takes a slot is built by clicking a free box and nowhere else.
 _Avoid_: building slot, plot, space, capacity
 
 **Coastal Slot**:
@@ -386,6 +390,10 @@ _Avoid_: diplomacy points, favour, reputation
 How much Influence a Faction has built up on one place. Since version 0.03 it persists: it is never wiped when the place changes hands, it decays 1 a turn on a place the Faction controls and 2 a turn elsewhere when nothing is spent, and spending on a place you hold raises it.
 _Avoid_: accumulation, influence points, loyalty
 
+**Threshold**:
+The Standing a Faction must reach to take a place. A Region's is a base plus a figure for each step of the state's size; a Colony's is a figure for each of its Colonists, and a Space Station's has a base of its own besides. Green Consensus lowers every threshold by a quarter, and since version 0.05 each Faction reads its own, since its Blame raises it on every place it does not hold. A place already held wants the holder's Standing plus the challenge margin as well, so the threshold is the floor and never the whole price. The word has a second, unrelated sense in the climate rules, where a Break or a Sea Level threshold is a Temperature; this entry is the Influence one.
+_Avoid_: cost, price, target (for the Influence sense); the climate sense, which is a Break or a Sea Level threshold
+
 **Allotment**:
 The amount of Influence a Faction receives each turn, split freely across any number of targets during the Orders phase. It is a base plus the Influence value of every Region the Faction controls (since version 0.03 each state carries its own value, from its economic and military weight), and it does not carry over.
 _Avoid_: influence budget, diplomacy pool, action points
@@ -419,6 +427,10 @@ _Avoid_: processing, execution, upkeep phase
 **Report**:
 The phase that opens a turn for the player, and the dated dispatch it shows. It opens with a headline: the most serious thing that happened, chosen by a fixed order of severity. Everything else is grouped under four headings, In space, On Earth, The climate and Your works, and an empty heading is left out. Every line that is about somewhere is a way there. It ends with what each rival Faction did, told in plain sentences of what the board could see.
 _Avoid_: summary, news, digest
+
+**Tutorial**:
+The guided first turns, since version 0.07.5, begun from the title screen's own button and played as the Custodians at their home. It is an ordinary game on an ordinary board: nothing is forced and nothing is checked, and a **tutorial note** -- drawn as a Moment is drawn -- opens each of the first five turns to say what that turn is for. The last note says so and the tutorial ends itself; the game carries on with nothing thrown away. The game does not remember it has been played. Its words live in `assets/data/tutorial.toml`.
+_Avoid_: walkthrough, onboarding, training mission, guided mode
 
 **Moment**:
 A short modal that stops the turn before the Report, for one sentence and one number: a Colony founded, a Break or the sea rising, a Battle that cost a unit, a place changing hands, a Tech completed, Antarctica opening, the Archive finished, or Colonists lost in transit. At most two a turn, the most serious first, and every kind can be switched off.
@@ -515,7 +527,7 @@ The CO2-equivalent a source adds to the CO2 Stock in a turn. Every source has it
 _Avoid_: output, carbon, footprint
 
 **Emissions history**:
-Since version 0.07.4, the record the engine keeps of every Climate phase -- the breakdown by source, the CO2 Stock, the Temperature and the Breaks that fired -- saved with the game, and the chart drawn from it: what the world emitted, what the Natural Sink and the Scrubbers removed, and the net between them, turn by turn against a zero line, the Breaks ticked red on the turn axis. Drawn small on the top bar's Emissions hover and wide on the Climate Panel under the by-source list. Its sibling, the **Temperature history**, draws the Temperature turn by turn on the top bar's Temperature hover, on the data's own range with the Breaks' Temperatures as faint lines.
+Since version 0.07.4, the record the engine keeps of every Climate phase -- the breakdown by source, the CO2 Stock, the Temperature and the Breaks that fired -- saved with the game, and the chart drawn from it: what the world emitted, what the Natural Sink and the Scrubbers removed, and the net between them, turn by turn against a zero line, the Breaks ticked red on the turn axis. Drawn small on the top bar's Emissions hover and wide on the Climate Panel under the by-source list. Its siblings are the **Temperature history**, which draws the Temperature turn by turn on the top bar's Temperature hover, on the data's own range with the Breaks' Temperatures as faint lines; and, since version 0.07.5, the **population history**, which draws Earth's people and space's on two scales of their own, since one axis would lay the space line flat. Since version 0.07.5 every chart's time axis carries the in-game date and never the turn number, and the record carries the two population figures, written after the Climate phase has settled them.
 _Avoid_: emissions total, emissions log, graph, chart (as names)
 
 **Natural Sink**:
@@ -543,5 +555,5 @@ The one Temperature at which the game ends with nobody winning, unless a Faction
 _Avoid_: threshold, tipping point, game over temperature
 
 **Climate Panel**:
-The screen showing the CO2 Stock, the Temperature and where it is heading, a Temperature bar notched with every Break, every Sea Level threshold and Antarctica's opening, this turn's Emissions by source, the sink and the net, since version 0.07.4 the Emissions history beneath them, the penalties in force, the Committed Warming, the Last Turn, and a projection to the last turn.
+The screen showing the CO2 Stock, the Temperature and where it is heading, a Temperature bar notched with every Break, every Sea Level threshold and Antarctica's opening, this turn's Emissions by source, the sink and the net, since version 0.07.4 the Emissions history beneath them and since version 0.07.5 the population history above the growth rate, the penalties in force, the Committed Warming, the Last Turn, and a projection to the last turn.
 _Avoid_: warming meter, climate HUD

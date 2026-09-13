@@ -47,6 +47,9 @@ pub enum Selection {
 pub enum Popup {
     None,
     Event,
+    /// Ticket #169 (version 0.07.5): a tutorial game's note for this turn, shown before everything
+    /// else, since it says what the turn is for.
+    Tutorial,
     /// Ticket #58: the nth Moment of this turn, shown before the Report.
     Moment(usize),
     Report,
@@ -71,6 +74,11 @@ pub struct Session {
     pub last_error: Option<String>,
     /// Ticket #105 (version 0.07.0): why the last End Turn was refused, shown once in its own popup.
     pub refusal: Option<String>,
+    /// Ticket #169 (version 0.07.5): this game was begun from the title screen's Tutorial button,
+    /// so a note opens each of its first turns. The designer chose a **guided free game** over a
+    /// scripted one: nothing is forced and nothing is checked, the notes only say where to look.
+    /// It goes false once the last note has been shown, and the game carries on as any other.
+    pub tutorial: bool,
     /// Ticket #64: nobody is playing this game. All four seats are the computer's, the interface
     /// gives no orders, and every Faction's board is open to be read.
     pub spectator: bool,
@@ -297,7 +305,6 @@ pub struct ViewState {
     /// Ticket #145 (version 0.07.3): the Hab View, open on one station or Colony, and the tile
     /// clicked in it -- a standing Module by index, or a free slot, whose strip offers the build
     /// buttons.
-    pub hab_view: Option<ColonyId>,
     pub hab_tile: Option<HabTile>,
     /// Ticket #146 (version 0.07.3): the slot box clicked on the selected Region's card.
     pub slot_box: Option<SlotBox>,
@@ -346,7 +353,6 @@ impl Default for ViewState {
             climate_reopen: false,
             show_victory: false,
             show_trade: false,
-            hab_view: None,
             hab_tile: None,
             slot_box: None,
             trade_amounts: [5, 10, 10, 10],

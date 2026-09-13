@@ -1132,18 +1132,23 @@ impl Game {
         if pending.iter().any(|o| matches!(o, Order::Change { building: b, .. } if *b == building)) {
             return fail("this building already has an order this turn");
         }
-        let (mothballed, changing, is_archive) = match building {
+        let (mothballed, changing, fixed) = match building {
             BuildingRef::Facility(sid, i) => match self.state(sid).facilities.get(i) {
-                Some(f) => (f.mothballed, f.change.is_some(), false),
+                Some(f) => (f.mothballed, f.change.is_some(), None),
                 None => return fail("no such Facility"),
             },
             BuildingRef::Module(cid, i) => match self.colony(cid).and_then(|c| c.modules.get(i)) {
-                Some(m) => (m.mothballed, m.change.is_some(), m.kind == ModuleKind::Archive),
+                Some(m) => (m.mothballed, m.change.is_some(), Some(m.kind).filter(|k| matches!(k, ModuleKind::Archive | ModuleKind::Core))),
                 None => return fail("no such Module"),
             },
         };
-        if is_archive {
-            return fail("the Archive is raised and lost by its own rules; it is not mothballed");
+        match fixed {
+            Some(ModuleKind::Archive) => return fail("the Archive is raised and lost by its own rules; it is not mothballed"),
+            // Ticket #164 (version 0.07.5): the Core Module is the place itself. Mothballing or
+            // decommissioning it would leave a Colony with nowhere for its people to live and no
+            // way to build one.
+            Some(ModuleKind::Core) => return fail("the Core Module is the place itself; it is never mothballed or decommissioned"),
+            _ => {}
         }
         if changing {
             return fail("this building is already being mothballed, restarted or decommissioned");

@@ -45,7 +45,7 @@ fn emissions_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
         return;
     }
     // Room at the right for the last figure and at the bottom for the turn axis.
-    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(6.0, 6.0), rect.max - egui::vec2(44.0, 16.0));
+    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(6.0, 6.0), rect.max - egui::vec2(44.0, 20.0));
     let emitted: Vec<f64> = h.iter().map(|r| r.breakdown.total()).collect();
     let removed: Vec<f64> = h.iter().map(|r| r.breakdown.total_sink()).collect();
     let net: Vec<f64> = h.iter().map(|r| r.breakdown.net()).collect();
@@ -75,14 +75,84 @@ fn emissions_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
     line(&net, NET, 2.0);
     for r in h.iter().filter(|r| !r.breaks.is_empty()) {
         let bx = x(r.turn);
-        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 9.0)], egui::Stroke::new(2.0, BREAK));
+        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 6.0)], egui::Stroke::new(2.0, BREAK));
     }
-    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, format!("turn {first}"), FontId::proportional(10.0), Color32::from_gray(150));
+    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, game.date(first).text(), FontId::proportional(10.0), Color32::from_gray(150));
     if last > first {
-        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, format!("turn {last}"), FontId::proportional(10.0), Color32::from_gray(150));
+        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, game.date(last).text(), FontId::proportional(10.0), Color32::from_gray(150));
     }
     let end = net[net.len() - 1];
     painter.text(Pos2::new(plot.right() + 3.0, y(end)), egui::Align2::LEFT_CENTER, format!("{end:+.1}"), FontId::proportional(11.0), NET);
+}
+
+/// Ticket #166 (version 0.07.5): **the population history**, the third of the top bar's charts. The
+/// designer: *"get a mouse over graph for the population as well."* Two lines on **two scales** --
+/// Earth read against the left of the chart and space against the right, each with its own ends
+/// written small at its own side -- because Earth is counted in the hundreds of units and space in
+/// single figures, and on one scale the space line lies flat on the floor for the whole game and
+/// says nothing. Drawn that way the chart says the thing worth seeing: Earth falling while space
+/// rises. The Breaks are ticked red on the turn axis, as on its two siblings, because the heat is
+/// what takes the people.
+fn population_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
+    const EARTH: Color32 = Color32::from_rgb(150, 190, 240);
+    const SPACE: Color32 = Color32::from_rgb(235, 235, 240);
+    const BREAK: Color32 = Color32::from_rgb(236, 88, 76);
+    let h = &game.climate.history;
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 6.0;
+        ui.label(RichText::new("Earth").color(EARTH).small());
+        ui.label(RichText::new("space").color(SPACE).small());
+        ui.label(RichText::new("on scales of their own; a red tick is a Break").weak().small());
+    });
+    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    let painter = ui.painter();
+    painter.rect_filled(rect, 3.0, Color32::from_rgb(38, 38, 44));
+    if h.is_empty() {
+        painter.text(rect.center(), egui::Align2::CENTER_CENTER, "No turn resolved yet.", FontId::proportional(12.0), Color32::from_gray(150));
+        return;
+    }
+    // Room at both sides for a scale's ends, and at the bottom for the turn axis.
+    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(34.0, 6.0), rect.max - egui::vec2(34.0, 20.0));
+    let (first, last) = (h[0].turn, h[h.len() - 1].turn);
+    let span = (last.max(first + 1) - first) as f32;
+    let x = |turn: u32| plot.left() + (turn - first) as f32 / span * plot.width();
+    // Each line on its own range, with a margin, so both are legible whatever the other does.
+    let scale = |lo: f64, hi: f64| {
+        let pad = ((hi - lo) * 0.15).max(0.5);
+        (lo - pad, hi + pad)
+    };
+    let (e_lo, e_hi) = {
+        let (lo, hi) = h.iter().fold((f64::MAX, f64::MIN), |(a, b), r| (a.min(r.earth_population), b.max(r.earth_population)));
+        scale(lo, hi)
+    };
+    let (s_lo, s_hi) = {
+        let (lo, hi) = h.iter().fold((f64::MAX, f64::MIN), |(a, b), r| (a.min(r.space_population as f64), b.max(r.space_population as f64)));
+        scale(lo, hi)
+    };
+    let y = |v: f64, lo: f64, hi: f64| plot.bottom() - (((v - lo) / (hi - lo)).clamp(0.0, 1.0) as f32) * plot.height();
+    let line = |values: Vec<Pos2>, colour: Color32| {
+        if values.len() == 1 {
+            painter.circle_filled(values[0], 3.0, colour);
+        } else {
+            painter.add(egui::Shape::line(values, egui::Stroke::new(2.0, colour)));
+        }
+    };
+    line(h.iter().map(|r| Pos2::new(x(r.turn), y(r.earth_population, e_lo, e_hi))).collect(), EARTH);
+    line(h.iter().map(|r| Pos2::new(x(r.turn), y(r.space_population as f64, s_lo, s_hi))).collect(), SPACE);
+    for r in h.iter().filter(|r| !r.breaks.is_empty()) {
+        let bx = x(r.turn);
+        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 6.0)], egui::Stroke::new(2.0, BREAK));
+    }
+    // Each scale's ends at its own side, in its own colour, in people rather than units.
+    let small = FontId::proportional(9.0);
+    painter.text(Pos2::new(plot.left() - 3.0, plot.top()), egui::Align2::RIGHT_TOP, Game::people_text(e_hi), small.clone(), EARTH);
+    painter.text(Pos2::new(plot.left() - 3.0, plot.bottom()), egui::Align2::RIGHT_BOTTOM, Game::people_text(e_lo.max(0.0)), small.clone(), EARTH);
+    painter.text(Pos2::new(plot.right() + 3.0, plot.top()), egui::Align2::LEFT_TOP, Game::people_text(s_hi), small.clone(), SPACE);
+    painter.text(Pos2::new(plot.right() + 3.0, plot.bottom()), egui::Align2::LEFT_BOTTOM, Game::people_text(s_lo.max(0.0)), small.clone(), SPACE);
+    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, game.date(first).text(), small.clone(), Color32::from_gray(150));
+    if last > first {
+        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, game.date(last).text(), small, Color32::from_gray(150));
+    }
 }
 
 /// Ticket #158 (version 0.07.4): **the Temperature history**, the Emissions history's sibling on
@@ -104,7 +174,7 @@ fn temperature_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
         painter.text(rect.center(), egui::Align2::CENTER_CENTER, "No turn resolved yet.", FontId::proportional(12.0), Color32::from_gray(150));
         return;
     }
-    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(6.0, 6.0), rect.max - egui::vec2(44.0, 16.0));
+    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(6.0, 6.0), rect.max - egui::vec2(44.0, 20.0));
     // The data's own range, at the designer's word, with a margin above and below and never
     // narrower than half a degree, so the first turns do not read as a cliff.
     let (min, max) = h.iter().fold((f64::MAX, f64::MIN), |(lo, hi), r| (lo.min(r.temperature), hi.max(r.temperature)));
@@ -132,11 +202,11 @@ fn temperature_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
     }
     for r in h.iter().filter(|r| !r.breaks.is_empty()) {
         let bx = x(r.turn);
-        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 9.0)], egui::Stroke::new(2.0, BREAK));
+        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 6.0)], egui::Stroke::new(2.0, BREAK));
     }
-    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, format!("turn {first}"), FontId::proportional(10.0), Color32::from_gray(150));
+    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, game.date(first).text(), FontId::proportional(10.0), Color32::from_gray(150));
     if last > first {
-        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, format!("turn {last}"), FontId::proportional(10.0), Color32::from_gray(150));
+        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, game.date(last).text(), FontId::proportional(10.0), Color32::from_gray(150));
     }
     let end = h[h.len() - 1].temperature;
     painter.text(Pos2::new(plot.right() + 3.0, y(end)), egui::Align2::LEFT_CENTER, format!("{end:+.1}"), FontId::proportional(11.0), LINE);
@@ -248,6 +318,10 @@ enum Action {
     GoTo(ReportPlace),
     ChooseFaction(FactionKind),
     NewGame(FactionKind, StateId),
+    /// Ticket #169 (version 0.07.5): the Tutorial button on the title screen.
+    StartTutorial,
+    /// Ticket #169: the reader pressed on through a tutorial note.
+    TutorialNoteRead,
     /// Ticket #64: Spectate, the fifth button on the choice screen.
     Spectate,
     /// Ticket #64: the Auto box beside End Turn.
@@ -292,8 +366,19 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mu
             view.hotkey = Some(HotKey::EndTurn);
         }
     } else {
-        if keys.just_pressed(KeyCode::Tab) {
+        // Ticket #162 (version 0.07.5): M swaps between the Solar System Map and the surface, the
+        // job Tab held until now. The designer freed M by retiring the Hab View window and asked
+        // for it here: *"use it to bring up the solar system map replace tab."*
+        if keys.just_pressed(KeyCode::KeyM) {
             view.swap();
+        }
+        // Ticket #163 (version 0.07.5): and Tab, freed by that move, brings the roster back. The
+        // panel shows the roster whenever nothing is selected, so clearing the selection is what
+        // "bring up the roster" means. The designer: *"should bring up the roster."*
+        if keys.just_pressed(KeyCode::Tab) {
+            view.selection = Selection::None;
+            view.slot_box = None;
+            view.hab_tile = None;
         }
         // Ticket #41: C toggles the Climate Panel, a second way back once it is closed.
         if keys.just_pressed(KeyCode::KeyC) {
@@ -309,17 +394,6 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mu
         }
         if keys.just_pressed(KeyCode::KeyR) && !session.spectator {
             view.show_trade = !view.show_trade;
-        }
-        // Ticket #145 (version 0.07.3): M opens the Hab View for the selected station or Colony,
-        // and closes it if it is open.
-        if keys.just_pressed(KeyCode::KeyM) {
-            if view.hab_view.is_some() {
-                view.hab_view = None;
-                view.hab_tile = None;
-            } else if let Selection::Colony(cid) = view.selection {
-                view.hab_view = Some(cid);
-                view.hab_tile = None;
-            }
         }
         let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
         if ctrl && keys.just_pressed(KeyCode::KeyS) {
@@ -338,9 +412,9 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mu
         if view.popup != Popup::None {
             let moments = session.game.as_ref().map(|g| view.moments_of(&session.tables, &g.report).len()).unwrap_or(0);
             advance_popup(&mut view, moments);
-        } else if view.hab_view.is_some() {
-            // Ticket #145: Esc closes the Hab View before it leaves a Surface Map.
-            view.hab_view = None;
+        } else if view.hab_tile.is_some() {
+            // Ticket #162 (version 0.07.5): Esc clears a clicked Module tile before it leaves a
+            // Surface Map, as it closed the Hab View before the window retired.
             view.hab_tile = None;
         } else if matches!(view.view, View::Surface(_)) {
             view.view = View::Solar;
@@ -356,9 +430,20 @@ pub fn toggle_climate(view: &mut ViewState) {
     view.climate_reopen = view.show_climate;
 }
 
+/// Ticket #169 (version 0.07.5): the tutorial's note for a turn, if it has one. The notes are
+/// words and nothing else, so they live in `assets/data/tutorial.toml` with every other sentence
+/// the game says, and the turn they open is a field on the note rather than their order in the file.
+fn tutorial_note(tables: &Tables, turn: u32) -> Option<&dying_earth_engine::TutorialNote> {
+    tables.tutorial.note.iter().find(|n| n.turn == turn)
+}
+
 /// Ticket #58: Event, then the turn's Moments one after another, then the Report.
 fn advance_popup(view: &mut ViewState, moments: usize) {
     view.popup = match view.popup {
+        // Ticket #169 (version 0.07.5): the tutorial's note comes first and hands on to whatever
+        // the turn would have opened with.
+        Popup::Tutorial if moments > 0 => Popup::Moment(0),
+        Popup::Tutorial => Popup::Report,
         Popup::Event if moments > 0 => Popup::Moment(0),
         Popup::Event => Popup::Report,
         Popup::Moment(i) if i + 1 < moments => Popup::Moment(i + 1),
@@ -817,7 +902,12 @@ pub fn draw(
                 }
                 view.selection = Selection::None;
                 let moments = session.game.as_ref().map(|g| view.moments_of(&session.tables, &g.report).len()).unwrap_or(0);
-                view.popup = if session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some() {
+                // Ticket #169 (version 0.07.5): a tutorial game opens its first turns with a note
+                // saying what the turn is for, before the Event, the Moments and the Report.
+                let has_note = session.tutorial && session.game.as_ref().map(|g| tutorial_note(&session.tables, g.turn).is_some()).unwrap_or(false);
+                view.popup = if has_note {
+                    Popup::Tutorial
+                } else if session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some() {
                     Popup::Event
                 } else if moments > 0 {
                     Popup::Moment(0)
@@ -883,6 +973,32 @@ pub fn draw(
                 let (lon, lat) = geo::state_lonlat(s);
                 view.yaw = geo::yaw_facing(lon, lat);
             }
+            // Ticket #169 (version 0.07.5): the Tutorial begins an ordinary game as the Custodians
+            // at their own home, and opens on its first note rather than on the Report.
+            Action::StartTutorial => {
+                let f = FactionKind::Custodians;
+                let s = session.tables.faction(f).home;
+                session.new_game(f, s);
+                session.tutorial = true;
+                *view = ViewState::default();
+                view.popup = Popup::Tutorial;
+                let (lon, lat) = geo::state_lonlat(s);
+                view.yaw = geo::yaw_facing(lon, lat);
+            }
+            // Ticket #169: on from a note to whatever the turn would have opened with. The tutorial
+            // ends itself once the last note has been read, and the game carries on as any other.
+            Action::TutorialNoteRead => {
+                let turn = session.game.as_ref().map(|g| g.turn).unwrap_or(0);
+                if session.tables.tutorial.note.iter().map(|n| n.turn).max() == Some(turn) {
+                    session.tutorial = false;
+                }
+                let moments = session.game.as_ref().map(|g| view.moments_of(&session.tables, &g.report).len()).unwrap_or(0);
+                if session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some() {
+                    view.popup = Popup::Event;
+                } else {
+                    advance_popup(&mut view, moments);
+                }
+            }
             Action::Save => {
                 session.save_now();
             }
@@ -947,6 +1063,17 @@ fn title_screen(root: &mut Ui, session: &mut Session, actions: &mut Vec<Action>)
             ui.label(RichText::new("DYING EARTH").size(48.0).strong());
             ui.label(RichText::new("Colonize the solar system before ecological collapse overtakes Earth.").size(16.0));
             ui.add_space(40.0);
+            // Ticket #169 (version 0.07.5): the Tutorial, above New Game, where a new player looks
+            // first. It begins an ordinary game as the Custodians at their home, with a note at the
+            // head of each of its first turns; the Faction and the start are not asked for, since
+            // the whole point is to be playing within one click.
+            if ui
+                .add(egui::Button::new(RichText::new("Tutorial").size(22.0)).min_size(egui::vec2(220.0, 44.0)))
+                .on_hover_text("Play as the Custodians, with a note at the start of each of the first five turns saying what that turn is for. An ordinary game otherwise, and an ordinary game afterwards.")
+                .clicked()
+            {
+                actions.push(Action::StartTutorial);
+            }
             if ui.add(egui::Button::new(RichText::new("New Game").size(22.0)).min_size(egui::vec2(220.0, 44.0))).clicked() {
                 session.screen = Screen::ChooseFaction;
             }
@@ -1178,8 +1305,29 @@ fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut
     let card = session.tables.faction(kind);
     egui::Frame::group(ui.style()).inner_margin(12.0).show(ui, |ui| {
         ui.horizontal(|ui| {
-            let (swatch, _) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), egui::Sense::hover());
-            ui.painter().rect_filled(swatch, 4.0, rgb(card.colour));
+            // Ticket #168 (version 0.07.5): the Faction's symbol stands where its colour swatch
+            // stood, drawn in the Faction's own colour, so the card says which Faction and which
+            // colour in one mark and grows by nothing. The designer: *"I want to pick four symbols
+            // to represent the factions - for now these symbols should only appear on the faction
+            // selection screen in their respective cards."*
+            //
+            // This is the one place a caller picks an icon's colour. `icons::fill` decides it
+            // everywhere else, and the reason for that rule is that a colour on this board means
+            // WHOSE -- which is exactly what a Faction symbol is for, so the rule is bent here
+            // deliberately and nowhere else. The research (#167) measured that the symbol wants 28
+            // pixels rather than the swatch's 24: at 24 a glyph has a quarter fewer pixels and
+            // three of the candidates stopped naming themselves.
+            let key = crate::icons::faction_symbol(kind);
+            match Icons::from_ctx(ui.ctx(), key, 28.0) {
+                Some(image) => {
+                    ui.add(image.tint(rgb(card.colour)));
+                }
+                None => {
+                    // No art loaded: the swatch it replaced, so the row is never empty.
+                    let (swatch, _) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), egui::Sense::hover());
+                    ui.painter().rect_filled(swatch, 4.0, rgb(card.colour));
+                }
+            }
             ui.label(RichText::new(&card.name).size(24.0).strong().color(rgb(card.colour)));
         });
         ui.label(&card.blurb);
@@ -1619,7 +1767,11 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             // say when a pick is owed. End Turn is disabled until one is made, but that only shows
             // on a hover, and a player who does not know to look will not find it.
             if game.research.awaiting_pick == Some(Seat(0)) && game.research.current.is_none() && !game.available_techs().is_empty() && !session.spectator {
-                if ui.button(RichText::new("Pick a Tech").color(Color32::BLACK).strong()).on_hover_text("The Research Lead is yours: choose what the world researches next. The turn cannot end until you do.").clicked() {
+                // Ticket #163 (version 0.07.5): in the red End Turn wears, since the two are the
+                // pair that gate a turn. The designer: *"'Pick a tech' button when present should be
+                // red."* It was black text on the default dark fill, the least legible button on the bar.
+                let pick = egui::Button::new(RichText::new("Pick a Tech").strong()).fill(TURN_RED);
+                if ui.add(pick).on_hover_text("The Research Lead is yours: choose what the world researches next. The turn cannot end until you do.").clicked() {
                     view.show_tech = true;
                 }
                 ui.separator();
@@ -1677,15 +1829,35 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 .filter(|(n, _)| *n > 0)
                 .collect();
             bodies.sort_by_key(|(n, _)| std::cmp::Reverse(*n));
-            let earth_lines: Vec<String> = regions.iter().map(|(p, n)| format!("{n} {}", Game::people_text(*p))).collect();
+            // Ticket #166 (version 0.07.5): the four largest and a count of the rest. All fourteen
+            // were listed, which buried the chart the player hovered for under a list they could
+            // read off the map.
+            const NAMED: usize = 4;
+            let mut earth_lines: Vec<String> = regions.iter().take(NAMED).map(|(p, n)| format!("{n} {}", Game::people_text(*p))).collect();
+            if regions.len() > NAMED {
+                let rest: f64 = regions.iter().skip(NAMED).map(|(p, _)| *p).sum();
+                earth_lines.push(format!("and {} more, {}", regions.len() - NAMED, Game::people_text(rest)));
+            }
             let space_lines: Vec<String> = if bodies.is_empty() { vec!["nobody yet".to_string()] } else { bodies.iter().map(|(n, b)| format!("{} {}", b, Game::people_text(*n as f64))).collect() };
-            bar_resource(
+            // Ticket #166 (version 0.07.5): the figure's hover draws the population history under
+            // its sentence, as the Emissions figure's does.
+            let pop_sentence = format!(
+                "On Earth: {}.\nOff Earth: {}.\nOne Colonist is five million people; a station over Earth is off Earth and Antarctica is on it.\nEmigrants waiting on a card and Colonists aboard a Ship are in neither line.",
+                earth_lines.join(", "),
+                space_lines.join(", ")
+            );
+            bar_resource_with(
                 ui,
                 icons,
                 "population",
-                "Population",
+                "Population history",
                 format!("Earth {} · Space {}", Game::people_text(game.earth_population()), Game::people_text(game.space_population() as f64)),
-                format!("On Earth: {}.\nOff Earth: {}.\nOne Colonist is five million people; a station over Earth is off Earth and Antarctica is on it.", earth_lines.join(", "), space_lines.join(", ")),
+                |ui| {
+                    ui.set_max_width(300.0);
+                    ui.label(RichText::new("Population history").strong());
+                    ui.label(&pop_sentence);
+                    population_history(ui, game, egui::vec2(280.0, 96.0));
+                },
             );
         });
         ui.horizontal_wrapped(|ui| {
@@ -1716,8 +1888,8 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 ui.label(RichText::new(text).strong().color(Color32::from_rgb(140, 210, 150)));
             }
             let swap_text = match view.view {
-                View::Solar => format!("To {} (Tab)", game.tables.body(view.last_surface).name),
-                View::Surface(_) => "Solar System Map (Tab)".to_string(),
+                View::Solar => format!("To {} (M)", game.tables.body(view.last_surface).name),
+                View::Surface(_) => "Solar System Map (M)".to_string(),
             };
             if ui.add(bar_button(swap_text)).clicked() {
                 view.swap();
@@ -1731,7 +1903,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 // of the side panel, where the rest of the every-turn controls now are. A spectator
                 // has no cluster -- they give no orders -- so theirs stays here beside the Auto box.
                 if session.spectator {
-                    let button = egui::Button::new(RichText::new("End Turn (Enter)").strong().size(16.0)).fill(Color32::from_rgb(120, 40, 30));
+                    let button = egui::Button::new(RichText::new("End Turn (Enter)").strong().size(16.0)).fill(TURN_RED);
                     if ui.add_enabled(view.popup == Popup::None, button).clicked() {
                         press_end_turn(session, game, view, actions);
                     }
@@ -2091,7 +2263,10 @@ A station is where Ships refuel and where a Shipyard can stand, and a Warship ho
             Control::Controlled(s) => game.seat_name(s),
             Control::Occupied { occupier, .. } => format!("occupied by the {}", game.seat_name(occupier)),
         };
-        let mods: Vec<&str> = c.modules.iter().map(|m| m.kind.name()).collect();
+        // Ticket #165 (version 0.07.5): the Core Module is left out of the list. Every Colony and
+        // every station has one, so naming it says nothing about this one; and a station that holds
+        // only its Core Module is exactly what the words below have always called a bare core module.
+        let mods: Vec<&str> = c.modules.iter().filter(|m| m.kind != ModuleKind::Core).map(|m| m.kind.name()).collect();
         let text = format!("{}: {}, {} Colonists, {}", game.station_name(body, c.slot), owner, c.colonists, if mods.is_empty() { "a bare core module".to_string() } else { mods.join(", ") });
         if ui.button(text).clicked() {
             view.selection = Selection::Colony(c.id);
@@ -2317,7 +2492,7 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
     });
 
     // End Turn, where a hand already is. Ticket #128 (version 0.07.2): named for its key.
-    let button = egui::Button::new(RichText::new("End Turn (Enter)").strong().size(16.0)).fill(Color32::from_rgb(120, 40, 30));
+    let button = egui::Button::new(RichText::new("End Turn (Enter)").strong().size(16.0)).fill(TURN_RED);
     if ui.add_enabled(can_end_turn(game, view), button).on_disabled_hover_text("Pick a Tech first").clicked() {
         press_end_turn(session, game, view, actions);
     }
@@ -2461,7 +2636,9 @@ fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
                 roster_of(ui, session, game, seat, false, &mut jump);
         }
     } else {
-        ui.label(RichText::new("Your roster").size(18.0).strong());
+        // Ticket #163 (version 0.07.5): the roster has no button on the bar, so its heading names
+        // the key that brings it back, which is the rule every bar button follows.
+        ui.label(RichText::new("Your roster (Tab)").size(18.0).strong());
         // Ticket #127 (version 0.07.2): the ring, in place of 0.07.1's "no order" and its filter.
         ui.label(RichText::new("Click a row to select it and go there. An open ring marks a row that still wants an order; it fills once the order is given.").weak());
         roster_of(ui, session, game, Seat(0), true, &mut jump);
@@ -2479,9 +2656,10 @@ fn roster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
         }
         view.selection = sel;
         view.attack_preview = false;
-        // Ticket #145 (version 0.07.3): a Colony's or station's roster row opens its Hab View too.
-        if let Selection::Colony(cid) = sel {
-            view.hab_view = Some(cid);
+        // Ticket #162 (version 0.07.5): selecting a Colony is enough -- its card carries the
+        // Module tiles now, so there is no window for the roster row to open. The clicked tile is
+        // cleared, as it was when the row opened a fresh window.
+        if matches!(sel, Selection::Colony(_)) {
             view.hab_tile = None;
         }
     }
@@ -2682,7 +2860,16 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
         let building = c.queue.len();
         let ordered = building > 0 || pending.iter().any(|o| roster_order_touches_colony(o, c.id));
         // Ticket #127: the spectator's word tag agrees with the glyph, so a station is not a "Colony:".
-        let text = format!("{}{}: {} Colonists, {} Modules{}", tag(if c.in_orbit { "Station" } else { "Colony" }), game.place_name(Place::Colony(c.id)), c.colonists, c.modules.len(), if building > 0 { format!(", {building} building") } else { String::new() });
+        // Ticket #165 (version 0.07.5): the count is the one the card shows, which leaves out the
+        // Core Module every place has and the Archive, so the roster and the card cannot disagree.
+        let text = format!(
+            "{}{}: {} Colonists, {} Modules{}",
+            tag(if c.in_orbit { "Station" } else { "Colony" }),
+            game.place_name(Place::Colony(c.id)),
+            c.colonists,
+            c.modules.iter().filter(|m| m.kind != ModuleKind::Core && m.kind != ModuleKind::Archive).count(),
+            if building > 0 { format!(", {building} building") } else { String::new() }
+        );
         colony_rows.push(RosterRow { kind: Kind::of_colony(c), text, tip: None, mark: marks.then_some(!ordered), jump: Some((View::Surface(c.body), Selection::Colony(c.id))) });
     }
     roster_group(ui, RosterGroup { name: "Colonies and stations", empty: "  none; a Colony Ship founds one" }, colony_rows, marks, jump);
@@ -2882,7 +3069,7 @@ fn rule_tip_ui(response: egui::Response, word: &str, add: impl Fn(&mut Ui)) -> e
 /// except the top bar. It reaches the art through the egui context, so a call site deep in a panel
 /// does not have to be handed an `Icons` to draw one. Where the art is missing the line is
 /// unchanged, so nothing is ever lost -- only unillustrated.
-fn icon_word(ui: &mut Ui, key: &str, text: impl Into<String>) {
+fn icon_word(ui: &mut Ui, key: &str, text: impl Into<String>) -> egui::Response {
     let text = text.into();
     match Icons::from_ctx(ui.ctx(), key, 15.0) {
         Some(image) => {
@@ -2890,11 +3077,10 @@ fn icon_word(ui: &mut Ui, key: &str, text: impl Into<String>) {
                 ui.spacing_mut().item_spacing.x = 4.0;
                 ui.add(image);
                 ui.label(text);
-            });
+            })
+            .response
         }
-        None => {
-            ui.label(text);
-        }
+        None => ui.label(text),
     }
 }
 
@@ -3198,12 +3384,27 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
         return;
     }
     if controls {
+        // Ticket #161 (version 0.07.5): the Colony's card follows the Nation card, and its three
+        // controls -- which the Nation card no longer has -- get hovers of their own.
         ui.horizontal(|ui| {
-            ui.label("Influence:");
+            rule_tip(
+                ui.label("Influence:"),
+                format!(
+                    "How much of this turn's Allotment to put here. It becomes your Standing and stays, whoever holds the place after.\nUnspent Allotment is lost at End Turn. A Standing decays {} a turn for the holder, {} for everyone else.",
+                    game.tables.influence.decay_controlled, game.tables.influence.decay
+                ),
+            );
             ui.add(egui::DragValue::new(&mut view.influence_amount).range(1..=100));
             let order = Order::Influence { target, amount: view.influence_amount };
             let ok = game.check_order(Seat(0), &session.pending, &order);
-            if ui.add_enabled(ok.is_ok(), egui::Button::new("Spend")).clicked() {
+            let spend = ui.add_enabled(ok.is_ok(), egui::Button::new("Spend"));
+            let needed = game.influence_needed_for(Seat(0), target);
+            let mine = game.seat(Seat(0)).influence.get(&target).copied().unwrap_or(0);
+            let spend = match &ok {
+                Ok(_) => rule_tip(spend, format!("Adds the figure beside it to your Standing here, now {mine}. You take this place at {needed}.")),
+                Err(e) => spend.on_disabled_hover_text(e.0.clone()),
+            };
+            if spend.clicked() {
                 actions.push(Action::Place(order));
             }
             if let Err(e) = ok {
@@ -3211,7 +3412,12 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
             }
         });
         // Ticket #42: buying Influence lives in the Trading window now.
-        if ui.small_button("Buy more Influence in the Trading window").clicked() {
+        if rule_tip(
+            ui.small_button("Buy more Influence in the Trading window"),
+            "Ducats buy Influence into this turn's Allotment, two a point, spent like any other. Opens the Trading window.".to_string(),
+        )
+        .clicked()
+        {
             view.show_trade = true;
         }
     }
@@ -3234,7 +3440,7 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
     // Ticket #53: on every Region the player does not hold, what its Blame is costing it here.
     let blame_mult = game.blame_threshold_multiplier_on(Seat(0), target);
     if blame_mult > 1.0 {
-        ui.label(
+        let note = ui.label(
             RichText::new(format!(
                 "Blame: your threshold here is {}, not {} (share {:.2}, x{:.2}). Emit less, or take back what you emit, and it comes down.",
                 threshold,
@@ -3243,6 +3449,15 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
                 blame_mult
             ))
             .color(Color32::from_rgb(255, 170, 120)),
+        );
+        // Ticket #161 (version 0.07.5): four rule-governed figures on one line and no hover behind
+        // any of them.
+        rule_tip(
+            note,
+            format!(
+                "Blame is the CO2 you are answerable for all game: what your places emitted, less what you took back.\nYour share is {:.0} per cent, above a fair quarter, so every place you do not hold costs more to win over -- up to half again.\nThe Climate Panel breaks it down by Faction.",
+                game.blame_share(Seat(0)) * 100.0
+            ),
         );
     }
 }
@@ -3271,13 +3486,52 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
                 continue;
             }
             any = true;
-            ui.label(RichText::new(format!(" {} {} ", game.seat_name(s), v)).color(Color32::BLACK).background_color(seat_colour(session, s)));
+            let chip = ui.label(RichText::new(format!(" {} {} ", game.seat_name(s), v)).color(Color32::BLACK).background_color(seat_colour(session, s)));
+            // Ticket #161 (version 0.07.5): a chip of its own says whose the Standing is and how far
+            // it has to go, which the line's hover -- written for the player's own case -- cannot.
+            // The designer asked that the player's own chip, on a place they hold, say instead what
+            // it would take to be safe from the nearest rival, which is the figure they act on.
+            let holder = game.place_control(target).controller();
+            let mine = s == Seat(0) && !session.spectator;
+            let whose = if mine { "Your Standing here.".to_string() } else { format!("The {}' Standing here.", game.seat_name(s)) };
+            let rest = if holder == Some(s) && mine {
+                let margin = game.tables.influence.challenge_margin;
+                let nearest = Seat(0).others().iter().map(|r| (*r, game.seat(*r).influence.get(&target).copied().unwrap_or(0))).max_by_key(|(_, n)| *n).filter(|(_, n)| *n > 0);
+                match nearest {
+                    Some((r, n)) => format!("A rival takes it at {}, your Standing plus {margin}. The {} are nearest at {n}, {} short. Every point you add here adds one to that.", v + margin, game.seat_name(r), (v + margin - n).max(0)),
+                    None => format!("No rival has any Standing here; one would need {}, your Standing plus {margin}.", v + margin),
+                }
+            } else if holder == Some(s) {
+                "They hold this place.".to_string()
+            } else {
+                let needed = game.influence_needed_for(s, target);
+                let who = if mine { "You take" } else { "They take" };
+                let want = if mine { "you want" } else { "they want" };
+                format!("{who} this place at {needed}, so {want} {} more.", (needed - v).max(0))
+            };
+            rule_tip(chip, format!("{whose} {rest}"));
         }
         if !any {
-            ui.label(RichText::new("nobody has any yet").weak());
+            rule_tip(
+                ui.label(RichText::new("nobody has any yet").weak()),
+                "No Faction has spent here. The first Standing to reach the threshold takes it; two arriving level are settled by lot.".to_string(),
+            );
         }
         ui.label(RichText::new("·").weak());
-        ui.label(format!("Threshold {threshold}"));
+        // Ticket #161: what a threshold IS and what sets it. The line's hover uses the word and
+        // never defines it.
+        let t = &game.tables.influence;
+        let from = match target {
+            Place::State(s) => format!("{}, plus {} a size step; this state's size is {}.", t.state_threshold_base, t.state_threshold_per_size, game.tables.state(s).size),
+            Place::Colony(_) => format!("{} a Colonist living here{}.", t.colony_threshold_per_colonist, if game.colony(match target { Place::Colony(c) => c, _ => unreachable!() }).map(|c| c.in_orbit).unwrap_or(false) { format!(", and {} for the station itself", t.station_threshold_base) } else { String::new() }),
+        };
+        rule_tip(
+            ui.label(format!("Threshold {threshold}")),
+            format!(
+                "What a Standing must reach to take this place: {from}\nGreen Consensus cuts a quarter off it; your Blame adds to the one you read, on every place you do not hold.\nA held place also wants the holder's Standing plus {}.",
+                t.challenge_margin
+            ),
+        );
     });
     rule_tip(row.response, explain);
 }
@@ -3435,6 +3689,11 @@ fn no_slot_section(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mi
     }
 }
 
+/// Ticket #163 (version 0.07.5): the red the game puts on a button that gates the turn. End Turn
+/// has worn it since the first playable; the Pick a Tech button joins it, since the turn cannot end
+/// until the pick is made. Written twice as a literal before this; named once now.
+const TURN_RED: Color32 = Color32::from_rgb(120, 40, 30);
+
 /// The columns of slot boxes on a Region's card: six, since the card is a step wider than the Hab View.
 const SLOT_COLS: usize = 6;
 /// Ticket #152 (version 0.07.4): how long the start globe takes to turn once on its own.
@@ -3562,7 +3821,21 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         Control::Controlled(s) => format!("Controlled by the {}", game.seat_name(s)),
         Control::Occupied { occupier, turns, .. } => format!("Occupied by the {} (turn {} of {})", game.seat_name(occupier), turns, game.tables.influence.occupation_turns),
     };
-    ui.label(owner);
+    // Ticket #161 (version 0.07.5): who holds a Region, and by what rule they keep or lose it.
+    let owner_tip = match st.control {
+        Control::Neutral => "Nobody holds it. The first Standing to reach the threshold takes it; two arriving level are settled by lot.".to_string(),
+        Control::Controlled(s) => format!(
+            "The {} hold it, and take its Influence value into their Allotment each turn.\nA rival needs their Standing plus {}, and at least its own threshold.",
+            game.seat_name(s),
+            game.tables.influence.challenge_margin
+        ),
+        Control::Occupied { occupier, .. } => format!(
+            "An Army of the {} beat its defenders: they choose what is built here but do not direct its Armies.\nControl passes after {} turns, or sooner once the occupier's Influence, gained each turn and halved while Unrest is high, passes the threshold.",
+            game.seat_name(occupier),
+            game.tables.influence.occupation_turns
+        ),
+    };
+    rule_tip(ui.label(owner), owner_tip);
     let mult = st.control.director().map(|s| game.tables.faction(game.kind(s)).emissions_multiplier).unwrap_or(1.0);
     let industry_em = card.baseline_emissions * st.industry_level as f64 * mult;
     let fac_em: f64 = st.facilities.iter().filter(|f| f.working()).map(|f| game.tables.facility(f.kind).emissions * mult).sum();
@@ -3571,7 +3844,14 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // read it as the Nation's. The designer: *"Population 12.2 (hundreds of millions) should say
     // something like Population 12.2 (339M)."*
     icon_word(ui, "population", format!("Region population {}, Industry Level {}, leans {:?}", Game::population_text(st.population), st.industry_level, card.resource_lean));
-    icon_word(ui, "influence", format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid)));
+    // Ticket #161 (version 0.07.5): what an Allotment is, which this line names and never explains.
+    rule_tip(
+        icon_word(ui, "influence", format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid))),
+        format!(
+            "The Allotment is what you receive each turn: {}, plus the Influence value of every Region you hold.\nIt does not carry over; what is unspent at End Turn is lost. Ducats buy more, two a point, in the Trading window.",
+            game.tables.influence.allotment_base
+        ),
+    );
     ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 5, never below 1); a Bank here would add {}", card.gdp, game.state_ducats(sid), (game.tables.facility(FacilityKind::Bank).produces.as_ref().map(|p| p.amount).unwrap_or(0) * card.gdp) / 10));
     icon_word(ui, "emissions", format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult));
     // Ticket #54: the per-person line, its formula, and what Leapfrog has taken off it.
@@ -3643,7 +3923,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             let step = game.tables.ai.thresholds.influence_step;
             let pressing = Seat(0).others().iter().map(|s| (*s, game.seat(*s).influence.get(&target).copied().unwrap_or(0))).max_by_key(|(_, n)| *n).filter(|(_, n)| *n > 0 && *n + 2 * step >= mine);
             if let Some((rival, standing)) = pressing {
-                ui.label(
+                let warn = ui.label(
                     RichText::new(format!(
                         "The {} stand at {} here against your {}: they take it at {}. Spend here to stay ahead.",
                         game.seat_name(rival),
@@ -3652,6 +3932,17 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                         mine + game.tables.influence.challenge_margin
                     ))
                     .color(Color32::from_rgb(255, 160, 60)),
+                );
+                // Ticket #161 (version 0.07.5): the challenge margin is the rule behind this warning
+                // and the warning never names it.
+                rule_tip(
+                    warn,
+                    format!(
+                        "A rival takes a place you hold at your Standing plus the challenge margin of {}, and never below their own threshold.\nSpending here raises the bar; doing nothing lowers it, yours decaying {} a turn and theirs {}.",
+                        game.tables.influence.challenge_margin,
+                        game.tables.influence.decay_controlled,
+                        game.tables.influence.decay
+                    ),
                 );
             }
         }
@@ -3662,7 +3953,18 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         // which is every card by the middle of a game. It is the reason a player clicked the
         // country; it goes where their eye lands.
         ui.separator();
-        icon_word(ui, "influence", "Influence");
+        // Ticket #161 (version 0.07.5): the heading is the one place that can say what Influence IS,
+        // which nothing on the card says today. The designer: *"influence mouse over on all words in
+        // the influence portion of the nation card."*
+        rule_tip(
+            icon_word(ui, "influence", "Influence"),
+            format!(
+                "Your claim here: spend from the corner's Allotment and it becomes your Standing, which survives any change of hands.\nHighest Standing at the threshold takes a free place; a held one wants the holder's plus {}.\nDecays {} a turn for the holder, {} for everyone else.",
+                game.tables.influence.challenge_margin,
+                game.tables.influence.decay_controlled,
+                game.tables.influence.decay
+            ),
+        );
         influence_row(ui, game, session, view, Place::State(sid), false, actions);
         ui.separator();
         // Ticket #73: Emigrants waiting here for a lift or the sea.
@@ -3842,11 +4144,19 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         Control::Occupied { occupier, turns, .. } => format!("Occupied by the {} (turn {})", game.seat_name(occupier), turns),
     };
     ui.label(owner);
-    ui.label(format!("Colonists {} of {} Habitat room", col.colonists, game.habitat_room(col)));
+    // Ticket #164 (version 0.07.5): the room is the Core Module's four and the Habitats' eight
+    // each, so the line no longer names Habitats alone.
+    ui.label(format!("Colonists {} of {} room", col.colonists, game.habitat_room(col)));
     // Ticket #97 (version 0.07.0): the Module cap, shown beside the Colonists that buy it, so a
     // player meets it on the card rather than as a refusal.
     let (used, cap) = (game.module_slots_used(col), game.module_slots(col));
-    let line = format!("Modules {used} of {cap} ({} free, one for each Colonist)", game.tables.slots.base);
+    // Ticket #164 (version 0.07.5): with the base allowance at nothing, the cap is exactly the
+    // number of people living here, so the line says that rather than naming a base of zero.
+    let line = if game.tables.slots.base == 0 {
+        format!("Modules {used} of {cap} (one for each Colonist)")
+    } else {
+        format!("Modules {used} of {cap} ({} free, one for each Colonist)", game.tables.slots.base)
+    };
     let resp = if used >= cap {
         ui.colored_label(Color32::YELLOW, format!("{line} - no room for another until more Colonists live here"))
     } else {
@@ -3857,25 +4167,29 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     rule_tip(
         resp,
         format!(
-            "{} slots from the day it is founded, and one more for every {} Colonist living here: a Colony grows by filling its Habitats first.\nMothballed keeps a slot, building reserves one. The Archive counts on neither side.",
-            game.tables.slots.base,
-            game.tables.slots.per_colonist
+            "One slot for every {} Colonist living here, and none before: the Core Module a founding gives is the whole of what a founding gives, so a place grows only as its people arrive.\nIts Core Module holds {}, which is how the first of them get here. Mothballed keeps a slot and building reserves one; the Core Module and the Archive count on neither side.",
+            game.tables.slots.per_colonist,
+            game.tables.module(ModuleKind::Core).holds_colonists
         ),
     );
-    ui.label(RichText::new("Modules").strong());
     let research = game.tables.archive.research;
-    // Ticket #145 (version 0.07.3): the Modules live in the Hab View now. The card keeps its
-    // summary line above, the Modules by name, and the button that opens the window; the rows
-    // with figures and buttons that stood here are the window's strip.
-    ui.horizontal_wrapped(|ui| {
-        ui.label(RichText::new("Modules:").strong());
-        let names: Vec<String> = col.modules.iter().map(|m| format!("{}{}", if m.kind == ModuleKind::Archive { "the Archive" } else { m.kind.name() }, if m.mothballed { " (mothballed)" } else { "" })).collect();
-        ui.label(if names.is_empty() { "none".to_string() } else { names.join(", ") });
-    });
-    if ui.button("Modules (M)").on_hover_text("Open the Hab View: every Module as a tile, with its figures and controls on a click.").clicked() {
-        view.hab_view = Some(cid);
-        view.hab_tile = None;
+    // Ticket #162 (version 0.07.5): the Modules are tiles on the card, where ticket #145 had put
+    // them in a window. The summary line above says the cap; the tiles say the rest, so the
+    // heading, the list of names and the button that opened the window are gone.
+    // Ticket #88: build it where you dig. Ticket #162 (version 0.07.5): the note stands above the
+    // tiles, where a free one is clicked to build, rather than under a Build header that no longer
+    // offers a Module.
+    match game.working_mines(col) {
+        0 => {}
+        1 => {
+            ui.label(RichText::new(format!("One working Mine here: Modules cost x{} (never under half the row).", game.tables.in_situ.one_mine)).weak());
+        }
+        n => {
+            ui.label(RichText::new(format!("{n} working Mines here: Modules cost x{} (never under half the row).", game.tables.in_situ.two_mines)).weak());
+        }
     }
+    let mine_here = !session.spectator && col.control.director() == Some(Seat(0));
+    module_boxes(ui, session, game, view, cid, mine_here, col.control.director(), actions);
     // Ticket #51: the Archive on order shows before its Module does.
     if !col.modules.iter().any(|m| m.kind == ModuleKind::Archive)
         && let Some(b) = col.queue.iter().find(|b| b.item == BuildItem::Module(ModuleKind::Archive))
@@ -3955,18 +4269,10 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             }
             ui.separator();
         }
-        ui.label(RichText::new("Build (hover a button for what it makes)").strong());
-        // Ticket #88: build it where you dig.
-        match game.working_mines(col) {
-            0 => {}
-            1 => {
-                ui.label(RichText::new(format!("One working Mine here: Modules cost x{} (never under half the row).", game.tables.in_situ.one_mine)).weak());
-            }
-            n => {
-                ui.label(RichText::new(format!("{n} working Mines here: Modules cost x{} (never under half the row).", game.tables.in_situ.two_mines)).weak());
-            }
-        }
-        module_build_buttons(ui, session, game, cid, actions);
+        // Ticket #162 (version 0.07.5): the header matches the Nation card's, which ticket #154
+        // renamed when its own build list folded into the boxes. A Module is ordered from a free
+        // tile; what is left here is orders.
+        ui.label(RichText::new("Orders (hover a button for what it does)").strong());
         if !col.in_orbit {
             cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::Colony(cid) }, "Build Army (Barracks)", actions);
         }
@@ -4462,14 +4768,15 @@ fn moments_corner(ui: &mut Ui, session: &Session, view: &mut ViewState) {
 
 // ------------------------------------------------------------------ Ticket #145: the Hab View
 
-/// The side of a Hab View tile, the gap between tiles, and the columns in a row.
+/// The side of a Module or build-slot tile and the gap between tiles. Ticket #162 (version 0.07.5)
+/// retired `HAB_COLS`, the Hab View window's five: both cards lay their tiles out in `SLOT_COLS`
+/// columns now.
 const HAB_TILE: f32 = 84.0;
 const HAB_GAP: f32 = 10.0;
-const HAB_COLS: usize = 5;
 /// Room under a tile for its name.
 const HAB_LABEL: f32 = 18.0;
 
-/// What a Hab View tile shows.
+/// What a tile shows.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum TileState {
     Standing,
@@ -4609,100 +4916,94 @@ fn module_rules(heading: &str) -> String {
     format!("{heading}\nEnergy upkeep is paid at Income first; short of Energy, Modules go offline in order until the bill is met, and an offline one makes nothing and keeps its place.\nMothballed, it makes nothing and pays nothing until it is restarted.")
 }
 
-fn hab_view_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
-    let Some(cid) = view.hab_view else { return };
-    let Some(col) = game.colony(cid) else {
-        view.hab_view = None;
-        return;
+/// Ticket #162 (version 0.07.5): a Colony's Module tiles are laid out in the SAME grid as a
+/// Region's build slots, at the designer's word -- *"the grid should match the one used by
+/// nations"* -- so the two cards read as one thing and neither can drift from the other.
+const MODULE_COLS: usize = SLOT_COLS;
+
+/// Ticket #162 (version 0.07.5): **a Colony's or a station's Modules as boxes on its card**, in the
+/// language the Region card's build slots already speak. The designer: *"Move the station module
+/// grid to its in the card like nation states and retire the window."* One tile per Module standing
+/// (dimmed while mothballed), one hatched tile per Module building, one dashed tile per free place
+/// under the cap, and the Archive on a row of its own outside the count. A click puts that Module's
+/// figures and its Mothball, Restart and Decommission buttons in the strip beneath; a click on a
+/// free tile puts the build buttons there, which is the only place a Module is ordered -- as a
+/// Facility that takes a slot is ordered only from a free box on a Region's card (#154).
+#[allow(clippy::too_many_arguments)]
+fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, cid: ColonyId, mine: bool, director: Option<Seat>, actions: &mut Vec<Action>) {
+    let Some(col) = game.colony(cid) else { return };
+    let (used, cap) = (game.module_slots_used(col), game.module_slots(col));
+    // The tiles, in the order the cap counts them: standing (the Archive apart), building, free.
+    let standing: Vec<usize> = (0..col.modules.len()).filter(|i| col.modules[*i].kind != ModuleKind::Archive).collect();
+    let building: Vec<(ModuleKind, u32)> = col.queue.iter().filter_map(|b| if let BuildItem::Module(k) = b.item { if k == ModuleKind::Archive { None } else { Some((k, b.due_turn + 1)) } } else { None }).collect();
+    let free = cap.saturating_sub(used) as usize;
+    let total = standing.len() + building.len() + free;
+    let rows = total.div_ceil(MODULE_COLS).max(1);
+    let archive = col.modules.iter().position(|m| m.kind == ModuleKind::Archive);
+    let archive_rows = if archive.is_some() { 1 } else { 0 };
+    let grid_size = egui::vec2(MODULE_COLS as f32 * HAB_TILE + (MODULE_COLS as f32 - 1.0) * HAB_GAP, (rows + archive_rows) as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP));
+    let (grid, _) = ui.allocate_exact_size(grid_size, egui::Sense::hover());
+    let tile_rect = |i: usize| {
+        let (c, r) = (i % MODULE_COLS, i / MODULE_COLS);
+        egui::Rect::from_min_size(grid.min + egui::vec2(c as f32 * (HAB_TILE + HAB_GAP), r as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP)), egui::vec2(HAB_TILE, HAB_TILE))
     };
-    let mine = !session.spectator && col.control.director() == Some(Seat(0));
-    let director = col.control.director();
-    let mut open = true;
-    let title = game.place_name(Place::Colony(cid));
-    egui::Window::new(format!("{title} - Hab View")).id(egui::Id::new("hab_view")).open(&mut open).resizable(false).show(ctx, |ui| {
-        let holder = director.map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".to_string());
-        let (used, cap) = (game.module_slots_used(col), game.module_slots(col));
-        ui.label(RichText::new(format!("{holder} · {} Colonists · {} Module slots free from the start and one more for every {} Colonist", col.colonists, game.tables.slots.base, game.tables.slots.per_colonist)).weak());
-        ui.add_space(4.0);
-        // The tiles, in the order the cap counts them: standing (the Archive apart), building, free.
-        let standing: Vec<usize> = (0..col.modules.len()).filter(|i| col.modules[*i].kind != ModuleKind::Archive).collect();
-        let building: Vec<(ModuleKind, u32)> = col.queue.iter().filter_map(|b| if let BuildItem::Module(k) = b.item { if k == ModuleKind::Archive { None } else { Some((k, b.due_turn + 1)) } } else { None }).collect();
-        let free = cap.saturating_sub(used) as usize;
-        let total = standing.len() + building.len() + free;
-        let rows = total.div_ceil(HAB_COLS).max(1);
-        let archive = col.modules.iter().position(|m| m.kind == ModuleKind::Archive);
-        let archive_rows = if archive.is_some() { 1 } else { 0 };
-        let grid_size = egui::vec2(HAB_COLS as f32 * HAB_TILE + (HAB_COLS as f32 - 1.0) * HAB_GAP, (rows + archive_rows) as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP));
-        let (grid, _) = ui.allocate_exact_size(grid_size, egui::Sense::hover());
-        let tile_rect = |i: usize| {
-            let (c, r) = (i % HAB_COLS, i / HAB_COLS);
-            egui::Rect::from_min_size(grid.min + egui::vec2(c as f32 * (HAB_TILE + HAB_GAP), r as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP)), egui::vec2(HAB_TILE, HAB_TILE))
-        };
-        let mut i = 0usize;
-        for mi in standing {
+    let mut i = 0usize;
+    for mi in standing {
+        let m = &col.modules[mi];
+        let state = if m.mothballed { TileState::Mothballed } else { TileState::Standing };
+        let selected = view.hab_tile == Some(HabTile::Module(mi));
+        // Ticket #150 (version 0.07.4): the tile's hover -- the figures its strip line carries and
+        // the Module rules, which the old rows never had.
+        let tip = module_rules(&module_line(game, col, cid, mi, director));
+        if hab_tile(ui, tile_rect(i), ui.id().with(("hab", mi)), Some(crate::icons::module_icon(m.kind)), m.kind.name(), state, selected, None, tip).clicked() {
+            view.hab_tile = Some(HabTile::Module(mi));
+        }
+        i += 1;
+    }
+    for (bi, (kind, ready)) in building.iter().enumerate() {
+        let tip = format!("{}: building, ready turn {ready}.", kind.name());
+        hab_tile(ui, tile_rect(i), ui.id().with(("hab-building", bi)), Some(crate::icons::module_icon(*kind)), kind.name(), TileState::Building, false, None, tip);
+        i += 1;
+    }
+    for fi in 0..free {
+        // One free place is as good as another, so the first stands for the click.
+        let selected = fi == 0 && view.hab_tile == Some(HabTile::Free);
+        let tip = format!("Room for another Module: click it to build here.\n{} places are free from the start and one more for every {} Colonist.", game.tables.slots.base, game.tables.slots.per_colonist);
+        if hab_tile(ui, tile_rect(i), ui.id().with(("hab-free", fi)), None, "", TileState::Free, selected, None, tip).clicked() {
+            view.hab_tile = Some(HabTile::Free);
+        }
+        i += 1;
+    }
+    if let Some(ai) = archive {
+        // The Archive stands apart: a row of its own, outside the count.
+        let rect = egui::Rect::from_min_size(grid.min + egui::vec2(0.0, rows as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP)), egui::vec2(HAB_TILE, HAB_TILE));
+        let state = if col.modules[ai].mothballed { TileState::Mothballed } else { TileState::Standing };
+        let tip = format!("{}\nOutside the Module count. Its Research is paid into the Archive fund at any pace; complete, it takes a great deal of Energy to keep running. Destroyed outright if this Colony changes hands; the fund is kept.", module_line(game, col, cid, ai, director));
+        if hab_tile(ui, rect, ui.id().with("hab-archive"), Some(crate::icons::module_icon(ModuleKind::Archive)), "The Archive", state, view.hab_tile == Some(HabTile::Module(ai)), None, tip).clicked() {
+            view.hab_tile = Some(HabTile::Module(ai));
+        }
+    }
+    ui.add_space(4.0);
+    // The strip: the clicked tile's figures and controls, or the build buttons for a free one.
+    match view.hab_tile {
+        Some(HabTile::Module(mi)) if mi < col.modules.len() => {
             let m = &col.modules[mi];
-            let state = if m.mothballed { TileState::Mothballed } else { TileState::Standing };
-            let selected = view.hab_tile == Some(HabTile::Module(mi));
-            // Ticket #150 (version 0.07.4): the tile's hover -- the figures its strip line carries
-            // and the Module rules, which the old rows never had.
-            let tip = module_rules(&module_line(game, col, cid, mi, director));
-            if hab_tile(ui, tile_rect(i), ui.id().with(("hab", mi)), Some(crate::icons::module_icon(m.kind)), m.kind.name(), state, selected, None, tip).clicked() {
-                view.hab_tile = Some(HabTile::Module(mi));
-            }
-            i += 1;
-        }
-        for (bi, (kind, ready)) in building.iter().enumerate() {
-            let tip = format!("{}: building, ready turn {ready}.", kind.name());
-            hab_tile(ui, tile_rect(i), ui.id().with(("hab-building", bi)), Some(crate::icons::module_icon(*kind)), kind.name(), TileState::Building, false, None, tip);
-            i += 1;
-        }
-        for fi in 0..free {
-            // One free slot is as good as another, so the first stands for the click.
-            let selected = fi == 0 && view.hab_tile == Some(HabTile::Free);
-            let tip = format!("Room for another Module: click it to build here.\n{} places are free from the start and one more for every {} Colonist.", game.tables.slots.base, game.tables.slots.per_colonist);
-            if hab_tile(ui, tile_rect(i), ui.id().with(("hab-free", fi)), None, "", TileState::Free, selected, None, tip).clicked() {
-                view.hab_tile = Some(HabTile::Free);
-            }
-            i += 1;
-        }
-        if let Some(ai) = archive {
-            // The Archive stands apart: a row of its own, outside the count.
-            let row = rows;
-            let rect = egui::Rect::from_min_size(grid.min + egui::vec2(0.0, row as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP)), egui::vec2(HAB_TILE, HAB_TILE));
-            let state = if col.modules[ai].mothballed { TileState::Mothballed } else { TileState::Standing };
-            let tip = format!("{}\nOutside the Module count. Its Research is paid into the Archive fund at any pace; complete, it takes a great deal of Energy to keep running. Destroyed outright if this Colony changes hands; the fund is kept.", module_line(game, col, cid, ai, director));
-            if hab_tile(ui, rect, ui.id().with("hab-archive"), Some(crate::icons::module_icon(ModuleKind::Archive)), "The Archive", state, view.hab_tile == Some(HabTile::Module(ai)), None, tip).clicked() {
-                view.hab_tile = Some(HabTile::Module(ai));
+            let colour = if m.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
+            figures_with_icons(ui, &module_line(game, col, cid, mi, director), 14.0, colour, &[]);
+            if mine && m.kind != ModuleKind::Archive {
+                change_row(ui, game, &session.pending, BuildingRef::Module(cid, mi), m.mothballed, m.change, actions);
             }
         }
-        ui.add_space(6.0);
-        ui.separator();
-        // The strip: the clicked tile's figures and controls, or the build buttons for a free one.
-        match view.hab_tile {
-            Some(HabTile::Module(mi)) if mi < col.modules.len() => {
-                let m = &col.modules[mi];
-                let colour = if m.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
-                figures_with_icons(ui, &module_line(game, col, cid, mi, director), 14.0, colour, &[]);
-                if mine && m.kind != ModuleKind::Archive {
-                    change_row(ui, game, &session.pending, BuildingRef::Module(cid, mi), m.mothballed, m.change, actions);
-                }
-            }
-            Some(HabTile::Free) => {
-                if mine {
-                    ui.label(RichText::new("Build here (hover a button for what it makes)").strong());
-                    module_build_buttons(ui, session, game, cid, actions);
-                } else {
-                    ui.label(RichText::new("Room for another Module.").weak());
-                }
-            }
-            _ => {
-                ui.label(RichText::new(format!("{used} of {cap} Module slots. Click a tile for its figures and controls, a free tile to build. Esc closes.")).weak());
-            }
+        Some(HabTile::Free) if mine => {
+            ui.label(RichText::new("Build here (hover a button for what it makes)").strong());
+            module_build_buttons(ui, session, game, cid, actions);
         }
-    });
-    if !open {
-        view.hab_view = None;
-        view.hab_tile = None;
+        Some(HabTile::Free) => {
+            ui.label(RichText::new("Room for another Module.").weak());
+        }
+        _ => {
+            ui.label(RichText::new("Click a tile for its figures and controls, a free tile to build.").weak());
+        }
     }
 }
 
@@ -4728,7 +5029,6 @@ fn module_build_buttons(ui: &mut Ui, session: &Session, game: &Game, cid: Colony
 }
 
 fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
-    hab_view_window(ctx, session, game, view, actions);
     if view.show_trade && !session.spectator {
         let mut open = true;
         egui::Window::new("Trading").open(&mut open).default_width(470.0).show(ctx, |ui| trading_window(ui, session, game, view, actions));
@@ -4780,7 +5080,15 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         // driven headlessly -- which also means the Blame block at its foot is below the fold for a
         // player at 1280x800 until they scroll.
         let top = std::env::args().any(|a| a == "climate:top");
-        let home = (if session.spectator { 420.0 } else { 10.0 }, if top { 10.0 } else { bottom - 400.0 });
+        // Ticket #165 (version 0.07.5): the panel opens at the TOP, under the top bar, and as tall
+        // as the window leaves room for. The designer: *"climate panel should start long enough to
+        // show all the information in the panel."* It held about a thousand rows of content and
+        // opened four hundred tall, four hundred rows off the bottom, so two thirds of it -- the
+        // whole Blame block among them -- were below the fold before the player touched it. Opened
+        // this way a maximised window shows the lot and a small one still scrolls.
+        let bar = 104.0;
+        let home = (if session.spectator { 420.0 } else { 10.0 }, if top { 10.0 } else { bar });
+        let tall = (bottom - home.1 - 12.0).max(300.0);
         // Ticket #104 (version 0.07.0): the panel could be dragged larger but not back down. Its
         // content is not what held it: rendered at 230 wide everything wraps and nothing overflows.
         // So the width is made authoritative -- an explicit floor it may be dragged to, and a scroll
@@ -4789,9 +5097,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             .open(&mut open)
             .default_pos(home)
             .default_width(400.0)
-            // The aid also has to force the height: with a scroll area inside, the window settles
-            // at about 400 rows whatever room it is given, which is the fold the block sits below.
-            .default_height(if top { 1300.0 } else { 400.0 })
+            // The aid still forces its own height: with a scroll area inside, the window settles at
+            // whatever it is given, and a picture wants more rows than the screen has.
+            .default_height(if top { 1300.0 } else { tall })
             .resizable(true)
             .min_width(230.0)
             .min_height(140.0)
@@ -4840,6 +5148,10 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             ui.add_space(4.0);
             emissions_history(ui, game, egui::vec2(ui.available_width(), 110.0));
             ui.separator();
+            // Ticket #166 (version 0.07.5): the population history stands with the growth rate that
+            // drives it, as the Emissions history stands under the sources that drive it.
+            population_history(ui, game, egui::vec2(ui.available_width(), 96.0));
+            ui.add_space(4.0);
             let growth = game.population_growth_rate() * 100.0;
             ui.label(format!(
                 "Penalties in force: population growth {:+.2}% per turn; a card comes {:.0}% of turns at this Temperature ({} cards left in the deck, {} of them Climate).",
@@ -4992,7 +5304,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.label(why);
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button("Pick a Tech").clicked() {
+                    // Ticket #163: the same words and the same job as the bar's, so the same red.
+                    if ui.add(egui::Button::new(RichText::new("Pick a Tech").strong()).fill(TURN_RED)).clicked() {
                         view.popup = Popup::None;
                         view.show_tech = true;
                     }
@@ -5141,6 +5454,28 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 if ui.button("Close").clicked() {
                     let moments = view.moments_of(&session.tables, &game.report).len();
                     advance_popup(view, moments);
+                }
+            });
+        }
+        Popup::Tutorial => {
+            // Ticket #169 (version 0.07.5): the tutorial's note for this turn. Drawn as a Moment is
+            // drawn, because it is the same thing to the player: the turn stops for one short
+            // thought. Nothing is forced and nothing is checked -- the note says where to look.
+            let Some(note) = tutorial_note(&session.tables, game.turn).cloned() else {
+                advance_popup(view, view.moments_of(&session.tables, &game.report).len());
+                return;
+            };
+            let last = session.tables.tutorial.note.iter().map(|n| n.turn).max() == Some(game.turn);
+            egui::Modal::new("tutorial".into()).show(ctx, |ui| {
+                ui.set_width(460.0);
+                ui.label(RichText::new(&note.figure).size(26.0).strong().color(Color32::from_rgb(255, 220, 150)));
+                ui.label(RichText::new(&note.text).size(17.0));
+                if let Some(line) = &note.note {
+                    ui.label(RichText::new(line).size(15.0).color(Color32::from_rgb(200, 220, 255)));
+                }
+                ui.add_space(8.0);
+                if ui.button(if last { "Play on" } else { "Go on" }).clicked() {
+                    actions.push(Action::TutorialNoteRead);
                 }
             });
         }

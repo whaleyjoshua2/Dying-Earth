@@ -86,17 +86,24 @@ fn main() {
             Some((w.parse().ok()?, h.parse().ok()?))
         })
         .unwrap_or((1280, 800));
+    // Ticket #165 (version 0.07.5): the game opens MAXIMISED, filling the screen with its title bar
+    // and buttons where the player can find them. The designer: *"Game starts in full sized
+    // window."* The Climate Panel is about a thousand rows of content and the Tech Tree is 768 by
+    // 576; at the old 1280x800 neither fitted. A `shot:` run is never maximised -- it wants the
+    // exact off-screen size it was given, and `window:<w>x<h>` sets it.
+    let mut window = Window { title: "Dying Earth".into(), resolution: (width, height).into(), position, ..default() };
+    if mode == Mode::Play {
+        window.set_maximized(true);
+    }
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window { title: "Dying Earth".into(), resolution: (width, height).into(), position, ..default() }),
-            ..default()
-        }))
+        .add_plugins(DefaultPlugins.set(WindowPlugin { primary_window: Some(window), ..default() }))
         .add_plugins(EguiPlugin::default())
         .insert_resource(ClearColor(Color::srgb(0.02, 0.02, 0.05)))
         .insert_resource(Session {
             tables,
             game: None,
             pending: Vec::new(),
+            tutorial: false,
             screen: Screen::Title,
             seed,
             mode,
