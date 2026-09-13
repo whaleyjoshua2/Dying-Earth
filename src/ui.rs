@@ -712,6 +712,18 @@ fn credits_screen(root: &mut Ui, session: &mut Session, icons: &Icons) {
                     ui.label(RichText::new(format!("{}: \"{}\" by {}", c.resource, c.icon, c.author)).size(15.0));
                 });
             }
+            // Ticket #135 (version 0.07.3): the game's own drawings, named so the list is complete.
+            for d in crate::icons::DRAWN {
+                ui.horizontal(|ui| {
+                    ui.add_space(ui.available_width() / 2.0 - 190.0);
+                    ui.spacing_mut().item_spacing.x = 8.0;
+                    if let Some(image) = icons.image(d, 22.0) {
+                        ui.add(image);
+                    }
+                    let name = format!("{}{}", d[..1].to_uppercase(), &d[1..]);
+                    ui.label(RichText::new(format!("{name}: drawn for Dying Earth, no credit owed")).size(15.0));
+                });
+            }
             ui.add_space(12.0);
             ui.label(RichText::new("https://game-icons.net").size(14.0).weak());
             // Ticket #122 (version 0.07.2): the Nations' flags. MIT asks nothing on screen; they are

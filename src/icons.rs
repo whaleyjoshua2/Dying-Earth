@@ -31,7 +31,7 @@ pub struct Credit {
 
 /// The icons in use, their authors, and the names they carry at game-icons.net. Anything added to
 /// `assets/icons/` belongs here too: the credit is the licence's price, not a courtesy.
-pub const CREDITS: [Credit; 13] = [
+pub const CREDITS: [Credit; 12] = [
     Credit { resource: "Materials", icon: "Mine Wagon", author: "Delapouite" },
     Credit { resource: "Fuel", icon: "Jerrycan", author: "Delapouite" },
     Credit { resource: "Energy", icon: "Electric", author: "Sbed" },
@@ -45,10 +45,18 @@ pub const CREDITS: [Credit; 13] = [
     // sheet at fourteen and sixteen pixels, since that is where a roster row draws them.
     Credit { resource: "Warship", icon: "Spaceship", author: "Delapouite" },
     Credit { resource: "Colony Ship", icon: "Rocket", author: "Lorc" },
-    Credit { resource: "Station", icon: "Defense Satellite", author: "Delapouite" },
+    // Ticket #135 (version 0.07.3): the station's glyph is the game's own drawing and owes no credit;
+    // it is in DRAWN below. (Delapouite's Defense Satellite wore the row for one version.)
     Credit { resource: "Colony", icon: "Habitat Dome", author: "Delapouite" },
     Credit { resource: "Region", icon: "Modern City", author: "Delapouite" },
 ];
+
+/// Ticket #135 (version 0.07.3): the SVGs in `assets/icons/` that are the game's own drawings, so
+/// they owe nobody a credit and the Credits screen does not list them. The station's glyph -- two
+/// solar panels on a bar with a central module, the ISS reduced to its silhouette -- was drawn for
+/// the game after the designer passed on every station game-icons.net has, none of which is drawn
+/// as a station. A drawn glyph still loads and tints through `Icons` like any other.
+pub const DRAWN: [&str; 1] = ["station"];
 
 impl Credit {
     /// The file stem in `assets/icons/` this credit is for: the name, lower-cased, spaces to
@@ -283,10 +291,15 @@ mod tests {
             .collect();
         on_disk.sort();
         let mut credited: Vec<String> = CREDITS.iter().map(Credit::key).collect();
+        // Ticket #135: a drawn glyph is the game's own and owes no credit, but it must still exist.
+        credited.extend(DRAWN.iter().map(|s| s.to_string()));
         credited.sort();
-        assert_eq!(on_disk, credited, "left: the SVGs in assets/icons; right: the keys CREDITS names");
+        assert_eq!(on_disk, credited, "left: the SVGs in assets/icons; right: the keys CREDITS names plus DRAWN");
         for kind in KINDS {
-            assert!(credited.iter().any(|k| k == kind), "kind glyph {kind} has no credit");
+            assert!(credited.iter().any(|k| k == kind), "kind glyph {kind} has neither a credit nor a drawing");
+        }
+        for d in DRAWN {
+            assert!(!CREDITS.iter().any(|c| c.key() == d), "{d} is drawn and credited both");
         }
     }
 }

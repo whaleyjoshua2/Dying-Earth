@@ -176,6 +176,22 @@ which, like the Army's shield, would need no art file and no credit. Left to rig
 Recommended to the designer: **6, Material Design's Space Station**, the one glyph that is the thing
 itself, with **10, the drawn panels**, as the runner-up if a silhouette that owes nothing is preferred.
 
+**The designer chose 10, the drawn panels.** Two solar panels on a bar with a central module, the ISS
+reduced to its silhouette, drawn for the game in four rectangles and a circle. It ships as
+`assets/icons/station.svg` and loads and tints through `Icons` like every other Kind Glyph, so
+nothing in the interface changed to wear it; Delapouite's *Defense Satellite* is gone from the tree.
+The Credits screen gained a `DRAWN` list beside `CREDITS` -- a glyph that is the game's own owes no
+credit but must still exist, and the credits test now checks both -- and names the station as
+*drawn for Dying Earth, no credit owed*, so the list of icons on screen stays complete.
+
+![The glyph on the roster](station-glyph-on-the-roster.png)
+
+![The glyph on the Report's lines](station-glyph-in-the-report.png)
+
+![The Credits screen](credits-with-a-drawn-glyph.png)
+
+Clippy clean with `-D warnings`, 253 tests passing.
+
 ## Building art: candidate sheets (research, ticket #144)
 
 Sixty-two game-icons.net candidates for the twenty-two building kinds, drawn with the game's own
