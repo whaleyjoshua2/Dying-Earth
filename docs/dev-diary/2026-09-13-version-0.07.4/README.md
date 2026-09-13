@@ -106,3 +106,10 @@ across it, the Collapse line labelled, the Breaks fired ticked red on the turn a
 at the line's end; the hover only. The heading-to figure is a projection and is not drawn.
 
 ![The Temperature figure's hover at turn 13, from `turns:12 tip:Temperature`](temperature-history-hover.png)
+
+**Decided by the designer** off that picture: **the data's own range** rather than base-to-Collapse
+(the detail over the context), the faint Break lines and the ticks kept, the hover only. The range
+takes a margin above and below and is never narrower than half a degree; the Breaks' Temperatures
+and the Collapse line are drawn only where they fall inside it.
+
+![As decided: the Temperature on its own range, +1.0 to +2.2 at turn 13](temperature-history-own-range.png)

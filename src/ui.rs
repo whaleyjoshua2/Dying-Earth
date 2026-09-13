@@ -86,16 +86,17 @@ fn emissions_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
 }
 
 /// Ticket #158 (version 0.07.4): **the Temperature history**, the Emissions history's sibling on
-/// the top bar's Temperature figure: the Temperature turn by turn on the same base-to-Collapse
-/// scale the Climate Panel's bar runs, so the line never rescales as it climbs; the Breaks'
-/// Temperatures as faint lines across it and the Breaks fired ticked red on the turn axis; the last
-/// figure at the line's end. The heading-to figure is a projection, not a record, and is not drawn.
+/// the top bar's Temperature figure: the Temperature turn by turn on the data's own range (the
+/// designer's choice over the base-to-Collapse scale, for the detail); the Breaks' Temperatures
+/// that fall in the range as faint lines across it, the Collapse line when it does, and the Breaks
+/// fired ticked red on the turn axis; the last figure at the line's end. The heading-to figure is
+/// a projection, not a record, and is not drawn.
 fn temperature_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
     const LINE: Color32 = Color32::from_rgb(235, 235, 240);
     const BREAK: Color32 = Color32::from_rgb(236, 88, 76);
     let h = &game.climate.history;
     let c = &game.tables.climate;
-    ui.label(RichText::new("Temperature by turn, from the base to the Collapse line; red is a Break").weak().small());
+    ui.label(RichText::new("Temperature by turn; red is a Break").weak().small());
     let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
     let painter = ui.painter();
     painter.rect_filled(rect, 3.0, Color32::from_rgb(38, 38, 44));
@@ -104,16 +105,25 @@ fn temperature_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
         return;
     }
     let plot = egui::Rect::from_min_max(rect.min + egui::vec2(6.0, 6.0), rect.max - egui::vec2(44.0, 16.0));
-    let (lo, hi) = (c.base_temperature, c.collapse_line.max(h.iter().map(|r| r.temperature).fold(c.collapse_line, f64::max)));
+    // The data's own range, at the designer's word, with a margin above and below and never
+    // narrower than half a degree, so the first turns do not read as a cliff.
+    let (min, max) = h.iter().fold((f64::MAX, f64::MIN), |(lo, hi), r| (lo.min(r.temperature), hi.max(r.temperature)));
+    let pad = ((max - min) * 0.15).max(0.25);
+    let (lo, hi) = (min - pad, max + pad);
     let (first, last) = (h[0].turn, h[h.len() - 1].turn);
     let span = (last.max(first + 1) - first) as f32;
     let x = |turn: u32| plot.left() + (turn - first) as f32 / span * plot.width();
     let y = |v: f64| plot.bottom() - (((v - lo) / (hi - lo)).clamp(0.0, 1.0) as f32) * plot.height();
-    for b in &c.breaks {
+    // The Breaks' Temperatures that fall in the range, faint, and the Collapse line if it does.
+    for b in c.breaks.iter().filter(|b| b.temperature > lo && b.temperature < hi) {
         painter.line_segment([Pos2::new(plot.left(), y(b.temperature)), Pos2::new(plot.right(), y(b.temperature))], egui::Stroke::new(1.0, BREAK.gamma_multiply(0.35)));
     }
-    painter.line_segment([Pos2::new(plot.left(), y(c.collapse_line)), Pos2::new(plot.right(), y(c.collapse_line))], egui::Stroke::new(1.0, Color32::from_gray(150)));
-    painter.text(Pos2::new(plot.right() + 3.0, y(c.collapse_line)), egui::Align2::LEFT_CENTER, format!("{:+.1}", c.collapse_line), FontId::proportional(10.0), Color32::from_gray(150));
+    if c.collapse_line > lo && c.collapse_line < hi {
+        painter.line_segment([Pos2::new(plot.left(), y(c.collapse_line)), Pos2::new(plot.right(), y(c.collapse_line))], egui::Stroke::new(1.0, Color32::from_gray(150)));
+        painter.text(Pos2::new(plot.right() + 3.0, y(c.collapse_line)), egui::Align2::LEFT_CENTER, format!("{:+.1}", c.collapse_line), FontId::proportional(10.0), Color32::from_gray(150));
+    }
+    painter.text(Pos2::new(plot.left() + 2.0, plot.bottom()), egui::Align2::LEFT_BOTTOM, format!("{lo:+.1}"), FontId::proportional(9.0), Color32::from_gray(120));
+    painter.text(Pos2::new(plot.left() + 2.0, plot.top()), egui::Align2::LEFT_TOP, format!("{hi:+.1}"), FontId::proportional(9.0), Color32::from_gray(120));
     let points: Vec<Pos2> = h.iter().map(|r| Pos2::new(x(r.turn), y(r.temperature))).collect();
     if points.len() == 1 {
         painter.circle_filled(points[0], 3.0, LINE);
