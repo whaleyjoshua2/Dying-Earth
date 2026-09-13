@@ -3288,7 +3288,8 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
 fn facility_figures(game: &Game, sid: StateId, f: &Facility, director: Option<Seat>) -> String {
     // Ticket #54: a mothballed Facility says so rather than showing figures it is not making.
     if f.mothballed {
-        return "mothballed: making nothing, paying no upkeep, emitting nothing, keeping its slot".to_string();
+        // Ticket #154 (version 0.07.4): a Scrubber or Sea Wall has no slot to keep.
+        return format!("mothballed: making nothing, paying no upkeep, emitting nothing{}", if game.takes_slot(f.kind) { ", keeping its slot" } else { "" });
     }
     // Ticket #69: a Lab in a state nobody holds, or under Occupation, works for the world.
     let world_lab = f.kind == FacilityKind::ResearchLab && f.working() && !f.offline_until_resolution && matches!(game.state(sid).control, Control::Neutral | Control::Occupied { .. });
@@ -3322,15 +3323,12 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
     let mut inline = false;
     ui.horizontal(|ui| {
         ui.add_space(8.0);
+        // Ticket #154 (version 0.07.4): coastal or inland only where the building has a slot to be
+        // on; a Scrubber or Sea Wall is neither.
+        let side = if !game.takes_slot(f.kind) { "" } else if f.coastal { " (coastal)" } else { " (inland)" };
         let resp = figures_with_icons(
             ui,
-            &format!(
-                "{} ({}): {}{}",
-                f.kind.name(),
-                if f.coastal { "coastal" } else { "inland" },
-                figures,
-                if f.online || f.mothballed { "" } else { " (offline, making nothing)" }
-            ),
+            &format!("{}{}: {}{}", f.kind.name(), side, figures, if f.online || f.mothballed { "" } else { " (offline, making nothing)" }),
             14.0,
             colour,
             &[],
@@ -3352,8 +3350,10 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
 /// Build section and in the strip under the slot boxes for a free box alike.
 fn facility_build_buttons(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, actions: &mut Vec<Action>) {
     for fk in FacilityKind::ALL {
-        // Ticket #54: the Scrubber has its own button, with the state's cap on it.
-        if fk == FacilityKind::Scrubber {
+        // Ticket #54: the Scrubber has its own button, with the state's cap on it. Ticket #154
+        // (version 0.07.4): so does the Sea Wall -- neither takes a slot, so neither is offered
+        // for a free box; both stand under the boxes in `no_slot_section`.
+        if !game.takes_slot(fk) {
             continue;
         }
         // Ticket #56: a Facility that waits on a Tech is not offered until the Tech is in.
@@ -3366,6 +3366,67 @@ fn facility_build_buttons(ui: &mut Ui, session: &Session, game: &Game, sid: Stat
             // Ticket #42: the same building bought outright for Ducats.
             cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: fk }, "or", actions);
         });
+    }
+}
+
+/// Ticket #154 (version 0.07.4): **the Facilities that take no slot** -- the Scrubber and the Sea
+/// Wall -- under the boxes, in the Facilities section: each a row when it stands, a line while it
+/// builds, and a build button pair when it may be built here. The designer: *"scrubber sea wall
+/// need to stay but put them in the same section as the tiles just below them."* The Scrubber's
+/// pair carries the state's cap; the Sea Wall's appears once Coastal Engineering is in and while
+/// none stands or builds, one being the most a state may hold.
+#[allow(clippy::too_many_arguments)]
+fn no_slot_section(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mine: bool, director: Option<Seat>, actions: &mut Vec<Action>) {
+    let st = game.state(sid);
+    for (i, f) in st.facilities.iter().enumerate() {
+        if !game.takes_slot(f.kind) {
+            facility_row(ui, session, game, sid, i, f, mine, director, actions);
+        }
+    }
+    for b in &st.queue {
+        if let BuildItem::Facility(k) = b.item
+            && !game.takes_slot(k)
+        {
+            ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
+        }
+    }
+    if !mine {
+        return;
+    }
+    if game.kind(Seat(0)) == FactionKind::Custodians {
+        let sink = game.tables.facility(FacilityKind::Scrubber).sink_per_turn;
+        ui.horizontal(|ui| {
+            cost_button_with_hover(
+                ui,
+                game,
+                &session.pending,
+                Order::BuildFacility { state: sid, kind: FacilityKind::Scrubber },
+                "Scrubber",
+                Some(format!("+{sink:.1} ppm on the Natural Sink and 1 off this state's Unrest a turn, no build slot, 4 Energy upkeep. Destroyed if this state changes hands.")),
+                actions,
+            );
+            cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::Scrubber }, "or", actions);
+            ui.label(RichText::new(format!("{} of {} this state may hold", game.scrubbers_committed(sid), game.scrubber_cap(sid))).weak());
+        });
+    }
+    if game.has_tech(TechId::CoastalEngineering) {
+        let standing = st.facilities.iter().any(|f| f.kind == FacilityKind::SeaWall);
+        let building = st.queue.iter().any(|b| matches!(b.item, BuildItem::Facility(FacilityKind::SeaWall)));
+        if !standing && !building {
+            let hover = game.facility_yield(Seat(0), sid, FacilityKind::SeaWall).text();
+            ui.horizontal(|ui| {
+                cost_button_with_hover(
+                    ui,
+                    game,
+                    &session.pending,
+                    Order::BuildFacility { state: sid, kind: FacilityKind::SeaWall },
+                    "Sea Wall",
+                    Some(format!("{hover}. No build slot, at most one to a state; while it works, this state's next Sea Level threshold takes no slots, and the wall is destroyed absorbing it.")),
+                    actions,
+                );
+                cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::SeaWall }, "or", actions);
+            });
+        }
     }
 }
 
@@ -3548,7 +3609,8 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     } else if st.baseline_rise > 0.0 {
         ui.label(RichText::new(format!("A spent Strip Permit left its Baseline Emissions {:.1} higher, for good.", st.baseline_rise)).weak());
     }
-    ui.label(format!("Build slots: {} used of {} ({} free); Education Level {}", game.slots_used(sid), game.build_slots(sid), game.free_slots(sid), card.education_level));
+    // Ticket #154 (version 0.07.4): the slot count is said once, on the Facilities header.
+    ui.label(format!("Education Level {}", card.education_level));
     // Ticket #52: Unrest, and what it is doing here in words.
     {
         let u = &game.tables.unrest;
@@ -3636,20 +3698,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     let mine = !session.spectator && st.control.director() == Some(Seat(0));
     // Ticket #146 (version 0.07.3): the slots as boxes, with the clicked box's line beneath them.
     slot_boxes(ui, session, game, view, sid, mine, director, actions);
-    // The Facilities that take no slot -- a Sea Wall, a Scrubber -- keep their rows, as the designer
-    // asked: *"buildings that don't take slots can still be listed as they are now under the boxes."*
-    for (i, f) in st.facilities.iter().enumerate() {
-        if !game.takes_slot(f.kind) {
-            facility_row(ui, session, game, sid, i, f, mine, director, actions);
-        }
-    }
-    for b in &st.queue {
-        if let BuildItem::Facility(k) = b.item
-            && !game.takes_slot(k)
-        {
-            ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
-        }
-    }
+    no_slot_section(ui, session, game, sid, mine, director, actions);
     ui.label(RichText::new("Armies").strong());
     let armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid))).collect();
     for a in &armies {
@@ -3661,24 +3710,13 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     }
     ui.separator();
     if mine {
-        ui.label(RichText::new("Build (hover a button for what it makes)").strong());
-        // Ticket #54: the Custodians' Scrubber and Leapfrog, and the Prospectors' Strip Permit.
+        // Ticket #154 (version 0.07.4): the per-kind build list is gone from here -- a Facility is
+        // built by clicking a free box -- and the Scrubber and Sea Wall buttons stand under the
+        // boxes; what is left is orders, and the header says so. The designer: *"remove redundant
+        // build list from the region cards."*
+        ui.label(RichText::new("Orders (hover a button for what it does)").strong());
+        // Ticket #54: the Custodians' Leapfrog, and the Prospectors' Strip Permit.
         if game.kind(Seat(0)) == FactionKind::Custodians {
-            ui.label(RichText::new(format!("Scrubbers {} of {}", game.scrubbers_committed(sid), game.scrubber_cap(sid))).strong());
-            let sink = game.tables.facility(FacilityKind::Scrubber).sink_per_turn;
-            ui.horizontal(|ui| {
-                cost_button_with_hover(
-                    ui,
-                    game,
-                    &session.pending,
-                    Order::BuildFacility { state: sid, kind: FacilityKind::Scrubber },
-                    "Scrubber",
-                    Some(format!("+{sink:.1} ppm on the Natural Sink and 1 off this state's Unrest a turn, no build slot, 4 Energy upkeep")),
-                    actions,
-                );
-                cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::Scrubber }, "or", actions);
-            });
-            ui.label(RichText::new("A Scrubber takes no build slot and is destroyed if this state changes hands.").weak());
             ui.horizontal(|ui| {
                 cost_button(ui, game, &session.pending, Order::Leapfrog { state: sid }, "Leapfrog", actions);
                 ui.label(RichText::new(format!("lowers its people to {:.2} per hundred million, for good", (game.population_coefficient(sid) - game.tables.climate.population_emissions_per_level).max(game.tables.climate.population_emissions_base) * Game::UNITS_PER_HUNDRED_MILLION)).weak());
@@ -3690,13 +3728,6 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 cost_button(ui, game, &session.pending, Order::StripPermit { state: sid }, "Strip Permit", actions);
                 ui.label(RichText::new(format!("{} turns of double output here, then +{:.1} Baseline Emissions and +{} Unrest, for good", t.turns, t.baseline_rise, Game::unrest_figure(t.unrest))).weak());
             });
-        }
-        facility_build_buttons(ui, session, game, sid, actions);
-        if game.has_tech(TechId::CoastalEngineering) {
-            ui.label(
-                RichText::new("A Sea Wall takes no build slot, as a Scrubber does, and takes this state's next Sea Level threshold whole; it is destroyed doing it.")
-                    .weak(),
-            );
         }
         cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
         ui.label(RichText::new("Raising the Industry Level adds an inland slot, which the sea never reaches.").weak());

@@ -113,3 +113,20 @@ takes a margin above and below and is never narrower than half a degree; the Bre
 and the Collapse line are drawn only where they fall inside it.
 
 ![As decided: the Temperature on its own range, +1.0 to +2.2 at turn 13](temperature-history-own-range.png)
+
+## The build list folded into the boxes
+
+Ticket [#154](https://github.com/whaleyjoshua2/Dying-Earth/issues/154). The designer's line: *"remove
+redundant build list from the region cards - scrubber sea wall need to stay but put them in the same
+section as the tiles just below them."* The per-kind `Build Factory 20 · or 40` list at the bottom of
+the card was the very list a free box's click strip draws. Built as the ticket's recommendation for
+the designer to react to: the list gone; **the Scrubber and the Sea Wall under the boxes with no
+heading**, each a row when it stands and a build button pair when it may be built (the Scrubber's
+with the state's cap beside it, the Sea Wall's once Coastal Engineering is in and while none stands);
+the Sea Wall out of the free box's strip, since it takes no slot; the bottom header renamed
+**Orders** with Leapfrog and the Strip Permit staying under it; the slot count said once, on the
+Facilities header; and a no-slot row no longer says `(inland)` or, mothballed, `keeping its slot`.
+
+![China as the Custodians with a Sea Wall standing, from `select:EastAsia walls:1`](build-list-folded-sea-wall-standing.png)
+
+![The same card without one](build-list-folded-no-sea-wall.png)
