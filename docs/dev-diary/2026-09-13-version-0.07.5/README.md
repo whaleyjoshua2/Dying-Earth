@@ -132,3 +132,19 @@ is what a core module looks like; a ground Colony's wears it too, for want of a 
 need a Habitat to hold anybody and Colonists to earn the slot to build one. Now the Core Module
 holds four from the day the station stands, so Emigrants can be lifted to it at once, and each one
 buys a slot.
+
+## The game opens full size, and the Climate Panel opens tall enough to read
+
+Ticket [#165](https://github.com/whaleyjoshua2/Dying-Earth/issues/165). Two of the designer's lines,
+together because the second depends on the first: *"climate panel should start long enough to show
+all the information in the panel"* and *"Game starts in full sized window."*
+
+The game opens **maximised**, filling the screen with its title bar and buttons where they can be
+found; a `shot:` run is never maximised, since it wants the exact off-screen size it was given. The
+Climate Panel opens **at the top, under the bar, and as tall as the window leaves room for**, where
+it opened four hundred rows tall and four hundred rows off the bottom -- about a third of its
+thousand rows of content, with the whole Blame block below the fold before the player touched it.
+
+![The whole panel, from the CO2 Stock to the Blame block, at 1920 by 1080](climate-panel-whole-at-full-size.png)
+
+![The same panel at the old 1280 by 800: far more of it, and it still scrolls for the rest](climate-panel-at-1280x800.png)

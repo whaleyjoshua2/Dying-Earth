@@ -4900,7 +4900,15 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         // driven headlessly -- which also means the Blame block at its foot is below the fold for a
         // player at 1280x800 until they scroll.
         let top = std::env::args().any(|a| a == "climate:top");
-        let home = (if session.spectator { 420.0 } else { 10.0 }, if top { 10.0 } else { bottom - 400.0 });
+        // Ticket #165 (version 0.07.5): the panel opens at the TOP, under the top bar, and as tall
+        // as the window leaves room for. The designer: *"climate panel should start long enough to
+        // show all the information in the panel."* It held about a thousand rows of content and
+        // opened four hundred tall, four hundred rows off the bottom, so two thirds of it -- the
+        // whole Blame block among them -- were below the fold before the player touched it. Opened
+        // this way a maximised window shows the lot and a small one still scrolls.
+        let bar = 104.0;
+        let home = (if session.spectator { 420.0 } else { 10.0 }, if top { 10.0 } else { bar });
+        let tall = (bottom - home.1 - 12.0).max(300.0);
         // Ticket #104 (version 0.07.0): the panel could be dragged larger but not back down. Its
         // content is not what held it: rendered at 230 wide everything wraps and nothing overflows.
         // So the width is made authoritative -- an explicit floor it may be dragged to, and a scroll
@@ -4909,9 +4917,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             .open(&mut open)
             .default_pos(home)
             .default_width(400.0)
-            // The aid also has to force the height: with a scroll area inside, the window settles
-            // at about 400 rows whatever room it is given, which is the fold the block sits below.
-            .default_height(if top { 1300.0 } else { 400.0 })
+            // The aid still forces its own height: with a scroll area inside, the window settles at
+            // whatever it is given, and a picture wants more rows than the screen has.
+            .default_height(if top { 1300.0 } else { tall })
             .resizable(true)
             .min_width(230.0)
             .min_height(140.0)
