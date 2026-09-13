@@ -5,7 +5,7 @@ A single-player, turn-based strategy game about colonizing the solar system befo
 ## Language
 
 **First Playable**:
-The small version of the game: twelve turns and two Factions as first built, twenty-four turns since version 0.02, four Factions since version 0.05 and thirty-six turns of two months since version 0.05.5. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`, `docs/spec/version-0.03.md`, `docs/spec/version-0.04.md`, `docs/spec/version-0.05.md` `docs/spec/version-0.05.5.md`, `docs/spec/version-0.06.0.md` and `docs/spec/version-0.07.0.md`.
+The small version of the game: twelve turns and two Factions as first built, twenty-four turns since version 0.02, four Factions since version 0.05 and thirty-six turns of two months since version 0.05.5. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`, `docs/spec/version-0.03.md`, `docs/spec/version-0.04.md`, `docs/spec/version-0.05.md`, `docs/spec/version-0.05.5.md`, `docs/spec/version-0.06.0.md`, `docs/spec/version-0.07.0.md`, `docs/spec/version-0.07.1.md`, `docs/spec/version-0.07.2.md` and `docs/spec/version-0.07.3.md`.
 _Avoid_: slice, MVP, demo, v1, prototype
 
 **Faction**:
@@ -65,7 +65,7 @@ A permanent settlement a Faction holds on a Body, founded when a Colony Ship unl
 _Avoid_: base, outpost, settlement
 
 **Colony Slot**:
-One of a fixed number of places on a Body where a Colony can be founded, shared by all Factions. Since version 0.04 each is a real geological place, drawn at its position on the Surface Map and giving its Colony its name. Since version 0.05 each also has its own four yields, drawn when the game starts and never far from its Body's, so no two places on a world are equally worth settling; a free slot shows what a Colony there would get. A landing Colony Ship is founded into a chosen one. Earth's three, in Antarctica, are shut under the ice until the Temperature has stood at +1.6 C in a Climate phase; once open they stay open.
+One of a fixed number of places on a Body where a Colony can be founded, shared by all Factions. Since version 0.04 each is a real geological place, drawn at its position on the Surface Map and giving its Colony its name. Since version 0.05 each also has its own four yields, drawn when the game starts and never far from its Body's, so no two places on a world are equally worth settling; a free slot shows what a Colony there would get. The four are Materials, Energy, Fuel and, since version 0.07.3, Research: the fourth was the Habitat yield, which set how many Colonists a Habitat there held, until the designer traded it for one that multiplies an Observatory. A landing Colony Ship is founded into a chosen one. Earth's three, in Antarctica, are shut under the ice until the Temperature has stood at +1.6 C in a Climate phase; once open they stay open.
 _Avoid_: site, plot, capacity
 
 **Orbital Slot**:
@@ -137,15 +137,23 @@ The three Techs the Research Lead chooses between, drawn when a Tech completes, 
 _Avoid_: options, candidates, draft, offer
 
 **Command Cluster**:
-The strip along the foot of the side panel, since version 0.07.1, holding the controls a player reaches for every turn: the Influence still unspent, Spend on whatever place is selected, Defence, and End Turn. It does not scroll: the card or the Roster scrolls above it. It is the only place End Turn stands.
+The strip along the foot of the side panel, since version 0.07.1, holding the controls a player reaches for every turn: the Influence still unspent, Spend on whatever place is selected, Max (Defence until version 0.07.3), and End Turn. It does not scroll: the card or the Roster scrolls above it. It is the only place End Turn stands.
 _Avoid_: action bar, toolbar, HUD, control panel
 
+**Max**:
+The button in the Command Cluster, since version 0.07.3, that spends everything left of the turn's Allotment on the selected place in one press, as one order to be read and cancelled like any other; greyed out while nothing is selected. **Every turn** makes it a standing order on the place selected when it was ticked: at the start of each turn the whole Allotment is placed on that place as an ordinary order, never spent unwatched, until the box is unticked, the placed order is cancelled, or the place is no longer the player's.
+_Avoid_: all-in, spend all, auto-spend, Defence (the retired button)
+
 **Defence**:
-The button in the Command Cluster, since version 0.07.1, that spreads the turn's unspent Influence across the places a rival could take. It funds the most threatened place to safe before any of the budget reaches the next, because taking a place is a threshold and not a race, and where the budget cannot cover a place in full it passes over it to one it can still save. A place no rival can reach needs nothing and gets nothing. **Every turn** makes it a standing order: it places the same split as ordinary orders at the start of each turn, to be read and cancelled like any other, and never spends unwatched. The computer players defend by the same rule.
-_Avoid_: auto-spend, garrison, fortify, budget split
+Retired in version 0.07.3; see Max. It was the Command Cluster button, from version 0.07.1, that spread the turn's unspent Influence across the places a rival could take, most threatened first and each funded to safe or not at all, and the rule the computer players defended by; both went, and the computer players hold their places by their own arithmetic again.
+_Avoid_: using it for anything Max now does; auto-spend, garrison, fortify, budget split
+
+**Hab View**:
+The window, since version 0.07.3, that shows a Space Station's or Colony's Modules as a grid of tiles: one tile per Module with its picture, dimmed while mothballed and hatched while building, a dashed empty tile for every free place under the Module cap, and the Archive on a tile of its own outside the count. Clicking a tile shows that Module's figures and its Mothball, Restart and Decommission buttons beneath the grid; clicking a free tile offers the build buttons there. Opened from the card's Modules button, from the Roster row, or with M; closed with Esc. Named after the habitat screen of Terra Invicta, the designer's reference.
+_Avoid_: module window, colony screen, base view, habitat panel
 
 **Figure**:
-One of the eight things the board counts and draws a glyph for: Materials, Fuel, Energy, Research, Ducats, population, Influence and Emissions. A figure's glyph carries one fill wherever it is drawn, decided by which figure it is and never by the colour of the text around it, and a word is traded for its glyph only where it names a figure -- which is to say only directly after a number.
+One of the eight things the board counts and draws a glyph for: Materials, Fuel, Energy, Research, Ducats, population, Influence and Emissions. A figure's glyph carries one fill wherever it is drawn, decided by which figure it is and never by the colour of the text around it, and a word is traded for its glyph only where it names a figure -- which is to say only directly after a number, or, since version 0.07.3, where it heads a multiplier (`[research] x1.25` on a Faction card, `leans [materials]` on the start globe), with the phrase the glyph replaced on its hover.
 _Avoid_: stat, counter, metric, indicator
 
 **Roster**:
@@ -197,7 +205,7 @@ _Avoid_: antenna, transmitter, beacon
 ### Pieces
 
 **Observatory**:
-The Module that makes Research away from Earth, since version 0.06.0: on a Colony, a Space Station or in Antarctica. It takes no Body yield; every Colonist living at its Colony adds one per cent to what it makes, and Public Science lifts it as it lifts a Research Lab. Its Research counts toward the Research Lead as a Lab's does.
+The Module that makes Research away from Earth, since version 0.06.0: on a Colony, a Space Station or in Antarctica. It took no Body yield until version 0.07.3; since then it is multiplied by its slot's Research yield on the ground and by its Body's on a station, the first Body yield a station has read. Every Colonist living at its Colony adds one per cent to what it makes, and Public Science lifts it as it lifts a Research Lab. Its Research counts toward the Research Lead as a Lab's does.
 _Avoid_: lab, laboratory, research station, institute, science module
 
 **Solar Array**:
@@ -209,7 +217,7 @@ The Module only a ground Colony on a small world (the Moon, Phobos, Deimos) hold
 _Avoid_: catapult, launcher, railgun, launch loop
 
 **Module**:
-A building placed inside a Colony. Twelve kinds since version 0.06.0: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, the Solar Array (a Space Station's alone), the Mass Driver (a small world's alone), and the Archive, which only the Archivists raise, one to a Faction, from its own button. A Habitat holds eight Colonists since version 0.06.0.
+A building placed inside a Colony. Twelve kinds since version 0.06.0: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, the Solar Array (a Space Station's alone), the Mass Driver (a small world's alone), and the Archive, which only the Archivists raise, one to a Faction, from its own button. A Habitat holds eight Colonists since version 0.06.0, and since version 0.07.3 the same eight everywhere: no world's slot makes it hold more or fewer.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:
@@ -249,15 +257,15 @@ The Module that lets a Colony hold and build a defensive Army. A Colony without 
 _Avoid_: fort, garrison, base
 
 **Colonist**:
-A person counted in the population of a Colony or Region. Since version 0.05.5 Colonists are built: they muster in a Region as Emigrants, are carried by Ships and held by Habitats, and are never spent as a resource.
+A person counted in the population of a Colony or Region. Since version 0.05.5 Colonists are built: they muster in a Region as Emigrants, are carried by Ships and held by Habitats, and are never spent as a resource. One Colonist is one unit of population, five million people since version 0.07.3, and the top bar counts every Colonist living off Earth as the space population beside Earth's.
 
 **Emigrant**:
-A Colonist mustered in a Region and not yet gone: up to four a turn per Faction (eight for the Arkwrights), in one state the Faction directs, at a tenth of a person each, on the state's card at End Turn. A batch takes half a point off the state's Unrest. A working Launch Site lifts Emigrants onto a Ship, and once the Antarctic ice is open the sea takes them to Antarctica in a turn with no launch. They are people of their state until they leave it.
+A Colonist mustered in a Region and not yet gone: up to four a turn per Faction (eight for the Arkwrights), in one state the Faction directs, each taking one unit of the state's population -- five million people, since version 0.07.3; a tenth of a hundred million, ten million, before -- on the state's card at End Turn. A batch takes half a point off the state's Unrest. A working Launch Site lifts Emigrants onto a Ship, or, since version 0.07.3, straight onto a Space Station of their Faction's over Earth, as many as its Habitats have room for, aboard at that turn's Resolution -- a launch, with no crowd; and once the Antarctic ice is open the sea takes them to Antarctica in a turn with no launch. They are people of their state until they leave it.
 _Avoid_: settler, recruit, migrant, passenger, colonist-in-waiting
 _Avoid_: settler, crew, worker, population resource
 
 **Region**:
-One of twelve territories of the Earth Map that a Faction can control and build in, called a Region until version 0.07.2 and since then **named for its Nation** -- the power that leads it -- so the territory that was South Asia is India and the one that was Europe is the European Union. Eight until version 0.05, which split Africa at the Sahara, Asia into East, South and South-East, and Central America and the Caribbean out of North America; Antarctica left the list in version 0.04 to become Earth's Colony Slots. Each carries a population, an Industry Level, a Resource Lean, a Baseline Emissions figure, an Education Level, a GDP, an Influence value, an Unrest figure and a Standing Army. Armies move only between neighbouring Regions.
+One of twelve territories of the Earth Map that a Faction can control and build in, called a Region until version 0.07.2 and since then **named for its Nation** -- the power that leads it -- so the territory that was South Asia is India and the one that was Europe is the European Union. Eight until version 0.05, which split Africa at the Sahara, Asia into East, South and South-East, and Central America and the Caribbean out of North America; Antarctica left the list in version 0.04 to become Earth's Colony Slots. Each carries a population -- the whole territory's, not its Nation's alone, counted in units of five million people since version 0.07.3 (hundreds of millions before) and written on its card as `Region population 228.0 (1.14B)` -- an Industry Level, a Resource Lean, a Baseline Emissions figure, an Education Level, a GDP, an Influence value, an Unrest figure and a Standing Army. Armies move only between neighbouring Regions.
 _Avoid_: nation state, country, territory, state, continent, bloc
 
 **Nation**:
@@ -323,7 +331,7 @@ How dirty a Region's industry is before any Facility is built there.
 _Avoid_: pollution rating, carbon score
 
 **Build Slot**:
-One of the places a Facility occupies in a Region. A state has Size + Industry Level + three of them, and each is either a **Coastal Slot** or an **Inland Slot**: the sea takes only the first, and every slot a raise of the Industry Level adds is one of the second. Its start Facilities stand on the coast first; a later build fills an inland slot while one is free.
+One of the places a Facility occupies in a Region. A state has Size + Industry Level + three of them, and each is either a **Coastal Slot** or an **Inland Slot**: the sea takes only the first, and every slot a raise of the Industry Level adds is one of the second. Its start Facilities stand on the coast first; a later build fills an inland slot while one is free. Since version 0.07.3 the card draws them as boxes in the Hab View's language -- a picture on a dark box, dimmed while mothballed, hatched while building, dashed while free, a coastal box outlined in blue and an inland one in grey -- and a slot the sea has taken stands under water, three quarters flooded with the drowned building dimmed beneath.
 _Avoid_: building slot, plot, space, capacity
 
 **Coastal Slot**:

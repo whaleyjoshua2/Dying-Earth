@@ -422,7 +422,9 @@ fn print_board(g: &Game) {
         "  Techs done: {}",
         if g.research.done.is_empty() { "none".into() } else { g.research.done.iter().map(|x| t.tech(*x).name.clone()).collect::<Vec<_>>().join(", ") }
     );
-    if g.research.awaiting_pick == Some(me) || g.research.current.is_none() {
+    // Version 0.07.3: a complete tree owes nobody a pick; the marker was printed with nothing under it
+    // once every Tech was done, and a driver that trusted it wrote a `tech` line that could not parse.
+    if (g.research.awaiting_pick == Some(me) || g.research.current.is_none()) && !g.available_techs().is_empty() {
         let drawn = !g.research.shortlist.is_empty();
         println!(
             "  *** YOU MUST PICK THE NEXT TECH (a `tech <name>` line). {} ***",

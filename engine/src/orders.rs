@@ -85,16 +85,25 @@ pub enum Order {
     /// nothing toward the Research Lead. Set once, it holds until it is set again, and it is read
     /// at the next Income; it never moves Research that Income has already paid out.
     SetArchiveFunding { on: bool },
-    /// Version 0.07.1 (ticket #114): the Defence split repeats every turn until it is switched off.
-    /// Free, and it spends nothing by itself: what it sets is whether the interface places next
-    /// turn's split for the player to look at.
-    SetDefenceStanding { on: bool },
+    /// Version 0.07.3 (ticket #134): Max repeats every turn on one place until it is switched off
+    /// -- `Some(place)` turns it on there, `None` turns it off. Free, and it spends nothing by
+    /// itself: what it sets is whether the interface places next turn's whole Allotment on that
+    /// place as an ordinary order for the player to look at. (Version 0.07.1's Defence split, the
+    /// standing order this replaces, lasted two versions.)
+    SetMaxStanding { target: Option<Target> },
     /// Version 0.05.5 (ticket #73): muster Emigrants, the built Colonists, in a Nation State the
     /// seat directs: up to four a turn per Faction, in one state, at a tenth of a person each.
     BuildEmigrants { state: StateId, n: u32 },
     /// Version 0.05.5 (ticket #73): send waiting Emigrants to Antarctica by sea, into a free slot
     /// (founding a Colony) or the seat's own Colony there; a turn to arrive, no launch.
     SendToAntarctica { state: StateId, n: u32, into: UnloadTarget },
+    /// Version 0.07.3 (ticket #141): lift waiting Emigrants straight onto the seat's own Space
+    /// Station over Earth, from a Nation State with a working Launch Site. A launch (it emits and
+    /// goes on Blame), no crowd, as many as the station has Habitat room for, landing at this
+    /// turn's Resolution; a warship blockading the station's slot refuses it. The designer: *"Send
+    /// emigrates from earths surface directly to stations that it orbits - similar to the
+    /// Antarctica is handled."*
+    LiftToStation { state: StateId, n: u32, colony: ColonyId },
     /// Version 0.05.5 (ticket #72): the Prospectors set the share of their Materials output the
     /// Venture Capital Fund banks each Income, in whole percent (a step of 10, 0 to 80).
     SetVentureShare { share: u32 },
@@ -387,12 +396,17 @@ impl Game {
                 let materials_form = Order::BuildModule { colony: *colony, kind: *kind };
                 self.check_order_inner(seat, pending, &materials_form, false).map(|_| cost)
             }
-            Order::SetDefenceStanding { on } => {
-                if pending.iter().any(|o| matches!(o, Order::SetDefenceStanding { .. })) {
-                    return fail("Defence is already set this turn");
+            Order::SetMaxStanding { target } => {
+                if pending.iter().any(|o| matches!(o, Order::SetMaxStanding { .. })) {
+                    return fail("Max is already set this turn");
                 }
-                if *on == self.seat(seat).defence_standing {
-                    return fail(if *on { "Defence already repeats every turn" } else { "Defence does not repeat" });
+                if *target == self.seat(seat).max_standing {
+                    return fail(if target.is_some() { "Max already repeats every turn there" } else { "Max does not repeat" });
+                }
+                if let Some(place) = target
+                    && !self.directs(seat, *place)
+                {
+                    return fail("Max repeats only on a place you hold");
                 }
                 Ok(cost)
             }
@@ -990,7 +1004,7 @@ impl Game {
                 if !self.antarctica_open {
                     return fail(format!("the Antarctic ice has not opened: it opens at {:+.1} C", self.tables.climate.antarctica_opens_at));
                 }
-                let sending: u32 = pending.iter().map(|o| if let Order::SendToAntarctica { state: s, n, .. } = o { if s == state { *n } else { 0 } } else { 0 }).sum();
+                let sending = self.emigrants_leaving(pending, *state);
                 let waiting = self.state(*state).emigrants.saturating_sub(sending);
                 if *n == 0 || *n > waiting {
                     return fail(format!("{waiting} Emigrants are waiting there"));
@@ -1010,6 +1024,34 @@ impl Game {
                             return fail("that is not your Colony in Antarctica");
                         }
                     }
+                }
+                Ok(cost)
+            }
+            // Ticket #141 (version 0.07.3): waiting Emigrants lift straight to the seat's own
+            // station over Earth, by a Launch Site, into the room its Habitats have.
+            Order::LiftToStation { state, n, colony } => {
+                if self.state(*state).control.director() != Some(seat) {
+                    return fail("you do not direct that Nation State");
+                }
+                if !self.state(*state).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()) {
+                    return fail("a lift to orbit needs a working Launch Site there");
+                }
+                let sending = self.emigrants_leaving(pending, *state);
+                let waiting = self.state(*state).emigrants.saturating_sub(sending);
+                if *n == 0 || *n > waiting {
+                    return fail(format!("{waiting} Emigrants are waiting there"));
+                }
+                let Some(col) = self.colony(*colony) else { return fail("no such station") };
+                if col.body != BodyId::Earth || !col.in_orbit || col.control.director() != Some(seat) {
+                    return fail("that is not your station over Earth");
+                }
+                if self.slot_blockaded_against(seat, BodyId::Earth, col.slot) {
+                    return fail("a rival warship blockades that station's slot");
+                }
+                let bound: u32 = pending.iter().map(|o| if let Order::LiftToStation { colony: c, n, .. } = o { if c == colony { *n } else { 0 } } else { 0 }).sum();
+                let room = self.habitat_room(col).saturating_sub(col.colonists).saturating_sub(bound);
+                if *n > room {
+                    return fail(format!("{} has Habitat room for {room} more", self.place_name(Place::Colony(*colony))));
                 }
                 Ok(cost)
             }
@@ -1253,12 +1295,11 @@ impl Game {
                     let text = self.say("archive_begun", &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(*colony)))]);
                     self.report_line(LineKind::Archive, Some(ReportPlace::Colony(*colony)), text);
                 }
-                Order::SetDefenceStanding { on } => {
-                    self.seat_mut(seat).defence_standing = *on;
-                    let line = if *on {
-                        format!("The {} will split their Influence across the places they hold every turn.", self.seat_name(seat))
-                    } else {
-                        format!("The {} will place their Influence by hand again.", self.seat_name(seat))
+                Order::SetMaxStanding { target } => {
+                    self.seat_mut(seat).max_standing = *target;
+                    let line = match target {
+                        Some(place) => format!("The {} will spend their whole Allotment on {} every turn.", self.seat_name(seat), self.place_name(*place)),
+                        None => format!("The {} will place their Influence by hand again.", self.seat_name(seat)),
                     };
                     self.log(line);
                 }
@@ -1331,6 +1372,21 @@ impl Game {
                     let line = format!("{} Emigrants left {} for Antarctica by sea, for the {}.", n, self.tables.state(*state).name, self.seat_name(seat));
                     self.log(line);
                 }
+                // Ticket #141 (version 0.07.3): Emigrants lift straight to the seat's station over
+                // Earth. A launch, as a lift onto a Ship is; they are aboard at this Resolution.
+                Order::LiftToStation { state, n, colony } => {
+                    let left = self.state(*state).emigrants.saturating_sub(*n);
+                    self.state_mut(*state).emigrants = left;
+                    self.climate.launches_pending[seat.index()] += 1;
+                    if let Some(c) = self.colony_mut(*colony) {
+                        c.colonists += n;
+                    }
+                    let station = self.place_name(Place::Colony(*colony));
+                    let line = format!("{} Emigrants lifted from {} to {}, for the {}.", n, self.tables.state(*state).name, station, self.seat_name(seat));
+                    self.log(line);
+                    let text = self.say("emigrants_lifted", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone()), ("station", station)]);
+                    self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::Colony(*colony)), text);
+                }
                 // Ticket #72: the Fund's orders land now; the share is read at the next Income.
                 Order::SetVentureShare { share } => {
                     self.seat_mut(seat).venture_share = *share as f64 / 100.0;
@@ -1353,19 +1409,16 @@ impl Game {
                     let cut = self.tables.climate.leapfrog_baseline_cut;
                     self.state_mut(*state).leapfrog += per;
                     self.state_mut(*state).baseline_cut += cut;
-                    let line = format!(
-                        "The {} Leapfrogged {}: its people now emit {:.2} per hundred million.",
-                        self.seat_name(seat),
-                        self.tables.state(*state).name,
-                        self.population_coefficient(*state)
-                    );
+                    // Ticket #143 (version 0.07.3): the rate is quoted per hundred million, twenty units.
+                    let per_hundred_million = self.population_coefficient(*state) * Game::UNITS_PER_HUNDRED_MILLION;
+                    let line = format!("The {} Leapfrogged {}: its people now emit {:.2} per hundred million.", self.seat_name(seat), self.tables.state(*state).name, per_hundred_million);
                     self.log(line);
                     let text = self.say(
                         "leapfrog",
                         &[
                             ("faction", self.seat_name(seat)),
                             ("state", self.tables.state(*state).name.clone()),
-                            ("coefficient", format!("{:.2}", self.population_coefficient(*state))),
+                            ("coefficient", format!("{per_hundred_million:.2}")),
                         ],
                     );
                     self.report_line(LineKind::Climate, Some(ReportPlace::State(*state)), text);
@@ -1501,7 +1554,10 @@ impl Game {
             }
             Order::BuildArchive { colony } => r("build_archive", &[("colony", place(Place::Colony(*colony)))]),
             Order::SetArchiveFunding { on } => r(if *on { "fund_archive" } else { "unfund_archive" }, &[]),
-            Order::SetDefenceStanding { on } => r(if *on { "defence_on" } else { "defence_off" }, &[]),
+            Order::SetMaxStanding { target } => match target {
+                Some(p) => r("max_on", &[("place", place(*p))]),
+                None => r("max_off", &[]),
+            },
             Order::Repair { unit, .. } | Order::RepairWithDucats { unit, .. } => r("repair", &[("unit", unit_of(*unit))]),
             Order::Transit { ship, to, .. } => {
                 let unit = self.ship(*ship).map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into());
@@ -1551,6 +1607,7 @@ impl Game {
             }
             Order::BuildEmigrants { state, n } => r("build_emigrants", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone())]),
             Order::SendToAntarctica { state, n, .. } => r("send_antarctica", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone())]),
+            Order::LiftToStation { state, n, colony } => r("lift_station", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone()), ("station", place(Place::Colony(*colony)))]),
             Order::SetVentureShare { share } => r("set_venture_share", &[("share", share.to_string())]),
             Order::DrawVenture { amount } => r("draw_venture", &[("n", amount.to_string())]),
             Order::Leapfrog { state } => r("leapfrog", &[("state", self.tables.state(*state).name.clone())]),

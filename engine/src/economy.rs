@@ -98,6 +98,22 @@ impl Game {
             s.funding_archive = false;
         }
         self.replenish_standing_armies();
+        // Ticket #134 (version 0.07.3): a standing Max order ends by itself when its place is no
+        // longer the seat's to spend on, and the Report says so.
+        for seat in Seat::ALL {
+            if let Some(place) = self.seat(seat).max_standing
+                && !self.directs(seat, place)
+            {
+                self.seat_mut(seat).max_standing = None;
+                let text = format!("The standing Max order on {} ends: it is no longer yours to spend on.", self.place_name(place));
+                self.log(text.clone());
+                let at = match place {
+                    Place::State(s) => ReportPlace::State(s),
+                    Place::Colony(c) => ReportPlace::Colony(c),
+                };
+                self.report_line(LineKind::Note, Some(at), text);
+            }
+        }
         for s in &mut self.ships {
             s.escaped = false;
             s.arrived_this_turn = false;
@@ -289,7 +305,11 @@ impl Game {
                 // Ticket #81: a Faction may carry a second Research multiplier for off Earth (the
                 // Archivists' 1.75), a station over Earth counting as off and Antarctica as on.
                 let research_multiplier = if self.off_earth(col) { fac.research_multiplier_off_earth.unwrap_or(fac.research_multiplier) } else { fac.research_multiplier };
-                let mut r = p.amount as f64 * (1.0 + col.colonists as f64 * per) * research_multiplier;
+                // Ticket #140 (version 0.07.3): the slot's Research yield on the ground, the Body's
+                // on a station -- the first Body yield a station has read. The designer traded the
+                // Habitat yield for it: *"Replace habitat bonuses with science bonuses."*
+                let science = self.research_yield_at(col);
+                let mut r = p.amount as f64 * science * (1.0 + col.colonists as f64 * per) * research_multiplier;
                 r *= self.tech_multiplier(seat, TechId::PublicScience);
                 // Ticket #84: the Upload stacks on Public Science.
                 r *= self.tech_multiplier(seat, TechId::TheUpload);
@@ -479,10 +499,11 @@ impl Game {
         m
     }
 
-    /// A controlled state's base Ducats a turn (ticket #35): gdp x Industry Level / 10, rounded down.
+    /// A controlled state's base Ducats a turn (ticket #35): gdp x Industry Level / 10, rounded down,
+    /// the formula living in `Tables::base_ducats` since ticket #132 so the start screen reads the same one.
     /// Ticket #83 (version 0.06.0): times its controller's `ducats_multiplier` (the Prospectors' 1.2).
     pub fn state_ducats(&self, sid: StateId) -> i64 {
-        let base = (self.tables.state(sid).gdp * self.state(sid).industry_level as i64) / 10;
+        let base = self.tables.base_ducats(sid, self.state(sid).industry_level);
         let m = self.state(sid).control.controller().map(|s| self.tables.faction(self.kind(s)).ducats_multiplier).unwrap_or(1.0);
         (base as f64 * m).floor() as i64
     }

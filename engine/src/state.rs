@@ -275,13 +275,14 @@ pub struct SlotYields {
     pub mine: f64,
     pub generator: f64,
     pub refinery: f64,
-    pub habitat: f64,
+    /// Ticket #140 (version 0.07.3): Research, for an Observatory; the Habitat yield until then.
+    pub research: f64,
 }
 
 impl SlotYields {
     /// The Body's own figures, which a station in orbit and any slot off the table read.
     pub fn of_body(card: &crate::data::BodyCard) -> SlotYields {
-        SlotYields { mine: card.mine_yield, generator: card.generator_yield, refinery: card.refinery_yield, habitat: card.habitat_yield }
+        SlotYields { mine: card.mine_yield, generator: card.generator_yield, refinery: card.refinery_yield, research: card.research_yield }
     }
 
     pub fn of_module(&self, kind: ModuleKind) -> f64 {
@@ -289,15 +290,17 @@ impl SlotYields {
             ModuleKind::Mine => self.mine,
             ModuleKind::Generator => self.generator,
             ModuleKind::Refinery => self.refinery,
-            // A Trade Post (ticket #35) follows the Habitat yield: trade goes where people live.
-            ModuleKind::Habitat | ModuleKind::TradePost => self.habitat,
+            // Ticket #140 (version 0.07.3): the fourth yield is the Observatory's. A Habitat holds
+            // the same everywhere now, and a Trade Post (which followed the Habitat yield from
+            // ticket #35 until the network of ticket #90 stopped reading it) reads nothing.
+            ModuleKind::Observatory => self.research,
             _ => 1.0,
         }
     }
 
     /// "M 1.31 G 0.68 R 1.52 H 1.44", the figures the Surface Map writes under a slot's name.
     pub fn text(&self) -> String {
-        format!("M {:.2} G {:.2} R {:.2} H {:.2}", self.mine, self.generator, self.refinery, self.habitat)
+        format!("M {:.2} G {:.2} R {:.2} S {:.2}", self.mine, self.generator, self.refinery, self.research)
     }
 }
 
@@ -590,7 +593,7 @@ pub struct SeatState {
     /// before ending the turn. The flag lives here rather than in the interface so it survives a
     /// save, the way the Venture share and the Archive's funding do.
     #[serde(default)]
-    pub defence_standing: bool,
+    pub max_standing: Option<Target>,
     /// Ticket #51: Provisional Findings is in force this turn, because last turn's Research went to
     /// the shared Tech. True at the start of the game.
     pub provisional_findings: bool,
@@ -736,7 +739,7 @@ impl Game {
             archive_fund: 0,
             funding_archive: false,
             archive_funding: false,
-            defence_standing: false,
+            max_standing: None,
             provisional_findings: true,
             resettle_to: None,
             blame_emitted: 0.0,
@@ -1181,6 +1184,19 @@ impl Game {
         self.colony_ship_capacity(seat) + self.crowd_extra()
     }
 
+    /// Ticket #141 (version 0.07.3): how many of a Nation State's waiting Emigrants the pending
+    /// orders already send away, by sea or by lift, so the same people are never ordered twice.
+    pub fn emigrants_leaving(&self, pending: &[crate::orders::Order], state: StateId) -> u32 {
+        use crate::orders::Order;
+        pending
+            .iter()
+            .map(|o| match o {
+                Order::SendToAntarctica { state: s, n, .. } | Order::LiftToStation { state: s, n, .. } if *s == state => *n,
+                _ => 0,
+            })
+            .sum()
+    }
+
     /// The population a lift from a Launch Site takes for this many Colonists (Steerage doubles it).
     pub fn lift_population(&self, seat: Seat, colonists: u32) -> f64 {
         // Ticket #73: paid when the Emigrants muster, not when a Ship lifts them.
@@ -1430,8 +1446,48 @@ impl Game {
         self.build_slots(s).saturating_sub(self.slots_used(s))
     }
 
+    /// Ticket #143 (version 0.07.3): the population figure's unit, in people. A Region's figure, a
+    /// Colonist and an Emigrant are all counted in it, so `Region population 76.0` is 380 million
+    /// people and one Colonist is five million. (A hundred million, with a Colonist a tenth of one,
+    /// until this ticket.) The designer: *"I want country cards to use the actual population."*
+    pub const PEOPLE_PER_UNIT: f64 = 5_000_000.0;
+
+    /// Units in a hundred million people, since the cards quote per-person Emissions at that rate.
+    pub const UNITS_PER_HUNDRED_MILLION: f64 = 100_000_000.0 / Game::PEOPLE_PER_UNIT;
+
+    /// A population figure written as real people: `1.14B`, `380M`, `20M`.
+    pub fn people_text(units: f64) -> String {
+        let people = units * Game::PEOPLE_PER_UNIT;
+        if people >= 1_000_000_000.0 {
+            format!("{:.2}B", people / 1_000_000_000.0)
+        } else {
+            format!("{:.0}M", people / 1_000_000.0)
+        }
+    }
+
+    /// The card's form: the figure in units to one decimal, and the real number beside it.
+    pub fn population_text(units: f64) -> String {
+        format!("{units:.1} ({})", Game::people_text(units))
+    }
+
+    /// Ticket #143: everyone on Earth -- the Regions' figures and the Colonists in Antarctica.
+    pub fn earth_population(&self) -> f64 {
+        let regions: f64 = self.states.iter().map(|s| s.population).sum();
+        let antarctica: u32 = self.colonies.iter().filter(|c| !self.off_earth(c)).map(|c| c.colonists).sum();
+        regions + antarctica as f64
+    }
+
+    /// Ticket #143: everyone living off Earth, in Habitats, a station over Earth counting as off and
+    /// Antarctica as on -- the Off-world Presence count, summed over every seat. People aboard a Ship
+    /// are not yet anywhere and are not counted.
+    pub fn space_population(&self) -> u32 {
+        self.colonies.iter().filter(|c| self.off_earth(c)).map(|c| c.colonists).sum()
+    }
+
     pub fn population_factor(&self, s: StateId) -> f64 {
-        1.0 + self.state(s).population / 50.0
+        // Ticket #143 (version 0.07.3): the unit is five million people, so 1,000 units is the five
+        // billion that 50 hundred-million was.
+        1.0 + self.state(s).population / 1000.0
     }
 
     /// Ticket #97 (version 0.07.0): the Modules this Colony or Space Station may hold: the table's
@@ -1470,11 +1526,18 @@ impl Game {
         let per = self.tables.module(ModuleKind::Habitat).holds_colonists as i64
             + seat.map(|s| self.tech_addition(s, TechId::ExpandedHabitats)).unwrap_or(0);
         let faction = seat.map(|s| self.tables.faction(self.kind(s)).habitat_capacity_multiplier).unwrap_or(1.0);
-        // A station's Habitats are built for orbit: no Body yield applies (ticket #46). On a surface
-        // it is the slot's own Habitat yield, not the Body's (ticket #57).
-        let yield_ = if c.in_orbit { 1.0 } else { self.slot_yields(c.body, c.slot).habitat };
+        // Ticket #140 (version 0.07.3): a Habitat holds the same everywhere. It read the slot's
+        // Habitat yield on a surface (ticket #57) and 1.0 in orbit (ticket #46) until the designer
+        // traded that yield for a Research one.
         let habitats = c.modules.iter().filter(|m| m.kind == ModuleKind::Habitat).count() as f64;
-        (habitats * per.max(0) as f64 * yield_ * faction).floor() as u32
+        (habitats * per.max(0) as f64 * faction).floor() as u32
+    }
+
+    /// Ticket #140 (version 0.07.3): what an Observatory here is multiplied by -- the slot's own
+    /// Research yield on a surface, and in orbit the Body's, since a station over Mars is doing
+    /// Mars science. The first Body yield a station has ever read.
+    pub fn research_yield_at(&self, c: &Colony) -> f64 {
+        if c.in_orbit { self.tables.body(c.body).research_yield } else { self.slot_yields(c.body, c.slot).research }
     }
 
     /// Ticket #51: the seat's Colonists at one Body, counting a station over it as being there.
@@ -1534,75 +1597,6 @@ impl Game {
             Some(c) => threshold.max(self.seat(c).influence.get(&target).copied().unwrap_or(0) + self.tables.influence.challenge_margin),
             None => threshold,
         }
-    }
-
-    /// Ticket #114 (version 0.07.1): **the Defence split.** Every place this seat holds, and what it
-    /// would have to spend on each to keep it out of every rival's reach for one more turn.
-    ///
-    /// A rival with Standing `R` takes a place this seat holds when `R` reaches BOTH that rival's own
-    /// threshold and this seat's Standing plus the challenge margin. So a place is safe while
-    /// `mine + margin > best rival`, and the shortfall is what Defence has to cover. Two things are
-    /// counted in besides: the **decay** a held place suffers at every Resolution, so the spend still
-    /// holds after it, and the **threshold arm** -- a rival below their own threshold cannot take the
-    /// place at any Standing, so a place no rival can reach needs nothing.
-    ///
-    /// What it does NOT do is guess at what a rival will spend this turn. It assumes their Standing
-    /// stays where it is, which makes the figure a floor rather than a promise, and is the honest
-    /// assumption: a rival's Allotment is not something this seat can see.
-    ///
-    /// The list comes back **most threatened first**, which is the order the budget is spent in.
-    pub fn defence_needs(&self, seat: Seat) -> Vec<(Target, i64)> {
-        let mut held: Vec<Target> = self.directed_states(seat).into_iter().map(Place::State).collect();
-        held.extend(self.directed_colonies(seat).into_iter().map(Place::Colony));
-        let margin = self.tables.influence.challenge_margin;
-        let mut out: Vec<(Target, i64)> = held
-            .into_iter()
-            .map(|place| {
-                let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
-                let need = seat
-                    .others()
-                    .into_iter()
-                    .map(|rival| {
-                        let theirs = self.seat(rival).influence.get(&place).copied().unwrap_or(0);
-                        // A rival below their own threshold cannot take this place at any Standing.
-                        if theirs < self.influence_threshold_for(rival, place) {
-                            return 0;
-                        }
-                        (theirs + 1 - margin - mine + self.tables.influence.decay_controlled).max(0)
-                    })
-                    .max()
-                    .unwrap_or(0);
-                (place, need)
-            })
-            .filter(|(_, need)| *need > 0)
-            .collect();
-        out.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-        out
-    }
-
-    /// Ticket #114: the Defence split itself -- what to spend, and where, out of `budget`.
-    ///
-    /// The designer's rule: *"fill the most threatened place to safe, then the next, then the next,
-    /// and stop."* Taking a place is a **threshold and not a race**, so a place funded most of the
-    /// way is exactly as lost as one funded not at all; that is why the budget is spent whole on one
-    /// place before any of it reaches the next. Where the budget cannot cover the next place in full
-    /// this walks PAST it to the ones it can still save, rather than stopping dead: same money, more
-    /// places held, and every place it does fund is funded to safe.
-    ///
-    /// Whatever is left over is left unspent, and the caller decides what to say about it.
-    pub fn defence_split(&self, seat: Seat, budget: i64) -> Vec<(Target, i64)> {
-        let mut left = budget;
-        let mut out = Vec::new();
-        for (place, need) in self.defence_needs(seat) {
-            if need <= left {
-                left -= need;
-                out.push((place, need));
-            }
-            if left == 0 {
-                break;
-            }
-        }
-        out
     }
 
     /// Ticket #53: Blame raises this seat's threshold on a Nation State it does not control, and
@@ -1667,6 +1661,15 @@ impl Game {
     pub fn state_influence_value(&self, s: StateId) -> i64 {
         let card = self.tables.state(s);
         card.influence + (self.state(s).industry_level as i64 - card.industry_level as i64).max(0)
+    }
+
+    /// Ticket #134 (version 0.07.3): whether this seat directs a place -- a Region it controls or
+    /// occupies, or a Colony likewise -- which is what a standing Max order needs of its place.
+    pub fn directs(&self, seat: Seat, place: Place) -> bool {
+        match place {
+            Place::State(s) => self.directed_states(seat).contains(&s),
+            Place::Colony(c) => self.directed_colonies(seat).contains(&c),
+        }
     }
 
     /// What the seat's online Embassies and Relays add to its Allotment (ticket #36).
@@ -1754,7 +1757,7 @@ impl Game {
                     mine: draw(card.mine_yield),
                     generator: draw(card.generator_yield),
                     refinery: draw(card.refinery_yield),
-                    habitat: draw(card.habitat_yield),
+                    research: draw(card.research_yield),
                 };
                 self.slot_yields.insert((body, slot), y);
             }

@@ -62,7 +62,9 @@ pub struct BodyCard {
     pub mine_yield: f64,
     pub generator_yield: f64,
     pub refinery_yield: f64,
-    pub habitat_yield: f64,
+    /// Ticket #140 (version 0.07.3): the fourth yield is Research, multiplying an Observatory; it
+    /// was the Habitat yield, which multiplied a Habitat's room, until the designer traded it.
+    pub research_yield: f64,
 }
 
 impl BodyCard {
@@ -1425,4 +1427,39 @@ pub fn default_data_dir() -> PathBuf {
     // Development: the workspace root holds `assets/`.
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest.parent().map(|p| p.join("assets").join("data")).unwrap_or_else(|| PathBuf::from("assets/data"))
+}
+
+/// Ticket #132 (version 0.07.3): the figures a start is chosen on, read from the cards alone. The
+/// start globe's Region panel shows a Region's Ducats a turn and its Emissions before any game
+/// exists, so these are computed from the card as the game will compute them at turn 1 -- and the
+/// Ducats formula lives HERE, in one place, so that `Game::state_ducats` and the panel can never
+/// disagree and the ticket that moves the formula moves one line.
+impl Tables {
+    /// The base Ducats a Region's economy pays a turn at an Industry Level. Ticket #35 set it at
+    /// GDP x Industry Level / 10, rounded down, under which ten of the fourteen Regions paid nothing
+    /// at the start; ticket #139 (version 0.07.3) made it **GDP x Industry Level / 5, rounded down,
+    /// never below 1** -- the designer: *"Saudi Arabia can't pay 0"* -- so every Region pays, the
+    /// rich pay double, and a small economy pays a flat one until GDP x Industry reaches 10.
+    pub fn base_ducats(&self, sid: StateId, industry_level: u32) -> i64 {
+        ((self.state(sid).gdp * industry_level as i64) / 5).max(1)
+    }
+
+    /// What a Region's economy would pay `faction` a turn as the game opens: the base at the card's
+    /// Industry Level, times the Faction's Ducats multiplier (ticket #83).
+    pub fn start_ducats(&self, sid: StateId, faction: FactionKind) -> i64 {
+        (self.base_ducats(sid, self.state(sid).industry_level) as f64 * self.faction(faction).ducats_multiplier).floor() as i64
+    }
+
+    /// What a Region emits a turn as the game opens under `faction`: its industry, its people and
+    /// its start Facilities, each times the Faction's Emissions multiplier, as `emissions_now` will
+    /// count them at turn 1 before any Tech, Strip Permit or Leapfrog has moved a figure.
+    pub fn start_emissions(&self, sid: StateId, faction: FactionKind) -> f64 {
+        let card = self.state(sid);
+        let c = &self.climate;
+        let m = self.faction(faction).emissions_multiplier;
+        let industry = card.baseline_emissions * card.industry_level as f64 * m;
+        let people = (c.population_emissions_base + c.population_emissions_per_level * card.industry_level as f64) * card.population * m;
+        let facilities: f64 = card.start_facilities.iter().map(|k| self.facility(*k).emissions * m).sum();
+        industry + people + facilities
+    }
 }

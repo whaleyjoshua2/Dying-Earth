@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.07.2
+DYING EARTH - playtest build, version 0.07.3
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,45 +16,48 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-   (Windows only again; there is no Linux zip for 0.07.2.)
+   (Windows only again; there is no Linux zip for 0.07.3.)
 
-WHAT CHANGED SINCE 0.07.1
+WHAT CHANGED SINCE 0.07.2
 -------------------------
-This one is about the map of Earth and the words on it. Nothing about how the game is
-won has changed, and no balance number moved.
+This one gives places depth, counts people in real numbers, and moves four balance
+numbers. For the first time every one of the four sides wins games against the computer.
 
-- THE MAP FOLLOWS REAL BORDERS. Each region of Earth is now made of whole countries -
-  India's region is India, Pakistan, Bangladesh and Sri Lanka; Russia stops at Russia's
-  border; Kazakhstan is no longer cut in half. An island belongs to its country. The
-  lines you see are the lines the game plays by.
-- TWO NEW REGIONS, fourteen in all: Japan (with Korea), cut out of China's region, and
-  Saudi Arabia (the Arabian Peninsula), cut out of Iran's. Both got a share of their
-  parent's people and industry, so nothing was added to the world, only divided.
-- REGIONS ARE NAMED FOR THEIR MAIN COUNTRY, and that country's flag is on the card:
-  China, India, The United States, Brazil, Russia, Australia, The European Union, Iran,
-  Egypt, Nigeria, Indonesia, Mexico, Japan and Saudi Arabia. "East Asia" is now called
-  China everywhere - map, cards, roster, reports.
-- EVERY REGION HAS A COLOUR OF ITS OWN while nobody holds it. Once a side takes it, it
-  wears that side's colour, a little stronger, with a light coastline. The region colours
-  were checked against the four side colours so they cannot be mistaken for each other.
-- YOU PICK YOUR START BY CLICKING THE GLOBE. The list of fourteen buttons is gone. Point
-  at a region to read its card, click it to choose it, then press Begin. Every region's
-  name is written on the globe, so you can find it.
-- THE COUNTRY CARD IS TIDIER. Buttons that cost nothing no longer say "(free)". Prices
-  are pictures: "Factory 20 [cart]" instead of "Factory (20 Materials)". Pointing at a
-  build button now tells you how long it takes ("Ready next turn"). The Influence
-  buttons are gone from the card: spend from the bottom-right corner instead.
-- THE ROSTER ON THE RIGHT HAS PICTURES AND RINGS. Every row starts with a small picture
-  saying what it is - a warship, a colony ship, a station, a colony, a region, or a
-  shield for an army. A row that still wants an order from you ends in an open ring;
-  the ring fills in once you have given one. The count-and-filter on each heading from
-  0.07.1 is gone. The same pictures appear in front of names on the maps, on cards and
-  in the Report.
-- THE TOP BAR: Influence now stands before Research; the buttons are a bit bigger; and
-  every button names its key: Tech Tree (T), Climate Panel (C), Victory (V), Trading (R),
-  Save (Ctrl+S), the map swap (Tab), Back (Esc). END TURN IS ENTER. If you have Influence
-  unspent, Enter asks first; Enter again confirms. While a report or a message is up,
-  only Esc does anything.
+- THE HAB VIEW. Click a station or colony in the roster, or press M with one selected,
+  and a window shows its modules as a grid of tiles with pictures: a dimmed tile is
+  mothballed, a hatched one is still building, a dashed empty one is room to build.
+  Click a tile for its figures and its Mothball / Decommission buttons; click an empty
+  tile to build there. Esc closes it.
+- BUILD SLOTS ARE BOXES on a region's card, drawn the same way. Coastal boxes have a
+  blue edge, inland ones grey. A slot the sea has taken sits three quarters under water
+  with the drowned building showing through. Click a box for its figures and buttons,
+  or an empty box to build.
+- ORBITS ARE DRAWN. On a planet or moon's surface view every station slot is a ring
+  round the globe, dashed while empty, with the station's picture on it once one is
+  built. On the Solar System Map each world has one orbit with its stations on it, and
+  pointing at a world lists its slots by name and who holds them.
+- POPULATION IN REAL NUMBERS. A region's card says "Region population 288.0 (1.44B)".
+  It is the whole region's people, not the main country's alone. The unit is five
+  million, and each Emigrant you muster is one of them. The top bar's right end counts
+  Earth and space: "Earth 7.86B - Space 20M".
+- EMIGRANTS CAN LIFT STRAIGHT TO YOUR STATION. A region with a Launch Site can send its
+  waiting Emigrants to a station of yours over Earth, as many as it has room for, with
+  no colony ship. It counts as a launch, so it pollutes.
+- MAX REPLACES DEFENCE. The button in the bottom-right corner spends everything you have
+  left on the selected place. "Every turn" makes it a standing order on that place until
+  you untick it, cancel the order it places, or lose the place. The computer no longer
+  defends by the old rule either.
+- EVERY REGION PAYS DUCATS NOW. The rich pay double what they did (the United States 13,
+  the European Union 12, China 10 a turn) and no region pays nothing.
+- SCIENCE YIELDS. The fourth number on a colony slot is now a Research yield that
+  multiplies an Observatory there (Mars and Venus 1.3, the Moon 1.0, the small moons
+  0.8), and a habitat holds eight people everywhere.
+- TECH PRICES: 15, 30 and 45 by rung, Coastal Engineering 12.
+- THE TECH TREE READS LEFT TO RIGHT, one row per branch.
+- SMALLER THINGS: the start screen's cards use resource pictures; the country card's
+  influence paragraph is one line with a hover; a building's Mothball and Decommission
+  buttons sit on its own line; the station picture is new (two solar panels on a bar);
+  the army's shield sits inside its roster button like the other pictures.
 
 HOW TO PLAY, IN ONE MINUTE
 --------------------------
@@ -64,12 +67,11 @@ HOW TO PLAY, IN ONE MINUTE
 - You are looking at the Earth Map. Click a region for its card and orders on the right.
   Drag to turn the globe, mouse wheel to zoom. Tab switches to the Solar System Map;
   Esc goes back.
-- Build things with the buttons on a card. Hover a build button to see what it makes and
-  how long it takes. Hover almost any number: if a rule sets it, the rule is there.
+- Build things with the buttons on a card, or click an empty box among a region's slots.
+  Hover a build button to see what it makes and how long it takes. Hover almost any
+  number: if a rule sets it, the rule is there.
 - Spend Influence on other regions to win them over. Your home region starts held.
-  Click a region and use the Spend button in the bottom-right corner. Press Defence to
-  spread what is left over the places you might lose; tick "every turn" to have it done
-  for you each turn, as orders you can still cancel.
+  Click a region and use Spend in the bottom-right corner, or Max to spend all of it.
 - Every region has an "Unrest" number. Heat, floods and refugees push it up. At 4 its
   army stops growing, at 7 its factories work at half speed, and at 10 the region throws
   you out. Pay Relief, build a Constabulary, or muster Emigrants to push it back down.
@@ -78,10 +80,11 @@ HOW TO PLAY, IN ONE MINUTE
 - Open the Climate Panel (C). The coloured bar marks every point where the world changes
   for good, including where Antarctica opens. The top bar shows this turn's net
   pollution beside the temperature.
-- Getting off Earth: put a Shipyard on your station first - ships are only built at a
-  Shipyard. Muster Emigrants in a region with a Launch Site, lift them, and load them on
-  a Colony Ship. The Moon is one turn away. Mars is cheap only in a launch window; hover
-  Mars to see when. Remember a colony's size limit: land people before you plan buildings.
+- Getting off Earth: muster Emigrants in a region with a Launch Site and send them
+  straight to your station over Earth (a Habitat on it gives room for eight). Put a
+  Shipyard on the station to build ships. The Moon is one turn away. Mars is cheap only
+  in a launch window; hover Mars to see when. Open a colony's Hab View (M) to see what
+  stands there and how much room is left.
 - The roster on the right lists everything you own. An open ring at the end of a row
   means it is still waiting for an order from you this turn.
 - End Turn - bottom right, red, or press Enter. Thirty-six turns. Watch the temperature
@@ -92,17 +95,13 @@ WHAT WE WANT TO KNOW
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- DO THE BORDERS READ? Could you find the region you wanted on the globe? Did any
-  border surprise you - a country you expected somewhere else?
-- COULD YOU TELL A HELD REGION FROM AN UNHELD ONE? Unheld regions wear their own colour,
-  held ones wear a side's colour. Was that ever confusing, especially India and the
-  United States, which are both green?
-- DID THE START SCREEN WORK WITHOUT THE LIST? Did you miss it?
-- THE ROSTER RINGS: did you understand the open ring without being told? Did the small
-  pictures read at that size, or are any of them a smudge?
-- DID ENTER ENDING THE TURN EVER SURPRISE YOU?
-- DO THE NEW REGIONS FEEL RIGHT? Japan and Saudi Arabia are new and their numbers are
-  a first guess.
+- THE HAB VIEW AND THE SLOT BOXES: did you find them? Did the pictures tell you what
+  each building was without reading the name? Did the water read as water?
+- THE ORBITS: could you tell a built station from an empty slot on the globe?
+- THE POPULATION NUMBERS: did "Region population" make sense? Did it bother you that
+  Nigeria's region says 1.14 billion (it is all of sub-Saharan Africa)?
+- THE LIFT TO A STATION: did you use it, and did it feel too easy?
+- MAX: did you miss Defence?
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.
@@ -111,19 +110,16 @@ Screenshots help. Print Screen, then paste into a message.
 
 KNOWN ROUGH EDGES
 -----------------
-- THE CUSTODIANS ARE TOO STRONG. Over eighty computer-only games on the new map they win
-  70, from any seat. That is the next thing to fix and this version deliberately did
-  not touch it.
-- THE ARCHIVISTS ALMOST NEVER WIN in those eighty, though the Archive itself gets built.
-  Getting twelve people to live at it is the part that fails.
+- THE BALANCE MOVED A LOT and none of it has been played by a person yet. Over eighty
+  computer-only games the Custodians now win 36, the Archivists 21, the Arkwrights 6
+  and the Prospectors 1, with the world collapsing in 14. Last version the Custodians
+  won 70. The lift to a station did most of that. Tell us if any side feels hopeless.
 - Every side's victory target was set against a computer that never competed for it, so
   the numbers are all suspect.
-- RESEARCH IS NOT A CONSTRAINT. The whole tech tree gets finished in 73 of 80 games.
-  Whether it should is a question for a balance version.
-- DEFENCE ONLY REACTS AT THE LAST MOMENT. It answers a rival who could take a place next
-  turn, and nobody sooner. Known, and not yet decided what to do about it.
-- SAUDI ARABIA EARNS NO DUCATS: its economy figure is too small for the formula to pay
-  anything. A first-guess number; tell us if it feels wrong.
+- THE HAB VIEW'S AND SLOT BOXES' PICTURES ARE FIRST PICKS from a free icon set and may
+  change; say which ones misled you.
+- The list of station slots on the Solar System Map appears only while you point at
+  the world, because open all the time it covered the Moon.
 - A region's name at the very edge of the globe on the start screen can sit half under
   the panel. Turn the globe a little.
 - Antarctica's three colony sites have labels that overlap each other when you are zoomed

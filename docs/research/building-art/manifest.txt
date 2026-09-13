@@ -1,0 +1,21 @@
+Factory|delapouite/factory delapouite/factory-arm lorc/gears
+Power Plant|delapouite/nuclear-plant delapouite/power-generator delapouite/wind-turbine
+Refinery|delapouite/refinery delapouite/oil-rig skoll/oil-drum
+Launch Site|delapouite/space-shuttle lorc/rocket-flight delapouite/control-tower
+Research Lab|lorc/round-bottom-flask lorc/test-tubes delapouite/atom-core
+Bank|delapouite/bank delapouite/strongbox delapouite/piggy-bank
+Embassy|lorc/capitol delapouite/shaking-hands delapouite/tower-flag
+Constabulary|andymeneely/police-badge lorc/handcuffs delapouite/police-officer-head
+Sea Wall|delapouite/dam delapouite/stone-wall delapouite/flood
+Scrubber|lorc/gas-mask delapouite/computer-fan lorc/recycle
+Mine|delapouite/gold-mine lorc/mining delapouite/drill
+Generator|delapouite/power-generator delapouite/turbine sbed/nuclear
+Habitat|delapouite/base-dome delapouite/family-house delapouite/cryo-chamber
+Shipyard|lorc/cargo-crane delapouite/harbor-dock delapouite/crane
+Barracks|delapouite/barracks delapouite/barracks-tent delapouite/medieval-barracks
+Trade Post|lorc/trade delapouite/shop delapouite/cargo-crate
+Relay|delapouite/radio-tower lorc/radar-dish delapouite/satellite-communication
+Observatory|delapouite/observatory delapouite/telescope caro-asercion/astrolabe
+Solar Array|skoll/solar-power lorc/sun delapouite/green-power
+Mass Driver|sbed/mass-driver lorc/cannon delapouite/railway
+Archive|delapouite/archive-register delapouite/archive-research delapouite/database

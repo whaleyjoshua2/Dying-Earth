@@ -414,18 +414,23 @@ fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction
 fn a_controlled_state_pays_ducats_from_gdp_times_industry_and_a_bank_adds_more() {
     let mut g = game();
     // Ticket #53: East Asia gdp 23 x Industry 3 / 10 = 6 a turn; ticket #125 (version 0.07.2)
-    // took 6 of that gdp to Japan and Korea, so 17 x 3 / 10 = 5. Europe 20 x 3 / 10 = 6, and
-    // ticket #83 (version 0.06.0): x1.2 for the Prospectors who hold it, 7.
-    assert_eq!(g.state_ducats(StateId::EastAsia), 5);
-    assert_eq!(g.state_ducats(StateId::Europe), 7);
+    // took 6 of that gdp to Japan and Korea, so 17 x 3 / 10 = 5. Ticket #139 (version 0.07.3): the
+    // divisor is 5 and nothing pays under 1, so 17 x 3 / 5 = 10; Europe 20 x 3 / 5 = 12, and ticket
+    // #83 (version 0.06.0): x1.2 for the Prospectors who hold it, 14. North Africa, gdp 1 at
+    // Industry 1, would have paid nothing under the old rule and pays the floor of 1.
+    assert_eq!(g.state_ducats(StateId::EastAsia), 10);
+    assert_eq!(g.state_ducats(StateId::Europe), 14);
+    assert_eq!(g.tables.base_ducats(StateId::NorthAfrica, 1), 1, "the floor: no Region pays nothing");
+    assert_eq!(g.tables.base_ducats(StateId::ArabianPeninsula, 2), 1, "Saudi Arabia, 2 x 2 / 5, pays the floor");
     let paid = income_of(&mut g, Seat(0));
-    assert_eq!(paid.ducats, 5);
+    assert_eq!(paid.ducats, 10);
     // A Bank in East Asia adds 4 x 17 / 10 = 6 (it was 4 x 23 / 10 = 9 before ticket #125 took 6 of
-    // the gdp to Japan and Korea); in North Africa (gdp 1) it would add nothing.
+    // the gdp to Japan and Korea); in North Africa (gdp 1) it would add nothing. A Bank's own
+    // figure did not move on ticket #139.
     g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Bank));
     assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Bank).amount, 6);
     assert_eq!(g.facility_yield(Seat(0), StateId::NorthAfrica, FacilityKind::Bank).amount, 0);
-    assert_eq!(income_of(&mut g, Seat(0)).ducats, 11);
+    assert_eq!(income_of(&mut g, Seat(0)).ducats, 16);
     // A Trade Post followed the Habitat yield; ticket #90 (version 0.06.0): it pays 2 per Colonist
     // at its Body plus 3 per other Body held. Empty Colonies on the Moon and Mars, with Earth held:
     // each sees two other Bodies, so 6.
@@ -572,8 +577,8 @@ fn phobos_and_deimos_are_small_different_bodies_one_hop_past_mars() {
     assert_eq!(ph.name, "Phobos");
     assert_eq!(de.name, "Deimos");
     assert_eq!((ph.colony_slots(), de.colony_slots()), (2, 1));
-    assert_eq!((ph.mine_yield, ph.generator_yield, ph.refinery_yield, ph.habitat_yield), (1.75, 0.75, 0.5, 0.5));
-    assert_eq!((de.mine_yield, de.generator_yield, de.refinery_yield, de.habitat_yield), (1.0, 1.0, 0.25, 0.5));
+    assert_eq!((ph.mine_yield, ph.generator_yield, ph.refinery_yield, ph.research_yield), (1.75, 0.75, 0.5, 0.8));
+    assert_eq!((de.mine_yield, de.generator_yield, de.refinery_yield, de.research_yield), (1.0, 1.0, 0.25, 0.8));
     // Reach. Ticket #57 replaced the fixed card turns for a crossing between the Earth system and
     // the Mars system with the real flight: at the window it is the Hohmann 259 days, nine turns,
     // for the card's Fuel. The hops inside a system are untouched by it.
@@ -631,7 +636,7 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
     let earth = g.tables.body(BodyId::Earth).clone();
     assert_eq!(earth.colony_slots(), 3, "three Colony Slots on Earth, in Antarctica");
     // Ticket #56 re-cut them: abundant ore and Fuel under the ice.
-    assert_eq!((earth.mine_yield, earth.generator_yield, earth.refinery_yield, earth.habitat_yield), (1.75, 0.75, 2.0, 1.0));
+    assert_eq!((earth.mine_yield, earth.generator_yield, earth.refinery_yield, earth.research_yield), (1.75, 0.75, 2.0, 1.0));
     assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3);
     assert_eq!(StateId::ALL.len(), 14, "fourteen Regions since ticket #125, and Antarctica is none of them");
     let m = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
@@ -1207,12 +1212,13 @@ fn tech_hardened_hulls_adds_two_strength_to_every_ship_but_a_colony_ship_stays_a
 #[test]
 fn tech_expanded_habitats_holds_two_more() {
     let mut g = game();
-    // Ticket #80 (version 0.06.0): a Habitat holds 8; the Moon's Habitat yield is 1.1 (ticket #72),
-    // so 8.8 reads 8 and 11.0 reads 11.
+    // Ticket #80 (version 0.06.0): a Habitat holds 8. The Moon's Habitat yield of 1.1 made that
+    // 8.8 and 11.0 until ticket #140 (version 0.07.3) traded the yield for a Research one: flat 8
+    // and 10 everywhere now.
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 0);
     assert_eq!(g.habitat_room(g.colony(c).unwrap()), 8);
     with_tech(&mut g, TechId::ExpandedHabitats);
-    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 11);
+    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 10);
 }
 
 #[test]
@@ -1845,13 +1851,13 @@ fn an_arkwright_muster_takes_twice_the_population_out_of_its_state() {
     g.state_mut(StateId::NorthAfrica).control = Control::Controlled(Seat(2));
     g.state_mut(StateId::NorthAfrica).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
     g.state_mut(StateId::NorthAfrica).facilities.push(facility(FacilityKind::LaunchSite));
-    assert!((g.lift_population(Seat(0), 4) - 0.4).abs() < 1e-9);
-    assert!((g.lift_population(Seat(2), 4) - 0.8).abs() < 1e-9, "Steerage costs the state twice");
+    assert!((g.lift_population(Seat(0), 4) - 4.0).abs() < 1e-9, "one unit of five million each since ticket #143 (version 0.07.3)");
+    assert!((g.lift_population(Seat(2), 4) - 8.0).abs() < 1e-9, "Steerage costs the state twice");
     // Ticket #73: the population is paid when the Emigrants muster, and the lift takes none.
     let before = g.state(StateId::NorthAfrica).population;
     g.commit_orders(Seat(2), &[Order::BuildEmigrants { state: StateId::NorthAfrica, n: 4 }]);
     let taken = before - g.state(StateId::NorthAfrica).population;
-    assert!((taken - 0.8).abs() < 1e-9, "the muster took {taken}, not 0.8");
+    assert!((taken - 8.0).abs() < 1e-9, "the muster took {taken}, not 8.0 (two units of five million per Emigrant under Steerage)");
     let after_muster = g.state(StateId::NorthAfrica).population;
     let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
     g.commit_orders(Seat(2), &[Order::Load { ship, colonists: 4, from: LoadSource::State(StateId::NorthAfrica), army: None }]);
@@ -1864,14 +1870,15 @@ fn an_arkwright_muster_takes_twice_the_population_out_of_its_state() {
 fn an_arkwright_habitat_holds_twelve() {
     let mut g = game();
     // Ticket #80 (version 0.06.0): a Habitat holds 8, the Arkwrights' 12. The Moon's Habitat yield
-    // is 1.1 (ticket #72): 8.8 reads 8, 13.2 reads 13, and with Expanded Habitats 11.0 and 16.5.
+    // of 1.1 made those 8 and 13 until ticket #140 (version 0.07.3) traded the yield away: a
+    // Habitat holds the same everywhere, so 8 and 12, and with Expanded Habitats 10 and 15.
     let theirs = colony(&mut g, Seat(2), BodyId::Moon, &[ModuleKind::Habitat], 0);
     let mine = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 0);
     assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 8);
-    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 13, "half again for the Arkwrights");
+    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 12, "half again for the Arkwrights");
     g.research.done.push(TechId::ExpandedHabitats);
-    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 11);
-    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 16, "(8 + 2) x 1.5 x 1.1");
+    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 10);
+    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 15, "(8 + 2) x 1.5");
 }
 
 #[test]
@@ -2648,9 +2655,10 @@ fn twelve_nation_states_share_out_the_eight_they_came_from() {
     let america = [StateId::NorthAmerica, StateId::CentralAmerica];
     assert_eq!(america.iter().map(|s| card(*s).gdp).sum::<i64>(), 25);
     assert_eq!(america.iter().map(|s| card(*s).influence).sum::<i64>(), 8);
-    // The world still holds about 7.9 billion people, as the eight states did.
+    // The world still holds about 7.9 billion people, as the eight states did: 1,572 units of five
+    // million since ticket #143 (version 0.07.3), 78.6 hundred-million before.
     let people: f64 = StateId::ALL.iter().map(|s| card(*s).population).sum();
-    assert!((people - 78.6).abs() < 0.1, "population {people}");
+    assert!((people - 1572.0).abs() < 0.1, "population {people}");
     // Every edge is listed on both states, and nothing neighbours itself.
     for s in StateId::ALL {
         assert!(!card(s).neighbours.contains(&s), "{s:?} neighbours itself");
@@ -3085,17 +3093,20 @@ fn b_decommission_refunds_half_frees_the_slot_and_adds_two_unrest() {
 fn c_population_emissions_follow_the_industry_level() {
     let g = game();
     let c = &g.tables.climate;
-    assert_eq!(c.population_emissions_base, 0.04);
-    assert_eq!(c.population_emissions_per_level, 0.03);
+    // Ticket #143 (version 0.07.3): per unit of five million, a twentieth of the per-hundred-million 0.04 and 0.03.
+    assert_eq!(c.population_emissions_base, 0.002);
+    assert_eq!(c.population_emissions_per_level, 0.0015);
     for sid in StateId::ALL {
         let want = c.population_emissions_base + c.population_emissions_per_level * g.state(sid).industry_level as f64;
         assert!((g.population_coefficient(sid) - want).abs() < 1e-9, "{sid:?}: {} where {want} was wanted", g.population_coefficient(sid));
     }
-    // Sub-Saharan Africa at Industry Level 1 emits 0.07; East Asia at 3 emits 0.13.
-    assert!((g.population_coefficient(StateId::SubSaharanAfrica) - 0.07).abs() < 1e-9);
-    assert!((g.population_coefficient(StateId::EastAsia) - 0.13).abs() < 1e-9);
+    // Sub-Saharan Africa at Industry Level 1 emits 0.07 per hundred million; East Asia at 3 emits
+    // 0.13. Ticket #143: the coefficient is per unit of five million, twenty to the hundred million.
+    let per_hundred_million = Game::UNITS_PER_HUNDRED_MILLION;
+    assert!((g.population_coefficient(StateId::SubSaharanAfrica) * per_hundred_million - 0.07).abs() < 1e-9);
+    assert!((g.population_coefficient(StateId::EastAsia) * per_hundred_million - 0.13).abs() < 1e-9);
     let new: f64 = StateId::ALL.iter().map(|s| g.population_coefficient(*s) * g.state(*s).population).sum();
-    let old: f64 = StateId::ALL.iter().map(|s| 0.1 * g.state(*s).population).sum();
+    let old: f64 = StateId::ALL.iter().map(|s| 0.1 / per_hundred_million * g.state(*s).population).sum();
     assert!((new - old).abs() / old < 0.10, "the world's people emit {new:.2} where the flat 0.1 gave {old:.2}");
     // And the Climate phase reads it: one more Industry Level in East Asia is 0.03 x 14.4 more,
     // 14.4 being what ticket #125 (version 0.07.2) left it after Japan and Korea took 2.0.
@@ -3104,7 +3115,9 @@ fn c_population_emissions_follow_the_industry_level() {
     let mult = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
     g.state_mut(StateId::EastAsia).industry_level += 1;
     let rise = g.emissions_now().population - before;
-    assert!((rise - 0.03 * 14.4 * mult).abs() < 1e-9, "the population line rose {rise:.3}");
+    // Ticket #143: 288 units of five million, the 14.4 hundred-million of before; the same 0.432.
+    let per_level = g.tables.climate.population_emissions_per_level;
+    assert!((rise - per_level * 288.0 * mult).abs() < 1e-9, "the population line rose {rise:.3}");
 }
 
 /// (d) Leapfrog is the Custodians' alone, costs 50 Ducats, takes one level's worth off the state's
@@ -3830,7 +3843,7 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     // Ticket #69 (version 0.05.5): moved from rung 2 at 25 to rung 1 at 10 with no prerequisite.
     // Ticket #117 (version 0.07.1): 10 to 11, with every other cost, a tenth rounded to the nearest.
     assert_eq!(c.rung, 1, "rung 1, beside Efficient Grids");
-    assert_eq!(c.cost, 11);
+    assert_eq!(c.cost, 12, "12 since ticket #142 (version 0.07.3); 11 from ticket #117, 10 before");
     assert!(c.needs.is_empty(), "it needs nothing");
     assert!(c.effect.contains("Sea Wall"), "its effect names the Sea Wall: {}", c.effect);
     // Two boxes on Industry rung 1, and Clean Power alone on rung 2.
@@ -3893,7 +3906,7 @@ fn g_antarctica_opens_at_one_point_six_and_stays_open() {
     assert!((e.mine_yield - 1.75).abs() < 1e-9, "Mine 1.75: {}", e.mine_yield);
     assert!((e.refinery_yield - 2.0).abs() < 1e-9, "Refinery 2.0: {}", e.refinery_yield);
     assert!((e.generator_yield - 0.75).abs() < 1e-9, "Generator 0.75: {}", e.generator_yield);
-    assert!((e.habitat_yield - 1.0).abs() < 1e-9, "Habitat 1.0: {}", e.habitat_yield);
+    assert!((e.research_yield - 1.0).abs() < 1e-9, "Research 1.0 (the Habitat yield until ticket #140): {}", e.research_yield);
 }
 
 /// (h) The AI enumerates a Sea Wall once Coastal Engineering is in and a threshold is near.
@@ -4038,7 +4051,7 @@ fn every_colony_slot_draws_its_own_four_yields_within_a_quarter_of_its_bodys() {
                 ("Mine", y.mine, card.mine_yield),
                 ("Generator", y.generator, card.generator_yield),
                 ("Refinery", y.refinery, card.refinery_yield),
-                ("Habitat", y.habitat, card.habitat_yield),
+                ("Research", y.research, card.research_yield),
             ] {
                 let factor = drawn / base;
                 assert!(
@@ -4112,14 +4125,24 @@ fn a_modules_output_uses_its_own_slots_yield() {
     let poor_out = g.module_yield(Seat(0), poor_id, ModuleKind::Mine).amount;
     let rich_out = g.module_yield(Seat(0), rich_id, ModuleKind::Mine).amount;
     assert!(poor_out != rich_out || by_body != poor_out, "the two slots do not both read the Body's {by_body}: {poor_out} and {rich_out}");
-    // A Habitat's room follows the slot too, and a station over Earth still takes no Body yield.
+    // Ticket #140 (version 0.07.3): a Habitat holds the same everywhere -- the slot's fourth yield
+    // is Research now, and it is the Observatory that follows the slot, on the ground; a station's
+    // Observatory reads its Body's figure, the first Body yield a station has read.
     g.colony_mut(rich_id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     let per = g.tables.module(ModuleKind::Habitat).holds_colonists as f64;
-    let want = (per * g.slot_yields(BodyId::Mars, rich).habitat).floor() as u32;
-    assert_eq!(g.habitat_room(g.colony(rich_id).unwrap()), want, "the Habitat holds what its slot's Habitat yield says");
+    assert_eq!(g.habitat_room(g.colony(rich_id).unwrap()), per as u32, "a Habitat holds the same on every slot");
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
     g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Habitat));
-    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), per as u32, "a station's Habitats take no Body yield and no slot's either");
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), per as u32, "and the same in orbit");
+    let science = g.slot_yields(BodyId::Mars, rich).research;
+    assert!((g.research_yield_at(g.colony(rich_id).unwrap()) - science).abs() < 1e-9, "an Observatory on the ground reads its slot's Research yield");
+    assert!((g.research_yield_at(g.colony(iss).unwrap()) - g.tables.body(BodyId::Earth).research_yield).abs() < 1e-9, "a station's Observatory reads its Body's");
+    g.colony_mut(rich_id).unwrap().modules.push(Module::new(ModuleKind::Observatory));
+    let base = g.tables.module(ModuleKind::Observatory).produces.as_ref().map(|p| p.amount).unwrap_or(0) as f64;
+    let colonists = g.colony(rich_id).unwrap().colonists as f64;
+    let per_colonist = g.tables.observatory.research_per_colonist;
+    let want = (base * science * (1.0 + colonists * per_colonist) * g.tables.faction(g.kind(Seat(0))).research_multiplier_off_earth.unwrap_or(g.tables.faction(g.kind(Seat(0))).research_multiplier)).floor() as i64;
+    assert_eq!(g.module_yield(Seat(0), rich_id, ModuleKind::Observatory).research, want, "the Observatory's Research carries the slot's yield");
 }
 
 /// Ticket #57 (c), amended by ticket #67 (version 0.05.5): the game begins on 1 January 2030, runs
@@ -4946,7 +4969,7 @@ fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
 fn coastal_engineering_sits_on_rung_one_below_its_rungs_cost_with_no_prerequisite() {
     let g = game();
     let t = g.tables.tech(TechId::CoastalEngineering);
-    assert_eq!((t.rung, t.cost), (1, 11));
+    assert_eq!((t.rung, t.cost), (1, 12), "12 since ticket #142");
     assert!(t.cost < g.tables.tech(TechId::EfficientGrids).cost, "cheaper than the rung it shares, or the Sea Wall arrives too late");
     assert!(t.needs.is_empty(), "no prerequisite: {:?}", t.needs);
     assert!(g.available_techs().contains(&TechId::CoastalEngineering), "pickable from the first turn");
@@ -5045,7 +5068,7 @@ fn seven_hundred_and_fifty_in_the_fund_is_the_prospectors_first_part() {
 fn the_moons_four_yields_are_up_a_tenth() {
     let g = game();
     let m = g.tables.body(BodyId::Moon);
-    assert!((m.mine_yield - 1.65).abs() < 1e-9 && (m.generator_yield - 1.375).abs() < 1e-9 && (m.refinery_yield - 0.55).abs() < 1e-9 && (m.habitat_yield - 1.1).abs() < 1e-9, "{:?}", (m.mine_yield, m.generator_yield, m.refinery_yield, m.habitat_yield));
+    assert!((m.mine_yield - 1.65).abs() < 1e-9 && (m.generator_yield - 1.375).abs() < 1e-9 && (m.refinery_yield - 0.55).abs() < 1e-9 && (m.research_yield - 1.0).abs() < 1e-9, "{:?}", (m.mine_yield, m.generator_yield, m.refinery_yield, m.research_yield));
 }
 
 /// Ticket #72 (e): the Prospector AI plays the share as a strategy: nothing before the pace's first
@@ -5173,7 +5196,7 @@ fn a_helium_three_vein_doubles_the_moons_generators_for_two_turns_and_triples_wi
 /// lifts them the turn they are ordered), and the batch takes 0.5 off the state's Unrest. Steerage:
 /// eight a turn at twice the population.
 #[test]
-fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_a_tenth_of_population_each_and_calm_it() {
+fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_one_unit_of_population_each_and_calm_it() {
     let mut g = game();
     calm(&mut g);
     g.state_mut(StateId::EastAsia).unrest = 3.0;
@@ -5186,13 +5209,13 @@ fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_a_tenth_of_populatio
     assert!(g.check_order(Seat(0), &[], &Order::Load { ship: ShipId(999), colonists: 1, from: LoadSource::State(StateId::EastAsia), army: None }).is_err(), "nothing waits yet");
     g.commit_orders(Seat(0), &[build]);
     assert_eq!(g.state(StateId::EastAsia).emigrants, 4, "on the card at End Turn");
-    assert!((pop - g.state(StateId::EastAsia).population - 0.4).abs() < 1e-9, "a tenth of a person each");
+    assert!((pop - g.state(StateId::EastAsia).population - 4.0).abs() < 1e-9, "one unit of five million each (ticket #143)");
     assert_eq!(g.state(StateId::EastAsia).unrest, 2.5, "the batch took 0.5 off");
     assert!(g.log.to_vec().iter().any(|l| l.contains("Emigrants mustered in China")), "{:?}", g.log.to_vec());
     // Steerage: eight a turn at twice the population.
     assert_eq!(g.emigrants_per_turn(Seat(0)), 4);
     assert_eq!(g.emigrants_per_turn(Seat(2)), 8, "the Arkwrights muster eight");
-    assert!((g.lift_population(Seat(2), 8) - 1.6).abs() < 1e-9, "at twice the population");
+    assert!((g.lift_population(Seat(2), 8) - 16.0).abs() < 1e-9, "at twice the population");
 }
 
 /// Ticket #73 (b): a Launch Site lifts only the Emigrants waiting in its state; the population was
@@ -5216,6 +5239,46 @@ fn a_launch_site_lifts_only_the_emigrants_waiting_in_its_state() {
 
 /// Ticket #73 (c): Emigrants go to Antarctica by sea from any state the Faction directs, a turn to
 /// arrive, no launch, founding a Colony in an open slot or joining one of the Faction's own; the ice
+/// Ticket #141 (version 0.07.3): waiting Emigrants lift straight onto the seat's own station over
+/// Earth, from a state with a working Launch Site, as many as the station has Habitat room for.
+/// It is a launch, they are aboard at this Resolution, a rival's station and a blockaded slot both
+/// refuse it, and the same Emigrants cannot be sent twice.
+#[test]
+fn emigrants_lift_straight_to_a_station_over_earth_by_a_launch_site() {
+    let mut g = game();
+    calm(&mut g);
+    let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the Custodians start with a station");
+    if !g.colony(iss).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Habitat) {
+        g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    }
+    let room = g.habitat_room(g.colony(iss).unwrap());
+    assert!(room >= 8, "a Habitat's room: {room}");
+    let home = g.controlled_states(Seat(0))[0];
+    assert!(g.state(home).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()), "the start state has a Launch Site");
+    g.state_mut(home).emigrants = 6;
+    let lift = Order::LiftToStation { state: home, n: 4, colony: iss };
+    assert!(g.check_order(Seat(0), &[], &lift).is_ok(), "{:?}", g.check_order(Seat(0), &[], &lift));
+    assert!(g.check_order(Seat(0), &[], &Order::LiftToStation { state: home, n: 7, colony: iss }).unwrap_err().0.contains("waiting"), "six waiting");
+    assert!(g.check_order(Seat(0), &[], &Order::LiftToStation { state: home, n: room + 1, colony: iss }).is_err(), "no more than the room");
+    let tiangong = station_of(&g, Seat(1), BodyId::Earth).expect("the Prospectors start with a station");
+    assert!(g.check_order(Seat(0), &[], &Order::LiftToStation { state: home, n: 1, colony: tiangong }).unwrap_err().0.contains("not your station"), "own stations only");
+    let pending = [lift.clone()];
+    assert!(g.check_order(Seat(0), &pending, &Order::LiftToStation { state: home, n: 3, colony: iss }).is_err(), "four of the six are already bound: two remain");
+    // Without a Launch Site nothing lifts.
+    let sites: Vec<_> = g.state(home).facilities.iter().filter(|f| f.kind == FacilityKind::LaunchSite).cloned().collect();
+    g.state_mut(home).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
+    assert!(g.check_order(Seat(0), &[], &lift).unwrap_err().0.contains("Launch Site"), "a lift wants a rocket");
+    g.state_mut(home).facilities.extend(sites);
+    // It is a launch, and they are aboard at this Resolution.
+    let launches = g.climate.launches_pending[0];
+    let before = g.colony(iss).unwrap().colonists;
+    g.commit_orders(Seat(0), std::slice::from_ref(&lift));
+    assert_eq!(g.state(home).emigrants, 2, "they have left");
+    assert_eq!(g.climate.launches_pending[0], launches + 1, "a lift is a launch");
+    assert_eq!(g.colony(iss).unwrap().colonists, before + 4, "aboard now");
+    assert!(g.log.to_vec().iter().any(|l| l.contains("4 Emigrants lifted from")), "{:?}", g.log.to_vec());
+}
+
 /// must be open.
 #[test]
 fn emigrants_go_to_antarctica_by_sea_from_any_state_and_arrive_a_turn_later() {
@@ -5278,48 +5341,32 @@ fn the_ai_musters_emigrants_then_lifts_them_or_sends_them_to_antarctica() {
 
 // ---------------------------------------------------------------- Ticket #75 (version 0.05.5): the undefended home state
 
-/// Ticket #75, **rewritten on ticket #114 (version 0.07.1)** and the rewrite is the point.
-///
-/// This test was written when the challenge margin was 10 and it encoded the AI's own arithmetic:
-/// a holder answered any rival within two Influence steps of its own Standing, and pushed until it
-/// stood two steps clear of that rival plus the margin. Version 0.07.1 gives the AI the same rule
-/// the player's Defence button splits by -- `defence_needs`, which asks the sharper question of
-/// whether a rival **can actually take the place**: they need their own threshold AND the holder's
-/// Standing plus the margin, which is 20 now, not 10.
-///
-/// Under the old arithmetic a holder at 30 answered a rival at 25 by spending 25, defending against
-/// somebody who needed 50 to take anything. That is not caution, it is Influence set on fire, and
-/// the AI's Influence comes out of the same Allotment it takes new places with.
-///
-/// What the ticket was really guarding -- that a holder does not sit still while a rival walks in --
-/// is what is asserted here, at the Standing where it matters.
+/// Ticket #75, rewritten on ticket #114 (version 0.07.1) to the shared Defence rule, and **put back
+/// on ticket #134 (version 0.07.3)**, which retired Defence for the computer players as well as the
+/// button: *"computer players lose it too."* The AI is on its own arithmetic again: once a rival's
+/// Standing comes within two steps of its own it pushes as many holds as it takes to stand two steps
+/// clear of the rival plus the challenge margin, as many as its Allotment allows; a rival far below
+/// gets no answer. The rule it had for two versions asked the sharper question of whether the rival
+/// could actually take the place; this one does not, and the sweep on the ticket measures the cost.
 #[test]
-fn an_ai_holder_answers_a_rival_who_can_actually_take_the_place() {
+fn an_ai_holder_pushes_as_many_holds_as_it_takes_when_a_rival_comes_within_reach() {
     let mut g = game();
     let here = Place::State(StateId::Europe);
     g.take_control(StateId::Europe, Seat(1));
+    let margin = g.tables.influence.challenge_margin;
+    g.seats[1].influence.insert(here, 30);
+    g.seats[0].influence.insert(here, 25);
     g.seats[1].allotment = 40;
     g.seats[1].stockpile.energy = 200;
     let held = |orders: &[Order]| -> i64 { orders.iter().map(|o| match o { Order::Influence { target: Place::State(StateId::Europe), amount } => *amount, _ => 0 }).sum() };
-
-    // A rival one push away: above their own threshold AND able to reach the take-point, which is
-    // the holder's Standing plus the challenge margin -- 30 and 20 here, so 50. Europe's own
-    // threshold is 40, so a rival at 45 is above the threshold and STILL cannot take it; that case
-    // is the last assertion below, and it is the whole difference between this rule and the old one.
-    let threshold = g.influence_threshold_for(Seat(0), here);
-    g.seats[1].influence.insert(here, 30);
-    g.seats[0].influence.insert(here, threshold.max(60));
-    let need = g.defence_needs(Seat(1)).into_iter().find(|(p, _)| *p == here).map(|(_, n)| n).unwrap();
-    assert!(need > 0, "a rival who can take it next turn is a threat");
     let orders = g.ai_orders(Seat(1));
-    assert!(held(&orders) >= need, "it held Europe with {} of the {need} it needed: {orders:?}", held(&orders));
-
-    // A rival far below gets no answer, and -- the change -- neither does one who is close in
-    // Standing but still cannot reach the take-point.
+    // 25 + the margin + two steps of 5 - 30: as many holds as that takes, within an Allotment of 40.
+    let need = (25 + margin + 10 - 30).min(40);
+    assert!(held(&orders) >= need, "it held Europe with {} of the {need} it wanted: {orders:?}", held(&orders));
+    // A rival far below needs no answer.
     g.seats[0].influence.insert(here, 5);
-    assert_eq!(held(&g.ai_orders(Seat(1))), 0, "a rival far below needs no answer");
-    g.seats[0].influence.insert(here, 45);
-    assert_eq!(held(&g.ai_orders(Seat(1))), 0, "at 45 against 30 they still need 50 to take it: no answer is the right answer");
+    let orders = g.ai_orders(Seat(1));
+    assert_eq!(held(&orders), 0, "{orders:?}");
 }
 
 /// Ticket #75, second round: a Faction begins with a Standing on its start state equal to that
@@ -5361,21 +5408,26 @@ fn the_ai_spends_its_influence_on_neutral_states_while_any_are_worth_having() {
 // ---------------------------------------------------------------- 0.06.0 ticket #80: the Observatory
 
 /// Ticket #80: an Observatory makes 2 Research, plus one per cent for every Colonist at its Colony,
-/// times the Faction's Research multiplier and Public Science, rounded down; no Body yield and no
-/// output multiplier touch it. The Archivists (x1.6) with none: 3; with 25: 2 x 1.25 x 1.6 = 4.
+/// times the Faction's Research multiplier and Public Science, rounded down; no output multiplier
+/// touches it. Ticket #140 (version 0.07.3): times its slot's Research yield too, which on Mars is
+/// drawn near 1.3, so the expected figures carry the drawn yield rather than a constant.
 #[test]
 fn observatory_makes_two_research_plus_a_per_cent_per_colonist() {
     let mut g = game();
     let ark = Seat(3);
     let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Observatory, ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 0);
+    let science = g.research_yield_at(g.colony(mars).unwrap());
+    assert!(science > 1.0, "Mars is where the planetary science is: {science}");
+    let off = g.tables.faction(g.kind(ark)).research_multiplier_off_earth.unwrap_or(g.tables.faction(g.kind(ark)).research_multiplier);
     let y = g.module_yield(ark, mars, ModuleKind::Observatory);
     assert_eq!(y.resource, None, "Research is not a Stockpile resource");
-    assert_eq!(y.research, 3, "2 x 1.6 = 3.2 with no Colonists");
+    assert_eq!(y.research, (2.0 * science * off).floor() as i64, "2 x the slot's yield x the off-Earth multiplier with no Colonists");
     assert_eq!(y.upkeep, 3);
     g.colony_mut(mars).unwrap().colonists = 25;
-    assert_eq!(g.module_yield(ark, mars, ModuleKind::Observatory).research, 4, "2 x 1.25 x 1.6 = 4.0 with 25 Colonists");
+    assert_eq!(g.module_yield(ark, mars, ModuleKind::Observatory).research, (2.0 * science * 1.25 * off).floor() as i64, "x1.25 with 25 Colonists");
     with_tech(&mut g, TechId::PublicScience);
-    assert_eq!(g.module_yield(ark, mars, ModuleKind::Observatory).research, 6, "x1.5 with Public Science");
+    let public = g.tables.tech(TechId::PublicScience).value;
+    assert_eq!(g.module_yield(ark, mars, ModuleKind::Observatory).research, (2.0 * science * 1.25 * off * public).floor() as i64, "and Public Science on top");
 }
 
 /// Ticket #80: the Observatory's Research reaches the seat's Income, named by its Colony.
@@ -5385,12 +5437,15 @@ fn observatory_research_flows_into_the_income() {
     let ark = Seat(3);
     g.seats[ark.index()].stockpile.energy = 100;
     let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Observatory, ModuleKind::Generator], 0);
+    // Ticket #140 (version 0.07.3): the figure carries the slot's drawn Research yield.
+    let want = g.module_yield(ark, mars, ModuleKind::Observatory).research;
+    assert!(want >= 3, "at least 2 x 1.6 on Mars: {want}");
     let before = g.seat(ark).research_last_turn;
     g.income_phase();
     let s = g.seat(ark);
-    assert!(s.research_last_turn >= before + 3, "3 Research from the Observatory, got {}", s.research_last_turn);
+    assert!(s.research_last_turn >= before + want, "{want} Research from the Observatory, got {}", s.research_last_turn);
     let name = g.place_name(Place::Colony(mars));
-    assert!(s.income_sources.iter().any(|(src, r, n)| src == &format!("Observatory in {name}") && *r == Resource::Research && *n == 3), "{:?}", s.income_sources);
+    assert!(s.income_sources.iter().any(|(src, r, n)| src == &format!("Observatory in {name}") && *r == Resource::Research && *n == want), "{:?}", s.income_sources);
 }
 
 /// Ticket #80: a Space Station holds a Shipyard, Habitats and Observatories; still no Barracks.
@@ -5432,13 +5487,18 @@ fn archivists_research_is_one_and_a_half_on_earth_and_one_and_three_quarters_off
     let axiom = station_of(&g, ark, BodyId::Earth).expect("the Archivists start with Axiom");
     g.colony_mut(axiom).unwrap().modules.push(Module::new(ModuleKind::Observatory));
     g.colony_mut(axiom).unwrap().colonists = 50;
-    assert_eq!(g.module_yield(ark, axiom, ModuleKind::Observatory).research, 5, "a station over Earth is off Earth: 2 x 1.5 x 1.75 = 5.25");
+    // Ticket #140 (version 0.07.3): a station's Observatory reads its Body's Research yield, Earth's
+    // 1.0, so Axiom's figure is unchanged; a ground Observatory reads its slot's drawn yield.
+    assert_eq!(g.module_yield(ark, axiom, ModuleKind::Observatory).research, 5, "a station over Earth is off Earth: 2 x 1.0 x 1.5 x 1.75 = 5.25");
     let mars = colony(&mut g, ark, BodyId::Mars, &[ModuleKind::Observatory, ModuleKind::Mine], 50);
-    assert_eq!(g.module_yield(ark, mars, ModuleKind::Observatory).research, 5, "2 x 1.5 x 1.75 = 5.25");
+    let mars_science = g.research_yield_at(g.colony(mars).unwrap());
+    assert_eq!(g.module_yield(ark, mars, ModuleKind::Observatory).research, (2.0 * mars_science * 1.5 * 1.75).floor() as i64, "2 x the slot's yield x 1.5 x 1.75");
     assert_eq!(g.module_yield(ark, mars, ModuleKind::Mine).amount, 5, "the output nerf is gone: 4 x 1.25 x 1.0");
     let vostok = colony(&mut g, ark, BodyId::Earth, &[ModuleKind::Observatory], 50);
+    let vostok_science = g.research_yield_at(g.colony(vostok).unwrap());
     with_tech(&mut g, TechId::PublicScience);
-    assert_eq!(g.module_yield(ark, vostok, ModuleKind::Observatory).research, 6, "Antarctica is Earth: 2 x 1.5 x 1.5 x 1.5 = 6.75");
+    let public = g.tables.tech(TechId::PublicScience).value;
+    assert_eq!(g.module_yield(ark, vostok, ModuleKind::Observatory).research, (2.0 * vostok_science * 1.5 * 1.5 * public).floor() as i64, "Antarctica is Earth: 2 x the slot's yield x 1.5 x 1.5 x Public Science");
 }
 
 /// Ticket #81: Colonists on a station over Earth count as off Earth for Off-world Presence and the
@@ -5592,9 +5652,10 @@ fn the_prospectors_states_pay_their_ducats_at_one_point_two() {
     g.state_mut(sid).industry_level = 10;
     let gdp = g.tables.state(sid).gdp;
     g.state_mut(sid).control = Control::Controlled(Seat(0));
-    assert_eq!(g.state_ducats(sid), gdp, "the Custodians: gdp x 10 / 10");
+    // Ticket #139 (version 0.07.3): the divisor is 5 now, so Industry 10 pays twice the gdp.
+    assert_eq!(g.state_ducats(sid), 2 * gdp, "the Custodians: gdp x 10 / 5");
     g.state_mut(sid).control = Control::Controlled(pro);
-    assert_eq!(g.state_ducats(sid), (gdp as f64 * 1.2).floor() as i64, "the Prospectors: x1.2");
+    assert_eq!(g.state_ducats(sid), (2.0 * gdp as f64 * 1.2).floor() as i64, "the Prospectors: x1.2");
 }
 
 /// Ticket #83: the Prospectors buy Materials, Fuel, Energy and outright buildings at 15% off,
@@ -5647,7 +5708,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     // ticket guards is that no Faction's gate is dearer than another's, so the figure is checked
     // against the rung rather than against a literal repeated four times.
     let rung_three = g.tables.tech(TechId::PlanetaryStewardship).cost;
-    assert_eq!(rung_three, 44, "rung 3 costs 44 since ticket #117");
+    assert_eq!(rung_three, 45, "rung 3 costs 45 since ticket #142 (version 0.07.3): 44 rounded to the nearest 5; 44 from ticket #117, 40 before");
     for (kind, t, needs) in gates {
         let card = g.tables.tech(t);
         assert_eq!(card.rung, 3, "{t:?}");
@@ -6782,69 +6843,3 @@ fn an_army_keeps_its_stance_through_resolution_until_something_happens_to_it() {
 }
 
 
-// ---------------------------------------------------------------- 8.3 The Defence split
-
-/// Ticket #114 (version 0.07.1). A place this seat holds is safe while its Standing plus the
-/// challenge margin stays above the best rival's, so Defence has to cover the shortfall AND the
-/// decay the place takes at Resolution. A rival still under their own threshold cannot take the
-/// place at any Standing, so a place nobody can reach needs nothing.
-#[test]
-fn defence_needs_covers_the_shortfall_and_the_decay_and_nothing_else() {
-    let mut g = game();
-    let margin = g.tables.influence.challenge_margin;
-    let decay = g.tables.influence.decay_controlled;
-    let here = Place::State(StateId::EastAsia);
-    g.state_mut(StateId::EastAsia).control = Control::Controlled(Seat(0));
-    let threshold = g.influence_threshold_for(Seat(1), here);
-
-    // A rival well above their threshold and well above this seat: the shortfall plus the decay.
-    g.seat_mut(Seat(0)).influence.insert(here, 30);
-    g.seat_mut(Seat(1)).influence.insert(here, threshold + 40);
-    let need = g.defence_needs(Seat(0)).into_iter().find(|(p, _)| *p == here).map(|(_, n)| n).unwrap();
-    assert_eq!(need, threshold + 40 + 1 - margin - 30 + decay, "the shortfall to out-stand them by one, and the decay on top");
-
-    // Spending exactly that much makes the place safe: after the decay the rival is still short.
-    g.seat_mut(Seat(0)).influence.insert(here, 30 + need);
-    assert!(g.defence_needs(Seat(0)).iter().all(|(p, _)| *p != here), "funded to safe, it drops off the list");
-
-    // A rival BELOW their own threshold cannot take it whatever their Standing beside this seat's.
-    g.seat_mut(Seat(0)).influence.insert(here, 0);
-    g.seat_mut(Seat(1)).influence.insert(here, threshold - 1);
-    assert!(g.defence_needs(Seat(0)).iter().all(|(p, _)| *p != here), "a rival under their threshold is not a threat");
-}
-
-/// The split spends the budget WHOLE on a place before any of it reaches the next, because taking a
-/// place is a threshold and not a race: a place funded most of the way is as lost as one funded not
-/// at all. Where the budget cannot cover the next place it walks past to one it can still save.
-#[test]
-fn the_defence_split_funds_places_to_safe_and_never_part_way() {
-    let mut g = game();
-    let margin = g.tables.influence.challenge_margin;
-    let big = Place::State(StateId::EastAsia);
-    let small = Place::State(StateId::SouthAsia);
-    for (place, sid) in [(big, StateId::EastAsia), (small, StateId::SouthAsia)] {
-        g.state_mut(sid).control = Control::Controlled(Seat(0));
-        g.seat_mut(Seat(0)).influence.insert(place, 0);
-        let _ = place;
-    }
-    // East Asia is the more threatened of the two; South Asia is cheap to save.
-    let big_rival = g.influence_threshold_for(Seat(1), big).max(margin + 60);
-    let small_rival = g.influence_threshold_for(Seat(1), small).max(margin + 5);
-    g.seat_mut(Seat(1)).influence.insert(big, big_rival);
-    g.seat_mut(Seat(1)).influence.insert(small, small_rival);
-    let needs = g.defence_needs(Seat(0));
-    assert_eq!(needs[0].0, big, "most threatened first");
-    let (big_need, small_need) = (needs[0].1, needs[1].1);
-    assert!(big_need > small_need);
-
-    // A budget that covers both funds both, to the point where each is safe and no further.
-    let both = g.defence_split(Seat(0), big_need + small_need);
-    assert_eq!(both, vec![(big, big_need), (small, small_need)]);
-
-    // A budget one short of the big one does NOT part-fund it: it walks past and saves the small one.
-    let past = g.defence_split(Seat(0), big_need - 1);
-    assert_eq!(past, vec![(small, small_need)], "no part-funding, and the money still saves what it can");
-
-    // A budget too small for either spends nothing rather than spending it uselessly.
-    assert!(g.defence_split(Seat(0), small_need - 1).is_empty());
-}

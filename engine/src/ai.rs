@@ -245,12 +245,15 @@ impl Game {
     /// Ticket #57: what one Colony Slot's own yields are worth to the part the AI is furthest
     /// behind on. Every slot has its own four figures now, so the AI reads the slot, not the Body.
     fn slot_worth(&self, seat: Seat, y: SlotYields, behind: Behind) -> f64 {
+        // Ticket #140 (version 0.07.3): a Habitat holds the same everywhere now, so a slot is worth
+        // the same to Presence wherever it is, and the Energy that runs the Habitats decides; the
+        // fourth yield is Research, which the science-first Factions read.
         match behind {
-            Behind::Presence => y.habitat,
+            Behind::Presence => y.generator,
             Behind::First => match self.first_kind(seat) {
                 VictoryFirstKind::VentureFund => y.mine + y.refinery,
-                VictoryFirstKind::ColonistsOffEarth => y.habitat,
-                VictoryFirstKind::StabilizationRun | VictoryFirstKind::ResearchProduced | VictoryFirstKind::ArchiveResearch => y.generator + y.habitat,
+                VictoryFirstKind::ColonistsOffEarth => y.generator,
+                VictoryFirstKind::StabilizationRun | VictoryFirstKind::ResearchProduced | VictoryFirstKind::ArchiveResearch => y.generator + y.research,
             },
         }
     }
@@ -687,7 +690,7 @@ impl Game {
                     gap_for(Cat::Leapfrog, None),
                     1.0,
                     1.0,
-                    format!("Leapfrog {} ({:.2} per hundred million now)", self.tables.state(sid).name, self.population_coefficient(sid)),
+                    format!("Leapfrog {} ({:.2} per hundred million now)", self.tables.state(sid).name, self.population_coefficient(sid) * Game::UNITS_PER_HUNDRED_MILLION),
                     None,
                 );
             }
@@ -761,8 +764,10 @@ impl Game {
                             continue;
                         }
                         // Ticket #81: at its own weight; ticket #82: twice it when an idle Research
-                        // Lab of the seat's would double it.
-                        (Cat::Observatory, self.base_weight(seat, Cat::Observatory) * self.production_moved_boost(seat, &col, mk))
+                        // Lab of the seat's would double it. Ticket #140 (version 0.07.3): times the
+                        // Research yield here, so the computer builds its Observatories where the
+                        // science is, the way it digs where the ore is.
+                        (Cat::Observatory, self.base_weight(seat, Cat::Observatory) * self.production_moved_boost(seat, &col, mk) * self.research_yield_at(&col))
                     }
                     // Ticket #90: a Trade Post pays for the network, so it is worth half again once
                     // the seat holds two Bodies or more.
@@ -922,25 +927,28 @@ impl Game {
         // rival's Standing plus the challenge margin, as many as the Allotment and the Ducats allow.
         // One hold a turn against a rival pouring its whole Allotment in lost seat 0's start state
         // on turn 7 in every seed of the Prospectors' batch.
-        // Ticket #114 (version 0.07.1): the computer defends its holdings by the same rule the
-        // player's Defence button splits by -- `defence_needs`, which counts the shortfall to
-        // out-stand the best rival, the decay a held place takes at Resolution, and the threshold
-        // arm that makes a rival below their own threshold no threat at all. The AI had its own
-        // arithmetic here and it was close but not the same: it ignored the threshold arm, so it
-        // spent on places nobody could take, and it ignored decay, so it stopped one point short.
-        // A rule belongs in the engine and not in one caller; this is that lesson applied.
-        //
-        // What stays the AI's own is the WEIGHTING: the need decides how many step-sized orders are
-        // offered, and the usual weights decide which of them the seat can afford to take.
+        // Ticket #114 (version 0.07.1) had the computer defend by the same rule the player's Defence
+        // button split by. Ticket #134 (version 0.07.3) retired Defence, button and rule together --
+        // the designer's call: *"computer players lose it too"* -- and the AI is back on its own
+        // arithmetic from ticket #75: once a rival's Standing comes within two steps of its own it
+        // pushes as many holds as it takes to stand two steps clear of the rival plus the challenge
+        // margin. Cruder than the rule it had (it does not ask whether the rival is above their own
+        // threshold, nor count the decay), and measured by the sweep on the ticket.
+        let mut owned: Vec<Place> = self.controlled_states(seat).into_iter().map(Place::State).collect();
+        owned.extend(self.colonies.iter().filter(|c| c.control.controller() == Some(seat)).map(|c| Place::Colony(c.id)));
         let bought_steps = if per > 0 { ducats / per } else { 0 };
-        for (place, need) in self.defence_needs(seat) {
+        for place in owned {
             let rival = self.rival_standing(seat, place);
             let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
-            let can = ((allotment + bought_steps) / step).max(1);
-            let copies = ((need + step - 1) / step).clamp(1, can);
-            let opp = if rival + step >= mine { m.opportunity } else { 1.0 };
-            for _ in 0..copies {
-                push(vec![Order::Influence { target: place, amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, m.threat, opp, format!("hold {} with {} Influence", self.place_name(place), step), None);
+            if rival > 0 && rival + 2 * step >= mine {
+                let margin = self.tables.influence.challenge_margin;
+                let need = (rival + margin + 2 * step - mine).max(step);
+                let can = ((allotment + bought_steps) / step).max(1);
+                let copies = ((need + step - 1) / step).clamp(1, can);
+                let opp = if rival + step >= mine { m.opportunity } else { 1.0 };
+                for _ in 0..copies {
+                    push(vec![Order::Influence { target: place, amount: step }], Cat::Influence, self.base_weight(seat, Cat::Influence), 1.0, m.threat, opp, format!("hold {} with {} Influence", self.place_name(place), step), None);
+                }
             }
         }
 
@@ -1223,6 +1231,25 @@ impl Game {
                 if let Some(st) = target {
                     let opp = if presence_needed > 0 && waiting == 0 { m.opportunity } else { 1.0 };
                     push(vec![Order::BuildEmigrants { state: st, n: per }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("muster {} Emigrants in {}", per, self.tables.state(st).name), None);
+                }
+            }
+            // Ticket #141 (version 0.07.3): waiting Emigrants lift straight to the seat's own station
+            // over Earth while it has room, from a state with a working Launch Site. Presence, not a
+            // foothold: a station over Earth is off Earth, so it takes the unload's full weight.
+            for sid in self.directed_states(seat) {
+                let n = self.state(sid).emigrants;
+                if n == 0 || !self.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()) {
+                    continue;
+                }
+                let station = self
+                    .colonies
+                    .iter()
+                    .filter(|c| c.body == BodyId::Earth && c.in_orbit && c.control.director() == Some(seat) && self.habitat_room(c) > c.colonists && !self.slot_blockaded_against(seat, BodyId::Earth, c.slot))
+                    .max_by_key(|c| self.habitat_room(c) - c.colonists);
+                if let Some(c) = station {
+                    let k = n.min(self.habitat_room(c) - c.colonists);
+                    let opp = if presence_needed > 0 { m.opportunity } else { 1.0 };
+                    push(vec![Order::LiftToStation { state: sid, n: k, colony: c.id }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("lift {} Emigrants from {} to {}", k, self.tables.state(sid).name, self.place_name(Place::Colony(c.id))), None);
                 }
             }
             // With the ice open, waiting Emigrants go to Antarctica by sea: a free slot first, else

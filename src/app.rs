@@ -252,6 +252,21 @@ pub enum HotKey {
     EndTurn,
 }
 
+/// Ticket #145 (version 0.07.3): what is clicked in the Hab View.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum HabTile {
+    Module(usize),
+    Free,
+}
+
+/// Ticket #146 (version 0.07.3): what is clicked among a Region card's slot boxes -- a standing
+/// Facility by its index, or a free box, whose strip offers the build buttons.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SlotBox {
+    Facility(usize),
+    Free,
+}
+
 #[derive(Resource)]
 pub struct ViewState {
     pub view: View,
@@ -279,6 +294,13 @@ pub struct ViewState {
     /// Ticket #42: the trading window, and the quantity on each of its four lines
     /// (Influence, Materials, Fuel, Energy).
     pub show_trade: bool,
+    /// Ticket #145 (version 0.07.3): the Hab View, open on one station or Colony, and the tile
+    /// clicked in it -- a standing Module by index, or a free slot, whose strip offers the build
+    /// buttons.
+    pub hab_view: Option<ColonyId>,
+    pub hab_tile: Option<HabTile>,
+    /// Ticket #146 (version 0.07.3): the slot box clicked on the selected Region's card.
+    pub slot_box: Option<SlotBox>,
     pub trade_amounts: [i64; 4],
     pub load_state: Option<StateId>,
     pub influence_amount: i64,
@@ -289,9 +311,9 @@ pub struct ViewState {
     /// Ticket #57, a building aid (`hover:<body id>`): the Solar System Map draws that Body's launch
     /// window tooltip as though the pointer were on it, so a picture can be taken of it.
     pub force_hover: Option<BodyId>,
-    /// Ticket #114 (version 0.07.1): the last turn the standing Defence split was placed, so it is
+    /// Ticket #114 (version 0.07.1), Max since ticket #134: the last turn the standing order was placed, so it is
     /// placed once a turn and not once a frame.
-    pub defence_placed: Option<u32>,
+    pub max_placed: Option<u32>,
     /// Ticket #128 (version 0.07.2): a shortcut pressed and not yet acted on.
     pub hotkey: Option<HotKey>,
     /// Ticket #126 (version 0.07.2): on the start screen, the Region under the pointer, the Region
@@ -324,13 +346,16 @@ impl Default for ViewState {
             climate_reopen: false,
             show_victory: false,
             show_trade: false,
+            hab_view: None,
+            hab_tile: None,
+            slot_box: None,
             trade_amounts: [5, 10, 10, 10],
             load_state: None,
             influence_amount: 5,
             attack_preview: false,
             moments_on: None,
             force_hover: None,
-            defence_placed: None,
+            max_placed: None,
             hotkey: None,
             start_hover: None,
             start_selected: None,
