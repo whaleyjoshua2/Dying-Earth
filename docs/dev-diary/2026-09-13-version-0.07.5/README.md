@@ -200,9 +200,12 @@ should only appear on the faction selection screen in their respective cards."*
 
 ![The four Faction cards, each with its symbol where its colour swatch stood](faction-symbols-on-the-cards.png)
 
-![The four title rows magnified: a sprout, a mining helmet, an exit door, a cloud with an arrow](faction-symbols-magnified.png)
+![The four title rows magnified: hands under a globe, a mining helmet, a ringed planet, a processor](faction-symbols-magnified.png)
 
-Built as the ticket's recommendation: **the symbol stands where the colour swatch stood**, drawn in
+**Chosen by the designer off the sheets**, row by row, which changed three of the four I had put up:
+the hands and the Earth for the Custodians, the ringed planet for the Arkwrights, the processor for
+the Archivists; the helmet stood. Built as the ticket's recommendation: **the symbol stands where
+the colour swatch stood**, drawn in
 the Faction's own colour at 28 pixels, so the card says which Faction and which colour in one mark
 and grows by nothing. The research measured that 28 is the size to use and not the swatch's 24 -- at
 24 a glyph has a quarter fewer pixels and three of the candidates stopped naming themselves.
@@ -212,10 +215,10 @@ already on the Credits screen, so it gains four rows and no new name:
 
 | Faction | symbol | why |
 |---|---|---|
-| Custodians | **Sprout** (Lorc) | the boldest shape on its sheet, and the only one of the green candidates that survives 24 with its meaning; `recycle` was passed over because the Trade Post already wears an arrow loop |
+| Custodians | **Ecology** (Delapouite) | two hands cupped under a globe: the Faction's whole business in one gesture, and the gesture is what survives 24 even as the continents blur |
 | Prospectors | **Mining Helmet** (Delapouite) | the cleanest shape on its sheet; `miner` and `war-pick` are the Mine Module's own picture |
-| Arkwrights | **Exit Door** (Delapouite) | a door with a thick arrow through it -- *leave Earth* said in one mark, and the boldest shape available, which the darkest of the four colours needs |
-| Archivists | **Cloud Upload** (Delapouite) | says the thing the Faction does; `open-book` is the Archive Module's own picture |
+| Arkwrights | **Moon Orbit** (Delapouite) | a ringed disc with a moon: bold at 24, which the darkest of the four colours needs, and it says *another world* rather than *a journey* |
+| Archivists | **CPU** (Delapouite) | a square die with a window and pins, clean at 24; `open-book` is the Archive Module's own picture and `microchip` is the same object tilted, which aliases its pins
 
 **One standing rule is bent here, deliberately and nowhere else.** An icon's colour is decided in
 `icons::fill` and never by its caller, because a colour on this board means *whose*. A Faction symbol

@@ -40,10 +40,10 @@ pub const CREDITS: [Credit; 36] = [
     // Ticket #168 (version 0.07.5): a symbol for each Faction, worn on its card on the Faction
     // screen and nowhere else. Both authors were already credited above, so the screen gains four
     // rows and no new name.
-    Credit { resource: "Custodians", icon: "Sprout", author: "Lorc" },
+    Credit { resource: "Custodians", icon: "Ecology", author: "Delapouite" },
     Credit { resource: "Prospectors", icon: "Mining Helmet", author: "Delapouite" },
-    Credit { resource: "Arkwrights", icon: "Exit Door", author: "Delapouite" },
-    Credit { resource: "Archivists", icon: "Cloud Upload", author: "Delapouite" },
+    Credit { resource: "Arkwrights", icon: "Moon Orbit", author: "Delapouite" },
+    Credit { resource: "Archivists", icon: "CPU", author: "Delapouite" },
     // Ticket #112 (version 0.07.1): three figures that were words on the board.
     Credit { resource: "Population", icon: "Character", author: "Delapouite" },
     Credit { resource: "Influence", icon: "Megaphone", author: "Delapouite" },
