@@ -71,8 +71,8 @@ of the four against the panel, and the sheet where the tint costs the most):
 7. `heaven-gate` -- dissolves: only the cloud base survives 24.
 8. `journey` -- a winding road holds; the figure beside it becomes a stroke.
 9. `apollo-capsule` -- a truncated cone with a window band, clean.
-10. `moon-orbit` -- a disc with a ring and a moon; bold at 24, and says "a planet".
-11. `cargo-ship` -- hull, bridge and waves hold; the containers smear.
+10. `cargo-ship` -- hull, bridge and waves hold; the containers smear.
+11. `moon-orbit` -- a disc with a ring and a moon; bold at 24, and says "a planet".
 12. `dove` -- a bird with spread wings, clean; says peace, not departure.
 
 **[faction-symbols-sheet-archivists-untinted.png](faction-symbols-sheet-archivists-untinted.png)**
