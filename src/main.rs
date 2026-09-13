@@ -104,6 +104,7 @@ fn main() {
             game: None,
             pending: Vec::new(),
             tutorial: false,
+            tutorial_ticked: false,
             screen: Screen::Title,
             seed,
             mode,

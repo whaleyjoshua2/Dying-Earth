@@ -43,3 +43,44 @@ was believed green: reverted on purpose, the new test failed, the rule restored,
 The headless driver reads the pick too, so it was taught the same rule. Its board now says
 *"Deep Mining IS CHOSEN FOR THIS TURN, and not locked in until the turn ends"* where it used to
 demand a pick, and two `tech` lines in one turn now both apply, the second winning.
+
+## The tutorial is asked for on the Custodians' card
+
+Ticket [#174](https://github.com/whaleyjoshua2/Dying-Earth/issues/174). The designer's line: *"move
+tutorial choice to a radio box on custodian card during faction selection."*
+
+Version 0.07.5 put a **Tutorial** button on the title screen that began a Custodian game at Europe
+in one click, asking for neither Faction nor start. The choice now lives on the one card it belongs
+to, as a tick at the foot of the Custodians' card reading **`Play Tutorial`**.
+
+![The Custodians' card, with the tick at its foot](tutorial-tick-on-the-custodian-card.png)
+
+![The tick, magnified](tutorial-tick-magnified.png)
+
+The title screen's button is gone, and New Game is the top of the list again.
+
+![The title screen, the button gone](title-screen-without-the-tutorial-button.png)
+
+**Decided by the designer** on the ticket:
+
+- **The tick sits at the bottom of the card and reads `Play Tutorial`**, under the `Play the
+  Custodians` button rather than above it.
+- **A ticked card still picks a start.** The tick is on the Faction, not on the whole opening, so
+  `Play the Custodians` goes on to the start screen as it always did and the notes begin once a
+  Region has been chosen. None of the five notes names a Region, so any start reads correctly.
+- **The other three cards stay quiet.** A line about a thing the card in front of you cannot give
+  is clutter.
+
+The tick is remembered while the Faction screen is open, so looking at another card and coming back
+does not clear it, and it is cleared when a game begins. A hover says what it does: *A note at the
+head of each of the first five turns, saying what that turn is for. Nothing is forced, and it stops
+after the fifth.*
+
+A player who ticks the box, thinks better of it and plays the Prospectors instead gets **no notes**:
+every note is written about the Custodians. That rule is `tutorial_wanted` in the engine-facing app
+layer rather than a condition buried in one caller, and a new test,
+`the_tutorial_runs_only_when_the_tick_and_the_custodians_agree`, pins all three cases. It was
+witnessed red before it was believed green. **256 tests pass; clippy clean.**
+
+The headless harness gained `tutorialtick:1`, which stands the tick up for a picture, since a
+headless run cannot click it.

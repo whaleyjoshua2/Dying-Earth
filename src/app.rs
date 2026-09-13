@@ -74,11 +74,17 @@ pub struct Session {
     pub last_error: Option<String>,
     /// Ticket #105 (version 0.07.0): why the last End Turn was refused, shown once in its own popup.
     pub refusal: Option<String>,
-    /// Ticket #169 (version 0.07.5): this game was begun from the title screen's Tutorial button,
-    /// so a note opens each of its first turns. The designer chose a **guided free game** over a
-    /// scripted one: nothing is forced and nothing is checked, the notes only say where to look.
-    /// It goes false once the last note has been shown, and the game carries on as any other.
+    /// Ticket #169 (version 0.07.5): this game was begun with the tutorial asked for, so a note
+    /// opens each of its first turns. The designer chose a **guided free game** over a scripted
+    /// one: nothing is forced and nothing is checked, the notes only say where to look. It goes
+    /// false once the last note has been shown, and the game carries on as any other.
     pub tutorial: bool,
+    /// Ticket #174 (version 0.07.6): the `Play Tutorial` tick at the foot of the Custodians' card
+    /// on the Faction screen. The designer: *"move tutorial choice to a radio box on custodian card
+    /// during faction selection."* It is remembered while the screen is open, so looking at another
+    /// card and coming back does not clear it, and it is read when the game begins -- after the
+    /// start has been chosen, because a ticked card still picks its own Region.
+    pub tutorial_ticked: bool,
     /// Ticket #64: nobody is playing this game. All four seats are the computer's, the interface
     /// gives no orders, and every Faction's board is open to be read.
     pub spectator: bool,
@@ -95,6 +101,14 @@ pub struct Session {
     pub saves_list: Vec<SaveEntry>,
     /// Ticket #59: a Delete asks once; this is the row it is asking about.
     pub confirm_delete: Option<PathBuf>,
+}
+
+/// Ticket #174 (version 0.07.6): whether a game about to begin is a tutorial game. The tutorial is
+/// asked for by a tick at the foot of the Custodians' card, so it is on only when that tick is on
+/// AND the Faction being played is the Custodians -- a player who ticks it, thinks better of it and
+/// plays the Prospectors instead gets no notes, since every note is written about the Custodians.
+pub fn tutorial_wanted(ticked: bool, kind: FactionKind) -> bool {
+    ticked && kind == FactionKind::Custodians
 }
 
 /// Ticket #59: how long "Saved." stands in the top bar.
@@ -420,6 +434,24 @@ mod tests {
         // Ticked and clear, but the interval has not passed.
         assert!(!auto_should_advance(true, false, 0.0));
         assert!(!auto_should_advance(true, false, AUTO_INTERVAL - 0.01));
+    }
+
+    /// Ticket #174 (version 0.07.6): the tutorial is asked for by the tick at the foot of the
+    /// Custodians' card, so it runs only for a Custodian game. The designer moved the choice there
+    /// from the title screen's button: *"move tutorial choice to a radio box on custodian card
+    /// during faction selection."* Guarded here rather than in a picture because the tick's effect
+    /// is one turn deep into a game no capture reaches.
+    #[test]
+    fn the_tutorial_runs_only_when_the_tick_and_the_custodians_agree() {
+        assert!(tutorial_wanted(true, FactionKind::Custodians), "ticked, and playing them");
+        // Ticked, then a different Faction played: the notes are all about the Custodians.
+        for k in [FactionKind::Prospectors, FactionKind::Arkwrights, FactionKind::Archivists] {
+            assert!(!tutorial_wanted(true, k), "{k:?} has no notes written for it");
+        }
+        // Never ticked: no notes for anyone, the Custodians included.
+        for k in FactionKind::ALL {
+            assert!(!tutorial_wanted(false, k), "{k:?} was not asked for");
+        }
     }
 
     /// Ticket #104 (version 0.07.0): a new game opens on a clear map. This is guarded here rather

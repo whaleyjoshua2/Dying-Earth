@@ -319,7 +319,9 @@ enum Action {
     ChooseFaction(FactionKind),
     NewGame(FactionKind, StateId),
     /// Ticket #169 (version 0.07.5): the Tutorial button on the title screen.
-    StartTutorial,
+    /// Ticket #174 (version 0.07.6): the `Play Tutorial` tick at the foot of the Custodians' card
+    /// was pressed. The card is drawn from a read-only Session, so the tick travels as an action.
+    SetTutorialTick(bool),
     /// Ticket #169: the reader pressed on through a tutorial note.
     TutorialNoteRead,
     /// Ticket #64: Spectate, the fifth button on the choice screen.
@@ -967,24 +969,20 @@ pub fn draw(
                 session.earth_dirty = true;
             }
             Action::NewGame(f, s) => {
+                // Ticket #174 (version 0.07.6): the tutorial is asked for on the Custodians' card
+                // and read here, once the start has been chosen -- a ticked card still picks its own
+                // Region, at the designer's word. A tutorial game opens on its first note rather
+                // than on the Report, because the note says what the turn is for.
+                let tutorial = crate::app::tutorial_wanted(session.tutorial_ticked, f);
                 session.new_game(f, s);
+                session.tutorial = tutorial;
+                session.tutorial_ticked = false;
                 *view = ViewState::default();
-                view.popup = Popup::Report;
+                view.popup = if tutorial { Popup::Tutorial } else { Popup::Report };
                 let (lon, lat) = geo::state_lonlat(s);
                 view.yaw = geo::yaw_facing(lon, lat);
             }
-            // Ticket #169 (version 0.07.5): the Tutorial begins an ordinary game as the Custodians
-            // at their own home, and opens on its first note rather than on the Report.
-            Action::StartTutorial => {
-                let f = FactionKind::Custodians;
-                let s = session.tables.faction(f).home;
-                session.new_game(f, s);
-                session.tutorial = true;
-                *view = ViewState::default();
-                view.popup = Popup::Tutorial;
-                let (lon, lat) = geo::state_lonlat(s);
-                view.yaw = geo::yaw_facing(lon, lat);
-            }
+            Action::SetTutorialTick(on) => session.tutorial_ticked = on,
             // Ticket #169: on from a note to whatever the turn would have opened with. The tutorial
             // ends itself once the last note has been read, and the game carries on as any other.
             Action::TutorialNoteRead => {
@@ -1063,17 +1061,9 @@ fn title_screen(root: &mut Ui, session: &mut Session, actions: &mut Vec<Action>)
             ui.label(RichText::new("DYING EARTH").size(48.0).strong());
             ui.label(RichText::new("Colonize the solar system before ecological collapse overtakes Earth.").size(16.0));
             ui.add_space(40.0);
-            // Ticket #169 (version 0.07.5): the Tutorial, above New Game, where a new player looks
-            // first. It begins an ordinary game as the Custodians at their home, with a note at the
-            // head of each of its first turns; the Faction and the start are not asked for, since
-            // the whole point is to be playing within one click.
-            if ui
-                .add(egui::Button::new(RichText::new("Tutorial").size(22.0)).min_size(egui::vec2(220.0, 44.0)))
-                .on_hover_text("Play as the Custodians, with a note at the start of each of the first five turns saying what that turn is for. An ordinary game otherwise, and an ordinary game afterwards.")
-                .clicked()
-            {
-                actions.push(Action::StartTutorial);
-            }
+            // Ticket #174 (version 0.07.6): the Tutorial button stood here until the designer moved
+            // the choice onto the Custodians' card on the Faction screen, where the Faction it
+            // teaches is chosen. New Game is the top of the list again.
             if ui.add(egui::Button::new(RichText::new("New Game").size(22.0)).min_size(egui::vec2(220.0, 44.0))).clicked() {
                 session.screen = Screen::ChooseFaction;
             }
@@ -1403,6 +1393,23 @@ fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut
         ui.add_space(10.0);
         if ui.add(egui::Button::new(RichText::new(format!("Play the {}", card.name)).size(17.0)).min_size(egui::vec2(190.0, 36.0))).clicked() {
             actions.push(Action::ChooseFaction(kind));
+        }
+        // Ticket #174 (version 0.07.6): the tutorial is asked for here, at the foot of the one card
+        // it belongs to, and nowhere else. The designer: *"move tutorial choice to a radio box on
+        // custodian card during faction selection"*, placed at the bottom of the card and reading
+        // `Play Tutorial`. The other three cards stay quiet: a line about a thing this card cannot
+        // give you is clutter. The tick is remembered while the screen is open and read once the
+        // start has been chosen, since a ticked card still picks its own Region.
+        if kind == FactionKind::Custodians {
+            ui.add_space(6.0);
+            let mut on = session.tutorial_ticked;
+            if ui
+                .checkbox(&mut on, "Play Tutorial")
+                .on_hover_text("A note at the head of each of the first five turns, saying what that turn is for. Nothing is forced, and it stops after the fifth.")
+                .changed()
+            {
+                actions.push(Action::SetTutorialTick(on));
+            }
         }
     });
 }
