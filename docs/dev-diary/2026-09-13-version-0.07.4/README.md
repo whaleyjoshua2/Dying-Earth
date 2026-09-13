@@ -149,3 +149,23 @@ next turn 11 (seven), where the 0.07.3 picture caught it.
 ![Turn 1, the worst conjunction: Venus clear of Earth, its label below](solar-rescaled-turn-1.png)
 
 ![Turn 11, where 0.07.3's picture had Venus on Earth](solar-rescaled-turn-11.png)
+
+## Coastal Engineering put in its place on the Tech Tree
+
+Ticket [#156](https://github.com/whaleyjoshua2/Dying-Earth/issues/156). The designer's line: *"adjust
+costal engineering in the tech tree,"* read as a question of its place, its price of 12 having been
+decided on 0.07.3. It was the tree's only orphan, and its box beside Efficient Grids doubled the
+first column, pushed Efficient Grids out of line with the other first-rung Techs, had Efficient Grids'
+lines run beneath it, and widened the tree to 928 pixels against a Moment popup of 780. Built as the
+ticket's recommendation for the designer to react to: **two Techs on one rung stack in a taller
+branch row on every rung but the last**, where nothing leaves them and they stay side by side
+(Planetary Stewardship beside The Upload); a lone box stands at its band's middle. So Coastal
+Engineering sits beneath Efficient Grids, every column is one box wide, Efficient Grids' lines leave
+its right edge, and the tree is 768 wide -- inside the Moment popup with no change there.
+
+![The Tech Tree window: Coastal Engineering beneath Efficient Grids](tech-tree-coastal-engineering-stacked.png)
+
+![The same tree in the Tech Moment popup, from `menus:1 moment:tech`](tech-tree-in-the-moment-popup.png)
+
+First try had Clean Power on the Industry band's top row while Clean Manufacturing stood at its
+middle; now every lone box is centred in its band.

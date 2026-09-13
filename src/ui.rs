@@ -4317,9 +4317,12 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     }
     let rungs = TechId::ALL.iter().map(|t| game.tables.tech(*t).rung).max().unwrap_or(1).max(1) as usize;
     // Ticket #56: a branch may hold more than one Tech on a rung (Efficient Grids and Coastal
-    // Engineering both sit on Industry 1). Ticket #133: they sit SIDE BY SIDE, so a rung's column
-    // is as many columns wide as its busiest branch and the Techs on it share that width; stacked,
-    // the tree would be seven rows and would not fit under the top bar.
+    // Engineering both sit on Industry 1). Ticket #133: they sat SIDE BY SIDE. Ticket #156
+    // (version 0.07.4): they sit side by side only on the LAST rung, where nothing leaves them
+    // (Planetary Stewardship beside The Upload); on any earlier rung they are STACKED in a taller
+    // branch row, so every column is one box wide, every first-rung box lines up, and a line out
+    // of Efficient Grids leaves its right edge instead of running beneath Coastal Engineering.
+    // The designer: *"adjust costal engineering in the tech tree."*
     let cell: Vec<Vec<TechId>> = (0..branches.len() * rungs)
         .map(|i| {
             let (b, r) = (i % branches.len(), i / branches.len());
@@ -4332,10 +4335,15 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
                 .collect()
         })
         .collect();
-    let span: Vec<f32> = (0..rungs).map(|r| (0..branches.len()).map(|b| cell[r * branches.len() + b].len()).max().unwrap_or(1).max(1) as f32).collect();
+    let stacked = |r: usize| r + 1 < rungs;
+    let span: Vec<f32> = (0..rungs).map(|r| if stacked(r) { 1.0 } else { (0..branches.len()).map(|b| cell[r * branches.len() + b].len()).max().unwrap_or(1).max(1) as f32 }).collect();
     let left: Vec<f32> = (0..rungs).map(|r| HEAD_W + span[..r].iter().sum::<f32>() * COL).collect();
     let width: f32 = HEAD_W + span.iter().sum::<f32>() * COL;
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, ROW * branches.len() as f32), egui::Sense::hover());
+    // A branch's band is as many rows tall as its tallest stacked cell.
+    let rows: Vec<f32> = (0..branches.len()).map(|b| (0..rungs).filter(|r| stacked(*r)).map(|r| cell[r * branches.len() + b].len()).max().unwrap_or(1).max(1) as f32).collect();
+    let top: Vec<f32> = (0..branches.len()).map(|b| rows[..b].iter().sum::<f32>() * ROW).collect();
+    let height: f32 = rows.iter().sum::<f32>() * ROW;
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
     let painter = ui.painter_at(rect);
     let box_of = |t: TechId| -> egui::Rect {
         let card = game.tables.tech(t);
@@ -4343,13 +4351,17 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
         let r = card.rung.max(1) as usize - 1;
         let here = &cell[r * branches.len() + b];
         let i = here.iter().position(|x| *x == t).unwrap_or(0) as f32;
-        let each = span[r] * COL / here.len().max(1) as f32;
-        let centre = left[r] + each * (i + 0.5);
-        let min = rect.min + egui::vec2(centre - BOX_W / 2.0, b as f32 * ROW + (ROW - BOX_H) / 2.0);
-        egui::Rect::from_min_size(min, egui::vec2(BOX_W, BOX_H))
+        // A stack fills its band row by row; a lone box, on any rung, stands at the band's middle.
+        let (centre, y) = if stacked(r) && here.len() > 1 {
+            (left[r] + COL / 2.0, top[b] + i * ROW + (ROW - BOX_H) / 2.0)
+        } else {
+            let each = span[r] * COL / here.len().max(1) as f32;
+            (left[r] + each * (i + 0.5), top[b] + (rows[b] * ROW - BOX_H) / 2.0)
+        };
+        egui::Rect::from_min_size(rect.min + egui::vec2(centre - BOX_W / 2.0, y), egui::vec2(BOX_W, BOX_H))
     };
     for (i, b) in branches.iter().enumerate() {
-        painter.text(rect.min + egui::vec2(HEAD_W - 12.0, (i as f32 + 0.5) * ROW), egui::Align2::RIGHT_CENTER, b, FontId::proportional(14.0), Color32::WHITE);
+        painter.text(rect.min + egui::vec2(HEAD_W - 12.0, top[i] + rows[i] * ROW / 2.0), egui::Align2::RIGHT_CENTER, b, FontId::proportional(14.0), Color32::WHITE);
     }
     // Lines first, so the boxes sit on top of them. A line is green once the Tech it comes from is done.
     // Ticket #133: a line is ELBOWED -- it leaves the needed box, runs along the gap to the left of
