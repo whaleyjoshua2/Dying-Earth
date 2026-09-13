@@ -115,6 +115,11 @@ pub fn module_icon(kind: dying_earth_engine::ModuleKind) -> &'static str {
         SolarArray => "module_solar_array",
         MassDriver => "module_mass_driver",
         Archive => "module_archive",
+        // Ticket #164 (version 0.07.5): the Core Module wears the station glyph the game drew for
+        // itself on ticket #135 -- two solar panels on a bar with a module between them, which is
+        // what a core module is. It owes no credit. A ground Colony's Core Module wears it too,
+        // for want of a drawing of its own; the designer may want one.
+        Core => "station",
     }
 }
 

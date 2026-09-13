@@ -105,3 +105,30 @@ roster whenever nothing is selected, so Tab clears the selection; the heading na
 is the rule every button on the bar follows.
 
 ![The roster's heading names its key](roster-comes-back-on-tab.png)
+
+## The Core Module: how a Colony or a station is founded
+
+Ticket [#164](https://github.com/whaleyjoshua2/Dying-Earth/issues/164), the version's one rules
+change. The designer's line: *"let's adjust the way colonies and stations are founded, now their
+construction comes with a core module - a new module that provides room for four emigrants no
+further build slots until its populated."*
+
+**Decided before it was built**, in one round: the base allowance drops from **three to zero**, so
+the cap is exactly the number of Colonists and a place nobody lives in builds nothing; the **Core
+Module replaces the free Habitat** a ground Colony was founded with; it **holds a flat four for
+everyone** -- neither Expanded Habitats nor the Arkwrights' capacity multiplier reaches it, the
+designer adding *"arkwrights can always build habitats"*; and it **draws 1 Energy a turn**.
+
+![A station the turn it stands: its Core Module, four places to live, and no slots](core-module-a-station-the-turn-it-stands.png)
+
+![The same station with four Colonists: four slots bought, and the tiles for them](core-module-four-colonists-four-slots.png)
+
+The Core Module is never ordered, never mothballed, never decommissioned, and is never shut for want
+of Energy: it is the walls of the place rather than a building in it. It stands outside the Module
+count as the Archive does. It wears the station glyph the game drew for itself on ticket #135, which
+is what a core module looks like; a ground Colony's wears it too, for want of a drawing of its own.
+
+**It kills a deadlock that has been in the game since stations existed.** A bare station used to
+need a Habitat to hold anybody and Colonists to earn the slot to build one. Now the Core Module
+holds four from the day the station stands, so Emigrants can be lifted to it at once, and each one
+buys a slot.

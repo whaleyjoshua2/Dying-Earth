@@ -1226,7 +1226,9 @@ impl Game {
             body: BodyId::Earth,
             slot,
             control: Control::Controlled(seat),
-            modules: vec![Module::new(ModuleKind::Habitat)],
+            // Ticket #164 (version 0.07.5): a founding gives the Core Module, where it gave a
+            // free Habitat. It holds four, so a Colony founded by sea takes its four at once.
+            modules: vec![Module::new(ModuleKind::Core)],
             colonists: 0,
             queue: Vec::new(),
             grid_failed: false,
@@ -1303,7 +1305,10 @@ impl Game {
             }
             let seat = &if contenders.len() > 1 { self.tiebreak_at_body(*body, &contenders) } else { *seat };
             let id = ColonyId(self.fresh_id());
-            self.colonies.push(Colony { id, body: *body, slot: *slot, control: Control::Controlled(*seat), modules: Vec::new(), colonists: 0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: true });
+            // Ticket #164 (version 0.07.5): a station is founded with its Core Module, so it can take
+            // four people the turn it stands, where a bare one could hold nobody until a Habitat was
+            // built out of an allowance it no longer has.
+            self.colonies.push(Colony { id, body: *body, slot: *slot, control: Control::Controlled(*seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: true });
             let line = format!("{} built {}.", self.seat_name(*seat), self.place_name(Place::Colony(id)));
             self.log(line);
             let text = self.say("station_built", &[("faction", self.seat_name(*seat)), ("station", self.place_name(Place::Colony(id)))]);
@@ -1429,7 +1434,9 @@ impl Game {
                                 body: b,
                                 slot,
                                 control: Control::Controlled(seat),
-                                modules: vec![Module::new(ModuleKind::Habitat)],
+                                // Ticket #164 (version 0.07.5): the Core Module in the free
+                                // Habitat's place. It holds four, which is a Colony Ship's load.
+                                modules: vec![Module::new(ModuleKind::Core)],
                                 colonists: 0,
                                 queue: Vec::new(),
                                 grid_failed: false,

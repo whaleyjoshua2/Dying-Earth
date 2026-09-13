@@ -74,7 +74,11 @@ fn colony(g: &mut Game, seat: Seat, body: BodyId, modules: &[ModuleKind], coloni
         body,
         slot,
         control: Control::Controlled(seat),
-        modules: modules.iter().map(|k| Module::new(*k)).collect(),
+        // Ticket #164 (version 0.07.5): every founding gives a Core Module, so a Colony without one
+        // is not a board the game can produce. It is appended AFTER the kinds asked for: the order
+        // of a Colony's Modules carries no rule, and this way an index into the list still means
+        // the nth kind the test asked for.
+        modules: modules.iter().map(|k| Module::new(*k)).chain(std::iter::once(Module::new(ModuleKind::Core))).collect(),
         colonists,
         queue: Vec::new(),
         grid_failed: false,
@@ -120,7 +124,8 @@ fn income_shortfall_stops_once_the_balance_is_met() {
     let st = g.state(StateId::EastAsia);
     assert!(st.facilities.iter().find(|f| f.kind == FacilityKind::Factory).unwrap().online);
     assert!(!st.facilities.iter().find(|f| f.kind == FacilityKind::Refinery).unwrap().online);
-    assert_eq!(g.seats[0].stockpile.energy, 2);
+    // Ticket #164 (version 0.07.5): one less, for the Core Module on the seat's station.
+    assert_eq!(g.seats[0].stockpile.energy, 1);
 }
 
 // ---------------------------------------------------------------- 11.1 Temperature lag
@@ -507,7 +512,9 @@ fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard
     assert_eq!(g.place_name(Place::Colony(tiangong)), "Tiangong over Earth");
     assert_eq!(g.place_name(Place::Colony(axiom)), "Axiom over Earth");
     assert!(station_of(&g, Seat(2), BodyId::Earth).is_none(), "the Arkwrights start with no station");
-    assert!(g.colony(iss).unwrap().modules.is_empty(), "no Shipyard at the start");
+    // Ticket #164 (version 0.07.5): a station stands with its Core Module and nothing else.
+    assert_eq!(g.colony(iss).unwrap().modules.len(), 1, "its Core Module, and no Shipyard at the start");
+    assert_eq!(g.colony(iss).unwrap().modules[0].kind, ModuleKind::Core);
     assert!(g.colony(iss).unwrap().in_orbit);
     assert_eq!(g.free_orbital_slots(BodyId::Earth), vec![3, 4]);
     assert_eq!(g.free_slots_on(BodyId::Earth).len(), 3, "stations take no surface slot");
@@ -525,11 +532,14 @@ fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard
     assert_eq!(reef.control, Control::Controlled(Seat(0)));
     assert_eq!(reef.colonists, 0);
     // Only a Shipyard and Habitats stand on a station.
+    // A bare station is not free to take: its threshold starts at the station base.
+    assert_eq!(g.influence_threshold(Place::Colony(iss)), 20);
+    // Ticket #164 (version 0.07.5): a station nobody lives on has no slots, and the lines below are
+    // about which kinds stand in orbit, so give it somebody first.
+    g.colony_mut(iss).unwrap().colonists = 2;
     assert!(g.check_order(Seat(0), &[], &Order::BuildModule { colony: iss, kind: ModuleKind::Mine }).is_err(), "nothing to dig in orbit");
     assert!(g.check_order(Seat(0), &[], &Order::BuildModule { colony: iss, kind: ModuleKind::Shipyard }).is_ok());
     assert!(g.check_order(Seat(0), &[], &Order::BuildModule { colony: iss, kind: ModuleKind::Habitat }).is_ok());
-    // A bare station is not free to take: its threshold starts at the station base.
-    assert_eq!(g.influence_threshold(Place::Colony(iss)), 20);
     // A Colony on Mars lets the seat build a station over Mars.
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 0);
     assert!(g.check_order(Seat(0), &[], &Order::BuildStation { body: BodyId::Mars, slot: 0 }).is_ok());
@@ -1043,13 +1053,16 @@ fn solar_maximum_boosts_power_plants_and_generators_at_the_next_income_once() {
     drawn(&mut g, EventId::SolarMaximum, EventTarget::Everyone);
     g.apply_event_now();
     // Power Plant 6 x 1.5 = 9; Generator 5 x 1.375 (the Moon since ticket #72) x 1.5 = 10.
-    assert_eq!(income_of(&mut g, Seat(0)).energy, 19);
-    assert_eq!(income_of(&mut g, Seat(0)).energy, 12, "the boost lasts one Income");
+    // Ticket #164 (version 0.07.5): less the Colony's Core Module, 1 Energy a turn.
+    // Ticket #164 (version 0.07.5): less two Core Modules, the Moon Colony's and the station's.
+    assert_eq!(income_of(&mut g, Seat(0)).energy, 19 - 2);
+    assert_eq!(income_of(&mut g, Seat(0)).energy, 12 - 2, "the boost lasts one Income");
     with_tech(&mut g, TechId::EfficientGrids);
     drawn(&mut g, EventId::SolarMaximum, EventTarget::Everyone);
     g.apply_event_now();
     // Power Plant 6 x 1.5 x 2 = 18; Generator 5 x 1.375 x 1.5 x 2 = 20 (rounded down).
-    assert_eq!(income_of(&mut g, Seat(0)).energy, 38, "Efficient Grids makes it x2");
+    // Ticket #164 (version 0.07.5): less the two Core Modules.
+    assert_eq!(income_of(&mut g, Seat(0)).energy, 38 - 2, "Efficient Grids makes it x2");
 }
 
 #[test]
@@ -1151,8 +1164,9 @@ fn tech_efficient_grids_raises_power_plant_and_generator_output() {
     let plain = income_of(&mut g, Seat(0)).energy;
     with_tech(&mut g, TechId::EfficientGrids);
     let boosted = income_of(&mut g, Seat(0)).energy;
-    assert_eq!(plain, 6);
-    assert_eq!(boosted, 9);
+    // Ticket #164 (version 0.07.5): less the ISS's Core Module, 1 Energy a turn.
+    assert_eq!(plain, 6 - 1);
+    assert_eq!(boosted, 9 - 1);
 }
 
 #[test]
@@ -1216,9 +1230,11 @@ fn tech_expanded_habitats_holds_two_more() {
     // 8.8 and 11.0 until ticket #140 (version 0.07.3) traded the yield for a Research one: flat 8
     // and 10 everywhere now.
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 0);
-    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 8);
+    // Ticket #164 (version 0.07.5): plus the Core Module's flat four, which the Tech does not reach.
+    let core = g.tables.module(ModuleKind::Core).holds_colonists;
+    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 8 + core);
     with_tech(&mut g, TechId::ExpandedHabitats);
-    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 10);
+    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 10 + core);
 }
 
 #[test]
@@ -1229,8 +1245,10 @@ fn tech_closed_loop_colonies_halves_module_upkeep() {
     let plain = income_of(&mut g, Seat(0)).energy;
     with_tech(&mut g, TechId::ClosedLoopColonies);
     let halved = income_of(&mut g, Seat(0)).energy;
-    assert_eq!(plain, -3);
-    assert_eq!(halved, -1, "3 x 0.5 rounded down");
+    // Ticket #164 (version 0.07.5): the Mine's 3 and two Core Modules, the Colony's and the
+    // station's, at 1 each.
+    assert_eq!(plain, -5);
+    assert_eq!(halved, -1, "the Mine's 3 halved to 1, and each Core Module's 1 halved to nothing");
 }
 
 #[test]
@@ -1388,6 +1406,13 @@ fn building_yields_on_the_card_equal_what_income_pays() {
         }
         expect.energy -= y.upkeep;
     }
+    // Ticket #164 (version 0.07.5): the seat's station over Earth carries a Core Module of its own,
+    // whose Energy the loops above never walk, so account for every Core Module the seat holds.
+    for col in g.colonies.iter().filter(|x| x.control.director() == Some(Seat(0)) && x.id != c) {
+        for m in col.modules.iter().filter(|m| m.kind == ModuleKind::Core) {
+            expect.energy -= g.tables.module(m.kind).energy_upkeep;
+        }
+    }
     assert!(expect.materials > 0 && expect.fuel > 0 && research > 0, "the scenario produces something: {expect:?} research {research}");
     let paid = income_of(&mut g, Seat(0));
     assert_eq!((paid.materials, paid.fuel, paid.energy), (expect.materials, expect.fuel, expect.energy));
@@ -1438,8 +1463,9 @@ fn start_income_flows_from_turn_one() {
     let s = g.seat(Seat(0));
     assert!(s.income_last_turn.materials > 0, "Materials income on turn one: {:?}", s.income_last_turn);
     assert!(s.income_last_turn.fuel > 0, "Fuel income on turn one: {:?}", s.income_last_turn);
-    // Asia's start (Factory, Power Plant, Refinery and the Launch Site) pays 7 Energy against 6 made.
-    assert_eq!(s.income_last_turn.energy, -1, "{:?}", s.income_last_turn);
+    // Asia's start (Factory, Power Plant, Refinery and the Launch Site) pays 7 Energy against 6 made,
+    // and since ticket #164 the ISS's Core Module pays 1 more.
+    assert_eq!(s.income_last_turn.energy, -2, "{:?}", s.income_last_turn);
     assert!(s.stockpile.energy >= 15, "no Energy starvation at the start: {:?}", s.stockpile);
 }
 
@@ -1874,11 +1900,14 @@ fn an_arkwright_habitat_holds_twelve() {
     // Habitat holds the same everywhere, so 8 and 12, and with Expanded Habitats 10 and 15.
     let theirs = colony(&mut g, Seat(2), BodyId::Moon, &[ModuleKind::Habitat], 0);
     let mine = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 0);
-    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 8);
-    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 12, "half again for the Arkwrights");
+    // Ticket #164 (version 0.07.5): and the Core Module every founding gives holds four more, flat,
+    // which neither the Arkwrights' multiplier nor Expanded Habitats reaches.
+    let core = g.tables.module(ModuleKind::Core).holds_colonists;
+    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 8 + core);
+    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 12 + core, "half again for the Arkwrights");
     g.research.done.push(TechId::ExpandedHabitats);
-    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 10);
-    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 15, "(8 + 2) x 1.5");
+    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 10 + core);
+    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 15 + core, "(8 + 2) x 1.5, and the Core Module still four");
 }
 
 #[test]
@@ -2103,6 +2132,9 @@ fn the_archive_is_destroyed_when_its_colony_changes_hands_and_the_fund_is_kept()
     assert!(g.report.lines.iter().any(|l| l.text.contains("Archive at") && l.text.contains("destroyed")), "{:?}", g.report.lines);
     // An Occupied Colony's Archive is dark while the Occupation lasts.
     let again = archive_at(&mut g, Seat(3), BodyId::Moon, 80, 12);
+    // Ticket #164 (version 0.07.5): every Colony now draws 1 Energy for its Core Module, and an
+    // Archive is 12 on its own; this test is about Occupation, not about the Energy bill.
+    g.seats[3].stockpile.energy = 400;
     g.income_phase();
     assert!(g.archive_online(Seat(3)));
     g.colony_mut(again).unwrap().control = Control::Occupied { occupier: Seat(1), previous: Some(Seat(3)), turns: 1 };
@@ -2170,9 +2202,16 @@ fn the_archivist_ai_builds_its_way_off_earth_and_then_the_archive() {
     g.seats[arc.index()].stockpile.materials = 200;
     g.seats[arc.index()].stockpile.energy = 200;
     let orders = g.ai_orders(arc);
+    // Ticket #164 (version 0.07.5): a station is founded with a Core Module holding four, so it is
+    // somewhere people can live from the day it stands. Raising the Archive there is itself a step
+    // off Earth, where under #51 the seat could only sit on Earth; the guard is that it takes one
+    // of the three steps that lead off Earth rather than none.
     assert!(
-        orders.iter().any(|o| matches!(o, Order::BuildFacility { kind: FacilityKind::LaunchSite, .. } | Order::BuildModule { kind: ModuleKind::Shipyard, .. })),
-        "no Launch Site or Shipyard on the way to a Colony: {orders:?}"
+        orders.iter().any(|o| matches!(
+            o,
+            Order::BuildFacility { kind: FacilityKind::LaunchSite, .. } | Order::BuildModule { kind: ModuleKind::Shipyard, .. } | Order::BuildArchive { .. }
+        )),
+        "nothing on the way off Earth: {orders:?}"
     );
     let mut g = game();
     let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
@@ -3083,7 +3122,9 @@ fn b_decommission_refunds_half_frees_the_slot_and_adds_two_unrest() {
     let cid = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 0);
     g.seats[0].stockpile.materials = 0;
     change_now(&mut g, Seat(0), BuildingRef::Module(cid, 0), BuildingChange::Decommission);
-    assert!(g.colony(cid).unwrap().modules.is_empty(), "the Mine is gone");
+    // Ticket #164 (version 0.07.5): the Core Module stays; it is never decommissioned.
+    assert!(!g.colony(cid).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Mine), "the Mine is gone");
+    assert!(g.colony(cid).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Core), "and the Core Module remains");
     assert_eq!(g.seats[0].stockpile.materials, g.tables.module(ModuleKind::Mine).materials / 2);
 }
 
@@ -3994,6 +4035,11 @@ fn the_ai_holds_materials_four_turns_for_a_colony_ship_it_wants_more_than_a_fact
             g.state_mut(sid).facilities.push(facility(FacilityKind::Bank));
         }
     }
+    // Ticket #164 (version 0.07.5): a station holds four from the day it stands, so lifting
+    // Emigrants to it is a live use of Materials that would outbid the saving. Fill it: this test
+    // is about waiting for a Colony Ship.
+    let room = g.habitat_room(g.colony(iss).unwrap());
+    g.colony_mut(iss).unwrap().colonists = room;
     g.seats[cust.index()].stockpile.materials = 8;
     g.seats[cust.index()].stockpile.energy = 200;
     g.seats[cust.index()].income_last_turn.materials = 8;
@@ -4001,7 +4047,14 @@ fn the_ai_holds_materials_four_turns_for_a_colony_ship_it_wants_more_than_a_fact
     let orders = g.ai_orders(cust);
     let spent: Vec<&Order> = orders.iter().filter(|o| g.order_cost(cust, o).materials > 0).collect();
     let lines: Vec<String> = g.log.iter().filter(|&l| l.contains("Colony Ship") || l.starts_with("  take")).cloned().collect();
-    assert!(lines.iter().any(|l| l.contains("wait") && l.contains("Colony Ship")), "the Colony Ship is waited for: {lines:#?}");
+    // Ticket #164 (version 0.07.5): the AI logs `wait` for something affordable within a few turns
+    // and `save` for something it is holding Materials against a cheaper want; both mean it is
+    // holding rather than buying, which is what this test guards, and the assertion below is the
+    // hard half of it.
+    assert!(
+        lines.iter().any(|l| (l.contains("wait") || l.contains("save")) && l.contains("Colony Ship")),
+        "the Colony Ship is held for: {lines:#?}"
+    );
     assert!(spent.is_empty(), "and nothing cheaper takes the Materials meanwhile: {spent:?}");
 }
 
@@ -4130,10 +4183,15 @@ fn a_modules_output_uses_its_own_slots_yield() {
     // Observatory reads its Body's figure, the first Body yield a station has read.
     g.colony_mut(rich_id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     let per = g.tables.module(ModuleKind::Habitat).holds_colonists as f64;
-    assert_eq!(g.habitat_room(g.colony(rich_id).unwrap()), per as u32, "a Habitat holds the same on every slot");
+    // Ticket #164 (version 0.07.5): a place also holds four for every Core Module standing on it,
+    // so the reading is the Habitat's figure plus whatever this place was founded with.
+    let core_room = |g: &Game, c| {
+        g.colony(c).unwrap().modules.iter().filter(|m| m.kind == ModuleKind::Core).count() as u32 * g.tables.module(ModuleKind::Core).holds_colonists
+    };
+    assert_eq!(g.habitat_room(g.colony(rich_id).unwrap()), per as u32 + core_room(&g, rich_id), "a Habitat holds the same on every slot");
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
     g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Habitat));
-    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), per as u32, "and the same in orbit");
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), per as u32 + core_room(&g, iss), "and the same in orbit");
     let science = g.slot_yields(BodyId::Mars, rich).research;
     assert!((g.research_yield_at(g.colony(rich_id).unwrap()) - science).abs() < 1e-9, "an Observatory on the ground reads its slot's Research yield");
     assert!((g.research_yield_at(g.colony(iss).unwrap()) - g.tables.body(BodyId::Earth).research_yield).abs() < 1e-9, "a station's Observatory reads its Body's");
@@ -5328,13 +5386,26 @@ fn the_ai_musters_emigrants_then_lifts_them_or_sends_them_to_antarctica() {
     assert!(orders.iter().any(|o| matches!(o, Order::BuildEmigrants { state: StateId::EastAsia, .. })), "an empty Colony Ship at Earth and nobody waiting: it musters: {orders:?}");
     assert!(!orders.iter().any(|o| matches!(o, Order::Load { .. })), "and cannot load yet: {orders:?}");
     g.state_mut(StateId::EastAsia).emigrants = 4;
+    // Ticket #164 (version 0.07.5): with a station that holds four from the day it stands, the lift
+    // straight to orbit is the cheaper way and the computer takes it first.
     let orders = g.ai_orders(Seat(0));
-    assert!(orders.iter().any(|o| matches!(o, Order::Load { colonists: 4, from: LoadSource::State(StateId::EastAsia), .. })), "it lifts the four: {orders:?}");
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    assert!(orders.iter().any(|o| matches!(o, Order::LiftToStation { state: StateId::EastAsia, n: 4, colony } if *colony == iss)), "it lifts them to the station: {orders:?}");
+    // With the station full there is nowhere to lift them, and the Colony Ship takes them instead.
+    let room = g.habitat_room(g.colony(iss).unwrap());
+    g.colony_mut(iss).unwrap().colonists = room;
+    let orders = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::Load { colonists: 4, from: LoadSource::State(StateId::EastAsia), .. })), "it loads the four: {orders:?}");
     // The ice open and Emigrants waiting with no Ship to take them: by sea.
     let mut g = game();
     g.antarctica_open = true;
     g.state_mut(StateId::EastAsia).emigrants = 4;
     g.seats[0].stockpile.energy = 200;
+    // Ticket #164 (version 0.07.5): the station over Earth holds four from the day it stands and
+    // would take them first, so fill it; this reading is about the sea.
+    let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    let room = g.habitat_room(g.colony(iss).unwrap());
+    g.colony_mut(iss).unwrap().colonists = room;
     let orders = g.ai_orders(Seat(0));
     assert!(orders.iter().any(|o| matches!(o, Order::SendToAntarctica { state: StateId::EastAsia, n: 4, .. })), "{orders:?}");
 }
@@ -5454,23 +5525,32 @@ fn observatory_stands_on_a_station_and_a_barracks_does_not() {
     let mut g = game();
     g.seats[0].stockpile.materials = 200;
     let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the Custodians start with a station");
+    // Ticket #164 (version 0.07.5): somebody must live there before anything may be built.
+    g.colony_mut(iss).unwrap().colonists = 2;
     assert!(g.check_order(Seat(0), &[], &Order::BuildModule { colony: iss, kind: ModuleKind::Observatory }).is_ok());
     assert!(g.check_order(Seat(0), &[], &Order::BuildModule { colony: iss, kind: ModuleKind::Barracks }).is_err());
 }
 
 /// Ticket #80: a Habitat holds 8, 12 for the Arkwrights, +2 with Expanded Habitats; read on a
 /// station, where no Body yield applies.
+///
+/// Ticket #164 (version 0.07.5): the station's own Core Module holds four besides, and holds a FLAT
+/// four -- neither the Arkwrights' multiplier nor Expanded Habitats reaches it. So every figure here
+/// is the Habitat's, plus the same four.
 #[test]
-fn a_habitat_holds_eight_and_twelve_for_the_arkwrights() {
+fn a_habitat_holds_eight_and_twelve_for_the_arkwrights_and_the_core_module_four_flat() {
     let mut g = game();
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    let core = g.tables.module(ModuleKind::Core).holds_colonists;
+    assert_eq!(core, 4);
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), core, "the Core Module alone, before any Habitat");
     g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Habitat));
-    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 8);
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 8 + core);
     // The Arkwrights (seat 2) start with no station: hand them the ISS for the reading.
     g.colony_mut(iss).unwrap().control = Control::Controlled(Seat(2));
-    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 12, "half again for the Arkwrights");
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 12 + core, "half again for the Arkwrights, and the Core Module flat");
     with_tech(&mut g, TechId::ExpandedHabitats);
-    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 15, "(8 + 2) x 1.5");
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 15 + core, "(8 + 2) x 1.5, and the Core Module still four");
 }
 
 // ---------------------------------------------------------------- 0.06.0 ticket #81: the Archivists' card
@@ -6117,7 +6197,10 @@ fn a_solar_array_stands_only_on_a_station() {
     let mut g = game();
     g.seats[0].stockpile.materials = 200;
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
-    let ground = colony(&mut g, Seat(0), BodyId::Moon, &[], 0);
+    // Ticket #164 (version 0.07.5): a place nobody lives on has no Module slots, so give both
+    // somebody to live there; this test is about which kinds stand where, not about the cap.
+    g.colony_mut(iss).unwrap().colonists = 2;
+    let ground = colony(&mut g, Seat(0), BodyId::Moon, &[], 2);
     assert!(g.check_order(Seat(0), &[], &Order::BuildModule { colony: iss, kind: ModuleKind::SolarArray }).is_ok());
     let err = g.check_order(Seat(0), &[], &Order::BuildModule { colony: ground, kind: ModuleKind::SolarArray }).unwrap_err().0;
     assert!(err.contains("station"), "{err}");
@@ -6134,6 +6217,9 @@ fn the_ai_raises_a_solar_array_on_its_station_when_energy_is_tight() {
     g.seats[0].stockpile.materials = 200;
     g.seats[0].stockpile.energy = 0;
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
+    // Ticket #164 (version 0.07.5): a station nobody lives on has no Module slots, so nothing can
+    // be raised on it at all. Its Core Module holds four, so put people there first.
+    g.colony_mut(iss).unwrap().colonists = 2;
     let orders = g.ai_orders(Seat(0));
     assert!(orders.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: ModuleKind::SolarArray } if *colony == iss)), "no Solar Array on the ISS: {orders:?}");
 }
@@ -6168,18 +6254,20 @@ fn one_trade_post_per_faction_per_body_on_the_ground_or_in_orbit() {
     let mut g = game();
     g.seats[0].stockpile.materials = 300;
     let cus = Seat(0);
-    let a = colony(&mut g, cus, BodyId::Mars, &[ModuleKind::TradePost], 0);
-    let b = colony(&mut g, cus, BodyId::Mars, &[], 0);
+    // Ticket #164 (version 0.07.5): people, or there are no slots to argue about.
+    let a = colony(&mut g, cus, BodyId::Mars, &[ModuleKind::TradePost], 2);
+    let b = colony(&mut g, cus, BodyId::Mars, &[], 2);
     let post = |c| Order::BuildModule { colony: c, kind: ModuleKind::TradePost };
     assert!(g.check_order(cus, &[], &post(a)).unwrap_err().0.contains("Trade Post"), "a second at the same Colony");
     assert!(g.check_order(cus, &[], &post(b)).unwrap_err().0.contains("Trade Post"), "a second on the same Body");
-    let moon = colony(&mut g, cus, BodyId::Moon, &[], 0);
+    let moon = colony(&mut g, cus, BodyId::Moon, &[], 2);
     assert!(g.check_order(cus, &[], &post(moon)).is_ok(), "another Body");
     let iss = station_of(&g, cus, BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().colonists = 2;
     assert!(g.check_order(cus, &[], &post(iss)).is_ok(), "a station may hold one");
     let pro = Seat(1);
     g.seats[1].stockpile.materials = 300;
-    let theirs = colony(&mut g, pro, BodyId::Mars, &[], 0);
+    let theirs = colony(&mut g, pro, BodyId::Mars, &[], 2);
     assert!(g.check_order(pro, &[], &post(theirs)).is_ok(), "the Prospectors' first on Mars");
 }
 
@@ -6216,8 +6304,9 @@ fn the_mass_driver_stands_on_a_low_gravity_colony_behind_efficient_transit_one_p
     assert_eq!((card.materials, card.build_turns, card.energy_upkeep), (35, 2, 4));
     assert_eq!(card.needs_tech, Some(TechId::EfficientTransit));
     g.seats[0].stockpile.materials = 300;
-    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 0);
-    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 0);
+    // Ticket #164 (version 0.07.5): people, or there are no slots to build a Mass Driver into.
+    let moon = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Mine], 3);
+    let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Mine], 3);
     let build = |c| Order::BuildModule { colony: c, kind: ModuleKind::MassDriver };
     assert!(g.check_order(Seat(0), &[], &build(moon)).unwrap_err().0.contains("Efficient Transit"), "the Tech first");
     with_tech(&mut g, TechId::EfficientTransit);
@@ -6468,57 +6557,67 @@ fn funding_the_archive_pays_even_when_the_turn_completes_a_tech() {
 /// for every Colonist living there. Before this rule a Colony had no ceiling at all, and Build Where
 /// You Dig made each further Module cheaper than the last: one playtested Moon Colony reached 51
 /// Mines and 28 Generators on about twelve Colonists, extracting 775 Materials a turn by turn 13.
+///
+/// Ticket #164 (version 0.07.5): `base` is now 0 -- the Core Module a founding gives is the whole of
+/// what a founding gives, and every slot after it is bought with a Colonist. So the cap is exactly
+/// the number of people living there, and a place nobody lives in builds nothing.
 #[test]
-fn a_colony_holds_three_modules_free_and_one_more_for_each_colonist() {
+fn a_colony_holds_one_module_for_each_colonist_and_none_without() {
     let mut g = game();
     g.seats[0].stockpile.materials = 2000;
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[], 2);
-    // Three free and one for each of two Colonists.
-    assert_eq!(g.module_slots(g.colony(c).unwrap()), 5);
-    assert_eq!(g.free_module_slots(g.colony(c).unwrap()), 5);
-    for _ in 0..5 {
+    // One for each of two Colonists, and nothing free on top.
+    assert_eq!(g.module_slots(g.colony(c).unwrap()), 2);
+    assert_eq!(g.free_module_slots(g.colony(c).unwrap()), 2);
+    for _ in 0..2 {
         g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::Mine));
     }
     let order = Order::BuildModule { colony: c, kind: ModuleKind::Mine };
-    assert!(g.check_order(Seat(0), &[], &order).is_err(), "a Colony of two Colonists holds five Modules, not six");
+    assert!(g.check_order(Seat(0), &[], &order).is_err(), "a Colony of two Colonists holds two Modules, not three");
     // A Colonist buys exactly one more.
     g.colony_mut(c).unwrap().colonists = 3;
-    assert_eq!(g.module_slots(g.colony(c).unwrap()), 6);
-    assert!(g.check_order(Seat(0), &[], &order).is_ok(), "the third Colonist bought a sixth");
+    assert_eq!(g.module_slots(g.colony(c).unwrap()), 3);
+    assert!(g.check_order(Seat(0), &[], &order).is_ok(), "the third Colonist bought a third");
     // An order already given this turn takes its room, so a cap of six cannot be filled twice over.
     assert!(g.check_order(Seat(0), std::slice::from_ref(&order), &order).is_err(), "the pending order took the last slot");
     // A mothballed Module keeps its slot, as a mothballed Facility does in a Nation State.
     g.colony_mut(c).unwrap().modules[0].mothballed = true;
     assert!(g.check_order(Seat(0), &[], &order).is_ok(), "mothballing frees Energy, never room");
-    assert_eq!(g.module_slots_used(g.colony(c).unwrap()), 5);
+    assert_eq!(g.module_slots_used(g.colony(c).unwrap()), 2);
     // One under construction reserves its slot.
     let due = g.turn + 1;
     g.colony_mut(c).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), due_turn: due, coastal: false });
-    assert_eq!(g.module_slots_used(g.colony(c).unwrap()), 6);
+    assert_eq!(g.module_slots_used(g.colony(c).unwrap()), 3);
     assert!(g.check_order(Seat(0), &[], &order).is_err(), "the one building holds the last slot");
     // The Archive is exempt, and counted on neither side of the sum.
     g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::Archive));
-    assert_eq!(g.module_slots_used(g.colony(c).unwrap()), 6, "the Archive is not counted");
+    assert_eq!(g.module_slots_used(g.colony(c).unwrap()), 3, "the Archive is not counted");
+    // Ticket #164: and so is the Core Module every founding gives.
+    g.colony_mut(c).unwrap().modules.push(Module::new(ModuleKind::Core));
+    assert_eq!(g.module_slots_used(g.colony(c).unwrap()), 3, "the Core Module is not counted either");
 }
 
-/// Ticket #97: a Space Station reads the same rule, so one founded bare holds the free allowance and
-/// grows only as its people arrive. Three is exactly the Shipyard, Solar Array and Observatory that
-/// a station over Earth is actually built with.
+/// Ticket #97: a Space Station reads the same rule, so it grows only as its people arrive.
+///
+/// Ticket #164 (version 0.07.5): and with `base` at 0 a station nobody lives on builds **nothing**.
+/// That is not the deadlock it would once have been, because the Core Module it is founded with
+/// holds four: people can arrive the turn it is built, and each one buys a slot.
 #[test]
-fn a_bare_space_station_holds_the_free_allowance_and_grows_with_its_people() {
+fn a_station_builds_nothing_until_someone_lives_on_it_and_its_core_module_holds_the_first_four() {
     let mut g = game();
     g.seats[0].stockpile.materials = 2000;
     let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("a station over Earth");
-    assert_eq!(g.colony(station).unwrap().colonists, 0, "it starts bare");
-    assert_eq!(g.module_slots(g.colony(station).unwrap()), 3, "three free, and no people yet");
-    for k in [ModuleKind::Shipyard, ModuleKind::SolarArray, ModuleKind::Observatory] {
-        g.colony_mut(station).unwrap().modules.push(Module::new(k));
-    }
+    assert_eq!(g.colony(station).unwrap().colonists, 0, "it starts with nobody on it");
+    assert_eq!(g.colony(station).unwrap().modules.len(), 1, "and with its Core Module");
+    assert_eq!(g.colony(station).unwrap().modules[0].kind, ModuleKind::Core);
+    assert_eq!(g.module_slots(g.colony(station).unwrap()), 0, "no slots, and no people yet");
     let habitat = Order::BuildModule { colony: station, kind: ModuleKind::Habitat };
-    assert!(g.check_order(Seat(0), &[], &habitat).is_err(), "a bare station is full at three");
+    assert!(g.check_order(Seat(0), &[], &habitat).is_err(), "a station nobody lives on builds nothing");
+    // The Core Module is what breaks the circle: it holds four before anything is built.
+    assert_eq!(g.habitat_room(g.colony(station).unwrap()), 4, "the Core Module holds four");
     // People arriving buy the room, one slot each.
     g.colony_mut(station).unwrap().colonists = 2;
-    assert_eq!(g.module_slots(g.colony(station).unwrap()), 5);
+    assert_eq!(g.module_slots(g.colony(station).unwrap()), 2);
     assert!(g.check_order(Seat(0), &[], &habitat).is_ok());
 }
 

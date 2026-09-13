@@ -804,7 +804,8 @@ impl Game {
                     ModuleKind::Generator | ModuleKind::Refinery => (Cat::Producer, self.base_weight(seat, Cat::Producer) * self.production_moved_boost(seat, &col, mk)),
                     ModuleKind::Relay => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
                     // Ticket #51: the Archive is never an ordinary Module build; it has its own order.
-                    ModuleKind::Archive => continue,
+                    // Ticket #164 (version 0.07.5): nor is the Core Module, which a founding gives.
+                    ModuleKind::Archive | ModuleKind::Core => continue,
                     ModuleKind::Habitat => (Cat::Habitat, self.base_weight(seat, Cat::Habitat)),
                     ModuleKind::Shipyard => {
                         if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {

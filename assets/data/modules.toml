@@ -101,15 +101,22 @@ energy_upkeep = 12
 # At that cap a turn of funding is refused, and the Research stays with the shared Tech.
 # Ticket #97 (version 0.07.0): how many Modules a Colony or a Space Station may hold. `base` free,
 # and one more for every `per_colonist` Colonists living there. The Archive is exempt and never
-# counted. A mothballed Module keeps its slot and one under construction reserves one, exactly as a
-# Facility does in a Nation State.
+# counted, and since ticket #164 so is the Core Module. A mothballed Module keeps its slot and one
+# under construction reserves one, exactly as a Facility does in a Nation State.
+#
+# Ticket #164 (version 0.07.5): `base` is 0, where it was 3. The designer: *"now their construction
+# comes with a core module - a new module that provides room for four emigrants no further build
+# slots until its populated."* The Core Module is the whole of what a founding gives, and every slot
+# after it is bought with a Colonist, so a place that nobody lives in builds nothing. A Colony
+# founded with four Colonists has four slots; a station built this turn has none, and can take four
+# people at once because its Core Module holds them.
 #
 # `per_colonist = 1` is not a taste: the designer's rule is that a filled Habitat must always hand
 # back at least two slots after paying for its own. The poorest Habitat in the game holds three
 # (Phobos and Deimos, Habitat yield 0.5), so one slot per Colonist is the simplest ratio that keeps
 # that promise on every Colony Slot. At one per two it would hand back nothing there.
 [slots]
-base = 3
+base = 0
 per_colonist = 1
 
 [archive]
@@ -160,6 +167,19 @@ build_turns = 2
 energy_upkeep = 4
 needs_tech = "efficient_transit"
 low_gravity_only = true
+
+# Ticket #164 (version 0.07.5): the Core Module. Every Colony and every Space Station is founded
+# with one; it is never ordered, never mothballed, never decommissioned, and does not count against
+# the Module cap. It holds `holds_colonists` people flat -- Expanded Habitats and the Arkwrights'
+# capacity multiplier reach a Habitat and not this -- so a place can take its first arrivals before
+# it has built anything, and `materials` and `build_turns` are zero because nobody buys it.
+[[module]]
+id = "core"
+name = "Core Module"
+materials = 0
+build_turns = 0
+energy_upkeep = 1
+holds_colonists = 4
 
 # Ticket #88 (version 0.06.0): build it where you dig. A Module (the Archive included) built at a
 # Colony with one working Mine costs `one_mine` of its price, with two or more `two_mines`,

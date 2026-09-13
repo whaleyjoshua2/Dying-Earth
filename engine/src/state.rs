@@ -892,7 +892,8 @@ impl Game {
             let Some(want) = game.tables.faction(game.kind(seat)).start_station.clone() else { continue };
             let Some(slot) = game.tables.body(BodyId::Earth).stations.iter().position(|n| *n == want) else { continue };
             let id = ColonyId(game.fresh_id());
-            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules: Vec::new(), colonists: 0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+            // Ticket #164 (version 0.07.5): the three starting stations stand with their Core Modules.
+            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
         }
         // Starting positions (spec 14.3, ticket #50): the player's pick, then each AI seat in turn.
         let mut taken = vec![setup.player_start];
@@ -1522,11 +1523,14 @@ impl Game {
     /// Module keeps its slot and one under construction reserves one, exactly as a Facility does in
     /// a Nation State; the Archive is exempt and counted on neither side.
     pub fn module_slots_used(&self, c: &Colony) -> u32 {
-        let standing = c.modules.iter().filter(|m| m.kind != ModuleKind::Archive).count() as u32;
+        // Ticket #164 (version 0.07.5): the Core Module is exempt as the Archive is -- it is what a
+        // founding gives, not something bought out of the allowance.
+        let exempt = |k: ModuleKind| k == ModuleKind::Archive || k == ModuleKind::Core;
+        let standing = c.modules.iter().filter(|m| !exempt(m.kind)).count() as u32;
         let building = c
             .queue
             .iter()
-            .filter(|b| matches!(b.item, BuildItem::Module(k) if k != ModuleKind::Archive))
+            .filter(|b| matches!(b.item, BuildItem::Module(k) if !exempt(k)))
             .count() as u32;
         standing + building
     }
@@ -1549,7 +1553,12 @@ impl Game {
         // Habitat yield on a surface (ticket #57) and 1.0 in orbit (ticket #46) until the designer
         // traded that yield for a Research one.
         let habitats = c.modules.iter().filter(|m| m.kind == ModuleKind::Habitat).count() as f64;
-        (habitats * per.max(0) as f64 * faction).floor() as u32
+        // Ticket #164 (version 0.07.5): the Core Module holds people too, and holds a FLAT figure --
+        // Expanded Habitats and the Arkwrights' capacity multiplier reach a Habitat and not this, at
+        // the designer's word: *"yes everyone arkwrights can always build habitats."* It is what
+        // lets a station founded this turn take its first four before anything is built.
+        let core: u32 = c.modules.iter().filter(|m| m.kind == ModuleKind::Core).map(|_| self.tables.module(ModuleKind::Core).holds_colonists).sum();
+        (habitats * per.max(0) as f64 * faction).floor() as u32 + core
     }
 
     /// Ticket #140 (version 0.07.3): what an Observatory here is multiplied by -- the slot's own

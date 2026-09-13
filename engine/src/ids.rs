@@ -159,10 +159,16 @@ pub enum ModuleKind {
     /// Version 0.06.0 (ticket #92): the Mass Driver, a Module only a ground Colony on a low-gravity
     /// Body holds, behind Efficient Transit: the owner's departures four Fuel cheaper, its Mines +1.
     MassDriver,
+    /// Version 0.07.5 (ticket #164): the **Core Module**, which every Colony and every Space Station
+    /// is founded with. It holds four Colonists, is never ordered, never mothballed and never
+    /// decommissioned, and stands outside the Module count as the Archive does. It is the walls of
+    /// the place rather than a building in it. Appended last because `Tables::module` indexes this
+    /// enum by discriminant.
+    Core,
 }
 
 impl ModuleKind {
-    pub const ALL: [ModuleKind; 12] = [
+    pub const ALL: [ModuleKind; 13] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -175,6 +181,7 @@ impl ModuleKind {
         ModuleKind::Observatory,
         ModuleKind::SolarArray,
         ModuleKind::MassDriver,
+        ModuleKind::Core,
     ];
     /// The Modules an ordinary build order may place (ticket #51: the Archive is not one of them).
     pub const BUILDABLE: [ModuleKind; 11] = [
@@ -192,6 +199,7 @@ impl ModuleKind {
     ];
     pub fn name(self) -> &'static str {
         match self {
+            ModuleKind::Core => "Core Module",
             ModuleKind::Mine => "Mine",
             ModuleKind::Generator => "Generator",
             ModuleKind::Refinery => "Refinery",

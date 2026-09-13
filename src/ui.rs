@@ -3964,11 +3964,19 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         Control::Occupied { occupier, turns, .. } => format!("Occupied by the {} (turn {})", game.seat_name(occupier), turns),
     };
     ui.label(owner);
-    ui.label(format!("Colonists {} of {} Habitat room", col.colonists, game.habitat_room(col)));
+    // Ticket #164 (version 0.07.5): the room is the Core Module's four and the Habitats' eight
+    // each, so the line no longer names Habitats alone.
+    ui.label(format!("Colonists {} of {} room", col.colonists, game.habitat_room(col)));
     // Ticket #97 (version 0.07.0): the Module cap, shown beside the Colonists that buy it, so a
     // player meets it on the card rather than as a refusal.
     let (used, cap) = (game.module_slots_used(col), game.module_slots(col));
-    let line = format!("Modules {used} of {cap} ({} free, one for each Colonist)", game.tables.slots.base);
+    // Ticket #164 (version 0.07.5): with the base allowance at nothing, the cap is exactly the
+    // number of people living here, so the line says that rather than naming a base of zero.
+    let line = if game.tables.slots.base == 0 {
+        format!("Modules {used} of {cap} (one for each Colonist)")
+    } else {
+        format!("Modules {used} of {cap} ({} free, one for each Colonist)", game.tables.slots.base)
+    };
     let resp = if used >= cap {
         ui.colored_label(Color32::YELLOW, format!("{line} - no room for another until more Colonists live here"))
     } else {
@@ -3979,9 +3987,9 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     rule_tip(
         resp,
         format!(
-            "{} slots from the day it is founded, and one more for every {} Colonist living here: a Colony grows by filling its Habitats first.\nMothballed keeps a slot, building reserves one. The Archive counts on neither side.",
-            game.tables.slots.base,
-            game.tables.slots.per_colonist
+            "One slot for every {} Colonist living here, and none before: the Core Module a founding gives is the whole of what a founding gives, so a place grows only as its people arrive.\nIts Core Module holds {}, which is how the first of them get here. Mothballed keeps a slot and building reserves one; the Core Module and the Archive count on neither side.",
+            game.tables.slots.per_colonist,
+            game.tables.module(ModuleKind::Core).holds_colonists
         ),
     );
     let research = game.tables.archive.research;
