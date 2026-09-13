@@ -331,7 +331,7 @@ How dirty a Region's industry is before any Facility is built there.
 _Avoid_: pollution rating, carbon score
 
 **Build Slot**:
-One of the places a Facility occupies in a Region. A state has Size + Industry Level + three of them, and each is either a **Coastal Slot** or an **Inland Slot**: the sea takes only the first, and every slot a raise of the Industry Level adds is one of the second. Its start Facilities stand on the coast first; a later build fills an inland slot while one is free.
+One of the places a Facility occupies in a Region. A state has Size + Industry Level + three of them, and each is either a **Coastal Slot** or an **Inland Slot**: the sea takes only the first, and every slot a raise of the Industry Level adds is one of the second. Its start Facilities stand on the coast first; a later build fills an inland slot while one is free. Since version 0.07.3 the card draws them as boxes in the Hab View's language -- a picture on a dark box, dimmed while mothballed, hatched while building, dashed while free, a coastal box outlined in blue and an inland one in grey -- and a slot the sea has taken stands under water, three quarters flooded with the drowned building dimmed beneath.
 _Avoid_: building slot, plot, space, capacity
 
 **Coastal Slot**:

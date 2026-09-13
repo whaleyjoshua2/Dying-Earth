@@ -503,6 +503,42 @@ it. `hab:1` and `habtile:<n>` / `habtile:free` are the aids that photographed it
 
 Clippy clean with `-D warnings`, 244 engine tests and 254 in all passing.
 
+## Build slots drawn as boxes on the Nation card
+
+Ticket [#146](https://github.com/whaleyjoshua2/Dying-Earth/issues/146). The designer's line, at the
+charting: *"represent them as boxes inland and costal differ in line used for the box (color
+hatching) completed building will have art representing them populate the empty boxes. adding an
+industrial level will add them. flooded ones greyed out buildings that don't take slots can still be
+listed as they are now under the boxes."* And at the ticket: *"let's follow the same design language
+in this ticket as in prior. Only difference is that I want flooded tiles to filled 3/4th with a blue
+transparency and wave like billows along the top the transparency overlay such that it looks like
+water."* Decided off a mock (`slot-boxes-mock-china.png`): blue outline for coastal and grey for
+inland; the Facility rows into a strip beneath, with the no-slot Facilities still listed; the water
+as mocked; the research's own picture picks.
+
+![China with two slots under the sea](slot-boxes-china.png)
+
+**The boxes are the Hab View's tiles**, drawn by the same function with one more parameter, the
+coast's blue edge: coastal boxes first -- standing, building, free, then the ones the sea has taken --
+and the inland boxes after. **A flooded box is under water**: three quarters of it under translucent
+blue, the top edge a sine of two billows with a bright crest and a fainter one below, the drowned
+building dimmed beneath, *lost to the sea* in the corner. The `Coastal:` and `Inland:` word-rows
+and the sea-blue `2 coastal slot(s) lost to the sea` line are gone; the boxes say all three things.
+
+![The Launch Site clicked: its line in the strip](slot-boxes-launch-site-clicked.png)
+
+![A free box clicked: the build buttons in the strip](slot-boxes-free-clicked.png)
+
+**A click on a box puts that Facility's line in the strip** -- the same line, figures, hover and
+buttons, that ticket #138 had put on one row, now the body of `facility_row` -- and a click on a
+free box puts the build buttons there, drawn by the same function as the card's Build section. The
+Sea Wall and the Scrubber, which take no slot, keep their rows beneath the boxes as the designer
+asked. Nine Facility pictures join `assets/icons/` and the Credits screen; the Refinery shares the
+Module's file. The `walls:1` aid, which floods two of China's slots and stands a Sea Wall, and a new
+`slotbox:<n>` / `slotbox:free` aid photographed it.
+
+Clippy clean with `-D warnings`, 254 tests passing.
+
 ## Building art: candidate sheets (research, ticket #144)
 
 Sixty-two game-icons.net candidates for the twenty-two building kinds, drawn with the game's own

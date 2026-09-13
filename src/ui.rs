@@ -2604,52 +2604,6 @@ fn building_name(game: &Game, b: BuildingRef) -> String {
     }
 }
 
-/// Ticket #54: the Mothball / Restart / Decommission row under one standing building.
-/// Ticket #56: the two rows of a Region's build slots, Coastal and Inland, each slot named by
-/// what stands or builds in it, or "free". The coastal slots the sea has taken stand at the end of
-/// the coastal row, struck through in the sea's own blue.
-fn slot_rows(ui: &mut Ui, game: &Game, sid: StateId) {
-    let st = game.state(sid);
-    let occupants = |coastal: bool| -> Vec<String> {
-        let mut v: Vec<String> = st
-            .facilities
-            .iter()
-            .filter(|f| f.coastal == coastal && game.takes_slot(f.kind))
-            .map(|f| f.kind.name().to_string())
-            .collect();
-        v.extend(
-            st.queue
-                .iter()
-                .filter(|b| b.coastal == coastal && matches!(b.item, BuildItem::Facility(k) if game.takes_slot(k)))
-                .map(|b| format!("{} building", b.item.name())),
-        );
-        v
-    };
-    for (coastal, label, total) in [(true, "Coastal", game.coastal_slots(sid)), (false, "Inland", game.inland_slots(sid))] {
-        let mut cells = occupants(coastal);
-        while (cells.len() as u32) < total {
-            cells.push("free".to_string());
-        }
-        let lost = if coastal { st.lost_slots } else { 0 };
-        ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new(format!("{label}:")).strong());
-            for c in &cells {
-                let weak = c == "free";
-                ui.label(if weak { RichText::new(c).weak() } else { RichText::new(c) });
-            }
-            for i in 0..lost {
-                let what = match st.drowned.get(i as usize) {
-                    Some(k) => format!("{}, lost to the sea", k.name()),
-                    None => "lost to the sea".to_string(),
-                };
-                ui.label(RichText::new(what).color(Color32::from_rgb(110, 160, 220)).strikethrough());
-            }
-            if cells.is_empty() && lost == 0 {
-                ui.label(RichText::new("none").weak());
-            }
-        });
-    }
-}
 
 fn change_row(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, mothballed: bool, change: Option<PendingChange>, actions: &mut Vec<Action>) {
     if let Some(c) = change {
@@ -3118,6 +3072,186 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
     rule_tip(row.response, explain);
 }
 
+
+/// Ticket #146 (version 0.07.3): one Facility's line -- its figures with their glyphs, the hover
+/// naming the rule, and the Mothball / Restart / Decommission buttons on the line (ticket #138).
+/// It was the body of the card's Facility loop; it is now the strip under the slot boxes for the
+/// box that was clicked, and the row a Facility that takes no slot (a Sea Wall, a Scrubber) keeps.
+#[allow(clippy::too_many_arguments)]
+fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: usize, f: &Facility, mine: bool, director: Option<Seat>, actions: &mut Vec<Action>) {
+    // Ticket #54: a mothballed Facility says so rather than showing figures it is not making.
+    let figures = if f.mothballed {
+        "mothballed: making nothing, paying no upkeep, emitting nothing, keeping its slot".to_string()
+    } else {
+        // Ticket #69: a Lab in a state nobody holds, or under Occupation, works for the world.
+        let world_lab = f.kind == FacilityKind::ResearchLab && f.working() && !f.offline_until_resolution && matches!(game.state(sid).control, Control::Neutral | Control::Occupied { .. });
+        match director {
+            Some(d) if world_lab => format!("{} (the Lab works for the world: {} Research a turn to the Tech under research)", game.facility_yield(d, sid, f.kind).text(), game.world_lab_yield(sid) / 2),
+            Some(d) => game.facility_yield(d, sid, f.kind).text(),
+            None if world_lab => format!("in no one's hands: {} Research a turn to the Tech under research", game.world_lab_yield(sid) / 2),
+            None => "idle, nobody directs this state".to_string(),
+        }
+    };
+    let colour = if f.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
+    // Ticket #112 (version 0.07.1): the glyphs come down into the Facility list, where the
+    // figures are compared building against building and the words are most of the width.
+    // Ticket #138 (version 0.07.3): the two buttons ride right-aligned on this line, after the
+    // figures, and drop beneath only if the panel is too narrow. The designer: *"Mothball and
+    // decommission buttons moved next to facility name not under (after yields and upkeep)."*
+    let mut inline = false;
+    ui.horizontal(|ui| {
+        ui.add_space(8.0);
+        let resp = figures_with_icons(
+            ui,
+            &format!(
+                "{} ({}): {}{}",
+                f.kind.name(),
+                if f.coastal { "coastal" } else { "inland" },
+                figures,
+                if f.online || f.mothballed { "" } else { " (offline, making nothing)" }
+            ),
+            14.0,
+            colour,
+            &[],
+        );
+        // Ticket #116 (version 0.07.1): what the two figures on the line actually DO. Upkeep and
+        // Emissions are the numbers a player weighs a building by, and neither said what it cost
+        // to fail to pay them.
+        rule_tip(
+            resp,
+            format!(
+                "{}\nEnergy upkeep is paid at Income first; short of Energy, buildings go offline in order until the bill is met, and an offline one makes nothing and keeps its slot.\nIts Emissions go on the CO2 Stock every turn and on its controller's Blame.{}",
+                f.kind.name(),
+                if f.coastal { "\nOn the coast, the sea can take it at a threshold." } else { "" }
+            ),
+        );
+        if mine && f.change.is_none() && ui.available_width() >= CHANGE_BUTTONS_WIDTH {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                change_buttons(ui, game, &session.pending, BuildingRef::Facility(sid, i), f.mothballed, true, actions);
+            });
+            inline = true;
+        }
+    });
+    if mine && !inline {
+        change_row(ui, game, &session.pending, BuildingRef::Facility(sid, i), f.mothballed, f.change, actions);
+    }
+}
+
+/// Ticket #146 (version 0.07.3): the Facility build buttons a Region's card offers, drawn in its
+/// Build section and in the strip under the slot boxes for a free box alike.
+fn facility_build_buttons(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, actions: &mut Vec<Action>) {
+    for fk in FacilityKind::ALL {
+        // Ticket #54: the Scrubber has its own button, with the state's cap on it.
+        if fk == FacilityKind::Scrubber {
+            continue;
+        }
+        // Ticket #56: a Facility that waits on a Tech is not offered until the Tech is in.
+        if game.tables.facility(fk).needs_tech.map(|t| !game.has_tech(t)).unwrap_or(false) {
+            continue;
+        }
+        let hover = game.facility_yield(Seat(0), sid, fk).text();
+        ui.horizontal(|ui| {
+            cost_button_with_hover(ui, game, &session.pending, Order::BuildFacility { state: sid, kind: fk }, fk.name(), Some(hover), actions);
+            // Ticket #42: the same building bought outright for Ducats.
+            cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: fk }, "or", actions);
+        });
+    }
+}
+
+/// The columns of slot boxes on a Region's card: six, since the card is a step wider than the Hab View.
+const SLOT_COLS: usize = 6;
+/// The coast's blue, a slot box's edge where the sea can reach it.
+const COAST_EDGE: Color32 = Color32::from_rgb(90, 150, 230);
+
+/// Ticket #146 (version 0.07.3): what one slot box on a Region's card shows.
+enum SlotBoxKind {
+    Standing(usize),
+    Building(FacilityKind),
+    Free,
+    Flooded(Option<FacilityKind>),
+}
+
+/// Ticket #146 (version 0.07.3): **a Region's build slots as boxes**, in the Hab View's language.
+/// The designer: *"represent them as boxes inland and costal differ in line used for the box …
+/// completed building will have art representing them populate the empty boxes. adding an
+/// industrial level will add them. flooded ones greyed out."* Coastal boxes first, edged in the
+/// coast's blue -- standing, building, free, then the ones the sea has taken, under water -- and
+/// the inland boxes after, edged in grey. A click on a box puts that Facility's line in the strip
+/// beneath; a click on a free box puts the build buttons there.
+#[allow(clippy::too_many_arguments)]
+fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, sid: StateId, mine: bool, director: Option<Seat>, actions: &mut Vec<Action>) {
+    let st = game.state(sid);
+    let mut boxes: Vec<(SlotBoxKind, bool)> = Vec::new();
+    for coastal in [true, false] {
+        for (i, f) in st.facilities.iter().enumerate() {
+            if f.coastal == coastal && game.takes_slot(f.kind) {
+                boxes.push((SlotBoxKind::Standing(i), coastal));
+            }
+        }
+        for b in &st.queue {
+            if let BuildItem::Facility(k) = b.item
+                && b.coastal == coastal
+                && game.takes_slot(k)
+            {
+                boxes.push((SlotBoxKind::Building(k), coastal));
+            }
+        }
+        let free = if coastal { game.coastal_slots(sid).saturating_sub(game.coastal_used(sid)) } else { game.inland_slots(sid).saturating_sub(game.inland_used(sid)) };
+        for _ in 0..free {
+            boxes.push((SlotBoxKind::Free, coastal));
+        }
+        if coastal {
+            for k in 0..st.lost_slots as usize {
+                boxes.push((SlotBoxKind::Flooded(st.drowned.get(k).copied()), true));
+            }
+        }
+    }
+    let rows = boxes.len().div_ceil(SLOT_COLS).max(1);
+    let grid_size = egui::vec2(SLOT_COLS as f32 * HAB_TILE + (SLOT_COLS as f32 - 1.0) * HAB_GAP, rows as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP));
+    let (grid, _) = ui.allocate_exact_size(grid_size, egui::Sense::hover());
+    for (n, (kind, coastal)) in boxes.iter().enumerate() {
+        let (c, r) = (n % SLOT_COLS, n / SLOT_COLS);
+        let rect = egui::Rect::from_min_size(grid.min + egui::vec2(c as f32 * (HAB_TILE + HAB_GAP), r as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP)), egui::vec2(HAB_TILE, HAB_TILE));
+        let edge = if *coastal { Some(COAST_EDGE) } else { None };
+        let id = ui.id().with(("slot-box", n));
+        match kind {
+            SlotBoxKind::Standing(i) => {
+                let f = &st.facilities[*i];
+                let state = if f.mothballed { TileState::Mothballed } else { TileState::Standing };
+                if hab_tile(ui, rect, id, Some(crate::icons::facility_icon(f.kind)), f.kind.name(), state, view.slot_box == Some(SlotBox::Facility(*i)), edge).clicked() {
+                    view.slot_box = Some(SlotBox::Facility(*i));
+                }
+            }
+            SlotBoxKind::Building(k) => {
+                hab_tile(ui, rect, id, Some(crate::icons::facility_icon(*k)), k.name(), TileState::Building, false, edge);
+            }
+            SlotBoxKind::Free => {
+                let first_free = boxes.iter().position(|(k, _)| matches!(k, SlotBoxKind::Free)) == Some(n);
+                if hab_tile(ui, rect, id, None, "", TileState::Free, first_free && view.slot_box == Some(SlotBox::Free), edge).clicked() {
+                    view.slot_box = Some(SlotBox::Free);
+                }
+            }
+            SlotBoxKind::Flooded(k) => {
+                hab_tile(ui, rect, id, k.map(crate::icons::facility_icon), k.map(|k| k.name()).unwrap_or(""), TileState::Flooded, false, edge);
+            }
+        }
+    }
+    ui.add_space(4.0);
+    // The strip: the clicked box's line, or the build buttons for a free one.
+    match view.slot_box {
+        Some(SlotBox::Facility(i)) if i < st.facilities.len() && game.takes_slot(st.facilities[i].kind) => {
+            facility_row(ui, session, game, sid, i, &st.facilities[i], mine, director, actions);
+        }
+        Some(SlotBox::Free) if mine => {
+            ui.label(RichText::new("Build here (hover a button for what it makes)").strong());
+            facility_build_buttons(ui, session, game, sid, actions);
+        }
+        _ => {
+            ui.label(RichText::new("Click a box for its figures and controls, a free box to build.").weak());
+        }
+    }
+}
+
 fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, sid: StateId, actions: &mut Vec<Action>) {
     let card = game.tables.state(sid);
     let st = game.state(sid);
@@ -3258,11 +3392,9 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             );
         }
     }
-    if st.lost_slots > 0 {
-        ui.colored_label(Color32::LIGHT_BLUE, format!("{} coastal slot(s) lost to the sea", st.lost_slots));
-    }
+    // Ticket #146 (version 0.07.3): the slots the sea took are drawn under water among the boxes
+    // below, so the sea-blue count that stood here is gone.
     // Ticket #56: the two rows of slots, with what stands in each and what the sea has taken.
-    slot_rows(ui, game, sid);
     rule_tip(
         ui.label(RichText::new(format!("Facilities ({} of {} slots free)", game.free_slots(sid), game.build_slots(sid))).strong()),
         format!(
@@ -3276,66 +3408,21 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     let director = st.control.director();
     // Ticket #64: a spectator reads every card and orders on none of them.
     let mine = !session.spectator && st.control.director() == Some(Seat(0));
+    // Ticket #146 (version 0.07.3): the slots as boxes, with the clicked box's line beneath them.
+    slot_boxes(ui, session, game, view, sid, mine, director, actions);
+    // The Facilities that take no slot -- a Sea Wall, a Scrubber -- keep their rows, as the designer
+    // asked: *"buildings that don't take slots can still be listed as they are now under the boxes."*
     for (i, f) in st.facilities.iter().enumerate() {
-        // Ticket #54: a mothballed Facility says so rather than showing figures it is not making.
-        let figures = if f.mothballed {
-            "mothballed: making nothing, paying no upkeep, emitting nothing, keeping its slot".to_string()
-        } else {
-            // Ticket #69: a Lab in a state nobody holds, or under Occupation, works for the world.
-            let world_lab = f.kind == FacilityKind::ResearchLab && f.working() && !f.offline_until_resolution && matches!(game.state(sid).control, Control::Neutral | Control::Occupied { .. });
-            match director {
-                Some(d) if world_lab => format!("{} (the Lab works for the world: {} Research a turn to the Tech under research)", game.facility_yield(d, sid, f.kind).text(), game.world_lab_yield(sid) / 2),
-                Some(d) => game.facility_yield(d, sid, f.kind).text(),
-                None if world_lab => format!("in no one's hands: {} Research a turn to the Tech under research", game.world_lab_yield(sid) / 2),
-                None => "idle, nobody directs this state".to_string(),
-            }
-        };
-        let colour = if f.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
-        // Ticket #112 (version 0.07.1): the glyphs come down into the Facility list, where the
-        // figures are compared building against building and the words are most of the width.
-        // Ticket #138 (version 0.07.3): the two buttons ride right-aligned on this line, after the
-        // figures, and drop beneath only if the panel is too narrow. The designer: *"Mothball and
-        // decommission buttons moved next to facility name not under (after yields and upkeep)."*
-        let mut inline = false;
-        ui.horizontal(|ui| {
-            ui.add_space(8.0);
-            let resp = figures_with_icons(
-                ui,
-                &format!(
-                    "{} ({}): {}{}",
-                    f.kind.name(),
-                    if f.coastal { "coastal" } else { "inland" },
-                    figures,
-                    if f.online || f.mothballed { "" } else { " (offline, making nothing)" }
-                ),
-                14.0,
-                colour,
-                &[],
-            );
-            // Ticket #116 (version 0.07.1): what the two figures on the line actually DO. Upkeep and
-            // Emissions are the numbers a player weighs a building by, and neither said what it cost
-            // to fail to pay them.
-            rule_tip(
-                resp,
-                format!(
-                    "{}\nEnergy upkeep is paid at Income first; short of Energy, buildings go offline in order until the bill is met, and an offline one makes nothing and keeps its slot.\nIts Emissions go on the CO2 Stock every turn and on its controller's Blame.{}",
-                    f.kind.name(),
-                    if f.coastal { "\nOn the coast, the sea can take it at a threshold." } else { "" }
-                ),
-            );
-            if mine && f.change.is_none() && ui.available_width() >= CHANGE_BUTTONS_WIDTH {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    change_buttons(ui, game, &session.pending, BuildingRef::Facility(sid, i), f.mothballed, true, actions);
-                });
-                inline = true;
-            }
-        });
-        if mine && !inline {
-            change_row(ui, game, &session.pending, BuildingRef::Facility(sid, i), f.mothballed, f.change, actions);
+        if !game.takes_slot(f.kind) {
+            facility_row(ui, session, game, sid, i, f, mine, director, actions);
         }
     }
     for b in &st.queue {
-        ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
+        if let BuildItem::Facility(k) = b.item
+            && !game.takes_slot(k)
+        {
+            ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
+        }
     }
     ui.label(RichText::new("Armies").strong());
     let armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid))).collect();
@@ -3378,22 +3465,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 ui.label(RichText::new(format!("{} turns of double output here, then +{:.1} Baseline Emissions and +{} Unrest, for good", t.turns, t.baseline_rise, Game::unrest_figure(t.unrest))).weak());
             });
         }
-        for fk in FacilityKind::ALL {
-            // Ticket #54: the Scrubber has its own button, with the state's cap on it.
-            if fk == FacilityKind::Scrubber {
-                continue;
-            }
-            // Ticket #56: a Facility that waits on a Tech is not offered until the Tech is in.
-            if game.tables.facility(fk).needs_tech.map(|t| !game.has_tech(t)).unwrap_or(false) {
-                continue;
-            }
-            let hover = game.facility_yield(Seat(0), sid, fk).text();
-            ui.horizontal(|ui| {
-                cost_button_with_hover(ui, game, &session.pending, Order::BuildFacility { state: sid, kind: fk }, fk.name(), Some(hover), actions);
-                // Ticket #42: the same building bought outright for Ducats.
-                cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: fk }, "or", actions);
-            });
-        }
+        facility_build_buttons(ui, session, game, sid, actions);
         if game.has_tech(TechId::CoastalEngineering) {
             ui.label(
                 RichText::new("A Sea Wall takes no build slot, as a Scrubber does, and takes this state's next Sea Level threshold whole; it is destroyed doing it.")
@@ -4130,20 +4202,25 @@ enum TileState {
     Mothballed,
     Building,
     Free,
+    /// Ticket #146: a coastal slot the sea has taken, drawn under water.
+    Flooded,
 }
 
 /// Ticket #145 (version 0.07.3): one tile of the Hab View -- a picture on a dark tile with its name
 /// beneath: dimmed while mothballed, hatched while building, dashed and empty for a free slot. Returns
 /// the click response so the window can open the strip for it.
-fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name: &str, state: TileState, selected: bool) -> egui::Response {
+#[allow(clippy::too_many_arguments)]
+fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name: &str, state: TileState, selected: bool, edge: Option<Color32>) -> egui::Response {
     let resp = ui.interact(rect, id, egui::Sense::click());
     let painter = ui.painter();
+    // Ticket #146: a slot box on a Region's card carries the coast's blue as its edge; a tile in
+    // the Hab View has none of its own. The selection and the hover still win over it.
     let outline = if selected {
         Color32::from_rgb(250, 210, 130)
     } else if resp.hovered() {
         Color32::from_gray(200)
     } else {
-        Color32::from_gray(120)
+        edge.unwrap_or(Color32::from_gray(120))
     };
     match state {
         TileState::Free => {
@@ -4169,9 +4246,9 @@ fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name
         }
         _ => {
             let fill = if state == TileState::Mothballed { Color32::from_rgb(36, 36, 42) } else { Color32::from_rgb(48, 48, 58) };
-            painter.rect(rect, 6.0, fill, egui::Stroke::new(1.0, outline), egui::StrokeKind::Inside);
+            painter.rect(rect, 6.0, fill, egui::Stroke::new(if edge.is_some() { 2.0 } else { 1.0 }, outline), egui::StrokeKind::Inside);
             if let Some(image) = key.and_then(|k| Icons::from_ctx(ui.ctx(), k, 48.0)) {
-                let tint = if state == TileState::Mothballed { crate::icons::kind_fill().gamma_multiply(0.4) } else { crate::icons::kind_fill() };
+                let tint = if matches!(state, TileState::Mothballed | TileState::Flooded) { crate::icons::kind_fill().gamma_multiply(0.4) } else { crate::icons::kind_fill() };
                 let art = egui::Rect::from_center_size(rect.center() - egui::vec2(0.0, 4.0), egui::vec2(48.0, 48.0));
                 image.tint(tint).paint_at(ui, art);
             }
@@ -4188,6 +4265,29 @@ fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name
             }
             if state == TileState::Mothballed {
                 ui.painter().text(rect.left_bottom() + egui::vec2(4.0, -4.0), egui::Align2::LEFT_BOTTOM, "mothballed", FontId::proportional(11.0), Color32::from_rgb(170, 170, 190));
+            }
+            if state == TileState::Flooded {
+                // Ticket #146 (version 0.07.3): the sea. The designer: *"flooded tiles to filled 3/4th
+                // with a blue transparency and wave like billows along the top the transparency
+                // overlay such that it looks like water."* Three quarters of the box under
+                // translucent blue, the top edge a sine of two billows with a bright crest and a
+                // fainter one a little below it, the drowned building dimmed beneath.
+                let inner = rect.shrink(1.0);
+                let top = inner.min.y + inner.height() * 0.25;
+                let amp = 3.0;
+                let water = Color32::from_rgba_unmultiplied(60, 130, 230, 120);
+                let p = ui.painter().with_clip_rect(inner);
+                p.rect_filled(egui::Rect::from_min_max(Pos2::new(inner.min.x, top + amp), inner.max), 0.0, water);
+                let n = inner.width().round() as usize;
+                let wave = |px: usize, phase: f32, a: f32, base: f32| Pos2::new(inner.min.x + px as f32, base + a * (px as f32 / inner.width() * std::f32::consts::TAU * 2.0 + phase).sin());
+                let crest: Vec<Pos2> = (0..=n).map(|px| wave(px, 0.0, amp, top)).collect();
+                for c in &crest {
+                    p.line_segment([*c, Pos2::new(c.x, top + amp + 0.5)], egui::Stroke::new(1.0, water));
+                }
+                p.add(egui::Shape::line(crest, egui::Stroke::new(2.0, Color32::from_rgba_unmultiplied(150, 200, 255, 200))));
+                let second: Vec<Pos2> = (0..=n).map(|px| wave(px, 1.2, 2.5, top + 9.0)).collect();
+                p.add(egui::Shape::line(second, egui::Stroke::new(1.0, Color32::from_rgba_unmultiplied(120, 180, 255, 90))));
+                p.text(inner.left_bottom() + egui::vec2(4.0, -4.0), egui::Align2::LEFT_BOTTOM, "lost to the sea", FontId::proportional(11.0), Color32::from_rgb(180, 210, 255));
             }
         }
     }
@@ -4239,19 +4339,19 @@ fn hab_view_window(ctx: &egui::Context, session: &Session, game: &Game, view: &m
             let m = &col.modules[mi];
             let state = if m.mothballed { TileState::Mothballed } else { TileState::Standing };
             let selected = view.hab_tile == Some(HabTile::Module(mi));
-            if hab_tile(ui, tile_rect(i), ui.id().with(("hab", mi)), Some(crate::icons::module_icon(m.kind)), m.kind.name(), state, selected).clicked() {
+            if hab_tile(ui, tile_rect(i), ui.id().with(("hab", mi)), Some(crate::icons::module_icon(m.kind)), m.kind.name(), state, selected, None).clicked() {
                 view.hab_tile = Some(HabTile::Module(mi));
             }
             i += 1;
         }
         for (bi, kind) in building.iter().enumerate() {
-            hab_tile(ui, tile_rect(i), ui.id().with(("hab-building", bi)), Some(crate::icons::module_icon(*kind)), kind.name(), TileState::Building, false);
+            hab_tile(ui, tile_rect(i), ui.id().with(("hab-building", bi)), Some(crate::icons::module_icon(*kind)), kind.name(), TileState::Building, false, None);
             i += 1;
         }
         for fi in 0..free {
             // One free slot is as good as another, so the first stands for the click.
             let selected = fi == 0 && view.hab_tile == Some(HabTile::Free);
-            if hab_tile(ui, tile_rect(i), ui.id().with(("hab-free", fi)), None, "", TileState::Free, selected).clicked() {
+            if hab_tile(ui, tile_rect(i), ui.id().with(("hab-free", fi)), None, "", TileState::Free, selected, None).clicked() {
                 view.hab_tile = Some(HabTile::Free);
             }
             i += 1;
@@ -4261,7 +4361,7 @@ fn hab_view_window(ctx: &egui::Context, session: &Session, game: &Game, view: &m
             let row = rows;
             let rect = egui::Rect::from_min_size(grid.min + egui::vec2(0.0, row as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP)), egui::vec2(HAB_TILE, HAB_TILE));
             let state = if col.modules[ai].mothballed { TileState::Mothballed } else { TileState::Standing };
-            if hab_tile(ui, rect, ui.id().with("hab-archive"), Some(crate::icons::module_icon(ModuleKind::Archive)), "The Archive", state, view.hab_tile == Some(HabTile::Module(ai))).clicked() {
+            if hab_tile(ui, rect, ui.id().with("hab-archive"), Some(crate::icons::module_icon(ModuleKind::Archive)), "The Archive", state, view.hab_tile == Some(HabTile::Module(ai)), None).clicked() {
                 view.hab_tile = Some(HabTile::Module(ai));
             }
         }

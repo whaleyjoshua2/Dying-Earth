@@ -96,6 +96,9 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
         // the grid can be photographed with a Module's figures or the build buttons in it.
         view.hab_tile = std::env::args().find_map(|a| a.strip_prefix("habtile:").map(str::to_owned)).and_then(|v| if v == "free" { Some(HabTile::Free) } else { v.parse::<usize>().ok().map(HabTile::Module) });
     }
+    // `slotbox:<n>` or `slotbox:free` (a building aid, ticket #146): that slot box on the selected
+    // Region's card is clicked, so the strip beneath the boxes can be photographed.
+    view.slot_box = std::env::args().find_map(|a| a.strip_prefix("slotbox:").map(str::to_owned)).and_then(|v| if v == "free" { Some(SlotBox::Free) } else { v.parse::<usize>().ok().map(SlotBox::Facility) });
     view.force_hover = plan.hover.filter(|_| view.view == View::Solar);
     // Ticket #51: `archive:<stage>` opens the Archive's Colony card in that Body's picture.
     if let (Some(cid), View::Surface(_)) = (plan.archive_colony, view.view) {

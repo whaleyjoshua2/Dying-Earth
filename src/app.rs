@@ -259,6 +259,14 @@ pub enum HabTile {
     Free,
 }
 
+/// Ticket #146 (version 0.07.3): what is clicked among a Region card's slot boxes -- a standing
+/// Facility by its index, or a free box, whose strip offers the build buttons.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SlotBox {
+    Facility(usize),
+    Free,
+}
+
 #[derive(Resource)]
 pub struct ViewState {
     pub view: View,
@@ -291,6 +299,8 @@ pub struct ViewState {
     /// buttons.
     pub hab_view: Option<ColonyId>,
     pub hab_tile: Option<HabTile>,
+    /// Ticket #146 (version 0.07.3): the slot box clicked on the selected Region's card.
+    pub slot_box: Option<SlotBox>,
     pub trade_amounts: [i64; 4],
     pub load_state: Option<StateId>,
     pub influence_amount: i64,
@@ -338,6 +348,7 @@ impl Default for ViewState {
             show_trade: false,
             hab_view: None,
             hab_tile: None,
+            slot_box: None,
             trade_amounts: [5, 10, 10, 10],
             load_state: None,
             influence_amount: 5,

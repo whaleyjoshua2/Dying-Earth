@@ -31,7 +31,7 @@ pub struct Credit {
 
 /// The icons in use, their authors, and the names they carry at game-icons.net. Anything added to
 /// `assets/icons/` belongs here too: the credit is the licence's price, not a courtesy.
-pub const CREDITS: [Credit; 23] = [
+pub const CREDITS: [Credit; 32] = [
     Credit { resource: "Materials", icon: "Mine Wagon", author: "Delapouite" },
     Credit { resource: "Fuel", icon: "Jerrycan", author: "Delapouite" },
     Credit { resource: "Energy", icon: "Electric", author: "Sbed" },
@@ -64,7 +64,39 @@ pub const CREDITS: [Credit; 23] = [
     Credit { resource: "Module Solar Array", icon: "Solar Power", author: "Skoll" },
     Credit { resource: "Module Mass Driver", icon: "Mass Driver", author: "Sbed" },
     Credit { resource: "Module Archive", icon: "Archive Register", author: "Delapouite" },
+    // Ticket #146 (version 0.07.3): the slot boxes' pictures on a Region's card, the first candidate
+    // of each kind on ticket #144's sheets except where the research warned -- a control tower for
+    // the Launch Site (the shuttle is the Colony Ship's rocket family), a handshake for the Embassy
+    // (the capitol is the Bank's building twice), handcuffs for the Constabulary (the badge is the
+    // Army's shield shape), a fan for the Scrubber (the gas mask says poison). The Refinery shares
+    // the Module's file.
+    Credit { resource: "Facility Factory", icon: "Factory", author: "Delapouite" },
+    Credit { resource: "Facility Power Plant", icon: "Nuclear Plant", author: "Delapouite" },
+    Credit { resource: "Facility Launch Site", icon: "Control Tower", author: "Delapouite" },
+    Credit { resource: "Facility Research Lab", icon: "Round Bottom Flask", author: "Lorc" },
+    Credit { resource: "Facility Bank", icon: "Bank", author: "Delapouite" },
+    Credit { resource: "Facility Embassy", icon: "Shaking Hands", author: "Delapouite" },
+    Credit { resource: "Facility Constabulary", icon: "Handcuffs", author: "Lorc" },
+    Credit { resource: "Facility Sea Wall", icon: "Dam", author: "Delapouite" },
+    Credit { resource: "Facility Scrubber", icon: "Computer Fan", author: "Delapouite" },
 ];
+
+/// Ticket #146 (version 0.07.3): the icon key a Facility's slot box wears on a Region's card.
+pub fn facility_icon(kind: dying_earth_engine::FacilityKind) -> &'static str {
+    use dying_earth_engine::FacilityKind::*;
+    match kind {
+        Factory => "facility_factory",
+        PowerPlant => "facility_power_plant",
+        Refinery => "module_refinery",
+        ResearchLab => "facility_research_lab",
+        LaunchSite => "facility_launch_site",
+        Bank => "facility_bank",
+        Embassy => "facility_embassy",
+        Constabulary => "facility_constabulary",
+        SeaWall => "facility_sea_wall",
+        Scrubber => "facility_scrubber",
+    }
+}
 
 /// Ticket #145 (version 0.07.3): the icon key a Module kind's tile wears in the Hab View. The
 /// Habitat wears the Colony's own dome, at the designer's word; every other kind has a file of its own.
