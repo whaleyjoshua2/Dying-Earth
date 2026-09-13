@@ -492,7 +492,7 @@ fn warship_in_slot(game: &Game, body: BodyId, slot: u32) -> Option<&Ship> {
 /// of the globe; the part behind the globe is not drawn. A built station's glyph **travels slowly
 /// round its ring** (one revolution in about a minute and a half, each slot's period its own),
 /// in its holder's colour with its name beneath, clickable as it goes; in `shot:` mode the clock
-/// is stopped so the pictures are reproducible. An empty slot is a dashed ring; a warship
+/// is stopped so the pictures are reproducible. An empty slot is a solid grey ring; a warship
 /// blockading the slot is drawn beside the station in its Faction's colour, which is the first
 /// time Blockade has been visible on a map.
 #[allow(clippy::too_many_arguments)]
@@ -525,7 +525,9 @@ fn orbit_rings_on_globe(
     // The clock the stations travel by. Stopped in `shot:` mode, so a picture is the same twice.
     let clock = if session.shot_prefix.is_empty() { painter.ctx().input(|i| i.time) as f32 } else { 0.0 };
     for slot in 0..n {
-        let radius = GLOBE_RADIUS * (1.12 + 0.045 * slot as f32);
+        // A step tighter to the globe than the first try, at the designer's word ("just slightly
+        // tighter"), so the outer rings stay nearer the window at the default zoom.
+        let radius = GLOBE_RADIUS * (1.08 + 0.04 * slot as f32);
         // Each slot's own plane: a lean from the equator of 32 to 61 degrees, and a heading for
         // the line of nodes a good step round from the last slot's.
         let incline = 0.55 + 0.13 * slot as f32;
@@ -543,7 +545,9 @@ fn orbit_rings_on_globe(
             .collect();
         let station = game.colonies.iter().find(|c| c.in_orbit && c.body == body && c.slot == slot);
         let colour = station.and_then(|c| c.control.director()).map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
-        orbit_polyline(painter, &points, station.is_none(), colour.gamma_multiply(0.8));
+        // Ticket #151: an empty slot's ring is a solid line in the empty grey, no longer dashed --
+        // the designer: *"lets make them solid lines, same color."*
+        orbit_polyline(painter, &points, false, colour.gamma_multiply(0.8));
         // The glyph starts a step further round its ring than the last slot's, so five glyphs fan
         // out rather than line up, and travels on from there: one revolution in ninety seconds
         // for the first slot and eight seconds longer for each after it, so they drift apart.

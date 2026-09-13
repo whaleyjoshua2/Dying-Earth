@@ -54,3 +54,13 @@ Seen and put to the designer: a ring fixed to the globe is edge-on for a moment 
 turn of the globe (the camera sits in the equatorial plane), which the different headings keep to
 one ring at a time; and the outer rings reach past the window's bottom edge at the default zoom, so
 a travelling station leaves the screen for part of each revolution.
+
+**Decided by the designer** off those pictures: *"1 - just slightly tighter - let's also rethink the
+hashed lines for unoccupied orbits, lets make them sold lines, same color 2 90 seconds is good
+perfectly scaled 3 riding beneath the glyph."* So the rings a step tighter (1.08 to 1.24 of the
+globe's radius where they had been 1.12 to 1.30), **an empty slot's ring solid in the same grey**
+rather than dashed, the ninety-second revolution kept, and the name riding beneath the glyph.
+
+![Heading 90 as decided: solid grey rings for the empty slots, Axiom's ring inside the window](orbits-final-heading-90.png)
+
+![The Moon's two empty rings, solid](orbits-final-moon.png)
