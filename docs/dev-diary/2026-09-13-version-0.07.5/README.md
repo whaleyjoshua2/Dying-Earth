@@ -148,3 +148,12 @@ thousand rows of content, with the whole Blame block below the fold before the p
 ![The whole panel, from the CO2 Stock to the Blame block, at 1920 by 1080](climate-panel-whole-at-full-size.png)
 
 ![The same panel at the old 1280 by 800: far more of it, and it still scrolls for the rest](climate-panel-at-1280x800.png)
+
+**Decided by the designer**: maximised rather than borderless fullscreen, the panel at full height,
+the size left as a number in the code -- and one thing the Core Module ticket had left behind. Every
+station and Colony has a Core Module, so naming it in a list said nothing about the place; it is
+left out of both the station list on a Surface Map and the roster's Module count, which now matches
+the card's. The happy accident is that *"a bare core module"*, the placeholder those station lines
+have shown since version 0.04 when a station held nothing, is now literally what such a station has.
+
+![The station list and the roster, with the Core Module left out of both](the-core-module-leaves-the-lists.png)

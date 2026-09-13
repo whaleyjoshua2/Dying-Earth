@@ -2095,7 +2095,10 @@ A station is where Ships refuel and where a Shipyard can stand, and a Warship ho
             Control::Controlled(s) => game.seat_name(s),
             Control::Occupied { occupier, .. } => format!("occupied by the {}", game.seat_name(occupier)),
         };
-        let mods: Vec<&str> = c.modules.iter().map(|m| m.kind.name()).collect();
+        // Ticket #165 (version 0.07.5): the Core Module is left out of the list. Every Colony and
+        // every station has one, so naming it says nothing about this one; and a station that holds
+        // only its Core Module is exactly what the words below have always called a bare core module.
+        let mods: Vec<&str> = c.modules.iter().filter(|m| m.kind != ModuleKind::Core).map(|m| m.kind.name()).collect();
         let text = format!("{}: {}, {} Colonists, {}", game.station_name(body, c.slot), owner, c.colonists, if mods.is_empty() { "a bare core module".to_string() } else { mods.join(", ") });
         if ui.button(text).clicked() {
             view.selection = Selection::Colony(c.id);
@@ -2689,7 +2692,16 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
         let building = c.queue.len();
         let ordered = building > 0 || pending.iter().any(|o| roster_order_touches_colony(o, c.id));
         // Ticket #127: the spectator's word tag agrees with the glyph, so a station is not a "Colony:".
-        let text = format!("{}{}: {} Colonists, {} Modules{}", tag(if c.in_orbit { "Station" } else { "Colony" }), game.place_name(Place::Colony(c.id)), c.colonists, c.modules.len(), if building > 0 { format!(", {building} building") } else { String::new() });
+        // Ticket #165 (version 0.07.5): the count is the one the card shows, which leaves out the
+        // Core Module every place has and the Archive, so the roster and the card cannot disagree.
+        let text = format!(
+            "{}{}: {} Colonists, {} Modules{}",
+            tag(if c.in_orbit { "Station" } else { "Colony" }),
+            game.place_name(Place::Colony(c.id)),
+            c.colonists,
+            c.modules.iter().filter(|m| m.kind != ModuleKind::Core && m.kind != ModuleKind::Archive).count(),
+            if building > 0 { format!(", {building} building") } else { String::new() }
+        );
         colony_rows.push(RosterRow { kind: Kind::of_colony(c), text, tip: None, mark: marks.then_some(!ordered), jump: Some((View::Surface(c.body), Selection::Colony(c.id))) });
     }
     roster_group(ui, RosterGroup { name: "Colonies and stations", empty: "  none; a Colony Ship founds one" }, colony_rows, marks, jump);
