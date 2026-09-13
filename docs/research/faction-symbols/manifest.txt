@@ -1,0 +1,4 @@
+custodians|38,165,153|ecology earth-africa-europe wireframe-globe globe seedling sprout oak-leaf recycle greenhouse water-recycling scales custodian-helmet
+prospectors|216,127,51|miner mining-helmet gold-nuggets dig-hole oil-pump bulldozer bucket-wheel-excavator profit war-pick ore dynamite coins-pile
+arkwrights|112,70,168|meeple-group three-friends caravan suitcase backpack exit-door heaven-gate journey apollo-capsule cargo-ship moon-orbit dove
+archivists|222,82,111|bookshelf book-pile open-book cloud-upload hive-mind brain server-rack cpu microchip classical-knowledge wisdom scroll-unfurled
