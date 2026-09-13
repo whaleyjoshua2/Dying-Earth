@@ -4,6 +4,7 @@
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use dying_earth_engine::Tables;
 use dying_earth_engine::*;
 use std::path::Path;
 
@@ -45,11 +46,11 @@ pub struct Textures {
     pub mask: Vec<u8>,
 }
 
-/// The mask's values, 1 to 13, in the order the file was painted (`examples/prep_assets.rs`).
-/// Antarctica keeps value 2 though it is no longer a Nation State (ticket #44), and ticket #53's
-/// four new states were appended rather than renumbered, so an old mask still reads correctly for
-/// the states that did not move.
-const MASK_STATES: [Option<StateId>; 13] = [
+/// The mask's values, 1 to 15, in the order the file was painted (`examples/prep_assets.rs`).
+/// Antarctica keeps value 2 though it is no longer a Region (ticket #44); ticket #53's four new
+/// Regions and ticket #125's two (Japan and Korea, the Arabian Peninsula) were appended rather than
+/// renumbered, so an old mask still reads correctly for the Regions that did not move.
+const MASK_STATES: [Option<StateId>; 15] = [
     Some(StateId::SubSaharanAfrica),
     None,
     Some(StateId::EastAsia),
@@ -63,6 +64,8 @@ const MASK_STATES: [Option<StateId>; 13] = [
     Some(StateId::SouthAsia),
     Some(StateId::SouthEastAsia),
     Some(StateId::CentralAmerica),
+    Some(StateId::Japan),
+    Some(StateId::ArabianPeninsula),
 ];
 
 impl Textures {
@@ -80,6 +83,15 @@ impl Textures {
         Ok(Textures { earth, moon, mars, phobos, deimos, venus, mask: mask_img.into_raw() })
     }
 
+    /// Ticket #126 (version 0.07.2): the Region under a point on the globe, by the mask -- which is
+    /// the border a player sees -- and not by the nearest label, which on a board of real borders
+    /// gave Kazakhstan to Russia and the Nejd to Iran.
+    pub fn state_at_lonlat(&self, lon: f32, lat: f32) -> Option<StateId> {
+        let x = (((lon + 180.0) / 360.0 * self.earth.w as f32) as u32).min(self.earth.w - 1);
+        let y = (((90.0 - lat) / 180.0 * self.earth.h as f32) as u32).min(self.earth.h - 1);
+        self.state_at(x, y)
+    }
+
     pub fn state_at(&self, x: u32, y: u32) -> Option<StateId> {
         let v = self.mask[(y * self.earth.w + x) as usize];
         if v == 0 { None } else { MASK_STATES.get(v as usize - 1).copied().flatten() }
@@ -87,10 +99,22 @@ impl Textures {
 
     /// The Earth Map for the current board (spec 17.1, 11.4).
     pub fn compose_earth(&self, game: &Game, colours: &[[f32; 3]]) -> Rgba {
-        let (w, h) = (self.earth.w, self.earth.h);
-        let mut out = self.earth.data.clone();
         let warm = ((game.climate.temperature - game.tables.climate.base_temperature) / 1.8).clamp(0.0, 1.0) as f32;
         let fired: Vec<u32> = game.states.iter().map(|s| s.thresholds_fired.iter().filter(|f| **f).count() as u32).collect();
+        self.compose_with(&game.tables, warm, &fired, &|sid| game.state(sid).control, colours, None)
+    }
+
+    /// Ticket #126 (version 0.07.2): the start screen's globe, before there is a game. Every Region
+    /// is neutral there, so every Region wears its own colour, and the borders are drawn -- which
+    /// is what lets a player choose a Region by clicking it with no list to fall back on.
+    pub fn compose_regions(&self, tables: &Tables, lit: Option<StateId>) -> Rgba {
+        let fired = vec![0u32; StateId::ALL.len()];
+        self.compose_with(tables, 0.0, &fired, &|_| Control::Neutral, &[], lit)
+    }
+
+    fn compose_with(&self, tables: &Tables, warm: f32, fired: &[u32], control: &dyn Fn(StateId) -> Control, colours: &[[f32; 3]], lit: Option<StateId>) -> Rgba {
+        let (w, h) = (self.earth.w, self.earth.h);
+        let mut out = self.earth.data.clone();
         let tint_of = |seat: Seat| -> [f32; 3] { colours.get(seat.index()).copied().unwrap_or([0.6, 0.6, 0.6]) };
         for y in 0..h {
             for x in 0..w {
@@ -101,7 +125,6 @@ impl Textures {
                 }
                 // Antarctica (mask value 2) is no state since ticket #44: its ice stays as painted.
                 let Some(sid) = MASK_STATES.get(v as usize - 1).copied().flatten() else { continue };
-                let st = game.state(sid);
                 let p = i * 4;
                 let mut r = out[p] as f32 / 255.0;
                 let mut g = out[p + 1] as f32 / 255.0;
@@ -121,16 +144,25 @@ impl Textures {
                     g = g * (1.0 - k) + 0.42 * k;
                     b = b * (1.0 - k) + 0.25 * k;
                 }
-                let tint = match st.control {
-                    Control::Neutral => None,
-                    Control::Controlled(s) => Some(tint_of(s)),
+                // Ticket #126 (version 0.07.2): a Region nobody holds wears its OWN colour, a little
+                // more lightly than a held one wears its holder's, so the two still read apart at a
+                // glance. A card with no colour (all zero) leaves the photograph bare, as before.
+                let own = tables.state(sid).colour;
+                let neutral = if own == [0.0, 0.0, 0.0] { None } else { Some(own) };
+                let (tint, held) = match control(sid) {
+                    Control::Neutral => (neutral, false),
+                    Control::Controlled(s) => (Some(tint_of(s)), true),
                     Control::Occupied { occupier, previous, .. } => {
-                        // Hatched: the occupier's colour on diagonal stripes, the old colour (or none) between.
-                        if ((x + y) / 10) % 2 == 0 { Some(tint_of(occupier)) } else { previous.map(tint_of) }
+                        // Hatched: the occupier's colour on diagonal stripes, the old colour (or the
+                        // Region's own) between.
+                        if ((x + y) / 10) % 2 == 0 { (Some(tint_of(occupier)), true) } else { (previous.map(tint_of).or(neutral), true) }
                     }
                 };
                 if let Some(t) = tint {
-                    let k = 0.45;
+                    // Ticket #126: the Region the start screen has lit -- under the pointer, or
+                    // chosen -- wears its colour at nearly full strength, so it stands out of the
+                    // fourteen at a glance.
+                    let k = if lit == Some(sid) { 0.7 } else if held { 0.45 } else { 0.35 };
                     r = r * (1.0 - k) + t[0] * k;
                     g = g * (1.0 - k) + t[1] * k;
                     b = b * (1.0 - k) + t[2] * k;
@@ -143,7 +175,7 @@ impl Textures {
                         g *= 0.25;
                         b *= 0.25;
                     }
-                    2 if tint.is_some() => {
+                    2 if held => {
                         r = r * 0.4 + 0.6;
                         g = g * 0.4 + 0.6;
                         b = b * 0.4 + 0.6;

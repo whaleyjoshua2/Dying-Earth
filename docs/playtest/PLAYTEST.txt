@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.07.1
+DYING EARTH - playtest build, version 0.07.2
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,96 +16,93 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-   (Windows only again; there is no Linux zip for 0.07.1.)
+   (Windows only again; there is no Linux zip for 0.07.2.)
 
-WHAT CHANGED SINCE 0.07.0
+WHAT CHANGED SINCE 0.07.1
 -------------------------
-This one is almost all about reading the board and reaching its controls. Nothing about
-how the game is won has changed, and only one number moved.
+This one is about the map of Earth and the words on it. Nothing about how the game is
+won has changed, and no balance number moved.
 
-- EVERYTHING THE GAME COUNTS NOW HAS A PICTURE, AND THE PICTURES HAVE COLOURS. People,
-  influence and pollution had none; they are now a person, a megaphone and a chimney.
-  Materials and Ducats swapped pictures, because the old ones were the wrong way round:
-  the "money" one was labelled Materials and the "mineral" one was labelled Ducats. All
-  eight now have a colour of their own, so you can pick a figure out of a line without
-  reading it - the red jerrycan is fuel, the brown chimney is pollution.
-- THE CONTROLS YOU USE EVERY TURN NOW LIVE IN ONE CORNER. Bottom right, under the panel:
-  how much Influence you have left, a Spend button for whatever you have clicked,
-  a Defence button, and End Turn. End Turn has MOVED there from the top of the screen.
-- THE DEFENCE BUTTON spreads your unspent Influence across the places a rival could
-  actually take, most threatened first. It funds a place all the way to safe or not at
-  all, because holding a place is a threshold and not a race - half-defending two places
-  loses both. Tick "every turn" and it does the same each turn, as ordinary orders you
-  can read and cancel before you end the turn. It never spends behind your back. The
-  computer players defend the same way now.
-- INFLUENCE IS THE FIRST THING ON A COUNTRY'S CARD, not the last. It used to be below
-  the buildings, the armies and two paragraphs of help.
-- THE ROSTER ON THE RIGHT IS SORTED AND SHORTER. Each heading says how many rows still
-  want an order from you, and clicking that number hides everything else in that group.
-  Armies no longer nag: an army keeps the stance you gave it until you move it, and the
-  row now shows which stance that is.
-- THE COLONY SITE NUMBERS ON A WORLD MAP ARE PICTURES NOW. "M 1.22 G 0.80 R 1.86 H 1.63"
-  was four letters nobody was ever taught; it is now a cart, a bolt, a can and a person,
-  which is what a mine, a generator, a refinery and a habitat would make there.
-- NINE MORE THINGS EXPLAIN THEMSELVES WHEN YOU POINT AT THEM. The rule is: if the game
-  shows you a bare number that a rule governs, pointing at it tells you the rule. Unrest
-  and its three thresholds; what a Standing is and how fast it fades; how a country's
-  building slots are set; what a building's upkeep and pollution actually do; a colony's
-  size limit; a ship's tank and what "stranded" means.
-- TWO SIDES CHANGED COLOUR. The Arkwrights are a darker purple and the Archivists are
-  crimson instead of pale blue. This was to keep side colours and figure colours from
-  being confused with each other. Map labels are also drawn lighter, so they read against
-  their own territory.
-- RESEARCH COSTS A TENTH MORE. The only balance change. It is a nudge: measured over
-  eighty computer-only games it costs the tech tree four completions out of eighty and
-  makes a game two or three turns longer.
+- THE MAP FOLLOWS REAL BORDERS. Each region of Earth is now made of whole countries -
+  India's region is India, Pakistan, Bangladesh and Sri Lanka; Russia stops at Russia's
+  border; Kazakhstan is no longer cut in half. An island belongs to its country. The
+  lines you see are the lines the game plays by.
+- TWO NEW REGIONS, fourteen in all: Japan (with Korea), cut out of China's region, and
+  Saudi Arabia (the Arabian Peninsula), cut out of Iran's. Both got a share of their
+  parent's people and industry, so nothing was added to the world, only divided.
+- REGIONS ARE NAMED FOR THEIR MAIN COUNTRY, and that country's flag is on the card:
+  China, India, The United States, Brazil, Russia, Australia, The European Union, Iran,
+  Egypt, Nigeria, Indonesia, Mexico, Japan and Saudi Arabia. "East Asia" is now called
+  China everywhere - map, cards, roster, reports.
+- EVERY REGION HAS A COLOUR OF ITS OWN while nobody holds it. Once a side takes it, it
+  wears that side's colour, a little stronger, with a light coastline. The region colours
+  were checked against the four side colours so they cannot be mistaken for each other.
+- YOU PICK YOUR START BY CLICKING THE GLOBE. The list of fourteen buttons is gone. Point
+  at a region to read its card, click it to choose it, then press Begin. Every region's
+  name is written on the globe, so you can find it.
+- THE COUNTRY CARD IS TIDIER. Buttons that cost nothing no longer say "(free)". Prices
+  are pictures: "Factory 20 [cart]" instead of "Factory (20 Materials)". Pointing at a
+  build button now tells you how long it takes ("Ready next turn"). The Influence
+  buttons are gone from the card: spend from the bottom-right corner instead.
+- THE ROSTER ON THE RIGHT HAS PICTURES AND RINGS. Every row starts with a small picture
+  saying what it is - a warship, a colony ship, a station, a colony, a region, or a
+  shield for an army. A row that still wants an order from you ends in an open ring;
+  the ring fills in once you have given one. The count-and-filter on each heading from
+  0.07.1 is gone. The same pictures appear in front of names on the maps, on cards and
+  in the Report.
+- THE TOP BAR: Influence now stands before Research; the buttons are a bit bigger; and
+  every button names its key: Tech Tree (T), Climate Panel (C), Victory (V), Trading (R),
+  Save (Ctrl+S), the map swap (Tab), Back (Esc). END TURN IS ENTER. If you have Influence
+  unspent, Enter asks first; Enter again confirms. While a report or a message is up,
+  only Esc does anything.
 
 HOW TO PLAY, IN ONE MINUTE
 --------------------------
-- New Game > pick one of the four sides > pick a starting continent, from the list or by
-  clicking the globe. The computer plays the other three. There is also a Spectate button
-  under the cards: the computer plays all four and you just watch.
-- You are looking at the Earth Map. Click a country for its card and orders on the right.
+- New Game > pick one of the four sides > click a region on the globe, then Begin. The
+  computer plays the other three. There is also a Spectate button under the cards: the
+  computer plays all four and you just watch.
+- You are looking at the Earth Map. Click a region for its card and orders on the right.
   Drag to turn the globe, mouse wheel to zoom. Tab switches to the Solar System Map;
   Esc goes back.
-- Build things with the buttons on a card. Hover a build button to see the cost and what
-  it makes. Hover almost any number now: if a rule sets it, the rule is there.
-- Spend Influence on other countries to win them over. Your home country starts held.
-  Click a country and use the Spend button in the bottom-right corner, or the one on its
-  card. Press Defence to spread what is left over the places you might lose.
-- Every country has an "Unrest" number. Heat, floods and refugees push it up. At 4 its
-  army stops growing, at 7 its factories work at half speed, and at 10 the country throws
+- Build things with the buttons on a card. Hover a build button to see what it makes and
+  how long it takes. Hover almost any number: if a rule sets it, the rule is there.
+- Spend Influence on other regions to win them over. Your home region starts held.
+  Click a region and use the Spend button in the bottom-right corner. Press Defence to
+  spread what is left over the places you might lose; tick "every turn" to have it done
+  for you each turn, as orders you can still cancel.
+- Every region has an "Unrest" number. Heat, floods and refugees push it up. At 4 its
+  army stops growing, at 7 its factories work at half speed, and at 10 the region throws
   you out. Pay Relief, build a Constabulary, or muster Emigrants to push it back down.
 - If you are the Custodians, build Scrubbers: they cost no building space, they pull
-  carbon back out of the air, and they calm the country they stand in.
-- Open the Climate Panel (the C key). The coloured bar marks every point where the world
-  changes for good, including where Antarctica opens. The top bar now also shows this
-  turn's net pollution beside the temperature, so you can see at a glance whether the
-  world went over or under the natural sink.
+  carbon back out of the air, and they calm the region they stand in.
+- Open the Climate Panel (C). The coloured bar marks every point where the world changes
+  for good, including where Antarctica opens. The top bar shows this turn's net
+  pollution beside the temperature.
 - Getting off Earth: put a Shipyard on your station first - ships are only built at a
-  Shipyard. Muster Emigrants in a country with a Launch Site, lift them, and load them on
+  Shipyard. Muster Emigrants in a region with a Launch Site, lift them, and load them on
   a Colony Ship. The Moon is one turn away. Mars is cheap only in a launch window; hover
   Mars to see when. Remember a colony's size limit: land people before you plan buildings.
-- End Turn - BOTTOM RIGHT now, red. Thirty-six turns. Watch the temperature in the top
-  bar: at +3.0 C the world collapses and nobody wins.
+- The roster on the right lists everything you own. An open ring at the end of a row
+  means it is still waiting for an order from you this turn.
+- End Turn - bottom right, red, or press Enter. Thirty-six turns. Watch the temperature
+  in the top bar: at +3.0 C the world collapses and nobody wins.
 
 WHAT WE WANT TO KNOW
 --------------------
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- A rule you could not find explained anywhere - there should be far fewer of those now.
-- DO THE PICTURES READ? Can you tell the eight apart at a glance, in the top bar and in a
-  list of buildings? Is any one of them a puzzle? The chimney is the one we are least
-  sure of: at the size the bar draws it, you mostly see the smoke.
-- DID YOU FIND THE BOTTOM-RIGHT CORNER? End Turn moved there. Did you look for it at the
-  top first, and for how long?
-- DOES DEFENCE DO WHAT YOU EXPECT? It deliberately does nothing when nobody can take
-  anything from you, and it deliberately refuses to half-fund a place. Did it ever leave
-  Influence unspent when you wanted it used?
-- Did "every turn" feel safe, or did you want to see what it was going to do first?
-- CAN YOU DRAG THE CLIMATE PANEL SMALLER? Still the one change nobody has watched work.
-- Two sides changed colour. If you played 0.07.0, did that trip you up?
+- DO THE BORDERS READ? Could you find the region you wanted on the globe? Did any
+  border surprise you - a country you expected somewhere else?
+- COULD YOU TELL A HELD REGION FROM AN UNHELD ONE? Unheld regions wear their own colour,
+  held ones wear a side's colour. Was that ever confusing, especially India and the
+  United States, which are both green?
+- DID THE START SCREEN WORK WITHOUT THE LIST? Did you miss it?
+- THE ROSTER RINGS: did you understand the open ring without being told? Did the small
+  pictures read at that size, or are any of them a smudge?
+- DID ENTER ENDING THE TURN EVER SURPRISE YOU?
+- DO THE NEW REGIONS FEEL RIGHT? Japan and Saudi Arabia are new and their numbers are
+  a first guess.
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.
@@ -114,17 +111,21 @@ Screenshots help. Print Screen, then paste into a message.
 
 KNOWN ROUGH EDGES
 -----------------
-- THE CUSTODIANS ARE TOO STRONG. Over eighty computer-only games they win 69, from any
-  seat. That is the next thing to fix and this version deliberately did not touch it.
-- THE ARCHIVISTS WIN NOTHING in those eighty, though the Archive itself gets built and
-  finished. Getting twelve people to live at it is the part that fails.
+- THE CUSTODIANS ARE TOO STRONG. Over eighty computer-only games on the new map they win
+  70, from any seat. That is the next thing to fix and this version deliberately did
+  not touch it.
+- THE ARCHIVISTS ALMOST NEVER WIN in those eighty, though the Archive itself gets built.
+  Getting twelve people to live at it is the part that fails.
 - Every side's victory target was set against a computer that never competed for it, so
   the numbers are all suspect.
-- RESEARCH IS NOT A CONSTRAINT. The whole tech tree gets finished in 75 of 80 games with
-  six turns or more to spare. Whether it should is a question for the next version.
+- RESEARCH IS NOT A CONSTRAINT. The whole tech tree gets finished in 73 of 80 games.
+  Whether it should is a question for a balance version.
 - DEFENCE ONLY REACTS AT THE LAST MOMENT. It answers a rival who could take a place next
-  turn, and nobody sooner - so somebody who jumps a long way in one turn is never
-  answered in time. Known, and not yet decided what to do about it.
+  turn, and nobody sooner. Known, and not yet decided what to do about it.
+- SAUDI ARABIA EARNS NO DUCATS: its economy figure is too small for the formula to pay
+  anything. A first-guess number; tell us if it feels wrong.
+- A region's name at the very edge of the globe on the start screen can sit half under
+  the panel. Turn the globe a little.
 - Antarctica's three colony sites have labels that overlap each other when you are zoomed
-  out. That is older than this version, and not caused by the new pictures.
+  out. Older than this version.
 - No sound, no tutorial beyond the first Report.

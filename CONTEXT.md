@@ -29,7 +29,7 @@ The Faction that means to save what humanity knows, and as many of its people as
 _Avoid_: scholars, librarians, scientists, the Academy
 
 **Steerage**:
-The Arkwrights' signature rule: their Colony Ships carry twice the Colonists and cost less to build, and they muster eight Emigrants a turn where others muster four, but every Emigrant costs their Nation State twice the population.
+The Arkwrights' signature rule: their Colony Ships carry twice the Colonists and cost less to build, and they muster eight Emigrants a turn where others muster four, but every Emigrant costs their Region twice the population.
 _Avoid_: mass transit, cattle class, overcrowding, packing them in
 
 **Diaspora**:
@@ -61,7 +61,7 @@ A place in the solar system that can hold a Colony or a Space Station. Six since
 _Avoid_: planet, world, site, location, node
 
 **Colony**:
-A permanent settlement a Faction holds on a Body, founded when a Colony Ship unloads Colonists into a free Colony Slot. It takes the name of its slot ("Tycho on the Moon"). None exist when the game starts. Since version 0.07.0 it holds three Modules free and one more for every Colonist living there: people gate industry, as Size and Industry Level gate a Nation State's build slots. The Archive is exempt; a mothballed Module keeps its slot and one building reserves one; a cap fallen below what already stands destroys nothing and simply leaves no room.
+A permanent settlement a Faction holds on a Body, founded when a Colony Ship unloads Colonists into a free Colony Slot. It takes the name of its slot ("Tycho on the Moon"). None exist when the game starts. Since version 0.07.0 it holds three Modules free and one more for every Colonist living there: people gate industry, as Size and Industry Level gate a Region's build slots. The Archive is exempt; a mothballed Module keeps its slot and one building reserves one; a cap fallen below what already stands destroys nothing and simply leaves no room.
 _Avoid_: base, outpost, settlement
 
 **Colony Slot**:
@@ -97,7 +97,7 @@ The 3D view of one Body's surface, entered by clicking that Body on the Solar Sy
 _Avoid_: planet view, ground view, zoomed view
 
 **Earth Map**:
-Earth's Body Surface Map, divided into Nation States, where Earth-side building, Army orders and the Climate Panel are seen and acted on.
+Earth's Body Surface Map, divided into Regions, where Earth-side building, Army orders and the Climate Panel are seen and acted on.
 _Avoid_: home view, globe view, terrestrial map
 
 **Solar System Map**:
@@ -149,8 +149,12 @@ One of the eight things the board counts and draws a glyph for: Materials, Fuel,
 _Avoid_: stat, counter, metric, indicator
 
 **Roster**:
-The list in the side panel of everything a Faction holds, since version 0.03 and organised in version 0.07.1: its Ships, Armies, Colonies and stations, and Nation States, each group in a stable order with the count of rows that still want an order on its heading. Clicking that count filters the group to those rows. An Army carries no such mark, since an Army keeps the stance it was last given until it is moved.
+The list in the side panel of everything a Faction holds, since version 0.03 and organised in version 0.07.1: its Ships, Armies, Colonies and stations, and Regions, each group in a stable order. Since version 0.07.2 every row wears its Kind Glyph in front of its name and, where the row can want an order, a ring at its end: open while an order is still wanted this turn, filled once one is given. An Army carries no ring, since an Army keeps the stance it was last given until it is moved. (Version 0.07.1's count on the heading, clickable to filter the group, lasted one version.)
 _Avoid_: unit list, overview, empire panel
+
+**Kind Glyph**:
+The small off-white mark, since version 0.07.2, drawn in front of a thing's name wherever the interface names it — a Roster row, a card's title, a map label, a Report line — saying what kind of thing it is: a warship, a Colony Ship (a Carrier wears the same), a station, a Colony, a Region, or an Army, whose glyph is the shield the Earth Map draws for it. Always off-white and never a colour of its own: on the board a colour says whose a thing is, and the glyph says what it is. A Figure's glyph, by contrast, says how much of something.
+_Avoid_: unit icon, type icon, category marker
 
 ### Resources
 
@@ -171,15 +175,15 @@ The single shared pool holding all Materials, Fuel, Energy and, since version 0.
 _Avoid_: central bank, per-world stocks, inventory
 
 **Ducats**:
-Money, the fourth resource since version 0.03. A controlled Nation State pays them from its GDP figure times its Industry Level; a Bank on Earth and a Trade Post in a Colony make more. They buy Influence at two for one, added to this turn's Allotment, and pay for Relief, Resettle, a Leapfrog and repair points in place of Materials.
+Money, the fourth resource since version 0.03. A controlled Region pays them from its GDP figure times its Industry Level; a Bank on Earth and a Trade Post in a Colony make more. They buy Influence at two for one, added to this turn's Allotment, and pay for Relief, Resettle, a Leapfrog and repair points in place of Materials.
 _Avoid_: Ducketts, credits, money, gold, cash
 
 **Bank**:
-The Facility that makes Ducats in a Nation State, in proportion to the state's GDP.
+The Facility that makes Ducats in a Region, in proportion to the state's GDP.
 _Avoid_: treasury, mint, exchange
 
 **Trade Post**:
-The Module that makes Ducats off Earth. Since version 0.06.0 trade is a network: a Trade Post pays for every Colonist of its Faction at its Body and for every other Body where the Faction holds a Colony, a Space Station or, on Earth, a Nation State, so it pays for the shape of an empire rather than its size. One per Faction per Body, on the ground or on a station.
+The Module that makes Ducats off Earth. Since version 0.06.0 trade is a network: a Trade Post pays for every Colonist of its Faction at its Body and for every other Body where the Faction holds a Colony, a Space Station or, on Earth, a Region, so it pays for the shape of an empire rather than its size. One per Faction per Body, on the ground or on a station.
 _Avoid_: market, exchange, shop
 
 **Embassy**:
@@ -233,11 +237,11 @@ The heavy warship type: the most strength and hit points, low Pursuit, dear and 
 _Avoid_: capital ship, dreadnought, cruiser
 
 **Army**:
-A ground fighting unit. A Nation State's Armies belong to the state and are directed by the Faction that controls it, following the state if control changes. A Colony's Army belongs to the Colony, exists only where it has a Barracks, and only defends.
+A ground fighting unit. A Region's Armies belong to the state and are directed by the Faction that controls it, following the state if control changes. A Colony's Army belongs to the Colony, exists only where it has a Barracks, and only defends.
 _Avoid_: troops, soldiers, garrison, marines
 
 **Standing Army**:
-The Armies a Nation State keeps on its own, sized by its card and replenished a little each turn, whether or not any Faction controls it.
+The Armies a Region keeps on its own, sized by its card and replenished a little each turn, whether or not any Faction controls it.
 _Avoid_: garrison, militia, defence value
 
 **Barracks**:
@@ -245,25 +249,29 @@ The Module that lets a Colony hold and build a defensive Army. A Colony without 
 _Avoid_: fort, garrison, base
 
 **Colonist**:
-A person counted in the population of a Colony or Nation State. Since version 0.05.5 Colonists are built: they muster in a Nation State as Emigrants, are carried by Ships and held by Habitats, and are never spent as a resource.
+A person counted in the population of a Colony or Region. Since version 0.05.5 Colonists are built: they muster in a Region as Emigrants, are carried by Ships and held by Habitats, and are never spent as a resource.
 
 **Emigrant**:
-A Colonist mustered in a Nation State and not yet gone: up to four a turn per Faction (eight for the Arkwrights), in one state the Faction directs, at a tenth of a person each, on the state's card at End Turn. A batch takes half a point off the state's Unrest. A working Launch Site lifts Emigrants onto a Ship, and once the Antarctic ice is open the sea takes them to Antarctica in a turn with no launch. They are people of their state until they leave it.
+A Colonist mustered in a Region and not yet gone: up to four a turn per Faction (eight for the Arkwrights), in one state the Faction directs, at a tenth of a person each, on the state's card at End Turn. A batch takes half a point off the state's Unrest. A working Launch Site lifts Emigrants onto a Ship, and once the Antarctic ice is open the sea takes them to Antarctica in a turn with no launch. They are people of their state until they leave it.
 _Avoid_: settler, recruit, migrant, passenger, colonist-in-waiting
 _Avoid_: settler, crew, worker, population resource
 
-**Nation State**:
-One of twelve regions of the Earth Map that a Faction can control and build in. Eight until version 0.05, which split Africa at the Sahara, Asia into East, South and South-East, and Central America and the Caribbean out of North America; Antarctica left the list in version 0.04 to become Earth's Colony Slots. Each carries a population, an Industry Level, a Resource Lean, a Baseline Emissions figure, an Education Level, a GDP, an Influence value, an Unrest figure and a Standing Army. Armies move only between neighbouring states.
-_Avoid_: country, nation, territory, region, state, continent (some are, some are not)
+**Region**:
+One of twelve territories of the Earth Map that a Faction can control and build in, called a Region until version 0.07.2 and since then **named for its Nation** -- the power that leads it -- so the territory that was South Asia is India and the one that was Europe is the European Union. Eight until version 0.05, which split Africa at the Sahara, Asia into East, South and South-East, and Central America and the Caribbean out of North America; Antarctica left the list in version 0.04 to become Earth's Colony Slots. Each carries a population, an Industry Level, a Resource Lean, a Baseline Emissions figure, an Education Level, a GDP, an Influence value, an Unrest figure and a Standing Army. Armies move only between neighbouring Regions.
+_Avoid_: nation state, country, territory, state, continent, bloc
+
+**Nation**:
+The power a Region is named for and whose flag its card wears, since version 0.07.2: China, India, the United States, Brazil, Russia, Australia, the European Union, Iran, Egypt, Nigeria, Indonesia and Mexico. A Nation is a name and a flag; the Region is the thing on the board that is held, built in and fought over, and it is larger than its Nation -- India the Region holds Pakistan, Bangladesh and Sri Lanka. The choice of Nation for a Region is the designer's and is a statement about the world of 2030.
+_Avoid_: primary power (the charting phrase; not the game's word), country, capital, leader
 
 ### Earth
 
 **Facility**:
-A building placed in a Nation State. Ten kinds since version 0.05: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, and the Sea Wall and the Scrubber, which take no build slot (the Sea Wall stood in a Coastal Slot until version 0.05.5). Since version 0.04 a Launch Site builds no Ship: it lifts Emigrants and Armies from its state into orbit, and each lift is a launch.
+A building placed in a Region. Ten kinds since version 0.05: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, and the Sea Wall and the Scrubber, which take no build slot (the Sea Wall stood in a Coastal Slot until version 0.05.5). Since version 0.04 a Launch Site builds no Ship: it lifts Emigrants and Armies from its state into orbit, and each lift is a launch.
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Cheap Industry**:
-The first clause of the Prospectors' signature rule: raising a Nation State's Industry Level costs them half, and since version 0.05.5 every Facility and Colony Module costs them 15% less. The second is the Strip Permit.
+The first clause of the Prospectors' signature rule: raising a Region's Industry Level costs them half, and since version 0.05.5 every Facility and Colony Module costs them 15% less. The second is the Strip Permit.
 _Avoid_: industry discount, cheap building
 
 **Restoration**:
@@ -271,19 +279,19 @@ Retired in version 0.05; see Scrubber. It was the Custodians' signature rule: En
 _Avoid_: using it for anything the Scrubber now does
 
 **Scrubber**:
-The Custodians' signature Facility, which only they build and only in a Nation State they control. It takes no build slot, draws Energy, emits nothing, and while it is online it enlarges the Natural Sink and lowers its state's Unrest every turn. How many one state may hold follows its population, and they are destroyed outright if the state changes hands.
+The Custodians' signature Facility, which only they build and only in a Region they control. It takes no build slot, draws Energy, emits nothing, and while it is online it enlarges the Natural Sink and lowers its state's Unrest every turn. How many one state may hold follows its population, and they are destroyed outright if the state changes hands.
 _Avoid_: carbon capture, cleanup, restoration (the retired rule), terraforming, filter
 
 **Leapfrog**:
-The Custodians' other signature clause: an Orders-phase order paid in Ducats on a Nation State they control, which lowers that state's per-person Emissions coefficient by one Industry Level's worth, for good. It may be bought any number of times, and never takes the figure below the base every state pays.
+The Custodians' other signature clause: an Orders-phase order paid in Ducats on a Region they control, which lowers that state's per-person Emissions coefficient by one Industry Level's worth, for good. It may be bought any number of times, and never takes the figure below the base every state pays.
 _Avoid_: clean development, technology transfer, offset, upgrade
 
 **Strip Permit**:
-The Prospectors' other signature clause: an Orders-phase order, free, that may be taken once in a Nation State's whole life. For three turns every Facility there produces double; when it ends, that state's Baseline Emissions and its Unrest rise for good.
+The Prospectors' other signature clause: an Orders-phase order, free, that may be taken once in a Region's whole life. For three turns every Facility there produces double; when it ends, that state's Baseline Emissions and its Unrest rise for good.
 _Avoid_: licence, boom, overdrive, exploitation
 
 **Mothball**:
-The Orders-phase order that stands a Facility or a Module down. A mothballed building produces nothing, pays no Energy upkeep, emits nothing, is online for no rule, and keeps its slot. It is free, it takes effect at the Resolution, it raises the Unrest of a Nation State it happens in, and only a Restart brings the building back, for Materials and a turn.
+The Orders-phase order that stands a Facility or a Module down. A mothballed building produces nothing, pays no Energy upkeep, emits nothing, is online for no rule, and keeps its slot. It is free, it takes effect at the Resolution, it raises the Unrest of a Region it happens in, and only a Restart brings the building back, for Materials and a turn.
 _Avoid_: pause, disable, switch off, idle, shut down (that is the Energy shortfall rule)
 
 **Production Moved**:
@@ -291,35 +299,35 @@ The Custodians' third signature rule, since version 0.06.0. While a Factory, Pow
 _Avoid_: offshoring, relocation bonus, the mothball bonus
 
 **Decommission**:
-The Orders-phase order that takes a Facility or a Module down for good: a turn later half its Materials come back, its slot is free, and it is gone. In a Nation State it raises Unrest more than a Mothball does; in a Colony it raises none.
+The Orders-phase order that takes a Facility or a Module down for good: a turn later half its Materials come back, its slot is free, and it is gone. In a Region it raises Unrest more than a Mothball does; in a Colony it raises none.
 _Avoid_: demolish, scrap, sell, destroy
 
 **Industry Level**:
-How built-up a Nation State is. Together with the state's size it sets how many Facilities fit, and every slot it adds is an Inland Slot. It scales the state's emissions. Raising it is a build action.
+How built-up a Region is. Together with the state's size it sets how many Facilities fit, and every slot it adds is an Inland Slot. It scales the state's emissions. Raising it is a build action.
 _Avoid_: development, tier, infrastructure
 
 **Neutral Development**:
-What a Nation State nobody holds does for itself: every ninth turn of unbroken neutrality it raises its own Industry Level by one and wakes one of its own Facilities to run itself, emitting to nobody and making nothing for anyone, until it is as built-up as a neutral state gets. A world already too hot, or a population already too restive, stops it. The clock is the state's own, starts again whenever it is freed, and the states neutral at the start are staggered so they do not all step together.
+What a Region nobody holds does for itself: every ninth turn of unbroken neutrality it raises its own Industry Level by one and wakes one of its own Facilities to run itself, emitting to nobody and making nothing for anyone, until it is as built-up as a neutral state gets. A world already too hot, or a population already too restive, stops it. The clock is the state's own, starts again whenever it is freed, and the states neutral at the start are staggered so they do not all step together.
 _Avoid_: growth, expansion, auto-build, industrialization, AI development
 
 **Education Level**:
-A fixed figure on a Nation State's card, taken from real-world values in the First Playable, that multiplies the Research each Lab in that state produces.
+A fixed figure on a Region's card, taken from real-world values in the First Playable, that multiplies the Research each Lab in that state produces.
 _Avoid_: literacy, science level, schooling
 
 **Resource Lean**:
-The one of Materials, Fuel or Energy a Nation State is naturally good at producing.
+The one of Materials, Fuel or Energy a Region is naturally good at producing.
 _Avoid_: specialty, bonus, affinity
 
 **Baseline Emissions**:
-How dirty a Nation State's industry is before any Facility is built there.
+How dirty a Region's industry is before any Facility is built there.
 _Avoid_: pollution rating, carbon score
 
 **Build Slot**:
-One of the places a Facility occupies in a Nation State. A state has Size + Industry Level + three of them, and each is either a **Coastal Slot** or an **Inland Slot**: the sea takes only the first, and every slot a raise of the Industry Level adds is one of the second. Its start Facilities stand on the coast first; a later build fills an inland slot while one is free.
+One of the places a Facility occupies in a Region. A state has Size + Industry Level + three of them, and each is either a **Coastal Slot** or an **Inland Slot**: the sea takes only the first, and every slot a raise of the Industry Level adds is one of the second. Its start Facilities stand on the coast first; a later build fills an inland slot while one is free.
 _Avoid_: building slot, plot, space, capacity
 
 **Coastal Slot**:
-A build slot on a Nation State's coast, where the sea can reach it. A state has three per point of Coastal Exposure, never more than its start slots less one, and never gains another. A Facility standing in one the sea takes is destroyed, oldest first.
+A build slot on a Region's coast, where the sea can reach it. A state has three per point of Coastal Exposure, never more than its start slots less one, and never gains another. A Facility standing in one the sea takes is destroyed, oldest first.
 _Avoid_: shore slot, waterfront, flood zone
 
 **Inland Slot**:
@@ -327,7 +335,7 @@ A build slot the sea never reaches: the start slots the coastal ones leave over,
 _Avoid_: safe slot, interior, highland
 
 **Coastal Exposure**:
-How much of a Nation State stands on the coast, a figure on its card. It sets how many Coastal Slots the state has, two per point since version 0.05.5 (three before), and how many of them each Sea Level threshold takes. A state with no Coastal Slots left loses no more of them, though the threshold still drives out its people and raises its Unrest.
+How much of a Region stands on the coast, a figure on its card. It sets how many Coastal Slots the state has, two per point since version 0.05.5 (three before), and how many of them each Sea Level threshold takes. A state with no Coastal Slots left loses no more of them, though the threshold still drives out its people and raises its Unrest.
 _Avoid_: coastline, vulnerability, flood risk
 
 **Sea Wall**:
@@ -339,31 +347,31 @@ The Industry Tech that unlocks the Sea Wall, and does nothing else.
 _Avoid_: sea defence, civil engineering, hydrology
 
 **Unrest**:
-How restive a Nation State's people are, a figure from 0 to 10 on its card, moving in halves. Heat, the rising sea, the Climate cards, Occupation and arriving Refugees raise it; it falls on its own every turn except the turn the state changed hands, so a rise and the fall net out, and it falls further to Relief, a Constabulary and a Scrubber. Past its first threshold the Standing Army stops replenishing, past its second the state's Facilities run at half, and at the top the state throws its controller off and goes neutral.
+How restive a Region's people are, a figure from 0 to 10 on its card, moving in halves. Heat, the rising sea, the Climate cards, Occupation and arriving Refugees raise it; it falls on its own every turn except the turn the state changed hands, so a rise and the fall net out, and it falls further to Relief, a Constabulary and a Scrubber. Past its first threshold the Standing Army stops replenishing, past its second the state's Facilities run at half, and at the top the state throws its controller off and goes neutral.
 _Avoid_: unhappiness, morale, stability, dissent, revolt meter
 
 **Relief**:
-The Orders-phase order that buys a Nation State's calm: Ducats spent on a state you direct to lower its Unrest by one, as many times in a turn as you can pay for.
+The Orders-phase order that buys a Region's calm: Ducats spent on a state you direct to lower its Unrest by one, as many times in a turn as you can pay for.
 _Avoid_: aid, welfare, subsidy, bribe, appeasement
 
 **Constabulary**:
-The Facility that holds a Nation State's Unrest down: while it stands and is online it lowers Unrest every turn whatever else happened that turn, and softens what the climate and arriving Refugees add. At most one stands in a state.
+The Facility that holds a Region's Unrest down: while it stands and is online it lowers Unrest every turn whatever else happened that turn, and softens what the climate and arriving Refugees add. At most one stands in a state.
 _Avoid_: police, militia, garrison, barracks (that is the Colony word)
 
 **Refugees**:
-The people who leave a Nation State for its neighbours when the heat or the sea takes their homes, instead of simply being lost. They are added to the state that receives them, and their arrival raises its Unrest.
+The people who leave a Region for its neighbours when the heat or the sea takes their homes, instead of simply being lost. They are added to the state that receives them, and their arrival raises its Unrest.
 _Avoid_: migrants, displaced, evacuees, exodus, immigration
 
 **Resettle**:
-The Orders-phase order that steers Refugees: once a turn, for Ducats, every flow leaving the states a Faction directs goes to one Nation State of its choosing instead of to the neighbours, and its Standing there rises.
+The Orders-phase order that steers Refugees: once a turn, for Ducats, every flow leaving the states a Faction directs goes to one Region of its choosing instead of to the neighbours, and its Standing there rises.
 _Avoid_: relocate, evacuate, transfer, deport
 
 **Blame**:
-The CO2 a Faction is answerable for over the whole game: everything the sources it controlled has emitted, less everything it has taken back, and never less than nothing. What no Faction controls is nobody's. A Faction's share of the four Factions' Blame, when it rises above a fair quarter, makes every Nation State it does not hold harder for it to win over.
+The CO2 a Faction is answerable for over the whole game: everything the sources it controlled has emitted, less everything it has taken back, and never less than nothing. What no Faction controls is nobody's. A Faction's share of the four Factions' Blame, when it rises above a fair quarter, makes every Region it does not hold harder for it to win over.
 _Avoid_: carbon debt, guilt, pollution score, emissions total, footprint
 
 **Influence**:
-A Faction's claim on a Nation State or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold, and when two claimants reach it on the same turn at the same Standing the lot decides between them (since version 0.05.5); a controlled place goes to a rival whose Standing is at least the controller's plus the challenge margin (20 since version 0.05.5, 10 from version 0.04) and at least the threshold, which since version 0.05 each Faction reads for itself, since its Blame raises it on every Nation State it does not hold. A holder is never tied with a challenger, and keeps the place when two challengers tie. Since version 0.05.5 every Faction begins with a Standing on its start state equal to that state's threshold: a claim on its home from turn 1.
+A Faction's claim on a Region or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold, and when two claimants reach it on the same turn at the same Standing the lot decides between them (since version 0.05.5); a controlled place goes to a rival whose Standing is at least the controller's plus the challenge margin (20 since version 0.05.5, 10 from version 0.04) and at least the threshold, which since version 0.05 each Faction reads for itself, since its Blame raises it on every Region it does not hold. A holder is never tied with a challenger, and keeps the place when two challengers tie. Since version 0.05.5 every Faction begins with a Standing on its start state equal to that state's threshold: a claim on its home from turn 1.
 _Avoid_: diplomacy points, favour, reputation
 
 **Standing**:
@@ -371,11 +379,11 @@ How much Influence a Faction has built up on one place. Since version 0.03 it pe
 _Avoid_: accumulation, influence points, loyalty
 
 **Allotment**:
-The amount of Influence a Faction receives each turn, split freely across any number of targets during the Orders phase. It is a base plus the Influence value of every Nation State the Faction controls (since version 0.03 each state carries its own value, from its economic and military weight), and it does not carry over.
+The amount of Influence a Faction receives each turn, split freely across any number of targets during the Orders phase. It is a base plus the Influence value of every Region the Faction controls (since version 0.03 each state carries its own value, from its economic and military weight), and it does not carry over.
 _Avoid_: influence budget, diplomacy pool, action points
 
 **Research**:
-Points produced by Research Labs on Earth and, since version 0.06.0, by Observatories at Colonies and Space Stations, and spent only on Techs. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship. Since version 0.05.5 a Lab in a Nation State nobody holds, or one under Occupation, runs itself and pays half its yield into the Tech under research for no Faction; North America and South-East Asia begin with such a Lab.
+Points produced by Research Labs on Earth and, since version 0.06.0, by Observatories at Colonies and Space Stations, and spent only on Techs. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship. Since version 0.05.5 a Lab in a Region nobody holds, or one under Occupation, runs itself and pays half its yield into the Tech under research for no Faction; North America and South-East Asia begin with such a Lab.
 _Avoid_: science, research points, RP, fourth resource
 
 ### The turn
@@ -419,7 +427,7 @@ _Avoid_: checkpoint, snapshot, savegame
 ### Combat
 
 **Battle**:
-A melee at one Body, Nation State or Colony in which every Faction present is hostile to every other, resolved automatically in rounds during end-of-turn processing and always finished inside the turn. Each round a party's chance to hit is its share of the total strength present, and its hits are spread across the other parties in proportion to theirs.
+A melee at one Body, Region or Colony in which every Faction present is hostile to every other, resolved automatically in rounds during end-of-turn processing and always finished inside the turn. Each round a party's chance to hit is its share of the total strength present, and its hits are spread across the other parties in proportion to theirs.
 _Avoid_: fight, engagement, skirmish, encounter
 
 **Stance**:
@@ -431,7 +439,7 @@ How hard a unit hits. A unit's type sets it; Hardened Hulls raises it for every 
 _Avoid_: attack, power, combat value
 
 **Hit Points**:
-How much damage a unit can take before it is destroyed with everything it carries. Damage persists until repaired at a Shipyard or Launch Site (Ships) or in a controlled Nation State or a Colony with a Barracks (Armies).
+How much damage a unit can take before it is destroyed with everything it carries. Damage persists until repaired at a Shipyard or Launch Site (Ships) or in a controlled Region or a Colony with a Barracks (Armies).
 _Avoid_: health, HP, hull, morale
 
 **Pursuit**:
@@ -455,7 +463,7 @@ What a warship does by sitting in an Orbital Slot, since version 0.07.0. A Ship 
 _Avoid_: siege, embargo, interdiction, orbital control
 
 **Occupation**:
-The state of a Nation State or Colony whose defenders were beaten by an Army. The occupier chooses build orders but does not direct its Armies; control transfers after the lesser of three turns or the population being Pacified.
+The state of a Region or Colony whose defenders were beaten by an Army. The occupier chooses build orders but does not direct its Armies; control transfers after the lesser of three turns or the population being Pacified.
 _Avoid_: conquest, annexation, capture
 
 **Pacified**:
@@ -495,7 +503,7 @@ Degrees above pre-industrial. It follows the CO2 Stock with a lag of one to two 
 _Avoid_: heat, warming percentage
 
 **Emissions**:
-The CO2-equivalent a source adds to the CO2 Stock in a turn. Every source has its own figure and the Climate Panel shows them one by one before the sum; methane-heavy sources carry a heavier weight. Since version 0.05 a Nation State's people emit more the more built-up the state is, and a Leapfrog lowers that state's figure for good.
+The CO2-equivalent a source adds to the CO2 Stock in a turn. Every source has its own figure and the Climate Panel shows them one by one before the sum; methane-heavy sources carry a heavier weight. Since version 0.05 a Region's people emit more the more built-up the state is, and a Leapfrog lowers that state's figure for good.
 _Avoid_: output, carbon, footprint
 
 **Natural Sink**:
@@ -503,7 +511,7 @@ The amount of CO2 the oceans and forests remove from the CO2 Stock every turn. N
 _Avoid_: absorption, offset, carbon capture
 
 **Sea Level**:
-How far the oceans have risen with the Temperature. It is drawn on the globe as a creeping waterline, and at each of its thresholds it permanently takes Coastal Slots from every Nation State, as many as the state's Coastal Exposure and never more than it has left. It takes nothing else: an Inland Slot is out of its reach, and so is a state whose coast is already gone.
+How far the oceans have risen with the Temperature. It is drawn on the globe as a creeping waterline, and at each of its thresholds it permanently takes Coastal Slots from every Region, as many as the state's Coastal Exposure and never more than it has left. It takes nothing else: an Inland Slot is out of its reach, and so is a state whose coast is already gone.
 _Avoid_: flooding, water line, ocean rise
 
 **Break**:

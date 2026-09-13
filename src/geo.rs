@@ -93,7 +93,11 @@ pub fn state_lonlat(state: StateId) -> (f32, f32) {
         StateId::CentralAmerica => (-89.0, 17.0),
         StateId::SouthAmerica => (-60.0, -15.0),
         StateId::Russia => (90.0, 62.0),
-        StateId::MiddleEast => (46.0, 28.0),
+        // Ticket #125 (version 0.07.2): the Middle East lost the peninsula, so its label moves up
+        // to the Iranian plateau; the two new Regions sit on Honshu and on the Nejd.
+        StateId::MiddleEast => (50.0, 33.0),
+        StateId::Japan => (138.0, 37.0),
+        StateId::ArabianPeninsula => (45.0, 23.0),
     }
 }
 
