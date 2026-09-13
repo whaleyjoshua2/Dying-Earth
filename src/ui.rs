@@ -344,6 +344,29 @@ fn kind_glyph(ui: &mut Ui, kind: Kind, size: f32) {
     }
 }
 
+/// Ticket #138 (version 0.07.3): a button with a kind glyph inside it for a kind whose glyph is
+/// drawn rather than loaded (the Army's shield), so it looks and behaves like `Button::image_and_text`
+/// does for the kinds that have art. A clickable group in the button's own visuals, as `priced_button`.
+fn glyph_button(ui: &mut Ui, kind: Kind, text: &str) -> egui::Response {
+    ui.scope_builder(egui::UiBuilder::new().sense(egui::Sense::click()), |ui| {
+        let resp = ui.response();
+        let visuals = *ui.style().interact(&resp);
+        egui::Frame::new()
+            .inner_margin(egui::Margin::symmetric(4, 1))
+            .corner_radius(visuals.corner_radius)
+            .fill(visuals.weak_bg_fill)
+            .stroke(visuals.bg_stroke)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 4.0;
+                    kind_glyph(ui, kind, KIND_GLYPH);
+                    ui.label(RichText::new(text).color(visuals.text_color()));
+                });
+            });
+    })
+    .response
+}
+
 /// The Army's shield as a kind glyph: the Earth Map's shape, in the kind fill, with no number on it.
 fn shield_glyph(painter: &egui::Painter, rect: egui::Rect) {
     let (w, h) = (rect.width() * 0.8, rect.height() * 0.95);
@@ -2275,14 +2298,14 @@ fn roster_group(ui: &mut Ui, group: RosterGroup, rows: Vec<RosterRow>, marks: bo
     for row in &rows {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 6.0;
-            // Ticket #127: the kind glyph rides inside the button where there is art for it; the
-            // Army's shield is drawn beside the button, a drawn shape having no way into one.
+            // Ticket #127: the kind glyph rides inside the button where there is art for it.
+            // Ticket #138 (version 0.07.3): the Army's shield rides inside too -- it stood beside
+            // the button, a drawn shape having no way into egui's, and the designer saw it: *"every
+            // other glyph is a part of the button while armies stands apart."* Its button is drawn
+            // by hand, the way a priced button is.
             let mut resp = match row.kind.image(ui.ctx(), KIND_GLYPH) {
                 Some(image) => ui.add(egui::Button::image_and_text(image, &row.text)),
-                None => {
-                    kind_glyph(ui, row.kind, KIND_GLYPH);
-                    ui.button(&row.text)
-                }
+                None => glyph_button(ui, row.kind, &row.text),
             };
             if let Some(tip) = &row.tip {
                 resp = rule_tip(resp, tip.clone());
@@ -2591,12 +2614,28 @@ fn change_row(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, mothb
     }
     ui.horizontal(|ui| {
         ui.add_space(16.0);
-        let wanted = if mothballed { BuildingChange::Restart } else { BuildingChange::Mothball };
-        for what in [wanted, BuildingChange::Decommission] {
-            cost_button(ui, game, pending, Order::Change { building: b, what }, what.name(), actions);
-        }
+        change_buttons(ui, game, pending, b, mothballed, false, actions);
     });
 }
+
+/// Ticket #138 (version 0.07.3): the two buttons a standing building carries -- Mothball (Restart
+/// once it is mothballed) and Decommission. `reversed` lays them out for a right-to-left row, which
+/// adds from the right, so that they still read Mothball then Decommission.
+fn change_buttons(ui: &mut Ui, game: &Game, pending: &[Order], b: BuildingRef, mothballed: bool, reversed: bool, actions: &mut Vec<Action>) {
+    let wanted = if mothballed { BuildingChange::Restart } else { BuildingChange::Mothball };
+    let mut pair = [wanted, BuildingChange::Decommission];
+    if reversed {
+        pair.reverse();
+    }
+    for what in pair {
+        cost_button(ui, game, pending, Order::Change { building: b, what }, what.name(), actions);
+    }
+}
+
+/// Ticket #138 (version 0.07.3): the room a building's name line needs to its right for its two
+/// buttons. With less than this the buttons go beneath the line as they did before, so a narrowed
+/// panel degrades to the old shape rather than to clipped buttons.
+const CHANGE_BUTTONS_WIDTH: f32 = 196.0;
 
 /// Ticket #116 (version 0.07.1): the rule for what gets a tooltip, so the next person has a test
 /// to apply rather than a list to extend. The designer: *"increase the use of mouse over tooltips."*
@@ -3205,6 +3244,10 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         let colour = if f.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
         // Ticket #112 (version 0.07.1): the glyphs come down into the Facility list, where the
         // figures are compared building against building and the words are most of the width.
+        // Ticket #138 (version 0.07.3): the two buttons ride right-aligned on this line, after the
+        // figures, and drop beneath only if the panel is too narrow. The designer: *"Mothball and
+        // decommission buttons moved next to facility name not under (after yields and upkeep)."*
+        let mut inline = false;
         ui.horizontal(|ui| {
             ui.add_space(8.0);
             let resp = figures_with_icons(
@@ -3231,8 +3274,14 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     if f.coastal { "\nOn the coast, the sea can take it at a threshold." } else { "" }
                 ),
             );
+            if mine && f.change.is_none() && ui.available_width() >= CHANGE_BUTTONS_WIDTH {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    change_buttons(ui, game, &session.pending, BuildingRef::Facility(sid, i), f.mothballed, true, actions);
+                });
+                inline = true;
+            }
         });
-        if mine {
+        if mine && !inline {
             change_row(ui, game, &session.pending, BuildingRef::Facility(sid, i), f.mothballed, f.change, actions);
         }
     }
@@ -3438,11 +3487,19 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             }
         };
         let colour = if m.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
+        // Ticket #138 (version 0.07.3): the buttons on the line, as on a Facility row.
+        let mut inline = false;
         ui.horizontal(|ui| {
             ui.add_space(8.0);
             figures_with_icons(ui, &format!("{}: {}{}", m.kind.name(), figures, if m.online || m.mothballed { "" } else { " (offline, making nothing)" }), 14.0, colour, &[]);
+            if colony_mine && m.change.is_none() && ui.available_width() >= CHANGE_BUTTONS_WIDTH {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    change_buttons(ui, game, &session.pending, BuildingRef::Module(cid, mi), m.mothballed, true, actions);
+                });
+                inline = true;
+            }
         });
-        if colony_mine {
+        if colony_mine && !inline {
             change_row(ui, game, &session.pending, BuildingRef::Module(cid, mi), m.mothballed, m.change, actions);
         }
     }

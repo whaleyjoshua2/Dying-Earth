@@ -253,6 +253,37 @@ function, so it follows without a second change.
 
 Clippy clean with `-D warnings`, 253 tests passing.
 
+## Mothball and Decommission on the line, and the Army's shield inside its button
+
+Ticket [#138](https://github.com/whaleyjoshua2/Dying-Earth/issues/138). The designer's lines: *"Mothball
+and decommission buttons moved next to facility name not under (after yields and upkeep)"* and *"The
+army icon on the cards left of buttons when other icons are not."* Decided in one round: the buttons
+right-aligned on the name line, Restart in Mothball's place, the Module rows following -- and the
+second line, which the charting had read as a card question, corrected by the designer: *"on roster
+every other glyph is a part of the button while armies stands apart."*
+
+![Before: the buttons beneath each Facility](facility-buttons-beneath-before.png)
+
+![After: the buttons on the line, right-aligned](facility-buttons-on-the-line.png)
+
+**The two buttons ride on the building's own line**, right-aligned after its figures, so they make a
+column down the card and every row is one line shorter. The line keeps its hover on the figures. The
+buttons drop beneath, as they were, only when the panel is too narrow to hold both after the figures
+(about 196 pixels' worth); a building under a pending change keeps its weak "ordered, lands at turn
+N" line. A Colony's Module rows do the same.
+
+![Before: the shield beside the button](roster-army-shield-outside-before.png)
+
+![After: the shield inside it](roster-army-shield-inside.png)
+
+**The Army's shield is inside its roster button.** Every other kind's glyph is loaded art and rides
+inside the row's button through egui's own image-and-text button; the shield is drawn, and had no
+way into one, so 0.07.2 drew it beside the button. The designer saw the difference at a glance. The
+Army's row is now a hand-drawn button in the button's own visuals -- the shape `priced_button`
+already uses -- with the shield painted inside, so it looks and behaves like the rest.
+
+Clippy clean with `-D warnings`, 253 tests passing.
+
 ## Building art: candidate sheets (research, ticket #144)
 
 Sixty-two game-icons.net candidates for the twenty-two building kinds, drawn with the game's own
