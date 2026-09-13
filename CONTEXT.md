@@ -9,7 +9,7 @@ The small version of the game: twelve turns and two Factions as first built, twe
 _Avoid_: slice, MVP, demo, v1, prototype
 
 **Faction**:
-A competing power with its own multipliers, signature rule and victory condition. The finished game has six; the First Playable has four since version 0.05, the Custodians, the Prospectors, the Arkwrights and the Archivists, and all four sit at every table.
+A competing power with its own multipliers, signature rule and victory condition. The finished game has six; the First Playable has four since version 0.05, the Custodians, the Prospectors, the Arkwrights and the Archivists, and all four sit at every table. Since version 0.07.5 each also has a **symbol**, worn in place of its colour swatch on its card on the Faction screen and nowhere else, drawn in the Faction's own colour -- the one place a caller picks an icon's colour rather than reading it from the fill rule, since a Faction symbol is exactly a statement of whose.
 _Avoid_: side, team, empire
 
 **Custodians**:
@@ -428,6 +428,10 @@ _Avoid_: processing, execution, upkeep phase
 The phase that opens a turn for the player, and the dated dispatch it shows. It opens with a headline: the most serious thing that happened, chosen by a fixed order of severity. Everything else is grouped under four headings, In space, On Earth, The climate and Your works, and an empty heading is left out. Every line that is about somewhere is a way there. It ends with what each rival Faction did, told in plain sentences of what the board could see.
 _Avoid_: summary, news, digest
 
+**Tutorial**:
+The guided first turns, since version 0.07.5, begun from the title screen's own button and played as the Custodians at their home. It is an ordinary game on an ordinary board: nothing is forced and nothing is checked, and a **tutorial note** -- drawn as a Moment is drawn -- opens each of the first five turns to say what that turn is for. The last note says so and the tutorial ends itself; the game carries on with nothing thrown away. The game does not remember it has been played. Its words live in `assets/data/tutorial.toml`.
+_Avoid_: walkthrough, onboarding, training mission, guided mode
+
 **Moment**:
 A short modal that stops the turn before the Report, for one sentence and one number: a Colony founded, a Break or the sea rising, a Battle that cost a unit, a place changing hands, a Tech completed, Antarctica opening, the Archive finished, or Colonists lost in transit. At most two a turn, the most serious first, and every kind can be switched off.
 _Avoid_: popup, alert, notification, cutscene, interruption
@@ -523,7 +527,7 @@ The CO2-equivalent a source adds to the CO2 Stock in a turn. Every source has it
 _Avoid_: output, carbon, footprint
 
 **Emissions history**:
-Since version 0.07.4, the record the engine keeps of every Climate phase -- the breakdown by source, the CO2 Stock, the Temperature and the Breaks that fired -- saved with the game, and the chart drawn from it: what the world emitted, what the Natural Sink and the Scrubbers removed, and the net between them, turn by turn against a zero line, the Breaks ticked red on the turn axis. Drawn small on the top bar's Emissions hover and wide on the Climate Panel under the by-source list. Its sibling, the **Temperature history**, draws the Temperature turn by turn on the top bar's Temperature hover, on the data's own range with the Breaks' Temperatures as faint lines.
+Since version 0.07.4, the record the engine keeps of every Climate phase -- the breakdown by source, the CO2 Stock, the Temperature and the Breaks that fired -- saved with the game, and the chart drawn from it: what the world emitted, what the Natural Sink and the Scrubbers removed, and the net between them, turn by turn against a zero line, the Breaks ticked red on the turn axis. Drawn small on the top bar's Emissions hover and wide on the Climate Panel under the by-source list. Its siblings are the **Temperature history**, which draws the Temperature turn by turn on the top bar's Temperature hover, on the data's own range with the Breaks' Temperatures as faint lines; and, since version 0.07.5, the **population history**, which draws Earth's people and space's on two scales of their own, since one axis would lay the space line flat. Since version 0.07.5 every chart's time axis carries the in-game date and never the turn number, and the record carries the two population figures, written after the Climate phase has settled them.
 _Avoid_: emissions total, emissions log, graph, chart (as names)
 
 **Natural Sink**:
@@ -551,5 +555,5 @@ The one Temperature at which the game ends with nobody winning, unless a Faction
 _Avoid_: threshold, tipping point, game over temperature
 
 **Climate Panel**:
-The screen showing the CO2 Stock, the Temperature and where it is heading, a Temperature bar notched with every Break, every Sea Level threshold and Antarctica's opening, this turn's Emissions by source, the sink and the net, since version 0.07.4 the Emissions history beneath them, the penalties in force, the Committed Warming, the Last Turn, and a projection to the last turn.
+The screen showing the CO2 Stock, the Temperature and where it is heading, a Temperature bar notched with every Break, every Sea Level threshold and Antarctica's opening, this turn's Emissions by source, the sink and the net, since version 0.07.4 the Emissions history beneath them and since version 0.07.5 the population history above the growth rate, the penalties in force, the Committed Warming, the Last Turn, and a projection to the last turn.
 _Avoid_: warming meter, climate HUD

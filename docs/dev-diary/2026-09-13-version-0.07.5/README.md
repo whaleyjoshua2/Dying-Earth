@@ -258,3 +258,53 @@ the player: the turn stops for one short thought. A `tutorial:<turn>` picture ai
 **Written knowing the seat is the hard one.** Over eighty computer-played games the Custodian seat
 wins 3 in 20 and collapses the world in 11, the worst record of the four, which the designer chose
 anyway: it is the seat that teaches the climate. The notes do not promise an easy win.
+
+## The amendments written, the baseline restarted, and the kit built
+
+Ticket [#170](https://github.com/whaleyjoshua2/Dying-Earth/issues/170), the last on the map. The
+spec is [`docs/spec/version-0.07.5.md`](../../spec/version-0.07.5.md), one section per decision,
+written from the resolution comments; the playtest note is
+[`docs/playtest/PLAYTEST.txt`](../../playtest/PLAYTEST.txt), rewritten for 0.07.5; `CONTEXT.md`
+coined the **Core Module**, **Threshold** and **Tutorial**, retired **Hab View**, and amended
+**Module**, **Space Station**, **Build Slot**, **Faction**, **Emissions history** and **Climate
+Panel**.
+
+![The Earth Map at the end of the version](final-earth.png)
+
+**The sweep baseline restarts here.** The Core Module changes how every Colony and station begins,
+so nothing measured before this version is comparable to what follows. Twenty seeds in each of four
+seatings on the finished build:
+
+| seat 0 | wins | Collapses | draws | tree completes |
+|---|---|---|---|---|
+| Custodians | Archivists 8, Custodians 1 | **11** | 0 | 19 of 20 |
+| Prospectors | Archivists 11, Custodians 3 | 6 | 0 | 19 of 20 |
+| Arkwrights | Archivists 11, Custodians 8, Arkwrights 1 | 0 | 0 | 7 of 20 |
+| Archivists | Archivists 16, Custodians 4 | 0 | 0 | 5 of 20 |
+| **totals** | **Archivists 46**, Custodians 16, Arkwrights 1, Prospectors 0 | **17** | **0** | **50 of 80** |
+
+The table reproduces the Core Module ticket's own after-sweep to the cell, which confirms that
+nothing decided after it touched the rules. **The Archivists went from 21 of 80 to 46**: a station
+over Earth counts as off Earth and is habitable the day it stands, which is most of what their
+Victory Condition wants. The designer kept it, expecting later work to move the Factions again.
+
+**A whole game from seat 0**, headless through the `play` example, seed 11, Custodians from Europe,
+giving no order but the owed Tech picks: 28 turn commands, **none refused**, and the world collapsed
+on turn 28 at +3.0 C with the tree finished. The same seed reached turn 23 and an Archivist win last
+version; a Custodian seat that builds nothing deliberate now burns.
+
+![The Faction screen, each side with its symbol](final-faction.png)
+
+![The Credits screen, the four new rows among them](final-credits.png)
+
+![The Solar System Map at the end of the version](final-solar.png)
+
+The rest of the final set -- every Body and every screen -- is filed beside these as `final-*.png`.
+
+**The kit**: `dist/dying-earth-0.07.5/` -- `dying-earth.exe` (static CRT), `assets/` with the four
+Faction symbols and `tutorial.toml` among them, and the playtest note as `README.txt` -- zipped to
+`dist/dying-earth-0.07.5-playtest.zip`, 37.5 MB, seventy-seven entries. Windows only; `dist/` is
+gitignored.
+
+The suite is 254 tests, clippy clean with `-D warnings`. The pull request is opened from
+`version-0.07.5` against `main`.

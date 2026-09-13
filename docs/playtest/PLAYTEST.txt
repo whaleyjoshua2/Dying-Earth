@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.07.4
+DYING EARTH - playtest build, version 0.07.5
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,47 +16,49 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-   (Windows only again; there is no Linux zip for 0.07.4.)
+   (Windows only again; there is no Linux zip for 0.07.5.)
 
-WHAT CHANGED SINCE 0.07.3
+WHAT CHANGED SINCE 0.07.4
 -------------------------
-Nothing in the rules. This one is seven fixes to how the last version looked and read,
-each asked for by the designer after playing it, plus one that grew out of them.
+One rule changed, and the rest is about reading the board. There is also a tutorial,
+the first this game has ever had.
 
-- HOVER A BUILDING. Point at any box on a country's card or any tile in the Hab View and
-  it says what it makes, what it costs to run, and the rules behind those numbers. An
-  empty box says it is free, a hatched one says when it is ready, a drowned one says
-  what took it.
-- ORBITS TURN WITH THE GLOBE. On a planet or moon's surface view the station rings now
-  sit on their own tilted planes, cross each other, and turn when you drag the globe.
-  A station slides slowly round its ring (a lap every minute and a half) and you can
-  click it as it goes. An empty slot's ring is a plain grey line now.
-- THE START GLOBE IS SLOWER: one turn every 75 seconds instead of 25, and clicking a
-  region stops it.
-- POLLUTION HISTORY. Hover the ppm number in the top bar for a graph of every turn so
-  far: what the world put out, what the sink and the scrubbers took back, and the net.
-  Red ticks are the turns the world changed for good. The same graph sits on the
-  Climate Panel. Hover the temperature beside it for its own graph.
-- THE COUNTRY CARD IS SHORTER. The long list of build buttons at the bottom is gone;
-  build by clicking an empty box among the slots. Scrubbers and the Sea Wall, which
-  take no slot, sit just under the boxes with their own buttons. The header at the
-  bottom now says Orders.
-- VENUS AND EARTH NO LONGER OVERLAP on the Solar System Map; Venus's orbit is drawn
-  nearer the sun and Earth's further out, and Venus's and the moons' names hang below
-  them so no two labels meet.
-- THE TECH TREE lines up: Coastal Engineering sits under Efficient Grids instead of
-  beside it, so every column is one box wide.
+- A TUTORIAL. There is a Tutorial button on the title screen now. It starts an ordinary
+  game as the Custodians and puts a short note at the start of each of the first five
+  turns saying what that turn is for. Nothing is forced; the notes only say where to
+  look, and after the fifth the game carries on as normal. Fair warning: the Custodians
+  are the hardest of the four to win with. They are the side that teaches the climate.
+- EVERY COLONY AND STATION NOW COMES WITH A CORE MODULE. It holds four people and costs
+  one energy a turn, and it is what a place is founded with instead of a free habitat.
+  The catch: a place has ONE BUILD SLOT FOR EACH PERSON LIVING THERE AND NONE BEFORE.
+  A station you build this turn can hold four people at once but cannot build anything
+  until they arrive. This is the only rule change, and it moved the balance a long way.
+- MODULES ARE ON THE COLONY'S CARD NOW, drawn as tiles in the same grid a country's
+  build slots use. The separate window is gone. Click a tile for its figures and
+  buttons, an empty one to build. M no longer opens that window: it switches to the
+  Solar System Map, the job Tab used to do. Tab brings the roster back.
+- HOVER ANY WORD IN THE INFLUENCE SECTION of a country's card and it explains itself:
+  what influence is, what a standing is, what a threshold is and what raises it, what
+  blame is costing you, and how close your nearest rival is.
+- THE GAME OPENS FULL SIZE, and the Climate Panel opens tall enough to read. It used to
+  show about a third of itself.
+- A POPULATION GRAPH. Hover the population figure in the top bar for Earth's people and
+  space's, turn by turn. Every graph now labels its axis with dates rather than turn
+  numbers.
+- THE PICK A TECH BUTTON IS RED when it appears, like End Turn.
+- EACH SIDE HAS A SYMBOL on the faction selection screen.
 
 HOW TO PLAY, IN ONE MINUTE
 --------------------------
-- New Game > pick one of the four sides > click a region on the globe, then Begin. The
-  computer plays the other three. There is also a Spectate button under the cards: the
-  computer plays all four and you just watch.
+- Tutorial if this is your first game: it starts one for you and talks you through the
+  first five turns. Otherwise New Game > pick one of the four sides > click a region on
+  the globe, then Begin. The computer plays the other three. There is also a Spectate
+  button under the cards: the computer plays all four and you just watch.
 - You are looking at the Earth Map. Click a region for its card and orders on the right.
   Drag to turn the globe, mouse wheel to zoom. M switches to the Solar System Map, Tab
-  brings the roster back;
-  Esc goes back.
-- Build things with the buttons on a card, or click an empty box among a region's slots.
+  brings the roster back, and Esc goes back.
+- Build things by clicking an empty box among a region's slots, or an empty tile among a
+  colony's modules; a few things that take no slot have their own buttons on the card.
   Hover a build button to see what it makes and how long it takes. Hover almost any
   number: if a rule sets it, the rule is there.
 - Spend Influence on other regions to win them over. Your home region starts held.
@@ -84,10 +86,12 @@ WHAT WE WANT TO KNOW
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- THE HOVERS: did pointing at a box or a tile tell you what you wanted to know?
-- THE ORBITS: could you click a moving station? Did the crossing rings read as orbits,
-  or as clutter?
-- THE HISTORY GRAPHS: did you find them? Did they change what you did next?
+- THE TUTORIAL: did you use it? Did the five notes tell you enough to play on, or did
+  you still not know what to do on turn six?
+- THE CORE MODULE: did "one build slot per person" make sense on the card, or did you
+  find out by being refused?
+- THE INFLUENCE HOVERS: is there still a word in that section you could not explain?
+- THE POPULATION GRAPH: did the two scales confuse you?
 - THE POPULATION NUMBERS: did "Region population" make sense? Did it bother you that
   Nigeria's region says 1.14 billion (it is all of sub-Saharan Africa)?
 - THE LIFT TO A STATION: did you use it, and did it feel too easy?
@@ -101,9 +105,11 @@ Screenshots help. Print Screen, then paste into a message.
 KNOWN ROUGH EDGES
 -----------------
 - THE BALANCE MOVED A LOT and none of it has been played by a person yet. Over eighty
-  computer-only games the Custodians now win 36, the Archivists 21, the Arkwrights 6
-  and the Prospectors 1, with the world collapsing in 14. Last version the Custodians
-  won 70. The lift to a station did most of that. Tell us if any side feels hopeless.
+  computer-only games the Archivists now win 46, the Custodians 16, the Arkwrights 1
+  and the Prospectors none, with the world collapsing in 17. Last version it was
+  Custodians 36, Archivists 21. The core module did that: a station over Earth counts
+  as off Earth and can be lived on from the day it is built, which is most of what the
+  Archivists need. Tell us if any side feels hopeless.
 - Every side's victory target was set against a computer that never competed for it, so
   the numbers are all suspect.
 - THE HAB VIEW'S AND SLOT BOXES' PICTURES ARE FIRST PICKS from a free icon set and may
