@@ -72,6 +72,8 @@ impl Game {
             self.pick_tech(Seat(0), pick).ok();
         }
         self.log(format!("--- Turn {} ---", self.turn));
+        // Ticket #173 (version 0.07.6): the first turn freezes its findings Tech too.
+        self.research.findings_tech = self.research.current;
         self.log("Phase 1: Income");
         self.income_phase();
         self.log("Phase 2: Climate");
@@ -122,6 +124,12 @@ impl Game {
         if self.is_over() {
             return Ok(());
         }
+        // Ticket #173 (version 0.07.6): the Lead's pick becomes final HERE and nowhere earlier. The
+        // designer: *"tech choice is not locked in until the turn is ended."* Everything a pick used
+        // to do the instant it was clicked -- spending the banked Research, throwing away the
+        // shortlist, and possibly finishing the Tech outright -- happens now, after the refusal
+        // check, so a turn that is refused leaves the pick as changeable as it was.
+        self.commit_pick();
         self.log("Phase 4: Orders");
         let mut all: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
         // Report for the coming turn starts collecting now, before the AI seats order, so their
@@ -171,6 +179,11 @@ impl Game {
         }
         self.turn += 1;
         self.log(format!("--- Turn {} ---", self.turn));
+        // Ticket #173 (version 0.07.6): the Archivists read the Tech under research for the whole of
+        // the turn to come, frozen here. Their Provisional Findings gives them half its effect while
+        // the turn is still being ordered, and a Lead that may change its pick would otherwise
+        // re-price orders already placed.
+        self.research.findings_tech = self.research.current;
         self.log("Phase 1: Income");
         self.income_phase();
         self.log("Phase 2: Climate");

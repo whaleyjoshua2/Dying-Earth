@@ -495,6 +495,29 @@ pub struct Research {
     /// into the shared Tech over the game, for the simulation's report.
     #[serde(default)]
     pub neutral_total: i64,
+    /// Ticket #173 (version 0.07.6): whether `current` has been **committed**. A human Lead's pick
+    /// is provisional until the turn ends -- the designer: *"tech choice is not locked in until the
+    /// turn is ended"* -- so the pick is recorded here at once but the banked Research is not poured
+    /// into it, the shortlist is not thrown away, and the Tech cannot complete, until `commit_pick`
+    /// runs at the head of `end_turn`. A computer seat's pick commits in the same breath. False with
+    /// no Tech under research means nothing is owed.
+    #[serde(default = "crate::state::yes")]
+    pub pick_committed: bool,
+    /// Ticket #173: which seat made the pick that is waiting to be committed.
+    #[serde(default)]
+    pub picked_by: Option<Seat>,
+    /// Ticket #173: the Tech the Archivists' Provisional Findings reads for the whole of this turn,
+    /// frozen at the turn's head. Their signature gives them half the effect of the Tech under
+    /// research while the turn is still being ordered; with a pick that can change, reading `current`
+    /// live would re-price orders already placed, so the turn reads this instead.
+    #[serde(default)]
+    pub findings_tech: Option<TechId>,
+}
+
+/// Serde's default for `pick_committed`: a save written before ticket #173 has no provisional pick
+/// in it, so whatever Tech it carries is committed.
+pub fn yes() -> bool {
+    true
 }
 
 impl Research {
@@ -871,6 +894,10 @@ impl Game {
                 last_lead: None,
                 last_picked_turn: [None; SEAT_COUNT],
                 neutral_total: 0,
+                // Ticket #173: nothing picked yet, so nothing is waiting to be committed.
+                pick_committed: true,
+                picked_by: None,
+                findings_tech: None,
             },
             deck,
             discoveries: Vec::new(),
@@ -1034,8 +1061,13 @@ impl Game {
 
     /// True while this seat reads the Tech at half strength: it is not done, but it is the one under
     /// research and Provisional Findings is in force.
+    /// Ticket #173 (version 0.07.6): the Tech read here is the one **frozen at the turn's head**,
+    /// not whatever is under research this instant. A Lead may change its pick until the turn ends,
+    /// and a half-effect that moved with it would re-price orders already placed.
     fn reads_half(&self, seat: Seat, t: TechId) -> bool {
-        !self.has_tech(t) && self.research.current == Some(t) && self.provisional_findings(seat)
+        !self.has_tech(t)
+            && self.research.findings_tech == Some(t)
+            && self.provisional_findings(seat)
     }
 
     /// A multiplier Tech read for one seat: its full value once done, `1 + (value - 1) / 2` under

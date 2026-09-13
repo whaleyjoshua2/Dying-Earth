@@ -4715,6 +4715,11 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
         let r = box_of(t);
         let (fill, status) = if game.research.done.contains(&t) {
             (Color32::from_rgb(50, 120, 60), "done")
+        } else if game.research.current == Some(t) && !game.research.pick_committed {
+            // Ticket #173 (version 0.07.6): picked this turn, and still changeable until the turn
+            // ends. A paler amber than the settled one. The caption stays one word because the box
+            // is only as wide as "cost 45 - locked"; the prompt above the tree carries the rest.
+            (Color32::from_rgb(120, 95, 35), "chosen")
         } else if game.research.current == Some(t) {
             (Color32::from_rgb(170, 130, 30), "under research")
         } else if available.contains(&t) {
@@ -4732,7 +4737,7 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
         painter.text(r.center_top() + egui::vec2(0.0, 32.0), egui::Align2::CENTER_CENTER, format!("cost {} - {}", card.cost, status), FontId::proportional(11.0), Color32::from_gray(230));
         let needs = if card.needs.is_empty() { "nothing".to_string() } else { card.needs.iter().map(|n| game.tables.tech(*n).name.clone()).collect::<Vec<_>>().join(" and ") };
         ui.interact(r, ui.id().with(format!("tech-{t:?}")), egui::Sense::hover()).on_hover_text(format!("{} (rung {}, cost {} Research)\n{}\nNeeds: {}", card.name, card.rung, card.cost, card.effect, needs));
-        if must_pick && available.contains(&t) {
+        if must_pick && available.contains(&t) && game.research.current != Some(t) {
             let b = egui::Rect::from_center_size(r.center_bottom() - egui::vec2(0.0, 11.0), egui::vec2(56.0, 18.0));
             if ui.put(b, egui::Button::new(RichText::new("Pick").size(11.0))).clicked() {
                 actions.push(Action::PickTech(t));
@@ -4740,7 +4745,9 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
         }
     }
     ui.horizontal(|ui| {
-        for (colour, label) in [(Color32::from_rgb(50, 120, 60), "done"), (Color32::from_rgb(170, 130, 30), "under research"), (Color32::from_rgb(40, 90, 160), "available"), (Color32::from_gray(60), "locked")] {
+        // Ticket #173 (version 0.07.6): the paler amber of a pick that can still change earns its own
+        // swatch, next to the settled amber it must be told apart from.
+        for (colour, label) in [(Color32::from_rgb(50, 120, 60), "done"), (Color32::from_rgb(170, 130, 30), "under research"), (Color32::from_rgb(120, 95, 35), "chosen this turn"), (Color32::from_rgb(40, 90, 160), "available"), (Color32::from_gray(60), "locked")] {
             let (sw, _) = ui.allocate_exact_size(egui::vec2(14.0, 14.0), egui::Sense::hover());
             ui.painter().rect_filled(sw, 3.0, colour);
             ui.label(label);
@@ -5060,9 +5067,15 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                     ui.colored_label(Color32::YELLOW, "Your Labs pay the Archive fund: the turn after they next pay it, Provisional Findings is off.");
                 }
             }
-            let must_pick = game.research.awaiting_pick == Some(Seat(0)) && game.research.current.is_none();
-            if must_pick {
+            // Ticket #173 (version 0.07.6): the tree keeps offering its Pick buttons while the
+            // choice can still be changed -- a Tech picked this turn is not locked in until the turn
+            // ends -- not only while none has been picked at all.
+            let must_pick = game.research.awaiting_pick == Some(Seat(0)) || !game.research.pick_committed;
+            if game.research.current.is_none() && must_pick {
                 ui.colored_label(Color32::YELLOW, "You pick the next Tech: choose one below.");
+            } else if !game.research.pick_committed {
+                // Ticket #173: the pick is made but not final; say so where the player is looking.
+                ui.colored_label(Color32::from_rgb(210, 190, 120), "Chosen for this turn. Press another box to change it; it is locked in when the turn ends.");
             }
             // Ticket #98: the Lead chooses from the drawn shortlist, so that is what the tree offers.
             let available = game.pickable_techs();
@@ -5497,7 +5510,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // buttons when the player is the Research Lead.
                 if m.tech.is_some() {
                     ui.separator();
-                    let must_pick = game.research.awaiting_pick == Some(Seat(0)) && game.research.current.is_none();
+                    // Ticket #173: the same, in the Moment that a completed Tech opens.
+                    let must_pick = game.research.awaiting_pick == Some(Seat(0)) || !game.research.pick_committed;
                     let available = game.pickable_techs();
                     tech_tree(ui, game, &available, must_pick, actions);
                 }

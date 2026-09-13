@@ -424,12 +424,22 @@ fn print_board(g: &Game) {
     );
     // Version 0.07.3: a complete tree owes nobody a pick; the marker was printed with nothing under it
     // once every Tech was done, and a driver that trusted it wrote a `tech` line that could not parse.
-    if (g.research.awaiting_pick == Some(me) || g.research.current.is_none()) && !g.available_techs().is_empty() {
+    // Ticket #173 (version 0.07.6): a pick made this turn is not locked in until the turn ends, so
+    // the board says the choice is open rather than owed, and a second `tech` line in the same turn
+    // is now accepted where it used to be refused. The driver and the game have to agree.
+    let owed = (g.research.awaiting_pick == Some(me) || g.research.current.is_none()) && !g.available_techs().is_empty();
+    let changeable = g.research.current.is_some() && !g.research.pick_committed;
+    if owed || changeable {
         let drawn = !g.research.shortlist.is_empty();
-        println!(
-            "  *** YOU MUST PICK THE NEXT TECH (a `tech <name>` line). {} ***",
-            if drawn { "The Research Lead's shortlist:" } else { "A free choice of everything available:" }
-        );
+        if changeable {
+            let name = g.research.current.map(|x| t.tech(x).name.clone()).unwrap_or_default();
+            println!("  *** {name} IS CHOSEN FOR THIS TURN, and not locked in until the turn ends. Another `tech <name>` line changes it. ***");
+        } else {
+            println!(
+                "  *** YOU MUST PICK THE NEXT TECH (a `tech <name>` line). {} ***",
+                if drawn { "The Research Lead's shortlist:" } else { "A free choice of everything available:" }
+            );
+        }
         for x in g.pickable_techs() {
             let c = t.tech(x);
             println!("      {} ({} Research, rung {}): {}", c.name, c.cost, c.rung, c.effect);

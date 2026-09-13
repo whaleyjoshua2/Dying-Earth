@@ -2074,6 +2074,11 @@ fn provisional_findings_halves_the_tech_under_research_and_goes_off_the_turn_aft
     g.state_mut(StateId::Europe).control = Control::Controlled(Seat(3));
     g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
     g.pick_tech(Seat(0), TechId::PublicScience).unwrap();
+    // Ticket #173 (version 0.07.6): the half-effect reads the Tech FROZEN at the turn's head, not
+    // whatever was picked a moment ago, so that a Lead changing its mind cannot re-price orders
+    // already placed. A pick made during this turn is read from the next one; the test stands the
+    // frozen Tech up by hand rather than running a turn, which would move everything else it reads.
+    g.research.findings_tech = g.research.current;
     // A multiplier of 1.5 reads 1.25; nobody else reads an unfinished Tech at all.
     assert!(g.provisional_findings(Seat(3)), "on at the start: nobody has funded yet");
     assert!((g.tech_multiplier(Seat(3), TechId::PublicScience) - 1.25).abs() < 1e-9);
@@ -6679,9 +6684,51 @@ fn the_research_lead_picks_from_a_shortlist_of_three() {
     // A Tech that is available but off the list is refused.
     let off = g.available_techs().into_iter().find(|t| !list.contains(t)).expect("something off the list");
     assert!(g.pick_tech(Seat(0), off).is_err(), "{off:?} is off the shortlist {list:?}");
-    // One on it is taken, and taking it clears the list for the next completion.
+    // One on it is taken. Ticket #173 (version 0.07.6): a human Lead's pick is provisional until
+    // the turn ends, so the list is KEPT -- the Lead may change its mind, and redrawing the three
+    // on every change would be a free reroll -- and only the commit throws it away.
     assert!(g.pick_tech(Seat(0), list[0]).is_ok());
-    assert!(g.research.shortlist.is_empty(), "a pick clears the list");
+    assert_eq!(g.research.shortlist, list, "the list is kept while the pick can still change");
+    assert!(!g.research.pick_committed);
+    // And the Lead may pick again, off the same three.
+    assert!(g.pick_tech(Seat(0), list[1]).is_ok(), "a provisional pick can be changed");
+    assert_eq!(g.research.current, Some(list[1]));
+    g.commit_pick();
+    assert!(g.research.shortlist.is_empty(), "committing clears the list");
+}
+
+/// Ticket #173 (version 0.07.6): a human Lead's Tech pick is not locked in until the turn ends.
+/// The designer: *"tech choice is not locked in until the turn is ended."* Until then the pick can
+/// be changed as often as the player likes, nothing is spent, and the shortlist is kept; the turn
+/// ending is what makes it final. A computer seat's pick still commits in the same breath.
+#[test]
+fn a_tech_pick_can_be_changed_until_the_turn_ends() {
+    let mut g = game();
+    g.research.shortlist = Vec::new();
+    g.accrue_research(Seat(2), 6);
+    assert_eq!(g.research.unallocated[2], 6, "banked while nothing is under research");
+
+    g.pick_tech(Seat(0), TechId::PublicScience).unwrap();
+    assert_eq!(g.research.current, Some(TechId::PublicScience));
+    assert!(!g.research.pick_committed, "a human pick is provisional");
+    assert_eq!(g.research.unallocated[2], 6, "and spends nothing");
+    assert!(g.end_turn_refusal().is_none(), "the turn is no longer owed a Tech");
+
+    // Changed, twice, for nothing.
+    g.pick_tech(Seat(0), TechId::DeepMining).unwrap();
+    g.pick_tech(Seat(0), TechId::CleanPropellant).unwrap();
+    assert_eq!(g.research.current, Some(TechId::CleanPropellant));
+    assert_eq!(g.research.unallocated[2], 6, "still nothing spent");
+
+    // Ending the turn makes it final: the bank pours in under its owner's name.
+    let orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+    g.end_turn(orders).expect("the turn ends");
+    assert!(g.research.pick_committed, "the turn ending locks it in");
+    assert_eq!(g.research.unallocated[2], 0, "the bank is spent now");
+    assert!(g.research.contributions[2] >= 6, "and it is still seat 2's");
+
+    // And a committed Tech is settled: it cannot be swapped for another.
+    assert!(g.pick_tech(Seat(0), TechId::DeepMining).is_err(), "a committed pick is final");
 }
 
 /// Ticket #98: a Faction can be denied a rival's gate but never its own, so the Lead's own Victory
@@ -6897,6 +6944,11 @@ fn research_banked_between_techs_keeps_its_owner() {
     // the eight banked points land without completing it and resetting what we are measuring.
     g.research.shortlist = Vec::new();
     g.pick_tech(Seat(0), TechId::PublicScience).unwrap();
+    // Ticket #173 (version 0.07.6): the pick alone spends nothing -- it can still be changed --
+    // and the bank pours when the pick is committed at the end of the turn.
+    assert_eq!(g.research.unallocated[2], 5, "the bank is untouched while the pick can change");
+    assert_eq!(g.research.progress, 0);
+    g.commit_pick();
     assert_eq!(g.research.contributions[2], 5, "seat 2's banked Research is still seat 2's");
     assert_eq!(g.research.contributions[3], 2);
     assert_eq!(g.research.contributions[0], 0, "picking a Tech earns nothing");
