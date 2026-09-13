@@ -353,6 +353,45 @@ with this table for the balance version.
 
 Clippy clean with `-D warnings`, 253 tests passing (seven rewritten for the yield and the flat room).
 
+## Emigrants lifted straight to a station over Earth
+
+Ticket [#141](https://github.com/whaleyjoshua2/Dying-Earth/issues/141). The designer's line: *"Send
+emigrates from earths surface directly to stations that it orbits - similar to the Antarctica is
+handled."* Decided in one round, every answer (a): the order on the Region's card; it wants a working
+Launch Site and it is a launch; no crowd; the Faction's own stations only; as many as wait and the
+station has room for; the computer learns it; measured before it is final.
+
+![The button under the muster on China's card](lift-to-station-button.png)
+
+**`Send N to ISS over Earth by lift`** sits under `Muster N Emigrants`, one button per station of
+yours over Earth with Habitat room, for as many as it has room for. It is `Order::LiftToStation`:
+checked like the sea order (the same waiting people cannot be ordered twice, by sea or by lift,
+through one `emigrants_leaving` count), wanting a working Launch Site as a lift onto a Ship does,
+refusing a rival's station and a slot a rival warship blockades. At the Resolution the Emigrants are
+aboard, the seat's launch count rises by one so the lift emits and goes on Blame, and the Report says
+*4 Emigrants lifted from China to ISS over Earth*. The computer players lift to their own station
+over Earth whenever it has room, at the unload's full weight, since a station over Earth is off Earth.
+A `room:1` aid gives seat 0's station a Habitat on turn 1 so the button could be photographed.
+
+**Measured before it was final**, on top of the three balance changes before it:
+
+| after | Custodians | Archivists | Arkwrights | Prospectors | Collapses | tree completes |
+|---|---|---|---|---|---|---|
+| the 0.07.2 baseline | 70 | 1 | 1 | 0 | 8 | 73 of 80 |
+| the Ducats formula | 62 | 2 | 2 | 0 | 14 | 76 of 80 |
+| Research yields | 72 | 1 | 1 | 0 | 6 | 62 of 80 |
+| **the lift** | **47** | **15** | **8** | **1** | **9** | **67 of 80** |
+
+Colonists off Earth across the eighty games nearly doubled, 2,361 to 4,326. The Archivists win ten of
+their own twenty where they won none before this version; the Arkwrights eight of theirs; the
+Prospectors a game for the first time in any sweep; the Custodians still the most at 47. Every
+Faction's station over Earth fills as fast as its Region musters, with no Colony Ship in the loop, so
+the Archive on Axiom has people from turn two and Diaspora's thirty are within the Arkwrights' reach.
+Put to the designer; kept as decided -- the closest to a four-way table any sweep has shown, and for
+the reason the rules say: people who can reach orbit without a Ship colonise.
+
+Clippy clean with `-D warnings`, 254 tests passing (one new).
+
 ## Building art: candidate sheets (research, ticket #144)
 
 Sixty-two game-icons.net candidates for the twenty-two building kinds, drawn with the game's own

@@ -2527,6 +2527,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::SetArchiveFunding { on: false } => "Pay your Labs into the shared Tech from the next Income".to_string(),
         // Ticket #73.
         Order::BuildEmigrants { state, n } => format!("Muster {n} Emigrants in {}", game.tables.state(*state).name),
+        Order::LiftToStation { state, n, colony } => format!("Send {n} Emigrants from {} to {} by lift", game.tables.state(*state).name, game.place_name(Place::Colony(*colony))),
         Order::SendToAntarctica { state, n, into } => format!(
             "Send {n} Emigrants from {} to {} by sea",
             game.tables.state(*state).name,
@@ -3377,6 +3378,26 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             }
             for c in game.colonies.iter().filter(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(Seat(0))) {
                 cost_button(ui, game, &session.pending, Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Colony(c.id) }, &format!("Send {n} to {} by sea", game.place_name(Place::Colony(c.id))), actions);
+            }
+        }
+        // Ticket #141 (version 0.07.3): waiting Emigrants lift straight to a station of yours over
+        // Earth, as many as it has room for, by the Launch Site here. A launch, no Ship.
+        if st.emigrants > 0 && st.facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()) {
+            for c in game.colonies.iter().filter(|c| c.body == BodyId::Earth && c.in_orbit && c.control.director() == Some(Seat(0))) {
+                let room = game.habitat_room(c).saturating_sub(c.colonists);
+                let n = st.emigrants.min(room);
+                if n == 0 {
+                    continue;
+                }
+                cost_button_with_hover(
+                    ui,
+                    game,
+                    &session.pending,
+                    Order::LiftToStation { state: sid, n, colony: c.id },
+                    &format!("Send {n} to {} by lift", game.place_name(Place::Colony(c.id))),
+                    Some(format!("Aboard at this turn's Resolution. A launch: it emits like any lift. {} has room for {room} more.", game.place_name(Place::Colony(c.id)))),
+                    actions,
+                );
             }
         }
         // Ticket #52: Relief and Resettle, with their prices on the buttons.

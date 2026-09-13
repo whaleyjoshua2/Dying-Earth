@@ -1233,6 +1233,25 @@ impl Game {
                     push(vec![Order::BuildEmigrants { state: st, n: per }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("muster {} Emigrants in {}", per, self.tables.state(st).name), None);
                 }
             }
+            // Ticket #141 (version 0.07.3): waiting Emigrants lift straight to the seat's own station
+            // over Earth while it has room, from a state with a working Launch Site. Presence, not a
+            // foothold: a station over Earth is off Earth, so it takes the unload's full weight.
+            for sid in self.directed_states(seat) {
+                let n = self.state(sid).emigrants;
+                if n == 0 || !self.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()) {
+                    continue;
+                }
+                let station = self
+                    .colonies
+                    .iter()
+                    .filter(|c| c.body == BodyId::Earth && c.in_orbit && c.control.director() == Some(seat) && self.habitat_room(c) > c.colonists && !self.slot_blockaded_against(seat, BodyId::Earth, c.slot))
+                    .max_by_key(|c| self.habitat_room(c) - c.colonists);
+                if let Some(c) = station {
+                    let k = n.min(self.habitat_room(c) - c.colonists);
+                    let opp = if presence_needed > 0 { m.opportunity } else { 1.0 };
+                    push(vec![Order::LiftToStation { state: sid, n: k, colony: c.id }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("lift {} Emigrants from {} to {}", k, self.tables.state(sid).name, self.place_name(Place::Colony(c.id))), None);
+                }
+            }
             // With the ice open, waiting Emigrants go to Antarctica by sea: a free slot first, else
             // a Colony of the seat's with room. A foothold, not Presence: half weight and no gap,
             // as a Ship's unload there.

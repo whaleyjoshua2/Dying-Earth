@@ -5233,6 +5233,46 @@ fn a_launch_site_lifts_only_the_emigrants_waiting_in_its_state() {
 
 /// Ticket #73 (c): Emigrants go to Antarctica by sea from any state the Faction directs, a turn to
 /// arrive, no launch, founding a Colony in an open slot or joining one of the Faction's own; the ice
+/// Ticket #141 (version 0.07.3): waiting Emigrants lift straight onto the seat's own station over
+/// Earth, from a state with a working Launch Site, as many as the station has Habitat room for.
+/// It is a launch, they are aboard at this Resolution, a rival's station and a blockaded slot both
+/// refuse it, and the same Emigrants cannot be sent twice.
+#[test]
+fn emigrants_lift_straight_to_a_station_over_earth_by_a_launch_site() {
+    let mut g = game();
+    calm(&mut g);
+    let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the Custodians start with a station");
+    if !g.colony(iss).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Habitat) {
+        g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    }
+    let room = g.habitat_room(g.colony(iss).unwrap());
+    assert!(room >= 8, "a Habitat's room: {room}");
+    let home = g.controlled_states(Seat(0))[0];
+    assert!(g.state(home).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()), "the start state has a Launch Site");
+    g.state_mut(home).emigrants = 6;
+    let lift = Order::LiftToStation { state: home, n: 4, colony: iss };
+    assert!(g.check_order(Seat(0), &[], &lift).is_ok(), "{:?}", g.check_order(Seat(0), &[], &lift));
+    assert!(g.check_order(Seat(0), &[], &Order::LiftToStation { state: home, n: 7, colony: iss }).unwrap_err().0.contains("waiting"), "six waiting");
+    assert!(g.check_order(Seat(0), &[], &Order::LiftToStation { state: home, n: room + 1, colony: iss }).is_err(), "no more than the room");
+    let tiangong = station_of(&g, Seat(1), BodyId::Earth).expect("the Prospectors start with a station");
+    assert!(g.check_order(Seat(0), &[], &Order::LiftToStation { state: home, n: 1, colony: tiangong }).unwrap_err().0.contains("not your station"), "own stations only");
+    let pending = [lift.clone()];
+    assert!(g.check_order(Seat(0), &pending, &Order::LiftToStation { state: home, n: 3, colony: iss }).is_err(), "four of the six are already bound: two remain");
+    // Without a Launch Site nothing lifts.
+    let sites: Vec<_> = g.state(home).facilities.iter().filter(|f| f.kind == FacilityKind::LaunchSite).cloned().collect();
+    g.state_mut(home).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
+    assert!(g.check_order(Seat(0), &[], &lift).unwrap_err().0.contains("Launch Site"), "a lift wants a rocket");
+    g.state_mut(home).facilities.extend(sites);
+    // It is a launch, and they are aboard at this Resolution.
+    let launches = g.climate.launches_pending[0];
+    let before = g.colony(iss).unwrap().colonists;
+    g.commit_orders(Seat(0), std::slice::from_ref(&lift));
+    assert_eq!(g.state(home).emigrants, 2, "they have left");
+    assert_eq!(g.climate.launches_pending[0], launches + 1, "a lift is a launch");
+    assert_eq!(g.colony(iss).unwrap().colonists, before + 4, "aboard now");
+    assert!(g.log.to_vec().iter().any(|l| l.contains("4 Emigrants lifted from")), "{:?}", g.log.to_vec());
+}
+
 /// must be open.
 #[test]
 fn emigrants_go_to_antarctica_by_sea_from_any_state_and_arrive_a_turn_later() {

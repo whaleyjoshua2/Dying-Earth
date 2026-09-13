@@ -1184,6 +1184,19 @@ impl Game {
         self.colony_ship_capacity(seat) + self.crowd_extra()
     }
 
+    /// Ticket #141 (version 0.07.3): how many of a Nation State's waiting Emigrants the pending
+    /// orders already send away, by sea or by lift, so the same people are never ordered twice.
+    pub fn emigrants_leaving(&self, pending: &[crate::orders::Order], state: StateId) -> u32 {
+        use crate::orders::Order;
+        pending
+            .iter()
+            .map(|o| match o {
+                Order::SendToAntarctica { state: s, n, .. } | Order::LiftToStation { state: s, n, .. } if *s == state => *n,
+                _ => 0,
+            })
+            .sum()
+    }
+
     /// The population a lift from a Launch Site takes for this many Colonists (Steerage doubles it).
     pub fn lift_population(&self, seat: Seat, colonists: u32) -> f64 {
         // Ticket #73: paid when the Emigrants muster, not when a Ship lifts them.

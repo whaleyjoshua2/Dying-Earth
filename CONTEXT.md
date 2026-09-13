@@ -256,7 +256,7 @@ _Avoid_: fort, garrison, base
 A person counted in the population of a Colony or Region. Since version 0.05.5 Colonists are built: they muster in a Region as Emigrants, are carried by Ships and held by Habitats, and are never spent as a resource.
 
 **Emigrant**:
-A Colonist mustered in a Region and not yet gone: up to four a turn per Faction (eight for the Arkwrights), in one state the Faction directs, at a tenth of a person each, on the state's card at End Turn. A batch takes half a point off the state's Unrest. A working Launch Site lifts Emigrants onto a Ship, and once the Antarctic ice is open the sea takes them to Antarctica in a turn with no launch. They are people of their state until they leave it.
+A Colonist mustered in a Region and not yet gone: up to four a turn per Faction (eight for the Arkwrights), in one state the Faction directs, at a tenth of a person each, on the state's card at End Turn. A batch takes half a point off the state's Unrest. A working Launch Site lifts Emigrants onto a Ship, or, since version 0.07.3, straight onto a Space Station of their Faction's over Earth, as many as its Habitats have room for, aboard at that turn's Resolution -- a launch, with no crowd; and once the Antarctic ice is open the sea takes them to Antarctica in a turn with no launch. They are people of their state until they leave it.
 _Avoid_: settler, recruit, migrant, passenger, colonist-in-waiting
 _Avoid_: settler, crew, worker, population resource
 

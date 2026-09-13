@@ -345,6 +345,14 @@ fn build_board(session: &mut Session) {
                 g.state_mut(sid).emigrants = n;
             }
         }
+        // `room:1` (a building aid, ticket #141): seat 0's station over Earth has a Habitat, so the
+        // lift button can be photographed on turn 1, when the station is still a bare core.
+        if std::env::args().any(|a| a == "room:1")
+            && let Some(id) = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.id)
+            && !g.colony(id).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Habitat)
+        {
+            g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+        }
         // `venture:<n>` (a building aid, ticket #72): seat 0 as the Prospectors holds n Materials in
         // the Venture Capital Fund and banks half its output.
         if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("venture:").and_then(|v| v.parse::<i64>().ok()))
