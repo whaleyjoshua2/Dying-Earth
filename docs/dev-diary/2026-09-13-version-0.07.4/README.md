@@ -75,3 +75,23 @@ a Region stops it for good** as a drag does, so the Region chosen stays where it
 number is a named constant now, `START_GLOBE_PERIOD_SECS`.
 
 ![The start screen after the same wait as before: the globe has turned a third as far](start-globe-slower.png)
+
+## An Emissions history on the top bar's hover
+
+Ticket [#153](https://github.com/whaleyjoshua2/Dying-Earth/issues/153). The designer's line: *"mouse
+over on emissions on top bar should proc a history graph."* The game kept no history: the engine held
+only the last turn's breakdown. Built as the ticket's recommendation (b) for the designer to react
+to: **one record per Climate phase** kept in the engine and saved with the game (the breakdown by
+source, the Stock, the Temperature, and the Breaks that fired); a **hand-painted chart** of three
+lines -- what the world emitted, what the Sink and Scrubbers removed, and the net between them --
+against a plain zero line, a red tick on the turn axis where a Break fired, the last net figure at
+the line's end; drawn small in the top bar's hover and wide on the Climate Panel under the by-source
+list. No charting crate: the same allocate-and-paint the Temperature bar uses. A new `rule_tip_ui`
+lets the `tip:` aid photograph a hover that draws.
+
+![The top bar's Emissions hover at turn 13, from `turns:12 tip:history`](emissions-history-hover.png)
+
+![The same history on the Climate Panel, from `climate:top`](emissions-history-climate-panel.png)
+
+First try had the zero line's `0` label colliding with `turn 13` while nothing had gone below zero;
+the label now appears only when the zero line stands clear of the turn axis.

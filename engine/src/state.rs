@@ -414,11 +414,29 @@ impl EmissionsBreakdown {
     }
 }
 
+/// Ticket #153 (version 0.07.4): one turn of the **Emissions history** -- the breakdown the Climate
+/// phase settled, the Stock and Temperature it left, and any Breaks that fired in it. One record
+/// per Climate phase, kept for the whole game and saved with it, so the top bar's hover and the
+/// Climate Panel can draw the world's Emissions turn by turn.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmissionsRecord {
+    pub turn: u32,
+    pub breakdown: EmissionsBreakdown,
+    pub co2: f64,
+    pub temperature: f64,
+    /// Indices into `climate.toml`'s Breaks of those that fired this phase.
+    pub breaks: Vec<usize>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Climate {
     pub co2: f64,
     pub temperature: f64,
     pub last: EmissionsBreakdown,
+    /// Ticket #153 (version 0.07.4): every Climate phase so far, oldest first. A save from before
+    /// this version loads with an empty history and the graph grows from there.
+    #[serde(default)]
+    pub history: Vec<EmissionsRecord>,
     /// Launches from Earth since the last Climate phase, per seat, charged next time.
     pub launches_pending: [u32; SEAT_COUNT],
     /// Emissions a card (the Methane Burst) adds at the next Climate phase, worldwide.
@@ -824,6 +842,7 @@ impl Game {
                 co2: tables.climate.starting_co2,
                 temperature: tables.climate.base_temperature,
                 last: EmissionsBreakdown::default(),
+                history: Vec::new(),
                 launches_pending: [0; SEAT_COUNT],
                 card_emissions_next: 0.0,
                 natural_sink: tables.climate.natural_sink,

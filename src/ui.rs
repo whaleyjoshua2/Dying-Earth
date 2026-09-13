@@ -17,6 +17,74 @@ use egui::{Color32, FontId, Pos2, RichText, Ui};
 /// filled and the ones ahead are thin and dim; the Temperature now carries a filled marker and the
 /// Temperature the CO2 Stock has already committed the world to a hollow one, with the warming
 /// between them shaded; and the line beneath names the next Break ahead.
+/// Ticket #153 (version 0.07.4): **the Emissions history**, a hand-painted line chart of every
+/// Climate phase so far. The designer: *"mouse over on emissions on top bar should proc a history
+/// graph."* Three lines against a plain zero line: what the world emitted, what the Natural Sink and
+/// the Scrubbers removed, and the net between them, which is the top bar's figure and the CO2
+/// Stock's change each turn; a red tick on the turn axis where a Break fired; the last net figure
+/// written at the line's end. Drawn at whatever size the caller allots -- small in the bar's hover,
+/// wide on the Climate Panel -- with no charting crate, as the Temperature bar is drawn.
+fn emissions_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
+    const EMITTED: Color32 = Color32::from_rgb(232, 140, 90);
+    const REMOVED: Color32 = Color32::from_rgb(110, 190, 130);
+    const NET: Color32 = Color32::from_rgb(235, 235, 240);
+    const BREAK: Color32 = Color32::from_rgb(236, 88, 76);
+    let h = &game.climate.history;
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 6.0;
+        ui.label(RichText::new("emitted").color(EMITTED).small());
+        ui.label(RichText::new("removed").color(REMOVED).small());
+        ui.label(RichText::new("net").color(NET).small());
+        ui.label(RichText::new("ppm a turn; a red tick is a Break").weak().small());
+    });
+    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    let painter = ui.painter();
+    painter.rect_filled(rect, 3.0, Color32::from_rgb(38, 38, 44));
+    if h.is_empty() {
+        painter.text(rect.center(), egui::Align2::CENTER_CENTER, "No turn resolved yet.", FontId::proportional(12.0), Color32::from_gray(150));
+        return;
+    }
+    // Room at the right for the last figure and at the bottom for the turn axis.
+    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(6.0, 6.0), rect.max - egui::vec2(44.0, 16.0));
+    let emitted: Vec<f64> = h.iter().map(|r| r.breakdown.total()).collect();
+    let removed: Vec<f64> = h.iter().map(|r| r.breakdown.total_sink()).collect();
+    let net: Vec<f64> = h.iter().map(|r| r.breakdown.net()).collect();
+    let top = emitted.iter().chain(&removed).chain(&net).cloned().fold(0.0_f64, f64::max).max(1.0) * 1.08;
+    let bottom = net.iter().cloned().fold(0.0_f64, f64::min).min(0.0) * 1.08;
+    let (first, last) = (h[0].turn, h[h.len() - 1].turn);
+    let span = (last.max(first + 1) - first) as f32;
+    let x = |turn: u32| plot.left() + (turn - first) as f32 / span * plot.width();
+    let y = |v: f64| plot.bottom() - (((v - bottom) / (top - bottom)) as f32) * plot.height();
+    // The zero line is the point of the picture: above it the Stock rose, below it fell.
+    painter.line_segment([Pos2::new(plot.left(), y(0.0)), Pos2::new(plot.right(), y(0.0))], egui::Stroke::new(1.0, Color32::from_gray(150)));
+    // Its label only when the line stands clear of the turn axis, which it does not while nothing
+    // has yet gone below zero.
+    if plot.bottom() - y(0.0) > 10.0 {
+        painter.text(Pos2::new(plot.right() + 3.0, y(0.0)), egui::Align2::LEFT_CENTER, "0", FontId::proportional(10.0), Color32::from_gray(150));
+    }
+    let line = |values: &[f64], colour: Color32, width: f32| {
+        let points: Vec<Pos2> = h.iter().zip(values).map(|(r, v)| Pos2::new(x(r.turn), y(*v))).collect();
+        if points.len() == 1 {
+            painter.circle_filled(points[0], width + 1.0, colour);
+        } else {
+            painter.add(egui::Shape::line(points, egui::Stroke::new(width, colour)));
+        }
+    };
+    line(&emitted, EMITTED, 1.2);
+    line(&removed, REMOVED, 1.2);
+    line(&net, NET, 2.0);
+    for r in h.iter().filter(|r| !r.breaks.is_empty()) {
+        let bx = x(r.turn);
+        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 9.0)], egui::Stroke::new(2.0, BREAK));
+    }
+    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, format!("turn {first}"), FontId::proportional(10.0), Color32::from_gray(150));
+    if last > first {
+        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, format!("turn {last}"), FontId::proportional(10.0), Color32::from_gray(150));
+    }
+    let end = net[net.len() - 1];
+    painter.text(Pos2::new(plot.right() + 3.0, y(end)), egui::Align2::LEFT_CENTER, format!("{end:+.1}"), FontId::proportional(11.0), NET);
+}
+
 fn temperature_bar(ui: &mut Ui, game: &Game) {
     const BREAK: Color32 = Color32::from_rgb(236, 88, 76);
     const SEA: Color32 = Color32::from_rgb(96, 156, 236);
@@ -1388,6 +1456,28 @@ fn bar_resource(ui: &mut Ui, icons: &Icons, key: &str, word: &str, value: String
     });
 }
 
+/// Ticket #153 (version 0.07.4): `bar_resource` for a figure whose hover draws something -- the
+/// Emissions figure and its history. One tooltip on the glyph and the label together, so the chart
+/// is never painted twice.
+fn bar_resource_with(ui: &mut Ui, icons: &Icons, key: &str, word: &str, value: String, add: impl Fn(&mut Ui)) {
+    let resp = ui
+        .horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            match icons.image(key, 16.0) {
+                Some(image) => {
+                    ui.add(image);
+                    ui.label(RichText::new(value).strong());
+                }
+                None => {
+                    ui.label(RichText::new(format!("{word} {value}")).strong());
+                }
+            }
+        })
+        .response
+        .interact(egui::Sense::hover());
+    rule_tip_ui(resp, word, add);
+}
+
 /// The Influence figure's hover, lifted out of the bar when ticket #128 moved the figure.
 const INFLUENCE_HOVER: &str = "The Allotment is what your places and buildings give each turn; bought Influence comes from the Trading window at 2 Ducats each.";
 
@@ -1503,14 +1593,13 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             // Ticket #112 (version 0.07.1): net Emissions join the bar. Until now the only way to
             // learn whether the world went over or under the Natural Sink this turn was to open the
             // Climate Panel; the Temperature beside it moves too slowly to answer that question.
-            bar_resource(
-                ui,
-                icons,
-                "emissions",
-                "Emissions",
-                format!("{:+.1} ppm", game.climate.last.net()),
-                "Net Emissions at the last Resolution: everything the world emitted less the Natural Sink and any Scrubbers. Above zero the CO2 Stock rose and the Temperature will follow; below zero it fell. The Climate Panel breaks it into its sources.".to_string(),
-            );
+            // Ticket #153 (version 0.07.4): the hover draws the Emissions history under its sentence.
+            bar_resource_with(ui, icons, "emissions", "Emissions history", format!("{:+.1} ppm", game.climate.last.net()), |ui| {
+                ui.set_max_width(300.0);
+                ui.label(RichText::new("Emissions history").strong());
+                ui.label("Net Emissions at the last Resolution: everything the world emitted less the Natural Sink and any Scrubbers. Above zero the CO2 Stock rose and the Temperature will follow; below zero it fell. The Climate Panel breaks it into its sources.");
+                emissions_history(ui, game, egui::vec2(280.0, 96.0));
+            });
             ui.separator();
             // Ticket #143 (version 0.07.3): Earth's people and space's, in real numbers. The
             // designer: *"Please track earth and space populations on the top bar."* Earth is the
@@ -2700,6 +2789,24 @@ fn rule_tip(response: egui::Response, text: String) -> egui::Response {
         }
     }
     response.on_hover_ui(|ui| hover_with_icons(ui, &text))
+}
+
+/// Ticket #153 (version 0.07.4): `rule_tip` for a tooltip that DRAWS rather than says -- the
+/// Emissions history. `word` is what the `tip:` aid matches against, so the hover can be
+/// photographed headlessly like any other; the same once-a-frame guard applies.
+fn rule_tip_ui(response: egui::Response, word: &str, add: impl Fn(&mut Ui)) -> egui::Response {
+    if let Some(wanted) = std::env::args().find_map(|a| a.strip_prefix("tip:").map(str::to_owned))
+        && word.contains(&wanted)
+    {
+        let pass = response.ctx.cumulative_pass_nr();
+        let fired: Option<u64> = response.ctx.data(|d| d.get_temp(egui::Id::new("tip_fired")));
+        if fired != Some(pass) {
+            response.ctx.data_mut(|d| d.insert_temp(egui::Id::new("tip_fired"), pass));
+            response.show_tooltip_ui(|ui| add(ui));
+            return response;
+        }
+    }
+    response.on_hover_ui(|ui| add(ui))
 }
 
 /// Ticket #112 (version 0.07.1): a figure's glyph BESIDE its word, which is the rule everywhere
@@ -4617,6 +4724,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // Ticket #54: the Scrubbers stand beside the Natural Sink in the same line.
             ui.label(format!("Natural Sink -{:.1}{}", e.sink, if e.scrubbers > 0.0 { format!(" and Scrubbers -{:.1}", e.scrubbers) } else { String::new() }));
             ui.label(RichText::new(format!("Net {:+.1} ppm", e.net())).strong());
+            // Ticket #153 (version 0.07.4): the same history, at the panel's width.
+            ui.add_space(4.0);
+            emissions_history(ui, game, egui::vec2(ui.available_width(), 110.0));
             ui.separator();
             let growth = game.population_growth_rate() * 100.0;
             ui.label(format!(
