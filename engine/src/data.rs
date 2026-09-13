@@ -1433,10 +1433,13 @@ pub fn default_data_dir() -> PathBuf {
 /// Ducats formula lives HERE, in one place, so that `Game::state_ducats` and the panel can never
 /// disagree and the ticket that moves the formula moves one line.
 impl Tables {
-    /// The base Ducats a Region's economy pays a turn at an Industry Level (ticket #35): GDP x
-    /// Industry Level / 10, rounded down.
+    /// The base Ducats a Region's economy pays a turn at an Industry Level. Ticket #35 set it at
+    /// GDP x Industry Level / 10, rounded down, under which ten of the fourteen Regions paid nothing
+    /// at the start; ticket #139 (version 0.07.3) made it **GDP x Industry Level / 5, rounded down,
+    /// never below 1** -- the designer: *"Saudi Arabia can't pay 0"* -- so every Region pays, the
+    /// rich pay double, and a small economy pays a flat one until GDP x Industry reaches 10.
     pub fn base_ducats(&self, sid: StateId, industry_level: u32) -> i64 {
-        (self.state(sid).gdp * industry_level as i64) / 10
+        ((self.state(sid).gdp * industry_level as i64) / 5).max(1)
     }
 
     /// What a Region's economy would pay `faction` a turn as the game opens: the base at the card's

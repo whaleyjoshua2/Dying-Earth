@@ -1174,7 +1174,7 @@ fn start_screen(
                     ui,
                     &[
                         RowPart { before: String::new(), icon: Some("influence"), after: format!("{}", c.influence), hover: Some(format!("Influence value {}: what it adds to its controller's Allotment each turn.", c.influence)) },
-                        RowPart { before: String::new(), icon: Some("ducats"), after: format!("{ducats} a turn"), hover: Some(format!("GDP {}: its economy pays {} Ducats a turn (GDP x Industry Level / 10).", c.gdp, ducats)) },
+                        RowPart { before: String::new(), icon: Some("ducats"), after: format!("{ducats} a turn"), hover: Some(format!("GDP {}: its economy pays {} Ducats a turn (GDP x Industry Level / 5, never below 1).", c.gdp, ducats)) },
                         RowPart { before: String::new(), icon: Some("emissions"), after: format!("{:.1}", session.tables.start_emissions(sid, faction)), hover: Some("Emissions a turn as the game opens: its industry, its people and its start Facilities.".to_string()) },
                         RowPart { before: format!("Education Level {}", c.education_level), icon: None, after: String::new(), hover: None },
                     ],
@@ -3098,7 +3098,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     let fac_em: f64 = st.facilities.iter().filter(|f| f.working()).map(|f| game.tables.facility(f.kind).emissions * mult).sum();
     icon_word(ui, "population", format!("Population {:.1} (hundreds of millions), Industry Level {}, leans {:?}", st.population, st.industry_level, card.resource_lean));
     icon_word(ui, "influence", format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid)));
-    ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 10); a Bank here would add {}", card.gdp, game.state_ducats(sid), (game.tables.facility(FacilityKind::Bank).produces.as_ref().map(|p| p.amount).unwrap_or(0) * card.gdp) / 10));
+    ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 5, never below 1); a Bank here would add {}", card.gdp, game.state_ducats(sid), (game.tables.facility(FacilityKind::Bank).produces.as_ref().map(|p| p.amount).unwrap_or(0) * card.gdp) / 10));
     icon_word(ui, "emissions", format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult));
     // Ticket #54: the per-person line, its formula, and what Leapfrog has taken off it.
     {

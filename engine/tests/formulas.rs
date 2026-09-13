@@ -414,18 +414,23 @@ fn the_allotment_is_the_base_plus_each_controlled_states_value_times_the_faction
 fn a_controlled_state_pays_ducats_from_gdp_times_industry_and_a_bank_adds_more() {
     let mut g = game();
     // Ticket #53: East Asia gdp 23 x Industry 3 / 10 = 6 a turn; ticket #125 (version 0.07.2)
-    // took 6 of that gdp to Japan and Korea, so 17 x 3 / 10 = 5. Europe 20 x 3 / 10 = 6, and
-    // ticket #83 (version 0.06.0): x1.2 for the Prospectors who hold it, 7.
-    assert_eq!(g.state_ducats(StateId::EastAsia), 5);
-    assert_eq!(g.state_ducats(StateId::Europe), 7);
+    // took 6 of that gdp to Japan and Korea, so 17 x 3 / 10 = 5. Ticket #139 (version 0.07.3): the
+    // divisor is 5 and nothing pays under 1, so 17 x 3 / 5 = 10; Europe 20 x 3 / 5 = 12, and ticket
+    // #83 (version 0.06.0): x1.2 for the Prospectors who hold it, 14. North Africa, gdp 1 at
+    // Industry 1, would have paid nothing under the old rule and pays the floor of 1.
+    assert_eq!(g.state_ducats(StateId::EastAsia), 10);
+    assert_eq!(g.state_ducats(StateId::Europe), 14);
+    assert_eq!(g.tables.base_ducats(StateId::NorthAfrica, 1), 1, "the floor: no Region pays nothing");
+    assert_eq!(g.tables.base_ducats(StateId::ArabianPeninsula, 2), 1, "Saudi Arabia, 2 x 2 / 5, pays the floor");
     let paid = income_of(&mut g, Seat(0));
-    assert_eq!(paid.ducats, 5);
+    assert_eq!(paid.ducats, 10);
     // A Bank in East Asia adds 4 x 17 / 10 = 6 (it was 4 x 23 / 10 = 9 before ticket #125 took 6 of
-    // the gdp to Japan and Korea); in North Africa (gdp 1) it would add nothing.
+    // the gdp to Japan and Korea); in North Africa (gdp 1) it would add nothing. A Bank's own
+    // figure did not move on ticket #139.
     g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Bank));
     assert_eq!(g.facility_yield(Seat(0), StateId::EastAsia, FacilityKind::Bank).amount, 6);
     assert_eq!(g.facility_yield(Seat(0), StateId::NorthAfrica, FacilityKind::Bank).amount, 0);
-    assert_eq!(income_of(&mut g, Seat(0)).ducats, 11);
+    assert_eq!(income_of(&mut g, Seat(0)).ducats, 16);
     // A Trade Post followed the Habitat yield; ticket #90 (version 0.06.0): it pays 2 per Colonist
     // at its Body plus 3 per other Body held. Empty Colonies on the Moon and Mars, with Earth held:
     // each sees two other Bodies, so 6.
@@ -5576,9 +5581,10 @@ fn the_prospectors_states_pay_their_ducats_at_one_point_two() {
     g.state_mut(sid).industry_level = 10;
     let gdp = g.tables.state(sid).gdp;
     g.state_mut(sid).control = Control::Controlled(Seat(0));
-    assert_eq!(g.state_ducats(sid), gdp, "the Custodians: gdp x 10 / 10");
+    // Ticket #139 (version 0.07.3): the divisor is 5 now, so Industry 10 pays twice the gdp.
+    assert_eq!(g.state_ducats(sid), 2 * gdp, "the Custodians: gdp x 10 / 5");
     g.state_mut(sid).control = Control::Controlled(pro);
-    assert_eq!(g.state_ducats(sid), (gdp as f64 * 1.2).floor() as i64, "the Prospectors: x1.2");
+    assert_eq!(g.state_ducats(sid), (2.0 * gdp as f64 * 1.2).floor() as i64, "the Prospectors: x1.2");
 }
 
 /// Ticket #83: the Prospectors buy Materials, Fuel, Energy and outright buildings at 15% off,

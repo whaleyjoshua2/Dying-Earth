@@ -284,6 +284,36 @@ already uses -- with the shield painted inside, so it looks and behaves like the
 
 Clippy clean with `-D warnings`, 253 tests passing.
 
+## The Ducats formula: every Region pays something
+
+Ticket [#139](https://github.com/whaleyjoshua2/Dying-Earth/issues/139). The designer's line: *"Adjust the
+ducket formula Saudi Arabia can't pay 0."* It was wider than Saudi Arabia: under `GDP x Industry
+Level / 10, rounded down`, ten of the fourteen Regions paid nothing at the start and eighteen Ducats
+a turn left the whole table. Decided in one round and a measurement: **`GDP x Industry Level / 5,
+rounded down, never below 1`**. The United States 13, the European Union 12, China 10, Japan 3,
+every other Region 1; forty-eight a turn across the table. A small economy pays a flat one until
+GDP x Industry reaches 10. One line in `Tables::base_ducats`, which the Region card and the start
+globe both read.
+
+![Saudi Arabia pays one](ducats-saudi-arabia-pays-one.png)
+
+**Measured before it was final**, twenty seeds in each of four seatings, three rules side by side:
+
+| rule | Custodian wins | other wins | Collapses | tree completes |
+|---|---|---|---|---|
+| / 10 rounded down (the 0.07.2 baseline) | 70 | Arkwrights 1, Archivists 1 | 8 | 73 of 80 |
+| / 10 rounded up, never below 1 | 68 | Archivists 2 | 10 | 75 of 80 |
+| **/ 5 rounded down, never below 1** | **62** | **Arkwrights 2, Archivists 2** | **14** | **76 of 80** |
+
+Five of the six new Collapses are in the seating where the Prospectors sit in China: a Prospector
+with twice the Ducats buys more Materials, builds more and emits more, and the world crosses the
+Collapse Line before turn 36 in a quarter of those games. The Custodians lose eight wins, most to
+those Collapses rather than to a rival; both rival wins doubled. Put to the designer with the gentler
+rule beside it; the designer kept the chosen one -- *"looks most balanced yet"* -- and the Collapse
+rise is written on the map for the balance version.
+
+Clippy clean with `-D warnings`, 253 tests passing (two rewritten for the divisor and the floor).
+
 ## Building art: candidate sheets (research, ticket #144)
 
 Sixty-two game-icons.net candidates for the twenty-two building kinds, drawn with the game's own
