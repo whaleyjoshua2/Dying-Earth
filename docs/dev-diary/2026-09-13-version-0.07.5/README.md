@@ -190,3 +190,35 @@ reaches further than this ticket -- **a chart's time axis carries the date, not 
 `turn 1` to `turn 17`, which is the form the top bar has always used. The Break ticks were shortened
 and the plot floor lifted in the same pass, because a tick landing near the last turn sat on top of
 the label.
+
+## The four Faction symbols
+
+Ticket [#168](https://github.com/whaleyjoshua2/Dying-Earth/issues/168), chosen off the candidate
+sheets that [the research](https://github.com/whaleyjoshua2/Dying-Earth/issues/167) filed. The
+designer's line: *"I want to pick four symbols to represent the factions - for now these symbols
+should only appear on the faction selection screen in their respective cards."*
+
+![The four Faction cards, each with its symbol where its colour swatch stood](faction-symbols-on-the-cards.png)
+
+![The four title rows magnified: a sprout, a mining helmet, an exit door, a cloud with an arrow](faction-symbols-magnified.png)
+
+Built as the ticket's recommendation: **the symbol stands where the colour swatch stood**, drawn in
+the Faction's own colour at 28 pixels, so the card says which Faction and which colour in one mark
+and grows by nothing. The research measured that 28 is the size to use and not the swatch's 24 -- at
+24 a glyph has a quarter fewer pixels and three of the candidates stopped naming themselves.
+
+The four, all from game-icons.net under the licence the game already carries, and both authors
+already on the Credits screen, so it gains four rows and no new name:
+
+| Faction | symbol | why |
+|---|---|---|
+| Custodians | **Sprout** (Lorc) | the boldest shape on its sheet, and the only one of the green candidates that survives 24 with its meaning; `recycle` was passed over because the Trade Post already wears an arrow loop |
+| Prospectors | **Mining Helmet** (Delapouite) | the cleanest shape on its sheet; `miner` and `war-pick` are the Mine Module's own picture |
+| Arkwrights | **Exit Door** (Delapouite) | a door with a thick arrow through it -- *leave Earth* said in one mark, and the boldest shape available, which the darkest of the four colours needs |
+| Archivists | **Cloud Upload** (Delapouite) | says the thing the Faction does; `open-book` is the Archive Module's own picture |
+
+**One standing rule is bent here, deliberately and nowhere else.** An icon's colour is decided in
+`icons::fill` and never by its caller, because a colour on this board means *whose*. A Faction symbol
+is exactly a statement of whose, so the Faction card picks the tint itself, with the reason written
+where the bending happens. The symbols appear on the Faction screen and nowhere else: the roster,
+the map labels, the Report and the Victory screen keep their Faction colours and names.

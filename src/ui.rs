@@ -1248,8 +1248,29 @@ fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut
     let card = session.tables.faction(kind);
     egui::Frame::group(ui.style()).inner_margin(12.0).show(ui, |ui| {
         ui.horizontal(|ui| {
-            let (swatch, _) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), egui::Sense::hover());
-            ui.painter().rect_filled(swatch, 4.0, rgb(card.colour));
+            // Ticket #168 (version 0.07.5): the Faction's symbol stands where its colour swatch
+            // stood, drawn in the Faction's own colour, so the card says which Faction and which
+            // colour in one mark and grows by nothing. The designer: *"I want to pick four symbols
+            // to represent the factions - for now these symbols should only appear on the faction
+            // selection screen in their respective cards."*
+            //
+            // This is the one place a caller picks an icon's colour. `icons::fill` decides it
+            // everywhere else, and the reason for that rule is that a colour on this board means
+            // WHOSE -- which is exactly what a Faction symbol is for, so the rule is bent here
+            // deliberately and nowhere else. The research (#167) measured that the symbol wants 28
+            // pixels rather than the swatch's 24: at 24 a glyph has a quarter fewer pixels and
+            // three of the candidates stopped naming themselves.
+            let key = crate::icons::faction_symbol(kind);
+            match Icons::from_ctx(ui.ctx(), key, 28.0) {
+                Some(image) => {
+                    ui.add(image.tint(rgb(card.colour)));
+                }
+                None => {
+                    // No art loaded: the swatch it replaced, so the row is never empty.
+                    let (swatch, _) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), egui::Sense::hover());
+                    ui.painter().rect_filled(swatch, 4.0, rgb(card.colour));
+                }
+            }
             ui.label(RichText::new(&card.name).size(24.0).strong().color(rgb(card.colour)));
         });
         ui.label(&card.blurb);
