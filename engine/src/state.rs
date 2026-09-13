@@ -1446,8 +1446,48 @@ impl Game {
         self.build_slots(s).saturating_sub(self.slots_used(s))
     }
 
+    /// Ticket #143 (version 0.07.3): the population figure's unit, in people. A Region's figure, a
+    /// Colonist and an Emigrant are all counted in it, so `Region population 76.0` is 380 million
+    /// people and one Colonist is five million. (A hundred million, with a Colonist a tenth of one,
+    /// until this ticket.) The designer: *"I want country cards to use the actual population."*
+    pub const PEOPLE_PER_UNIT: f64 = 5_000_000.0;
+
+    /// Units in a hundred million people, since the cards quote per-person Emissions at that rate.
+    pub const UNITS_PER_HUNDRED_MILLION: f64 = 100_000_000.0 / Game::PEOPLE_PER_UNIT;
+
+    /// A population figure written as real people: `1.14B`, `380M`, `20M`.
+    pub fn people_text(units: f64) -> String {
+        let people = units * Game::PEOPLE_PER_UNIT;
+        if people >= 1_000_000_000.0 {
+            format!("{:.2}B", people / 1_000_000_000.0)
+        } else {
+            format!("{:.0}M", people / 1_000_000.0)
+        }
+    }
+
+    /// The card's form: the figure in units to one decimal, and the real number beside it.
+    pub fn population_text(units: f64) -> String {
+        format!("{units:.1} ({})", Game::people_text(units))
+    }
+
+    /// Ticket #143: everyone on Earth -- the Regions' figures and the Colonists in Antarctica.
+    pub fn earth_population(&self) -> f64 {
+        let regions: f64 = self.states.iter().map(|s| s.population).sum();
+        let antarctica: u32 = self.colonies.iter().filter(|c| !self.off_earth(c)).map(|c| c.colonists).sum();
+        regions + antarctica as f64
+    }
+
+    /// Ticket #143: everyone living off Earth, in Habitats, a station over Earth counting as off and
+    /// Antarctica as on -- the Off-world Presence count, summed over every seat. People aboard a Ship
+    /// are not yet anywhere and are not counted.
+    pub fn space_population(&self) -> u32 {
+        self.colonies.iter().filter(|c| self.off_earth(c)).map(|c| c.colonists).sum()
+    }
+
     pub fn population_factor(&self, s: StateId) -> f64 {
-        1.0 + self.state(s).population / 50.0
+        // Ticket #143 (version 0.07.3): the unit is five million people, so 1,000 units is the five
+        // billion that 50 hundred-million was.
+        1.0 + self.state(s).population / 1000.0
     }
 
     /// Ticket #97 (version 0.07.0): the Modules this Colony or Space Station may hold: the table's

@@ -113,11 +113,12 @@ emissions = 0.0
 needs_tech = "coastal_engineering"
 no_slot = true
 
-# Ticket #54: the cap on Scrubbers in one Nation State, from its population in hundreds of millions:
+# Ticket #54: the cap on Scrubbers in one Nation State, from its population -- in units of five
+# million since ticket #143 (version 0.07.3), so 40 units is the two hundred million each Scrubber wants:
 # clamp(round(population / per_population), min, max). Russia at 1.5 gets the floor of 2; South Asia
 # at 19.4 gets the ceiling of 10.
 [scrubber]
-per_population = 2.0
+per_population = 40.0
 min = 2
 max = 10
 

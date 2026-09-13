@@ -20,7 +20,7 @@ influence_multiplier = 1.2
 # mothballed, one Module of the paired kind off Earth (a station over Earth included, Antarctica
 # not) makes double: one for one, the most productive undoubled Module first, on its final figure.
 mothball_pairs = { factory = "mine", power_plant = "generator", refinery = "refinery", research_lab = "observatory" }
-signature = "The Scrubber and Leapfrog. A Scrubber is a Facility only they build, in a Nation State they control, taking no build slot: 30 Materials, 2 turns, 4 Energy upkeep, no Emissions; while it is online it enlarges the Natural Sink by 3.0 ppm a turn and takes 1 off that state's Unrest. A state holds as many as half its population in hundreds of millions, between 2 and 10, and they are destroyed if it changes hands. Leapfrog costs 50 Ducats on a state they control and lowers its people's Emissions coefficient by 0.03 for good, never below 0.04. Production Moved: while a Factory, Power Plant, Refinery or Research Lab of theirs is mothballed, one Mine, Generator, Refinery or Observatory of theirs off Earth makes double, one for one, the most productive first."
+signature = "The Scrubber and Leapfrog. A Scrubber is a Facility only they build, in a Nation State they control, taking no build slot: 30 Materials, 2 turns, 4 Energy upkeep, no Emissions; while it is online it enlarges the Natural Sink by 3.0 ppm a turn and takes 1 off that state's Unrest. A state holds one for every two hundred million people it has, between 2 and 10, and they are destroyed if it changes hands. Leapfrog costs 50 Ducats on a state they control and lowers its people's Emissions coefficient by 0.03 for good, never below 0.04. Production Moved: while a Factory, Power Plant, Refinery or Research Lab of theirs is mothballed, one Mine, Generator, Refinery or Observatory of theirs off Earth makes double, one for one, the most productive first."
 victory = "Stabilization (3 consecutive Climate phases with net Emissions below the Natural Sink) plus 12 Colonists living off Earth."
 victory_first = { kind = "stabilization_run", bar = 3 }
 victory_second = { kind = "off_world_presence", bar = 12 }
@@ -137,7 +137,7 @@ draw_return = 0.9
 # later, with no launch.
 [emigrants]
 per_turn = 4
-population_each = 0.1
+population_each = 1.0
 unrest_fall = 0.5
 antarctica_turns = 1
 

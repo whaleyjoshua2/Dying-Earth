@@ -1409,19 +1409,16 @@ impl Game {
                     let cut = self.tables.climate.leapfrog_baseline_cut;
                     self.state_mut(*state).leapfrog += per;
                     self.state_mut(*state).baseline_cut += cut;
-                    let line = format!(
-                        "The {} Leapfrogged {}: its people now emit {:.2} per hundred million.",
-                        self.seat_name(seat),
-                        self.tables.state(*state).name,
-                        self.population_coefficient(*state)
-                    );
+                    // Ticket #143 (version 0.07.3): the rate is quoted per hundred million, twenty units.
+                    let per_hundred_million = self.population_coefficient(*state) * Game::UNITS_PER_HUNDRED_MILLION;
+                    let line = format!("The {} Leapfrogged {}: its people now emit {:.2} per hundred million.", self.seat_name(seat), self.tables.state(*state).name, per_hundred_million);
                     self.log(line);
                     let text = self.say(
                         "leapfrog",
                         &[
                             ("faction", self.seat_name(seat)),
                             ("state", self.tables.state(*state).name.clone()),
-                            ("coefficient", format!("{:.2}", self.population_coefficient(*state))),
+                            ("coefficient", format!("{per_hundred_million:.2}")),
                         ],
                     );
                     self.report_line(LineKind::Climate, Some(ReportPlace::State(*state)), text);

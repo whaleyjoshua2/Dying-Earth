@@ -1163,7 +1163,7 @@ fn start_screen(
                 glyph_row(
                     ui,
                     &[
-                        RowPart { before: String::new(), icon: Some("population"), after: format!("Population {:.1} (hundreds of millions)", c.population), hover: None },
+                        RowPart { before: String::new(), icon: Some("population"), after: format!("Region population {}", Game::population_text(c.population)), hover: Some("The whole Region's people, not its Nation's alone, in units of five million.".to_string()) },
                         RowPart { before: format!("Industry Level {}", c.industry_level), icon: None, after: String::new(), hover: None },
                         RowPart { before: "leans".to_string(), icon: Some(lean_key), after: String::new(), hover: Some(format!("Leans {:?}: the resource this Region is naturally good at producing.", c.resource_lean)) },
                     ],
@@ -1461,6 +1461,29 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 "Emissions",
                 format!("{:+.1} ppm", game.climate.last.net()),
                 "Net Emissions at the last Resolution: everything the world emitted less the Natural Sink and any Scrubbers. Above zero the CO2 Stock rose and the Temperature will follow; below zero it fell. The Climate Panel breaks it into its sources.".to_string(),
+            );
+            ui.separator();
+            // Ticket #143 (version 0.07.3): Earth's people and space's, in real numbers. The
+            // designer: *"Please track earth and space populations on the top bar."* Earth is the
+            // Regions' figures and the Colonists in Antarctica; space is every Colonist living off
+            // Earth, a station over Earth counting as off, as Off-world Presence counts it.
+            let mut regions: Vec<(f64, String)> = StateId::ALL.iter().map(|s| (game.state(*s).population, game.tables.state(*s).name.clone())).collect();
+            regions.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            let mut bodies: Vec<(u32, String)> = BodyId::ALL
+                .iter()
+                .map(|b| (game.colonies.iter().filter(|c| c.body == *b && game.off_earth(c)).map(|c| c.colonists).sum::<u32>(), game.tables.body(*b).name.clone()))
+                .filter(|(n, _)| *n > 0)
+                .collect();
+            bodies.sort_by_key(|(n, _)| std::cmp::Reverse(*n));
+            let earth_lines: Vec<String> = regions.iter().map(|(p, n)| format!("{n} {}", Game::people_text(*p))).collect();
+            let space_lines: Vec<String> = if bodies.is_empty() { vec!["nobody yet".to_string()] } else { bodies.iter().map(|(n, b)| format!("{} {}", b, Game::people_text(*n as f64))).collect() };
+            bar_resource(
+                ui,
+                icons,
+                "population",
+                "Population",
+                format!("Earth {} · Space {}", Game::people_text(game.earth_population()), Game::people_text(game.space_population() as f64)),
+                format!("On Earth: {}.\nOff Earth: {}.\nOne Colonist is five million people; a station over Earth is off Earth and Antarctica is on it.", earth_lines.join(", "), space_lines.join(", ")),
             );
         });
         ui.horizontal_wrapped(|ui| {
@@ -2544,7 +2567,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::Resettle { state } => format!("Resettle this turn's refugees in {}", game.tables.state(*state).name),
         // Ticket #54.
         Order::Change { building, what } => format!("{} the {} at {}", what.name(), building_name(game, *building), game.place_name(building.place())),
-        Order::Leapfrog { state } => format!("Leapfrog {}: its people emit 0.03 less per hundred million", game.tables.state(*state).name),
+        Order::Leapfrog { state } => format!("Leapfrog {}: its people emit {:.2} less per hundred million", game.tables.state(*state).name, game.tables.climate.population_emissions_per_level * Game::UNITS_PER_HUNDRED_MILLION),
         Order::StripPermit { state } => format!("Strip Permit in {}: three turns of double output", game.tables.state(*state).name),
     }
 }
@@ -3097,7 +3120,11 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     let mult = st.control.director().map(|s| game.tables.faction(game.kind(s)).emissions_multiplier).unwrap_or(1.0);
     let industry_em = card.baseline_emissions * st.industry_level as f64 * mult;
     let fac_em: f64 = st.facilities.iter().filter(|f| f.working()).map(|f| game.tables.facility(f.kind).emissions * mult).sum();
-    icon_word(ui, "population", format!("Population {:.1} (hundreds of millions), Industry Level {}, leans {:?}", st.population, st.industry_level, card.resource_lean));
+    // Ticket #143 (version 0.07.3): the figure in units of five million with the real number beside
+    // it, and the word Region, since the figure is the territory's and the Nation's name on the card
+    // read it as the Nation's. The designer: *"Population 12.2 (hundreds of millions) should say
+    // something like Population 12.2 (339M)."*
+    icon_word(ui, "population", format!("Region population {}, Industry Level {}, leans {:?}", Game::population_text(st.population), st.industry_level, card.resource_lean));
     icon_word(ui, "influence", format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid)));
     ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 5, never below 1); a Bank here would add {}", card.gdp, game.state_ducats(sid), (game.tables.facility(FacilityKind::Bank).produces.as_ref().map(|p| p.amount).unwrap_or(0) * card.gdp) / 10));
     icon_word(ui, "emissions", format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult));
@@ -3114,9 +3141,10 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         ui.label(
             RichText::new(format!(
                 "Its people emit {:.2} per hundred million ({:.2} base + {:.2} x Industry Level {}{})",
-                game.population_coefficient(sid),
-                c.population_emissions_base,
-                c.population_emissions_per_level,
+                // Ticket #143: the rate is kept per hundred million, which is twenty units now.
+                game.population_coefficient(sid) * Game::UNITS_PER_HUNDRED_MILLION,
+                c.population_emissions_base * Game::UNITS_PER_HUNDRED_MILLION,
+                c.population_emissions_per_level * Game::UNITS_PER_HUNDRED_MILLION,
                 st.industry_level,
                 leaps
             ))
@@ -3320,7 +3348,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             ui.label(RichText::new("A Scrubber takes no build slot and is destroyed if this state changes hands.").weak());
             ui.horizontal(|ui| {
                 cost_button(ui, game, &session.pending, Order::Leapfrog { state: sid }, "Leapfrog", actions);
-                ui.label(RichText::new(format!("lowers its people to {:.2} per hundred million, for good", (game.population_coefficient(sid) - game.tables.climate.population_emissions_per_level).max(game.tables.climate.population_emissions_base))).weak());
+                ui.label(RichText::new(format!("lowers its people to {:.2} per hundred million, for good", (game.population_coefficient(sid) - game.tables.climate.population_emissions_per_level).max(game.tables.climate.population_emissions_base) * Game::UNITS_PER_HUNDRED_MILLION)).weak());
             });
         }
         if game.kind(Seat(0)) == FactionKind::Prospectors && !st.strip_permit_used {
@@ -3365,8 +3393,8 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             Order::BuildEmigrants { state: sid, n: per },
             &format!("Muster {per} Emigrants"),
             Some(format!(
-                "{:.1} population, on the card at End Turn, and {} off this state's Unrest. A working Launch Site lifts them onto a Ship; once the ice is open the sea takes them to Antarctica.",
-                game.lift_population(Seat(0), per),
+                "{} people, on the card at End Turn, and {} off this state's Unrest. A working Launch Site lifts them onto a Ship or straight to a station of yours over Earth; once the ice is open the sea takes them to Antarctica.",
+                Game::people_text(game.lift_population(Seat(0), per)),
                 Game::unrest_figure(game.tables.emigrants.unrest_fall)
             )),
             actions,
@@ -4200,7 +4228,10 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 let c = &game.tables.climate;
                 ui.label(format!("Population {:.1}", e.population)).on_hover_text(format!(
                     "Each state's people emit {:.2} + {:.2} x its Industry Level per hundred million, halved by Green Consensus, times its controller's Emissions multiplier. The Custodians' Leapfrog lowers a state's own figure by {:.2} for good, never below {:.2}.",
-                    c.population_emissions_base, c.population_emissions_per_level, c.population_emissions_per_level, c.population_emissions_base
+                    c.population_emissions_base * Game::UNITS_PER_HUNDRED_MILLION,
+                    c.population_emissions_per_level * Game::UNITS_PER_HUNDRED_MILLION,
+                    c.population_emissions_per_level * Game::UNITS_PER_HUNDRED_MILLION,
+                    c.population_emissions_base * Game::UNITS_PER_HUNDRED_MILLION
                 ));
             }
             if e.cards > 0.0 {

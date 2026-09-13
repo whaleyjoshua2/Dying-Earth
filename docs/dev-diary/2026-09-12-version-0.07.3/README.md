@@ -417,6 +417,59 @@ version's write-up will restart the baseline from.
 
 Clippy clean with `-D warnings`, 254 tests passing.
 
+## Population in real numbers
+
+Ticket [#143](https://github.com/whaleyjoshua2/Dying-Earth/issues/143). The designer's lines: *"I want
+country cards to use the actual population … Population 12.2 (339M) … a reduction of 4 emigrants in
+a country with a population of 12.2 would become 8.2 … Please track earth and space populations on
+the top bar."* Decided in two rounds: the unit is **five million people**; one Emigrant is one unit;
+the card reads `Region population 228.0 (1.14B)`; every rule rescaled by twenty and none retuned;
+the top bar carries Earth and space; space counts Habitats only.
+
+![China's card](population-on-the-region-card.png)
+
+**The unit is five million.** Every Region's figure is twenty times what it was -- India 388, China
+288, the Nigeria Region 228, Indonesia 136, the European Union 120, Brazil 90, the United States 76,
+Egypt 52, Iran 50, Mexico 44, Japan 40, Russia 30, Saudi Arabia 20, Australia 10, 1,572 units and
+7.86 billion people in all -- and every rule that read it is rescaled by the same twenty: the
+per-person Emissions coefficients (0.04 and 0.03 per hundred million are 0.002 and 0.0015 per unit,
+and every card and tooltip still quotes the rate per hundred million), the Scrubber cap (one per
+forty units, the two hundred million it was), the Lab's population factor (a thousand units where
+fifty hundred-millions stood). `Game::PEOPLE_PER_UNIT` and `Game::people_text` are the one place the
+unit and its spelling live.
+
+**One Emigrant is one unit**, as the designer's example says: four Emigrants take four off. An
+Emigrant was ten million people; it is five million now, so a Region empties half as fast to
+emigration. The designer chose that knowing it, and the sweep below shows what it does.
+
+**"Nigeria does not have 1.14 billion people."** It does not, and the figure is not Nigeria's: it is
+the whole Region's, Sub-Saharan Africa, some forty-six countries, which the World Bank totals put
+at 1.2 billion when the borders were redrawn. Since 0.07.2 named each Region for its Nation, the
+card's plain `Population` read as the Nation's. The data was right; the word was wrong. The card and
+the start panel say **`Region population`** now, with a hover on the start panel saying whose it is.
+
+![The start panel](population-on-the-start-panel.png)
+
+**The top bar** carries `Earth 8.17B · Space 50M` at its right end in the population glyph's fill:
+Earth is the Regions' figures and the Colonists in Antarctica, space is every Colonist living off
+Earth with a station over Earth counting as off, as Off-world Presence counts it, and the hover
+lists every Region and every Body. People aboard a Ship are nowhere yet and are not counted.
+
+![The top bar at turn 9](population-on-the-top-bar.png)
+
+**Swept once after**, on top of everything before it:
+
+| after | Custodians | Archivists | Arkwrights | Prospectors | Collapses | draws | tree completes |
+|---|---|---|---|---|---|---|---|
+| the rounded costs | 40 | 12 | 12 | 3 | 12 | 1 | 66 of 80 |
+| **five million a unit** | **36** | **21** | **6** | **1** | **14** | **2** | **68 of 80** |
+
+The one rule that changed in substance is the Emigrant's drain, halved; the swing between the
+Archivists and the Arkwrights is larger than twenty seeds' noise usually is and is written here for
+the balance version. The four-way shape holds.
+
+Clippy clean with `-D warnings`, 254 tests passing (six repinned to the unit).
+
 ## Building art: candidate sheets (research, ticket #144)
 
 Sixty-two game-icons.net candidates for the twenty-two building kinds, drawn with the game's own

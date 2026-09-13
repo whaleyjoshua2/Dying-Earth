@@ -1851,13 +1851,13 @@ fn an_arkwright_muster_takes_twice_the_population_out_of_its_state() {
     g.state_mut(StateId::NorthAfrica).control = Control::Controlled(Seat(2));
     g.state_mut(StateId::NorthAfrica).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
     g.state_mut(StateId::NorthAfrica).facilities.push(facility(FacilityKind::LaunchSite));
-    assert!((g.lift_population(Seat(0), 4) - 0.4).abs() < 1e-9);
-    assert!((g.lift_population(Seat(2), 4) - 0.8).abs() < 1e-9, "Steerage costs the state twice");
+    assert!((g.lift_population(Seat(0), 4) - 4.0).abs() < 1e-9, "one unit of five million each since ticket #143 (version 0.07.3)");
+    assert!((g.lift_population(Seat(2), 4) - 8.0).abs() < 1e-9, "Steerage costs the state twice");
     // Ticket #73: the population is paid when the Emigrants muster, and the lift takes none.
     let before = g.state(StateId::NorthAfrica).population;
     g.commit_orders(Seat(2), &[Order::BuildEmigrants { state: StateId::NorthAfrica, n: 4 }]);
     let taken = before - g.state(StateId::NorthAfrica).population;
-    assert!((taken - 0.8).abs() < 1e-9, "the muster took {taken}, not 0.8");
+    assert!((taken - 8.0).abs() < 1e-9, "the muster took {taken}, not 8.0 (two units of five million per Emigrant under Steerage)");
     let after_muster = g.state(StateId::NorthAfrica).population;
     let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
     g.commit_orders(Seat(2), &[Order::Load { ship, colonists: 4, from: LoadSource::State(StateId::NorthAfrica), army: None }]);
@@ -2655,9 +2655,10 @@ fn twelve_nation_states_share_out_the_eight_they_came_from() {
     let america = [StateId::NorthAmerica, StateId::CentralAmerica];
     assert_eq!(america.iter().map(|s| card(*s).gdp).sum::<i64>(), 25);
     assert_eq!(america.iter().map(|s| card(*s).influence).sum::<i64>(), 8);
-    // The world still holds about 7.9 billion people, as the eight states did.
+    // The world still holds about 7.9 billion people, as the eight states did: 1,572 units of five
+    // million since ticket #143 (version 0.07.3), 78.6 hundred-million before.
     let people: f64 = StateId::ALL.iter().map(|s| card(*s).population).sum();
-    assert!((people - 78.6).abs() < 0.1, "population {people}");
+    assert!((people - 1572.0).abs() < 0.1, "population {people}");
     // Every edge is listed on both states, and nothing neighbours itself.
     for s in StateId::ALL {
         assert!(!card(s).neighbours.contains(&s), "{s:?} neighbours itself");
@@ -3092,17 +3093,20 @@ fn b_decommission_refunds_half_frees_the_slot_and_adds_two_unrest() {
 fn c_population_emissions_follow_the_industry_level() {
     let g = game();
     let c = &g.tables.climate;
-    assert_eq!(c.population_emissions_base, 0.04);
-    assert_eq!(c.population_emissions_per_level, 0.03);
+    // Ticket #143 (version 0.07.3): per unit of five million, a twentieth of the per-hundred-million 0.04 and 0.03.
+    assert_eq!(c.population_emissions_base, 0.002);
+    assert_eq!(c.population_emissions_per_level, 0.0015);
     for sid in StateId::ALL {
         let want = c.population_emissions_base + c.population_emissions_per_level * g.state(sid).industry_level as f64;
         assert!((g.population_coefficient(sid) - want).abs() < 1e-9, "{sid:?}: {} where {want} was wanted", g.population_coefficient(sid));
     }
-    // Sub-Saharan Africa at Industry Level 1 emits 0.07; East Asia at 3 emits 0.13.
-    assert!((g.population_coefficient(StateId::SubSaharanAfrica) - 0.07).abs() < 1e-9);
-    assert!((g.population_coefficient(StateId::EastAsia) - 0.13).abs() < 1e-9);
+    // Sub-Saharan Africa at Industry Level 1 emits 0.07 per hundred million; East Asia at 3 emits
+    // 0.13. Ticket #143: the coefficient is per unit of five million, twenty to the hundred million.
+    let per_hundred_million = Game::UNITS_PER_HUNDRED_MILLION;
+    assert!((g.population_coefficient(StateId::SubSaharanAfrica) * per_hundred_million - 0.07).abs() < 1e-9);
+    assert!((g.population_coefficient(StateId::EastAsia) * per_hundred_million - 0.13).abs() < 1e-9);
     let new: f64 = StateId::ALL.iter().map(|s| g.population_coefficient(*s) * g.state(*s).population).sum();
-    let old: f64 = StateId::ALL.iter().map(|s| 0.1 * g.state(*s).population).sum();
+    let old: f64 = StateId::ALL.iter().map(|s| 0.1 / per_hundred_million * g.state(*s).population).sum();
     assert!((new - old).abs() / old < 0.10, "the world's people emit {new:.2} where the flat 0.1 gave {old:.2}");
     // And the Climate phase reads it: one more Industry Level in East Asia is 0.03 x 14.4 more,
     // 14.4 being what ticket #125 (version 0.07.2) left it after Japan and Korea took 2.0.
@@ -3111,7 +3115,9 @@ fn c_population_emissions_follow_the_industry_level() {
     let mult = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
     g.state_mut(StateId::EastAsia).industry_level += 1;
     let rise = g.emissions_now().population - before;
-    assert!((rise - 0.03 * 14.4 * mult).abs() < 1e-9, "the population line rose {rise:.3}");
+    // Ticket #143: 288 units of five million, the 14.4 hundred-million of before; the same 0.432.
+    let per_level = g.tables.climate.population_emissions_per_level;
+    assert!((rise - per_level * 288.0 * mult).abs() < 1e-9, "the population line rose {rise:.3}");
 }
 
 /// (d) Leapfrog is the Custodians' alone, costs 50 Ducats, takes one level's worth off the state's
@@ -5190,7 +5196,7 @@ fn a_helium_three_vein_doubles_the_moons_generators_for_two_turns_and_triples_wi
 /// lifts them the turn they are ordered), and the batch takes 0.5 off the state's Unrest. Steerage:
 /// eight a turn at twice the population.
 #[test]
-fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_a_tenth_of_population_each_and_calm_it() {
+fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_one_unit_of_population_each_and_calm_it() {
     let mut g = game();
     calm(&mut g);
     g.state_mut(StateId::EastAsia).unrest = 3.0;
@@ -5203,13 +5209,13 @@ fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_a_tenth_of_populatio
     assert!(g.check_order(Seat(0), &[], &Order::Load { ship: ShipId(999), colonists: 1, from: LoadSource::State(StateId::EastAsia), army: None }).is_err(), "nothing waits yet");
     g.commit_orders(Seat(0), &[build]);
     assert_eq!(g.state(StateId::EastAsia).emigrants, 4, "on the card at End Turn");
-    assert!((pop - g.state(StateId::EastAsia).population - 0.4).abs() < 1e-9, "a tenth of a person each");
+    assert!((pop - g.state(StateId::EastAsia).population - 4.0).abs() < 1e-9, "one unit of five million each (ticket #143)");
     assert_eq!(g.state(StateId::EastAsia).unrest, 2.5, "the batch took 0.5 off");
     assert!(g.log.to_vec().iter().any(|l| l.contains("Emigrants mustered in China")), "{:?}", g.log.to_vec());
     // Steerage: eight a turn at twice the population.
     assert_eq!(g.emigrants_per_turn(Seat(0)), 4);
     assert_eq!(g.emigrants_per_turn(Seat(2)), 8, "the Arkwrights muster eight");
-    assert!((g.lift_population(Seat(2), 8) - 1.6).abs() < 1e-9, "at twice the population");
+    assert!((g.lift_population(Seat(2), 8) - 16.0).abs() < 1e-9, "at twice the population");
 }
 
 /// Ticket #73 (b): a Launch Site lifts only the Emigrants waiting in its state; the population was
