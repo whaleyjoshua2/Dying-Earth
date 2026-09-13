@@ -2882,7 +2882,7 @@ fn rule_tip_ui(response: egui::Response, word: &str, add: impl Fn(&mut Ui)) -> e
 /// except the top bar. It reaches the art through the egui context, so a call site deep in a panel
 /// does not have to be handed an `Icons` to draw one. Where the art is missing the line is
 /// unchanged, so nothing is ever lost -- only unillustrated.
-fn icon_word(ui: &mut Ui, key: &str, text: impl Into<String>) {
+fn icon_word(ui: &mut Ui, key: &str, text: impl Into<String>) -> egui::Response {
     let text = text.into();
     match Icons::from_ctx(ui.ctx(), key, 15.0) {
         Some(image) => {
@@ -2890,11 +2890,10 @@ fn icon_word(ui: &mut Ui, key: &str, text: impl Into<String>) {
                 ui.spacing_mut().item_spacing.x = 4.0;
                 ui.add(image);
                 ui.label(text);
-            });
+            })
+            .response
         }
-        None => {
-            ui.label(text);
-        }
+        None => ui.label(text),
     }
 }
 
@@ -3198,12 +3197,27 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
         return;
     }
     if controls {
+        // Ticket #161 (version 0.07.5): the Colony's card follows the Nation card, and its three
+        // controls -- which the Nation card no longer has -- get hovers of their own.
         ui.horizontal(|ui| {
-            ui.label("Influence:");
+            rule_tip(
+                ui.label("Influence:"),
+                format!(
+                    "How much of this turn's Allotment to put on this place. It becomes your Standing here and stays, whoever holds the place afterwards.\nThe Allotment does not carry over: whatever is unspent at End Turn is lost. Left alone a Standing decays {} a turn for the holder and {} for everybody else.",
+                    game.tables.influence.decay_controlled, game.tables.influence.decay
+                ),
+            );
             ui.add(egui::DragValue::new(&mut view.influence_amount).range(1..=100));
             let order = Order::Influence { target, amount: view.influence_amount };
             let ok = game.check_order(Seat(0), &session.pending, &order);
-            if ui.add_enabled(ok.is_ok(), egui::Button::new("Spend")).clicked() {
+            let spend = ui.add_enabled(ok.is_ok(), egui::Button::new("Spend"));
+            let needed = game.influence_needed_for(Seat(0), target);
+            let mine = game.seat(Seat(0)).influence.get(&target).copied().unwrap_or(0);
+            let spend = match &ok {
+                Ok(_) => rule_tip(spend, format!("Put the Influence beside this on your Standing here, which stands at {mine}. You take this place at {needed}.")),
+                Err(e) => spend.on_disabled_hover_text(e.0.clone()),
+            };
+            if spend.clicked() {
                 actions.push(Action::Place(order));
             }
             if let Err(e) = ok {
@@ -3211,7 +3225,12 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
             }
         });
         // Ticket #42: buying Influence lives in the Trading window now.
-        if ui.small_button("Buy more Influence in the Trading window").clicked() {
+        if rule_tip(
+            ui.small_button("Buy more Influence in the Trading window"),
+            "Ducats buy Influence into this turn's Allotment, two Ducats a point, and it is spent like any other. Opens the Trading window.".to_string(),
+        )
+        .clicked()
+        {
             view.show_trade = true;
         }
     }
@@ -3234,7 +3253,7 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
     // Ticket #53: on every Region the player does not hold, what its Blame is costing it here.
     let blame_mult = game.blame_threshold_multiplier_on(Seat(0), target);
     if blame_mult > 1.0 {
-        ui.label(
+        let note = ui.label(
             RichText::new(format!(
                 "Blame: your threshold here is {}, not {} (share {:.2}, x{:.2}). Emit less, or take back what you emit, and it comes down.",
                 threshold,
@@ -3243,6 +3262,15 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
                 blame_mult
             ))
             .color(Color32::from_rgb(255, 170, 120)),
+        );
+        // Ticket #161 (version 0.07.5): four rule-governed figures on one line and no hover behind
+        // any of them.
+        rule_tip(
+            note,
+            format!(
+                "Blame is the CO2 you are answerable for over the whole game -- everything your places and buildings have emitted, less everything you have taken back.\nYour share of the four Factions' Blame is {:.0} per cent, above a fair quarter, so every place you do not hold costs you more to win over, up to half again.\nThe Climate Panel breaks the Blame down Faction by Faction.",
+                game.blame_share(Seat(0)) * 100.0
+            ),
         );
     }
 }
@@ -3271,13 +3299,39 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
                 continue;
             }
             any = true;
-            ui.label(RichText::new(format!(" {} {} ", game.seat_name(s), v)).color(Color32::BLACK).background_color(seat_colour(session, s)));
+            let chip = ui.label(RichText::new(format!(" {} {} ", game.seat_name(s), v)).color(Color32::BLACK).background_color(seat_colour(session, s)));
+            // Ticket #161 (version 0.07.5): a chip of its own says whose the Standing is and how far
+            // it has to go, which the line's hover -- written for the player's own case -- cannot.
+            let holder = game.place_control(target).controller();
+            let standing = if holder == Some(s) {
+                "They hold this place.".to_string()
+            } else {
+                let needed = game.influence_needed_for(s, target);
+                format!("They take this place at {needed}, so they want {} more.", (needed - v).max(0))
+            };
+            rule_tip(chip, format!("The {}' Standing here: the Influence they have built up on this place.\n{standing}", game.seat_name(s)));
         }
         if !any {
-            ui.label(RichText::new("nobody has any yet").weak());
+            rule_tip(
+                ui.label(RichText::new("nobody has any yet").weak()),
+                "No Faction has spent Influence on this place. The first whose Standing reaches the threshold takes it; two arriving together on the same Standing are settled by lot.".to_string(),
+            );
         }
         ui.label(RichText::new("·").weak());
-        ui.label(format!("Threshold {threshold}"));
+        // Ticket #161: what a threshold IS and what sets it. The line's hover uses the word and
+        // never defines it.
+        let t = &game.tables.influence;
+        let from = match target {
+            Place::State(s) => format!("{} plus {} for each step of this state's size, which is {}.", t.state_threshold_base, t.state_threshold_per_size, game.tables.state(s).size),
+            Place::Colony(_) => format!("{} for every Colonist living here{}.", t.colony_threshold_per_colonist, if game.colony(match target { Place::Colony(c) => c, _ => unreachable!() }).map(|c| c.in_orbit).unwrap_or(false) { format!(", and {} for the station itself", t.station_threshold_base) } else { String::new() }),
+        };
+        rule_tip(
+            ui.label(format!("Threshold {threshold}")),
+            format!(
+                "What a Standing must reach to take this place: {from}\nGreen Consensus lowers every threshold by a quarter; your Blame raises the one you read, on every place you do not hold.\nA place already held wants the holder's Standing plus {} as well.",
+                t.challenge_margin
+            ),
+        );
     });
     rule_tip(row.response, explain);
 }
@@ -3562,7 +3616,21 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         Control::Controlled(s) => format!("Controlled by the {}", game.seat_name(s)),
         Control::Occupied { occupier, turns, .. } => format!("Occupied by the {} (turn {} of {})", game.seat_name(occupier), turns, game.tables.influence.occupation_turns),
     };
-    ui.label(owner);
+    // Ticket #161 (version 0.07.5): who holds a Region, and by what rule they keep or lose it.
+    let owner_tip = match st.control {
+        Control::Neutral => "Nobody holds this Region. The first Faction whose Standing reaches the threshold takes it; two arriving together on the same Standing are settled by lot.".to_string(),
+        Control::Controlled(s) => format!(
+            "The {} hold it, and take its Influence value into their Allotment every turn.\nA rival takes it with a Standing of at least theirs plus {}, and at least the rival's own threshold.",
+            game.seat_name(s),
+            game.tables.influence.challenge_margin
+        ),
+        Control::Occupied { occupier, .. } => format!(
+            "An Army of the {} beat its defenders. The occupier chooses what is built here but does not direct its Armies.\nControl passes after {} turns, or sooner if the people are Pacified: the occupier gains Influence here every turn, at half rate while Unrest is past its first threshold, and control transfers the moment that passes the place's threshold.",
+            game.seat_name(occupier),
+            game.tables.influence.occupation_turns
+        ),
+    };
+    rule_tip(ui.label(owner), owner_tip);
     let mult = st.control.director().map(|s| game.tables.faction(game.kind(s)).emissions_multiplier).unwrap_or(1.0);
     let industry_em = card.baseline_emissions * st.industry_level as f64 * mult;
     let fac_em: f64 = st.facilities.iter().filter(|f| f.working()).map(|f| game.tables.facility(f.kind).emissions * mult).sum();
@@ -3571,7 +3639,14 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // read it as the Nation's. The designer: *"Population 12.2 (hundreds of millions) should say
     // something like Population 12.2 (339M)."*
     icon_word(ui, "population", format!("Region population {}, Industry Level {}, leans {:?}", Game::population_text(st.population), st.industry_level, card.resource_lean));
-    icon_word(ui, "influence", format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid)));
+    // Ticket #161 (version 0.07.5): what an Allotment is, which this line names and never explains.
+    rule_tip(
+        icon_word(ui, "influence", format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid))),
+        format!(
+            "The Allotment is the Influence you receive each turn: {} to start with, plus the Influence value of every Region you hold.\nIt does not carry over -- whatever you have not spent by End Turn is lost. Ducats buy more of it in the Trading window, two Ducats a point.",
+            game.tables.influence.allotment_base
+        ),
+    );
     ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 5, never below 1); a Bank here would add {}", card.gdp, game.state_ducats(sid), (game.tables.facility(FacilityKind::Bank).produces.as_ref().map(|p| p.amount).unwrap_or(0) * card.gdp) / 10));
     icon_word(ui, "emissions", format!("Emissions this turn: industry {:.1}, Facilities {:.1}, people {:.1}", industry_em, fac_em, game.population_coefficient(sid) * st.population * mult));
     // Ticket #54: the per-person line, its formula, and what Leapfrog has taken off it.
@@ -3643,7 +3718,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             let step = game.tables.ai.thresholds.influence_step;
             let pressing = Seat(0).others().iter().map(|s| (*s, game.seat(*s).influence.get(&target).copied().unwrap_or(0))).max_by_key(|(_, n)| *n).filter(|(_, n)| *n > 0 && *n + 2 * step >= mine);
             if let Some((rival, standing)) = pressing {
-                ui.label(
+                let warn = ui.label(
                     RichText::new(format!(
                         "The {} stand at {} here against your {}: they take it at {}. Spend here to stay ahead.",
                         game.seat_name(rival),
@@ -3652,6 +3727,17 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                         mine + game.tables.influence.challenge_margin
                     ))
                     .color(Color32::from_rgb(255, 160, 60)),
+                );
+                // Ticket #161 (version 0.07.5): the challenge margin is the rule behind this warning
+                // and the warning never names it.
+                rule_tip(
+                    warn,
+                    format!(
+                        "A rival takes a place you hold at your Standing plus the challenge margin of {}, and never below their own threshold.\nSpending here raises yours out of their reach. Left alone, yours decays {} a turn and theirs {}, so doing nothing closes the gap.",
+                        game.tables.influence.challenge_margin,
+                        game.tables.influence.decay_controlled,
+                        game.tables.influence.decay
+                    ),
                 );
             }
         }
@@ -3662,7 +3748,18 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         // which is every card by the middle of a game. It is the reason a player clicked the
         // country; it goes where their eye lands.
         ui.separator();
-        icon_word(ui, "influence", "Influence");
+        // Ticket #161 (version 0.07.5): the heading is the one place that can say what Influence IS,
+        // which nothing on the card says today. The designer: *"influence mouse over on all words in
+        // the influence portion of the nation card."*
+        rule_tip(
+            icon_word(ui, "influence", "Influence"),
+            format!(
+                "Your claim on this place. Spend it from the turn's Allotment in the corner; where it lands it becomes your Standing here, and it stays there even when the place changes hands.\nThe highest Standing at the threshold takes a place nobody holds. A place already held wants the holder's Standing plus {} as well.\nLeft alone a Standing decays {} a turn for the holder and {} for everybody else.",
+                game.tables.influence.challenge_margin,
+                game.tables.influence.decay_controlled,
+                game.tables.influence.decay
+            ),
+        );
         influence_row(ui, game, session, view, Place::State(sid), false, actions);
         ui.separator();
         // Ticket #73: Emigrants waiting here for a lift or the sea.
