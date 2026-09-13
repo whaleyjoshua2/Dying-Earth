@@ -16,7 +16,7 @@ the tooltip rule set on ticket #116 requires.
 
 ![The Threshold figure: what sets it, and what lowers and raises it](influence-hover-threshold.png)
 
-![A Faction's chip: whose the Standing is, and how far it has to go](influence-hover-chip.png)
+![Your own chip: what it would take a rival to reach you, and what spending here does](influence-hover-own-chip.png)
 
 ![The holder line: by what rule the holder keeps it, or an occupier takes it](influence-hover-holder.png)
 
@@ -26,6 +26,14 @@ value** line (which names the Allotment and never says what an Allotment is), an
 yet`**. The Colony's card followed, and its three controls -- `Influence:`, `Spend` and `Buy more
 Influence in the Trading window`, which the Nation card lost on ticket #121 -- gained hovers of
 their own.
+
+**Decided by the designer** off those pictures: *"revise verbage to be the most efficient possible
+in conveying information"*, so every one of the new hovers was tightened -- the heading's went from
+six rendered lines to four with no fact dropped; **your own chip says what it would take to be safe
+from the nearest rival** rather than repeating the rule; **Threshold gains an entry in
+`CONTEXT.md`**, which it never had, saying plainly that this is the Influence sense and not the
+climate one; and the Colony card **follows the same choices as the Nation card** rather than being
+special-cased.
 
 `icon_word` now hands back its response so a heading drawn with a glyph can carry a hover, which is
 what the Influence heading and the Influence value line needed.

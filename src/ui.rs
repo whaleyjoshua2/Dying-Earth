@@ -3203,7 +3203,7 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
             rule_tip(
                 ui.label("Influence:"),
                 format!(
-                    "How much of this turn's Allotment to put on this place. It becomes your Standing here and stays, whoever holds the place afterwards.\nThe Allotment does not carry over: whatever is unspent at End Turn is lost. Left alone a Standing decays {} a turn for the holder and {} for everybody else.",
+                    "How much of this turn's Allotment to put here. It becomes your Standing and stays, whoever holds the place after.\nUnspent Allotment is lost at End Turn. A Standing decays {} a turn for the holder, {} for everyone else.",
                     game.tables.influence.decay_controlled, game.tables.influence.decay
                 ),
             );
@@ -3214,7 +3214,7 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
             let needed = game.influence_needed_for(Seat(0), target);
             let mine = game.seat(Seat(0)).influence.get(&target).copied().unwrap_or(0);
             let spend = match &ok {
-                Ok(_) => rule_tip(spend, format!("Put the Influence beside this on your Standing here, which stands at {mine}. You take this place at {needed}.")),
+                Ok(_) => rule_tip(spend, format!("Adds the figure beside it to your Standing here, now {mine}. You take this place at {needed}.")),
                 Err(e) => spend.on_disabled_hover_text(e.0.clone()),
             };
             if spend.clicked() {
@@ -3227,7 +3227,7 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
         // Ticket #42: buying Influence lives in the Trading window now.
         if rule_tip(
             ui.small_button("Buy more Influence in the Trading window"),
-            "Ducats buy Influence into this turn's Allotment, two Ducats a point, and it is spent like any other. Opens the Trading window.".to_string(),
+            "Ducats buy Influence into this turn's Allotment, two a point, spent like any other. Opens the Trading window.".to_string(),
         )
         .clicked()
         {
@@ -3268,7 +3268,7 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
         rule_tip(
             note,
             format!(
-                "Blame is the CO2 you are answerable for over the whole game -- everything your places and buildings have emitted, less everything you have taken back.\nYour share of the four Factions' Blame is {:.0} per cent, above a fair quarter, so every place you do not hold costs you more to win over, up to half again.\nThe Climate Panel breaks the Blame down Faction by Faction.",
+                "Blame is the CO2 you are answerable for all game: what your places emitted, less what you took back.\nYour share is {:.0} per cent, above a fair quarter, so every place you do not hold costs more to win over -- up to half again.\nThe Climate Panel breaks it down by Faction.",
                 game.blame_share(Seat(0)) * 100.0
             ),
         );
@@ -3302,19 +3302,32 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
             let chip = ui.label(RichText::new(format!(" {} {} ", game.seat_name(s), v)).color(Color32::BLACK).background_color(seat_colour(session, s)));
             // Ticket #161 (version 0.07.5): a chip of its own says whose the Standing is and how far
             // it has to go, which the line's hover -- written for the player's own case -- cannot.
+            // The designer asked that the player's own chip, on a place they hold, say instead what
+            // it would take to be safe from the nearest rival, which is the figure they act on.
             let holder = game.place_control(target).controller();
-            let standing = if holder == Some(s) {
+            let mine = s == Seat(0) && !session.spectator;
+            let whose = if mine { "Your Standing here.".to_string() } else { format!("The {}' Standing here.", game.seat_name(s)) };
+            let rest = if holder == Some(s) && mine {
+                let margin = game.tables.influence.challenge_margin;
+                let nearest = Seat(0).others().iter().map(|r| (*r, game.seat(*r).influence.get(&target).copied().unwrap_or(0))).max_by_key(|(_, n)| *n).filter(|(_, n)| *n > 0);
+                match nearest {
+                    Some((r, n)) => format!("A rival takes it at {}, your Standing plus {margin}. The {} are nearest at {n}, {} short. Every point you add here adds one to that.", v + margin, game.seat_name(r), (v + margin - n).max(0)),
+                    None => format!("No rival has any Standing here; one would need {}, your Standing plus {margin}.", v + margin),
+                }
+            } else if holder == Some(s) {
                 "They hold this place.".to_string()
             } else {
                 let needed = game.influence_needed_for(s, target);
-                format!("They take this place at {needed}, so they want {} more.", (needed - v).max(0))
+                let who = if mine { "You take" } else { "They take" };
+                let want = if mine { "you want" } else { "they want" };
+                format!("{who} this place at {needed}, so {want} {} more.", (needed - v).max(0))
             };
-            rule_tip(chip, format!("The {}' Standing here: the Influence they have built up on this place.\n{standing}", game.seat_name(s)));
+            rule_tip(chip, format!("{whose} {rest}"));
         }
         if !any {
             rule_tip(
                 ui.label(RichText::new("nobody has any yet").weak()),
-                "No Faction has spent Influence on this place. The first whose Standing reaches the threshold takes it; two arriving together on the same Standing are settled by lot.".to_string(),
+                "No Faction has spent here. The first Standing to reach the threshold takes it; two arriving level are settled by lot.".to_string(),
             );
         }
         ui.label(RichText::new("·").weak());
@@ -3322,13 +3335,13 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
         // never defines it.
         let t = &game.tables.influence;
         let from = match target {
-            Place::State(s) => format!("{} plus {} for each step of this state's size, which is {}.", t.state_threshold_base, t.state_threshold_per_size, game.tables.state(s).size),
-            Place::Colony(_) => format!("{} for every Colonist living here{}.", t.colony_threshold_per_colonist, if game.colony(match target { Place::Colony(c) => c, _ => unreachable!() }).map(|c| c.in_orbit).unwrap_or(false) { format!(", and {} for the station itself", t.station_threshold_base) } else { String::new() }),
+            Place::State(s) => format!("{}, plus {} a size step; this state's size is {}.", t.state_threshold_base, t.state_threshold_per_size, game.tables.state(s).size),
+            Place::Colony(_) => format!("{} a Colonist living here{}.", t.colony_threshold_per_colonist, if game.colony(match target { Place::Colony(c) => c, _ => unreachable!() }).map(|c| c.in_orbit).unwrap_or(false) { format!(", and {} for the station itself", t.station_threshold_base) } else { String::new() }),
         };
         rule_tip(
             ui.label(format!("Threshold {threshold}")),
             format!(
-                "What a Standing must reach to take this place: {from}\nGreen Consensus lowers every threshold by a quarter; your Blame raises the one you read, on every place you do not hold.\nA place already held wants the holder's Standing plus {} as well.",
+                "What a Standing must reach to take this place: {from}\nGreen Consensus cuts a quarter off it; your Blame adds to the one you read, on every place you do not hold.\nA held place also wants the holder's Standing plus {}.",
                 t.challenge_margin
             ),
         );
@@ -3618,14 +3631,14 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     };
     // Ticket #161 (version 0.07.5): who holds a Region, and by what rule they keep or lose it.
     let owner_tip = match st.control {
-        Control::Neutral => "Nobody holds this Region. The first Faction whose Standing reaches the threshold takes it; two arriving together on the same Standing are settled by lot.".to_string(),
+        Control::Neutral => "Nobody holds it. The first Standing to reach the threshold takes it; two arriving level are settled by lot.".to_string(),
         Control::Controlled(s) => format!(
-            "The {} hold it, and take its Influence value into their Allotment every turn.\nA rival takes it with a Standing of at least theirs plus {}, and at least the rival's own threshold.",
+            "The {} hold it, and take its Influence value into their Allotment each turn.\nA rival needs their Standing plus {}, and at least its own threshold.",
             game.seat_name(s),
             game.tables.influence.challenge_margin
         ),
         Control::Occupied { occupier, .. } => format!(
-            "An Army of the {} beat its defenders. The occupier chooses what is built here but does not direct its Armies.\nControl passes after {} turns, or sooner if the people are Pacified: the occupier gains Influence here every turn, at half rate while Unrest is past its first threshold, and control transfers the moment that passes the place's threshold.",
+            "An Army of the {} beat its defenders: they choose what is built here but do not direct its Armies.\nControl passes after {} turns, or sooner once the occupier's Influence, gained each turn and halved while Unrest is high, passes the threshold.",
             game.seat_name(occupier),
             game.tables.influence.occupation_turns
         ),
@@ -3643,7 +3656,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     rule_tip(
         icon_word(ui, "influence", format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid))),
         format!(
-            "The Allotment is the Influence you receive each turn: {} to start with, plus the Influence value of every Region you hold.\nIt does not carry over -- whatever you have not spent by End Turn is lost. Ducats buy more of it in the Trading window, two Ducats a point.",
+            "The Allotment is what you receive each turn: {}, plus the Influence value of every Region you hold.\nIt does not carry over; what is unspent at End Turn is lost. Ducats buy more, two a point, in the Trading window.",
             game.tables.influence.allotment_base
         ),
     );
@@ -3733,7 +3746,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 rule_tip(
                     warn,
                     format!(
-                        "A rival takes a place you hold at your Standing plus the challenge margin of {}, and never below their own threshold.\nSpending here raises yours out of their reach. Left alone, yours decays {} a turn and theirs {}, so doing nothing closes the gap.",
+                        "A rival takes a place you hold at your Standing plus the challenge margin of {}, and never below their own threshold.\nSpending here raises the bar; doing nothing lowers it, yours decaying {} a turn and theirs {}.",
                         game.tables.influence.challenge_margin,
                         game.tables.influence.decay_controlled,
                         game.tables.influence.decay
@@ -3754,7 +3767,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         rule_tip(
             icon_word(ui, "influence", "Influence"),
             format!(
-                "Your claim on this place. Spend it from the turn's Allotment in the corner; where it lands it becomes your Standing here, and it stays there even when the place changes hands.\nThe highest Standing at the threshold takes a place nobody holds. A place already held wants the holder's Standing plus {} as well.\nLeft alone a Standing decays {} a turn for the holder and {} for everybody else.",
+                "Your claim here: spend from the corner's Allotment and it becomes your Standing, which survives any change of hands.\nHighest Standing at the threshold takes a free place; a held one wants the holder's plus {}.\nDecays {} a turn for the holder, {} for everyone else.",
                 game.tables.influence.challenge_margin,
                 game.tables.influence.decay_controlled,
                 game.tables.influence.decay

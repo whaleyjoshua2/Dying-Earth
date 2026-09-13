@@ -386,6 +386,10 @@ _Avoid_: diplomacy points, favour, reputation
 How much Influence a Faction has built up on one place. Since version 0.03 it persists: it is never wiped when the place changes hands, it decays 1 a turn on a place the Faction controls and 2 a turn elsewhere when nothing is spent, and spending on a place you hold raises it.
 _Avoid_: accumulation, influence points, loyalty
 
+**Threshold**:
+The Standing a Faction must reach to take a place. A Region's is a base plus a figure for each step of the state's size; a Colony's is a figure for each of its Colonists, and a Space Station's has a base of its own besides. Green Consensus lowers every threshold by a quarter, and since version 0.05 each Faction reads its own, since its Blame raises it on every place it does not hold. A place already held wants the holder's Standing plus the challenge margin as well, so the threshold is the floor and never the whole price. The word has a second, unrelated sense in the climate rules, where a Break or a Sea Level threshold is a Temperature; this entry is the Influence one.
+_Avoid_: cost, price, target (for the Influence sense); the climate sense, which is a Break or a Sea Level threshold
+
 **Allotment**:
 The amount of Influence a Faction receives each turn, split freely across any number of targets during the Orders phase. It is a base plus the Influence value of every Region the Faction controls (since version 0.03 each state carries its own value, from its economic and military weight), and it does not carry over.
 _Avoid_: influence budget, diplomacy pool, action points
