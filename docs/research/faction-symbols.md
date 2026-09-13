@@ -92,7 +92,7 @@ the one building-art found for mass drivers and sea walls.
 Tabler icons -- `leaf`, `pick`, `users-group`, `archive` -- were fetched into
 [`assets/icons/candidates/tabler/`](../../assets/icons/candidates/tabler) with the MIT notice beside
 them and put through the same sheet program:
-[faction-symbols-sheet-tabler-untinted.png](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-sheet-tabler-untinted.png).
+[faction-symbols-sheet-tabler-untinted.png](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-sheet-tabler-untinted.png).
 **They come out black on the dark panel, all but invisible.** A Tabler file is
 `fill="none" stroke="currentColor"`, `currentColor` resolves to black in `usvg`, and since
 `Icons::from_ctx` tints by a per-channel multiply, a black glyph multiplied by any colour is still
@@ -239,7 +239,7 @@ that Faction's.
 ## Collisions with what the board already draws
 
 The control is
-[faction-symbols-sheet-worn-offwhite.png](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-sheet-worn-offwhite.png):
+[faction-symbols-sheet-worn-offwhite.png](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-sheet-worn-offwhite.png):
 all **thirty-three** SVGs in `assets/icons/` at the same sizes in the kind fill -- the eight Figure
 glyphs (Materials, Fuel, Energy, Research, Ducats, Population, Influence, Emissions), the five kind
 glyphs (warship, Colony Ship, station, Colony, Region), the ten Facility pictures and the ten Module
@@ -341,7 +341,7 @@ the answer is different for each Faction, and this section is the one the design
 
 ## The sheets
 
-Filed in [`docs/dev-diary/2026-09-14-version-0.07.5/`](../dev-diary/2026-09-14-version-0.07.5/),
+Filed in [`docs/dev-diary/2026-09-13-version-0.07.5/`](../dev-diary/2026-09-13-version-0.07.5/),
 with a numbered list of what each row and column reads as in the README there. Every one was looked
 at with the `eyes-on` prescreen and then by eye before it was filed; the readings in the tables
 above are what was seen, not what was expected.
@@ -349,31 +349,31 @@ above are what was seen, not what was expected.
 - **Per Faction, the deciding sheets** -- one candidate a row, numbered to match the tables, each
   drawn at 96, 64, 40, 28 and 24 pixels and then the 28 and the 24 blown up three times without
   smoothing:
-  [custodians-untinted](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-sheet-custodians-untinted.png) /
-  [tinted](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-sheet-custodians-tinted.png),
-  [prospectors-untinted](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-sheet-prospectors-untinted.png) /
-  [tinted](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-sheet-prospectors-tinted.png),
-  [arkwrights-untinted](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-sheet-arkwrights-untinted.png) /
-  [tinted](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-sheet-arkwrights-tinted.png),
-  [archivists-untinted](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-sheet-archivists-untinted.png) /
-  [tinted](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-sheet-archivists-tinted.png).
+  [custodians-untinted](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-sheet-custodians-untinted.png) /
+  [tinted](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-sheet-custodians-tinted.png),
+  [prospectors-untinted](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-sheet-prospectors-untinted.png) /
+  [tinted](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-sheet-prospectors-tinted.png),
+  [arkwrights-untinted](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-sheet-arkwrights-untinted.png) /
+  [tinted](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-sheet-arkwrights-tinted.png),
+  [archivists-untinted](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-sheet-archivists-untinted.png) /
+  [tinted](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-sheet-archivists-tinted.png).
 - **Per Faction, the contact sheet** the ticket asked for, twelve candidates across at 28, 40 and 64
   magnified, which is the quicker view for comparing candidates against each other rather than
   against a size:
-  [custodians](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-contact-custodians.png),
-  [prospectors](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-contact-prospectors.png),
-  [arkwrights](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-contact-arkwrights.png),
-  [archivists](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-contact-archivists.png).
+  [custodians](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-contact-custodians.png),
+  [prospectors](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-contact-prospectors.png),
+  [arkwrights](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-contact-arkwrights.png),
+  [archivists](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-contact-archivists.png).
 - **The control**,
-  [worn-offwhite](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-sheet-worn-offwhite.png):
+  [worn-offwhite](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-sheet-worn-offwhite.png):
   the thirty-three glyphs the board already draws, four to a row, alphabetical, in the kind fill.
 - **The Tabler test**,
-  [tabler-untinted](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-sheet-tabler-untinted.png):
+  [tabler-untinted](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-sheet-tabler-untinted.png):
   four MIT icons through the same path, black on the panel.
 
-![Custodians, untinted](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-sheet-custodians-untinted.png)
+![Custodians, untinted](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-sheet-custodians-untinted.png)
 
-![Arkwrights, in violet](../dev-diary/2026-09-14-version-0.07.5/faction-symbols-sheet-arkwrights-tinted.png)
+![Arkwrights, in violet](../dev-diary/2026-09-13-version-0.07.5/faction-symbols-sheet-arkwrights-tinted.png)
 
 **How the pictures were made.** The contact sheets are the existing aid, unchanged:
 `cargo run --release --example icon_sheet -- <out.png> assets/icons/candidates/<faction> 28,40,64`.
