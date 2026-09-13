@@ -64,3 +64,14 @@ rather than dashed, the ninety-second revolution kept, and the name riding benea
 ![Heading 90 as decided: solid grey rings for the empty slots, Axiom's ring inside the window](orbits-final-heading-90.png)
 
 ![The Moon's two empty rings, solid](orbits-final-moon.png)
+
+## The start globe turns slower
+
+Ticket [#152](https://github.com/whaleyjoshua2/Dying-Earth/issues/152). The designer's line: *"slow
+the rotation of the earth in the territory select screen."* It turned once every 25 seconds, a
+bare number in the code, and only a drag stopped it. Decided with the designer without a picture,
+since a picture cannot show speed: **once every 75 seconds**, a third of the speed, and **a click on
+a Region stops it for good** as a drag does, so the Region chosen stays where it was chosen. The
+number is a named constant now, `START_GLOBE_PERIOD_SECS`.
+
+![The start screen after the same wait as before: the globe has turned a third as far](start-globe-slower.png)

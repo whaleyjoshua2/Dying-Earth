@@ -602,8 +602,10 @@ pub fn draw(
     icons.load_flags(ctx, &crate::assets_root().join("flags"));
     let icons = &*icons;
     // Ticket #100 (version 0.07.0): the start globe turns on its own only until a hand is put on it.
+    // Ticket #152 (version 0.07.4): once every 75 seconds, a third of the speed it opened at; the
+    // designer: *"slow the rotation of the earth in the territory select screen."*
     if !view.start_grabbed {
-        view.spin += time.delta_secs() * 0.25;
+        view.spin += time.delta_secs() * std::f32::consts::TAU / START_GLOBE_PERIOD_SECS;
     }
     let _ = window;
     // Ticket #59: "Saved." stands in the top bar for a few seconds and then goes.
@@ -1267,6 +1269,12 @@ fn start_screen(
             && let Some(sid) = start_pick(pos, camera, cam_gt, globes, textures)
         {
             view.start_selected = Some(sid);
+            // Ticket #152 (version 0.07.4): a click stops the spin for good as a drag does, so the
+            // Region chosen stays where it was chosen.
+            if !view.start_grabbed {
+                view.yaw = view.spin;
+                view.start_grabbed = true;
+            }
         }
         // The names, painted where the game view paints them: on the globe, lifted, over a plate.
         if let (Some((camera, cam_gt)), Some((_, globe_gt))) = (cam, globes.iter().find(|(g, _)| g.0 == BodyId::Earth)) {
@@ -3192,6 +3200,8 @@ fn facility_build_buttons(ui: &mut Ui, session: &Session, game: &Game, sid: Stat
 
 /// The columns of slot boxes on a Region's card: six, since the card is a step wider than the Hab View.
 const SLOT_COLS: usize = 6;
+/// Ticket #152 (version 0.07.4): how long the start globe takes to turn once on its own.
+const START_GLOBE_PERIOD_SECS: f32 = 75.0;
 /// The coast's blue, a slot box's edge where the sea can reach it.
 const COAST_EDGE: Color32 = Color32::from_rgb(90, 150, 230);
 
