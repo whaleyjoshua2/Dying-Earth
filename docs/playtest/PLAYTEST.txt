@@ -53,7 +53,7 @@ HOW TO PLAY, IN ONE MINUTE
   computer plays the other three. There is also a Spectate button under the cards: the
   computer plays all four and you just watch.
 - You are looking at the Earth Map. Click a region for its card and orders on the right.
-  Drag to turn the globe, mouse wheel to zoom. Tab switches to the Solar System Map;
+  Drag to turn the globe, mouse wheel to zoom. M switches to the Solar System Map;
   Esc goes back.
 - Build things with the buttons on a card, or click an empty box among a region's slots.
   Hover a build button to see what it makes and how long it takes. Hover almost any

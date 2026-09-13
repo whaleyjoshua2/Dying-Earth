@@ -71,3 +71,14 @@ Facility that takes a slot has been buildable only from a free box since ticket 
 Build section keeps the Army, the Ships and the Archivists' Archive, which take no Module slot, and
 the Build-Where-You-Dig discount note moved up to stand above the tiles where it says what a Module
 here will cost.
+
+**Decided by the designer** off those pictures: *"q1 the grid should match the one used by nations q2
+use it to bring up the solar system map replace tab q3 retire it q4 which ever matches the nation
+state cards."* So the Colony's tiles are laid out in **the same constant** the Region's boxes use,
+not a number of their own, and the two can never drift apart; **M swaps to the Solar System Map and
+back, the job Tab held** until the Hab View freed the key, with the bar's button renamed to match;
+the **Hab View is retired** in `CONTEXT.md` as a term, with its tiles written into *Module* the way a
+Region's boxes live in *Build Slot*; and the Colony card's bottom header is **`Orders (hover a
+button for what it does)`**, matching the Nation card's since ticket #154.
+
+![The bar: the map key is M now](the-map-key-is-now-m.png)

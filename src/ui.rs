@@ -292,7 +292,10 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mu
             view.hotkey = Some(HotKey::EndTurn);
         }
     } else {
-        if keys.just_pressed(KeyCode::Tab) {
+        // Ticket #162 (version 0.07.5): M swaps between the Solar System Map and the surface, the
+        // job Tab held until now. The designer freed M by retiring the Hab View window and asked
+        // for it here: *"use it to bring up the solar system map replace tab."*
+        if keys.just_pressed(KeyCode::KeyM) {
             view.swap();
         }
         // Ticket #41: C toggles the Climate Panel, a second way back once it is closed.
@@ -310,8 +313,6 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mu
         if keys.just_pressed(KeyCode::KeyR) && !session.spectator {
             view.show_trade = !view.show_trade;
         }
-        // Ticket #162 (version 0.07.5): M is free. It opened the Hab View, and the Modules are
-        // tiles on the card now, so there is no window to open.
         let ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
         if ctrl && keys.just_pressed(KeyCode::KeyS) {
             view.hotkey = Some(HotKey::Save);
@@ -1707,8 +1708,8 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 ui.label(RichText::new(text).strong().color(Color32::from_rgb(140, 210, 150)));
             }
             let swap_text = match view.view {
-                View::Solar => format!("To {} (Tab)", game.tables.body(view.last_surface).name),
-                View::Surface(_) => "Solar System Map (Tab)".to_string(),
+                View::Solar => format!("To {} (M)", game.tables.body(view.last_surface).name),
+                View::Surface(_) => "Solar System Map (M)".to_string(),
             };
             if ui.add(bar_button(swap_text)).clicked() {
                 view.swap();
@@ -4061,7 +4062,10 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             }
             ui.separator();
         }
-        ui.label(RichText::new("Build (hover a button for what it makes)").strong());
+        // Ticket #162 (version 0.07.5): the header matches the Nation card's, which ticket #154
+        // renamed when its own build list folded into the boxes. A Module is ordered from a free
+        // tile; what is left here is orders.
+        ui.label(RichText::new("Orders (hover a button for what it does)").strong());
         if !col.in_orbit {
             cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::Colony(cid) }, "Build Army (Barracks)", actions);
         }
@@ -4558,8 +4562,8 @@ fn moments_corner(ui: &mut Ui, session: &Session, view: &mut ViewState) {
 // ------------------------------------------------------------------ Ticket #145: the Hab View
 
 /// The side of a Module or build-slot tile and the gap between tiles. Ticket #162 (version 0.07.5)
-/// retired `HAB_COLS`, the Hab View window's five: a Region's card sets its own column count in
-/// `SLOT_COLS` and a Colony's in `MODULE_COLS`.
+/// retired `HAB_COLS`, the Hab View window's five: both cards lay their tiles out in `SLOT_COLS`
+/// columns now.
 const HAB_TILE: f32 = 84.0;
 const HAB_GAP: f32 = 10.0;
 /// Room under a tile for its name.
@@ -4705,9 +4709,10 @@ fn module_rules(heading: &str) -> String {
     format!("{heading}\nEnergy upkeep is paid at Income first; short of Energy, Modules go offline in order until the bill is met, and an offline one makes nothing and keeps its place.\nMothballed, it makes nothing and pays nothing until it is restarted.")
 }
 
-/// The columns of Module tiles on a Colony's or station's card: three, which fits the side panel at
-/// its default width where the Hab View's window took five.
-const MODULE_COLS: usize = 6;
+/// Ticket #162 (version 0.07.5): a Colony's Module tiles are laid out in the SAME grid as a
+/// Region's build slots, at the designer's word -- *"the grid should match the one used by
+/// nations"* -- so the two cards read as one thing and neither can drift from the other.
+const MODULE_COLS: usize = SLOT_COLS;
 
 /// Ticket #162 (version 0.07.5): **a Colony's or a station's Modules as boxes on its card**, in the
 /// language the Region card's build slots already speak. The designer: *"Move the station module
