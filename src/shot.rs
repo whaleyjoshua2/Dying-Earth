@@ -378,6 +378,31 @@ fn build_board(session: &mut Session) {
         {
             g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
         }
+        // `ship:1` (a building aid, ticket #193, version 0.08.0): a Colony Ship of seat 0's sits at
+        // Earth, so the Region card's "Send N to Colony Ship" button can be photographed. The
+        // computer almost never has one parked at Earth with Emigrants waiting -- about 1.8 Colony
+        // Ships are completed a game -- which is exactly why the missing button showed up as a
+        // player's complaint rather than as a figure in a sweep.
+        if std::env::args().any(|a| a == "ship:1") {
+            let id = ShipId(g.fresh_id());
+            let turn = g.turn;
+            g.ships.push(Ship {
+                id,
+                slot: None,
+                kind: UnitKind::ColonyShip,
+                seat: Seat(0),
+                damage: 0,
+                at: ShipAt::Body(BodyId::Earth),
+                colonists: 0,
+                colonists_education: 1.0,
+                army: None,
+                stance: Stance::Hold,
+                escaped: false,
+                arrived_this_turn: false,
+                built_turn: turn,
+                fuel: g.tables.unit(UnitKind::ColonyShip).tank,
+            });
+        }
         // `venture:<n>` (a building aid, ticket #72): seat 0 as the Prospectors holds n Materials in
         // the Venture Capital Fund and banks half its output.
         if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("venture:").and_then(|v| v.parse::<i64>().ok()))

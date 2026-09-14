@@ -1784,21 +1784,36 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 ui.separator();
             }
             // Ticket #109: Research joins the others, its word replaced by its glyph on the bar.
-            match icons.image("research", 16.0) {
-                Some(image) => {
-                    ui.horizontal(|ui| {
+            // Ticket #194 (version 0.08.0): the figure OPENS the Tech Tree, and so does the race bar
+            // beside it. They sit side by side and are about the same thing, so making one live and
+            // the other dead would be a distinction a player finds only by clicking. OPEN rather
+            // than toggle: a player who clicks a FIGURE is asking to see what is behind it, and a
+            // figure that makes a window vanish on a second click is a surprise. The `Tech Tree (T)`
+            // button keeps toggling, because a button labelled "Tech Tree" reads as a switch.
+            let research_hover = format!("{research_hover}\nClick to open the Tech Tree.");
+            let opened = match icons.image("research", 16.0) {
+                Some(image) => ui
+                    .horizontal(|ui| {
                         ui.spacing_mut().item_spacing.x = 4.0;
-                        ui.add(image).on_hover_text(&research_hover);
-                        ui.label(research).on_hover_text(&research_hover);
-                    });
-                }
-                None => {
-                    ui.label(format!("Research {research}")).on_hover_text(&research_hover);
-                }
+                        let glyph = ui.add(image).interact(egui::Sense::click());
+                        let figure = ui.add(egui::Label::new(research).sense(egui::Sense::click()));
+                        (glyph | figure).on_hover_cursor(egui::CursorIcon::PointingHand).on_hover_text(&research_hover).clicked()
+                    })
+                    .inner,
+                None => ui
+                    .add(egui::Label::new(format!("Research {research}")).sense(egui::Sense::click()))
+                    .on_hover_cursor(egui::CursorIcon::PointingHand)
+                    .on_hover_text(&research_hover)
+                    .clicked(),
+            };
+            if opened {
+                view.show_tech = true;
             }
             // Ticket #58: the Research race, as a bar of the four Factions' contributions to the
             // Tech under research, in Faction colours and in proportion.
-            research_race_bar(ui, session, game);
+            if research_race_bar(ui, session, game) {
+                view.show_tech = true;
+            }
             ui.separator();
             // Ticket #57: the bar names the turn's month. Ticket #67 (version 0.05.5): a Turn is two months,
             // named by its first alone, so turn 2 reads March 2030.
@@ -1930,8 +1945,12 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
 
 /// Ticket #58: the four Factions' shares of the Tech under research, drawn as one bar in Faction
 /// colours. The unfilled part of the bar is what the Tech still needs.
-fn research_race_bar(ui: &mut Ui, session: &Session, game: &Game) {
-    let Some(tech) = game.research.current else { return };
+/// Ticket #194 (version 0.08.0): returns true when it was clicked, which OPENS the Tech Tree. One
+/// wrinkle, recorded rather than solved: when no Tech is under research the bar is not drawn at all,
+/// so in that state only the Research figure is there to click -- which is also the state in which
+/// the red `Pick a Tech` button is on the bar doing the same job, so nothing is lost.
+fn research_race_bar(ui: &mut Ui, session: &Session, game: &Game) -> bool {
+    let Some(tech) = game.research.current else { return false };
     let cost = game.tables.tech(tech).cost.max(1);
     let c = game.research.contributions;
     let (rect, _) = ui.allocate_exact_size(egui::vec2(150.0, 14.0), egui::Sense::hover());
@@ -1949,8 +1968,16 @@ fn research_race_bar(ui: &mut Ui, session: &Session, game: &Game) {
     }
     painter.rect_stroke(rect, 3.0, egui::Stroke::new(1.0, Color32::from_gray(120)), egui::StrokeKind::Inside);
     let shares: Vec<String> = Seat::ALL.into_iter().map(|s| format!("{} {}", game.seat_name(s), c[s.index()])).collect();
-    ui.interact(rect, ui.id().with("race"), egui::Sense::hover())
-        .on_hover_text(format!("The Research race for {}: {}. {} of {}.", game.tables.tech(tech).name, shares.join(", "), game.research.progress, cost));
+    ui.interact(rect, ui.id().with("race"), egui::Sense::click())
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
+        .on_hover_text(format!(
+            "The Research race for {}: {}. {} of {}.\nClick to open the Tech Tree.",
+            game.tables.tech(tech).name,
+            shares.join(", "),
+            game.research.progress,
+            cost
+        ))
+        .clicked()
 }
 
 // ------------------------------------------------------------------ overlays and picking
@@ -3446,6 +3473,7 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
         None => format!("First to {threshold} takes it. Decays {} a turn.", game.tables.influence.decay),
     };
     standings_row(ui, game, session, target, threshold, explain);
+    threshold_breakdown(ui, game, target);
     // Ticket #53: on every Region the player does not hold, what its Blame is costing it here.
     let blame_mult = game.blame_threshold_multiplier_on(Seat(0), target);
     if blame_mult > 1.0 {
@@ -3469,6 +3497,80 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
             ),
         );
     }
+}
+
+/// Ticket #190 (version 0.08.0): the breakdown of what it takes to win this place, in the designer's
+/// own three-line format:
+///
+/// ```text
+/// Threshold 40 - 20 + 20 for size 2
+/// Held by the Archivists: 58 - 38 + 20 (margin) + 5 (Constabulary)
+/// Your Influence converts at 0.91
+/// ```
+///
+/// It replaces a single sentence that named neither Blame nor Green Consensus though both already
+/// moved the figure. Blame and Green Consensus join the threshold line as further terms only while
+/// they are BITING, which keeps the common case to three lines: measured, Blame sits at exactly
+/// x1.00 in 66% of takes. The conversion line is new with Resistance (ticket #187) and belongs
+/// beside the threshold rather than inside it: it prices what your SPENDING is worth here, where the
+/// other two lines price the gate.
+fn threshold_breakdown(ui: &mut Ui, game: &Game, target: Place) {
+    let t = &game.tables.influence;
+    let threshold = game.influence_threshold_for(Seat(0), target);
+    let mut line = match target {
+        Place::State(s) => {
+            let size = game.tables.state(s).size as i64;
+            format!("Threshold {threshold} - {} + {} for size {size}", t.state_threshold_base, t.state_threshold_per_size * size)
+        }
+        Place::Colony(c) => {
+            let people = game.colony(c).map(|x| x.colonists).unwrap_or(0) as i64;
+            let station = game.colony(c).map(|x| x.in_orbit).unwrap_or(false);
+            let base = if station { format!("{} for the station", t.station_threshold_base) } else { "0".to_string() };
+            format!("Threshold {threshold} - {base} + {} for {people} Colonists", t.colony_threshold_per_colonist * people)
+        }
+    };
+    // Ticket #53 and ticket #43: the two multipliers that already moved this figure and never said
+    // so. Shown only while they bite, so the usual card is three lines.
+    let blame = game.blame_threshold_multiplier_on(Seat(0), target);
+    if blame > 1.0 {
+        line.push_str(&format!(", x{blame:.2} (Blame)"));
+    }
+    if game.research.done.contains(&TechId::GreenConsensus) {
+        line.push_str(", cut by Green Consensus");
+    }
+    ui.label(RichText::new(line).weak());
+
+    // The second line: what the holder's Standing and the margin make of it.
+    if let Some(c) = game.place_control(target).controller() {
+        let standing = game.seat(c).influence.get(&target).copied().unwrap_or(0);
+        let margin = game.challenge_margin_at(target);
+        let base = t.challenge_margin;
+        let guard = margin - base;
+        let held = if c == Seat(0) { "Held by you".to_string() } else { format!("Held by the {}", game.seat_name(c)) };
+        let needed = game.influence_needed_for(Seat(0), target);
+        let mut second = format!("{held}: {needed} - {standing} + {base} (margin)");
+        if guard > 0 {
+            second.push_str(&format!(" + {guard} (Constabulary)"));
+        }
+        // A holder with little Standing is protected by the THRESHOLD rather than by the margin, and
+        // the line has to say so or it reads as bad arithmetic: "80 - 0 + 20" is not 80.
+        if standing + margin < needed {
+            second.push_str(&format!(" comes to {}, under the threshold, so the threshold stands", standing + margin));
+        }
+        ui.label(RichText::new(second).weak());
+    }
+
+    // The third: Resistance, which taxes the spending rather than the gate.
+    let convert = 1.0 / game.resistance(target).max(1e-9);
+    let own = game.place_control(target).controller() == Some(Seat(0));
+    ui.label(
+        RichText::new(if own {
+            "Your Influence converts at 1.00 here: a controller converts in full.".to_string()
+        } else {
+            format!("Your Influence converts at {convert:.2}")
+        })
+        .weak(),
+    );
 }
 
 /// Ticket #50: four seats, so the Standings are chips in Faction colours, and only where there is
@@ -3617,7 +3719,14 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
 /// Ticket #146 (version 0.07.3): the Facility build buttons a Region's card offers, drawn in its
 /// Build section and in the strip under the slot boxes for a free box alike.
 fn facility_build_buttons(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, actions: &mut Vec<Action>) {
+    // Ticket #181 (version 0.08.0): a Unique Facility REPLACES the common building on its Faction's
+    // list, so a Prospector sees the Investment Bank where everyone else sees the Bank -- and nobody
+    // sees another Faction's, a captured Region full of them included.
+    let me = game.kind(Seat(0));
     for fk in FacilityKind::ALL {
+        if fk.built_by(me) != fk || fk.unique_to().is_some_and(|f| f != me) {
+            continue;
+        }
         // Ticket #54: the Scrubber has its own button, with the state's cap on it. Ticket #154
         // (version 0.07.4): so does the Sea Wall -- neither takes a slot, so neither is offered
         // for a free box; both stand under the boxes in `no_slot_section`.
@@ -4098,6 +4207,36 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 );
             }
         }
+        // Ticket #193 (version 0.08.0): and straight onto a Colony Ship of yours at Earth with room
+        // left, whether it sits in an Orbital Slot or at the Body at large -- that distinction is
+        // about blockades and has nothing to do with loading people, so a button for one and not the
+        // other would read as a defect. A Carrier takes an Army and no Colonists, so it never
+        // appears. The rule already worked; only the door was missing, exactly as ticket #141
+        // answered for stations. Both doors write the same Load order, so either cancels the other.
+        //
+        // It never offers the CROWDED places: above +1.8 a Ship lifting at Earth may take Colonists
+        // beyond its capacity, and each of those may die on arrival. A risk that drowns people wants
+        // the sentence explaining it beside the button, and that sentence lives on the Ship's card --
+        // so a player who means to crowd a ship goes there deliberately.
+        if st.emigrants > 0 && st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
+            let capacity = game.colony_ship_capacity(Seat(0));
+            for s in game.ships.iter().filter(|s| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth)) {
+                let room = capacity.saturating_sub(s.colonists);
+                let n = st.emigrants.min(room);
+                if n == 0 {
+                    continue;
+                }
+                cost_button_with_hover(
+                    ui,
+                    game,
+                    &session.pending,
+                    Order::Load { ship: s.id, colonists: n, from: LoadSource::State(sid), army: None },
+                    &format!("Send {n} to Colony Ship {} in orbit", s.id.0),
+                    Some(format!("A launch, aboard at this turn's Resolution. This Ship carries {capacity} and has {} aboard. To crowd it past its capacity, load it from its own card.", s.colonists)),
+                    actions,
+                );
+            }
+        }
         // Ticket #52: Relief and Resettle, with their prices on the buttons.
         ui.label(RichText::new("Unrest").strong());
         ui.horizontal(|ui| {
@@ -4279,6 +4418,35 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                 }
                 if resp.clicked() {
                     actions.push(Action::Place(order));
+                }
+            }
+            // Ticket #192 (version 0.08.0): the Upload. Free, and irreversible -- the people leave
+            // the board -- so it is an order like any other and the turn may be thought better of
+            // before it ends. It draws only from the people at the Archive's own place, and it may
+            // be done in batches: four at a time from a Core Module alone is enough, three times
+            // over, which is what keeps the Habitat off the Archivists' critical path.
+            if game.archive_complete(Seat(0)) && game.archive_colony(Seat(0)) == Some(cid) {
+                let bar = game.tables.faction(game.kind(Seat(0))).victory_second.bar as u32;
+                let uploaded = game.seat(Seat(0)).uploaded;
+                let already: u32 = session.pending.iter().map(|o| if let Order::Upload { colony: c, n } = o { if *c == cid { *n } else { 0 } } else { 0 }).sum();
+                let room = game.uploadable_at(cid, already);
+                ui.label(format!("Uploaded: {uploaded} of {bar}"));
+                if room > 0 {
+                    let n = room.min(bar.saturating_sub(uploaded).max(1));
+                    cost_button_with_hover(
+                        ui,
+                        game,
+                        &session.pending,
+                        Order::Upload { colony: cid, n },
+                        &format!("Upload {n} Colonists"),
+                        Some(format!(
+                            "They are read into the Archive and leave the living population here: {} live at this place now. It cannot be undone once the turn ends, and the uploaded can never be lost -- not to a raid, a crowding death or a handover.",
+                            game.colony(cid).map(|c| c.colonists).unwrap_or(0)
+                        )),
+                        actions,
+                    );
+                } else {
+                    ui.label(RichText::new("Nobody is left here to upload; the Archive draws only from the people where it stands.").weak());
                 }
             }
             ui.separator();
@@ -4758,6 +4926,16 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
             }
         }
     }
+    // Ticket #194 (version 0.08.0): put the layout cursor back where the tree's ALLOCATION left it
+    // before the legend is drawn. The tree paints every box with `painter_at` at absolute
+    // coordinates, but each Pick button is placed with `ui.put()`, which advances the Ui's cursor --
+    // so the legend below used to start from wherever the last Pick button happened to be, which is
+    // INSIDE the tree, about a third of the way down and lying across the connector lines. The
+    // painted tree never noticed. That is also why it read as wonky *when picking a Tech*: the
+    // legend's position was decided by which boxes currently carry a Pick button, and picking,
+    // unpicking or changing a pick is exactly what changes that set. Diagnosed from a picture; the
+    // reading of this code made while the ticket was charted was wrong.
+    ui.advance_cursor_after_rect(rect);
     ui.horizontal(|ui| {
         // Ticket #173 (version 0.07.6): the paler amber of a pick that can still change earns its own
         // swatch, next to the settled amber it must be told apart from.
@@ -4772,6 +4950,66 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
 
 /// Ticket #58: the Moments corner at the foot of the Report. A checkbox per kind, remembered for
 /// the session; `report.toml` holds the defaults.
+/// Ticket #191 (version 0.08.0): the Relations grid -- what every Faction thinks of every other, one
+/// score per ORDERED PAIR, so the Arkwrights' view of the Prospectors is a different cell from the
+/// Prospectors' view of the Arkwrights. A row is one Faction's view of the others.
+///
+/// The score does nothing mechanical in this version: it is read, not spent. Two things follow that
+/// are worth knowing before the grid is read as broken. The scale runs to +10 but nothing fills that
+/// half yet, so every cell is zero or negative; and measured over 80 games, the median pair's first
+/// offence is turn 17 in a 22.5-turn game, with half of all ordered pairs never offending at all --
+/// so the grid is empty until the middle of the game and about half its cells still read 0 at the
+/// end. The line beneath it says so, rather than leaving a player to wonder.
+///
+/// A proper Faction window is the intended home in a later version, at the designer's word.
+fn relations_grid(ui: &mut Ui, session: &Session, game: &Game) {
+    ui.separator();
+    ui.label(RichText::new("Relations").strong());
+    egui::Grid::new("relations").striped(true).min_col_width(76.0).show(ui, |ui| {
+        ui.label("");
+        for subject in Seat::ALL {
+            ui.label(RichText::new(game.seat_name(subject)).color(seat_colour(session, subject)));
+        }
+        ui.end_row();
+        for viewer in Seat::ALL {
+            ui.label(RichText::new(game.seat_name(viewer)).color(seat_colour(session, viewer)));
+            for subject in Seat::ALL {
+                if viewer == subject {
+                    ui.label(RichText::new("-").weak());
+                    continue;
+                }
+                let v = game.relations_score(viewer, subject);
+                let colour = if v < 0 { Color32::from_rgb(230, 120, 100) } else { Color32::from_gray(190) };
+                let cell = ui.label(RichText::new(format!("{v:+}")).color(colour));
+                rule_tip(
+                    cell,
+                    format!(
+                        "What the {} think of the {}, from {} to {}.
+It falls {} for each turn the {} spend Influence on a place the {} hold, or open a Battle against them, and recovers {} every {} quiet turns -- never above {}.",
+                        game.seat_name(viewer),
+                        game.seat_name(subject),
+                        game.tables.relations.worst,
+                        game.tables.relations.best,
+                        game.tables.relations.fall_per_offending_turn,
+                        game.seat_name(subject),
+                        game.seat_name(viewer),
+                        game.tables.relations.recover,
+                        game.tables.relations.quiet_turns,
+                        game.tables.relations.start
+                    ),
+                );
+            }
+            ui.end_row();
+        }
+    });
+    ui.label(
+        RichText::new(
+            "A row is one Faction's view of the others. Nothing in this version reads these figures: they are a record, not a rule. Half of all pairs never cross each other at all in a whole game, and the first offence usually falls around the middle of one.",
+        )
+        .weak(),
+    );
+}
+
 fn moments_corner(ui: &mut Ui, session: &Session, view: &mut ViewState) {
     egui::CollapsingHeader::new("Moments").id_salt("moments_corner").show(ui, |ui| {
         ui.label(RichText::new("A Moment stops the turn for one sentence and one number before this Report. At most two a turn, the most serious first.").weak());
@@ -5032,10 +5270,18 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
 /// and in the Hab View's strip for a free tile alike, so the two never differ.
 fn module_build_buttons(ui: &mut Ui, session: &Session, game: &Game, cid: ColonyId, actions: &mut Vec<Action>) {
     let Some(col) = game.colony(cid) else { return };
+    // Ticket #186 (version 0.08.0): as on Earth -- the Custodians see their Academy where everyone
+    // else sees the Institute.
+    let me = game.kind(Seat(0));
     for mk in ModuleKind::BUILDABLE {
+        if mk.built_by(me) != mk || mk.unique_to().is_some_and(|f| f != me) {
+            continue;
+        }
         // Ticket #80: a station holds a Shipyard, Habitats and Observatories; ticket #89: and
         // Solar Arrays, which stand nowhere else.
-        if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost) {
+        // Ticket #185 (version 0.08.0): and an Institute -- or the Custodians' Academy -- since a
+        // station carries Observatories and the Institute is what multiplies them.
+        if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Academy) {
             continue;
         }
         if !col.in_orbit && game.tables.module(mk).station_only {
@@ -5057,7 +5303,13 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
     }
     if view.show_tech {
         let mut open = true;
-        egui::Window::new("Tech Tree").open(&mut open).resizable(false).show(ctx, |ui| {
+        // Ticket #194 (version 0.08.0): a default position clear of the Climate Panel, which sits at
+        // x 10 (or 420 spectating) and is 400 wide. Found while taking the pictures for this ticket:
+        // on the Earth view the Panel covered the Tech Tree's left third, hiding every branch name
+        // and four of the five legend swatches, and the first two captures were useless because of
+        // it. `default_pos` only places it the first time, so a window the player has dragged stays
+        // where they put it.
+        egui::Window::new("Tech Tree").open(&mut open).resizable(false).default_pos(egui::pos2(if session.spectator { 840.0 } else { 430.0 }, 120.0)).show(ctx, |ui| {
             ui.label(match game.research.current {
                 Some(t) => format!("Under research: {} ({} of {}). {}", game.tables.tech(t).name, game.research.progress, game.tables.tech(t).cost, game.research_lead_text()),
                 None => format!("No Tech under research. {} Research waiting.", game.research.unallocated.iter().sum::<i64>() + game.research.unattributed),
@@ -5321,6 +5573,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                     }
                 });
             }
+            relations_grid(ui, session, game);
         });
         view.show_victory = open;
     }
