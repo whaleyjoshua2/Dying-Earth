@@ -151,9 +151,15 @@ pub fn faction_symbol(kind: dying_earth_engine::FactionKind) -> &'static str {
 /// solar panels on a bar with a central module, the ISS reduced to its silhouette -- was drawn for
 /// the game after the designer passed on every station game-icons.net has, none of which is drawn
 /// as a station. A drawn glyph still loads and tints through `Icons` like any other.
-/// Ticket #185 (version 0.08.0): the School's is drawn for the game too -- a pediment on columns
-/// over a row of desks -- because game-icons.net has no school and the nearest candidates were a
-/// laboratory and a capitol, which say other things.
+/// Ticket #185 (version 0.08.0): the School's is drawn for the game too -- a mortarboard: the flat
+/// board, the cap beneath it and a tassel hanging right. game-icons.net has no school, and the
+/// nearest candidates said other things (a laboratory, a capitol).
+///
+/// It was drawn as a pediment on columns first, and the icon sheet killed that at a glance: at 16
+/// pixels it was the BANK's silhouette exactly, distinguished only by the currency glyph the Bank
+/// carries. This is the collision ticket #146 already dodged once when it gave the Embassy a
+/// handshake, "since the capitol is the Bank's building twice". The open book was unavailable too:
+/// the Archive has it.
 pub const DRAWN: [&str; 2] = ["station", "facility_school"];
 
 impl Credit {
