@@ -19,7 +19,7 @@ fn tables() -> Arc<Tables> {
 fn game() -> Game {
     let mut g = fresh();
     for s in &mut g.states {
-        s.facilities.retain(|f| f.kind == FacilityKind::LaunchSite);
+        s.facilities.retain(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite));
     }
     g
 }
@@ -870,7 +870,7 @@ fn occupation_of_a_controlled_state_returns_it_to_its_owner_when_broken() {
 
 fn meet_first(g: &mut Game, seat: Seat) {
     match g.kind(seat) {
-        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 750,
+        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 1000,
         FactionKind::Custodians => g.seats[seat.index()].stabilization_run = 3,
         FactionKind::Arkwrights => {}
         FactionKind::Archivists => g.seats[seat.index()].research_total = 150,
@@ -894,7 +894,7 @@ fn both_met_the_larger_margin_wins() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
     g.seats[0].stabilization_run = 3; // parts 1.0 and 1.0 -> margin 1.0
-    g.seats[1].venture_fund = 900; // parts 1.2 and 1.25 -> margin 1.2
+    g.seats[1].venture_fund = 1200; // parts 1.2 and 1.25 -> margin 1.2
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
@@ -906,7 +906,7 @@ fn both_met_by_the_same_margin_is_a_draw() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     g.seats[0].stabilization_run = 3;
-    g.seats[1].venture_fund = 900; // the lower fraction is the presence, 1.0, on both sides
+    g.seats[1].venture_fund = 1200; // the lower fraction is the presence, 1.0, on both sides
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Draw { .. })), "{:?}", g.outcome);
@@ -1444,8 +1444,15 @@ fn every_state_starts_with_its_start_facilities_and_the_faction_states_add_a_lau
         let card = g.tables.state(sid);
         let have: Vec<FacilityKind> = g.state(sid).facilities.iter().map(|f| f.kind).collect();
         let mut want = card.start_facilities.clone();
-        if g.state(sid).control.controller().is_some() {
+        // Ticket #181 (version 0.08.0): a Faction's start Region's Facilities come up as that
+        // Faction's own versions, the added Launch Site included -- so the Arkwrights' start Region
+        // carries a Spaceport and Australia's Power Plant is the Archivists' Reactor.
+        if let Some(seat) = g.state(sid).control.controller() {
             want.push(FacilityKind::LaunchSite);
+            let faction = g.kind(seat);
+            for k in want.iter_mut() {
+                *k = k.built_by(faction);
+            }
         }
         assert_eq!(have, want, "{}", card.name);
         // Ticket #69: North America and South-East Asia carry a Research Lab on top of the count.
@@ -1652,7 +1659,7 @@ fn more_than_one_seat_meeting_its_condition_gives_the_game_to_the_larger_margin(
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
     g.seats[0].stabilization_run = 3; // parts 1.0 and 1.0 -> margin 1.0
-    g.seats[1].venture_fund = 900; // parts 1.2 and 1.25 -> margin 1.2
+    g.seats[1].venture_fund = 1200; // parts 1.2 and 1.25 -> margin 1.2
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
@@ -1713,7 +1720,7 @@ fn the_ai_seats_take_start_states_not_adjacent_to_any_taken_one() {
     // Every seat's start carries a Launch Site.
     for seat in Seat::ALL {
         let sid = held(seat)[0];
-        assert!(g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite), "{seat:?} has no Launch Site");
+        assert!(g.state(sid).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite)), "{seat:?} has no Launch Site");
     }
 }
 
@@ -3988,10 +3995,11 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     let on_rung = |r: u32| -> Vec<&str> { TechId::ALL.into_iter().map(|t| g.tables.tech(t)).filter(|t| t.branch == "Industry" && t.rung == r).map(|t| t.name.as_str()).collect() };
     assert_eq!(on_rung(1), vec!["Efficient Grids", "Coastal Engineering"], "two boxes on Industry rung 1");
     assert_eq!(on_rung(2), vec!["Clean Power"]);
-    // The Sea Wall's card names it as its unlock, and there are eleven Facilities since ticket #185
-    // (version 0.08.0) added the School.
+    // The Sea Wall's card names it as its unlock, and there are fifteen Facilities in version
+    // 0.08.0: ten through version 0.07, the School on ticket #185, and the four Unique Facilities on
+    // tickets #182 to #186 -- the Investment Bank, the Spaceport, the Reactor and the Academy.
     assert_eq!(g.tables.facility(FacilityKind::SeaWall).needs_tech, Some(TechId::CoastalEngineering));
-    assert_eq!(FacilityKind::ALL.len(), 11, "eleven Facilities");
+    assert_eq!(FacilityKind::ALL.len(), 15, "fifteen Facilities");
 }
 
 /// (g) Antarctica opens the first Climate phase the Temperature stands at +1.6, stays open, and its
@@ -5199,21 +5207,23 @@ fn the_venture_capital_fund_banks_a_share_of_materials_output_and_a_draw_returns
     assert_eq!(g.check_order(Seat(0), &[], &Order::DrawVenture { amount: 1 }).unwrap_err().0, "only the Prospectors have a Venture Capital Fund");
 }
 
-/// Ticket #72 (c): 750 in the Fund is the first part of the Prospectors' condition, the running
-/// Extraction Total being retired, and the ranking reads the Fund over 750.
+/// Ticket #72 (c): the Fund is the first part of the Prospectors' condition, the running Extraction
+/// Total being retired, and the ranking reads the Fund over the bar. Ticket #182 (version 0.08.0)
+/// moved that bar from 750 to 1000, because the Investment Bank pays uncapped interest into the Fund
+/// and, measured over 40 games, nobody had ever reached 750 at all.
 #[test]
-fn seven_hundred_and_fifty_in_the_fund_is_the_prospectors_first_part() {
+fn a_thousand_in_the_fund_is_the_prospectors_first_part() {
     let mut g = game();
     let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
     let card = g.tables.faction(FactionKind::Prospectors).victory_first;
-    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 750.0));
+    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 1000.0));
     assert_eq!(card.kind.name(), "Venture Capital Fund");
-    g.seats[pro.index()].venture_fund = 300;
+    g.seats[pro.index()].venture_fund = 400;
     let p = g.progress(pro);
-    assert_eq!((p.first_value, p.first_bar), (300.0, 750.0));
+    assert_eq!((p.first_value, p.first_bar), (400.0, 1000.0));
     assert!((p.first_fraction() - 0.4).abs() < 1e-9);
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 12);
-    g.seats[pro.index()].venture_fund = 750;
+    g.seats[pro.index()].venture_fund = 1000;
     open_gates(&mut g);
     assert!(g.progress(pro).met());
     g.end_phase();
@@ -7613,4 +7623,326 @@ fn schooling_moderates_the_observatorys_per_colonist_bonus() {
         let want = (base * science * taught * (1.0 + n * per * taught) * mult).floor() as i64;
         assert_eq!(g.module_yield_at(Seat(0), id, idx).research, want, "at {taught} the per-Colonist bonus should be moderated too");
     }
+}
+
+// ------------------------------------------- 0.08.0 tickets #181 to #186: the Unique Facilities
+
+fn seat_of(g: &Game, kind: FactionKind) -> Seat {
+    Seat::ALL.into_iter().find(|s| g.kind(*s) == kind).expect("every game seats all four Factions")
+}
+
+/// Ticket #181: a Unique Facility is a building of its own and it REPLACES the common one on its
+/// Faction's build list. A Prospector who orders a Bank raises an Investment Bank; every other
+/// Faction raises a Bank; and the name is not a back door -- nobody else may order one, a Faction
+/// that has captured a Region full of them included, because a captured building is never a licence
+/// to build more.
+#[test]
+fn a_faction_builds_its_own_version_of_the_common_building() {
+    let mut g = game();
+    let pro = seat_of(&g, FactionKind::Prospectors);
+    let cus = seat_of(&g, FactionKind::Custodians);
+    let ps = g.controlled_states(pro)[0];
+    let cs = g.controlled_states(cus)[0];
+    g.seats[pro.index()].stockpile.materials = 500;
+    g.seats[cus.index()].stockpile.materials = 500;
+
+    g.commit_orders(pro, &[Order::BuildFacility { state: ps, kind: FacilityKind::Bank }]);
+    g.commit_orders(cus, &[Order::BuildFacility { state: cs, kind: FacilityKind::Bank }]);
+    let queued = |g: &Game, sid: StateId| -> Vec<BuildItem> { g.state(sid).queue.iter().map(|b| b.item).collect() };
+    assert_eq!(queued(&g, ps), vec![BuildItem::Facility(FacilityKind::InvestmentBank)], "a Prospector never raises a plain Bank");
+    assert_eq!(queued(&g, cs), vec![BuildItem::Facility(FacilityKind::Bank)], "and everybody else raises one");
+
+    let err = g.check_order(cus, &[], &Order::BuildFacility { state: cs, kind: FacilityKind::InvestmentBank }).unwrap_err();
+    assert_eq!(err.0, "only the Prospectors build the Investment Bank");
+    assert!(g.check_order(pro, &[], &Order::BuildFacility { state: ps, kind: FacilityKind::InvestmentBank }).is_ok(), "by its own name too");
+
+    // The cap reads the JOB, not the name: an Academy standing blocks a School order and back.
+    let cus_state = g.controlled_states(cus)[0];
+    g.state_mut(cus_state).queue.clear();
+    g.state_mut(cus_state).facilities.push(Facility::new(FacilityKind::Academy));
+    let err = g.check_order(cus, &[], &Order::BuildFacility { state: cus_state, kind: FacilityKind::School }).unwrap_err();
+    assert_eq!(err.0, "this Nation State already has a School");
+}
+
+/// Ticket #181: the price is the common building's, exactly -- the same Materials, the same build
+/// turns, the same upkeep, the same output, the same slot. A Unique Facility costs nothing extra,
+/// and quietly paying less would be a cost by another name.
+#[test]
+fn a_unique_facility_costs_and_makes_what_the_common_one_does() {
+    let g = game();
+    for (unique, common) in [
+        (FacilityKind::InvestmentBank, FacilityKind::Bank),
+        (FacilityKind::Spaceport, FacilityKind::LaunchSite),
+        (FacilityKind::Reactor, FacilityKind::PowerPlant),
+        (FacilityKind::Academy, FacilityKind::School),
+    ] {
+        assert_eq!(unique.common(), Some(common), "{} replaces {}", unique.name(), common.name());
+        let u = g.tables.facility(unique);
+        let c = g.tables.facility(common);
+        assert_eq!((u.materials, u.build_turns, u.energy_upkeep, u.no_slot), (c.materials, c.build_turns, c.energy_upkeep, c.no_slot), "{}", unique.name());
+        assert!((u.emissions - c.emissions).abs() < 1e-9, "{}", unique.name());
+        assert_eq!(u.produces.as_ref().map(|p| (p.resource, p.amount)), c.produces.as_ref().map(|p| (p.resource, p.amount)), "{}", unique.name());
+    }
+    // And off Earth, the Academy against the Institute.
+    let a = g.tables.module(ModuleKind::Academy);
+    let i = g.tables.module(ModuleKind::Institute);
+    assert_eq!((a.materials, a.build_turns, a.energy_upkeep), (i.materials, i.build_turns, i.energy_upkeep));
+    assert_eq!(ModuleKind::Academy.common(), Some(ModuleKind::Institute));
+}
+
+/// Ticket #181: a Faction's start Region's Facilities come up as that Faction's own versions, the
+/// Launch Site every start Region is handed included. The consequence is asymmetric and was accepted
+/// knowingly: the Arkwrights hold their Spaceport from turn 1, the Archivists usually hold a Reactor
+/// because ten of the fourteen Regions start with a Power Plant, and neither the Bank nor the School
+/// is in any Region's start Facilities, so the Prospectors and the Custodians must build for theirs.
+#[test]
+fn a_start_region_comes_up_with_its_factions_own_versions() {
+    let g = fresh();
+    let ark = seat_of(&g, FactionKind::Arkwrights);
+    let sid = g.controlled_states(ark)[0];
+    assert!(g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::Spaceport), "the Arkwrights launch from turn 1");
+    assert!(!g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite), "and never from a common Launch Site");
+
+    // Nobody starts with another Faction's version, and no start Region carries a Bank or a School,
+    // so the Prospectors and the Custodians begin with nothing of theirs.
+    for seat in Seat::ALL {
+        let faction = g.kind(seat);
+        for sid in g.controlled_states(seat) {
+            for f in &g.state(sid).facilities {
+                assert!(f.kind.unique_to().map(|o| o == faction).unwrap_or(true), "{:?} holds another Faction's {}", seat, f.kind.name());
+            }
+        }
+    }
+    for seat in [seat_of(&g, FactionKind::Prospectors), seat_of(&g, FactionKind::Custodians)] {
+        let holds = g.controlled_states(seat).iter().any(|s| g.state(*s).facilities.iter().any(|f| f.kind.unique_to().is_some()));
+        assert!(!holds, "{seat:?} should start with none of its own");
+    }
+}
+
+/// Ticket #181: a Unique Facility is never destroyed when its place changes hands. It keeps standing
+/// and pays its new holder the same clause it paid its builder -- the opposite of the Scrubber and
+/// the Archive, which are destroyed outright. And the mirror does NOT hold: a common building
+/// already standing does not convert when the Faction whose Unique version it is takes the Region.
+/// The bricks are the bricks, and the rule cuts both ways or it is not a rule.
+#[test]
+fn a_unique_facility_changes_sides_and_a_common_building_never_converts() {
+    let mut g = game();
+    let pro = seat_of(&g, FactionKind::Prospectors);
+    let cus = seat_of(&g, FactionKind::Custodians);
+    let sid = g.controlled_states(pro)[0];
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::InvestmentBank));
+
+    g.take_control(sid, cus);
+    assert!(g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::InvestmentBank), "it stands, and in Custodian hands");
+
+    // The other way: three plain Banks taken by the Prospectors stay three plain Banks.
+    let other = g.controlled_states(cus)[0];
+    for _ in 0..3 {
+        g.state_mut(other).facilities.push(Facility::new(FacilityKind::Bank));
+    }
+    g.take_control(other, pro);
+    assert_eq!(g.state(other).facilities.iter().filter(|f| f.kind == FacilityKind::Bank).count(), 3, "capture is not conversion");
+    assert!(!g.state(other).facilities.iter().any(|f| f.kind == FacilityKind::InvestmentBank));
+}
+
+/// Ticket #182: the Investment Bank banks 1% of the Venture Capital Fund's balance back INTO the
+/// Fund, read before this turn's banking is added, rounded down, and the Materials are created
+/// rather than drawn from the Stockpile, so they compound from next turn. ONE per Region pays,
+/// however many stand there, and a floor of one applies to a single building Faction-wide.
+#[test]
+fn an_investment_bank_banks_a_hundredth_of_the_fund_one_per_region() {
+    let mut g = game();
+    let pro = seat_of(&g, FactionKind::Prospectors);
+    g.seats[pro.index()].stockpile.energy = 500;
+    let a = g.controlled_states(pro)[0];
+    let b = StateId::ALL.into_iter().find(|s| *s != a).unwrap();
+    g.take_control(b, pro);
+    // Two in one Region and one in the other: three buildings, two paying Regions.
+    g.state_mut(a).facilities.push(Facility::new(FacilityKind::InvestmentBank));
+    g.state_mut(a).facilities.push(Facility::new(FacilityKind::InvestmentBank));
+    g.state_mut(b).facilities.push(Facility::new(FacilityKind::InvestmentBank));
+
+    g.seats[pro.index()].venture_fund = 500;
+    let before = g.seats[pro.index()].stockpile.materials;
+    g.income_phase();
+    assert_eq!(g.seats[pro.index()].venture_fund, 500 + 10, "1% of 500 is 5, once per Region, twice");
+    assert_eq!(g.seats[pro.index()].stockpile.materials - before, g.seats[pro.index()].income_last_turn.materials, "the interest is created, never taken from the Stockpile");
+
+    // And it compounds: next turn's interest reads the larger balance.
+    g.income_phase();
+    assert_eq!(g.seats[pro.index()].venture_fund, 510 + 10, "1% of 510 is 5 again, and the balance keeps climbing");
+
+    // The floor: below 100 in the Fund the percentage floors to nothing, and one building still pays.
+    g.seats[pro.index()].venture_fund = 50;
+    g.income_phase();
+    assert_eq!(g.seats[pro.index()].venture_fund, 51, "one Material, Faction-wide, not one per Region");
+}
+
+/// Ticket #182: in a non-Prospector's hands the same share applies to that Faction's DUCAT income
+/// instead, at a minimum of one Ducat, because no other Faction has a Fund for it to pay into. The
+/// cap travels with the clause, so capturing a Prospector Region is never better than being the
+/// Prospectors there.
+#[test]
+fn a_captured_investment_bank_pays_its_captor_ducats() {
+    let mut g = game();
+    let cus = seat_of(&g, FactionKind::Custodians);
+    g.seats[cus.index()].stockpile.energy = 500;
+    let sid = g.controlled_states(cus)[0];
+    g.income_phase();
+    let plain = g.seats[cus.index()].income_last_turn.ducats;
+
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::InvestmentBank));
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::InvestmentBank));
+    let fund_before = g.seats[cus.index()].venture_fund;
+    g.income_phase();
+    let with = g.seats[cus.index()].income_last_turn.ducats;
+    let bank_ducats = g.facility_yield(cus, sid, FacilityKind::InvestmentBank).amount * 2;
+    assert_eq!(with - plain - bank_ducats, 1, "one Region pays once, at the floor of one Ducat");
+    assert_eq!(g.seats[cus.index()].venture_fund, fund_before, "and nothing reaches a Fund they do not have");
+}
+
+/// Ticket #183: the Spaceport pays +1 Influence for every Emigrant it lifts OFF EARTH -- onto a Ship
+/// in orbit, or onto a station of the seat's over Earth. It lands as free Allotment paid into NEXT
+/// turn's, at face value OUTSIDE the Allotment formula, so the Arkwrights' x0.8 Influence multiplier
+/// never touches it. The sea to Antarctica pays nothing: it is not a launch, and Antarctica is on
+/// Earth.
+#[test]
+fn a_spaceport_pays_an_influence_for_every_emigrant_it_launches() {
+    let mut g = game();
+    let ark = seat_of(&g, FactionKind::Arkwrights);
+    let sid = g.controlled_states(ark)[0];
+    assert!(g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::Spaceport), "the premise: their start Region carries one");
+    let st = station_at(&mut g, ark, BodyId::Earth);
+    g.colony_mut(st).unwrap().modules.push(Module::new(ModuleKind::Core));
+
+    let base = g.influence_allotment(ark);
+    g.state_mut(sid).emigrants = 3;
+    g.commit_orders(ark, &[Order::LiftToStation { state: sid, n: 3, colony: st }]);
+    assert_eq!(g.seats[ark.index()].spaceport_influence, 3, "one for each Emigrant lifted");
+    assert_eq!(g.influence_allotment(ark), base + 3, "at face value, never through the x0.8");
+
+    // The sea is not a launch.
+    g.state_mut(sid).emigrants = 4;
+    g.commit_orders(ark, &[Order::SendToAntarctica { state: sid, n: 4, into: UnloadTarget::Slot(BodyId::Earth, 0) }]);
+    assert_eq!(g.seats[ark.index()].spaceport_influence, 3, "Antarctica is on Earth");
+
+    // A common Launch Site earns nothing, and the tally is cleared once it has been paid.
+    g.state_mut(sid).facilities.retain(|f| f.kind != FacilityKind::Spaceport);
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::LaunchSite));
+    g.income_phase();
+    assert_eq!(g.seats[ark.index()].spaceport_influence, 0, "paid, and the tally begins again");
+    g.state_mut(sid).emigrants = 2;
+    g.commit_orders(ark, &[Order::LiftToStation { state: sid, n: 2, colony: st }]);
+    assert_eq!(g.seats[ark.index()].spaceport_influence, 0, "a Launch Site is not a Spaceport");
+}
+
+/// Ticket #184: while a Reactor stands and is online, its holder pays 75% of the total Energy upkeep
+/// of everything it owns -- off the TOTAL and floored once, never per building, because at 2 and 3
+/// Energy a building per-building rounding turns a 75% rule into a 50% and a 33% cut. The Archive is
+/// the one exception and pays its figure in full. No stacking: a second Reactor is an ordinary
+/// power station.
+#[test]
+fn a_reactor_takes_a_quarter_off_the_whole_energy_bill_but_never_off_the_archive() {
+    let mut g = game();
+    let arc = seat_of(&g, FactionKind::Archivists);
+    let sid = g.controlled_states(arc)[0];
+    g.state_mut(sid).facilities.clear();
+    for _ in 0..2 {
+        g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Factory));
+    }
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::ResearchLab));
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::PowerPlant));
+    g.seats[arc.index()].stockpile.energy = 500;
+
+    // A Power Plant and a Reactor make the same Energy, so swapping one for the other isolates the
+    // clause exactly: the whole difference is the relief.
+    g.income_phase();
+    let plain = g.seats[arc.index()].income_last_turn.energy;
+    let bill: i64 = g.state(sid).facilities.iter().map(|f| g.tables.facility(f.kind).energy_upkeep).sum::<i64>() + g.unit_upkeep(arc);
+    let want = bill - (bill as f64 * 0.75).floor() as i64;
+    assert!(want > 0, "the premise: there is a bill to take a quarter off, {bill}");
+
+    let i = g.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::PowerPlant).unwrap();
+    g.state_mut(sid).facilities[i].kind = FacilityKind::Reactor;
+    g.income_phase();
+    assert_eq!(g.seats[arc.index()].income_last_turn.energy - plain, want, "off the total, floored once");
+
+    // No stacking: a second Reactor is worth its 6 Energy and nothing more.
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Reactor));
+    g.income_phase();
+    let two = g.seats[arc.index()].income_last_turn.energy;
+    g.state_mut(sid).facilities.pop();
+    g.income_phase();
+    let one = g.seats[arc.index()].income_last_turn.energy;
+    // What a Reactor actually makes here, not the row figure: this Region leans Energy, so its
+    // power stations pay half again.
+    let makes = g.facility_yield(arc, sid, FacilityKind::Reactor).amount;
+    assert_eq!(two - one, makes, "the second Reactor pays its Energy and no second discount");
+
+    // And the Archive pays in full: it is left out of the sum the relief is taken from, so adding it
+    // costs its whole figure and not three quarters of it. (Ticket #51: it draws no Energy until its
+    // Research is paid in full, so the fund is filled first or there is nothing to measure.)
+    let cid = colony(&mut g, arc, BodyId::Mars, &[], 4);
+    g.income_phase();
+    let without = g.seats[arc.index()].income_last_turn.energy;
+    g.colony_mut(cid).unwrap().modules.push(Module::new(ModuleKind::Archive));
+    g.seats[arc.index()].archive_fund = g.tables.archive.research;
+    let archive_upkeep = g.tables.module(ModuleKind::Archive).energy_upkeep;
+    assert!(archive_upkeep > 0, "the premise: the Archive has a bill of its own");
+    g.income_phase();
+    assert_eq!(without - g.seats[arc.index()].income_last_turn.energy, archive_upkeep, "the Archive's upkeep is paid whole");
+}
+
+/// Ticket #186: the Academy does everything a School does and pays +1 Ducat a turn, flat, wherever
+/// it stands -- Region, Colony or station -- while it is online. Flat rather than scaled by GDP,
+/// which would make it a second Bank built where the money already is rather than where schooling is
+/// wanted; and flat is why a captured Academy pays its captor exactly what it paid its builder,
+/// since 1 through the largest output multiplier in the game floors back to 1.
+#[test]
+fn an_academy_pays_a_ducat_wherever_it_stands_and_teaches_like_a_school() {
+    let mut g = game();
+    let cus = seat_of(&g, FactionKind::Custodians);
+    g.seats[cus.index()].stockpile.energy = 500;
+    let sid = g.controlled_states(cus)[0];
+    g.income_phase();
+    let plain = g.seats[cus.index()].income_last_turn.ducats;
+
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Academy));
+    let cid = colony(&mut g, cus, BodyId::Mars, &[ModuleKind::Academy], 4);
+    g.income_phase();
+    let with = g.seats[cus.index()].income_last_turn.ducats;
+    // The figure is pinned as a literal rather than read back from the same table the rule reads:
+    // an oracle that shares its input with the code under test agrees with it while both diverge.
+    assert_eq!(g.tables.unique.academy_ducats, 1, "the card figure: a flat Ducat");
+    assert_eq!(with - plain, 2, "one on Earth and one off it");
+
+    // It teaches: the Region's schooling climbs by the School's own step, to the School's ceiling.
+    let step = g.tables.school.per_turn;
+    let taught = g.state(sid).schooling;
+    g.run_schools();
+    assert!((g.state(sid).schooling - (taught + step)).abs() < 1e-9, "an Academy is a School that pays");
+    let before = g.colony(cid).unwrap().education;
+    g.run_schools();
+    assert!(g.colony(cid).unwrap().education > before, "and off Earth too");
+}
+
+/// Ticket #181: only a CONTROLLER collects. An occupier pays a Unique Facility's upkeep and draws
+/// nothing from its clause until control transfers -- the precedent ticket #69 set for an occupied
+/// Research Lab, which works for the world and not for the occupier.
+#[test]
+fn an_occupier_draws_nothing_from_a_unique_facilitys_clause() {
+    let mut g = game();
+    let cus = seat_of(&g, FactionKind::Custodians);
+    let pro = seat_of(&g, FactionKind::Prospectors);
+    g.seats[cus.index()].stockpile.energy = 500;
+    let sid = g.controlled_states(cus)[0];
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Academy));
+    g.income_phase();
+    let controlled = g.seats[cus.index()].income_last_turn.ducats;
+
+    let economy = g.state_ducats(sid);
+    g.state_mut(sid).control = Control::Occupied { occupier: cus, previous: Some(pro), turns: 1 };
+    g.income_phase();
+    let occupied = g.seats[cus.index()].income_last_turn.ducats;
+    assert_eq!(controlled - occupied, 1 + economy, "the clause and the economy both wait for control");
 }

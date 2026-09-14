@@ -1411,6 +1411,8 @@ impl Game {
                                 }
                                 // Ticket #189 (version 0.08.0): what they know goes aboard with them.
                                 let taught = self.take_emigrants(st, colonists);
+                                // Ticket #183 (version 0.08.0): a lift onto a Ship is a launch too.
+                                self.pay_spaceport(seat, st, colonists);
                                 self.load_people(ship, colonists, taught);
                             }
                             LoadSource::Colony(c) => {

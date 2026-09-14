@@ -201,7 +201,9 @@ impl Game {
                 let half = if self.facilities_at_half(st.id) { 0.5 } else { 1.0 };
                 for f in st.facilities.iter().filter(|f| f.self_run && f.working()) {
                     let e = t.facility(f.kind).emissions * half;
-                    match f.kind {
+                    // Ticket #181 (version 0.08.0): a Unique Facility is charged to the bucket of
+                    // the job it does, so a Reactor's Emissions are Power Plant Emissions.
+                    match f.kind.common().unwrap_or(f.kind) {
                         FacilityKind::Factory => b.factories += e * fr_mult,
                         FacilityKind::Refinery => b.refineries += e * fr_mult,
                         FacilityKind::PowerPlant => b.power_plants += e * pp_mult,
@@ -217,12 +219,12 @@ impl Game {
                     }
                     // Ticket #52: at Unrest 7 every Facility in the state emits at half.
                     let e = t.facility(f.kind).emissions * if self.facilities_at_half(st.id) { 0.5 } else { 1.0 };
-                    let charged = match f.kind {
+                    let charged = match f.kind.common().unwrap_or(f.kind) {
                         FacilityKind::Factory | FacilityKind::Refinery => e * fr_mult * m,
                         FacilityKind::PowerPlant => e * pp_mult * m,
                         _ => 0.0,
                     };
-                    match f.kind {
+                    match f.kind.common().unwrap_or(f.kind) {
                         FacilityKind::Factory => b.factories += charged,
                         FacilityKind::PowerPlant => b.power_plants += charged,
                         FacilityKind::Refinery => b.refineries += charged,

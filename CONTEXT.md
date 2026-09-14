@@ -17,7 +17,7 @@ The Faction that colonizes the solar system while limiting ecological damage to 
 _Avoid_: Stewards (the retired name), environmentalists, greens, moderates, eco-terrorists
 
 **Prospectors**:
-The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry and the Strip Permit, and since version 0.05.5 they win on a hoard: 750 Materials in their Venture Capital Fund, and expansion.
+The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry and the Strip Permit, and since version 0.05.5 they win on a hoard: 1000 Materials in their Venture Capital Fund, and expansion.
 _Avoid_: Extractors (the retired name), capitalists, industrialists, exploiters
 
 **Arkwrights**:
@@ -501,7 +501,7 @@ Retired in version 0.05.5 for the Venture Capital Fund. It was the Prospectors' 
 _Avoid_: extraction total, production score, output total, wealth
 
 **Venture Capital Fund**:
-The Prospectors' own pool beside the Stockpile, and their measure since version 0.05.5: 750 Materials in it is the first part of their Victory Condition. On any turn they set the share of their Factories' and Mines' Materials output that goes into it at Income, from nothing to four fifths in steps of a tenth; Materials bought, refunded or found are not output. A draw takes Materials back out at a tenth's loss.
+The Prospectors' own pool beside the Stockpile, and their measure since version 0.05.5: 1000 Materials in it is the first part of their Victory Condition (750 until version 0.08.0, which raised the bar when the Investment Bank began paying interest into it). On any turn they set the share of their Factories' and Mines' Materials output that goes into it at Income, from nothing to four fifths in steps of a tenth; Materials bought, refunded or found are not output. A draw takes Materials back out at a tenth's loss.
 _Avoid_: the pool, savings, treasury, war chest, bank
 
 **Stabilization**:

@@ -648,6 +648,10 @@ pub struct SeatState {
     pub venture_share: f64,
     #[serde(default)]
     pub venture_banked_last_turn: i64,
+    /// Ticket #183 (version 0.08.0): Influence the seat's Spaceports earned lifting Emigrants off
+    /// Earth this turn, waiting to be paid into NEXT turn's Allotment. Read and cleared at Income.
+    #[serde(default)]
+    pub spaceport_influence: i64,
     pub stabilization_run: u32,
     pub influence: BTreeMap<Target, i64>,
     /// Targets that received Influence this turn (spent or gained by Occupation), so they do not decay.
@@ -819,6 +823,7 @@ impl Game {
             venture_fund: 0,
             venture_share: 0.0,
             venture_banked_last_turn: 0,
+            spaceport_influence: 0,
             stabilization_run: 0,
             influence: BTreeMap::new(),
             influenced_this_turn: Vec::new(),
@@ -989,6 +994,17 @@ impl Game {
         for (sid, seat) in taken.iter().zip(Seat::ALL) {
             game.take_control(*sid, seat);
             game.add_start_facility(*sid, FacilityKind::LaunchSite);
+            // Ticket #181 (version 0.08.0): a Faction's start Region's Facilities come up as that
+            // Faction's own versions, the Launch Site just added included. The consequences are
+            // asymmetric and were accepted knowingly: every start Region is handed a Launch Site, so
+            // the ARKWRIGHTS hold a Spaceport from turn 1; ten of the fourteen Regions start with a
+            // Power Plant, so the ARCHIVISTS usually hold a Reactor; and neither the Bank nor the
+            // School is in any Region's start Facilities, so the PROSPECTORS and the CUSTODIANS start
+            // with nothing of theirs and must build for their clause.
+            let faction = game.kind(seat);
+            for f in game.state_mut(*sid).facilities.iter_mut() {
+                f.kind = f.kind.built_by(faction);
+            }
             // Ticket #75 (version 0.05.5): a claim on its home from turn 1. The seat's Standing on its
             // start state begins at the state's threshold, so a challenger needs the threshold plus
             // the margin at once and the holder's spending counts from a real footing; with nothing
@@ -1445,7 +1461,7 @@ impl Game {
         let ceiling = self.tables.school.ceiling;
         for sid in StateId::ALL {
             let card = self.tables.state(sid).education_level;
-            let open = self.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::School && f.working());
+            let open = self.state(sid).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::School) && f.working());
             let now = self.state(sid).schooling;
             let next = if open { (now + step).min((ceiling - card).max(0.0)) } else { (now - step).max(0.0) };
             self.state_mut(sid).schooling = next;
@@ -1457,7 +1473,7 @@ impl Game {
         let ids: Vec<ColonyId> = self.colonies.iter().map(|c| c.id).collect();
         for cid in ids {
             let Some(col) = self.colony(cid) else { continue };
-            let open = col.modules.iter().any(|m| m.kind == ModuleKind::Institute && m.working());
+            let open = col.modules.iter().any(|m| m.kind.does_the_job_of(ModuleKind::Institute) && m.working());
             let floor = col.settler_education;
             let now = col.education;
             let next = if open { (now + step).min(ceiling) } else { (now - step).max(floor) };
@@ -1997,7 +2013,33 @@ impl Game {
         let states: i64 = self.controlled_states(seat).iter().map(|s| self.state_influence_value(*s)).sum();
         let base = t.allotment_base + states + self.building_allotment(seat);
         let m = self.tables.faction(self.kind(seat)).influence_multiplier;
-        (base as f64 * m).floor() as i64
+        // Ticket #183 (version 0.08.0): what the Spaceports earned last turn is added AFTER the
+        // multiplier, at face value. This is a deliberate departure from the Embassy, whose
+        // contribution sits inside it and so gives the Arkwrights 1.6 rather than 2: their x0.8 says
+        // they are bad at diplomacy, and this clause says they are good at moving people, which is a
+        // different kind of Influence. Applying their designed weakness to the rule written to mend
+        // it would be the rule arguing with itself.
+        (base as f64 * m).floor() as i64 + self.seat(seat).spaceport_influence
+    }
+
+    /// Ticket #183 (version 0.08.0): the Spaceport's clause. +1 Influence for every Emigrant it lifts
+    /// OFF EARTH, which means the two launches -- onto a Ship in orbit, or onto a Space Station of
+    /// the seat's over Earth. The sea to Antarctica pays NOTHING: it is explicitly not a launch and
+    /// Antarctica is explicitly on Earth, so an Arkwright choosing the ice is choosing to forgo the
+    /// Influence. Lifting an Army pays nothing either, because the clause is per Emigrant.
+    ///
+    /// It is paid ONCE per Emigrant however many Spaceports stand -- the Emigrant is what is counted,
+    /// not the building -- and only where the seat CONTROLS the Region, per ticket #181. There is no
+    /// cap: the designer's word was that the muster limit is the brake, "8 a turn is already the
+    /// brake".
+    pub fn pay_spaceport(&mut self, seat: Seat, from: StateId, n: u32) {
+        if n == 0 || self.state(from).control != Control::Controlled(seat) {
+            return;
+        }
+        if !self.state(from).facilities.iter().any(|f| f.kind == FacilityKind::Spaceport && f.working()) {
+            return;
+        }
+        self.seats[seat.index()].spaceport_influence += n as i64;
     }
 
     pub fn ships_at(&self, seat: Seat, body: BodyId) -> Vec<ShipId> {

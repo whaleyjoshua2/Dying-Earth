@@ -51,8 +51,13 @@ ducats_multiplier = 1.2
 market_multiplier = 0.85
 signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs 15 Materials instead of 30, and every Facility and Colony Module costs them 15% less. Their states pay a fifth more Ducats, and the Trading window sells to them at 15% off. A Strip Permit is free, once per Nation State ever: for three turns every Facility there produces double, and when it ends that state's Baseline Emissions rise by 0.2 for good and its Unrest by 3. The Venture Capital Fund: on any turn they set a share of their Factories' and Mines' Materials output, 0% to 80% in steps of 10, to be banked in the Fund; a draw from it returns nine tenths."
 # Ticket #72: the Extraction Total is retired; the first part is Materials banked in the Fund.
-victory = "750 Materials in the Venture Capital Fund, plus 12 Colonists living off Earth."
-victory_first = { kind = "venture_fund", bar = 750 }
+victory = "1000 Materials in the Venture Capital Fund, plus 12 Colonists living off Earth."
+# Ticket #182 (version 0.08.0): 750 to 1000, because the Investment Bank pays uncapped interest
+# on the Fund. Measured first: in 40 games nobody EVER reached 750 -- the highest balance ever
+# seen was 745, the median game ended around turn 28 with the Fund in the 400s, and the
+# Prospectors won 0 of 80. The bar rises to keep the Fund a race rather than a formality now
+# that a Bank in each of ten Regions pays around 44 Materials a turn by turn 24.
+victory_first = { kind = "venture_fund", bar = 1000 }
 victory_second = { kind = "off_world_presence", bar = 12 }
 colour = [0.85, 0.5, 0.2]
 

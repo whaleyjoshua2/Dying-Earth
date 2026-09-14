@@ -126,6 +126,58 @@ build_turns = 2
 energy_upkeep = 2
 emissions = 0.0
 
+# Tickets #181 to #186 (version 0.08.0): the four Unique Facilities, one per Faction. Each REPLACES
+# a common building on its Faction's build list at the common price -- the same Materials, the same
+# build turns, the same upkeep, the same output, the same slot -- so every row below is its common
+# sibling's row with a new id and a new name. The clause each carries is in code, not here, because
+# every one of them reads something no facility row can say (the Venture Capital Fund's balance, the
+# Emigrants a turn lifted, the holder's whole Energy bill, a flat Ducat).
+#
+# Order matters: `Tables::facility` indexes FacilityKind by discriminant, so these four sit after
+# `school` here exactly as they do in the enum.
+
+# Ticket #182: the Prospectors' Bank. Banks 1% of the Venture Capital Fund's balance into the Fund
+# each turn while it is online, one Investment Bank per Region paying, and pays its Ducats in full.
+[[facility]]
+id = "investment_bank"
+name = "Investment Bank"
+materials = 25
+build_turns = 1
+energy_upkeep = 2
+produces = { resource = "ducats", amount = 4 }
+emissions = 0.0
+
+# Ticket #183: the Arkwrights' Launch Site. Pays +1 Influence into next turn's Allotment for every
+# Emigrant it lifts off Earth -- onto a Ship in orbit or a station over Earth, never by sea.
+[[facility]]
+id = "spaceport"
+name = "Spaceport"
+materials = 30
+build_turns = 2
+energy_upkeep = 2
+emissions = 0.0
+
+# Ticket #184: the Archivists' Power Plant. While one stands and is online, its holder pays 75% of
+# the total Energy upkeep of everything it owns, the Archive excepted; off the total, once, floored.
+[[facility]]
+id = "reactor"
+name = "Reactor"
+materials = 25
+build_turns = 2
+energy_upkeep = 0
+produces = { resource = "energy", amount = 6 }
+emissions = 1.5
+
+# Ticket #186: the Custodians' School. Does everything a School does and pays +1 Ducat a turn flat
+# while it is online. `academy_ducats` below is that figure.
+[[facility]]
+id = "academy"
+name = "Academy"
+materials = 25
+build_turns = 2
+energy_upkeep = 2
+emissions = 0.0
+
 # Ticket #54: the cap on Scrubbers in one Nation State, from its population -- in units of five
 # million since ticket #143 (version 0.07.3), so 40 units is the two hundred million each Scrubber wants:
 # clamp(round(population / per_population), min, max). Russia at 1.5 gets the floor of 2; South Asia
@@ -152,6 +204,27 @@ decommission_turns = 1
 [school]
 per_turn = 0.25
 ceiling = 2.0
+
+# Tickets #182, #184 and #186 (version 0.08.0): the three figures the Unique Facility clauses read.
+# The Spaceport's is not here: +1 Influence per Emigrant is the whole of it, and the designer refused
+# a cap ("8 a turn is already the brake"), so there is nothing left to tune.
+[unique]
+# The share of the Venture Capital Fund's balance an Investment Bank banks back into it each turn,
+# read BEFORE that turn's banking is added, rounded down, one Investment Bank per Region paying. In
+# another Faction's hands the same share applies to that Faction's Ducat income instead.
+investment_bank_interest = 0.01
+# The floor under that interest, Faction-wide and on ONE building only, so an early Investment Bank
+# is never literally worthless. Per building it would have paid about 500 over a game; this pays 36.
+investment_bank_floor = 1
+# What a Reactor's holder pays of its total Energy upkeep, the Archive excepted. Off the TOTAL and
+# rounded down once, never per building: at 2 and 3 Energy a building, per-building rounding turns
+# 75% into a 50% and a 33% cut. No stacking -- a second Reactor is an ordinary power station.
+reactor_upkeep = 0.75
+# What an Academy pays its holder a turn, flat, wherever it stands. Flat rather than scaled by GDP
+# (which would make it a second Bank) or by its own Education Level (which would compound with the
+# schooling). Run through the largest output multiplier in the game, x1.25, it floors back to 1, so
+# a captured Academy pays its captor exactly what it paid its builder.
+academy_ducats = 1
 
 [industry_level]
 materials = 30

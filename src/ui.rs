@@ -1734,7 +1734,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             if game.kind(Seat(0)) == FactionKind::Prospectors {
                 let s = game.seat(Seat(0));
                 ui.label(RichText::new(format!("Fund {} ({}%)", s.venture_fund, (s.venture_share * 100.0).round() as u32)).strong())
-                    .on_hover_text("The Venture Capital Fund: Materials banked toward the 750 your Victory Condition asks for, and the share of your Factories' and Mines' output going in each turn. Set it on the Victory panel.");
+                    .on_hover_text("The Venture Capital Fund: Materials banked toward the 1000 your Victory Condition asks for, and the share of your Factories' and Mines' output going in each turn. Set it on the Victory panel.");
             }
             ui.separator();
             bar_resource(ui, icons, "fuel", "Fuel", format!("{} ({})", left.fuel, signed(inc.fuel)), sources(dying_earth_engine::Resource::Fuel));
@@ -4078,7 +4078,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         }
         // Ticket #141 (version 0.07.3): waiting Emigrants lift straight to a station of yours over
         // Earth, as many as it has room for, by the Launch Site here. A launch, no Ship.
-        if st.emigrants > 0 && st.facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()) {
+        if st.emigrants > 0 && st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
             for c in game.colonies.iter().filter(|c| c.body == BodyId::Earth && c.in_orbit && c.control.director() == Some(Seat(0))) {
                 let room = game.habitat_room(c).saturating_sub(c.colonists);
                 let n = st.emigrants.min(room);
@@ -4110,7 +4110,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         );
         // Ticket #46: Ships come from Shipyards; a Launch Site lifts people to orbit.
         ui.label(
-            RichText::new(if st.facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()) {
+            RichText::new(if st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
                 "Launch Site: Colonists and Armies lift to orbit from here. Ships are built at a Shipyard on a station or Colony."
             } else {
                 "No working Launch Site: nothing lifts to orbit from here."

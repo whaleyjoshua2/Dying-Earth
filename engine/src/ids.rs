@@ -107,10 +107,25 @@ pub enum FacilityKind {
     /// online it raises its state's Education Level by a step a turn to a ceiling, and the figure
     /// decays back at the same rate when it stops.
     School,
+    /// Version 0.08.0 (ticket #182): the Investment Bank, the Prospectors' Unique Facility, which
+    /// replaces the Bank on their build list at the common price and banks 1% of the Venture
+    /// Capital Fund's balance into the Fund each turn, one per Region.
+    InvestmentBank,
+    /// Version 0.08.0 (ticket #183): the Spaceport, the Arkwrights' Unique Facility, which replaces
+    /// the Launch Site and pays +1 Influence for every Emigrant it lifts off Earth.
+    Spaceport,
+    /// Version 0.08.0 (ticket #184): the Reactor, the Archivists' Unique Facility, which replaces
+    /// the Power Plant and takes 75% off the total Energy upkeep of everything its holder owns,
+    /// the Archive excepted.
+    Reactor,
+    /// Version 0.08.0 (ticket #186): the Academy, the Custodians' Unique Facility, which replaces
+    /// the School and pays +1 Ducat a turn on top of the schooling. Off Earth it is a Unique
+    /// Module of the same name, replacing the Institute.
+    Academy,
 }
 
 impl FacilityKind {
-    pub const ALL: [FacilityKind; 11] = [
+    pub const ALL: [FacilityKind; 15] = [
         FacilityKind::Factory,
         FacilityKind::PowerPlant,
         FacilityKind::Refinery,
@@ -122,6 +137,10 @@ impl FacilityKind {
         FacilityKind::Scrubber,
         FacilityKind::SeaWall,
         FacilityKind::School,
+        FacilityKind::InvestmentBank,
+        FacilityKind::Spaceport,
+        FacilityKind::Reactor,
+        FacilityKind::Academy,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -136,7 +155,58 @@ impl FacilityKind {
             FacilityKind::Scrubber => "Scrubber",
             FacilityKind::SeaWall => "Sea Wall",
             FacilityKind::School => "School",
+            FacilityKind::InvestmentBank => "Investment Bank",
+            FacilityKind::Spaceport => "Spaceport",
+            FacilityKind::Reactor => "Reactor",
+            FacilityKind::Academy => "Academy",
         }
+    }
+
+    /// Version 0.08.0 (ticket #181): the Faction this kind is the Unique Facility of, or `None` for
+    /// a common kind. A Unique Facility replaces a common one on exactly one Faction's build list;
+    /// it is never destroyed on capture and pays whoever holds it, which is why this says who
+    /// BUILDS it and never who benefits.
+    pub fn unique_to(self) -> Option<FactionKind> {
+        match self {
+            FacilityKind::InvestmentBank => Some(FactionKind::Prospectors),
+            FacilityKind::Spaceport => Some(FactionKind::Arkwrights),
+            FacilityKind::Reactor => Some(FactionKind::Archivists),
+            FacilityKind::Academy => Some(FactionKind::Custodians),
+            _ => None,
+        }
+    }
+
+    /// The common kind a Unique Facility replaces, or `None` for a common kind. Used where a rule
+    /// is about the building's JOB rather than its owner -- the Sea Level taking a coastal slot,
+    /// a Tech that reads Power Plants -- so that a Reactor is a Power Plant everywhere but the
+    /// build list.
+    pub fn common(self) -> Option<FacilityKind> {
+        match self {
+            FacilityKind::InvestmentBank => Some(FacilityKind::Bank),
+            FacilityKind::Spaceport => Some(FacilityKind::LaunchSite),
+            FacilityKind::Reactor => Some(FacilityKind::PowerPlant),
+            FacilityKind::Academy => Some(FacilityKind::School),
+            _ => None,
+        }
+    }
+
+    /// What `faction` builds when it orders this kind: its own Unique Facility where it has one for
+    /// this job, otherwise the kind itself. This is the whole of the substitution -- a Faction never
+    /// builds the common version of a job it has a Unique Facility for, and never builds another
+    /// Faction's.
+    pub fn built_by(self, faction: FactionKind) -> FacilityKind {
+        for unique in FacilityKind::ALL {
+            if unique.common() == Some(self) && unique.unique_to() == Some(faction) {
+                return unique;
+            }
+        }
+        self
+    }
+
+    /// True where this kind does the job the common `kind` does -- itself, or the Unique Facility
+    /// that replaces it. Every count of "how many Power Plants stand here" wants this.
+    pub fn does_the_job_of(self, kind: FacilityKind) -> bool {
+        self == kind || self.common() == Some(kind)
     }
 }
 
@@ -175,10 +245,14 @@ pub enum ModuleKind {
     /// Colony or Space Station; while it stands and is online it raises its place's Education Level
     /// a step a turn to the ceiling, and the figure decays back to the settlers' own average.
     Institute,
+    /// Version 0.08.0 (ticket #186): the Academy, the Custodians' Unique Module, which replaces the
+    /// Institute on their build list at the common price and pays +1 Ducat a turn on top of the
+    /// schooling. It wears the same name as their Unique Facility on Earth, at the designer's word.
+    Academy,
 }
 
 impl ModuleKind {
-    pub const ALL: [ModuleKind; 14] = [
+    pub const ALL: [ModuleKind; 15] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -193,9 +267,10 @@ impl ModuleKind {
         ModuleKind::MassDriver,
         ModuleKind::Core,
         ModuleKind::Institute,
+        ModuleKind::Academy,
     ];
     /// The Modules an ordinary build order may place (ticket #51: the Archive is not one of them).
-    pub const BUILDABLE: [ModuleKind; 12] = [
+    pub const BUILDABLE: [ModuleKind; 13] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -208,11 +283,13 @@ impl ModuleKind {
         ModuleKind::SolarArray,
         ModuleKind::MassDriver,
         ModuleKind::Institute,
+        ModuleKind::Academy,
     ];
     pub fn name(self) -> &'static str {
         match self {
             ModuleKind::Core => "Core Module",
             ModuleKind::Institute => "Institute",
+            ModuleKind::Academy => "Academy",
             ModuleKind::Mine => "Mine",
             ModuleKind::Generator => "Generator",
             ModuleKind::Refinery => "Refinery",
@@ -226,6 +303,41 @@ impl ModuleKind {
             ModuleKind::SolarArray => "Solar Array",
             ModuleKind::MassDriver => "Mass Driver",
         }
+    }
+
+    /// Version 0.08.0 (ticket #186): the Faction whose Unique Module this is, or `None`. The Archive
+    /// is deliberately NOT one: it is a Faction-only Module that is destroyed on capture, which is
+    /// the opposite rule, and `CONTEXT.md` keeps the two apart.
+    pub fn unique_to(self) -> Option<FactionKind> {
+        match self {
+            ModuleKind::Academy => Some(FactionKind::Custodians),
+            _ => None,
+        }
+    }
+
+    /// The common kind a Unique Module replaces, or `None` for a common kind.
+    pub fn common(self) -> Option<ModuleKind> {
+        match self {
+            ModuleKind::Academy => Some(ModuleKind::Institute),
+            _ => None,
+        }
+    }
+
+    /// What `faction` builds when it orders this kind: its own Unique Module where it has one, else
+    /// the kind itself.
+    pub fn built_by(self, faction: FactionKind) -> ModuleKind {
+        for unique in ModuleKind::ALL {
+            if unique.common() == Some(self) && unique.unique_to() == Some(faction) {
+                return unique;
+            }
+        }
+        self
+    }
+
+    /// True where this kind does the job the common `kind` does -- itself, or the Unique Module that
+    /// replaces it.
+    pub fn does_the_job_of(self, kind: ModuleKind) -> bool {
+        self == kind || self.common() == Some(kind)
     }
 }
 

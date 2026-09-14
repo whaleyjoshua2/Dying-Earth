@@ -368,7 +368,7 @@ impl Game {
         for sid in self.directed_states(seat) {
             let lean = if self.tables.state(sid).resource_lean == Resource::Energy { 1.5 } else { 1.0 };
             for f in self.state(sid).facilities.iter().filter(|f| !f.mothballed) {
-                if f.kind == FacilityKind::PowerPlant {
+                if f.kind.does_the_job_of(FacilityKind::PowerPlant) {
                     e += (6.0 * lean * fac * grids).floor();
                 }
             }
@@ -469,7 +469,7 @@ impl Game {
             let col = self.colony(*c).unwrap();
             col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) || col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Shipyard))
         });
-        let queued_power: i64 = self.states.iter().flat_map(|s| s.queue.iter()).filter(|b| b.seat == seat && b.item == BuildItem::Facility(FacilityKind::PowerPlant)).count() as i64 * 6
+        let queued_power: i64 = self.states.iter().flat_map(|s| s.queue.iter()).filter(|b| b.seat == seat && matches!(b.item, BuildItem::Facility(k) if k.does_the_job_of(FacilityKind::PowerPlant))).count() as i64 * 6
             + self.colonies.iter().flat_map(|c| c.queue.iter()).filter(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Generator)).count() as i64 * 5;
         let energy_short = self.energy_production(seat) + queued_power < self.total_upkeep(seat) + 2;
         // Bootstrap needs: a producer of one of these counts as advancing whatever the seat is behind on.
@@ -569,10 +569,20 @@ impl Game {
         // --- Earth builds
         for sid in self.directed_states(seat) {
             let free = self.free_slots(sid);
-            let has_launch = self.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite);
+            let has_launch = self.state(sid).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite));
             if free > 0 {
                 for fk in FacilityKind::ALL {
-                    let (cat, mut base) = match fk {
+                    // Ticket #181 (version 0.08.0): a Faction builds its own Unique Facility in
+                    // place of the common one and never the reverse, so the common kind is passed
+                    // over where this seat has a replacement for that job, and every other Faction's
+                    // Unique Facility is passed over outright. What is left is weighed by the JOB it
+                    // does, so a Reactor is weighed as the Power Plant it is and no arm below has to
+                    // learn four new names.
+                    if fk.built_by(self.kind(seat)) != fk || fk.unique_to().is_some_and(|f| f != self.kind(seat)) {
+                        continue;
+                    }
+                    let job = fk.common().unwrap_or(fk);
+                    let (cat, mut base) = match job {
                         FacilityKind::Factory | FacilityKind::PowerPlant | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                         FacilityKind::ResearchLab => (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab)),
                         // Ticket #185 (version 0.08.0): the School is a Research building in all but
@@ -604,7 +614,23 @@ impl Game {
                         // Ticket #77: a Sea Wall takes no build slot, so it is enumerated below with
                         // the Scrubber rather than here among the slot-takers.
                         FacilityKind::SeaWall => continue,
+                        // Unreachable: every Unique Facility was mapped to its common job above.
+                        FacilityKind::InvestmentBank | FacilityKind::Spaceport | FacilityKind::Reactor | FacilityKind::Academy => continue,
                     };
+                    // Ticket #181: a slight bias toward a seat's own Unique Facility over the common
+                    // counterpart -- the designer's words, and deliberately small, because ticket #41
+                    // measured a Ducat-hungry AI costing the Custodians every win in twenty seeds.
+                    // Ticket #182: the Prospectors are the exception. An Investment Bank's worth IS
+                    // 1% of the Venture Capital Fund, so their appetite tracks the balance rather
+                    // than a flat bias: worth nothing beside a Factory while the Fund is empty, and
+                    // outbidding one on its own merits once the Fund is in the hundreds.
+                    if fk.unique_to().is_some() {
+                        base *= if fk == FacilityKind::InvestmentBank {
+                            1.0 + self.seat(seat).venture_fund as f64 * m.investment_bank_per_fund
+                        } else {
+                            m.unique_bias
+                        };
+                    }
                     let produces = self.tables.facility(fk).produces.as_ref().map(|p| p.resource);
                     if cat == Cat::Producer {
                         if produces.map(|p| needs.contains(&p) || p == scarce).unwrap_or(false) {
@@ -744,6 +770,12 @@ impl Game {
                 continue;
             }
             for mk in ModuleKind::BUILDABLE {
+                // Ticket #186 (version 0.08.0): as on Earth -- the Custodians build their Academy in
+                // place of the Institute, nobody else builds an Academy, and what is left is weighed
+                // by the job it does.
+                if mk.built_by(self.kind(seat)) != mk || mk.unique_to().is_some_and(|f| f != self.kind(seat)) {
+                    continue;
+                }
                 // Ticket #46: a station holds only a Shipyard and Habitats; ticket #80: and an
                 // Observatory. Ticket #81: a Habitat over Earth now houses people who count as off
                 // Earth, so the AI builds them there too.
@@ -759,7 +791,8 @@ impl Game {
                 if !col.in_orbit && self.tables.module(mk).station_only {
                     continue;
                 }
-                let (cat, mut base) = match mk {
+                let module_job = mk.common().unwrap_or(mk);
+                let (cat, mut base) = match module_job {
                     // Ticket #89: a Solar Array is an Energy producer; the Energy-shortage bonus below
                     // is what makes the AI raise one when the Stockpile is within a turn of nothing.
                     ModuleKind::SolarArray => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
@@ -769,8 +802,8 @@ impl Game {
                     // a School multiplies a Lab, so it waits for one and then takes the same weight.
                     ModuleKind::Institute => {
                         if !col.modules.iter().any(|m| m.kind == ModuleKind::Observatory)
-                            || col.modules.iter().any(|m| m.kind == ModuleKind::Institute)
-                            || col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Institute))
+                            || col.modules.iter().any(|m| m.kind.does_the_job_of(ModuleKind::Institute))
+                            || col.queue.iter().any(|b| matches!(b.item, BuildItem::Module(k) if k.does_the_job_of(ModuleKind::Institute)))
                         {
                             continue;
                         }
@@ -839,7 +872,13 @@ impl Game {
                         }
                         (Cat::ArmyOrBarracks, self.base_weight(seat, Cat::ArmyOrBarracks))
                     }
+                    // Unreachable: every Unique Module was mapped to its common job above.
+                    ModuleKind::Academy => continue,
                 };
+                // Ticket #181: the slight bias toward a seat's own Unique Module, as on Earth.
+                if mk.unique_to().is_some() {
+                    base *= m.unique_bias;
+                }
                 let produces = self.tables.module(mk).produces.as_ref().map(|p| p.resource);
                 if cat == Cat::Producer {
                     if produces.map(|p| needs.contains(&p) || p == scarce).unwrap_or(false) {
@@ -982,7 +1021,7 @@ impl Game {
         for body in BodyId::ALL {
             let has_station = self.colonies.iter().any(|c| c.in_orbit && c.body == body && c.control.director() == Some(seat));
             let foothold = match body {
-                BodyId::Earth => self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working())),
+                BodyId::Earth => self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working())),
                 // Ticket #93: at Venus, a Body of orbits only, a Ship of the seat's there is the
                 // foothold, and the station is what its Colonists land in.
                 b if self.tables.body(b).colony_slots() == 0 => self.ships.iter().any(|s| s.seat == seat && s.at == ShipAt::Body(b) && !s.arrived_this_turn),
@@ -1082,7 +1121,7 @@ impl Game {
             for sid in self.directed_states(seat) {
                 for (i, f) in self.state(sid).facilities.iter().enumerate() {
                     // Ticket #56: never the Launch Site; it is the only way to lift anything.
-                    if f.kind == FacilityKind::LaunchSite {
+                    if f.kind.does_the_job_of(FacilityKind::LaunchSite) {
                         continue;
                     }
                     let produces = self.tables.facility(f.kind).produces.is_some();
@@ -1260,7 +1299,7 @@ impl Game {
                 let with_site = self
                     .directed_states(seat)
                     .into_iter()
-                    .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()))
+                    .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()))
                     .max_by(by_population);
                 let target = with_site.or_else(|| if self.antarctica_open { self.directed_states(seat).into_iter().max_by(by_population) } else { None });
                 // Ticket #196: as many as the state can pay for, not all or nothing. A Steerage batch
@@ -1278,7 +1317,7 @@ impl Game {
             // foothold: a station over Earth is off Earth, so it takes the unload's full weight.
             for sid in self.directed_states(seat) {
                 let n = self.state(sid).emigrants;
-                if n == 0 || !self.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()) {
+                if n == 0 || !self.state(sid).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
                     continue;
                 }
                 let station = self
@@ -1342,7 +1381,7 @@ impl Game {
                     let from = self
                         .directed_states(seat)
                         .into_iter()
-                        .filter(|s| self.state(*s).emigrants > 0 && self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()))
+                        .filter(|s| self.state(*s).emigrants > 0 && self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()))
                         .max_by_key(|s| self.state(*s).emigrants);
                     if let Some(st) = from {
                         let n = (capacity - s.colonists).min(self.state(st).emigrants);
@@ -1440,7 +1479,7 @@ impl Game {
                             if !a.standing
                                 && self.army_seat(a) == Some(seat)
                                 && self.state(st).control.director() == Some(seat)
-                                && self.state(st).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()) =>
+                                && self.state(st).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) =>
                         {
                             Some((a.id, st))
                         }

@@ -84,7 +84,7 @@ impl Game {
             EventId::LaunchPadFire => {
                 let states: Vec<StateId> = StateId::ALL
                     .into_iter()
-                    .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite))
+                    .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite)))
                     .collect();
                 match self.pick_uniform(&states) {
                     Some(s) => {
@@ -363,7 +363,7 @@ impl Game {
                     return;
                 }
                 let st = self.state_mut(s);
-                for f in st.facilities.iter_mut().filter(|f| f.kind == FacilityKind::LaunchSite) {
+                for f in st.facilities.iter_mut().filter(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite)) {
                     f.offline_until_resolution = true;
                     f.online = false;
                 }

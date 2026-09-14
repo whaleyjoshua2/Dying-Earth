@@ -167,6 +167,21 @@ pub struct SchoolCard {
     pub ceiling: f64,
 }
 
+/// Tickets #182, #184 and #186 (version 0.08.0): the figures the Unique Facility clauses read
+/// (`facilities.toml`). The Spaceport has none: +1 Influence per Emigrant launched is the whole of
+/// its clause and the designer refused a cap on it.
+#[derive(Debug, Clone, Deserialize)]
+pub struct UniqueCard {
+    /// The share of the Venture Capital Fund an Investment Bank banks back into it, one per Region.
+    pub investment_bank_interest: f64,
+    /// The floor under that interest, Faction-wide and on one building only.
+    pub investment_bank_floor: i64,
+    /// What a Reactor's holder pays of its total Energy upkeep, the Archive excepted; off the total.
+    pub reactor_upkeep: f64,
+    /// What an Academy pays its holder a turn, flat, wherever it stands.
+    pub academy_ducats: i64,
+}
+
 /// Ticket #54 (version 0.05): what a Restart and a Decommission cost (`facilities.toml`). A
 /// Mothball is free and lands at the Resolution of the turn it is ordered.
 #[derive(Debug, Clone, Deserialize)]
@@ -772,6 +787,11 @@ pub struct AiMultipliers {
     pub threat: f64,
     pub opportunity: f64,
     pub energy_shortage_bonus: f64,
+    /// Ticket #181 (version 0.08.0): the slight bias a seat gets toward its own Unique Facility.
+    pub unique_bias: f64,
+    /// Ticket #182: what one Material in the Venture Capital Fund adds to the Prospectors' appetite
+    /// for an Investment Bank, since the building's worth is a share of that balance.
+    pub investment_bank_per_fund: f64,
 }
 
 /// Ticket #50: one pace schedule per Faction. `first` is the schedule for the Faction's first
@@ -900,6 +920,7 @@ struct FacilitiesFile {
     scrubber: ScrubberCard,
     mothball: MothballCard,
     school: SchoolCard,
+    unique: UniqueCard,
 }
 /// Ticket #51: the Archive. Its Materials, build turns and Energy upkeep sit on its Module row.
 /// Ticket #68 (version 0.05.5): the Research it requires in all, and the share of it the fund may
@@ -1061,6 +1082,8 @@ pub struct Tables {
     pub mothball: MothballCard,
     /// Ticket #185: the School's step and ceiling.
     pub school: SchoolCard,
+    /// Tickets #182, #184, #186: the three Unique Facility clause figures that have one.
+    pub unique: UniqueCard,
     pub modules: Vec<ModuleCard>,
     /// Ticket #97: how many Modules a Colony or a Space Station may hold.
     pub slots: SlotsCard,
@@ -1154,6 +1177,7 @@ impl Tables {
             scrubber: facilities.scrubber,
             mothball: facilities.mothball,
             school: facilities.school,
+            unique: facilities.unique,
             slots: modules.slots,
             archive: modules.archive,
             observatory: modules.observatory,

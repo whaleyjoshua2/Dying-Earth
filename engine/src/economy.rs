@@ -1,5 +1,6 @@
 //! The Income phase (spec 6 phase 1, 7.1, 7.2, 12.1).
 
+use crate::data::VictoryFirstKind;
 use crate::ids::*;
 use crate::state::*;
 
@@ -138,7 +139,11 @@ impl Game {
         self.discoveries.retain(|d| d.turns_left > 0);
         for seat in Seat::ALL {
             let allot = self.influence_allotment(seat);
-            self.seat_mut(seat).allotment = allot;
+            let s = self.seat_mut(seat);
+            s.allotment = allot;
+            // Ticket #183 (version 0.08.0): last turn's Spaceport Influence has now been paid into
+            // this Allotment, so the tally is cleared and begins again.
+            s.spaceport_influence = 0;
         }
     }
 
@@ -258,7 +263,7 @@ impl Game {
         let fr = self.tech_multiplier(seat, TechId::CleanManufacturing);
         y.emissions = fc.emissions
             * fac.emissions_multiplier
-            * match kind {
+            * match kind.common().unwrap_or(kind) {
                 FacilityKind::PowerPlant => pp,
                 FacilityKind::Factory | FacilityKind::Refinery => fr,
                 _ => 1.0,
@@ -480,6 +485,9 @@ impl Game {
     }
 
     fn tech_output_multiplier_facility(&self, seat: Seat, kind: FacilityKind) -> f64 {
+        // Ticket #181 (version 0.08.0): a Unique Facility takes the Techs of the job it does, so
+        // Efficient Grids reaches a Reactor and the Solar Maximum bites it.
+        let kind = kind.common().unwrap_or(kind);
         let mut m = 1.0;
         if kind == FacilityKind::PowerPlant {
             m *= self.solar_maximum_multiplier();
@@ -538,14 +546,54 @@ impl Game {
     }
 
     /// Runs the shortfall rule over a producer list; returns the final Energy balance and what was shut.
+    /// Ticket #184 (version 0.08.0): what an online Reactor gives its holder back of this turn's
+    /// Energy bill -- the difference between the whole upkeep of everything it owns and
+    /// `reactor_upkeep` of it, taken off the TOTAL and floored once. The Archive is left out of the
+    /// sum and pays its own figure in full, at the designer's word.
+    ///
+    /// Off the total and never per building: upkeep figures are small whole numbers and most of what
+    /// a seat owns costs 2 or 3, so per building a 75% rule floors to a 50% cut on a 2 and a 33% cut
+    /// on a 3, which would make the cheapest building the most Energy-efficient thing to own. **No
+    /// stacking**: a second Reactor is an ordinary power station worth its 6 Energy and nothing more.
+    /// Ships and Armies are not buildings and their upkeep is untouched.
+    ///
+    /// Only a CONTROLLER collects: an occupier pays a Unique Facility's upkeep and draws nothing from
+    /// its clause, which is the precedent ticket #69 set for an occupied Research Lab.
+    /// Ticket #181 (version 0.08.0): whether this seat CONTROLS the place a producer stands in.
+    /// Every Unique Facility clause reads this rather than direction, because an occupier pays a
+    /// Unique Facility's upkeep and draws nothing from its clause until control transfers -- the
+    /// precedent ticket #69 set for an occupied Research Lab, which works for the world and not for
+    /// the occupier.
+    fn controls_producer(&self, seat: Seat, place: ProducerPlace) -> bool {
+        match place {
+            ProducerPlace::Facility(sid, _) => self.state(sid).control == Control::Controlled(seat),
+            ProducerPlace::Module(cid, _) => self.colony(cid).map(|c| c.control == Control::Controlled(seat)).unwrap_or(false),
+        }
+    }
+
+    fn reactor_relief(&self, seat: Seat, producers: &[Producer]) -> i64 {
+        let lit = producers.iter().any(|p| {
+            p.online
+                && p.name == FacilityKind::Reactor.name()
+                && matches!(p.place, ProducerPlace::Facility(sid, _) if self.state(sid).control == Control::Controlled(seat))
+        });
+        if !lit {
+            return 0;
+        }
+        let archive = ModuleKind::Archive.name();
+        let bill: i64 = producers.iter().filter(|p| p.online && p.name != archive).map(|p| p.upkeep).sum();
+        bill - (bill as f64 * self.tables.unique.reactor_upkeep).floor() as i64
+    }
+
     fn apply_shortfall(&self, seat: Seat, producers: &mut [Producer]) -> (i64, Vec<String>) {
-        let energy_in: i64 = producers
-            .iter()
-            .filter(|p| p.online)
-            .filter_map(|p| p.output.filter(|(r, _)| *r == Resource::Energy).map(|(_, v)| v))
-            .sum();
-        let upkeep: i64 = producers.iter().filter(|p| p.online).map(|p| p.upkeep).sum();
-        let mut balance = self.seat(seat).stockpile.energy + energy_in - upkeep - self.unit_upkeep(seat);
+        // Ticket #184: the balance is recomputed from scratch whenever a building goes dark, because
+        // the Reactor's relief is a share of the bill and shrinks with it.
+        let balance_now = |g: &Self, ps: &[Producer]| -> i64 {
+            let energy_in: i64 = ps.iter().filter(|p| p.online).filter_map(|p| p.output.filter(|(r, _)| *r == Resource::Energy).map(|(_, v)| v)).sum();
+            let upkeep: i64 = ps.iter().filter(|p| p.online).map(|p| p.upkeep).sum();
+            g.seat(seat).stockpile.energy + energy_in - upkeep - g.unit_upkeep(seat) + g.reactor_relief(seat, ps)
+        };
+        let mut balance = balance_now(self, producers);
         // Ticket #164 (version 0.07.5): the Core Module is never shut for want of Energy. It is the
         // walls of the place rather than a building in it -- it cannot be mothballed either -- so
         // its upkeep is paid whatever else goes dark.
@@ -564,13 +612,9 @@ impl Game {
             if balance >= 0 {
                 break;
             }
-            let p = &mut producers[i];
-            p.online = false;
-            balance += p.upkeep;
-            if let Some((Resource::Energy, v)) = p.output {
-                balance -= v;
-            }
-            shut.push(p.name.to_string());
+            producers[i].online = false;
+            shut.push(producers[i].name.to_string());
+            balance = balance_now(self, producers);
         }
         (balance, shut)
     }
@@ -648,6 +692,56 @@ impl Game {
                 sources.push((format!("Economy of {}", self.tables.state(sid).name), Resource::Ducats, v));
             }
         }
+        // Ticket #186 (version 0.08.0): every Academy the seat CONTROLS pays a flat Ducat while it
+        // is online, wherever it stands -- Region, Colony or station. Flat rather than scaled by GDP,
+        // which would make it a second Bank built where the money already is rather than where
+        // schooling is wanted. It is also why a captured Academy pays its captor exactly what it paid
+        // its builder: 1 run through the largest output multiplier in the game, x1.25, floors to 1.
+        let academies = producers
+            .iter()
+            .filter(|p| p.online && p.name == FacilityKind::Academy.name() && self.controls_producer(seat, p.place))
+            .count() as i64;
+        let academy_ducats = academies * self.tables.unique.academy_ducats;
+        if academy_ducats > 0 {
+            gained.ducats += academy_ducats;
+            let word = if academies == 1 { "Academy" } else { "Academies" };
+            sources.push((format!("{academies} {word}"), Resource::Ducats, academy_ducats));
+        }
+        // Ticket #182 (version 0.08.0): the Investment Bank's interest. ONE per Region pays, however
+        // many stand there, on the Venture Capital Fund's balance BEFORE this turn's banking is added
+        // -- which is the balance here, since the banking below is what adds it. The Materials are
+        // CREATED rather than drawn from the Stockpile, and they go straight into the Fund, so they
+        // compound from next turn. A floor of one applies to ONE building only, Faction-wide, so an
+        // early Investment Bank is never literally worthless without paying ~500 over a game.
+        //
+        // In a non-Prospector's hands the same share applies to that Faction's DUCAT INCOME instead,
+        // at a minimum of one Ducat, because no other Faction has a Fund for it to pay into. The cap
+        // travels with the clause, so capturing a Prospector Region is never better than being the
+        // Prospectors there.
+        let mut paying_regions: std::collections::BTreeSet<StateId> = std::collections::BTreeSet::new();
+        for p in producers.iter().filter(|p| p.online && p.name == FacilityKind::InvestmentBank.name()) {
+            if let ProducerPlace::Facility(sid, _) = p.place
+                && self.state(sid).control == Control::Controlled(seat)
+            {
+                paying_regions.insert(sid);
+            }
+        }
+        let u_interest = self.tables.unique.investment_bank_interest;
+        let u_floor = self.tables.unique.investment_bank_floor;
+        let mut interest_to_fund = 0i64;
+        if !paying_regions.is_empty() {
+            let n = paying_regions.len() as i64;
+            if self.tables.faction(self.kind(seat)).victory_first.kind == VictoryFirstKind::VentureFund {
+                let per = (self.seat(seat).venture_fund as f64 * u_interest).floor() as i64;
+                interest_to_fund = (n * per).max(u_floor);
+                sources.push((format!("{n} Investment Bank (interest banked)"), Resource::Materials, interest_to_fund));
+            } else {
+                let per = ((gained.ducats as f64 * u_interest).floor() as i64).max(u_floor);
+                let paid = n * per;
+                gained.ducats += paid;
+                sources.push((format!("{n} Investment Bank (interest)"), Resource::Ducats, paid));
+            }
+        }
         // Ticket #72 (version 0.05.5): the Venture Capital Fund takes its share of the Materials the
         // seat's Factories and Mines paid, rounded down, before the Stockpile sees them.
         let share = self.seat(seat).venture_share;
@@ -677,7 +771,7 @@ impl Game {
             s.research_total += research;
             s.research_off_earth_total += off_earth;
             s.doubled_module_turns += doubled_turns;
-            s.venture_fund += banked;
+            s.venture_fund += banked + interest_to_fund;
             s.venture_banked_last_turn = banked;
         }
         if !shut.is_empty() {
