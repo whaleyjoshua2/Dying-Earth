@@ -74,6 +74,9 @@ building_decommissioned_state = "The {faction} decommissioned the {building} in 
 building_changed_colony = "The {faction} {done} the {building} at {colony}."
 building_decommissioned_colony = "The {faction} decommissioned the {building} at {colony}: {refund} Materials back."
 build_lost = "{building} at {place} had no slot left and was lost."
+# Ticket #197 (version 0.08.0): Colonists lost when a building coming down leaves fewer Habitats
+# than the people living there. It was the one way Colonists went without a word.
+colonists_no_room = "{n} Colonists at {colony} had nowhere to live and were lost."
 launch_pad_fire = "Launch Pad Fire: the {faction} {item} at {place} completes next turn instead."
 game_over_win = "Game over on turn {turn}: the {faction} win ({note})."
 game_over_draw = "Game over on turn {turn}: a draw ({note})."

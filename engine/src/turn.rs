@@ -135,6 +135,11 @@ impl Game {
         // Report for the coming turn starts collecting now, before the AI seats order, so their
         // scored lists survive into it (ticket #50: three AI seats write to it, one after another).
         self.report = Report::default();
+        // Ticket #178: stamped HERE as well as in `report_phase`, because a game that ends this turn
+        // returns below without reaching either `self.turn += 1` or `report_phase`, and the heading is
+        // drawn from `report.turn`. Without it the last Report of every game read January 2030. A turn
+        // that carries on overwrites this with the new turn in `report_phase`, exactly as before.
+        self.report.turn = self.turn;
         for seat in Seat::ALL {
             if self.seat(seat).ai {
                 all[seat.index()] = self.ai_orders(seat);
