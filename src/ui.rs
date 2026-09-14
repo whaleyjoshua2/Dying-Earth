@@ -4048,7 +4048,12 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
         // Ticket #73: muster Emigrants here, and send them to Antarctica by sea once the ice is open.
         ui.label(RichText::new("Emigrants").strong());
-        let per = game.emigrants_per_turn(Seat(0));
+        // Ticket #196 (version 0.08.0): as many as this state's people can pay for, where the button
+        // always asked for the whole batch. Steerage costs the Arkwrights twice the population for
+        // twice the batch -- 16.0 people -- and Australia carries 10.1 to 12.6, so the button was dead
+        // there with nothing on screen to say why. Where the state cannot pay for even one, it still
+        // offers one, so the refusal a player reads is "not enough people there" rather than silence.
+        let per = game.emigrants_affordable(Seat(0), sid).max(1);
         cost_button_with_hover(
             ui,
             game,

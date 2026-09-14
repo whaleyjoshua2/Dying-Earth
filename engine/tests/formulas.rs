@@ -7145,3 +7145,67 @@ fn decommissioning_a_habitat_still_loses_the_people_it_held_and_says_so() {
         g.report.lines.iter().map(|l| l.text.clone()).collect::<Vec<_>>()
     );
 }
+
+// ------------------------------------------------ 0.08.0 ticket #196: the muster gate and partial batches
+
+/// Ticket #196: the AI's muster gate wanted a Colony Ship or a Shipyard it could never get. A bare
+/// station has zero Module slots (`base = 0`, one per Colonist), so it cannot raise the Shipyard
+/// that would let it muster the Colonists that earn the slots; ticket #164's Core Module ended that
+/// deadlock in the rules and the gate was never updated. Measured over 320 seat-games, NO seat ever
+/// held a ship or a yard while the ice was still shut, so Antarctica opening was the only door into
+/// the Colonist economy for everybody. Room to put people opens it too.
+#[test]
+fn a_seat_with_room_on_a_station_musters_before_antarctica_opens() {
+    let mut g = game();
+    let seat = Seat(0);
+    assert!(!g.antarctica_open, "the premise: the ice is still shut");
+    assert!(!g.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip), "the premise: no Colony Ship");
+    // Its station over Earth stands with a Core Module, which holds four people from the day it is built.
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(seat)).map(|c| c.id).expect("seat 0 starts with a station");
+    assert!(g.habitat_room(g.colony(station).unwrap()) > 0, "the premise: the Core Module holds somebody");
+    assert!(!g.colony(station).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Shipyard), "the premise: no Shipyard");
+
+    let orders = g.ai_orders(seat);
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::BuildEmigrants { .. })),
+        "with room on a station and the ice shut, the AI should still muster: {orders:?}"
+    );
+}
+
+/// Ticket #196: a Steerage batch costs 8 x 2.0 = 16.0 population, and Australia carries 10.1 to
+/// 12.6 -- the only one of the fourteen Regions below 16 -- so the Arkwright AI was refused every
+/// turn it held it, 243 times across twenty measured games, and mustered nothing at all. A muster
+/// now takes as many as the Region can pay for.
+#[test]
+fn a_muster_takes_as_many_as_the_region_can_pay_for() {
+    let mut g = game();
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+    let per = g.emigrants_per_turn(ark);
+    // The Arkwrights start with no station, and ticket #196's gate wants somewhere to put people,
+    // so give them one: this test is about the SIZE of a batch, not about the gate.
+    let st = station_at(&mut g, ark, BodyId::Earth);
+    // `station_at` predates ticket #164 and makes a BARE station; the real game founds one with a
+    // Core Module, which is what holds the first four people and so gives the gate its room.
+    g.colony_mut(st).unwrap().modules.push(Module::new(ModuleKind::Core));
+    assert!(g.habitat_room(g.colony(st).unwrap()) > 0, "the premise: the Core Module holds somebody");
+    // A Region too small to pay for a whole batch, but big enough for some of it.
+    let small = g.directed_states(ark)[0];
+    g.states[small as usize].population = g.lift_population(ark, per) / 2.0;
+    let want = g.emigrants_affordable(ark, small);
+    assert!(want > 0 && want < per, "the premise: {want} should be a partial batch out of {per}");
+    assert!(
+        g.check_order(ark, &[], &Order::BuildEmigrants { state: small, n: want }).is_ok(),
+        "a batch the Region can pay for should be legal"
+    );
+    assert!(
+        g.check_order(ark, &[], &Order::BuildEmigrants { state: small, n: per }).is_err(),
+        "the whole batch should still be refused: the Region cannot pay for it"
+    );
+
+    // And the AI asks for what it can afford rather than for nothing.
+    let orders = g.ai_orders(ark);
+    match orders.iter().find_map(|o| if let Order::BuildEmigrants { n, .. } = o { Some(*n) } else { None }) {
+        Some(n) => assert!(n <= want, "the AI mustered {n}, more than the {want} the Region can pay for"),
+        None => panic!("the Arkwright AI mustered nothing in a Region that can pay for {want}: {orders:?}"),
+    }
+}

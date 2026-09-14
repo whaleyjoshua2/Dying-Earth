@@ -1274,6 +1274,24 @@ impl Game {
         self.tables.emigrants.population_each * colonists as f64 * self.tables.faction(self.kind(seat)).lift_population_multiplier
     }
 
+    /// Ticket #196 (version 0.08.0): how many Emigrants this seat could muster in this state right
+    /// now -- its per-turn cap, or what the state's people can pay for, whichever is smaller.
+    ///
+    /// A batch was all-or-nothing until now, and Steerage costs the Arkwrights twice the population
+    /// for twice the batch: 8 x 2.0 = 16.0 people, where Australia carries 10.1 to 12.6 and is the
+    /// only one of the fourteen Regions below 16. Measured, an Arkwright AI holding it was refused
+    /// on all 243 turns it tried and mustered nothing in twenty games. A muster takes what the
+    /// Region can pay for.
+    pub fn emigrants_affordable(&self, seat: Seat, s: StateId) -> u32 {
+        let per = self.emigrants_per_turn(seat);
+        let each = self.lift_population(seat, 1);
+        if each <= 0.0 {
+            return per;
+        }
+        let afford = (self.state(s).population / each).floor().max(0.0) as u32;
+        per.min(afford)
+    }
+
     /// What a Colony Module costs this seat in Materials, rounded down (ticket #51).
     pub fn module_materials(&self, seat: Seat, kind: ModuleKind) -> i64 {
         let base = self.tables.module(kind).materials as f64;

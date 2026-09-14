@@ -1220,7 +1220,21 @@ impl Game {
             let waiting: u32 = self.directed_states(seat).iter().map(|s| self.state(*s).emigrants).sum();
             let has_ship_or_yard = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip)
                 || self.colonies.iter().any(|c| c.control.director() == Some(seat) && c.modules.iter().any(|m| m.kind == ModuleKind::Shipyard));
-            let want = if has_ship_or_yard { capacity * 2 } else { 0 } + if self.antarctica_open { capacity } else { 0 };
+            // Ticket #196 (version 0.08.0): room to put people opens the gate too. It used to want a
+            // Colony Ship or a Shipyard, or the ice open -- and measured over 320 seat-games, NO seat
+            // ever held a ship or a yard while the ice was still shut, because a bare station has zero
+            // Module slots (`base = 0`, one per Colonist) and so cannot raise the Shipyard that would
+            // let it muster the Colonists that earn the slots. Ticket #164's Core Module ended that
+            // deadlock in the rules; the gate was never updated, so Antarctica opening was the only
+            // door into the Colonist economy for everybody, and a Custodian holding the Temperature
+            // down locked itself out of its own Victory Condition.
+            let room_off_earth: u32 = self
+                .colonies
+                .iter()
+                .filter(|c| c.control.director() == Some(seat))
+                .map(|c| self.habitat_room(c).saturating_sub(c.colonists))
+                .sum();
+            let want = if has_ship_or_yard { capacity * 2 } else { 0 } + if self.antarctica_open { capacity } else { 0 } + room_off_earth;
             if per > 0 && waiting < want {
                 let by_population = |a: &StateId, b: &StateId| self.state(*a).population.partial_cmp(&self.state(*b).population).unwrap_or(std::cmp::Ordering::Equal);
                 let with_site = self
@@ -1229,9 +1243,14 @@ impl Game {
                     .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()))
                     .max_by(by_population);
                 let target = with_site.or_else(|| if self.antarctica_open { self.directed_states(seat).into_iter().max_by(by_population) } else { None });
-                if let Some(st) = target {
+                // Ticket #196: as many as the state can pay for, not all or nothing. A Steerage batch
+                // costs the Arkwrights 16.0 people and Australia carries 10.1 to 12.6.
+                if let Some(st) = target
+                    && let n = self.emigrants_affordable(seat, st)
+                    && n > 0
+                {
                     let opp = if presence_needed > 0 && waiting == 0 { m.opportunity } else { 1.0 };
-                    push(vec![Order::BuildEmigrants { state: st, n: per }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("muster {} Emigrants in {}", per, self.tables.state(st).name), None);
+                    push(vec![Order::BuildEmigrants { state: st, n }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("muster {n} Emigrants in {}", self.tables.state(st).name), None);
                 }
             }
             // Ticket #141 (version 0.07.3): waiting Emigrants lift straight to the seat's own station
