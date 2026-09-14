@@ -406,6 +406,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("building_changed_colony", &["faction", "done", "building", "colony"]),
     ("building_decommissioned_colony", &["faction", "building", "colony", "refund"]),
     ("build_lost", &["building", "place"]),
+    ("colonists_no_room", &["n", "colony"]),
     ("launch_pad_fire", &["faction", "item", "place"]),
     ("game_over_win", &["turn", "faction", "note"]),
     ("game_over_draw", &["turn", "note"]),

@@ -937,6 +937,8 @@ impl Game {
                 .rev()
                 .filter(|i| self.colony(cid).unwrap().modules[*i].change.map(|c| c.due_turn <= turn).unwrap_or(false))
                 .collect();
+            // Ticket #197: whether anything actually came down here, read before `due` is consumed.
+            let changed_here = !due.is_empty();
             for i in due {
                 let change = self.colony(cid).unwrap().modules[i].change.unwrap();
                 let kind = self.colony(cid).unwrap().modules[i].kind;
@@ -980,10 +982,30 @@ impl Game {
                 said.push((mine, Some(ReportPlace::Colony(cid)), text));
             }
             // Colonists beyond the Habitats a decommission left are lost with them.
-            if let Some(col) = self.colony(cid) {
+            //
+            // Ticket #197: ONLY where a change actually resolved here. This ran on every Colony every
+            // phase, and `habitat_room` reads the CURRENT holder's Habitat capacity multiplier -- which
+            // only the Arkwrights have -- so an Arkwright station passing to another Faction shrank in
+            // the same Resolution and its people were deleted, with no log line and no Report line:
+            // twenty Colonists gone in silence over eighty measured games. A cap that falls below what
+            // already stands destroys nothing, exactly as a Module cap does not (`CONTEXT.md`,
+            // **Colony**); only a building coming down takes people with it. And now it says so, since
+            // this was the one way Colonists were lost without a word -- crowding has always logged and
+            // raised a Moment.
+            if changed_here && let Some(col) = self.colony(cid) {
                 let room = self.habitat_room(col);
-                if let Some(col) = self.colony_mut(cid) {
-                    col.colonists = col.colonists.min(room);
+                let had = col.colonists;
+                if had > room {
+                    let lost = had - room;
+                    let where_ = self.place_name(Place::Colony(cid));
+                    self.colony_mut(cid).unwrap().colonists = room;
+                    lines.push(format!("{lost} Colonists at {where_} had nowhere to live and were lost."));
+                    let text = self.say("colonists_no_room", &[("n", lost.to_string()), ("colony", where_)]);
+                    let mine = match self.colony(cid).and_then(|c| c.control.controller()) {
+                        Some(seat) => crate::report::line_kind_of(seat, LineKind::YourWorks, LineKind::Archive, self.spectator),
+                        None => LineKind::Archive,
+                    };
+                    said.push((mine, Some(ReportPlace::Colony(cid)), text));
                 }
             }
         }

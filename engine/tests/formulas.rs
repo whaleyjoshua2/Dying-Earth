@@ -7071,3 +7071,77 @@ fn an_army_keeps_its_stance_through_resolution_until_something_happens_to_it() {
 }
 
 
+
+// ---------------------------------------------- Defects found while charting version 0.08.0
+
+/// Ticket #178: the LAST Report of every game carried turn 0, so a game ending in 2035 opened its
+/// final dispatch as *Report, January 2030* while the top bar beside it read the true date.
+/// `end_turn` clears the Report for the turn to come (leaving `turn` at 0) and stamps the real turn
+/// later, in `report_phase`; on game over it returns before both, so the stamp never happened.
+#[test]
+fn the_last_report_carries_the_turn_the_game_finished_on() {
+    let mut g = with_seed(3);
+    for s in Seat::ALL {
+        g.seats[s.index()].ai = true;
+    }
+    for _ in 0..200 {
+        if g.is_over() {
+            break;
+        }
+        g.end_turn(std::array::from_fn(|_| Vec::new())).expect("every seat is AI, so no pick is ever owed");
+    }
+    assert!(g.is_over(), "the game should have ended inside 200 turns");
+    assert_eq!(g.report.turn, g.turn, "the final Report should carry the turn the game finished on ({}), not {}", g.turn, g.report.turn);
+}
+
+/// Ticket #197: Colonists were deleted with no log line and no Report line when a station changed
+/// hands. `resolve_changes` clamped EVERY Colony to its `habitat_room` -- not only one where a
+/// Mothball or Decommission had just resolved -- and `habitat_room` reads the CURRENT holder's
+/// Habitat capacity multiplier, which only the Arkwrights have (x1.5). So an Arkwright station
+/// passing to another Faction shrank in the same Resolution and lost its people.
+#[test]
+fn a_station_changing_hands_does_not_delete_its_colonists() {
+    let mut g = fresh();
+    let arkwrights = Seat(2);
+    assert_eq!(g.kind(arkwrights), FactionKind::Arkwrights, "seat 2 should be the Arkwrights");
+    let id = station_at(&mut g, arkwrights, BodyId::Earth);
+    for _ in 0..2 {
+        g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    }
+    let arkwright_room = g.habitat_room(g.colony(id).unwrap());
+    g.colony_mut(id).unwrap().colonists = arkwright_room;
+    // It passes to the Custodians, who have no capacity multiplier, so the room falls.
+    g.colony_mut(id).unwrap().control = Control::Controlled(Seat(0));
+    let custodian_room = g.habitat_room(g.colony(id).unwrap());
+    assert!(custodian_room < arkwright_room, "the premise: Arkwright room {arkwright_room} should exceed Custodian room {custodian_room}");
+    g.resolution_phase();
+    assert_eq!(
+        g.colony(id).unwrap().colonists,
+        arkwright_room,
+        "nobody living at the station should be deleted by a change of hands; {arkwright_room} lived there and the new holder's room is {custodian_room}"
+    );
+}
+
+/// Ticket #197, the other half: narrowing the clamp to Colonies where something actually came down
+/// must NOT disable the rule it was written for. Decommissioning a Habitat still loses the people
+/// it held -- and now says so, where before it went without a word.
+#[test]
+fn decommissioning_a_habitat_still_loses_the_people_it_held_and_says_so() {
+    let mut g = fresh();
+    let id = station_at(&mut g, Seat(0), BodyId::Earth);
+    for _ in 0..2 {
+        g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    }
+    let full = g.habitat_room(g.colony(id).unwrap());
+    g.colony_mut(id).unwrap().colonists = full;
+    change_now(&mut g, Seat(0), BuildingRef::Module(id, 0), BuildingChange::Decommission);
+    let room = g.habitat_room(g.colony(id).unwrap());
+    assert!(room < full, "the premise: one Habitat fewer should hold fewer people than {full}");
+    assert_eq!(g.colony(id).unwrap().colonists, room, "the people the decommissioned Habitat held are lost with it");
+    let lost = full - room;
+    assert!(
+        g.report.lines.iter().any(|l| l.text.contains(&format!("{lost} Colonists")) && l.text.contains("nowhere to live")),
+        "the Report should say the {lost} Colonists were lost; it said: {:?}",
+        g.report.lines.iter().map(|l| l.text.clone()).collect::<Vec<_>>()
+    );
+}
