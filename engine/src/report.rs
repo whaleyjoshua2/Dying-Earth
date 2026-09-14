@@ -407,6 +407,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("building_decommissioned_colony", &["faction", "building", "colony", "refund"]),
     ("build_lost", &["building", "place"]),
     ("colonists_no_room", &["n", "colony"]),
+    // Ticket #191 (version 0.08.0): Relations, said in the offender's paragraph.
+    ("relations_fell", &["victim", "offender"]),
     ("launch_pad_fire", &["faction", "item", "place"]),
     ("game_over_win", &["turn", "faction", "note"]),
     ("game_over_draw", &["turn", "note"]),

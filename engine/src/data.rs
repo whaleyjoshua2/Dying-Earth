@@ -593,6 +593,8 @@ pub struct InfluenceTable {
     pub decay_controlled: i64,
     /// Version 0.04 (ticket #41): a challenger needs the controller's standing plus this.
     pub challenge_margin: i64,
+    /// Ticket #190 (version 0.08.0): what an online Constabulary adds to the margin in its Region.
+    pub constabulary_margin: i64,
     /// Ticket #46: a station's threshold starts here.
     #[serde(default)]
     pub station_threshold_base: i64,
@@ -1009,6 +1011,18 @@ struct FactionsFile {
     ducats: DucatsCard,
     venture_capital: VentureCard,
     emigrants: EmigrantsCard,
+    relations: RelationsCard,
+}
+
+/// Ticket #191 (version 0.08.0): the Relations scale and what moves it (`factions.toml`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct RelationsCard {
+    pub best: i64,
+    pub worst: i64,
+    pub start: i64,
+    pub fall_per_offending_turn: i64,
+    pub recover: i64,
+    pub quiet_turns: u32,
 }
 
 /// Ticket #73 (version 0.05.5): Emigrants, the built Colonists: how many a Faction musters a turn,
@@ -1110,6 +1124,8 @@ pub struct Tables {
     pub ducats: DucatsCard,
     pub venture: VentureCard,
     pub emigrants: EmigrantsCard,
+    /// Ticket #191: the Relations scale and what moves it.
+    pub relations: RelationsCard,
     pub climate: ClimateTable,
     pub influence: InfluenceTable,
     /// Ticket #52: `unrest.toml`.
@@ -1196,6 +1212,7 @@ impl Tables {
             ducats: factions.ducats,
             venture: factions.venture_capital,
             emigrants: factions.emigrants,
+            relations: factions.relations,
             climate,
             influence,
             unrest,

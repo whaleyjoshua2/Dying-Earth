@@ -436,7 +436,7 @@ impl Game {
     fn standing_pressed(&self, seat: Seat, place: Place) -> bool {
         let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
         let rival = self.rival_standing(seat, place);
-        rival > 0 && rival + self.tables.influence.challenge_margin >= mine
+        rival > 0 && rival + self.challenge_margin_at(place) >= mine
     }
 
     /// The highest Standing any other seat has on a place (ticket #50).
@@ -1001,7 +1001,7 @@ impl Game {
             let rival = self.rival_standing(seat, place);
             let mine = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
             if rival > 0 && rival + 2 * step >= mine {
-                let margin = self.tables.influence.challenge_margin;
+                let margin = self.challenge_margin_at(place);
                 let need = (rival + margin + 2 * step - mine).max(step);
                 let can = ((allotment + bought_steps) / step).max(1);
                 let copies = ((need + step - 1) / step).clamp(1, can);

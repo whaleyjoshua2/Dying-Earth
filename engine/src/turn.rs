@@ -177,6 +177,9 @@ impl Game {
         self.event_phase();
         self.log("Phase 6: Resolution");
         self.resolution_phase();
+        // Ticket #191 (version 0.08.0): the turn's offences are charged once, the quiet pairs
+        // recover, and the slate is wiped.
+        self.settle_relations();
         self.log("Phase 7: End");
         self.end_phase();
         if self.is_over() {

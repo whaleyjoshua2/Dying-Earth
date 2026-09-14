@@ -339,6 +339,12 @@ impl Game {
 
     /// One melee of Ship stacks at a Body (ticket #50).
     fn ship_melee(&mut self, place: &str, body: BodyId, parties: &[(Seat, bool, Vec<ShipId>)]) {
+        // Ticket #191 (version 0.08.0): opening a Battle offends everyone on the other side of it.
+        for (aggressor, _, _) in parties.iter().filter(|(_, agg, _)| *agg) {
+            for (other, _, _) in parties {
+                self.offend(*aggressor, *other);
+            }
+        }
         let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
             parties.iter().map(|(seat, agg, ids)| (Some(*seat), *agg, ids.iter().map(|id| self.ship_combatant(*id)).collect())).collect();
         let mut line = self.run_melee(place, units);
@@ -355,6 +361,13 @@ impl Game {
 
     /// One melee of Armies at a ground place (ticket #50).
     fn army_melee(&mut self, place_name: &str, place: Place, aggressors: &[Seat], parties: &[(Option<Seat>, bool, Vec<ArmyId>)]) {
+        // Ticket #191: as in orbit. A neutral state's own Armies are nobody's Faction, so a Battle
+        // against them offends nobody -- which is most Battles: 46 of the 55 measured over 80 games.
+        for aggressor in aggressors {
+            for other in parties.iter().filter_map(|(s, _, _)| *s) {
+                self.offend(*aggressor, other);
+            }
+        }
         let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
             parties.iter().map(|(seat, agg, ids)| (*seat, *agg, ids.iter().map(|id| self.army_combatant(*id)).collect())).collect();
         let mut line = self.run_melee(place_name, units);
@@ -710,6 +723,15 @@ impl Game {
             // Ticket #187 (version 0.08.0): Resistance. An outsider's Influence buys less Standing at
             // a well-schooled place and more at a badly-schooled one; the controller converts in full.
             let gained = if own { amount } else { self.standing_from(target, amount) };
+            // Ticket #191 (version 0.08.0): spending on a place another Faction HOLDS is an offence,
+            // and their view of you falls once for the turn however many orders you put in. A
+            // NEUTRAL place is never an offence, however hotly contested: two Factions bidding for
+            // empty ground are competing, not crossing each other.
+            if let Some(victim) = self.place_control(target).director()
+                && victim != seat
+            {
+                self.offend(seat, victim);
+            }
             let s = self.seat_mut(seat);
             *s.influence.entry(target).or_insert(0) += gained;
             s.influenced_this_turn.push(target);

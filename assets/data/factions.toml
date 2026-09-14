@@ -130,6 +130,37 @@ colour = [0.871, 0.322, 0.439]
 
 # Ticket #72 (version 0.05.5): the Prospectors' Venture Capital Fund. The largest share of Materials
 # output that may be banked a turn, the step the share moves in, and what a draw gives back.
+# Ticket #191 (version 0.08.0): Relations. One score per ORDERED PAIR, so twelve in a four-seat
+# game: the Arkwrights' view of the Prospectors is a different number from the Prospectors' view of
+# the Arkwrights. Measured over 80 games, of the 317 pairs where anything happened 49% were purely
+# one-directional and 80% of offending pair-turns had only one direction firing, so a shared number
+# would have thrown all of that away.
+#
+# The score does NOTHING mechanical in this version -- it is read, not spent, and the computer
+# players do not read it. Giving the computer a grudge would re-open the denial multiplier ticket
+# #50 deliberately removed, and would move every figure in the sweep at the same moment six other
+# rules are moving them.
+[relations]
+# The scale. The +10 half is RESERVED and nothing fills it in this version; it exists so the scale
+# reads naturally and 0 is genuinely neutral. An all-zero-or-negative grid is the rule working.
+best = 10
+worst = -10
+start = 0
+# What one OFFENDING TURN costs: a turn in which the offender spent any Influence on a place the
+# victim holds, or opened a Battle against them. Charged per TURN and never per spend order -- a pair
+# that offends puts in a median 15.6 Influence across about three orders, and charging per order
+# would make a big push and a small one differ by a factor nobody can read off the board.
+fall_per_offending_turn = 1
+# Recovery: this much every `quiet_turns` quiet turns, stopping at `start` and never rising past it.
+# Letting peace accrue goodwill was measured and rejected: half of all ordered pairs never interact
+# at all in a whole game, so goodwill earned by mere quiet would mostly be between Factions on
+# opposite sides of the board who have never met -- that is distance, not friendship. There is an
+# arithmetic trap too: a pair offends on 12.55% of its turns, so at -1 an offence and +0.25 a quiet
+# turn the two cancel, and a median offender would end at about +0.5. For an offender to stay
+# negative the cost must be roughly seven times the per-turn recovery; stopping at 0 removes it.
+recover = 1
+quiet_turns = 4
+
 [venture_capital]
 max_share = 0.8
 share_step = 0.1

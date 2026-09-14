@@ -761,6 +761,32 @@ impl BattleLine {
 }
 
 
+/// Ticket #191 (version 0.08.0): Relations. Every Faction keeps a score for every other -- ONE PER
+/// ORDERED PAIR, so twelve in a four-seat game, and the Arkwrights' view of the Prospectors is a
+/// different number from the Prospectors' view of the Arkwrights. Measured over 80 games, of the 317
+/// pairs where anything happened 49% were purely one-directional and 80% of offending pair-turns had
+/// only one direction firing, so a shared number would have thrown all of that away.
+///
+/// The score falls for each OFFENDING TURN -- a turn in which the offender spent any Influence on a
+/// place the victim holds, or opened a Battle against them -- charged per TURN and never per order.
+/// It recovers slowly while a pair is quiet and stops at neutral: it never rises above it.
+///
+/// **In version 0.08.0 the score does nothing mechanical.** It is read, not spent: no rule reads it
+/// and the computer players do not read it. It is built now so that it can be watched for a version
+/// and given teeth in 0.09 with evidence rather than a guess.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Relations {
+    /// `score[viewer][subject]`: what the seat at `viewer` thinks of the seat at `subject`.
+    pub score: [[i64; SEAT_COUNT]; SEAT_COUNT],
+    /// Consecutive turns `subject` has not offended `viewer`.
+    pub quiet: [[u32; SEAT_COUNT]; SEAT_COUNT],
+    /// `offended[viewer][subject]`: set as offences happen through the turn, then read and cleared
+    /// when the turn ends. This is what makes the charge per turn rather than per order.
+    pub offended: [[bool; SEAT_COUNT]; SEAT_COUNT],
+    /// `fell[viewer][subject]`: whether the score moved down this turn, for the Report line.
+    pub fell: [[bool; SEAT_COUNT]; SEAT_COUNT],
+}
+
 /// Everything about one game. Fields are public because the interface reads all of them.
 #[derive(Debug, Clone)]
 pub struct Game {
@@ -800,6 +826,8 @@ pub struct Game {
     pub spectator: bool,
     /// Lines for the simulate log and the dev diary; the interface ignores them.
     pub log: Vec<String>,
+    /// Ticket #191 (version 0.08.0): what every Faction thinks of every other.
+    pub relations: Relations,
 }
 
 /// Ticket #50: every game seats all four Factions. The player picks one Faction and a start
@@ -967,6 +995,7 @@ impl Game {
             slot_yields: BTreeMap::new(),
             spectator: false,
             log: Vec::new(),
+            relations: Relations::default(),
             tables,
         };
         // Ticket #57: every Colony Slot on every Body draws its own four yields, in Body order then
@@ -1909,9 +1938,22 @@ impl Game {
     pub fn influence_needed_for(&self, seat: Seat, target: Target) -> i64 {
         let threshold = self.influence_threshold_for(seat, target);
         match self.place_control(target).controller() {
-            Some(c) => threshold.max(self.seat(c).influence.get(&target).copied().unwrap_or(0) + self.tables.influence.challenge_margin),
+            Some(c) => threshold.max(self.seat(c).influence.get(&target).copied().unwrap_or(0) + self.challenge_margin_at(target)),
             None => threshold,
         }
+    }
+
+    /// Ticket #190 (version 0.08.0): the challenge margin at `target` -- the base, plus what a
+    /// Constabulary adds where one stands and is online. The Constabulary protects WHOEVER HOLDS the
+    /// place, not the Faction that raised it: a police force serves the government of the day, and
+    /// the building needs no memory of who paid for it, so a Faction that builds one in a Region it
+    /// later loses has made its own job harder. At most one stands in a Region, so no stacking
+    /// question arises. It does nothing on a neutral place, which has no margin at all -- the caller
+    /// asks for a margin only when a holder is there to be challenged.
+    pub fn challenge_margin_at(&self, target: Target) -> i64 {
+        let t = &self.tables.influence;
+        let guarded = matches!(target, Place::State(s) if self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Constabulary && f.working()));
+        t.challenge_margin + if guarded { t.constabulary_margin } else { 0 }
     }
 
     /// Ticket #53: Blame raises this seat's threshold on a Nation State it does not control, and
@@ -2700,6 +2742,67 @@ impl Game {
 
     /// The same, for a line that belongs to the player when seat 0 did it and to the board
     /// otherwise: the player's builds, lifts, repairs and funding go under "Your works".
+    /// Ticket #191 (version 0.08.0): mark that `offender` has crossed `victim` this turn. Charged per
+    /// TURN, so a second offence in the same turn is free: a pair that offends puts in a median 15.6
+    /// Influence across about three separate orders, and charging per order would make a big push and
+    /// a small one differ by a factor nobody can read off the board.
+    pub fn offend(&mut self, offender: Seat, victim: Seat) {
+        if offender != victim {
+            self.relations.offended[victim.index()][offender.index()] = true;
+        }
+    }
+
+    /// What `viewer` thinks of `subject` (ticket #191). Neutral at the card's `start`.
+    pub fn relations_score(&self, viewer: Seat, subject: Seat) -> i64 {
+        self.relations.score[viewer.index()][subject.index()]
+    }
+
+    /// Ticket #191: charge the turn's offences, let the quiet pairs recover, and wipe the slate. Run
+    /// once a turn, after the Resolution has recorded everything that happened.
+    ///
+    /// The recovery **stops at neutral** and never rises past it. The +10 half of the scale is
+    /// reserved and nothing fills it in this version: letting peace accrue goodwill was measured and
+    /// rejected, because half of all ordered pairs never interact at all in a whole game and the
+    /// goodwill would mostly be between Factions on opposite sides of the board who have never met.
+    pub fn settle_relations(&mut self) {
+        let c = self.tables.relations.clone();
+        for victim in Seat::ALL {
+            for offender in Seat::ALL {
+                if victim == offender {
+                    continue;
+                }
+                let (v, o) = (victim.index(), offender.index());
+                if self.relations.offended[v][o] {
+                    let was = self.relations.score[v][o];
+                    self.relations.score[v][o] = (was - c.fall_per_offending_turn).max(c.worst);
+                    self.relations.quiet[v][o] = 0;
+                    self.relations.fell[v][o] = self.relations.score[v][o] < was;
+                } else {
+                    self.relations.fell[v][o] = false;
+                    let quiet = self.relations.quiet[v][o] + 1;
+                    if c.quiet_turns > 0 && quiet >= c.quiet_turns {
+                        self.relations.quiet[v][o] = 0;
+                        self.relations.score[v][o] = (self.relations.score[v][o] + c.recover).min(c.start);
+                    } else {
+                        self.relations.quiet[v][o] = quiet;
+                    }
+                }
+                self.relations.offended[v][o] = false;
+            }
+        }
+        // The Report line goes in the OFFENDER's paragraph: it is what sends a player to the grid.
+        for victim in Seat::ALL {
+            for offender in Seat::ALL {
+                if victim == offender || !self.relations.fell[victim.index()][offender.index()] {
+                    continue;
+                }
+                let text = self.say("relations_fell", &[("victim", self.seat_name(victim)), ("offender", self.seat_name(offender))]);
+                self.log(text.clone());
+                self.report_line_of(offender, LineKind::YourWorks, LineKind::Note, None, text);
+            }
+        }
+    }
+
     pub fn report_line_of(&mut self, seat: Seat, mine: LineKind, theirs: LineKind, place: Option<ReportPlace>, text: String) {
         let kind = crate::report::line_kind_of(seat, mine, theirs, self.spectator);
         self.report_line(kind, place, text);

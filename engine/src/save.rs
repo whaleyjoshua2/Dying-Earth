@@ -110,6 +110,9 @@ pub struct SavedGame {
     pub slot_yields: BTreeMap<(BodyId, u32), SlotYields>,
     pub spectator: bool,
     pub log: Vec<String>,
+    /// Ticket #191 (version 0.08.0): what every Faction thinks of every other.
+    #[serde(default)]
+    pub relations: Relations,
 }
 
 impl SavedGame {
@@ -141,6 +144,7 @@ impl SavedGame {
             slot_yields,
             spectator,
             log,
+            relations,
         } = g;
         SavedGame {
             seed: *seed,
@@ -166,6 +170,7 @@ impl SavedGame {
             slot_yields: slot_yields.clone(),
             spectator: *spectator,
             log: log.clone(),
+            relations: relations.clone(),
         }
     }
 
@@ -195,6 +200,7 @@ impl SavedGame {
             antarctica_open: self.antarctica_open,
             slot_yields: self.slot_yields,
             spectator: self.spectator,
+            relations: self.relations,
             log: self.log,
         }
     }

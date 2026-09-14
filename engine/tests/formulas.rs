@@ -7946,3 +7946,139 @@ fn an_occupier_draws_nothing_from_a_unique_facilitys_clause() {
     let occupied = g.seats[cus.index()].income_last_turn.ducats;
     assert_eq!(controlled - occupied, 1 + economy, "the clause and the economy both wait for control");
 }
+
+// ------------------------------------------- 0.08.0 ticket #190: the Constabulary's margin
+
+/// Ticket #190: while a Constabulary stands and is online in a Region, the challenge margin there is
+/// 25 instead of 20, so taking that Region from its holder wants the holder's Standing plus 25. It
+/// protects WHOEVER HOLDS the Region, not the Faction that raised it -- a police force serves the
+/// government of the day -- so a Faction that builds one in a Region it later loses has made its own
+/// job harder. It does nothing on a neutral Region, which has no margin at all: the price there is
+/// the threshold alone.
+#[test]
+fn a_constabulary_adds_five_to_the_challenge_margin_for_every_challenger() {
+    let mut g = game();
+    let holder = Seat(0);
+    let challenger = Seat(1);
+    let sid = g.controlled_states(holder)[0];
+    let target = Place::State(sid);
+    // A holder's Standing high enough that the margin, not the threshold, is what binds.
+    let threshold = g.influence_threshold_for(challenger, target);
+    g.seats[holder.index()].influence.insert(target, threshold + 40);
+
+    assert_eq!(g.challenge_margin_at(target), 20, "the base margin");
+    let plain = g.influence_needed_for(challenger, target);
+
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Constabulary));
+    assert_eq!(g.challenge_margin_at(target), 25, "and 25 with a Constabulary standing");
+    assert_eq!(g.influence_needed_for(challenger, target) - plain, 5, "the price of taking it rises by exactly five");
+
+    // For every challenger, whoever built it: the third seat pays the same.
+    assert_eq!(g.influence_needed_for(Seat(2), target), g.influence_needed_for(challenger, target));
+
+    // It must be online.
+    let i = g.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::Constabulary).unwrap();
+    g.state_mut(sid).facilities[i].mothballed = true;
+    assert_eq!(g.challenge_margin_at(target), 20, "a mothballed Constabulary guards nothing");
+    g.state_mut(sid).facilities[i].mothballed = false;
+
+    // And nothing on a neutral Region: the price there is the threshold alone, Constabulary or not.
+    g.state_mut(sid).control = Control::Neutral;
+    assert_eq!(g.influence_needed_for(challenger, target), g.influence_threshold_for(challenger, target), "a neutral Region has no margin to raise");
+}
+
+// ------------------------------------------- 0.08.0 ticket #191: Relations
+
+/// Ticket #191: one score per ORDERED PAIR, so the Arkwrights' view of the Prospectors is a
+/// different number from the Prospectors' view of the Arkwrights. It starts neutral at 0, falls by
+/// one for each OFFENDING TURN -- charged per turn, never per order -- and an offence is Influence
+/// spent on a place the victim HOLDS. A neutral place is never an offence, however hotly contested:
+/// two Factions bidding for empty ground are competing, not crossing each other.
+#[test]
+fn relations_fall_once_a_turn_for_spending_on_a_place_a_rival_holds() {
+    let mut g = game();
+    let victim = Seat(0);
+    let offender = Seat(1);
+    let held = Place::State(g.controlled_states(victim)[0]);
+    let neutral = Place::State(StateId::ALL.into_iter().find(|s| g.state(*s).control == Control::Neutral).expect("a neutral Region"));
+
+    assert_eq!(g.relations_score(victim, offender), 0, "neutral to begin");
+    assert_eq!(g.relations_score(offender, victim), 0, "and in both directions");
+
+    // Two spends on the same victim in one turn cost one point, not two.
+    g.pending.influence.push((offender, held, 10));
+    g.pending.influence.push((offender, held, 10));
+    g.pending.influence.push((offender, neutral, 10));
+    g.resolution_phase();
+    g.settle_relations();
+    assert_eq!(g.relations_score(victim, offender), -1, "charged once for the turn, however many orders");
+    assert_eq!(g.relations_score(offender, victim), 0, "and the ordered pair is one-directional");
+
+    // The neutral Region's holder-to-be is nobody, so nobody was offended by that third order.
+    for seat in Seat::ALL {
+        if seat != victim {
+            assert_eq!(g.relations_score(seat, offender), 0, "{seat:?} was not crossed");
+        }
+    }
+}
+
+/// Ticket #191: the score recovers one every four quiet turns and STOPS AT NEUTRAL -- it never rises
+/// above it. The +10 half of the scale is reserved and nothing fills it in this version, so an
+/// all-zero-or-negative grid is the rule working and not a defect.
+#[test]
+fn relations_recover_slowly_and_never_rise_above_neutral() {
+    let mut g = game();
+    let (victim, offender) = (Seat(0), Seat(1));
+    g.relations.score[victim.index()][offender.index()] = -3;
+
+    for _ in 0..3 {
+        g.settle_relations();
+    }
+    assert_eq!(g.relations_score(victim, offender), -3, "three quiet turns are not enough");
+    g.settle_relations();
+    assert_eq!(g.relations_score(victim, offender), -2, "the fourth pays one back");
+
+    for _ in 0..40 {
+        g.settle_relations();
+    }
+    assert_eq!(g.relations_score(victim, offender), 0, "and it stops at neutral, however long the peace");
+
+    // The floor holds too.
+    for _ in 0..20 {
+        g.offend(offender, victim);
+        g.settle_relations();
+    }
+    assert_eq!(g.relations_score(victim, offender), -10, "and the scale has a floor");
+}
+
+/// Ticket #191: in version 0.08.0 the score does nothing mechanical. It is read, not spent -- no
+/// rule reads it, and the computer players do not read it. Pinned so that a later version giving it
+/// teeth has to come past this test and say so.
+#[test]
+fn relations_do_nothing_mechanical_in_this_version() {
+    let mut a = with_seed(11);
+    let mut b = with_seed(11);
+    for viewer in Seat::ALL {
+        for subject in Seat::ALL {
+            if viewer != subject {
+                b.relations.score[viewer.index()][subject.index()] = -10;
+            }
+        }
+    }
+    for _ in 0..6 {
+        pick_a_tech(&mut a);
+        pick_a_tech(&mut b);
+        a.end_turn(std::array::from_fn(|_| Vec::new())).unwrap();
+        b.end_turn(std::array::from_fn(|_| Vec::new())).unwrap();
+    }
+    let picture = |g: &Game| -> Vec<(i64, i64, i64, u32, usize)> {
+        Seat::ALL
+            .into_iter()
+            .map(|s| {
+                let st = g.seat(s);
+                (st.stockpile.materials, st.stockpile.ducats, st.venture_fund, st.allotment as u32, g.controlled_states(s).len())
+            })
+            .collect()
+    };
+    assert_eq!(picture(&a), picture(&b), "six turns of the worst possible blood changed nothing about the board");
+}
