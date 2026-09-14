@@ -185,6 +185,20 @@ the world has fewer turns in which to burn.
 
 ---
 
+## The kit
+
+`dist/dying-earth-0.08.0/` -- `dying-earth.exe` (static CRT, so it runs on a machine with no Visual
+C++ runtime), `assets/` with the four new icons among them, and the playtest note as `README.txt` --
+zipped to `dist/dying-earth-0.08.0-playtest.zip`, **37.6 MB, eighty-two entries**. Windows only;
+`dist/` is gitignored, as it has been every version.
+
+`assets/icons/candidates/` is left out of the kit: it is the working material the icons were chosen
+from and the game never reads it.
+
+**Checked by extracting the zip to a fresh folder outside the repository and running it there**, so
+nothing it needs could have come from the working tree. It drew all eight views at 1280x800 and
+exited 0.
+
 ## Red witnesses
 
 Seventeen false states were constructed across this version's work, each watched failing on the
