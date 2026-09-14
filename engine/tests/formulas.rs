@@ -7539,3 +7539,78 @@ fn resistance_bites_an_outsider_and_never_the_controller() {
     let after = g.seat(Seat(0)).influence.get(&place).copied().unwrap_or(0);
     assert_eq!(after - before, 30, "the controller's own 30 is worth 30");
 }
+
+// ---------------------------------- 0.08.0 ticket #188: schooling moderates what a population is worth
+
+/// Ticket #188: the population BONUS -- the part above 1 -- is scaled by the state's schooling, so a
+/// great many badly-schooled people are worth less than a great many well-schooled ones. The base 1
+/// stays, so no Region is ever worth less than one with no people at all.
+#[test]
+fn schooling_moderates_the_population_bonus() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    let card = g.tables.state(sid).education_level;
+    let pop = g.state(sid).population;
+    let bonus = pop / 1000.0;
+
+    assert!((g.population_factor(sid) - (1.0 + bonus * card)).abs() < 1e-9, "the card figure scales the bonus");
+
+    for taught in [0.7, 1.0, 2.0] {
+        g.state_mut(sid).schooling = taught - card;
+        let want = 1.0 + bonus * taught;
+        assert!((g.population_factor(sid) - want).abs() < 1e-9, "at schooling {taught} the factor should be {want}, not {}", g.population_factor(sid));
+    }
+
+    // Uncapped in both directions: schooling below the pivot shrinks the bonus, above it enlarges.
+    g.state_mut(sid).schooling = 0.5 - card;
+    let low = g.population_factor(sid);
+    g.state_mut(sid).schooling = 2.0 - card;
+    let high = g.population_factor(sid);
+    assert!(low < 1.0 + bonus && high > 1.0 + bonus, "it moves both ways around the old factor: {low} then {high}");
+    assert!(low > 1.0, "and never below 1: {low}");
+}
+
+/// Ticket #188: and schooling therefore applies TWICE to a Lab -- once inside the population factor
+/// and once as the outright multiplier it has always been. The compounding is the point: it is what
+/// makes a School in a big, badly-schooled Region transformative rather than marginal.
+#[test]
+fn schooling_applies_twice_to_a_research_lab() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    let card = g.tables.state(sid).education_level;
+    let pop = g.state(sid).population;
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::ResearchLab));
+
+    let taught = 2.0;
+    g.state_mut(sid).schooling = taught - card;
+    let base = g.tables.facility(FacilityKind::ResearchLab).produces.as_ref().unwrap().amount as f64;
+    let mult = g.tables.faction(g.kind(Seat(0))).research_multiplier;
+    let want = (base * (1.0 + pop / 1000.0 * taught) * taught * mult).floor() as i64;
+    assert_eq!(g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).research, want, "the factor and the multiplier both carry the schooling");
+}
+
+/// Ticket #188: the Observatory's per-Colonist bonus is moderated the same way, so the rule reads
+/// the same in both halves of the game.
+#[test]
+fn schooling_moderates_the_observatorys_per_colonist_bonus() {
+    let mut g = game();
+    let id = station_at(&mut g, Seat(0), BodyId::Earth);
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Core));
+    for _ in 0..6 {
+        g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    }
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Observatory));
+    g.settle_people(id, 40, 1.0);
+    let idx = g.colony(id).unwrap().modules.iter().position(|m| m.kind == ModuleKind::Observatory).unwrap();
+
+    let per = g.tables.observatory.research_per_colonist;
+    let n = g.colony(id).unwrap().colonists as f64;
+    let science = g.research_yield_at(g.colony(id).unwrap());
+    let base = g.tables.module(ModuleKind::Observatory).produces.as_ref().unwrap().amount as f64;
+    let mult = g.tables.faction(g.kind(Seat(0))).research_multiplier;
+    for taught in [0.5, 2.0] {
+        g.colony_mut(id).unwrap().education = taught;
+        let want = (base * science * taught * (1.0 + n * per * taught) * mult).floor() as i64;
+        assert_eq!(g.module_yield_at(Seat(0), id, idx).research, want, "at {taught} the per-Colonist bonus should be moderated too");
+    }
+}

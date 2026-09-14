@@ -316,7 +316,10 @@ impl Game {
                 // Ticket #189 (version 0.08.0): and its Colony's Education Level -- the weighted
                 // average of the people who settled it, raised by an Institute -- exactly as a
                 // Research Lab reads its Region's. This is what gives a Colony's figure a job.
-                let mut r = p.amount as f64 * science * col.education * (1.0 + col.colonists as f64 * per) * research_multiplier;
+                // Ticket #188 (version 0.08.0): and the per-Colonist bonus is moderated by the
+                // Colony's schooling too, exactly as a Region's population bonus is, so the rule
+                // reads the same in both halves of the game.
+                let mut r = p.amount as f64 * science * col.education * (1.0 + col.colonists as f64 * per * col.education) * research_multiplier;
                 r *= self.tech_multiplier(seat, TechId::PublicScience);
                 // Ticket #84: the Upload stacks on Public Science.
                 r *= self.tech_multiplier(seat, TechId::TheUpload);

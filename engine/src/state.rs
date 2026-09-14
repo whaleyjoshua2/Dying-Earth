@@ -1769,7 +1769,16 @@ impl Game {
     pub fn population_factor(&self, s: StateId) -> f64 {
         // Ticket #143 (version 0.07.3): the unit is five million people, so 1,000 units is the five
         // billion that 50 hundred-million was.
-        1.0 + self.state(s).population / 1000.0
+        //
+        // Ticket #188 (version 0.08.0): the BONUS -- the part above 1 -- is scaled by the state's
+        // schooling, so a great many badly-schooled people are worth less to a Research Lab than a
+        // great many well-schooled ones. The base 1 stays, so no Region is ever worth less than one
+        // with nobody in it. Uncapped in both directions: capping it would make the rule a pure nerf
+        // and cancel the whole interaction with the School, which is what makes it matter.
+        //
+        // The Education Level therefore applies TWICE to a Lab -- here, and as the outright
+        // multiplier it has always been. That compounding is the point.
+        1.0 + (self.state(s).population / 1000.0) * self.education_level(s)
     }
 
     /// Ticket #97 (version 0.07.0): the Modules this Colony or Space Station may hold: the table's
