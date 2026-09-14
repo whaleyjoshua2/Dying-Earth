@@ -80,6 +80,14 @@ pub enum Order {
     /// Version 0.05 (ticket #51): the Archive, at a Colony off Earth. Version 0.05.5 (ticket #68):
     /// one Module, paid in Materials from the Stockpile; its Research is paid into the fund after.
     BuildArchive { colony: ColonyId },
+    /// Version 0.08.0 (ticket #192): **Upload**. Colonists at the Archive's own place are read into
+    /// it and leave the living population. An ORDER because it is irreversible -- those people leave
+    /// the board, and this game asks before anything irreversible -- and FREE, because the 80
+    /// Research and the Energy upkeep are already the monument's price. It needs the Archive
+    /// complete: the Research is the machine, and the upload is what the machine is for. It may be
+    /// done in batches, four at a time from a Core Module alone being enough, three times over, so
+    /// that no Habitat is on the Archivists' critical path.
+    Upload { colony: ColonyId, n: u32 },
     /// Version 0.05 (ticket #51), rebuilt for 0.07.0: the Archivists' standing declaration that
     /// their Labs' Research goes into the Archive fund instead of the shared Tech, where it counts
     /// nothing toward the Research Lead. Set once, it holds until it is set again, and it is read
@@ -454,6 +462,46 @@ impl Game {
                 }
                 if self.archive_ordered(seat) || pending.iter().any(|o| matches!(o, Order::BuildArchive { .. })) {
                     return fail("the Archive is already building");
+                }
+                // Ticket #192 (version 0.08.0): the gate. Checked ONCE, here, at the order; neither
+                // the three-turn build nor the standing Module cares afterwards. A build that could
+                // stall halfway would be a new state to hold in the save, draw on the card and say in
+                // the Report, for a case that fires rarely, and the Victory Condition does its own
+                // checking at the end.
+                let want = self.tables.archive.colonists_to_order;
+                if col.colonists < want {
+                    let place = self.place_name(Place::Colony(*colony));
+                    return fail(match col.colonists {
+                        0 => format!("the Archive wants {want} Colonists living at its Colony; nobody lives at {place}"),
+                        1 => format!("the Archive wants {want} Colonists living at its Colony; one lives at {place}"),
+                        n => format!("the Archive wants {want} Colonists living at its Colony; {n} live at {place}"),
+                    });
+                }
+                Ok(cost)
+            }
+            // Ticket #192 (version 0.08.0): Upload. The Archive may only draw from the population of
+            // the place it stands at, and only once it is complete.
+            Order::Upload { colony, n } => {
+                if self.kind(seat) != FactionKind::Archivists {
+                    return fail("only the Archivists upload into the Archive");
+                }
+                if self.archive_colony(seat) != Some(*colony) {
+                    return fail("the Archive does not stand here; it may only draw from the people where it is");
+                }
+                if !self.archive_complete(seat) {
+                    return fail("the Archive is not complete: its Research is the machine, and the upload is what the machine is for");
+                }
+                if *n == 0 {
+                    return fail("upload at least one Colonist");
+                }
+                let already: u32 = pending.iter().map(|o| if let Order::Upload { colony: c, n } = o { if c == colony { *n } else { 0 } } else { 0 }).sum();
+                let room = self.uploadable_at(*colony, already);
+                if *n > room {
+                    let place = self.place_name(Place::Colony(*colony));
+                    return fail(match room {
+                        0 => format!("nobody is left to upload at {place}"),
+                        r => format!("only {r} Colonists are left to upload at {place}"),
+                    });
                 }
                 Ok(cost)
             }
@@ -1333,6 +1381,25 @@ impl Game {
                     self.pending.cargo.push((seat, order.clone()));
                 }
                 Order::Load { .. } | Order::Unload { .. } => self.pending.cargo.push((seat, order.clone())),
+                // Ticket #192 (version 0.08.0): the upload lands now. The people leave the living
+                // population -- the place shrinks as it uploads, and Module slots go with them, though
+                // nothing already standing is destroyed: a cap that falls below what stands simply
+                // leaves no room.
+                Order::Upload { colony, n } => {
+                    let taken = self.colony(*colony).map(|c| c.colonists.min(*n)).unwrap_or(0);
+                    if taken > 0 {
+                        if let Some(c) = self.colony_mut(*colony) {
+                            c.colonists -= taken;
+                        }
+                        self.seat_mut(seat).uploaded += taken;
+                        let place = self.place_name(Place::Colony(*colony));
+                        let total = self.seat(seat).uploaded;
+                        let line = format!("{} uploaded {} Colonists into the Archive at {}; {} in all.", self.seat_name(seat), taken, place, total);
+                        self.log(line);
+                        let text = self.say("uploaded", &[("n", taken.to_string()), ("colony", place), ("total", total.to_string())]);
+                        self.report_line_of(seat, LineKind::Archive, LineKind::Archive, Some(ReportPlace::Colony(*colony)), text);
+                    }
+                }
                 Order::BuildStation { body, slot } => self.pending.stations.push((seat, *body, *slot)),
                 Order::BuildArchive { colony } => {
                     // Ticket #68: the Module rises in the Colony's queue like any other build, three
@@ -1604,6 +1671,7 @@ impl Game {
                 r("refuel", &[("unit", unit_of(UnitRef::Ship(*ship))), ("body", body.unwrap_or_else(|| "space".to_string()))])
             }
             Order::BuildArchive { colony } => r("build_archive", &[("colony", place(Place::Colony(*colony)))]),
+            Order::Upload { colony, n } => r("upload", &[("n", n.to_string()), ("colony", place(Place::Colony(*colony)))]),
             Order::SetArchiveFunding { on } => r(if *on { "fund_archive" } else { "unfund_archive" }, &[]),
             Order::SetMaxStanding { target } => match target {
                 Some(p) => r("max_on", &[("place", place(*p))]),

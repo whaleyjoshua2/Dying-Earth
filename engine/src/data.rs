@@ -442,7 +442,11 @@ impl VictoryFirstKind {
 pub enum VictorySecondKind {
     OffWorldPresence,
     ColoniesOnBodies,
-    ColonistsAtArchive,
+    /// Ticket #192 (version 0.08.0): Colonists UPLOADED into the Archive, replacing "Colonists living
+    /// at the Archive's Colony". The count is monotonic -- uploaded people cannot be lost to a raid,
+    /// a crowding death or a handover -- and it closes the odd case the old wording allowed, where a
+    /// Faction won by having twelve people standing NEXT TO a finished Archive rather than inside it.
+    ColonistsUploaded,
 }
 
 impl VictorySecondKind {
@@ -450,7 +454,7 @@ impl VictorySecondKind {
         match self {
             VictorySecondKind::OffWorldPresence => "Off-world Presence",
             VictorySecondKind::ColoniesOnBodies => "Bodies settled",
-            VictorySecondKind::ColonistsAtArchive => "Colonists at the Archive",
+            VictorySecondKind::ColonistsUploaded => "Colonists uploaded",
         }
     }
 }
@@ -458,7 +462,7 @@ impl VictorySecondKind {
 #[derive(Debug, Clone, Copy, Deserialize)]
 pub struct VictorySecondCard {
     pub kind: VictorySecondKind,
-    /// For off_world_presence and colonists_at_archive.
+    /// For off_world_presence and colonists_uploaded.
     #[serde(default)]
     pub bar: f64,
     /// For colonies_on_bodies: how many Bodies, and how many Colonists on each.
@@ -756,6 +760,8 @@ pub struct AiWeights {
     pub fund_archive: f64,
     /// Ticket #51: build the Archive. Ticket #68: one Module, from its own button.
     pub build_archive: f64,
+    /// Ticket #192 (version 0.08.0): read Colonists at the Archive's place into it.
+    pub upload: f64,
     /// Ticket #52: pay Relief on a state the seat directs.
     pub relief: f64,
     /// Ticket #52: raise a Constabulary in a restive state.
@@ -939,6 +945,8 @@ pub struct SlotsCard {
 pub struct ArchiveCard {
     pub research: i64,
     pub banked_before_built: f64,
+    /// Ticket #192 (version 0.08.0): Colonists who must live at the place before it may be ORDERED.
+    pub colonists_to_order: u32,
 }
 
 /// Ticket #80 (version 0.06.0): the Observatory's one figure beyond its row: the share of its
@@ -1265,7 +1273,7 @@ impl Tables {
             }
             // Ticket #51: whichever second part a card names, its own figures must be positive.
             let second_ok = match f.victory_second.kind {
-                VictorySecondKind::OffWorldPresence | VictorySecondKind::ColonistsAtArchive => f.victory_second.bar > 0.0,
+                VictorySecondKind::OffWorldPresence | VictorySecondKind::ColonistsUploaded => f.victory_second.bar > 0.0,
                 VictorySecondKind::ColoniesOnBodies => f.victory_second.bodies > 0 && f.victory_second.colonists_each > 0,
             };
             if !second_ok {

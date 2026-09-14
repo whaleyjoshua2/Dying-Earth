@@ -122,6 +122,20 @@ per_colonist = 1
 [archive]
 research = 80
 banked_before_built = 0.25
+# Ticket #192 (version 0.08.0): how many Colonists must live at the place before the Archive may be
+# ORDERED. Checked once, at the order; neither the three-turn build nor the standing Module cares
+# afterwards, and the Victory Condition does its own checking at the end.
+#
+# Four rather than the twelve this was charted as, and the measurement is why. The Archive is ordered
+# on turn 1, at a station with nobody on it, in 80 of 80 games -- always Axiom over Earth, which is
+# founded bare. A bare station has zero Module slots (one per Colonist) and the Archive is exempt from
+# that cap, so on turn 1 the Archive is literally the only thing the Archivists can build there. The
+# first four people arrive at a median turn 11, which is the Core Module's four; the Habitat that
+# lifts the ceiling past four lands at a median turn 17 and NEVER AT ALL in 24 of 80 games. Under a
+# twelve gate the Archive was orderable in 29 games of 80, at a median turn 17, and only 17 of those
+# had the three turns the Module needs left. The Archivists direct exactly one off-Earth place in
+# every game, so the gate could not be routed around. Four is reachable; twelve was near-total.
+colonists_to_order = 4
 
 # Ticket #80 (version 0.06.0): the Observatory, the one Module that makes Research, on a Colony, a
 # Space Station or in Antarctica. It takes no Body yield and no output multiplier: `amount`

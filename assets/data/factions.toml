@@ -122,7 +122,8 @@ signature = "Provisional Findings: while their Research went to the shared Tech 
 # which the fund holds only a quarter of until the Archive Module stands at a Colony off Earth.
 victory = "Build the Archive at a Colony off Earth (50 Materials, three turns), pay 80 Research into it and keep it running, with 12 Colonists living at its Colony to be uploaded."
 victory_first = { kind = "archive_research", bar = 80 }
-victory_second = { kind = "colonists_at_archive", bar = 12 }
+# Ticket #192 (version 0.08.0): twelve Colonists UPLOADED, not twelve living beside the Archive.
+victory_second = { kind = "colonists_uploaded", bar = 12 }
 colour = [0.871, 0.322, 0.439]
 
 # Ticket #54 (version 0.05): the [restoration] table is retired with the order; the Custodians'

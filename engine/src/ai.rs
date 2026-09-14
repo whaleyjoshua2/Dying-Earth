@@ -28,6 +28,8 @@ enum Cat {
     FundArchive,
     /// Ticket #51: build the Archive; one Module since ticket #68.
     BuildArchive,
+    /// Ticket #192 (version 0.08.0): read Colonists at the Archive's place into it.
+    Upload,
     Influence,
     Transit,
     LoadUnload,
@@ -111,6 +113,7 @@ impl Game {
             Cat::Resettle => w.resettle,
             Cat::FundArchive => w.fund_archive,
             Cat::BuildArchive => w.build_archive,
+            Cat::Upload => w.upload,
             Cat::Influence => w.influence,
             Cat::Transit => w.transit,
             Cat::LoadUnload => w.load_unload,
@@ -539,7 +542,7 @@ impl Game {
                 // neither (its station starts bare) spent every turn on Influence and never left
                 // Earth in twenty seeds of thirty-six turns.
                 VictoryFirstKind::ArchiveResearch => {
-                    matches!(cat, Cat::BuildArchive | Cat::FundArchive | Cat::ResearchLab | Cat::Observatory | Cat::ColonyShip | Cat::FoundColony | Cat::Transit | Cat::LoadUnload | Cat::LaunchSiteOrShipyard | Cat::Habitat)
+                    matches!(cat, Cat::BuildArchive | Cat::Upload | Cat::FundArchive | Cat::ResearchLab | Cat::Observatory | Cat::ColonyShip | Cat::FoundColony | Cat::Transit | Cat::LoadUnload | Cat::LaunchSiteOrShipyard | Cat::Habitat)
                 }
             }
         };
@@ -1048,9 +1051,45 @@ impl Game {
                 push(vec![Order::SetArchiveFunding { on: true }], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, opp, format!("pay the Labs into the Archive fund from the next Income, {} Research a turn", self.seat(seat).research_last_turn), None);
             }
             if !self.archive_built(seat) && !self.archive_ordered(seat) {
-                let home = self.colonies.iter().filter(|c| c.control.director() == Some(seat) && self.may_hold_archive(c)).min_by_key(|c| (c.founded_turn, c.id.0)).map(|c| c.id);
+                // Ticket #192 (version 0.08.0): the gate. The computer ordered the Archive on turn 1
+                // of every one of 80 measured games, at a station with nobody on it; without this it
+                // would simply spend that turn on a refused order, every turn, until somebody moved
+                // in. The first place with enough people, oldest first as before.
+                let want = self.tables.archive.colonists_to_order;
+                let home = self
+                    .colonies
+                    .iter()
+                    .filter(|c| c.control.director() == Some(seat) && self.may_hold_archive(c) && c.colonists >= want)
+                    .min_by_key(|c| (c.founded_turn, c.id.0))
+                    .map(|c| c.id);
                 if let Some(cid) = home {
                     push(vec![Order::BuildArchive { colony: cid }], Cat::BuildArchive, self.base_weight(seat, Cat::BuildArchive), gap_for(Cat::BuildArchive, None), 1.0, m.opportunity, format!("build the Archive at {}", self.place_name(Place::Colony(cid))), None);
+                }
+            }
+            // Ticket #192: and the Upload, which is the second half of their Victory Condition. The
+            // rule is the simple one: whenever the Archive is complete and anybody is living at its
+            // place, read them in. There is no reason to hold people back -- an uploaded Colonist
+            // cannot be lost to a raid, a crowding death or a handover, and nothing else at that
+            // place needs them. Without this the Archivists win nothing at all.
+            if self.archive_complete(seat)
+                && let Some(cid) = self.archive_colony(seat)
+            {
+                let here = self.colony(cid).map(|c| c.colonists).unwrap_or(0);
+                let bar = self.tables.faction(kind).victory_second.bar as u32;
+                let still_wanted = bar.saturating_sub(self.seat(seat).uploaded);
+                let n = here.min(still_wanted);
+                if n > 0 {
+                    let opp = if self.seat(seat).uploaded + n >= bar { m.opportunity } else { 1.0 };
+                    push(
+                        vec![Order::Upload { colony: cid, n }],
+                        Cat::Upload,
+                        self.base_weight(seat, Cat::Upload),
+                        gap_for(Cat::Upload, None),
+                        1.0,
+                        opp,
+                        format!("upload {} Colonists into the Archive at {}", n, self.place_name(Place::Colony(cid))),
+                        None,
+                    );
                 }
             }
         }

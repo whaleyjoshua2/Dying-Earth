@@ -2975,6 +2975,8 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::Change { building, what } => format!("{} the {} at {}", what.name(), building_name(game, *building), game.place_name(building.place())),
         Order::Leapfrog { state } => format!("Leapfrog {}: its people emit {:.2} less per hundred million", game.tables.state(*state).name, game.tables.climate.population_emissions_per_level * Game::UNITS_PER_HUNDRED_MILLION),
         Order::StripPermit { state } => format!("Strip Permit in {}: three turns of double output", game.tables.state(*state).name),
+        // Ticket #192 (version 0.08.0): the Upload.
+        Order::Upload { colony, n } => format!("Upload {} Colonists into the Archive at {}", n, game.place_name(Place::Colony(*colony))),
     }
 }
 

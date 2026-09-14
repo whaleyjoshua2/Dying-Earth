@@ -34,6 +34,7 @@ build_constabulary = 5
 resettle = 2
 fund_archive = 0
 build_archive = 0
+upload = 0
 build_producer = 5
 raise_industry = 5
 build_research_lab = 8
@@ -72,6 +73,7 @@ build_constabulary = 6
 resettle = 2
 fund_archive = 0
 build_archive = 0
+upload = 0
 build_producer = 6
 raise_industry = 3
 build_research_lab = 8
@@ -107,6 +109,7 @@ build_constabulary = 4
 resettle = 2
 fund_archive = 0
 build_archive = 0
+upload = 0
 build_producer = 6
 raise_industry = 3
 build_research_lab = 6
@@ -141,6 +144,10 @@ build_constabulary = 5
 resettle = 2
 fund_archive = 8
 build_archive = 9
+# Ticket #192 (version 0.08.0): the Upload is the Archivists' second Victory part now, not a
+# side errand, so it outranks raising the Module itself: there is no reason ever to hold people
+# back from a complete Archive, and a seat that does not upload wins nothing at all.
+upload = 10
 build_producer = 6
 raise_industry = 3
 build_research_lab = 9

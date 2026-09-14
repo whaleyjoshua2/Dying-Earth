@@ -1854,10 +1854,15 @@ fn a_colony_ship(g: &mut Game, seat: Seat, body: BodyId) -> ShipId {
 
 /// A Colony off Earth holding the seat's Archive Module with `paid` Research in the fund, and
 /// Habitats and Colonists. Ticket #68 (version 0.05.5): one Module, no stages.
+/// Ticket #192 (version 0.08.0): `colonists` is now what has been UPLOADED as well as who lives
+/// there, because the Archivists' second Victory part counts the uploaded rather than whoever
+/// happens to be standing beside the Module. Every caller of this helper means "the second part
+/// stands at N", and a test that wants the two apart sets `uploaded` itself.
 fn archive_at(g: &mut Game, seat: Seat, body: BodyId, paid: i64, colonists: u32) -> ColonyId {
     let cid = colony(g, seat, body, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], colonists);
     g.colony_mut(cid).unwrap().modules.push(Module::new(ModuleKind::Archive));
     g.seats[seat.index()].archive_fund = paid;
+    g.seats[seat.index()].uploaded = colonists;
     cid
 }
 
@@ -2049,6 +2054,14 @@ fn the_archive_is_one_module_of_fifty_materials_and_three_turns_built_once_off_e
     let ant = colony(&mut g, Seat(3), BodyId::Earth, &[ModuleKind::Habitat], 4);
     assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: ant }).unwrap_err().0.contains("off Earth"));
     let axiom = station_of(&g, Seat(3), BodyId::Earth).unwrap();
+    // Ticket #192 (version 0.08.0): four must live at the place before it may be ORDERED, and Axiom
+    // is founded bare -- which is the whole of the measured problem this gate had to be small for.
+    assert_eq!(
+        g.check_order(Seat(3), &[], &Order::BuildArchive { colony: axiom }).unwrap_err().0,
+        "the Archive wants 4 Colonists living at its Colony; nobody lives at Axiom over Earth"
+    );
+    g.colony_mut(axiom).unwrap().modules.push(Module::new(ModuleKind::Core));
+    g.settle_people(axiom, 4, 1.0);
     assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: axiom }).is_ok(), "a station over Earth is off Earth since ticket #81");
     // Nobody else builds one, and the ordinary Module button never places it.
     let mine = colony(&mut g, Seat(0), BodyId::Mars, &[], 0);
@@ -2137,7 +2150,7 @@ fn a_complete_archive_goes_offline_when_energy_runs_short_and_wins_nothing_that_
     assert!(!g.archive_online(Seat(3)));
     let p = g.progress(Seat(3));
     assert_eq!(p.first_value, 80.0, "every point of Research is paid");
-    assert_eq!(p.second_value, 12.0, "and the Colonists are there");
+    assert_eq!(p.second_value, 12.0, "and the Colonists are uploaded");
     assert!(p.first_held_back.is_some() && !p.met(), "but it is not running");
     g.end_phase();
     assert!(g.outcome.is_none(), "no win with the Archive dark: {:?}", g.outcome);
@@ -2166,7 +2179,7 @@ fn the_archive_is_destroyed_when_its_colony_changes_hands_and_the_fund_is_kept()
 }
 
 #[test]
-fn the_archivists_win_with_the_archive_running_and_twelve_colonists_at_its_colony() {
+fn the_archivists_win_with_the_archive_running_and_twelve_colonists_uploaded() {
     let mut g = game();
     let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 80, 12);
     let _ = cid;
@@ -2224,11 +2237,18 @@ fn the_archivist_ai_builds_its_way_off_earth_and_then_the_archive() {
     let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
     g.seats[arc.index()].stockpile.materials = 200;
     g.seats[arc.index()].stockpile.energy = 200;
+    // Ticket #192 (version 0.08.0): the station is bare, so the Archive is not orderable there, and
+    // the computer must not spend the turn on an order that would be refused. Measured, it ordered
+    // the Archive on turn 1 at an empty station in 80 of 80 games before this gate.
+    let axiom = station_of(&g, arc, BodyId::Earth).unwrap();
+    assert_eq!(g.colony(axiom).unwrap().colonists, 0, "the premise: Axiom is founded bare");
     let orders = g.ai_orders(arc);
-    // Ticket #164 (version 0.07.5): a station is founded with a Core Module holding four, so it is
-    // somewhere people can live from the day it stands. Raising the Archive there is itself a step
-    // off Earth, where under #51 the seat could only sit on Earth; the guard is that it takes one
-    // of the three steps that lead off Earth rather than none.
+    assert!(!orders.iter().any(|o| matches!(o, Order::BuildArchive { .. })), "it should not order what would be refused: {orders:?}");
+
+    // With the Core Module's four living there, it orders the Module at once.
+    g.colony_mut(axiom).unwrap().modules.push(Module::new(ModuleKind::Core));
+    g.settle_people(axiom, 4, 1.0);
+    let orders = g.ai_orders(arc);
     assert!(
         orders.iter().any(|o| matches!(
             o,
@@ -2241,14 +2261,18 @@ fn the_archivist_ai_builds_its_way_off_earth_and_then_the_archive() {
     g.seats[arc.index()].stockpile.materials = 200;
     g.seats[arc.index()].stockpile.energy = 200;
     let mars = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Mine, ModuleKind::Generator], 4);
-    let orders = g.ai_orders(arc);
-    // Ticket #81 (version 0.06.0): a station over Earth is off Earth, so the first Colony off Earth
-    // the AI holds is Axiom, its start station, and it raises the Archive there rather than on Mars.
     let axiom = station_of(&g, arc, BodyId::Earth).unwrap();
-    assert!(
-        orders.iter().any(|o| matches!(o, Order::BuildArchive { colony } if *colony == axiom || *colony == mars)),
-        "no Archive order at a Colony off Earth: {orders:?}"
-    );
+    // Ticket #192 (version 0.08.0): the Archive goes to the oldest place that can take it, and since
+    // this ticket "can take it" means four people live there. Axiom is bare here, so Mars wins --
+    // which is the gate doing its job rather than a change of preference.
+    let orders = g.ai_orders(arc);
+    assert!(orders.iter().any(|o| matches!(o, Order::BuildArchive { colony } if *colony == mars)), "no Archive order at the one place that can take it: {orders:?}");
+
+    // People Axiom, and it takes the older place back, per ticket #81: a station over Earth is off
+    // Earth, and Axiom is the first Colony off Earth the seat holds.
+    g.colony_mut(axiom).unwrap().modules.push(Module::new(ModuleKind::Core));
+    g.settle_people(axiom, 4, 1.0);
+    let orders = g.ai_orders(arc);
     assert!(orders.iter().any(|o| matches!(o, Order::BuildArchive { colony } if *colony == axiom)), "since ticket #81 the AI raises it on Axiom first: {orders:?}");
 }
 
@@ -6829,7 +6853,15 @@ fn a_tech_pick_can_be_changed_until_the_turn_ends() {
     g.end_turn(orders).expect("the turn ends");
     assert!(g.research.pick_committed, "the turn ending locks it in");
     assert_eq!(g.research.unallocated[2], 0, "the bank is spent now");
-    assert!(g.research.contributions[2] >= 6, "and it is still seat 2's");
+    // Version 0.08.0: the world makes enough Research on turn 1 that this pick can now COMPLETE in
+    // the same breath, and a completed Tech clears the contributions. Either way the bank left seat
+    // 2's hands under seat 2's name, which is what this test is about; the assertion says both.
+    assert!(
+        g.research.contributions[2] >= 6 || g.research.done.contains(&TechId::CleanPropellant),
+        "the bank was neither credited to seat 2 nor spent finishing the Tech: contributions {:?}, done {:?}",
+        g.research.contributions,
+        g.research.done
+    );
 
     // And a committed Tech is settled: it cannot be swapped for another.
     assert!(g.pick_tech(Seat(0), TechId::DeepMining).is_err(), "a committed pick is final");
@@ -8081,4 +8113,150 @@ fn relations_do_nothing_mechanical_in_this_version() {
             .collect()
     };
     assert_eq!(picture(&a), picture(&b), "six turns of the worst possible blood changed nothing about the board");
+}
+
+// ------------------------------------------- 0.08.0 ticket #192: the Archive's gate and the Upload
+
+/// Ticket #192: ordering the Archive wants four Colonists living at the place, checked ONCE at the
+/// order. Neither the three-turn build nor the standing Module cares afterwards: a build that could
+/// stall halfway would be a new state to hold in the save, draw on the card and say in the Report,
+/// for a case that fires rarely, and the Victory Condition does its own checking at the end.
+#[test]
+fn ordering_the_archive_wants_four_colonists_at_the_place_and_only_at_the_order() {
+    let mut g = game();
+    let arc = seat_of(&g, FactionKind::Archivists);
+    g.seats[arc.index()].stockpile.materials = 200;
+    let cid = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Habitat], 0);
+    let order = Order::BuildArchive { colony: cid };
+
+    assert_eq!(g.tables.archive.colonists_to_order, 4, "the card figure");
+    for (living, expected) in [
+        (0, "the Archive wants 4 Colonists living at its Colony; nobody lives at"),
+        (1, "the Archive wants 4 Colonists living at its Colony; one lives at"),
+        (3, "the Archive wants 4 Colonists living at its Colony; 3 live at"),
+    ] {
+        g.colony_mut(cid).unwrap().colonists = living;
+        let err = g.check_order(arc, &[], &order).unwrap_err().0;
+        assert!(err.starts_with(expected), "at {living}: {err}");
+    }
+    g.colony_mut(cid).unwrap().colonists = 4;
+    assert!(g.check_order(arc, &[], &order).is_ok(), "four is enough");
+
+    // Once ordered, the place may empty and the build RUNS TO COMPLETION regardless. A build that
+    // could stall halfway would be a new state to hold in the save, draw on the card and say in the
+    // Report, and the Victory Condition does its own checking at the end anyway.
+    g.commit_orders(arc, std::slice::from_ref(&order));
+    assert!(g.archive_ordered(arc));
+    g.colony_mut(cid).unwrap().colonists = 0;
+    for _ in 0..g.tables.module(ModuleKind::Archive).build_turns {
+        g.turn += 1;
+        g.resolution_phase();
+    }
+    assert!(g.archive_built(arc), "the Module stands though nobody lives there now");
+}
+
+/// Ticket #192: Upload. An ORDER, because it is irreversible and this game asks before anything
+/// irreversible, and FREE, because the 80 Research and the Energy upkeep are already the monument's
+/// price. It needs the Archive complete, it may only draw from the population of the place the
+/// Archive stands at, and an uploaded Colonist leaves the living population.
+#[test]
+fn uploading_reads_colonists_into_the_archive_and_they_leave_the_living() {
+    let mut g = game();
+    let arc = seat_of(&g, FactionKind::Archivists);
+    let cus = seat_of(&g, FactionKind::Custodians);
+    let cid = archive_at(&mut g, arc, BodyId::Mars, 0, 8);
+    g.seats[arc.index()].uploaded = 0;
+    let upload = |n| Order::Upload { colony: cid, n };
+
+    // The Research is the machine, and the upload is what the machine is for.
+    assert_eq!(
+        g.check_order(arc, &[], &upload(4)).unwrap_err().0,
+        "the Archive is not complete: its Research is the machine, and the upload is what the machine is for"
+    );
+    g.seats[arc.index()].archive_fund = g.tables.archive.research;
+    assert!(g.archive_complete(arc));
+    assert_eq!(g.order_cost(arc, &upload(4)), Cost::default(), "free");
+
+    // Only the Archivists, and only where the Archive stands.
+    assert_eq!(g.check_order(cus, &[], &upload(4)).unwrap_err().0, "only the Archivists upload into the Archive");
+    let elsewhere = colony(&mut g, arc, BodyId::Moon, &[ModuleKind::Habitat], 8);
+    assert_eq!(
+        g.check_order(arc, &[], &Order::Upload { colony: elsewhere, n: 4 }).unwrap_err().0,
+        "the Archive does not stand here; it may only draw from the people where it is"
+    );
+
+    // In batches, and never more than live there.
+    assert!(g.check_order(arc, &[], &upload(9)).unwrap_err().0.starts_with("only 8 Colonists are left to upload"));
+    assert!(g.check_order(arc, &[upload(5)], &upload(4)).unwrap_err().0.starts_with("only 3 Colonists are left to upload"), "a pending order takes its people first");
+
+    g.commit_orders(arc, &[upload(4)]);
+    assert_eq!(g.seats[arc.index()].uploaded, 4, "four read in");
+    assert_eq!(g.colony(cid).unwrap().colonists, 4, "and four fewer living");
+    g.commit_orders(arc, &[upload(4)]);
+    assert_eq!(g.seats[arc.index()].uploaded, 8);
+    assert_eq!(g.colony(cid).unwrap().colonists, 0, "the place shrinks as it uploads");
+    assert_eq!(g.check_order(arc, &[], &upload(1)).unwrap_err().0.split(" at ").next().unwrap(), "nobody is left to upload");
+}
+
+/// Ticket #192: the second Victory part counts the UPLOADED and not the living. The count is
+/// monotonic -- uploaded people cannot be lost to a raid, a crowding death or a handover -- and it
+/// closes the odd case the old wording allowed, where a Faction won by having twelve people standing
+/// NEXT TO a finished Archive rather than inside it.
+#[test]
+fn the_archivists_second_part_counts_the_uploaded_not_the_living() {
+    let mut g = game();
+    let arc = seat_of(&g, FactionKind::Archivists);
+    let cid = archive_at(&mut g, arc, BodyId::Mars, 80, 12);
+    // Twelve standing beside a finished Archive, and nobody read in: no win.
+    g.seats[arc.index()].uploaded = 0;
+    open_gates(&mut g);
+    g.seats[arc.index()].stockpile.energy = 200;
+    g.income_phase();
+    assert!(g.archive_online(arc), "the premise: the Archive is running");
+    let p = g.progress(arc);
+    assert_eq!((p.first_value, p.second_value), (80.0, 0.0), "standing next to it is worth nothing now");
+    assert!(!p.met());
+
+    // Read them in, and the same twelve win it -- while the Colony itself stands empty.
+    g.commit_orders(arc, &[Order::Upload { colony: cid, n: 12 }]);
+    assert_eq!(g.colony(cid).unwrap().colonists, 0);
+    let p = g.progress(arc);
+    assert_eq!((p.second_value, p.second_bar), (12.0, 12.0));
+    assert!(p.met());
+
+    // And it cannot be taken back: losing the Colony outright leaves the count where it was.
+    g.colonies.retain(|c| c.id != cid);
+    assert_eq!(g.progress(arc).second_value, 12.0, "the uploaded are beyond reach");
+}
+
+/// Ticket #192: the computer must be taught both halves or the Archivists win nothing at all. It
+/// uploads whenever the Archive is complete and anybody lives at its place, and it asks for no more
+/// than the bar still wants.
+#[test]
+fn the_archivist_ai_uploads_whenever_the_archive_is_complete_and_anybody_lives_there() {
+    let mut g = game();
+    let arc = seat_of(&g, FactionKind::Archivists);
+    g.seats[arc.index()].stockpile.materials = 200;
+    g.seats[arc.index()].stockpile.energy = 200;
+    let cid = archive_at(&mut g, arc, BodyId::Mars, 0, 6);
+    g.seats[arc.index()].uploaded = 0;
+
+    // Not while the Research is unpaid.
+    assert!(!g.ai_orders(arc).iter().any(|o| matches!(o, Order::Upload { .. })), "the Archive is not complete yet");
+
+    g.seats[arc.index()].archive_fund = g.tables.archive.research;
+    let orders = g.ai_orders(arc);
+    match orders.iter().find_map(|o| if let Order::Upload { colony, n } = o { Some((*colony, *n)) } else { None }) {
+        Some((c, n)) => {
+            assert_eq!(c, cid, "at the Archive's own place");
+            assert_eq!(n, 6, "everyone living there");
+        }
+        None => panic!("the Archivist AI never uploads: {orders:?}"),
+    }
+
+    // And it asks for no more than the bar still wants.
+    g.seats[arc.index()].uploaded = 10;
+    let orders = g.ai_orders(arc);
+    let n = orders.iter().find_map(|o| if let Order::Upload { n, .. } = o { Some(*n) } else { None }).expect("an upload order");
+    assert_eq!(n, 2, "two short of twelve, so two");
 }

@@ -652,6 +652,12 @@ pub struct SeatState {
     /// Earth this turn, waiting to be paid into NEXT turn's Allotment. Read and cleared at Income.
     #[serde(default)]
     pub spaceport_influence: i64,
+    /// Ticket #192 (version 0.08.0): Colonists uploaded into the Archive, all told. The Archivists'
+    /// second Victory part counts this rather than who happens to be living beside the Module, and
+    /// it only ever climbs: an uploaded Colonist cannot be lost to a raid, a crowding death or a
+    /// handover.
+    #[serde(default)]
+    pub uploaded: u32,
     pub stabilization_run: u32,
     pub influence: BTreeMap<Target, i64>,
     /// Targets that received Influence this turn (spent or gained by Occupation), so they do not decay.
@@ -852,6 +858,7 @@ impl Game {
             venture_share: 0.0,
             venture_banked_last_turn: 0,
             spaceport_influence: 0,
+            uploaded: 0,
             stabilization_run: 0,
             influence: BTreeMap::new(),
             influenced_this_turn: Vec::new(),
@@ -1237,6 +1244,13 @@ impl Game {
     /// Colonists living at the Colony that holds this seat's Archive.
     pub fn colonists_at_archive(&self, seat: Seat) -> u32 {
         self.archive_colony(seat).and_then(|c| self.colony(c)).map(|c| c.colonists).unwrap_or(0)
+    }
+
+    /// Ticket #192 (version 0.08.0): how many Colonists this seat may still upload at `colony` this
+    /// turn -- everyone living there, less whatever is already ordered. The Archive may only draw
+    /// from the population of the place it stands at.
+    pub fn uploadable_at(&self, colony: ColonyId, already: u32) -> u32 {
+        self.colony(colony).map(|c| c.colonists).unwrap_or(0).saturating_sub(already)
     }
 
     /// A Colony off Earth may hold the Archive; Antarctica may not. Ticket #81: a station over
