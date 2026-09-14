@@ -304,6 +304,13 @@ fn influence_threshold_takes_control_and_decay_takes_two_from_untouched_targets(
     let mut g = game();
     // Ticket #53: North Africa is Size 2, so 20 + 10 * 2 = 40.
     assert_eq!(g.influence_threshold(Place::State(StateId::NorthAfrica)), 40);
+    // Ticket #187 (version 0.08.0): this test is about the threshold and the decay, not about
+    // schooling, so the state is set to Resistance's pivot where an outsider's Influence converts
+    // one for one. At its own card of 0.85 it converts 39 into 41 and the place changes hands.
+    let pivot = g.tables.influence.resistance.pivot;
+    for s in [StateId::NorthAfrica, StateId::Europe] {
+        g.state_mut(s).schooling = pivot - g.tables.state(s).education_level;
+    }
     g.seats[0].allotment = 100;
     g.pending.influence.push((Seat(0), Place::State(StateId::NorthAfrica), 39));
     g.pending.influence.push((Seat(0), Place::State(StateId::Europe), 10));
@@ -2956,6 +2963,10 @@ fn e_a_transfer_uses_the_challengers_own_threshold() {
     }
     g.seats[1].blame_emitted = 100.0;
     let target = Place::State(StateId::NorthAfrica);
+    // Ticket #187 (version 0.08.0): the pivot, so Resistance converts one for one and this test
+    // measures only whose threshold applies.
+    let pivot = g.tables.influence.resistance.pivot;
+    g.state_mut(StateId::NorthAfrica).schooling = pivot - g.tables.state(StateId::NorthAfrica).education_level;
     assert_eq!(g.influence_threshold(target), 40);
     assert_eq!(g.influence_threshold_for(Seat(1), target), 60);
     // 45 clears the plain threshold of 40 and not the Prospectors' own 60.
@@ -7458,4 +7469,73 @@ fn an_observatory_reads_its_colonys_education_level() {
     let rich = h.module_yield_at(Seat(0), id2, idx).research;
 
     assert!(rich > poor, "a well-schooled Colony's Observatory should out-produce a poorly-schooled one: {poor} then {rich}");
+}
+
+// ------------------------------------------------------- 0.08.0 ticket #187: Resistance
+
+/// Ticket #187: a place's schooling bends what an outsider's Influence buys there. The pivot has no
+/// effect; the worst-schooled Region on the board gives back MORE than was spent, the ceiling gives
+/// back less, and each side reaches its own end of the band.
+#[test]
+fn resistance_runs_from_the_boards_worst_schooling_to_the_schools_ceiling() {
+    let g = game();
+    let r = &g.tables.influence.resistance;
+    let sid = g.directed_states(Seat(0))[0];
+    let place = Place::State(sid);
+
+    // The anchors, read off a Region whose figure is moved to each in turn.
+    let mut h = game();
+    let at = |h: &mut Game, e: f64| {
+        let card = h.tables.state(sid).education_level;
+        h.state_mut(sid).schooling = e - card;
+        h.resistance(place)
+    };
+    assert!((at(&mut h, r.pivot) - 1.0).abs() < 1e-9, "the pivot has no effect");
+    assert!((at(&mut h, r.low) - (1.0 - r.band)).abs() < 1e-9, "the lowest card reaches 1 - band");
+    assert!((at(&mut h, r.high) - (1.0 + r.band)).abs() < 1e-9, "the ceiling reaches 1 + band");
+    // And it is monotonic between them, not a step.
+    let mid_low = at(&mut h, (r.low + r.pivot) / 2.0);
+    assert!(mid_low > 1.0 - r.band && mid_low < 1.0, "halfway down sits inside the band, not at an end: {mid_low}");
+}
+
+/// Ticket #187: the designer's worked example -- 30 Influence spent on a Region schooled to the
+/// ceiling moves the needle by 27 -- and the other end, where a badly-schooled place gives back more.
+#[test]
+fn thirty_influence_buys_twenty_seven_standing_at_the_ceiling() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    let place = Place::State(sid);
+    let card = g.tables.state(sid).education_level;
+
+    g.state_mut(sid).schooling = g.tables.influence.resistance.high - card;
+    assert_eq!(g.standing_from(place, 30), 27, "30 spent at the ceiling should become 27");
+
+    g.state_mut(sid).schooling = g.tables.influence.resistance.low - card;
+    assert_eq!(g.standing_from(place, 30), 33, "30 spent at the worst schooling should become 33");
+}
+
+/// Ticket #187: it bites an OUTSIDER and never the controller, through the Resolution rather than
+/// through the helper by hand. Reinforcing a place you hold is never taxed.
+#[test]
+fn resistance_bites_an_outsider_and_never_the_controller() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    let place = Place::State(sid);
+    let card = g.tables.state(sid).education_level;
+    g.state_mut(sid).schooling = g.tables.influence.resistance.high - card;
+    assert_eq!(g.place_control(place).controller(), Some(Seat(0)), "the premise: seat 0 holds it");
+
+    // Seat 1 is an outsider here, and pays the tax.
+    g.seats[1].allotment = 100;
+    g.commit_orders(Seat(1), &[Order::Influence { target: place, amount: 30 }]);
+    g.resolution_phase();
+    assert_eq!(g.seat(Seat(1)).influence.get(&place).copied().unwrap_or(0), 27, "an outsider's 30 becomes 27");
+
+    // Seat 0 holds it, and converts in full.
+    let before = g.seat(Seat(0)).influence.get(&place).copied().unwrap_or(0);
+    g.seats[0].allotment = 100;
+    g.commit_orders(Seat(0), &[Order::Influence { target: place, amount: 30 }]);
+    g.resolution_phase();
+    let after = g.seat(Seat(0)).influence.get(&place).copied().unwrap_or(0);
+    assert_eq!(after - before, 30, "the controller's own 30 is worth 30");
 }

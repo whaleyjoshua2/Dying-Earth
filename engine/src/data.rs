@@ -147,6 +147,16 @@ pub struct ScrubberCard {
     pub max: u32,
 }
 
+/// Ticket #187 (version 0.08.0): the band a place's Education Level bends its Resistance through,
+/// and the two anchors it is measured between (`influence.toml`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct ResistanceCard {
+    pub band: f64,
+    pub pivot: f64,
+    pub low: f64,
+    pub high: f64,
+}
+
 /// Ticket #185 (version 0.08.0): what a School does to its state's Education Level, a step a turn
 /// to a ceiling (`facilities.toml`). No maximum Education Level was ever declared -- the card
 /// figures simply run 0.70 to 1.50 -- so the ceiling is this table's, and the step is the smallest
@@ -573,6 +583,9 @@ pub struct InfluenceTable {
     pub station_threshold_base: i64,
     pub occupation_turns: u32,
     pub destruction_chance: f64,
+    /// Ticket #187 (version 0.08.0): how far a place's schooling bends what an outsider's Influence
+    /// buys there. See `influence.toml`.
+    pub resistance: ResistanceCard,
     /// Ticket #53: what a Faction's share of the table's Blame does to its Influence thresholds.
     pub blame: BlameTable,
 }

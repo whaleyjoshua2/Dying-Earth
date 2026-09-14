@@ -1390,6 +1390,45 @@ impl Game {
         taught
     }
 
+    /// Ticket #187 (version 0.08.0): a place's Education Level -- a Region's card plus its Schools,
+    /// a Colony's settlers plus its Institute.
+    pub fn place_education(&self, place: Place) -> f64 {
+        match place {
+            Place::State(s) => self.education_level(s),
+            Place::Colony(c) => self.colony(c).map(|x| x.education).unwrap_or(1.0),
+        }
+    }
+
+    /// Ticket #187: how hard a place is to sway, from how well it is schooled. 1.0 at the pivot and
+    /// no effect; down to `1 - band` at the lowest figure any card carries, up to `1 + band` at the
+    /// School's ceiling. Each side scales to its OWN end, because the range is asymmetric -- 0.30
+    /// below the pivot and 1.00 above -- and one coefficient would leave the floor unreachable.
+    pub fn resistance(&self, place: Place) -> f64 {
+        let r = &self.tables.influence.resistance;
+        let e = self.place_education(place);
+        if (e - r.pivot).abs() < 1e-9 {
+            1.0
+        } else if e < r.pivot {
+            let span = (r.pivot - r.low).max(1e-9);
+            1.0 - r.band * ((r.pivot - e) / span).clamp(0.0, 1.0)
+        } else {
+            let span = (r.high - r.pivot).max(1e-9);
+            1.0 + r.band * ((e - r.pivot) / span).clamp(0.0, 1.0)
+        }
+    }
+
+    /// Ticket #187: what `spent` Influence actually becomes at `place`, for a Faction that does not
+    /// control it: `spent / resistance`, rounded down. A well-schooled place gives less back than
+    /// was put in and a badly-schooled one gives more. The CONTROLLER converts in full and never
+    /// calls this, so reinforcing a place you hold is never taxed.
+    pub fn standing_from(&self, place: Place, spent: i64) -> i64 {
+        let r = self.resistance(place);
+        if r <= 0.0 {
+            return spent;
+        }
+        (spent as f64 / r).floor() as i64
+    }
+
     /// Ticket #185 (version 0.08.0): a Nation State's Education Level as it stands -- the figure on
     /// its card plus whatever a School has added. It was the card figure alone until now, and
     /// nothing in the game moved it.

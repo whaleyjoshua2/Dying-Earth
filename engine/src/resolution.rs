@@ -595,7 +595,9 @@ impl Game {
     }
 
     fn occupation_gain(&mut self, place: Place, seat: Seat) {
-        let gain = self.pacification_gain(place);
+        // Ticket #187 (version 0.08.0): an occupier's Standing is an outsider's by definition, so
+        // Resistance bites it. Otherwise invading would be the way round a well-schooled population.
+        let gain = self.standing_from(place, self.pacification_gain(place));
         let s = self.seat_mut(seat);
         *s.influence.entry(place).or_insert(0) += gain;
         s.influenced_this_turn.push(place);
@@ -705,10 +707,14 @@ impl Game {
         let spent = std::mem::take(&mut self.pending.influence);
         for (seat, target, amount) in spent {
             let own = self.place_control(target).controller() == Some(seat);
+            // Ticket #187 (version 0.08.0): Resistance. An outsider's Influence buys less Standing at
+            // a well-schooled place and more at a badly-schooled one; the controller converts in full.
+            let gained = if own { amount } else { self.standing_from(target, amount) };
             let s = self.seat_mut(seat);
-            *s.influence.entry(target).or_insert(0) += amount;
+            *s.influence.entry(target).or_insert(0) += gained;
             s.influenced_this_turn.push(target);
-            self.log(format!("{} spent {} Influence {} {}.", self.seat_name(seat), amount, if own { "holding" } else { "on" }, self.place_name(target)));
+            let bite = if gained == amount { String::new() } else { format!(" (worth {gained} there)") };
+            self.log(format!("{} spent {} Influence {} {}{}.", self.seat_name(seat), amount, if own { "holding" } else { "on" }, self.place_name(target), bite));
         }
         // Embassies and Relays (ticket #36) raise their place's standing for its controller each turn,
         // which counts as Influence received, so the standing does not decay.
