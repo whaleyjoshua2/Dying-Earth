@@ -1411,6 +1411,21 @@ impl Game {
             let next = if open { (now + step).min((ceiling - card).max(0.0)) } else { (now - step).max(0.0) };
             self.state_mut(sid).schooling = next;
         }
+        // Ticket #185 (version 0.08.0): the Institutes do the same off Earth. A Colony's live figure
+        // climbs to the ceiling while one stands and is online, and falls back to the settlers' own
+        // average -- what its people know without a school -- when it stops. It never falls below
+        // that: a Colony whose Institute goes dark has not become less educated, its school shut.
+        let ids: Vec<ColonyId> = self.colonies.iter().map(|c| c.id).collect();
+        for cid in ids {
+            let Some(col) = self.colony(cid) else { continue };
+            let open = col.modules.iter().any(|m| m.kind == ModuleKind::Institute && m.working());
+            let floor = col.settler_education;
+            let now = col.education;
+            let next = if open { (now + step).min(ceiling) } else { (now - step).max(floor) };
+            if let Some(col) = self.colony_mut(cid) {
+                col.education = next;
+            }
+        }
     }
 
     /// Ticket #196 (version 0.08.0): how many Emigrants this seat could muster in this state right

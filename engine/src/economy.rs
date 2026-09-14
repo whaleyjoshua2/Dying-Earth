@@ -313,7 +313,10 @@ impl Game {
                 // on a station -- the first Body yield a station has read. The designer traded the
                 // Habitat yield for it: *"Replace habitat bonuses with science bonuses."*
                 let science = self.research_yield_at(col);
-                let mut r = p.amount as f64 * science * (1.0 + col.colonists as f64 * per) * research_multiplier;
+                // Ticket #189 (version 0.08.0): and its Colony's Education Level -- the weighted
+                // average of the people who settled it, raised by an Institute -- exactly as a
+                // Research Lab reads its Region's. This is what gives a Colony's figure a job.
+                let mut r = p.amount as f64 * science * col.education * (1.0 + col.colonists as f64 * per) * research_multiplier;
                 r *= self.tech_multiplier(seat, TechId::PublicScience);
                 // Ticket #84: the Upload stacks on Public Science.
                 r *= self.tech_multiplier(seat, TechId::TheUpload);

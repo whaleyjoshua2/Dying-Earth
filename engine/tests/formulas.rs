@@ -7384,3 +7384,78 @@ fn schooling_travels_from_the_region_to_the_station_it_is_lifted_to() {
         g.colony(station).unwrap().education
     );
 }
+
+// ------------------------------------------------- 0.08.0 ticket #185: the Institute, off Earth
+
+/// Ticket #185: the Institute is the School's form off Earth, on the same step and ceiling. What it
+/// decays BACK to is the difference that matters: not zero, and not a card figure a Colony does not
+/// have, but the settlers' own average -- what its people know without a school. A Colony whose
+/// Institute goes dark has not become less educated; its school shut.
+#[test]
+fn an_institute_raises_a_colony_and_decays_back_to_what_its_settlers_knew() {
+    let mut g = game();
+    let id = station_at(&mut g, Seat(0), BodyId::Earth);
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Core));
+    g.settle_people(id, 4, 0.8);
+    let settlers = g.colony(id).unwrap().settler_education;
+    assert!((settlers - 0.8).abs() < 1e-9, "the settlers brought 0.8");
+
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Institute));
+    let step = g.tables.school.per_turn;
+    let ceiling = g.tables.school.ceiling;
+    g.run_schools();
+    assert!((g.colony(id).unwrap().education - (0.8 + step)).abs() < 1e-9, "one turn should add a step");
+    for _ in 0..40 {
+        g.run_schools();
+    }
+    assert!((g.colony(id).unwrap().education - ceiling).abs() < 1e-9, "it climbs to the ceiling {ceiling}, not {}", g.colony(id).unwrap().education);
+
+    // Mothballed, it falls back -- and stops at what the settlers knew.
+    let idx = g.colony(id).unwrap().modules.iter().position(|m| m.kind == ModuleKind::Institute).unwrap();
+    g.colony_mut(id).unwrap().modules[idx].mothballed = true;
+    g.colony_mut(id).unwrap().modules[idx].online = false;
+    for _ in 0..60 {
+        g.run_schools();
+    }
+    assert!(
+        (g.colony(id).unwrap().education - settlers).abs() < 1e-9,
+        "it should stop at the settlers' own {settlers}, not {}",
+        g.colony(id).unwrap().education
+    );
+}
+
+/// Ticket #185: one Institute to a Colony, as one School to a Nation State.
+#[test]
+fn a_colony_holds_one_institute() {
+    let mut g = game();
+    let id = station_at(&mut g, Seat(0), BodyId::Earth);
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Core));
+    g.settle_people(id, 8, 1.0);
+    g.seats[0].stockpile.materials = 500;
+    let o = Order::BuildModule { colony: id, kind: ModuleKind::Institute };
+    assert!(g.check_order(Seat(0), &[], &o).is_ok(), "the first Institute is legal");
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Institute));
+    assert!(g.check_order(Seat(0), &[], &o).is_err(), "a second Institute at one Colony should be refused");
+}
+
+/// Ticket #189: an Observatory reads its Colony's Education Level, exactly as a Research Lab reads
+/// its Region's. Without this the Colony's figure would be bookkeeping.
+#[test]
+fn an_observatory_reads_its_colonys_education_level() {
+    let mut g = game();
+    let id = station_at(&mut g, Seat(0), BodyId::Earth);
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Core));
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Observatory));
+    g.settle_people(id, 4, 0.5);
+    let idx = g.colony(id).unwrap().modules.iter().position(|m| m.kind == ModuleKind::Observatory).unwrap();
+    let poor = g.module_yield_at(Seat(0), id, idx).research;
+
+    let mut h = game();
+    let id2 = station_at(&mut h, Seat(0), BodyId::Earth);
+    h.colony_mut(id2).unwrap().modules.push(Module::new(ModuleKind::Core));
+    h.colony_mut(id2).unwrap().modules.push(Module::new(ModuleKind::Observatory));
+    h.settle_people(id2, 4, 2.0);
+    let rich = h.module_yield_at(Seat(0), id2, idx).research;
+
+    assert!(rich > poor, "a well-schooled Colony's Observatory should out-produce a poorly-schooled one: {poor} then {rich}");
+}

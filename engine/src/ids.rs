@@ -171,10 +171,14 @@ pub enum ModuleKind {
     /// the place rather than a building in it. Appended last because `Tables::module` indexes this
     /// enum by discriminant.
     Core,
+    /// Version 0.08.0 (ticket #185): the Institute, the School's form off Earth. At most one per
+    /// Colony or Space Station; while it stands and is online it raises its place's Education Level
+    /// a step a turn to the ceiling, and the figure decays back to the settlers' own average.
+    Institute,
 }
 
 impl ModuleKind {
-    pub const ALL: [ModuleKind; 13] = [
+    pub const ALL: [ModuleKind; 14] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -188,9 +192,10 @@ impl ModuleKind {
         ModuleKind::SolarArray,
         ModuleKind::MassDriver,
         ModuleKind::Core,
+        ModuleKind::Institute,
     ];
     /// The Modules an ordinary build order may place (ticket #51: the Archive is not one of them).
-    pub const BUILDABLE: [ModuleKind; 11] = [
+    pub const BUILDABLE: [ModuleKind; 12] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -202,10 +207,12 @@ impl ModuleKind {
         ModuleKind::Observatory,
         ModuleKind::SolarArray,
         ModuleKind::MassDriver,
+        ModuleKind::Institute,
     ];
     pub fn name(self) -> &'static str {
         match self {
             ModuleKind::Core => "Core Module",
+            ModuleKind::Institute => "Institute",
             ModuleKind::Mine => "Mine",
             ModuleKind::Generator => "Generator",
             ModuleKind::Refinery => "Refinery",

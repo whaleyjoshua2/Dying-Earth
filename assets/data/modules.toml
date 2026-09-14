@@ -181,6 +181,17 @@ build_turns = 0
 energy_upkeep = 1
 holds_colonists = 4
 
+# Ticket #185 (version 0.08.0): the Institute, the School's form off Earth. At most one per Colony
+# or Space Station. While it stands and is online it raises its place's Education Level by the
+# School's own step a turn, to the same ceiling (`[school]` in facilities.toml), and the figure
+# decays back at that rate to the settlers' own average when it stops. Priced as the School is.
+[[module]]
+id = "institute"
+name = "Institute"
+materials = 25
+build_turns = 2
+energy_upkeep = 2
+
 # Ticket #88 (version 0.06.0): build it where you dig. A Module (the Archive included) built at a
 # Colony with one working Mine costs `one_mine` of its price, with two or more `two_mines`,
 # multiplicative with the Faction's own discount, rounded down, never below `floor` of the row.

@@ -603,8 +603,20 @@ impl Game {
                 // Ticket #46: a station holds only a Shipyard and Habitats; ticket #80: and Observatories;
                 // ticket #89: and Solar Arrays, which stand nowhere else.
                 // Ticket #90: and a Trade Post.
-                if col.in_orbit && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost) {
-                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays and a Trade Post");
+                // Ticket #185 (version 0.08.0): and an Institute, since a station carries Observatories
+                // and the Institute is what multiplies them.
+                if col.in_orbit
+                    && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute)
+                {
+                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays, a Trade Post and an Institute");
+                }
+                // Ticket #185: one Institute to a Colony or station, as one School to a Nation State.
+                if *kind == ModuleKind::Institute
+                    && (col.modules.iter().any(|m| m.kind == ModuleKind::Institute)
+                        || col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Institute))
+                        || pending.iter().any(|o| o.build_module().map(|(c, k)| c == *colony && k == ModuleKind::Institute).unwrap_or(false)))
+                {
+                    return fail("this Colony already has an Institute");
                 }
                 if !col.in_orbit && self.tables.module(*kind).station_only {
                     return fail(format!("a {} stands only on a station", kind.name()));

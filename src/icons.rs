@@ -123,6 +123,9 @@ pub fn module_icon(kind: dying_earth_engine::ModuleKind) -> &'static str {
         Observatory => "module_observatory",
         SolarArray => "module_solar_array",
         MassDriver => "module_mass_driver",
+        // Ticket #185 (version 0.08.0): the Institute is the School off Earth and wears its
+        // mortarboard, as the Refinery Facility wears the Refinery Module's own file.
+        Institute => "facility_school",
         Archive => "module_archive",
         // Ticket #164 (version 0.07.5): the Core Module wears the station glyph the game drew for
         // itself on ticket #135 -- two solar panels on a bar with a module between them, which is

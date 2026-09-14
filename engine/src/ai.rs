@@ -765,6 +765,17 @@ impl Game {
                     ModuleKind::SolarArray => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                     // Ticket #80: an Observatory once the Colony holds enough Colonists to make it worth
                     // its keep (`observatory_colonists`), at the Research Lab's weight.
+                    // Ticket #185 (version 0.08.0): an Institute multiplies an Observatory exactly as
+                    // a School multiplies a Lab, so it waits for one and then takes the same weight.
+                    ModuleKind::Institute => {
+                        if !col.modules.iter().any(|m| m.kind == ModuleKind::Observatory)
+                            || col.modules.iter().any(|m| m.kind == ModuleKind::Institute)
+                            || col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Institute))
+                        {
+                            continue;
+                        }
+                        (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab))
+                    }
                     ModuleKind::Observatory => {
                         if col.colonists < self.tables.ai_weights(self.kind(seat)).observatory_colonists
                             || col.modules.iter().any(|m| m.kind == ModuleKind::Observatory)
