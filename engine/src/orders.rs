@@ -1363,11 +1363,11 @@ impl Game {
                 // nothing lifts them before next turn, which is the turn to muster.
                 Order::BuildEmigrants { state, n } => {
                     let cost = self.lift_population(seat, *n);
-                    {
-                        let st = self.state_mut(*state);
-                        st.population = (st.population - cost).max(0.0);
-                        st.emigrants += n;
-                    }
+                    self.state_mut(*state).population = (self.state(*state).population - cost).max(0.0);
+                    // Ticket #189 (version 0.08.0): they take their Region's schooling AS IT STANDS
+                    // NOW, so a batch mustered after a School has run knows more than one before it,
+                    // and the two average together on the card.
+                    self.muster_emigrants(*state, *n);
                     let fell = self.lower_unrest(*state, self.tables.emigrants.unrest_fall);
                     let line = format!("{} Emigrants mustered in {} for the {}; its Unrest fell by {} to {}.", n, self.tables.state(*state).name, self.seat_name(seat), Game::unrest_figure(fell), self.unrest_text(*state));
                     self.log(line);
@@ -1379,22 +1379,20 @@ impl Game {
                 }
                 // Ticket #73: Emigrants leave for Antarctica by sea, and land a turn later.
                 Order::SendToAntarctica { state, n, into } => {
-                    let left = self.state(*state).emigrants.saturating_sub(*n);
-                    self.state_mut(*state).emigrants = left;
+                    // Ticket #189 (version 0.08.0): what they know goes to sea with them.
+                    let taught = self.take_emigrants(*state, *n);
                     let due = turn + self.tables.emigrants.antarctica_turns;
-                    self.antarctic_sends.push(AntarcticSend { seat, from: *state, n: *n, into: *into, due_turn: due });
+                    self.antarctic_sends.push(AntarcticSend { seat, from: *state, n: *n, into: *into, due_turn: due, education: taught });
                     let line = format!("{} Emigrants left {} for Antarctica by sea, for the {}.", n, self.tables.state(*state).name, self.seat_name(seat));
                     self.log(line);
                 }
                 // Ticket #141 (version 0.07.3): Emigrants lift straight to the seat's station over
                 // Earth. A launch, as a lift onto a Ship is; they are aboard at this Resolution.
                 Order::LiftToStation { state, n, colony } => {
-                    let left = self.state(*state).emigrants.saturating_sub(*n);
-                    self.state_mut(*state).emigrants = left;
+                    // Ticket #189 (version 0.08.0): a lift carries their schooling to the station.
+                    let taught = self.take_emigrants(*state, *n);
                     self.climate.launches_pending[seat.index()] += 1;
-                    if let Some(c) = self.colony_mut(*colony) {
-                        c.colonists += n;
-                    }
+                    self.settle_people(*colony, *n, taught);
                     let station = self.place_name(Place::Colony(*colony));
                     let line = format!("{} Emigrants lifted from {} to {}, for the {}.", n, self.tables.state(*state).name, station, self.seat_name(seat));
                     self.log(line);

@@ -205,6 +205,11 @@ pub struct NationState {
     /// They are people of this state until they leave it: a new holder gets them.
     #[serde(default)]
     pub emigrants: u32,
+    /// Ticket #189 (version 0.08.0): the mean Education Level of the Emigrants waiting here. They
+    /// take this state's figure at the moment they MUSTER, so a second batch mustered after a School
+    /// has run averages in higher, and the pile carries one number and a count.
+    #[serde(default = "neutral_education")]
+    pub emigrants_education: f64,
     /// Ticket #185 (version 0.08.0): what a School has added to this state's Education Level, above
     /// the figure on its card. It climbs a step a turn while a School stands and is online, to the
     /// ceiling, and falls back at the same rate when it stops -- so it never drops below the card.
@@ -320,6 +325,12 @@ impl SlotYields {
     }
 }
 
+/// Ticket #189 (version 0.08.0): what a pool of people with no recorded schooling counts as. Saves
+/// are refused across versions, so this can never fire on a real save; it is the honest neutral.
+fn neutral_education() -> f64 {
+    1.0
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Colony {
     pub id: ColonyId,
@@ -328,6 +339,17 @@ pub struct Colony {
     pub control: Control,
     pub modules: Vec<Module>,
     pub colonists: u32,
+    /// Ticket #189 (version 0.08.0): this Colony's Education Level as it stands -- the weighted
+    /// average of the people living here, raised by an Institute. Arriving settlers average into it
+    /// by head count, Institute gains and all, so a shipload of poorly-schooled people dilutes what
+    /// an Institute has built.
+    #[serde(default = "neutral_education")]
+    pub education: f64,
+    /// Ticket #189: the same average with no Institute ever counted -- what this Colony's people
+    /// know on their own. It is the floor an Institute's gains decay back to, so a Colony whose
+    /// Institute goes dark returns to what its settlers brought rather than falling to nothing.
+    #[serde(default = "neutral_education")]
+    pub settler_education: f64,
     pub queue: Vec<Build>,
     /// Grid Failure: Modules offline until the next Resolution.
     pub grid_failed: bool,
@@ -350,6 +372,10 @@ pub struct Ship {
     pub damage: u32,
     pub at: ShipAt,
     pub colonists: u32,
+    /// Ticket #189 (version 0.08.0): the mean Education Level of the people aboard, carried from
+    /// the Region they were mustered in.
+    #[serde(default = "neutral_education")]
+    pub colonists_education: f64,
     pub army: Option<ArmyId>,
     pub stance: Stance,
     pub escaped: bool,
@@ -592,6 +618,9 @@ pub struct AntarcticSend {
     pub seat: Seat,
     pub from: StateId,
     pub n: u32,
+    /// Ticket #189 (version 0.08.0): what the people aboard know, carried across the sea with them.
+    #[serde(default = "neutral_education")]
+    pub education: f64,
     pub into: crate::orders::UnloadTarget,
     pub due_turn: u32,
 }
@@ -823,6 +852,8 @@ impl Game {
                 industry_level: c.industry_level,
                 // Ticket #185 (version 0.08.0): no School has run yet, so the state reads its card.
                 schooling: 0.0,
+                // Ticket #189 (version 0.08.0): nobody is waiting, so the figure is the neutral one.
+                emigrants_education: 1.0,
                 control: Control::Neutral,
                 // Ticket #56: the start Facilities take coastal slots first, in the table's order.
                 facilities: {
@@ -947,7 +978,7 @@ impl Game {
             let Some(slot) = game.tables.body(BodyId::Earth).stations.iter().position(|n| *n == want) else { continue };
             let id = ColonyId(game.fresh_id());
             // Ticket #164 (version 0.07.5): the three starting stations stand with their Core Modules.
-            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
         }
         // Starting positions (spec 14.3, ticket #50): the player's pick, then each AI seat in turn.
         let mut taken = vec![setup.player_start];
@@ -1280,6 +1311,83 @@ impl Game {
     pub fn lift_population(&self, seat: Seat, colonists: u32) -> f64 {
         // Ticket #73: paid when the Emigrants muster, not when a Ship lifts them.
         self.tables.emigrants.population_each * colonists as f64 * self.tables.faction(self.kind(seat)).lift_population_multiplier
+    }
+
+    // ------------------------------------------ Ticket #189 (version 0.08.0): people carry their schooling
+    //
+    // Every pool of people -- the Emigrants waiting on a Region's card, the Colonists aboard a Ship,
+    // the people living at a Colony -- is a head count AND a mean Education Level. These four are
+    // the only way a pool is moved, so a caller cannot move people and forget to move what they
+    // know. Deaths never move a mean: the dead are drawn evenly from the people there.
+
+    /// The weighted mean of two pools, by head count. An empty result keeps the neutral figure.
+    pub fn blend(a_n: u32, a_e: f64, b_n: u32, b_e: f64) -> f64 {
+        let total = a_n + b_n;
+        if total == 0 {
+            return 1.0;
+        }
+        (a_e * a_n as f64 + b_e * b_n as f64) / total as f64
+    }
+
+    /// Muster `n` Emigrants in a Nation State: they take its Education Level as it stands NOW, and
+    /// average into whoever is already waiting there.
+    pub fn muster_emigrants(&mut self, s: StateId, n: u32) {
+        let taught = self.education_level(s);
+        let st = self.state(s);
+        let blended = Game::blend(st.emigrants, st.emigrants_education, n, taught);
+        let st = self.state_mut(s);
+        st.emigrants += n;
+        st.emigrants_education = blended;
+    }
+
+    /// Take `n` Emigrants off a Nation State's card and say what they know. The pile's mean does not
+    /// move: the ones who left are no better or worse taught than the ones who stayed.
+    pub fn take_emigrants(&mut self, s: StateId, n: u32) -> f64 {
+        let taught = self.state(s).emigrants_education;
+        let st = self.state_mut(s);
+        st.emigrants = st.emigrants.saturating_sub(n);
+        taught
+    }
+
+    /// Put `n` people who know `taught` aboard a Ship, averaging with whoever is already aboard.
+    pub fn load_people(&mut self, id: ShipId, n: u32, taught: f64) {
+        let Some(s) = self.ship(id) else { return };
+        let blended = Game::blend(s.colonists, s.colonists_education, n, taught);
+        if let Some(s) = self.ship_mut(id) {
+            s.colonists += n;
+            s.colonists_education = blended;
+        }
+    }
+
+    /// Take `n` people off a Ship and say what they know; the mean aboard does not move.
+    pub fn unload_people(&mut self, id: ShipId, n: u32) -> f64 {
+        let taught = self.ship(id).map(|s| s.colonists_education).unwrap_or(1.0);
+        if let Some(s) = self.ship_mut(id) {
+            s.colonists = s.colonists.saturating_sub(n);
+        }
+        taught
+    }
+
+    /// Settle `n` people who know `taught` at a Colony, averaging by head count into BOTH figures:
+    /// the live one an Institute has been raising, and the settler average that is its decay floor.
+    pub fn settle_people(&mut self, c: ColonyId, n: u32, taught: f64) {
+        let Some(col) = self.colony(c) else { return };
+        let live = Game::blend(col.colonists, col.education, n, taught);
+        let settlers = Game::blend(col.colonists, col.settler_education, n, taught);
+        if let Some(col) = self.colony_mut(c) {
+            col.colonists += n;
+            col.education = live;
+            col.settler_education = settlers;
+        }
+    }
+
+    /// Take `n` people off a Colony and say what they know; neither figure moves.
+    pub fn take_colonists(&mut self, c: ColonyId, n: u32) -> f64 {
+        let taught = self.colony(c).map(|x| x.education).unwrap_or(1.0);
+        if let Some(col) = self.colony_mut(c) {
+            col.colonists = col.colonists.saturating_sub(n);
+        }
+        taught
     }
 
     /// Ticket #185 (version 0.08.0): a Nation State's Education Level as it stands -- the figure on
