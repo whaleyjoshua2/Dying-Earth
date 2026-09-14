@@ -352,9 +352,11 @@ pub struct FactionCard {
     /// Ticket #51: the second part, generalised the way #50 generalised the first.
     pub victory_second: VictorySecondCard,
     pub colour: [f32; 3],
-    /// Ticket #100 (version 0.07.0): the continent the start screen opens its globe on. It changes
-    /// no starting position: any of the twelve may still be chosen.
-    pub home: StateId,
+    /// Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
+    /// screen opens its globe on. It has ONE reader, and its only job is pointing the start globe's
+    /// camera, which the old name `home` did not say -- it read as a starting position, which it has
+    /// never been: any of the fourteen may still be chosen.
+    pub opens_on: StateId,
     /// Ticket #46: the station over Earth the Faction starts with, by name in bodies.toml.
     /// Ticket #50: the Arkwrights start with none, so this is optional.
     #[serde(default)]

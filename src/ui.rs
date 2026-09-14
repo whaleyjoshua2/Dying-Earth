@@ -1435,7 +1435,7 @@ fn start_screen(
     // Ticket #100 (version 0.07.0): open the globe on this Faction's home, once. Aiming every frame
     // would undo a drag as fast as the player made it.
     if view.start_aimed != Some(faction) {
-        let (lon, lat) = geo::state_lonlat(session.tables.faction(faction).home);
+        let (lon, lat) = geo::state_lonlat(session.tables.faction(faction).opens_on);
         view.spin = geo::yaw_facing(lon, lat);
         view.yaw = view.spin;
         // Tilt to the home's latitude as well, or a northern continent sits on the limb.
