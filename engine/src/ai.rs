@@ -575,6 +575,15 @@ impl Game {
                     let (cat, mut base) = match fk {
                         FacilityKind::Factory | FacilityKind::PowerPlant | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                         FacilityKind::ResearchLab => (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab)),
+                        // Ticket #185 (version 0.08.0): the School is a Research building in all but
+                        // name -- it multiplies every Lab in its state -- so it is weighed as one. It
+                        // is worth nothing where no Lab stands, so it waits for one.
+                        FacilityKind::School => {
+                            if !self.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::ResearchLab) {
+                                continue;
+                            }
+                            (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab))
+                        }
                         FacilityKind::Embassy => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
                         // Ticket #52: a Constabulary is worth raising only where Unrest has taken hold.
                         FacilityKind::Constabulary => {

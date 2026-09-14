@@ -544,6 +544,15 @@ impl Game {
                         return fail(format!("this Nation State holds its {cap} Scrubbers already"));
                     }
                 }
+                // Ticket #185 (version 0.08.0): at most one School per Nation State. A second would
+                // only reach the same ceiling sooner, and the ceiling is what caps the rule.
+                if *kind == FacilityKind::School
+                    && (self.state(*state).facilities.iter().any(|f| f.kind == FacilityKind::School)
+                        || self.state(*state).queue.iter().any(|b| b.item == BuildItem::Facility(FacilityKind::School))
+                        || pending.iter().any(|o| matches!(o.build_state(), Some(s) if s == *state) && matches!(o, Order::BuildFacility { kind: FacilityKind::School, .. } | Order::BuildFacilityWithDucats { kind: FacilityKind::School, .. })))
+                {
+                    return fail("this Nation State already has a School");
+                }
                 // Ticket #52: at most one Constabulary per Nation State.
                 if *kind == FacilityKind::Constabulary
                     && (self.state(*state).facilities.iter().any(|f| f.kind == FacilityKind::Constabulary)

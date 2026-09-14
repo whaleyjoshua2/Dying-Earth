@@ -3973,9 +3973,10 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     let on_rung = |r: u32| -> Vec<&str> { TechId::ALL.into_iter().map(|t| g.tables.tech(t)).filter(|t| t.branch == "Industry" && t.rung == r).map(|t| t.name.as_str()).collect() };
     assert_eq!(on_rung(1), vec!["Efficient Grids", "Coastal Engineering"], "two boxes on Industry rung 1");
     assert_eq!(on_rung(2), vec!["Clean Power"]);
-    // The Sea Wall's card names it as its unlock, and there are ten Facilities.
+    // The Sea Wall's card names it as its unlock, and there are eleven Facilities since ticket #185
+    // (version 0.08.0) added the School.
     assert_eq!(g.tables.facility(FacilityKind::SeaWall).needs_tech, Some(TechId::CoastalEngineering));
-    assert_eq!(FacilityKind::ALL.len(), 10, "ten Facilities");
+    assert_eq!(FacilityKind::ALL.len(), 11, "eleven Facilities");
 }
 
 /// (g) Antarctica opens the first Climate phase the Temperature stands at +1.6, stays open, and its
@@ -7208,4 +7209,83 @@ fn a_muster_takes_as_many_as_the_region_can_pay_for() {
         Some(n) => assert!(n <= want, "the AI mustered {n}, more than the {want} the Region can pay for"),
         None => panic!("the Arkwright AI mustered nothing in a Region that can pay for {want}: {orders:?}"),
     }
+}
+
+// ------------------------------------------- 0.08.0 ticket #185: the School and a moving Education Level
+
+/// Ticket #185: the Education Level was a fixed figure on a Region's card that nothing in the game
+/// moved. A School raises it a step a turn while it stands and is online, to a ceiling, and it
+/// decays back at the same rate when the School stops -- so what took five turns to build takes
+/// five turns to lose, and it stops at the figure the card carries.
+///
+/// Driven through `run_schools` rather than a whole Income phase, so the arithmetic under test is
+/// not also measuring the Energy economy: over forty Income phases with no production the School
+/// is shut for want of Energy, which is correct and is a different rule.
+#[test]
+fn a_school_raises_its_regions_education_level_a_step_a_turn_to_the_ceiling() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    let card = g.tables.state(sid).education_level;
+    assert!((g.education_level(sid) - card).abs() < 1e-9, "it starts at the card figure {card}");
+
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::School));
+    let step = g.tables.school.per_turn;
+    let ceiling = g.tables.school.ceiling;
+    for turn in 1..=3 {
+        g.run_schools();
+        let want = (card + step * turn as f64).min(ceiling);
+        assert!((g.education_level(sid) - want).abs() < 1e-9, "after {turn} turn(s) it should read {want}, not {}", g.education_level(sid));
+    }
+    for _ in 0..40 {
+        g.run_schools();
+    }
+    assert!((g.education_level(sid) - ceiling).abs() < 1e-9, "it should climb to the ceiling {ceiling} and stop, not {}", g.education_level(sid));
+
+    // Mothballed, it falls back at the same rate and stops at the card figure.
+    let idx = g.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::School).unwrap();
+    g.state_mut(sid).facilities[idx].mothballed = true;
+    g.state_mut(sid).facilities[idx].online = false;
+    g.run_schools();
+    assert!((g.education_level(sid) - (ceiling - step)).abs() < 1e-9, "it should fall a step to {}, not {}", ceiling - step, g.education_level(sid));
+    for _ in 0..40 {
+        g.run_schools();
+    }
+    assert!((g.education_level(sid) - card).abs() < 1e-9, "it should stop falling at the card figure {card}, not {}", g.education_level(sid));
+}
+
+/// Ticket #185: and the Schools run at Income, once a turn, without anybody calling them by hand.
+#[test]
+fn the_schools_run_at_income() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::School));
+    let before = g.education_level(sid);
+    g.income_phase();
+    assert!(g.education_level(sid) > before, "an Income phase should move it: it read {before} and still reads {}", g.education_level(sid));
+}
+
+/// Ticket #185: one School to a Region, as the Constabulary and the Sea Wall are.
+#[test]
+fn a_region_holds_one_school() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::School));
+    let o = Order::BuildFacility { state: sid, kind: FacilityKind::School };
+    assert!(g.check_order(Seat(0), &[], &o).is_err(), "a second School in one Region should be refused");
+}
+
+/// Ticket #185: a Research Lab reads the LIVE figure, not the card. That is the whole point of the
+/// building -- the Education Level multiplies what a Lab makes, and now it moves.
+#[test]
+fn a_research_lab_reads_the_education_level_the_school_has_raised() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::ResearchLab));
+    let before = g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).research;
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::School));
+    for _ in 0..8 {
+        g.run_schools();
+    }
+    let after = g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).research;
+    assert!(after > before, "a Lab should make more once the School has run: {before} then {after}");
 }

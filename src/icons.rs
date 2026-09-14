@@ -102,6 +102,8 @@ pub fn facility_icon(kind: dying_earth_engine::FacilityKind) -> &'static str {
         Constabulary => "facility_constabulary",
         SeaWall => "facility_sea_wall",
         Scrubber => "facility_scrubber",
+        // Ticket #185 (version 0.08.0): the School.
+        School => "facility_school",
     }
 }
 
@@ -149,7 +151,10 @@ pub fn faction_symbol(kind: dying_earth_engine::FactionKind) -> &'static str {
 /// solar panels on a bar with a central module, the ISS reduced to its silhouette -- was drawn for
 /// the game after the designer passed on every station game-icons.net has, none of which is drawn
 /// as a station. A drawn glyph still loads and tints through `Icons` like any other.
-pub const DRAWN: [&str; 1] = ["station"];
+/// Ticket #185 (version 0.08.0): the School's is drawn for the game too -- a pediment on columns
+/// over a row of desks -- because game-icons.net has no school and the nearest candidates were a
+/// laboratory and a capitol, which say other things.
+pub const DRAWN: [&str; 2] = ["station", "facility_school"];
 
 impl Credit {
     /// The file stem in `assets/icons/` this credit is for: the name, lower-cased, spaces to

@@ -147,6 +147,16 @@ pub struct ScrubberCard {
     pub max: u32,
 }
 
+/// Ticket #185 (version 0.08.0): what a School does to its state's Education Level, a step a turn
+/// to a ceiling (`facilities.toml`). No maximum Education Level was ever declared -- the card
+/// figures simply run 0.70 to 1.50 -- so the ceiling is this table's, and the step is the smallest
+/// that reliably shows in a Lab's floored Research.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SchoolCard {
+    pub per_turn: f64,
+    pub ceiling: f64,
+}
+
 /// Ticket #54 (version 0.05): what a Restart and a Decommission cost (`facilities.toml`). A
 /// Mothball is free and lands at the Resolution of the turn it is ordered.
 #[derive(Debug, Clone, Deserialize)]
@@ -876,6 +886,7 @@ struct FacilitiesFile {
     industry_level: IndustryLevelCard,
     scrubber: ScrubberCard,
     mothball: MothballCard,
+    school: SchoolCard,
 }
 /// Ticket #51: the Archive. Its Materials, build turns and Energy upkeep sit on its Module row.
 /// Ticket #68 (version 0.05.5): the Research it requires in all, and the share of it the fund may
@@ -1035,6 +1046,8 @@ pub struct Tables {
     /// Ticket #54: the Scrubber cap and the Mothball prices (`facilities.toml`).
     pub scrubber: ScrubberCard,
     pub mothball: MothballCard,
+    /// Ticket #185: the School's step and ceiling.
+    pub school: SchoolCard,
     pub modules: Vec<ModuleCard>,
     /// Ticket #97: how many Modules a Colony or a Space Station may hold.
     pub slots: SlotsCard,
@@ -1127,6 +1140,7 @@ impl Tables {
             industry_level: facilities.industry_level,
             scrubber: facilities.scrubber,
             mothball: facilities.mothball,
+            school: facilities.school,
             slots: modules.slots,
             archive: modules.archive,
             observatory: modules.observatory,

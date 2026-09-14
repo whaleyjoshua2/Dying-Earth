@@ -103,10 +103,14 @@ pub enum FacilityKind {
     /// Version 0.05 (ticket #56): the Sea Wall. Always stands in a coastal slot, at most one per
     /// Nation State, and it absorbs the state's next Sea Level threshold and is destroyed doing it.
     SeaWall,
+    /// Version 0.08.0 (ticket #185): the School. At most one per Nation State. While it stands and is
+    /// online it raises its state's Education Level by a step a turn to a ceiling, and the figure
+    /// decays back at the same rate when it stops.
+    School,
 }
 
 impl FacilityKind {
-    pub const ALL: [FacilityKind; 10] = [
+    pub const ALL: [FacilityKind; 11] = [
         FacilityKind::Factory,
         FacilityKind::PowerPlant,
         FacilityKind::Refinery,
@@ -117,6 +121,7 @@ impl FacilityKind {
         FacilityKind::Constabulary,
         FacilityKind::Scrubber,
         FacilityKind::SeaWall,
+        FacilityKind::School,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -130,6 +135,7 @@ impl FacilityKind {
             FacilityKind::Constabulary => "Constabulary",
             FacilityKind::Scrubber => "Scrubber",
             FacilityKind::SeaWall => "Sea Wall",
+            FacilityKind::School => "School",
         }
     }
 }

@@ -205,6 +205,12 @@ pub struct NationState {
     /// They are people of this state until they leave it: a new holder gets them.
     #[serde(default)]
     pub emigrants: u32,
+    /// Ticket #185 (version 0.08.0): what a School has added to this state's Education Level, above
+    /// the figure on its card. It climbs a step a turn while a School stands and is online, to the
+    /// ceiling, and falls back at the same rate when it stops -- so it never drops below the card.
+    /// The Education Level was a fixed card figure until now and nothing in the game moved it.
+    #[serde(default)]
+    pub schooling: f64,
     /// Ticket #52: Unrest, 0 to 10 (9 while the state is neutral). Ticket #53: it moves in halves.
     pub unrest: f64,
     /// Ticket #53: the state changed hands this turn, which is the one turn its Unrest does not
@@ -815,6 +821,8 @@ impl Game {
                 id: c.id,
                 population: c.population,
                 industry_level: c.industry_level,
+                // Ticket #185 (version 0.08.0): no School has run yet, so the state reads its card.
+                schooling: 0.0,
                 control: Control::Neutral,
                 // Ticket #56: the start Facilities take coastal slots first, in the table's order.
                 facilities: {
@@ -1272,6 +1280,29 @@ impl Game {
     pub fn lift_population(&self, seat: Seat, colonists: u32) -> f64 {
         // Ticket #73: paid when the Emigrants muster, not when a Ship lifts them.
         self.tables.emigrants.population_each * colonists as f64 * self.tables.faction(self.kind(seat)).lift_population_multiplier
+    }
+
+    /// Ticket #185 (version 0.08.0): a Nation State's Education Level as it stands -- the figure on
+    /// its card plus whatever a School has added. It was the card figure alone until now, and
+    /// nothing in the game moved it.
+    pub fn education_level(&self, s: StateId) -> f64 {
+        self.tables.state(s).education_level + self.state(s).schooling
+    }
+
+    /// Ticket #185: the School's work, run once a turn at Income. It climbs a step while a School
+    /// stands and is online and falls back at the same rate when it does not, so what took five
+    /// turns to build takes five turns to lose; it never goes above the ceiling, and never below
+    /// the state's own card.
+    pub fn run_schools(&mut self) {
+        let step = self.tables.school.per_turn;
+        let ceiling = self.tables.school.ceiling;
+        for sid in StateId::ALL {
+            let card = self.tables.state(sid).education_level;
+            let open = self.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::School && f.working());
+            let now = self.state(sid).schooling;
+            let next = if open { (now + step).min((ceiling - card).max(0.0)) } else { (now - step).max(0.0) };
+            self.state_mut(sid).schooling = next;
+        }
     }
 
     /// Ticket #196 (version 0.08.0): how many Emigrants this seat could muster in this state right

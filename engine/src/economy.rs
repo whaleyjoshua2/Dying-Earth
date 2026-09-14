@@ -124,6 +124,8 @@ impl Game {
         for seat in Seat::ALL {
             self.income_for(seat);
         }
+        // Ticket #185 (version 0.08.0): the Schools do their work for the turn.
+        self.run_schools();
         self.neutral_research();
         self.solar_maximum_next = false;
         // Ticket #76: a Drought lasts one Income.
@@ -181,7 +183,8 @@ impl Game {
         let t = &self.tables;
         let base = t.facility(FacilityKind::ResearchLab).produces.as_ref().map(|p| p.amount).unwrap_or(0) as f64;
         let public = if self.has_tech(TechId::PublicScience) { t.tech(TechId::PublicScience).value } else { 1.0 };
-        (base * self.population_factor(sid) * t.state(sid).education_level * public).floor() as i64
+        // Ticket #185 (version 0.08.0): the LIVE Education Level, which a School moves.
+        (base * self.population_factor(sid) * self.education_level(sid) * public).floor() as i64
     }
 
     fn replenish_standing_armies(&mut self) {
@@ -225,7 +228,8 @@ impl Game {
                     if self.state(sid).control.is_occupied() {
                         y.research = 0;
                     } else {
-                        let mut r = p.amount as f64 * self.population_factor(sid) * card.education_level * fac.research_multiplier;
+                        // Ticket #185 (version 0.08.0): the LIVE Education Level, which a School moves.
+                        let mut r = p.amount as f64 * self.population_factor(sid) * self.education_level(sid) * fac.research_multiplier;
                         r *= self.tech_multiplier(seat, TechId::PublicScience);
                         // Ticket #84: the Upload stacks on Public Science.
                         r *= self.tech_multiplier(seat, TechId::TheUpload);
