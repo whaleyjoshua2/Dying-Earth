@@ -240,12 +240,21 @@ sentence in a rival's Report paragraph on a turn their view of you changed.
 
 ---
 
-## 8. The Archive's gate and the Upload
+## 8. The Archive's two gates and the Upload
 
-*Ticket [#192](https://github.com/whaleyjoshua2/Dying-Earth/issues/192).*
+*Tickets [#192](https://github.com/whaleyjoshua2/Dying-Earth/issues/192),
+[#199](https://github.com/whaleyjoshua2/Dying-Earth/issues/199).*
 
-**Ordering the Archive wants four Colonists living at the place**, checked **once, when the order is
-placed**; neither the three-turn build nor the standing Module cares afterwards.
+**Ordering the Archive wants two things, both checked once, when the order is placed**; neither the
+three-turn build nor the standing Module cares afterwards.
+
+**The Archivists' gate Tech, The Upload, must stand.** It is named first of the two refusals, because
+it is the one still true after the other is solved: the four Colonists arrive at a median turn 11 and
+The Upload at a median 15. The gate Tech already gated the **win** (ticket #84); measured, it arrived
+one turn before the Archivists were ready anyway, so it gated nothing. Gating the **order** is what
+moves them.
+
+**And four Colonists must live at the place.**
 
 **A new requirement: twelve Colonists must be Uploaded**, and the Archive may only draw from the
 population of the place it stands at. **Uploading is an order, and it is free** — an order because it
@@ -263,6 +272,29 @@ The ticket was charted as twelve at the order, and measurement forced the redesi
 ordered on **turn 1, at a station with nobody on it, in 80 of 80 games**, always Axiom over Earth,
 which is founded bare. Under a twelve gate it was orderable in **29 games of 80** at a median turn 17,
 and only 17 of those had the three turns the Module needs left.
+
+**Banking into the Archive fund before the Tech is unchanged**: it can still start on turn 1, capped
+at a quarter of the 80 until the Module stands. It is the one thing the Archivists can do while they
+wait, and stopping it would delay the Archive twice over. It has a useful side effect: the fund fills
+to its cap in about three turns, after which their Labs feed the shared tree again, so they start
+leading the Research race and can pick their own gate -- which the computer already does when it
+leads. The seat chooses between its monument and its tree, which is a better game than diverting
+everything and letting rivals do the science, as it did before this gate.
+
+**The computer is deliberately not taught this gate.** Every AI candidate goes through `check_order`
+before it is chosen and through `check_order_legality` before it can reserve Materials, so a refused
+Archive is skipped at no cost and cannot freeze the seat's build programme. A guard in the AI was
+written first and removed when its false state could not be constructed -- the signal that it was
+claiming to prevent something the validator already prevents. Ticket #192's Colonist gate is
+different and stays: it chooses **which** Colony to name, which no validator can do.
+
+**Why this gate and not a larger one.** The whole seventeen-Tech tree completes by **turn 16 of 36**,
+so a rung-3 Tech is a mid-game milestone rather than a late one, and the Archivists contribute **0
+Research to their own gate** -- rivals finish it for them while every Lab goes to the Archive fund.
+That larger finding is **not** addressed in this version: changing the Research pace in the same
+version that changed what a Lab makes, what a population adds and when the Archive may be begun would
+make the sweep unreadable. It is
+[its own ticket](https://github.com/whaleyjoshua2/Dying-Earth/issues/201).
 
 ---
 

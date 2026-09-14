@@ -55,10 +55,16 @@ on a region's card; now it is something you move, and half a dozen rules read it
 - A CONSTABULARY NOW DEFENDS AS WELL AS CALMS. While one stands, a rival needs your
   standing plus 25 to take that region instead of plus 20. It protects whoever holds
   the region, including someone who takes it off you.
-- THE ARCHIVE IS NOW A PLACE YOU FILL. Four colonists must live at the colony before
-  you may START it, and when it is finished you must UPLOAD twelve people into it from
-  the people living there. Uploading is a free order; the people leave the living
-  population for good, and the count can never go down. Four at a time is enough.
+- THE ARCHIVE IS NOW A PLACE YOU FILL, AND IT WAITS ON YOUR OWN TECH. Two things must
+  be true before you may START it: the world must have researched THE UPLOAD, which is
+  the Archivists' own tech at the far end of the Society branch, and four colonists must
+  live at the colony. When it is finished you must UPLOAD twelve people into it from the
+  people living there. Uploading is a free order; the people leave the living population
+  for good, and the count can never go down. Four at a time is enough.
+  You can still bank research into the archive fund from turn one while you wait - up to
+  a quarter of what it needs - so the waiting is not wasted. After that your labs feed
+  the shared tech tree again, which is how you get to choose The Upload yourself instead
+  of waiting for somebody else to pick it.
 - RELATIONS. Every side now keeps a score of what it thinks of every other, on a grid
   at the foot of the Victory window (V). It drops a point each turn someone spends
   influence on a place you hold or attacks you, and recovers slowly. IT DOES NOTHING
@@ -117,8 +123,10 @@ Write down anything, however small. Especially:
   hovering it?
 - THE THREE LINES ON THE REGION CARD: do they read, or are they three numbers in a row?
   The middle one has a clause about the threshold that only appears sometimes.
-- THE ARCHIVE, if you played the Archivists: did the four-people requirement stop you
-  from starting it, and did you find the Upload button when it was finished?
+- THE ARCHIVE, if you played the Archivists: which of the two gates held you up longer,
+  the four people or The Upload? Did you work out that you could steer the tech tree
+  toward your own tech by NOT banking everything into the archive fund? Did you find the
+  Upload button when it was finished?
 - THE RELATIONS GRID: did you look at it? Did the fact that it does nothing bother you,
   or was it interesting to watch anyway?
 - THE TECH TREE: did you try clicking the research number to open it?

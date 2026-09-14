@@ -25,7 +25,7 @@ The Faction that exists to get people off Earth and spread them as widely as it 
 _Avoid_: settlers, arks, exodus, nomads
 
 **Archivists**:
-The Faction that means to save what humanity knows, and as many of its people as it can, in one place off Earth. Their signature rule is Provisional Findings, their Unique Facility is the Reactor, and they win by completing the Archive and Uploading twelve Colonists into it.
+The Faction that means to save what humanity knows, and as many of its people as it can, in one place off Earth. Their signature rule is Provisional Findings, their Unique Facility is the Reactor, and they win by completing the Archive and Uploading twelve Colonists into it. Since version 0.08.0 they may not begin the Archive until The Upload, their own gate Tech, stands -- so their Labs' Research is a choice between the monument and the tree that opens its door.
 _Avoid_: scholars, librarians, scientists, the Academy
 
 **Steerage**:
@@ -41,7 +41,7 @@ Retired in version 0.05.5. The word named a construction raised in stages, each 
 _Avoid_: project, megaproject, wonder, great work, campaign, stage
 
 **The Archive**:
-A Module only the Archivists build, at one Colony off Earth and at most one per Faction, three turns to raise from its own button. Since version 0.08.0 four Colonists must live at the place before it may be ORDERED, checked once at the order and never again. Standing, it still wants its Research, paid into the Archive fund at any pace; complete, with every point paid, it takes a great deal of Energy to keep running, and only then may Colonists be Uploaded into it. It is destroyed outright if its Colony changes hands, and the fund is kept.
+A Module only the Archivists build, at one Colony off Earth and at most one per Faction, three turns to raise from its own button. Since version 0.08.0 it may be ORDERED only when two things hold, both checked once at the order and never again: the Archivists' gate Tech, **The Upload**, must stand, and **four Colonists** must live at the place. Standing, it still wants its Research, paid into the Archive fund at any pace; complete, with every point paid, it takes a great deal of Energy to keep running, and only then may Colonists be Uploaded into it. It is destroyed outright if its Colony changes hands, and the fund is kept.
 _Avoid_: library, vault, monument, database, stage
 
 **Fund the Archive**:

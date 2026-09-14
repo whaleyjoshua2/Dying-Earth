@@ -1154,6 +1154,14 @@ fn with_tech(g: &mut Game, t: TechId) {
 
 /// Ticket #84 (version 0.06.0): every Victory Condition waits on its gate Tech, so a test about
 /// winning opens all four first.
+/// Ticket #199 (version 0.08.0): the Archivists' gate Tech, which the Archive now waits on to be
+/// ORDERED as well as to win. Every test that builds an Archive needs it in.
+fn the_upload(g: &mut Game) {
+    if !g.research.done.contains(&TechId::TheUpload) {
+        g.research.done.push(TechId::TheUpload);
+    }
+}
+
 fn open_gates(g: &mut Game) {
     for t in [TechId::PlanetaryStewardship, TechId::ExtractionCharter, TechId::GenerationShips, TechId::TheUpload] {
         g.research.done.push(t);
@@ -2045,6 +2053,7 @@ fn funding_the_archive_banks_this_turns_research_and_contributes_nothing_to_the_
 fn the_archive_is_one_module_of_fifty_materials_and_three_turns_built_once_off_earth() {
     let mut g = game();
     g.seats[3].stockpile.materials = 200;
+    the_upload(&mut g);
     let mars = colony(&mut g, Seat(3), BodyId::Mars, &[ModuleKind::Habitat], 4);
     let order = Order::BuildArchive { colony: mars };
     assert_eq!(g.order_cost(Seat(3), &order).materials, 50);
@@ -2237,6 +2246,7 @@ fn the_archivist_ai_builds_its_way_off_earth_and_then_the_archive() {
     let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
     g.seats[arc.index()].stockpile.materials = 200;
     g.seats[arc.index()].stockpile.energy = 200;
+    the_upload(&mut g);
     // Ticket #192 (version 0.08.0): the station is bare, so the Archive is not orderable there, and
     // the computer must not spend the turn on an order that would be refused. Measured, it ordered
     // the Archive on turn 1 at an empty station in 80 of 80 games before this gate.
@@ -2261,6 +2271,20 @@ fn the_archivist_ai_builds_its_way_off_earth_and_then_the_archive() {
     g.seats[arc.index()].stockpile.materials = 200;
     g.seats[arc.index()].stockpile.energy = 200;
     let mars = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Mine, ModuleKind::Generator], 4);
+    // Ticket #199 (version 0.08.0): without the gate Tech the Archive is refused, and the computer
+    // must neither order it nor FREEZE ITS MATERIALS waiting for it -- a candidate it cannot afford
+    // yet makes the seat hold its Materials and build nothing else, which over the fifteen turns the
+    // Tech takes would be worse than the gate itself. Both are guaranteed by the validator rather
+    // than by a guard in the AI: `check_order` drops the candidate and `check_order_legality` stops
+    // it reserving. The place has its four Colonists here, so the Tech is all that is left.
+    assert!(!g.has_tech(TechId::TheUpload), "the premise: the world has not researched it yet");
+    let orders = g.ai_orders(arc);
+    assert!(!orders.iter().any(|o| matches!(o, Order::BuildArchive { .. })), "it should not order what the Tech refuses: {orders:?}");
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::BuildFacility { .. } | Order::BuildModule { .. })),
+        "and it should get on with something else rather than hold its Materials for an Archive it cannot order: {orders:?}"
+    );
+    the_upload(&mut g);
     let axiom = station_of(&g, arc, BodyId::Earth).unwrap();
     // Ticket #192 (version 0.08.0): the Archive goes to the oldest place that can take it, and since
     // this ticket "can take it" means four people live there. Axiom is bare here, so Mars wins --
@@ -8128,6 +8152,18 @@ fn ordering_the_archive_wants_four_colonists_at_the_place_and_only_at_the_order(
     g.seats[arc.index()].stockpile.materials = 200;
     let cid = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Habitat], 0);
     let order = Order::BuildArchive { colony: cid };
+
+    // Ticket #199 (version 0.08.0): the gate Tech is named FIRST of the two refusals, because it is
+    // the one still true after the other is solved -- four Colonists arrive at a median turn 11 and
+    // The Upload at a median 15.
+    g.colony_mut(cid).unwrap().colonists = 4;
+    assert_eq!(
+        g.check_order(arc, &[], &order).unwrap_err().0,
+        "the Archive waits on The Upload, which the world has not researched yet"
+    );
+    g.colony_mut(cid).unwrap().colonists = 0;
+    assert_eq!(g.check_order(arc, &[], &order).unwrap_err().0.split(',').next().unwrap(), "the Archive waits on The Upload");
+    the_upload(&mut g);
 
     assert_eq!(g.tables.archive.colonists_to_order, 4, "the card figure");
     for (living, expected) in [

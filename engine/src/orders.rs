@@ -463,6 +463,19 @@ impl Game {
                 if self.archive_ordered(seat) || pending.iter().any(|o| matches!(o, Order::BuildArchive { .. })) {
                     return fail("the Archive is already building");
                 }
+                // Ticket #199 (version 0.08.0): and the Archivists' own gate Tech must stand. The
+                // gate Tech already gates the WIN (ticket #84); measured, it arrived one turn before
+                // they were ready anyway, so it gated nothing. Gating the ORDER is what moves them.
+                //
+                // Named FIRST of the two refusals because it is the one that will still be true after
+                // the other is solved: the four Colonists arrive at a median turn 11 and The Upload at
+                // a median 15, so a player told to fetch people who is then told to wait for a Tech
+                // has been led on.
+                if let Some(gate) = self.tables.victory_gate(FactionKind::Archivists)
+                    && !self.has_tech(gate)
+                {
+                    return fail(format!("the Archive waits on {}, which the world has not researched yet", self.tables.tech(gate).name));
+                }
                 // Ticket #192 (version 0.08.0): the gate. Checked ONCE, here, at the order; neither
                 // the three-turn build nor the standing Module cares afterwards. A build that could
                 // stall halfway would be a new state to hold in the save, draw on the card and say in

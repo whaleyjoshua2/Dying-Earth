@@ -1050,6 +1050,14 @@ impl Game {
                 let opp = if fund + self.seat(seat).research_last_turn >= cap { m.opportunity } else { 1.0 };
                 push(vec![Order::SetArchiveFunding { on: true }], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, opp, format!("pay the Labs into the Archive fund from the next Income, {} Research a turn", self.seat(seat).research_last_turn), None);
             }
+            // Ticket #199 (version 0.08.0): the Archive also waits on the gate Tech, and the computer
+            // is deliberately NOT taught that here. Every candidate goes through `check_order` before
+            // it is chosen and through `check_order_legality` before it can reserve Materials, so a
+            // refused Archive is skipped at no cost and never freezes the seat's build programme.
+            // A guard here was written first and then removed: its false state could not be
+            // constructed, which is the signal that the code was claiming to prevent something the
+            // validator already prevents. Ticket #192's Colonist gate is different and stays -- it
+            // chooses WHICH Colony to name, which no validator can do.
             if !self.archive_built(seat) && !self.archive_ordered(seat) {
                 // Ticket #192 (version 0.08.0): the gate. The computer ordered the Archive on turn 1
                 // of every one of 80 measured games, at a station with nobody on it; without this it

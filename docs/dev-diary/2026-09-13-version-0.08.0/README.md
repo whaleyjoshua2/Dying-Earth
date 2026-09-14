@@ -133,7 +133,7 @@ output is in [`sweep-before.txt`](sweep-before.txt) and [`sweep-after.txt`](swee
 | Archivists | Archivists 11, Custodians 9 | 0 |
 | **totals** | **Archivists 42, Custodians 21, Arkwrights 6, Prospectors 2** | **9 of 80** |
 
-**After, the finished version:**
+**After the version's own rules, before the Archive's Tech gate:**
 
 | seat 0 | wins | Collapses |
 |---|---|---|
@@ -142,6 +142,58 @@ output is in [`sweep-before.txt`](sweep-before.txt) and [`sweep-after.txt`](swee
 | Arkwrights | Archivists 17, Arkwrights 2 | 1 |
 | Archivists | Archivists 20 | 0 |
 | **totals** | **Archivists 74, Custodians 3, Arkwrights 2, Prospectors 0** | **1 of 80** |
+
+**After the Archive's Tech gate (ticket #199), which is what shipped:**
+
+| seat 0 | wins | Collapses |
+|---|---|---|
+| Custodians | Archivists 20 | 0 |
+| Prospectors | Archivists 12, Custodians 4, Prospectors 3 | 1 |
+| Arkwrights | Archivists 15, Custodians 5 | 0 |
+| Archivists | Archivists 11, Custodians 9 | 0 |
+| **totals** | **Archivists 58, Custodians 18, Prospectors 3, Arkwrights 0** | **1 of 80** |
+
+The Archive now stands at a median turn **18 to 25** instead of 8 to 10 and completes at **20 to 28**
+instead of 13 to 15; in the Arkwright seating it never completes at all in 4 seeds of 20, and in the
+Archivists' own seating in 8 of 20. The Custodians recover from 3 wins to **18**, near their
+branch-point 21, and **the Prospectors take their first 3 wins** -- the first any measurement in this
+version produced. **It halves the excess rather than removing it, knowingly**: 58 of 80 is still 72%,
+and the Upload's bar remains the other lever.
+
+**The Arkwrights fell from 2 wins to 0.** Longer games should have helped them and did not; their
+seating is the one where the Archive most often fails to complete, so those wins went to the
+Custodians. At 20 seeds it may be noise, and it may be that Diaspora is unreachable in any length of
+game -- which is already sitting in the map's fog.
+
+This sweep was run twice: once as a **trial in a throwaway worktree** before the decision was taken,
+and again on the branch after it was built. The two agree in every seating to the seed, which is what
+established that the guard first written into the computer's own reasoning made no difference -- see
+the red witnesses below.
+
+### Why the Archive waits on a Tech now
+
+The first sweep sent the designer looking at the Tech Tree: *"I find it hard to believe they've
+researched a level three tech by turn 16."* The doubt was right and the truth was worse.
+
+**The whole seventeen-Tech tree completes by turn 16 of 36.** Every Faction's gate is a rung-3 Tech
+and all four are standing: Planetary Stewardship at turn 13, The Extraction Charter and Generation
+Ships at 15, The Upload at 16. A rung-3 Tech is a mid-game milestone in this build, and The Upload is
+merely the last of seventeen because nothing ever prioritised it.
+
+**And the Archivists researched none of it.** The completion line reads `Custodians 21, Prospectors
+23, Arkwrights 6, Archivists 0` -- their rivals finished their own gate for them while they poured
+every Lab into the Archive fund. The **Prospectors** picked The Upload on turn 15, and not
+deliberately: the computer's fallback is the cheapest Tech left, and by then it was one of the last
+two on the board.
+
+So the Archive now waits on The Upload to be **ordered**, not merely to win -- the gate Tech already
+gated the win, it just arrived a turn before they were ready. The Archivists' Labs become a choice
+between the monument and the tree that opens its door.
+
+**That the tree finishes in sixteen turns is deliberately not addressed here**, since changing the
+Research pace in the same version that changed what a Lab makes and what a population adds would make
+this whole table unreadable. It is
+[its own ticket](https://github.com/whaleyjoshua2/Dying-Earth/issues/201).
 
 ### The Upload made the Archivists stronger, not weaker
 
@@ -215,3 +267,12 @@ because they found something rather than confirming it:
 - **A weight of zero does not remove an order.** Setting the computer's `upload` weight to 0 left it
   uploading anyway, so that false state had to perturb the code that pushes the order, not the number
   that prices it.
+- **A guard in the computer's reasoning was written and then deleted, because its false state could
+  not be constructed.** Ticket #199's Tech gate was taught to the AI the way ticket #192's Colonist
+  gate had been; removing it again changed no test and no sweep figure. Chasing that to its
+  precondition: every AI candidate passes `check_order` before it is chosen **and**
+  `check_order_legality` before it may reserve Materials, so a refused Archive is skipped at no cost
+  and cannot freeze the seat's build programme either. The guard was claiming to prevent something
+  the validator already prevents, and it is gone. The test now pins what actually matters -- without
+  the Tech the computer neither orders the Archive nor holds its Materials for one. Ticket #192's
+  Colonist gate stays, because it chooses **which** Colony to name, which no validator can do.
