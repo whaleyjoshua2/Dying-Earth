@@ -367,6 +367,12 @@ pub enum ShipAt {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Ship {
     pub id: ShipId,
+    /// Ticket #210 (version 0.08.1): the hull's own name, without its Faction's prefix -- `Magellan`,
+    /// not `TSV Magellan`. The prefix belongs to whoever flies it and is read from the seat when the
+    /// Ship is drawn, so a name travels with the hull and a prefix with its owner. Unique across the
+    /// whole board: two Challengers on two sides in one game is a bug report waiting to happen.
+    #[serde(default)]
+    pub name: String,
     pub kind: UnitKind,
     pub seat: Seat,
     pub damage: u32,
@@ -1282,6 +1288,48 @@ impl Game {
     /// measured games there are **0 Mars-system Colonies, 0 Venus stations and 0 Colonies on Phobos
     /// or Deimos** -- so it would have been a rule the computer could never satisfy at all. Reduces
     /// to `body != Earth`, since Antarctica was already barred for being ON Earth.
+    /// Ticket #210 (version 0.08.1): the name a Ship of this kind would be built with -- the first
+    /// name in its list that no Ship on the board is already using. In LIST ORDER, deliberately: ids
+    /// are sequential and deterministic, so this draws no randomness at all, where a random pick
+    /// would shift every later roll in a seeded game and make a sweep incomparable with its baseline.
+    /// A Colony Ship draws from the colony list; a Frigate, a Battleship and a Carrier from the
+    /// warship list, the Carrier included at the designer's word because it sails with a fleet.
+    /// Once a list is exhausted it begins again with a numeral -- Magellan, Magellan II, Magellan III
+    /// -- which a thirty-six-turn game will never reach and an eighty-game sweep might.
+    pub fn next_ship_name(&self, kind: UnitKind) -> String {
+        let list = if kind == UnitKind::ColonyShip { &self.tables.ship_names.colony.names } else { &self.tables.ship_names.warship.names };
+        if list.is_empty() {
+            return String::new();
+        }
+        let taken: std::collections::HashSet<&str> = self.ships.iter().map(|s| s.name.as_str()).collect();
+        for pass in 0..1000u32 {
+            for base in list {
+                let name = if pass == 0 { base.clone() } else { format!("{base} {}", Self::numeral(pass + 1)) };
+                if !taken.contains(name.as_str()) {
+                    return name;
+                }
+            }
+        }
+        list[0].clone()
+    }
+
+    /// A small Roman numeral for a reused name. Beyond what any game reaches it falls back to the
+    /// figure itself, which is ugly and unreachable rather than wrong.
+    fn numeral(n: u32) -> String {
+        const ROMAN: [&str; 19] = ["II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"];
+        ROMAN.get(n as usize - 2).map(|r| r.to_string()).unwrap_or_else(|| n.to_string())
+    }
+
+    /// Ticket #210 (version 0.08.1): what a Ship is called on screen -- its Faction's prefix and its
+    /// own name, `TSV Magellan`. A Ship built before this version, or one whose list was empty, has
+    /// no name and falls back to the kind and id it always had.
+    pub fn ship_name(&self, s: &Ship) -> String {
+        if s.name.is_empty() {
+            return format!("{} {}", s.kind.name(), s.id.0);
+        }
+        format!("{} {}", self.tables.faction(self.kind(s.seat)).ship_prefix, s.name)
+    }
+
     pub fn may_hold_archive(&self, c: &Colony) -> bool {
         c.body != BodyId::Earth
     }

@@ -1,0 +1,43 @@
+# Ticket #210 (version 0.08.1): every Ship is named when it is built. The designer: *"Ships should
+# be given a name when made e.g. USS Challenger USS Magellan draw from two list one for warships
+# another for colony"*.
+#
+# Two lists, and four Ship kinds. A **Colony Ship** draws from `colony`; a **Frigate** and a
+# **Battleship** draw from `warship`; and so does the **Carrier**, at the designer's word, because it
+# sails with a fleet and an explorer's name would read oddly beside a Battleship.
+#
+# HOW A NAME IS PICKED, and why it is not random. Ship ids are sequential and deterministic, so the
+# first unused name in list order is a deterministic choice that draws no randomness at all. That
+# matters more than it sounds: the sweep compares seeds against a baseline, and a new random draw
+# would shift every subsequent roll in a game and make the comparison meaningless.
+#
+# A name is **unique across the whole board**, not per Faction -- two Challengers in one game on two
+# different sides is a bug report waiting to happen. When a list is exhausted it begins again with a
+# numeral: Magellan, then Magellan II, then Magellan III. Forty names a list is far more than a
+# thirty-six-turn game will ever spend, and the wrapping exists for the sweep, which plays eighty.
+#
+# The Faction's prefix is NOT here: it lives on the Faction's own card in `factions.toml`, beside
+# its colour and its symbol, and is put in front of the name when the Ship is drawn. So the name
+# belongs to the hull and the prefix to whoever holds it.
+
+# Ships of exploration and discovery, real ones, for the hulls that carry people somewhere new.
+[colony]
+names = [
+  "Magellan", "Challenger", "Endeavour", "Beagle", "Discovery", "Resolution", "Endurance",
+  "Terra Nova", "Fram", "Nautilus", "Vostok", "Zarya", "Kon-Tiki", "Golden Hind", "Victoria",
+  "Santa Maria", "Erebus", "Investigator", "Adventure", "Bounty", "Rattlesnake", "Astrolabe",
+  "Belgica", "Aurora", "Quest", "Pourquoi Pas", "Gjoa", "Maud", "Nimrod", "Southern Cross",
+  "Scotia", "Deutschland", "Polarstern", "Healy", "Meteor", "Albatross", "Valdivia", "Carnegie",
+  "Atlantis", "Knorr",
+]
+
+# Ships of the line, for the hulls that fight and for the Carrier that sails with them.
+[warship]
+names = [
+  "Valiant", "Defiant", "Vanguard", "Indomitable", "Implacable", "Formidable", "Illustrious",
+  "Dauntless", "Dreadnought", "Invincible", "Repulse", "Renown", "Revenge", "Warspite", "Rodney",
+  "Tiger", "Lion", "Agincourt", "Bellerophon", "Temeraire", "Ajax", "Achilles", "Exeter",
+  "Sheffield", "Belfast", "Jervis", "Cossack", "Javelin", "Onslow", "Musketeer", "Savage",
+  "Scorpion", "Swift", "Zealous", "Zephyr", "Venomous", "Vendetta", "Vigilant", "Intrepid",
+  "Relentless",
+]

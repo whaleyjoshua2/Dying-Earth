@@ -112,7 +112,8 @@ impl Game {
             if lost == 0 {
                 continue;
             }
-            let ship_name = format!("{} {}", kind.name(), id.0);
+            // Ticket #210 (version 0.08.1): the Report names the hull, not its kind and id.
+            let ship_name = self.ship(*id).map(|s| self.ship_name(s)).unwrap_or_else(|| format!("{} {}", kind.name(), id.0));
             if let Some(s) = self.ship_mut(*id) {
                 s.colonists -= lost;
             }
@@ -133,7 +134,8 @@ impl Game {
             );
         }
         for (seat, body, id) in &arrivals {
-            let kind = self.ship(*id).map(|s| s.kind.name()).unwrap_or("Ship").to_string();
+            // Ticket #210 (version 0.08.1): the hull's name where its kind stood.
+            let kind = self.ship(*id).map(|s| self.ship_name(s)).unwrap_or_else(|| "Ship".to_string());
             let line = format!("{} {} arrived at {}.", self.seat_name(*seat), kind, self.tables.body(*body).name);
             let text = self.say(
                 "ship_arrived",
@@ -455,7 +457,7 @@ impl Game {
         let cargo = if ship.colonists > 0 { self.phrase("cargo_aboard", &[("n", ship.colonists.to_string())]) } else { String::new() };
         let text = self.say(
             "ship_destroyed",
-            &[("faction", self.seat_name(ship.seat)), ("ship", ship.kind.name().to_string()), ("why", why.to_string()), ("cargo", cargo)],
+            &[("faction", self.seat_name(ship.seat)), ("ship", self.ship_name(&ship)), ("why", why.to_string()), ("cargo", cargo)],
         );
         let place = match ship.at {
             ShipAt::Body(b) => Some(ReportPlace::Body(b)),
@@ -1181,8 +1183,13 @@ impl Game {
                     Place::Colony(c) => self.colony(c).map(|c| c.body).unwrap_or(BodyId::Earth),
                 };
                 let id = ShipId(self.fresh_id());
+                // Ticket #210 (version 0.08.1): named at the build, from the list its kind draws
+                // from, taking the first name no Ship on the board is using. This is the ONE place a
+                // Ship comes into a real game, so it is the one place a name is given.
+                let name = self.next_ship_name(kind);
                 self.ships.push(Ship {
                     id,
+                    name,
                     // Ticket #99: a Ship built at a Shipyard starts at the Body at large.
                     slot: None,
                     kind,

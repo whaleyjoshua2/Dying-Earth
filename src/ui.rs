@@ -577,6 +577,24 @@ impl Kind {
 
 /// The kind glyph in a `Ui` row, at `size`: the icon where one is loaded, the Army's drawn shield,
 /// and nothing at all where the art is missing, so a name is never pushed about by a hole.
+/// Ticket #210 (version 0.08.1): **whose it is, as a mark rather than a sentence.** The designer
+/// asked for the Faction's symbol on a station's card *"similar to the flags for nations"* -- a
+/// Region card wears its Nation's flag beside its name (ticket #122) and says who controls it only
+/// in words below. A Colony card said `Held by the Archivists` and wore nothing, so this puts the
+/// holder's symbol where the flag sits, in the Faction's own colour, and on Ships for the same
+/// reason. Neutral places wear nothing, exactly as a Region with no flag stands alone.
+///
+/// This is the third caller to pick an icon's colour rather than read it from `icons::fill`, after
+/// the Faction card and the Faction window, and for the same reason: a Faction symbol's colour means
+/// WHOSE, which is the one thing that rule exists to express.
+fn faction_glyph(ui: &mut Ui, session: &Session, game: &Game, seat: Option<Seat>, size: f32) {
+    let Some(seat) = seat else { return };
+    let key = crate::icons::faction_symbol(game.kind(seat));
+    if let Some(image) = Icons::from_ctx(ui.ctx(), key, size) {
+        ui.add(image.tint(seat_colour(session, seat))).on_hover_text(format!("The {}", game.seat_name(seat)));
+    }
+}
+
 fn kind_glyph(ui: &mut Ui, kind: Kind, size: f32) {
     if kind == Kind::Army {
         let (rect, _) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::hover());
@@ -4291,7 +4309,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     game,
                     &session.pending,
                     Order::Load { ship: s.id, colonists: n, from: LoadSource::State(sid), army: None },
-                    &format!("Send {n} to Colony Ship {} in orbit", s.id.0),
+                    &format!("Send {n} to {} in orbit", game.ship_name(s)),
                     Some(format!("A launch, aboard at this turn's Resolution. This Ship carries {capacity} and has {} aboard. To crowd it past its capacity, load it from its own card.", s.colonists)),
                     actions,
                 );
@@ -4443,6 +4461,10 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // Ticket #127 (version 0.07.2): the kind glyph in front of the name, as on the roster.
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
+        // Ticket #210 (version 0.08.1): the holder's symbol first, where a Region card's flag sits,
+        // then the kind glyph that says station or surface, then the name. At 22 to match this
+        // card's own heading rather than the Region card's 32: the two headings are different sizes.
+        faction_glyph(ui, session, game, col.control.controller(), 22.0);
         kind_glyph(ui, Kind::of_colony(col), 22.0);
         ui.label(RichText::new(game.place_name(Place::Colony(cid))).size(22.0).strong());
     });
@@ -4680,7 +4702,11 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         if s.army.is_some() {
             extra.push("an Army".into());
         }
-        ui.label(format!("  {} {}: strength {}, damage {}/{}{}", s.kind.name(), s.id.0, game.ship_strength(s), s.damage, card.hit_points, if extra.is_empty() { String::new() } else { format!(", carrying {}", extra.join(" and ")) }));
+        ui.horizontal(|ui| {
+            faction_glyph(ui, session, game, Some(s.seat), 16.0);
+            ui.label(format!("{}: strength {}, damage {}/{}{}", game.ship_name(s), game.ship_strength(s), s.damage, card.hit_points, if extra.is_empty() { String::new() } else { format!(", carrying {}", extra.join(" and ")) }))
+                .on_hover_text(format!("{} {}", s.kind.name(), s.id.0));
+        });
     }
     if session.spectator {
         let enemy = game.enemy_ship_strength(seat, body);
@@ -4739,7 +4765,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             ui.label(format!("To {}: {} turn(s), {} Fuel each from the tank", game.tables.body(to).name, turns, fuel));
             for s in &ships {
                 // Ticket #87: the button reads the tank against the leg.
-                cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: None }, &format!("{} {} ({}/{} in the tank)", s.kind.name(), s.id.0, s.fuel, game.tables.unit(s.kind).tank), actions);
+                cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: None }, &format!("{} ({}/{} in the tank)", game.ship_name(s), s.fuel, game.tables.unit(s.kind).tank), actions);
             }
         });
     }
@@ -4749,7 +4775,11 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     for s in &ships {
         let tank = game.tables.unit(s.kind).tank;
         ui.horizontal_wrapped(|ui| {
-            ui.label(format!("{} {}: {}/{} Fuel", s.kind.name(), s.id.0, s.fuel, tank));
+            // Ticket #210 (version 0.08.1): the name, with the Faction's symbol in front of it and
+            // the kind and id kept on the hover -- a save, a log line and a Report all speak in ids.
+            faction_glyph(ui, session, game, Some(s.seat), 16.0);
+            ui.label(format!("{}: {}/{} Fuel", game.ship_name(s), s.fuel, tank))
+                .on_hover_text(format!("{} {}", s.kind.name(), s.id.0));
             if game.own_station_at(Seat(0), body) {
                 cost_button(ui, game, &session.pending, Order::Refuel { ship: s.id }, "Refuel from the Stockpile", actions);
             } else if game.stranded(s.id) {
@@ -4769,7 +4799,10 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         if capacity == 0 && !card.carries_army {
             continue;
         }
-        ui.label(format!("{} {}:", s.kind.name(), s.id.0));
+        ui.horizontal(|ui| {
+            faction_glyph(ui, session, game, Some(s.seat), 16.0);
+            ui.label(format!("{}:", game.ship_name(s))).on_hover_text(format!("{} {}", s.kind.name(), s.id.0));
+        });
         if crowd > 0 {
             let p = game.tables.crowding.death_chance_per_extra * 100.0;
             ui.colored_label(

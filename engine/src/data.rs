@@ -338,6 +338,10 @@ pub struct FactionCard {
     pub id: FactionKind,
     pub name: String,
     pub blurb: String,
+    /// Ticket #210 (version 0.08.1): the prefix every Ship of this Faction wears in front of its
+    /// name. It belongs to the HOLDER, not the hull -- a name travels with the ship, a prefix with
+    /// whoever flies it -- so it is read from the seat at drawing time and never stored on the Ship.
+    pub ship_prefix: String,
     pub output_multiplier: f64,
     pub emissions_multiplier: f64,
     pub research_multiplier: f64,
@@ -1166,6 +1170,23 @@ pub struct Tables {
     /// of a tutorial game's first turns. They are words and nothing else -- no rule reads them -- but
     /// they live here with every other sentence the game says, so they can be rewritten without a build.
     pub tutorial: TutorialTable,
+    /// Ticket #210 (version 0.08.1): the two lists every Ship is named from.
+    pub ship_names: ShipNames,
+}
+
+/// Ticket #210 (version 0.08.1): the names a Ship may be given, in two lists. A Colony Ship draws
+/// from `colony`; a Frigate, a Battleship and a Carrier from `warship`. Order matters: a Ship takes
+/// the first unused name in list order, which is deterministic and draws no randomness, so naming
+/// cannot shift a seeded game's rolls and make a sweep incomparable with its baseline.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ShipNames {
+    pub colony: ShipNameList,
+    pub warship: ShipNameList,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ShipNameList {
+    pub names: Vec<String>,
 }
 
 fn read<T: for<'de> Deserialize<'de>>(dir: &Path, file: &str) -> Result<T, DataError> {
@@ -1203,7 +1224,9 @@ impl Tables {
         let ephemeris: EphemerisFile = read(dir, "ephemeris.toml")?;
         let report: crate::report::ReportTable = read(dir, "report.toml")?;
         let tutorial: TutorialTable = read(dir, "tutorial.toml")?;
+        let ship_names: ShipNames = read(dir, "ship_names.toml")?;
         let tables = Tables {
+            ship_names,
             sibling_transit: (bodies.sibling_turns, bodies.sibling_fuel),
             station_materials: bodies.station_materials,
             slot_yield_spread: bodies.slot_yield_spread,

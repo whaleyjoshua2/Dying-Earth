@@ -205,7 +205,10 @@ fn build_board(session: &mut Session) {
             };
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
-            g.ships.push(Ship { id, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
+            // Ticket #210 (version 0.08.1): a planted Ship is named as a built one is, so a picture
+            // shows what a game shows.
+            let name = g.next_ship_name(kind);
+            g.ships.push(Ship { id, name, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
         }
         // `battle:1` (a building aid): three seats bring a Frigate to Mars with Attack stances and
         // one more turn runs, so the Report carries a three-party Battle (ticket #50).
@@ -213,7 +216,8 @@ fn build_board(session: &mut Session) {
             for seat in [Seat(0), Seat(1), Seat(2)] {
                 let id = ShipId(g.fresh_id());
                 let built_turn = g.turn;
-                g.ships.push(Ship { id, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
+                let name = g.next_ship_name(UnitKind::Frigate);
+                g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
             }
             for s in g.ships.iter_mut().filter(|s| s.at == ShipAt::Body(BodyId::Mars)) {
                 s.stance = Stance::Attack;
@@ -315,8 +319,10 @@ fn build_board(session: &mut Session) {
             g.climate.temperature = 2.6;
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
             g.ships.push(Ship {
                 id,
+                name,
                 kind: UnitKind::ColonyShip,
                 seat: Seat(0),
                 damage: 0,
@@ -401,8 +407,10 @@ fn build_board(session: &mut Session) {
         if std::env::args().any(|a| a == "ship:1") {
             let id = ShipId(g.fresh_id());
             let turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
             g.ships.push(Ship {
                 id,
+                name,
                 slot: None,
                 kind: UnitKind::ColonyShip,
                 seat: Seat(0),
@@ -574,8 +582,10 @@ fn build_board(session: &mut Session) {
         if std::env::args().any(|a| a == "found:1" || a == "moment:colony") && !std::env::args().any(|a| a.starts_with("antarctic:")) {
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
             g.ships.push(Ship {
                 id,
+                name,
                 kind: UnitKind::ColonyShip,
                 seat: Seat(0),
                 damage: 0,
