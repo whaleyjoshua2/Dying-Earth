@@ -35,7 +35,13 @@ materials = 25
 build_turns = 1
 energy_upkeep = 2
 # Ticket #80 (version 0.06.0): 8, from 4 (the Arkwrights 12; Expanded Habitats still +2).
-holds_colonists = 8
+# Ticket #207 (version 0.08.1): back to 4, at the designer's word -- "Habs back to 4" -- with
+# Expanded Habitats raised to +4 in its place (`habitat_colonists` in techs.toml), so a RESEARCHED
+# Habitat holds the 8 an unresearched one held before. The squeeze therefore falls almost entirely
+# on the early game: about a third tighter until the Tech lands, which a measured game reaches
+# around turn 11, and about 15% tighter after it. The Core Module's flat 4 is untouched, and so is
+# the Arkwrights' x1.5, which now carries 6 and 12 where it carried 12 and 15.
+holds_colonists = 4
 
 [[module]]
 id = "shipyard"

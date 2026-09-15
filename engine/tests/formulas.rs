@@ -1243,7 +1243,7 @@ fn tech_hardened_hulls_adds_two_strength_to_every_ship_but_a_colony_ship_stays_a
 }
 
 #[test]
-fn tech_expanded_habitats_holds_two_more() {
+fn tech_expanded_habitats_holds_four_more() {
     let mut g = game();
     // Ticket #80 (version 0.06.0): a Habitat holds 8. The Moon's Habitat yield of 1.1 made that
     // 8.8 and 11.0 until ticket #140 (version 0.07.3) traded the yield for a Research one: flat 8
@@ -1251,9 +1251,12 @@ fn tech_expanded_habitats_holds_two_more() {
     let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 0);
     // Ticket #164 (version 0.07.5): plus the Core Module's flat four, which the Tech does not reach.
     let core = g.tables.module(ModuleKind::Core).holds_colonists;
-    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 8 + core);
+    // Ticket #207 (version 0.08.1): 4, with the Tech raised to +4 in its place, so a RESEARCHED
+    // Habitat holds the 8 an unresearched one held before. The Tech's Colony Ship clause stays +2
+    // and is read from `value`; this one is read from `habitat_colonists`.
+    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 4 + core);
     with_tech(&mut g, TechId::ExpandedHabitats);
-    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 10 + core);
+    assert_eq!(g.habitat_room(g.colony(c).unwrap()), 8 + core);
 }
 
 #[test]
@@ -1934,11 +1937,12 @@ fn an_arkwright_habitat_holds_twelve() {
     // Ticket #164 (version 0.07.5): and the Core Module every founding gives holds four more, flat,
     // which neither the Arkwrights' multiplier nor Expanded Habitats reaches.
     let core = g.tables.module(ModuleKind::Core).holds_colonists;
-    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 8 + core);
-    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 12 + core, "half again for the Arkwrights");
+    // Ticket #207 (version 0.08.1): 4 and 6, and with Expanded Habitats 8 and 12.
+    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 4 + core);
+    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 6 + core, "half again for the Arkwrights");
     g.research.done.push(TechId::ExpandedHabitats);
-    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 10 + core);
-    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 15 + core, "(8 + 2) x 1.5, and the Core Module still four");
+    assert_eq!(g.habitat_room(g.colony(mine).unwrap()), 8 + core);
+    assert_eq!(g.habitat_room(g.colony(theirs).unwrap()), 12 + core, "(4 + 4) x 1.5, and the Core Module still four");
 }
 
 #[test]
@@ -5695,19 +5699,19 @@ fn observatory_stands_on_a_station_and_a_barracks_does_not() {
 /// four -- neither the Arkwrights' multiplier nor Expanded Habitats reaches it. So every figure here
 /// is the Habitat's, plus the same four.
 #[test]
-fn a_habitat_holds_eight_and_twelve_for_the_arkwrights_and_the_core_module_four_flat() {
+fn a_habitat_holds_four_and_six_for_the_arkwrights_and_the_core_module_four_flat() {
     let mut g = game();
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
     let core = g.tables.module(ModuleKind::Core).holds_colonists;
     assert_eq!(core, 4);
     assert_eq!(g.habitat_room(g.colony(iss).unwrap()), core, "the Core Module alone, before any Habitat");
     g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Habitat));
-    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 8 + core);
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 4 + core);
     // The Arkwrights (seat 2) start with no station: hand them the ISS for the reading.
     g.colony_mut(iss).unwrap().control = Control::Controlled(Seat(2));
-    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 12 + core, "half again for the Arkwrights, and the Core Module flat");
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 6 + core, "half again for the Arkwrights, and the Core Module flat");
     with_tech(&mut g, TechId::ExpandedHabitats);
-    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 15 + core, "(8 + 2) x 1.5, and the Core Module still four");
+    assert_eq!(g.habitat_room(g.colony(iss).unwrap()), 12 + core, "(4 + 4) x 1.5, and the Core Module still four");
 }
 
 // ---------------------------------------------------------------- 0.06.0 ticket #81: the Archivists' card

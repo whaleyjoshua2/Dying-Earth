@@ -271,6 +271,13 @@ pub struct TechCard {
     pub needs: Vec<TechId>,
     pub effect: String,
     pub value: f64,
+    /// Ticket #207 (version 0.08.1): Expanded Habitats is read in TWO places -- what a Habitat
+    /// holds and what a Colony Ship carries -- and until now one `value` served both, so neither
+    /// could be moved without the other. This is the Habitat clause where a Tech wants its own
+    /// figure for it; `value` stays the Colony Ship's. Absent, `value` answers for both, which is
+    /// every other Tech in the tree.
+    #[serde(default)]
+    pub habitat_colonists: Option<f64>,
     #[serde(default)]
     pub influence_threshold_multiplier: Option<f64>,
     /// Ticket #84 (version 0.06.0): the Faction whose Victory Condition this Tech opens, if any.

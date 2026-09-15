@@ -1188,7 +1188,23 @@ impl Game {
     /// An additive Tech read for one seat: its full value once done, half rounded down under
     /// Provisional Findings, and 0 otherwise.
     pub fn tech_addition(&self, seat: Seat, t: TechId) -> i64 {
-        let v = self.tables.tech(t).value as i64;
+        self.tech_addition_of(seat, t, self.tables.tech(t).value)
+    }
+
+    /// Ticket #207 (version 0.08.1): what a Tech adds to a HABITAT's capacity, which is not always
+    /// what it adds elsewhere. Expanded Habitats is read both here and by `colony_ship_capacity`,
+    /// and one `value` served both until the designer wanted the Habitat clause moved on its own:
+    /// *"q5 b"* -- split the figure, so housing and transport can be tuned apart. A Tech with no
+    /// `habitat_colonists` of its own answers with its `value`, as every other Tech in the tree does.
+    pub fn habitat_addition(&self, seat: Seat, t: TechId) -> i64 {
+        let card = self.tables.tech(t);
+        self.tech_addition_of(seat, t, card.habitat_colonists.unwrap_or(card.value))
+    }
+
+    /// The shared body: the whole figure once the Tech stands, half of it while the Archivists are
+    /// reading it early through Provisional Findings, nothing otherwise.
+    fn tech_addition_of(&self, seat: Seat, t: TechId, value: f64) -> i64 {
+        let v = value as i64;
         if self.has_tech(t) {
             v
         } else if self.reads_half(seat, t) {
@@ -1877,7 +1893,9 @@ impl Game {
         // holds the Colony, since Provisional Findings gives the Archivists half the Tech early.
         let seat = c.control.controller();
         let per = self.tables.module(ModuleKind::Habitat).holds_colonists as i64
-            + seat.map(|s| self.tech_addition(s, TechId::ExpandedHabitats)).unwrap_or(0);
+            // Ticket #207 (version 0.08.1): the HABITAT clause of Expanded Habitats, which is +4
+            // where the Colony Ship clause it shares a card with is +2.
+            + seat.map(|s| self.habitat_addition(s, TechId::ExpandedHabitats)).unwrap_or(0);
         let faction = seat.map(|s| self.tables.faction(self.kind(s)).habitat_capacity_multiplier).unwrap_or(1.0);
         // Ticket #140 (version 0.07.3): a Habitat holds the same everywhere. It read the slot's
         // Habitat yield on a surface (ticket #57) and 1.0 in orbit (ticket #46) until the designer

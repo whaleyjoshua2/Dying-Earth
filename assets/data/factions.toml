@@ -104,7 +104,7 @@ ship_materials_multiplier = 0.85
 # three quarters (both rounded down).
 station_materials_multiplier = 0.5
 module_materials_multiplier = 0.75
-signature = "Steerage: a Colony Ship carries 8 Colonists (12 with Expanded Habitats), every Ship costs them 15% less (a Colony Ship 25 Materials), and they muster 8 Emigrants a turn where others muster 4, but every Emigrant takes twice the population. Their Habitats hold half again as many (12, 15 with Expanded Habitats), a transit burns three quarters of the Fuel, and, starting with no station, a Space Station costs them 20 Materials and a Colony Module three quarters."
+signature = "Steerage: a Colony Ship carries 8 Colonists (12 with Expanded Habitats), every Ship costs them 15% less (a Colony Ship 25 Materials), and they muster 8 Emigrants a turn where others muster 4, but every Emigrant takes twice the population. Their Habitats hold half again as many (6, 12 with Expanded Habitats), a transit burns three quarters of the Fuel, and, starting with no station, a Space Station costs them 20 Materials and a Colony Module three quarters."
 # Ticket #203 (version 0.08.1). The building is ticket #183's.
 unique = "Spaceport -- replaces the Launch Site, and pays +1 Influence into next turn's Allotment for every Emigrant it lifts off Earth."
 victory = "Diaspora: 30 Colonists living off Earth, on Colonies spread over at least three Bodies with at least 4 Colonists each (Antarctica and stations over Earth do not count)."

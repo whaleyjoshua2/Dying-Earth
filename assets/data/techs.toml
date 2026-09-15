@@ -94,8 +94,16 @@ branch = "Off-world Living"
 rung = 1
 cost = 15
 needs = []
-effect = "Each Habitat holds +2 Colonists"
+# Ticket #207 (version 0.08.1): this card is read in TWO places -- `habitat_room` and
+# `colony_ship_capacity` -- and said so in neither. Its effect line had claimed only the Habitat
+# since ticket #80, so a player had no way to know the Tech also filled their Ships. The figures are
+# now split: `habitat_colonists` is the Habitat clause, `value` the Colony Ship's, and the line
+# names both. The Habitat clause is +4 where the Habitat itself fell from 8 to 4, at the designer's
+# word, so a researched Habitat still holds what an unresearched one held before this version; the
+# Colony Ship clause is left at +2 because nothing asked for ships to grow.
+effect = "Each Habitat holds +4 Colonists; a Colony Ship carries +2 Colonists"
 value = 2.0
+habitat_colonists = 4.0
 
 [[tech]]
 id = "closed_loop_colonies"
