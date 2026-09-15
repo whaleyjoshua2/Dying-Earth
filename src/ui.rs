@@ -417,7 +417,10 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mu
         }
         if view.popup != Popup::None {
             let moments = session.game.as_ref().map(|g| view.moments_of(&session.tables, &g.report).len()).unwrap_or(0);
-            advance_popup(&mut view, moments);
+            // Ticket #205 (version 0.08.1): Escape is the path that used to lose a tutorial turn's
+            // Event, since it never carried the flag the note's own button checked for.
+            let has_event = session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some();
+            advance_popup(&mut view, moments, has_event);
         } else if view.hab_tile.is_some() {
             // Ticket #162 (version 0.07.5): Esc clears a clicked Module tile before it leaves a
             // Surface Map, as it closed the Hab View before the window retired.
@@ -444,10 +447,18 @@ fn tutorial_note(tables: &Tables, turn: u32) -> Option<&dying_earth_engine::Tuto
 }
 
 /// Ticket #58: Event, then the turn's Moments one after another, then the Report.
-fn advance_popup(view: &mut ViewState, moments: usize) {
+///
+/// Ticket #205 (version 0.08.1): `has_event` closes a hole. A tutorial note dismissed by its BUTTON
+/// went on to the Event when the turn had drawn one, because `Action::TutorialNoteRead` checked for
+/// itself; a note dismissed with ESCAPE came through here, where there was no Event arm at all, and
+/// the turn's Event was never shown. So a new player -- the only player a tutorial has -- could be
+/// hit by an Event and never told, and the one who pressed Escape was the one it happened to. Both
+/// paths now pass through the same arm, and `Action::TutorialNoteRead` no longer checks separately.
+fn advance_popup(view: &mut ViewState, moments: usize, has_event: bool) {
     view.popup = match view.popup {
         // Ticket #169 (version 0.07.5): the tutorial's note comes first and hands on to whatever
         // the turn would have opened with.
+        Popup::Tutorial if has_event => Popup::Event,
         Popup::Tutorial if moments > 0 => Popup::Moment(0),
         Popup::Tutorial => Popup::Report,
         Popup::Event if moments > 0 => Popup::Moment(0),
@@ -995,11 +1006,8 @@ pub fn draw(
                     session.tutorial = false;
                 }
                 let moments = session.game.as_ref().map(|g| view.moments_of(&session.tables, &g.report).len()).unwrap_or(0);
-                if session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some() {
-                    view.popup = Popup::Event;
-                } else {
-                    advance_popup(&mut view, moments);
-                }
+                let has_event = session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some();
+                advance_popup(&mut view, moments, has_event);
             }
             Action::Save => {
                 session.save_now();
@@ -5924,7 +5932,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 }
                 if ui.button("Continue").clicked() {
                     let moments = view.moments_of(&session.tables, &game.report).len();
-                    advance_popup(view, moments);
+                    advance_popup(view, moments, false);
                 }
             });
         }
@@ -6047,7 +6055,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 moments_corner(ui, session, view);
                 if ui.button("Close").clicked() {
                     let moments = view.moments_of(&session.tables, &game.report).len();
-                    advance_popup(view, moments);
+                    advance_popup(view, moments, false);
                 }
             });
         }
@@ -6056,7 +6064,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // drawn, because it is the same thing to the player: the turn stops for one short
             // thought. Nothing is forced and nothing is checked -- the note says where to look.
             let Some(note) = tutorial_note(&session.tables, game.turn).cloned() else {
-                advance_popup(view, view.moments_of(&session.tables, &game.report).len());
+                advance_popup(view, view.moments_of(&session.tables, &game.report).len(), game.last_event.is_some());
                 return;
             };
             let last = session.tables.tutorial.note.iter().map(|n| n.turn).max() == Some(game.turn);
@@ -6098,7 +6106,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 }
                 ui.horizontal(|ui| {
                     if ui.button("Close").clicked() {
-                        advance_popup(view, count);
+                        advance_popup(view, count, false);
                     }
                     ui.label(RichText::new(format!("{} of {}", i + 1, count)).weak());
                 });
@@ -6136,5 +6144,31 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 }
             });
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Ticket #205 (version 0.08.1): a tutorial note must hand on to the turn's Event when there is
+    /// one. It did so when the note was dismissed by its button, because `Action::TutorialNoteRead`
+    /// checked for itself, and NOT when it was dismissed with Escape, which came through
+    /// `advance_popup` where no Event arm existed. A new player -- the only player a tutorial has --
+    /// could therefore be hit by an Event and never told.
+    #[test]
+    fn a_tutorial_note_hands_on_to_the_turns_event() {
+        let next = |popup: Popup, moments: usize, has_event: bool| {
+            let mut view = ViewState { popup, ..Default::default() };
+            advance_popup(&mut view, moments, has_event);
+            view.popup
+        };
+
+        assert_eq!(next(Popup::Tutorial, 0, true), Popup::Event, "a note with an Event behind it hands on to the Event");
+        // With no Event the older order stands: the Moments, then the Report.
+        assert_eq!(next(Popup::Tutorial, 2, false), Popup::Moment(0), "no Event, but Moments to show");
+        assert_eq!(next(Popup::Tutorial, 0, false), Popup::Report, "no Event and no Moments: straight to the Report");
+        // An Event already on screen never hands on to itself, whatever the flag says.
+        assert_eq!(next(Popup::Event, 0, true), Popup::Report, "the Event is the thing being dismissed");
     }
 }
