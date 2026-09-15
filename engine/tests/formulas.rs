@@ -19,7 +19,7 @@ fn tables() -> Arc<Tables> {
 fn game() -> Game {
     let mut g = fresh();
     for s in &mut g.states {
-        s.facilities.retain(|f| f.kind == FacilityKind::LaunchSite);
+        s.facilities.retain(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite));
     }
     g
 }
@@ -80,6 +80,10 @@ fn colony(g: &mut Game, seat: Seat, body: BodyId, modules: &[ModuleKind], coloni
         // the nth kind the test asked for.
         modules: modules.iter().map(|k| Module::new(*k)).chain(std::iter::once(Module::new(ModuleKind::Core))).collect(),
         colonists,
+        // Ticket #189 (version 0.08.0): a test Colony's people know the neutral figure unless the
+        // test settles somebody with a figure of their own.
+        education: 1.0,
+        settler_education: 1.0,
         queue: Vec::new(),
         grid_failed: false,
         founded_turn: 1,
@@ -300,6 +304,13 @@ fn influence_threshold_takes_control_and_decay_takes_two_from_untouched_targets(
     let mut g = game();
     // Ticket #53: North Africa is Size 2, so 20 + 10 * 2 = 40.
     assert_eq!(g.influence_threshold(Place::State(StateId::NorthAfrica)), 40);
+    // Ticket #187 (version 0.08.0): this test is about the threshold and the decay, not about
+    // schooling, so the state is set to Resistance's pivot where an outsider's Influence converts
+    // one for one. At its own card of 0.85 it converts 39 into 41 and the place changes hands.
+    let pivot = g.tables.influence.resistance.pivot;
+    for s in [StateId::NorthAfrica, StateId::Europe] {
+        g.state_mut(s).schooling = pivot - g.tables.state(s).education_level;
+    }
     g.seats[0].allotment = 100;
     g.pending.influence.push((Seat(0), Place::State(StateId::NorthAfrica), 39));
     g.pending.influence.push((Seat(0), Place::State(StateId::Europe), 10));
@@ -484,7 +495,7 @@ fn ducats_pay_for_a_leapfrog_and_repairs_at_the_table_rates() {
     g.commit_orders(Seat(0), &[r]);
     assert_eq!(g.seats[0].stockpile.ducats, 10);
     // A repair: 10 Ducats a point, same legality as a Materials repair.
-    g.ships.push(Ship { id: ShipId(1), kind: UnitKind::Frigate, seat: Seat(0), damage: 1, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    g.ships.push(Ship { id: ShipId(1), kind: UnitKind::Frigate, seat: Seat(0), damage: 1, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
     let fix = Order::RepairWithDucats { unit: UnitRef::Ship(ShipId(1)), points: 1 };
     assert_eq!(g.order_cost(Seat(0), &fix).ducats, 10);
     assert!(g.check_order(Seat(0), &[], &fix).is_ok());
@@ -558,7 +569,7 @@ fn ships_are_built_only_at_shipyards_and_lifts_need_a_launch_site() {
     assert!(g.check_order(Seat(0), &[], &frigate(Place::Colony(iss))).is_ok());
     // Lifts: a Ship at Earth loads Colonists only from a state with a Launch Site, and each lift is a launch.
     let ship = ShipId(g.fresh_id());
-    g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
     g.state_mut(StateId::NorthAfrica).control = Control::Controlled(Seat(0));
     g.state_mut(StateId::NorthAfrica).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
     // Ticket #73: a lift takes Emigrants already mustered, so both states hold some.
@@ -670,7 +681,7 @@ fn only_a_carrier_carries_an_army_and_a_colony_ship_carries_only_colonists() {
     let mut g = game();
     let army = ArmyId(g.fresh_id());
     g.armies.push(Army { id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
-    let ship = |id: u32, kind: UnitKind| Ship { id: ShipId(id), kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None };
+    let ship = |id: u32, kind: UnitKind| Ship { id: ShipId(id), kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None };
     g.ships.extend([ship(101, UnitKind::ColonyShip), ship(102, UnitKind::Battleship), ship(103, UnitKind::Carrier)]);
     let load_army = |s: u32| Order::Load { ship: ShipId(s), colonists: 0, from: LoadSource::State(StateId::EastAsia), army: Some(army) };
     assert!(g.check_order(Seat(0), &[], &load_army(101)).is_err(), "a Colony Ship carries Colonists only");
@@ -859,7 +870,7 @@ fn occupation_of_a_controlled_state_returns_it_to_its_owner_when_broken() {
 
 fn meet_first(g: &mut Game, seat: Seat) {
     match g.kind(seat) {
-        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 750,
+        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 1000,
         FactionKind::Custodians => g.seats[seat.index()].stabilization_run = 3,
         FactionKind::Arkwrights => {}
         FactionKind::Archivists => g.seats[seat.index()].research_total = 150,
@@ -883,7 +894,7 @@ fn both_met_the_larger_margin_wins() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
     g.seats[0].stabilization_run = 3; // parts 1.0 and 1.0 -> margin 1.0
-    g.seats[1].venture_fund = 900; // parts 1.2 and 1.25 -> margin 1.2
+    g.seats[1].venture_fund = 1200; // parts 1.2 and 1.25 -> margin 1.2
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
@@ -895,7 +906,7 @@ fn both_met_by_the_same_margin_is_a_draw() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     g.seats[0].stabilization_run = 3;
-    g.seats[1].venture_fund = 900; // the lower fraction is the presence, 1.0, on both sides
+    g.seats[1].venture_fund = 1200; // the lower fraction is the presence, 1.0, on both sides
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Draw { .. })), "{:?}", g.outcome);
@@ -992,7 +1003,7 @@ fn launch_pad_fire_closes_a_launch_site_unless_clean_propellant_is_known() {
     g.resolution_phase();
     assert!(!g.state(StateId::EastAsia).facilities.iter().find(|f| f.kind == FacilityKind::LaunchSite).unwrap().online, "the Launch Site is offline");
     let ship = ShipId(g.fresh_id());
-    g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
     assert!(g.check_order(Seat(0), &[], &Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::EastAsia), army: None }).is_err(), "nothing lifts from a closed Launch Site");
     // With Clean Propellant the Launch Site stays open.
     let mut g = game();
@@ -1084,7 +1095,7 @@ fn the_methane_burst_adds_scaled_emissions_next_turn_that_do_not_count_against_s
 #[test]
 fn meteor_shower_hits_ships_in_orbit_not_in_transit_and_hardened_hulls_shrug() {
     let mut g = game();
-    let mk = |id: u32, at: ShipAt| Ship { id: ShipId(id), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at, colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None };
+    let mk = |id: u32, at: ShipAt| Ship { id: ShipId(id), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at, colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None };
     g.ships.push(mk(1, ShipAt::Body(BodyId::Earth)));
     g.ships.push(mk(2, ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 2 }));
     drawn(&mut g, EventId::MeteorShower, EventTarget::Everyone);
@@ -1143,6 +1154,14 @@ fn with_tech(g: &mut Game, t: TechId) {
 
 /// Ticket #84 (version 0.06.0): every Victory Condition waits on its gate Tech, so a test about
 /// winning opens all four first.
+/// Ticket #199 (version 0.08.0): the Archivists' gate Tech, which the Archive now waits on to be
+/// ORDERED as well as to win. Every test that builds an Archive needs it in.
+fn the_upload(g: &mut Game) {
+    if !g.research.done.contains(&TechId::TheUpload) {
+        g.research.done.push(TechId::TheUpload);
+    }
+}
+
 fn open_gates(g: &mut Game) {
     for t in [TechId::PlanetaryStewardship, TechId::ExtractionCharter, TechId::GenerationShips, TechId::TheUpload] {
         g.research.done.push(t);
@@ -1215,7 +1234,7 @@ fn tech_efficient_transit_cuts_fuel() {
 #[test]
 fn tech_hardened_hulls_adds_two_strength_to_every_ship_but_a_colony_ship_stays_at_zero() {
     let mut g = game();
-    let f = Ship { id: ShipId(1), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None };
+    let f = Ship { id: ShipId(1), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None };
     let c = Ship { kind: UnitKind::ColonyShip, ..f.clone() };
     assert_eq!(g.ship_strength(&f), 3);
     with_tech(&mut g, TechId::HardenedHulls);
@@ -1344,7 +1363,7 @@ fn colony_attack_turns(seed: u64) -> Option<u32> {
         let attacker = ArmyId(g.fresh_id());
         let ship = ShipId(g.fresh_id());
         g.armies.push(Army { id: attacker, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
-        g.ships.push(Ship { id: ship, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, army: Some(attacker), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+        g.ships.push(Ship { id: ship, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, colonists_education: 1.0, army: Some(attacker), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
         attackers.push(attacker);
         ships.push(ship);
     }
@@ -1433,8 +1452,15 @@ fn every_state_starts_with_its_start_facilities_and_the_faction_states_add_a_lau
         let card = g.tables.state(sid);
         let have: Vec<FacilityKind> = g.state(sid).facilities.iter().map(|f| f.kind).collect();
         let mut want = card.start_facilities.clone();
-        if g.state(sid).control.controller().is_some() {
+        // Ticket #181 (version 0.08.0): a Faction's start Region's Facilities come up as that
+        // Faction's own versions, the added Launch Site included -- so the Arkwrights' start Region
+        // carries a Spaceport and Australia's Power Plant is the Archivists' Reactor.
+        if let Some(seat) = g.state(sid).control.controller() {
             want.push(FacilityKind::LaunchSite);
+            let faction = g.kind(seat);
+            for k in want.iter_mut() {
+                *k = k.built_by(faction);
+            }
         }
         assert_eq!(have, want, "{}", card.name);
         // Ticket #69: North America and South-East Asia carry a Research Lab on top of the count.
@@ -1499,7 +1525,7 @@ fn only_climate_cards_scale_with_the_temperature() {
     }
     assert_eq!(seen, 4);
     // And a Meteor Shower does one damage at +3.0 as at +1.2.
-    let mk = |id: u32| Ship { id: ShipId(id), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None };
+    let mk = |id: u32| Ship { id: ShipId(id), kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None };
     g.ships.push(mk(1));
     drawn(&mut g, EventId::MeteorShower, EventTarget::Everyone);
     g.apply_event_now();
@@ -1607,7 +1633,7 @@ fn orbital_control_needs_the_only_engaged_warship_at_the_body() {
         seat,
         damage: 0,
         at: ShipAt::Body(BodyId::Mars),
-        colonists: 0,
+        colonists: 0, colonists_education: 1.0,
         army: None,
         stance: Stance::Hold,
         escaped: false,
@@ -1641,7 +1667,7 @@ fn more_than_one_seat_meeting_its_condition_gives_the_game_to_the_larger_margin(
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
     g.seats[0].stabilization_run = 3; // parts 1.0 and 1.0 -> margin 1.0
-    g.seats[1].venture_fund = 900; // parts 1.2 and 1.25 -> margin 1.2
+    g.seats[1].venture_fund = 1200; // parts 1.2 and 1.25 -> margin 1.2
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
@@ -1702,7 +1728,7 @@ fn the_ai_seats_take_start_states_not_adjacent_to_any_taken_one() {
     // Every seat's start carries a Launch Site.
     for seat in Seat::ALL {
         let sid = held(seat)[0];
-        assert!(g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite), "{seat:?} has no Launch Site");
+        assert!(g.state(sid).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite)), "{seat:?} has no Launch Site");
     }
 }
 
@@ -1799,7 +1825,7 @@ fn a_tie_between_seats_is_drawn_from_the_seed_and_is_the_same_every_replay() {
         seat: Seat(1),
         damage: 0,
         at: ShipAt::Body(BodyId::Mars),
-        colonists: 0,
+        colonists: 0, colonists_education: 1.0,
         army: None,
         stance: Stance::Hold,
         escaped: false,
@@ -1823,7 +1849,7 @@ fn a_colony_ship(g: &mut Game, seat: Seat, body: BodyId) -> ShipId {
         seat,
         damage: 0,
         at: ShipAt::Body(body),
-        colonists: 0,
+        colonists: 0, colonists_education: 1.0,
         army: None,
         stance: Stance::Hold,
         escaped: false,
@@ -1836,10 +1862,15 @@ fn a_colony_ship(g: &mut Game, seat: Seat, body: BodyId) -> ShipId {
 
 /// A Colony off Earth holding the seat's Archive Module with `paid` Research in the fund, and
 /// Habitats and Colonists. Ticket #68 (version 0.05.5): one Module, no stages.
+/// Ticket #192 (version 0.08.0): `colonists` is now what has been UPLOADED as well as who lives
+/// there, because the Archivists' second Victory part counts the uploaded rather than whoever
+/// happens to be standing beside the Module. Every caller of this helper means "the second part
+/// stands at N", and a test that wants the two apart sets `uploaded` itself.
 fn archive_at(g: &mut Game, seat: Seat, body: BodyId, paid: i64, colonists: u32) -> ColonyId {
     let cid = colony(g, seat, body, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], colonists);
     g.colony_mut(cid).unwrap().modules.push(Module::new(ModuleKind::Archive));
     g.seats[seat.index()].archive_fund = paid;
+    g.seats[seat.index()].uploaded = colonists;
     cid
 }
 
@@ -1955,7 +1986,7 @@ fn diaspora_wants_three_bodies_with_four_colonists_each_and_counts_no_antarctic_
         slot: 0,
         control: Control::Controlled(Seat(2)),
         modules: vec![Module::new(ModuleKind::Habitat)],
-        colonists: 4,
+        colonists: 4, education: 1.0, settler_education: 1.0,
         queue: Vec::new(),
         grid_failed: false,
         founded_turn: 1,
@@ -2022,6 +2053,7 @@ fn funding_the_archive_banks_this_turns_research_and_contributes_nothing_to_the_
 fn the_archive_is_one_module_of_fifty_materials_and_three_turns_built_once_off_earth() {
     let mut g = game();
     g.seats[3].stockpile.materials = 200;
+    the_upload(&mut g);
     let mars = colony(&mut g, Seat(3), BodyId::Mars, &[ModuleKind::Habitat], 4);
     let order = Order::BuildArchive { colony: mars };
     assert_eq!(g.order_cost(Seat(3), &order).materials, 50);
@@ -2031,6 +2063,14 @@ fn the_archive_is_one_module_of_fifty_materials_and_three_turns_built_once_off_e
     let ant = colony(&mut g, Seat(3), BodyId::Earth, &[ModuleKind::Habitat], 4);
     assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: ant }).unwrap_err().0.contains("off Earth"));
     let axiom = station_of(&g, Seat(3), BodyId::Earth).unwrap();
+    // Ticket #192 (version 0.08.0): four must live at the place before it may be ORDERED, and Axiom
+    // is founded bare -- which is the whole of the measured problem this gate had to be small for.
+    assert_eq!(
+        g.check_order(Seat(3), &[], &Order::BuildArchive { colony: axiom }).unwrap_err().0,
+        "the Archive wants 4 Colonists living at its Colony; nobody lives at Axiom over Earth"
+    );
+    g.colony_mut(axiom).unwrap().modules.push(Module::new(ModuleKind::Core));
+    g.settle_people(axiom, 4, 1.0);
     assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: axiom }).is_ok(), "a station over Earth is off Earth since ticket #81");
     // Nobody else builds one, and the ordinary Module button never places it.
     let mine = colony(&mut g, Seat(0), BodyId::Mars, &[], 0);
@@ -2119,7 +2159,7 @@ fn a_complete_archive_goes_offline_when_energy_runs_short_and_wins_nothing_that_
     assert!(!g.archive_online(Seat(3)));
     let p = g.progress(Seat(3));
     assert_eq!(p.first_value, 80.0, "every point of Research is paid");
-    assert_eq!(p.second_value, 12.0, "and the Colonists are there");
+    assert_eq!(p.second_value, 12.0, "and the Colonists are uploaded");
     assert!(p.first_held_back.is_some() && !p.met(), "but it is not running");
     g.end_phase();
     assert!(g.outcome.is_none(), "no win with the Archive dark: {:?}", g.outcome);
@@ -2148,7 +2188,7 @@ fn the_archive_is_destroyed_when_its_colony_changes_hands_and_the_fund_is_kept()
 }
 
 #[test]
-fn the_archivists_win_with_the_archive_running_and_twelve_colonists_at_its_colony() {
+fn the_archivists_win_with_the_archive_running_and_twelve_colonists_uploaded() {
     let mut g = game();
     let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 80, 12);
     let _ = cid;
@@ -2206,11 +2246,19 @@ fn the_archivist_ai_builds_its_way_off_earth_and_then_the_archive() {
     let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
     g.seats[arc.index()].stockpile.materials = 200;
     g.seats[arc.index()].stockpile.energy = 200;
+    the_upload(&mut g);
+    // Ticket #192 (version 0.08.0): the station is bare, so the Archive is not orderable there, and
+    // the computer must not spend the turn on an order that would be refused. Measured, it ordered
+    // the Archive on turn 1 at an empty station in 80 of 80 games before this gate.
+    let axiom = station_of(&g, arc, BodyId::Earth).unwrap();
+    assert_eq!(g.colony(axiom).unwrap().colonists, 0, "the premise: Axiom is founded bare");
     let orders = g.ai_orders(arc);
-    // Ticket #164 (version 0.07.5): a station is founded with a Core Module holding four, so it is
-    // somewhere people can live from the day it stands. Raising the Archive there is itself a step
-    // off Earth, where under #51 the seat could only sit on Earth; the guard is that it takes one
-    // of the three steps that lead off Earth rather than none.
+    assert!(!orders.iter().any(|o| matches!(o, Order::BuildArchive { .. })), "it should not order what would be refused: {orders:?}");
+
+    // With the Core Module's four living there, it orders the Module at once.
+    g.colony_mut(axiom).unwrap().modules.push(Module::new(ModuleKind::Core));
+    g.settle_people(axiom, 4, 1.0);
+    let orders = g.ai_orders(arc);
     assert!(
         orders.iter().any(|o| matches!(
             o,
@@ -2223,14 +2271,32 @@ fn the_archivist_ai_builds_its_way_off_earth_and_then_the_archive() {
     g.seats[arc.index()].stockpile.materials = 200;
     g.seats[arc.index()].stockpile.energy = 200;
     let mars = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Mine, ModuleKind::Generator], 4);
+    // Ticket #199 (version 0.08.0): without the gate Tech the Archive is refused, and the computer
+    // must neither order it nor FREEZE ITS MATERIALS waiting for it -- a candidate it cannot afford
+    // yet makes the seat hold its Materials and build nothing else, which over the fifteen turns the
+    // Tech takes would be worse than the gate itself. Both are guaranteed by the validator rather
+    // than by a guard in the AI: `check_order` drops the candidate and `check_order_legality` stops
+    // it reserving. The place has its four Colonists here, so the Tech is all that is left.
+    assert!(!g.has_tech(TechId::TheUpload), "the premise: the world has not researched it yet");
     let orders = g.ai_orders(arc);
-    // Ticket #81 (version 0.06.0): a station over Earth is off Earth, so the first Colony off Earth
-    // the AI holds is Axiom, its start station, and it raises the Archive there rather than on Mars.
-    let axiom = station_of(&g, arc, BodyId::Earth).unwrap();
+    assert!(!orders.iter().any(|o| matches!(o, Order::BuildArchive { .. })), "it should not order what the Tech refuses: {orders:?}");
     assert!(
-        orders.iter().any(|o| matches!(o, Order::BuildArchive { colony } if *colony == axiom || *colony == mars)),
-        "no Archive order at a Colony off Earth: {orders:?}"
+        orders.iter().any(|o| matches!(o, Order::BuildFacility { .. } | Order::BuildModule { .. })),
+        "and it should get on with something else rather than hold its Materials for an Archive it cannot order: {orders:?}"
     );
+    the_upload(&mut g);
+    let axiom = station_of(&g, arc, BodyId::Earth).unwrap();
+    // Ticket #192 (version 0.08.0): the Archive goes to the oldest place that can take it, and since
+    // this ticket "can take it" means four people live there. Axiom is bare here, so Mars wins --
+    // which is the gate doing its job rather than a change of preference.
+    let orders = g.ai_orders(arc);
+    assert!(orders.iter().any(|o| matches!(o, Order::BuildArchive { colony } if *colony == mars)), "no Archive order at the one place that can take it: {orders:?}");
+
+    // People Axiom, and it takes the older place back, per ticket #81: a station over Earth is off
+    // Earth, and Axiom is the first Colony off Earth the seat holds.
+    g.colony_mut(axiom).unwrap().modules.push(Module::new(ModuleKind::Core));
+    g.settle_people(axiom, 4, 1.0);
+    let orders = g.ai_orders(arc);
     assert!(orders.iter().any(|o| matches!(o, Order::BuildArchive { colony } if *colony == axiom)), "since ticket #81 the AI raises it on Axiom first: {orders:?}");
 }
 
@@ -2952,6 +3018,10 @@ fn e_a_transfer_uses_the_challengers_own_threshold() {
     }
     g.seats[1].blame_emitted = 100.0;
     let target = Place::State(StateId::NorthAfrica);
+    // Ticket #187 (version 0.08.0): the pivot, so Resistance converts one for one and this test
+    // measures only whose threshold applies.
+    let pivot = g.tables.influence.resistance.pivot;
+    g.state_mut(StateId::NorthAfrica).schooling = pivot - g.tables.state(StateId::NorthAfrica).education_level;
     assert_eq!(g.influence_threshold(target), 40);
     assert_eq!(g.influence_threshold_for(Seat(1), target), 60);
     // 45 clears the plain threshold of 40 and not the Prospectors' own 60.
@@ -3973,9 +4043,11 @@ fn f_coastal_engineering_is_the_thirteenth_tech() {
     let on_rung = |r: u32| -> Vec<&str> { TechId::ALL.into_iter().map(|t| g.tables.tech(t)).filter(|t| t.branch == "Industry" && t.rung == r).map(|t| t.name.as_str()).collect() };
     assert_eq!(on_rung(1), vec!["Efficient Grids", "Coastal Engineering"], "two boxes on Industry rung 1");
     assert_eq!(on_rung(2), vec!["Clean Power"]);
-    // The Sea Wall's card names it as its unlock, and there are ten Facilities.
+    // The Sea Wall's card names it as its unlock, and there are fifteen Facilities in version
+    // 0.08.0: ten through version 0.07, the School on ticket #185, and the four Unique Facilities on
+    // tickets #182 to #186 -- the Investment Bank, the Spaceport, the Reactor and the Academy.
     assert_eq!(g.tables.facility(FacilityKind::SeaWall).needs_tech, Some(TechId::CoastalEngineering));
-    assert_eq!(FacilityKind::ALL.len(), 10, "ten Facilities");
+    assert_eq!(FacilityKind::ALL.len(), 15, "fifteen Facilities");
 }
 
 /// (g) Antarctica opens the first Climate phase the Temperature stands at +1.6, stays open, and its
@@ -3997,7 +4069,7 @@ fn g_antarctica_opens_at_one_point_six_and_stays_open() {
         seat: Seat(0),
         damage: 0,
         at: ShipAt::Body(BodyId::Earth),
-        colonists: 4,
+        colonists: 4, colonists_education: 1.0,
         army: None,
         stance: Stance::Hold,
         escaped: false,
@@ -4238,7 +4310,7 @@ fn a_modules_output_uses_its_own_slots_yield() {
             slot,
             control: Control::Controlled(Seat(0)),
             modules: vec![Module::new(ModuleKind::Mine)],
-            colonists: 0,
+            colonists: 0, education: 1.0, settler_education: 1.0,
             queue: Vec::new(),
             grid_failed: false,
             founded_turn: 1,
@@ -4450,6 +4522,7 @@ fn the_ai_banks_fuel_when_the_mars_window_is_within_two_turns() {
                 damage: 0,
                 at: ShipAt::Body(BodyId::Earth),
                 colonists,
+                colonists_education: 1.0,
                 army: None,
                 stance: Stance::Hold,
                 escaped: false,
@@ -4499,7 +4572,7 @@ fn a_loaded_colony_ship_goes_to_the_moon_when_mars_is_a_year_away() {
     let (mars_turns, _) = g.transit_cost_for(cust, BodyId::Earth, BodyId::Mars);
     assert!(mars_turns >= 8, "off the window Mars is far: {mars_turns} turns");
     let ship = ShipId(900);
-    g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: cust, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    g.ships.push(Ship { id: ship, kind: UnitKind::ColonyShip, seat: cust, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
     g.seats[cust.index()].stockpile.fuel = 100;
     g.seats[cust.index()].stockpile.energy = 200;
     let orders = g.ai_orders(cust);
@@ -4524,7 +4597,7 @@ fn colony_ship_ready(g: &mut Game, body: BodyId) -> (ShipId, Order) {
         seat: Seat(0),
         damage: 0,
         at: ShipAt::Body(body),
-        colonists: 4,
+        colonists: 4, colonists_education: 1.0,
         army: None,
         stance: Stance::Hold,
         escaped: false,
@@ -4641,7 +4714,7 @@ fn a_rivals_paragraph_names_its_visible_orders_and_none_of_its_scores() {
         seat,
         damage: 0,
         at: ShipAt::Body(BodyId::Earth),
-        colonists: 0,
+        colonists: 0, colonists_education: 1.0,
         army: None,
         stance: Stance::Hold,
         escaped: false,
@@ -5182,21 +5255,23 @@ fn the_venture_capital_fund_banks_a_share_of_materials_output_and_a_draw_returns
     assert_eq!(g.check_order(Seat(0), &[], &Order::DrawVenture { amount: 1 }).unwrap_err().0, "only the Prospectors have a Venture Capital Fund");
 }
 
-/// Ticket #72 (c): 750 in the Fund is the first part of the Prospectors' condition, the running
-/// Extraction Total being retired, and the ranking reads the Fund over 750.
+/// Ticket #72 (c): the Fund is the first part of the Prospectors' condition, the running Extraction
+/// Total being retired, and the ranking reads the Fund over the bar. Ticket #182 (version 0.08.0)
+/// moved that bar from 750 to 1000, because the Investment Bank pays uncapped interest into the Fund
+/// and, measured over 40 games, nobody had ever reached 750 at all.
 #[test]
-fn seven_hundred_and_fifty_in_the_fund_is_the_prospectors_first_part() {
+fn a_thousand_in_the_fund_is_the_prospectors_first_part() {
     let mut g = game();
     let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
     let card = g.tables.faction(FactionKind::Prospectors).victory_first;
-    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 750.0));
+    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 1000.0));
     assert_eq!(card.kind.name(), "Venture Capital Fund");
-    g.seats[pro.index()].venture_fund = 300;
+    g.seats[pro.index()].venture_fund = 400;
     let p = g.progress(pro);
-    assert_eq!((p.first_value, p.first_bar), (300.0, 750.0));
+    assert_eq!((p.first_value, p.first_bar), (400.0, 1000.0));
     assert!((p.first_fraction() - 0.4).abs() < 1e-9);
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 12);
-    g.seats[pro.index()].venture_fund = 750;
+    g.seats[pro.index()].venture_fund = 1000;
     open_gates(&mut g);
     assert!(g.progress(pro).met());
     g.end_phase();
@@ -6173,7 +6248,7 @@ fn refuel_is_an_order_at_a_station_of_your_own_and_a_station_rescues_a_stranded_
     assert!(g.stranded(far), "1 in the tank, the cheapest leg (Phobos, 2) beyond it, no station of ours");
     assert!(!g.stranded(ship), "14 in the tank at Earth flies to the Moon");
     let id = ColonyId(g.fresh_id());
-    g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: Vec::new(), colonists: 0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: Vec::new(), colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
     assert!(!g.stranded(far), "a station of ours in orbit rescues it");
     assert!(g.check_order(Seat(0), &[], &Order::Refuel { ship: far }).is_ok());
     let (full, _) = colony_ship_ready(&mut g, BodyId::Earth);
@@ -6240,7 +6315,7 @@ fn modules_cost_less_at_a_colony_with_working_mines() {
 /// A station of seat 0's over `body`, bare, for the tests that need one.
 fn station_at(g: &mut Game, seat: Seat, body: BodyId) -> ColonyId {
     let id = ColonyId(g.fresh_id());
-    g.colonies.push(Colony { id, body, slot: 0, control: Control::Controlled(seat), modules: Vec::new(), colonists: 0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.colonies.push(Colony { id, body, slot: 0, control: Control::Controlled(seat), modules: Vec::new(), colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
     id
 }
 
@@ -6717,14 +6792,14 @@ fn a_filled_habitat_always_hands_back_at_least_two_slots() {
                 slot,
                 control: Control::Controlled(Seat(0)),
                 modules: vec![Module::new(ModuleKind::Habitat)],
-                colonists: 0,
+                colonists: 0, education: 1.0, settler_education: 1.0,
                 queue: Vec::new(),
                 grid_failed: false,
                 founded_turn: 1,
                 in_orbit: false,
             };
             let holds = g.habitat_room(&c);
-            let filled = Colony { colonists: holds, ..c.clone() };
+            let filled = Colony { colonists: holds, education: 1.0, settler_education: 1.0, ..c.clone() };
             // What the Habitat earns, less the one slot the Habitat itself takes.
             let net = g.module_slots(&filled) as i64 - g.module_slots(&c) as i64 - 1;
             assert!(
@@ -6802,7 +6877,15 @@ fn a_tech_pick_can_be_changed_until_the_turn_ends() {
     g.end_turn(orders).expect("the turn ends");
     assert!(g.research.pick_committed, "the turn ending locks it in");
     assert_eq!(g.research.unallocated[2], 0, "the bank is spent now");
-    assert!(g.research.contributions[2] >= 6, "and it is still seat 2's");
+    // Version 0.08.0: the world makes enough Research on turn 1 that this pick can now COMPLETE in
+    // the same breath, and a completed Tech clears the contributions. Either way the bank left seat
+    // 2's hands under seat 2's name, which is what this test is about; the assertion says both.
+    assert!(
+        g.research.contributions[2] >= 6 || g.research.done.contains(&TechId::CleanPropellant),
+        "the bank was neither credited to seat 2 nor spent finishing the Tech: contributions {:?}, done {:?}",
+        g.research.contributions,
+        g.research.done
+    );
 
     // And a committed Tech is settled: it cannot be swapped for another.
     assert!(g.pick_tech(Seat(0), TechId::DeepMining).is_err(), "a committed pick is final");
@@ -6876,14 +6959,14 @@ fn a_warship_blockades_the_orbital_slot_it_sits_in_and_nothing_more() {
     // A rival Frigate arrives at the Body at large: it blockades nothing.
     let rival = ShipId(g.fresh_id());
     g.ships.push(Ship {
-        id: rival, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, army: None,
+        id: rival, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None,
         stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
     });
     // A warship of ours contests the orbit, so nobody holds Orbital Control and the ground is open:
     // that isolates the slot rule from the ground rule.
     let mine = ShipId(g.fresh_id());
     g.ships.push(Ship {
-        id: mine, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, army: None,
+        id: mine, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None,
         stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
     });
     assert_eq!(g.orbital_control(body), None, "contested, so nobody holds it");
@@ -6913,7 +6996,7 @@ fn only_a_rival_holding_orbital_control_shuts_the_ground() {
     let push = |g: &mut Game, seat: Seat| {
         let id = ShipId(g.fresh_id());
         g.ships.push(Ship {
-            id, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, army: None,
+            id, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None,
             stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
         });
     };
@@ -6939,13 +7022,13 @@ fn a_blockade_stops_refuelling_and_holds_an_empty_slot_against_a_builder() {
     g.seats[0].stockpile.materials = 500;
     let mine = ShipId(g.fresh_id());
     g.ships.push(Ship {
-        id: mine, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, army: None,
+        id: mine, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None,
         stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 5, slot: None,
     });
     assert!(g.check_order(Seat(0), &[], &Order::Refuel { ship: mine }).is_ok(), "an unblockaded station fuels it");
     let rival = ShipId(g.fresh_id());
     g.ships.push(Ship {
-        id: rival, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, army: None,
+        id: rival, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None,
         stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(slot),
     });
     let err = g.check_order(Seat(0), &[], &Order::Refuel { ship: mine }).unwrap_err().0;
@@ -6964,7 +7047,7 @@ fn a_transit_names_the_slot_it_arrives_into() {
     let mut g = game();
     let ship = ShipId(g.fresh_id());
     g.ships.push(Ship {
-        id: ship, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, army: None,
+        id: ship, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None,
         stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
     });
     let slots = g.tables.body(BodyId::Moon).orbital_slots;
@@ -7144,4 +7227,1072 @@ fn decommissioning_a_habitat_still_loses_the_people_it_held_and_says_so() {
         "the Report should say the {lost} Colonists were lost; it said: {:?}",
         g.report.lines.iter().map(|l| l.text.clone()).collect::<Vec<_>>()
     );
+}
+
+// ------------------------------------------------ 0.08.0 ticket #196: the muster gate and partial batches
+
+/// Ticket #196: the AI's muster gate wanted a Colony Ship or a Shipyard it could never get. A bare
+/// station has zero Module slots (`base = 0`, one per Colonist), so it cannot raise the Shipyard
+/// that would let it muster the Colonists that earn the slots; ticket #164's Core Module ended that
+/// deadlock in the rules and the gate was never updated. Measured over 320 seat-games, NO seat ever
+/// held a ship or a yard while the ice was still shut, so Antarctica opening was the only door into
+/// the Colonist economy for everybody. Room to put people opens it too.
+#[test]
+fn a_seat_with_room_on_a_station_musters_before_antarctica_opens() {
+    let mut g = game();
+    let seat = Seat(0);
+    assert!(!g.antarctica_open, "the premise: the ice is still shut");
+    assert!(!g.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::ColonyShip), "the premise: no Colony Ship");
+    // Its station over Earth stands with a Core Module, which holds four people from the day it is built.
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(seat)).map(|c| c.id).expect("seat 0 starts with a station");
+    assert!(g.habitat_room(g.colony(station).unwrap()) > 0, "the premise: the Core Module holds somebody");
+    assert!(!g.colony(station).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Shipyard), "the premise: no Shipyard");
+
+    let orders = g.ai_orders(seat);
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::BuildEmigrants { .. })),
+        "with room on a station and the ice shut, the AI should still muster: {orders:?}"
+    );
+}
+
+/// Ticket #196: a Steerage batch costs 8 x 2.0 = 16.0 population, and Australia carries 10.1 to
+/// 12.6 -- the only one of the fourteen Regions below 16 -- so the Arkwright AI was refused every
+/// turn it held it, 243 times across twenty measured games, and mustered nothing at all. A muster
+/// now takes as many as the Region can pay for.
+#[test]
+fn a_muster_takes_as_many_as_the_region_can_pay_for() {
+    let mut g = game();
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+    let per = g.emigrants_per_turn(ark);
+    // The Arkwrights start with no station, and ticket #196's gate wants somewhere to put people,
+    // so give them one: this test is about the SIZE of a batch, not about the gate.
+    let st = station_at(&mut g, ark, BodyId::Earth);
+    // `station_at` predates ticket #164 and makes a BARE station; the real game founds one with a
+    // Core Module, which is what holds the first four people and so gives the gate its room.
+    g.colony_mut(st).unwrap().modules.push(Module::new(ModuleKind::Core));
+    assert!(g.habitat_room(g.colony(st).unwrap()) > 0, "the premise: the Core Module holds somebody");
+    // A Region too small to pay for a whole batch, but big enough for some of it.
+    let small = g.directed_states(ark)[0];
+    g.states[small as usize].population = g.lift_population(ark, per) / 2.0;
+    let want = g.emigrants_affordable(ark, small);
+    assert!(want > 0 && want < per, "the premise: {want} should be a partial batch out of {per}");
+    assert!(
+        g.check_order(ark, &[], &Order::BuildEmigrants { state: small, n: want }).is_ok(),
+        "a batch the Region can pay for should be legal"
+    );
+    assert!(
+        g.check_order(ark, &[], &Order::BuildEmigrants { state: small, n: per }).is_err(),
+        "the whole batch should still be refused: the Region cannot pay for it"
+    );
+
+    // And the AI asks for what it can afford rather than for nothing.
+    let orders = g.ai_orders(ark);
+    match orders.iter().find_map(|o| if let Order::BuildEmigrants { n, .. } = o { Some(*n) } else { None }) {
+        Some(n) => assert!(n <= want, "the AI mustered {n}, more than the {want} the Region can pay for"),
+        None => panic!("the Arkwright AI mustered nothing in a Region that can pay for {want}: {orders:?}"),
+    }
+}
+
+// ------------------------------------------- 0.08.0 ticket #185: the School and a moving Education Level
+
+/// Ticket #185: the Education Level was a fixed figure on a Region's card that nothing in the game
+/// moved. A School raises it a step a turn while it stands and is online, to a ceiling, and it
+/// decays back at the same rate when the School stops -- so what took five turns to build takes
+/// five turns to lose, and it stops at the figure the card carries.
+///
+/// Driven through `run_schools` rather than a whole Income phase, so the arithmetic under test is
+/// not also measuring the Energy economy: over forty Income phases with no production the School
+/// is shut for want of Energy, which is correct and is a different rule.
+#[test]
+fn a_school_raises_its_regions_education_level_a_step_a_turn_to_the_ceiling() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    let card = g.tables.state(sid).education_level;
+    assert!((g.education_level(sid) - card).abs() < 1e-9, "it starts at the card figure {card}");
+
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::School));
+    let step = g.tables.school.per_turn;
+    let ceiling = g.tables.school.ceiling;
+    for turn in 1..=3 {
+        g.run_schools();
+        let want = (card + step * turn as f64).min(ceiling);
+        assert!((g.education_level(sid) - want).abs() < 1e-9, "after {turn} turn(s) it should read {want}, not {}", g.education_level(sid));
+    }
+    for _ in 0..40 {
+        g.run_schools();
+    }
+    assert!((g.education_level(sid) - ceiling).abs() < 1e-9, "it should climb to the ceiling {ceiling} and stop, not {}", g.education_level(sid));
+
+    // Mothballed, it falls back at the same rate and stops at the card figure.
+    let idx = g.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::School).unwrap();
+    g.state_mut(sid).facilities[idx].mothballed = true;
+    g.state_mut(sid).facilities[idx].online = false;
+    g.run_schools();
+    assert!((g.education_level(sid) - (ceiling - step)).abs() < 1e-9, "it should fall a step to {}, not {}", ceiling - step, g.education_level(sid));
+    for _ in 0..40 {
+        g.run_schools();
+    }
+    assert!((g.education_level(sid) - card).abs() < 1e-9, "it should stop falling at the card figure {card}, not {}", g.education_level(sid));
+}
+
+/// Ticket #185: and the Schools run at Income, once a turn, without anybody calling them by hand.
+#[test]
+fn the_schools_run_at_income() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::School));
+    let before = g.education_level(sid);
+    g.income_phase();
+    assert!(g.education_level(sid) > before, "an Income phase should move it: it read {before} and still reads {}", g.education_level(sid));
+}
+
+/// Ticket #185: one School to a Region, as the Constabulary and the Sea Wall are.
+#[test]
+fn a_region_holds_one_school() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::School));
+    let o = Order::BuildFacility { state: sid, kind: FacilityKind::School };
+    assert!(g.check_order(Seat(0), &[], &o).is_err(), "a second School in one Region should be refused");
+}
+
+/// Ticket #185: a Research Lab reads the LIVE figure, not the card. That is the whole point of the
+/// building -- the Education Level multiplies what a Lab makes, and now it moves.
+#[test]
+fn a_research_lab_reads_the_education_level_the_school_has_raised() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::ResearchLab));
+    let before = g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).research;
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::School));
+    for _ in 0..8 {
+        g.run_schools();
+    }
+    let after = g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).research;
+    assert!(after > before, "a Lab should make more once the School has run: {before} then {after}");
+}
+
+// ------------------------------------ 0.08.0 ticket #189: Colonists carry the schooling of their Region
+
+/// Ticket #189: Emigrants take their Region's Education Level at the moment they MUSTER, and the
+/// pile waiting on the card carries one mean and a count. A batch mustered after a School has run
+/// knows more than one mustered before it, and the two average by head count.
+#[test]
+fn emigrants_take_their_regions_schooling_at_the_moment_they_muster() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    let card = g.tables.state(sid).education_level;
+    g.state_mut(sid).population = 10_000.0;
+
+    g.muster_emigrants(sid, 4);
+    assert!((g.state(sid).emigrants_education - card).abs() < 1e-9, "the first batch knows the card figure {card}");
+
+    // A School runs, then a second batch musters: it knows more, and the pile averages.
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::School));
+    for _ in 0..4 {
+        g.run_schools();
+    }
+    let taught = g.education_level(sid);
+    assert!(taught > card, "the premise: the School raised it from {card} to {taught}");
+    g.muster_emigrants(sid, 4);
+    let want = (card + taught) / 2.0;
+    assert!((g.state(sid).emigrants_education - want).abs() < 1e-9, "four at {card} and four at {taught} should average {want}, not {}", g.state(sid).emigrants_education);
+    assert_eq!(g.state(sid).emigrants, 8, "and there are eight of them");
+}
+
+/// Ticket #189: a Colony's Education Level is the weighted average of the people who settled it,
+/// and arrivals average in by head count -- so a Colony founded out of a well-schooled Region and
+/// then joined by people from a poorly-schooled one sits between the two.
+#[test]
+fn a_colony_reads_the_weighted_average_of_the_people_who_settled_it() {
+    let mut g = game();
+    let id = station_at(&mut g, Seat(0), BodyId::Earth);
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Core));
+    for _ in 0..3 {
+        g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    }
+
+    g.settle_people(id, 4, 1.5);
+    assert!((g.colony(id).unwrap().education - 1.5).abs() < 1e-9, "the founders' figure is the Colony's");
+    g.settle_people(id, 4, 0.7);
+    let want = (1.5 * 4.0 + 0.7 * 4.0) / 8.0;
+    assert!((g.colony(id).unwrap().education - want).abs() < 1e-9, "four at 1.5 and four at 0.7 should average {want}, not {}", g.colony(id).unwrap().education);
+    assert_eq!(g.colony(id).unwrap().colonists, 8);
+}
+
+/// Ticket #189: deaths do not move a mean. The dead are drawn evenly from the people there, so
+/// losing half a Colony leaves the survivors knowing exactly what everyone knew.
+#[test]
+fn deaths_do_not_move_what_the_survivors_know() {
+    let mut g = game();
+    let id = station_at(&mut g, Seat(0), BodyId::Earth);
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Core));
+    for _ in 0..3 {
+        g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    }
+    g.settle_people(id, 4, 1.5);
+    g.settle_people(id, 4, 0.7);
+    let before = g.colony(id).unwrap().education;
+    g.take_colonists(id, 4);
+    assert_eq!(g.colony(id).unwrap().colonists, 4, "four are gone");
+    assert!((g.colony(id).unwrap().education - before).abs() < 1e-9, "the mean should not move: {before} then {}", g.colony(id).unwrap().education);
+}
+
+/// Ticket #189: and it survives the whole journey -- mustered in a Region, lifted to a station,
+/// through the order layer rather than through the helpers by hand.
+#[test]
+fn schooling_travels_from_the_region_to_the_station_it_is_lifted_to() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    let card = g.tables.state(sid).education_level;
+    g.state_mut(sid).population = 10_000.0;
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("seat 0 starts with a station");
+    g.state_mut(sid).facilities.push(Facility { online: true, ..Facility::new(FacilityKind::LaunchSite) });
+
+    g.commit_orders(Seat(0), &[Order::BuildEmigrants { state: sid, n: 4 }]);
+    assert_eq!(g.state(sid).emigrants, 4, "four are waiting");
+    g.commit_orders(Seat(0), &[Order::LiftToStation { state: sid, n: 4, colony: station }]);
+
+    assert_eq!(g.colony(station).unwrap().colonists, 4, "four reached the station");
+    assert!(
+        (g.colony(station).unwrap().education - card).abs() < 1e-9,
+        "the station should know what {} knows ({card}), not {}",
+        g.tables.state(sid).name,
+        g.colony(station).unwrap().education
+    );
+}
+
+// ------------------------------------------------- 0.08.0 ticket #185: the Institute, off Earth
+
+/// Ticket #185: the Institute is the School's form off Earth, on the same step and ceiling. What it
+/// decays BACK to is the difference that matters: not zero, and not a card figure a Colony does not
+/// have, but the settlers' own average -- what its people know without a school. A Colony whose
+/// Institute goes dark has not become less educated; its school shut.
+#[test]
+fn an_institute_raises_a_colony_and_decays_back_to_what_its_settlers_knew() {
+    let mut g = game();
+    let id = station_at(&mut g, Seat(0), BodyId::Earth);
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Core));
+    g.settle_people(id, 4, 0.8);
+    let settlers = g.colony(id).unwrap().settler_education;
+    assert!((settlers - 0.8).abs() < 1e-9, "the settlers brought 0.8");
+
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Institute));
+    let step = g.tables.school.per_turn;
+    let ceiling = g.tables.school.ceiling;
+    g.run_schools();
+    assert!((g.colony(id).unwrap().education - (0.8 + step)).abs() < 1e-9, "one turn should add a step");
+    for _ in 0..40 {
+        g.run_schools();
+    }
+    assert!((g.colony(id).unwrap().education - ceiling).abs() < 1e-9, "it climbs to the ceiling {ceiling}, not {}", g.colony(id).unwrap().education);
+
+    // Mothballed, it falls back -- and stops at what the settlers knew.
+    let idx = g.colony(id).unwrap().modules.iter().position(|m| m.kind == ModuleKind::Institute).unwrap();
+    g.colony_mut(id).unwrap().modules[idx].mothballed = true;
+    g.colony_mut(id).unwrap().modules[idx].online = false;
+    for _ in 0..60 {
+        g.run_schools();
+    }
+    assert!(
+        (g.colony(id).unwrap().education - settlers).abs() < 1e-9,
+        "it should stop at the settlers' own {settlers}, not {}",
+        g.colony(id).unwrap().education
+    );
+}
+
+/// Ticket #185: one Institute to a Colony, as one School to a Nation State.
+#[test]
+fn a_colony_holds_one_institute() {
+    let mut g = game();
+    let id = station_at(&mut g, Seat(0), BodyId::Earth);
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Core));
+    g.settle_people(id, 8, 1.0);
+    g.seats[0].stockpile.materials = 500;
+    let o = Order::BuildModule { colony: id, kind: ModuleKind::Institute };
+    assert!(g.check_order(Seat(0), &[], &o).is_ok(), "the first Institute is legal");
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Institute));
+    assert!(g.check_order(Seat(0), &[], &o).is_err(), "a second Institute at one Colony should be refused");
+}
+
+/// Ticket #189: an Observatory reads its Colony's Education Level, exactly as a Research Lab reads
+/// its Region's. Without this the Colony's figure would be bookkeeping.
+#[test]
+fn an_observatory_reads_its_colonys_education_level() {
+    let mut g = game();
+    let id = station_at(&mut g, Seat(0), BodyId::Earth);
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Core));
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Observatory));
+    g.settle_people(id, 4, 0.5);
+    let idx = g.colony(id).unwrap().modules.iter().position(|m| m.kind == ModuleKind::Observatory).unwrap();
+    let poor = g.module_yield_at(Seat(0), id, idx).research;
+
+    let mut h = game();
+    let id2 = station_at(&mut h, Seat(0), BodyId::Earth);
+    h.colony_mut(id2).unwrap().modules.push(Module::new(ModuleKind::Core));
+    h.colony_mut(id2).unwrap().modules.push(Module::new(ModuleKind::Observatory));
+    h.settle_people(id2, 4, 2.0);
+    let rich = h.module_yield_at(Seat(0), id2, idx).research;
+
+    assert!(rich > poor, "a well-schooled Colony's Observatory should out-produce a poorly-schooled one: {poor} then {rich}");
+}
+
+// ------------------------------------------------------- 0.08.0 ticket #187: Resistance
+
+/// Ticket #187: a place's schooling bends what an outsider's Influence buys there. The pivot has no
+/// effect; the worst-schooled Region on the board gives back MORE than was spent, the ceiling gives
+/// back less, and each side reaches its own end of the band.
+#[test]
+fn resistance_runs_from_the_boards_worst_schooling_to_the_schools_ceiling() {
+    let g = game();
+    let r = &g.tables.influence.resistance;
+    let sid = g.directed_states(Seat(0))[0];
+    let place = Place::State(sid);
+
+    // The anchors, read off a Region whose figure is moved to each in turn.
+    let mut h = game();
+    let at = |h: &mut Game, e: f64| {
+        let card = h.tables.state(sid).education_level;
+        h.state_mut(sid).schooling = e - card;
+        h.resistance(place)
+    };
+    assert!((at(&mut h, r.pivot) - 1.0).abs() < 1e-9, "the pivot has no effect");
+    assert!((at(&mut h, r.low) - (1.0 - r.band)).abs() < 1e-9, "the lowest card reaches 1 - band");
+    assert!((at(&mut h, r.high) - (1.0 + r.band)).abs() < 1e-9, "the ceiling reaches 1 + band");
+    // And it is monotonic between them, not a step.
+    let mid_low = at(&mut h, (r.low + r.pivot) / 2.0);
+    assert!(mid_low > 1.0 - r.band && mid_low < 1.0, "halfway down sits inside the band, not at an end: {mid_low}");
+}
+
+/// Ticket #187: the designer's worked example -- 30 Influence spent on a Region schooled to the
+/// ceiling moves the needle by 27 -- and the other end, where a badly-schooled place gives back more.
+#[test]
+fn thirty_influence_buys_twenty_seven_standing_at_the_ceiling() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    let place = Place::State(sid);
+    let card = g.tables.state(sid).education_level;
+
+    g.state_mut(sid).schooling = g.tables.influence.resistance.high - card;
+    assert_eq!(g.standing_from(place, 30), 27, "30 spent at the ceiling should become 27");
+
+    g.state_mut(sid).schooling = g.tables.influence.resistance.low - card;
+    assert_eq!(g.standing_from(place, 30), 33, "30 spent at the worst schooling should become 33");
+}
+
+/// Ticket #187: it bites an OUTSIDER and never the controller, through the Resolution rather than
+/// through the helper by hand. Reinforcing a place you hold is never taxed.
+#[test]
+fn resistance_bites_an_outsider_and_never_the_controller() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    let place = Place::State(sid);
+    let card = g.tables.state(sid).education_level;
+    g.state_mut(sid).schooling = g.tables.influence.resistance.high - card;
+    assert_eq!(g.place_control(place).controller(), Some(Seat(0)), "the premise: seat 0 holds it");
+
+    // Seat 1 is an outsider here, and pays the tax.
+    g.seats[1].allotment = 100;
+    g.commit_orders(Seat(1), &[Order::Influence { target: place, amount: 30 }]);
+    g.resolution_phase();
+    assert_eq!(g.seat(Seat(1)).influence.get(&place).copied().unwrap_or(0), 27, "an outsider's 30 becomes 27");
+
+    // Seat 0 holds it, and converts in full.
+    let before = g.seat(Seat(0)).influence.get(&place).copied().unwrap_or(0);
+    g.seats[0].allotment = 100;
+    g.commit_orders(Seat(0), &[Order::Influence { target: place, amount: 30 }]);
+    g.resolution_phase();
+    let after = g.seat(Seat(0)).influence.get(&place).copied().unwrap_or(0);
+    assert_eq!(after - before, 30, "the controller's own 30 is worth 30");
+}
+
+// ---------------------------------- 0.08.0 ticket #188: schooling moderates what a population is worth
+
+/// Ticket #188: the population BONUS -- the part above 1 -- is scaled by the state's schooling, so a
+/// great many badly-schooled people are worth less than a great many well-schooled ones. The base 1
+/// stays, so no Region is ever worth less than one with no people at all.
+#[test]
+fn schooling_moderates_the_population_bonus() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    let card = g.tables.state(sid).education_level;
+    let pop = g.state(sid).population;
+    let bonus = pop / 1000.0;
+
+    assert!((g.population_factor(sid) - (1.0 + bonus * card)).abs() < 1e-9, "the card figure scales the bonus");
+
+    for taught in [0.7, 1.0, 2.0] {
+        g.state_mut(sid).schooling = taught - card;
+        let want = 1.0 + bonus * taught;
+        assert!((g.population_factor(sid) - want).abs() < 1e-9, "at schooling {taught} the factor should be {want}, not {}", g.population_factor(sid));
+    }
+
+    // Uncapped in both directions: schooling below the pivot shrinks the bonus, above it enlarges.
+    g.state_mut(sid).schooling = 0.5 - card;
+    let low = g.population_factor(sid);
+    g.state_mut(sid).schooling = 2.0 - card;
+    let high = g.population_factor(sid);
+    assert!(low < 1.0 + bonus && high > 1.0 + bonus, "it moves both ways around the old factor: {low} then {high}");
+    assert!(low > 1.0, "and never below 1: {low}");
+}
+
+/// Ticket #188: and schooling therefore applies TWICE to a Lab -- once inside the population factor
+/// and once as the outright multiplier it has always been. The compounding is the point: it is what
+/// makes a School in a big, badly-schooled Region transformative rather than marginal.
+#[test]
+fn schooling_applies_twice_to_a_research_lab() {
+    let mut g = game();
+    let sid = g.directed_states(Seat(0))[0];
+    let card = g.tables.state(sid).education_level;
+    let pop = g.state(sid).population;
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::ResearchLab));
+
+    let taught = 2.0;
+    g.state_mut(sid).schooling = taught - card;
+    let base = g.tables.facility(FacilityKind::ResearchLab).produces.as_ref().unwrap().amount as f64;
+    let mult = g.tables.faction(g.kind(Seat(0))).research_multiplier;
+    let want = (base * (1.0 + pop / 1000.0 * taught) * taught * mult).floor() as i64;
+    assert_eq!(g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).research, want, "the factor and the multiplier both carry the schooling");
+}
+
+/// Ticket #188: the Observatory's per-Colonist bonus is moderated the same way, so the rule reads
+/// the same in both halves of the game.
+#[test]
+fn schooling_moderates_the_observatorys_per_colonist_bonus() {
+    let mut g = game();
+    let id = station_at(&mut g, Seat(0), BodyId::Earth);
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Core));
+    for _ in 0..6 {
+        g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    }
+    g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Observatory));
+    g.settle_people(id, 40, 1.0);
+    let idx = g.colony(id).unwrap().modules.iter().position(|m| m.kind == ModuleKind::Observatory).unwrap();
+
+    let per = g.tables.observatory.research_per_colonist;
+    let n = g.colony(id).unwrap().colonists as f64;
+    let science = g.research_yield_at(g.colony(id).unwrap());
+    let base = g.tables.module(ModuleKind::Observatory).produces.as_ref().unwrap().amount as f64;
+    let mult = g.tables.faction(g.kind(Seat(0))).research_multiplier;
+    for taught in [0.5, 2.0] {
+        g.colony_mut(id).unwrap().education = taught;
+        let want = (base * science * taught * (1.0 + n * per * taught) * mult).floor() as i64;
+        assert_eq!(g.module_yield_at(Seat(0), id, idx).research, want, "at {taught} the per-Colonist bonus should be moderated too");
+    }
+}
+
+// ------------------------------------------- 0.08.0 tickets #181 to #186: the Unique Facilities
+
+fn seat_of(g: &Game, kind: FactionKind) -> Seat {
+    Seat::ALL.into_iter().find(|s| g.kind(*s) == kind).expect("every game seats all four Factions")
+}
+
+/// Ticket #181: a Unique Facility is a building of its own and it REPLACES the common one on its
+/// Faction's build list. A Prospector who orders a Bank raises an Investment Bank; every other
+/// Faction raises a Bank; and the name is not a back door -- nobody else may order one, a Faction
+/// that has captured a Region full of them included, because a captured building is never a licence
+/// to build more.
+#[test]
+fn a_faction_builds_its_own_version_of_the_common_building() {
+    let mut g = game();
+    let pro = seat_of(&g, FactionKind::Prospectors);
+    let cus = seat_of(&g, FactionKind::Custodians);
+    let ps = g.controlled_states(pro)[0];
+    let cs = g.controlled_states(cus)[0];
+    g.seats[pro.index()].stockpile.materials = 500;
+    g.seats[cus.index()].stockpile.materials = 500;
+
+    g.commit_orders(pro, &[Order::BuildFacility { state: ps, kind: FacilityKind::Bank }]);
+    g.commit_orders(cus, &[Order::BuildFacility { state: cs, kind: FacilityKind::Bank }]);
+    let queued = |g: &Game, sid: StateId| -> Vec<BuildItem> { g.state(sid).queue.iter().map(|b| b.item).collect() };
+    assert_eq!(queued(&g, ps), vec![BuildItem::Facility(FacilityKind::InvestmentBank)], "a Prospector never raises a plain Bank");
+    assert_eq!(queued(&g, cs), vec![BuildItem::Facility(FacilityKind::Bank)], "and everybody else raises one");
+
+    let err = g.check_order(cus, &[], &Order::BuildFacility { state: cs, kind: FacilityKind::InvestmentBank }).unwrap_err();
+    assert_eq!(err.0, "only the Prospectors build the Investment Bank");
+    assert!(g.check_order(pro, &[], &Order::BuildFacility { state: ps, kind: FacilityKind::InvestmentBank }).is_ok(), "by its own name too");
+
+    // The cap reads the JOB, not the name: an Academy standing blocks a School order and back.
+    let cus_state = g.controlled_states(cus)[0];
+    g.state_mut(cus_state).queue.clear();
+    g.state_mut(cus_state).facilities.push(Facility::new(FacilityKind::Academy));
+    let err = g.check_order(cus, &[], &Order::BuildFacility { state: cus_state, kind: FacilityKind::School }).unwrap_err();
+    assert_eq!(err.0, "this Nation State already has a School");
+}
+
+/// Ticket #181: the price is the common building's, exactly -- the same Materials, the same build
+/// turns, the same upkeep, the same output, the same slot. A Unique Facility costs nothing extra,
+/// and quietly paying less would be a cost by another name.
+#[test]
+fn a_unique_facility_costs_and_makes_what_the_common_one_does() {
+    let g = game();
+    for (unique, common) in [
+        (FacilityKind::InvestmentBank, FacilityKind::Bank),
+        (FacilityKind::Spaceport, FacilityKind::LaunchSite),
+        (FacilityKind::Reactor, FacilityKind::PowerPlant),
+        (FacilityKind::Academy, FacilityKind::School),
+    ] {
+        assert_eq!(unique.common(), Some(common), "{} replaces {}", unique.name(), common.name());
+        let u = g.tables.facility(unique);
+        let c = g.tables.facility(common);
+        assert_eq!((u.materials, u.build_turns, u.energy_upkeep, u.no_slot), (c.materials, c.build_turns, c.energy_upkeep, c.no_slot), "{}", unique.name());
+        assert!((u.emissions - c.emissions).abs() < 1e-9, "{}", unique.name());
+        assert_eq!(u.produces.as_ref().map(|p| (p.resource, p.amount)), c.produces.as_ref().map(|p| (p.resource, p.amount)), "{}", unique.name());
+    }
+    // And off Earth, the Academy against the Institute.
+    let a = g.tables.module(ModuleKind::Academy);
+    let i = g.tables.module(ModuleKind::Institute);
+    assert_eq!((a.materials, a.build_turns, a.energy_upkeep), (i.materials, i.build_turns, i.energy_upkeep));
+    assert_eq!(ModuleKind::Academy.common(), Some(ModuleKind::Institute));
+}
+
+/// Ticket #181: a Faction's start Region's Facilities come up as that Faction's own versions, the
+/// Launch Site every start Region is handed included. The consequence is asymmetric and was accepted
+/// knowingly: the Arkwrights hold their Spaceport from turn 1, the Archivists usually hold a Reactor
+/// because ten of the fourteen Regions start with a Power Plant, and neither the Bank nor the School
+/// is in any Region's start Facilities, so the Prospectors and the Custodians must build for theirs.
+#[test]
+fn a_start_region_comes_up_with_its_factions_own_versions() {
+    let g = fresh();
+    let ark = seat_of(&g, FactionKind::Arkwrights);
+    let sid = g.controlled_states(ark)[0];
+    assert!(g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::Spaceport), "the Arkwrights launch from turn 1");
+    assert!(!g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite), "and never from a common Launch Site");
+
+    // Nobody starts with another Faction's version, and no start Region carries a Bank or a School,
+    // so the Prospectors and the Custodians begin with nothing of theirs.
+    for seat in Seat::ALL {
+        let faction = g.kind(seat);
+        for sid in g.controlled_states(seat) {
+            for f in &g.state(sid).facilities {
+                assert!(f.kind.unique_to().map(|o| o == faction).unwrap_or(true), "{:?} holds another Faction's {}", seat, f.kind.name());
+            }
+        }
+    }
+    for seat in [seat_of(&g, FactionKind::Prospectors), seat_of(&g, FactionKind::Custodians)] {
+        let holds = g.controlled_states(seat).iter().any(|s| g.state(*s).facilities.iter().any(|f| f.kind.unique_to().is_some()));
+        assert!(!holds, "{seat:?} should start with none of its own");
+    }
+}
+
+/// Ticket #181: a Unique Facility is never destroyed when its place changes hands. It keeps standing
+/// and pays its new holder the same clause it paid its builder -- the opposite of the Scrubber and
+/// the Archive, which are destroyed outright. And the mirror does NOT hold: a common building
+/// already standing does not convert when the Faction whose Unique version it is takes the Region.
+/// The bricks are the bricks, and the rule cuts both ways or it is not a rule.
+#[test]
+fn a_unique_facility_changes_sides_and_a_common_building_never_converts() {
+    let mut g = game();
+    let pro = seat_of(&g, FactionKind::Prospectors);
+    let cus = seat_of(&g, FactionKind::Custodians);
+    let sid = g.controlled_states(pro)[0];
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::InvestmentBank));
+
+    g.take_control(sid, cus);
+    assert!(g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::InvestmentBank), "it stands, and in Custodian hands");
+
+    // The other way: three plain Banks taken by the Prospectors stay three plain Banks.
+    let other = g.controlled_states(cus)[0];
+    for _ in 0..3 {
+        g.state_mut(other).facilities.push(Facility::new(FacilityKind::Bank));
+    }
+    g.take_control(other, pro);
+    assert_eq!(g.state(other).facilities.iter().filter(|f| f.kind == FacilityKind::Bank).count(), 3, "capture is not conversion");
+    assert!(!g.state(other).facilities.iter().any(|f| f.kind == FacilityKind::InvestmentBank));
+}
+
+/// Ticket #182: the Investment Bank banks 1% of the Venture Capital Fund's balance back INTO the
+/// Fund, read before this turn's banking is added, rounded down, and the Materials are created
+/// rather than drawn from the Stockpile, so they compound from next turn. ONE per Region pays,
+/// however many stand there, and a floor of one applies to a single building Faction-wide.
+#[test]
+fn an_investment_bank_banks_a_hundredth_of_the_fund_one_per_region() {
+    let mut g = game();
+    let pro = seat_of(&g, FactionKind::Prospectors);
+    g.seats[pro.index()].stockpile.energy = 500;
+    let a = g.controlled_states(pro)[0];
+    let b = StateId::ALL.into_iter().find(|s| *s != a).unwrap();
+    g.take_control(b, pro);
+    // Two in one Region and one in the other: three buildings, two paying Regions.
+    g.state_mut(a).facilities.push(Facility::new(FacilityKind::InvestmentBank));
+    g.state_mut(a).facilities.push(Facility::new(FacilityKind::InvestmentBank));
+    g.state_mut(b).facilities.push(Facility::new(FacilityKind::InvestmentBank));
+
+    g.seats[pro.index()].venture_fund = 500;
+    let before = g.seats[pro.index()].stockpile.materials;
+    g.income_phase();
+    assert_eq!(g.seats[pro.index()].venture_fund, 500 + 10, "1% of 500 is 5, once per Region, twice");
+    assert_eq!(g.seats[pro.index()].stockpile.materials - before, g.seats[pro.index()].income_last_turn.materials, "the interest is created, never taken from the Stockpile");
+
+    // And it compounds: next turn's interest reads the larger balance.
+    g.income_phase();
+    assert_eq!(g.seats[pro.index()].venture_fund, 510 + 10, "1% of 510 is 5 again, and the balance keeps climbing");
+
+    // The floor: below 100 in the Fund the percentage floors to nothing, and one building still pays.
+    g.seats[pro.index()].venture_fund = 50;
+    g.income_phase();
+    assert_eq!(g.seats[pro.index()].venture_fund, 51, "one Material, Faction-wide, not one per Region");
+}
+
+/// Ticket #182: in a non-Prospector's hands the same share applies to that Faction's DUCAT income
+/// instead, at a minimum of one Ducat, because no other Faction has a Fund for it to pay into. The
+/// cap travels with the clause, so capturing a Prospector Region is never better than being the
+/// Prospectors there.
+#[test]
+fn a_captured_investment_bank_pays_its_captor_ducats() {
+    let mut g = game();
+    let cus = seat_of(&g, FactionKind::Custodians);
+    g.seats[cus.index()].stockpile.energy = 500;
+    let sid = g.controlled_states(cus)[0];
+    g.income_phase();
+    let plain = g.seats[cus.index()].income_last_turn.ducats;
+
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::InvestmentBank));
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::InvestmentBank));
+    let fund_before = g.seats[cus.index()].venture_fund;
+    g.income_phase();
+    let with = g.seats[cus.index()].income_last_turn.ducats;
+    let bank_ducats = g.facility_yield(cus, sid, FacilityKind::InvestmentBank).amount * 2;
+    assert_eq!(with - plain - bank_ducats, 1, "one Region pays once, at the floor of one Ducat");
+    assert_eq!(g.seats[cus.index()].venture_fund, fund_before, "and nothing reaches a Fund they do not have");
+}
+
+/// Ticket #183: the Spaceport pays +1 Influence for every Emigrant it lifts OFF EARTH -- onto a Ship
+/// in orbit, or onto a station of the seat's over Earth. It lands as free Allotment paid into NEXT
+/// turn's, at face value OUTSIDE the Allotment formula, so the Arkwrights' x0.8 Influence multiplier
+/// never touches it. The sea to Antarctica pays nothing: it is not a launch, and Antarctica is on
+/// Earth.
+#[test]
+fn a_spaceport_pays_an_influence_for_every_emigrant_it_launches() {
+    let mut g = game();
+    let ark = seat_of(&g, FactionKind::Arkwrights);
+    let sid = g.controlled_states(ark)[0];
+    assert!(g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::Spaceport), "the premise: their start Region carries one");
+    let st = station_at(&mut g, ark, BodyId::Earth);
+    g.colony_mut(st).unwrap().modules.push(Module::new(ModuleKind::Core));
+
+    let base = g.influence_allotment(ark);
+    g.state_mut(sid).emigrants = 3;
+    g.commit_orders(ark, &[Order::LiftToStation { state: sid, n: 3, colony: st }]);
+    assert_eq!(g.seats[ark.index()].spaceport_influence, 3, "one for each Emigrant lifted");
+    assert_eq!(g.influence_allotment(ark), base + 3, "at face value, never through the x0.8");
+
+    // The sea is not a launch.
+    g.state_mut(sid).emigrants = 4;
+    g.commit_orders(ark, &[Order::SendToAntarctica { state: sid, n: 4, into: UnloadTarget::Slot(BodyId::Earth, 0) }]);
+    assert_eq!(g.seats[ark.index()].spaceport_influence, 3, "Antarctica is on Earth");
+
+    // A common Launch Site earns nothing, and the tally is cleared once it has been paid.
+    g.state_mut(sid).facilities.retain(|f| f.kind != FacilityKind::Spaceport);
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::LaunchSite));
+    g.income_phase();
+    assert_eq!(g.seats[ark.index()].spaceport_influence, 0, "paid, and the tally begins again");
+    g.state_mut(sid).emigrants = 2;
+    g.commit_orders(ark, &[Order::LiftToStation { state: sid, n: 2, colony: st }]);
+    assert_eq!(g.seats[ark.index()].spaceport_influence, 0, "a Launch Site is not a Spaceport");
+}
+
+/// Ticket #184: while a Reactor stands and is online, its holder pays 75% of the total Energy upkeep
+/// of everything it owns -- off the TOTAL and floored once, never per building, because at 2 and 3
+/// Energy a building per-building rounding turns a 75% rule into a 50% and a 33% cut. The Archive is
+/// the one exception and pays its figure in full. No stacking: a second Reactor is an ordinary
+/// power station.
+#[test]
+fn a_reactor_takes_a_quarter_off_the_whole_energy_bill_but_never_off_the_archive() {
+    let mut g = game();
+    let arc = seat_of(&g, FactionKind::Archivists);
+    let sid = g.controlled_states(arc)[0];
+    g.state_mut(sid).facilities.clear();
+    for _ in 0..2 {
+        g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Factory));
+    }
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::ResearchLab));
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::PowerPlant));
+    g.seats[arc.index()].stockpile.energy = 500;
+
+    // A Power Plant and a Reactor make the same Energy, so swapping one for the other isolates the
+    // clause exactly: the whole difference is the relief.
+    g.income_phase();
+    let plain = g.seats[arc.index()].income_last_turn.energy;
+    let bill: i64 = g.state(sid).facilities.iter().map(|f| g.tables.facility(f.kind).energy_upkeep).sum::<i64>() + g.unit_upkeep(arc);
+    let want = bill - (bill as f64 * 0.75).floor() as i64;
+    assert!(want > 0, "the premise: there is a bill to take a quarter off, {bill}");
+
+    let i = g.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::PowerPlant).unwrap();
+    g.state_mut(sid).facilities[i].kind = FacilityKind::Reactor;
+    g.income_phase();
+    assert_eq!(g.seats[arc.index()].income_last_turn.energy - plain, want, "off the total, floored once");
+
+    // No stacking: a second Reactor is worth its 6 Energy and nothing more.
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Reactor));
+    g.income_phase();
+    let two = g.seats[arc.index()].income_last_turn.energy;
+    g.state_mut(sid).facilities.pop();
+    g.income_phase();
+    let one = g.seats[arc.index()].income_last_turn.energy;
+    // What a Reactor actually makes here, not the row figure: this Region leans Energy, so its
+    // power stations pay half again.
+    let makes = g.facility_yield(arc, sid, FacilityKind::Reactor).amount;
+    assert_eq!(two - one, makes, "the second Reactor pays its Energy and no second discount");
+
+    // And the Archive pays in full: it is left out of the sum the relief is taken from, so adding it
+    // costs its whole figure and not three quarters of it. (Ticket #51: it draws no Energy until its
+    // Research is paid in full, so the fund is filled first or there is nothing to measure.)
+    let cid = colony(&mut g, arc, BodyId::Mars, &[], 4);
+    g.income_phase();
+    let without = g.seats[arc.index()].income_last_turn.energy;
+    g.colony_mut(cid).unwrap().modules.push(Module::new(ModuleKind::Archive));
+    g.seats[arc.index()].archive_fund = g.tables.archive.research;
+    let archive_upkeep = g.tables.module(ModuleKind::Archive).energy_upkeep;
+    assert!(archive_upkeep > 0, "the premise: the Archive has a bill of its own");
+    g.income_phase();
+    assert_eq!(without - g.seats[arc.index()].income_last_turn.energy, archive_upkeep, "the Archive's upkeep is paid whole");
+}
+
+/// Ticket #186: the Academy does everything a School does and pays +1 Ducat a turn, flat, wherever
+/// it stands -- Region, Colony or station -- while it is online. Flat rather than scaled by GDP,
+/// which would make it a second Bank built where the money already is rather than where schooling is
+/// wanted; and flat is why a captured Academy pays its captor exactly what it paid its builder,
+/// since 1 through the largest output multiplier in the game floors back to 1.
+#[test]
+fn an_academy_pays_a_ducat_wherever_it_stands_and_teaches_like_a_school() {
+    let mut g = game();
+    let cus = seat_of(&g, FactionKind::Custodians);
+    g.seats[cus.index()].stockpile.energy = 500;
+    let sid = g.controlled_states(cus)[0];
+    g.income_phase();
+    let plain = g.seats[cus.index()].income_last_turn.ducats;
+
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Academy));
+    let cid = colony(&mut g, cus, BodyId::Mars, &[ModuleKind::Academy], 4);
+    g.income_phase();
+    let with = g.seats[cus.index()].income_last_turn.ducats;
+    // The figure is pinned as a literal rather than read back from the same table the rule reads:
+    // an oracle that shares its input with the code under test agrees with it while both diverge.
+    assert_eq!(g.tables.unique.academy_ducats, 1, "the card figure: a flat Ducat");
+    assert_eq!(with - plain, 2, "one on Earth and one off it");
+
+    // It teaches: the Region's schooling climbs by the School's own step, to the School's ceiling.
+    let step = g.tables.school.per_turn;
+    let taught = g.state(sid).schooling;
+    g.run_schools();
+    assert!((g.state(sid).schooling - (taught + step)).abs() < 1e-9, "an Academy is a School that pays");
+    let before = g.colony(cid).unwrap().education;
+    g.run_schools();
+    assert!(g.colony(cid).unwrap().education > before, "and off Earth too");
+}
+
+/// Ticket #181: only a CONTROLLER collects. An occupier pays a Unique Facility's upkeep and draws
+/// nothing from its clause until control transfers -- the precedent ticket #69 set for an occupied
+/// Research Lab, which works for the world and not for the occupier.
+#[test]
+fn an_occupier_draws_nothing_from_a_unique_facilitys_clause() {
+    let mut g = game();
+    let cus = seat_of(&g, FactionKind::Custodians);
+    let pro = seat_of(&g, FactionKind::Prospectors);
+    g.seats[cus.index()].stockpile.energy = 500;
+    let sid = g.controlled_states(cus)[0];
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Academy));
+    g.income_phase();
+    let controlled = g.seats[cus.index()].income_last_turn.ducats;
+
+    let economy = g.state_ducats(sid);
+    g.state_mut(sid).control = Control::Occupied { occupier: cus, previous: Some(pro), turns: 1 };
+    g.income_phase();
+    let occupied = g.seats[cus.index()].income_last_turn.ducats;
+    assert_eq!(controlled - occupied, 1 + economy, "the clause and the economy both wait for control");
+}
+
+// ------------------------------------------- 0.08.0 ticket #190: the Constabulary's margin
+
+/// Ticket #190: while a Constabulary stands and is online in a Region, the challenge margin there is
+/// 25 instead of 20, so taking that Region from its holder wants the holder's Standing plus 25. It
+/// protects WHOEVER HOLDS the Region, not the Faction that raised it -- a police force serves the
+/// government of the day -- so a Faction that builds one in a Region it later loses has made its own
+/// job harder. It does nothing on a neutral Region, which has no margin at all: the price there is
+/// the threshold alone.
+#[test]
+fn a_constabulary_adds_five_to_the_challenge_margin_for_every_challenger() {
+    let mut g = game();
+    let holder = Seat(0);
+    let challenger = Seat(1);
+    let sid = g.controlled_states(holder)[0];
+    let target = Place::State(sid);
+    // A holder's Standing high enough that the margin, not the threshold, is what binds.
+    let threshold = g.influence_threshold_for(challenger, target);
+    g.seats[holder.index()].influence.insert(target, threshold + 40);
+
+    assert_eq!(g.challenge_margin_at(target), 20, "the base margin");
+    let plain = g.influence_needed_for(challenger, target);
+
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Constabulary));
+    assert_eq!(g.challenge_margin_at(target), 25, "and 25 with a Constabulary standing");
+    assert_eq!(g.influence_needed_for(challenger, target) - plain, 5, "the price of taking it rises by exactly five");
+
+    // For every challenger, whoever built it: the third seat pays the same.
+    assert_eq!(g.influence_needed_for(Seat(2), target), g.influence_needed_for(challenger, target));
+
+    // It must be online.
+    let i = g.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::Constabulary).unwrap();
+    g.state_mut(sid).facilities[i].mothballed = true;
+    assert_eq!(g.challenge_margin_at(target), 20, "a mothballed Constabulary guards nothing");
+    g.state_mut(sid).facilities[i].mothballed = false;
+
+    // And nothing on a neutral Region: the price there is the threshold alone, Constabulary or not.
+    g.state_mut(sid).control = Control::Neutral;
+    assert_eq!(g.influence_needed_for(challenger, target), g.influence_threshold_for(challenger, target), "a neutral Region has no margin to raise");
+}
+
+// ------------------------------------------- 0.08.0 ticket #191: Relations
+
+/// Ticket #191: one score per ORDERED PAIR, so the Arkwrights' view of the Prospectors is a
+/// different number from the Prospectors' view of the Arkwrights. It starts neutral at 0, falls by
+/// one for each OFFENDING TURN -- charged per turn, never per order -- and an offence is Influence
+/// spent on a place the victim HOLDS. A neutral place is never an offence, however hotly contested:
+/// two Factions bidding for empty ground are competing, not crossing each other.
+#[test]
+fn relations_fall_once_a_turn_for_spending_on_a_place_a_rival_holds() {
+    let mut g = game();
+    let victim = Seat(0);
+    let offender = Seat(1);
+    let held = Place::State(g.controlled_states(victim)[0]);
+    let neutral = Place::State(StateId::ALL.into_iter().find(|s| g.state(*s).control == Control::Neutral).expect("a neutral Region"));
+
+    assert_eq!(g.relations_score(victim, offender), 0, "neutral to begin");
+    assert_eq!(g.relations_score(offender, victim), 0, "and in both directions");
+
+    // Two spends on the same victim in one turn cost one point, not two.
+    g.pending.influence.push((offender, held, 10));
+    g.pending.influence.push((offender, held, 10));
+    g.pending.influence.push((offender, neutral, 10));
+    g.resolution_phase();
+    g.settle_relations();
+    assert_eq!(g.relations_score(victim, offender), -1, "charged once for the turn, however many orders");
+    assert_eq!(g.relations_score(offender, victim), 0, "and the ordered pair is one-directional");
+
+    // The neutral Region's holder-to-be is nobody, so nobody was offended by that third order.
+    for seat in Seat::ALL {
+        if seat != victim {
+            assert_eq!(g.relations_score(seat, offender), 0, "{seat:?} was not crossed");
+        }
+    }
+}
+
+/// Ticket #191: the score recovers one every four quiet turns and STOPS AT NEUTRAL -- it never rises
+/// above it. The +10 half of the scale is reserved and nothing fills it in this version, so an
+/// all-zero-or-negative grid is the rule working and not a defect.
+#[test]
+fn relations_recover_slowly_and_never_rise_above_neutral() {
+    let mut g = game();
+    let (victim, offender) = (Seat(0), Seat(1));
+    g.relations.score[victim.index()][offender.index()] = -3;
+
+    for _ in 0..3 {
+        g.settle_relations();
+    }
+    assert_eq!(g.relations_score(victim, offender), -3, "three quiet turns are not enough");
+    g.settle_relations();
+    assert_eq!(g.relations_score(victim, offender), -2, "the fourth pays one back");
+
+    for _ in 0..40 {
+        g.settle_relations();
+    }
+    assert_eq!(g.relations_score(victim, offender), 0, "and it stops at neutral, however long the peace");
+
+    // The floor holds too.
+    for _ in 0..20 {
+        g.offend(offender, victim);
+        g.settle_relations();
+    }
+    assert_eq!(g.relations_score(victim, offender), -10, "and the scale has a floor");
+}
+
+/// Ticket #191: in version 0.08.0 the score does nothing mechanical. It is read, not spent -- no
+/// rule reads it, and the computer players do not read it. Pinned so that a later version giving it
+/// teeth has to come past this test and say so.
+#[test]
+fn relations_do_nothing_mechanical_in_this_version() {
+    let mut a = with_seed(11);
+    let mut b = with_seed(11);
+    for viewer in Seat::ALL {
+        for subject in Seat::ALL {
+            if viewer != subject {
+                b.relations.score[viewer.index()][subject.index()] = -10;
+            }
+        }
+    }
+    for _ in 0..6 {
+        pick_a_tech(&mut a);
+        pick_a_tech(&mut b);
+        a.end_turn(std::array::from_fn(|_| Vec::new())).unwrap();
+        b.end_turn(std::array::from_fn(|_| Vec::new())).unwrap();
+    }
+    let picture = |g: &Game| -> Vec<(i64, i64, i64, u32, usize)> {
+        Seat::ALL
+            .into_iter()
+            .map(|s| {
+                let st = g.seat(s);
+                (st.stockpile.materials, st.stockpile.ducats, st.venture_fund, st.allotment as u32, g.controlled_states(s).len())
+            })
+            .collect()
+    };
+    assert_eq!(picture(&a), picture(&b), "six turns of the worst possible blood changed nothing about the board");
+}
+
+// ------------------------------------------- 0.08.0 ticket #192: the Archive's gate and the Upload
+
+/// Ticket #192: ordering the Archive wants four Colonists living at the place, checked ONCE at the
+/// order. Neither the three-turn build nor the standing Module cares afterwards: a build that could
+/// stall halfway would be a new state to hold in the save, draw on the card and say in the Report,
+/// for a case that fires rarely, and the Victory Condition does its own checking at the end.
+#[test]
+fn ordering_the_archive_wants_four_colonists_at_the_place_and_only_at_the_order() {
+    let mut g = game();
+    let arc = seat_of(&g, FactionKind::Archivists);
+    g.seats[arc.index()].stockpile.materials = 200;
+    let cid = colony(&mut g, arc, BodyId::Mars, &[ModuleKind::Habitat], 0);
+    let order = Order::BuildArchive { colony: cid };
+
+    // Ticket #199 (version 0.08.0): the gate Tech is named FIRST of the two refusals, because it is
+    // the one still true after the other is solved -- four Colonists arrive at a median turn 11 and
+    // The Upload at a median 15.
+    g.colony_mut(cid).unwrap().colonists = 4;
+    assert_eq!(
+        g.check_order(arc, &[], &order).unwrap_err().0,
+        "the Archive waits on The Upload, which the world has not researched yet"
+    );
+    g.colony_mut(cid).unwrap().colonists = 0;
+    assert_eq!(g.check_order(arc, &[], &order).unwrap_err().0.split(',').next().unwrap(), "the Archive waits on The Upload");
+    the_upload(&mut g);
+
+    assert_eq!(g.tables.archive.colonists_to_order, 4, "the card figure");
+    for (living, expected) in [
+        (0, "the Archive wants 4 Colonists living at its Colony; nobody lives at"),
+        (1, "the Archive wants 4 Colonists living at its Colony; one lives at"),
+        (3, "the Archive wants 4 Colonists living at its Colony; 3 live at"),
+    ] {
+        g.colony_mut(cid).unwrap().colonists = living;
+        let err = g.check_order(arc, &[], &order).unwrap_err().0;
+        assert!(err.starts_with(expected), "at {living}: {err}");
+    }
+    g.colony_mut(cid).unwrap().colonists = 4;
+    assert!(g.check_order(arc, &[], &order).is_ok(), "four is enough");
+
+    // Once ordered, the place may empty and the build RUNS TO COMPLETION regardless. A build that
+    // could stall halfway would be a new state to hold in the save, draw on the card and say in the
+    // Report, and the Victory Condition does its own checking at the end anyway.
+    g.commit_orders(arc, std::slice::from_ref(&order));
+    assert!(g.archive_ordered(arc));
+    g.colony_mut(cid).unwrap().colonists = 0;
+    for _ in 0..g.tables.module(ModuleKind::Archive).build_turns {
+        g.turn += 1;
+        g.resolution_phase();
+    }
+    assert!(g.archive_built(arc), "the Module stands though nobody lives there now");
+}
+
+/// Ticket #192: Upload. An ORDER, because it is irreversible and this game asks before anything
+/// irreversible, and FREE, because the 80 Research and the Energy upkeep are already the monument's
+/// price. It needs the Archive complete, it may only draw from the population of the place the
+/// Archive stands at, and an uploaded Colonist leaves the living population.
+#[test]
+fn uploading_reads_colonists_into_the_archive_and_they_leave_the_living() {
+    let mut g = game();
+    let arc = seat_of(&g, FactionKind::Archivists);
+    let cus = seat_of(&g, FactionKind::Custodians);
+    let cid = archive_at(&mut g, arc, BodyId::Mars, 0, 8);
+    g.seats[arc.index()].uploaded = 0;
+    let upload = |n| Order::Upload { colony: cid, n };
+
+    // The Research is the machine, and the upload is what the machine is for.
+    assert_eq!(
+        g.check_order(arc, &[], &upload(4)).unwrap_err().0,
+        "the Archive is not complete: its Research is the machine, and the upload is what the machine is for"
+    );
+    g.seats[arc.index()].archive_fund = g.tables.archive.research;
+    assert!(g.archive_complete(arc));
+    assert_eq!(g.order_cost(arc, &upload(4)), Cost::default(), "free");
+
+    // Only the Archivists, and only where the Archive stands.
+    assert_eq!(g.check_order(cus, &[], &upload(4)).unwrap_err().0, "only the Archivists upload into the Archive");
+    let elsewhere = colony(&mut g, arc, BodyId::Moon, &[ModuleKind::Habitat], 8);
+    assert_eq!(
+        g.check_order(arc, &[], &Order::Upload { colony: elsewhere, n: 4 }).unwrap_err().0,
+        "the Archive does not stand here; it may only draw from the people where it is"
+    );
+
+    // In batches, and never more than live there.
+    assert!(g.check_order(arc, &[], &upload(9)).unwrap_err().0.starts_with("only 8 Colonists are left to upload"));
+    assert!(g.check_order(arc, &[upload(5)], &upload(4)).unwrap_err().0.starts_with("only 3 Colonists are left to upload"), "a pending order takes its people first");
+
+    g.commit_orders(arc, &[upload(4)]);
+    assert_eq!(g.seats[arc.index()].uploaded, 4, "four read in");
+    assert_eq!(g.colony(cid).unwrap().colonists, 4, "and four fewer living");
+    g.commit_orders(arc, &[upload(4)]);
+    assert_eq!(g.seats[arc.index()].uploaded, 8);
+    assert_eq!(g.colony(cid).unwrap().colonists, 0, "the place shrinks as it uploads");
+    assert_eq!(g.check_order(arc, &[], &upload(1)).unwrap_err().0.split(" at ").next().unwrap(), "nobody is left to upload");
+}
+
+/// Ticket #192: the second Victory part counts the UPLOADED and not the living. The count is
+/// monotonic -- uploaded people cannot be lost to a raid, a crowding death or a handover -- and it
+/// closes the odd case the old wording allowed, where a Faction won by having twelve people standing
+/// NEXT TO a finished Archive rather than inside it.
+#[test]
+fn the_archivists_second_part_counts_the_uploaded_not_the_living() {
+    let mut g = game();
+    let arc = seat_of(&g, FactionKind::Archivists);
+    let cid = archive_at(&mut g, arc, BodyId::Mars, 80, 12);
+    // Twelve standing beside a finished Archive, and nobody read in: no win.
+    g.seats[arc.index()].uploaded = 0;
+    open_gates(&mut g);
+    g.seats[arc.index()].stockpile.energy = 200;
+    g.income_phase();
+    assert!(g.archive_online(arc), "the premise: the Archive is running");
+    let p = g.progress(arc);
+    assert_eq!((p.first_value, p.second_value), (80.0, 0.0), "standing next to it is worth nothing now");
+    assert!(!p.met());
+
+    // Read them in, and the same twelve win it -- while the Colony itself stands empty.
+    g.commit_orders(arc, &[Order::Upload { colony: cid, n: 12 }]);
+    assert_eq!(g.colony(cid).unwrap().colonists, 0);
+    let p = g.progress(arc);
+    assert_eq!((p.second_value, p.second_bar), (12.0, 12.0));
+    assert!(p.met());
+
+    // And it cannot be taken back: losing the Colony outright leaves the count where it was.
+    g.colonies.retain(|c| c.id != cid);
+    assert_eq!(g.progress(arc).second_value, 12.0, "the uploaded are beyond reach");
+}
+
+/// Ticket #192: the computer must be taught both halves or the Archivists win nothing at all. It
+/// uploads whenever the Archive is complete and anybody lives at its place, and it asks for no more
+/// than the bar still wants.
+#[test]
+fn the_archivist_ai_uploads_whenever_the_archive_is_complete_and_anybody_lives_there() {
+    let mut g = game();
+    let arc = seat_of(&g, FactionKind::Archivists);
+    g.seats[arc.index()].stockpile.materials = 200;
+    g.seats[arc.index()].stockpile.energy = 200;
+    let cid = archive_at(&mut g, arc, BodyId::Mars, 0, 6);
+    g.seats[arc.index()].uploaded = 0;
+
+    // Not while the Research is unpaid.
+    assert!(!g.ai_orders(arc).iter().any(|o| matches!(o, Order::Upload { .. })), "the Archive is not complete yet");
+
+    g.seats[arc.index()].archive_fund = g.tables.archive.research;
+    let orders = g.ai_orders(arc);
+    match orders.iter().find_map(|o| if let Order::Upload { colony, n } = o { Some((*colony, *n)) } else { None }) {
+        Some((c, n)) => {
+            assert_eq!(c, cid, "at the Archive's own place");
+            assert_eq!(n, 6, "everyone living there");
+        }
+        None => panic!("the Archivist AI never uploads: {orders:?}"),
+    }
+
+    // And it asks for no more than the bar still wants.
+    g.seats[arc.index()].uploaded = 10;
+    let orders = g.ai_orders(arc);
+    let n = orders.iter().find_map(|o| if let Order::Upload { n, .. } = o { Some(*n) } else { None }).expect("an upload order");
+    assert_eq!(n, 2, "two short of twelve, so two");
 }

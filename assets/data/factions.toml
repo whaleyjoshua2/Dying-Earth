@@ -2,10 +2,11 @@
 
 [[faction]]
 id = "custodians"
-# Ticket #100 (version 0.07.0): the continent the start screen opens the globe on for this
-# Faction. It changes nothing else: no starting position, and any of the twelve may still be
-# chosen. Energy-lean for the Scrubbers, education 1.45 for the Research their Stabilization run leans on.
-home = "europe"
+# Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
+# screen opens the globe on for this Faction. It changes nothing else -- no starting position, and
+# any of the fourteen may still be chosen -- which is what the old name `home` did not say.
+# Energy-lean for the Scrubbers, education 1.45 for the Research their Stabilization run leans on.
+opens_on = "europe"
 name = "Custodians"
 # Version 0.04 (ticket #46): the bare station over Earth the Faction starts with (named in bodies.toml).
 start_station = "ISS"
@@ -28,10 +29,11 @@ colour = [0.15, 0.65, 0.6]
 
 [[faction]]
 id = "prospectors"
-# Ticket #100 (version 0.07.0): the continent the start screen opens the globe on for this
-# Faction. It changes nothing else: no starting position, and any of the twelve may still be
-# chosen. Materials-lean at Industry 3 and GDP 23: the extraction engine their whole game is.
-home = "east_asia"
+# Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
+# screen opens the globe on for this Faction. It changes nothing else -- no starting position, and
+# any of the fourteen may still be chosen -- which is what the old name `home` did not say.
+# Materials-lean at Industry 3 and GDP 23: the extraction engine their whole game is.
+opens_on = "east_asia"
 name = "Prospectors"
 start_station = "Tiangong"
 blurb = "Maximize extraction regardless of ecological cost."
@@ -51,8 +53,13 @@ ducats_multiplier = 1.2
 market_multiplier = 0.85
 signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs 15 Materials instead of 30, and every Facility and Colony Module costs them 15% less. Their states pay a fifth more Ducats, and the Trading window sells to them at 15% off. A Strip Permit is free, once per Nation State ever: for three turns every Facility there produces double, and when it ends that state's Baseline Emissions rise by 0.2 for good and its Unrest by 3. The Venture Capital Fund: on any turn they set a share of their Factories' and Mines' Materials output, 0% to 80% in steps of 10, to be banked in the Fund; a draw from it returns nine tenths."
 # Ticket #72: the Extraction Total is retired; the first part is Materials banked in the Fund.
-victory = "750 Materials in the Venture Capital Fund, plus 12 Colonists living off Earth."
-victory_first = { kind = "venture_fund", bar = 750 }
+victory = "1000 Materials in the Venture Capital Fund, plus 12 Colonists living off Earth."
+# Ticket #182 (version 0.08.0): 750 to 1000, because the Investment Bank pays uncapped interest
+# on the Fund. Measured first: in 40 games nobody EVER reached 750 -- the highest balance ever
+# seen was 745, the median game ended around turn 28 with the Fund in the 400s, and the
+# Prospectors won 0 of 80. The bar rises to keep the Fund a race rather than a formality now
+# that a Bank in each of ten Regions pays around 44 Materials a turn by turn 24.
+victory_first = { kind = "venture_fund", bar = 1000 }
 victory_second = { kind = "off_world_presence", bar = 12 }
 colour = [0.85, 0.5, 0.2]
 
@@ -60,10 +67,13 @@ colour = [0.85, 0.5, 0.2]
 
 [[faction]]
 id = "arkwrights"
-# Ticket #100 (version 0.07.0): the continent the start screen opens the globe on for this
-# Faction. It changes nothing else: no starting position, and any of the twelve may still be
-# chosen. Population 19.4, the largest on Earth, and Steerage musters eight a turn at twice the population cost.
-home = "south_asia"
+# Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
+# screen opens the globe on for this Faction. It changes nothing else -- no starting position, and
+# any of the fourteen may still be chosen -- which is what the old name `home` did not say.
+# Population 388, the largest on Earth -- 19.4 in the units used before ticket #143 (version
+# 0.07.3) put population in units of five million people -- and Steerage musters eight a turn at
+# twice the population cost.
+opens_on = "south_asia"
 name = "Arkwrights"
 # The Arkwrights start with no station over Earth (ticket #50): they leave from the ground.
 blurb = "Leave Earth: the diaspora is the point."
@@ -97,10 +107,11 @@ colour = [0.44, 0.275, 0.66]
 
 [[faction]]
 id = "archivists"
-# Ticket #100 (version 0.07.0): the continent the start screen opens the globe on for this
-# Faction. It changes nothing else: no starting position, and any of the twelve may still be
-# chosen. Education 1.5, the highest there is, and GDP 23 to pay for the Archive.
-home = "north_america"
+# Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
+# screen opens the globe on for this Faction. It changes nothing else -- no starting position, and
+# any of the fourteen may still be chosen -- which is what the old name `home` did not say.
+# Education 1.5, the highest there is, and GDP 23 to pay for the Archive.
+opens_on = "north_america"
 name = "Archivists"
 start_station = "Axiom"
 blurb = "Build the Archive and upload everyone."
@@ -115,9 +126,10 @@ influence_multiplier = 1.0
 signature = "Provisional Findings: while their Research went to the shared Tech last turn, they already have half the effect of the Tech under research (a multiplier x reads 1 + (x - 1) / 2, an addition reads half rounded down, and immunities do not carry). A turn of funding the Archive switches it off for the turn after. Their Research is x1.5 on Earth and x1.75 off it, an Observatory on a station over Earth counting as off."
 # Ticket #68 (version 0.05.5): the first part is the Research paid into the Archive, 80 in all,
 # which the fund holds only a quarter of until the Archive Module stands at a Colony off Earth.
-victory = "Build the Archive at a Colony off Earth (50 Materials, three turns), pay 80 Research into it and keep it running, with 12 Colonists living at its Colony to be uploaded."
+victory = "Build the Archive at a Colony off Earth (50 Materials, three turns, and four Colonists must live there to begin it), pay 80 Research into it and keep it running, then upload 12 Colonists into it from the people living where it stands."
 victory_first = { kind = "archive_research", bar = 80 }
-victory_second = { kind = "colonists_at_archive", bar = 12 }
+# Ticket #192 (version 0.08.0): twelve Colonists UPLOADED, not twelve living beside the Archive.
+victory_second = { kind = "colonists_uploaded", bar = 12 }
 colour = [0.871, 0.322, 0.439]
 
 # Ticket #54 (version 0.05): the [restoration] table is retired with the order; the Custodians'
@@ -125,6 +137,37 @@ colour = [0.871, 0.322, 0.439]
 
 # Ticket #72 (version 0.05.5): the Prospectors' Venture Capital Fund. The largest share of Materials
 # output that may be banked a turn, the step the share moves in, and what a draw gives back.
+# Ticket #191 (version 0.08.0): Relations. One score per ORDERED PAIR, so twelve in a four-seat
+# game: the Arkwrights' view of the Prospectors is a different number from the Prospectors' view of
+# the Arkwrights. Measured over 80 games, of the 317 pairs where anything happened 49% were purely
+# one-directional and 80% of offending pair-turns had only one direction firing, so a shared number
+# would have thrown all of that away.
+#
+# The score does NOTHING mechanical in this version -- it is read, not spent, and the computer
+# players do not read it. Giving the computer a grudge would re-open the denial multiplier ticket
+# #50 deliberately removed, and would move every figure in the sweep at the same moment six other
+# rules are moving them.
+[relations]
+# The scale. The +10 half is RESERVED and nothing fills it in this version; it exists so the scale
+# reads naturally and 0 is genuinely neutral. An all-zero-or-negative grid is the rule working.
+best = 10
+worst = -10
+start = 0
+# What one OFFENDING TURN costs: a turn in which the offender spent any Influence on a place the
+# victim holds, or opened a Battle against them. Charged per TURN and never per spend order -- a pair
+# that offends puts in a median 15.6 Influence across about three orders, and charging per order
+# would make a big push and a small one differ by a factor nobody can read off the board.
+fall_per_offending_turn = 1
+# Recovery: this much every `quiet_turns` quiet turns, stopping at `start` and never rising past it.
+# Letting peace accrue goodwill was measured and rejected: half of all ordered pairs never interact
+# at all in a whole game, so goodwill earned by mere quiet would mostly be between Factions on
+# opposite sides of the board who have never met -- that is distance, not friendship. There is an
+# arithmetic trap too: a pair offends on 12.55% of its turns, so at -1 an offence and +0.25 a quiet
+# turn the two cancel, and a median offender would end at about +0.5. For an offender to stay
+# negative the cost must be roughly seven times the per-turn recovery; stopping at 0 removes it.
+recover = 1
+quiet_turns = 4
+
 [venture_capital]
 max_share = 0.8
 share_step = 0.1

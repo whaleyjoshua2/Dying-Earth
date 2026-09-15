@@ -407,6 +407,9 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("building_decommissioned_colony", &["faction", "building", "colony", "refund"]),
     ("build_lost", &["building", "place"]),
     ("colonists_no_room", &["n", "colony"]),
+    // Ticket #191 (version 0.08.0): Relations, said in the offender's paragraph.
+    ("relations_fell", &["victim", "offender"]),
+    ("uploaded", &["n", "colony", "total"]),
     ("launch_pad_fire", &["faction", "item", "place"]),
     ("game_over_win", &["turn", "faction", "note"]),
     ("game_over_draw", &["turn", "note"]),
@@ -477,6 +480,8 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("build_army", &["place"]),
     ("build_station", &["body"]),
     ("build_archive", &["colony"]),
+    // Ticket #192 (version 0.08.0): the Upload.
+    ("upload", &["n", "colony"]),
     ("fund_archive", &[]),
     ("unfund_archive", &[]),
     ("max_on", &["place"]),

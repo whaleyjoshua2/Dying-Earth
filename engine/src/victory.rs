@@ -67,10 +67,12 @@ impl Game {
                 second.bodies as f64,
                 format!("{} of {} Bodies with {} Colonists or more", self.bodies_settled(seat, second.colonists_each), second.bodies, second.colonists_each),
             ),
-            VictorySecondKind::ColonistsAtArchive => (
-                self.colonists_at_archive(seat) as f64,
+            // Ticket #192 (version 0.08.0): the uploaded, not the living. Monotonic, and it asks the
+            // same question the build gate asks, of the same place.
+            VictorySecondKind::ColonistsUploaded => (
+                self.seat(seat).uploaded as f64,
                 second.bar,
-                format!("{} of {:.0} Colonists living at the Archive's Colony", self.colonists_at_archive(seat), second.bar),
+                format!("{} of {:.0} Colonists uploaded into the Archive", self.seat(seat).uploaded, second.bar),
             ),
         };
         let mut first_held_back = match card.kind {

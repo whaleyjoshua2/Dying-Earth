@@ -80,6 +80,14 @@ pub enum Order {
     /// Version 0.05 (ticket #51): the Archive, at a Colony off Earth. Version 0.05.5 (ticket #68):
     /// one Module, paid in Materials from the Stockpile; its Research is paid into the fund after.
     BuildArchive { colony: ColonyId },
+    /// Version 0.08.0 (ticket #192): **Upload**. Colonists at the Archive's own place are read into
+    /// it and leave the living population. An ORDER because it is irreversible -- those people leave
+    /// the board, and this game asks before anything irreversible -- and FREE, because the 80
+    /// Research and the Energy upkeep are already the monument's price. It needs the Archive
+    /// complete: the Research is the machine, and the upload is what the machine is for. It may be
+    /// done in batches, four at a time from a Core Module alone being enough, three times over, so
+    /// that no Habitat is on the Archivists' critical path.
+    Upload { colony: ColonyId, n: u32 },
     /// Version 0.05 (ticket #51), rebuilt for 0.07.0: the Archivists' standing declaration that
     /// their Labs' Research goes into the Archive fund instead of the shared Tech, where it counts
     /// nothing toward the Research Lead. Set once, it holds until it is set again, and it is read
@@ -455,6 +463,59 @@ impl Game {
                 if self.archive_ordered(seat) || pending.iter().any(|o| matches!(o, Order::BuildArchive { .. })) {
                     return fail("the Archive is already building");
                 }
+                // Ticket #199 (version 0.08.0): and the Archivists' own gate Tech must stand. The
+                // gate Tech already gates the WIN (ticket #84); measured, it arrived one turn before
+                // they were ready anyway, so it gated nothing. Gating the ORDER is what moves them.
+                //
+                // Named FIRST of the two refusals because it is the one that will still be true after
+                // the other is solved: the four Colonists arrive at a median turn 11 and The Upload at
+                // a median 15, so a player told to fetch people who is then told to wait for a Tech
+                // has been led on.
+                if let Some(gate) = self.tables.victory_gate(FactionKind::Archivists)
+                    && !self.has_tech(gate)
+                {
+                    return fail(format!("the Archive waits on {}, which the world has not researched yet", self.tables.tech(gate).name));
+                }
+                // Ticket #192 (version 0.08.0): the gate. Checked ONCE, here, at the order; neither
+                // the three-turn build nor the standing Module cares afterwards. A build that could
+                // stall halfway would be a new state to hold in the save, draw on the card and say in
+                // the Report, for a case that fires rarely, and the Victory Condition does its own
+                // checking at the end.
+                let want = self.tables.archive.colonists_to_order;
+                if col.colonists < want {
+                    let place = self.place_name(Place::Colony(*colony));
+                    return fail(match col.colonists {
+                        0 => format!("the Archive wants {want} Colonists living at its Colony; nobody lives at {place}"),
+                        1 => format!("the Archive wants {want} Colonists living at its Colony; one lives at {place}"),
+                        n => format!("the Archive wants {want} Colonists living at its Colony; {n} live at {place}"),
+                    });
+                }
+                Ok(cost)
+            }
+            // Ticket #192 (version 0.08.0): Upload. The Archive may only draw from the population of
+            // the place it stands at, and only once it is complete.
+            Order::Upload { colony, n } => {
+                if self.kind(seat) != FactionKind::Archivists {
+                    return fail("only the Archivists upload into the Archive");
+                }
+                if self.archive_colony(seat) != Some(*colony) {
+                    return fail("the Archive does not stand here; it may only draw from the people where it is");
+                }
+                if !self.archive_complete(seat) {
+                    return fail("the Archive is not complete: its Research is the machine, and the upload is what the machine is for");
+                }
+                if *n == 0 {
+                    return fail("upload at least one Colonist");
+                }
+                let already: u32 = pending.iter().map(|o| if let Order::Upload { colony: c, n } = o { if c == colony { *n } else { 0 } } else { 0 }).sum();
+                let room = self.uploadable_at(*colony, already);
+                if *n > room {
+                    let place = self.place_name(Place::Colony(*colony));
+                    return fail(match room {
+                        0 => format!("nobody is left to upload at {place}"),
+                        r => format!("only {r} Colonists are left to upload at {place}"),
+                    });
+                }
                 Ok(cost)
             }
             Order::BuildStation { body, slot } => {
@@ -465,7 +526,7 @@ impl Game {
                     return fail("a station is already ordered there");
                 }
                 let foothold = match body {
-                    BodyId::Earth => self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working())),
+                    BodyId::Earth => self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working())),
                     // Ticket #93: at a Body with no Colony Slots (Venus) a station is built from a
                     // Ship of the seat's in orbit there, since there is no ground to build from.
                     b if self.tables.body(*b).colony_slots() == 0 => self.ships.iter().any(|s| s.seat == seat && s.at == ShipAt::Body(*b)),
@@ -527,6 +588,14 @@ impl Game {
                 {
                     return fail("this Nation State already has a Sea Wall");
                 }
+                // Ticket #181 (version 0.08.0): a Unique Facility belongs to one Faction's build
+                // list. Nobody else may order one, even having captured a Region full of them: the
+                // bricks are the bricks, and a captured building is never a licence to build more.
+                if let Some(owner) = kind.unique_to()
+                    && self.kind(seat) != owner
+                {
+                    return fail(format!("only the {} build the {}", owner.name(), kind.name()));
+                }
                 // Ticket #54: the Scrubber, the Custodians' signature Facility.
                 if *kind == FacilityKind::Scrubber {
                     if self.kind(seat) != FactionKind::Custodians {
@@ -543,6 +612,17 @@ impl Game {
                     if self.scrubbers_committed(*state) + ordered >= cap {
                         return fail(format!("this Nation State holds its {cap} Scrubbers already"));
                     }
+                }
+                // Ticket #185 (version 0.08.0): at most one School per Nation State. A second would
+                // only reach the same ceiling sooner, and the ceiling is what caps the rule.
+                // Ticket #181: the cap reads the JOB, so an Academy standing blocks a School order
+                // and the reverse, and a captured Academy is not a free second schoolhouse.
+                if kind.does_the_job_of(FacilityKind::School)
+                    && (self.state(*state).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::School))
+                        || self.state(*state).queue.iter().any(|b| matches!(b.item, BuildItem::Facility(k) if k.does_the_job_of(FacilityKind::School)))
+                        || pending.iter().any(|o| matches!(o.build_state(), Some(s) if s == *state) && matches!(o.build_facility(), Some(k) if k.does_the_job_of(FacilityKind::School))))
+                {
+                    return fail("this Nation State already has a School");
                 }
                 // Ticket #52: at most one Constabulary per Nation State.
                 if *kind == FacilityKind::Constabulary
@@ -594,8 +674,28 @@ impl Game {
                 // Ticket #46: a station holds only a Shipyard and Habitats; ticket #80: and Observatories;
                 // ticket #89: and Solar Arrays, which stand nowhere else.
                 // Ticket #90: and a Trade Post.
-                if col.in_orbit && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost) {
-                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays and a Trade Post");
+                // Ticket #185 (version 0.08.0): and an Institute, since a station carries Observatories
+                // and the Institute is what multiplies them.
+                if col.in_orbit
+                    && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Academy)
+                {
+                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays, a Trade Post and an Institute");
+                }
+                // Ticket #186 (version 0.08.0): nobody but the Custodians builds an Academy off
+                // Earth either, captured ones included.
+                if let Some(owner) = kind.unique_to()
+                    && self.kind(seat) != owner
+                {
+                    return fail(format!("only the {} build the {}", owner.name(), kind.name()));
+                }
+                // Ticket #185: one Institute to a Colony or station, as one School to a Nation State.
+                // Ticket #186: the cap reads the job, so an Academy blocks an Institute and back.
+                if kind.does_the_job_of(ModuleKind::Institute)
+                    && (col.modules.iter().any(|m| m.kind.does_the_job_of(ModuleKind::Institute))
+                        || col.queue.iter().any(|b| matches!(b.item, BuildItem::Module(k) if k.does_the_job_of(ModuleKind::Institute)))
+                        || pending.iter().any(|o| o.build_module().map(|(c, k)| c == *colony && k.does_the_job_of(ModuleKind::Institute)).unwrap_or(false)))
+                {
+                    return fail("this Colony already has an Institute");
                 }
                 if !col.in_orbit && self.tables.module(*kind).station_only {
                     return fail(format!("a {} stands only on a station", kind.name()));
@@ -863,7 +963,7 @@ impl Game {
                                 return fail("you do not direct that Nation State");
                             }
                             // Ticket #46: a lift to orbit needs a Launch Site there.
-                            if !self.state(*st).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()) {
+                            if !self.state(*st).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
                                 return fail("a lift to orbit needs a working Launch Site there");
                             }
                             // Ticket #73: a Launch Site lifts only the Emigrants waiting there; the
@@ -894,7 +994,7 @@ impl Game {
                     if self.army_seat(a) != Some(seat) || a.standing && self.army_stands_down(a) {
                         return fail("not your Army");
                     }
-                    if matches!(a.at, ArmyAt::Place(Place::State(st)) if !self.state(st).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working())) {
+                    if matches!(a.at, ArmyAt::Place(Place::State(st)) if !self.state(st).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working())) {
                         return fail("a lift to orbit needs a working Launch Site there");
                     }
                     if matches!(a.home, ArmyHome::Colony(_)) {
@@ -1033,7 +1133,7 @@ impl Game {
                 if self.state(*state).control.director() != Some(seat) {
                     return fail("you do not direct that Nation State");
                 }
-                if !self.state(*state).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working()) {
+                if !self.state(*state).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
                     return fail("a lift to orbit needs a working Launch Site there");
                 }
                 let sending = self.emigrants_leaving(pending, *state);
@@ -1165,7 +1265,7 @@ impl Game {
             BodyId::Earth => self
                 .directed_states(seat)
                 .iter()
-                .any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::LaunchSite && f.working())),
+                .any(|s| self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working())),
             b => self
                 .colonies
                 .iter()
@@ -1196,19 +1296,26 @@ impl Game {
             let turn = self.turn;
             match order {
                 Order::BuildFacility { state, kind } | Order::BuildFacilityWithDucats { state, kind } => {
-                    let due = turn + self.tables.facility(*kind).build_turns - 1;
+                    // Ticket #181 (version 0.08.0): the substitution happens HERE, once, so that
+                    // neither the interface nor the computer has to remember it. A Faction that
+                    // orders the common building gets its own Unique Facility for that job at the
+                    // same price; a Faction that has none for that job gets what it asked for.
+                    let kind = kind.built_by(self.kind(seat));
+                    let due = turn + self.tables.facility(kind).build_turns - 1;
                     // Ticket #56: the build reserves the slot it will stand in, coastal or inland.
-                    let coastal = self.next_slot_is_coastal(*state, *kind, 0, 0).unwrap_or(false);
-                    self.state_mut(*state).queue.push(Build { item: BuildItem::Facility(*kind), seat, due_turn: due, coastal });
+                    let coastal = self.next_slot_is_coastal(*state, kind, 0, 0).unwrap_or(false);
+                    self.state_mut(*state).queue.push(Build { item: BuildItem::Facility(kind), seat, due_turn: due, coastal });
                 }
                 Order::RaiseIndustry { state } => {
                     let due = turn + self.tables.industry_level.build_turns - 1;
                     self.state_mut(*state).queue.push(Build { item: BuildItem::IndustryLevel, seat, due_turn: due, coastal: false });
                 }
                 Order::BuildModule { colony, kind } | Order::BuildModuleWithDucats { colony, kind } => {
-                    let due = turn + self.tables.module(*kind).build_turns - 1;
+                    // Ticket #186: as on Earth -- the Custodians' Institute order raises an Academy.
+                    let kind = kind.built_by(self.kind(seat));
+                    let due = turn + self.tables.module(kind).build_turns - 1;
                     if let Some(c) = self.colony_mut(*colony) {
-                        c.queue.push(Build { item: BuildItem::Module(*kind), seat, due_turn: due, coastal: false });
+                        c.queue.push(Build { item: BuildItem::Module(kind), seat, due_turn: due, coastal: false });
                     }
                 }
                 Order::BuildShip { site, kind } => {
@@ -1287,6 +1394,25 @@ impl Game {
                     self.pending.cargo.push((seat, order.clone()));
                 }
                 Order::Load { .. } | Order::Unload { .. } => self.pending.cargo.push((seat, order.clone())),
+                // Ticket #192 (version 0.08.0): the upload lands now. The people leave the living
+                // population -- the place shrinks as it uploads, and Module slots go with them, though
+                // nothing already standing is destroyed: a cap that falls below what stands simply
+                // leaves no room.
+                Order::Upload { colony, n } => {
+                    let taken = self.colony(*colony).map(|c| c.colonists.min(*n)).unwrap_or(0);
+                    if taken > 0 {
+                        if let Some(c) = self.colony_mut(*colony) {
+                            c.colonists -= taken;
+                        }
+                        self.seat_mut(seat).uploaded += taken;
+                        let place = self.place_name(Place::Colony(*colony));
+                        let total = self.seat(seat).uploaded;
+                        let line = format!("{} uploaded {} Colonists into the Archive at {}; {} in all.", self.seat_name(seat), taken, place, total);
+                        self.log(line);
+                        let text = self.say("uploaded", &[("n", taken.to_string()), ("colony", place), ("total", total.to_string())]);
+                        self.report_line_of(seat, LineKind::Archive, LineKind::Archive, Some(ReportPlace::Colony(*colony)), text);
+                    }
+                }
                 Order::BuildStation { body, slot } => self.pending.stations.push((seat, *body, *slot)),
                 Order::BuildArchive { colony } => {
                     // Ticket #68: the Module rises in the Colony's queue like any other build, three
@@ -1354,11 +1480,11 @@ impl Game {
                 // nothing lifts them before next turn, which is the turn to muster.
                 Order::BuildEmigrants { state, n } => {
                     let cost = self.lift_population(seat, *n);
-                    {
-                        let st = self.state_mut(*state);
-                        st.population = (st.population - cost).max(0.0);
-                        st.emigrants += n;
-                    }
+                    self.state_mut(*state).population = (self.state(*state).population - cost).max(0.0);
+                    // Ticket #189 (version 0.08.0): they take their Region's schooling AS IT STANDS
+                    // NOW, so a batch mustered after a School has run knows more than one before it,
+                    // and the two average together on the card.
+                    self.muster_emigrants(*state, *n);
                     let fell = self.lower_unrest(*state, self.tables.emigrants.unrest_fall);
                     let line = format!("{} Emigrants mustered in {} for the {}; its Unrest fell by {} to {}.", n, self.tables.state(*state).name, self.seat_name(seat), Game::unrest_figure(fell), self.unrest_text(*state));
                     self.log(line);
@@ -1370,22 +1496,22 @@ impl Game {
                 }
                 // Ticket #73: Emigrants leave for Antarctica by sea, and land a turn later.
                 Order::SendToAntarctica { state, n, into } => {
-                    let left = self.state(*state).emigrants.saturating_sub(*n);
-                    self.state_mut(*state).emigrants = left;
+                    // Ticket #189 (version 0.08.0): what they know goes to sea with them.
+                    let taught = self.take_emigrants(*state, *n);
                     let due = turn + self.tables.emigrants.antarctica_turns;
-                    self.antarctic_sends.push(AntarcticSend { seat, from: *state, n: *n, into: *into, due_turn: due });
+                    self.antarctic_sends.push(AntarcticSend { seat, from: *state, n: *n, into: *into, due_turn: due, education: taught });
                     let line = format!("{} Emigrants left {} for Antarctica by sea, for the {}.", n, self.tables.state(*state).name, self.seat_name(seat));
                     self.log(line);
                 }
                 // Ticket #141 (version 0.07.3): Emigrants lift straight to the seat's station over
                 // Earth. A launch, as a lift onto a Ship is; they are aboard at this Resolution.
                 Order::LiftToStation { state, n, colony } => {
-                    let left = self.state(*state).emigrants.saturating_sub(*n);
-                    self.state_mut(*state).emigrants = left;
+                    // Ticket #189 (version 0.08.0): a lift carries their schooling to the station.
+                    let taught = self.take_emigrants(*state, *n);
                     self.climate.launches_pending[seat.index()] += 1;
-                    if let Some(c) = self.colony_mut(*colony) {
-                        c.colonists += n;
-                    }
+                    // Ticket #183 (version 0.08.0): a Spaceport earns for every Emigrant it lifts.
+                    self.pay_spaceport(seat, *state, *n);
+                    self.settle_people(*colony, *n, taught);
                     let station = self.place_name(Place::Colony(*colony));
                     let line = format!("{} Emigrants lifted from {} to {}, for the {}.", n, self.tables.state(*state).name, station, self.seat_name(seat));
                     self.log(line);
@@ -1558,6 +1684,7 @@ impl Game {
                 r("refuel", &[("unit", unit_of(UnitRef::Ship(*ship))), ("body", body.unwrap_or_else(|| "space".to_string()))])
             }
             Order::BuildArchive { colony } => r("build_archive", &[("colony", place(Place::Colony(*colony)))]),
+            Order::Upload { colony, n } => r("upload", &[("n", n.to_string()), ("colony", place(Place::Colony(*colony)))]),
             Order::SetArchiveFunding { on } => r(if *on { "fund_archive" } else { "unfund_archive" }, &[]),
             Order::SetMaxStanding { target } => match target {
                 Some(p) => r("max_on", &[("place", place(*p))]),

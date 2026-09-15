@@ -147,6 +147,41 @@ pub struct ScrubberCard {
     pub max: u32,
 }
 
+/// Ticket #187 (version 0.08.0): the band a place's Education Level bends its Resistance through,
+/// and the two anchors it is measured between (`influence.toml`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct ResistanceCard {
+    pub band: f64,
+    pub pivot: f64,
+    pub low: f64,
+    pub high: f64,
+}
+
+/// Ticket #185 (version 0.08.0): what a School does to its state's Education Level, a step a turn
+/// to a ceiling (`facilities.toml`). No maximum Education Level was ever declared -- the card
+/// figures simply run 0.70 to 1.50 -- so the ceiling is this table's, and the step is the smallest
+/// that reliably shows in a Lab's floored Research.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SchoolCard {
+    pub per_turn: f64,
+    pub ceiling: f64,
+}
+
+/// Tickets #182, #184 and #186 (version 0.08.0): the figures the Unique Facility clauses read
+/// (`facilities.toml`). The Spaceport has none: +1 Influence per Emigrant launched is the whole of
+/// its clause and the designer refused a cap on it.
+#[derive(Debug, Clone, Deserialize)]
+pub struct UniqueCard {
+    /// The share of the Venture Capital Fund an Investment Bank banks back into it, one per Region.
+    pub investment_bank_interest: f64,
+    /// The floor under that interest, Faction-wide and on one building only.
+    pub investment_bank_floor: i64,
+    /// What a Reactor's holder pays of its total Energy upkeep, the Archive excepted; off the total.
+    pub reactor_upkeep: f64,
+    /// What an Academy pays its holder a turn, flat, wherever it stands.
+    pub academy_ducats: i64,
+}
+
 /// Ticket #54 (version 0.05): what a Restart and a Decommission cost (`facilities.toml`). A
 /// Mothball is free and lands at the Resolution of the turn it is ordered.
 #[derive(Debug, Clone, Deserialize)]
@@ -317,9 +352,11 @@ pub struct FactionCard {
     /// Ticket #51: the second part, generalised the way #50 generalised the first.
     pub victory_second: VictorySecondCard,
     pub colour: [f32; 3],
-    /// Ticket #100 (version 0.07.0): the continent the start screen opens its globe on. It changes
-    /// no starting position: any of the twelve may still be chosen.
-    pub home: StateId,
+    /// Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
+    /// screen opens its globe on. It has ONE reader, and its only job is pointing the start globe's
+    /// camera, which the old name `home` did not say -- it read as a starting position, which it has
+    /// never been: any of the fourteen may still be chosen.
+    pub opens_on: StateId,
     /// Ticket #46: the station over Earth the Faction starts with, by name in bodies.toml.
     /// Ticket #50: the Arkwrights start with none, so this is optional.
     #[serde(default)]
@@ -407,7 +444,11 @@ impl VictoryFirstKind {
 pub enum VictorySecondKind {
     OffWorldPresence,
     ColoniesOnBodies,
-    ColonistsAtArchive,
+    /// Ticket #192 (version 0.08.0): Colonists UPLOADED into the Archive, replacing "Colonists living
+    /// at the Archive's Colony". The count is monotonic -- uploaded people cannot be lost to a raid,
+    /// a crowding death or a handover -- and it closes the odd case the old wording allowed, where a
+    /// Faction won by having twelve people standing NEXT TO a finished Archive rather than inside it.
+    ColonistsUploaded,
 }
 
 impl VictorySecondKind {
@@ -415,7 +456,7 @@ impl VictorySecondKind {
         match self {
             VictorySecondKind::OffWorldPresence => "Off-world Presence",
             VictorySecondKind::ColoniesOnBodies => "Bodies settled",
-            VictorySecondKind::ColonistsAtArchive => "Colonists at the Archive",
+            VictorySecondKind::ColonistsUploaded => "Colonists uploaded",
         }
     }
 }
@@ -423,7 +464,7 @@ impl VictorySecondKind {
 #[derive(Debug, Clone, Copy, Deserialize)]
 pub struct VictorySecondCard {
     pub kind: VictorySecondKind,
-    /// For off_world_presence and colonists_at_archive.
+    /// For off_world_presence and colonists_uploaded.
     #[serde(default)]
     pub bar: f64,
     /// For colonies_on_bodies: how many Bodies, and how many Colonists on each.
@@ -558,11 +599,16 @@ pub struct InfluenceTable {
     pub decay_controlled: i64,
     /// Version 0.04 (ticket #41): a challenger needs the controller's standing plus this.
     pub challenge_margin: i64,
+    /// Ticket #190 (version 0.08.0): what an online Constabulary adds to the margin in its Region.
+    pub constabulary_margin: i64,
     /// Ticket #46: a station's threshold starts here.
     #[serde(default)]
     pub station_threshold_base: i64,
     pub occupation_turns: u32,
     pub destruction_chance: f64,
+    /// Ticket #187 (version 0.08.0): how far a place's schooling bends what an outsider's Influence
+    /// buys there. See `influence.toml`.
+    pub resistance: ResistanceCard,
     /// Ticket #53: what a Faction's share of the table's Blame does to its Influence thresholds.
     pub blame: BlameTable,
 }
@@ -716,6 +762,8 @@ pub struct AiWeights {
     pub fund_archive: f64,
     /// Ticket #51: build the Archive. Ticket #68: one Module, from its own button.
     pub build_archive: f64,
+    /// Ticket #192 (version 0.08.0): read Colonists at the Archive's place into it.
+    pub upload: f64,
     /// Ticket #52: pay Relief on a state the seat directs.
     pub relief: f64,
     /// Ticket #52: raise a Constabulary in a restive state.
@@ -749,6 +797,11 @@ pub struct AiMultipliers {
     pub threat: f64,
     pub opportunity: f64,
     pub energy_shortage_bonus: f64,
+    /// Ticket #181 (version 0.08.0): the slight bias a seat gets toward its own Unique Facility.
+    pub unique_bias: f64,
+    /// Ticket #182: what one Material in the Venture Capital Fund adds to the Prospectors' appetite
+    /// for an Investment Bank, since the building's worth is a share of that balance.
+    pub investment_bank_per_fund: f64,
 }
 
 /// Ticket #50: one pace schedule per Faction. `first` is the schedule for the Faction's first
@@ -876,6 +929,8 @@ struct FacilitiesFile {
     industry_level: IndustryLevelCard,
     scrubber: ScrubberCard,
     mothball: MothballCard,
+    school: SchoolCard,
+    unique: UniqueCard,
 }
 /// Ticket #51: the Archive. Its Materials, build turns and Energy upkeep sit on its Module row.
 /// Ticket #68 (version 0.05.5): the Research it requires in all, and the share of it the fund may
@@ -892,6 +947,8 @@ pub struct SlotsCard {
 pub struct ArchiveCard {
     pub research: i64,
     pub banked_before_built: f64,
+    /// Ticket #192 (version 0.08.0): Colonists who must live at the place before it may be ORDERED.
+    pub colonists_to_order: u32,
 }
 
 /// Ticket #80 (version 0.06.0): the Observatory's one figure beyond its row: the share of its
@@ -964,6 +1021,18 @@ struct FactionsFile {
     ducats: DucatsCard,
     venture_capital: VentureCard,
     emigrants: EmigrantsCard,
+    relations: RelationsCard,
+}
+
+/// Ticket #191 (version 0.08.0): the Relations scale and what moves it (`factions.toml`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct RelationsCard {
+    pub best: i64,
+    pub worst: i64,
+    pub start: i64,
+    pub fall_per_offending_turn: i64,
+    pub recover: i64,
+    pub quiet_turns: u32,
 }
 
 /// Ticket #73 (version 0.05.5): Emigrants, the built Colonists: how many a Faction musters a turn,
@@ -1035,6 +1104,10 @@ pub struct Tables {
     /// Ticket #54: the Scrubber cap and the Mothball prices (`facilities.toml`).
     pub scrubber: ScrubberCard,
     pub mothball: MothballCard,
+    /// Ticket #185: the School's step and ceiling.
+    pub school: SchoolCard,
+    /// Tickets #182, #184, #186: the three Unique Facility clause figures that have one.
+    pub unique: UniqueCard,
     pub modules: Vec<ModuleCard>,
     /// Ticket #97: how many Modules a Colony or a Space Station may hold.
     pub slots: SlotsCard,
@@ -1061,6 +1134,8 @@ pub struct Tables {
     pub ducats: DucatsCard,
     pub venture: VentureCard,
     pub emigrants: EmigrantsCard,
+    /// Ticket #191: the Relations scale and what moves it.
+    pub relations: RelationsCard,
     pub climate: ClimateTable,
     pub influence: InfluenceTable,
     /// Ticket #52: `unrest.toml`.
@@ -1127,6 +1202,8 @@ impl Tables {
             industry_level: facilities.industry_level,
             scrubber: facilities.scrubber,
             mothball: facilities.mothball,
+            school: facilities.school,
+            unique: facilities.unique,
             slots: modules.slots,
             archive: modules.archive,
             observatory: modules.observatory,
@@ -1145,6 +1222,7 @@ impl Tables {
             ducats: factions.ducats,
             venture: factions.venture_capital,
             emigrants: factions.emigrants,
+            relations: factions.relations,
             climate,
             influence,
             unrest,
@@ -1197,7 +1275,7 @@ impl Tables {
             }
             // Ticket #51: whichever second part a card names, its own figures must be positive.
             let second_ok = match f.victory_second.kind {
-                VictorySecondKind::OffWorldPresence | VictorySecondKind::ColonistsAtArchive => f.victory_second.bar > 0.0,
+                VictorySecondKind::OffWorldPresence | VictorySecondKind::ColonistsUploaded => f.victory_second.bar > 0.0,
                 VictorySecondKind::ColoniesOnBodies => f.victory_second.bodies > 0 && f.victory_second.colonists_each > 0,
             };
             if !second_ok {

@@ -5,11 +5,11 @@ A single-player, turn-based strategy game about colonizing the solar system befo
 ## Language
 
 **First Playable**:
-The small version of the game: twelve turns and two Factions as first built, twenty-four turns since version 0.02, four Factions since version 0.05 and thirty-six turns of two months since version 0.05.5. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`, `docs/spec/version-0.03.md`, `docs/spec/version-0.04.md`, `docs/spec/version-0.05.md`, `docs/spec/version-0.05.5.md`, `docs/spec/version-0.06.0.md`, `docs/spec/version-0.07.0.md`, `docs/spec/version-0.07.1.md`, `docs/spec/version-0.07.2.md`, `docs/spec/version-0.07.3.md`, `docs/spec/version-0.07.4.md`, `docs/spec/version-0.07.5.md` and `docs/spec/version-0.07.6.md`.
+The small version of the game: twelve turns and two Factions as first built, twenty-four turns since version 0.02, four Factions since version 0.05 and thirty-six turns of two months since version 0.05.5. Its specification is `docs/spec/first-playable.md`, amended by `docs/spec/version-0.02.md`, `docs/spec/version-0.03.md`, `docs/spec/version-0.04.md`, `docs/spec/version-0.05.md`, `docs/spec/version-0.05.5.md`, `docs/spec/version-0.06.0.md`, `docs/spec/version-0.07.0.md`, `docs/spec/version-0.07.1.md`, `docs/spec/version-0.07.2.md`, `docs/spec/version-0.07.3.md`, `docs/spec/version-0.07.4.md`, `docs/spec/version-0.07.5.md`, `docs/spec/version-0.07.6.md` and `docs/spec/version-0.08.0.md`.
 _Avoid_: slice, MVP, demo, v1, prototype
 
 **Faction**:
-A competing power with its own multipliers, signature rule and victory condition. The finished game has six; the First Playable has four since version 0.05, the Custodians, the Prospectors, the Arkwrights and the Archivists, and all four sit at every table. Since version 0.07.5 each also has a **symbol**, worn in place of its colour swatch on its card on the Faction screen and nowhere else, drawn in the Faction's own colour -- the one place a caller picks an icon's colour rather than reading it from the fill rule, since a Faction symbol is exactly a statement of whose.
+A competing power with its own multipliers, signature rule, Victory Condition and -- since version 0.08.0 -- one Unique Facility. A Faction also keeps a Relations score for every other. The finished game has six; the First Playable has four since version 0.05, the Custodians, the Prospectors, the Arkwrights and the Archivists, and all four sit at every table. Since version 0.07.5 each also has a **symbol**, worn in place of its colour swatch on its card on the Faction screen and nowhere else, drawn in the Faction's own colour -- the one place a caller picks an icon's colour rather than reading it from the fill rule, since a Faction symbol is exactly a statement of whose.
 _Avoid_: side, team, empire
 
 **Custodians**:
@@ -17,7 +17,7 @@ The Faction that colonizes the solar system while limiting ecological damage to 
 _Avoid_: Stewards (the retired name), environmentalists, greens, moderates, eco-terrorists
 
 **Prospectors**:
-The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry and the Strip Permit, and since version 0.05.5 they win on a hoard: 750 Materials in their Venture Capital Fund, and expansion.
+The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry and the Strip Permit, their Unique Facility is the Investment Bank, and since version 0.05.5 they win on a hoard: 1000 Materials in their Venture Capital Fund, and expansion.
 _Avoid_: Extractors (the retired name), capitalists, industrialists, exploiters
 
 **Arkwrights**:
@@ -25,7 +25,7 @@ The Faction that exists to get people off Earth and spread them as widely as it 
 _Avoid_: settlers, arks, exodus, nomads
 
 **Archivists**:
-The Faction that means to save what humanity knows, and as many of its people as it can, in one place off Earth. Their signature rule is Provisional Findings, and they win by completing the Archive.
+The Faction that means to save what humanity knows, and as many of its people as it can, in one place off Earth. Their signature rule is Provisional Findings, their Unique Facility is the Reactor, and they win by completing the Archive and Uploading twelve Colonists into it. Since version 0.08.0 they may not begin the Archive until The Upload, their own gate Tech, stands -- so their Labs' Research is a choice between the monument and the tree that opens its door.
 _Avoid_: scholars, librarians, scientists, the Academy
 
 **Steerage**:
@@ -41,7 +41,7 @@ Retired in version 0.05.5. The word named a construction raised in stages, each 
 _Avoid_: project, megaproject, wonder, great work, campaign, stage
 
 **The Archive**:
-A Module only the Archivists build, at one Colony off Earth and at most one per Faction, three turns to raise from its own button. Standing, it still wants its Research, paid into the Archive fund at any pace; complete, with every point paid, it takes a great deal of Energy to keep running. It is destroyed outright if its Colony changes hands, and the fund is kept.
+A Module only the Archivists build, at one Colony off Earth and at most one per Faction, three turns to raise from its own button. Since version 0.08.0 it may be ORDERED only when two things hold, both checked once at the order and never again: the Archivists' gate Tech, **The Upload**, must stand, and **four Colonists** must live at the place. Standing, it still wants its Research, paid into the Archive fund at any pace; complete, with every point paid, it takes a great deal of Energy to keep running, and only then may Colonists be Uploaded into it. It is destroyed outright if its Colony changes hands, and the fund is kept.
 _Avoid_: library, vault, monument, database, stage
 
 **Fund the Archive**:
@@ -59,6 +59,10 @@ _Avoid_: warming track, doom clock, countdown, timer, disaster meter
 **Body**:
 A place in the solar system that can hold a Colony or a Space Station. Six since version 0.06.0: Earth (its Colony Slots are Antarctica's, shut under the ice until +1.6 C), the Moon, Mars, Phobos, Deimos and Venus, a Body of orbits only, with no Colony Slots and three Orbital Slots. A Body may be another's satellite, which sets how far apart they are.
 _Avoid_: planet, world, site, location, node
+
+**Upload**:
+Reading Colonists at the Archive's own place into it, from version 0.08.0. An order, because it is irreversible, and free, because the Archive's Research and Energy are already its price; it needs the Archive complete, it draws only from the people living where the Archive stands, and it may be done in batches. An uploaded Colonist LEAVES THE LIVING POPULATION -- the place shrinks as it uploads -- and is counted for the Archivists' Victory Condition for good.
+_Avoid_: digitize, archive (that is the Module), store, ascend, sacrifice
 
 **Colony**:
 A permanent settlement a Faction holds on a Body, founded when a Colony Ship unloads Colonists into a free Colony Slot. It takes the name of its slot ("Tycho on the Moon"). None exist when the game starts. Since version 0.07.0 it holds three Modules free and one more for every Colonist living there: people gate industry, as Size and Industry Level gate a Region's build slots. The Archive is exempt; a mothballed Module keeps its slot and one building reserves one; a cap fallen below what already stands destroys nothing and simply leaves no room.
@@ -124,6 +128,10 @@ _Avoid_: event probability, calm cards, event rate
 An advance on the Tech Tree that changes an output, a capacity, an upkeep, a Ship strength, an Influence cost or how much a source emits. When a Tech completes, every Faction has it.
 _Avoid_: research, upgrade, invention
 
+**opens_on**:
+The Region a Faction's card names for the start screen's globe to face. It has one reader and one job: pointing the camera. It is not a starting position -- any Region may be chosen -- which is why it stopped being called `home` in version 0.08.0.
+_Avoid_: home, capital, start state, homeland
+
 **Tech Tree**:
 The single tree of Techs shared by all Factions, seventeen of them since version 0.06.0, in five branches: Industry, Propulsion, Off-world Living, Extraction, Society. A branch may hold more than one Tech on a rung; since version 0.07.4 two such Techs stack in a taller branch row on every rung but the last, where they sit side by side, so every column is one box wide. One Tech is under research at a time, worldwide. Four of the seventeen are Victory gates, one per Faction on rung 3: each is a Tech for everyone, and its Faction cannot win until it stands. Since version 0.07.6 a box chosen this turn but not yet committed wears a paler amber than the settled one, reads `chosen`, and has its own Pick button withdrawn.
 _Avoid_: per-faction tree, research tree
@@ -187,7 +195,7 @@ Money, the fourth resource since version 0.03. A controlled Region pays them fro
 _Avoid_: Ducketts, credits, money, gold, cash
 
 **Bank**:
-The Facility that makes Ducats in a Region, in proportion to the state's GDP.
+The Facility that makes Ducats in a Region, in proportion to the state's GDP. Since version 0.08.0 the Prospectors build the Investment Bank in its place, which makes the same Ducats and pays interest besides.
 _Avoid_: treasury, mint, exchange
 
 **Trade Post**:
@@ -269,17 +277,17 @@ _Avoid_: settler, recruit, migrant, passenger, colonist-in-waiting
 _Avoid_: settler, crew, worker, population resource
 
 **Region**:
-One of twelve territories of the Earth Map that a Faction can control and build in, called a Region until version 0.07.2 and since then **named for its Nation** -- the power that leads it -- so the territory that was South Asia is India and the one that was Europe is the European Union. Eight until version 0.05, which split Africa at the Sahara, Asia into East, South and South-East, and Central America and the Caribbean out of North America; Antarctica left the list in version 0.04 to become Earth's Colony Slots. Each carries a population -- the whole territory's, not its Nation's alone, counted in units of five million people since version 0.07.3 (hundreds of millions before) and written on its card as `Region population 228.0 (1.14B)` -- an Industry Level, a Resource Lean, a Baseline Emissions figure, an Education Level, a GDP, an Influence value, an Unrest figure and a Standing Army. Armies move only between neighbouring Regions.
+One of fourteen territories of the Earth Map that a Faction can control and build in, called a Region until version 0.07.2 and since then **named for its Nation** -- the power that leads it -- so the territory that was South Asia is India and the one that was Europe is the European Union. Eight until version 0.05, which split Africa at the Sahara, Asia into East, South and South-East, and Central America and the Caribbean out of North America; Antarctica left the list in version 0.04 to become Earth's Colony Slots. Each carries a population -- the whole territory's, not its Nation's alone, counted in units of five million people since version 0.07.3 (hundreds of millions before) and written on its card as `Region population 228.0 (1.14B)` -- an Industry Level, a Resource Lean, a Baseline Emissions figure, an Education Level, a GDP, an Influence value, an Unrest figure and a Standing Army. Armies move only between neighbouring Regions.
 _Avoid_: nation state, country, territory, state, continent, bloc
 
 **Nation**:
-The power a Region is named for and whose flag its card wears, since version 0.07.2: China, India, the United States, Brazil, Russia, Australia, the European Union, Iran, Egypt, Nigeria, Indonesia and Mexico. A Nation is a name and a flag; the Region is the thing on the board that is held, built in and fought over, and it is larger than its Nation -- India the Region holds Pakistan, Bangladesh and Sri Lanka. The choice of Nation for a Region is the designer's and is a statement about the world of 2030.
+The power a Region is named for and whose flag its card wears, since version 0.07.2: China, India, the United States, Brazil, Russia, Australia, the European Union, Iran, Egypt, Nigeria, Indonesia, Mexico and -- since ticket #125 cut them out of East Asia and the Middle East in that same version -- Japan and Saudi Arabia. A Nation is a name and a flag; the Region is the thing on the board that is held, built in and fought over, and it is larger than its Nation -- India the Region holds Pakistan, Bangladesh and Sri Lanka. The choice of Nation for a Region is the designer's and is a statement about the world of 2030.
 _Avoid_: primary power (the charting phrase; not the game's word), country, capital, leader
 
 ### Earth
 
 **Facility**:
-A building placed in a Region. Ten kinds since version 0.05: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, and the Sea Wall and the Scrubber, which take no build slot (the Sea Wall stood in a Coastal Slot until version 0.05.5). Since version 0.04 a Launch Site builds no Ship: it lifts Emigrants and Armies from its state into orbit, and each lift is a launch.
+A building placed in a Region. Fifteen kinds since version 0.08.0: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, the School, the four Unique Facilities, and the Sea Wall and the Scrubber, which take no build slot (the Sea Wall stood in a Coastal Slot until version 0.05.5). Since version 0.04 a Launch Site builds no Ship: it lifts Emigrants and Armies from its state into orbit, and each lift is a launch.
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Cheap Industry**:
@@ -289,6 +297,15 @@ _Avoid_: industry discount, cheap building
 **Restoration**:
 Retired in version 0.05; see Scrubber. It was the Custodians' signature rule: Energy spent in a turn enlarged the Natural Sink for that turn only.
 _Avoid_: using it for anything the Scrubber now does
+
+**Unique Facility**:
+A Facility one Faction builds in place of a common one, at the common price -- the same Materials, the same build turns, the same upkeep, the same output, the same slot -- with its own name, its own icon and its own row on that Faction's build list, and one clause the common building does not have. One per Faction as a rule of the system, from version 0.08.0: the Prospectors' Investment Bank, the Arkwrights' Spaceport, the Archivists' Reactor and the Custodians' Academy. A Faction never builds the common version of a job it has a Unique Facility for, and never builds another Faction's.
+It is **never destroyed when its place changes hands**: it keeps standing and pays its new holder the same clause it paid its builder, which is the opposite of the Scrubber and the Archive. The mirror does not hold -- a common building already standing does not convert when the Faction whose Unique version it is takes the place. Only a CONTROLLER collects: an occupier pays the upkeep and draws nothing.
+_Avoid_: unique building (the glossary keeps Facility and Module apart), signature building, faction building, wonder
+
+**Unique Module**:
+The same idea off Earth: a Module one Faction builds in place of a common one, at the common price. Version 0.08.0 has one, the Custodians' Academy, which replaces the Institute and wears the same name their Unique Facility does on Earth. The Archive is NOT one: it is a Faction-only Module that is destroyed on capture, which is the opposite rule.
+_Avoid_: unique building, signature module
 
 **Scrubber**:
 The Custodians' signature Facility, which only they build and only in a Region they control. It takes no build slot, draws Energy, emits nothing, and while it is online it enlarges the Natural Sink and lowers its state's Unrest every turn. How many one state may hold follows its population, and they are destroyed outright if the state changes hands.
@@ -323,8 +340,8 @@ What a Region nobody holds does for itself: every ninth turn of unbroken neutral
 _Avoid_: growth, expansion, auto-build, industrialization, AI development
 
 **Education Level**:
-A fixed figure on a Region's card, taken from real-world values in the First Playable, that multiplies the Research each Lab in that state produces.
-_Avoid_: literacy, science level, schooling
+How well a place is schooled. It began as a fixed figure on a Region's card, taken from real-world values, that multiplies the Research each Lab there produces. Since version 0.08.0 it MOVES and it is no longer a Region's alone: a School raises it a step a turn to a ceiling and it falls back at the same rate when the School stops; a Colony or a Space Station has one too, the weighted average of the schooling the settlers brought from the Regions they were mustered in, which an Institute raises the same way. It does three jobs now -- it multiplies a Lab's and an Observatory's Research, it moderates what a large population adds to Research, and it is what Resistance reads.
+_Avoid_: literacy, science level; schooling is the ACCUMULATED part alone, not the whole figure
 
 **Resource Lean**:
 The one of Materials, Fuel or Energy a Region is naturally good at producing.
@@ -366,8 +383,20 @@ _Avoid_: unhappiness, morale, stability, dissent, revolt meter
 The Orders-phase order that buys a Region's calm: Ducats spent on a state you direct to lower its Unrest by one, as many times in a turn as you can pay for.
 _Avoid_: aid, welfare, subsidy, bribe, appeasement
 
+**School**:
+The Facility that teaches, from version 0.08.0. At most one per Region, buildable by any Faction. While it stands and is online it raises its Region's Education Level by a step a turn to a ceiling; when it stops, the figure falls back at the same rate and stops at the card's own. It is the only thing in the game that moves an Education Level on Earth.
+_Avoid_: university, college, academy (that is the Custodians' version), institute (that is the version off Earth)
+
+**Institute**:
+The School's form off Earth: a Module at a Colony or a Space Station, at most one per place, doing the same work at the same step to the same ceiling. When it stops, the figure falls back to the average the settlers brought with them.
+_Avoid_: school (that is the Earth version), laboratory, observatory
+
+**Academy**:
+The Custodians' Unique Facility on Earth and their Unique Module off it -- one name in both halves. It does everything a School and an Institute do, and pays its holder a flat Ducat a turn besides while it is online, wherever it stands.
+_Avoid_: school, institute, university
+
 **Constabulary**:
-The Facility that holds a Region's Unrest down: while it stands and is online it lowers Unrest every turn whatever else happened that turn, and softens what the climate and arriving Refugees add. At most one stands in a state.
+The Facility that holds a Region's Unrest down: while it stands and is online it lowers Unrest every turn whatever else happened that turn, and softens what the climate and arriving Refugees add. At most one stands in a state. Since version 0.08.0 it is also a defensive building: while it stands and is online the challenge margin in that Region is 25 instead of 20, for EVERY challenger and whoever built it -- a police force serves the government of the day.
 _Avoid_: police, militia, garrison, barracks (that is the Colony word)
 
 **Refugees**:
@@ -383,23 +412,31 @@ The CO2 a Faction is answerable for over the whole game: everything the sources 
 _Avoid_: carbon debt, guilt, pollution score, emissions total, footprint
 
 **Influence**:
-A Faction's claim on a Region or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold, and when two claimants reach it on the same turn at the same Standing the lot decides between them (since version 0.05.5); a controlled place goes to a rival whose Standing is at least the controller's plus the challenge margin (20 since version 0.05.5, 10 from version 0.04) and at least the threshold, which since version 0.05 each Faction reads for itself, since its Blame raises it on every Region it does not hold. A holder is never tied with a challenger, and keeps the place when two challengers tie. Since version 0.05.5 every Faction begins with a Standing on its start state equal to that state's threshold: a claim on its home from turn 1.
+A Faction's claim on a Region or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold, and when two claimants reach it on the same turn at the same Standing the lot decides between them (since version 0.05.5); a controlled place goes to a rival whose Standing is at least the controller's plus the challenge margin (20 since version 0.05.5, 10 from version 0.04, and 25 since version 0.08.0 in a Region where a Constabulary stands and is online) and at least the threshold, which since version 0.05 each Faction reads for itself, since its Blame raises it on every Region it does not hold. Since version 0.08.0 the Influence an OUTSIDER spends is divided by the place's Resistance before it becomes Standing. A holder is never tied with a challenger, and keeps the place when two challengers tie. Since version 0.05.5 every Faction begins with a Standing on its start state equal to that state's threshold: a claim on its home from turn 1.
 _Avoid_: diplomacy points, favour, reputation
 
 **Standing**:
-How much Influence a Faction has built up on one place. Since version 0.03 it persists: it is never wiped when the place changes hands, it decays 1 a turn on a place the Faction controls and 2 a turn elsewhere when nothing is spent, and spending on a place you hold raises it.
+How much Influence a Faction has built up on one place. Since version 0.03 it persists: it is never wiped when the place changes hands, it decays 1 a turn on a place the Faction controls and 2 a turn elsewhere when nothing is spent, and spending on a place you hold raises it. Since version 0.08.0 it is no longer simply the Influence spent: an outsider's spending is divided by the place's Resistance first, so 30 Influence on a well-schooled Region buys 27 Standing. A controller converts in full.
 _Avoid_: accumulation, influence points, loyalty
 
 **Threshold**:
-The Standing a Faction must reach to take a place. A Region's is a base plus a figure for each step of the state's size; a Colony's is a figure for each of its Colonists, and a Space Station's has a base of its own besides. Green Consensus lowers every threshold by a quarter, and since version 0.05 each Faction reads its own, since its Blame raises it on every place it does not hold. A place already held wants the holder's Standing plus the challenge margin as well, so the threshold is the floor and never the whole price. The word has a second, unrelated sense in the climate rules, where a Break or a Sea Level threshold is a Temperature; this entry is the Influence one.
+The Standing a Faction must reach to take a place. A Region's is a base plus a figure for each step of the state's size; a Colony's is a figure for each of its Colonists, and a Space Station's has a base of its own besides. Green Consensus lowers every threshold by a quarter, and since version 0.05 each Faction reads its own, since its Blame raises it on every place it does not hold. A place already held wants the holder's Standing plus the challenge margin as well, so the threshold is the floor and never the whole price. Schooling does NOT move the threshold: Resistance taxes the spending instead. The word has a second, unrelated sense in the climate rules, where a Break or a Sea Level threshold is a Temperature; this entry is the Influence one.
 _Avoid_: cost, price, target (for the Influence sense); the climate sense, which is a Break or a Sea Level threshold
+
+**Resistance**:
+How hard a place is to sway, from how well it is schooled, from version 0.08.0. The Influence an OUTSIDER spends there is divided by it before it becomes Standing, rounded down; the controller converts in full. A place at the neutral pivot has no effect; below it an outsider's spending goes further, above it less, to a band either side. It touches neither the threshold nor the challenge margin -- it taxes the spending, not the gate -- which is why a well-schooled Region is harder to buy without being harder to reach.
+_Avoid_: defence, loyalty, resilience, stubbornness
+
+**Relations**:
+What one Faction thinks of another, from version 0.08.0. One score per ORDERED PAIR, so twelve in a four-seat game and the Arkwrights' view of the Prospectors is a different number from the Prospectors' view of the Arkwrights. It starts neutral, falls by one for each OFFENDING TURN -- a turn in which the offender spent any Influence on a place the victim holds, or opened a Battle against them -- and recovers slowly while a pair is quiet, never rising above neutral. In version 0.08.0 it does nothing mechanical: it is read, not spent, and no rule and no computer player reads it.
+_Avoid_: diplomacy, alliance, opinion, reputation (that is close to Standing)
 
 **Allotment**:
 The amount of Influence a Faction receives each turn, split freely across any number of targets during the Orders phase. It is a base plus the Influence value of every Region the Faction controls (since version 0.03 each state carries its own value, from its economic and military weight), and it does not carry over.
 _Avoid_: influence budget, diplomacy pool, action points
 
 **Research**:
-Points produced by Research Labs on Earth and, since version 0.06.0, by Observatories at Colonies and Space Stations, and spent only on Techs. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship. Since version 0.05.5 a Lab in a Region nobody holds, or one under Occupation, runs itself and pays half its yield into the Tech under research for no Faction; North America and South-East Asia begin with such a Lab.
+Points produced by Research Labs on Earth and, since version 0.06.0, by Observatories at Colonies and Space Stations, and spent only on Techs. Since version 0.08.0 a place's Education Level moderates what its population adds as well as multiplying the building's own figure, so schooling applies twice to a Lab. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship. Since version 0.05.5 a Lab in a Region nobody holds, or one under Occupation, runs itself and pays half its yield into the Tech under research for no Faction; North America and South-East Asia begin with such a Lab.
 _Avoid_: science, research points, RP, fourth resource
 
 ### The turn
@@ -493,7 +530,7 @@ _Avoid_: subdued, loyal, converted
 ### Winning
 
 **Victory Condition**:
-What one Faction must achieve to win. Each Faction has its own, and meeting it in an End phase wins the game at once; since version 0.06.0 it is not met until the Faction's Victory gate, a Tech of its own on the Tech Tree, stands, though every part of it accrues before that; if more than one seat meets it in the same phase, the larger margin over its own bar wins and an exact tie is a draw. If no Faction has met its condition by the end of the last turn, the seats are ranked by the percentage of their own condition, then by Colonists off Earth, then by Colonies held.
+What one Faction must achieve to win. Since version 0.08.0 the Archivists' second part counts Colonists UPLOADED into the Archive rather than Colonists living beside it, which makes that half monotonic: an uploaded Colonist cannot be lost to a raid, a crowding death or a handover. Each Faction has its own, and meeting it in an End phase wins the game at once; since version 0.06.0 it is not met until the Faction's Victory gate, a Tech of its own on the Tech Tree, stands, though every part of it accrues before that; if more than one seat meets it in the same phase, the larger margin over its own bar wins and an exact tie is a draw. If no Faction has met its condition by the end of the last turn, the seats are ranked by the percentage of their own condition, then by Colonists off Earth, then by Colonies held.
 _Avoid_: win condition, goal, objective, victory points
 
 **Extraction Total**:
@@ -501,7 +538,7 @@ Retired in version 0.05.5 for the Venture Capital Fund. It was the Prospectors' 
 _Avoid_: extraction total, production score, output total, wealth
 
 **Venture Capital Fund**:
-The Prospectors' own pool beside the Stockpile, and their measure since version 0.05.5: 750 Materials in it is the first part of their Victory Condition. On any turn they set the share of their Factories' and Mines' Materials output that goes into it at Income, from nothing to four fifths in steps of a tenth; Materials bought, refunded or found are not output. A draw takes Materials back out at a tenth's loss.
+The Prospectors' own pool beside the Stockpile, and their measure since version 0.05.5: 1000 Materials in it is the first part of their Victory Condition (750 until version 0.08.0, which raised the bar when the Investment Bank began paying interest into it). On any turn they set the share of their Factories' and Mines' Materials output that goes into it at Income, from nothing to four fifths in steps of a tenth; Materials bought, refunded or found are not output. A draw takes Materials back out at a tenth's loss.
 _Avoid_: the pool, savings, treasury, war chest, bank
 
 **Stabilization**:

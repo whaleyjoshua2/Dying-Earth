@@ -77,6 +77,11 @@ build_lost = "{building} at {place} had no slot left and was lost."
 # Ticket #197 (version 0.08.0): Colonists lost when a building coming down leaves fewer Habitats
 # than the people living there. It was the one way Colonists went without a word.
 colonists_no_room = "{n} Colonists at {colony} had nowhere to live and were lost."
+# Ticket #191 (version 0.08.0): Relations. Said in the OFFENDER's Report on a turn a rival's view of
+# them fell, so a player is sent to the grid on the Victory window rather than expected to watch it.
+# Ticket #192 (version 0.08.0): the Upload, in the Report.
+uploaded = "{n} Colonists were uploaded into the Archive at {colony}: {total} in all."
+relations_fell = "The {victim} have not forgiven the {offender}."
 launch_pad_fire = "Launch Pad Fire: the {faction} {item} at {place} completes next turn instead."
 game_over_win = "Game over on turn {turn}: the {faction} win ({note})."
 game_over_draw = "Game over on turn {turn}: a draw ({note})."
@@ -139,6 +144,8 @@ build_ship = "began a {unit} at {place}"
 build_army = "began an Army at {place}"
 build_station = "began a Space Station over {body}"
 build_archive = "began the Archive at {colony}"
+# Ticket #192 (version 0.08.0): the Upload, in the rival-deeds paragraph.
+upload = "uploaded {n} Colonists into the Archive at {colony}"
 fund_archive = "set its Labs to pay the Archive fund from the next Income"
 unfund_archive = "set its Labs back to the shared Tech from the next Income"
 max_on = "set its whole Allotment to go to {place} every turn"

@@ -339,6 +339,12 @@ impl Game {
 
     /// One melee of Ship stacks at a Body (ticket #50).
     fn ship_melee(&mut self, place: &str, body: BodyId, parties: &[(Seat, bool, Vec<ShipId>)]) {
+        // Ticket #191 (version 0.08.0): opening a Battle offends everyone on the other side of it.
+        for (aggressor, _, _) in parties.iter().filter(|(_, agg, _)| *agg) {
+            for (other, _, _) in parties {
+                self.offend(*aggressor, *other);
+            }
+        }
         let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
             parties.iter().map(|(seat, agg, ids)| (Some(*seat), *agg, ids.iter().map(|id| self.ship_combatant(*id)).collect())).collect();
         let mut line = self.run_melee(place, units);
@@ -355,6 +361,13 @@ impl Game {
 
     /// One melee of Armies at a ground place (ticket #50).
     fn army_melee(&mut self, place_name: &str, place: Place, aggressors: &[Seat], parties: &[(Option<Seat>, bool, Vec<ArmyId>)]) {
+        // Ticket #191: as in orbit. A neutral state's own Armies are nobody's Faction, so a Battle
+        // against them offends nobody -- which is most Battles: 46 of the 55 measured over 80 games.
+        for aggressor in aggressors {
+            for other in parties.iter().filter_map(|(s, _, _)| *s) {
+                self.offend(*aggressor, other);
+            }
+        }
         let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
             parties.iter().map(|(seat, agg, ids)| (*seat, *agg, ids.iter().map(|id| self.army_combatant(*id)).collect())).collect();
         let mut line = self.run_melee(place_name, units);
@@ -595,7 +608,9 @@ impl Game {
     }
 
     fn occupation_gain(&mut self, place: Place, seat: Seat) {
-        let gain = self.pacification_gain(place);
+        // Ticket #187 (version 0.08.0): an occupier's Standing is an outsider's by definition, so
+        // Resistance bites it. Otherwise invading would be the way round a well-schooled population.
+        let gain = self.standing_from(place, self.pacification_gain(place));
         let s = self.seat_mut(seat);
         *s.influence.entry(place).or_insert(0) += gain;
         s.influenced_this_turn.push(place);
@@ -705,10 +720,23 @@ impl Game {
         let spent = std::mem::take(&mut self.pending.influence);
         for (seat, target, amount) in spent {
             let own = self.place_control(target).controller() == Some(seat);
+            // Ticket #187 (version 0.08.0): Resistance. An outsider's Influence buys less Standing at
+            // a well-schooled place and more at a badly-schooled one; the controller converts in full.
+            let gained = if own { amount } else { self.standing_from(target, amount) };
+            // Ticket #191 (version 0.08.0): spending on a place another Faction HOLDS is an offence,
+            // and their view of you falls once for the turn however many orders you put in. A
+            // NEUTRAL place is never an offence, however hotly contested: two Factions bidding for
+            // empty ground are competing, not crossing each other.
+            if let Some(victim) = self.place_control(target).director()
+                && victim != seat
+            {
+                self.offend(seat, victim);
+            }
             let s = self.seat_mut(seat);
-            *s.influence.entry(target).or_insert(0) += amount;
+            *s.influence.entry(target).or_insert(0) += gained;
             s.influenced_this_turn.push(target);
-            self.log(format!("{} spent {} Influence {} {}.", self.seat_name(seat), amount, if own { "holding" } else { "on" }, self.place_name(target)));
+            let bite = if gained == amount { String::new() } else { format!(" (worth {gained} there)") };
+            self.log(format!("{} spent {} Influence {} {}{}.", self.seat_name(seat), amount, if own { "holding" } else { "on" }, self.place_name(target), bite));
         }
         // Embassies and Relays (ticket #36) raise their place's standing for its controller each turn,
         // which counts as Influence received, so the standing does not decay.
@@ -1162,6 +1190,8 @@ impl Game {
                     damage: 0,
                     at: ShipAt::Body(body),
                     colonists: 0,
+                    // Ticket #189 (version 0.08.0): empty, so the figure is the neutral one.
+                    colonists_education: 1.0,
                     army: None,
                     stance: Stance::Hold,
                     escaped: false,
@@ -1214,10 +1244,10 @@ impl Game {
         for s in due {
             let landed = match s.into {
                 UnloadTarget::Slot(_, slot) if self.antarctica_open && self.free_slots_on(BodyId::Earth).contains(&slot) => {
-                    self.found_antarctic_colony(s.seat, slot, s.n, s.from);
+                    self.found_antarctic_colony(s.seat, slot, s.n, s.from, s.education);
                     true
                 }
-                UnloadTarget::Colony(c) => self.join_antarctic_colony(s.seat, c, s.n, s.from),
+                UnloadTarget::Colony(c) => self.join_antarctic_colony(s.seat, c, s.n, s.from, s.education),
                 UnloadTarget::Slot(..) => {
                     let own = self
                         .colonies
@@ -1225,13 +1255,17 @@ impl Game {
                         .find(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(s.seat) && self.habitat_room(c) > c.colonists)
                         .map(|c| c.id);
                     match own {
-                        Some(c) => self.join_antarctic_colony(s.seat, c, s.n, s.from),
+                        Some(c) => self.join_antarctic_colony(s.seat, c, s.n, s.from, s.education),
                         None => false,
                     }
                 }
             };
             if !landed {
-                self.state_mut(s.from).emigrants += s.n;
+                // Ticket #189 (version 0.08.0): they come home knowing what they left knowing.
+                let blended = Game::blend(self.state(s.from).emigrants, self.state(s.from).emigrants_education, s.n, s.education);
+                let st = self.state_mut(s.from);
+                st.emigrants += s.n;
+                st.emigrants_education = blended;
                 let line = format!("{} Emigrants from {} found no room in Antarctica and came home.", s.n, self.tables.state(s.from).name);
                 self.log(line);
                 let text = self.say("emigrants_returned", &[("n", s.n.to_string()), ("state", self.tables.state(s.from).name.clone())]);
@@ -1241,7 +1275,7 @@ impl Game {
     }
 
     /// Ticket #73: Emigrants found a Colony in a free Antarctic slot, as a Colony Ship's unload does.
-    fn found_antarctic_colony(&mut self, seat: Seat, slot: u32, n: u32, from: StateId) {
+    fn found_antarctic_colony(&mut self, seat: Seat, slot: u32, n: u32, from: StateId, taught: f64) {
         let id = ColonyId(self.fresh_id());
         self.colonies.push(Colony {
             id,
@@ -1252,6 +1286,10 @@ impl Game {
             // free Habitat. It holds four, so a Colony founded by sea takes its four at once.
             modules: vec![Module::new(ModuleKind::Core)],
             colonists: 0,
+            // Ticket #189 (version 0.08.0): a bare Colony knows nothing until its people arrive,
+            // one line below.
+            education: 1.0,
+            settler_education: 1.0,
             queue: Vec::new(),
             grid_failed: false,
             founded_turn: self.turn,
@@ -1259,9 +1297,14 @@ impl Game {
         });
         let room = self.habitat_room(self.colony(id).unwrap());
         let moved = n.min(room);
-        self.colony_mut(id).unwrap().colonists = moved;
+        // Ticket #189: the founders bring their schooling with them.
+        self.settle_people(id, moved, taught);
         if moved < n {
-            self.state_mut(from).emigrants += n - moved;
+            let back = n - moved;
+            let blended = Game::blend(self.state(from).emigrants, self.state(from).emigrants_education, back, taught);
+            let st = self.state_mut(from);
+            st.emigrants += back;
+            st.emigrants_education = blended;
         }
         let slot_name = self.tables.body(BodyId::Earth).slots[slot as usize].name.clone();
         let line = format!("The {} founded a Colony at {} in Antarctica with {} Emigrants from {}.", self.seat_name(seat), slot_name, moved, self.tables.state(from).name);
@@ -1287,7 +1330,7 @@ impl Game {
     }
 
     /// Ticket #73: Emigrants join the seat's own Antarctic Colony while it has room; the rest go home.
-    fn join_antarctic_colony(&mut self, seat: Seat, c: ColonyId, n: u32, from: StateId) -> bool {
+    fn join_antarctic_colony(&mut self, seat: Seat, c: ColonyId, n: u32, from: StateId, taught: f64) -> bool {
         let Some(col) = self.colony(c) else { return false };
         if col.body != BodyId::Earth || col.in_orbit || col.control.director() != Some(seat) {
             return false;
@@ -1297,9 +1340,14 @@ impl Game {
         if moved == 0 {
             return false;
         }
-        self.colony_mut(c).unwrap().colonists += moved;
+        // Ticket #189 (version 0.08.0): the arrivals average into what the Colony already knows.
+        self.settle_people(c, moved, taught);
         if moved < n {
-            self.state_mut(from).emigrants += n - moved;
+            let back = n - moved;
+            let blended = Game::blend(self.state(from).emigrants, self.state(from).emigrants_education, back, taught);
+            let st = self.state_mut(from);
+            st.emigrants += back;
+            st.emigrants_education = blended;
         }
         let line = format!("{} Emigrants from {} landed in Antarctica and joined {}.", moved, self.tables.state(from).name, self.place_name(Place::Colony(c)));
         self.log(line);
@@ -1330,7 +1378,7 @@ impl Game {
             // Ticket #164 (version 0.07.5): a station is founded with its Core Module, so it can take
             // four people the turn it stands, where a bare one could hold nobody until a Habitat was
             // built out of an allowance it no longer has.
-            self.colonies.push(Colony { id, body: *body, slot: *slot, control: Control::Controlled(*seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: true });
+            self.colonies.push(Colony { id, body: *body, slot: *slot, control: Control::Controlled(*seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: self.turn, in_orbit: true });
             let line = format!("{} built {}.", self.seat_name(*seat), self.place_name(Place::Colony(id)));
             self.log(line);
             let text = self.say("station_built", &[("faction", self.seat_name(*seat)), ("station", self.place_name(Place::Colony(id)))]);
@@ -1383,18 +1431,19 @@ impl Game {
                                 if self.state(st).emigrants < colonists {
                                     continue;
                                 }
-                                self.state_mut(st).emigrants -= colonists;
+                                // Ticket #189 (version 0.08.0): what they know goes aboard with them.
+                                let taught = self.take_emigrants(st, colonists);
+                                // Ticket #183 (version 0.08.0): a lift onto a Ship is a launch too.
+                                self.pay_spaceport(seat, st, colonists);
+                                self.load_people(ship, colonists, taught);
                             }
                             LoadSource::Colony(c) => {
-                                let Some(col) = self.colony_mut(c) else { continue };
-                                if col.colonists < colonists {
+                                if self.colony(c).map(|col| col.colonists < colonists).unwrap_or(true) {
                                     continue;
                                 }
-                                col.colonists -= colonists;
+                                let taught = self.take_colonists(c, colonists);
+                                self.load_people(ship, colonists, taught);
                             }
-                        }
-                        if let Some(s) = self.ship_mut(ship) {
-                            s.colonists += colonists;
                         }
                     }
                     if let Some(aid) = army {
@@ -1460,6 +1509,9 @@ impl Game {
                                 // Habitat's place. It holds four, which is a Colony Ship's load.
                                 modules: vec![Module::new(ModuleKind::Core)],
                                 colonists: 0,
+                                // Ticket #189 (version 0.08.0): it knows nothing until its people land.
+                                education: 1.0,
+                                settler_education: 1.0,
                                 queue: Vec::new(),
                                 grid_failed: false,
                                 founded_turn: self.turn,
@@ -1467,10 +1519,9 @@ impl Game {
                             });
                             let room = self.habitat_room(self.colony(id).unwrap());
                             let moved = n.min(room);
-                            self.colony_mut(id).unwrap().colonists = moved;
-                            if let Some(s) = self.ship_mut(ship) {
-                                s.colonists -= moved;
-                            }
+                            // Ticket #189: the founders bring what they know.
+                            let taught = self.unload_people(ship, moved);
+                            self.settle_people(id, moved, taught);
                             if let Some(aid) = aboard_army.filter(|_| army) {
                                 self.land_army(aid, ship, Place::Colony(id));
                             }

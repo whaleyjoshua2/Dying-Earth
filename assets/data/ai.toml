@@ -34,6 +34,7 @@ build_constabulary = 5
 resettle = 2
 fund_archive = 0
 build_archive = 0
+upload = 0
 build_producer = 5
 raise_industry = 5
 build_research_lab = 8
@@ -72,6 +73,7 @@ build_constabulary = 6
 resettle = 2
 fund_archive = 0
 build_archive = 0
+upload = 0
 build_producer = 6
 raise_industry = 3
 build_research_lab = 8
@@ -107,6 +109,7 @@ build_constabulary = 4
 resettle = 2
 fund_archive = 0
 build_archive = 0
+upload = 0
 build_producer = 6
 raise_industry = 3
 build_research_lab = 6
@@ -141,6 +144,10 @@ build_constabulary = 5
 resettle = 2
 fund_archive = 8
 build_archive = 9
+# Ticket #192 (version 0.08.0): the Upload is the Archivists' second Victory part now, not a
+# side errand, so it outranks raising the Module itself: there is no reason ever to hold people
+# back from a complete Archive, and a seat that does not upload wins nothing at all.
+upload = 10
 build_producer = 6
 raise_industry = 3
 build_research_lab = 9
@@ -168,6 +175,17 @@ victory_gap_max = 3.0
 threat = 2.0
 opportunity = 2.0
 energy_shortage_bonus = 2
+# Ticket #181 (version 0.08.0): the bias a seat gets toward its OWN Unique Facility over the common
+# counterpart -- the designer asked for "only a slight bias", and slight is what this is. It is kept
+# small on purpose: ticket #41 taught the AI to chase Ducats and it cost the Custodians every win in
+# twenty seeds, because a Bank on turn 1 displaced the Research Lab.
+unique_bias = 1.15
+# Ticket #182: the Prospectors are the exception to that bias. An Investment Bank pays 1% of the
+# Venture Capital Fund's balance, so its worth grows with the Fund, and the computer's appetite is
+# made to grow with it: the weight is multiplied by 1 + balance x this. At the measured median Fund
+# of 400 by turn 24 that is x1.8, and at 1000 -- the bar itself -- x3.0. Early, with an empty Fund,
+# an Investment Bank is worth nothing and loses to the Factory that fills the Fund, which is right.
+investment_bank_per_fund = 0.002
 
 # Pace (spec 16.3), stretched to twenty-four turns on ticket #27 and keyed per Faction on #50.
 # `first` is the Faction's first Victory part by turn, as [turn, value]; a Faction whose first part
@@ -175,10 +193,14 @@ energy_shortage_bonus = 2
 # `within_ppm` of the Sink by `within_by_turn`, and under it by `under_sink_by_turn`.
 # `colonists` is the Colonists off Earth the Faction should hold, as [turn, colonists].
 
-# Ticket #72 (version 0.05.5): the pace is Materials banked in the Venture Capital Fund, 750 by
-# turn 34 of thirty-six; the AI sets its share each turn to stay on it.
+# Ticket #72 (version 0.05.5): the pace is Materials banked in the Venture Capital Fund, by turn 34
+# of thirty-six; the AI sets its share each turn to stay on it.
+# Ticket #182 (version 0.08.0): the bar moved from 750 to 1000, so the whole schedule is RESCALED by
+# 1000/750 rather than given a new last number -- it is what makes the computer set its banking share
+# every turn, and leaving the early marks where they were would have it bank too little until turn 27
+# and then find the last stretch impossible.
 [pace.prospectors]
-first = [[9, 100], [18, 250], [27, 450], [34, 750]]
+first = [[9, 133], [18, 333], [27, 600], [34, 1000]]
 colonists = [[12, 4], [22, 12]]
 
 [pace.custodians]

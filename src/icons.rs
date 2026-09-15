@@ -31,7 +31,7 @@ pub struct Credit {
 
 /// The icons in use, their authors, and the names they carry at game-icons.net. Anything added to
 /// `assets/icons/` belongs here too: the credit is the licence's price, not a courtesy.
-pub const CREDITS: [Credit; 36] = [
+pub const CREDITS: [Credit; 40] = [
     Credit { resource: "Materials", icon: "Mine Wagon", author: "Delapouite" },
     Credit { resource: "Fuel", icon: "Jerrycan", author: "Delapouite" },
     Credit { resource: "Energy", icon: "Electric", author: "Sbed" },
@@ -86,6 +86,20 @@ pub const CREDITS: [Credit; 36] = [
     Credit { resource: "Facility Constabulary", icon: "Handcuffs", author: "Lorc" },
     Credit { resource: "Facility Sea Wall", icon: "Dam", author: "Delapouite" },
     Credit { resource: "Facility Scrubber", icon: "Computer Fan", author: "Delapouite" },
+    // Tickets #181 to #186 (version 0.08.0): the four Unique Facilities. Every candidate was
+    // rendered at 16 and 28 pixels on the game's own ground and looked at before any was adopted,
+    // and two were killed by that: a TURBINE for the Reactor, which at 16 pixels is the Scrubber's
+    // computer fan exactly, and a HARBOUR DOCK for the Spaceport, which carries an anchor and so
+    // says sea. All three authors are already named above, so the Credits screen gains four rows
+    // and no new name.
+    Credit { resource: "Facility Investment Bank", icon: "Strongbox", author: "Delapouite" },
+    Credit { resource: "Facility Spaceport", icon: "Space Shuttle", author: "Delapouite" },
+    Credit { resource: "Facility Reactor", icon: "Nuclear", author: "Sbed" },
+    // The Academy took two rounds: the telescope says astronomy, which is the Observatory's job, and
+    // the open book is the Archive's. The designer picked the test tubes, knowing they are the
+    // Research Lab's round-bottom flask's sibling -- the one pair on the board worth re-reading at
+    // 16 pixels whenever the icon sheet is next photographed.
+    Credit { resource: "Facility Academy", icon: "Test Tubes", author: "Lorc" },
 ];
 
 /// Ticket #146 (version 0.07.3): the icon key a Facility's slot box wears on a Region's card.
@@ -102,6 +116,15 @@ pub fn facility_icon(kind: dying_earth_engine::FacilityKind) -> &'static str {
         Constabulary => "facility_constabulary",
         SeaWall => "facility_sea_wall",
         Scrubber => "facility_scrubber",
+        // Ticket #185 (version 0.08.0): the School.
+        School => "facility_school",
+        // Tickets #181 to #186 (version 0.08.0): the four Unique Facilities, each its own picture
+        // rather than a corner mark on the common one -- at build-slot-box size, nine near-identical
+        // grey boxes with a small Faction mark is not a thing a player reads.
+        InvestmentBank => "facility_investment_bank",
+        Spaceport => "facility_spaceport",
+        Reactor => "facility_reactor",
+        Academy => "facility_academy",
     }
 }
 
@@ -121,6 +144,12 @@ pub fn module_icon(kind: dying_earth_engine::ModuleKind) -> &'static str {
         Observatory => "module_observatory",
         SolarArray => "module_solar_array",
         MassDriver => "module_mass_driver",
+        // Ticket #185 (version 0.08.0): the Institute is the School off Earth and wears its
+        // mortarboard, as the Refinery Facility wears the Refinery Module's own file.
+        Institute => "facility_school",
+        // Ticket #186 (version 0.08.0): the Custodians' Unique Module wears their Unique Facility's
+        // picture, as the Institute wears the School's.
+        Academy => "facility_academy",
         Archive => "module_archive",
         // Ticket #164 (version 0.07.5): the Core Module wears the station glyph the game drew for
         // itself on ticket #135 -- two solar panels on a bar with a module between them, which is
@@ -149,7 +178,16 @@ pub fn faction_symbol(kind: dying_earth_engine::FactionKind) -> &'static str {
 /// solar panels on a bar with a central module, the ISS reduced to its silhouette -- was drawn for
 /// the game after the designer passed on every station game-icons.net has, none of which is drawn
 /// as a station. A drawn glyph still loads and tints through `Icons` like any other.
-pub const DRAWN: [&str; 1] = ["station"];
+/// Ticket #185 (version 0.08.0): the School's is drawn for the game too -- a mortarboard: the flat
+/// board, the cap beneath it and a tassel hanging right. game-icons.net has no school, and the
+/// nearest candidates said other things (a laboratory, a capitol).
+///
+/// It was drawn as a pediment on columns first, and the icon sheet killed that at a glance: at 16
+/// pixels it was the BANK's silhouette exactly, distinguished only by the currency glyph the Bank
+/// carries. This is the collision ticket #146 already dodged once when it gave the Embassy a
+/// handshake, "since the capitol is the Bank's building twice". The open book was unavailable too:
+/// the Archive has it.
+pub const DRAWN: [&str; 2] = ["station", "facility_school"];
 
 impl Credit {
     /// The file stem in `assets/icons/` this credit is for: the name, lower-cased, spaces to

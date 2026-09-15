@@ -190,7 +190,7 @@ fn build_board(session: &mut Session) {
             };
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
-            g.ships.push(Ship { id, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
+            g.ships.push(Ship { id, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
         }
         // `battle:1` (a building aid): three seats bring a Frigate to Mars with Attack stances and
         // one more turn runs, so the Report carries a three-party Battle (ticket #50).
@@ -198,7 +198,7 @@ fn build_board(session: &mut Session) {
             for seat in [Seat(0), Seat(1), Seat(2)] {
                 let id = ShipId(g.fresh_id());
                 let built_turn = g.turn;
-                g.ships.push(Ship { id, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
+                g.ships.push(Ship { id, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
             }
             for s in g.ships.iter_mut().filter(|s| s.at == ShipAt::Body(BodyId::Mars)) {
                 s.stance = Stance::Attack;
@@ -230,7 +230,7 @@ fn build_board(session: &mut Session) {
             } else {
                 modules.push(Module::new(ModuleKind::Archive));
             }
-            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: 8, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: 8, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
             g.seats[0].archive_fund = match point {
                 0 => (research as f64 * g.tables.archive.banked_before_built) as i64,
                 1 => research / 2,
@@ -258,7 +258,7 @@ fn build_board(session: &mut Session) {
             if std::env::args().any(|a| a == "post:1") {
                 modules.push(Module::new(ModuleKind::TradePost));
             }
-            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: n, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: n, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
             g.seats[0].stockpile.materials = 120;
             g.seats[0].stockpile.energy = 60;
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
@@ -307,6 +307,7 @@ fn build_board(session: &mut Session) {
                 damage: 0,
                 at: ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 1 },
                 colonists: 8,
+                colonists_education: 1.0,
                 army: None,
                 stance: Stance::Hold,
                 escaped: false,
@@ -342,7 +343,7 @@ fn build_board(session: &mut Session) {
             let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
             let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Mine), Module::new(ModuleKind::MassDriver)];
-            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
             g.seats[0].stockpile.materials = 120;
             g.seats[0].stockpile.energy = 60;
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
@@ -376,6 +377,31 @@ fn build_board(session: &mut Session) {
             && !g.colony(id).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Habitat)
         {
             g.colony_mut(id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+        }
+        // `ship:1` (a building aid, ticket #193, version 0.08.0): a Colony Ship of seat 0's sits at
+        // Earth, so the Region card's "Send N to Colony Ship" button can be photographed. The
+        // computer almost never has one parked at Earth with Emigrants waiting -- about 1.8 Colony
+        // Ships are completed a game -- which is exactly why the missing button showed up as a
+        // player's complaint rather than as a figure in a sweep.
+        if std::env::args().any(|a| a == "ship:1") {
+            let id = ShipId(g.fresh_id());
+            let turn = g.turn;
+            g.ships.push(Ship {
+                id,
+                slot: None,
+                kind: UnitKind::ColonyShip,
+                seat: Seat(0),
+                damage: 0,
+                at: ShipAt::Body(BodyId::Earth),
+                colonists: 0,
+                colonists_education: 1.0,
+                army: None,
+                stance: Stance::Hold,
+                escaped: false,
+                arrived_this_turn: false,
+                built_turn: turn,
+                fuel: g.tables.unit(UnitKind::ColonyShip).tank,
+            });
         }
         // `venture:<n>` (a building aid, ticket #72): seat 0 as the Prospectors holds n Materials in
         // the Venture Capital Fund and banks half its output.
@@ -539,7 +565,7 @@ fn build_board(session: &mut Session) {
                 seat: Seat(0),
                 damage: 0,
                 at: ShipAt::Body(BodyId::Moon),
-                colonists: 4,
+                colonists: 4, colonists_education: 1.0,
                 army: None,
                 stance: Stance::Hold,
                 escaped: false,

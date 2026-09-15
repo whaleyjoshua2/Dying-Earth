@@ -13,6 +13,17 @@ decay_controlled = 1
 # (version 0.05.5): 10 to 20, beside a start Standing on every Faction's home state equal to its
 # threshold, after the Custodian AI took seat 0's start state on turn 7 in every seed.
 challenge_margin = 20
+# Ticket #190 (version 0.08.0): what a Constabulary standing and online adds to the challenge margin
+# in its Region, for EVERY challenger, whoever built it -- a police force serves the government of
+# the day. Nothing on a neutral Region, which has no margin at all: the price there is the threshold.
+# Measured over 800 games, this will almost never fire under the computer players: a Constabulary
+# stands on 0.5% of Region-turns, only 29 of 9,463 Influence takes had one standing, and a margin of
+# 25 would have blocked 7 of them -- about one take per 114 games. It is kept because it gives a
+# PLAYER a reason to build a Constabulary that the computer does not have: today it is purely an
+# Unrest tool raised in emergencies, and after this it is also a defensive building raised in a
+# Region you mean to keep. A threshold rule was measured instead and would have blocked 0 of the 29,
+# because on every one the holder's Standing plus the margin already exceeded the threshold.
+constabulary_margin = 5
 # Version 0.04 (ticket #46): a station's threshold starts here, plus the per-Colonist figure.
 station_threshold_base = 20
 occupation_turns = 3
@@ -26,3 +37,19 @@ destruction_chance = 0.25
 [blame]
 fair_share = 0.25
 cap = 1.5
+
+# Ticket #187 (version 0.08.0): Resistance. A place's schooling takes a bite out of the Influence an
+# OUTSIDER spends there: Standing gained = spent / resistance, rounded down. The controller converts
+# in full. It touches neither the threshold nor the challenge margin -- measured, the margin is the
+# binding figure in 95% of takes of a held Region, so a threshold rule would have missed the
+# contested board entirely, while a tax on the spending does not care which figure binds.
+#
+# `pivot` reads 1.00 and has no effect. Below it the figure scales down to `1 - band` at `low`, the
+# lowest Education Level on any card; above it, up to `1 + band` at `high`, the School's ceiling.
+# Each side scales to its own end because the range is asymmetric -- 0.30 below the pivot and 1.00
+# above -- and a single coefficient would leave the -10% floor unreachable by any Region on the board.
+[resistance]
+band = 0.10
+pivot = 1.0
+low = 0.7
+high = 2.0

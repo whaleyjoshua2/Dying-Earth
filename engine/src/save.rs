@@ -24,7 +24,14 @@ use std::sync::Arc;
 pub const SAVE_VERSION: u32 = 1;
 
 /// The rules version this executable plays, named beside the file's own in a refusal.
-pub const GAME_VERSION: &str = "0.05.5";
+///
+/// Ticket #195 (version 0.08.0): this had been left at 0.05.5 for six versions, which meant saves
+/// were NOT in fact version-locked across any of them -- a fact the 0.08.0 charting relied on being
+/// true. It has to move now whether or not it moved before: this version adds four Facility kinds
+/// and a Module kind, renames a Victory part, and gives every seat two new fields, so a file written
+/// by an earlier build describes a board this one cannot read. A refusal naming both versions is the
+/// right answer to that, and a silent partial load is not.
+pub const GAME_VERSION: &str = "0.08.0";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;
@@ -110,6 +117,9 @@ pub struct SavedGame {
     pub slot_yields: BTreeMap<(BodyId, u32), SlotYields>,
     pub spectator: bool,
     pub log: Vec<String>,
+    /// Ticket #191 (version 0.08.0): what every Faction thinks of every other.
+    #[serde(default)]
+    pub relations: Relations,
 }
 
 impl SavedGame {
@@ -141,6 +151,7 @@ impl SavedGame {
             slot_yields,
             spectator,
             log,
+            relations,
         } = g;
         SavedGame {
             seed: *seed,
@@ -166,6 +177,7 @@ impl SavedGame {
             slot_yields: slot_yields.clone(),
             spectator: *spectator,
             log: log.clone(),
+            relations: relations.clone(),
         }
     }
 
@@ -195,6 +207,7 @@ impl SavedGame {
             antarctica_open: self.antarctica_open,
             slot_yields: self.slot_yields,
             spectator: self.spectator,
+            relations: self.relations,
             log: self.log,
         }
     }

@@ -205,6 +205,17 @@ pub struct NationState {
     /// They are people of this state until they leave it: a new holder gets them.
     #[serde(default)]
     pub emigrants: u32,
+    /// Ticket #189 (version 0.08.0): the mean Education Level of the Emigrants waiting here. They
+    /// take this state's figure at the moment they MUSTER, so a second batch mustered after a School
+    /// has run averages in higher, and the pile carries one number and a count.
+    #[serde(default = "neutral_education")]
+    pub emigrants_education: f64,
+    /// Ticket #185 (version 0.08.0): what a School has added to this state's Education Level, above
+    /// the figure on its card. It climbs a step a turn while a School stands and is online, to the
+    /// ceiling, and falls back at the same rate when it stops -- so it never drops below the card.
+    /// The Education Level was a fixed card figure until now and nothing in the game moved it.
+    #[serde(default)]
+    pub schooling: f64,
     /// Ticket #52: Unrest, 0 to 10 (9 while the state is neutral). Ticket #53: it moves in halves.
     pub unrest: f64,
     /// Ticket #53: the state changed hands this turn, which is the one turn its Unrest does not
@@ -314,6 +325,12 @@ impl SlotYields {
     }
 }
 
+/// Ticket #189 (version 0.08.0): what a pool of people with no recorded schooling counts as. Saves
+/// are refused across versions, so this can never fire on a real save; it is the honest neutral.
+fn neutral_education() -> f64 {
+    1.0
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Colony {
     pub id: ColonyId,
@@ -322,6 +339,17 @@ pub struct Colony {
     pub control: Control,
     pub modules: Vec<Module>,
     pub colonists: u32,
+    /// Ticket #189 (version 0.08.0): this Colony's Education Level as it stands -- the weighted
+    /// average of the people living here, raised by an Institute. Arriving settlers average into it
+    /// by head count, Institute gains and all, so a shipload of poorly-schooled people dilutes what
+    /// an Institute has built.
+    #[serde(default = "neutral_education")]
+    pub education: f64,
+    /// Ticket #189: the same average with no Institute ever counted -- what this Colony's people
+    /// know on their own. It is the floor an Institute's gains decay back to, so a Colony whose
+    /// Institute goes dark returns to what its settlers brought rather than falling to nothing.
+    #[serde(default = "neutral_education")]
+    pub settler_education: f64,
     pub queue: Vec<Build>,
     /// Grid Failure: Modules offline until the next Resolution.
     pub grid_failed: bool,
@@ -344,6 +372,10 @@ pub struct Ship {
     pub damage: u32,
     pub at: ShipAt,
     pub colonists: u32,
+    /// Ticket #189 (version 0.08.0): the mean Education Level of the people aboard, carried from
+    /// the Region they were mustered in.
+    #[serde(default = "neutral_education")]
+    pub colonists_education: f64,
     pub army: Option<ArmyId>,
     pub stance: Stance,
     pub escaped: bool,
@@ -586,6 +618,9 @@ pub struct AntarcticSend {
     pub seat: Seat,
     pub from: StateId,
     pub n: u32,
+    /// Ticket #189 (version 0.08.0): what the people aboard know, carried across the sea with them.
+    #[serde(default = "neutral_education")]
+    pub education: f64,
     pub into: crate::orders::UnloadTarget,
     pub due_turn: u32,
 }
@@ -613,6 +648,16 @@ pub struct SeatState {
     pub venture_share: f64,
     #[serde(default)]
     pub venture_banked_last_turn: i64,
+    /// Ticket #183 (version 0.08.0): Influence the seat's Spaceports earned lifting Emigrants off
+    /// Earth this turn, waiting to be paid into NEXT turn's Allotment. Read and cleared at Income.
+    #[serde(default)]
+    pub spaceport_influence: i64,
+    /// Ticket #192 (version 0.08.0): Colonists uploaded into the Archive, all told. The Archivists'
+    /// second Victory part counts this rather than who happens to be living beside the Module, and
+    /// it only ever climbs: an uploaded Colonist cannot be lost to a raid, a crowding death or a
+    /// handover.
+    #[serde(default)]
+    pub uploaded: u32,
     pub stabilization_run: u32,
     pub influence: BTreeMap<Target, i64>,
     /// Targets that received Influence this turn (spent or gained by Occupation), so they do not decay.
@@ -722,6 +767,32 @@ impl BattleLine {
 }
 
 
+/// Ticket #191 (version 0.08.0): Relations. Every Faction keeps a score for every other -- ONE PER
+/// ORDERED PAIR, so twelve in a four-seat game, and the Arkwrights' view of the Prospectors is a
+/// different number from the Prospectors' view of the Arkwrights. Measured over 80 games, of the 317
+/// pairs where anything happened 49% were purely one-directional and 80% of offending pair-turns had
+/// only one direction firing, so a shared number would have thrown all of that away.
+///
+/// The score falls for each OFFENDING TURN -- a turn in which the offender spent any Influence on a
+/// place the victim holds, or opened a Battle against them -- charged per TURN and never per order.
+/// It recovers slowly while a pair is quiet and stops at neutral: it never rises above it.
+///
+/// **In version 0.08.0 the score does nothing mechanical.** It is read, not spent: no rule reads it
+/// and the computer players do not read it. It is built now so that it can be watched for a version
+/// and given teeth in 0.09 with evidence rather than a guess.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Relations {
+    /// `score[viewer][subject]`: what the seat at `viewer` thinks of the seat at `subject`.
+    pub score: [[i64; SEAT_COUNT]; SEAT_COUNT],
+    /// Consecutive turns `subject` has not offended `viewer`.
+    pub quiet: [[u32; SEAT_COUNT]; SEAT_COUNT],
+    /// `offended[viewer][subject]`: set as offences happen through the turn, then read and cleared
+    /// when the turn ends. This is what makes the charge per turn rather than per order.
+    pub offended: [[bool; SEAT_COUNT]; SEAT_COUNT],
+    /// `fell[viewer][subject]`: whether the score moved down this turn, for the Report line.
+    pub fell: [[bool; SEAT_COUNT]; SEAT_COUNT],
+}
+
 /// Everything about one game. Fields are public because the interface reads all of them.
 #[derive(Debug, Clone)]
 pub struct Game {
@@ -761,6 +832,8 @@ pub struct Game {
     pub spectator: bool,
     /// Lines for the simulate log and the dev diary; the interface ignores them.
     pub log: Vec<String>,
+    /// Ticket #191 (version 0.08.0): what every Faction thinks of every other.
+    pub relations: Relations,
 }
 
 /// Ticket #50: every game seats all four Factions. The player picks one Faction and a start
@@ -784,6 +857,8 @@ impl Game {
             venture_fund: 0,
             venture_share: 0.0,
             venture_banked_last_turn: 0,
+            spaceport_influence: 0,
+            uploaded: 0,
             stabilization_run: 0,
             influence: BTreeMap::new(),
             influenced_this_turn: Vec::new(),
@@ -815,6 +890,10 @@ impl Game {
                 id: c.id,
                 population: c.population,
                 industry_level: c.industry_level,
+                // Ticket #185 (version 0.08.0): no School has run yet, so the state reads its card.
+                schooling: 0.0,
+                // Ticket #189 (version 0.08.0): nobody is waiting, so the figure is the neutral one.
+                emigrants_education: 1.0,
                 control: Control::Neutral,
                 // Ticket #56: the start Facilities take coastal slots first, in the table's order.
                 facilities: {
@@ -923,6 +1002,7 @@ impl Game {
             slot_yields: BTreeMap::new(),
             spectator: false,
             log: Vec::new(),
+            relations: Relations::default(),
             tables,
         };
         // Ticket #57: every Colony Slot on every Body draws its own four yields, in Body order then
@@ -939,7 +1019,7 @@ impl Game {
             let Some(slot) = game.tables.body(BodyId::Earth).stations.iter().position(|n| *n == want) else { continue };
             let id = ColonyId(game.fresh_id());
             // Ticket #164 (version 0.07.5): the three starting stations stand with their Core Modules.
-            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
         }
         // Starting positions (spec 14.3, ticket #50): the player's pick, then each AI seat in turn.
         let mut taken = vec![setup.player_start];
@@ -950,6 +1030,17 @@ impl Game {
         for (sid, seat) in taken.iter().zip(Seat::ALL) {
             game.take_control(*sid, seat);
             game.add_start_facility(*sid, FacilityKind::LaunchSite);
+            // Ticket #181 (version 0.08.0): a Faction's start Region's Facilities come up as that
+            // Faction's own versions, the Launch Site just added included. The consequences are
+            // asymmetric and were accepted knowingly: every start Region is handed a Launch Site, so
+            // the ARKWRIGHTS hold a Spaceport from turn 1; ten of the fourteen Regions start with a
+            // Power Plant, so the ARCHIVISTS usually hold a Reactor; and neither the Bank nor the
+            // School is in any Region's start Facilities, so the PROSPECTORS and the CUSTODIANS start
+            // with nothing of theirs and must build for their clause.
+            let faction = game.kind(seat);
+            for f in game.state_mut(*sid).facilities.iter_mut() {
+                f.kind = f.kind.built_by(faction);
+            }
             // Ticket #75 (version 0.05.5): a claim on its home from turn 1. The seat's Standing on its
             // start state begins at the state's threshold, so a challenger needs the threshold plus
             // the margin at once and the holder's spending counts from a real footing; with nothing
@@ -1155,6 +1246,13 @@ impl Game {
         self.archive_colony(seat).and_then(|c| self.colony(c)).map(|c| c.colonists).unwrap_or(0)
     }
 
+    /// Ticket #192 (version 0.08.0): how many Colonists this seat may still upload at `colony` this
+    /// turn -- everyone living there, less whatever is already ordered. The Archive may only draw
+    /// from the population of the place it stands at.
+    pub fn uploadable_at(&self, colony: ColonyId, already: u32) -> u32 {
+        self.colony(colony).map(|c| c.colonists).unwrap_or(0).saturating_sub(already)
+    }
+
     /// A Colony off Earth may hold the Archive; Antarctica may not. Ticket #81: a station over
     /// Earth is off Earth, so it may.
     pub fn may_hold_archive(&self, c: &Colony) -> bool {
@@ -1272,6 +1370,178 @@ impl Game {
     pub fn lift_population(&self, seat: Seat, colonists: u32) -> f64 {
         // Ticket #73: paid when the Emigrants muster, not when a Ship lifts them.
         self.tables.emigrants.population_each * colonists as f64 * self.tables.faction(self.kind(seat)).lift_population_multiplier
+    }
+
+    // ------------------------------------------ Ticket #189 (version 0.08.0): people carry their schooling
+    //
+    // Every pool of people -- the Emigrants waiting on a Region's card, the Colonists aboard a Ship,
+    // the people living at a Colony -- is a head count AND a mean Education Level. These four are
+    // the only way a pool is moved, so a caller cannot move people and forget to move what they
+    // know. Deaths never move a mean: the dead are drawn evenly from the people there.
+
+    /// The weighted mean of two pools, by head count. An empty result keeps the neutral figure.
+    pub fn blend(a_n: u32, a_e: f64, b_n: u32, b_e: f64) -> f64 {
+        let total = a_n + b_n;
+        if total == 0 {
+            return 1.0;
+        }
+        (a_e * a_n as f64 + b_e * b_n as f64) / total as f64
+    }
+
+    /// Muster `n` Emigrants in a Nation State: they take its Education Level as it stands NOW, and
+    /// average into whoever is already waiting there.
+    pub fn muster_emigrants(&mut self, s: StateId, n: u32) {
+        let taught = self.education_level(s);
+        let st = self.state(s);
+        let blended = Game::blend(st.emigrants, st.emigrants_education, n, taught);
+        let st = self.state_mut(s);
+        st.emigrants += n;
+        st.emigrants_education = blended;
+    }
+
+    /// Take `n` Emigrants off a Nation State's card and say what they know. The pile's mean does not
+    /// move: the ones who left are no better or worse taught than the ones who stayed.
+    pub fn take_emigrants(&mut self, s: StateId, n: u32) -> f64 {
+        let taught = self.state(s).emigrants_education;
+        let st = self.state_mut(s);
+        st.emigrants = st.emigrants.saturating_sub(n);
+        taught
+    }
+
+    /// Put `n` people who know `taught` aboard a Ship, averaging with whoever is already aboard.
+    pub fn load_people(&mut self, id: ShipId, n: u32, taught: f64) {
+        let Some(s) = self.ship(id) else { return };
+        let blended = Game::blend(s.colonists, s.colonists_education, n, taught);
+        if let Some(s) = self.ship_mut(id) {
+            s.colonists += n;
+            s.colonists_education = blended;
+        }
+    }
+
+    /// Take `n` people off a Ship and say what they know; the mean aboard does not move.
+    pub fn unload_people(&mut self, id: ShipId, n: u32) -> f64 {
+        let taught = self.ship(id).map(|s| s.colonists_education).unwrap_or(1.0);
+        if let Some(s) = self.ship_mut(id) {
+            s.colonists = s.colonists.saturating_sub(n);
+        }
+        taught
+    }
+
+    /// Settle `n` people who know `taught` at a Colony, averaging by head count into BOTH figures:
+    /// the live one an Institute has been raising, and the settler average that is its decay floor.
+    pub fn settle_people(&mut self, c: ColonyId, n: u32, taught: f64) {
+        let Some(col) = self.colony(c) else { return };
+        let live = Game::blend(col.colonists, col.education, n, taught);
+        let settlers = Game::blend(col.colonists, col.settler_education, n, taught);
+        if let Some(col) = self.colony_mut(c) {
+            col.colonists += n;
+            col.education = live;
+            col.settler_education = settlers;
+        }
+    }
+
+    /// Take `n` people off a Colony and say what they know; neither figure moves.
+    pub fn take_colonists(&mut self, c: ColonyId, n: u32) -> f64 {
+        let taught = self.colony(c).map(|x| x.education).unwrap_or(1.0);
+        if let Some(col) = self.colony_mut(c) {
+            col.colonists = col.colonists.saturating_sub(n);
+        }
+        taught
+    }
+
+    /// Ticket #187 (version 0.08.0): a place's Education Level -- a Region's card plus its Schools,
+    /// a Colony's settlers plus its Institute.
+    pub fn place_education(&self, place: Place) -> f64 {
+        match place {
+            Place::State(s) => self.education_level(s),
+            Place::Colony(c) => self.colony(c).map(|x| x.education).unwrap_or(1.0),
+        }
+    }
+
+    /// Ticket #187: how hard a place is to sway, from how well it is schooled. 1.0 at the pivot and
+    /// no effect; down to `1 - band` at the lowest figure any card carries, up to `1 + band` at the
+    /// School's ceiling. Each side scales to its OWN end, because the range is asymmetric -- 0.30
+    /// below the pivot and 1.00 above -- and one coefficient would leave the floor unreachable.
+    pub fn resistance(&self, place: Place) -> f64 {
+        let r = &self.tables.influence.resistance;
+        let e = self.place_education(place);
+        if (e - r.pivot).abs() < 1e-9 {
+            1.0
+        } else if e < r.pivot {
+            let span = (r.pivot - r.low).max(1e-9);
+            1.0 - r.band * ((r.pivot - e) / span).clamp(0.0, 1.0)
+        } else {
+            let span = (r.high - r.pivot).max(1e-9);
+            1.0 + r.band * ((e - r.pivot) / span).clamp(0.0, 1.0)
+        }
+    }
+
+    /// Ticket #187: what `spent` Influence actually becomes at `place`, for a Faction that does not
+    /// control it: `spent / resistance`, rounded down. A well-schooled place gives less back than
+    /// was put in and a badly-schooled one gives more. The CONTROLLER converts in full and never
+    /// calls this, so reinforcing a place you hold is never taxed.
+    pub fn standing_from(&self, place: Place, spent: i64) -> i64 {
+        let r = self.resistance(place);
+        if r <= 0.0 {
+            return spent;
+        }
+        (spent as f64 / r).floor() as i64
+    }
+
+    /// Ticket #185 (version 0.08.0): a Nation State's Education Level as it stands -- the figure on
+    /// its card plus whatever a School has added. It was the card figure alone until now, and
+    /// nothing in the game moved it.
+    pub fn education_level(&self, s: StateId) -> f64 {
+        self.tables.state(s).education_level + self.state(s).schooling
+    }
+
+    /// Ticket #185: the School's work, run once a turn at Income. It climbs a step while a School
+    /// stands and is online and falls back at the same rate when it does not, so what took five
+    /// turns to build takes five turns to lose; it never goes above the ceiling, and never below
+    /// the state's own card.
+    pub fn run_schools(&mut self) {
+        let step = self.tables.school.per_turn;
+        let ceiling = self.tables.school.ceiling;
+        for sid in StateId::ALL {
+            let card = self.tables.state(sid).education_level;
+            let open = self.state(sid).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::School) && f.working());
+            let now = self.state(sid).schooling;
+            let next = if open { (now + step).min((ceiling - card).max(0.0)) } else { (now - step).max(0.0) };
+            self.state_mut(sid).schooling = next;
+        }
+        // Ticket #185 (version 0.08.0): the Institutes do the same off Earth. A Colony's live figure
+        // climbs to the ceiling while one stands and is online, and falls back to the settlers' own
+        // average -- what its people know without a school -- when it stops. It never falls below
+        // that: a Colony whose Institute goes dark has not become less educated, its school shut.
+        let ids: Vec<ColonyId> = self.colonies.iter().map(|c| c.id).collect();
+        for cid in ids {
+            let Some(col) = self.colony(cid) else { continue };
+            let open = col.modules.iter().any(|m| m.kind.does_the_job_of(ModuleKind::Institute) && m.working());
+            let floor = col.settler_education;
+            let now = col.education;
+            let next = if open { (now + step).min(ceiling) } else { (now - step).max(floor) };
+            if let Some(col) = self.colony_mut(cid) {
+                col.education = next;
+            }
+        }
+    }
+
+    /// Ticket #196 (version 0.08.0): how many Emigrants this seat could muster in this state right
+    /// now -- its per-turn cap, or what the state's people can pay for, whichever is smaller.
+    ///
+    /// A batch was all-or-nothing until now, and Steerage costs the Arkwrights twice the population
+    /// for twice the batch: 8 x 2.0 = 16.0 people, where Australia carries 10.1 to 12.6 and is the
+    /// only one of the fourteen Regions below 16. Measured, an Arkwright AI holding it was refused
+    /// on all 243 turns it tried and mustered nothing in twenty games. A muster takes what the
+    /// Region can pay for.
+    pub fn emigrants_affordable(&self, seat: Seat, s: StateId) -> u32 {
+        let per = self.emigrants_per_turn(seat);
+        let each = self.lift_population(seat, 1);
+        if each <= 0.0 {
+            return per;
+        }
+        let afford = (self.state(s).population / each).floor().max(0.0) as u32;
+        per.min(afford)
     }
 
     /// What a Colony Module costs this seat in Materials, rounded down (ticket #51).
@@ -1558,7 +1828,16 @@ impl Game {
     pub fn population_factor(&self, s: StateId) -> f64 {
         // Ticket #143 (version 0.07.3): the unit is five million people, so 1,000 units is the five
         // billion that 50 hundred-million was.
-        1.0 + self.state(s).population / 1000.0
+        //
+        // Ticket #188 (version 0.08.0): the BONUS -- the part above 1 -- is scaled by the state's
+        // schooling, so a great many badly-schooled people are worth less to a Research Lab than a
+        // great many well-schooled ones. The base 1 stays, so no Region is ever worth less than one
+        // with nobody in it. Uncapped in both directions: capping it would make the rule a pure nerf
+        // and cancel the whole interaction with the School, which is what makes it matter.
+        //
+        // The Education Level therefore applies TWICE to a Lab -- here, and as the outright
+        // multiplier it has always been. That compounding is the point.
+        1.0 + (self.state(s).population / 1000.0) * self.education_level(s)
     }
 
     /// Ticket #97 (version 0.07.0): the Modules this Colony or Space Station may hold: the table's
@@ -1673,9 +1952,22 @@ impl Game {
     pub fn influence_needed_for(&self, seat: Seat, target: Target) -> i64 {
         let threshold = self.influence_threshold_for(seat, target);
         match self.place_control(target).controller() {
-            Some(c) => threshold.max(self.seat(c).influence.get(&target).copied().unwrap_or(0) + self.tables.influence.challenge_margin),
+            Some(c) => threshold.max(self.seat(c).influence.get(&target).copied().unwrap_or(0) + self.challenge_margin_at(target)),
             None => threshold,
         }
+    }
+
+    /// Ticket #190 (version 0.08.0): the challenge margin at `target` -- the base, plus what a
+    /// Constabulary adds where one stands and is online. The Constabulary protects WHOEVER HOLDS the
+    /// place, not the Faction that raised it: a police force serves the government of the day, and
+    /// the building needs no memory of who paid for it, so a Faction that builds one in a Region it
+    /// later loses has made its own job harder. At most one stands in a Region, so no stacking
+    /// question arises. It does nothing on a neutral place, which has no margin at all -- the caller
+    /// asks for a margin only when a holder is there to be challenged.
+    pub fn challenge_margin_at(&self, target: Target) -> i64 {
+        let t = &self.tables.influence;
+        let guarded = matches!(target, Place::State(s) if self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Constabulary && f.working()));
+        t.challenge_margin + if guarded { t.constabulary_margin } else { 0 }
     }
 
     /// Ticket #53: Blame raises this seat's threshold on a Nation State it does not control, and
@@ -1777,7 +2069,33 @@ impl Game {
         let states: i64 = self.controlled_states(seat).iter().map(|s| self.state_influence_value(*s)).sum();
         let base = t.allotment_base + states + self.building_allotment(seat);
         let m = self.tables.faction(self.kind(seat)).influence_multiplier;
-        (base as f64 * m).floor() as i64
+        // Ticket #183 (version 0.08.0): what the Spaceports earned last turn is added AFTER the
+        // multiplier, at face value. This is a deliberate departure from the Embassy, whose
+        // contribution sits inside it and so gives the Arkwrights 1.6 rather than 2: their x0.8 says
+        // they are bad at diplomacy, and this clause says they are good at moving people, which is a
+        // different kind of Influence. Applying their designed weakness to the rule written to mend
+        // it would be the rule arguing with itself.
+        (base as f64 * m).floor() as i64 + self.seat(seat).spaceport_influence
+    }
+
+    /// Ticket #183 (version 0.08.0): the Spaceport's clause. +1 Influence for every Emigrant it lifts
+    /// OFF EARTH, which means the two launches -- onto a Ship in orbit, or onto a Space Station of
+    /// the seat's over Earth. The sea to Antarctica pays NOTHING: it is explicitly not a launch and
+    /// Antarctica is explicitly on Earth, so an Arkwright choosing the ice is choosing to forgo the
+    /// Influence. Lifting an Army pays nothing either, because the clause is per Emigrant.
+    ///
+    /// It is paid ONCE per Emigrant however many Spaceports stand -- the Emigrant is what is counted,
+    /// not the building -- and only where the seat CONTROLS the Region, per ticket #181. There is no
+    /// cap: the designer's word was that the muster limit is the brake, "8 a turn is already the
+    /// brake".
+    pub fn pay_spaceport(&mut self, seat: Seat, from: StateId, n: u32) {
+        if n == 0 || self.state(from).control != Control::Controlled(seat) {
+            return;
+        }
+        if !self.state(from).facilities.iter().any(|f| f.kind == FacilityKind::Spaceport && f.working()) {
+            return;
+        }
+        self.seats[seat.index()].spaceport_influence += n as i64;
     }
 
     pub fn ships_at(&self, seat: Seat, body: BodyId) -> Vec<ShipId> {
@@ -2438,6 +2756,67 @@ impl Game {
 
     /// The same, for a line that belongs to the player when seat 0 did it and to the board
     /// otherwise: the player's builds, lifts, repairs and funding go under "Your works".
+    /// Ticket #191 (version 0.08.0): mark that `offender` has crossed `victim` this turn. Charged per
+    /// TURN, so a second offence in the same turn is free: a pair that offends puts in a median 15.6
+    /// Influence across about three separate orders, and charging per order would make a big push and
+    /// a small one differ by a factor nobody can read off the board.
+    pub fn offend(&mut self, offender: Seat, victim: Seat) {
+        if offender != victim {
+            self.relations.offended[victim.index()][offender.index()] = true;
+        }
+    }
+
+    /// What `viewer` thinks of `subject` (ticket #191). Neutral at the card's `start`.
+    pub fn relations_score(&self, viewer: Seat, subject: Seat) -> i64 {
+        self.relations.score[viewer.index()][subject.index()]
+    }
+
+    /// Ticket #191: charge the turn's offences, let the quiet pairs recover, and wipe the slate. Run
+    /// once a turn, after the Resolution has recorded everything that happened.
+    ///
+    /// The recovery **stops at neutral** and never rises past it. The +10 half of the scale is
+    /// reserved and nothing fills it in this version: letting peace accrue goodwill was measured and
+    /// rejected, because half of all ordered pairs never interact at all in a whole game and the
+    /// goodwill would mostly be between Factions on opposite sides of the board who have never met.
+    pub fn settle_relations(&mut self) {
+        let c = self.tables.relations.clone();
+        for victim in Seat::ALL {
+            for offender in Seat::ALL {
+                if victim == offender {
+                    continue;
+                }
+                let (v, o) = (victim.index(), offender.index());
+                if self.relations.offended[v][o] {
+                    let was = self.relations.score[v][o];
+                    self.relations.score[v][o] = (was - c.fall_per_offending_turn).max(c.worst);
+                    self.relations.quiet[v][o] = 0;
+                    self.relations.fell[v][o] = self.relations.score[v][o] < was;
+                } else {
+                    self.relations.fell[v][o] = false;
+                    let quiet = self.relations.quiet[v][o] + 1;
+                    if c.quiet_turns > 0 && quiet >= c.quiet_turns {
+                        self.relations.quiet[v][o] = 0;
+                        self.relations.score[v][o] = (self.relations.score[v][o] + c.recover).min(c.start);
+                    } else {
+                        self.relations.quiet[v][o] = quiet;
+                    }
+                }
+                self.relations.offended[v][o] = false;
+            }
+        }
+        // The Report line goes in the OFFENDER's paragraph: it is what sends a player to the grid.
+        for victim in Seat::ALL {
+            for offender in Seat::ALL {
+                if victim == offender || !self.relations.fell[victim.index()][offender.index()] {
+                    continue;
+                }
+                let text = self.say("relations_fell", &[("victim", self.seat_name(victim)), ("offender", self.seat_name(offender))]);
+                self.log(text.clone());
+                self.report_line_of(offender, LineKind::YourWorks, LineKind::Note, None, text);
+            }
+        }
+    }
+
     pub fn report_line_of(&mut self, seat: Seat, mine: LineKind, theirs: LineKind, place: Option<ReportPlace>, text: String) {
         let kind = crate::report::line_kind_of(seat, mine, theirs, self.spectator);
         self.report_line(kind, place, text);

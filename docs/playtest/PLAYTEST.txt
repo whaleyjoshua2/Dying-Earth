@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.07.6
+DYING EARTH - playtest build, version 0.08.0
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -21,27 +21,62 @@ HOW TO RUN
    RUN-ON-LINUX.txt beside it says what to do if the window does not open, and where
    the saves go. It is built on Ubuntu 22.04 and wants 22.04 or newer.
 
-WHAT CHANGED SINCE 0.07.5
+WHAT CHANGED SINCE 0.07.6
 -------------------------
-Four small things, three of them about changing your mind or seeing less of what you
-did not ask for.
+The biggest version since the climate one. Education used to be a fixed number printed
+on a region's card; now it is something you move, and half a dozen rules read it.
 
-- A TECH CHOICE IS NO LONGER FINAL THE MOMENT YOU CLICK IT. Pick a tech, then pick a
-  different one, as often as you like; it locks in when you end the turn. The box you
-  have chosen is a paler amber and says so, and the line above the tree tells you it is
-  not settled yet. Nothing is spent until it locks in.
-- THE TUTORIAL MOVED. The button on the title screen is gone. The choice is a tick at
-  the bottom of the Custodians' card on the faction screen, reading "Play Tutorial".
-  Ticking it still lets you choose where you start, which the old button did not.
-- THE POPULATION GRAPH CAME OFF THE CLIMATE PANEL. It is still one pointer-move away,
-  on the population figure in the top bar. The panel keeps the emissions graph, which
-  is what the panel is about.
-- THE REPORT SAYS FAR LESS ABOUT REFUGEES. It used to print a line for every flow of
-  people out of every region, and another for every region that received any; a hot
-  turn could spend thirty-nine of its seventy-four lines on it, most of them moving a
-  fraction of a person. Now each region says one line, in net, and only when the net is
-  worth at least half a person. A region that both gained and lost people says nothing
-  at all.
+- SCHOOLS. A new building, one per region, that any side can build. While it stands it
+  raises that region's Education Level by 0.25 a turn, up to 2.00, and the number falls
+  back at the same rate if you mothball it. Off Earth the same building is called an
+  Institute and goes on a colony or a station.
+- EDUCATION NOW DOES THREE JOBS. It still multiplies what a Research Lab makes. It now
+  also decides how much a region's PEOPLE add to that lab - so a school in a big,
+  badly-schooled region is worth far more than one in a small, well-schooled one. And
+  it makes a place harder for a RIVAL to buy: spend 30 Influence on a well-schooled
+  region and only 27 of it sticks. Your own regions always convert in full.
+- COLONISTS CARRY THEIR SCHOOLING WITH THEM. Emigrants take their home region's
+  education level as it stands the turn they muster, and a colony's figure is the
+  average of everyone who settled it.
+- EVERY SIDE NOW HAS ONE BUILDING OF ITS OWN. It replaces a common building on your
+  build list, at the same price, with its own name and picture:
+    * Prospectors - INVESTMENT BANK, instead of the Bank. It pays 1% of your Venture
+      Capital Fund back into the fund every turn, one per region, and it compounds.
+      Your victory target moved from 750 to 1000 to go with it.
+    * Arkwrights - SPACEPORT, instead of the Launch Site. +1 Influence for every
+      emigrant it lifts OFF EARTH - onto a ship or to your station - paid into next
+      turn's allotment. The sea to Antarctica pays nothing.
+    * Archivists - REACTOR, instead of the Power Plant. While one is running you pay
+      only 75% of the energy bill for everything you own, the Archive excepted.
+    * Custodians - ACADEMY, instead of the School and the Institute. It teaches like a
+      school and pays you 1 Ducat a turn wherever it stands.
+  A captured one keeps working for whoever holds it. A plain building you capture does
+  NOT turn into your version; you would have to knock it down and rebuild.
+- A CONSTABULARY NOW DEFENDS AS WELL AS CALMS. While one stands, a rival needs your
+  standing plus 25 to take that region instead of plus 20. It protects whoever holds
+  the region, including someone who takes it off you.
+- THE ARCHIVE IS NOW A PLACE YOU FILL, AND IT WAITS ON YOUR OWN TECH. Two things must
+  be true before you may START it: the world must have researched THE UPLOAD, which is
+  the Archivists' own tech at the far end of the Society branch, and four colonists must
+  live at the colony. When it is finished you must UPLOAD twelve people into it from the
+  people living there. Uploading is a free order; the people leave the living population
+  for good, and the count can never go down. Four at a time is enough.
+  You can still bank research into the archive fund from turn one while you wait - up to
+  a quarter of what it needs - so the waiting is not wasted. After that your labs feed
+  the shared tech tree again, which is how you get to choose The Upload yourself instead
+  of waiting for somebody else to pick it.
+- RELATIONS. Every side now keeps a score of what it thinks of every other, on a grid
+  at the foot of the Victory window (V). It drops a point each turn someone spends
+  influence on a place you hold or attacks you, and recovers slowly. IT DOES NOTHING
+  YET - it is there to be watched for a version before it is given teeth.
+- THE REGION CARD SAYS WHAT A PLACE COSTS. Three lines under the standings: what the
+  threshold is made of, what the holder's standing and the margin make of it, and what
+  your influence is worth there.
+- SENDING PEOPLE TO A SHIP GOT A BUTTON. A colony ship of yours parked at Earth now
+  appears in the region card's Emigrants block beside the sea and station buttons.
+- THE TECH TREE. Click the research figure or the race bar beside it to open it. Its
+  legend used to draw itself through the middle of the tree; it is under the tree now.
+  The window no longer opens underneath the Climate Panel.
 
 HOW TO PLAY, IN ONE MINUTE
 --------------------------
@@ -82,16 +117,22 @@ WHAT WE WANT TO KNOW
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
+- SCHOOLS: did you build one? Did you see the education number move, and did you work
+  out what it was doing for you?
+- YOUR OWN BUILDING: did you notice you had one? Did you understand what it did without
+  hovering it?
+- THE THREE LINES ON THE REGION CARD: do they read, or are they three numbers in a row?
+  The middle one has a clause about the threshold that only appears sometimes.
+- THE ARCHIVE, if you played the Archivists: which of the two gates held you up longer,
+  the four people or The Upload? Did you work out that you could steer the tech tree
+  toward your own tech by NOT banking everything into the archive fund? Did you find the
+  Upload button when it was finished?
+- THE RELATIONS GRID: did you look at it? Did the fact that it does nothing bother you,
+  or was it interesting to watch anyway?
+- THE TECH TREE: did you try clicking the research number to open it?
 - THE TUTORIAL TICK: did you find it on the Custodians' card? Did the five notes tell
   you enough to play on, or did you still not know what to do on turn six?
-- CHANGING A TECH PICK: did you notice you could change it? Was it clear the choice was
-  not settled until you ended the turn?
-- THE REPORT: is it readable now? Is there anything you used to learn from the refugee
-  lines that you now miss?
-- THE CORE MODULE: did "one build slot per person" make sense on the card, or did you
-  find out by being refused?
 - THE INFLUENCE HOVERS: is there still a word in that section you could not explain?
-- THE POPULATION GRAPH: did you find it on the top bar, now that it is not on the panel?
 - THE POPULATION NUMBERS: did "Region population" make sense? Did it bother you that
   Nigeria's region says 1.14 billion (it is all of sub-Saharan Africa)?
 - THE LIFT TO A STATION: did you use it, and did it feel too easy?
@@ -104,14 +145,18 @@ Screenshots help. Print Screen, then paste into a message.
 
 KNOWN ROUGH EDGES
 -----------------
-- THE BALANCE MOVED A LOT and none of it has been played by a person yet. Over eighty
-  computer-only games the Archivists now win 46, the Custodians 16, the Arkwrights 1
-  and the Prospectors none, with the world collapsing in 17. Last version it was
-  Custodians 36, Archivists 21. The core module did that: a station over Earth counts
-  as off Earth and can be lived on from the day it is built, which is most of what the
-  Archivists need. Tell us if any side feels hopeless.
+- THE ARCHIVISTS ARE WINNING FAR TOO MUCH, AND WE KNOW WHY. Over eighty computer-only
+  games they win 74, the Custodians 3, the Arkwrights 2 and the Prospectors none, and
+  the game is usually over by turn sixteen. Making the Archive's target "twelve people
+  uploaded" instead of "twelve people living beside it" was meant to make their job
+  harder and made it much easier: uploads pile up across turns and each batch empties
+  the station so the next can arrive. The number twelve was priced for the old, harder
+  target. It is the next thing to fix. Tell us if the game ends before you have got
+  going.
 - Every side's victory target was set against a computer that never competed for it, so
   the numbers are all suspect.
+- THE PROSPECTORS STILL WIN NOTHING. Their new Investment Bank compounds, but the games
+  are ending too early for it to matter.
 - THE HAB VIEW'S AND SLOT BOXES' PICTURES ARE FIRST PICKS from a free icon set and may
   change; say which ones misled you.
 - A station ring can be edge-on for a moment as you turn the globe; it comes back as
@@ -122,7 +167,7 @@ KNOWN ROUGH EDGES
   the panel. Turn the globe a little.
 - Antarctica's three colony sites have labels that overlap each other when you are zoomed
   out. Older than this version.
-- THE LAST REPORT OF A GAME IS DATED WRONG. When the game ends, the report that comes
-  with it is headed January 2030 whatever year it actually is. The top bar beside it is
-  right. Known, and being fixed.
+- THE SPACEPORT AND THE LAUNCH SITE look alike at the small size a build box draws them
+  at: both are a tall thing over a low thing. Say so if you ever mistook one for the
+  other.
 - No sound.
