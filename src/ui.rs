@@ -5343,7 +5343,12 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         return;
     }
     let mut open = true;
-    egui::Window::new("Factions").open(&mut open).default_width(524.0).show(ctx, |ui| {
+    // The window opens BELOW the top bar's row of buttons. Left where egui first placed it, it came
+    // up over `Tech Tree (T)` through `Trading (R)` -- the same complaint ticket #194 answered for
+    // the Tech Tree, whose left third the Climate Panel was covering. The designer, seeing the first
+    // capture: *"shift the faction window down so it doesn't block."* `default_pos` places it only
+    // the first time, so a window the player has dragged stays where they put it.
+    egui::Window::new("Factions").open(&mut open).default_width(524.0).default_pos(egui::pos2(16.0, 120.0)).show(ctx, |ui| {
         // The dropdown, in the top right, at the designer's word. Under the hood it names SEATS --
         // every live figure below is a seat's -- but each seat holds one Faction, so its four rows
         // are the four Factions, each with its small glyph in its own colour.
