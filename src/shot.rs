@@ -39,6 +39,14 @@ pub struct ShotPlan {
     pub trade: bool,
     /// `victory:1` (a building aid): the Victory panel is open in every picture.
     pub victory: bool,
+    /// `factions:1` or `factions:<faction id>` (a building aid, ticket #203): the Faction window is
+    /// open in every picture, on seat 0's page or on the page of the Faction named. A rival's page
+    /// is the only way to photograph the totals-only disclosure line.
+    pub faction_window: bool,
+    pub faction_seat: Option<Seat>,
+    /// `rulebook:1` (a building aid, ticket #203): the Faction window's rulebook header starts
+    /// OPEN. It is shut by default in play, so the picture of it open has to be asked for.
+    pub rulebook_open: bool,
     /// `stack:1` (a building aid): the player's Ship stack at Mars is selected, so its card and the
     /// attack odds preview are in the picture.
     pub stack: bool,
@@ -86,6 +94,13 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     }
     if plan.victory {
         view.show_victory = true;
+    }
+    if plan.faction_window {
+        view.show_factions = true;
+        view.faction_rulebook_open = plan.rulebook_open;
+        if let Some(seat) = plan.faction_seat {
+            view.faction_seat = seat;
+        }
     }
     if plan.stack {
         view.selection = Selection::ShipStack(BodyId::Mars, Seat(0));
@@ -912,6 +927,14 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         plan.hab_colony = session.game.as_ref().and_then(|g| g.colonies.iter().find(|c| c.control.director() == Some(Seat(0))).map(|c| c.id));
         plan.trade = std::env::args().any(|a| a == "trade:1");
         plan.victory = std::env::args().any(|a| a == "victory:1");
+        // Ticket #203: `factions:1` for seat 0's page, `factions:archivists` for that Faction's.
+        if let Some(v) = std::env::args().find_map(|a| a.strip_prefix("factions:").map(str::to_owned)) {
+            plan.faction_window = true;
+            plan.rulebook_open = std::env::args().any(|a| a == "rulebook:1");
+            if let Some(kind) = FactionKind::from_id(&v) {
+                plan.faction_seat = session.game.as_ref().and_then(|g| Seat::ALL.into_iter().find(|s| g.kind(*s) == kind));
+            }
+        }
         plan.stack = std::env::args().any(|a| a == "stack:1");
         plan.hover = std::env::args().find_map(|a| a.strip_prefix("hover:").and_then(body_from_id));
         plan.look = std::env::args().find_map(|a| {

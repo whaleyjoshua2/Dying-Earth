@@ -345,6 +345,12 @@ pub struct FactionCard {
     #[serde(default)]
     pub mothball_pairs: std::collections::BTreeMap<FacilityKind, ModuleKind>,
     pub signature: String,
+    /// Ticket #203 (version 0.08.1): the Faction's Unique Facility in one sentence -- what it is,
+    /// what it replaces, and what it does beyond the common building's job. It was on no card until
+    /// the Faction window went in: the four Unique Facilities arrived in version 0.08.0 (tickets
+    /// #182 to #186) and the signature rules were never rewritten to name them, so a player could
+    /// build one without ever being told what it was for.
+    pub unique: String,
     /// The Victory Condition in prose, for the cards and the panel.
     pub victory: String,
     /// Ticket #50: the first part of the Victory Condition, in figures.
