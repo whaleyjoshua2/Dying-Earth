@@ -2057,7 +2057,12 @@ impl Game {
     pub fn challenge_margin_at(&self, target: Target) -> i64 {
         let t = &self.tables.influence;
         let guarded = matches!(target, Place::State(s) if self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Constabulary && f.working()));
-        t.challenge_margin + if guarded { t.constabulary_margin } else { 0 }
+        // Ticket #201 (version 0.08.1): Civil Defense doubles what a Constabulary is worth at the
+        // gate -- 10 where it adds 5 without. The Tech is the world's, as every Tech is, so it
+        // helps whoever holds a garrisoned Region and hinders whoever wants one, which is the same
+        // asymmetry the Constabulary itself has carried since ticket #190.
+        let garrison = if self.has_tech(TechId::CivilDefense) { t.constabulary_margin_defended } else { t.constabulary_margin };
+        t.challenge_margin + if guarded { garrison } else { 0 }
     }
 
     /// Ticket #53: Blame raises this seat's threshold on a Nation State it does not control, and

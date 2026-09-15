@@ -24,6 +24,12 @@ challenge_margin = 20
 # Region you mean to keep. A threshold rule was measured instead and would have blocked 0 of the 29,
 # because on every one the holder's Standing plus the margin already exceeded the threshold.
 constabulary_margin = 5
+# Ticket #201 (version 0.08.1): what a Constabulary adds instead once CIVIL DEFENSE stands -- the
+# eighteenth Tech, Society rung 2. Doubled rather than nudged because the Constabulary is a
+# player's tool and barely a computer's: the sweep builds one in about 14% of games, so a small
+# figure here would have been invisible to everyone. The Tech is the world's, as every Tech is, so
+# it helps whoever HOLDS a garrisoned Region and hinders whoever wants one.
+constabulary_margin_defended = 10
 # Version 0.04 (ticket #46): a station's threshold starts here, plus the per-Colonist figure.
 station_threshold_base = 20
 occupation_turns = 3

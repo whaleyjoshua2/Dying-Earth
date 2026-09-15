@@ -618,6 +618,8 @@ pub struct InfluenceTable {
     pub challenge_margin: i64,
     /// Ticket #190 (version 0.08.0): what an online Constabulary adds to the margin in its Region.
     pub constabulary_margin: i64,
+    /// Ticket #201 (version 0.08.1): what a Constabulary adds instead, once Civil Defense stands.
+    pub constabulary_margin_defended: i64,
     /// Ticket #46: a station's threshold starts here.
     #[serde(default)]
     pub station_threshold_base: i64,

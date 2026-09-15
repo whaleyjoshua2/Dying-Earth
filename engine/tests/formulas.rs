@@ -4035,15 +4035,16 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
 #[test]
 fn f_coastal_engineering_is_the_thirteenth_tech() {
     let g = fresh();
-    assert_eq!(TechId::ALL.len(), 17, "thirteen Techs and the four gates");
-    assert_eq!(g.tables.techs.len(), 17, "and seventeen rows in techs.toml");
+    // Ticket #201 (version 0.08.1): eighteen, with Civil Defense on Society rung 2.
+    assert_eq!(TechId::ALL.len(), 18, "thirteen Techs, the four gates, and Civil Defense");
+    assert_eq!(g.tables.techs.len(), 18, "and eighteen rows in techs.toml");
     let c = g.tables.tech(TechId::CoastalEngineering);
     assert_eq!(c.name, "Coastal Engineering");
     assert_eq!(c.branch, "Industry");
     // Ticket #69 (version 0.05.5): moved from rung 2 at 25 to rung 1 at 10 with no prerequisite.
     // Ticket #117 (version 0.07.1): 10 to 11, with every other cost, a tenth rounded to the nearest.
     assert_eq!(c.rung, 1, "rung 1, beside Efficient Grids");
-    assert_eq!(c.cost, 12, "12 since ticket #142 (version 0.07.3); 11 from ticket #117, 10 before");
+    assert_eq!(c.cost, 14, "14 since ticket #201 (version 0.08.1); 12 from #142, 11 from #117, 10 before");
     assert!(c.needs.is_empty(), "it needs nothing");
     assert!(c.effect.contains("Sea Wall"), "its effect names the Sea Wall: {}", c.effect);
     // Two boxes on Industry rung 1, and Clean Power alone on rung 2.
@@ -5192,7 +5193,7 @@ fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
 fn coastal_engineering_sits_on_rung_one_below_its_rungs_cost_with_no_prerequisite() {
     let g = game();
     let t = g.tables.tech(TechId::CoastalEngineering);
-    assert_eq!((t.rung, t.cost), (1, 12), "12 since ticket #142");
+    assert_eq!((t.rung, t.cost), (1, 14), "14 since ticket #201, still below the rung it shares");
     assert!(t.cost < g.tables.tech(TechId::EfficientGrids).cost, "cheaper than the rung it shares, or the Sea Wall arrives too late");
     assert!(t.needs.is_empty(), "no prerequisite: {:?}", t.needs);
     assert!(g.available_techs().contains(&TechId::CoastalEngineering), "pickable from the first turn");
@@ -5969,7 +5970,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         assert_eq!(card.needs, needs, "{t:?}");
         assert_eq!(g.tables.victory_gate(kind), Some(t));
     }
-    assert_eq!(TechId::ALL.len(), 17);
+    assert_eq!(TechId::ALL.len(), 18, "seventeen, and Civil Defense since ticket #201");
 }
 
 /// Ticket #84: with both parts at their bars the Custodians still do not win until Planetary
@@ -8390,4 +8391,59 @@ fn an_exhausted_ship_name_list_wraps_with_a_numeral() {
     assert_eq!(g.next_ship_name(UnitKind::ColonyShip), format!("{} II", names[0]), "the whole list is spent, so it begins again");
     // The warship list is untouched by any of that.
     assert_eq!(g.next_ship_name(UnitKind::Battleship), g.tables.ship_names.warship.names[0]);
+}
+
+// ------------------------------------------------------- 0.08.1 ticket #201: Civil Defense
+
+/// Ticket #201 (version 0.08.1): the eighteenth Tech. It began life on its ticket as "something
+/// that moderates unrest" and became something else at the designer's word, knowingly: it works
+/// through the CONSTABULARY and raises the CHALLENGE MARGIN, which is the price of taking a place
+/// its holder already has, and no figure Unrest ever reads. A Constabulary adds 10 where it added 5.
+///
+/// The Tech is the world's, as every Tech is, so it helps whoever HOLDS a garrisoned Region and
+/// hinders whoever wants one -- the same asymmetry the Constabulary has carried since ticket #190.
+#[test]
+fn civil_defense_doubles_what_a_constabulary_is_worth_at_the_gate() {
+    let mut g = game();
+    let sid = StateId::EastAsia;
+    let base = g.tables.influence.challenge_margin;
+    let target = Place::State(sid);
+
+    // No Constabulary: the Tech reaches nothing at all.
+    assert_eq!(g.challenge_margin_at(target), base, "no garrison, no bonus");
+    with_tech(&mut g, TechId::CivilDefense);
+    assert_eq!(g.challenge_margin_at(target), base, "the Tech alone does nothing: it works through the building");
+
+    // With one standing and online, the Tech's figure replaces the Constabulary's own.
+    let mut g = game();
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::Constabulary));
+    assert_eq!(g.challenge_margin_at(target), base + g.tables.influence.constabulary_margin, "5 without the Tech");
+    with_tech(&mut g, TechId::CivilDefense);
+    assert_eq!(
+        g.challenge_margin_at(target),
+        base + g.tables.influence.constabulary_margin_defended,
+        "10 with it, not 5 plus 10"
+    );
+    assert_eq!(g.tables.influence.constabulary_margin_defended, 10);
+}
+
+/// Ticket #201: the tree's costs, which this ticket set and whose header comment had been wrong
+/// since version 0.07.1 -- it claimed 16, 28, 44 while the data said 15, 30, 45.
+#[test]
+fn the_tree_costs_eighteen_thirty_and_forty_five_by_rung() {
+    let g = game();
+    for t in TechId::ALL {
+        let card = g.tables.tech(t);
+        if t == TechId::CoastalEngineering {
+            continue;
+        }
+        let want = match card.rung {
+            1 => 18,
+            2 => 30,
+            _ => 45,
+        };
+        assert_eq!(card.cost, want, "rung {} costs {want}: {t:?}", card.rung);
+    }
+    let total: i64 = TechId::ALL.into_iter().map(|t| g.tables.tech(t).cost).sum();
+    assert_eq!(total, 554, "the whole tree, 507 over seventeen Techs before ticket #201");
 }
