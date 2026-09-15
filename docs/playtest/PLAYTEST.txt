@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.08.0
+DYING EARTH - playtest build, version 0.08.1
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -21,73 +21,71 @@ HOW TO RUN
    RUN-ON-LINUX.txt beside it says what to do if the window does not open, and where
    the saves go. It is built on Ubuntu 22.04 and wants 22.04 or newer.
 
-WHAT CHANGED SINCE 0.07.6
+WHAT CHANGED SINCE 0.08.0
 -------------------------
-The biggest version since the climate one. Education used to be a fixed number printed
-on a region's card; now it is something you move, and half a dozen rules read it.
+Mostly this version is about KNOWING WHO. Last version gave every side its own building
+and started keeping a grudge score; this one gives you somewhere to read all of it, and
+puts a name and a badge on the things that belong to somebody.
 
-- SCHOOLS. A new building, one per region, that any side can build. While it stands it
-  raises that region's Education Level by 0.25 a turn, up to 2.00, and the number falls
-  back at the same rate if you mothball it. Off Earth the same building is called an
-  Institute and goes on a colony or a station.
-- EDUCATION NOW DOES THREE JOBS. It still multiplies what a Research Lab makes. It now
-  also decides how much a region's PEOPLE add to that lab - so a school in a big,
-  badly-schooled region is worth far more than one in a small, well-schooled one. And
-  it makes a place harder for a RIVAL to buy: spend 30 Influence on a well-schooled
-  region and only 27 of it sticks. Your own regions always convert in full.
-- COLONISTS CARRY THEIR SCHOOLING WITH THEM. Emigrants take their home region's
-  education level as it stands the turn they muster, and a colony's figure is the
-  average of everyone who settled it.
-- EVERY SIDE NOW HAS ONE BUILDING OF ITS OWN. It replaces a common building on your
-  build list, at the same price, with its own name and picture:
-    * Prospectors - INVESTMENT BANK, instead of the Bank. It pays 1% of your Venture
-      Capital Fund back into the fund every turn, one per region, and it compounds.
-      Your victory target moved from 750 to 1000 to go with it.
-    * Arkwrights - SPACEPORT, instead of the Launch Site. +1 Influence for every
-      emigrant it lifts OFF EARTH - onto a ship or to your station - paid into next
-      turn's allotment. The sea to Antarctica pays nothing.
-    * Archivists - REACTOR, instead of the Power Plant. While one is running you pay
-      only 75% of the energy bill for everything you own, the Archive excepted.
-    * Custodians - ACADEMY, instead of the School and the Institute. It teaches like a
-      school and pays you 1 Ducat a turn wherever it stands.
-  A captured one keeps working for whoever holds it. A plain building you capture does
-  NOT turn into your version; you would have to knock it down and rebuild.
-- A CONSTABULARY NOW DEFENDS AS WELL AS CALMS. While one stands, a rival needs your
-  standing plus 25 to take that region instead of plus 20. It protects whoever holds
-  the region, including someone who takes it off you.
-- THE ARCHIVE IS NOW A PLACE YOU FILL, AND IT WAITS ON YOUR OWN TECH. Two things must
-  be true before you may START it: the world must have researched THE UPLOAD, which is
-  the Archivists' own tech at the far end of the Society branch, and four colonists must
-  live at the colony. When it is finished you must UPLOAD twelve people into it from the
-  people living there. Uploading is a free order; the people leave the living population
-  for good, and the count can never go down. Four at a time is enough.
-  You can still bank research into the archive fund from turn one while you wait - up to
-  a quarter of what it needs - so the waiting is not wasted. After that your labs feed
-  the shared tech tree again, which is how you get to choose The Upload yourself instead
-  of waiting for somebody else to pick it.
-- RELATIONS. Every side now keeps a score of what it thinks of every other, on a grid
-  at the foot of the Victory window (V). It drops a point each turn someone spends
-  influence on a place you hold or attacks you, and recovers slowly. IT DOES NOTHING
-  YET - it is there to be watched for a version before it is given teeth.
-- THE REGION CARD SAYS WHAT A PLACE COSTS. Three lines under the standings: what the
-  threshold is made of, what the holder's standing and the margin make of it, and what
-  your influence is worth there.
-- SENDING PEOPLE TO A SHIP GOT A BUTTON. A colony ship of yours parked at Earth now
-  appears in the region card's Emigrants block beside the sea and station buttons.
-- THE TECH TREE. Click the research figure or the race bar beside it to open it. Its
-  legend used to draw itself through the middle of the tree; it is under the tree now.
-  The window no longer opens underneath the Climate Panel.
+- A FACTION WINDOW. Press F, or the new button on the top bar. A dropdown in its top
+  right picks any of the four sides. It shows their symbol large, how far along their
+  victory they are, what they earned last turn, their share of the pollution, what they
+  think of the other three and what the other three think of them, and what they hold.
+  Underneath, folded away until you click it, is their CARD - the one you read on the
+  setup screen and could never get back to once a game started: their multipliers, their
+  signature rule, their own building and their victory condition.
+  You see a rival's income as totals only. The building-by-building breakdown is yours
+  alone. The Relations grid has moved off the Victory window into here.
+- SHIPS HAVE NAMES. Every ship is christened when it is built - TSV Magellan, ARK
+  Endurance, PMV Valiant - drawn from two lists, explorers for colony ships and warships
+  for the rest. The three letters in front are your side's. The old "Colony Ship 3" is
+  still there if you hover it.
+- BADGES ON WHAT IS YOURS. Your side's symbol now appears at the head of a colony or
+  station's card, the way a nation's flag sits on a region card, and beside every ship.
+  A place nobody holds wears none.
+- THE TUTORIAL GETS TO THE POINT. It used to spend two of its five notes telling you
+  things and not asking for anything, so the first instruction landed on turn three and
+  "get off Earth" on turn five. Now the first three turns each ask for ONE thing, and the
+  three are one chain: spend your influence, muster emigrants, send them to the ISS.
+  Turns four and five still appear but ask for nothing - they point at the climate and at
+  the research race.
+- A STATION CAN ASK FOR PEOPLE. You could always send emigrants UP to a station from a
+  region's card. Now the station's own card has a "from <region>" dropdown and a Lift
+  button, and an Antarctic colony has the same thing for the sea. Both ends, same order.
+- HABITATS ARE SMALLER AGAIN. A Habitat holds 4 people, down from 8. EXPANDED HABITATS
+  now adds 4 instead of 2, so a researched Habitat holds the 8 it used to - which means
+  the squeeze is on the EARLY game, before you have the tech. The Core Module every
+  station and colony starts with still holds 4 flat.
+- THE ARCHIVE MUST LEAVE EARTH ORBIT. If you play the Archivists, you can no longer raise
+  the Archive on your station over Earth. It has to stand on another body - the Moon
+  counts, and so does anywhere further. This is the biggest rule change in the version
+  and it has cut the Archivists hard; see the rough edges below.
+- AN EIGHTEENTH TECH, AND A DEARER FIRST RUNG. Rung-1 techs cost 18 instead of 15 and
+  Coastal Engineering 14 instead of 12. CIVIL DEFENSE is new, on the Society branch
+  behind Public Science: while it stands, a Constabulary makes a region cost a rival your
+  standing plus 30 instead of plus 25.
+- SCHOOLS ARE SLOWER, AND YOU CAN FINALLY SEE THEM WORK. The step is 0.20 a turn instead
+  of 0.25. More to the point: the Education Level on a region's card used to be the
+  number printed in the rulebook and never moved, whatever your school did. It is now the
+  LIVE figure, and hovering it tells you what the card says and what your school has
+  added.
+- SMALLER THINGS YOU READ. The bottom-right command corner is 15% bigger. "Emigrants
+  waiting" now sits directly above the Muster button and shows even when it is zero. The
+  research race bar has moved onto the top of the Tech Tree window, with the sentence it
+  replaced on its hover. Hovering a "Found a Colony" button tells you what the site is
+  worth. And the race bar itself used to under-draw - research carried over from the last
+  tech belongs to nobody, and was simply not painted; it is grey now, so the bar adds up.
 
 HOW TO PLAY, IN ONE MINUTE
 --------------------------
 - New Game > pick one of the four sides > click a region on the globe, then Begin. If
   this is your first game, take the Custodians and tick "Play Tutorial" at the bottom of
   their card: you still choose where you start, and a short note opens each of the first
-  five turns. The computer plays the other three. There is also a Spectate
-  button under the cards: the computer plays all four and you just watch.
+  five turns. The computer plays the other three. There is also a Spectate button under
+  the cards: the computer plays all four and you just watch.
 - You are looking at the Earth Map. Click a region for its card and orders on the right.
   Drag to turn the globe, mouse wheel to zoom. M switches to the Solar System Map, Tab
-  brings the roster back, and Esc goes back.
+  brings the roster back, and Esc goes back. F opens the Faction window.
 - Build things by clicking an empty box among a region's slots, or an empty tile among a
   colony's modules; a few things that take no slot have their own buttons on the card.
   Hover a build button to see what it makes and how long it takes. Hover almost any
@@ -102,11 +100,11 @@ HOW TO PLAY, IN ONE MINUTE
 - Open the Climate Panel (C). The coloured bar marks every point where the world changes
   for good, including where Antarctica opens. The top bar shows this turn's net
   pollution beside the temperature.
-- Getting off Earth: muster Emigrants in a region with a Launch Site and send them
-  straight to your station over Earth (a Habitat on it gives room for eight). Put a
-  Shipyard on the station to build ships. The Moon is one turn away. Mars is cheap only
-  in a launch window; hover Mars to see when. Open a colony's Hab View (M) to see what
-  stands there and how much room is left.
+- Getting off Earth: muster Emigrants in a region with a Launch Site - your starting
+  region always has one - and send them straight to your station over Earth, either from
+  the region's card or from the station's own. Put a Shipyard on the station to build
+  ships. The Moon is one turn away. Mars is cheap only in a launch window; hover Mars to
+  see when.
 - The roster on the right lists everything you own. An open ring at the end of a row
   means it is still waiting for an order from you this turn.
 - End Turn - bottom right, red, or press Enter. Thirty-six turns. Watch the temperature
@@ -117,26 +115,21 @@ WHAT WE WANT TO KNOW
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- SCHOOLS: did you build one? Did you see the education number move, and did you work
-  out what it was doing for you?
-- YOUR OWN BUILDING: did you notice you had one? Did you understand what it did without
-  hovering it?
-- THE THREE LINES ON THE REGION CARD: do they read, or are they three numbers in a row?
-  The middle one has a clause about the threshold that only appears sometimes.
-- THE ARCHIVE, if you played the Archivists: which of the two gates held you up longer,
-  the four people or The Upload? Did you work out that you could steer the tech tree
-  toward your own tech by NOT banking everything into the archive fund? Did you find the
-  Upload button when it was finished?
-- THE RELATIONS GRID: did you look at it? Did the fact that it does nothing bother you,
-  or was it interesting to watch anyway?
-- THE TECH TREE: did you try clicking the research number to open it?
-- THE TUTORIAL TICK: did you find it on the Custodians' card? Did the five notes tell
-  you enough to play on, or did you still not know what to do on turn six?
-- THE INFLUENCE HOVERS: is there still a word in that section you could not explain?
-- THE POPULATION NUMBERS: did "Region population" make sense? Did it bother you that
-  Nigeria's region says 1.14 billion (it is all of sub-Saharan Africa)?
-- THE LIFT TO A STATION: did you use it, and did it feel too easy?
-- MAX: did you miss Defence?
+- THE FACTION WINDOW: did you find it? Did you open a rival's page, and did anything on
+  it change what you did next? Was the folded-away card worth unfolding?
+- SHIP NAMES: did you notice them? Did losing "Colony Ship 3" ever leave you unsure
+  which ship you were ordering?
+- THE TUTORIAL, if you used it: the first three turns each ask for one thing. Did you do
+  them? Did turn four leave you knowing what to do on turn six?
+- THE ARCHIVE, if you played the Archivists: you have to get to the Moon before you can
+  start it. Did you manage it, and roughly what turn? Did the game end before you
+  finished?
+- HABITATS AT 4: did the early game feel tight for room? Did you notice Expanded
+  Habitats being worth more than it used to be?
+- THE EDUCATION LEVEL ON A REGION'S CARD: build a school and watch it. Does it move
+  visibly enough to be worth the 25 materials?
+- CIVIL DEFENSE: did you research it? Did you already have a Constabulary when you did?
+- THE BIGGER COMMAND CORNER: better, or does it crowd the card above it?
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.
@@ -145,18 +138,31 @@ Screenshots help. Print Screen, then paste into a message.
 
 KNOWN ROUGH EDGES
 -----------------
-- THE ARCHIVISTS ARE WINNING FAR TOO MUCH, AND WE KNOW WHY. Over eighty computer-only
-  games they win 74, the Custodians 3, the Arkwrights 2 and the Prospectors none, and
-  the game is usually over by turn sixteen. Making the Archive's target "twelve people
-  uploaded" instead of "twelve people living beside it" was meant to make their job
-  harder and made it much easier: uploads pile up across turns and each batch empties
-  the station so the next can arrive. The number twelve was priced for the old, harder
-  target. It is the next thing to fix. Tell us if the game ends before you have got
-  going.
-- Every side's victory target was set against a computer that never competed for it, so
-  the numbers are all suspect.
-- THE PROSPECTORS STILL WIN NOTHING. Their new Investment Bank compounds, but the games
-  are ending too early for it to matter.
+- THE SIDES HAVE SWAPPED PLACES, AND WE KNOW WHY. Over eighty computer-only games the
+  Custodians now win 42, the Prospectors 11, the Arkwrights 7 and the Archivists 6. Last
+  version the Archivists won 58 and the Arkwrights none. Almost all of that is the one
+  rule that stopped the Archive standing in Earth orbit: their Archive now goes up around
+  turn 25 instead of turn 19, which leaves too few turns to upload twelve people into it.
+  The table is more even than it has ever been and no side is on nothing, but the
+  Custodians at 42 are now the problem the Archivists used to be. Tell us if a game felt
+  decided early.
+- THE WORLD COLLAPSES MORE OFTEN - 14 games in 80, against 1 last version. This is not a
+  climate change: nothing about pollution moved. It is that the Archivists used to END
+  games around turn 20 by winning them, and now nobody does, so the world gets fifteen
+  more turns to heat up. Whether that is a fair game or a grim one is exactly what we
+  want to hear about.
+- THE TECH TREE STILL FINISHES. Rung 1 got dearer and a tech was added, and a typical
+  game still researches all eighteen with turns to spare, so research never really
+  constrains you. Making it bite means moving the dearer rungs, which we have not done.
+- THE ARKWRIGHTS STILL CANNOT REALLY WIN. Their victory wants 30 colonists spread over
+  three bodies. In eighty games no side has EVER founded a colony in the Mars system, on
+  Venus, or on Phobos or Deimos - only the Moon is ever settled. Their condition is
+  close to impossible rather than merely hard.
+- EVERY SIDE'S VICTORY TARGET was set against a computer that never competed for it, so
+  the numbers are all still suspect.
+- HOVERING A "FOUND A COLONY" BUTTON should tell you the site's four yields. We have not
+  been able to photograph it, so it is the one new thing in this version nobody has
+  actually looked at. Tell us if it is missing or wrong.
 - THE HAB VIEW'S AND SLOT BOXES' PICTURES ARE FIRST PICKS from a free icon set and may
   change; say which ones misled you.
 - A station ring can be edge-on for a moment as you turn the globe; it comes back as

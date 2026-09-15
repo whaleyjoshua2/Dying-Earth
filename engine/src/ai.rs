@@ -510,7 +510,22 @@ impl Game {
         };
         let mut cands: Vec<Candidate> = Vec::new();
 
+        // Ticket #209 (version 0.08.1): while the Archivists have nowhere the Archive may stand,
+        // everything that carries them to such a place is worth more than its standing weight says.
+        // Narrowing `may_hold_archive` stops them ordering in Earth orbit on its own -- their
+        // Archive push already filters on that function -- but nothing in it makes them GO. Ticket
+        // #192's warning about the Upload was that a computer not taught the new move wins nothing
+        // at all, and that warning proved right; this is the same shape, so the appetite is added
+        // deliberately rather than hoped for.
+        let homeless_archive = self.archive_is_homeless(seat);
+        let homeless_bonus = self.tables.ai.multipliers.archive_needs_a_place;
+
         let mut push = |orders: Vec<Order>, cat: Cat, base: f64, gap: f64, threat: f64, opportunity: f64, note: String, stack: Option<String>| {
+            let base = if homeless_archive && matches!(cat, Cat::ColonyShip | Cat::Transit | Cat::FoundColony | Cat::LoadUnload | Cat::LaunchSiteOrShipyard) {
+                base * homeless_bonus
+            } else {
+                base
+            };
             cands.push(Candidate { orders, cat, base, gap, threat, opportunity, note, stack });
         };
 

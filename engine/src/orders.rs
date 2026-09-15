@@ -448,7 +448,11 @@ impl Game {
                     return fail("you do not direct this Colony");
                 }
                 if !self.may_hold_archive(col) {
-                    return fail("the Archive stands at a Colony off Earth; Antarctica will not do");
+                    // Ticket #209 (version 0.08.1): the message names the new rule. It said
+                    // "off Earth; Antarctica will not do" while a station over Earth still counted,
+                    // and would now be actively misleading -- a player reading it at Axiom would
+                    // think the problem was the ice.
+                    return fail("the Archive stands at a Colony on another Body; neither Antarctica nor a station over Earth will do");
                 }
                 // At most one Archive per Faction, wherever it stands.
                 if let Some(home) = self.archive_colony(seat)

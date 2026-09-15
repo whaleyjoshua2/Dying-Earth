@@ -409,6 +409,9 @@ pub enum TechId {
     /// Version 0.05 (ticket #56): the thirteenth Tech, Industry rung 2 beside Clean Power. It
     /// unlocks the Sea Wall and nothing else.
     CoastalEngineering,
+    /// Ticket #201 (version 0.08.1): the eighteenth Tech, Society rung 2. With it standing, a
+    /// Constabulary adds 10 to the challenge margin where it adds 5 without.
+    CivilDefense,
     /// Version 0.06.0 (ticket #84): the four gates, one per Faction, on rung 3. Each opens its
     /// Faction's Victory Condition and is a Tech for everyone besides.
     PlanetaryStewardship,
@@ -418,7 +421,7 @@ pub enum TechId {
 }
 
 impl TechId {
-    pub const ALL: [TechId; 17] = [
+    pub const ALL: [TechId; 18] = [
         TechId::EfficientGrids,
         TechId::CleanPower,
         TechId::CleanManufacturing,
@@ -432,6 +435,7 @@ impl TechId {
         TechId::PublicScience,
         TechId::GreenConsensus,
         TechId::CoastalEngineering,
+        TechId::CivilDefense,
         TechId::PlanetaryStewardship,
         TechId::ExtractionCharter,
         TechId::GenerationShips,

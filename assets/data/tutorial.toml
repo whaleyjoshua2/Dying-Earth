@@ -15,33 +15,55 @@
 #
 # `figure` is the big line at the top of the note, `text` the sentence under it, and `note` the
 # quieter line under that.
+#
+# Ticket #205 (version 0.08.1): rewritten. The designer: *"fix tutorial - cards show up to late -
+# should direct user for first three turns that takes them though important mechanics."* The old
+# five notes spent TWO of them asking for nothing -- "You are the Custodians" and "Read the board"
+# -- so the first instruction landed on turn 3 and getting off Earth, the thing the designer wanted
+# taught, on turn 5. Now **the first three turns each ask for one thing, and they are one chain**:
+# spend, muster, launch. Turns 4 and 5 keep their place but ask for NOTHING, at the designer's word:
+# they point at the climate and at the Research race, which are the two things that have started
+# happening to the player by then.
+#
+# The chain closes exactly, and the arithmetic is worth keeping here because the notes depend on it:
+#
+#   - **Every start Region has a working Launch Site.** It is not in `nation_states.toml`; the game
+#     adds one to each seat's start Region at setup (`add_start_facility`, engine/src/state.rs), so
+#     the player always has one whichever Region they pick. Checked against a headless picture of
+#     turn 1, not against the data file, after the data file said otherwise and was wrong.
+#   - A muster is **4** for the Custodians, and the Emigrants are on the Region's card at End Turn --
+#     so mustering on turn 2 means they are waiting on turn 3.
+#   - The ISS begins bare, and **a Core Module holds exactly 4**. Four mustered fill it precisely.
+#
+# The Reactor is NOT what a Custodian builds: it is the Archivists' Unique Facility since ticket
+# #184. Nothing here asks for one.
 
 [[note]]
 turn = 1
-figure = "You are the Custodians"
-text = "Colonise the solar system without wrecking Earth doing it. You need three turns running where the world puts out less carbon than it takes back, and twelve Colonists living off Earth."
-note = "Nothing here is forced. Look where these notes point, then play as you like; they stop after the fifth turn."
+figure = "Spend your Influence"
+text = "Influence is your claim on a place. Click a Region on the globe, then spend from the corner in the lower right; Max spends everything left. What you do not spend by the end of the turn is lost."
+note = "You are the Custodians: colonise the solar system without wrecking Earth doing it. You need three turns running where the world puts out less carbon than it takes back, and twelve Colonists living off Earth."
 
 [[note]]
 turn = 2
-figure = "Read the board"
-text = "Click a Region on the globe for its card. Every figure on it explains itself: rest the pointer on a number and the rule behind it appears."
-note = "The bar along the top carries the world's figures. Hover the ppm and the temperature for their histories."
+figure = "Muster Emigrants"
+text = "The Region you started in has a Launch Site, so it can put people into orbit. Click it, and under Emigrants muster four: they take people from the Region and appear on its card when the turn ends."
+note = "Every figure on a card explains itself. Rest the pointer on a number and the rule behind it appears."
 
 [[note]]
 turn = 3
-figure = "Build a Scrubber"
-text = "The Scrubber is yours alone. It takes no building slot, it pulls carbon back out of the air, and it calms the state it stands in. Its button is under the build boxes on a Region you hold."
-note = "It is the only thing in the game that visibly moves the climate. You will want several."
+figure = "Send them to the ISS"
+text = "The ISS is yours, in orbit over Earth, and its Core Module holds exactly four. Send them up from the Region's own card, or ask for them from the ISS's."
+note = "That is the last of these notes that asks you for anything. Twelve people living off Earth is half your Victory Condition."
 
 [[note]]
 turn = 4
-figure = "Spend your Influence"
-text = "Influence is your claim on a place. Click a Region, then spend from the corner in the lower right; Max spends everything left. What you do not spend by the end of the turn is lost."
-note = "A neutral Region goes to the first Faction whose Standing reaches its threshold."
+figure = "Watch the temperature"
+text = "The bar along the top carries the world's figures: rest the pointer on the ppm and the temperature for their histories. The Climate Panel (C) holds the whole picture, and says what the air is already committed to whatever anybody does now."
+note = "The Scrubber is yours alone. It takes no build slot, it pulls carbon back out of the air and it calms the state it stands in -- and it is the only thing in the game that visibly moves the climate."
 
 [[note]]
 turn = 5
-figure = "Get off Earth"
-text = "Muster Emigrants in a Region with a Launch Site, then move them straight to your station over Earth or onto a Colony Ship. Twelve living off Earth is half your Victory Condition."
-note = "That is the last of these notes. The game carries on from here; press Enter to end a turn, and watch the temperature."
+figure = "The Research race"
+text = "The bar beside the Research figure is the race: each Faction's share of the Tech under research, in its own colour. Whoever gave the most picks the next one. Click the bar for the Tech Tree."
+note = "Planetary Stewardship is your gate: with both parts of your Victory Condition at their bars, you still do not win until it stands. That is the last of these notes; the game carries on from here."

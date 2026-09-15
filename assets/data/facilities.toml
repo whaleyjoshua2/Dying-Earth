@@ -198,11 +198,28 @@ restart_turns = 1
 decommission_turns = 1
 
 # Ticket #185: the step and the ceiling. The card figures run 0.70 (Nigeria) to 1.50 (the United
-# States and Japan) and no maximum was ever declared, so the designer set one: 2.0. A step of 0.25 is
-# the smallest that reliably shows, since a Lab's Research is floored and a lift of 0.10 or 0.15
-# frequently crosses no integer at all.
+# States and Japan) and no maximum was ever declared, so the designer set one: 2.0. A step of 0.25
+# was chosen as the smallest that reliably shows, since a Lab's Research is floored and a lift of
+# 0.10 or 0.15 frequently crosses no integer at all.
+#
+# Ticket #208 (version 0.08.1): 0.20, at the designer's word, and MEASURED against #185's reason
+# before it was taken. Walking every Region's ladder from its card figure to the ceiling and
+# counting the steps that change a Lab's floored Research:
+#
+#                    step 0.25              step 0.20
+#   neutral Lab      34 of 54 show (63%)    35 of 68 show (51%)
+#   Archivist Lab    44 of 54 show (81%)    47 of 68 show (69%)
+#
+# So #185's worry is half-borne-out and the change is safe. The COUNT of visible lifts barely
+# moves -- 34 to 35 -- but they are spread over more turns, so about half a School's turns show
+# nothing where a third did before, and the ceiling takes about a quarter longer to reach. The
+# worst cases are the United States and Japan, already at 1.50 with little headroom and small
+# populations: one visible step in three.
+#
+# The step and the decay are ONE figure, as the designer's line changed them together: two would
+# let a School be built cheaply and mothballed slowly, which is a lever nobody asked for.
 [school]
-per_turn = 0.25
+per_turn = 0.20
 ceiling = 2.0
 
 # Tickets #182, #184 and #186 (version 0.08.0): the three figures the Unique Facility clauses read.
