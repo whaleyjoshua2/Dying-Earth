@@ -4133,7 +4133,20 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         ui.label(RichText::new(format!("A spent Strip Permit left its Baseline Emissions {:.1} higher, for good.", st.baseline_rise)).weak());
     }
     // Ticket #154 (version 0.07.4): the slot count is said once, on the Facilities header.
-    ui.label(format!("Education Level {}", card.education_level));
+    // Ticket #208 (version 0.08.1): the LIVE figure, which a School moves, where the card's own
+    // unchanging row stood. Since ticket #185 built the School this line had printed
+    // `card.education_level` -- the static table value -- so a player could raise a School and
+    // watch the number it exists to lift sit there not moving, its only visible effect being a
+    // Lab's Research creeping up. It is the figure four rules now read: a Lab twice over, a
+    // Region's resistance to Influence, and what Colonists carry away with them.
+    let live = game.education_level(sid);
+    let schooled = live - card.education_level;
+    let hover = if schooled > 0.005 {
+        format!("{:.2} on the card, and {:+.2} from a School. It multiplies a Research Lab twice over, stiffens this Region against an outsider's Influence, and goes with any Colonist mustered here.", card.education_level, schooled)
+    } else {
+        format!("{:.2} on the card, and no School standing. It multiplies a Research Lab twice over, stiffens this Region against an outsider's Influence, and goes with any Colonist mustered here.", card.education_level)
+    };
+    rule_tip(ui.label(format!("Education Level {live:.2}")), hover);
     // Ticket #52: Unrest, and what it is doing here in words.
     {
         let u = &game.tables.unrest;

@@ -8447,3 +8447,43 @@ fn the_tree_costs_eighteen_thirty_and_forty_five_by_rung() {
     let total: i64 = TechId::ALL.into_iter().map(|t| g.tables.tech(t).cost).sum();
     assert_eq!(total, 554, "the whole tree, 507 over seventeen Techs before ticket #201");
 }
+
+// ------------------------------------------------------- 0.08.1 ticket #208: the School's step
+
+/// Ticket #208 (version 0.08.1): the School's step and decay go to 0.20, one figure for both --
+/// the designer's line changed them together, and two would let a School be built cheaply and
+/// mothballed slowly, which is a lever nobody asked for.
+///
+/// This test exists because the change was made and the whole suite stayed green: nothing pinned
+/// the figure, so a rule could move and no check had anything to say about it.
+#[test]
+fn a_school_climbs_and_decays_by_one_fifth_a_turn() {
+    let mut g = game();
+    let sid = StateId::EastAsia;
+    let card = g.tables.state(sid).education_level;
+    let step = g.tables.school.per_turn;
+    assert!((step - 0.20).abs() < 1e-9, "0.20 since ticket #208, 0.25 from #185");
+
+    // With a School standing and online it climbs a step a turn, and the LIVE figure is the card's
+    // plus what the School has done.
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::School));
+    g.run_schools();
+    assert!((g.education_level(sid) - (card + step)).abs() < 1e-9, "one step up");
+    g.run_schools();
+    assert!((g.education_level(sid) - (card + 2.0 * step)).abs() < 1e-9, "two steps up");
+
+    // It never climbs past the ceiling, however long it stands.
+    for _ in 0..40 {
+        g.run_schools();
+    }
+    assert!((g.education_level(sid) - g.tables.school.ceiling).abs() < 1e-9, "the ceiling holds");
+
+    // And it falls back at the SAME rate when the School stops, never below the card's own figure.
+    g.state_mut(sid).facilities.clear();
+    g.run_schools();
+    assert!((g.education_level(sid) - (g.tables.school.ceiling - step)).abs() < 1e-9, "one step down, at the same rate");
+    for _ in 0..40 {
+        g.run_schools();
+    }
+    assert!((g.education_level(sid) - card).abs() < 1e-9, "back to the card, and no lower");
+}
