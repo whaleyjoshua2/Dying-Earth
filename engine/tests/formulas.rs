@@ -2062,20 +2062,19 @@ fn the_archive_is_one_module_of_fifty_materials_and_three_turns_built_once_off_e
     let order = Order::BuildArchive { colony: mars };
     assert_eq!(g.order_cost(Seat(3), &order).materials, 50);
     assert!(g.check_order(Seat(3), &[], &order).is_ok(), "no Research needs banking first");
-    // Antarctica will not do. Ticket #81 (version 0.06.0): a station over Earth is off Earth, so
-    // Axiom will.
+    // Antarctica will not do, and ticket #209 (version 0.08.1): neither will a station over Earth,
+    // which ticket #81 had allowed and which was the only place the Archive ever stood.
     let ant = colony(&mut g, Seat(3), BodyId::Earth, &[ModuleKind::Habitat], 4);
-    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: ant }).unwrap_err().0.contains("off Earth"));
+    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: ant }).unwrap_err().0.contains("another Body"));
     let axiom = station_of(&g, Seat(3), BodyId::Earth).unwrap();
-    // Ticket #192 (version 0.08.0): four must live at the place before it may be ORDERED, and Axiom
-    // is founded bare -- which is the whole of the measured problem this gate had to be small for.
-    assert_eq!(
-        g.check_order(Seat(3), &[], &Order::BuildArchive { colony: axiom }).unwrap_err().0,
-        "the Archive wants 4 Colonists living at its Colony; nobody lives at Axiom over Earth"
-    );
+    // Ticket #209: the PLACE is refused before the four-Colonist gate of ticket #192 is reached, so
+    // filling Axiom does not help -- the refusal names the Body, not the population.
     g.colony_mut(axiom).unwrap().modules.push(Module::new(ModuleKind::Core));
     g.settle_people(axiom, 4, 1.0);
-    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: axiom }).is_ok(), "a station over Earth is off Earth since ticket #81");
+    assert_eq!(
+        g.check_order(Seat(3), &[], &Order::BuildArchive { colony: axiom }).unwrap_err().0,
+        "the Archive stands at a Colony on another Body; neither Antarctica nor a station over Earth will do"
+    );
     // Nobody else builds one, and the ordinary Module button never places it.
     let mine = colony(&mut g, Seat(0), BodyId::Mars, &[], 0);
     assert_eq!(g.check_order(Seat(0), &[], &Order::BuildArchive { colony: mine }).unwrap_err().0, "only the Archivists build the Archive");
@@ -2296,12 +2295,15 @@ fn the_archivist_ai_builds_its_way_off_earth_and_then_the_archive() {
     let orders = g.ai_orders(arc);
     assert!(orders.iter().any(|o| matches!(o, Order::BuildArchive { colony } if *colony == mars)), "no Archive order at the one place that can take it: {orders:?}");
 
-    // People Axiom, and it takes the older place back, per ticket #81: a station over Earth is off
-    // Earth, and Axiom is the first Colony off Earth the seat holds.
+    // Ticket #209 (version 0.08.1): peopling Axiom no longer takes the older place back. A station
+    // over Earth may not hold the Archive at all now, whoever lives on it, so Mars keeps the order
+    // -- which is the whole of this change, since Earth orbit is where the Archive stood in 80 of
+    // 80 measured games.
     g.colony_mut(axiom).unwrap().modules.push(Module::new(ModuleKind::Core));
     g.settle_people(axiom, 4, 1.0);
     let orders = g.ai_orders(arc);
-    assert!(orders.iter().any(|o| matches!(o, Order::BuildArchive { colony } if *colony == axiom)), "since ticket #81 the AI raises it on Axiom first: {orders:?}");
+    assert!(orders.iter().any(|o| matches!(o, Order::BuildArchive { colony } if *colony == mars)), "a peopled Axiom must not win the Archive back: {orders:?}");
+    assert!(!orders.iter().any(|o| matches!(o, Order::BuildArchive { colony } if *colony == axiom)), "Earth orbit is barred: {orders:?}");
 }
 
 // ---------------------------------------------------------------- Ticket #52: Unrest, Occupation and refugees
@@ -5755,15 +5757,20 @@ fn a_station_over_earth_is_off_earth_and_antarctica_is_not() {
     assert_eq!(g.bodies_settled(Seat(0), 4), 0, "Earth is not a Body for Diaspora, in orbit or on the ice");
 }
 
-/// Ticket #81: the Archive may stand on a station over Earth, and still not in Antarctica.
+/// Ticket #81 let the Archive stand on a station over Earth. Ticket #209 (version 0.08.1) takes
+/// that back: it must stand on another Body, the Moon included. Earth's orbit and Earth's ice are
+/// both refused, and Earth orbit is the only place it had ever stood in 80 measured games.
 #[test]
-fn the_archive_may_stand_on_a_station_over_earth() {
-    let g = game();
-    let axiom = station_of(&g, Seat(3), BodyId::Earth).unwrap();
-    assert!(g.may_hold_archive(g.colony(axiom).unwrap()));
+fn the_archive_may_not_stand_over_earth_nor_on_it() {
     let mut g = game();
+    let axiom = station_of(&g, Seat(3), BodyId::Earth).unwrap();
+    assert!(!g.may_hold_archive(g.colony(axiom).unwrap()), "a station over Earth will no longer do");
     let vostok = colony(&mut g, Seat(3), BodyId::Earth, &[ModuleKind::Habitat], 0);
-    assert!(!g.may_hold_archive(g.colony(vostok).unwrap()));
+    assert!(!g.may_hold_archive(g.colony(vostok).unwrap()), "nor will Antarctica");
+    let luna = colony(&mut g, Seat(3), BodyId::Moon, &[ModuleKind::Habitat], 0);
+    assert!(g.may_hold_archive(g.colony(luna).unwrap()), "the Moon counts: it is another Body");
+    let mars = colony(&mut g, Seat(3), BodyId::Mars, &[ModuleKind::Habitat], 0);
+    assert!(g.may_hold_archive(g.colony(mars).unwrap()), "and so does Mars");
 }
 
 // ---------------------------------------------------------------- 0.06.0 ticket #82: the Custodians' card

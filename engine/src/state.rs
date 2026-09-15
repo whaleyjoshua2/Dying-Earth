@@ -1271,8 +1271,32 @@ impl Game {
 
     /// A Colony off Earth may hold the Archive; Antarctica may not. Ticket #81: a station over
     /// Earth is off Earth, so it may.
+    /// Ticket #209 (version 0.08.1): **not in Earth orbit**, which until now was the only place it
+    /// had ever stood. `off_earth` counts a station over Earth as off Earth, and ticket #192
+    /// measured the Archive ordered on turn 1 at such a station, with nobody living on it, in 80 of
+    /// 80 games -- always Axiom. So this does not narrow a choice the Archivists were making; it
+    /// moves the Archive to a place no seat has been, which is the point and also the risk.
+    ///
+    /// What is left is every Body but Earth, its satellites included: the Moon counts, at the
+    /// designer's word. Barring the satellites too was considered and refused with numbers -- in 80
+    /// measured games there are **0 Mars-system Colonies, 0 Venus stations and 0 Colonies on Phobos
+    /// or Deimos** -- so it would have been a rule the computer could never satisfy at all. Reduces
+    /// to `body != Earth`, since Antarctica was already barred for being ON Earth.
     pub fn may_hold_archive(&self, c: &Colony) -> bool {
-        self.off_earth(c)
+        c.body != BodyId::Earth
+    }
+
+    /// Ticket #209 (version 0.08.1): the Archivists have nowhere to put the Archive and have not
+    /// begun it. Their whole Victory Condition waits on a journey they have never made -- their AI
+    /// already weights founding a Colony at 9 and a Colony Ship at 8, yet Antarctica and Earth orbit
+    /// are so much cheaper than a transit that nothing further ever won the comparison. While this
+    /// holds, the chain that carries them off Earth is worth more to them than its standing weight
+    /// says, and `archive_needs_a_place` in `ai.toml` is how much more.
+    pub fn archive_is_homeless(&self, seat: Seat) -> bool {
+        self.kind(seat) == FactionKind::Archivists
+            && !self.archive_built(seat)
+            && !self.archive_ordered(seat)
+            && !self.colonies.iter().any(|c| c.control.director() == Some(seat) && self.may_hold_archive(c))
     }
 
     // ---------------------------------------------------------------- Ticket #51: Steerage and the rest

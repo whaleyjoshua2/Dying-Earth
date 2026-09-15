@@ -815,6 +815,11 @@ pub struct AiMultipliers {
     /// Ticket #182: what one Material in the Venture Capital Fund adds to the Prospectors' appetite
     /// for an Investment Bank, since the building's worth is a share of that balance.
     pub investment_bank_per_fund: f64,
+    /// Ticket #209 (version 0.08.1): what the Archivists' appetite for the whole off-Earth chain --
+    /// a Colony Ship, a Launch Site or Shipyard, a load, a transit, a founding -- is multiplied by
+    /// while they have nowhere the Archive may stand. It applies to no other Faction and stops the
+    /// moment they hold such a place.
+    pub archive_needs_a_place: f64,
 }
 
 /// Ticket #50: one pace schedule per Faction. `first` is the schedule for the Faction's first
