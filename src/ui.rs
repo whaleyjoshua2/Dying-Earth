@@ -1874,7 +1874,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             }
             // Ticket #58: the Research race, as a bar of the four Factions' contributions to the
             // Tech under research, in Faction colours and in proportion.
-            if research_race_bar(ui, session, game) {
+            if research_race_bar(ui, session, game, 150.0, false) {
                 view.show_tech = true;
             }
             ui.separator();
@@ -2017,11 +2017,11 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
 /// wrinkle, recorded rather than solved: when no Tech is under research the bar is not drawn at all,
 /// so in that state only the Research figure is there to click -- which is also the state in which
 /// the red `Pick a Tech` button is on the bar doing the same job, so nothing is lost.
-fn research_race_bar(ui: &mut Ui, session: &Session, game: &Game) -> bool {
+fn research_race_bar(ui: &mut Ui, session: &Session, game: &Game, width: f32, in_window: bool) -> bool {
     let Some(tech) = game.research.current else { return false };
     let cost = game.tables.tech(tech).cost.max(1);
     let c = game.research.contributions;
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(150.0, 14.0), egui::Sense::hover());
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, 14.0), egui::Sense::hover());
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 3.0, Color32::from_gray(45));
     let mut x = rect.min.x;
@@ -2034,18 +2034,45 @@ fn research_race_bar(ui: &mut Ui, session: &Session, game: &Game) -> bool {
         painter.rect_filled(seg, 0.0, seat_colour(session, seat));
         x += w;
     }
+    // Ticket #211 (version 0.08.1): the Research NOBODY produced, in grey, so the bar's total
+    // always equals the progress figure printed beside it. When a Tech is picked, everything
+    // banked since the last one pours in: each seat's own share lands under its name, but the
+    // UNATTRIBUTED pool -- the spill past the previous Tech's cost, which ticket #105 credits to
+    // nobody on purpose -- goes into progress alone. So the bar had always under-drawn by exactly
+    // that amount, and a Tech opening with spill carried into it opened showing 10 of 45 beside an
+    // empty bar. Found by looking at a picture; the suite had nothing to say about it. Grey is
+    // this game's colour for nobody's, which is what an unheld Region wears.
+    let loose = (game.research.progress - c.iter().sum::<i64>()).max(0);
+    if loose > 0 {
+        let w = rect.width() * (loose as f32) / cost as f32;
+        let seg = egui::Rect::from_min_size(egui::pos2(x, rect.min.y), egui::vec2(w.min(rect.max.x - x), rect.height()));
+        painter.rect_filled(seg, 0.0, Color32::from_gray(110));
+    }
     painter.rect_stroke(rect, 3.0, egui::Stroke::new(1.0, Color32::from_gray(120)), egui::StrokeKind::Inside);
     let shares: Vec<String> = Seat::ALL.into_iter().map(|s| format!("{} {}", game.seat_name(s), c[s.index()])).collect();
-    ui.interact(rect, ui.id().with("race"), egui::Sense::click())
-        .on_hover_cursor(egui::CursorIcon::PointingHand)
-        .on_hover_text(format!(
-            "The Research race for {}: {}. {} of {}.\nClick to open the Tech Tree.",
-            game.tables.tech(tech).name,
-            shares.join(", "),
-            game.research.progress,
-            cost
-        ))
-        .clicked()
+    // Ticket #211 (version 0.08.1): in the Tech Tree window the bar stands where the window's first
+    // SENTENCE stood, and that sentence moves onto this hover -- the designer: "Put the research bar
+    // showing each factions contribution On the tech tree in place of text at top of window (make
+    // the text a mouse over) used in both places". So the hover carries the Research Lead there,
+    // and on the top bar it keeps the line saying what a click does. One function, two callers,
+    // which is what "used in both places" asks for.
+    let tail = if in_window { format!("
+{}", game.research_lead_text()) } else { "
+Click to open the Tech Tree.".to_string() };
+    let resp = ui.interact(rect, ui.id().with("race"), egui::Sense::click()).on_hover_text(format!(
+        "The Research race for {}: {}{}. {} of {}.{tail}",
+        game.tables.tech(tech).name,
+        shares.join(", "),
+        if loose > 0 { format!(", carried over {loose}") } else { String::new() },
+        game.research.progress,
+        cost
+    ));
+    // In the window a click opens nothing -- the window IS the Tech Tree -- so it wears no pointer.
+    if in_window {
+        false
+    } else {
+        resp.on_hover_cursor(egui::CursorIcon::PointingHand).clicked()
+    }
 }
 
 // ------------------------------------------------------------------ overlays and picking
@@ -2275,6 +2302,14 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
 /// tooltip behind it -- it is the whole of what is shown -- so it must never be able to go mute.
 const SLOT_YIELD_SIZE: f32 = 14.0;
 
+/// Ticket #211 (version 0.08.1): a slot's four yields as one line for a hover, in the form the
+/// glyph rule reads -- each figure's word heading its own multiplier, which `text_with_icons`
+/// trades for the glyph. The designer asked for the yields and nothing else: "no need for the
+/// clause just yeilds and use the glyps".
+fn slot_yield_hover(y: &dying_earth_engine::SlotYields) -> String {
+    format!("Materials x{:.2} - Energy x{:.2} - Fuel x{:.2} - Research x{:.2}", y.mine, y.generator, y.refinery, y.research)
+}
+
 fn slot_yield_label(painter: &egui::Painter, pos: Pos2, yields: &dying_earth_engine::SlotYields) {
     let figures = [("materials", yields.mine), ("energy", yields.generator), ("fuel", yields.refinery), ("research", yields.research)];
     let Some(glyphs) = figures.iter().map(|(key, _)| Icons::texture_from_ctx(painter.ctx(), key)).collect::<Option<Vec<_>>>() else {
@@ -2475,6 +2510,10 @@ fn apply_hit(hit: Hit, view: &mut ViewState) {
 
 // ------------------------------------------------------------------ the command cluster
 
+/// Ticket #211 (version 0.08.1): what the command cluster is multiplied by, the designer's own
+/// figure. One constant, so the next such request is one number.
+const CLUSTER_SCALE: f32 = 1.15;
+
 /// Ticket #114 (version 0.07.1): **the command cluster**, a strip along the foot of the side panel
 /// that never scrolls away. The designer asked for a corner like the one CK3 and other 4X games put
 /// their standing controls in: *"add influence spend button to bottom right ... with a second button
@@ -2499,16 +2538,29 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
     }
     let (_, influence_left) = game.remaining(Seat(0), &session.pending);
     let s = game.seat(Seat(0));
+    // Ticket #211 (version 0.08.1): the whole strip a seventh larger, at the designer's word --
+    // *"Everything in the command cluster 15% larger"*. It is done by scaling the panel's TEXT
+    // STYLES and not by editing the four explicit sizes, because most of the strip has no explicit
+    // size at all: the number box, `Spend on X`, `Max` and the every-turn checkbox all take egui's
+    // default, and scaling only the labelled figures would leave a 25-pixel Allotment beside an
+    // unchanged button. The explicit sizes are multiplied by the same constant so the strip keeps
+    // its proportions, and the icon with them.
+    //
+    // The cost, real and accepted knowingly: the cluster is drawn BEFORE the scrolling column and
+    // reserves its height (ticket #114), so the card above it loses whatever the strip gains.
+    for font in ui.style_mut().text_styles.values_mut() {
+        font.size *= CLUSTER_SCALE;
+    }
     ui.add_space(4.0);
     // The Allotment, at the size the designer asked for: "much higher and more prominent".
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 5.0;
-        if let Some(image) = Icons::from_ctx(ui.ctx(), "influence", 20.0) {
+        if let Some(image) = Icons::from_ctx(ui.ctx(), "influence", 20.0 * CLUSTER_SCALE) {
             ui.add(image);
         }
-        ui.label(RichText::new(format!("{influence_left}")).size(22.0).strong())
+        ui.label(RichText::new(format!("{influence_left}")).size(22.0 * CLUSTER_SCALE).strong())
             .on_hover_text("Influence still unspent this turn. It is lost at End Turn: the Allotment does not carry over.");
-        ui.label(RichText::new(format!("of {} left", s.allotment)).size(15.0));
+        ui.label(RichText::new(format!("of {} left", s.allotment)).size(15.0 * CLUSTER_SCALE));
     });
 
     // Spend, on whatever is selected.
@@ -2594,7 +2646,7 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
     });
 
     // End Turn, where a hand already is. Ticket #128 (version 0.07.2): named for its key.
-    let button = egui::Button::new(RichText::new("End Turn (Enter)").strong().size(16.0)).fill(TURN_RED);
+    let button = egui::Button::new(RichText::new("End Turn (Enter)").strong().size(16.0 * CLUSTER_SCALE)).fill(TURN_RED);
     if ui.add_enabled(can_end_turn(game, view), button).on_disabled_hover_text("Pick a Tech first").clicked() {
         press_end_turn(session, game, view, actions);
     }
@@ -4153,10 +4205,6 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         );
         influence_row(ui, game, session, view, Place::State(sid), false, actions);
         ui.separator();
-        // Ticket #73: Emigrants waiting here for a lift or the sea.
-        if st.emigrants > 0 {
-            ui.label(format!("Emigrants waiting: {}", st.emigrants)).on_hover_text("Mustered here and not yet lifted or sent: a working Launch Site lifts them onto a Ship, or, once the ice is open, the sea takes them to Antarctica.");
-        }
         if game.constabulary_online(sid) {
             ui.label(RichText::new("A Constabulary here takes 1 off every turn and damps what the climate and the refugees add.").weak());
         }
@@ -4227,6 +4275,14 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
         // Ticket #73: muster Emigrants here, and send them to Antarctica by sea once the ice is open.
         ui.label(RichText::new("Emigrants").strong());
+        // Ticket #211 (version 0.08.1): the figure stands at the HEAD of this block, above the
+        // button that changes it, and is shown at every value including nought. It existed before
+        // -- in the Influence block, some way up the card, and only while it was above zero -- so a
+        // player who mustered and then looked for the result found the line had simply not been
+        // there a moment ago. At nought it now says so, which is the answer to "did that work?".
+        ui.label(format!("Emigrants waiting: {}", st.emigrants)).on_hover_text(
+            "Mustered here and not yet lifted or sent: a working Launch Site lifts them onto a Ship or straight to a station of yours over Earth, and once the ice is open the sea takes them to Antarctica.",
+        );
         // Ticket #196 (version 0.08.0): as many as this state's people can pay for, where the button
         // always asked for the whole batch. Steerage costs the Arkwrights twice the population for
         // twice the batch -- 16.0 people -- and Australia carries 10.1 to 12.6, so the button was dead
@@ -4680,7 +4736,14 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
     );
     for s in game.ships.iter().filter(|s| !session.spectator && s.seat == Seat(0) && s.at == ShipAt::Body(body) && s.kind == UnitKind::ColonyShip && s.colonists > 0) {
         let order = Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) };
-        if ui.button(format!("Found a Colony here with the {} Colonists aboard {}", s.colonists, s.id)).clicked() {
+        // Ticket #211 (version 0.08.1): what the site is worth, at the moment of choosing it. The
+        // four yields are drawn under every slot on the Body view already, but the moment of the
+        // DECISION said nothing about them. In glyphs, at the designer's word -- each figure's word
+        // heads its multiplier, which is the form the one glyph rule reads (ticket #132).
+        if ui.button(format!("Found a Colony here with the {} Colonists aboard {}", s.colonists, game.ship_name(s)))
+            .on_hover_ui(|ui| hover_with_icons(ui, &slot_yield_hover(&game.slot_yields(body, slot))))
+            .clicked()
+        {
             actions.push(Action::Place(order));
         }
     }
@@ -4887,7 +4950,15 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     );
                 }
                 for slot in game.free_slots_on(body).into_iter().filter(|_| body != BodyId::Earth || game.antarctica_open) {
-                    cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) }, &format!("Found a Colony at {}", game.tables.body(body).slots[slot as usize].name), actions);
+                    cost_button_with_hover(
+                        ui,
+                        game,
+                        &session.pending,
+                        Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) },
+                        &format!("Found a Colony at {}", game.tables.body(body).slots[slot as usize].name),
+                        Some(slot_yield_hover(&game.slot_yields(body, slot))),
+                        actions,
+                    );
                 }
             }
         }
@@ -5674,10 +5745,19 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         // it. `default_pos` only places it the first time, so a window the player has dragged stays
         // where they put it.
         egui::Window::new("Tech Tree").open(&mut open).resizable(false).default_pos(egui::pos2(if session.spectator { 840.0 } else { 430.0 }, 120.0)).show(ctx, |ui| {
-            ui.label(match game.research.current {
-                Some(t) => format!("Under research: {} ({} of {}). {}", game.tables.tech(t).name, game.research.progress, game.tables.tech(t).cost, game.research_lead_text()),
-                None => format!("No Tech under research. {} Research waiting.", game.research.unallocated.iter().sum::<i64>() + game.research.unattributed),
-            });
+            // Ticket #211 (version 0.08.1): the race bar stands where this window's first SENTENCE
+            // stood, at the designer's word, and the sentence moves onto its hover. One wrinkle,
+            // handled rather than lived with: when NO Tech is under research the bar is not drawn at
+            // all -- and that is exactly the state this window is open in, with a pick owed -- so
+            // the line that says so takes its place and the top of the window is never empty.
+            match game.research.current {
+                Some(_) => {
+                    research_race_bar(ui, session, game, ui.available_width(), true);
+                }
+                None => {
+                    ui.label(format!("No Tech under research. {} Research waiting.", game.research.unallocated.iter().sum::<i64>() + game.research.unattributed));
+                }
+            }
             // Ticket #51: an Archivist player is told whether Provisional Findings is in force.
             if game.kind(Seat(0)) == FactionKind::Archivists {
                 let on = game.provisional_findings(Seat(0));
