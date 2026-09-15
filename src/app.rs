@@ -335,6 +335,9 @@ pub struct ViewState {
     pub slot_box: Option<SlotBox>,
     pub trade_amounts: [i64; 4],
     pub load_state: Option<StateId>,
+    /// Ticket #204 (version 0.08.1): the Region a Colony's own loader draws from, kept apart from
+    /// `load_state` so that choosing a Region on a Ship's card does not move it on a station's.
+    pub lift_state: Option<StateId>,
     pub influence_amount: i64,
     pub attack_preview: bool,
     /// Ticket #58: which Moment kinds are switched on, remembered for the session. `None` until the
@@ -385,6 +388,7 @@ impl Default for ViewState {
             slot_box: None,
             trade_amounts: [5, 10, 10, 10],
             load_state: None,
+            lift_state: None,
             influence_amount: 5,
             attack_preview: false,
             moments_on: None,

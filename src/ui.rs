@@ -4225,8 +4225,18 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             for slot in game.free_slots_on(BodyId::Earth) {
                 cost_button(ui, game, &session.pending, Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) }, &format!("Send {n} to {} by sea", game.tables.body(BodyId::Earth).slots[slot as usize].name), actions);
             }
+            // Ticket #204 (version 0.08.1): capped at the room there. A sea crossing checks no room
+            // at the order -- it lands `min(n, room)` a turn later and sends the surplus home with a
+            // Report line -- so this button offered to put twelve people on a round trip that costs
+            // a turn and achieves nothing, and said nothing about it first. The engine rule is
+            // unchanged; only the button stops offering it. Founding a NEW Colony from a free slot,
+            // above, still offers everyone waiting: there is no room limit where nothing stands yet.
             for c in game.colonies.iter().filter(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(Seat(0))) {
-                cost_button(ui, game, &session.pending, Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Colony(c.id) }, &format!("Send {n} to {} by sea", game.place_name(Place::Colony(c.id))), actions);
+                let k = n.min(game.habitat_room(c).saturating_sub(c.colonists));
+                if k == 0 {
+                    continue;
+                }
+                cost_button(ui, game, &session.pending, Order::SendToAntarctica { state: sid, n: k, into: UnloadTarget::Colony(c.id) }, &format!("Send {k} to {} by sea", game.place_name(Place::Colony(c.id))), actions);
             }
         }
         // Ticket #141 (version 0.07.3): waiting Emigrants lift straight to a station of yours over
@@ -4325,6 +4335,101 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     }
 }
 
+/// Ticket #204 (version 0.08.1): which Region a loader's dropdown opens on.
+///
+/// It was the most POPULOUS Region the player directs, chosen with no regard for whether that
+/// Region could lift at all -- so a Ship's door could open already dead: a greyed button, and
+/// nothing to suggest that another Region in the same list would work. It now opens on the first
+/// Region that can ACT, and falls back to the most populous when none can, so the refusal is still
+/// reachable and still explains itself. A sea crossing wants no Launch Site, which is what
+/// `needs_launch_site` is for.
+fn default_emigrant_source(game: &Game, states: &[StateId], needs_launch_site: bool) -> Option<StateId> {
+    let ready = states.iter().copied().find(|st| {
+        let s = game.state(*st);
+        s.emigrants > 0 && (!needs_launch_site || s.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()))
+    });
+    ready.or_else(|| states.iter().copied().max_by(|a, b| game.state(*a).population.partial_cmp(&game.state(*b).population).unwrap()))
+}
+
+/// Ticket #204 (version 0.08.1): **the receiver's door**. A Region's card has been able to send
+/// people to a station since ticket #141 and to a Colony Ship since ticket #193, but the place
+/// receiving them had no way to ask: a player standing on the ISS wondering how to get anybody up
+/// there had to go back down to a Region and find the button. This is the mirror of the job ticket
+/// #193 did for Ships, in the other direction. The rule does not change; only the door was missing.
+///
+/// It sits directly under the card's `Colonists N of M room`, at the designer's word, because that
+/// line is exactly the figure a lift changes -- cause and effect read as one thing. The `Orders`
+/// block below is a long list of build and mothball buttons and a loader would be lost in it.
+///
+/// The dropdown lists EVERY Region the player directs, with the button greying and naming the
+/// reason, since hiding a Region hides the answer to "why can't Brazil lift?".
+///
+/// **The two routes disagreed about "too many", and this door takes the stricter reading.** A lift
+/// refuses at the order (`LiftToStation` checks Habitat room); a sea crossing checks no room at
+/// all, lands `min(n, room)` a turn later and sends the surplus home with a Report line. So the
+/// Region card's sea button could dispatch twelve people on a round trip that costs a turn and
+/// achieves nothing, in silence. Both sea doors are now capped at `min(waiting, room)` -- the
+/// sender's included -- while **the engine rule is untouched**, so saves, the computer players and
+/// any other route to the same order behave exactly as before. Only the button stops offering it.
+fn emigrant_loader(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, col: &dying_earth_engine::Colony, actions: &mut Vec<Action>) {
+    // A lift is a launch from a surface, and there is no surface under a station over Mars; a
+    // Colony on a surface beyond Earth is loaded from a Ship, which has had its door all along.
+    if session.spectator || col.body != BodyId::Earth || col.control.director() != Some(Seat(0)) {
+        return;
+    }
+    let by_sea = !col.in_orbit;
+    if by_sea && !game.antarctica_open {
+        return;
+    }
+    let states = game.directed_states(Seat(0));
+    let Some(chosen) = view.lift_state.filter(|x| states.contains(x)).or_else(|| default_emigrant_source(game, &states, !by_sea)) else {
+        return;
+    };
+    let room = game.habitat_room(col).saturating_sub(col.colonists);
+    let waiting = game.state(chosen).emigrants;
+    let n = room.min(waiting);
+    ui.horizontal(|ui| {
+        ui.label("from");
+        egui::ComboBox::from_id_salt(("lift", col.id.0)).selected_text(game.tables.state(chosen).name.clone()).show_ui(ui, |ui| {
+            for st in &states {
+                if ui.selectable_label(*st == chosen, game.tables.state(*st).name.clone()).clicked() {
+                    view.lift_state = Some(*st);
+                }
+            }
+        });
+        // With nothing to move the door STAYS, disabled and saying why, rather than vanishing and
+        // leaving a player to wonder -- the shape ticket #196 settled for the muster button. It
+        // carries a refusal of its own rather than the engine's, because **the engine has none to
+        // give on the sea route**: `SendToAntarctica` checks no room, so a live button here would
+        // hand a player the very round trip this ticket set out to stop. Found by looking at the
+        // picture: at `Colonists 4 of 4 room` the sea button came up white and clickable.
+        if n == 0 {
+            let why = if waiting == 0 {
+                format!("Nobody is waiting in {}. Muster Emigrants there first.", game.tables.state(chosen).name)
+            } else {
+                format!("{} is full: {} Colonists in {} of room.", game.place_name(Place::Colony(col.id)), col.colonists, game.habitat_room(col))
+            };
+            let label = if by_sea { "Bring Emigrants by sea" } else { "Lift Emigrants" };
+            ui.add_enabled(false, egui::Button::new(label)).on_disabled_hover_text(why);
+            return;
+        }
+        let (order, label, hover) = if by_sea {
+            (
+                Order::SendToAntarctica { state: chosen, n, into: UnloadTarget::Colony(col.id) },
+                format!("Bring {n} Emigrants by sea"),
+                format!("They land here at NEXT turn's Resolution: a sea crossing takes a turn. {} has room for {room} more.", game.place_name(Place::Colony(col.id))),
+            )
+        } else {
+            (
+                Order::LiftToStation { state: chosen, n, colony: col.id },
+                format!("Lift {n} Emigrants"),
+                format!("Aboard at this turn's Resolution. A launch: it emits like any lift. {} has room for {room} more.", game.place_name(Place::Colony(col.id))),
+            )
+        };
+        cost_button_with_hover(ui, game, &session.pending, order, &label, Some(hover), actions);
+    });
+}
+
 fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, cid: ColonyId, actions: &mut Vec<Action>) {
     let Some(col) = game.colony(cid) else { return };
     // Ticket #127 (version 0.07.2): the kind glyph in front of the name, as on the roster.
@@ -4342,6 +4447,8 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // Ticket #164 (version 0.07.5): the room is the Core Module's four and the Habitats' eight
     // each, so the line no longer names Habitats alone.
     ui.label(format!("Colonists {} of {} room", col.colonists, game.habitat_room(col)));
+    // Ticket #204 (version 0.08.1): the receiver's door, against the figure it changes.
+    emigrant_loader(ui, session, game, view, col, actions);
     // Ticket #97 (version 0.07.0): the Module cap, shown beside the Colonists that buy it, so a
     // player meets it on the card rather than as a refusal.
     let (used, cap) = (game.module_slots_used(col), game.module_slots(col));
@@ -4667,8 +4774,12 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             match body {
                 BodyId::Earth => {
                     let states = game.directed_states(Seat(0));
-                    if !states.is_empty() {
-                        let chosen = view.load_state.filter(|x| states.contains(x)).unwrap_or_else(|| *states.iter().max_by(|a, b| game.state(**a).population.partial_cmp(&game.state(**b).population).unwrap()).unwrap());
+                    // Ticket #204 (version 0.08.1): opens on a Region that can actually lift, where
+                    // it opened on the most populous one whether or not it had a Launch Site or
+                    // anybody waiting. Same defect, same fix, both doors. The `Some` also stands in
+                    // for the emptiness check this replaced: with no directed Region there is
+                    // nothing to draw from and nothing to draw.
+                    if let Some(chosen) = view.load_state.filter(|x| states.contains(x)).or_else(|| default_emigrant_source(game, &states, true)) {
                         ui.horizontal(|ui| {
                             ui.label("from");
                             egui::ComboBox::from_id_salt(("load", s.id.0)).selected_text(game.tables.state(chosen).name.clone()).show_ui(ui, |ui| {

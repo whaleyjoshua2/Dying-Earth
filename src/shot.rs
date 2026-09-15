@@ -924,7 +924,17 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         plan.select = std::env::args().find_map(|a| a.strip_prefix("select:").map(str::to_owned));
         plan.tech = std::env::args().any(|a| a == "tech:1");
         plan.hab = std::env::args().any(|a| a == "hab:1");
-        plan.hab_colony = session.game.as_ref().and_then(|g| g.colonies.iter().find(|c| c.control.director() == Some(Seat(0))).map(|c| c.id));
+        // Ticket #204 (version 0.08.1): `hab:ground` picks seat 0's first Colony ON a surface
+        // rather than its first of any kind, which on every board so far is the station over Earth.
+        // It is how the sea half of the receiver's door gets photographed.
+        let ground = std::env::args().any(|a| a == "hab:ground");
+        if ground {
+            plan.hab = true;
+        }
+        plan.hab_colony = session
+            .game
+            .as_ref()
+            .and_then(|g| g.colonies.iter().find(|c| c.control.director() == Some(Seat(0)) && (!ground || !c.in_orbit)).map(|c| c.id));
         plan.trade = std::env::args().any(|a| a == "trade:1");
         plan.victory = std::env::args().any(|a| a == "victory:1");
         // Ticket #203: `factions:1` for seat 0's page, `factions:archivists` for that Faction's.
