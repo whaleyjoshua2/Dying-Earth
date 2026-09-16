@@ -8525,3 +8525,44 @@ fn market_prices_move_with_the_table() {
     g.settle_market();
     assert_eq!(g.market_price_at(0), base + 1, "any trade at all leaves the price where it was");
 }
+
+/// Ticket #221 (version 0.08.2): Blame is a LEVEL on the shown score, weighted by how much the
+/// RESENTING Faction minds. Watched red: with `blame_relations_term` returning 0 the Custodian
+/// assertion fails at 0 against -2.
+#[test]
+fn blame_costs_a_faction_its_friends() {
+    let mut g = game();
+    let (cus, pro, ark) = (Seat(0), Seat(1), Seat(2));
+    // A Prospector share of about 0.40 is one step above the 0.35 gate.
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = if s == pro { 40.0 } else { 20.0 };
+    }
+    assert_eq!(g.blame_relations_term(cus, pro), -2, "the Custodians mind at x2");
+    assert_eq!(g.blame_relations_term(ark, pro), 0, "the Arkwrights at x0.5 round TOWARD ZERO: one step x 0.5 truncates to nothing, so they feel it only from 0.45");
+    assert_eq!(g.blame_relations_term(pro, cus), 0, "the Prospectors mind nobody's Blame");
+    assert_eq!(g.relations_score(cus, pro), -2, "the shown score carries it without any deed");
+    assert_eq!(g.relations_deeds(cus, pro), 0, "and the deeds figure does not");
+    assert_eq!(g.relations_level(cus, pro), "Neutral", "-2 is still the top of Neutral");
+}
+
+/// Ticket #222/#225 (version 0.08.2): a turn charges the sum of every instance, capped; the scar
+/// counts TURNS. Watched red: with the cap removed the first assertion reads -12.
+#[test]
+fn the_ladder_sums_instances_and_the_scar_counts_turns() {
+    let mut g = game();
+    let (cus, pro) = (Seat(0), Seat(1));
+    // A conquest turn: a Battle (3), an Occupation (3), a place taken (5) and a bid elsewhere (1).
+    for w in [3, 3, 5, 1] {
+        g.offend_by(pro, cus, w);
+    }
+    g.settle_relations();
+    assert_eq!(g.relations_deeds(cus, pro), -g.tables.relations.turn_cap, "twelve charged, eight paid");
+    assert_eq!(g.relations.offending_turns[cus.index()][pro.index()], 1, "one turn, however much was done in it");
+    // Four offending turns move the floor one step, whatever each turn cost.
+    for _ in 0..3 {
+        g.offend_by(pro, cus, 1);
+        g.settle_relations();
+    }
+    assert_eq!(g.relations.floor[cus.index()][pro.index()], -1, "a step every four offending turns");
+    assert!(g.relations_deeds(cus, pro) <= -1, "and the deeds figure cannot climb above it");
+}

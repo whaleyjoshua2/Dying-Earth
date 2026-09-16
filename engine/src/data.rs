@@ -408,6 +408,12 @@ pub struct FactionCard {
     /// Influence and selling are untouched.
     #[serde(default = "one_f64")]
     pub market_multiplier: f64,
+    /// Ticket #221 (version 0.08.2): how much THIS Faction minds another's Blame -- the coefficient
+    /// on the resentment step. The Custodians at 2 mind twice as much as the Archivists at 1; the
+    /// Arkwrights at 0.5 mind half; the Prospectors at 0 do not mind at all, which is a statement
+    /// about them and not an oversight.
+    #[serde(default = "resentment_default")]
+    pub resentment: f64,
     /// A Space Station's Materials, times this.
     #[serde(default = "one_f64")]
     pub station_materials_multiplier: f64,
@@ -629,6 +635,10 @@ pub struct InfluenceTable {
     pub decay_controlled: i64,
     /// Version 0.04 (ticket #41): a challenger needs the controller's standing plus this.
     pub challenge_margin: i64,
+    /// Ticket #224 (version 0.08.2): the most the Relations term may add to a challenge margin. Two,
+    /// which is also its true maximum: the shown score clamps at -10 and the term is `|score| / 4`.
+    #[serde(default = "relations_margin_cap_default")]
+    pub relations_margin_cap: i64,
     /// Ticket #190 (version 0.08.0): what an online Constabulary adds to the margin in its Region.
     pub constabulary_margin: i64,
     /// Ticket #201 (version 0.08.1): what a Constabulary adds instead, once Civil Defense stands.
@@ -1070,6 +1080,62 @@ pub struct RelationsCard {
     pub fall_per_offending_turn: i64,
     pub recover: i64,
     pub quiet_turns: u32,
+    /// Ticket #222 (version 0.08.2): the most a single turn may charge, however much was done in it.
+    /// A guard against one dramatic turn spending the whole scale, not a working part of the rule --
+    /// measured, it bites on 1.7% of offending pair-turns.
+    #[serde(default = "turn_cap_default")]
+    pub turn_cap: i64,
+    /// Ticket #221: the share above a fair quarter that buys one step of resentment.
+    #[serde(default = "blame_step_default")]
+    pub blame_step: f64,
+    /// Ticket #221: the most Blame alone may cost, half the scale. Blame can make a pair Cold but
+    /// never, by itself, Hostile.
+    #[serde(default = "blame_cap_default")]
+    pub blame_cap: i64,
+    /// Ticket #223: what one act of friendship is worth, once a turn per ordered pair.
+    #[serde(default = "act_gain_default")]
+    pub act_gain: i64,
+    /// Ticket #223: how high the DEEDS figure may climb past the scale, so a pair carrying a heavy
+    /// Blame term can still reach Friendly on deeds alone.
+    #[serde(default = "deeds_ceiling_default")]
+    pub deeds_ceiling: i64,
+    /// Ticket #223: quiet turns to lose one point of a POSITIVE score -- twice the period below
+    /// neutral, so friendship lapses at half the rate enmity heals.
+    #[serde(default = "positive_quiet_default")]
+    pub positive_quiet_turns: u32,
+    /// Ticket #225: offending TURNS per step of the floor.
+    #[serde(default = "scar_turns_default")]
+    pub scar_turns: u32,
+    /// Ticket #225: the lowest the floor may go. -3 rather than -5 deliberately: since every act
+    /// that raises Relations is an Accord act, a pair floored below the level an Accord can be
+    /// struck at would have no road back at all.
+    #[serde(default = "scar_floor_default")]
+    pub scar_floor: i64,
+}
+
+fn turn_cap_default() -> i64 {
+    8
+}
+fn blame_step_default() -> f64 {
+    0.10
+}
+fn blame_cap_default() -> i64 {
+    5
+}
+fn act_gain_default() -> i64 {
+    1
+}
+fn deeds_ceiling_default() -> i64 {
+    15
+}
+fn positive_quiet_default() -> u32 {
+    8
+}
+fn scar_turns_default() -> u32 {
+    4
+}
+fn scar_floor_default() -> i64 {
+    -3
 }
 
 /// Ticket #73 (version 0.05.5): Emigrants, the built Colonists: how many a Faction musters a turn,
@@ -1635,4 +1701,17 @@ fn price_band_default() -> i64 {
 
 fn price_step_default() -> i64 {
     20
+}
+
+
+/// Ticket #221 (version 0.08.2): a Faction card written before resentment existed minds at the
+/// ordinary rate.
+fn resentment_default() -> f64 {
+    1.0
+}
+
+
+/// Ticket #224 (version 0.08.2).
+fn relations_margin_cap_default() -> i64 {
+    2
 }

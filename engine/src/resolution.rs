@@ -344,7 +344,8 @@ impl Game {
         // Ticket #191 (version 0.08.0): opening a Battle offends everyone on the other side of it.
         for (aggressor, _, _) in parties.iter().filter(|(_, agg, _)| *agg) {
             for (other, _, _) in parties {
-                self.offend(*aggressor, *other);
+                // Ticket #222 (version 0.08.2): opening a Battle is rung 3.
+                self.offend_by(*aggressor, *other, 3);
             }
         }
         let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
@@ -367,7 +368,8 @@ impl Game {
         // against them offends nobody -- which is most Battles: 46 of the 55 measured over 80 games.
         for aggressor in aggressors {
             for other in parties.iter().filter_map(|(s, _, _)| *s) {
-                self.offend(*aggressor, other);
+                // Ticket #222: rung 3, as above.
+                self.offend_by(*aggressor, other, 3);
             }
         }
         let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
@@ -720,6 +722,12 @@ impl Game {
         // Version 0.03 (ticket #33): every Faction keeps a standing on every place; spending on a place
         // you control raises your own standing there.
         let spent = std::mem::take(&mut self.pending.influence);
+        // Ticket #222 (version 0.08.2): an instance is a PLACE, never an order. Two spends on one
+        // Region in a turn are one offence; spends on two of their Regions are two. Tracked here
+        // because the pending list is per ORDER and the rule is per place -- without this, splitting
+        // one spend across three orders would cost three times the damage, which is exactly the trap
+        // 0.08.0's flat per-turn charge was written to avoid.
+        let mut charged: Vec<(Seat, Seat, Target)> = Vec::new();
         for (seat, target, amount) in spent {
             let own = self.place_control(target).controller() == Some(seat);
             // Ticket #187 (version 0.08.0): Resistance. An outsider's Influence buys less Standing at
@@ -732,7 +740,11 @@ impl Game {
             if let Some(victim) = self.place_control(target).director()
                 && victim != seat
             {
-                self.offend(seat, victim);
+                // Ticket #222: rung 1, once per place per turn.
+                if !charged.contains(&(seat, victim, target)) {
+                    charged.push((seat, victim, target));
+                    self.offend_by(seat, victim, 1);
+                }
             }
             let s = self.seat_mut(seat);
             *s.influence.entry(target).or_insert(0) += gained;
