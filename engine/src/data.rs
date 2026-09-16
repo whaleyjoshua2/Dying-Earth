@@ -521,6 +521,19 @@ pub struct DucatsCard {
     pub sell_divisor: i64,
     pub per_building_material: i64,
     pub bank_per_gdp_tenth: f64,
+    /// Ticket #220 (version 0.08.2): how far a price may wander either side of the card figure,
+    /// which is now the MIDPOINT of its band rather than a constant. At 1 every price stays a whole
+    /// number and no resource can become free, which is why all three base prices rose by one to
+    /// make room -- Materials 2 to 3, Fuel 3 to 4, Energy 1 to 2. Kept optional so an old table
+    /// still loads, as `trade_post_base` is.
+    #[serde(default = "price_band_default")]
+    pub price_band: i64,
+    /// Ticket #220: the NET units of one resource, bought less sold across the whole table in a
+    /// turn, that move its price one step. 20 is a measured figure: a trading turn carries a median
+    /// 20 units across all four seats, so a normal turn's trading is visible without pegging the
+    /// price at its band's edge.
+    #[serde(default = "price_step_default")]
+    pub price_step_units: i64,
     /// Ticket #90 (version 0.06.0): retired; kept optional so an old table still loads.
     #[serde(default)]
     pub trade_post_base: Option<f64>,
@@ -1612,4 +1625,14 @@ impl Tables {
         let facilities: f64 = card.start_facilities.iter().map(|k| self.facility(*k).emissions * m).sum();
         industry + people + facilities
     }
+}
+
+
+/// Ticket #220 (version 0.08.2): defaults for a table written before the market moved.
+fn price_band_default() -> i64 {
+    1
+}
+
+fn price_step_default() -> i64 {
+    20
 }

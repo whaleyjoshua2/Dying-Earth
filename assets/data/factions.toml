@@ -230,9 +230,17 @@ per_repair_point = 10
 # Version 0.04 (ticket #42): the trading window. Ducats per unit bought; a sale returns the buying
 # price divided by sell_divisor (rounded down over the lot); a building bought for Ducats costs its
 # Materials times per_building_material.
-per_materials = 2
-per_fuel = 3
-per_energy = 1
+# Ticket #220 (version 0.08.2): each of the three rose by ONE and is now the MIDPOINT of a band
+# `price_band` wide, not a constant. Energy at 1 had no downward step at all in whole Ducats, and
+# raising only Energy would have been a balance change smuggled in as a display fix -- so all three
+# rose together. This IS a substantive change and not a display one: Materials +50%, Fuel +33%,
+# Energy +100%, on a currency that also buys Influence, Relief, Resettle and Leapfrogs, and the
+# AI's fixed lot of ten Materials now costs 30 Ducats where it cost 20.
+per_materials = 3
+per_fuel = 4
+per_energy = 2
+price_band = 1
+price_step_units = 20
 sell_divisor = 2
 per_building_material = 2
 bank_per_gdp_tenth = 4.0

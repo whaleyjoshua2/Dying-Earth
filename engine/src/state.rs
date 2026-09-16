@@ -786,6 +786,24 @@ impl BattleLine {
 /// **In version 0.08.0 the score does nothing mechanical.** It is read, not spent: no rule reads it
 /// and the computer players do not read it. It is built now so that it can be watched for a version
 /// and given teeth in 0.09 with evidence rather than a guess.
+/// Ticket #220 (version 0.08.2): the Trading window's prices, and the net units moved this turn
+/// that will shift them at the next settle.
+///
+/// Measured before it was built, and the measurement is why the rule ships in the shape it does:
+/// over 80 games the computer seats placed **zero** Sell orders and bought **only Materials** --
+/// 29,440 units, no Fuel, no Energy -- with the Prospectors alone 61% of all trading. So Materials
+/// sees one-way upward pressure from the computer, and Fuel and Energy move only when a human
+/// trades them. The designer chose to ship it anyway; giving the seats an appetite to sell, and to
+/// buy the other two, is a separate ticket.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Market {
+    /// The live price of Materials, Fuel and Energy, in that order. Zero means "not opened yet" and
+    /// is read as the card figure, so a fresh game and an old save behave alike.
+    pub price: [i64; 3],
+    /// Net units of each bought less sold this turn, across the whole table.
+    pub net: [i64; 3],
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Relations {
     /// `score[viewer][subject]`: what the seat at `viewer` thinks of the seat at `subject`.
@@ -840,6 +858,11 @@ pub struct Game {
     pub log: Vec<String>,
     /// Ticket #191 (version 0.08.0): what every Faction thinks of every other.
     pub relations: Relations,
+    /// Ticket #220 (version 0.08.2): the Trading window's prices, which move with what the table
+    /// bought and sold. `Game` is not itself a serde type -- the save is assembled by hand in
+    /// `save.rs` -- so this carries no attribute; a zero price there reads as the card figure, which
+    /// is how a save written before this version opens at the right place.
+    pub market: Market,
 }
 
 /// Ticket #50: every game seats all four Factions. The player picks one Faction and a start
@@ -1009,6 +1032,7 @@ impl Game {
             spectator: false,
             log: Vec::new(),
             relations: Relations::default(),
+            market: Market::default(),
             tables,
         };
         // Ticket #57: every Colony Slot on every Body draws its own four yields, in Body order then

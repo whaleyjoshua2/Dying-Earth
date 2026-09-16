@@ -31,7 +31,11 @@ pub const SAVE_VERSION: u32 = 1;
 /// and a Module kind, renames a Victory part, and gives every seat two new fields, so a file written
 /// by an earlier build describes a board this one cannot read. A refusal naming both versions is the
 /// right answer to that, and a silent partial load is not.
-pub const GAME_VERSION: &str = "0.08.0";
+/// Ticket #220 (version 0.08.2): moved again. The Trading window's prices are saved state now, and
+/// a file written by an earlier build describes a market this one cannot read -- its prices are
+/// absent, and the three base figures it was played at have each risen by one besides. A refusal
+/// naming both versions is the right answer; a silent partial load is not.
+pub const GAME_VERSION: &str = "0.08.2";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;
@@ -120,6 +124,11 @@ pub struct SavedGame {
     /// Ticket #191 (version 0.08.0): what every Faction thinks of every other.
     #[serde(default)]
     pub relations: Relations,
+    /// Ticket #220 (version 0.08.2): the Trading window's live prices travel with the game, so a
+    /// save reopens on the market it left. `#[serde(default)]` so a save written before this version
+    /// still loads: its zeroes read as the card figures.
+    #[serde(default)]
+    pub market: Market,
 }
 
 impl SavedGame {
@@ -152,6 +161,7 @@ impl SavedGame {
             spectator,
             log,
             relations,
+            market,
         } = g;
         SavedGame {
             seed: *seed,
@@ -178,6 +188,7 @@ impl SavedGame {
             spectator: *spectator,
             log: log.clone(),
             relations: relations.clone(),
+            market: market.clone(),
         }
     }
 
@@ -208,6 +219,7 @@ impl SavedGame {
             slot_yields: self.slot_yields,
             spectator: self.spectator,
             relations: self.relations,
+            market: self.market,
             log: self.log,
         }
     }

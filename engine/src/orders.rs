@@ -291,12 +291,61 @@ impl Game {
     /// What the seat still has after its pending orders. Bought Influence counts toward the Allotment.
     /// Ticket #42: Ducats per unit in the trading window, or None for what it does not sell.
     pub fn trade_price(&self, resource: Resource) -> Option<i64> {
-        let d = &self.tables.ducats;
+        let i = Self::market_row(resource)?;
+        Some(self.market_price_at(i))
+    }
+
+    /// Ticket #220 (version 0.08.2): which row of the market a resource is, or `None` for one that
+    /// is not for sale at all. Materials, Fuel and Energy, in that order.
+    pub fn market_row(resource: Resource) -> Option<usize> {
         match resource {
-            Resource::Materials => Some(d.per_materials),
-            Resource::Fuel => Some(d.per_fuel),
-            Resource::Energy => Some(d.per_energy),
+            Resource::Materials => Some(0),
+            Resource::Fuel => Some(1),
+            Resource::Energy => Some(2),
             _ => None,
+        }
+    }
+
+    /// The card figure for a row: the MIDPOINT of that resource's band since ticket #220.
+    pub fn market_base(&self, row: usize) -> i64 {
+        let d = &self.tables.ducats;
+        [d.per_materials, d.per_fuel, d.per_energy][row]
+    }
+
+    /// The live price. A zero in `market.price` means the market has not opened yet -- a fresh game,
+    /// or a save written before this version -- and reads as the card figure.
+    pub fn market_price_at(&self, row: usize) -> i64 {
+        let p = self.market.price[row];
+        if p <= 0 { self.market_base(row) } else { p }
+    }
+
+    /// Ticket #220 (version 0.08.2): the turn's trading moves each price, once, at the settle.
+    ///
+    /// `price_step_units` net units bought moves it a step up, the same sold moves it a step down,
+    /// and it sticks at the edge of its band -- the window does NOT begin refusing there, which
+    /// would quietly invent a stock limit this game does not have (`check_order` tests only that the
+    /// amount is positive and the resource has a price; nothing is ever decremented window-side).
+    ///
+    /// A price comes home only on a turn in which NOBODY traded that resource at all. A resource
+    /// under steady demand therefore stays dear rather than sliding back between purchases, which is
+    /// what makes cornering Fuel before a Launch Window worth doing.
+    pub fn settle_market(&mut self) {
+        let step = self.tables.ducats.price_step_units.max(1);
+        let band = self.tables.ducats.price_band.max(0);
+        for row in 0..3 {
+            let base = self.market_base(row);
+            let mut price = self.market_price_at(row);
+            let net = self.market.net[row];
+            if net >= step {
+                price += 1;
+            } else if net <= -step {
+                price -= 1;
+            } else if net == 0 {
+                // Quiet in this resource: one step home, and no further than home.
+                price += (base - price).signum();
+            }
+            self.market.price[row] = price.clamp(base - band, base + band);
+            self.market.net[row] = 0;
         }
     }
 
@@ -1585,9 +1634,19 @@ impl Game {
                 }
                 Order::RepairWithDucats { unit, points } => self.pending.repairs.push((seat, *unit, *points)),
                 Order::Buy { resource, amount } => {
+                    // Ticket #220 (version 0.08.2): only a Buy and a Sell move a price. Buying a
+                    // building outright for Ducats does NOT: it is a Ducat-for-building conversion
+                    // that takes no goods off the table, and a price reacting to a trade that
+                    // consumed no Materials would be reacting to nothing.
+                    if let Some(row) = Self::market_row(*resource) {
+                        self.market.net[row] += amount;
+                    }
                     self.log(format!("{} bought {} {} for {} Ducats.", self.seat_name(seat), amount, resource.name(), cost.ducats));
                 }
                 Order::Sell { resource, amount } => {
+                    if let Some(row) = Self::market_row(*resource) {
+                        self.market.net[row] -= amount;
+                    }
                     self.log(format!("{} sold {} {} for {} Ducats.", self.seat_name(seat), amount, resource.name(), -cost.ducats));
                 }
             }

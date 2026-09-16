@@ -180,6 +180,10 @@ impl Game {
         // Ticket #191 (version 0.08.0): the turn's offences are charged once, the quiet pairs
         // recover, and the slate is wiped.
         self.settle_relations();
+        // Ticket #220 (version 0.08.2): the turn's trading moves each price once, and the tally is
+        // wiped -- beside the Relations settle, and for the same reason: both read a whole turn's
+        // worth of acts and neither can be judged an order at a time.
+        self.settle_market();
         self.log("Phase 7: End");
         self.end_phase();
         if self.is_over() {
