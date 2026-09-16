@@ -5775,8 +5775,20 @@ fn relations_row(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSta
             let (viewer, subject) = if outward { (seat, other) } else { (other, seat) };
             let v = game.relations_score(viewer, subject);
             faction_link(ui, view, other, RichText::new(game.seat_name(other)).color(seat_colour(session, other)));
+            // Ticket #221 (version 0.08.2): the LEVEL is what a player reasons with and the number is
+            // the audit trail, so the level is on the row and the figure rides on its hover -- with
+            // the Blame part broken out, because a standing penalty nobody can see the cause of is
+            // the one thing that would make this grid unreadable.
             let colour = if v < 0 { Color32::from_rgb(230, 120, 100) } else { Color32::from_gray(190) };
-            ui.label(RichText::new(format!("{v:+}")).color(colour));
+            let blame = game.blame_relations_term(viewer, subject);
+            let deeds = game.relations_deeds(viewer, subject);
+            let floor = game.relations.floor[viewer.index()][subject.index()];
+            let mut tip = format!("{:+} in all: {:+} from what they have done, {:+} from their Blame.", v, deeds, blame);
+            if floor < 0 {
+                tip.push_str(&format!("
+Scarred: this pair can never recover above {floor:+}."));
+            }
+            ui.label(RichText::new(game.relations_level(viewer, subject)).color(colour)).on_hover_text(tip);
             ui.add_space(10.0);
         }
     });
@@ -5798,7 +5810,108 @@ fn relations_row(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSta
 /// names individual buildings in individual Regions, which is a targeting list, where the total is
 /// only the rate of a hoard the Victory window already prints to the unit. A **spectator** gets the
 /// breakdown on every seat and no disclosure line at all, having no side to keep secrets from.
-fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewState) {
+/// Ticket #226 (version 0.08.2): the Accords, on a rival's page of the Faction window.
+///
+/// What stands between the player's seat and this one, what it would take to strike one, and the two
+/// acts that raise Relations. The terms are ticked and offered together, because an Accord is one
+/// bargain rather than four; the computer seat answers at the Resolution by its own weights, and a
+/// refusal is not an offence.
+fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actions: &mut Vec<Action>) {
+    let me = Seat(0);
+    let r = &game.tables.relations;
+    ui.label(RichText::new("Accords").strong());
+
+    let standing = game.accords.iter().find(|a| a.holds(me, other) || (a.ending && ((a.a == me && a.b == other) || (a.a == other && a.b == me))));
+    if let Some(acc) = standing {
+        let names: Vec<&str> = acc
+            .terms
+            .iter()
+            .map(|t| match t {
+                Term::NonAggression => "non-aggression",
+                Term::Passage => "passage",
+                Term::Refuel => "refuel",
+                Term::ResearchAgreement => "a research agreement",
+            })
+            .collect();
+        if acc.ending {
+            ui.label(RichText::new(format!("Your Accord with the {} is over: it lapses at the next turn.", game.seat_name(other))).color(Color32::from_rgb(230, 190, 120)));
+        } else {
+            ui.label(format!("You hold an Accord with the {}: {}.", game.seat_name(other), names.join(", ")));
+            let order = Order::EndAccord { with: other };
+            let placed = session.pending.contains(&order);
+            if placed {
+                ui.label(RichText::new("You have declared it over this turn.").weak());
+            } else if ui
+                .button("Declare it over")
+                .on_hover_text("Free, and it takes a turn's notice: it lapses at the start of the next turn and you may act then. Acting against a term while it still stands is another matter -- it costs 3 and ends the whole Accord at once.")
+                .clicked()
+            {
+                actions.push(Action::Place(order));
+            }
+        }
+    } else {
+        // No Accord: the terms to offer. `view` is not threaded in here, so the ticks live in egui's
+        // own memory under this pair's id -- they are a scratch choice, not game state.
+        let id = egui::Id::new(("accord-terms", other.index()));
+        let mut picked: Vec<Term> = ui.ctx().memory(|m| m.data.get_temp(id).unwrap_or_default());
+        let friendly = game.relations_score(me, other) >= 7 && game.relations_score(other, me) >= 7;
+        for (term, label, tip) in [
+            (Term::NonAggression, "Non-aggression", "Neither spends Influence on a place the other holds, nor opens a Battle against them."),
+            (Term::Passage, "Passage", "Neither treats the other's Ships as a target, and a Blockade does not shut them out of the slot."),
+            (Term::Refuel, "Refuel", "Either may Refuel at the other's Space Stations."),
+            (Term::ResearchAgreement, "Research agreement", "Both parties' Research rises a tenth while it stands. Wants Friendly on both sides to strike, and once struck it stands whatever the scores later do."),
+        ] {
+            let mut on = picked.contains(&term);
+            let enabled = term != Term::ResearchAgreement || friendly;
+            let resp = ui.add_enabled(enabled, egui::Checkbox::new(&mut on, label));
+            let resp = if enabled { resp.on_hover_text(tip) } else { resp.on_disabled_hover_text("Both sides must be Friendly to strike a research agreement.") };
+            if resp.changed() {
+                if on {
+                    picked.push(term);
+                } else {
+                    picked.retain(|t| *t != term);
+                }
+                ui.ctx().memory_mut(|m| m.data.insert_temp(id, picked.clone()));
+            }
+        }
+        let order = Order::ProposeAccord { to: other, terms: picked.clone() };
+        let offered = session.pending.iter().any(|o| matches!(o, Order::ProposeAccord { to, .. } if *to == other));
+        if offered {
+            ui.label(RichText::new("Your offer goes to them this turn.").weak());
+        } else {
+            let ok = game.check_order(me, &session.pending, &order);
+            let resp = ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Offer the {} an Accord", game.seat_name(other))));
+            let resp = match &ok {
+                Ok(_) => resp.on_hover_text("They answer this turn, by their own reckoning. A refusal costs you nothing: it is not an offence."),
+                Err(e) => resp.on_disabled_hover_text(e.0.clone()),
+            };
+            if resp.clicked() {
+                actions.push(Action::Place(order));
+            }
+        }
+    }
+
+    // Tribute: the other of the two acts that raise Relations, and the only one available to a pair
+    // holding no Accord at all -- which is how a pair climbs out of Neutral in the first place.
+    ui.horizontal(|ui| {
+        for (materials, label) in [(false, format!("Pay {} Ducats", r.tribute_ducats)), (true, format!("Pay {} Materials", r.tribute_materials))] {
+            let order = Order::Tribute { to: other, materials };
+            let placed = session.pending.iter().any(|o| matches!(o, Order::Tribute { to, .. } if *to == other));
+            let ok = game.check_order(me, &session.pending, &order);
+            let resp = ui.add_enabled(ok.is_ok() && !placed, egui::Button::new(label));
+            let resp = match &ok {
+                Ok(_) if !placed => resp.on_hover_text("A tribute raises their view of you by one. A fixed gift, one a turn to a Faction: the gain is flat, so a larger one would buy no more."),
+                Ok(_) => resp.on_disabled_hover_text("You have already paid them a tribute this turn."),
+                Err(e) => resp.on_disabled_hover_text(e.0.clone()),
+            };
+            if resp.clicked() {
+                actions.push(Action::Place(order));
+            }
+        }
+    });
+}
+
+fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
     if !view.show_factions {
         return;
     }
@@ -5929,15 +6042,34 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         relations_row(ui, session, game, view, seat, false);
         // The note the grid carried, kept word for word in substance: the scale, and that nothing
         // reads these figures.
+        // Ticket #221/#222/#224 (version 0.08.2): rewritten, because the old note ended "nothing in
+        // this version reads these figures: they are a record, not a rule", and that is now flatly
+        // false. Blame feeds them, they bite the challenge margin, and they gate the Accords.
         let r = &game.tables.relations;
         ui.label(
             RichText::new(format!(
-                "{:+} to {:+} from a neutral {}. A score falls {} for each turn the pair are crossed -- Influence spent on a place the other holds, or a Battle opened against them -- and recovers {} every {} quiet turns, never above {}. Nothing in this version reads these figures: they are a record, not a rule, and half of all ordered pairs never cross each other at all in a whole game.",
-                r.best, r.worst, r.start, r.fall_per_offending_turn, r.recover, r.quiet_turns, r.start
+                "{:+} to {:+} from a neutral {}, read as six levels from Friendly to Hostile. A score is what the pair have DONE to each other plus what this Faction makes of the other's Blame -- hover a level for the two figures. Offences differ in weight and a turn charges every one, to {} at most; quiet mends {} every {} turns below neutral and lapses half as fast above it. A pair crossed on {} turns can never fully recover again.",
+                r.best, r.worst, r.start, r.turn_cap, r.recover, r.quiet_turns, r.scar_turns
             ))
             .weak(),
         );
+        ui.label(
+            RichText::new("A rival that holds you at less than neutral defends its places against you a little harder, and an Accord wants a level it will not strike below.")
+                .weak(),
+        );
         ui.add_space(6.0);
+
+        // 4b. Ticket #226 (version 0.08.2): the Accords, where the designer put them -- "add
+        // necessary UI to faction screen". No new screen: this window already has a Faction selector
+        // and already shows the two Relations rows a player consults before offering anything, so
+        // the controls belong beside them.
+        //
+        // Only on a RIVAL's page, and never for a spectator, since an Accord is struck between the
+        // player's seat and somebody else. Your own page has nobody to strike one with.
+        if !session.spectator && seat != Seat(0) {
+            accords_block(ui, session, game, seat, actions);
+            ui.add_space(6.0);
+        }
 
         // 5. Holdings, which no window counted for anybody before this one.
         ui.label(RichText::new("Holdings").strong());
@@ -6251,7 +6383,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
     }
     // Ticket #203 (version 0.08.1): the Faction window, which took Relations and Blame off the
     // window above and brought the setup screen's Faction card in-game behind them.
-    faction_window(ctx, session, game, view);
+    faction_window(ctx, session, game, view, actions);
     match view.popup {
         // Ticket #105 (version 0.07.0): the engine refused to end the turn, and says why. The rule
         // is worth nothing if the player is left wondering why the button did nothing.
