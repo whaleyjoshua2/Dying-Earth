@@ -607,6 +607,34 @@ fn kind_glyph(ui: &mut Ui, kind: Kind, size: f32) {
 /// Ticket #138 (version 0.07.3): a button with a kind glyph inside it for a kind whose glyph is
 /// drawn rather than loaded (the Army's shield), so it looks and behaves like `Button::image_and_text`
 /// does for the kinds that have art. A clickable group in the button's own visuals, as `priced_button`.
+/// Ticket #218 (version 0.08.2): the founding button, carrying the site's four yields ON ITS FACE in
+/// glyph and number rather than on a hover. The player already reads that same row under every slot
+/// label on the Body Surface Map (`slot_yield_label`), so the moment of the decision uses the
+/// notation they have been reading all along instead of a second one. Ticket #211 put these figures
+/// on a hover one version ago; this supersedes that at the designer's word, and the hover is dropped
+/// entirely -- it held the same four figures in words, so it duplicated the face and nothing else.
+///
+/// Built as `glyph_button` is, a clickable frame of its own, because a plain egui button's face is
+/// text and cannot carry the glyphs.
+fn found_button(ui: &mut Ui, yields: &dying_earth_engine::SlotYields, label: &str) -> egui::Response {
+    ui.scope_builder(egui::UiBuilder::new().sense(egui::Sense::click()), |ui| {
+        let resp = ui.response();
+        let visuals = *ui.style().interact(&resp);
+        egui::Frame::new()
+            .inner_margin(egui::Margin::symmetric(6, 4))
+            .corner_radius(visuals.corner_radius)
+            .fill(visuals.weak_bg_fill)
+            .stroke(visuals.bg_stroke)
+            .show(ui, |ui| {
+                ui.vertical(|ui| {
+                    ui.label(RichText::new(label).color(visuals.text_color()));
+                    text_with_icons(ui, &slot_yield_hover(yields), 13.0, visuals.text_color());
+                });
+            });
+    })
+    .response
+}
+
 fn glyph_button(ui: &mut Ui, kind: Kind, text: &str) -> egui::Response {
     ui.scope_builder(egui::UiBuilder::new().sense(egui::Sense::click()), |ui| {
         let resp = ui.response();
@@ -4130,7 +4158,7 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             SlotBoxKind::Free => {
                 let first_free = boxes.iter().position(|(k, _)| matches!(k, SlotBoxKind::Free)) == Some(n);
                 let tip = format!("Free {side} slot: click it to build here.{}", if *coastal { "\nOn the coast, the sea can take what stands here at a threshold." } else { "" });
-                if hab_tile(ui, rect, id, None, "", TileState::Free, first_free && view.slot_box == Some(SlotBox::Free), edge, tip).clicked() {
+                if hab_tile(ui, rect, id, None, "", TileState::Free(mine), first_free && view.slot_box == Some(SlotBox::Free), edge, tip).clicked() {
                     view.slot_box = Some(SlotBox::Free);
                 }
             }
@@ -4154,7 +4182,7 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             facility_build_buttons(ui, session, game, sid, actions);
         }
         _ => {
-            ui.label(RichText::new("Click a box for its figures and controls, a free box to build.").weak());
+            ui.label(RichText::new("Click a box for its figures and controls.").weak());
         }
     }
 }
@@ -4873,10 +4901,7 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
         // four yields are drawn under every slot on the Body view already, but the moment of the
         // DECISION said nothing about them. In glyphs, at the designer's word -- each figure's word
         // heads its multiplier, which is the form the one glyph rule reads (ticket #132).
-        if ui.button(format!("Found a Colony here with the {} Colonists aboard {}", s.colonists, game.ship_name(s)))
-            .on_hover_ui(|ui| hover_with_icons(ui, &slot_yield_hover(&game.slot_yields(body, slot))))
-            .clicked()
-        {
+        if found_button(ui, &game.slot_yields(body, slot), &format!("Found a Colony here with the {} Colonists aboard {}", s.colonists, game.ship_name(s))).clicked() {
             actions.push(Action::Place(order));
         }
     }
@@ -5086,15 +5111,13 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     );
                 }
                 for slot in game.free_slots_on(body).into_iter().filter(|_| body != BodyId::Earth || game.antarctica_open) {
-                    cost_button_with_hover(
-                        ui,
-                        game,
-                        &session.pending,
-                        Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) },
-                        &format!("Found a Colony at {}", game.tables.body(body).slots[slot as usize].name),
-                        Some(slot_yield_hover(&game.slot_yields(body, slot))),
-                        actions,
-                    );
+                    // Both founding doors read the same, at the designer's word: the same decision
+                    // reached two ways should not want learning twice.
+                    let order = Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) };
+                    let label = format!("Found a Colony at {}", game.tables.body(body).slots[slot as usize].name);
+                    if found_button(ui, &game.slot_yields(body, slot), &label).clicked() {
+                        actions.push(Action::Place(order));
+                    }
                 }
             }
         }
@@ -5387,7 +5410,11 @@ enum TileState {
     Standing,
     Mothballed,
     Building,
-    Free,
+    /// Ticket #218 (version 0.08.2): the flag says whether the PLAYER could actually build here --
+    /// their own place, and not a slot the sea has taken. A tile they can use invites the click;
+    /// one they cannot keeps the old word, because telling somebody to click a thing that will do
+    /// nothing is worse than the word it replaced.
+    Free(bool),
     /// Ticket #146: a coastal slot the sea has taken, drawn under water.
     Flooded,
 }
@@ -5410,7 +5437,7 @@ fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name
         edge.unwrap_or(Color32::from_gray(120))
     };
     match state {
-        TileState::Free => {
+        TileState::Free(yours) => {
             // A dashed border, four sides of short strokes, and the word in the middle.
             let dash = 5.0;
             let step = 9.0;
@@ -5429,7 +5456,12 @@ fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name
                 painter.line_segment([Pos2::new(rect.max.x, y), Pos2::new(rect.max.x, y2)], stroke);
                 y += step;
             }
-            painter.text(rect.center(), egui::Align2::CENTER_CENTER, "free", FontId::proportional(12.0), Color32::from_gray(130));
+            // Ticket #218 (version 0.08.2): a tile the player can build in says so. Two lines: the
+            // tile is 84 square and `Click to Build` is about 78 wide at 12pt, so one line would
+            // leave three pixels of air and break if the font ever moved.
+            let (word, ink) = if yours { ("Click to
+Build", Color32::from_gray(165)) } else { ("free", Color32::from_gray(130)) };
+            painter.text(rect.center(), egui::Align2::CENTER_CENTER, word, FontId::proportional(12.0), ink);
         }
         _ => {
             let fill = if state == TileState::Mothballed { Color32::from_rgb(36, 36, 42) } else { Color32::from_rgb(48, 48, 58) };
@@ -5574,7 +5606,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         // One free place is as good as another, so the first stands for the click.
         let selected = fi == 0 && view.hab_tile == Some(HabTile::Free);
         let tip = format!("Room for another Module: click it to build here.\n{} places are free from the start and one more for every {} Colonist.", game.tables.slots.base, game.tables.slots.per_colonist);
-        if hab_tile(ui, tile_rect(i), ui.id().with(("hab-free", fi)), None, "", TileState::Free, selected, None, tip).clicked() {
+        if hab_tile(ui, tile_rect(i), ui.id().with(("hab-free", fi)), None, "", TileState::Free(mine), selected, None, tip).clicked() {
             view.hab_tile = Some(HabTile::Free);
         }
         i += 1;
@@ -5607,7 +5639,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             ui.label(RichText::new("Room for another Module.").weak());
         }
         _ => {
-            ui.label(RichText::new("Click a tile for its figures and controls, a free tile to build.").weak());
+            ui.label(RichText::new("Click a tile for its figures and controls.").weak());
         }
     }
 }
