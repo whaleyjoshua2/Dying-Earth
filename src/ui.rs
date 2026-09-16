@@ -1696,6 +1696,42 @@ fn game_screen(
                     view.pitch = (view.pitch + d.y * 0.008).clamp(-1.3, 1.3);
                 }
             }
+            // Ticket #216 (version 0.08.2): hovering a Faction's line in an in-orbit block names
+            // that Faction's hulls. The block itself is unchanged -- the designer wanted the maps to
+            // look as they do -- so this is the only way a name reaches a Ship sitting at a Body.
+            // Both maps use it: the Solar System Map's stack labels already carried a hotspot for
+            // the click, and the Body Surface Map's block grew one above.
+            //
+            // Capped at five with a tail, which keeps the standing six-line limit on a tooltip: the
+            // worst fleet ever measured was 27 hulls, and 27 lines over an eighteen-pixel Earth is
+            // what the stress mockup showed to be unreadable. The click is untouched and still
+            // selects the stack, where the full list lives.
+            if let Some(p) = resp.hover_pos() {
+                let mut best: Option<(f32, BodyId, Seat)> = None;
+                for h in &hotspots {
+                    if let Hit::Select(Selection::ShipStack(b, s)) = h.hit {
+                        let d = h.pos.distance(p);
+                        if d <= h.radius && best.map(|(bd, _, _)| d < bd).unwrap_or(true) {
+                            best = Some((d, b, s));
+                        }
+                    }
+                }
+                if let Some((_, b, s)) = best {
+                    let ids = game.ships_at(s, b);
+                    let mut lines: Vec<String> = ids
+                        .iter()
+                        .filter_map(|id| game.ship(*id))
+                        .take(5)
+                        .map(|sh| format!("{} ({})", game.ship_name(sh), sh.kind.name().to_lowercase()))
+                        .collect();
+                    if ids.len() > 5 {
+                        lines.push(format!("and {} more - click the stack", ids.len() - 5));
+                    }
+                    if !lines.is_empty() {
+                        resp.show_tooltip_text(lines.join("\n"));
+                    }
+                }
+            }
             if resp.hovered() {
                 let scroll = ui.input(|i| i.smooth_scroll_delta.y);
                 if scroll.abs() > 0.0 {
@@ -2258,28 +2294,38 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     slot_labels(painter, session, game, body, &visible, hotspots);
                     // The band along the top: Ship stacks in orbit and Orbital Control. Ticket #50:
                     // four seats will not fit on one line, so each takes its own in its own colour.
-                    let mut band: Vec<(String, Color32, Option<Kind>)> = Vec::new();
+                    // Ticket #216 (version 0.08.2): a line that belongs to a Faction's stack carries
+                    // its seat, so the block can grow hotspots and a hover naming the hulls. A
+                    // station's line and the Orbital Control line belong to nobody and carry None.
+                    let mut band: Vec<(String, Color32, Option<Kind>, Option<Seat>)> = Vec::new();
                     for seat in Seat::ALL {
                         let ids = game.ships_at(seat, body);
                         if !ids.is_empty() {
                             let kind = Kind::of_ships(ids.iter().filter_map(|id| game.ship(*id)));
-                            band.push((format!("{}: {} Ship(s), strength {}", game.seat_name(seat), ids.len(), game.ship_stack_strength(seat, body)), seat_colour(session, seat), Some(kind)));
+                            band.push((format!("{}: {} Ship(s), strength {}", game.seat_name(seat), ids.len(), game.ship_stack_strength(seat, body)), seat_colour(session, seat), Some(kind), Some(seat)));
                         }
                     }
                     for c in game.colonies.iter().filter(|c| c.in_orbit && c.body == body) {
                         let who = c.control.director();
                         let name = who.map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".into());
-                        band.push((format!("{} ({})", game.station_name(body, c.slot), name), who.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY), Some(Kind::Station)));
+                        band.push((format!("{} ({})", game.station_name(body, c.slot), name), who.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY), Some(Kind::Station), None));
                     }
                     band.push(match game.orbital_control(body) {
-                        Some(s) => (format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s), None),
-                        None => ("Orbital Control: nobody".to_string(), Color32::LIGHT_GRAY, None),
+                        Some(s) => (format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s), None, None),
+                        None => ("Orbital Control: nobody".to_string(), Color32::LIGHT_GRAY, None, None),
                     });
                     let rect = painter.clip_rect();
                     let x = rect.center().x - 120.0;
                     label_at(painter, Pos2::new(x, rect.min.y + 50.0), &format!("In orbit around {}", game.tables.body(body).name), Color32::WHITE, 13.0);
-                    for (i, (text, colour, kind)) in band.iter().enumerate() {
-                        label_kind_at(painter, Pos2::new(x, rect.min.y + 70.0 + 18.0 * i as f32), *kind, text, *colour, 12.0);
+                    for (i, (text, colour, kind, seat)) in band.iter().enumerate() {
+                        let at = Pos2::new(x, rect.min.y + 70.0 + 18.0 * i as f32);
+                        label_kind_at(painter, at, *kind, text, *colour, 12.0);
+                        // Ticket #216: a Faction's line gets a hit target, so hovering it can name
+                        // that Faction's hulls. The Solar System Map's block already had one for the
+                        // click; this block had none at all, being painted at fixed positions.
+                        if let Some(s) = seat {
+                            hotspots.push(Hotspot { pos: at, radius: 14.0, hit: Hit::Select(Selection::ShipStack(body, *s)) });
+                        }
                     }
                 }
             }
