@@ -11,24 +11,35 @@ Twenty seeds by four seatings at the shipped climate cell (`--steps=300 --balanc
 | Archivists | 6 | **7** | +1 |
 | **Collapses** | **14 of 80** | **23 of 80** | **+9** |
 
-## The finding that wants the designer's eye
+## The collapse rate rose, and that is the point
 
 **The world collapses in 23 of 80 games where it collapsed in 14.** That is the largest movement in
-the batch and it is not what any of the eleven decisions set out to do. The win table moved much less
-than the collapse rate did.
+the batch.
 
-The likeliest cause is the one substantive balance change in the version, and it was flagged as such
-when it was decided: **every Trading window price rose by one** — Materials +50%, Fuel +33%, Energy
-+100% — which is a broad cut to what a Ducat buys, on a currency that also pays for Relief, Resettle,
-Leapfrogs and Influence. A Custodian with less buying power raises fewer Scrubbers and buys fewer
-Leapfrogs, and the Natural Sink is what stands between the board and the Collapse Line.
+It was first written up here as a problem wanting attention. **The designer's reading, and the one
+that stands: a rise in collapses is a POSITIVE.** This is a game about colonizing the solar system
+*before ecological collapse overtakes Earth*, so a world that collapses more often is one where the
+climate genuinely bites — where the Collapse Line is a deadline being raced rather than a decoration.
+By that reading the 0.08.1 figure of 14 in 80 was on the low side, not the right side.
 
-The Arkwrights halving (7 to 3) is the other movement worth a look; they were already the thinnest
-seat.
+The likeliest cause is the version's one substantive balance change: **every Trading window price rose
+by one**, which cuts what a Ducat buys on a currency that also pays for Relief, Resettle and
+Leapfrogs. Fewer Scrubbers and Leapfrogs means a smaller Natural Sink. That is recorded as the
+mechanism, not as a fault to be corrected.
 
-**Nothing here has been acted on.** The rule was shipped knowingly and the sweep is doing its job by
-saying what it cost. Whether to soften the price rise, to compensate elsewhere, or to accept a
-hotter world is a design decision and belongs to the designer.
+## The win table, which is the figure that does want watching
+
+| Faction | 0.08.1 | 0.08.2 | |
+|---|---|---|---|
+| Custodians | 42 | **37** | −5 |
+| Prospectors | 11 | **10** | −1 |
+| Arkwrights | 7 | **3** | −4 |
+| Archivists | 6 | **7** | +1 |
+
+The spread is no better than it was: the Custodians still take nearly half the table, and **the
+Arkwrights have halved, from 7 to 3**, which leaves the thinnest Faction thinner. Nothing in this
+version set out to move either figure, and the Arkwrights' fall is the one worth a look — they were
+already the seat with one signature rule, no faction-only order and no Unique Module.
 
 ## What this sweep does NOT yet report
 
