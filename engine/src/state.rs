@@ -786,6 +786,53 @@ impl BattleLine {
 /// **In version 0.08.0 the score does nothing mechanical.** It is read, not spent: no rule reads it
 /// and the computer players do not read it. It is built now so that it can be watched for a version
 /// and given teeth in 0.09 with evidence rather than a guess.
+/// Ticket #226 (version 0.08.2): one Term of an Accord. Tribute is not here: it is a one-turn order
+/// that pays and is done, where these hold until the Accord ends.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Term {
+    /// Neither spends Influence on a place the other holds, nor opens a Battle against them. NOT
+    /// enforced by refusing the order: the act is allowed and costs +3, and ends the whole Accord.
+    NonAggression,
+    /// Neither treats the other's Ships as a target, and a Blockade does not shut the other out of
+    /// the slot. Measured near-dead on today's board -- the Blockade rung fired zero times in 80
+    /// games -- and kept deliberately, because it will matter for Mars.
+    Passage,
+    /// Either may Refuel at the other's Space Stations. Also near-dead today: off-Earth stations run
+    /// at 0-1 a game and three Factions each hold their own station over Earth.
+    Refuel,
+    /// Both parties' Research rises a tenth while it stands. Needs Friendly to STRIKE, and the gate
+    /// is checked only at that moment: a pair that worked nine or more acts to reach Friendly should
+    /// not lose it because a rival's emissions ticked up and moved a Blame step.
+    ResearchAgreement,
+}
+
+/// Ticket #226 (version 0.08.2): an Accord between two Factions, holding one or more Terms.
+///
+/// `diplomacy` is on Relations' own `_Avoid_` list in the glossary, so the system has a word of its
+/// own. Ending one takes a turn's notice and is free; VIOLATING a term while it stands costs +3 and
+/// ends the whole Accord -- without which a Faction could violate non-aggression every turn, pay 3
+/// each time, and keep drawing a permanent tenth of extra Research from a partner it was attacking.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Accord {
+    pub a: Seat,
+    pub b: Seat,
+    pub terms: Vec<Term>,
+    /// The turn it was struck, which is what `accord_kept` counts from.
+    pub struck: u32,
+    /// The last turn its keeping was paid for, so a long Accord pays every `accord_kept_turns`.
+    pub paid: u32,
+    /// Ticket #226: declared over on this turn; it lapses at the next turn's start and costs
+    /// nothing. That also gives the board a visible tell -- an Accord announced as ending is a turn
+    /// of warning that something is coming.
+    pub ending: bool,
+}
+
+impl Accord {
+    pub fn holds(&self, x: Seat, y: Seat) -> bool {
+        !self.ending && ((self.a == x && self.b == y) || (self.a == y && self.b == x))
+    }
+}
+
 /// Ticket #220 (version 0.08.2): the Trading window's prices, and the net units moved this turn
 /// that will shift them at the next settle.
 ///
@@ -882,6 +929,8 @@ pub struct Game {
     /// `save.rs` -- so this carries no attribute; a zero price there reads as the card figure, which
     /// is how a save written before this version opens at the right place.
     pub market: Market,
+    /// Ticket #226 (version 0.08.2): the Accords standing between pairs of Factions.
+    pub accords: Vec<Accord>,
 }
 
 /// Ticket #50: every game seats all four Factions. The player picks one Faction and a start
@@ -1052,6 +1101,7 @@ impl Game {
             log: Vec::new(),
             relations: Relations::default(),
             market: Market::default(),
+            accords: Vec::new(),
             tables,
         };
         // Ticket #57: every Colony Slot on every Body draws its own four yields, in Body order then
@@ -2938,6 +2988,13 @@ impl Game {
         if offender == victim || weight <= 0 {
             return;
         }
+        // Ticket #226 (version 0.08.2): non-aggression is NOT enforced by refusing the order -- the
+        // act is allowed and paid for. Acting against a term while your word still stands breaks the
+        // whole Accord, which is what stops a Faction violating it every turn, paying 3 each time,
+        // and keeping a permanent tenth of extra Research from a partner it is attacking.
+        if self.accord_has(offender, victim, Term::NonAggression) {
+            self.break_accord(offender, victim);
+        }
         let (v, o) = (victim.index(), offender.index());
         self.relations.owed[v][o] += weight;
         self.relations.offended[v][o] = true;
@@ -2993,6 +3050,116 @@ impl Game {
         // behave as x1 at the first step, which is the step most Factions ever reach.
         let raw = (steps * coefficient).trunc() as i64;
         -raw.min(c.blame_cap)
+    }
+
+    /// Ticket #226 (version 0.08.2): does an Accord standing between these two carry this Term?
+    /// An Accord declared as ending carries nothing: it lapses at the next turn's start, and the
+    /// turn's notice is what makes ending free where violating costs.
+    pub fn accord_has(&self, x: Seat, y: Seat, term: Term) -> bool {
+        self.accords.iter().any(|acc| acc.holds(x, y) && acc.terms.contains(&term))
+    }
+
+    /// Ticket #226: strike one. The Friendly gate on a research agreement is checked HERE and only
+    /// here; once made it stands whatever the score later does.
+    pub fn strike_accord(&mut self, a: Seat, b: Seat, terms: Vec<Term>) -> Result<(), String> {
+        if a == b {
+            return Err("a Faction cannot strike an Accord with itself".into());
+        }
+        if self.accords.iter().any(|acc| acc.holds(a, b)) {
+            return Err("these two already hold an Accord".into());
+        }
+        if terms.contains(&Term::ResearchAgreement) && (self.relations_score(a, b) < 7 || self.relations_score(b, a) < 7) {
+            return Err("a research agreement wants Friendly on both sides".into());
+        }
+        let turn = self.turn;
+        self.accords.push(Accord { a, b, terms, struck: turn, paid: turn, ending: false });
+        Ok(())
+    }
+
+    /// Ticket #226: declare it over. Free, and it lapses at the next turn's start.
+    pub fn end_accord(&mut self, a: Seat, b: Seat) {
+        if let Some(acc) = self.accords.iter_mut().find(|acc| acc.holds(a, b)) {
+            acc.ending = true;
+        }
+    }
+
+    /// Ticket #226: `breaker` acted against a term while their word still stood. The offence is
+    /// weight 3 -- the same rung as opening a Battle -- and the whole Accord ends at once, so the +3
+    /// is the lesser cost of betrayal and losing the arrangement is the real one.
+    pub fn break_accord(&mut self, breaker: Seat, other: Seat) {
+        if !self.accords.iter().any(|acc| acc.holds(breaker, other)) {
+            return;
+        }
+        self.accords.retain(|acc| !acc.holds(breaker, other));
+        self.offend_by(breaker, other, 3);
+        let text = format!("{} broke their Accord with {}.", self.seat_name(breaker), self.seat_name(other));
+        self.log(text);
+    }
+
+    /// Ticket #226 (version 0.08.2): run once a turn, beside the Relations settle.
+    ///
+    /// An Accord declared over lapses now -- the turn's notice is what makes ending free where
+    /// violating costs +3 -- and one that has stood `accord_kept_turns` pays both sides their act.
+    /// That act is also the only thing in the game that lifts a scarred pair's floor, one step at a
+    /// time, which is what gives a wronged pair a road back.
+    pub fn settle_accords(&mut self) {
+        let turn = self.turn;
+        let period = self.tables.relations.accord_kept_turns;
+        let lapsed: Vec<(Seat, Seat)> = self.accords.iter().filter(|a| a.ending).map(|a| (a.a, a.b)).collect();
+        for (a, b) in lapsed {
+            self.log(format!("The Accord between {} and {} has lapsed.", self.seat_name(a), self.seat_name(b)));
+        }
+        self.accords.retain(|a| !a.ending);
+        let mut paid: Vec<(Seat, Seat)> = Vec::new();
+        for acc in self.accords.iter_mut() {
+            if period > 0 && turn.saturating_sub(acc.paid) >= period {
+                acc.paid = turn;
+                paid.push((acc.a, acc.b));
+            }
+        }
+        for (a, b) in paid {
+            self.credit(a, b);
+            self.credit(b, a);
+            // The scar's only remedy: an Accord kept lifts the floor a step, on both sides.
+            for (x, y) in [(a, b), (b, a)] {
+                let f = &mut self.relations.floor[x.index()][y.index()];
+                if *f < 0 {
+                    *f += 1;
+                }
+            }
+            self.log(format!("The Accord between {} and {} has held.", self.seat_name(a), self.seat_name(b)));
+        }
+    }
+
+    /// Ticket #226 (version 0.08.2): would `seat` accept this offer from `from`?
+    ///
+    /// The arithmetic is the one `Candidate::score` already performs everywhere else: it accepts
+    /// when what it gets exceeds what it gives, scaled by what it thinks of the offerer. Plus one
+    /// hard floor -- it NEVER accepts a term that would lose it the game, so no non-aggression with
+    /// a Faction one turn from its Victory Condition.
+    ///
+    /// This is the largest risk on the ticket and is recorded as such: a seat that accepts anything
+    /// is exploitable, one that accepts nothing makes the whole system invisible. The sweep must
+    /// report Accords struck, by term and by seat.
+    pub fn accord_acceptable(&self, seat: Seat, from: Seat, terms: &[Term]) -> bool {
+        // Never help somebody already at the door.
+        if self.progress(from).score() >= 0.95 {
+            return false;
+        }
+        let view = self.relations_score(seat, from);
+        // Non-aggression from somebody it holds nothing against is easy; from somebody it loathes it
+        // is not. A research agreement is its own gate and needs no opinion beyond Friendly.
+        terms.iter().all(|t| match t {
+            Term::ResearchAgreement => true,
+            Term::NonAggression => view >= -2,
+            Term::Passage | Term::Refuel => view >= -5,
+        })
+    }
+
+    /// Ticket #226: a research agreement pays both parties a tenth more Research while it stands.
+    pub fn research_agreement_multiplier(&self, seat: Seat) -> f64 {
+        let any = Seat::ALL.into_iter().any(|other| other != seat && self.accord_has(seat, other, Term::ResearchAgreement));
+        if any { 1.10 } else { 1.0 }
     }
 
     /// Ticket #221 (version 0.08.2): the named level a score reads as. The level is what a player

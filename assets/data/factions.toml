@@ -230,6 +230,13 @@ positive_quiet_turns = 8
 # an Accord act, so a pair floored below the level an Accord can be struck at would have no road back.
 scar_turns = 4
 scar_floor = -3
+# Ticket #226 (version 0.08.2): a tribute is a FIXED gift, not an amount the giver picks -- the
+# Relations gain is the flat `act_gain`, so a free amount would let one Ducat buy what fifty buys.
+# An Accord kept pays every `accord_kept_turns` turns, repeatably, and is the only thing in the game
+# that lifts a scarred pair's floor.
+tribute_ducats = 25
+tribute_materials = 15
+accord_kept_turns = 4
 
 [venture_capital]
 max_share = 0.8

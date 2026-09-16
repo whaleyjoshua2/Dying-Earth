@@ -184,6 +184,8 @@ impl Game {
         // wiped -- beside the Relations settle, and for the same reason: both read a whole turn's
         // worth of acts and neither can be judged an order at a time.
         self.settle_market();
+        // Ticket #226 (version 0.08.2): Accords declared over lapse, and those that have stood pay.
+        self.settle_accords();
         self.log("Phase 7: End");
         self.end_phase();
         if self.is_over() {

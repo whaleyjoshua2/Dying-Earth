@@ -3223,6 +3223,22 @@ fn roster_order_touches_state(o: &Order, sid: StateId) -> bool {
 
 fn order_text(game: &Game, o: &Order) -> String {
     match o {
+        // Ticket #226 (version 0.08.2): the Accord orders, so a pending one reads in the order list
+        // like any other and can be cancelled like any other.
+        Order::ProposeAccord { to, terms } => {
+            let names: Vec<&str> = terms
+                .iter()
+                .map(|t| match t {
+                    Term::NonAggression => "non-aggression",
+                    Term::Passage => "passage",
+                    Term::Refuel => "refuel",
+                    Term::ResearchAgreement => "a research agreement",
+                })
+                .collect();
+            format!("Offer the {} an Accord: {}", game.seat_name(*to), names.join(", "))
+        }
+        Order::EndAccord { with } => format!("Declare your Accord with the {} over", game.seat_name(*with)),
+        Order::Tribute { to, materials } => format!("Pay the {} a tribute in {}", game.seat_name(*to), if *materials { "Materials" } else { "Ducats" }),
         Order::BuildFacility { state, kind } => format!("Build {} in {}", kind.name(), game.tables.state(*state).name),
         Order::RaiseIndustry { state } => format!("Raise Industry Level in {}", game.tables.state(*state).name),
         Order::BuildModule { colony, kind } => format!("Build {} at {}", kind.name(), game.place_name(Place::Colony(*colony))),

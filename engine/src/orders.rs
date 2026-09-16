@@ -93,6 +93,16 @@ pub enum Order {
     /// nothing toward the Research Lead. Set once, it holds until it is set again, and it is read
     /// at the next Income; it never moves Research that Income has already paid out.
     SetArchiveFunding { on: bool },
+    /// Ticket #226 (version 0.08.2): offer an Accord to another Faction. A computer seat answers at
+    /// the Resolution by its own weights; a refused offer is NOT an offence, since punishing a
+    /// refusal would make every offer a threat.
+    ProposeAccord { to: Seat, terms: Vec<Term> },
+    /// Ticket #226: declare a standing Accord over. Free, and it lapses at the next turn's start.
+    EndAccord { with: Seat },
+    /// Ticket #226: a fixed gift, one per pair per turn, paying +1 Relations. Fixed rather than a
+    /// free amount because the gain is flat: without a fixed price a one-Ducat tribute would buy the
+    /// same point as a fifty-Ducat one.
+    Tribute { to: Seat, materials: bool },
     /// Version 0.07.3 (ticket #134): Max repeats every turn on one place until it is switched off
     /// -- `Some(place)` turns it on there, `None` turns it off. Free, and it spends nothing by
     /// itself: what it sets is whether the interface places next turn's whole Allotment on that
@@ -425,6 +435,49 @@ impl Game {
                 // The same legality as a Materials repair; only the payment differs.
                 let materials_form = Order::Repair { unit: *unit, points: *points };
                 self.check_order_inner(seat, pending, &materials_form, false).map(|_| cost)
+            }
+            Order::ProposeAccord { to, terms } => {
+                if *to == seat {
+                    return fail("an Accord is struck with another Faction");
+                }
+                if terms.is_empty() {
+                    return fail("an Accord wants at least one Term");
+                }
+                if self.accords.iter().any(|a| a.holds(seat, *to)) {
+                    return fail("you already hold an Accord with them");
+                }
+                // The Friendly gate is checked at the OFFER as well as at the strike, so a player is
+                // told now rather than after a computer seat has said yes.
+                if terms.contains(&Term::ResearchAgreement) && (self.relations_score(seat, *to) < 7 || self.relations_score(*to, seat) < 7) {
+                    return fail("a research agreement wants Friendly on both sides");
+                }
+                if pending.iter().any(|o| matches!(o, Order::ProposeAccord { to: t, .. } if t == to)) {
+                    return fail("one offer a turn to a Faction");
+                }
+                Ok(cost)
+            }
+            Order::EndAccord { with } => {
+                if !self.accords.iter().any(|a| a.holds(seat, *with)) {
+                    return fail("you hold no Accord with them");
+                }
+                Ok(cost)
+            }
+            Order::Tribute { to, materials } => {
+                if *to == seat {
+                    return fail("a tribute is paid to another Faction");
+                }
+                let t = &self.tables.relations;
+                let s = self.seat(seat).stockpile;
+                if *materials && s.materials < t.tribute_materials {
+                    return fail("not enough Materials for a tribute");
+                }
+                if !*materials && s.ducats < t.tribute_ducats {
+                    return fail("not enough Ducats for a tribute");
+                }
+                if pending.iter().any(|o| matches!(o, Order::Tribute { to: x, .. } if x == to)) {
+                    return fail("one tribute a turn to a Faction");
+                }
+                Ok(cost)
             }
             Order::Buy { resource, amount } => {
                 if *amount <= 0 {
@@ -1633,6 +1686,37 @@ impl Game {
                     self.log(format!("{} bought {} Influence with Ducats.", self.seat_name(seat), amount));
                 }
                 Order::RepairWithDucats { unit, points } => self.pending.repairs.push((seat, *unit, *points)),
+                Order::ProposeAccord { to, terms } => {
+                    // Ticket #226 (version 0.08.2): a computer seat answers by its own weights, and
+                    // never accepts a term that would lose it the game. A refused offer is not an
+                    // offence: punishing a refusal would make every offer a threat.
+                    let yes = self.accord_acceptable(*to, seat, terms);
+                    if yes {
+                        let _ = self.strike_accord(seat, *to, terms.clone());
+                        let text = format!("{} and {} struck an Accord.", self.seat_name(seat), self.seat_name(*to));
+                        self.log(text);
+                    } else {
+                        self.log(format!("{} declined an Accord from {}.", self.seat_name(*to), self.seat_name(seat)));
+                    }
+                }
+                Order::EndAccord { with } => {
+                    self.end_accord(seat, *with);
+                    self.log(format!("{} declared their Accord with {} over.", self.seat_name(seat), self.seat_name(*with)));
+                }
+                Order::Tribute { to, materials } => {
+                    // Ticket #223/#226: one of the two acts that raise Relations. The gain is the
+                    // flat act_gain, not scaled by the gift, which is why the price is fixed.
+                    let t = self.tables.relations.clone();
+                    if *materials {
+                        self.seat_mut(seat).stockpile.materials -= t.tribute_materials;
+                        self.seat_mut(*to).stockpile.materials += t.tribute_materials;
+                    } else {
+                        self.seat_mut(seat).stockpile.ducats -= t.tribute_ducats;
+                        self.seat_mut(*to).stockpile.ducats += t.tribute_ducats;
+                    }
+                    self.credit(seat, *to);
+                    self.log(format!("{} paid tribute to {}.", self.seat_name(seat), self.seat_name(*to)));
+                }
                 Order::Buy { resource, amount } => {
                     // Ticket #220 (version 0.08.2): only a Buy and a Sell move a price. Buying a
                     // building outright for Ducats does NOT: it is a Ducat-for-building conversion
@@ -1788,6 +1872,9 @@ impl Game {
             }
             Order::Influence { target, amount } => r("influence", &[("n", amount.to_string()), ("place", place(*target))]),
             Order::BuyInfluence { amount } => r("buy_influence", &[("n", amount.to_string())]),
+            Order::ProposeAccord { to, .. } => r("propose_accord", &[("faction", self.seat_name(*to))]),
+            Order::EndAccord { with } => r("end_accord", &[("faction", self.seat_name(*with))]),
+            Order::Tribute { to, .. } => r("tribute", &[("faction", self.seat_name(*to))]),
             Order::Buy { resource, amount } => r("buy", &[("n", amount.to_string()), ("resource", resource.name().to_string())]),
             Order::Sell { resource, amount } => r("sell", &[("n", amount.to_string()), ("resource", resource.name().to_string())]),
             Order::Relief { state } => r("relief", &[("state", self.tables.state(*state).name.clone())]),

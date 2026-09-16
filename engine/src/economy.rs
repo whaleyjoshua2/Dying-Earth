@@ -750,6 +750,19 @@ impl Game {
             gained.materials -= banked;
             sources.push(("Venture Capital Fund (banked)".to_string(), Resource::Materials, -banked));
         }
+        // Ticket #226 (version 0.08.2): a research agreement pays both parties a tenth more Research
+        // while it stands, applied here -- after the buildings' own multipliers, on the Faction's
+        // income, so it stacks with Public Science and with Provisional Findings rather than
+        // competing with them. It reaches the Tech Tree, which already completes with the game half
+        // run, so the sweep must report the turn the tree finishes.
+        let agreement = self.research_agreement_multiplier(seat);
+        if agreement > 1.0 && research > 0 {
+            let lifted = (research as f64 * agreement).floor() as i64;
+            if lifted > research {
+                sources.push(("Research agreement".to_string(), Resource::Research, lifted - research));
+                research = lifted;
+            }
+        }
         self.seat_mut(seat).income_sources = sources;
         let before = self.seat(seat).stockpile;
         let clamped = balance.max(0);

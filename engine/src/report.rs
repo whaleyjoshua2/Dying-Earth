@@ -471,6 +471,10 @@ pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
 pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("paragraph", &["faction", "deeds"]),
     ("nothing", &["faction"]),
+    // Ticket #226 (version 0.08.2): the Accords, told as the board could see them.
+    ("propose_accord", &["faction"]),
+    ("end_accord", &["faction"]),
+    ("tribute", &["faction"]),
     ("build_facility", &["building", "state"]),
     ("build_facility_ducats", &["building", "state"]),
     ("raise_industry", &["state"]),

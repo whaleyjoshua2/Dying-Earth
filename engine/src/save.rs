@@ -129,6 +129,9 @@ pub struct SavedGame {
     /// still loads: its zeroes read as the card figures.
     #[serde(default)]
     pub market: Market,
+    /// Ticket #226 (version 0.08.2): the Accords travel with the game.
+    #[serde(default)]
+    pub accords: Vec<Accord>,
 }
 
 impl SavedGame {
@@ -162,6 +165,7 @@ impl SavedGame {
             log,
             relations,
             market,
+            accords,
         } = g;
         SavedGame {
             seed: *seed,
@@ -189,6 +193,7 @@ impl SavedGame {
             log: log.clone(),
             relations: relations.clone(),
             market: market.clone(),
+            accords: accords.clone(),
         }
     }
 
@@ -220,6 +225,7 @@ impl SavedGame {
             spectator: self.spectator,
             relations: self.relations,
             market: self.market,
+            accords: self.accords,
             log: self.log,
         }
     }

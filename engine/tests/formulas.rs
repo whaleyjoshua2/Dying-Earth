@@ -8566,3 +8566,49 @@ fn the_ladder_sums_instances_and_the_scar_counts_turns() {
     assert_eq!(g.relations.floor[cus.index()][pro.index()], -1, "a step every four offending turns");
     assert!(g.relations_deeds(cus, pro) <= -1, "and the deeds figure cannot climb above it");
 }
+
+/// Ticket #226 (version 0.08.2): an Accord holds until it is ended, ending is free with a turn's
+/// notice, and violating a term costs +3 AND ends the whole arrangement.
+///
+/// Watched red: with `break_accord` made a no-op the violation assertion finds the Accord still
+/// standing, and with the +3 removed the score reads -1 rather than -4.
+#[test]
+fn an_accord_ends_freely_and_breaks_dearly() {
+    let mut g = game();
+    let (cus, pro) = (Seat(0), Seat(1));
+
+    g.strike_accord(cus, pro, vec![Term::NonAggression]).expect("struck");
+    assert!(g.accord_has(cus, pro, Term::NonAggression), "it holds both ways round");
+    assert!(g.accord_has(pro, cus, Term::NonAggression));
+
+    // Ending is free and takes a turn's notice: it still holds this turn, and is gone next.
+    g.end_accord(cus, pro);
+    assert!(!g.accord_has(cus, pro, Term::NonAggression), "a declared-over Accord carries nothing");
+    g.settle_accords();
+    assert!(g.accords.is_empty(), "and lapses at the settle");
+    g.settle_relations();
+    assert_eq!(g.relations_deeds(pro, cus), 0, "ending cost nothing at all");
+
+    // Breaking is another matter: the offence AND the +3, and the Accord is gone at once.
+    g.strike_accord(cus, pro, vec![Term::NonAggression]).expect("struck again");
+    g.offend_by(cus, pro, 1);
+    assert!(g.accords.is_empty(), "violating a term ends the whole Accord");
+    g.settle_relations();
+    assert_eq!(g.relations_deeds(pro, cus), -4, "the act charged 1 and the betrayal 3");
+}
+
+/// Ticket #226: a research agreement wants Friendly on BOTH sides to strike, and pays a tenth once
+/// struck. Watched red: with the gate removed the first strike succeeds.
+#[test]
+fn a_research_agreement_wants_friendship_first() {
+    let mut g = game();
+    let (cus, pro) = (Seat(0), Seat(1));
+    assert!(g.strike_accord(cus, pro, vec![Term::ResearchAgreement]).is_err(), "Neutral is not Friendly");
+    g.relations.score[cus.index()][pro.index()] = 7;
+    g.relations.score[pro.index()][cus.index()] = 7;
+    assert!(g.strike_accord(cus, pro, vec![Term::ResearchAgreement]).is_ok(), "Friendly on both sides");
+    assert!((g.research_agreement_multiplier(cus) - 1.10).abs() < 1e-9, "a tenth more Research");
+    // The gate is checked only at the STRIKE: it stands whatever the score later does.
+    g.relations.score[cus.index()][pro.index()] = -9;
+    assert!((g.research_agreement_multiplier(cus) - 1.10).abs() < 1e-9, "once made, it stands");
+}

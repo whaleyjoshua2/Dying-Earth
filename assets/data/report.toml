@@ -135,6 +135,10 @@ you_pick = "You led. Pick the next Tech."
 [rival]
 paragraph = "The {faction} {deeds}."
 nothing = "The {faction} gave no orders this turn."
+# Ticket #226 (version 0.08.2): the Accords, told as the board could see them.
+propose_accord = "offered the {faction} an Accord"
+end_accord = "declared their Accord with the {faction} over"
+tribute = "paid the {faction} a tribute"
 build_facility = "began a {building} in {state}"
 build_facility_ducats = "bought a {building} in {state}"
 raise_industry = "raised the Industry Level in {state}"

@@ -1111,6 +1111,18 @@ pub struct RelationsCard {
     /// struck at would have no road back at all.
     #[serde(default = "scar_floor_default")]
     pub scar_floor: i64,
+    /// Ticket #226 (version 0.08.2): what one tribute costs, in Ducats or in Materials. A FIXED
+    /// price, not an amount the giver chooses: the Relations gain is a flat `act_gain`, so without a
+    /// fixed price a one-Ducat tribute would buy the same point as a fifty-Ducat one.
+    #[serde(default = "tribute_ducats_default")]
+    pub tribute_ducats: i64,
+    #[serde(default = "tribute_materials_default")]
+    pub tribute_materials: i64,
+    /// Ticket #226: turns an Accord must stand to pay its keeping, repeatably. Four, matching the
+    /// quiet-turn recovery cadence already in the rules -- and it is also the only thing that lifts
+    /// a scarred pair's floor.
+    #[serde(default = "accord_kept_default")]
+    pub accord_kept_turns: u32,
 }
 
 fn turn_cap_default() -> i64 {
@@ -1714,4 +1726,16 @@ fn resentment_default() -> f64 {
 /// Ticket #224 (version 0.08.2).
 fn relations_margin_cap_default() -> i64 {
     2
+}
+
+
+/// Ticket #226 (version 0.08.2).
+fn tribute_ducats_default() -> i64 {
+    25
+}
+fn tribute_materials_default() -> i64 {
+    15
+}
+fn accord_kept_default() -> u32 {
+    4
 }
