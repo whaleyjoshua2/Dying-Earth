@@ -2172,6 +2172,14 @@ fn research_race_bar(ui: &mut Ui, session: &Session, game: &Game, width: f32, in
     let tail = if in_window { format!("
 {}", game.research_lead_text()) } else { "
 Click to open the Tech Tree.".to_string() };
+    // Ticket #219 (version 0.08.2): the hover was to "trim to what the face does not say" now that
+    // each Faction's name and percentage stand under the bar. Nothing needed trimming. What this
+    // hover carries is the RAW COUNTS -- `Custodians 10, Prospectors 7` -- and a count is precisely
+    // what a percentage cannot tell you: whether 42% is 10 Research or 100. It also carries the
+    // Tech's name, the progress and the Research Lead, none of which the face says either. So the
+    // line stands as ticket #211 left it, and the trim is a no-op recorded rather than a change
+    // made. The top bar's copy is untouched for the same reason and one more: at 150 pixels it has
+    // no room for names, so its hover is the only place they appear at all.
     let resp = ui.interact(rect, ui.id().with("race"), egui::Sense::click()).on_hover_text(format!(
         "The Research race for {}: {}{}. {} of {}.{tail}",
         game.tables.tech(tech).name,
@@ -5360,6 +5368,15 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     // unpicking or changing a pick is exactly what changes that set. Diagnosed from a picture; the
     // reading of this code made while the ticket was charted was wrong.
     ui.advance_cursor_after_rect(rect);
+}
+
+/// Ticket #219 (version 0.08.2): the legend, lifted out of the tree's tail so it can be drawn
+/// DIRECTLY BENEATH the race bar at the top of the window. The designer asked for the bar "below the
+/// legend"; the literal reading was ruled out by measurement, since this window is `resizable(false)`
+/// around a fixed-size tree and does not scroll, so anything below the legend makes the WINDOW
+/// taller -- and at the default 1280x800 it already reaches the bottom of the screen. Moving the
+/// legend up satisfies "the bar, then the legend" and costs no height at all.
+fn tech_legend(ui: &mut Ui) {
     ui.horizontal(|ui| {
         // Ticket #173 (version 0.07.6): the paler amber of a pick that can still change earns its own
         // swatch, next to the settled amber it must be told apart from.
@@ -5369,6 +5386,37 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
             ui.label(label);
         }
         ui.label("Hover a box for its effect.");
+    });
+}
+
+/// Ticket #219 (version 0.08.2): under the race bar, one entry per Faction that has put Research
+/// into the Tech under research -- its symbol in its own colour, its name, and its SHARE OF WHAT HAS
+/// BEEN CONTRIBUTED SO FAR, the entries adding to 100%. That is the figure the bar's segment widths
+/// already draw; a percentage disagreeing with the width above it would be worse than none, which is
+/// why this is not a share of the Tech's whole cost. The `N of M` progress is unchanged.
+///
+/// A Faction that has contributed NOTHING is not shown at all, at the designer's word: its absence
+/// from this line and the grey remainder on the bar say the same thing twice. The symbol rather than
+/// a plain swatch, since 0.08.1 wears it wherever something belongs to somebody -- which also keeps
+/// the legend's swatches beneath meaning STATES rather than OWNERS.
+fn research_shares(ui: &mut Ui, session: &Session, game: &Game) {
+    let c = game.research.contributions;
+    let total: i64 = c.iter().map(|v| (*v).max(0)).sum();
+    if total <= 0 {
+        return;
+    }
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 6.0;
+        for seat in Seat::ALL {
+            let v = c[seat.index()].max(0);
+            if v == 0 {
+                continue;
+            }
+            faction_glyph(ui, session, game, Some(seat), 15.0);
+            let pct = (v as f64 * 100.0 / total as f64).round() as i64;
+            ui.label(RichText::new(format!("{} {}%", game.seat_name(seat), pct)).size(13.0).color(seat_colour(session, seat)).strong());
+            ui.add_space(10.0);
+        }
     });
 }
 
@@ -5923,14 +5971,21 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // handled rather than lived with: when NO Tech is under research the bar is not drawn at
             // all -- and that is exactly the state this window is open in, with a pick owed -- so
             // the line that says so takes its place and the top of the window is never empty.
+            // Ticket #219 (version 0.08.2): the bar, its shares and the legend are ONE block at the
+            // top of the window now. With no Tech under research -- the state this window is open in
+            // when a pick is owed -- a single sentence stands in place of the whole block, and the
+            // legend follows it, so the top never goes empty and never half-empties either.
             match game.research.current {
                 Some(_) => {
                     research_race_bar(ui, session, game, ui.available_width(), true);
+                    research_shares(ui, session, game);
                 }
                 None => {
                     ui.label(format!("No Tech under research. {} Research waiting.", game.research.unallocated.iter().sum::<i64>() + game.research.unattributed));
                 }
             }
+            tech_legend(ui);
+            ui.separator();
             // Ticket #51: an Archivist player is told whether Provisional Findings is in force.
             if game.kind(Seat(0)) == FactionKind::Archivists {
                 let on = game.provisional_findings(Seat(0));
