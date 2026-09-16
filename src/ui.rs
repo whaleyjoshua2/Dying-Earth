@@ -2180,7 +2180,14 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     let a = geo::solar_place(game, from);
                     let b = geo::solar_place(game, to);
                     if let Some(p) = project(a.lerp(b, 0.5) + Vec3::Y * 0.2) {
-                        label_kind_at(painter, p, Some(Kind::of_unit(s.kind)), &format!("{} {}: {} turn(s)", game.seat_name(s.seat), s.kind.name(), turns_left), seat_colour(session, s.seat), 12.0);
+                        // Ticket #216 (version 0.08.2): a Ship in transit is named. The designer's
+                        // "the name of the ship should appear ... and the map" meant THIS label and
+                        // not the per-Faction block at a Body, which is unchanged. The Faction's
+                        // NAME goes: the prefix already says whose (TSV, PMV, ARK, ACV) and the
+                        // label is drawn in the Faction's colour, so it was saying it three times.
+                        // The type stays in words at the designer's word, beside the kind glyph.
+                        let text = format!("{} ({}): {} turn(s)", game.ship_name(s), s.kind.name().to_lowercase(), turns_left);
+                        label_kind_at(painter, p, Some(Kind::of_unit(s.kind)), &text, seat_colour(session, s.seat), 12.0);
                     }
                 }
             }
@@ -2910,50 +2917,66 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
     let pending = &session.pending;
     let tag = |text: &str| if marks { String::new() } else { format!("{text}: ") };
 
-    // Ships, one row per stack at a Body, then those in transit.
+    // Ticket #216 (version 0.08.2): ONE ROW PER SHIP, at a Body and in transit alike, replacing the
+    // row-per-stack this list carried since ticket #115. Every Ship has a name since ticket #210 and
+    // the designer wants to read it here; the ring that says a thing still wants an order is also
+    // per-SHIP in meaning and was only per-stack by accident of the row.
+    //
+    // Affordable because it was measured, not assumed: over 200 games the median Faction holds ZERO
+    // Ships, one or two is typical, and the largest fleet ever seen was 27 (an Arkwright yard
+    // backlog at Earth, once). The rows this adds are almost always none.
     let mut ships_rows: Vec<RosterRow> = Vec::new();
     for body in BodyId::ALL {
         let ships: Vec<&Ship> = game.ships.iter().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)).collect();
-        if ships.is_empty() {
-            continue;
+        for s in ships {
+            let ordered = pending.iter().any(|o| {
+                matches!(o, Order::Transit { ship, .. } | Order::Load { ship, .. } | Order::Unload { ship, .. } | Order::Repair { unit: UnitRef::Ship(ship), .. } if *ship == s.id)
+            }) || pending.iter().any(|o| matches!(o, Order::ShipStance { body: b, .. } if *b == body));
+            let tank = game.tables.unit(s.kind).tank;
+            // The working figures stay ON the row: the Roster is where a player checks whether a
+            // hull can move before ordering it, and the tank is the figure that says stranded.
+            let mut text = format!(
+                "{}{} ({}) at {} - strength {}, {}/{}",
+                tag("Ship"),
+                game.ship_name(s),
+                s.kind.name().to_lowercase(),
+                game.tables.body(body).name,
+                game.ship_strength(s),
+                s.fuel,
+                tank
+            );
+            if s.colonists > 0 {
+                text.push_str(&format!(", {} Colonists aboard", s.colonists));
+            }
+            if s.army.is_some() {
+                text.push_str(", an Army aboard");
+            }
+            if s.damage > 0 {
+                text.push_str(&format!(", damage {}/{}", s.damage, game.tables.unit(s.kind).hit_points));
+            }
+            // Stranded is now per-SHIP rather than the old all-or-nothing warning on the stack,
+            // which is strictly more accurate: one hull can be dry while another beside it is full.
+            if game.stranded(s.id) {
+                text.push_str(" - STRANDED: no leg affordable and no station of yours here");
+            }
+            // Ticket #116 (version 0.07.1): what the tank is for, and what being stranded means. A Ship
+            // with no leg it can afford and no station of its own is the one piece in the game that can
+            // become permanently useless, and the roster said so in four words and explained none of it.
+            let tip = format!(
+                "Tank {} of {}. Fuel goes on transits, and a leg costs least at a launch window.\nRefuelling needs a station or Colony of yours where the Ship sits, so a Ship is STRANDED with no leg it can afford and nowhere to fill up.",
+                s.fuel, tank
+            );
+            ships_rows.push(RosterRow { kind: Kind::of_unit(s.kind), text, tip: Some(tip), mark: marks.then_some(!ordered), jump: Some((View::Solar, Selection::ShipStack(body, seat))) });
         }
-        let ordered = ships.iter().all(|s| {
-            pending.iter().any(|o| matches!(o, Order::Transit { ship, .. } | Order::Load { ship, .. } | Order::Unload { ship, .. } | Order::Repair { unit: UnitRef::Ship(ship), .. } if *ship == s.id))
-        }) || pending.iter().any(|o| matches!(o, Order::ShipStance { body: b, .. } if *b == body));
-        let mut kinds: Vec<String> = ships.iter().map(|s| s.kind.name().to_string()).collect();
-        kinds.sort();
-        kinds.dedup();
-        let cargo: u32 = ships.iter().map(|s| s.colonists).sum();
-        let armies = ships.iter().filter(|s| s.army.is_some()).count();
-        let mut text = format!("{}{} at {}: {} (strength {})", tag("Ships"), ships.len(), game.tables.body(body).name, kinds.join(", "), game.ship_stack_strength(seat, body));
-        if cargo > 0 {
-            text.push_str(&format!(", {cargo} Colonists aboard"));
-        }
-        if armies > 0 {
-            text.push_str(&format!(", {armies} Army aboard"));
-        }
-        // Ticket #87: the tanks, and a stack that cannot leave.
-        let fuel: i64 = ships.iter().map(|s| s.fuel).sum();
-        let tanks: i64 = ships.iter().map(|s| game.tables.unit(s.kind).tank).sum();
-        text.push_str(&format!(", tank {fuel}/{tanks}"));
-        if ships.iter().all(|s| game.stranded(s.id)) {
-            text.push_str(" - STRANDED: no leg affordable and no station of yours here");
-        }
-        // Ticket #116 (version 0.07.1): what the tank is for, and what being stranded means. A Ship
-        // with no leg it can afford and no station of its own is the one piece in the game that can
-        // become permanently useless, and the roster said so in four words and explained none of it.
-        let tip = format!(
-            "Tank {} of {}. Fuel goes on transits, and a leg costs least at a launch window.\nRefuelling needs a station or Colony of yours where the Ship sits, so a Ship is STRANDED with no leg it can afford and nowhere to fill up.",
-            fuel, tanks
-        );
-        ships_rows.push(RosterRow { kind: Kind::of_ships(ships.iter().copied()), text, tip: Some(tip), mark: marks.then_some(!ordered), jump: Some((View::Solar, Selection::ShipStack(body, seat))) });
     }
     for s in game.ships.iter().filter(|s| s.seat == seat) {
         if let ShipAt::Transit { to, turns_left, .. } = s.at {
-            // A Ship in transit is not waiting on anybody: it arrives when it arrives.
+            // A Ship in transit is not waiting on anybody: it arrives when it arrives. Named the same
+            // way as a Ship at a Body, so the two read as the same kind of thing -- and the same way
+            // the Solar System Map labels the transit, which is the point of naming it in both.
             ships_rows.push(RosterRow {
                 kind: Kind::of_unit(s.kind),
-                text: format!("{}{} in transit to {}, {} turn(s) left", tag("Ship"), s.kind.name(), game.tables.body(to).name, turns_left),
+                text: format!("{}{} ({}) - in transit to {}, {} turn(s) left", tag("Ship"), game.ship_name(s), s.kind.name().to_lowercase(), game.tables.body(to).name, turns_left),
                 tip: Some("A Ship in transit cannot be ordered and cannot be intercepted. It arrives at its Resolution, Holding, with whatever Fuel it has left.".to_string()),
                 mark: None,
                 jump: Some((View::Solar, Selection::None)),
@@ -4527,14 +4550,16 @@ fn emigrant_loader(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
 
 fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, cid: ColonyId, actions: &mut Vec<Action>) {
     let Some(col) = game.colony(cid) else { return };
-    // Ticket #127 (version 0.07.2): the kind glyph in front of the name, as on the roster.
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
-        // Ticket #210 (version 0.08.1): the holder's symbol first, where a Region card's flag sits,
-        // then the kind glyph that says station or surface, then the name. At 22 to match this
-        // card's own heading rather than the Region card's 32: the two headings are different sizes.
+        // Ticket #216 (version 0.08.2): the holder's symbol ALONE, where a Region card's flag sits.
+        // Ticket #210 put the kind glyph beside it and ticket #127 put it on the heading before that;
+        // both are undone here at the designer's word. On a CARD the kind is already said by the name
+        // and by what the card contains -- you are looking at a Colony -- where in the Roster the
+        // glyph is the only thing separating a Colony row from a Region row at a glance, so the
+        // Roster's own glyphs stay. A neutral place therefore wears no mark at all, which is the
+        // standing rule that a colour says whose and nobody's place says nothing.
         faction_glyph(ui, session, game, col.control.controller(), 22.0);
-        kind_glyph(ui, Kind::of_colony(col), 22.0);
         ui.label(RichText::new(game.place_name(Place::Colony(cid))).size(22.0).strong());
     });
     let owner = match col.control {
@@ -4766,7 +4791,10 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     let ships: Vec<&Ship> = game.ships.iter().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)).collect();
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
-        kind_glyph(ui, Kind::of_ships(ships.iter().copied()), 22.0);
+        // Ticket #216 (version 0.08.2): the Faction's symbol alone, as on a Colony card's heading.
+        // The heading already names the Faction and the Body, so the kind glyph said nothing a
+        // reader did not have.
+        faction_glyph(ui, session, game, Some(seat), 22.0);
         ui.label(RichText::new(format!("{} Ships at {}", game.seat_name(seat), game.tables.body(body).name)).size(22.0).strong());
     });
     for s in &ships {
