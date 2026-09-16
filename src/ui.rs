@@ -1306,16 +1306,39 @@ fn faction_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>) {
             ui.label(RichText::new("All four sit at every table: you take one seat, the computer plays the other three.").size(15.0));
             ui.add_space(10.0);
         });
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            for row in FactionKind::ALL.chunks(2) {
-                ui.columns(2, |cols| {
-                    for (i, kind) in row.iter().enumerate() {
-                        faction_card(&mut cols[i], session, *kind, actions);
-                    }
-                });
-                ui.add_space(6.0);
-            }
-        });
+        // Ticket #217 (version 0.08.2): the scrollbar shows ONLY when scrolling is required and is
+        // quiet when everything fits. That is the fix for the real defect this ticket found: at the
+        // default 1280x800 and at 1600x900 the second row is clipped and NEITHER the Arkwrights' nor
+        // the Archivists' Play button is on screen, with nothing saying the page scrolls at all. The
+        // grid is allowed to scroll -- no fit target was set -- so the cue is the whole remedy.
+        // `VisibleWhenNeeded` alone is not enough, and a picture is what showed it: egui's default
+        // scrollbar FLOATS, so it fades to nothing while no pointer is near it -- which is exactly
+        // the state a player is in when the screen opens. A non-floating bar is laid out solidly
+        // whenever the content overflows, and is absent entirely when it does not.
+        ui.style_mut().spacing.scroll.floating = false;
+        egui::ScrollArea::vertical()
+            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded)
+            .show(ui, |ui| {
+                // All four cards take ONE height, the tallest's, so the screen reads as a 2x2 matrix
+                // rather than as four cards of their own lengths. The height cannot be known before
+                // the cards are drawn, so it is measured and carried to the next frame through
+                // egui's own temporary memory: one frame of raggedness on the very first paint, and
+                // stable afterwards. `ui.columns` equalises width and never height, which is why the
+                // screen looked ragged despite already being a 2x2.
+                let id = egui::Id::new("faction-card-height");
+                let want: f32 = ui.ctx().memory(|m| m.data.get_temp(id).unwrap_or(0.0));
+                let mut tallest: f32 = 0.0;
+                for row in FactionKind::ALL.chunks(2) {
+                    ui.columns(2, |cols| {
+                        for (i, kind) in row.iter().enumerate() {
+                            let h = faction_card(&mut cols[i], session, *kind, want, actions);
+                            tallest = tallest.max(h);
+                        }
+                    });
+                    ui.add_space(6.0);
+                }
+                ui.ctx().memory_mut(|m| m.data.insert_temp(id, tallest));
+            });
     });
 }
 
@@ -1448,12 +1471,32 @@ fn faction_rulebook(ui: &mut Ui, session: &Session, kind: FactionKind) {
 
 /// One Faction's card on the setup screen: its symbol and name, the rulebook, the button that plays
 /// it, and the tutorial tick.
-fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut Vec<Action>) {
+/// Ticket #217 (version 0.08.2): `want` is the tallest card's CONTENT height, measured last frame;
+/// the card pads its own content out to it and then places its Play button, so the four buttons sit
+/// on two clean lines instead of wherever each rulebook happened to end. Returns this card's content
+/// height, so the caller can take the maximum for the next frame.
+fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, want: f32, actions: &mut Vec<Action>) -> f32 {
     let card = session.tables.faction(kind);
-    egui::Frame::group(ui.style()).inner_margin(12.0).show(ui, |ui| {
+    let r = egui::Frame::group(ui.style()).inner_margin(12.0).show(ui, |ui| {
         faction_heading(ui, session, kind, 28.0);
         faction_rulebook(ui, session, kind);
-        ui.add_space(10.0);
+        // What the foot of the card costs: the button, the space above it, and on the Custodians'
+        // card the tutorial tick beneath. Everything above is pushed up by padding out to `want`.
+        // The tick's height is reserved on ALL FOUR cards, not only the Custodians' -- otherwise the
+        // one card carrying it would seat its button that much higher than the other three and the
+        // buttons would not line up, which is the whole point of pinning them. Three cards end with
+        // that much empty air, which is the price of a straight row and is invisible.
+        let used: f32 = ui.min_rect().height();
+        // What is measured and matched across the four cards is the CONTENT height -- everything
+        // above the foot -- not the finished card's. Matching finished heights looked right and was
+        // not: the tallest card in a row hits the minimum-space clamp, `ui.columns` then stretches
+        // the shorter card's frame to match, and its button has already been placed off the stale
+        // figure. Padding the content to a common height puts every button at the same offset from
+        // the top of its card, which is what pinning them means.
+        // The 10 is added to EVERY card rather than used as a floor. As a floor it applied only to
+        // the tallest card -- the one card whose content already equals `want` -- seating its button
+        // ten pixels below the other three, which is precisely the raggedness being removed.
+        ui.add_space((want - used).max(0.0) + 10.0);
         if ui.add(egui::Button::new(RichText::new(format!("Play the {}", card.name)).size(17.0)).min_size(egui::vec2(190.0, 36.0))).clicked() {
             actions.push(Action::ChooseFaction(kind));
         }
@@ -1466,15 +1509,21 @@ fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut
         if kind == FactionKind::Custodians {
             ui.add_space(6.0);
             let mut on = session.tutorial_ticked;
+            // Ticket #217 (version 0.08.2): a fifth larger at the designer's word. The checkbox took
+            // egui's default size, so there was no number to multiply and one had to be named; this
+            // follows how ticket #211 handled the command cluster's 1.15. Its placement is unchanged
+            // -- ticket #174 put it at the foot of this card deliberately.
             if ui
-                .checkbox(&mut on, "Play Tutorial")
+                .checkbox(&mut on, RichText::new("Play Tutorial").size(TUTORIAL_TICK))
                 .on_hover_text("A note at the head of each of the first five turns, saying what that turn is for. Nothing is forced, and it stops after the fifth.")
                 .changed()
             {
                 actions.push(Action::SetTutorialTick(on));
             }
         }
+        used
     });
+    r.inner
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -5322,6 +5371,11 @@ fn moments_corner(ui: &mut Ui, session: &Session, view: &mut ViewState) {
 /// The side of a Module or build-slot tile and the gap between tiles. Ticket #162 (version 0.07.5)
 /// retired `HAB_COLS`, the Hab View window's five: both cards lay their tiles out in `SLOT_COLS`
 /// columns now.
+/// Ticket #217 (version 0.08.2): the `Play Tutorial` tick's text size on the Faction screen, a fifth
+/// larger than egui's 14-pixel body default at the designer's word. Named rather than written as
+/// 16.8 in place, so the next such request is one number -- as ticket #211's command cluster was.
+const TUTORIAL_TICK: f32 = 14.0 * 1.2;
+
 const HAB_TILE: f32 = 84.0;
 const HAB_GAP: f32 = 10.0;
 /// Room under a tile for its name.
