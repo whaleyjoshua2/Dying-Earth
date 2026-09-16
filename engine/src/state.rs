@@ -367,6 +367,12 @@ pub enum ShipAt {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Ship {
     pub id: ShipId,
+    /// Ticket #210 (version 0.08.1): the hull's own name, without its Faction's prefix -- `Magellan`,
+    /// not `TSV Magellan`. The prefix belongs to whoever flies it and is read from the seat when the
+    /// Ship is drawn, so a name travels with the hull and a prefix with its owner. Unique across the
+    /// whole board: two Challengers on two sides in one game is a bug report waiting to happen.
+    #[serde(default)]
+    pub name: String,
     pub kind: UnitKind,
     pub seat: Seat,
     pub damage: u32,
@@ -1188,7 +1194,23 @@ impl Game {
     /// An additive Tech read for one seat: its full value once done, half rounded down under
     /// Provisional Findings, and 0 otherwise.
     pub fn tech_addition(&self, seat: Seat, t: TechId) -> i64 {
-        let v = self.tables.tech(t).value as i64;
+        self.tech_addition_of(seat, t, self.tables.tech(t).value)
+    }
+
+    /// Ticket #207 (version 0.08.1): what a Tech adds to a HABITAT's capacity, which is not always
+    /// what it adds elsewhere. Expanded Habitats is read both here and by `colony_ship_capacity`,
+    /// and one `value` served both until the designer wanted the Habitat clause moved on its own:
+    /// *"q5 b"* -- split the figure, so housing and transport can be tuned apart. A Tech with no
+    /// `habitat_colonists` of its own answers with its `value`, as every other Tech in the tree does.
+    pub fn habitat_addition(&self, seat: Seat, t: TechId) -> i64 {
+        let card = self.tables.tech(t);
+        self.tech_addition_of(seat, t, card.habitat_colonists.unwrap_or(card.value))
+    }
+
+    /// The shared body: the whole figure once the Tech stands, half of it while the Archivists are
+    /// reading it early through Provisional Findings, nothing otherwise.
+    fn tech_addition_of(&self, seat: Seat, t: TechId, value: f64) -> i64 {
+        let v = value as i64;
         if self.has_tech(t) {
             v
         } else if self.reads_half(seat, t) {
@@ -1255,8 +1277,74 @@ impl Game {
 
     /// A Colony off Earth may hold the Archive; Antarctica may not. Ticket #81: a station over
     /// Earth is off Earth, so it may.
+    /// Ticket #209 (version 0.08.1): **not in Earth orbit**, which until now was the only place it
+    /// had ever stood. `off_earth` counts a station over Earth as off Earth, and ticket #192
+    /// measured the Archive ordered on turn 1 at such a station, with nobody living on it, in 80 of
+    /// 80 games -- always Axiom. So this does not narrow a choice the Archivists were making; it
+    /// moves the Archive to a place no seat has been, which is the point and also the risk.
+    ///
+    /// What is left is every Body but Earth, its satellites included: the Moon counts, at the
+    /// designer's word. Barring the satellites too was considered and refused with numbers -- in 80
+    /// measured games there are **0 Mars-system Colonies, 0 Venus stations and 0 Colonies on Phobos
+    /// or Deimos** -- so it would have been a rule the computer could never satisfy at all. Reduces
+    /// to `body != Earth`, since Antarctica was already barred for being ON Earth.
+    /// Ticket #210 (version 0.08.1): the name a Ship of this kind would be built with -- the first
+    /// name in its list that no Ship on the board is already using. In LIST ORDER, deliberately: ids
+    /// are sequential and deterministic, so this draws no randomness at all, where a random pick
+    /// would shift every later roll in a seeded game and make a sweep incomparable with its baseline.
+    /// A Colony Ship draws from the colony list; a Frigate, a Battleship and a Carrier from the
+    /// warship list, the Carrier included at the designer's word because it sails with a fleet.
+    /// Once a list is exhausted it begins again with a numeral -- Magellan, Magellan II, Magellan III
+    /// -- which a thirty-six-turn game will never reach and an eighty-game sweep might.
+    pub fn next_ship_name(&self, kind: UnitKind) -> String {
+        let list = if kind == UnitKind::ColonyShip { &self.tables.ship_names.colony.names } else { &self.tables.ship_names.warship.names };
+        if list.is_empty() {
+            return String::new();
+        }
+        let taken: std::collections::HashSet<&str> = self.ships.iter().map(|s| s.name.as_str()).collect();
+        for pass in 0..1000u32 {
+            for base in list {
+                let name = if pass == 0 { base.clone() } else { format!("{base} {}", Self::numeral(pass + 1)) };
+                if !taken.contains(name.as_str()) {
+                    return name;
+                }
+            }
+        }
+        list[0].clone()
+    }
+
+    /// A small Roman numeral for a reused name. Beyond what any game reaches it falls back to the
+    /// figure itself, which is ugly and unreachable rather than wrong.
+    fn numeral(n: u32) -> String {
+        const ROMAN: [&str; 19] = ["II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX"];
+        ROMAN.get(n as usize - 2).map(|r| r.to_string()).unwrap_or_else(|| n.to_string())
+    }
+
+    /// Ticket #210 (version 0.08.1): what a Ship is called on screen -- its Faction's prefix and its
+    /// own name, `TSV Magellan`. A Ship built before this version, or one whose list was empty, has
+    /// no name and falls back to the kind and id it always had.
+    pub fn ship_name(&self, s: &Ship) -> String {
+        if s.name.is_empty() {
+            return format!("{} {}", s.kind.name(), s.id.0);
+        }
+        format!("{} {}", self.tables.faction(self.kind(s.seat)).ship_prefix, s.name)
+    }
+
     pub fn may_hold_archive(&self, c: &Colony) -> bool {
-        self.off_earth(c)
+        c.body != BodyId::Earth
+    }
+
+    /// Ticket #209 (version 0.08.1): the Archivists have nowhere to put the Archive and have not
+    /// begun it. Their whole Victory Condition waits on a journey they have never made -- their AI
+    /// already weights founding a Colony at 9 and a Colony Ship at 8, yet Antarctica and Earth orbit
+    /// are so much cheaper than a transit that nothing further ever won the comparison. While this
+    /// holds, the chain that carries them off Earth is worth more to them than its standing weight
+    /// says, and `archive_needs_a_place` in `ai.toml` is how much more.
+    pub fn archive_is_homeless(&self, seat: Seat) -> bool {
+        self.kind(seat) == FactionKind::Archivists
+            && !self.archive_built(seat)
+            && !self.archive_ordered(seat)
+            && !self.colonies.iter().any(|c| c.control.director() == Some(seat) && self.may_hold_archive(c))
     }
 
     // ---------------------------------------------------------------- Ticket #51: Steerage and the rest
@@ -1877,7 +1965,9 @@ impl Game {
         // holds the Colony, since Provisional Findings gives the Archivists half the Tech early.
         let seat = c.control.controller();
         let per = self.tables.module(ModuleKind::Habitat).holds_colonists as i64
-            + seat.map(|s| self.tech_addition(s, TechId::ExpandedHabitats)).unwrap_or(0);
+            // Ticket #207 (version 0.08.1): the HABITAT clause of Expanded Habitats, which is +4
+            // where the Colony Ship clause it shares a card with is +2.
+            + seat.map(|s| self.habitat_addition(s, TechId::ExpandedHabitats)).unwrap_or(0);
         let faction = seat.map(|s| self.tables.faction(self.kind(s)).habitat_capacity_multiplier).unwrap_or(1.0);
         // Ticket #140 (version 0.07.3): a Habitat holds the same everywhere. It read the slot's
         // Habitat yield on a surface (ticket #57) and 1.0 in orbit (ticket #46) until the designer
@@ -1967,7 +2057,12 @@ impl Game {
     pub fn challenge_margin_at(&self, target: Target) -> i64 {
         let t = &self.tables.influence;
         let guarded = matches!(target, Place::State(s) if self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Constabulary && f.working()));
-        t.challenge_margin + if guarded { t.constabulary_margin } else { 0 }
+        // Ticket #201 (version 0.08.1): Civil Defense doubles what a Constabulary is worth at the
+        // gate -- 10 where it adds 5 without. The Tech is the world's, as every Tech is, so it
+        // helps whoever holds a garrisoned Region and hinders whoever wants one, which is the same
+        // asymmetry the Constabulary itself has carried since ticket #190.
+        let garrison = if self.has_tech(TechId::CivilDefense) { t.constabulary_margin_defended } else { t.constabulary_margin };
+        t.challenge_margin + if guarded { garrison } else { 0 }
     }
 
     /// Ticket #53: Blame raises this seat's threshold on a Nation State it does not control, and

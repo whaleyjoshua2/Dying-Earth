@@ -39,6 +39,14 @@ pub struct ShotPlan {
     pub trade: bool,
     /// `victory:1` (a building aid): the Victory panel is open in every picture.
     pub victory: bool,
+    /// `factions:1` or `factions:<faction id>` (a building aid, ticket #203): the Faction window is
+    /// open in every picture, on seat 0's page or on the page of the Faction named. A rival's page
+    /// is the only way to photograph the totals-only disclosure line.
+    pub faction_window: bool,
+    pub faction_seat: Option<Seat>,
+    /// `rulebook:1` (a building aid, ticket #203): the Faction window's rulebook header starts
+    /// OPEN. It is shut by default in play, so the picture of it open has to be asked for.
+    pub rulebook_open: bool,
     /// `stack:1` (a building aid): the player's Ship stack at Mars is selected, so its card and the
     /// attack odds preview are in the picture.
     pub stack: bool,
@@ -86,6 +94,13 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     }
     if plan.victory {
         view.show_victory = true;
+    }
+    if plan.faction_window {
+        view.show_factions = true;
+        view.faction_rulebook_open = plan.rulebook_open;
+        if let Some(seat) = plan.faction_seat {
+            view.faction_seat = seat;
+        }
     }
     if plan.stack {
         view.selection = Selection::ShipStack(BodyId::Mars, Seat(0));
@@ -190,7 +205,10 @@ fn build_board(session: &mut Session) {
             };
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
-            g.ships.push(Ship { id, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
+            // Ticket #210 (version 0.08.1): a planted Ship is named as a built one is, so a picture
+            // shows what a game shows.
+            let name = g.next_ship_name(kind);
+            g.ships.push(Ship { id, name, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
         }
         // `battle:1` (a building aid): three seats bring a Frigate to Mars with Attack stances and
         // one more turn runs, so the Report carries a three-party Battle (ticket #50).
@@ -198,7 +216,8 @@ fn build_board(session: &mut Session) {
             for seat in [Seat(0), Seat(1), Seat(2)] {
                 let id = ShipId(g.fresh_id());
                 let built_turn = g.turn;
-                g.ships.push(Ship { id, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
+                let name = g.next_ship_name(UnitKind::Frigate);
+                g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
             }
             for s in g.ships.iter_mut().filter(|s| s.at == ShipAt::Body(BodyId::Mars)) {
                 s.stance = Stance::Attack;
@@ -300,8 +319,10 @@ fn build_board(session: &mut Session) {
             g.climate.temperature = 2.6;
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
             g.ships.push(Ship {
                 id,
+                name,
                 kind: UnitKind::ColonyShip,
                 seat: Seat(0),
                 damage: 0,
@@ -386,8 +407,10 @@ fn build_board(session: &mut Session) {
         if std::env::args().any(|a| a == "ship:1") {
             let id = ShipId(g.fresh_id());
             let turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
             g.ships.push(Ship {
                 id,
+                name,
                 slot: None,
                 kind: UnitKind::ColonyShip,
                 seat: Seat(0),
@@ -559,8 +582,10 @@ fn build_board(session: &mut Session) {
         if std::env::args().any(|a| a == "found:1" || a == "moment:colony") && !std::env::args().any(|a| a.starts_with("antarctic:")) {
             let id = ShipId(g.fresh_id());
             let built_turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
             g.ships.push(Ship {
                 id,
+                name,
                 kind: UnitKind::ColonyShip,
                 seat: Seat(0),
                 damage: 0,
@@ -909,9 +934,27 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         plan.select = std::env::args().find_map(|a| a.strip_prefix("select:").map(str::to_owned));
         plan.tech = std::env::args().any(|a| a == "tech:1");
         plan.hab = std::env::args().any(|a| a == "hab:1");
-        plan.hab_colony = session.game.as_ref().and_then(|g| g.colonies.iter().find(|c| c.control.director() == Some(Seat(0))).map(|c| c.id));
+        // Ticket #204 (version 0.08.1): `hab:ground` picks seat 0's first Colony ON a surface
+        // rather than its first of any kind, which on every board so far is the station over Earth.
+        // It is how the sea half of the receiver's door gets photographed.
+        let ground = std::env::args().any(|a| a == "hab:ground");
+        if ground {
+            plan.hab = true;
+        }
+        plan.hab_colony = session
+            .game
+            .as_ref()
+            .and_then(|g| g.colonies.iter().find(|c| c.control.director() == Some(Seat(0)) && (!ground || !c.in_orbit)).map(|c| c.id));
         plan.trade = std::env::args().any(|a| a == "trade:1");
         plan.victory = std::env::args().any(|a| a == "victory:1");
+        // Ticket #203: `factions:1` for seat 0's page, `factions:archivists` for that Faction's.
+        if let Some(v) = std::env::args().find_map(|a| a.strip_prefix("factions:").map(str::to_owned)) {
+            plan.faction_window = true;
+            plan.rulebook_open = std::env::args().any(|a| a == "rulebook:1");
+            if let Some(kind) = FactionKind::from_id(&v) {
+                plan.faction_seat = session.game.as_ref().and_then(|g| Seat::ALL.into_iter().find(|s| g.kind(*s) == kind));
+            }
+        }
         plan.stack = std::env::args().any(|a| a == "stack:1");
         plan.hover = std::env::args().find_map(|a| a.strip_prefix("hover:").and_then(body_from_id));
         plan.look = std::env::args().find_map(|a| {

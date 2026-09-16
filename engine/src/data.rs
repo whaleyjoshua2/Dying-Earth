@@ -271,6 +271,13 @@ pub struct TechCard {
     pub needs: Vec<TechId>,
     pub effect: String,
     pub value: f64,
+    /// Ticket #207 (version 0.08.1): Expanded Habitats is read in TWO places -- what a Habitat
+    /// holds and what a Colony Ship carries -- and until now one `value` served both, so neither
+    /// could be moved without the other. This is the Habitat clause where a Tech wants its own
+    /// figure for it; `value` stays the Colony Ship's. Absent, `value` answers for both, which is
+    /// every other Tech in the tree.
+    #[serde(default)]
+    pub habitat_colonists: Option<f64>,
     #[serde(default)]
     pub influence_threshold_multiplier: Option<f64>,
     /// Ticket #84 (version 0.06.0): the Faction whose Victory Condition this Tech opens, if any.
@@ -331,6 +338,10 @@ pub struct FactionCard {
     pub id: FactionKind,
     pub name: String,
     pub blurb: String,
+    /// Ticket #210 (version 0.08.1): the prefix every Ship of this Faction wears in front of its
+    /// name. It belongs to the HOLDER, not the hull -- a name travels with the ship, a prefix with
+    /// whoever flies it -- so it is read from the seat at drawing time and never stored on the Ship.
+    pub ship_prefix: String,
     pub output_multiplier: f64,
     pub emissions_multiplier: f64,
     pub research_multiplier: f64,
@@ -345,6 +356,12 @@ pub struct FactionCard {
     #[serde(default)]
     pub mothball_pairs: std::collections::BTreeMap<FacilityKind, ModuleKind>,
     pub signature: String,
+    /// Ticket #203 (version 0.08.1): the Faction's Unique Facility in one sentence -- what it is,
+    /// what it replaces, and what it does beyond the common building's job. It was on no card until
+    /// the Faction window went in: the four Unique Facilities arrived in version 0.08.0 (tickets
+    /// #182 to #186) and the signature rules were never rewritten to name them, so a player could
+    /// build one without ever being told what it was for.
+    pub unique: String,
     /// The Victory Condition in prose, for the cards and the panel.
     pub victory: String,
     /// Ticket #50: the first part of the Victory Condition, in figures.
@@ -601,6 +618,8 @@ pub struct InfluenceTable {
     pub challenge_margin: i64,
     /// Ticket #190 (version 0.08.0): what an online Constabulary adds to the margin in its Region.
     pub constabulary_margin: i64,
+    /// Ticket #201 (version 0.08.1): what a Constabulary adds instead, once Civil Defense stands.
+    pub constabulary_margin_defended: i64,
     /// Ticket #46: a station's threshold starts here.
     #[serde(default)]
     pub station_threshold_base: i64,
@@ -802,6 +821,11 @@ pub struct AiMultipliers {
     /// Ticket #182: what one Material in the Venture Capital Fund adds to the Prospectors' appetite
     /// for an Investment Bank, since the building's worth is a share of that balance.
     pub investment_bank_per_fund: f64,
+    /// Ticket #209 (version 0.08.1): what the Archivists' appetite for the whole off-Earth chain --
+    /// a Colony Ship, a Launch Site or Shipyard, a load, a transit, a founding -- is multiplied by
+    /// while they have nowhere the Archive may stand. It applies to no other Faction and stops the
+    /// moment they hold such a place.
+    pub archive_needs_a_place: f64,
 }
 
 /// Ticket #50: one pace schedule per Faction. `first` is the schedule for the Faction's first
@@ -1148,6 +1172,23 @@ pub struct Tables {
     /// of a tutorial game's first turns. They are words and nothing else -- no rule reads them -- but
     /// they live here with every other sentence the game says, so they can be rewritten without a build.
     pub tutorial: TutorialTable,
+    /// Ticket #210 (version 0.08.1): the two lists every Ship is named from.
+    pub ship_names: ShipNames,
+}
+
+/// Ticket #210 (version 0.08.1): the names a Ship may be given, in two lists. A Colony Ship draws
+/// from `colony`; a Frigate, a Battleship and a Carrier from `warship`. Order matters: a Ship takes
+/// the first unused name in list order, which is deterministic and draws no randomness, so naming
+/// cannot shift a seeded game's rolls and make a sweep incomparable with its baseline.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ShipNames {
+    pub colony: ShipNameList,
+    pub warship: ShipNameList,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ShipNameList {
+    pub names: Vec<String>,
 }
 
 fn read<T: for<'de> Deserialize<'de>>(dir: &Path, file: &str) -> Result<T, DataError> {
@@ -1185,7 +1226,9 @@ impl Tables {
         let ephemeris: EphemerisFile = read(dir, "ephemeris.toml")?;
         let report: crate::report::ReportTable = read(dir, "report.toml")?;
         let tutorial: TutorialTable = read(dir, "tutorial.toml")?;
+        let ship_names: ShipNames = read(dir, "ship_names.toml")?;
         let tables = Tables {
+            ship_names,
             sibling_transit: (bodies.sibling_turns, bodies.sibling_fuel),
             station_materials: bodies.station_materials,
             slot_yield_spread: bodies.slot_yield_spread,

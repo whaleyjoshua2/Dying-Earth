@@ -313,6 +313,17 @@ pub struct ViewState {
     /// Ticket #41: the Climate Panel was just reopened; put it back at its home position once.
     pub climate_reopen: bool,
     pub show_victory: bool,
+    /// Ticket #203 (version 0.08.1): the Faction window, and which SEAT's page it is open on. The
+    /// dropdown in its top right names the four Factions, but every live figure on the page is a
+    /// seat's, so the seat is what is remembered. It opens on seat 0 -- the player's own Faction,
+    /// and in a spectated game the first of the four -- because a player's own rulebook is the one
+    /// this window is the only way back to.
+    pub show_factions: bool,
+    pub faction_seat: Seat,
+    /// `factions:<kind> rulebook:1` (a building aid, ticket #203): the Faction window's rulebook
+    /// header starts OPEN, so a headless picture can be taken of it. It is shut by default in play
+    /// and nothing but the aid sets this.
+    pub faction_rulebook_open: bool,
     /// Ticket #42: the trading window, and the quantity on each of its four lines
     /// (Influence, Materials, Fuel, Energy).
     pub show_trade: bool,
@@ -324,6 +335,9 @@ pub struct ViewState {
     pub slot_box: Option<SlotBox>,
     pub trade_amounts: [i64; 4],
     pub load_state: Option<StateId>,
+    /// Ticket #204 (version 0.08.1): the Region a Colony's own loader draws from, kept apart from
+    /// `load_state` so that choosing a Region on a Ship's card does not move it on a station's.
+    pub lift_state: Option<StateId>,
     pub influence_amount: i64,
     pub attack_preview: bool,
     /// Ticket #58: which Moment kinds are switched on, remembered for the session. `None` until the
@@ -366,11 +380,15 @@ impl Default for ViewState {
             show_climate: false,
             climate_reopen: false,
             show_victory: false,
+            show_factions: false,
+            faction_seat: Seat(0),
+            faction_rulebook_open: false,
             show_trade: false,
             hab_tile: None,
             slot_box: None,
             trade_amounts: [5, 10, 10, 10],
             load_state: None,
+            lift_state: None,
             influence_amount: 5,
             attack_preview: false,
             moments_on: None,

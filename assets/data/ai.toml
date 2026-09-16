@@ -186,6 +186,33 @@ unique_bias = 1.15
 # of 400 by turn 24 that is x1.8, and at 1000 -- the bar itself -- x3.0. Early, with an empty Fund,
 # an Investment Bank is worth nothing and loses to the Factory that fills the Fund, which is right.
 investment_bank_per_fund = 0.002
+# Ticket #209 (version 0.08.1): the Archive may no longer stand in Earth orbit, which is the only
+# place it has ever stood -- ordered there on turn 1 in 80 of 80 measured games. Narrowing the rule
+# stops the computer ordering in orbit, because its Archive push already filters on the same
+# function, but nothing in it makes the Archivists GO anywhere. They already weight founding a
+# Colony at 9 and a Colony Ship at 8 and never cash either in, since Antarctica and Earth orbit are
+# so much cheaper than a transit that nothing further ever wins the comparison. So while they have
+# nowhere the Archive may stand, the whole chain that carries them to one -- Colony Ship, Launch
+# Site or Shipyard, load, transit, founding -- is multiplied by this. It applies to no other
+# Faction and stops the moment they hold such a place. Ticket #192's warning that a computer not
+# taught the new move wins nothing at all proved right; this is the same shape, so the appetite is
+# added deliberately rather than hoped for.
+#
+# 5.0, chosen by sweeping it. At 2.0 the Archivists won 2 games of 80 and the Archive stood in 40;
+# at 5.0 they win 5 and it stands in 37 -- so the appetite is NOT what binds them, and more of it
+# buys very little. What binds them is the journey itself, which eats about twenty turns of a
+# thirty-six-turn game. 5.0 was taken anyway, at the designer's word, because the whole table reads
+# better there than at any figure measured so far: Custodians 43, Prospectors 13, Arkwrights 7,
+# Archivists 5, against the 58 / 18 / 3 / 0 this version started from, with no seat left on nothing.
+#
+# The lever held in reserve, if the Archivists are ever to be lifted without loosening the rule, is
+# `banked_before_built` in modules.toml. It caps the Archive fund at a quarter of the 80 the Archive
+# wants until the Module physically stands, and the sweeps show the fund sitting at exactly that cap
+# -- 20 -- in three seatings of four. So the Archivists now spend the journey with their Labs'
+# Research frozen as well as their Archive unplaceable: the rule charges them twice for one trip.
+# That cap was set when the Archive was ordered on turn 1 in Earth orbit, where there was no journey
+# to fund through, so its premise is gone even though the figure has not moved.
+archive_needs_a_place = 5.0
 
 # Pace (spec 16.3), stretched to twenty-four turns on ticket #27 and keyed per Faction on #50.
 # `first` is the Faction's first Victory part by turn, as [turn, value]; a Faction whose first part
@@ -245,7 +272,11 @@ never = "green_consensus"
 # since ticket #69) arrives before the sea takes the coast around turn 13, not around turn 17 as
 # the cheapest Tech left.
 [tech_picks.custodians]
-order = ["public_science", "coastal_engineering", "efficient_grids", "clean_power", "green_consensus", "clean_manufacturing"]
+# Ticket #201 (version 0.08.1): Civil Defense joins the list. A Tech nobody weights is picked only
+# by the cheapest-remaining fallback -- which is exactly how The Upload got chosen in the game that
+# opened ticket #201 -- and the Custodians are the seat that most wants to keep what it holds: they
+# lose their start Region in up to 12 seeds of 20.
+order = ["public_science", "coastal_engineering", "efficient_grids", "clean_power", "green_consensus", "civil_defense", "clean_manufacturing"]
 
 # Ticket #51: the Arkwrights want room, cheap upkeep and cheap transits.
 [tech_picks.arkwrights]
@@ -253,4 +284,4 @@ order = ["expanded_habitats", "closed_loop_colonies", "efficient_transit"]
 
 # Ticket #51: the Archivists want Research and a quiet world.
 [tech_picks.archivists]
-order = ["public_science", "efficient_grids", "coastal_engineering", "green_consensus"]
+order = ["public_science", "efficient_grids", "coastal_engineering", "green_consensus", "civil_defense"]
