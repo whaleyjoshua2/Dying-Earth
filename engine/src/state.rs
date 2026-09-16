@@ -654,6 +654,11 @@ pub struct SeatState {
     pub venture_share: f64,
     #[serde(default)]
     pub venture_banked_last_turn: i64,
+    /// Ticket #227 (version 0.08.2): units this seat has bought and sold through the Trading window
+    /// over the whole game. Kept because floating prices are only fair if more than one hand is on
+    /// them, and the sweep had no way to say whose were.
+    pub bought_units: i64,
+    pub sold_units: i64,
     /// Ticket #183 (version 0.08.0): Influence the seat's Spaceports earned lifting Emigrants off
     /// Earth this turn, waiting to be paid into NEXT turn's Allotment. Read and cleared at Income.
     #[serde(default)]
@@ -954,6 +959,8 @@ impl Game {
             venture_fund: 0,
             venture_share: 0.0,
             venture_banked_last_turn: 0,
+            bought_units: 0,
+            sold_units: 0,
             spaceport_influence: 0,
             uploaded: 0,
             stabilization_run: 0,

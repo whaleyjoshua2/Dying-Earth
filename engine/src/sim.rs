@@ -131,6 +131,24 @@ pub struct SimResult {
     /// Wall) was ever reachable; and whether any seat ever met its Victory Condition outright,
     /// rather than winning on the last turn's score.
     pub techs_completed: u32,
+    /// Ticket #227 (version 0.08.2): six figures the version's own rules depend on, which the sweep
+    /// had no way to report. Without them none of the Relations arithmetic can be believed.
+    ///
+    /// The shown Relations score of every ordered pair at the end, and how many pairs carry a scar
+    /// floor at all. A version where every pair is floored is the failure mode the scar named.
+    pub relations_end: Vec<i64>,
+    pub relations_floored: u32,
+    /// Accords standing at the end, and how many of each Term. A system the computer seats never use
+    /// is a system that is not there.
+    pub accords_end: u32,
+    pub accord_terms: [u32; 4],
+    /// Units bought and sold through the Trading window over the game, per seat. Floating prices are
+    /// unfair if only one seat trades.
+    pub bought: [i64; SEAT_COUNT],
+    pub sold: [i64; SEAT_COUNT],
+    /// The turn the whole Tech Tree completed, if it did. A research agreement pays two seats a
+    /// tenth more, and the tree already finished with the game half run.
+    pub tree_done_turn: Option<u32>,
     pub highest_rung: u32,
     pub victory_met: Option<(Seat, FactionKind)>,
     pub log: Vec<String>,
@@ -330,6 +348,40 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let net_at_end = game.climate.last.net();
     // Ticket #60: the Techs the world finished and the highest rung it reached.
     let techs_completed = game.research.done.len() as u32;
+    // Ticket #227 (version 0.08.2): the six figures above, read off the finished board.
+    let mut relations_end = Vec::new();
+    let mut relations_floored = 0;
+    for v in Seat::ALL {
+        for o in Seat::ALL {
+            if v == o {
+                continue;
+            }
+            relations_end.push(game.relations_score(v, o));
+            if game.relations.floor[v.index()][o.index()] < 0 {
+                relations_floored += 1;
+            }
+        }
+    }
+    let mut bought = [0i64; SEAT_COUNT];
+    let mut sold = [0i64; SEAT_COUNT];
+    for s in Seat::ALL {
+        bought[s.index()] = game.seat(s).bought_units;
+        sold[s.index()] = game.seat(s).sold_units;
+    }
+    let accords_end = game.accords.len() as u32;
+    let mut accord_terms = [0u32; 4];
+    for acc in &game.accords {
+        for t in &acc.terms {
+            let i = match t {
+                Term::NonAggression => 0,
+                Term::Passage => 1,
+                Term::Refuel => 2,
+                Term::ResearchAgreement => 3,
+            };
+            accord_terms[i] += 1;
+        }
+    }
+    let tree_done_turn = if game.research.done.len() == game.tables.techs.len() { Some(game.turn) } else { None };
     let highest_rung = game.research.done.iter().map(|t| tables.tech(*t).rung).max().unwrap_or(0);
     // Ticket #56, read off the log as the #52 to #55 figures are.
     let sea_walls_built = game.log.iter().filter(|l| l.contains("completed Sea Wall at")).count() as u32;
@@ -422,6 +474,13 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         turns_with_moment,
         most_moments_in_a_turn,
         techs_completed,
+        relations_end,
+        relations_floored,
+        accords_end,
+        accord_terms,
+        bought,
+        sold,
+        tree_done_turn,
         highest_rung,
         victory_met,
         log: game.log,

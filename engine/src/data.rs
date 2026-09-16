@@ -812,6 +812,11 @@ pub struct AiWeights {
     pub build_constabulary: f64,
     /// Ticket #52: steer this turn's refugee flows into one calm state.
     pub resettle: f64,
+    /// Ticket #227 (version 0.08.2): how readily this seat offers an Accord. Modest by default: an
+    /// offer costs nothing and a refusal is not an offence, but a table where every seat proposes
+    /// every turn would bury the player in yes-or-no questions.
+    #[serde(default = "accord_weight_default")]
+    pub accord: f64,
     pub influence: f64,
     pub transit: f64,
     pub load_unload: f64,
@@ -1738,4 +1743,10 @@ fn tribute_materials_default() -> i64 {
 }
 fn accord_kept_default() -> u32 {
     4
+}
+
+
+/// Ticket #227 (version 0.08.2).
+fn accord_weight_default() -> f64 {
+    3.0
 }

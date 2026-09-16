@@ -94,6 +94,16 @@ fn main() {
                     let (mut slots_lost, mut drowned) = (Vec::new(), Vec::new());
                     // Ticket #72: the Prospectors' Fund.
                     let mut venture = Vec::new();
+                    // Ticket #227 (version 0.08.2): the six figures the version's rules depend on.
+                    let mut blame_shares: [Vec<f64>; 4] = Default::default();
+                    let mut rel_end: Vec<i64> = Vec::new();
+                    let mut rel_floored = 0u32;
+                    let mut accords = 0u32;
+                    let mut accord_terms = [0u32; 4];
+                    let mut bought: [i64; 4] = [0; 4];
+                    let mut sold: [i64; 4] = [0; 4];
+                    let mut takes = 0u32;
+                    let mut tree_turns: Vec<u32> = Vec::new();
                     // Ticket #76: the deck.
                     let (mut cards_drawn, mut deck_empty) = (Vec::new(), 0u32);
                     // Ticket #73: Emigrants.
@@ -131,6 +141,21 @@ fn main() {
                             _ => {}
                         }
                         temps.push(r.temperature);
+                        for i in 0..4 {
+                            blame_shares[i].push(r.blame_share[i]);
+                            bought[i] += r.bought[i];
+                            sold[i] += r.sold[i];
+                        }
+                        rel_end.extend(r.relations_end.iter().copied());
+                        rel_floored += r.relations_floored;
+                        accords += r.accords_end;
+                        for i in 0..4 {
+                            accord_terms[i] += r.accord_terms[i];
+                        }
+                        takes += r.influence_transfers;
+                        if let Some(t) = r.tree_done_turn {
+                            tree_turns.push(t);
+                        }
                         scrubbers += r.scrubbers;
                         leapfrogs += r.leapfrogs;
                         constabularies += r.constabularies;
@@ -273,6 +298,33 @@ fn main() {
                             if victory_met.is_empty() { "none in any seed".to_string() } else { victory_met.join(", ") }
                         );
                         let fired: Vec<String> = tables.climate.breaks.iter().zip(&breaks_fired).map(|(b, n)| format!("{} {n}/{seeds}", b.name)).collect();
+                        // Ticket #227 (version 0.08.2): the six the spec asks for, in one block.
+                        let med = |v: &mut Vec<f64>| {
+                            if v.is_empty() {
+                                return "-".to_string();
+                            }
+                            v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                            format!("{:.2}", v[v.len() / 2])
+                        };
+                        let shares: Vec<String> = (0..4).map(|i| med(&mut blame_shares[i])).collect();
+                        println!("      Blame share at the end, by seat (median): [{}]", shares.join(", "));
+                        let floored_pct = if rel_end.is_empty() { 0.0 } else { rel_floored as f64 * 100.0 / rel_end.len() as f64 };
+                        let mut sorted = rel_end.clone();
+                        sorted.sort_unstable();
+                        let rel_med = if sorted.is_empty() { 0 } else { sorted[sorted.len() / 2] };
+                        let hostile = rel_end.iter().filter(|v| **v <= -6).count();
+                        println!(
+                            "      Relations at the end over {} ordered pairs: median {rel_med}, {hostile} at Cold or worse, {:.0}% carrying a scar floor",
+                            rel_end.len(),
+                            floored_pct
+                        );
+                        println!(
+                            "      Accords standing at the end: {accords} (non-aggression {}, passage {}, refuel {}, research {})",
+                            accord_terms[0], accord_terms[1], accord_terms[2], accord_terms[3]
+                        );
+                        println!("      Trading window units, by seat: bought {bought:?}, sold {sold:?}");
+                        println!("      Places taken by Influence over the batch: {takes}");
+                        println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
                         println!("      Breaks fired: {}", fired.join(", "));
                     }
                 }

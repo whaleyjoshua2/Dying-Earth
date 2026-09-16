@@ -1725,12 +1725,14 @@ impl Game {
                     if let Some(row) = Self::market_row(*resource) {
                         self.market.net[row] += amount;
                     }
+                    self.seat_mut(seat).bought_units += amount;
                     self.log(format!("{} bought {} {} for {} Ducats.", self.seat_name(seat), amount, resource.name(), cost.ducats));
                 }
                 Order::Sell { resource, amount } => {
                     if let Some(row) = Self::market_row(*resource) {
                         self.market.net[row] -= amount;
                     }
+                    self.seat_mut(seat).sold_units += amount;
                     self.log(format!("{} sold {} {} for {} Ducats.", self.seat_name(seat), amount, resource.name(), -cost.ducats));
                 }
             }

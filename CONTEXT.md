@@ -93,7 +93,7 @@ _Avoid_: resupply, top up, tanker
 _Avoid_: base, platform, orbital, outpost
 
 **Trading window**:
-Where Ducats buy Influence, Materials, Fuel and Energy at table prices, spendable in the same turn's orders, and where Materials and Fuel sell back at half. A building can also be bought outright for Ducats from its own build button, at twice its Materials cost.
+Where Ducats buy Influence, Materials, Fuel and Energy, spendable in the same turn's orders, and where Materials and Fuel sell back at half. Since version 0.08.2 the price of each of the three goods MOVES with what the whole table bought and sold: a card figure is the middle of a narrow band, enough net buying in a turn raises it a step and enough selling lowers it, it sticks at the band's edge rather than the window refusing, and it comes home one step only on a turn nobody traded that good at all. The window says the price and which way it moved; how much the table bought is not shown. A building can also be bought outright for Ducats from its own build button, at twice its Materials cost.
 _Avoid_: market, shop, exchange, store
 
 **Body Surface Map**:
@@ -169,11 +169,11 @@ One of the eight things the board counts and draws a glyph for: Materials, Fuel,
 _Avoid_: stat, counter, metric, indicator
 
 **Roster**:
-The list in the side panel of everything a Faction holds, since version 0.03 and organised in version 0.07.1: its Ships, Armies, Colonies and stations, and Regions, each group in a stable order. Since version 0.07.2 every row wears its Kind Glyph in front of its name and, where the row can want an order, a ring at its end: open while an order is still wanted this turn, filled once one is given. An Army carries no ring, since an Army keeps the stance it was last given until it is moved. (Version 0.07.1's count on the heading, clickable to filter the group, lasted one version.)
+The list in the side panel of everything a Faction holds, since version 0.03 and organised in version 0.07.1: its Ships, Armies, Colonies and stations, and Regions, each group in a stable order. Since version 0.08.2 every Ship has a row of its own, by name, rather than one row for a whole stack at a Body. Since version 0.07.2 every row wears its Kind Glyph in front of its name and, where the row can want an order, a ring at its end: open while an order is still wanted this turn, filled once one is given. An Army carries no ring, since an Army keeps the stance it was last given until it is moved. (Version 0.07.1's count on the heading, clickable to filter the group, lasted one version.)
 _Avoid_: unit list, overview, empire panel
 
 **Kind Glyph**:
-The small off-white mark, since version 0.07.2, drawn in front of a thing's name wherever the interface names it — a Roster row, a card's title, a map label, a Report line — saying what kind of thing it is: a warship, a Colony Ship (a Carrier wears the same), a station, a Colony, a Region, or an Army, whose glyph is the shield the Earth Map draws for it. Always off-white and never a colour of its own: on the board a colour says whose a thing is, and the glyph says what it is. A Figure's glyph, by contrast, says how much of something.
+The small off-white mark, since version 0.07.2, drawn in front of a thing's name where the interface names it — a Roster row, a map label, a Report line — saying what kind of thing it is. Since version 0.08.2 it is NOT on a card's title: a card already says what kind of thing it is by its name and its contents, so a heading carries the Faction's symbol alone and a neutral place carries no mark at all: a warship, a Colony Ship (a Carrier wears the same), a station, a Colony, a Region, or an Army, whose glyph is the shield the Earth Map draws for it. Always off-white and never a colour of its own: on the board a colour says whose a thing is, and the glyph says what it is. A Figure's glyph, by contrast, says how much of something.
 _Avoid_: unit icon, type icon, category marker
 
 ### Resources
@@ -195,7 +195,7 @@ The single shared pool holding all Materials, Fuel, Energy and, since version 0.
 _Avoid_: central bank, per-world stocks, inventory
 
 **Ducats**:
-Money, the fourth resource since version 0.03. A controlled Region pays them from its GDP figure times its Industry Level; a Bank on Earth and a Trade Post in a Colony make more. They buy Influence at two for one, added to this turn's Allotment, and pay for Relief, Resettle, a Leapfrog and repair points in place of Materials.
+Money, the fourth resource since version 0.03. A controlled Region pays them from its GDP figure times its Industry Level; a Bank on Earth and a Trade Post in a Colony make more. They buy Influence at two for one, added to this turn's Allotment, and pay for Relief, Resettle, a Leapfrog, a tribute and repair points in place of Materials. What they buy in the Trading window moves in price since version 0.08.2, and every good there costs one more than it did.
 _Avoid_: Ducketts, credits, money, gold, cash
 
 **Bank**:
@@ -359,7 +359,7 @@ How dirty a Region's industry is before any Facility is built there.
 _Avoid_: pollution rating, carbon score
 
 **Build Slot**:
-One of the places a Facility occupies in a Region. A state has Size + Industry Level + three of them, and each is either a **Coastal Slot** or an **Inland Slot**: the sea takes only the first, and every slot a raise of the Industry Level adds is one of the second. Its start Facilities stand on the coast first; a later build fills an inland slot while one is free. Since version 0.07.3 the card draws them as boxes -- a picture on a dark box, dimmed while mothballed, hatched while building, dashed while free, a coastal box outlined in blue and an inland one in grey -- and a slot the sea has taken stands under water, three quarters flooded with the drowned building dimmed beneath. Since version 0.07.4 every box says on hover what its row says -- the kind, its figures, and the upkeep, Emissions and coastal rules -- and a free, building or flooded box says what it is; the Scrubber and the Sea Wall, which take no slot, stand beneath the boxes with their build buttons, and a Facility that takes a slot is built by clicking a free box and nowhere else.
+One of the places a Facility occupies in a Region. A state has Size + Industry Level + three of them, and each is either a **Coastal Slot** or an **Inland Slot**: the sea takes only the first, and every slot a raise of the Industry Level adds is one of the second. Its start Facilities stand on the coast first; a later build fills an inland slot while one is free. Since version 0.07.3 the card draws them as boxes -- a picture on a dark box, dimmed while mothballed, hatched while building, dashed while free, a coastal box outlined in blue and an inland one in grey -- and a slot the sea has taken stands under water, three quarters flooded with the drowned building dimmed beneath. Since version 0.08.2 a free box the player could actually build in says so, where one they could not keeps the bare word. Since version 0.07.4 every box says on hover what its row says -- the kind, its figures, and the upkeep, Emissions and coastal rules -- and a free, building or flooded box says what it is; the Scrubber and the Sea Wall, which take no slot, stand beneath the boxes with their build buttons, and a Facility that takes a slot is built by clicking a free box and nowhere else.
 _Avoid_: building slot, plot, space, capacity
 
 **Coastal Slot**:
@@ -415,7 +415,7 @@ The Orders-phase order that steers Refugees: once a turn, for Ducats, every flow
 _Avoid_: relocate, evacuate, transfer, deport
 
 **Blame**:
-The CO2 a Faction is answerable for over the whole game: everything the sources it controlled has emitted, less everything it has taken back, and never less than nothing. What no Faction controls is nobody's. A Faction's share of the four Factions' Blame, when it rises above a fair quarter, makes every Region it does not hold harder for it to win over.
+The CO2 a Faction is answerable for over the whole game: everything the sources it controlled has emitted, less everything it has taken back, and never less than nothing. What no Faction controls is nobody's. A Faction's share of the four Factions' Blame, when it rises above a fair quarter, makes every Region it does not hold harder for it to win over. Since version 0.08.2 it does a second thing: the other Factions hold it against them, each by its own measure -- the Custodians minding twice as much as the Archivists, the Arkwrights half as much, the Prospectors not at all -- so a dirty Faction loses the room to strike an Accord as well as the ground it wanted.
 _Avoid_: carbon debt, guilt, pollution score, emissions total, footprint
 
 **Influence**:
@@ -427,7 +427,7 @@ How much Influence a Faction has built up on one place. Since version 0.03 it pe
 _Avoid_: accumulation, influence points, loyalty
 
 **Threshold**:
-The Standing a Faction must reach to take a place. A Region's is a base plus a figure for each step of the state's size; a Colony's is a figure for each of its Colonists, and a Space Station's has a base of its own besides. Green Consensus lowers every threshold by a quarter, and since version 0.05 each Faction reads its own, since its Blame raises it on every place it does not hold. A place already held wants the holder's Standing plus the challenge margin as well, so the threshold is the floor and never the whole price. Schooling does NOT move the threshold: Resistance taxes the spending instead. The word has a second, unrelated sense in the climate rules, where a Break or a Sea Level threshold is a Temperature; this entry is the Influence one.
+The Standing a Faction must reach to take a place. A Region's is a base plus a figure for each step of the state's size; a Colony's is a figure for each of its Colonists, and a Space Station's has a base of its own besides. Green Consensus lowers every threshold by a quarter, and since version 0.05 each Faction reads its own, since its Blame raises it on every place it does not hold. A place already held wants the holder's Standing plus the challenge margin as well, so the threshold is the floor and never the whole price. Since version 0.08.2 that margin is a little dearer for a challenger the holder thinks badly of, so the same Region costs more to take from somebody you have crossed than from somebody you have not. Schooling does NOT move the threshold: Resistance taxes the spending instead. The word has a second, unrelated sense in the climate rules, where a Break or a Sea Level threshold is a Temperature; this entry is the Influence one.
 _Avoid_: cost, price, target (for the Influence sense); the climate sense, which is a Break or a Sea Level threshold
 
 **Resistance**:
@@ -435,15 +435,23 @@ How hard a place is to sway, from how well it is schooled, from version 0.08.0. 
 _Avoid_: defence, loyalty, resilience, stubbornness
 
 **Relations**:
-What one Faction thinks of another, from version 0.08.0. One score per ORDERED PAIR, so twelve in a four-seat game and the Arkwrights' view of the Prospectors is a different number from the Prospectors' view of the Arkwrights. It starts neutral, falls by one for each OFFENDING TURN -- a turn in which the offender spent any Influence on a place the victim holds, or opened a Battle against them -- and recovers slowly while a pair is quiet, never rising above neutral. In version 0.08.0 it does nothing mechanical: it is read, not spent, and no rule and no computer player reads it.
+What one Faction thinks of another, from version 0.08.0. One score per ORDERED PAIR, so twelve in a four-seat game and the Arkwrights' view of the Prospectors is a different number from the Prospectors' view of the Arkwrights. Since version 0.08.2 it is two things added together: the **deeds**, everything the pair has done to each other, and a **Blame term** read afresh every turn off the other Faction's share of the four Factions' Blame. Only the shown sum is held to the scale; the deeds figure alone may climb past it, which is what lets a pair carrying a heavy Blame penalty still reach the top on deeds. It is read as six **levels** -- Friendly, Cordial, Neutral, Wary, Cold, Hostile -- and the level is what a player reasons with, the number being the audit trail. An OFFENDING TURN costs what the acts in it are worth rather than a flat one, to a limit; quiet mends it below neutral and lets it lapse half as fast above. A pair crossed often enough carries a **floor** it can never recover above again, which only an Accord kept will lift. Since version 0.08.2 it is no longer only read: a rival that holds you below neutral defends its places against you a little harder, and an Accord wants a level it will not be struck below.
 _Avoid_: diplomacy, alliance, opinion, reputation (that is close to Standing)
+
+**Accord**:
+A bargain between two Factions, from version 0.08.2, holding one or more **Terms**: non-aggression, passage, refuel, a tribute, or a research agreement. Either side may propose one and either may refuse, and a refusal is not an offence. Ending one takes a turn's notice and costs nothing -- the notice is a turn of warning to everybody watching -- where acting against a term while it still stands is an offence and ends the whole Accord at once. An Accord kept for a run of turns is one of only two acts that raise Relations, and the only thing that lifts a pair's floor. A Faction may hold Accords with two rivals at once, including with two who are fighting each other.
+_Avoid_: diplomacy, treaty, alliance, pact, deal
+
+**Terms**:
+What is inside an Accord. **Non-aggression**: neither spends Influence on a place the other holds, nor opens a Battle against them -- not forbidden by the rules, but paid for and fatal to the Accord. **Passage**: neither treats the other's Ships as a target, and a Blockade does not shut the other out of the slot. **Refuel**: either may Refuel at the other's Space Stations. **Tribute**: a fixed gift, one a turn to a Faction, which raises their view of you by one; it is a single turn's act rather than a standing term. **A research agreement**: both parties' Research rises a tenth while it stands, and it wants Friendly on both sides to strike -- checked at that moment and never again.
+_Avoid_: clause, article, condition (that is close to Victory Condition), provision
 
 **Allotment**:
 The amount of Influence a Faction receives each turn, split freely across any number of targets during the Orders phase. It is a base plus the Influence value of every Region the Faction controls (since version 0.03 each state carries its own value, from its economic and military weight), and it does not carry over.
 _Avoid_: influence budget, diplomacy pool, action points
 
 **Research**:
-Points produced by Research Labs on Earth and, since version 0.06.0, by Observatories at Colonies and Space Stations, and spent only on Techs. Since version 0.08.0 a place's Education Level moderates what its population adds as well as multiplying the building's own figure, so schooling applies twice to a Lab. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship. Since version 0.05.5 a Lab in a Region nobody holds, or one under Occupation, runs itself and pays half its yield into the Tech under research for no Faction; North America and South-East Asia begin with such a Lab.
+Points produced by Research Labs on Earth and, since version 0.06.0, by Observatories at Colonies and Space Stations, and spent only on Techs. Since version 0.08.2 two Factions holding a research agreement between them each make a tenth more. Since version 0.08.0 a place's Education Level moderates what its population adds as well as multiplying the building's own figure, so schooling applies twice to a Lab. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship. Since version 0.05.5 a Lab in a Region nobody holds, or one under Occupation, runs itself and pays half its yield into the Tech under research for no Faction; North America and South-East Asia begin with such a Lab.
 _Avoid_: science, research points, RP, fourth resource
 
 ### The turn

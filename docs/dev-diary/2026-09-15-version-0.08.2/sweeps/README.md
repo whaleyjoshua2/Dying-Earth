@@ -41,18 +41,40 @@ Arkwrights have halved, from 7 to 3**, which leaves the thinnest Faction thinner
 version set out to move either figure, and the Arkwrights' fall is the one worth a look — they were
 already the seat with one signature rule, no faction-only order and no Unique Module.
 
+## The second sweep, with the six figures the spec asked for
+
+`second-0.08.2.txt`. The sweep now reports all six, and two of them earned their place immediately.
+
+**The Accords were never struck at all.** The first run of these figures showed **zero standing at the
+end of twenty games** — the computer seats had no way to propose one, so the whole subsystem was
+invisible in a game they play among themselves. That is the risk the Accords ticket recorded as its
+own largest. Giving the seats an appetite (`ai.toml: accord`, and a push that offers what a seat
+would itself accept) fixed it: **157 Accords stand at the end across the 80 games**, all of them
+non-aggression, which is the only term that means anything on today's board.
+
+**Nearly half of all ordered pairs end the game carrying a scar floor** — 42% to 47% by seating, and
+between 84 and 103 of 240 pairs sit at Cold or worse. That is close to the failure mode the scar
+ticket named for itself: *"by turn 30 every pair is floored at the worst and the score stops carrying
+information."* It is not there — the median pair ends at −1 to −4, so the scale is still saying
+something — but it is nearer than the charting expected, and the step is one number in
+`factions.toml` if it wants softening.
+
+The other four, for the record:
+
+| figure | reading |
+|---|---|
+| Blame share at the end | The dirtiest seat sits at **0.64–0.65** when it is the Prospectors, 0.33–0.39 otherwise. The rule fires hard and constantly. |
+| Places taken by Influence | 269–372 a batch, which is the baseline the challenge-margin term should be watched against. |
+| Trading window units | bought `[80, 7100, 0, 70]`, sold `[0, 0, 0, 0]` — one seat is the market, and nobody sells. |
+| The whole Tech Tree | completes in 19–20 of 20 seeds, median turn **31–36**, where 0.08.1 had it done by the mid-game. |
+
 ## What this sweep does NOT yet report
 
-`docs/spec/version-0.08.2.md` section 12 names six figures this version's rules depend on, and the
-sweep reports none of them yet:
+All six are reported now. What remains unmeasured is narrower:
 
-- each seat's **Blame share** at the end and over the game;
-- the **distribution of Relations scores and floors** — a version where every pair is floored at Wary
-  is the failure mode the scar ticket named;
-- **takes per batch**, before and after, since the challenge-margin term is the one change that can
-  move the win table directly;
-- **Accords struck, by term and by seat** — a system the computer seats never use is invisible;
-- **buy and sell volume per seat**, and Ducat spending, since every price rose;
-- **the turn the Tech Tree completes**, since two seats at +10% Research reach it sooner.
+- **Ducat spending per seat**, which would say directly whether the price rise is what moved the
+  collapse rate.
+- **Accords by TERM struck over a game** rather than standing at its end, so a term struck and broken
+  is not invisible.
+- The figures are reported per seating; nothing yet aggregates them across the four.
 
-Adding them is part of the build ticket and has not been done.
