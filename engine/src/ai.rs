@@ -20,6 +20,11 @@ enum Cat {
     ArmyOrBarracks,
     /// Ticket #36: an Embassy or a Relay.
     BuildInfluence,
+    /// Ticket #227 (version 0.08.2): offering an Accord. Without this the computer seats never
+    /// propose one and the whole system is invisible in a game they play among themselves -- which
+    /// the first sweep after the Accords were built showed exactly: zero standing at the end of 20
+    /// games. The Accords ticket recorded that as its own largest risk; this is the answer to it.
+    Accord,
     /// Ticket #52: a Constabulary, Relief and Resettle.
     Constabulary,
     Relief,
@@ -111,6 +116,7 @@ impl Game {
             Cat::Constabulary => w.build_constabulary,
             Cat::Relief => w.relief,
             Cat::Resettle => w.resettle,
+            Cat::Accord => w.accord,
             Cat::FundArchive => w.fund_archive,
             Cat::BuildArchive => w.build_archive,
             Cat::Upload => w.upload,
@@ -1159,6 +1165,31 @@ impl Game {
                 1.0,
                 1.0,
                 format!("resettle this turn's refugees in {}", self.tables.state(sid).name),
+                None,
+            );
+        }
+
+        // Ticket #227 (version 0.08.2): offer an Accord to a Faction this seat neither loathes nor
+        // is about to lose to. It offers what it would itself accept -- non-aggression alone, the
+        // one term that means anything on today's board -- and only where none stands already. An
+        // offer costs nothing and a refusal is not an offence, so the guard is on frequency rather
+        // than on risk: a table where every seat proposed every turn would bury the player.
+        for other in Seat::ALL {
+            if other == seat || self.accords.iter().any(|a| a.holds(seat, other)) {
+                continue;
+            }
+            let terms = vec![Term::NonAggression];
+            if !self.accord_acceptable(seat, other, &terms) {
+                continue;
+            }
+            push(
+                vec![Order::ProposeAccord { to: other, terms }],
+                Cat::Accord,
+                self.base_weight(seat, Cat::Accord),
+                1.0,
+                1.0,
+                1.0,
+                format!("offer the {} an Accord", self.seat_name(other)),
                 None,
             );
         }

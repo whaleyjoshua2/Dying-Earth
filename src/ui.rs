@@ -607,6 +607,34 @@ fn kind_glyph(ui: &mut Ui, kind: Kind, size: f32) {
 /// Ticket #138 (version 0.07.3): a button with a kind glyph inside it for a kind whose glyph is
 /// drawn rather than loaded (the Army's shield), so it looks and behaves like `Button::image_and_text`
 /// does for the kinds that have art. A clickable group in the button's own visuals, as `priced_button`.
+/// Ticket #218 (version 0.08.2): the founding button, carrying the site's four yields ON ITS FACE in
+/// glyph and number rather than on a hover. The player already reads that same row under every slot
+/// label on the Body Surface Map (`slot_yield_label`), so the moment of the decision uses the
+/// notation they have been reading all along instead of a second one. Ticket #211 put these figures
+/// on a hover one version ago; this supersedes that at the designer's word, and the hover is dropped
+/// entirely -- it held the same four figures in words, so it duplicated the face and nothing else.
+///
+/// Built as `glyph_button` is, a clickable frame of its own, because a plain egui button's face is
+/// text and cannot carry the glyphs.
+fn found_button(ui: &mut Ui, yields: &dying_earth_engine::SlotYields, label: &str) -> egui::Response {
+    ui.scope_builder(egui::UiBuilder::new().sense(egui::Sense::click()), |ui| {
+        let resp = ui.response();
+        let visuals = *ui.style().interact(&resp);
+        egui::Frame::new()
+            .inner_margin(egui::Margin::symmetric(6, 4))
+            .corner_radius(visuals.corner_radius)
+            .fill(visuals.weak_bg_fill)
+            .stroke(visuals.bg_stroke)
+            .show(ui, |ui| {
+                ui.vertical(|ui| {
+                    ui.label(RichText::new(label).color(visuals.text_color()));
+                    text_with_icons(ui, &slot_yield_hover(yields), 13.0, visuals.text_color());
+                });
+            });
+    })
+    .response
+}
+
 fn glyph_button(ui: &mut Ui, kind: Kind, text: &str) -> egui::Response {
     ui.scope_builder(egui::UiBuilder::new().sense(egui::Sense::click()), |ui| {
         let resp = ui.response();
@@ -1306,16 +1334,39 @@ fn faction_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>) {
             ui.label(RichText::new("All four sit at every table: you take one seat, the computer plays the other three.").size(15.0));
             ui.add_space(10.0);
         });
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            for row in FactionKind::ALL.chunks(2) {
-                ui.columns(2, |cols| {
-                    for (i, kind) in row.iter().enumerate() {
-                        faction_card(&mut cols[i], session, *kind, actions);
-                    }
-                });
-                ui.add_space(6.0);
-            }
-        });
+        // Ticket #217 (version 0.08.2): the scrollbar shows ONLY when scrolling is required and is
+        // quiet when everything fits. That is the fix for the real defect this ticket found: at the
+        // default 1280x800 and at 1600x900 the second row is clipped and NEITHER the Arkwrights' nor
+        // the Archivists' Play button is on screen, with nothing saying the page scrolls at all. The
+        // grid is allowed to scroll -- no fit target was set -- so the cue is the whole remedy.
+        // `VisibleWhenNeeded` alone is not enough, and a picture is what showed it: egui's default
+        // scrollbar FLOATS, so it fades to nothing while no pointer is near it -- which is exactly
+        // the state a player is in when the screen opens. A non-floating bar is laid out solidly
+        // whenever the content overflows, and is absent entirely when it does not.
+        ui.style_mut().spacing.scroll.floating = false;
+        egui::ScrollArea::vertical()
+            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded)
+            .show(ui, |ui| {
+                // All four cards take ONE height, the tallest's, so the screen reads as a 2x2 matrix
+                // rather than as four cards of their own lengths. The height cannot be known before
+                // the cards are drawn, so it is measured and carried to the next frame through
+                // egui's own temporary memory: one frame of raggedness on the very first paint, and
+                // stable afterwards. `ui.columns` equalises width and never height, which is why the
+                // screen looked ragged despite already being a 2x2.
+                let id = egui::Id::new("faction-card-height");
+                let want: f32 = ui.ctx().memory(|m| m.data.get_temp(id).unwrap_or(0.0));
+                let mut tallest: f32 = 0.0;
+                for row in FactionKind::ALL.chunks(2) {
+                    ui.columns(2, |cols| {
+                        for (i, kind) in row.iter().enumerate() {
+                            let h = faction_card(&mut cols[i], session, *kind, want, actions);
+                            tallest = tallest.max(h);
+                        }
+                    });
+                    ui.add_space(6.0);
+                }
+                ui.ctx().memory_mut(|m| m.data.insert_temp(id, tallest));
+            });
     });
 }
 
@@ -1448,12 +1499,32 @@ fn faction_rulebook(ui: &mut Ui, session: &Session, kind: FactionKind) {
 
 /// One Faction's card on the setup screen: its symbol and name, the rulebook, the button that plays
 /// it, and the tutorial tick.
-fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut Vec<Action>) {
+/// Ticket #217 (version 0.08.2): `want` is the tallest card's CONTENT height, measured last frame;
+/// the card pads its own content out to it and then places its Play button, so the four buttons sit
+/// on two clean lines instead of wherever each rulebook happened to end. Returns this card's content
+/// height, so the caller can take the maximum for the next frame.
+fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, want: f32, actions: &mut Vec<Action>) -> f32 {
     let card = session.tables.faction(kind);
-    egui::Frame::group(ui.style()).inner_margin(12.0).show(ui, |ui| {
+    let r = egui::Frame::group(ui.style()).inner_margin(12.0).show(ui, |ui| {
         faction_heading(ui, session, kind, 28.0);
         faction_rulebook(ui, session, kind);
-        ui.add_space(10.0);
+        // What the foot of the card costs: the button, the space above it, and on the Custodians'
+        // card the tutorial tick beneath. Everything above is pushed up by padding out to `want`.
+        // The tick's height is reserved on ALL FOUR cards, not only the Custodians' -- otherwise the
+        // one card carrying it would seat its button that much higher than the other three and the
+        // buttons would not line up, which is the whole point of pinning them. Three cards end with
+        // that much empty air, which is the price of a straight row and is invisible.
+        let used: f32 = ui.min_rect().height();
+        // What is measured and matched across the four cards is the CONTENT height -- everything
+        // above the foot -- not the finished card's. Matching finished heights looked right and was
+        // not: the tallest card in a row hits the minimum-space clamp, `ui.columns` then stretches
+        // the shorter card's frame to match, and its button has already been placed off the stale
+        // figure. Padding the content to a common height puts every button at the same offset from
+        // the top of its card, which is what pinning them means.
+        // The 10 is added to EVERY card rather than used as a floor. As a floor it applied only to
+        // the tallest card -- the one card whose content already equals `want` -- seating its button
+        // ten pixels below the other three, which is precisely the raggedness being removed.
+        ui.add_space((want - used).max(0.0) + 10.0);
         if ui.add(egui::Button::new(RichText::new(format!("Play the {}", card.name)).size(17.0)).min_size(egui::vec2(190.0, 36.0))).clicked() {
             actions.push(Action::ChooseFaction(kind));
         }
@@ -1466,15 +1537,21 @@ fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, actions: &mut
         if kind == FactionKind::Custodians {
             ui.add_space(6.0);
             let mut on = session.tutorial_ticked;
+            // Ticket #217 (version 0.08.2): a fifth larger at the designer's word. The checkbox took
+            // egui's default size, so there was no number to multiply and one had to be named; this
+            // follows how ticket #211 handled the command cluster's 1.15. Its placement is unchanged
+            // -- ticket #174 put it at the foot of this card deliberately.
             if ui
-                .checkbox(&mut on, "Play Tutorial")
+                .checkbox(&mut on, RichText::new("Play Tutorial").size(TUTORIAL_TICK))
                 .on_hover_text("A note at the head of each of the first five turns, saying what that turn is for. Nothing is forced, and it stops after the fifth.")
                 .changed()
             {
                 actions.push(Action::SetTutorialTick(on));
             }
         }
+        used
     });
+    r.inner
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1694,6 +1771,42 @@ fn game_screen(
                 View::Surface(_) => {
                     view.yaw += d.x * 0.008;
                     view.pitch = (view.pitch + d.y * 0.008).clamp(-1.3, 1.3);
+                }
+            }
+            // Ticket #216 (version 0.08.2): hovering a Faction's line in an in-orbit block names
+            // that Faction's hulls. The block itself is unchanged -- the designer wanted the maps to
+            // look as they do -- so this is the only way a name reaches a Ship sitting at a Body.
+            // Both maps use it: the Solar System Map's stack labels already carried a hotspot for
+            // the click, and the Body Surface Map's block grew one above.
+            //
+            // Capped at five with a tail, which keeps the standing six-line limit on a tooltip: the
+            // worst fleet ever measured was 27 hulls, and 27 lines over an eighteen-pixel Earth is
+            // what the stress mockup showed to be unreadable. The click is untouched and still
+            // selects the stack, where the full list lives.
+            if let Some(p) = resp.hover_pos() {
+                let mut best: Option<(f32, BodyId, Seat)> = None;
+                for h in &hotspots {
+                    if let Hit::Select(Selection::ShipStack(b, s)) = h.hit {
+                        let d = h.pos.distance(p);
+                        if d <= h.radius && best.map(|(bd, _, _)| d < bd).unwrap_or(true) {
+                            best = Some((d, b, s));
+                        }
+                    }
+                }
+                if let Some((_, b, s)) = best {
+                    let ids = game.ships_at(s, b);
+                    let mut lines: Vec<String> = ids
+                        .iter()
+                        .filter_map(|id| game.ship(*id))
+                        .take(5)
+                        .map(|sh| format!("{} ({})", game.ship_name(sh), sh.kind.name().to_lowercase()))
+                        .collect();
+                    if ids.len() > 5 {
+                        lines.push(format!("and {} more - click the stack", ids.len() - 5));
+                    }
+                    if !lines.is_empty() {
+                        resp.show_tooltip_text(lines.join("\n"));
+                    }
                 }
             }
             if resp.hovered() {
@@ -2059,6 +2172,14 @@ fn research_race_bar(ui: &mut Ui, session: &Session, game: &Game, width: f32, in
     let tail = if in_window { format!("
 {}", game.research_lead_text()) } else { "
 Click to open the Tech Tree.".to_string() };
+    // Ticket #219 (version 0.08.2): the hover was to "trim to what the face does not say" now that
+    // each Faction's name and percentage stand under the bar. Nothing needed trimming. What this
+    // hover carries is the RAW COUNTS -- `Custodians 10, Prospectors 7` -- and a count is precisely
+    // what a percentage cannot tell you: whether 42% is 10 Research or 100. It also carries the
+    // Tech's name, the progress and the Research Lead, none of which the face says either. So the
+    // line stands as ticket #211 left it, and the trim is a no-op recorded rather than a change
+    // made. The top bar's copy is untouched for the same reason and one more: at 150 pixels it has
+    // no room for names, so its hover is the only place they appear at all.
     let resp = ui.interact(rect, ui.id().with("race"), egui::Sense::click()).on_hover_text(format!(
         "The Research race for {}: {}{}. {} of {}.{tail}",
         game.tables.tech(tech).name,
@@ -2180,7 +2301,14 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     let a = geo::solar_place(game, from);
                     let b = geo::solar_place(game, to);
                     if let Some(p) = project(a.lerp(b, 0.5) + Vec3::Y * 0.2) {
-                        label_kind_at(painter, p, Some(Kind::of_unit(s.kind)), &format!("{} {}: {} turn(s)", game.seat_name(s.seat), s.kind.name(), turns_left), seat_colour(session, s.seat), 12.0);
+                        // Ticket #216 (version 0.08.2): a Ship in transit is named. The designer's
+                        // "the name of the ship should appear ... and the map" meant THIS label and
+                        // not the per-Faction block at a Body, which is unchanged. The Faction's
+                        // NAME goes: the prefix already says whose (TSV, PMV, ARK, ACV) and the
+                        // label is drawn in the Faction's colour, so it was saying it three times.
+                        // The type stays in words at the designer's word, beside the kind glyph.
+                        let text = format!("{} ({}): {} turn(s)", game.ship_name(s), s.kind.name().to_lowercase(), turns_left);
+                        label_kind_at(painter, p, Some(Kind::of_unit(s.kind)), &text, seat_colour(session, s.seat), 12.0);
                     }
                 }
             }
@@ -2251,28 +2379,38 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     slot_labels(painter, session, game, body, &visible, hotspots);
                     // The band along the top: Ship stacks in orbit and Orbital Control. Ticket #50:
                     // four seats will not fit on one line, so each takes its own in its own colour.
-                    let mut band: Vec<(String, Color32, Option<Kind>)> = Vec::new();
+                    // Ticket #216 (version 0.08.2): a line that belongs to a Faction's stack carries
+                    // its seat, so the block can grow hotspots and a hover naming the hulls. A
+                    // station's line and the Orbital Control line belong to nobody and carry None.
+                    let mut band: Vec<(String, Color32, Option<Kind>, Option<Seat>)> = Vec::new();
                     for seat in Seat::ALL {
                         let ids = game.ships_at(seat, body);
                         if !ids.is_empty() {
                             let kind = Kind::of_ships(ids.iter().filter_map(|id| game.ship(*id)));
-                            band.push((format!("{}: {} Ship(s), strength {}", game.seat_name(seat), ids.len(), game.ship_stack_strength(seat, body)), seat_colour(session, seat), Some(kind)));
+                            band.push((format!("{}: {} Ship(s), strength {}", game.seat_name(seat), ids.len(), game.ship_stack_strength(seat, body)), seat_colour(session, seat), Some(kind), Some(seat)));
                         }
                     }
                     for c in game.colonies.iter().filter(|c| c.in_orbit && c.body == body) {
                         let who = c.control.director();
                         let name = who.map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".into());
-                        band.push((format!("{} ({})", game.station_name(body, c.slot), name), who.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY), Some(Kind::Station)));
+                        band.push((format!("{} ({})", game.station_name(body, c.slot), name), who.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY), Some(Kind::Station), None));
                     }
                     band.push(match game.orbital_control(body) {
-                        Some(s) => (format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s), None),
-                        None => ("Orbital Control: nobody".to_string(), Color32::LIGHT_GRAY, None),
+                        Some(s) => (format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s), None, None),
+                        None => ("Orbital Control: nobody".to_string(), Color32::LIGHT_GRAY, None, None),
                     });
                     let rect = painter.clip_rect();
                     let x = rect.center().x - 120.0;
                     label_at(painter, Pos2::new(x, rect.min.y + 50.0), &format!("In orbit around {}", game.tables.body(body).name), Color32::WHITE, 13.0);
-                    for (i, (text, colour, kind)) in band.iter().enumerate() {
-                        label_kind_at(painter, Pos2::new(x, rect.min.y + 70.0 + 18.0 * i as f32), *kind, text, *colour, 12.0);
+                    for (i, (text, colour, kind, seat)) in band.iter().enumerate() {
+                        let at = Pos2::new(x, rect.min.y + 70.0 + 18.0 * i as f32);
+                        label_kind_at(painter, at, *kind, text, *colour, 12.0);
+                        // Ticket #216: a Faction's line gets a hit target, so hovering it can name
+                        // that Faction's hulls. The Solar System Map's block already had one for the
+                        // click; this block had none at all, being painted at fixed positions.
+                        if let Some(s) = seat {
+                            hotspots.push(Hotspot { pos: at, radius: 14.0, hit: Hit::Select(Selection::ShipStack(body, *s)) });
+                        }
                     }
                 }
             }
@@ -2910,50 +3048,66 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
     let pending = &session.pending;
     let tag = |text: &str| if marks { String::new() } else { format!("{text}: ") };
 
-    // Ships, one row per stack at a Body, then those in transit.
+    // Ticket #216 (version 0.08.2): ONE ROW PER SHIP, at a Body and in transit alike, replacing the
+    // row-per-stack this list carried since ticket #115. Every Ship has a name since ticket #210 and
+    // the designer wants to read it here; the ring that says a thing still wants an order is also
+    // per-SHIP in meaning and was only per-stack by accident of the row.
+    //
+    // Affordable because it was measured, not assumed: over 200 games the median Faction holds ZERO
+    // Ships, one or two is typical, and the largest fleet ever seen was 27 (an Arkwright yard
+    // backlog at Earth, once). The rows this adds are almost always none.
     let mut ships_rows: Vec<RosterRow> = Vec::new();
     for body in BodyId::ALL {
         let ships: Vec<&Ship> = game.ships.iter().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)).collect();
-        if ships.is_empty() {
-            continue;
+        for s in ships {
+            let ordered = pending.iter().any(|o| {
+                matches!(o, Order::Transit { ship, .. } | Order::Load { ship, .. } | Order::Unload { ship, .. } | Order::Repair { unit: UnitRef::Ship(ship), .. } if *ship == s.id)
+            }) || pending.iter().any(|o| matches!(o, Order::ShipStance { body: b, .. } if *b == body));
+            let tank = game.tables.unit(s.kind).tank;
+            // The working figures stay ON the row: the Roster is where a player checks whether a
+            // hull can move before ordering it, and the tank is the figure that says stranded.
+            let mut text = format!(
+                "{}{} ({}) at {} - strength {}, {}/{}",
+                tag("Ship"),
+                game.ship_name(s),
+                s.kind.name().to_lowercase(),
+                game.tables.body(body).name,
+                game.ship_strength(s),
+                s.fuel,
+                tank
+            );
+            if s.colonists > 0 {
+                text.push_str(&format!(", {} Colonists aboard", s.colonists));
+            }
+            if s.army.is_some() {
+                text.push_str(", an Army aboard");
+            }
+            if s.damage > 0 {
+                text.push_str(&format!(", damage {}/{}", s.damage, game.tables.unit(s.kind).hit_points));
+            }
+            // Stranded is now per-SHIP rather than the old all-or-nothing warning on the stack,
+            // which is strictly more accurate: one hull can be dry while another beside it is full.
+            if game.stranded(s.id) {
+                text.push_str(" - STRANDED: no leg affordable and no station of yours here");
+            }
+            // Ticket #116 (version 0.07.1): what the tank is for, and what being stranded means. A Ship
+            // with no leg it can afford and no station of its own is the one piece in the game that can
+            // become permanently useless, and the roster said so in four words and explained none of it.
+            let tip = format!(
+                "Tank {} of {}. Fuel goes on transits, and a leg costs least at a launch window.\nRefuelling needs a station or Colony of yours where the Ship sits, so a Ship is STRANDED with no leg it can afford and nowhere to fill up.",
+                s.fuel, tank
+            );
+            ships_rows.push(RosterRow { kind: Kind::of_unit(s.kind), text, tip: Some(tip), mark: marks.then_some(!ordered), jump: Some((View::Solar, Selection::ShipStack(body, seat))) });
         }
-        let ordered = ships.iter().all(|s| {
-            pending.iter().any(|o| matches!(o, Order::Transit { ship, .. } | Order::Load { ship, .. } | Order::Unload { ship, .. } | Order::Repair { unit: UnitRef::Ship(ship), .. } if *ship == s.id))
-        }) || pending.iter().any(|o| matches!(o, Order::ShipStance { body: b, .. } if *b == body));
-        let mut kinds: Vec<String> = ships.iter().map(|s| s.kind.name().to_string()).collect();
-        kinds.sort();
-        kinds.dedup();
-        let cargo: u32 = ships.iter().map(|s| s.colonists).sum();
-        let armies = ships.iter().filter(|s| s.army.is_some()).count();
-        let mut text = format!("{}{} at {}: {} (strength {})", tag("Ships"), ships.len(), game.tables.body(body).name, kinds.join(", "), game.ship_stack_strength(seat, body));
-        if cargo > 0 {
-            text.push_str(&format!(", {cargo} Colonists aboard"));
-        }
-        if armies > 0 {
-            text.push_str(&format!(", {armies} Army aboard"));
-        }
-        // Ticket #87: the tanks, and a stack that cannot leave.
-        let fuel: i64 = ships.iter().map(|s| s.fuel).sum();
-        let tanks: i64 = ships.iter().map(|s| game.tables.unit(s.kind).tank).sum();
-        text.push_str(&format!(", tank {fuel}/{tanks}"));
-        if ships.iter().all(|s| game.stranded(s.id)) {
-            text.push_str(" - STRANDED: no leg affordable and no station of yours here");
-        }
-        // Ticket #116 (version 0.07.1): what the tank is for, and what being stranded means. A Ship
-        // with no leg it can afford and no station of its own is the one piece in the game that can
-        // become permanently useless, and the roster said so in four words and explained none of it.
-        let tip = format!(
-            "Tank {} of {}. Fuel goes on transits, and a leg costs least at a launch window.\nRefuelling needs a station or Colony of yours where the Ship sits, so a Ship is STRANDED with no leg it can afford and nowhere to fill up.",
-            fuel, tanks
-        );
-        ships_rows.push(RosterRow { kind: Kind::of_ships(ships.iter().copied()), text, tip: Some(tip), mark: marks.then_some(!ordered), jump: Some((View::Solar, Selection::ShipStack(body, seat))) });
     }
     for s in game.ships.iter().filter(|s| s.seat == seat) {
         if let ShipAt::Transit { to, turns_left, .. } = s.at {
-            // A Ship in transit is not waiting on anybody: it arrives when it arrives.
+            // A Ship in transit is not waiting on anybody: it arrives when it arrives. Named the same
+            // way as a Ship at a Body, so the two read as the same kind of thing -- and the same way
+            // the Solar System Map labels the transit, which is the point of naming it in both.
             ships_rows.push(RosterRow {
                 kind: Kind::of_unit(s.kind),
-                text: format!("{}{} in transit to {}, {} turn(s) left", tag("Ship"), s.kind.name(), game.tables.body(to).name, turns_left),
+                text: format!("{}{} ({}) - in transit to {}, {} turn(s) left", tag("Ship"), game.ship_name(s), s.kind.name().to_lowercase(), game.tables.body(to).name, turns_left),
                 tip: Some("A Ship in transit cannot be ordered and cannot be intercepted. It arrives at its Resolution, Holding, with whatever Fuel it has left.".to_string()),
                 mark: None,
                 jump: Some((View::Solar, Selection::None)),
@@ -3069,6 +3223,22 @@ fn roster_order_touches_state(o: &Order, sid: StateId) -> bool {
 
 fn order_text(game: &Game, o: &Order) -> String {
     match o {
+        // Ticket #226 (version 0.08.2): the Accord orders, so a pending one reads in the order list
+        // like any other and can be cancelled like any other.
+        Order::ProposeAccord { to, terms } => {
+            let names: Vec<&str> = terms
+                .iter()
+                .map(|t| match t {
+                    Term::NonAggression => "non-aggression",
+                    Term::Passage => "passage",
+                    Term::Refuel => "refuel",
+                    Term::ResearchAgreement => "a research agreement",
+                })
+                .collect();
+            format!("Offer the {} an Accord: {}", game.seat_name(*to), names.join(", "))
+        }
+        Order::EndAccord { with } => format!("Declare your Accord with the {} over", game.seat_name(*with)),
+        Order::Tribute { to, materials } => format!("Pay the {} a tribute in {}", game.seat_name(*to), if *materials { "Materials" } else { "Ducats" }),
         Order::BuildFacility { state, kind } => format!("Build {} in {}", kind.name(), game.tables.state(*state).name),
         Order::RaiseIndustry { state } => format!("Raise Industry Level in {}", game.tables.state(*state).name),
         Order::BuildModule { colony, kind } => format!("Build {} at {}", kind.name(), game.place_name(Place::Colony(*colony))),
@@ -4012,7 +4182,7 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             SlotBoxKind::Free => {
                 let first_free = boxes.iter().position(|(k, _)| matches!(k, SlotBoxKind::Free)) == Some(n);
                 let tip = format!("Free {side} slot: click it to build here.{}", if *coastal { "\nOn the coast, the sea can take what stands here at a threshold." } else { "" });
-                if hab_tile(ui, rect, id, None, "", TileState::Free, first_free && view.slot_box == Some(SlotBox::Free), edge, tip).clicked() {
+                if hab_tile(ui, rect, id, None, "", TileState::Free(mine), first_free && view.slot_box == Some(SlotBox::Free), edge, tip).clicked() {
                     view.slot_box = Some(SlotBox::Free);
                 }
             }
@@ -4036,7 +4206,7 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             facility_build_buttons(ui, session, game, sid, actions);
         }
         _ => {
-            ui.label(RichText::new("Click a box for its figures and controls, a free box to build.").weak());
+            ui.label(RichText::new("Click a box for its figures and controls.").weak());
         }
     }
 }
@@ -4527,14 +4697,16 @@ fn emigrant_loader(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
 
 fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, cid: ColonyId, actions: &mut Vec<Action>) {
     let Some(col) = game.colony(cid) else { return };
-    // Ticket #127 (version 0.07.2): the kind glyph in front of the name, as on the roster.
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
-        // Ticket #210 (version 0.08.1): the holder's symbol first, where a Region card's flag sits,
-        // then the kind glyph that says station or surface, then the name. At 22 to match this
-        // card's own heading rather than the Region card's 32: the two headings are different sizes.
+        // Ticket #216 (version 0.08.2): the holder's symbol ALONE, where a Region card's flag sits.
+        // Ticket #210 put the kind glyph beside it and ticket #127 put it on the heading before that;
+        // both are undone here at the designer's word. On a CARD the kind is already said by the name
+        // and by what the card contains -- you are looking at a Colony -- where in the Roster the
+        // glyph is the only thing separating a Colony row from a Region row at a glance, so the
+        // Roster's own glyphs stay. A neutral place therefore wears no mark at all, which is the
+        // standing rule that a colour says whose and nobody's place says nothing.
         faction_glyph(ui, session, game, col.control.controller(), 22.0);
-        kind_glyph(ui, Kind::of_colony(col), 22.0);
         ui.label(RichText::new(game.place_name(Place::Colony(cid))).size(22.0).strong());
     });
     let owner = match col.control {
@@ -4753,10 +4925,7 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
         // four yields are drawn under every slot on the Body view already, but the moment of the
         // DECISION said nothing about them. In glyphs, at the designer's word -- each figure's word
         // heads its multiplier, which is the form the one glyph rule reads (ticket #132).
-        if ui.button(format!("Found a Colony here with the {} Colonists aboard {}", s.colonists, game.ship_name(s)))
-            .on_hover_ui(|ui| hover_with_icons(ui, &slot_yield_hover(&game.slot_yields(body, slot))))
-            .clicked()
-        {
+        if found_button(ui, &game.slot_yields(body, slot), &format!("Found a Colony here with the {} Colonists aboard {}", s.colonists, game.ship_name(s))).clicked() {
             actions.push(Action::Place(order));
         }
     }
@@ -4766,7 +4935,10 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     let ships: Vec<&Ship> = game.ships.iter().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)).collect();
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 8.0;
-        kind_glyph(ui, Kind::of_ships(ships.iter().copied()), 22.0);
+        // Ticket #216 (version 0.08.2): the Faction's symbol alone, as on a Colony card's heading.
+        // The heading already names the Faction and the Body, so the kind glyph said nothing a
+        // reader did not have.
+        faction_glyph(ui, session, game, Some(seat), 22.0);
         ui.label(RichText::new(format!("{} Ships at {}", game.seat_name(seat), game.tables.body(body).name)).size(22.0).strong());
     });
     for s in &ships {
@@ -4963,15 +5135,13 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     );
                 }
                 for slot in game.free_slots_on(body).into_iter().filter(|_| body != BodyId::Earth || game.antarctica_open) {
-                    cost_button_with_hover(
-                        ui,
-                        game,
-                        &session.pending,
-                        Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) },
-                        &format!("Found a Colony at {}", game.tables.body(body).slots[slot as usize].name),
-                        Some(slot_yield_hover(&game.slot_yields(body, slot))),
-                        actions,
-                    );
+                    // Both founding doors read the same, at the designer's word: the same decision
+                    // reached two ways should not want learning twice.
+                    let order = Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) };
+                    let label = format!("Found a Colony at {}", game.tables.body(body).slots[slot as usize].name);
+                    if found_button(ui, &game.slot_yields(body, slot), &label).clicked() {
+                        actions.push(Action::Place(order));
+                    }
                 }
             }
         }
@@ -5214,6 +5384,15 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     // unpicking or changing a pick is exactly what changes that set. Diagnosed from a picture; the
     // reading of this code made while the ticket was charted was wrong.
     ui.advance_cursor_after_rect(rect);
+}
+
+/// Ticket #219 (version 0.08.2): the legend, lifted out of the tree's tail so it can be drawn
+/// DIRECTLY BENEATH the race bar at the top of the window. The designer asked for the bar "below the
+/// legend"; the literal reading was ruled out by measurement, since this window is `resizable(false)`
+/// around a fixed-size tree and does not scroll, so anything below the legend makes the WINDOW
+/// taller -- and at the default 1280x800 it already reaches the bottom of the screen. Moving the
+/// legend up satisfies "the bar, then the legend" and costs no height at all.
+fn tech_legend(ui: &mut Ui) {
     ui.horizontal(|ui| {
         // Ticket #173 (version 0.07.6): the paler amber of a pick that can still change earns its own
         // swatch, next to the settled amber it must be told apart from.
@@ -5223,6 +5402,37 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
             ui.label(label);
         }
         ui.label("Hover a box for its effect.");
+    });
+}
+
+/// Ticket #219 (version 0.08.2): under the race bar, one entry per Faction that has put Research
+/// into the Tech under research -- its symbol in its own colour, its name, and its SHARE OF WHAT HAS
+/// BEEN CONTRIBUTED SO FAR, the entries adding to 100%. That is the figure the bar's segment widths
+/// already draw; a percentage disagreeing with the width above it would be worse than none, which is
+/// why this is not a share of the Tech's whole cost. The `N of M` progress is unchanged.
+///
+/// A Faction that has contributed NOTHING is not shown at all, at the designer's word: its absence
+/// from this line and the grey remainder on the bar say the same thing twice. The symbol rather than
+/// a plain swatch, since 0.08.1 wears it wherever something belongs to somebody -- which also keeps
+/// the legend's swatches beneath meaning STATES rather than OWNERS.
+fn research_shares(ui: &mut Ui, session: &Session, game: &Game) {
+    let c = game.research.contributions;
+    let total: i64 = c.iter().map(|v| (*v).max(0)).sum();
+    if total <= 0 {
+        return;
+    }
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 6.0;
+        for seat in Seat::ALL {
+            let v = c[seat.index()].max(0);
+            if v == 0 {
+                continue;
+            }
+            faction_glyph(ui, session, game, Some(seat), 15.0);
+            let pct = (v as f64 * 100.0 / total as f64).round() as i64;
+            ui.label(RichText::new(format!("{} {}%", game.seat_name(seat), pct)).size(13.0).color(seat_colour(session, seat)).strong());
+            ui.add_space(10.0);
+        }
     });
 }
 
@@ -5248,6 +5458,11 @@ fn moments_corner(ui: &mut Ui, session: &Session, view: &mut ViewState) {
 /// The side of a Module or build-slot tile and the gap between tiles. Ticket #162 (version 0.07.5)
 /// retired `HAB_COLS`, the Hab View window's five: both cards lay their tiles out in `SLOT_COLS`
 /// columns now.
+/// Ticket #217 (version 0.08.2): the `Play Tutorial` tick's text size on the Faction screen, a fifth
+/// larger than egui's 14-pixel body default at the designer's word. Named rather than written as
+/// 16.8 in place, so the next such request is one number -- as ticket #211's command cluster was.
+const TUTORIAL_TICK: f32 = 14.0 * 1.2;
+
 const HAB_TILE: f32 = 84.0;
 const HAB_GAP: f32 = 10.0;
 /// Room under a tile for its name.
@@ -5259,7 +5474,11 @@ enum TileState {
     Standing,
     Mothballed,
     Building,
-    Free,
+    /// Ticket #218 (version 0.08.2): the flag says whether the PLAYER could actually build here --
+    /// their own place, and not a slot the sea has taken. A tile they can use invites the click;
+    /// one they cannot keeps the old word, because telling somebody to click a thing that will do
+    /// nothing is worse than the word it replaced.
+    Free(bool),
     /// Ticket #146: a coastal slot the sea has taken, drawn under water.
     Flooded,
 }
@@ -5282,7 +5501,7 @@ fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name
         edge.unwrap_or(Color32::from_gray(120))
     };
     match state {
-        TileState::Free => {
+        TileState::Free(yours) => {
             // A dashed border, four sides of short strokes, and the word in the middle.
             let dash = 5.0;
             let step = 9.0;
@@ -5301,7 +5520,12 @@ fn hab_tile(ui: &mut Ui, rect: egui::Rect, id: egui::Id, key: Option<&str>, name
                 painter.line_segment([Pos2::new(rect.max.x, y), Pos2::new(rect.max.x, y2)], stroke);
                 y += step;
             }
-            painter.text(rect.center(), egui::Align2::CENTER_CENTER, "free", FontId::proportional(12.0), Color32::from_gray(130));
+            // Ticket #218 (version 0.08.2): a tile the player can build in says so. Two lines: the
+            // tile is 84 square and `Click to Build` is about 78 wide at 12pt, so one line would
+            // leave three pixels of air and break if the font ever moved.
+            let (word, ink) = if yours { ("Click to
+Build", Color32::from_gray(165)) } else { ("free", Color32::from_gray(130)) };
+            painter.text(rect.center(), egui::Align2::CENTER_CENTER, word, FontId::proportional(12.0), ink);
         }
         _ => {
             let fill = if state == TileState::Mothballed { Color32::from_rgb(36, 36, 42) } else { Color32::from_rgb(48, 48, 58) };
@@ -5446,7 +5670,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         // One free place is as good as another, so the first stands for the click.
         let selected = fi == 0 && view.hab_tile == Some(HabTile::Free);
         let tip = format!("Room for another Module: click it to build here.\n{} places are free from the start and one more for every {} Colonist.", game.tables.slots.base, game.tables.slots.per_colonist);
-        if hab_tile(ui, tile_rect(i), ui.id().with(("hab-free", fi)), None, "", TileState::Free, selected, None, tip).clicked() {
+        if hab_tile(ui, tile_rect(i), ui.id().with(("hab-free", fi)), None, "", TileState::Free(mine), selected, None, tip).clicked() {
             view.hab_tile = Some(HabTile::Free);
         }
         i += 1;
@@ -5479,7 +5703,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             ui.label(RichText::new("Room for another Module.").weak());
         }
         _ => {
-            ui.label(RichText::new("Click a tile for its figures and controls, a free tile to build.").weak());
+            ui.label(RichText::new("Click a tile for its figures and controls.").weak());
         }
     }
 }
@@ -5551,8 +5775,20 @@ fn relations_row(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSta
             let (viewer, subject) = if outward { (seat, other) } else { (other, seat) };
             let v = game.relations_score(viewer, subject);
             faction_link(ui, view, other, RichText::new(game.seat_name(other)).color(seat_colour(session, other)));
+            // Ticket #221 (version 0.08.2): the LEVEL is what a player reasons with and the number is
+            // the audit trail, so the level is on the row and the figure rides on its hover -- with
+            // the Blame part broken out, because a standing penalty nobody can see the cause of is
+            // the one thing that would make this grid unreadable.
             let colour = if v < 0 { Color32::from_rgb(230, 120, 100) } else { Color32::from_gray(190) };
-            ui.label(RichText::new(format!("{v:+}")).color(colour));
+            let blame = game.blame_relations_term(viewer, subject);
+            let deeds = game.relations_deeds(viewer, subject);
+            let floor = game.relations.floor[viewer.index()][subject.index()];
+            let mut tip = format!("{:+} in all: {:+} from what they have done, {:+} from their Blame.", v, deeds, blame);
+            if floor < 0 {
+                tip.push_str(&format!("
+Scarred: this pair can never recover above {floor:+}."));
+            }
+            ui.label(RichText::new(game.relations_level(viewer, subject)).color(colour)).on_hover_text(tip);
             ui.add_space(10.0);
         }
     });
@@ -5574,7 +5810,108 @@ fn relations_row(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSta
 /// names individual buildings in individual Regions, which is a targeting list, where the total is
 /// only the rate of a hoard the Victory window already prints to the unit. A **spectator** gets the
 /// breakdown on every seat and no disclosure line at all, having no side to keep secrets from.
-fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewState) {
+/// Ticket #226 (version 0.08.2): the Accords, on a rival's page of the Faction window.
+///
+/// What stands between the player's seat and this one, what it would take to strike one, and the two
+/// acts that raise Relations. The terms are ticked and offered together, because an Accord is one
+/// bargain rather than four; the computer seat answers at the Resolution by its own weights, and a
+/// refusal is not an offence.
+fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actions: &mut Vec<Action>) {
+    let me = Seat(0);
+    let r = &game.tables.relations;
+    ui.label(RichText::new("Accords").strong());
+
+    let standing = game.accords.iter().find(|a| a.holds(me, other) || (a.ending && ((a.a == me && a.b == other) || (a.a == other && a.b == me))));
+    if let Some(acc) = standing {
+        let names: Vec<&str> = acc
+            .terms
+            .iter()
+            .map(|t| match t {
+                Term::NonAggression => "non-aggression",
+                Term::Passage => "passage",
+                Term::Refuel => "refuel",
+                Term::ResearchAgreement => "a research agreement",
+            })
+            .collect();
+        if acc.ending {
+            ui.label(RichText::new(format!("Your Accord with the {} is over: it lapses at the next turn.", game.seat_name(other))).color(Color32::from_rgb(230, 190, 120)));
+        } else {
+            ui.label(format!("You hold an Accord with the {}: {}.", game.seat_name(other), names.join(", ")));
+            let order = Order::EndAccord { with: other };
+            let placed = session.pending.contains(&order);
+            if placed {
+                ui.label(RichText::new("You have declared it over this turn.").weak());
+            } else if ui
+                .button("Declare it over")
+                .on_hover_text("Free, and it takes a turn's notice: it lapses at the start of the next turn and you may act then. Acting against a term while it still stands is another matter -- it costs 3 and ends the whole Accord at once.")
+                .clicked()
+            {
+                actions.push(Action::Place(order));
+            }
+        }
+    } else {
+        // No Accord: the terms to offer. `view` is not threaded in here, so the ticks live in egui's
+        // own memory under this pair's id -- they are a scratch choice, not game state.
+        let id = egui::Id::new(("accord-terms", other.index()));
+        let mut picked: Vec<Term> = ui.ctx().memory(|m| m.data.get_temp(id).unwrap_or_default());
+        let friendly = game.relations_score(me, other) >= 7 && game.relations_score(other, me) >= 7;
+        for (term, label, tip) in [
+            (Term::NonAggression, "Non-aggression", "Neither spends Influence on a place the other holds, nor opens a Battle against them."),
+            (Term::Passage, "Passage", "Neither treats the other's Ships as a target, and a Blockade does not shut them out of the slot."),
+            (Term::Refuel, "Refuel", "Either may Refuel at the other's Space Stations."),
+            (Term::ResearchAgreement, "Research agreement", "Both parties' Research rises a tenth while it stands. Wants Friendly on both sides to strike, and once struck it stands whatever the scores later do."),
+        ] {
+            let mut on = picked.contains(&term);
+            let enabled = term != Term::ResearchAgreement || friendly;
+            let resp = ui.add_enabled(enabled, egui::Checkbox::new(&mut on, label));
+            let resp = if enabled { resp.on_hover_text(tip) } else { resp.on_disabled_hover_text("Both sides must be Friendly to strike a research agreement.") };
+            if resp.changed() {
+                if on {
+                    picked.push(term);
+                } else {
+                    picked.retain(|t| *t != term);
+                }
+                ui.ctx().memory_mut(|m| m.data.insert_temp(id, picked.clone()));
+            }
+        }
+        let order = Order::ProposeAccord { to: other, terms: picked.clone() };
+        let offered = session.pending.iter().any(|o| matches!(o, Order::ProposeAccord { to, .. } if *to == other));
+        if offered {
+            ui.label(RichText::new("Your offer goes to them this turn.").weak());
+        } else {
+            let ok = game.check_order(me, &session.pending, &order);
+            let resp = ui.add_enabled(ok.is_ok(), egui::Button::new(format!("Offer the {} an Accord", game.seat_name(other))));
+            let resp = match &ok {
+                Ok(_) => resp.on_hover_text("They answer this turn, by their own reckoning. A refusal costs you nothing: it is not an offence."),
+                Err(e) => resp.on_disabled_hover_text(e.0.clone()),
+            };
+            if resp.clicked() {
+                actions.push(Action::Place(order));
+            }
+        }
+    }
+
+    // Tribute: the other of the two acts that raise Relations, and the only one available to a pair
+    // holding no Accord at all -- which is how a pair climbs out of Neutral in the first place.
+    ui.horizontal(|ui| {
+        for (materials, label) in [(false, format!("Pay {} Ducats", r.tribute_ducats)), (true, format!("Pay {} Materials", r.tribute_materials))] {
+            let order = Order::Tribute { to: other, materials };
+            let placed = session.pending.iter().any(|o| matches!(o, Order::Tribute { to, .. } if *to == other));
+            let ok = game.check_order(me, &session.pending, &order);
+            let resp = ui.add_enabled(ok.is_ok() && !placed, egui::Button::new(label));
+            let resp = match &ok {
+                Ok(_) if !placed => resp.on_hover_text("A tribute raises their view of you by one. A fixed gift, one a turn to a Faction: the gain is flat, so a larger one would buy no more."),
+                Ok(_) => resp.on_disabled_hover_text("You have already paid them a tribute this turn."),
+                Err(e) => resp.on_disabled_hover_text(e.0.clone()),
+            };
+            if resp.clicked() {
+                actions.push(Action::Place(order));
+            }
+        }
+    });
+}
+
+fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
     if !view.show_factions {
         return;
     }
@@ -5705,15 +6042,34 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         relations_row(ui, session, game, view, seat, false);
         // The note the grid carried, kept word for word in substance: the scale, and that nothing
         // reads these figures.
+        // Ticket #221/#222/#224 (version 0.08.2): rewritten, because the old note ended "nothing in
+        // this version reads these figures: they are a record, not a rule", and that is now flatly
+        // false. Blame feeds them, they bite the challenge margin, and they gate the Accords.
         let r = &game.tables.relations;
         ui.label(
             RichText::new(format!(
-                "{:+} to {:+} from a neutral {}. A score falls {} for each turn the pair are crossed -- Influence spent on a place the other holds, or a Battle opened against them -- and recovers {} every {} quiet turns, never above {}. Nothing in this version reads these figures: they are a record, not a rule, and half of all ordered pairs never cross each other at all in a whole game.",
-                r.best, r.worst, r.start, r.fall_per_offending_turn, r.recover, r.quiet_turns, r.start
+                "{:+} to {:+} from a neutral {}, read as six levels from Friendly to Hostile. A score is what the pair have DONE to each other plus what this Faction makes of the other's Blame -- hover a level for the two figures. Offences differ in weight and a turn charges every one, to {} at most; quiet mends {} every {} turns below neutral and lapses half as fast above it. A pair crossed on {} turns can never fully recover again.",
+                r.best, r.worst, r.start, r.turn_cap, r.recover, r.quiet_turns, r.scar_turns
             ))
             .weak(),
         );
+        ui.label(
+            RichText::new("A rival that holds you at less than neutral defends its places against you a little harder, and an Accord wants a level it will not strike below.")
+                .weak(),
+        );
         ui.add_space(6.0);
+
+        // 4b. Ticket #226 (version 0.08.2): the Accords, where the designer put them -- "add
+        // necessary UI to faction screen". No new screen: this window already has a Faction selector
+        // and already shows the two Relations rows a player consults before offering anything, so
+        // the controls belong beside them.
+        //
+        // Only on a RIVAL's page, and never for a spectator, since an Accord is struck between the
+        // player's seat and somebody else. Your own page has nobody to strike one with.
+        if !session.spectator && seat != Seat(0) {
+            accords_block(ui, session, game, seat, actions);
+            ui.add_space(6.0);
+        }
 
         // 5. Holdings, which no window counted for anybody before this one.
         ui.label(RichText::new("Holdings").strong());
@@ -5763,14 +6119,21 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // handled rather than lived with: when NO Tech is under research the bar is not drawn at
             // all -- and that is exactly the state this window is open in, with a pick owed -- so
             // the line that says so takes its place and the top of the window is never empty.
+            // Ticket #219 (version 0.08.2): the bar, its shares and the legend are ONE block at the
+            // top of the window now. With no Tech under research -- the state this window is open in
+            // when a pick is owed -- a single sentence stands in place of the whole block, and the
+            // legend follows it, so the top never goes empty and never half-empties either.
             match game.research.current {
                 Some(_) => {
                     research_race_bar(ui, session, game, ui.available_width(), true);
+                    research_shares(ui, session, game);
                 }
                 None => {
                     ui.label(format!("No Tech under research. {} Research waiting.", game.research.unallocated.iter().sum::<i64>() + game.research.unattributed));
                 }
             }
+            tech_legend(ui);
+            ui.separator();
             // Ticket #51: an Archivist player is told whether Provisional Findings is in force.
             if game.kind(Seat(0)) == FactionKind::Archivists {
                 let on = game.provisional_findings(Seat(0));
@@ -6020,7 +6383,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
     }
     // Ticket #203 (version 0.08.1): the Faction window, which took Relations and Blame off the
     // window above and brought the setup screen's Faction card in-game behind them.
-    faction_window(ctx, session, game, view);
+    faction_window(ctx, session, game, view, actions);
     match view.popup {
         // Ticket #105 (version 0.07.0): the engine refused to end the turn, and says why. The rule
         // is worth nothing if the player is left wondering why the button did nothing.

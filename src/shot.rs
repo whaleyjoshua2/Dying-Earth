@@ -606,6 +606,32 @@ fn build_board(session: &mut Session) {
                 g.seats[0].ai = true;
             }
         }
+        // `loaded:1` (a building aid, ticket #218 in version 0.08.2): seat 0 has a LOADED Colony
+        // Ship sitting at the Moon and the turn does NOT run, so the founding buttons are on screen
+        // to be photographed. `found:1` cannot serve: it unloads and ends the turn, so by the time a
+        // picture is taken the Colony already stands and the buttons have gone.
+        if std::env::args().any(|a| a == "loaded:1") {
+            let id = ShipId(g.fresh_id());
+            let built_turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            g.ships.push(Ship {
+                id,
+                name,
+                kind: UnitKind::ColonyShip,
+                seat: Seat(0),
+                damage: 0,
+                at: ShipAt::Body(BodyId::Moon),
+                colonists: 4,
+                colonists_education: 1.0,
+                army: None,
+                stance: Stance::Hold,
+                escaped: false,
+                arrived_this_turn: false,
+                built_turn,
+                fuel: 30,
+                slot: None,
+            });
+        }
         // `moment:tech` (a building aid, ticket #58): a rival seat pushes the Tech under research
         // over the line, so the Report carries a Tech Moment with the Lead, the margin and the AI's
         // pick. The turn a Tech completes is not one an aid can choose.

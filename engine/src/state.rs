@@ -654,6 +654,11 @@ pub struct SeatState {
     pub venture_share: f64,
     #[serde(default)]
     pub venture_banked_last_turn: i64,
+    /// Ticket #227 (version 0.08.2): units this seat has bought and sold through the Trading window
+    /// over the whole game. Kept because floating prices are only fair if more than one hand is on
+    /// them, and the sweep had no way to say whose were.
+    pub bought_units: i64,
+    pub sold_units: i64,
     /// Ticket #183 (version 0.08.0): Influence the seat's Spaceports earned lifting Emigrants off
     /// Earth this turn, waiting to be paid into NEXT turn's Allotment. Read and cleared at Income.
     #[serde(default)]
@@ -786,15 +791,99 @@ impl BattleLine {
 /// **In version 0.08.0 the score does nothing mechanical.** It is read, not spent: no rule reads it
 /// and the computer players do not read it. It is built now so that it can be watched for a version
 /// and given teeth in 0.09 with evidence rather than a guess.
+/// Ticket #226 (version 0.08.2): one Term of an Accord. Tribute is not here: it is a one-turn order
+/// that pays and is done, where these hold until the Accord ends.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Term {
+    /// Neither spends Influence on a place the other holds, nor opens a Battle against them. NOT
+    /// enforced by refusing the order: the act is allowed and costs +3, and ends the whole Accord.
+    NonAggression,
+    /// Neither treats the other's Ships as a target, and a Blockade does not shut the other out of
+    /// the slot. Measured near-dead on today's board -- the Blockade rung fired zero times in 80
+    /// games -- and kept deliberately, because it will matter for Mars.
+    Passage,
+    /// Either may Refuel at the other's Space Stations. Also near-dead today: off-Earth stations run
+    /// at 0-1 a game and three Factions each hold their own station over Earth.
+    Refuel,
+    /// Both parties' Research rises a tenth while it stands. Needs Friendly to STRIKE, and the gate
+    /// is checked only at that moment: a pair that worked nine or more acts to reach Friendly should
+    /// not lose it because a rival's emissions ticked up and moved a Blame step.
+    ResearchAgreement,
+}
+
+/// Ticket #226 (version 0.08.2): an Accord between two Factions, holding one or more Terms.
+///
+/// `diplomacy` is on Relations' own `_Avoid_` list in the glossary, so the system has a word of its
+/// own. Ending one takes a turn's notice and is free; VIOLATING a term while it stands costs +3 and
+/// ends the whole Accord -- without which a Faction could violate non-aggression every turn, pay 3
+/// each time, and keep drawing a permanent tenth of extra Research from a partner it was attacking.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Accord {
+    pub a: Seat,
+    pub b: Seat,
+    pub terms: Vec<Term>,
+    /// The turn it was struck, which is what `accord_kept` counts from.
+    pub struck: u32,
+    /// The last turn its keeping was paid for, so a long Accord pays every `accord_kept_turns`.
+    pub paid: u32,
+    /// Ticket #226: declared over on this turn; it lapses at the next turn's start and costs
+    /// nothing. That also gives the board a visible tell -- an Accord announced as ending is a turn
+    /// of warning that something is coming.
+    pub ending: bool,
+}
+
+impl Accord {
+    pub fn holds(&self, x: Seat, y: Seat) -> bool {
+        !self.ending && ((self.a == x && self.b == y) || (self.a == y && self.b == x))
+    }
+}
+
+/// Ticket #220 (version 0.08.2): the Trading window's prices, and the net units moved this turn
+/// that will shift them at the next settle.
+///
+/// Measured before it was built, and the measurement is why the rule ships in the shape it does:
+/// over 80 games the computer seats placed **zero** Sell orders and bought **only Materials** --
+/// 29,440 units, no Fuel, no Energy -- with the Prospectors alone 61% of all trading. So Materials
+/// sees one-way upward pressure from the computer, and Fuel and Energy move only when a human
+/// trades them. The designer chose to ship it anyway; giving the seats an appetite to sell, and to
+/// buy the other two, is a separate ticket.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Market {
+    /// The live price of Materials, Fuel and Energy, in that order. Zero means "not opened yet" and
+    /// is read as the card figure, so a fresh game and an old save behave alike.
+    pub price: [i64; 3],
+    /// Net units of each bought less sold this turn, across the whole table.
+    pub net: [i64; 3],
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Relations {
-    /// `score[viewer][subject]`: what the seat at `viewer` thinks of the seat at `subject`.
+    /// `score[viewer][subject]`: the DEEDS half of what the seat at `viewer` thinks of the seat at
+    /// `subject` -- everything the pair has done to each other. Since ticket #221 this is no longer
+    /// the whole score: what is shown is this plus a Blame term read afresh each settle, and ONLY
+    /// the shown figure clamps to the scale. This one may run past it, to `deeds_ceiling`, which is
+    /// what lets a pair carrying a heavy Blame penalty still climb to Friendly on deeds alone.
     pub score: [[i64; SEAT_COUNT]; SEAT_COUNT],
     /// Consecutive turns `subject` has not offended `viewer`.
     pub quiet: [[u32; SEAT_COUNT]; SEAT_COUNT],
-    /// `offended[viewer][subject]`: set as offences happen through the turn, then read and cleared
-    /// when the turn ends. This is what makes the charge per turn rather than per order.
+    /// Ticket #222 (version 0.08.2): what `subject` has cost `viewer` this turn, summed over every
+    /// instance -- a place, an act, never an order -- and capped when the turn settles. It replaced
+    /// a bare flag: an offence now has a weight, so a Battle is not a bid.
+    pub owed: [[i64; SEAT_COUNT]; SEAT_COUNT],
+    /// `offended[viewer][subject]`: whether `subject` offended `viewer` at all this turn. Kept
+    /// beside `owed` because the scar counts TURNS, not points.
     pub offended: [[bool; SEAT_COUNT]; SEAT_COUNT],
+    /// Ticket #223 (version 0.08.2): whether `subject` did `viewer` a kindness this turn -- a
+    /// tribute paid, or an Accord kept. One act a turn per ordered pair, whatever was done.
+    pub credited: [[bool; SEAT_COUNT]; SEAT_COUNT],
+    /// Ticket #225 (version 0.08.2): how many turns `subject` has offended `viewer` across the whole
+    /// game, which is what ratchets the floor. Turns and not points, so retuning the ladder later
+    /// does not silently move every scar with it.
+    pub offending_turns: [[u32; SEAT_COUNT]; SEAT_COUNT],
+    /// Ticket #225: the best this pair can recover to, lowered a step every `scar_turns` offending
+    /// turns and never below `scar_floor`. It caps the DEEDS figure, not the shown score, so a
+    /// Faction that cleans up its emissions does not find its forgiveness eaten by an old grudge.
+    pub floor: [[i64; SEAT_COUNT]; SEAT_COUNT],
     /// `fell[viewer][subject]`: whether the score moved down this turn, for the Report line.
     pub fell: [[bool; SEAT_COUNT]; SEAT_COUNT],
 }
@@ -840,6 +929,13 @@ pub struct Game {
     pub log: Vec<String>,
     /// Ticket #191 (version 0.08.0): what every Faction thinks of every other.
     pub relations: Relations,
+    /// Ticket #220 (version 0.08.2): the Trading window's prices, which move with what the table
+    /// bought and sold. `Game` is not itself a serde type -- the save is assembled by hand in
+    /// `save.rs` -- so this carries no attribute; a zero price there reads as the card figure, which
+    /// is how a save written before this version opens at the right place.
+    pub market: Market,
+    /// Ticket #226 (version 0.08.2): the Accords standing between pairs of Factions.
+    pub accords: Vec<Accord>,
 }
 
 /// Ticket #50: every game seats all four Factions. The player picks one Faction and a start
@@ -863,6 +959,8 @@ impl Game {
             venture_fund: 0,
             venture_share: 0.0,
             venture_banked_last_turn: 0,
+            bought_units: 0,
+            sold_units: 0,
             spaceport_influence: 0,
             uploaded: 0,
             stabilization_run: 0,
@@ -1009,6 +1107,8 @@ impl Game {
             spectator: false,
             log: Vec::new(),
             relations: Relations::default(),
+            market: Market::default(),
+            accords: Vec::new(),
             tables,
         };
         // Ticket #57: every Colony Slot on every Body draws its own four yields, in Body order then
@@ -2042,7 +2142,7 @@ impl Game {
     pub fn influence_needed_for(&self, seat: Seat, target: Target) -> i64 {
         let threshold = self.influence_threshold_for(seat, target);
         match self.place_control(target).controller() {
-            Some(c) => threshold.max(self.seat(c).influence.get(&target).copied().unwrap_or(0) + self.challenge_margin_at(target)),
+            Some(c) => threshold.max(self.seat(c).influence.get(&target).copied().unwrap_or(0) + self.challenge_margin_for(Some(seat), target)),
             None => threshold,
         }
     }
@@ -2055,14 +2155,40 @@ impl Game {
     /// question arises. It does nothing on a neutral place, which has no margin at all -- the caller
     /// asks for a margin only when a holder is there to be challenged.
     pub fn challenge_margin_at(&self, target: Target) -> i64 {
+        self.challenge_margin_for(None, target)
+    }
+
+    /// Ticket #224 (version 0.08.2): the margin a NAMED challenger faces, which since this version
+    /// is a property of the ORDERED PAIR rather than of the place. The Constabulary's own clause is
+    /// deliberately not: it protects whoever holds the place and asks nothing about who wants it.
+    ///
+    /// The term is read from the CONTROLLER'S view of the challenger and applies only while that is
+    /// negative -- `the people here have learned to distrust you`. A positive score never LOWERS the
+    /// margin: that would make friendship a weapon and punish a player who spent nine acts earning
+    /// it. `floor(|score| / 4)` gives 0 down to Wary, 1 at Cold and 2 at Hostile; the true maximum
+    /// is 2, because the shown score clamps at -10 and `floor(10 / 4)` is 2. A cap of 3 would be
+    /// dead text, so it is written as the 2 it actually is.
+    ///
+    /// The whole SHOWN score counts, Blame included, at the designer's word. The recorded risk: the
+    /// Custodians already win 42 of 80 and Blame already raises a dirty Faction's Threshold
+    /// everywhere, so this hands the strongest Faction a second permanent advantage against the
+    /// weakest -- worth about +1 on 45% of turns against the Prospectors, +2 once deeds stack on.
+    pub fn challenge_margin_for(&self, challenger: Option<Seat>, target: Target) -> i64 {
         let t = &self.tables.influence;
+        let relations = match (challenger, self.place_control(target).controller()) {
+            (Some(ch), Some(holder)) if ch != holder => {
+                let score = self.relations_score(holder, ch);
+                if score < 0 { (score.abs() / 4).min(t.relations_margin_cap) } else { 0 }
+            }
+            _ => 0,
+        };
         let guarded = matches!(target, Place::State(s) if self.state(s).facilities.iter().any(|f| f.kind == FacilityKind::Constabulary && f.working()));
         // Ticket #201 (version 0.08.1): Civil Defense doubles what a Constabulary is worth at the
         // gate -- 10 where it adds 5 without. The Tech is the world's, as every Tech is, so it
         // helps whoever holds a garrisoned Region and hinders whoever wants one, which is the same
         // asymmetry the Constabulary itself has carried since ticket #190.
         let garrison = if self.has_tech(TechId::CivilDefense) { t.constabulary_margin_defended } else { t.constabulary_margin };
-        t.challenge_margin + if guarded { garrison } else { 0 }
+        t.challenge_margin + relations + if guarded { garrison } else { 0 }
     }
 
     /// Ticket #53: Blame raises this seat's threshold on a Nation State it does not control, and
@@ -2856,14 +2982,204 @@ impl Game {
     /// Influence across about three separate orders, and charging per order would make a big push and
     /// a small one differ by a factor nobody can read off the board.
     pub fn offend(&mut self, offender: Seat, victim: Seat) {
-        if offender != victim {
-            self.relations.offended[victim.index()][offender.index()] = true;
+        self.offend_by(offender, victim, self.tables.relations.fall_per_offending_turn);
+    }
+
+    /// Ticket #222 (version 0.08.2): an offence with a WEIGHT. A turn charges the sum of every
+    /// instance -- a place spent on, an act committed -- capped when the turn settles; an instance is
+    /// never an ORDER, so splitting one spend across three orders cannot multiply the damage. That
+    /// is what keeps the spirit of 0.08.0's per-turn charge while giving the designer the
+    /// proportionality they asked for: a turn pushing on three of a rival's places genuinely costs
+    /// three times a turn pushing on one.
+    pub fn offend_by(&mut self, offender: Seat, victim: Seat, weight: i64) {
+        if offender == victim || weight <= 0 {
+            return;
+        }
+        // Ticket #226 (version 0.08.2): non-aggression is NOT enforced by refusing the order -- the
+        // act is allowed and paid for. Acting against a term while your word still stands breaks the
+        // whole Accord, which is what stops a Faction violating it every turn, paying 3 each time,
+        // and keeping a permanent tenth of extra Research from a partner it is attacking.
+        if self.accord_has(offender, victim, Term::NonAggression) {
+            self.break_accord(offender, victim);
+        }
+        let (v, o) = (victim.index(), offender.index());
+        self.relations.owed[v][o] += weight;
+        self.relations.offended[v][o] = true;
+    }
+
+    /// Ticket #223 (version 0.08.2): `giver` did `receiver` a kindness this turn. One act a turn per
+    /// ordered pair, whatever was done, so a rich Faction cannot buy a whole relationship in a turn.
+    pub fn credit(&mut self, giver: Seat, receiver: Seat) {
+        if giver != receiver {
+            self.relations.credited[receiver.index()][giver.index()] = true;
         }
     }
 
-    /// What `viewer` thinks of `subject` (ticket #191). Neutral at the card's `start`.
-    pub fn relations_score(&self, viewer: Seat, subject: Seat) -> i64 {
+    /// The DEEDS half alone: what this pair has done to each other, before Blame is read.
+    pub fn relations_deeds(&self, viewer: Seat, subject: Seat) -> i64 {
         self.relations.score[viewer.index()][subject.index()]
+    }
+
+    /// Ticket #221 (version 0.08.2): what `viewer` thinks of `subject` -- the deeds plus the Blame
+    /// term, clamped to the scale. This is the figure everything reads: the grid, the Report, the
+    /// challenge margin and the Accords' Friendly gate.
+    pub fn relations_score(&self, viewer: Seat, subject: Seat) -> i64 {
+        let c = &self.tables.relations;
+        (self.relations_deeds(viewer, subject) + self.blame_relations_term(viewer, subject)).clamp(c.worst, c.best)
+    }
+
+    /// Ticket #221 (version 0.08.2): how much `viewer` holds `subject`'s Blame against them, as a
+    /// LEVEL read afresh every settle rather than a charge added each turn. A Faction that cleans up
+    /// is therefore forgiven without needing quiet turns.
+    ///
+    /// `floor((share - fair) / 0.10)` steps -- nothing below 0.35, one at 0.35, two at 0.45 -- times
+    /// the RESENTING Faction's own coefficient. The coefficient belongs to the viewer and the share
+    /// to the Faction being viewed, which is the whole asymmetry: the Custodians mind at twice the
+    /// rate and the Prospectors do not mind at all.
+    ///
+    /// Measured over 200 games before it was built: the Prospectors sit above 0.35 from turn 1 and
+    /// climb to about 0.53, while the Custodians never crossed 0.35 once. So this is very nearly a
+    /// rule about how everyone feels about the Prospectors, and nobody ever resents the Custodians.
+    /// Capped at `blame_cap` -- half the scale -- so Blame can make a pair Cold but never, by itself,
+    /// Hostile: the last points are reserved for deeds.
+    pub fn blame_relations_term(&self, viewer: Seat, subject: Seat) -> i64 {
+        if viewer == subject {
+            return 0;
+        }
+        let c = &self.tables.relations;
+        let over = self.blame_share(subject) - self.tables.influence.blame.fair_share;
+        if over < c.blame_step {
+            return 0;
+        }
+        let steps = (over / c.blame_step).floor();
+        let coefficient = self.tables.faction(self.kind(viewer)).resentment;
+        // Toward zero, so the Arkwrights' x0.5 genuinely means "minds half as much" and does not
+        // behave as x1 at the first step, which is the step most Factions ever reach.
+        let raw = (steps * coefficient).trunc() as i64;
+        -raw.min(c.blame_cap)
+    }
+
+    /// Ticket #226 (version 0.08.2): does an Accord standing between these two carry this Term?
+    /// An Accord declared as ending carries nothing: it lapses at the next turn's start, and the
+    /// turn's notice is what makes ending free where violating costs.
+    pub fn accord_has(&self, x: Seat, y: Seat, term: Term) -> bool {
+        self.accords.iter().any(|acc| acc.holds(x, y) && acc.terms.contains(&term))
+    }
+
+    /// Ticket #226: strike one. The Friendly gate on a research agreement is checked HERE and only
+    /// here; once made it stands whatever the score later does.
+    pub fn strike_accord(&mut self, a: Seat, b: Seat, terms: Vec<Term>) -> Result<(), String> {
+        if a == b {
+            return Err("a Faction cannot strike an Accord with itself".into());
+        }
+        if self.accords.iter().any(|acc| acc.holds(a, b)) {
+            return Err("these two already hold an Accord".into());
+        }
+        if terms.contains(&Term::ResearchAgreement) && (self.relations_score(a, b) < 7 || self.relations_score(b, a) < 7) {
+            return Err("a research agreement wants Friendly on both sides".into());
+        }
+        let turn = self.turn;
+        self.accords.push(Accord { a, b, terms, struck: turn, paid: turn, ending: false });
+        Ok(())
+    }
+
+    /// Ticket #226: declare it over. Free, and it lapses at the next turn's start.
+    pub fn end_accord(&mut self, a: Seat, b: Seat) {
+        if let Some(acc) = self.accords.iter_mut().find(|acc| acc.holds(a, b)) {
+            acc.ending = true;
+        }
+    }
+
+    /// Ticket #226: `breaker` acted against a term while their word still stood. The offence is
+    /// weight 3 -- the same rung as opening a Battle -- and the whole Accord ends at once, so the +3
+    /// is the lesser cost of betrayal and losing the arrangement is the real one.
+    pub fn break_accord(&mut self, breaker: Seat, other: Seat) {
+        if !self.accords.iter().any(|acc| acc.holds(breaker, other)) {
+            return;
+        }
+        self.accords.retain(|acc| !acc.holds(breaker, other));
+        self.offend_by(breaker, other, 3);
+        let text = format!("{} broke their Accord with {}.", self.seat_name(breaker), self.seat_name(other));
+        self.log(text);
+    }
+
+    /// Ticket #226 (version 0.08.2): run once a turn, beside the Relations settle.
+    ///
+    /// An Accord declared over lapses now -- the turn's notice is what makes ending free where
+    /// violating costs +3 -- and one that has stood `accord_kept_turns` pays both sides their act.
+    /// That act is also the only thing in the game that lifts a scarred pair's floor, one step at a
+    /// time, which is what gives a wronged pair a road back.
+    pub fn settle_accords(&mut self) {
+        let turn = self.turn;
+        let period = self.tables.relations.accord_kept_turns;
+        let lapsed: Vec<(Seat, Seat)> = self.accords.iter().filter(|a| a.ending).map(|a| (a.a, a.b)).collect();
+        for (a, b) in lapsed {
+            self.log(format!("The Accord between {} and {} has lapsed.", self.seat_name(a), self.seat_name(b)));
+        }
+        self.accords.retain(|a| !a.ending);
+        let mut paid: Vec<(Seat, Seat)> = Vec::new();
+        for acc in self.accords.iter_mut() {
+            if period > 0 && turn.saturating_sub(acc.paid) >= period {
+                acc.paid = turn;
+                paid.push((acc.a, acc.b));
+            }
+        }
+        for (a, b) in paid {
+            self.credit(a, b);
+            self.credit(b, a);
+            // The scar's only remedy: an Accord kept lifts the floor a step, on both sides.
+            for (x, y) in [(a, b), (b, a)] {
+                let f = &mut self.relations.floor[x.index()][y.index()];
+                if *f < 0 {
+                    *f += 1;
+                }
+            }
+            self.log(format!("The Accord between {} and {} has held.", self.seat_name(a), self.seat_name(b)));
+        }
+    }
+
+    /// Ticket #226 (version 0.08.2): would `seat` accept this offer from `from`?
+    ///
+    /// The arithmetic is the one `Candidate::score` already performs everywhere else: it accepts
+    /// when what it gets exceeds what it gives, scaled by what it thinks of the offerer. Plus one
+    /// hard floor -- it NEVER accepts a term that would lose it the game, so no non-aggression with
+    /// a Faction one turn from its Victory Condition.
+    ///
+    /// This is the largest risk on the ticket and is recorded as such: a seat that accepts anything
+    /// is exploitable, one that accepts nothing makes the whole system invisible. The sweep must
+    /// report Accords struck, by term and by seat.
+    pub fn accord_acceptable(&self, seat: Seat, from: Seat, terms: &[Term]) -> bool {
+        // Never help somebody already at the door.
+        if self.progress(from).score() >= 0.95 {
+            return false;
+        }
+        let view = self.relations_score(seat, from);
+        // Non-aggression from somebody it holds nothing against is easy; from somebody it loathes it
+        // is not. A research agreement is its own gate and needs no opinion beyond Friendly.
+        terms.iter().all(|t| match t {
+            Term::ResearchAgreement => true,
+            Term::NonAggression => view >= -2,
+            Term::Passage | Term::Refuel => view >= -5,
+        })
+    }
+
+    /// Ticket #226: a research agreement pays both parties a tenth more Research while it stands.
+    pub fn research_agreement_multiplier(&self, seat: Seat) -> f64 {
+        let any = Seat::ALL.into_iter().any(|other| other != seat && self.accord_has(seat, other, Term::ResearchAgreement));
+        if any { 1.10 } else { 1.0 }
+    }
+
+    /// Ticket #221 (version 0.08.2): the named level a score reads as. The level is what a player
+    /// reasons with; the number is the audit trail and rides on the hover.
+    pub fn relations_level(&self, viewer: Seat, subject: Seat) -> &'static str {
+        match self.relations_score(viewer, subject) {
+            s if s >= 7 => "Friendly",
+            s if s >= 3 => "Cordial",
+            s if s >= -2 => "Neutral",
+            s if s >= -5 => "Wary",
+            s if s >= -8 => "Cold",
+            _ => "Hostile",
+        }
     }
 
     /// Ticket #191: charge the turn's offences, let the quiet pairs recover, and wipe the slate. Run
@@ -2881,22 +3197,55 @@ impl Game {
                     continue;
                 }
                 let (v, o) = (victim.index(), offender.index());
-                if self.relations.offended[v][o] {
-                    let was = self.relations.score[v][o];
-                    self.relations.score[v][o] = (was - c.fall_per_offending_turn).max(c.worst);
+                let was = self.relations.score[v][o];
+                // Ticket #222: the turn's offences, summed over every instance and capped here --
+                // the cap is a guard against one dramatic turn spending the whole scale, not a
+                // working part of the rule; measured, it bites on 1.7% of offending pair-turns.
+                let owed = self.relations.owed[v][o].min(c.turn_cap);
+                // Ticket #223: an act and an offence in the same turn BOTH count, and the effect is
+                // their sum -- a turn carrying a 3-point offence and a tribute nets -2.
+                let earned = if self.relations.credited[v][o] { c.act_gain } else { 0 };
+                if owed > 0 {
+                    // Ticket #225: the scar counts TURNS, not points. Being raided once brutally and
+                    // being ground down across fifteen turns are different things, and it is the
+                    // second that "crossed often enough" describes.
+                    self.relations.offending_turns[v][o] += 1;
+                    if c.scar_turns > 0 && self.relations.offending_turns[v][o].is_multiple_of(c.scar_turns) {
+                        self.relations.floor[v][o] = (self.relations.floor[v][o] - 1).max(c.scar_floor);
+                    }
+                }
+                if owed > 0 || earned > 0 {
                     self.relations.quiet[v][o] = 0;
-                    self.relations.fell[v][o] = self.relations.score[v][o] < was;
+                    let moved = was - owed + earned;
+                    // Only the SHOWN score clamps to the scale; the deeds figure may climb to
+                    // `deeds_ceiling`, which is what lets a pair carrying a heavy Blame term still
+                    // reach Friendly on deeds alone. Downward it stops at the scale's floor.
+                    self.relations.score[v][o] = moved.clamp(c.worst, c.deeds_ceiling);
                 } else {
-                    self.relations.fell[v][o] = false;
                     let quiet = self.relations.quiet[v][o] + 1;
-                    if c.quiet_turns > 0 && quiet >= c.quiet_turns {
+                    let period = if was > c.start { c.positive_quiet_turns } else { c.quiet_turns };
+                    if period > 0 && quiet >= period {
                         self.relations.quiet[v][o] = 0;
-                        self.relations.score[v][o] = (self.relations.score[v][o] + c.recover).min(c.start);
+                        // Below neutral a quiet pair RECOVERS toward it; above neutral it DECAYS
+                        // toward it, at half the rate. Friendship that never lapses would mean four
+                        // early acts fixing a pair for the whole game; friendship lapsing as fast as
+                        // enmity would not be worth earning.
+                        if was < c.start {
+                            self.relations.score[v][o] = (was + c.recover).min(c.start);
+                        } else if was > c.start {
+                            self.relations.score[v][o] = (was - c.recover).max(c.start);
+                        }
                     } else {
                         self.relations.quiet[v][o] = quiet;
                     }
                 }
+                // Ticket #225: the scar caps the DEEDS figure, so a pair crossed often enough can
+                // never recover above its floor however long it stays quiet.
+                self.relations.score[v][o] = self.relations.score[v][o].min(self.relations.floor[v][o]);
+                self.relations.fell[v][o] = self.relations.score[v][o] < was;
+                self.relations.owed[v][o] = 0;
                 self.relations.offended[v][o] = false;
+                self.relations.credited[v][o] = false;
             }
         }
         // The Report line goes in the OFFENDER's paragraph: it is what sends a player to the grid.

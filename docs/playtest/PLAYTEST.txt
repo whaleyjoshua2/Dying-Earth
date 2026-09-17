@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.08.1
+DYING EARTH - playtest build, version 0.08.2
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -21,60 +21,48 @@ HOW TO RUN
    RUN-ON-LINUX.txt beside it says what to do if the window does not open, and where
    the saves go. It is built on Ubuntu 22.04 and wants 22.04 or newer.
 
-WHAT CHANGED SINCE 0.08.0
+WHAT CHANGED SINCE 0.08.1
 -------------------------
-Mostly this version is about KNOWING WHO. Last version gave every side its own building
-and started keeping a grudge score; this one gives you somewhere to read all of it, and
-puts a name and a badge on the things that belong to somebody.
+Last version gave you somewhere to READ what the other three sides think of you. This one
+makes it matter. The grudge score has a cause, a vocabulary, a memory and a use, and for
+the first time you can strike a bargain with somebody.
 
-- A FACTION WINDOW. Press F, or the new button on the top bar. A dropdown in its top
-  right picks any of the four sides. It shows their symbol large, how far along their
-  victory they are, what they earned last turn, their share of the pollution, what they
-  think of the other three and what the other three think of them, and what they hold.
-  Underneath, folded away until you click it, is their CARD - the one you read on the
-  setup screen and could never get back to once a game started: their multipliers, their
-  signature rule, their own building and their victory condition.
-  You see a rival's income as totals only. The building-by-building breakdown is yours
-  alone. The Relations grid has moved off the Victory window into here.
-- SHIPS HAVE NAMES. Every ship is christened when it is built - TSV Magellan, ARK
-  Endurance, PMV Valiant - drawn from two lists, explorers for colony ships and warships
-  for the rest. The three letters in front are your side's. The old "Colony Ship 3" is
-  still there if you hover it.
-- BADGES ON WHAT IS YOURS. Your side's symbol now appears at the head of a colony or
-  station's card, the way a nation's flag sits on a region card, and beside every ship.
-  A place nobody holds wears none.
-- THE TUTORIAL GETS TO THE POINT. It used to spend two of its five notes telling you
-  things and not asking for anything, so the first instruction landed on turn three and
-  "get off Earth" on turn five. Now the first three turns each ask for ONE thing, and the
-  three are one chain: spend your influence, muster emigrants, send them to the ISS.
-  Turns four and five still appear but ask for nothing - they point at the climate and at
-  the research race.
-- A STATION CAN ASK FOR PEOPLE. You could always send emigrants UP to a station from a
-  region's card. Now the station's own card has a "from <region>" dropdown and a Lift
-  button, and an Antarctic colony has the same thing for the sea. Both ends, same order.
-- HABITATS ARE SMALLER AGAIN. A Habitat holds 4 people, down from 8. EXPANDED HABITATS
-  now adds 4 instead of 2, so a researched Habitat holds the 8 it used to - which means
-  the squeeze is on the EARLY game, before you have the tech. The Core Module every
-  station and colony starts with still holds 4 flat.
-- THE ARCHIVE MUST LEAVE EARTH ORBIT. If you play the Archivists, you can no longer raise
-  the Archive on your station over Earth. It has to stand on another body - the Moon
-  counts, and so does anywhere further. This is the biggest rule change in the version
-  and it has cut the Archivists hard; see the rough edges below.
-- AN EIGHTEENTH TECH, AND A DEARER FIRST RUNG. Rung-1 techs cost 18 instead of 15 and
-  Coastal Engineering 14 instead of 12. CIVIL DEFENSE is new, on the Society branch
-  behind Public Science: while it stands, a Constabulary makes a region cost a rival your
-  standing plus 30 instead of plus 25.
-- SCHOOLS ARE SLOWER, AND YOU CAN FINALLY SEE THEM WORK. The step is 0.20 a turn instead
-  of 0.25. More to the point: the Education Level on a region's card used to be the
-  number printed in the rulebook and never moved, whatever your school did. It is now the
-  LIVE figure, and hovering it tells you what the card says and what your school has
-  added.
-- SMALLER THINGS YOU READ. The bottom-right command corner is 15% bigger. "Emigrants
-  waiting" now sits directly above the Muster button and shows even when it is zero. The
-  research race bar has moved onto the top of the Tech Tree window, with the sentence it
-  replaced on its hover. Hovering a "Found a Colony" button tells you what the site is
-  worth. And the race bar itself used to under-draw - research carried over from the last
-  tech belongs to nobody, and was simply not painted; it is grey now, so the bar adds up.
+- SIDES NOW MIND YOUR POLLUTION. Your share of the four sides' pollution no longer only
+  makes neutral regions dearer to win over: the other three hold it against you, each by
+  its own measure. The Custodians mind twice as much as the Archivists, the Arkwrights
+  half as much, and the Prospectors do not mind at all. Play dirty and you lose the room
+  to deal as well as the ground.
+- THE SCORE READS AS WORDS. Friendly, Cordial, Neutral, Wary, Cold, Hostile. Hover one and
+  you get the number, and how much of it is your deeds and how much is your smoke.
+- OFFENCES NOW DIFFER IN SIZE. Bidding on one region they hold is not the same as taking
+  it, or as opening a battle. A turn charges everything you did in it, up to a limit -
+  and it charges per PLACE, so splitting one spend across three orders costs you no more
+  than one.
+- A GRUDGE CAN SCAR. Cross the same side on enough turns and the best that pair can ever
+  recover to drops, permanently. Only an Accord kept lifts it again.
+- IT BITES THE BOARD. A side that thinks badly of you defends its places against you a
+  little harder than against anybody else.
+- ACCORDS. New. In the Faction window, on another side's page, you can offer them a
+  bargain: NON-AGGRESSION (neither of you spends influence on the other's places or opens
+  a battle), PASSAGE, REFUELLING at each other's stations, or - if you are Friendly - a
+  RESEARCH AGREEMENT that pays you both a tenth more research. They can offer you one
+  too, and a refusal costs nothing. Ending an Accord is free and takes a turn's notice.
+  BREAKING one - acting against it while it still stands - costs you and ends the whole
+  bargain at once.
+- TRIBUTE. A fixed gift of Ducats or Materials to another side, once a turn. It and a
+  kept Accord are the only two things in the game that RAISE what somebody thinks of you.
+- MARKET PRICES MOVE. Every price in the trading window went up by one and is now the
+  middle of a small band rather than a fixed number. Enough buying across the table in a
+  turn pushes a price up a step, enough selling pushes it down, and it drifts home only
+  on a turn nobody traded that good at all.
+- THINGS YOU READ. Every ship now has its own line in the roster, by name, instead of one
+  line for a whole stack. A ship in transit is named on the solar map. A colony or
+  station's card wears your badge alone at its head - the little "what kind of thing is
+  this" mark has gone from card headings, though it stays in the roster. An empty build
+  box says "Click to Build". The "Found a Colony" button now shows the site's four yields
+  on its face instead of on a hover. The research race bar on the Tech Tree says who has
+  put in what, by name and percentage. And the faction-select screen's four cards are the
+  same height with their buttons in a row, with a scrollbar when they do not fit.
 
 HOW TO PLAY, IN ONE MINUTE
 --------------------------
@@ -138,31 +126,35 @@ Screenshots help. Print Screen, then paste into a message.
 
 KNOWN ROUGH EDGES
 -----------------
-- THE SIDES HAVE SWAPPED PLACES, AND WE KNOW WHY. Over eighty computer-only games the
-  Custodians now win 42, the Prospectors 11, the Arkwrights 7 and the Archivists 6. Last
-  version the Archivists won 58 and the Arkwrights none. Almost all of that is the one
-  rule that stopped the Archive standing in Earth orbit: their Archive now goes up around
-  turn 25 instead of turn 19, which leaves too few turns to upload twelve people into it.
-  The table is more even than it has ever been and no side is on nothing, but the
-  Custodians at 42 are now the problem the Archivists used to be. Tell us if a game felt
-  decided early.
-- THE WORLD COLLAPSES MORE OFTEN - 14 games in 80, against 1 last version. This is not a
-  climate change: nothing about pollution moved. It is that the Archivists used to END
-  games around turn 20 by winning them, and now nobody does, so the world gets fifteen
-  more turns to heat up. Whether that is a fair game or a grim one is exactly what we
-  want to hear about.
-- THE TECH TREE STILL FINISHES. Rung 1 got dearer and a tech was added, and a typical
-  game still researches all eighteen with turns to spare, so research never really
-  constrains you. Making it bite means moving the dearer rungs, which we have not done.
-- THE ARKWRIGHTS STILL CANNOT REALLY WIN. Their victory wants 30 colonists spread over
-  three bodies. In eighty games no side has EVER founded a colony in the Mars system, on
-  Venus, or on Phobos or Deimos - only the Moon is ever settled. Their condition is
-  close to impossible rather than merely hard.
-- EVERY SIDE'S VICTORY TARGET was set against a computer that never competed for it, so
-  the numbers are all still suspect.
-- HOVERING A "FOUND A COLONY" BUTTON should tell you the site's four yields. We have not
-  been able to photograph it, so it is the one new thing in this version nobody has
-  actually looked at. Tell us if it is missing or wrong.
+- THE CUSTODIANS STILL WIN TOO MUCH. Over eighty computer-only games they take 37, the
+  Prospectors 10, the Archivists 7 and the ARKWRIGHTS 3. Nothing in this version was
+  aimed at the balance and none of it explains the shift; the Arkwrights have halved and
+  are now the side to worry about. We know. It is a job for a later version.
+- THE WORLD COLLAPSES MORE OFTEN - 23 games in 80 against 14 last version - AND THAT IS
+  DELIBERATE. This is a game about getting off Earth before the climate wins; a world
+  that bites is the point. The likeliest cause is that everything in the trading window
+  costs one more, so there is less money for scrubbers and leapfrogs. Tell us whether a
+  losing game felt like a race you lost or like a foregone conclusion.
+- NEARLY HALF OF ALL PAIRS END A GAME SCARRED. Between 42% and 47% of the twelve
+  relationships carry a permanent floor by the end, and a third to a half sit at Cold or
+  worse. The scale still says something - a typical pair ends a point or four below
+  neutral - but if everyone ends up hating everyone the score stops meaning much. Say if
+  it felt that way.
+- ONLY NON-AGGRESSION EVER GETS STRUCK. The computer sides offer and accept that one and
+  nothing else, because passage and refuelling are worth almost nothing on today's board:
+  in eighty games no warship ever sat on a rival's station slot, and nobody needs to
+  refuel at somebody else's station when everyone has their own over Earth. Both terms
+  are built for when the game reaches Mars.
+- FUEL AND ENERGY PRICES BARELY MOVE, because the computer sides only ever buy Materials
+  and NEVER sell anything. So those two prices move only when YOU trade them. Giving the
+  computer an appetite to sell is a later job.
+- THE TECH TREE STILL FINISHES, now around turn 31 to 36 rather than the mid-game, so
+  research bites a little more than it did but still runs out before the game does.
+- TWO NEW THINGS NOBODY HAS LOOKED AT. Hovering a side's line in the "in orbit" list
+  should name their ships; and the "Found a Colony" button should carry the site's four
+  yields on its face. Both are built and neither could be photographed, because our
+  screenshot tool cannot hold a mouse pointer still. Tell us if either is missing or
+  wrong.
 - THE HAB VIEW'S AND SLOT BOXES' PICTURES ARE FIRST PICKS from a free icon set and may
   change; say which ones misled you.
 - A station ring can be edge-on for a moment as you turn the globe; it comes back as

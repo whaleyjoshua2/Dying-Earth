@@ -8,6 +8,9 @@ id = "custodians"
 # Energy-lean for the Scrubbers, education 1.45 for the Research their Stabilization run leans on.
 opens_on = "europe"
 name = "Custodians"
+# Ticket #221 (version 0.08.2): they exist to object to what the Prospectors do, and mind another
+# Faction's Blame at twice the ordinary rate.
+resentment = 2.0
 # Version 0.04 (ticket #46): the bare station over Earth the Faction starts with (named in bodies.toml).
 start_station = "ISS"
 # Ticket #210 (version 0.08.1): the prefix every Ship of theirs wears in front of its name --
@@ -25,7 +28,7 @@ influence_multiplier = 1.2
 # mothballed, one Module of the paired kind off Earth (a station over Earth included, Antarctica
 # not) makes double: one for one, the most productive undoubled Module first, on its final figure.
 mothball_pairs = { factory = "mine", power_plant = "generator", refinery = "refinery", research_lab = "observatory" }
-signature = "The Scrubber and Leapfrog. A Scrubber is a Facility only they build, in a Nation State they control, taking no build slot: 30 Materials, 2 turns, 4 Energy upkeep, no Emissions; while it is online it enlarges the Natural Sink by 3.0 ppm a turn and takes 1 off that state's Unrest. A state holds one for every two hundred million people it has, between 2 and 10, and they are destroyed if it changes hands. Leapfrog costs 50 Ducats on a state they control and lowers its people's Emissions coefficient by 0.03 for good, never below 0.04. Production Moved: while a Factory, Power Plant, Refinery or Research Lab of theirs is mothballed, one Mine, Generator, Refinery or Observatory of theirs off Earth makes double, one for one, the most productive first."
+signature = "The Scrubber, Leapfrog and Production Moved. Only they build a Scrubber, in a Region they control, and it takes no build slot: 30 Materials, 2 turns, 4 Energy upkeep, no Emissions. Online it adds 3.0 ppm a turn to the Natural Sink and takes 1 off that Region's Unrest. A Region holds one per two hundred million people, between 2 and 10, and they are destroyed if it changes hands. A Leapfrog costs 50 Ducats in a Region they control and lowers its people's Emissions coefficient by 0.03 for good, never below 0.04. Production Moved: while a Factory, Power Plant, Refinery or Research Lab of theirs stands mothballed, one Mine, Generator, Refinery or Observatory of theirs off Earth makes double, one for one, the most productive first."
 # Ticket #203 (version 0.08.1): the Unique Facility in one sentence, for the Faction card and the
 # Faction window. Ticket #186 built the Academy; nothing on any card named it until now.
 unique = "Academy -- replaces the School and the Institute, and pays +1 Ducat a turn while it is online."
@@ -62,7 +65,9 @@ module_materials_multiplier = 0.85
 # Materials, Fuel or Energy or a building bought outright; Influence and selling are untouched.
 ducats_multiplier = 1.2
 market_multiplier = 0.85
-signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs 15 Materials instead of 30, and every Facility and Colony Module costs them 15% less. Their states pay a fifth more Ducats, and the Trading window sells to them at 15% off. A Strip Permit is free, once per Nation State ever: for three turns every Facility there produces double, and when it ends that state's Baseline Emissions rise by 0.2 for good and its Unrest by 3. The Venture Capital Fund: on any turn they set a share of their Factories' and Mines' Materials output, 0% to 80% in steps of 10, to be banked in the Fund; a draw from it returns nine tenths."
+# Ticket #221: zero. They do not mind another Faction's Blame at all, which is a statement about them.
+resentment = 0.0
+signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit is free and may be taken once in a Region's whole life: for three turns every Facility there produces double, and when it ends that Region's Baseline Emissions rise by 0.2 for good and its Unrest by 3. The Venture Capital Fund: each turn they set what share of their Factories' and Mines' Materials is banked in it, 0% to 80% in tenths; a draw returns nine tenths."
 # Ticket #203 (version 0.08.1). The building is ticket #182's.
 unique = "Investment Bank -- replaces the Bank, and banks 1% interest a turn on the Venture Capital Fund's balance, one building per Region paying, never less than 1 Material in all."
 # Ticket #72: the Extraction Total is retired; the first part is Materials banked in the Fund.
@@ -88,6 +93,8 @@ id = "arkwrights"
 # twice the population cost.
 opens_on = "south_asia"
 name = "Arkwrights"
+# Ticket #221: half. Leaving is the point; the smoke behind them is somebody else's argument.
+resentment = 0.5
 # The Arkwrights start with no station over Earth (ticket #50): they leave from the ground.
 blurb = "Leave Earth: the diaspora is the point."
 # Ticket #210 (version 0.08.1): the prefix every Ship of theirs wears in front of its name --
@@ -116,7 +123,7 @@ ship_materials_multiplier = 0.85
 # three quarters (both rounded down).
 station_materials_multiplier = 0.5
 module_materials_multiplier = 0.75
-signature = "Steerage: a Colony Ship carries 8 Colonists (12 with Expanded Habitats), every Ship costs them 15% less (a Colony Ship 25 Materials), and they muster 8 Emigrants a turn where others muster 4, but every Emigrant takes twice the population. Their Habitats hold half again as many (6, 12 with Expanded Habitats), a transit burns three quarters of the Fuel, and, starting with no station, a Space Station costs them 20 Materials and a Colony Module three quarters."
+signature = "Steerage. A Colony Ship carries 8 Colonists, 12 with Expanded Habitats, and their Habitats hold half again as many, 6 and 12. They muster 8 Emigrants a turn where others muster 4, but every Emigrant takes twice the population. Every Ship costs them 15% less, a Colony Ship 25 Materials; a transit burns three quarters of the Fuel; and, starting with no station, a Space Station costs them 20 Materials and a Module three quarters."
 # Ticket #203 (version 0.08.1). The building is ticket #183's.
 unique = "Spaceport -- replaces the Launch Site, and pays +1 Influence into next turn's Allotment for every Emigrant it lifts off Earth."
 victory = "Diaspora: 30 Colonists living off Earth, on Colonies spread over at least three Bodies with at least 4 Colonists each (Antarctica and stations over Earth do not count)."
@@ -132,6 +139,8 @@ id = "archivists"
 # Education 1.5, the highest there is, and GDP 23 to pay for the Archive.
 opens_on = "north_america"
 name = "Archivists"
+# Ticket #221: the ordinary rate.
+resentment = 1.0
 start_station = "Axiom"
 # Ticket #210 (version 0.08.1): the prefix every Ship of theirs wears in front of its name --
 # Archive Class Vessel. Chosen at the designer's word, "dealers choice". It belongs to the
@@ -146,7 +155,7 @@ emissions_multiplier = 0.9
 research_multiplier = 1.5
 research_multiplier_off_earth = 1.75
 influence_multiplier = 1.0
-signature = "Provisional Findings: while their Research went to the shared Tech last turn, they already have half the effect of the Tech under research (a multiplier x reads 1 + (x - 1) / 2, an addition reads half rounded down, and immunities do not carry). A turn of funding the Archive switches it off for the turn after. Their Research is x1.5 on Earth and x1.75 off it, an Observatory on a station over Earth counting as off."
+signature = "Provisional Findings. While their Research went to the shared Tech last turn, they already have half the effect of the Tech under research: a multiplier x reads 1 + (x - 1) / 2, an addition reads half rounded down, and immunities do not carry. A turn of funding the Archive switches it off for the turn after. Their Research is x1.5 on Earth and x1.75 off it, an Observatory on a station over Earth counting as off."
 # Ticket #203 (version 0.08.1). The building is ticket #184's.
 unique = "Reactor -- replaces the Power Plant, and takes 75% off the Energy upkeep of everything its holder owns, the Archive excepted."
 # Ticket #68 (version 0.05.5): the first part is the Research paid into the Archive, 80 in all,
@@ -193,6 +202,42 @@ fall_per_offending_turn = 1
 recover = 1
 quiet_turns = 4
 
+# Ticket #222 (version 0.08.2): a turn charges the SUM of every instance -- a place spent on, an act
+# committed, never an ORDER -- capped here. This knowingly reverses the flat one-per-turn charge
+# above: charging per PLACE keeps that rule's objection (splitting one spend across three orders
+# cannot multiply the damage) while giving proportionality (pushing on three of their places costs
+# three times pushing on one). Measured, the cap bites on 1.7% of offending pair-turns.
+turn_cap = 8
+# Ticket #221: the share of the four Factions' Blame, above a fair quarter, that buys one step of
+# resentment -- nothing below 0.35, one step at 0.35, two at 0.45. Times the RESENTING Faction's own
+# `resentment` coefficient. Capped at half the scale, so Blame alone can make a pair Cold and never
+# Hostile. Measured over 200 games: the Prospectors are above 0.35 from turn 1 and reach about 0.53;
+# the Custodians never crossed it once in 200 games, so nobody ever resents them.
+blame_step = 0.10
+blame_cap = 5
+# Ticket #223: the +10 half, filled only by ACTS and never by time. The two acts are a tribute paid
+# and an Accord kept, both defined by the Accords; a pair that never strikes one can never rise above
+# neutral, which is correct, since 41-45% of ordered pairs never interact at all in a whole game.
+# `deeds_ceiling` is how far the DEEDS figure may climb past the scale: only the SHOWN score clamps,
+# so a pair carrying a -5 Blame term can still reach Friendly at +7 on deeds of +12.
+act_gain = 1
+deeds_ceiling = 15
+positive_quiet_turns = 8
+# Ticket #225: the floor ratchets one step every `scar_turns` OFFENDING TURNS -- turns, not points,
+# so retuning the ladder later does not silently move every scar. Measured: a pair that ever offends
+# has a median 10 offending turns, so at 4 the median pair reaches -2, one step short of the limit,
+# and only a hot pair is floored. -3 rather than -5 deliberately: every act that raises Relations is
+# an Accord act, so a pair floored below the level an Accord can be struck at would have no road back.
+scar_turns = 4
+scar_floor = -3
+# Ticket #226 (version 0.08.2): a tribute is a FIXED gift, not an amount the giver picks -- the
+# Relations gain is the flat `act_gain`, so a free amount would let one Ducat buy what fifty buys.
+# An Accord kept pays every `accord_kept_turns` turns, repeatably, and is the only thing in the game
+# that lifts a scarred pair's floor.
+tribute_ducats = 25
+tribute_materials = 15
+accord_kept_turns = 4
+
 [venture_capital]
 max_share = 0.8
 share_step = 0.1
@@ -230,9 +275,17 @@ per_repair_point = 10
 # Version 0.04 (ticket #42): the trading window. Ducats per unit bought; a sale returns the buying
 # price divided by sell_divisor (rounded down over the lot); a building bought for Ducats costs its
 # Materials times per_building_material.
-per_materials = 2
-per_fuel = 3
-per_energy = 1
+# Ticket #220 (version 0.08.2): each of the three rose by ONE and is now the MIDPOINT of a band
+# `price_band` wide, not a constant. Energy at 1 had no downward step at all in whole Ducats, and
+# raising only Energy would have been a balance change smuggled in as a display fix -- so all three
+# rose together. This IS a substantive change and not a display one: Materials +50%, Fuel +33%,
+# Energy +100%, on a currency that also buys Influence, Relief, Resettle and Leapfrogs, and the
+# AI's fixed lot of ten Materials now costs 30 Ducats where it cost 20.
+per_materials = 3
+per_fuel = 4
+per_energy = 2
+price_band = 1
+price_step_units = 20
 sell_divisor = 2
 per_building_material = 2
 bank_per_gdp_tenth = 4.0

@@ -707,23 +707,23 @@ fn the_trading_window_sells_materials_fuel_and_energy_at_the_table_prices() {
     let mut g = game();
     g.seats[0].stockpile = Stockpile { materials: 0, fuel: 0, energy: 0, ducats: 100 };
     let m = Order::Buy { resource: Resource::Materials, amount: 10 };
-    assert_eq!(g.order_cost(Seat(0), &m).ducats, 20, "Materials are 2 Ducats each");
+    assert_eq!(g.order_cost(Seat(0), &m).ducats, 30, "Materials are 3 Ducats each since ticket #220");
     // Bought Materials are spendable at once: a Factory (20 Materials) is affordable with the buy pending.
     let factory = Order::BuildFacility { state: StateId::EastAsia, kind: FacilityKind::Factory };
     assert!(g.check_order(Seat(0), &[], &factory).is_err(), "no Materials yet");
     let pending = vec![Order::Buy { resource: Resource::Materials, amount: 20 }];
     let (left, _) = g.remaining(Seat(0), &pending);
-    assert_eq!((left.materials, left.ducats), (20, 60));
+    assert_eq!((left.materials, left.ducats), (20, 40));
     assert!(g.check_order(Seat(0), &pending, &factory).is_ok());
     let f = Order::Buy { resource: Resource::Fuel, amount: 2 };
-    assert_eq!(g.order_cost(Seat(0), &f).ducats, 6, "Fuel is 3 Ducats each");
+    assert_eq!(g.order_cost(Seat(0), &f).ducats, 8, "Fuel is 4 Ducats each since ticket #220");
     let e = Order::Buy { resource: Resource::Energy, amount: 5 };
-    assert_eq!(g.order_cost(Seat(0), &e).ducats, 5, "Energy is 1 Ducat each");
+    assert_eq!(g.order_cost(Seat(0), &e).ducats, 10, "Energy is 2 Ducats each since ticket #220");
     assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Materials, amount: 0 }).is_err(), "a positive amount");
     assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Ducats, amount: 5 }).is_err(), "Ducats are not for sale");
-    assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Materials, amount: 51 }).is_err(), "102 Ducats needed, 100 held");
+    assert!(g.check_order(Seat(0), &[], &Order::Buy { resource: Resource::Materials, amount: 34 }).is_err(), "102 Ducats needed, 100 held");
     g.commit_orders(Seat(0), &[m, f, e]);
-    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 10, fuel: 2, energy: 5, ducats: 69 });
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 10, fuel: 2, energy: 5, ducats: 52 });
 }
 
 #[test]
@@ -757,18 +757,18 @@ fn selling_materials_or_fuel_returns_half_the_buying_price() {
     let mut g = game();
     g.seats[0].stockpile = Stockpile { materials: 10, fuel: 2, energy: 20, ducats: 0 };
     let m = Order::Sell { resource: Resource::Materials, amount: 10 };
-    assert_eq!(g.order_cost(Seat(0), &m).ducats, -10, "half of 2 Ducats each");
+    assert_eq!(g.order_cost(Seat(0), &m).ducats, -15, "half of 3 Ducats each since ticket #220");
     let f = Order::Sell { resource: Resource::Fuel, amount: 2 };
-    assert_eq!(g.order_cost(Seat(0), &f).ducats, -3, "half of 3 Ducats each, rounded down over the lot");
+    assert_eq!(g.order_cost(Seat(0), &f).ducats, -4, "half of 4 Ducats each, rounded down over the lot");
     assert!(g.check_order(Seat(0), &[], &Order::Sell { resource: Resource::Materials, amount: 11 }).is_err(), "10 held");
     assert!(g.check_order(Seat(0), &[], &Order::Sell { resource: Resource::Energy, amount: 5 }).is_err(), "Energy is not bought back");
     // The Ducats from a sale are spendable at once.
     let pending = vec![m.clone()];
     let (left, _) = g.remaining(Seat(0), &pending);
-    assert_eq!((left.materials, left.ducats), (0, 10));
+    assert_eq!((left.materials, left.ducats), (0, 15));
     assert!(g.check_order(Seat(0), &pending, &Order::BuyInfluence { amount: 5 }).is_ok());
     g.commit_orders(Seat(0), &[m, f]);
-    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 0, fuel: 0, energy: 20, ducats: 13 });
+    assert_eq!(g.seats[0].stockpile, Stockpile { materials: 0, fuel: 0, energy: 20, ducats: 19 });
 }
 
 // ---------------------------------------------------------------- #36 Embassies and Relays
@@ -5918,12 +5918,12 @@ fn the_prospectors_buy_at_fifteen_per_cent_off() {
     let g = game();
     let (cus, pro) = (Seat(0), Seat(1));
     let buy = |r, n| Order::Buy { resource: r, amount: n };
-    assert_eq!(g.order_cost(cus, &buy(Resource::Materials, 10)).ducats, 20);
-    assert_eq!(g.order_cost(pro, &buy(Resource::Materials, 10)).ducats, 17, "20 x 0.85");
-    assert_eq!(g.order_cost(pro, &buy(Resource::Fuel, 5)).ducats, 12, "15 x 0.85 = 12.75");
-    assert_eq!(g.order_cost(pro, &buy(Resource::Energy, 10)).ducats, 8, "10 x 0.85");
+    assert_eq!(g.order_cost(cus, &buy(Resource::Materials, 10)).ducats, 30);
+    assert_eq!(g.order_cost(pro, &buy(Resource::Materials, 10)).ducats, 25, "30 x 0.85 = 25.5");
+    assert_eq!(g.order_cost(pro, &buy(Resource::Fuel, 5)).ducats, 17, "20 x 0.85 = 17");
+    assert_eq!(g.order_cost(pro, &buy(Resource::Energy, 10)).ducats, 17, "20 x 0.85 = 17");
     assert_eq!(g.order_cost(pro, &Order::BuyInfluence { amount: 5 }).ducats, 10, "Influence is not a commodity");
-    assert_eq!(g.order_cost(pro, &Order::Sell { resource: Resource::Materials, amount: 10 }).ducats, -10, "selling unchanged");
+    assert_eq!(g.order_cost(pro, &Order::Sell { resource: Resource::Materials, amount: 10 }).ducats, -15, "selling is not discounted: half of 3 each, undiscounted");
     let sid = g.controlled_states(pro)[0];
     let outright = Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::Factory };
     assert_eq!(g.order_cost(pro, &outright).ducats, 28, "17 Materials x 2 = 34, x 0.85 = 28.9");
@@ -8486,4 +8486,129 @@ fn a_school_climbs_and_decays_by_one_fifth_a_turn() {
         g.run_schools();
     }
     assert!((g.education_level(sid) - card).abs() < 1e-9, "back to the card, and no lower");
+}
+
+/// Ticket #220 (version 0.08.2): the Trading window's prices move with what the table bought.
+///
+/// Watched red before it was believed: with `settle_market` made a no-op the first assertion fails
+/// at `4 != 3`, and with the drift arm removed the last one fails at `4 != 3` the other way about.
+#[test]
+fn market_prices_move_with_the_table() {
+    let mut g = game();
+    let step = g.tables.ducats.price_step_units;
+    let base = g.market_base(0);
+    assert_eq!(g.trade_price(dying_earth_engine::Resource::Materials), Some(base), "a fresh market opens at the card figure");
+
+    // A turn of net buying at the step moves it one up, and it sticks at the band's edge.
+    g.market.net[0] = step;
+    g.settle_market();
+    assert_eq!(g.market_price_at(0), base + 1, "net buying of one step raises the price");
+    g.market.net[0] = step * 4;
+    g.settle_market();
+    assert_eq!(g.market_price_at(0), base + g.tables.ducats.price_band, "the price sticks at the edge of its band");
+
+    // Trading below the step moves nothing, and does NOT count as quiet either.
+    g.market.price[0] = base;
+    g.market.net[0] = step - 1;
+    g.settle_market();
+    assert_eq!(g.market_price_at(0), base, "trading below the step moves nothing");
+
+    // Only a turn with NO trade in that resource brings it home.
+    g.market.price[0] = base + 1;
+    g.market.net[0] = 0;
+    g.settle_market();
+    assert_eq!(g.market_price_at(0), base, "a quiet turn brings the price one step home");
+
+    // A resource under steady demand stays dear rather than sliding back between purchases.
+    g.market.price[0] = base + 1;
+    g.market.net[0] = 1;
+    g.settle_market();
+    assert_eq!(g.market_price_at(0), base + 1, "any trade at all leaves the price where it was");
+}
+
+/// Ticket #221 (version 0.08.2): Blame is a LEVEL on the shown score, weighted by how much the
+/// RESENTING Faction minds. Watched red: with `blame_relations_term` returning 0 the Custodian
+/// assertion fails at 0 against -2.
+#[test]
+fn blame_costs_a_faction_its_friends() {
+    let mut g = game();
+    let (cus, pro, ark) = (Seat(0), Seat(1), Seat(2));
+    // A Prospector share of about 0.40 is one step above the 0.35 gate.
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = if s == pro { 40.0 } else { 20.0 };
+    }
+    assert_eq!(g.blame_relations_term(cus, pro), -2, "the Custodians mind at x2");
+    assert_eq!(g.blame_relations_term(ark, pro), 0, "the Arkwrights at x0.5 round TOWARD ZERO: one step x 0.5 truncates to nothing, so they feel it only from 0.45");
+    assert_eq!(g.blame_relations_term(pro, cus), 0, "the Prospectors mind nobody's Blame");
+    assert_eq!(g.relations_score(cus, pro), -2, "the shown score carries it without any deed");
+    assert_eq!(g.relations_deeds(cus, pro), 0, "and the deeds figure does not");
+    assert_eq!(g.relations_level(cus, pro), "Neutral", "-2 is still the top of Neutral");
+}
+
+/// Ticket #222/#225 (version 0.08.2): a turn charges the sum of every instance, capped; the scar
+/// counts TURNS. Watched red: with the cap removed the first assertion reads -12.
+#[test]
+fn the_ladder_sums_instances_and_the_scar_counts_turns() {
+    let mut g = game();
+    let (cus, pro) = (Seat(0), Seat(1));
+    // A conquest turn: a Battle (3), an Occupation (3), a place taken (5) and a bid elsewhere (1).
+    for w in [3, 3, 5, 1] {
+        g.offend_by(pro, cus, w);
+    }
+    g.settle_relations();
+    assert_eq!(g.relations_deeds(cus, pro), -g.tables.relations.turn_cap, "twelve charged, eight paid");
+    assert_eq!(g.relations.offending_turns[cus.index()][pro.index()], 1, "one turn, however much was done in it");
+    // Four offending turns move the floor one step, whatever each turn cost.
+    for _ in 0..3 {
+        g.offend_by(pro, cus, 1);
+        g.settle_relations();
+    }
+    assert_eq!(g.relations.floor[cus.index()][pro.index()], -1, "a step every four offending turns");
+    assert!(g.relations_deeds(cus, pro) <= -1, "and the deeds figure cannot climb above it");
+}
+
+/// Ticket #226 (version 0.08.2): an Accord holds until it is ended, ending is free with a turn's
+/// notice, and violating a term costs +3 AND ends the whole arrangement.
+///
+/// Watched red: with `break_accord` made a no-op the violation assertion finds the Accord still
+/// standing, and with the +3 removed the score reads -1 rather than -4.
+#[test]
+fn an_accord_ends_freely_and_breaks_dearly() {
+    let mut g = game();
+    let (cus, pro) = (Seat(0), Seat(1));
+
+    g.strike_accord(cus, pro, vec![Term::NonAggression]).expect("struck");
+    assert!(g.accord_has(cus, pro, Term::NonAggression), "it holds both ways round");
+    assert!(g.accord_has(pro, cus, Term::NonAggression));
+
+    // Ending is free and takes a turn's notice: it still holds this turn, and is gone next.
+    g.end_accord(cus, pro);
+    assert!(!g.accord_has(cus, pro, Term::NonAggression), "a declared-over Accord carries nothing");
+    g.settle_accords();
+    assert!(g.accords.is_empty(), "and lapses at the settle");
+    g.settle_relations();
+    assert_eq!(g.relations_deeds(pro, cus), 0, "ending cost nothing at all");
+
+    // Breaking is another matter: the offence AND the +3, and the Accord is gone at once.
+    g.strike_accord(cus, pro, vec![Term::NonAggression]).expect("struck again");
+    g.offend_by(cus, pro, 1);
+    assert!(g.accords.is_empty(), "violating a term ends the whole Accord");
+    g.settle_relations();
+    assert_eq!(g.relations_deeds(pro, cus), -4, "the act charged 1 and the betrayal 3");
+}
+
+/// Ticket #226: a research agreement wants Friendly on BOTH sides to strike, and pays a tenth once
+/// struck. Watched red: with the gate removed the first strike succeeds.
+#[test]
+fn a_research_agreement_wants_friendship_first() {
+    let mut g = game();
+    let (cus, pro) = (Seat(0), Seat(1));
+    assert!(g.strike_accord(cus, pro, vec![Term::ResearchAgreement]).is_err(), "Neutral is not Friendly");
+    g.relations.score[cus.index()][pro.index()] = 7;
+    g.relations.score[pro.index()][cus.index()] = 7;
+    assert!(g.strike_accord(cus, pro, vec![Term::ResearchAgreement]).is_ok(), "Friendly on both sides");
+    assert!((g.research_agreement_multiplier(cus) - 1.10).abs() < 1e-9, "a tenth more Research");
+    // The gate is checked only at the STRIKE: it stands whatever the score later does.
+    g.relations.score[cus.index()][pro.index()] = -9;
+    assert!((g.research_agreement_multiplier(cus) - 1.10).abs() < 1e-9, "once made, it stands");
 }

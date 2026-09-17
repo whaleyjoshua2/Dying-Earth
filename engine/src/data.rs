@@ -408,6 +408,12 @@ pub struct FactionCard {
     /// Influence and selling are untouched.
     #[serde(default = "one_f64")]
     pub market_multiplier: f64,
+    /// Ticket #221 (version 0.08.2): how much THIS Faction minds another's Blame -- the coefficient
+    /// on the resentment step. The Custodians at 2 mind twice as much as the Archivists at 1; the
+    /// Arkwrights at 0.5 mind half; the Prospectors at 0 do not mind at all, which is a statement
+    /// about them and not an oversight.
+    #[serde(default = "resentment_default")]
+    pub resentment: f64,
     /// A Space Station's Materials, times this.
     #[serde(default = "one_f64")]
     pub station_materials_multiplier: f64,
@@ -521,6 +527,19 @@ pub struct DucatsCard {
     pub sell_divisor: i64,
     pub per_building_material: i64,
     pub bank_per_gdp_tenth: f64,
+    /// Ticket #220 (version 0.08.2): how far a price may wander either side of the card figure,
+    /// which is now the MIDPOINT of its band rather than a constant. At 1 every price stays a whole
+    /// number and no resource can become free, which is why all three base prices rose by one to
+    /// make room -- Materials 2 to 3, Fuel 3 to 4, Energy 1 to 2. Kept optional so an old table
+    /// still loads, as `trade_post_base` is.
+    #[serde(default = "price_band_default")]
+    pub price_band: i64,
+    /// Ticket #220: the NET units of one resource, bought less sold across the whole table in a
+    /// turn, that move its price one step. 20 is a measured figure: a trading turn carries a median
+    /// 20 units across all four seats, so a normal turn's trading is visible without pegging the
+    /// price at its band's edge.
+    #[serde(default = "price_step_default")]
+    pub price_step_units: i64,
     /// Ticket #90 (version 0.06.0): retired; kept optional so an old table still loads.
     #[serde(default)]
     pub trade_post_base: Option<f64>,
@@ -616,6 +635,10 @@ pub struct InfluenceTable {
     pub decay_controlled: i64,
     /// Version 0.04 (ticket #41): a challenger needs the controller's standing plus this.
     pub challenge_margin: i64,
+    /// Ticket #224 (version 0.08.2): the most the Relations term may add to a challenge margin. Two,
+    /// which is also its true maximum: the shown score clamps at -10 and the term is `|score| / 4`.
+    #[serde(default = "relations_margin_cap_default")]
+    pub relations_margin_cap: i64,
     /// Ticket #190 (version 0.08.0): what an online Constabulary adds to the margin in its Region.
     pub constabulary_margin: i64,
     /// Ticket #201 (version 0.08.1): what a Constabulary adds instead, once Civil Defense stands.
@@ -789,6 +812,11 @@ pub struct AiWeights {
     pub build_constabulary: f64,
     /// Ticket #52: steer this turn's refugee flows into one calm state.
     pub resettle: f64,
+    /// Ticket #227 (version 0.08.2): how readily this seat offers an Accord. Modest by default: an
+    /// offer costs nothing and a refusal is not an offence, but a table where every seat proposes
+    /// every turn would bury the player in yes-or-no questions.
+    #[serde(default = "accord_weight_default")]
+    pub accord: f64,
     pub influence: f64,
     pub transit: f64,
     pub load_unload: f64,
@@ -1057,6 +1085,74 @@ pub struct RelationsCard {
     pub fall_per_offending_turn: i64,
     pub recover: i64,
     pub quiet_turns: u32,
+    /// Ticket #222 (version 0.08.2): the most a single turn may charge, however much was done in it.
+    /// A guard against one dramatic turn spending the whole scale, not a working part of the rule --
+    /// measured, it bites on 1.7% of offending pair-turns.
+    #[serde(default = "turn_cap_default")]
+    pub turn_cap: i64,
+    /// Ticket #221: the share above a fair quarter that buys one step of resentment.
+    #[serde(default = "blame_step_default")]
+    pub blame_step: f64,
+    /// Ticket #221: the most Blame alone may cost, half the scale. Blame can make a pair Cold but
+    /// never, by itself, Hostile.
+    #[serde(default = "blame_cap_default")]
+    pub blame_cap: i64,
+    /// Ticket #223: what one act of friendship is worth, once a turn per ordered pair.
+    #[serde(default = "act_gain_default")]
+    pub act_gain: i64,
+    /// Ticket #223: how high the DEEDS figure may climb past the scale, so a pair carrying a heavy
+    /// Blame term can still reach Friendly on deeds alone.
+    #[serde(default = "deeds_ceiling_default")]
+    pub deeds_ceiling: i64,
+    /// Ticket #223: quiet turns to lose one point of a POSITIVE score -- twice the period below
+    /// neutral, so friendship lapses at half the rate enmity heals.
+    #[serde(default = "positive_quiet_default")]
+    pub positive_quiet_turns: u32,
+    /// Ticket #225: offending TURNS per step of the floor.
+    #[serde(default = "scar_turns_default")]
+    pub scar_turns: u32,
+    /// Ticket #225: the lowest the floor may go. -3 rather than -5 deliberately: since every act
+    /// that raises Relations is an Accord act, a pair floored below the level an Accord can be
+    /// struck at would have no road back at all.
+    #[serde(default = "scar_floor_default")]
+    pub scar_floor: i64,
+    /// Ticket #226 (version 0.08.2): what one tribute costs, in Ducats or in Materials. A FIXED
+    /// price, not an amount the giver chooses: the Relations gain is a flat `act_gain`, so without a
+    /// fixed price a one-Ducat tribute would buy the same point as a fifty-Ducat one.
+    #[serde(default = "tribute_ducats_default")]
+    pub tribute_ducats: i64,
+    #[serde(default = "tribute_materials_default")]
+    pub tribute_materials: i64,
+    /// Ticket #226: turns an Accord must stand to pay its keeping, repeatably. Four, matching the
+    /// quiet-turn recovery cadence already in the rules -- and it is also the only thing that lifts
+    /// a scarred pair's floor.
+    #[serde(default = "accord_kept_default")]
+    pub accord_kept_turns: u32,
+}
+
+fn turn_cap_default() -> i64 {
+    8
+}
+fn blame_step_default() -> f64 {
+    0.10
+}
+fn blame_cap_default() -> i64 {
+    5
+}
+fn act_gain_default() -> i64 {
+    1
+}
+fn deeds_ceiling_default() -> i64 {
+    15
+}
+fn positive_quiet_default() -> u32 {
+    8
+}
+fn scar_turns_default() -> u32 {
+    4
+}
+fn scar_floor_default() -> i64 {
+    -3
 }
 
 /// Ticket #73 (version 0.05.5): Emigrants, the built Colonists: how many a Faction musters a turn,
@@ -1612,4 +1708,45 @@ impl Tables {
         let facilities: f64 = card.start_facilities.iter().map(|k| self.facility(*k).emissions * m).sum();
         industry + people + facilities
     }
+}
+
+
+/// Ticket #220 (version 0.08.2): defaults for a table written before the market moved.
+fn price_band_default() -> i64 {
+    1
+}
+
+fn price_step_default() -> i64 {
+    20
+}
+
+
+/// Ticket #221 (version 0.08.2): a Faction card written before resentment existed minds at the
+/// ordinary rate.
+fn resentment_default() -> f64 {
+    1.0
+}
+
+
+/// Ticket #224 (version 0.08.2).
+fn relations_margin_cap_default() -> i64 {
+    2
+}
+
+
+/// Ticket #226 (version 0.08.2).
+fn tribute_ducats_default() -> i64 {
+    25
+}
+fn tribute_materials_default() -> i64 {
+    15
+}
+fn accord_kept_default() -> u32 {
+    4
+}
+
+
+/// Ticket #227 (version 0.08.2).
+fn accord_weight_default() -> f64 {
+    3.0
 }
