@@ -5762,9 +5762,16 @@ fn module_build_buttons(ui: &mut Ui, session: &Session, game: &Game, cid: Colony
         }
         // Ticket #80: a station holds a Shipyard, Habitats and Observatories; ticket #89: and
         // Solar Arrays, which stand nowhere else.
-        // Ticket #185 (version 0.08.0): and an Institute -- or the Custodians' Academy -- since a
-        // station carries Observatories and the Institute is what multiplies them.
-        if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Academy) {
+        // Ticket #185 (version 0.08.0): and an Institute, since a station carries Observatories
+        // and the Institute is what multiplies them.
+        //
+        // Ticket #239 (version 0.08.3): the list names the JOB, never the kind. Written with the
+        // kinds it had to name the Academy too, and the next three Unique Modules broke it
+        // silently -- the Prospectors lost the Trade Post row from every station without gaining
+        // the Exchange, and the Archivists lost the Solar Array without gaining the Heliostat,
+        // because `built_by` above swaps the common kind out and this list then threw the Unique
+        // away. A picture of the build list found it; no test did.
+        if col.in_orbit && !mk.stands_on_a_station() {
             continue;
         }
         if !col.in_orbit && game.tables.module(mk).station_only {

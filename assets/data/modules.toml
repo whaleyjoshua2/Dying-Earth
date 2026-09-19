@@ -224,6 +224,51 @@ materials = 25
 build_turns = 2
 energy_upkeep = 2
 
+# Ticket #239 (version 0.08.3): the Heliostat, the Archivists' Unique Module, replacing the Solar
+# Array on their build list at the common price -- the same 25 Materials, two turns, no upkeep,
+# station-only and sun-scaled. It makes `heliostat_energy` (facilities.toml) more, added AFTER the
+# inverse square scaling so the extra point is worth the same at every distance. Appended:
+# `Tables::module` indexes ModuleKind by discriminant.
+[[module]]
+id = "heliostat"
+name = "Heliostat"
+materials = 25
+build_turns = 2
+energy_upkeep = 0
+produces = { resource = "energy", amount = 6 }
+station_only = true
+sun_scaled = true
+
+# Ticket #239 (version 0.08.3): the Exchange, the Prospectors' Unique Module, replacing the Trade
+# Post at the common price with every figure of its row, and paying `exchange_ducats`
+# (facilities.toml) more a turn -- flat, and AFTER the output multiplier, exactly as the Academy's
+# Ducat is, so a captured Exchange pays its captor what it paid its builder.
+[[module]]
+id = "exchange"
+name = "Exchange"
+materials = 25
+build_turns = 1
+energy_upkeep = 2
+produces = { resource = "ducats", amount = 2 }
+per_other_body = 3
+fuel_off = 4
+fuel_min = 1
+mine_bonus = 1
+
+# Ticket #239 (version 0.08.3): the Chorus, the Arkwrights' Unique Module, replacing the Relay at
+# the common price with every figure of its row -- the same Allotment, the same Standing, and
+# Relay Networks reaches it as it reaches a Relay. Its clause is `chorus_colonists`
+# (facilities.toml): one more Influence into the Allotment for every that many Colonists at its
+# OWN Colony, rounded down.
+[[module]]
+id = "chorus"
+name = "Chorus"
+materials = 25
+build_turns = 1
+energy_upkeep = 2
+influence_allotment = 1
+standing_per_turn = 2
+
 # Ticket #88 (version 0.06.0): build it where you dig. A Module (the Archive included) built at a
 # Colony with one working Mine costs `one_mine` of its price, with two or more `two_mines`,
 # multiplicative with the Faction's own discount, rounded down, never below `floor` of the row.

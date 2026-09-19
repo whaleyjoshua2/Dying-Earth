@@ -249,10 +249,24 @@ pub enum ModuleKind {
     /// Institute on their build list at the common price and pays +1 Ducat a turn on top of the
     /// schooling. It wears the same name as their Unique Facility on Earth, at the designer's word.
     Academy,
+    /// Version 0.08.3 (ticket #239): the Heliostat, the Archivists' Unique Module, which replaces
+    /// the Solar Array at the common price and makes one more Energy -- added AFTER the inverse
+    /// square scaling, so it is worth the same at Mars as at Venus rather than 0.43 of a point at
+    /// one and 1.91 at the other.
+    Heliostat,
+    /// Version 0.08.3 (ticket #239): the Exchange, the Prospectors' Unique Module, which replaces
+    /// the Trade Post at the common price and pays one more Ducat a turn, flat and AFTER the
+    /// output multiplier, exactly as the Academy's Ducat is.
+    Exchange,
+    /// Version 0.08.3 (ticket #239): the Chorus, the Arkwrights' Unique Module, which replaces the
+    /// Relay at the common price and adds one more Influence to its holder's Allotment for every
+    /// `chorus_colonists` living at its own Colony, rounded down. The more people stand here, the
+    /// further the voice carries -- which is the Faction whose whole game is moving people.
+    Chorus,
 }
 
 impl ModuleKind {
-    pub const ALL: [ModuleKind; 15] = [
+    pub const ALL: [ModuleKind; 18] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -268,9 +282,12 @@ impl ModuleKind {
         ModuleKind::Core,
         ModuleKind::Institute,
         ModuleKind::Academy,
+        ModuleKind::Heliostat,
+        ModuleKind::Exchange,
+        ModuleKind::Chorus,
     ];
     /// The Modules an ordinary build order may place (ticket #51: the Archive is not one of them).
-    pub const BUILDABLE: [ModuleKind; 13] = [
+    pub const BUILDABLE: [ModuleKind; 16] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -284,12 +301,18 @@ impl ModuleKind {
         ModuleKind::MassDriver,
         ModuleKind::Institute,
         ModuleKind::Academy,
+        ModuleKind::Heliostat,
+        ModuleKind::Exchange,
+        ModuleKind::Chorus,
     ];
     pub fn name(self) -> &'static str {
         match self {
             ModuleKind::Core => "Core Module",
             ModuleKind::Institute => "Institute",
             ModuleKind::Academy => "Academy",
+            ModuleKind::Heliostat => "Heliostat",
+            ModuleKind::Exchange => "Exchange",
+            ModuleKind::Chorus => "Chorus",
             ModuleKind::Mine => "Mine",
             ModuleKind::Generator => "Generator",
             ModuleKind::Refinery => "Refinery",
@@ -311,6 +334,9 @@ impl ModuleKind {
     pub fn unique_to(self) -> Option<FactionKind> {
         match self {
             ModuleKind::Academy => Some(FactionKind::Custodians),
+            ModuleKind::Heliostat => Some(FactionKind::Archivists),
+            ModuleKind::Exchange => Some(FactionKind::Prospectors),
+            ModuleKind::Chorus => Some(FactionKind::Arkwrights),
             _ => None,
         }
     }
@@ -319,6 +345,9 @@ impl ModuleKind {
     pub fn common(self) -> Option<ModuleKind> {
         match self {
             ModuleKind::Academy => Some(ModuleKind::Institute),
+            ModuleKind::Heliostat => Some(ModuleKind::SolarArray),
+            ModuleKind::Exchange => Some(ModuleKind::TradePost),
+            ModuleKind::Chorus => Some(ModuleKind::Relay),
             _ => None,
         }
     }
@@ -338,6 +367,25 @@ impl ModuleKind {
     /// replaces it.
     pub fn does_the_job_of(self, kind: ModuleKind) -> bool {
         self == kind || self.common() == Some(kind)
+    }
+
+    /// Ticket #239 (version 0.08.3): may this Module stand on a Space Station rather than a ground
+    /// Colony? Ticket #80 allowed a Shipyard, Habitats and Observatories, ticket #89 the Solar
+    /// Array, which stands nowhere else, and ticket #185 the Institute, since a station carries
+    /// the Observatories an Institute multiplies.
+    ///
+    /// It lives here because it was written out twice -- once in the interface's build list and
+    /// once in the computer's -- as a list of KINDS, and a list of kinds cannot know about a
+    /// Unique Module. The moment three more Uniques existed, the Prospectors lost the Trade Post
+    /// row from every station without gaining the Exchange and the Archivists lost the Solar Array
+    /// without gaining the Heliostat, because `built_by` swaps the common kind out and the list
+    /// then threw the Unique away. Answering by the JOB makes every future Unique follow its
+    /// sibling with nothing to remember.
+    pub fn stands_on_a_station(self) -> bool {
+        matches!(
+            self.common().unwrap_or(self),
+            ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute
+        )
     }
 }
 

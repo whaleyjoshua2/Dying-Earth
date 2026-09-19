@@ -7809,6 +7809,115 @@ fn a_unique_facility_costs_and_makes_what_the_common_one_does() {
     let i = g.tables.module(ModuleKind::Institute);
     assert_eq!((a.materials, a.build_turns, a.energy_upkeep), (i.materials, i.build_turns, i.energy_upkeep));
     assert_eq!(ModuleKind::Academy.common(), Some(ModuleKind::Institute));
+    // Ticket #239 (version 0.08.3): and the three that complete the set, each against its sibling.
+    // The whole point of a Unique is that it is the common building at the common price with one
+    // clause, so a row that drifts is the defect this catches.
+    for (unique, common) in [
+        (ModuleKind::Heliostat, ModuleKind::SolarArray),
+        (ModuleKind::Exchange, ModuleKind::TradePost),
+        (ModuleKind::Chorus, ModuleKind::Relay),
+    ] {
+        let u = g.tables.module(unique);
+        let c = g.tables.module(common);
+        assert_eq!(unique.common(), Some(common), "{}", unique.name());
+        assert_eq!((u.materials, u.build_turns, u.energy_upkeep), (c.materials, c.build_turns, c.energy_upkeep), "{} is priced as its sibling", unique.name());
+        assert_eq!(u.station_only, c.station_only, "{}", unique.name());
+        assert_eq!(u.sun_scaled, c.sun_scaled, "{}", unique.name());
+        assert_eq!(u.influence_allotment, c.influence_allotment, "{}", unique.name());
+        assert_eq!(u.standing_per_turn, c.standing_per_turn, "{}", unique.name());
+        assert_eq!(u.produces.as_ref().map(|p| (p.resource, p.amount)), c.produces.as_ref().map(|p| (p.resource, p.amount)), "{}", unique.name());
+    }
+    // Every Faction now has one Unique Module as well as one Unique Facility, which is what this
+    // ticket was for; the Custodians' Academy is deliberately both, and wears one name.
+    for faction in FactionKind::ALL {
+        assert!(ModuleKind::ALL.into_iter().any(|k| k.unique_to() == Some(faction)), "{faction:?} has no Unique Module");
+        assert!(FacilityKind::ALL.into_iter().any(|k| k.unique_to() == Some(faction)), "{faction:?} has no Unique Facility");
+    }
+}
+
+/// Ticket #239 (version 0.08.3): the three new Unique Modules' clauses, in EXACT figures.
+///
+/// Written first against `g.tables.unique.*` and witnessed to prove nothing: with all three
+/// figures zeroed in the data it still passed, because both sides of the assertion read the same
+/// table. The numbers below are therefore literals, and a clause that stops paying fails here.
+#[test]
+fn the_three_unique_modules_each_pay_their_one_clause() {
+    let mut g = game();
+    let arch = seat_of(&g, FactionKind::Archivists);
+    let pros = seat_of(&g, FactionKind::Prospectors);
+    let ark = seat_of(&g, FactionKind::Arkwrights);
+
+    // The Heliostat: one more Energy than a Solar Array, AFTER the inverse square scaling. Mars
+    // is the case that discriminates -- its sun factor is 0.43, so a Solar Array's 6 rounds to 3,
+    // and the extra point added BEFORE the scaling would give (6 + 1) x 0.43 = 3 as well. Only
+    // adding it after yields 4. The Moon, at full sunlight, cannot tell the two apart.
+    for (body, array, heliostat) in [(BodyId::Mars, 3, 4), (BodyId::Moon, 6, 7)] {
+        let cid = colony(&mut g, arch, body, &[ModuleKind::SolarArray], 0);
+        assert_eq!(g.module_yield(arch, cid, ModuleKind::SolarArray).amount, array, "a Solar Array at {body:?}");
+        assert_eq!(g.module_yield(arch, cid, ModuleKind::Heliostat).amount, heliostat, "a Heliostat at {body:?} is a Solar Array and one more, after the scaling");
+    }
+
+    // The Exchange: one more Ducat than a Trade Post at the same Colony, flat and AFTER the
+    // Prospectors' x1.25 -- which is the whole reason it is flat, since 1 through x1.25 floors
+    // back to 1 and a captured Exchange pays its captor what it paid its builder.
+    let cid = colony(&mut g, pros, BodyId::Mars, &[ModuleKind::TradePost], 6);
+    assert_eq!(g.module_yield(pros, cid, ModuleKind::TradePost).amount, 18, "a Trade Post at a Colony of 6");
+    assert_eq!(g.module_yield(pros, cid, ModuleKind::Exchange).amount, 19, "an Exchange is a Trade Post and one more Ducat");
+
+    // The Chorus: one more Influence in the Allotment for every 6 Colonists at its OWN Colony,
+    // rounded down. Three populations across the boundary pin the rounding: one short pays
+    // nothing, the step itself pays one, and a figure well past two steps pays two.
+    let cid = colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Relay], 0);
+    for (people, relay, chorus) in [(5u32, 1, 1), (6, 1, 2), (13, 1, 3)] {
+        g.colony_mut(cid).expect("the Colony just made").colonists = people;
+        assert_eq!(g.module_yield(ark, cid, ModuleKind::Relay).allotment, relay, "a plain Relay is unmoved by {people} Colonists");
+        assert_eq!(g.module_yield(ark, cid, ModuleKind::Chorus).allotment, chorus, "a Chorus at a Colony of {people}");
+        // Standing is untouched: "+1 Influence" has meant the Allotment since ticket #232, which
+        // is the Faction's budget everywhere rather than a hold on one place.
+        assert_eq!(g.module_yield(ark, cid, ModuleKind::Chorus).standing, 2, "a Chorus holds its place no harder than a Relay");
+    }
+}
+
+/// Ticket #239 (version 0.08.3): a Unique Module stands wherever its common sibling stands.
+///
+/// This is the guard for a bug a PICTURE found and no test did. The rule for what may stand on a
+/// Space Station was written out twice, in the interface's build list and the computer's, as a
+/// list of KINDS -- and a list of kinds cannot know about a Unique. With three new Uniques the
+/// Prospectors lost the Trade Post row from every station without gaining the Exchange, and the
+/// Archivists lost the Solar Array without gaining the Heliostat.
+#[test]
+fn a_unique_module_stands_where_its_sibling_stands() {
+    for unique in ModuleKind::ALL {
+        let Some(common) = unique.common() else { continue };
+        assert_eq!(
+            unique.stands_on_a_station(),
+            common.stands_on_a_station(),
+            "{} must stand exactly where a {} stands",
+            unique.name(),
+            common.name()
+        );
+    }
+    // And the four that a station takes, named, so the set itself cannot drift unnoticed.
+    assert!(ModuleKind::Exchange.stands_on_a_station(), "a station takes a Trade Post, so it takes an Exchange");
+    assert!(ModuleKind::Heliostat.stands_on_a_station(), "a Solar Array stands nowhere else, so a Heliostat must");
+    assert!(!ModuleKind::Chorus.stands_on_a_station(), "a Relay is a ground Module, so a Chorus is too");
+    assert!(!ModuleKind::Mine.stands_on_a_station(), "nobody digs in orbit");
+}
+
+/// Ticket #239 (version 0.08.3): a Unique Module does its COMMON sibling's job, so everything
+/// keyed by kind reaches it. The Chorus is the case that would have broken silently: Relay
+/// Networks takes a Relay's Allotment from 1 to 2, and written against the wrong kind the
+/// Arkwrights' own Relay would have been the one Relay in the game the Tech never reached.
+#[test]
+fn relay_networks_reaches_the_arkwrights_chorus() {
+    let mut g = game();
+    let ark = seat_of(&g, FactionKind::Arkwrights);
+    let cid = colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Relay], 0);
+    let before = g.module_yield(ark, cid, ModuleKind::Chorus).allotment;
+    with_tech(&mut g, TechId::RelayNetworks);
+    let after = g.module_yield(ark, cid, ModuleKind::Chorus).allotment;
+    assert!(after > before, "Relay Networks must reach a Chorus as it reaches a Relay: {before} -> {after}");
+    assert_eq!(after, g.module_yield(ark, cid, ModuleKind::Relay).allotment, "and reach it by exactly as much");
 }
 
 /// Ticket #181: a Faction's start Region's Facilities come up as that Faction's own versions, the
@@ -9141,3 +9250,4 @@ fn the_hold_clock_resets_on_a_change_of_hands_and_an_old_save_passes() {
     g.state_mut(sid).held_since = None;
     assert!(g.may_remake(pro, sid), "a missing clock counts as held long enough");
 }
+

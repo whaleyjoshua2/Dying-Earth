@@ -242,6 +242,20 @@ reactor_upkeep = 0.75
 # schooling). Run through the largest output multiplier in the game, x1.25, it floors back to 1, so
 # a captured Academy pays its captor exactly what it paid its builder.
 academy_ducats = 1
+# Ticket #239 (version 0.08.3): what a Heliostat makes over a Solar Array, added AFTER the inverse
+# square scaling. Before it, the point would be worth 0.43 at Mars and 1.91 at Venus; after it, one
+# everywhere, which is what "+1 Energy" reads as.
+heliostat_energy = 1
+# Ticket #239 (version 0.08.3): what an Exchange pays over a Trade Post, flat and after the output
+# multiplier. Flat for the Academy's reason: 1 run through x1.25 floors back to 1, so a captured
+# Exchange pays its captor exactly what it paid its builder.
+exchange_ducats = 1
+# Ticket #239 (version 0.08.3): how many Colonists at a Chorus's own Colony buy one more Influence
+# in its holder's Allotment, rounded down. Its OWN Colony rather than its Body, as the Observatory
+# reads its own Colony's people. Measured when it was set: the median BIGGEST Colony on the board
+# is 4 -- a bare Core Module -- and only the Arkwrights' reach 16 late, so at 6 a Colony must carry
+# a Habitat above its Core before a Chorus pays anything at all.
+chorus_colonists = 6
 
 [industry_level]
 materials = 30

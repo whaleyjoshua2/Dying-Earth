@@ -803,7 +803,16 @@ impl Game {
                 // Ticket #46: a station holds only a Shipyard and Habitats; ticket #80: and an
                 // Observatory. Ticket #81: a Habitat over Earth now houses people who count as off
                 // Earth, so the AI builds them there too.
-                if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Observatory | ModuleKind::Habitat | ModuleKind::SolarArray | ModuleKind::TradePost) {
+                //
+                // Ticket #239 (version 0.08.3): by JOB, for the reason the same list in `ui.rs`
+                // carries -- a Unique Module is not its common kind, so a list of kinds throws
+                // every Unique away the moment `built_by` swaps one in.
+                // The Institute is excluded here and NOT in the interface's copy of this rule.
+                // That difference predates ticket #239 -- ticket #185 added the Institute to the
+                // player's station list and not to this one -- so the computer has never raised an
+                // Institute on a station while a player may. It is left standing rather than
+                // quietly changed, because changing it changes what the computer builds.
+                if col.in_orbit && (!mk.stands_on_a_station() || mk.does_the_job_of(ModuleKind::Institute)) {
                     continue;
                 }
                 // Ticket #90: one Trade Post per Body; worth more once a second Body is held, since
@@ -846,12 +855,27 @@ impl Game {
                         // science is, the way it digs where the ore is.
                         (Cat::Observatory, self.base_weight(seat, Cat::Observatory) * self.production_moved_boost(seat, &col, mk) * self.research_yield_at(&col))
                     }
-                    // Ticket #90: a Trade Post pays for the network, so it is worth half again once
-                    // the seat holds two Bodies or more.
+                    // Ticket #90: a Trade Post pays for the network. Ticket #239 (version 0.08.3):
+                    // and the weight now READS that network instead of taking a step at two Bodies.
+                    //
+                    // It had the disease tickets #232 named on the Mine and the Relay, in its worst
+                    // form: a Trade Post is the only Producer whose resource is Ducats, and the
+                    // Producer bonus fires only for a resource the seat is SHORT of -- `scarcest`
+                    // returns only Energy, Materials or Fuel and `needs` holds only Materials or
+                    // Energy, deliberately, since ticket #41 measured Ducats on that list as
+                    // costing the Custodians every win. So a Trade Post could never earn the x1.5
+                    // its rivals routinely earn, and the sweep found ZERO standing in 120 games --
+                    // on a building worth about 20 Ducats a turn to the Prospectors at their
+                    // busiest Body, which is nearly two Regions' income.
+                    //
+                    // The ratio is its real yield here against its card's bare figure, CLAMPED to
+                    // the same band the Mine's tech factor runs in (1.0 to 2.06). Unclamped it
+                    // reaches 5 at a four-Colonist Colony and 12 at a rich one, which is how
+                    // ticket #232's first attempt at the Mine put 329 Mines on the board.
                     ModuleKind::TradePost => {
-                        let bodies = self.bodies_held(seat).len();
-                        let w = self.base_weight(seat, Cat::Producer) * if bodies >= 2 { 1.5 } else { 1.0 };
-                        (Cat::Producer, w)
+                        let bare = self.tables.module(ModuleKind::TradePost).produces.as_ref().map(|p| p.amount).unwrap_or(1).max(1) as f64;
+                        let with = self.module_yield(seat, cid, ModuleKind::TradePost).amount as f64;
+                        (Cat::Producer, self.base_weight(seat, Cat::Producer) * (with / bare).clamp(0.25, 2.0))
                     }
                     // Ticket #92: a Mass Driver at a low-gravity ground Colony with a Mine, once the
                     // Tech stands, one per Colony; and a Mine beside one weighs what the driver adds.
@@ -904,8 +928,15 @@ impl Game {
                         // A Relay's Allotment has no slot component -- it is the card figure plus
                         // Relay Networks -- so this ratio IS the tech factor: 1.0 until the Tech
                         // lands, 2.0 after.
-                        let bare = self.tables.module(ModuleKind::Relay).influence_allotment.max(1) as f64;
-                        let with = self.module_yield(seat, cid, ModuleKind::Relay).allotment as f64;
+                        //
+                        // Ticket #239 (version 0.08.3): weighed as `mk`, the kind this seat would
+                        // ACTUALLY build, not as the common Relay. Written with `ModuleKind::Relay`
+                        // hard-coded it read the common card twice and the Arkwrights' Chorus --
+                        // whose whole clause is an Allotment that grows with the Colony -- would
+                        // have been weighed as though the clause did not exist, which is the
+                        // mistake ticket #232 found on the Mine wearing different clothes.
+                        let bare = self.tables.module(mk).influence_allotment.max(1) as f64;
+                        let with = self.module_yield(seat, cid, mk).allotment as f64;
                         (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence) * (with / bare).max(0.25))
                     }
                     // Ticket #51: the Archive is never an ordinary Module build; it has its own order.
@@ -925,7 +956,7 @@ impl Game {
                         (Cat::ArmyOrBarracks, self.base_weight(seat, Cat::ArmyOrBarracks))
                     }
                     // Unreachable: every Unique Module was mapped to its common job above.
-                    ModuleKind::Academy => continue,
+                    ModuleKind::Academy | ModuleKind::Heliostat | ModuleKind::Exchange | ModuleKind::Chorus => continue,
                 };
                 // Ticket #181: the slight bias toward a seat's own Unique Module, as on Earth.
                 if mk.unique_to().is_some() {

@@ -180,6 +180,14 @@ pub struct UniqueCard {
     pub reactor_upkeep: f64,
     /// What an Academy pays its holder a turn, flat, wherever it stands.
     pub academy_ducats: i64,
+    /// Ticket #239 (version 0.08.3): what a Heliostat makes over a Solar Array, after sun scaling.
+    pub heliostat_energy: i64,
+    /// Ticket #239 (version 0.08.3): what an Exchange pays over a Trade Post, flat, after the
+    /// output multiplier.
+    pub exchange_ducats: i64,
+    /// Ticket #239 (version 0.08.3): how many Colonists at a Chorus's own Colony buy it one more
+    /// Influence in its holder's Allotment, rounded down.
+    pub chorus_colonists: i64,
 }
 
 /// Ticket #54 (version 0.05): what a Restart and a Decommission cost (`facilities.toml`). A

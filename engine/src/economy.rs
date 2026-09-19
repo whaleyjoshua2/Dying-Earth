@@ -303,18 +303,36 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
         let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None };
+        // Ticket #239 (version 0.08.3): a Unique Module does its sibling's job, so every lookup
+        // keyed by kind -- the Techs that multiply it, the slot's yield, a Discovery on it --
+        // reads the COMMON kind. Without this the Arkwrights' Chorus would be the one Relay in
+        // the game that Relay Networks does not reach, and an Exchange would miss the Trade
+        // Post's network rule and pay a flat 2.
+        let job = kind.common().unwrap_or(kind);
         // Ticket #232 (version 0.08.3): Relay Networks takes a Relay's Allotment from 1 to 2. Its
         // Standing is untouched: Standing holds one particular place, where the Allotment is the
         // Faction's whole diplomatic budget, and "+1 influence" reads as the budget everywhere
         // else in the game.
-        if kind == ModuleKind::Relay {
+        if job == ModuleKind::Relay {
             y.allotment += self.tech_addition(seat, TechId::RelayNetworks);
         }
         let Some(col) = self.colony(cid) else { return y };
+        // Ticket #239 (version 0.08.3): the Arkwrights' Chorus, one more Influence in the
+        // Allotment for every `chorus_colonists` at its OWN Colony, rounded down -- the
+        // Observatory's rule for reading a Colony's people, not the Trade Post's rule for reading
+        // a Body's. The Allotment rather than Standing, which is what "+1 Influence" has meant
+        // since ticket #232: the Faction's diplomatic budget everywhere, not a hold on one place.
+        if kind == ModuleKind::Chorus && t.unique.chorus_colonists > 0 {
+            let extra = col.colonists as i64 / t.unique.chorus_colonists;
+            if extra > 0 {
+                y.allotment += extra;
+                y.detail = Some(format!("{} Colonists here, {extra} more Influence", col.colonists));
+            }
+        }
         // Ticket #57: the yield is the Colony Slot's own, not its Body's. The Body's figures are
         // what the slot drew from when the game started; a station in orbit keeps the Body's.
         if let Some(p) = &mc.produces {
-            if kind == ModuleKind::TradePost {
+            if job == ModuleKind::TradePost {
                 // Ticket #90 (version 0.06.0): trade is a network. `amount` Ducats per Colonist of
                 // the Faction at this Body, plus `per_other_body` for every other Body the Faction
                 // holds; no Body yield; the Faction's output multiplier applies.
@@ -325,6 +343,14 @@ impl Game {
                 y.resource = Some(Resource::Ducats);
                 y.amount = (raw as f64 * fac.output_multiplier).floor() as i64;
                 y.detail = Some(format!("{} x {here} Colonists + {per_other} x {others} Bodies", p.amount));
+                // Ticket #239 (version 0.08.3): the Prospectors' Exchange pays one more, flat and
+                // AFTER the multiplier, for the Academy's reason -- 1 through the largest output
+                // multiplier in the game floors back to 1, so a captured Exchange pays its captor
+                // exactly what it paid its builder.
+                if kind == ModuleKind::Exchange {
+                    y.amount += t.unique.exchange_ducats;
+                    y.detail = Some(format!("{} x {here} Colonists + {per_other} x {others} Bodies, and {} for the Exchange", p.amount, t.unique.exchange_ducats));
+                }
             } else if p.resource == Resource::Research {
                 // Ticket #80 (version 0.06.0): the Observatory. No Body yield and no output
                 // multiplier: its amount, plus one per cent for every Colonist at its Colony, times
@@ -352,10 +378,10 @@ impl Game {
                 // Ticket #89: a sun-scaled Module (the Solar Array) reads the sunlight where its
                 // Body stands instead of a Body yield, is silenced by a Solar Storm turn, and
                 // rounds to the nearest whole.
-                let yield_ = if mc.sun_scaled { self.sun_factor(col.body) } else { self.colony_yields(col).of_module(kind) };
-                let mut v = p.amount as f64 * yield_ * fac.output_multiplier * self.tech_output_multiplier_module(seat, kind);
+                let yield_ = if mc.sun_scaled { self.sun_factor(col.body) } else { self.colony_yields(col).of_module(job) };
+                let mut v = p.amount as f64 * yield_ * fac.output_multiplier * self.tech_output_multiplier_module(seat, job);
                 for d in &self.discoveries {
-                    if d.body == col.body && d.kind == kind {
+                    if d.body == col.body && d.kind == job {
                         v *= d.multiplier;
                     }
                 }
@@ -364,9 +390,16 @@ impl Game {
                 }
                 y.resource = Some(p.resource);
                 y.amount = if mc.sun_scaled { v.round() as i64 } else { v.floor() as i64 };
+                // Ticket #239 (version 0.08.3): the Archivists' Heliostat makes one more, added
+                // AFTER the inverse square scaling and after the rounding, so the point is worth
+                // the same at every distance rather than 0.43 at Mars and 1.91 at Venus. A Solar
+                // Storm silences a Heliostat as it silences a Solar Array: nothing is added to nought.
+                if kind == ModuleKind::Heliostat && y.amount > 0 {
+                    y.amount += t.unique.heliostat_energy;
+                }
                 // Ticket #92: a working Mass Driver at the Colony gives each Mine there more, after
                 // everything.
-                if kind == ModuleKind::Mine && col.modules.iter().any(|m| m.kind == ModuleKind::MassDriver && m.working()) {
+                if job == ModuleKind::Mine && col.modules.iter().any(|m| m.kind == ModuleKind::MassDriver && m.working()) {
                     y.amount += t.mass_driver.mine_bonus;
                 }
             }
