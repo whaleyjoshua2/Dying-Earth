@@ -9029,6 +9029,24 @@ fn the_arkwrights_signature_rule_is_coach_class_and_says_steerage_nowhere() {
     }
 }
 
+// -------------------------------------------- 0.08.4 ticket #260: a motto on every card
+
+/// Ticket #260 (version 0.08.4): every Faction's card carries a motto, one line, its own. A guard,
+/// since a motto moves no mechanic and no other test would notice one going missing or two cards
+/// sharing one.
+#[test]
+fn every_faction_card_carries_a_motto_of_its_own() {
+    let g = game();
+    let mut seen = std::collections::BTreeSet::new();
+    for kind in FactionKind::ALL {
+        let c = g.tables.faction(kind);
+        assert!(!c.motto.trim().is_empty(), "{kind:?} has no motto");
+        assert!(c.motto.len() <= 48, "{kind:?}'s motto is a sentence, not a paragraph: {}", c.motto);
+        assert_ne!(c.motto, c.blurb, "{kind:?}'s motto restates its blurb");
+        assert!(seen.insert(c.motto.clone()), "{kind:?} shares its motto with another Faction");
+    }
+}
+
 // -------------------------------------------- 0.08.3 ticket #235: the Research Directive
 
 /// Ticket #235 (version 0.08.3): every Faction may send a share of its Research somewhere other

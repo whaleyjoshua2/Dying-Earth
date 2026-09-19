@@ -362,6 +362,10 @@ pub struct FactionCard {
     pub id: FactionKind,
     pub name: String,
     pub blurb: String,
+    /// Ticket #260 (version 0.08.4): what the Faction says of itself, one line, on the card under
+    /// its name. The blurb says what it does; the motto is the Faction speaking.
+    #[serde(default)]
+    pub motto: String,
     /// Ticket #210 (version 0.08.1): the prefix every Ship of this Faction wears in front of its
     /// name. It belongs to the HOLDER, not the hull -- a name travels with the ship, a prefix with
     /// whoever flies it -- so it is read from the seat at drawing time and never stored on the Ship.

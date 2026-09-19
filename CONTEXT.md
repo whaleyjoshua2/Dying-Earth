@@ -245,6 +245,10 @@ _Avoid_: building, structure, facility, improvement
 **Ship**:
 A persistent piece that travels between Bodies. It is one of four types since version 0.04: Colony Ship, Carrier, Frigate or Battleship. It is built only at a Shipyard, on a Space Station or a Colony. It is not consumed on arrival; damage it takes persists until repaired.
 _Avoid_: vessel, rocket, fleet, expedition
+**Motto**:
+One line a Faction says of itself, under its name on the selection card and in the in-game rulebook, since version 0.08.4 -- the Custodians' *Leave it better than we found it*, the Prospectors' *Everything has a price. We find it*, the Arkwrights' *Nothing left behind but the Earth*, the Archivists' *Everyone remembered*. It is the Faction speaking, where the blurb beneath it is the rules describing the Faction; it appears nowhere else.
+_Avoid_: slogan, tagline, catchphrase
+
 **Ship name**:
 The name a Ship is given when it is built, since version 0.08.1, drawn from one of two lists -- the ships of exploration for a Colony Ship, the ships of the line for a Frigate, a Battleship and the Carrier. It is unique across the whole board and is taken as the first unused name in list order, which draws no randomness and so cannot shift a seeded game. The **prefix** in front of it belongs to whoever flies the ship and is its Faction's -- TSV, PMV, ARK, ACV -- where the name belongs to the hull. The Ship's id survives on every hover, since a save file, a log line and the Report all speak in ids.
 _Avoid_: callsign, registry, hull number, designation

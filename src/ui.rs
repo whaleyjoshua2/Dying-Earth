@@ -1419,6 +1419,11 @@ fn faction_heading(ui: &mut Ui, session: &Session, kind: FactionKind, glyph: f32
 /// belong to the setup screen alone -- the `Play the X` button and the Custodians' tutorial tick.
 fn faction_rulebook(ui: &mut Ui, session: &Session, kind: FactionKind) {
     let card = session.tables.faction(kind);
+    // Ticket #260 (version 0.08.4): the motto, directly under the name -- which the caller has just
+    // drawn -- in italics and the Faction's own colour, before the blurb: the one line on the card
+    // where the Faction speaks rather than the rules describing it. The designer: "yes that
+    // exactly"; and here and nowhere else, since the rulebook is this same code in-game.
+    ui.label(RichText::new(&card.motto).italics().color(rgb(card.colour)));
     ui.label(&card.blurb);
     ui.add_space(6.0);
     ui.label(RichText::new("Multipliers").strong());
