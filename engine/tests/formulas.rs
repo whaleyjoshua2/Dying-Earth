@@ -2979,11 +2979,8 @@ fn b_a_scrubbers_removal_is_credited_and_blame_floors_at_zero() {
     assert_eq!(g.seats[0].blame_removed, removed, "the Climate phase banks what was removed");
     assert!(g.seats[0].blame_emitted > 0.0, "East Asia's industry is still theirs");
     assert_eq!(g.blame(Seat(0)), 0.0, "removing more than you emitted floors Blame at zero");
-    assert!(
-        (g.blame_credit(Seat(0)) - (removed - g.seats[0].blame_emitted)).abs() < 1e-9,
-        "and shows as a credit of {:.1} ppm",
-        g.blame_credit(Seat(0))
-    );
+    // Ticket #265 (version 0.08.4): the credit is what was REMOVED, not the surplus past what was emitted.
+    assert!((g.blame_credit(Seat(0)) - removed).abs() < 1e-9, "and shows what was removed as a credit of {:.1} ppm", g.blame_credit(Seat(0)));
 }
 
 /// (c) The share and the multiplier: an even quarter each is x1.0, half the table x1.25, the whole
@@ -9027,6 +9024,47 @@ fn the_arkwrights_signature_rule_is_coach_class_and_says_steerage_nowhere() {
             assert!(!text.to_lowercase().contains("steerage"), "{kind:?} still says Steerage: {text}");
         }
     }
+}
+
+// -------------------------------------------- 0.08.4 ticket #265: Blame and Blame credit
+
+/// Ticket #265 (version 0.08.4): Blame credit is what a Faction has REMOVED, not what it removed
+/// beyond everything it emitted -- a figure measured at zero in ten of ten games. A seat that
+/// emitted 100 and removed 40 is answerable for 60 and holds 40 in credit.
+#[test]
+fn blame_credit_is_what_a_faction_has_removed() {
+    let mut g = game();
+    g.seats[0].blame_emitted = 100.0;
+    g.seats[0].blame_removed = 40.0;
+    assert!((g.blame(Seat(0)) - 60.0).abs() < 1e-9, "answerable for what it emitted less what it removed");
+    assert!((g.blame_credit(Seat(0)) - 40.0).abs() < 1e-9, "and holds what it removed in credit: {}", g.blame_credit(Seat(0)));
+    g.seats[0].blame_removed = 0.0;
+    assert_eq!(g.blame_credit(Seat(0)), 0.0, "nothing removed, no credit");
+}
+
+/// Ticket #265 (version 0.08.4): what the Custodians' Research Directive has added to the Natural
+/// Sink counts as their removal at every Climate phase -- "credit", the designer said -- so a
+/// Custodian who has bought half a ppm of Sink is credited half a ppm a turn from then on.
+#[test]
+fn the_custodians_directive_into_the_sink_counts_as_removal_every_climate_phase() {
+    let mut g = game();
+    calm(&mut g);
+    quiet_world(&mut g);
+    let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    g.seats[cus.index()].directive_sink = 0.5;
+    let before = g.seats[cus.index()].blame_removed;
+    g.climate_phase();
+    assert!((g.seats[cus.index()].blame_removed - before - 0.5).abs() < 1e-9, "half a ppm credited: {} -> {}", before, g.seats[cus.index()].blame_removed);
+    g.climate_phase();
+    assert!((g.seats[cus.index()].blame_removed - before - 1.0).abs() < 1e-9, "and again the next phase, for good");
+    // A directive of 10 Research at the card's rate buys that much Sink and that much standing credit.
+    let rate = g.tables.research_directive.custodians_ppm_per_point;
+    g.seats[cus.index()].research_directive = 50;
+    let sink_before = g.climate.natural_sink;
+    let bought = g.spend_research_directive(cus, 20);
+    assert_eq!(bought, 10, "half of 20 directed");
+    assert!((g.climate.natural_sink - sink_before - 10.0 * rate).abs() < 1e-9);
+    assert!((g.seats[cus.index()].directive_sink - 0.5 - 10.0 * rate).abs() < 1e-9, "the enlargement is remembered as theirs: {}", g.seats[cus.index()].directive_sink);
 }
 
 // -------------------------------------------- 0.08.4 ticket #264: the Victory history

@@ -42,10 +42,12 @@ impl Game {
         // Ticket #53: Blame. Each Faction takes on what the sources it controls emitted this turn
         // and is credited with what it removed; both totals stand for the whole game. Ticket #54:
         // what it removed is its Scrubbers, read off the same board `emissions_now` just read.
+        // Ticket #265 (version 0.08.4): and what its Research Directive has added to the Natural
+        // Sink, which takes that much out of the air every phase it stands.
         let removed_by_seat = self.scrubber_removal_by_seat();
         for seat in Seat::ALL {
             let i = seat.index();
-            let (emitted, removed) = (breakdown.by_seat[i], removed_by_seat[i]);
+            let (emitted, removed) = (breakdown.by_seat[i], removed_by_seat[i] + self.seat(seat).directive_sink);
             let s = self.seat_mut(seat);
             s.blame_emitted += emitted;
             s.blame_removed += removed;

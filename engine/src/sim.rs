@@ -35,6 +35,10 @@ pub struct SimResult {
     /// share puts on its Influence thresholds; and how many neutral states developed themselves.
     pub blame: [f64; SEAT_COUNT],
     pub blame_share: [f64; SEAT_COUNT],
+    /// Ticket #265 (version 0.08.4): what each seat removed over the game, and the credit -- removed
+    /// beyond everything emitted -- it holds at the end. Both were unmeasured before this ticket.
+    pub blame_removed: [f64; SEAT_COUNT],
+    pub blame_credit: [f64; SEAT_COUNT],
     pub threshold_multiplier: [f64; SEAT_COUNT],
     pub developments: u32,
     /// Ticket #54: Scrubbers completed, Mothballs, Restarts and Decommissions landed, Leapfrogs
@@ -381,6 +385,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     // Ticket #53: Blame as it stands at the end, and the neutral states that developed themselves.
     let blame = Seat::ALL.map(|s| game.blame(s));
     let blame_share = Seat::ALL.map(|s| game.blame_share(s));
+    let blame_removed = Seat::ALL.map(|s| game.seat(s).blame_removed);
+    let blame_credit = Seat::ALL.map(|s| game.blame_credit(s));
     let threshold_multiplier = Seat::ALL.map(|s| game.blame_threshold_multiplier(s));
     let developments = game.log.iter().filter(|l| l.contains(" raised its Industry Level to ")).count() as u32;
     // Ticket #54, read off the log the same way the #52 and #53 figures are.
@@ -483,6 +489,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         population_moved,
         blame,
         blame_share,
+        blame_removed,
+        blame_credit,
         threshold_multiplier,
         developments,
         scrubbers,

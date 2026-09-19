@@ -348,6 +348,9 @@ impl Game {
                 // For GOOD, not for the turn. The Sink itself moves, as a Break moves it.
                 let ppm = want as f64 * t.custodians_ppm_per_point;
                 self.climate.natural_sink += ppm;
+                // Ticket #265 (version 0.08.4): remembered as this seat's, and credited to its
+                // removal at every Climate phase from now on -- "credit", the designer said.
+                self.seat_mut(seat).directive_sink += ppm;
                 let sink = self.climate.natural_sink;
                 let text = self.say("directive_sink", &[("faction", name), ("research", want.to_string()), ("ppm", format!("{ppm:.2}")), ("sink", format!("{sink:.2}"))]);
                 self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);

@@ -725,6 +725,12 @@ pub struct SeatState {
     /// Ticket #264 (version 0.08.4): this seat's Victory history, one record per Climate phase.
     #[serde(default)]
     pub victory_history: Vec<VictoryRecord>,
+    /// Ticket #265 (version 0.08.4): the ppm a turn this seat's Research Directive has added to the
+    /// Natural Sink, for good, over the whole game -- the Custodians' alone. Counted as removal at
+    /// every Climate phase, at the designer's word ("credit"), since that enlargement takes that
+    /// much CO2 out of the air every turn it stands.
+    #[serde(default)]
+    pub directive_sink: f64,
     /// Ticket #227 (version 0.08.2): units this seat has bought and sold through the Trading window
     /// over the whole game. Kept because floating prices are only fair if more than one hand is on
     /// them, and the sweep had no way to say whose were.
@@ -1053,6 +1059,7 @@ impl Game {
             sea_wall_upkeep_owed: 0.0,
             rival_steps_announced: [false; 2],
             victory_history: Vec::new(),
+            directive_sink: 0.0,
             bought_units: 0,
             sold_units: 0,
             spaceport_influence: 0,
@@ -2431,11 +2438,15 @@ impl Game {
         (s.blame_emitted - s.blame_removed).max(0.0)
     }
 
-    /// Ticket #53: the ppm a Faction removed beyond everything it ever emitted, which is what the
-    /// panels call a credit. Zero for everyone who has emitted more than they took back.
+    /// Ticket #53 defined the credit as the ppm removed BEYOND everything ever emitted -- and
+    /// ticket #265 (version 0.08.4) measured it at zero in ten games of ten: the Custodians scrub a
+    /// third to a half of what they emit, never more than all of it. At the designer's word the
+    /// credit is now what the Faction has REMOVED, full stop -- its Scrubbers' ppm over the game,
+    /// and the Custodians' Directive into the Sink -- so the word has a figure in every game, and
+    /// a carbon credit has a supply that exists. Blame itself is unchanged: emitted less removed,
+    /// never below nothing.
     pub fn blame_credit(&self, seat: Seat) -> f64 {
-        let s = self.seat(seat);
-        (s.blame_removed - s.blame_emitted).max(0.0)
+        self.seat(seat).blame_removed.max(0.0)
     }
 
     /// Ticket #53: the four Factions' Blame added together.

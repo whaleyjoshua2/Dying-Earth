@@ -6463,8 +6463,9 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         // (*"faction windows leave climate as is"*), being a four-Faction comparison read
         // occasionally rather than a page a player sits on, and the top bar's Influence hover keeps
         // its longer wording. Nothing is deleted.
-        ui.label(RichText::new("Blame").strong())
-            .on_hover_text("A share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again.");
+        // Ticket #265 (version 0.08.4): the hover names what Blame is, what the credit is, and the
+        // two rules that read it.
+        ui.label(RichText::new("Blame").strong()).on_hover_text("Blame is the CO2 this Faction is answerable for: everything the sources it controlled emitted, less everything it removed.\nWhat it removed -- its Scrubbers, and for the Custodians what their Research Directive adds to the Natural Sink -- is its Blame credit.\nTwo rules read Blame: a share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again;\nand every rival thinks a point worse of it for each step its share stands above that quarter, each by its own measure.");
         let share = game.blame_share(seat);
         ui.horizontal(|ui| {
             ui.add(
@@ -6473,8 +6474,15 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
                     .fill(seat_colour(session, seat))
                     .text(RichText::new(format!("{:.0}%", share * 100.0)).color(Color32::BLACK)),
             );
-            let credit = game.blame_credit(seat);
-            let line = if credit > 0.0 { format!("Blame 0 ppm, credit {credit:.0} ppm") } else { format!("Blame {:.0} ppm, thresholds x{:.2}", game.blame(seat), game.blame_threshold_multiplier(seat)) };
+            // Ticket #265 (version 0.08.4): answerable for, then how it got there, then the credit.
+            let s = game.seat(seat);
+            let line = format!(
+                "Answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit), thresholds x{:.2}",
+                game.blame(seat),
+                s.blame_emitted,
+                game.blame_credit(seat),
+                game.blame_threshold_multiplier(seat)
+            );
             figures_with_icons(ui, &line, 14.0, ui.visuals().weak_text_color(), &[("ppm", "emissions")]);
         });
         ui.add_space(6.0);
@@ -6795,31 +6803,20 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             ui.label(format!("Stabilization run: {} consecutive turn(s) under the Sink.", game.seat(Seat(0)).stabilization_run));
             // Ticket #53: Blame, Faction by Faction, in the panel that attributes the Emissions.
             ui.separator();
-            ui.label(RichText::new("Blame: the CO2 each Faction is answerable for").strong());
+            ui.label(RichText::new("Blame: the CO2 each Faction is answerable for").strong()).on_hover_text("Blame is the CO2 this Faction is answerable for: everything the sources it controlled emitted, less everything it removed.\nWhat it removed -- its Scrubbers, and for the Custodians what their Research Directive adds to the Natural Sink -- is its Blame credit.\nTwo rules read Blame: a share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again;\nand every rival thinks a point worse of it for each step its share stands above that quarter, each by its own measure.");
             for seat in Seat::ALL {
                 let s = game.seat(seat);
-                let credit = game.blame_credit(seat);
-                let line = if credit > 0.0 {
-                    format!(
-                        "{}: emitted {:.0} ppm, removed {:.0} ppm, Blame 0 ppm, credit {:.0} ppm, share {:.2}, thresholds x{:.2}",
-                        game.seat_name(seat),
-                        s.blame_emitted,
-                        s.blame_removed,
-                        credit,
-                        game.blame_share(seat),
-                        game.blame_threshold_multiplier(seat)
-                    )
-                } else {
-                    format!(
-                        "{}: emitted {:.0} ppm, removed {:.0} ppm, Blame {:.0} ppm, share {:.2}, thresholds x{:.2}",
-                        game.seat_name(seat),
-                        s.blame_emitted,
-                        s.blame_removed,
-                        game.blame(seat),
-                        game.blame_share(seat),
-                        game.blame_threshold_multiplier(seat)
-                    )
-                };
+                // Ticket #265 (version 0.08.4): one form for every seat -- answerable for, how it
+                // got there, and what it holds in credit -- at the designer's word.
+                let line = format!(
+                    "{}: answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit); share {:.2}, thresholds x{:.2}",
+                    game.seat_name(seat),
+                    game.blame(seat),
+                    s.blame_emitted,
+                    game.blame_credit(seat),
+                    game.blame_share(seat),
+                    game.blame_threshold_multiplier(seat)
+                );
                 // Ticket #112 (version 0.07.1): each Faction's ppm figures wear the Emissions
                 // glyph, so the figure a Faction is answerable for is marked as the same thing the
                 // Facility lists and the top bar count. "share" and "thresholds" are not ppm and
