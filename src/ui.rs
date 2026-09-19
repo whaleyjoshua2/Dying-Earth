@@ -6142,6 +6142,12 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // legend follows it, so the top never goes empty and never half-empties either.
             match game.research.current {
                 Some(_) => {
+                    // Ticket #242 (version 0.08.3): the bar says what it is. Ticket #219 put it at
+                    // the top of this window with its shares and legend beneath, and nothing there
+                    // named the quantity -- a reader saw a coloured bar and four percentages and
+                    // had to infer that the subject was Research. The designer: "let's add a
+                    // subheading at the top of the tech tree indicating the bar is research share".
+                    ui.label(RichText::new("Research share").strong());
                     research_race_bar(ui, session, game, ui.available_width(), true);
                     research_shares(ui, session, game);
                 }

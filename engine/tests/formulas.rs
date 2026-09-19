@@ -5198,6 +5198,12 @@ fn coastal_engineering_sits_on_rung_one_below_its_rungs_cost_with_no_prerequisit
     assert!(t.needs.is_empty(), "no prerequisite: {:?}", t.needs);
     assert!(g.available_techs().contains(&TechId::CoastalEngineering), "pickable from the first turn");
     assert_eq!(g.tables.tech(TechId::CleanPower).needs, vec![TechId::EfficientGrids]);
+    // Ticket #242 (version 0.08.3): Green Consensus dropped Clean Power, and with it the whole
+    // foot of the Industry branch, at the designer's word -- "Efficient grids is no longer
+    // required for green consensus". Pinned because it moves the Custodians' Victory gate:
+    // Planetary Stewardship now hangs off Society alone.
+    assert_eq!(g.tables.tech(TechId::GreenConsensus).needs, vec![TechId::PublicScience], "Society alone since ticket #242");
+    assert_eq!(g.tables.tech(TechId::PlanetaryStewardship).needs, vec![TechId::GreenConsensus], "and the gate above it is unchanged");
     let w = g.tables.facility(FacilityKind::SeaWall);
     assert_eq!((w.materials, w.build_turns), (20, 2), "20 Materials since ticket #77");
 }
@@ -5953,7 +5959,9 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     let g = game();
     let gates = [
         (FactionKind::Custodians, TechId::PlanetaryStewardship, vec![TechId::GreenConsensus]),
-        (FactionKind::Prospectors, TechId::ExtractionCharter, vec![TechId::AutomatedRefining]),
+        // Ticket #242 (version 0.08.3): Beneficiation joined, so the new Tech sits in the
+        // branch's spine rather than being a leaf nobody has to take.
+        (FactionKind::Prospectors, TechId::ExtractionCharter, vec![TechId::AutomatedRefining, TechId::Beneficiation]),
         (FactionKind::Arkwrights, TechId::GenerationShips, vec![TechId::ClosedLoopColonies]),
         (FactionKind::Archivists, TechId::TheUpload, vec![TechId::PublicScience, TechId::ExpandedHabitats]),
     ];

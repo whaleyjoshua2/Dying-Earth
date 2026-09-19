@@ -30,6 +30,9 @@ Living** and **Extraction** a second rung-2 Tech each, taking the tree from **se
 | [`before-overflow-800.png`](before-overflow-800.png) | 1280x800, before the fix. **The whole Society branch is off the bottom of the screen** — Public Science, Green Consensus, Civil Defense and two Victory gates — with no scrollbar and the window fixed at `resizable(false)`. |
 | [`before-fits-1080.png`](before-fits-1080.png) | 1920x1080, before the fix. All five branches fit, **with about thirty pixels to spare**. This is the size the game opens maximised into, which is why the defect was invisible to anyone playing on a large screen. |
 | [`after-scroll-800.png`](after-scroll-800.png) | 1280x800, with the tree scrolling inside a screen-bounded window: four branches and the head of the fifth, the rest a scroll away. |
+| [`after-shrink-1080.png`](after-shrink-1080.png) | 1920x1080, every layout figure and box font a tenth smaller. All five branches with real headroom below Civil Defense, and the two longest names -- **Closed-Loop Colonies** and **The Extraction Charter** -- still inside their boxes, which is what had to be checked since box text is not clipped. |
+| [`after-shrink-800.png`](after-shrink-800.png) | 1280x800 at nine tenths: four branches and the head of Society, against two branches before the scroll bound was fixed. |
+| [`after-edges-1080.png`](after-edges-1080.png) | The tree with the `Research share` subheading over the bar, **Green Consensus hanging off Public Science alone**, and **Beneficiation feeding The Extraction Charter** (drawn `locked`, since Beneficiation is not yet done in that game). |
 
 ## What was done
 

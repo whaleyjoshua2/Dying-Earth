@@ -179,7 +179,12 @@ name = "Green Consensus"
 branch = "Society"
 rung = 2
 cost = 32
-needs = ["public_science", "clean_power"]
+# Ticket #242 (version 0.08.3): Clean Power is no longer a prerequisite, at the designer's word --
+# "Efficient grids is no longer required for green consensus". Clean Power NEEDS Efficient Grids,
+# so requiring it required the whole foot of the Industry branch; dropping it frees the Society
+# line, and with it PLANETARY STEWARDSHIP, the Custodians' Victory gate, from Industry altogether.
+# That makes the Custodians' gate cheaper to reach, and they are the seat winning 37 of 80.
+needs = ["public_science"]
 effect = "Per-person Emissions x0.5; Influence thresholds x0.75; Heatwave loss halved"
 value = 0.5
 influence_threshold_multiplier = 0.75
@@ -242,7 +247,10 @@ name = "The Extraction Charter"
 branch = "Extraction"
 rung = 3
 cost = 48
-needs = ["automated_refining"]
+# Ticket #242 (version 0.08.3): Beneficiation joins Automated Refining as a prerequisite, at the
+# designer's word -- "beneficiation is now required for extraction charter". It gives the new Tech
+# a place in the branch's spine rather than leaving it a leaf nobody has to take.
+needs = ["automated_refining", "beneficiation"]
 effect = "Opens the Prospectors' Victory Condition; Mine output x1.25"
 value = 1.25
 gate_for = "prospectors"
