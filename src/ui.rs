@@ -3284,7 +3284,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         ),
         // Ticket #72.
         Order::SetVentureShare { share } => format!("Bank {share}% of Ducat income in the Venture Capital Fund"),
-        Order::DrawVenture { amount } => format!("Draw {amount} Ducats from the Venture Capital Fund"),
+        Order::DrawVenture { amount } => format!("Withdraw {amount} Ducats from the Venture Capital Fund"),
         // Ticket #52.
         Order::Relief { state } => format!("Relief in {}: Unrest -1", game.tables.state(*state).name),
         Order::Resettle { state } => format!("Resettle this turn's refugees in {}", game.tables.state(*state).name),
@@ -5984,6 +5984,94 @@ fn research_directive_control(ui: &mut Ui, session: &Session, game: &Game, actio
     }
 }
 
+/// Ticket #256 (version 0.08.4): **the Venture Capital Fund's controls** on the Victory window, the
+/// Prospectors only -- the share as a slider, and a withdrawal.
+///
+/// The share was a row of nine labels, 0% to 80% in tenths (ticket #72). The designer asked for a
+/// slider *"to allow finer control"*, mirroring the Research Directive's: the same full-width rail
+/// on a 0-to-100 scale in whole percents, with the part of the scale the rule does not allow --
+/// the top fifth, since `max_share` is 0.8 -- painted over in the grey the game uses for nobody's,
+/// so the bound is visible rather than implied. `share_step` in `factions.toml` is a hundredth now
+/// and the order takes whole percents; the AI's smallest-share-that-reaches-the-bar loop walks the
+/// same step.
+///
+/// The draw was one button that took ten, every time. It is **Withdraw** now, with a field for the
+/// amount as the Influence cluster has one, at the designer's word. The tenth lost on the way out is
+/// unchanged and the hover says what comes back.
+fn venture_fund_control(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    let me = Seat(0);
+    let v = game.tables.venture.clone();
+    let cap = (v.max_share * 100.0).round() as u32;
+    let standing = (game.seat(me).venture_share * 100.0).round() as u32;
+    let pending_set = session.pending.iter().find_map(|o| if let Order::SetVentureShare { share } = o { Some(*share) } else { None });
+    let mut share = pending_set.unwrap_or(standing);
+
+    ui.label(RichText::new(format!("Venture Capital Fund: banking {share}% of Ducat income")).strong()).on_hover_text(
+        "The share of each turn's Ducat income that goes into the Fund at Income, before you can spend a coin of it, from the next Income until you set it again. Ducats got by selling are not income and never reach it.",
+    );
+    // The same rail the Research Directive draws, a fifth larger than egui's default in both
+    // dimensions; see `research_directive_control` for why both figures matter.
+    let full = ui.available_width();
+    let (was_width, was_rail, was_interact) = (ui.spacing().slider_width, ui.spacing().slider_rail_height, ui.spacing().interact_size);
+    ui.spacing_mut().slider_width = full;
+    ui.spacing_mut().slider_rail_height = was_rail * 1.2;
+    ui.spacing_mut().interact_size.y = was_interact.y * 1.2;
+    let resp = ui.add(egui::Slider::new(&mut share, 0..=100).show_value(false));
+    ui.spacing_mut().slider_width = was_width;
+    ui.spacing_mut().slider_rail_height = was_rail;
+    ui.spacing_mut().interact_size = was_interact;
+    if cap < 100 {
+        // The fifth no share may reach, painted over the rail's top end in the Directive's grey.
+        let r = resp.rect;
+        let dim = egui::Rect::from_min_max(
+            egui::pos2(r.min.x + r.width() * cap as f32 / 100.0, r.center().y - ui.spacing().slider_rail_height * 0.6),
+            egui::pos2(r.max.x, r.center().y + ui.spacing().slider_rail_height * 0.6),
+        );
+        ui.painter().rect_filled(dim, 2.0, Color32::from_rgb(124, 104, 104));
+        ui.painter().line_segment(
+            [egui::pos2(dim.min.x, r.center().y - 9.0), egui::pos2(dim.min.x, r.center().y + 9.0)],
+            egui::Stroke::new(1.5, Color32::from_gray(120)),
+        );
+    }
+    share = share.min(cap);
+    let fund = game.seat(me).venture_fund;
+    let banked = game.seat(me).venture_banked_last_turn;
+    ui.label(
+        RichText::new(format!(
+            "The Fund holds {fund} Ducats; {banked} went in last turn.{}",
+            pending_set.filter(|p| *p != standing).map(|p| format!(" {p}% from the next Income.")).unwrap_or_default()
+        ))
+        .weak(),
+    );
+    if share != pending_set.unwrap_or(standing) {
+        if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetVentureShare { .. })) {
+            actions.push(Action::Cancel(i));
+        }
+        if share != standing {
+            let order = Order::SetVentureShare { share };
+            if game.check_order(me, &session.pending, &order).is_ok() {
+                actions.push(Action::Place(order));
+            }
+        }
+    }
+
+    // Withdraw: a field and a button, the Influence cluster's shape.
+    ui.horizontal(|ui| {
+        let most = fund - session.pending.iter().map(|o| if let Order::DrawVenture { amount } = o { *amount } else { 0 }).sum::<i64>();
+        ui.add(egui::DragValue::new(&mut view.venture_withdraw).range(1..=most.max(1)));
+        let order = Order::DrawVenture { amount: view.venture_withdraw };
+        let check = game.check_order(me, &session.pending, &order);
+        let back = (view.venture_withdraw as f64 * v.draw_return).floor() as i64;
+        let resp = ui.add_enabled(check.is_ok(), egui::Button::new("Withdraw from the Fund"));
+        if let Err(e) = &check {
+            resp.clone().on_disabled_hover_text(&e.0);
+        }
+        if resp.on_hover_text(format!("{back} Ducats come back to the Stockpile at End Turn; a tenth is lost on the way out.")).clicked() {
+            actions.push(Action::Place(order));
+        }
+    });
+}
+
 /// **The Faction window** (ticket #203, version 0.08.1), opened by `Factions (F)` on the top bar and
 /// by the F key. One Faction a page, chosen by the dropdown in its top right, which opens on the
 /// player's own seat.
@@ -6582,33 +6670,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.label(format!("{}: {}", p.second_name, p.second_text));
                 ui.add(egui::ProgressBar::new(p.second_fraction() as f32));
                 // Ticket #72: the Prospectors set their Venture Capital Fund's share here, and draw.
+                // Ticket #256 (version 0.08.4): a slider and a Withdraw field, in their own function.
                 if seat == Seat(0) && !session.spectator && game.kind(Seat(0)) == FactionKind::Prospectors {
-                    let v = game.tables.venture.clone();
-                    let now = (game.seat(Seat(0)).venture_share * 100.0).round() as u32;
-                    let pending_share = session.pending.iter().find_map(|o| if let Order::SetVentureShare { share } = o { Some(*share) } else { None });
-                    ui.horizontal_wrapped(|ui| {
-                        ui.label(format!("Banking {now}% of Ducat income{}:", pending_share.map(|p| format!(" ({p}% from next turn)")).unwrap_or_default()));
-                        let step = (v.share_step * 100.0).round().max(1.0) as u32;
-                        let max = (v.max_share * 100.0).round() as u32;
-                        let mut pct = 0u32;
-                        while pct <= max {
-                            if ui.selectable_label(pending_share.unwrap_or(now) == pct, format!("{pct}%")).clicked() {
-                                if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetVentureShare { .. })) {
-                                    actions.push(Action::Cancel(i));
-                                }
-                                if pct != now {
-                                    actions.push(Action::Place(Order::SetVentureShare { share: pct }));
-                                }
-                            }
-                            pct += step;
-                        }
-                    });
-                    let draw = Order::DrawVenture { amount: 10 };
-                    let ok = game.check_order(Seat(0), &session.pending, &draw).is_ok();
-                    let back = (10.0 * v.draw_return).floor() as i64;
-                    if ui.add_enabled(ok, egui::Button::new("Draw 10 from the Fund")).on_hover_text(format!("{back} Ducats come back to the Stockpile; a tenth is lost.")).clicked() {
-                        actions.push(Action::Place(draw));
-                    }
+                    venture_fund_control(ui, session, game, view, actions);
                 }
                 ui.add_space(8.0);
             }

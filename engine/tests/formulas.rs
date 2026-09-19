@@ -871,7 +871,7 @@ fn occupation_of_a_controlled_state_returns_it_to_its_owner_when_broken() {
 
 fn meet_first(g: &mut Game, seat: Seat) {
     match g.kind(seat) {
-        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 2000,
+        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 2500,
         FactionKind::Custodians => g.seats[seat.index()].stabilization_run = 3,
         FactionKind::Arkwrights => {}
         FactionKind::Archivists => g.seats[seat.index()].research_total = 150,
@@ -895,7 +895,7 @@ fn both_met_the_larger_margin_wins() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
     g.seats[0].stabilization_run = 3; // parts 1.0 and 1.0 -> margin 1.0
-    g.seats[1].venture_fund = 2400; // parts 1.2 and 1.25 -> margin 1.2
+    g.seats[1].venture_fund = 3000; // parts 1.2 and 1.25 -> margin 1.2 (ticket #256: the bar is 2500)
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
@@ -907,7 +907,7 @@ fn both_met_by_the_same_margin_is_a_draw() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     g.seats[0].stabilization_run = 3;
-    g.seats[1].venture_fund = 2400; // the lower fraction is the presence, 1.0, on both sides
+    g.seats[1].venture_fund = 3000; // the lower fraction is the presence, 1.0, on both sides (ticket #256: the bar is 2500)
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Draw { .. })), "{:?}", g.outcome);
@@ -1679,7 +1679,7 @@ fn more_than_one_seat_meeting_its_condition_gives_the_game_to_the_larger_margin(
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
     g.seats[0].stabilization_run = 3; // parts 1.0 and 1.0 -> margin 1.0
-    g.seats[1].venture_fund = 2400; // parts 1.2 and 1.25 -> margin 1.2
+    g.seats[1].venture_fund = 3000; // parts 1.2 and 1.25 -> margin 1.2 (ticket #256: the bar is 2500)
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
@@ -1696,7 +1696,7 @@ fn the_last_turn_ranks_every_seat_by_score() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 6);
     let p = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 9);
     let _ = p;
-    g.seats[1].venture_fund = 1500;
+    g.seats[1].venture_fund = 1875; // three quarters of the 2500 bar (ticket #256)
     colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat], 3);
     assert!((g.progress(Seat(1)).score() - 0.75).abs() < 1e-9, "{:?}", g.progress(Seat(1)).score());
     g.end_phase();
@@ -5269,7 +5269,9 @@ fn the_venture_capital_fund_banks_a_share_of_ducat_income_and_a_draw_returns_nin
     assert_eq!(g.seats[pro.index()].venture_fund, 0);
     // The share is an order, refused off the steps and to anyone else.
     assert_eq!(g.check_order(Seat(0), &[], &Order::SetVentureShare { share: 50 }).unwrap_err().0, "only the Prospectors have a Venture Capital Fund");
-    assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 15 }).is_err(), "not a step of 10");
+    // Ticket #256 (version 0.08.4): whole percents, so 15 is a share now; the cap is still 80.
+    assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 15 }).is_ok(), "a whole percent is a step");
+    assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 81 }).is_err(), "over 80");
     assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 90 }).is_err(), "over 80");
     assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 0 }).is_ok());
     assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 80 }).is_ok());
@@ -5306,18 +5308,18 @@ fn the_venture_capital_fund_banks_a_share_of_ducat_income_and_a_draw_returns_nin
 /// moved that bar from 750 to 1000, because the Investment Bank pays uncapped interest into the Fund
 /// and, measured over 40 games, nobody had ever reached 750 at all.
 #[test]
-fn two_thousand_ducats_in_the_fund_is_the_prospectors_first_part() {
+fn twenty_five_hundred_ducats_in_the_fund_is_the_prospectors_first_part() {
     let mut g = game();
     let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
     let card = g.tables.faction(FactionKind::Prospectors).victory_first;
-    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 2000.0));
+    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 2500.0));
     assert_eq!(card.kind.name(), "Venture Capital Fund");
-    g.seats[pro.index()].venture_fund = 800;
+    g.seats[pro.index()].venture_fund = 1000;
     let p = g.progress(pro);
-    assert_eq!((p.first_value, p.first_bar), (800.0, 2000.0));
+    assert_eq!((p.first_value, p.first_bar), (1000.0, 2500.0));
     assert!((p.first_fraction() - 0.4).abs() < 1e-9);
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 12);
-    g.seats[pro.index()].venture_fund = 2000;
+    g.seats[pro.index()].venture_fund = 2500;
     open_gates(&mut g);
     assert!(g.progress(pro).met());
     g.end_phase();
@@ -5345,7 +5347,10 @@ fn the_prospector_ai_sets_its_share_to_reach_the_fund_in_time_and_maxes_it_when_
         g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::Factory));
     }
     // Ticket #240 (version 0.08.3): DUCAT income is what the share is weighed against now.
-    g.seats[pro.index()].income_last_turn.ducats = 120;
+    // Ticket #256 (version 0.08.4): 120 to 200. At the bar of 2500, 120 a turn over the 24 turns left
+    // wants 87% and the seat maxes -- which is the AI READING the new bar, watched here when the
+    // bar moved and this line had not.
+    g.seats[pro.index()].income_last_turn.ducats = 200;
     g.seats[pro.index()].stockpile.energy = 500;
     g.turn = 4;
     let orders = g.ai_orders(pro);

@@ -339,6 +339,9 @@ pub struct ViewState {
     /// `load_state` so that choosing a Region on a Ship's card does not move it on a station's.
     pub lift_state: Option<StateId>,
     pub influence_amount: i64,
+    /// Ticket #256 (version 0.08.4): the Ducats the Withdraw field on the Victory window asks for,
+    /// kept as `influence_amount` is so the field remembers what was typed between frames.
+    pub venture_withdraw: i64,
     pub attack_preview: bool,
     /// Ticket #58: which Moment kinds are switched on, remembered for the session. `None` until the
     /// player touches a checkbox, when it is filled from the defaults in `report.toml`.
@@ -390,6 +393,7 @@ impl Default for ViewState {
             load_state: None,
             lift_state: None,
             influence_amount: 5,
+            venture_withdraw: 10,
             attack_preview: false,
             moments_on: None,
             force_hover: None,

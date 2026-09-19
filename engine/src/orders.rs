@@ -1680,7 +1680,7 @@ impl Game {
                         // Ducats. `draw_return` is unchanged: a tenth is still lost on the way out.
                         s.stockpile.ducats += back;
                     }
-                    let line = format!("The {} drew {} Ducats from the Venture Capital Fund; {} came back to the Stockpile.", self.seat_name(seat), amount, back);
+                    let line = format!("The {} withdrew {} Ducats from the Venture Capital Fund; {} came back to the Stockpile.", self.seat_name(seat), amount, back);
                     self.log(line);
                 }
                 Order::Leapfrog { state } => {

@@ -67,17 +67,21 @@ ducats_multiplier = 1.2
 market_multiplier = 0.85
 # Ticket #221: zero. They do not mind another Faction's Blame at all, which is a statement about them.
 resentment = 0.0
-signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit is free and may be taken once in a Region's whole life: for three turns every Facility there produces double, and when it ends that Region's Baseline Emissions rise by 0.2 for good and its Unrest by 3. The Venture Capital Fund: each turn they set what share of their Ducat income is banked in it, 0% to 80% in tenths; a draw returns nine tenths."
+signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit is free and may be taken once in a Region's whole life: for three turns every Facility there produces double, and when it ends that Region's Baseline Emissions rise by 0.2 for good and its Unrest by 3. The Venture Capital Fund: each turn they set what share of their Ducat income is banked in it, 0% to 80% in whole percents; a withdrawal returns nine tenths."
 # Ticket #203 (version 0.08.1). The building is ticket #182's.
 unique = "Investment Bank -- replaces the Bank, and banks 1% interest a turn on the Venture Capital Fund's balance, one building per Region paying, never less than 1 Material in all. Off Earth, the Exchange -- replaces the Trade Post, and pays 1 more Ducat a turn."
 # Ticket #72: the Extraction Total is retired; the first part is Materials banked in the Fund.
-victory = "2000 Ducats in the Venture Capital Fund, plus 12 Colonists living off Earth."
+victory = "2500 Ducats in the Venture Capital Fund, plus 12 Colonists living off Earth."
 # Ticket #182 (version 0.08.0): 750 to 1000, because the Investment Bank pays uncapped interest
 # on the Fund. Measured first: in 40 games nobody EVER reached 750 -- the highest balance ever
 # seen was 745, the median game ended around turn 28 with the Fund in the 400s, and the
 # Prospectors won 0 of 80. The bar rises to keep the Fund a race rather than a formality now
 # that a Bank in each of ten Regions pays around 44 Materials a turn by turn 24.
-victory_first = { kind = "venture_fund", bar = 2000 }
+# Ticket #256 (version 0.08.4): 2000 to 2500 at the designer's word, a deliberate stretch. Measured
+# first: at 2000 the median computer seat ended just across the line (2049 and 2145 in the two
+# seatings read) and the Prospectors won 30 of 80, the most of any seat. At 2500 the median game
+# ends short; "other things will bolster their output". The AI reads this figure, not a copy of it.
+victory_first = { kind = "venture_fund", bar = 2500 }
 victory_second = { kind = "off_world_presence", bar = 12 }
 colour = [0.85, 0.5, 0.2]
 
@@ -267,7 +271,9 @@ accord_kept_turns = 4
 
 [venture_capital]
 max_share = 0.8
-share_step = 0.1
+# Ticket #256 (version 0.08.4): a tenth to a hundredth. The share is a slider now, mirroring the
+# Research Directive's, and "the entire point of the slider is to allow finer control".
+share_step = 0.01
 draw_return = 0.9
 
 # Ticket #73 (version 0.05.5): Pioneers. Colonists are built: a Faction recruits up to `per_turn` a

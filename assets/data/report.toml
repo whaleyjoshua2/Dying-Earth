@@ -165,7 +165,9 @@ build_emigrants = "recruited {n} Pioneers in {state}"
 send_antarctica = "sent {n} Pioneers from {state} to Antarctica by sea"
 lift_station = "lifted {n} Pioneers from {state} to {station}"
 set_venture_share = "set the Venture Capital Fund to bank {share}% of its Materials output"
-draw_venture = "drew {n} Materials from the Venture Capital Fund"
+# Ticket #256 (version 0.08.4): "withdrew", and DUCATS -- this line still said Materials a version
+# after ticket #240 moved the Fund, which nobody saw because no sweep reads the Report.
+draw_venture = "withdrew {n} Ducats from the Venture Capital Fund"
 repair = "repaired {unit}"
 transit = "sent a {unit} to {body}"
 # Ticket #87 (version 0.06.0): the Refuel order.
