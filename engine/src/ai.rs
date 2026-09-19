@@ -870,6 +870,22 @@ impl Game {
                     }
                     ModuleKind::Mine => {
                         let mut w = self.base_weight(seat, Cat::Producer) * self.production_moved_boost(seat, &col, mk);
+                        // Ticket #232 (version 0.08.3): a Mine's weight reads WHAT ITS TECHS ARE
+                        // WORTH, so every multiplier on it moves the seat's appetite. Before this
+                        // the weight was flat, and the consequence was not small: Deep Mining's
+                        // x1.5 and the Extraction Charter's x1.25 had never once made a computer
+                        // seat want a Mine more, which is the likeliest reason the sweep found 26
+                        // Mines standing across forty games. The designer, asked whether to fix
+                        // Beneficiation alone or the whole gap: "let's fix that one outright".
+                        //
+                        // It reads the TECH factor and never the finished yield. The finished
+                        // yield carries the SLOT's own yield, which is at least 1 everywhere, so a
+                        // weight scaled by it lifts every Mine on the board with no Tech at all.
+                        // Built that way first and measured: Mines standing over twenty games went
+                        // 16 to 329, and the seating's win column swung from [14, 2, 0, 0] to
+                        // [0, 18, 0, 0]. With the tech factor alone it is 1.0 until Deep Mining
+                        // lands and 2.06 with all three.
+                        w *= self.tech_output_multiplier_module(seat, ModuleKind::Mine);
                         if col.modules.iter().any(|m| m.kind == ModuleKind::MassDriver && m.working()) {
                             // The yield here already carries the bonus; weigh it against the bare figure.
                             let with = self.module_yield(seat, cid, ModuleKind::Mine).amount as f64;
@@ -879,7 +895,19 @@ impl Game {
                         (Cat::Producer, w)
                     }
                     ModuleKind::Generator | ModuleKind::Refinery => (Cat::Producer, self.base_weight(seat, Cat::Producer) * self.production_moved_boost(seat, &col, mk)),
-                    ModuleKind::Relay => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
+                    // Ticket #232 (version 0.08.3): the Relay has the same disease the Mine had and
+                    // worse -- a flat weight reading nothing about what a Relay produces, and ONE
+                    // Relay built in forty games. Relay Networks would have changed the computer's
+                    // behaviour by exactly zero without this. The designer: "this should resolve
+                    // with Q5 full fix".
+                    ModuleKind::Relay => {
+                        // A Relay's Allotment has no slot component -- it is the card figure plus
+                        // Relay Networks -- so this ratio IS the tech factor: 1.0 until the Tech
+                        // lands, 2.0 after.
+                        let bare = self.tables.module(ModuleKind::Relay).influence_allotment.max(1) as f64;
+                        let with = self.module_yield(seat, cid, ModuleKind::Relay).allotment as f64;
+                        (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence) * (with / bare).max(0.25))
+                    }
                     // Ticket #51: the Archive is never an ordinary Module build; it has its own order.
                     // Ticket #164 (version 0.07.5): nor is the Core Module, which a founding gives.
                     ModuleKind::Archive | ModuleKind::Core => continue,

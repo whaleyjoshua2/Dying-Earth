@@ -291,6 +291,13 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
         let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None };
+        // Ticket #232 (version 0.08.3): Relay Networks takes a Relay's Allotment from 1 to 2. Its
+        // Standing is untouched: Standing holds one particular place, where the Allotment is the
+        // Faction's whole diplomatic budget, and "+1 influence" reads as the budget everywhere
+        // else in the game.
+        if kind == ModuleKind::Relay {
+            y.allotment += self.tech_addition(seat, TechId::RelayNetworks);
+        }
         let Some(col) = self.colony(cid) else { return y };
         // Ticket #57: the yield is the Colony Slot's own, not its Body's. The Body's figures are
         // what the slot drew from when the game started; a station in orbit keeps the Body's.
@@ -501,7 +508,12 @@ impl Game {
         m
     }
 
-    fn tech_output_multiplier_module(&self, seat: Seat, kind: ModuleKind) -> f64 {
+    /// Ticket #232 (version 0.08.3): `pub(crate)` so the AI can read the TECH-ONLY factor when
+    /// weighing a build. It must not read the finished yield instead: that carries the slot's own
+    /// yield, which is at least 1 everywhere, so a weight scaled by it would lift every Mine on
+    /// the board with no Tech researched at all. Measured when this was built the wrong way round:
+    /// Mines standing over twenty games went from 16 to 329.
+    pub(crate) fn tech_output_multiplier_module(&self, seat: Seat, kind: ModuleKind) -> f64 {
         let mut m = 1.0;
         // Ticket #89: a Solar Array reads the Sun as a Generator does.
         if matches!(kind, ModuleKind::Generator | ModuleKind::SolarArray) {
@@ -510,7 +522,12 @@ impl Game {
         match kind {
             ModuleKind::Generator | ModuleKind::SolarArray => m *= self.tech_multiplier(seat, TechId::EfficientGrids),
             // Ticket #84: the Extraction Charter stacks on Deep Mining.
-            ModuleKind::Mine => m *= self.tech_multiplier(seat, TechId::DeepMining) * self.tech_multiplier(seat, TechId::ExtractionCharter),
+            // Ticket #232 (version 0.08.3): and Beneficiation stacks on both, INSIDE this one
+            // chain, so the whole product is floored once by the caller. A tenth applied after a
+            // rounding would have been nothing at all on a small Colony.
+            ModuleKind::Mine => {
+                m *= self.tech_multiplier(seat, TechId::DeepMining) * self.tech_multiplier(seat, TechId::ExtractionCharter) * self.tech_multiplier(seat, TechId::Beneficiation)
+            }
             ModuleKind::Refinery => m *= self.tech_multiplier(seat, TechId::AutomatedRefining),
             _ => {}
         }

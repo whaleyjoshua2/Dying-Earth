@@ -268,3 +268,48 @@ needs = ["public_science", "expanded_habitats"]
 effect = "Opens the Archivists' Victory Condition; Research Lab and Observatory output x1.25"
 value = 1.25
 gate_for = "archivists"
+
+# Ticket #232 (version 0.08.3): the nineteenth and twentieth Techs, both on rung 2 at the rung's
+# price. Appended last, and their enum variants with them: `Tables::tech` indexes TechId by
+# discriminant, so a row inserted in the middle would silently re-point every Tech after it.
+
+# Beneficiation, Extraction rung 2. Every Mine makes a tenth more, ANTARCTICA INCLUDED.
+#
+# The designer's list said "a tech under extraction that boosts off world mines by 10%", and the
+# measurement is why this counts Antarctica anyway. Of sixteen Mines standing at the end of twenty
+# games, THIRTEEN were Antarctic and three were off Earth -- so an off-world-only clause would have
+# reached 0.15 Mines a game, and there would have been nothing for the AI nudge the designer asked
+# for in the same breath to bite on. Told that, the designer: "count Antarctica and change the
+# tech's name". Hence a name with no space word in it.
+#
+# It stacks on Deep Mining's x1.5 and the Extraction Charter's x1.25, inside the same multiplier
+# chain, so the whole product is floored once and a tenth is never lost to rounding.
+[[tech]]
+id = "beneficiation"
+name = "Beneficiation"
+branch = "Extraction"
+rung = 2
+cost = 32
+needs = ["deep_mining"]
+effect = "Mine output x1.1, wherever the Mine stands"
+value = 1.1
+
+# Relay Networks, Off-world Living rung 2. A Relay's Influence Allotment goes from 1 to 2.
+#
+# Asked for as "+1 influence" on every Habitat. Moved to the Relay at the designer's word -- "I
+# forgot about the relay - let's give the +1 influence to the relay instead" -- which is the better
+# home for it twice over: a Habitat paying Influence is the Relay's whole job, and a Tech that gave
+# it to Habitats would have left the Relay with no reason to exist at all.
+#
+# `value` is ADDITIVE here, read through `tech_addition`, so Provisional Findings gives the
+# Archivists half of it rounded down -- which is nothing until the Tech is actually done. That is
+# the same reading every additive Tech in the tree gets.
+[[tech]]
+id = "relay_networks"
+name = "Relay Networks"
+branch = "Off-world Living"
+rung = 2
+cost = 32
+needs = ["expanded_habitats"]
+effect = "A Relay adds 2 Influence to the Allotment instead of 1"
+value = 1.0

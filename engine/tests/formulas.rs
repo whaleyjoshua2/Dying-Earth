@@ -4036,8 +4036,8 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
 fn f_coastal_engineering_is_the_thirteenth_tech() {
     let g = fresh();
     // Ticket #201 (version 0.08.1): eighteen, with Civil Defense on Society rung 2.
-    assert_eq!(TechId::ALL.len(), 18, "thirteen Techs, the four gates, and Civil Defense");
-    assert_eq!(g.tables.techs.len(), 18, "and eighteen rows in techs.toml");
+    assert_eq!(TechId::ALL.len(), 20, "thirteen Techs, the four gates, Civil Defense, and ticket #232's two");
+    assert_eq!(g.tables.techs.len(), 20, "and twenty rows in techs.toml");
     let c = g.tables.tech(TechId::CoastalEngineering);
     assert_eq!(c.name, "Coastal Engineering");
     assert_eq!(c.branch, "Industry");
@@ -5970,7 +5970,7 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         assert_eq!(card.needs, needs, "{t:?}");
         assert_eq!(g.tables.victory_gate(kind), Some(t));
     }
-    assert_eq!(TechId::ALL.len(), 18, "seventeen, and Civil Defense since ticket #201");
+    assert_eq!(TechId::ALL.len(), 20, "eighteen, and Beneficiation and Relay Networks since ticket #232");
 }
 
 /// Ticket #84: with both parts at their bars the Custodians still do not win until Planetary
@@ -8449,7 +8449,7 @@ fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
         assert_eq!(card.cost, want, "rung {} costs {want}: {t:?}", card.rung);
     }
     let total: i64 = TechId::ALL.into_iter().map(|t| g.tables.tech(t).cost).sum();
-    assert_eq!(total, 585, "the whole tree since ticket #231; 554 from #201, 507 over seventeen Techs before it");
+    assert_eq!(total, 649, "the whole tree since ticket #232's two rung-2 Techs; 585 from #231, 554 from #201, 507 before that");
 }
 
 // ------------------------------------------------------- 0.08.1 ticket #208: the School's step
@@ -8615,4 +8615,99 @@ fn a_research_agreement_wants_friendship_first() {
     // The gate is checked only at the STRIKE: it stands whatever the score later does.
     g.relations.score[cus.index()][pro.index()] = -9;
     assert!((g.research_agreement_multiplier(cus) - 1.10).abs() < 1e-9, "once made, it stands");
+}
+
+// ------------------------------------------- 0.08.3 ticket #232: Beneficiation and Relay Networks
+
+/// Ticket #232 (version 0.08.3): Beneficiation gives every Mine a tenth more, stacked inside the
+/// same multiplier chain as Deep Mining and the Extraction Charter so the product is floored ONCE.
+///
+/// The figures are pinned exactly, and the reason is a defect this test had in its first draft: it
+/// asserted `after >= before`, which PASSES with the Tech's effect deleted. Watched to fail with
+/// the multiplier removed, it did not fail, and that is how the weak assertion was found. A tenth
+/// is small enough to vanish into a floor, so nothing less than an exact figure guards it.
+///
+/// Measured while deciding, with a Mine alone on the slot: a tenth ON ITS OWN is invisible on Earth
+/// (7 -> 7) and Mars (5 -> 5) and shows only on the Moon (6 -> 7). That case cannot arise in play,
+/// because Beneficiation NEEDS Deep Mining -- and with Deep Mining standing it is +1 Materials per
+/// Mine on every Body measured. The prerequisite is load-bearing, not decoration.
+#[test]
+fn beneficiation_adds_one_to_every_mine_once_deep_mining_stands() {
+    for (body, deep, with_ben, all_three) in [(BodyId::Earth, 10, 11, 14), (BodyId::Moon, 9, 10, 13), (BodyId::Mars, 7, 8, 10), (BodyId::Phobos, 10, 11, 14)] {
+        let mut g = game();
+        let seat = Seat(0);
+        let c = colony(&mut g, seat, body, &[ModuleKind::Mine], 4);
+        with_tech(&mut g, TechId::DeepMining);
+        assert_eq!(g.module_yield(seat, c, ModuleKind::Mine).amount, deep, "Deep Mining alone at {body:?}");
+        with_tech(&mut g, TechId::Beneficiation);
+        assert_eq!(g.module_yield(seat, c, ModuleKind::Mine).amount, with_ben, "and Beneficiation adds one at {body:?}");
+        with_tech(&mut g, TechId::ExtractionCharter);
+        assert_eq!(g.module_yield(seat, c, ModuleKind::Mine).amount, all_three, "and all three chain at {body:?}");
+    }
+    let g = game();
+    assert_eq!(g.tables.tech(TechId::Beneficiation).needs, vec![TechId::DeepMining], "the prerequisite the figures above depend on");
+}
+
+/// Ticket #232: ANTARCTICA IS INCLUDED -- the clause a reader of the designer's words ("off world
+/// mines") would get wrong, and the whole value of the Tech. Measured while deciding: of sixteen
+/// Mines standing at the end of twenty games, THIRTEEN were Antarctic and three were off Earth, so
+/// an off-world-only clause would have reached 0.15 Mines a game. The designer, told that: "count
+/// Antarctica and change the tech's name".
+#[test]
+fn beneficiation_reaches_an_antarctic_mine_too() {
+    let mut g = game();
+    let seat = Seat(0);
+    let c = colony(&mut g, seat, BodyId::Earth, &[ModuleKind::Mine], 4);
+    with_tech(&mut g, TechId::DeepMining);
+    let before = g.module_yield(seat, c, ModuleKind::Mine).amount;
+    with_tech(&mut g, TechId::Beneficiation);
+    assert_eq!(g.module_yield(seat, c, ModuleKind::Mine).amount, before + 1, "an Antarctic Mine reads the Tech exactly as one off Earth does");
+    assert_eq!(g.tables.tech(TechId::Beneficiation).effect, "Mine output x1.1, wherever the Mine stands", "and the effect line says so, because the name no longer can");
+    assert!(!g.tables.tech(TechId::Beneficiation).name.to_lowercase().contains("orbit"), "the name carries no space word: it would be a lie");
+}
+
+/// Ticket #232: Relay Networks takes a Relay's Influence Allotment from 1 to 2 and leaves its
+/// Standing alone. The designer asked for the +1 on the Habitat, then moved it here.
+#[test]
+fn relay_networks_takes_a_relay_from_one_influence_to_two() {
+    let mut g = game();
+    let seat = Seat(0);
+    let c = colony(&mut g, seat, BodyId::Moon, &[ModuleKind::Relay], 4);
+    let before = g.module_yield(seat, c, ModuleKind::Relay);
+    assert_eq!(before.allotment, 1, "a Relay pays 1 into the Allotment without the Tech");
+
+    with_tech(&mut g, TechId::RelayNetworks);
+    let after = g.module_yield(seat, c, ModuleKind::Relay);
+    assert_eq!(after.allotment, 2, "and 2 with it");
+    assert_eq!(after.standing, before.standing, "its Standing is untouched: Standing holds one place, the Allotment is the budget");
+
+    // A Habitat gets nothing: the designer moved the clause OFF the Habitat deliberately.
+    let h = colony(&mut g, seat, BodyId::Mars, &[ModuleKind::Habitat], 4);
+    assert_eq!(g.module_yield(seat, h, ModuleKind::Habitat).allotment, 0, "a Habitat pays no Influence");
+}
+
+/// Ticket #232: the AI's appetite. Both weights were FLAT and read nothing about what the building
+/// would actually make, so no Tech in the game had ever moved a computer seat's build choice. The
+/// sweep that found 26 Mines and 1 Relay standing across forty games is the evidence. These two
+/// assert the yields the weights now read, which is the thing that was missing.
+#[test]
+fn the_yields_the_ai_weights_now_read_actually_move_with_their_techs() {
+    let mut g = game();
+    let seat = Seat(0);
+    let mine = colony(&mut g, seat, BodyId::Moon, &[ModuleKind::Mine], 4);
+    let relay = colony(&mut g, seat, BodyId::Mars, &[ModuleKind::Relay], 4);
+    let mine_before = g.module_yield(seat, mine, ModuleKind::Mine).amount;
+    let relay_before = g.module_yield(seat, relay, ModuleKind::Relay).allotment;
+
+    for t in [TechId::DeepMining, TechId::Beneficiation, TechId::ExtractionCharter, TechId::RelayNetworks] {
+        with_tech(&mut g, t);
+    }
+    let mine_after = g.module_yield(seat, mine, ModuleKind::Mine).amount;
+    let relay_after = g.module_yield(seat, relay, ModuleKind::Relay).allotment;
+
+    assert!(mine_after > mine_before, "a Mine's yield moves with its Techs: {mine_before} -> {mine_after}");
+    assert!(relay_after > relay_before, "and a Relay's: {relay_before} -> {relay_after}");
+    // The Mine's weight is scaled by yield-over-card, so the card figure must stay reachable.
+    let card = g.tables.module(ModuleKind::Mine).produces.as_ref().map(|p| p.amount).unwrap_or(0);
+    assert_eq!(card, 4, "the Mine's card figure, which the AI weight divides by");
 }

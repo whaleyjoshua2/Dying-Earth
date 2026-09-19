@@ -418,10 +418,21 @@ pub enum TechId {
     ExtractionCharter,
     GenerationShips,
     TheUpload,
+    /// Ticket #232 (version 0.08.3): Extraction rung 2. Every Mine makes a tenth more, ANTARCTICA
+    /// INCLUDED -- the designer's list said "off world mines" and the measurement is why it does
+    /// not: of sixteen Mines standing at the end of twenty games, THIRTEEN were Antarctic and only
+    /// three were off Earth, so an off-world-only clause would have touched 0.15 Mines a game. The
+    /// name carries no space word for the same reason.
+    Beneficiation,
+    /// Ticket #232 (version 0.08.3): Off-world Living rung 2. A Relay's Influence Allotment goes
+    /// from 1 to 2. Asked for as "+1 influence" on every Habitat and moved to the Relay at the
+    /// designer's word -- "I forgot about the relay - let's give the +1 influence to the relay
+    /// instead" -- which also spares the Relay being made redundant by the Habitat.
+    RelayNetworks,
 }
 
 impl TechId {
-    pub const ALL: [TechId; 18] = [
+    pub const ALL: [TechId; 20] = [
         TechId::EfficientGrids,
         TechId::CleanPower,
         TechId::CleanManufacturing,
@@ -440,6 +451,8 @@ impl TechId {
         TechId::ExtractionCharter,
         TechId::GenerationShips,
         TechId::TheUpload,
+        TechId::Beneficiation,
+        TechId::RelayNetworks,
     ];
     pub fn index(self) -> usize {
         self as usize
