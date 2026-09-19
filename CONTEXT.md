@@ -17,7 +17,7 @@ The Faction that colonizes the solar system while limiting ecological damage to 
 _Avoid_: Stewards (the retired name), environmentalists, greens, moderates, eco-terrorists
 
 **Prospectors**:
-The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry and the Strip Permit, their Unique Facility is the Investment Bank, and since version 0.05.5 they win on a hoard: 1000 Materials in their Venture Capital Fund, and expansion.
+The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry and the Strip Permit, their Unique Facility is the Investment Bank, and since version 0.05.5 they win on a hoard: **2000 Ducats** in their Venture Capital Fund since version 0.08.3, and expansion. It was 1000 Materials before that.
 _Avoid_: Extractors (the retired name), capitalists, industrialists, exploiters
 
 **Arkwrights**:
@@ -593,7 +593,9 @@ Retired in version 0.05.5 for the Venture Capital Fund. It was the Prospectors' 
 _Avoid_: extraction total, production score, output total, wealth
 
 **Venture Capital Fund**:
-The Prospectors' own pool beside the Stockpile, and their measure since version 0.05.5: 1000 Materials in it is the first part of their Victory Condition (750 until version 0.08.0, which raised the bar when the Investment Bank began paying interest into it). On any turn they set the share of their Factories' and Mines' Materials output that goes into it at Income, from nothing to four fifths in steps of a tenth; Materials bought, refunded or found are not output. A draw takes Materials back out at a tenth's loss.
+The Prospectors' own pool beside the Stockpile, and their measure since version 0.05.5. **Since version 0.08.3 it holds Ducats, and 2000 of them is the first part of their Victory Condition**; it held Materials before that, with a bar of 750 and then 1000.
+On any turn they set the share of their **Ducat income** that goes into it at Income, from nothing to four fifths in steps of a tenth, taken before they can spend a coin of it; Ducats got by selling are not income and never reach it. A draw takes Ducats back out at a tenth's loss.
+The change is more than a change of units. A share of Materials output skimmed a resource they stockpile anyway, so the hoard cost them little; Ducats are what everybody spends on Influence, Relief, Resettle and repairs, so the Fund now competes with the Faction's whole economy and the share is a **decision taken every turn** — bank it or spend it — which is what a venture fund is. The bar was set by measurement rather than by converting the old one at the market rate: 2000 leaves the median long game just across the line, exactly as 1000 Materials did.
 _Avoid_: the pool, savings, treasury, war chest, bank
 
 **Stabilization**:

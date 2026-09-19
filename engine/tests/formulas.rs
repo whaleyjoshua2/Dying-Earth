@@ -454,13 +454,14 @@ fn a_controlled_state_pays_ducats_from_gdp_times_industry_and_a_bank_adds_more()
     let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::TradePost], 0);
     assert_eq!(g.module_yield(Seat(0), moon, ModuleKind::TradePost).amount, 6);
     assert_eq!(g.module_yield(Seat(0), mars, ModuleKind::TradePost).amount, 6);
-    // Ticket #72: Ducats are not Materials output, so a Bank banks nothing in the Venture Capital
-    // Fund however high the share is set.
+    // Ticket #72 had it that Ducats are not Materials output, so a Bank banked nothing in the
+    // Venture Capital Fund however high the share was set. Ticket #240 (version 0.08.3) turns that
+    // exactly around: the Fund banks DUCAT INCOME, so a Bank is now one of the things filling it.
     g.seats[1].venture_share = 0.8;
     let before = g.seats[1].venture_fund;
     g.state_mut(StateId::Europe).facilities = vec![facility(FacilityKind::Bank)];
     income_of(&mut g, Seat(1));
-    assert_eq!(g.seats[1].venture_fund, before);
+    assert!(g.seats[1].venture_fund > before, "a Bank's Ducats reach the Fund now: {} -> {}", before, g.seats[1].venture_fund);
 }
 
 #[test]
@@ -870,7 +871,7 @@ fn occupation_of_a_controlled_state_returns_it_to_its_owner_when_broken() {
 
 fn meet_first(g: &mut Game, seat: Seat) {
     match g.kind(seat) {
-        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 1000,
+        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 2000,
         FactionKind::Custodians => g.seats[seat.index()].stabilization_run = 3,
         FactionKind::Arkwrights => {}
         FactionKind::Archivists => g.seats[seat.index()].research_total = 150,
@@ -894,7 +895,7 @@ fn both_met_the_larger_margin_wins() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
     g.seats[0].stabilization_run = 3; // parts 1.0 and 1.0 -> margin 1.0
-    g.seats[1].venture_fund = 1200; // parts 1.2 and 1.25 -> margin 1.2
+    g.seats[1].venture_fund = 2400; // parts 1.2 and 1.25 -> margin 1.2
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
@@ -906,7 +907,7 @@ fn both_met_by_the_same_margin_is_a_draw() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     g.seats[0].stabilization_run = 3;
-    g.seats[1].venture_fund = 1200; // the lower fraction is the presence, 1.0, on both sides
+    g.seats[1].venture_fund = 2400; // the lower fraction is the presence, 1.0, on both sides
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Draw { .. })), "{:?}", g.outcome);
@@ -927,7 +928,7 @@ fn the_last_turn_scores_the_lower_fraction_of_the_two_parts() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 6); // presence 0.5, run 0 -> score 0
     g.seats[0].stabilization_run = 3;
     colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat], 3); // presence 0.25
-    g.seats[1].venture_fund = 750; // first 1.0 -> score 0.25
+    g.seats[1].venture_fund = 1500; // first 1.0 -> score 0.25
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(0), .. })), "0.5 beats 0.25: {:?}", g.outcome);
 }
@@ -1678,7 +1679,7 @@ fn more_than_one_seat_meeting_its_condition_gives_the_game_to_the_larger_margin(
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
     g.seats[0].stabilization_run = 3; // parts 1.0 and 1.0 -> margin 1.0
-    g.seats[1].venture_fund = 1200; // parts 1.2 and 1.25 -> margin 1.2
+    g.seats[1].venture_fund = 2400; // parts 1.2 and 1.25 -> margin 1.2
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
@@ -1695,7 +1696,7 @@ fn the_last_turn_ranks_every_seat_by_score() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 6);
     let p = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 9);
     let _ = p;
-    g.seats[1].venture_fund = 750;
+    g.seats[1].venture_fund = 1500;
     colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat], 3);
     assert!((g.progress(Seat(1)).score() - 0.75).abs() < 1e-9, "{:?}", g.progress(Seat(1)).score());
     g.end_phase();
@@ -5245,19 +5246,26 @@ fn the_prospectors_pay_fifteen_percent_less_for_facilities_and_modules_and_nothi
     assert_eq!(g.order_cost(pro, &Order::RaiseIndustry { state: StateId::Europe }).materials, 15, "Cheap Industry is its own clause");
 }
 
-/// Ticket #72 (b): the Venture Capital Fund. A share of the Materials the Prospectors' Factories
-/// and Mines pay at Income goes into it, set on any turn in steps of 10% from 0 to 80; a draw
-/// returns nine tenths, rounded down; nobody else has one.
+/// Ticket #72 (b), rewritten on ticket #240 (version 0.08.3): the Venture Capital Fund banks a
+/// share of the Prospectors' **Ducat income**, set on any turn in steps of 10% from 0 to 80; a draw
+/// returns nine tenths of it in Ducats, rounded down; nobody else has one.
+///
+/// It banked a share of Materials OUTPUT until version 0.08.3. The designer moved the hoard to
+/// Ducats — *"now require duckets rather than materials"* — and chose income over a relabelled
+/// share of output, because that makes the Condition a decision the seat takes every turn
+/// (bank it or spend it) rather than a consequence of digging.
 #[test]
-fn the_venture_capital_fund_banks_a_share_of_materials_output_and_a_draw_returns_nine_tenths() {
+fn the_venture_capital_fund_banks_a_share_of_ducat_income_and_a_draw_returns_nine_tenths() {
     let mut g = game();
     let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
     g.take_control(StateId::Europe, pro);
     g.state_mut(StateId::Europe).facilities = vec![facility(FacilityKind::Factory)];
     let moon = colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Mine], 0);
     let _ = moon;
-    // Output: a Factory at 4 x 1.25 = 5, a Mine at 4 x 1.65 x 1.25 = 8 (rounded down): 13 a turn.
-    assert_eq!(income_of(&mut g, pro).materials, 13, "at 0% nothing is banked");
+    // Europe's economy pays 14 Ducats a turn to this seat. Materials output is 13 and is now
+    // beside the point: a Factory at 4 x 1.25 = 5 and a Mine at 4 x 1.65 x 1.25 = 8.
+    let inc = income_of(&mut g, pro);
+    assert_eq!((inc.ducats, inc.materials), (14, 13), "at 0% nothing is banked and every Ducat lands");
     assert_eq!(g.seats[pro.index()].venture_fund, 0);
     // The share is an order, refused off the steps and to anyone else.
     assert_eq!(g.check_order(Seat(0), &[], &Order::SetVentureShare { share: 50 }).unwrap_err().0, "only the Prospectors have a Venture Capital Fund");
@@ -5267,24 +5275,29 @@ fn the_venture_capital_fund_banks_a_share_of_materials_output_and_a_draw_returns
     assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 80 }).is_ok());
     g.commit_orders(pro, &[Order::SetVentureShare { share: 50 }]);
     assert!((g.seats[pro.index()].venture_share - 0.5).abs() < 1e-9);
-    // Half of 13, rounded down, is banked: 6 to the Fund, 7 to the Stockpile.
-    assert_eq!(income_of(&mut g, pro).materials, 7);
-    assert_eq!(g.seats[pro.index()].venture_fund, 6);
-    assert!(g.seat(pro).income_sources.iter().any(|(name, _, n)| name.contains("Venture Capital Fund") && *n == -6), "{:?}", g.seat(pro).income_sources);
-    // Bought Materials are not output.
-    g.seats[pro.index()].stockpile.ducats = 100;
-    g.commit_orders(pro, &[Order::Buy { resource: Resource::Materials, amount: 10 }]);
-    assert_eq!(g.seats[pro.index()].venture_fund, 6, "a purchase banks nothing");
-    // 80% of 13 is 10, rounded down.
+    // Half of 14 is 7 to the Fund and 7 to the Stockpile. Materials are untouched by the share now.
+    let inc = income_of(&mut g, pro);
+    assert_eq!((inc.ducats, inc.materials), (7, 13));
+    assert_eq!(g.seats[pro.index()].venture_fund, 7);
+    assert!(g.seat(pro).income_sources.iter().any(|(name, r, n)| name.contains("Venture Capital Fund") && *r == Resource::Ducats && *n == -7), "{:?}", g.seat(pro).income_sources);
+    // Ducats taken by SELLING are not income, so the Fund never sees them. This is the clause that
+    // kept a Materials fund honest -- bought Materials were not output -- pointed at the new
+    // resource: a hoard you can fill by trading is not a hoard.
+    let fund = g.seats[pro.index()].venture_fund;
+    g.seats[pro.index()].stockpile.materials = 100;
+    g.commit_orders(pro, &[Order::Sell { resource: Resource::Materials, amount: 10 }]);
+    assert_eq!(g.seats[pro.index()].venture_fund, fund, "a sale banks nothing");
+    // 80% of 14 is 11, rounded down: 3 lands, 11 banks, taking the Fund to 18.
     g.commit_orders(pro, &[Order::SetVentureShare { share: 80 }]);
-    assert_eq!(income_of(&mut g, pro).materials, 3);
-    assert_eq!(g.seats[pro.index()].venture_fund, 16);
-    // A draw: 10 out, 9 back; never more than the Fund holds.
-    let before = g.seats[pro.index()].stockpile.materials;
-    assert!(g.check_order(pro, &[], &Order::DrawVenture { amount: 17 }).is_err(), "the Fund holds 16");
+    let inc = income_of(&mut g, pro);
+    assert_eq!(inc.ducats, 3);
+    assert_eq!(g.seats[pro.index()].venture_fund, 18);
+    // A draw: 10 out, 9 back IN DUCATS; never more than the Fund holds.
+    let before = g.seats[pro.index()].stockpile.ducats;
+    assert!(g.check_order(pro, &[], &Order::DrawVenture { amount: 19 }).is_err(), "the Fund holds 18");
     g.commit_orders(pro, &[Order::DrawVenture { amount: 10 }]);
-    assert_eq!(g.seats[pro.index()].venture_fund, 6);
-    assert_eq!(g.seats[pro.index()].stockpile.materials, before + 9, "nine tenths come back");
+    assert_eq!(g.seats[pro.index()].venture_fund, 8);
+    assert_eq!(g.seats[pro.index()].stockpile.ducats, before + 9, "nine tenths come back, in Ducats");
     assert_eq!(g.check_order(Seat(0), &[], &Order::DrawVenture { amount: 1 }).unwrap_err().0, "only the Prospectors have a Venture Capital Fund");
 }
 
@@ -5293,18 +5306,18 @@ fn the_venture_capital_fund_banks_a_share_of_materials_output_and_a_draw_returns
 /// moved that bar from 750 to 1000, because the Investment Bank pays uncapped interest into the Fund
 /// and, measured over 40 games, nobody had ever reached 750 at all.
 #[test]
-fn a_thousand_in_the_fund_is_the_prospectors_first_part() {
+fn two_thousand_ducats_in_the_fund_is_the_prospectors_first_part() {
     let mut g = game();
     let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
     let card = g.tables.faction(FactionKind::Prospectors).victory_first;
-    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 1000.0));
+    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 2000.0));
     assert_eq!(card.kind.name(), "Venture Capital Fund");
-    g.seats[pro.index()].venture_fund = 400;
+    g.seats[pro.index()].venture_fund = 800;
     let p = g.progress(pro);
-    assert_eq!((p.first_value, p.first_bar), (400.0, 1000.0));
+    assert_eq!((p.first_value, p.first_bar), (800.0, 2000.0));
     assert!((p.first_fraction() - 0.4).abs() < 1e-9);
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 12);
-    g.seats[pro.index()].venture_fund = 1000;
+    g.seats[pro.index()].venture_fund = 2000;
     open_gates(&mut g);
     assert!(g.progress(pro).met());
     g.end_phase();
@@ -5331,7 +5344,8 @@ fn the_prospector_ai_sets_its_share_to_reach_the_fund_in_time_and_maxes_it_when_
     while g.free_slots(StateId::Europe) > 0 {
         g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::Factory));
     }
-    g.seats[pro.index()].income_last_turn.materials = 60;
+    // Ticket #240 (version 0.08.3): DUCAT income is what the share is weighed against now.
+    g.seats[pro.index()].income_last_turn.ducats = 120;
     g.seats[pro.index()].stockpile.energy = 500;
     g.turn = 4;
     let orders = g.ai_orders(pro);
@@ -5343,7 +5357,7 @@ fn the_prospector_ai_sets_its_share_to_reach_the_fund_in_time_and_maxes_it_when_
     // Late and far behind, everything it may: 80.
     g.turn = 30;
     g.seats[pro.index()].venture_share = 0.0;
-    g.seats[pro.index()].income_last_turn.materials = 10;
+    g.seats[pro.index()].income_last_turn.ducats = 10;
     let orders = g.ai_orders(pro);
     let share = orders.iter().find_map(|o| if let Order::SetVentureShare { share } = o { Some(*share) } else { None });
     assert_eq!(share, Some(80), "{orders:?}");
@@ -9250,4 +9264,5 @@ fn the_hold_clock_resets_on_a_change_of_hands_and_an_old_save_passes() {
     g.state_mut(sid).held_since = None;
     assert!(g.may_remake(pro, sid), "a missing clock counts as held long enough");
 }
+
 

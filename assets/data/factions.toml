@@ -67,17 +67,17 @@ ducats_multiplier = 1.2
 market_multiplier = 0.85
 # Ticket #221: zero. They do not mind another Faction's Blame at all, which is a statement about them.
 resentment = 0.0
-signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit is free and may be taken once in a Region's whole life: for three turns every Facility there produces double, and when it ends that Region's Baseline Emissions rise by 0.2 for good and its Unrest by 3. The Venture Capital Fund: each turn they set what share of their Factories' and Mines' Materials is banked in it, 0% to 80% in tenths; a draw returns nine tenths."
+signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit is free and may be taken once in a Region's whole life: for three turns every Facility there produces double, and when it ends that Region's Baseline Emissions rise by 0.2 for good and its Unrest by 3. The Venture Capital Fund: each turn they set what share of their Ducat income is banked in it, 0% to 80% in tenths; a draw returns nine tenths."
 # Ticket #203 (version 0.08.1). The building is ticket #182's.
 unique = "Investment Bank -- replaces the Bank, and banks 1% interest a turn on the Venture Capital Fund's balance, one building per Region paying, never less than 1 Material in all. Off Earth, the Exchange -- replaces the Trade Post, and pays 1 more Ducat a turn."
 # Ticket #72: the Extraction Total is retired; the first part is Materials banked in the Fund.
-victory = "1000 Materials in the Venture Capital Fund, plus 12 Colonists living off Earth."
+victory = "2000 Ducats in the Venture Capital Fund, plus 12 Colonists living off Earth."
 # Ticket #182 (version 0.08.0): 750 to 1000, because the Investment Bank pays uncapped interest
 # on the Fund. Measured first: in 40 games nobody EVER reached 750 -- the highest balance ever
 # seen was 745, the median game ended around turn 28 with the Fund in the 400s, and the
 # Prospectors won 0 of 80. The bar rises to keep the Fund a race rather than a formality now
 # that a Bank in each of ten Regions pays around 44 Materials a turn by turn 24.
-victory_first = { kind = "venture_fund", bar = 1000 }
+victory_first = { kind = "venture_fund", bar = 2000 }
 victory_second = { kind = "off_world_presence", bar = 12 }
 colour = [0.85, 0.5, 0.2]
 
@@ -169,8 +169,14 @@ colour = [0.871, 0.322, 0.439]
 # Ticket #54 (version 0.05): the [restoration] table is retired with the order; the Custodians'
 # signature rule is the Scrubber (facilities.toml) and Leapfrog (per_leapfrog below).
 
-# Ticket #72 (version 0.05.5): the Prospectors' Venture Capital Fund. The largest share of Materials
-# output that may be banked a turn, the step the share moves in, and what a draw gives back.
+# Ticket #72 (version 0.05.5): the Prospectors' Venture Capital Fund. The largest share that may be
+# banked a turn, the step the share moves in, and what a draw gives back.
+# Ticket #240 (version 0.08.3): the share is of DUCAT INCOME, not Materials output, and the Fund
+# holds Ducats. max_share is left at 0.8 at the designer's word -- "keep 80" -- with the note that
+# the top of the slider is now a real trade-off rather than nearly free: measured over 120 games
+# every seat ends every game holding about five Ducats, so banking four fifths of income starves
+# Influence, Relief and repairs. The computer weighs it by taking the SMALLEST share that still
+# reaches the bar by its pace's last turn, so it banks the least it can.
 # Ticket #191 (version 0.08.0): Relations. One score per ORDERED PAIR, so twelve in a four-seat
 # game: the Arkwrights' view of the Prospectors is a different number from the Prospectors' view of
 # the Arkwrights. Measured over 80 games, of the 317 pairs where anything happened 49% were purely

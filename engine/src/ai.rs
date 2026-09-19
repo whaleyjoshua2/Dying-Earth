@@ -1961,7 +1961,14 @@ impl Game {
             let last = pace.first.last().map(|p| p[0]).unwrap_or(self.tables.victory.turns as i64) as u32;
             let turns_to = last.saturating_sub(self.turn).max(1) as f64;
             let s0 = self.seat(seat);
-            let gross = (s0.income_last_turn.materials + s0.venture_banked_last_turn).max(0) as f64;
+            // Ticket #240 (version 0.08.3): against DUCAT income, which is what the Fund banks
+            // now. The rule itself is unchanged and is the weighing the designer asked for -- the
+            // SMALLEST share that still reaches the bar by the pace's last turn -- so a seat banks
+            // the least it can and leaves the rest of its Ducats to spend on Influence, Relief and
+            // repairs. It matters more than it did: measured over 120 games every seat ends every
+            // game holding about five Ducats, so an over-large share starves the whole economy
+            // where an over-large Materials share only slowed a build.
+            let gross = (s0.income_last_turn.ducats + s0.venture_banked_last_turn).max(0) as f64;
             let need = (bar - s0.venture_fund as f64).max(0.0);
             let share = if self.turn < first_waypoint || need <= 0.0 {
                 0.0

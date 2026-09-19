@@ -1668,7 +1668,7 @@ impl Game {
                 // Ticket #72: the Fund's orders land now; the share is read at the next Income.
                 Order::SetVentureShare { share } => {
                     self.seat_mut(seat).venture_share = *share as f64 / 100.0;
-                    let line = format!("The {} set the Venture Capital Fund to bank {}% of their Materials output.", self.seat_name(seat), share);
+                    let line = format!("The {} set the Venture Capital Fund to bank {}% of their Ducat income.", self.seat_name(seat), share);
                     self.log(line);
                 }
                 Order::DrawVenture { amount } => {
@@ -1676,9 +1676,11 @@ impl Game {
                     {
                         let s = self.seat_mut(seat);
                         s.venture_fund -= amount;
-                        s.stockpile.materials += back;
+                        // Ticket #240 (version 0.08.3): the Fund holds Ducats, so a draw returns
+                        // Ducats. `draw_return` is unchanged: a tenth is still lost on the way out.
+                        s.stockpile.ducats += back;
                     }
-                    let line = format!("The {} drew {} Materials from the Venture Capital Fund; {} came back to the Stockpile.", self.seat_name(seat), amount, back);
+                    let line = format!("The {} drew {} Ducats from the Venture Capital Fund; {} came back to the Stockpile.", self.seat_name(seat), amount, back);
                     self.log(line);
                 }
                 Order::Leapfrog { state } => {

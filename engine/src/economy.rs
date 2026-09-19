@@ -13,7 +13,6 @@ struct Producer {
     upkeep: i64,
     output: Option<(Resource, i64)>,
     /// Materials or Fuel from a Mine, Refinery or Factory count toward the Extraction Total.
-    extraction: bool,
     research: i64,
     online: bool,
     /// Ticket #82: the Facility on Earth whose mothball doubles this Module, if one does.
@@ -490,7 +489,6 @@ impl Game {
                     is_module: false,
                     upkeep: y.upkeep,
                     output: y.resource.map(|r| (r, halve(y.amount))),
-                    extraction: matches!(f.kind, FacilityKind::Factory | FacilityKind::Refinery),
                     research: halve(y.research),
                     online: !f.offline_until_resolution,
                     doubled_by: None,
@@ -514,7 +512,6 @@ impl Game {
                     is_module: true,
                     upkeep: y.upkeep,
                     output: y.resource.map(|r| (r, y.amount)),
-                    extraction: matches!(m.kind, ModuleKind::Mine | ModuleKind::Refinery),
                     // Ticket #80: an Observatory's Research.
                     research: y.research,
                     online: !col.grid_failed && !m.offline_until_resolution && !(m.kind == ModuleKind::Archive && occupied),
@@ -688,7 +685,6 @@ impl Game {
         let mut research = 0;
         let mut off_earth = 0;
         let mut doubled_turns = 0;
-        let mut extraction = 0;
         let mut sources: Vec<(String, Resource, i64)> = Vec::new();
         for p in &producers {
             let where_ = match p.place {
@@ -733,10 +729,6 @@ impl Game {
                     Resource::Research => {}
                 }
                 sources.push((format!("{} in {}", p.name, where_), res, v));
-                // Ticket #72: the Materials output the Venture Capital Fund takes its share of.
-                if p.extraction && res == Resource::Materials {
-                    extraction += v;
-                }
             }
             if p.upkeep > 0 {
                 sources.push((format!("{} in {} (upkeep)", p.name, where_), Resource::Energy, -p.upkeep));
@@ -794,9 +786,13 @@ impl Game {
         if !paying_regions.is_empty() {
             let n = paying_regions.len() as i64;
             if self.tables.faction(self.kind(seat)).victory_first.kind == VictoryFirstKind::VentureFund {
+                // Ticket #240 (version 0.08.3): the Fund holds Ducats, so this interest is paid
+                // in Ducats. The rate and the floor were fitted against a Materials fund and are
+                // left where they are; the bar was set against a measured Fund that already
+                // carried them, so moving both at once would have priced neither.
                 let per = (self.seat(seat).venture_fund as f64 * u_interest).floor() as i64;
                 interest_to_fund = (n * per).max(u_floor);
-                sources.push((format!("{n} Investment Bank (interest banked)"), Resource::Materials, interest_to_fund));
+                sources.push((format!("{n} Investment Bank (interest banked)"), Resource::Ducats, interest_to_fund));
             } else {
                 let per = ((gained.ducats as f64 * u_interest).floor() as i64).max(u_floor);
                 let paid = n * per;
@@ -804,13 +800,23 @@ impl Game {
                 sources.push((format!("{n} Investment Bank (interest)"), Resource::Ducats, paid));
             }
         }
-        // Ticket #72 (version 0.05.5): the Venture Capital Fund takes its share of the Materials the
-        // seat's Factories and Mines paid, rounded down, before the Stockpile sees them.
+        // Ticket #72 (version 0.05.5): the Venture Capital Fund took its share of the Materials the
+        // seat's Factories and Mines paid, rounded down, before the Stockpile saw them.
+        //
+        // Ticket #240 (version 0.08.3): it takes its share of **Ducat income** instead, at Income
+        // and before the seat can spend a coin of it. The designer: the hoard is counted in Ducats
+        // now, and *"a"* -- a share of income rather than a relabelled share of output.
+        //
+        // This changes what the Condition ASKS. A share of Materials output skimmed a resource the
+        // seat stockpiles anyway; measured over 120 games, every seat ends every game holding about
+        // FIVE Ducats, so a Ducat share competes with the seat's whole economy -- Influence bought,
+        // Relief paid, repairs. "Bank it or spend it" is the decision, which is what a venture fund
+        // actually is, and it is why the bar could not simply be converted at the market rate.
         let share = self.seat(seat).venture_share;
-        let banked = if share > 0.0 { (extraction as f64 * share).floor() as i64 } else { 0 };
+        let banked = if share > 0.0 { (gained.ducats as f64 * share).floor() as i64 } else { 0 };
         if banked > 0 {
-            gained.materials -= banked;
-            sources.push(("Venture Capital Fund (banked)".to_string(), Resource::Materials, -banked));
+            gained.ducats -= banked;
+            sources.push(("Venture Capital Fund (banked)".to_string(), Resource::Ducats, -banked));
         }
         // Ticket #226 (version 0.08.2): a research agreement pays both parties a tenth more Research
         // while it stands, applied here -- after the buildings' own multipliers, on the Faction's
