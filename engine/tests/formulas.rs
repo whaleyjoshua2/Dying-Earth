@@ -1148,6 +1148,14 @@ fn reactor_leak_stops_generators_until_resolution_and_costs_five_energy() {
 
 // ---------------------------------------------------------------- 12.3 Every Tech effect
 
+/// Ticket #238 (version 0.08.3): the Strip Permit, the Leapfrog and the Exodus Call all want the
+/// Region held three whole turns. A test that issues one on turn 1 is testing the clock, not the
+/// order, so it backdates the hold instead.
+fn held_long_enough(g: &mut Game, s: StateId) {
+    g.turn = g.turn.max(g.tables.faction_orders.min_turns_held + 1);
+    g.state_mut(s).held_since = Some(0);
+}
+
 fn with_tech(g: &mut Game, t: TechId) {
     g.research.done.push(t);
 }
@@ -3340,6 +3348,9 @@ fn d_leapfrog_is_custodian_only_and_never_goes_below_the_base() {
     assert!(g.check_order(Seat(1), &[], &Order::Leapfrog { state: StateId::SouthAmerica }).is_err(), "only the Custodians Leapfrog");
     // And the Custodians need to control the state.
     assert!(g.check_order(Seat(0), &[], &Order::Leapfrog { state: StateId::SouthAmerica }).is_err(), "and only on a state they control");
+    // Ticket #238 (version 0.08.3): three whole turns in hand before a Faction may remake a
+    // country, so this test ages the hold rather than measuring the clock by accident.
+    held_long_enough(&mut g, sid);
     let o = Order::Leapfrog { state: sid };
     assert_eq!(g.order_cost(Seat(0), &o).ducats, 50, "50 Ducats a Leapfrog");
     let before = g.population_coefficient(sid);
@@ -9012,6 +9023,7 @@ fn an_exodus_call_doubles_the_muster_and_suspends_the_double_cost() {
     assert!((g.muster_population_in(ark, sid, plain) - g.lift_population(ark, plain)).abs() < 1e-9, "and pays double for them until the Call");
 
     g.seats[ark.index()].stockpile.ducats = 500;
+    held_long_enough(&mut g, sid);
     g.commit_orders(ark, &[Order::ExodusCall { state: sid }]);
     assert!(g.exodus_call_running(sid), "it runs from the turn it is sounded");
     assert_eq!(g.emigrants_per_turn_in(ark, sid), plain * 2, "sixteen, not eight");
@@ -9036,6 +9048,7 @@ fn an_exodus_call_is_once_per_region_and_the_arkwrights_alone() {
     let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
     let sid = g.controlled_states(ark)[0];
     g.seats[ark.index()].stockpile.ducats = 500;
+    held_long_enough(&mut g, sid);
 
     g.commit_orders(ark, &[Order::ExodusCall { state: sid }]);
     assert!(g.state(sid).exodus_call_used, "the Region is marked for good");
@@ -9047,9 +9060,84 @@ fn an_exodus_call_is_once_per_region_and_the_arkwrights_alone() {
     let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
     let theirs = g.controlled_states(cus)[0];
     g.seats[cus.index()].stockpile.ducats = 500;
+    held_long_enough(&mut g, theirs);
     assert_eq!(
         g.check_order(cus, &[], &Order::ExodusCall { state: theirs }).unwrap_err().0,
         "only the Arkwrights sound an Exodus Call"
     );
     assert_eq!(g.order_cost(ark, &Order::ExodusCall { state: sid }).ducats, g.tables.ducats.per_leapfrog, "priced as a Leapfrog, the other Faction-only order on a state you hold");
+}
+
+// ------------------------------------------- 0.08.3 ticket #238: three turns before you remake
+
+/// Ticket #238 (version 0.08.3): the Strip Permit, the Leapfrog and the Exodus Call all change a
+/// country for good, and a Faction that has just walked in does not get to do that. Three whole
+/// turns in hand, the turn of the taking not counting.
+///
+/// Measured before it was taken, over five whole games: the rule would have refused 31 of 31 Strip
+/// Permits and 2 of 36 Leapfrogs AS ISSUED. That figure overstates the harm, and the second
+/// measurement is why: every Strip Permit goes on a Region held nought or one turns, while the
+/// Prospectors hold nine Regions of nine for three turns or more by mid-game. The rule delays a
+/// strip onto the pile of long-held Regions the seat already sits on; it does not abolish it.
+#[test]
+fn three_turns_in_hand_before_a_faction_remakes_a_region() {
+    let mut g = game();
+    let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    let min = g.tables.faction_orders.min_turns_held;
+    assert_eq!(min, 3, "the figure the rest of this test is written against");
+    // Taken BEFORE the Region below is seized, or `controlled_states` hands back the new one.
+    let home = g.controlled_states(cus)[0];
+
+    // A Region taken this turn: refused, and the refusal names the turn it opens.
+    let fresh = StateId::ALL.into_iter().find(|s| g.state(*s).control == Control::Neutral).unwrap();
+    g.turn = 10;
+    g.take_control(fresh, cus);
+    g.seats[cus.index()].stockpile.ducats = 500;
+    assert_eq!(g.turns_held(cus, fresh), Some(0), "the turn of the taking does not count");
+    let refusal = g.check_order(cus, &[], &Order::Leapfrog { state: fresh }).unwrap_err().0;
+    assert!(refusal.contains("from turn 13"), "the refusal says when, not just no: {refusal}");
+
+    // Turn by turn until it opens.
+    for (turn, open) in [(11, false), (12, false), (13, true)] {
+        g.turn = turn;
+        assert_eq!(g.may_remake(cus, fresh), open, "turn {turn}, held {:?}", g.turns_held(cus, fresh));
+    }
+
+    // A starting Region is held from turn 1, so it opens on turn 4 -- no special case.
+    assert_eq!(g.state(home).held_since, Some(1), "held from the first turn");
+    g.turn = 3;
+    assert!(!g.may_remake(cus, home), "turn 3 is too soon");
+    g.turn = 4;
+    assert!(g.may_remake(cus, home), "and turn 4 opens it");
+}
+
+/// Ticket #238: losing the Region resets the clock, and a save written before this version -- which
+/// has no clock at all -- counts as held long enough rather than silently losing three orders.
+#[test]
+fn the_hold_clock_resets_on_a_change_of_hands_and_an_old_save_passes() {
+    let mut g = game();
+    let (cus, pro) = (
+        Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap(),
+        Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap(),
+    );
+    let sid = g.controlled_states(cus)[0];
+    g.turn = 20;
+    assert!(g.may_remake(cus, sid), "long held by its founder");
+
+    g.take_control(sid, pro);
+    assert_eq!(g.turns_held(pro, sid), Some(0), "the new holder starts from nothing");
+    assert!(!g.may_remake(pro, sid));
+    assert_eq!(g.turns_held(cus, sid), None, "and the old holder has no clock here at all");
+
+    // Written back to the SAME holder, the clock does not restart: a repeated write nobody can see
+    // must not deny an order forever.
+    g.turn = 25;
+    let before = g.state(sid).held_since;
+    g.take_control(sid, pro);
+    assert_eq!(g.state(sid).held_since, before, "same holder, same clock");
+    assert!(g.may_remake(pro, sid));
+
+    // An old save carries no clock.
+    g.state_mut(sid).held_since = None;
+    assert!(g.may_remake(pro, sid), "a missing clock counts as held long enough");
 }

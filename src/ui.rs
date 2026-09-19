@@ -3662,7 +3662,11 @@ fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Or
         resp = rule_tip(resp, whole).on_disabled_hover_ui(move |ui| hover_with_icons(ui, &b));
     }
     if let Err(e) = &check {
-        resp.clone().on_disabled_hover_text(&e.0);
+        // Ticket #238 (version 0.08.3): through `rule_tip`, so a REFUSAL can be photographed like
+        // any other tooltip. It could not be before -- a plain `on_disabled_hover_text` needs a
+        // pointer, and the shot window never has one -- which left every refusal in the game
+        // unlookable-at, this version's three-turn rule among them.
+        rule_tip(resp.clone(), e.0.clone());
     }
     if resp.clicked() {
         actions.push(Action::Place(order));

@@ -1306,6 +1306,11 @@ impl Game {
                 if self.state(*state).control != Control::Controlled(seat) {
                     return fail("Leapfrog needs a Nation State you control");
                 }
+                // Ticket #238 (version 0.08.3): three whole turns in hand before a Faction may
+                // remake a country. The turn of the taking does not count.
+                if !self.may_remake(seat, *state) {
+                    return fail(format!("{} has been yours for less than {} turns; you may act there from turn {}", self.tables.state(*state).name, self.tables.faction_orders.min_turns_held, self.may_remake_on_turn(*state)));
+                }
                 // Every Leapfrog already pending this turn has to come off before the next one bites.
                 let per = self.tables.climate.population_emissions_per_level;
                 let queued = pending.iter().filter(|o| matches!(o, Order::Leapfrog { state: s } if s == state)).count() as f64;
@@ -1328,6 +1333,11 @@ impl Game {
                 if self.state(*state).control.controller() != Some(seat) {
                     return fail("an Exodus Call needs a Nation State you control");
                 }
+                // Ticket #238 (version 0.08.3): three whole turns in hand before a Faction may
+                // remake a country. The turn of the taking does not count.
+                if !self.may_remake(seat, *state) {
+                    return fail(format!("{} has been yours for less than {} turns; you may act there from turn {}", self.tables.state(*state).name, self.tables.faction_orders.min_turns_held, self.may_remake_on_turn(*state)));
+                }
                 if self.state(*state).exodus_call_used {
                     return fail("this Region has answered an Exodus Call once already, and may not again");
                 }
@@ -1342,6 +1352,11 @@ impl Game {
                 }
                 if self.state(*state).control != Control::Controlled(seat) {
                     return fail("a Strip Permit needs a Nation State you control");
+                }
+                // Ticket #238 (version 0.08.3): three whole turns in hand before a Faction may
+                // remake a country. The turn of the taking does not count.
+                if !self.may_remake(seat, *state) {
+                    return fail(format!("{} has been yours for less than {} turns; you may act there from turn {}", self.tables.state(*state).name, self.tables.faction_orders.min_turns_held, self.may_remake_on_turn(*state)));
                 }
                 if self.state(*state).strip_permit_used {
                     return fail("this Nation State has had its Strip Permit");

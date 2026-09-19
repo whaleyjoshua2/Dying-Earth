@@ -260,6 +260,18 @@ pub struct NationState {
     /// Ticket #237: the last turn a Call here doubles the muster and suspends its double cost.
     #[serde(default)]
     pub exodus_call_ends: Option<u32>,
+    /// Ticket #238 (version 0.08.3): the turn this state's CURRENT holder took it, and who that is.
+    /// Nothing recorded how long a Region had been held before this -- `changed_hands` is true for
+    /// the single turn of a handover and `neutral_since` counts a run of neutrality -- so the
+    /// three-turn rule needed a clock of its own.
+    ///
+    /// Both are maintained in `restart_neutrality_clock`, which runs after EVERY write to
+    /// `control`: there are exactly two in the engine and the second calls it explicitly, so a new
+    /// way of taking a Region cannot quietly forget to reset the clock.
+    #[serde(default)]
+    pub held_since: Option<u32>,
+    #[serde(default)]
+    pub held_by: Option<Seat>,
 }
 
 /// Ticket #57: a calendar month of game time. Turn 1 is January 2030.
@@ -1071,6 +1083,8 @@ impl Game {
                 baseline_cut: 0.0,
                 strip_permit_used: false,
             exodus_call_used: false,
+            held_since: None,
+            held_by: None,
             exodus_call_ends: None,
                 strip_permit_ends: None,
             })
@@ -1914,6 +1928,46 @@ impl Game {
         let turn = self.turn;
         let st = self.state_mut(s);
         st.neutral_since = if st.control == Control::Neutral { Some(turn + 1) } else { None };
+        // Ticket #238 (version 0.08.3): and the hold clock, reset only when the HOLDER changes.
+        // A state written back to the same seat -- which happens -- keeps its clock, or the three
+        // faction-only orders could be denied forever by a repeated write nobody can see.
+        let who = st.control.controller();
+        if who != st.held_by {
+            st.held_by = who;
+            st.held_since = who.map(|_| turn);
+        }
+    }
+
+    /// Ticket #238 (version 0.08.3): may this seat remake this Region yet? The Strip Permit, the
+    /// Leapfrog and the Exodus Call all change a country for good, and a Faction that has just
+    /// walked in does not get to do that.
+    ///
+    /// A Region with NO clock recorded passes. That is every Region in a save written before this
+    /// version, and the alternative -- treating a missing clock as "just arrived" -- would silently
+    /// disable three Faction orders in every old save, which is a worse surprise than a save that
+    /// is briefly generous.
+    pub fn may_remake(&self, seat: Seat, s: StateId) -> bool {
+        match self.turns_held(seat, s) {
+            None => true,
+            Some(held) => held >= self.tables.faction_orders.min_turns_held,
+        }
+    }
+
+    /// Ticket #238: the turn this seat may first remake this Region, for the refusal to name.
+    pub fn may_remake_on_turn(&self, s: StateId) -> u32 {
+        let min = self.tables.faction_orders.min_turns_held;
+        self.state(s).held_since.map(|since| since + min).unwrap_or(self.turn)
+    }
+
+    /// Ticket #238 (version 0.08.3): how many whole turns this seat has held this Region, or None
+    /// if it does not hold it. The turn of the taking does not count, so a Region taken on turn 10
+    /// answers 0 that turn, 1 on turn 11, and opens its Faction-only order on turn 13.
+    pub fn turns_held(&self, seat: Seat, s: StateId) -> Option<u32> {
+        let st = self.state(s);
+        if st.control.controller() != Some(seat) {
+            return None;
+        }
+        st.held_since.map(|since| self.turn.saturating_sub(since))
     }
 
     pub fn controlled_states(&self, seat: Seat) -> Vec<StateId> {

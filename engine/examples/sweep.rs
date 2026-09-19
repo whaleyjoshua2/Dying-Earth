@@ -149,8 +149,8 @@ fn main() {
                         rel_end.extend(r.relations_end.iter().copied());
                         rel_floored += r.relations_floored;
                         accords += r.accords_end;
-                        for i in 0..4 {
-                            accord_terms[i] += r.accord_terms[i];
+                        for (i, a) in accord_terms.iter_mut().enumerate() {
+                            *a += r.accord_terms[i];
                         }
                         takes += r.influence_transfers;
                         if let Some(t) = r.tree_done_turn {

@@ -29,7 +29,7 @@ The Faction that means to save what humanity knows, and as many of its people as
 _Avoid_: scholars, librarians, scientists, the Academy
 
 **Exodus Call**:
-The Arkwrights' signature order, since version 0.08.3: on a Nation State they control, for the price of a Leapfrog, **two turns of a doubled muster** -- sixteen **Pioneers** a turn where they otherwise recruit eight. **Once per Region, ever**, the shape the **Strip Permit** has had since version 0.05.
+The Arkwrights' signature order, since version 0.08.3: on a Nation State they control, for the price of a Leapfrog, **two turns of a doubled muster** -- sixteen **Pioneers** a turn where they otherwise recruit eight. **Once per Region, ever**, the shape the **Strip Permit** has had since version 0.05, and like both older orders it needs **Three Turns Held**.
 While it runs it also **suspends Coach Class's double charge**: those sixteen cost the Region the ordinary population a Pioneer costs anybody else, not the Arkwrights' double. That clause is the order's point rather than a sweetener. Measured before it was decided, their home Region runs from twenty units of population to **one** over a game as it is, so an order that doubled only the count would have emptied the country twice as fast -- deepening the very thing that leaves them the thinnest seat at the table.
 _Avoid_: mass evacuation, the call (alone), lifeboat, rapture
 
@@ -327,12 +327,17 @@ The Custodians' signature Facility, which only they build and only in a Region t
 _Avoid_: carbon capture, cleanup, restoration (the retired rule), terraforming, filter
 
 **Leapfrog**:
-The Custodians' other signature clause: an Orders-phase order paid in Ducats on a Region they control, which lowers that state's per-person Emissions coefficient by one Industry Level's worth, for good. It may be bought any number of times, and never takes the figure below the base every state pays.
+The Custodians' other signature clause: an Orders-phase order paid in Ducats on a Region they control, which lowers that state's per-person Emissions coefficient by one Industry Level's worth, for good. It may be bought any number of times, and never takes the figure below the base every state pays. Since version 0.08.3 it needs **Three Turns Held**.
 _Avoid_: clean development, technology transfer, offset, upgrade
 
 **Strip Permit**:
-The Prospectors' other signature clause: an Orders-phase order, free, that may be taken once in a Region's whole life. For three turns every Facility there produces double; when it ends, that state's Baseline Emissions and its Unrest rise for good.
+The Prospectors' other signature clause: an Orders-phase order, free, that may be taken once in a Region's whole life. For three turns every Facility there produces double; when it ends, that state's Baseline Emissions and its Unrest rise for good. Since version 0.08.3 it needs **Three Turns Held**.
 _Avoid_: licence, boom, overdrive, exploitation
+
+**Three Turns Held**:
+The condition the three orders that remake a Region for good -- the **Leapfrog**, the **Strip Permit** and the **Exodus Call** -- have carried since version 0.08.3: the Faction must have held that Region for three whole turns. The turn of the taking does not count, so a Region taken on turn 10 opens its Faction order on turn 13. Holding is what the clock measures, not holding continuously by that Faction alone: it restarts whenever the **controller changes**, and a Region written back to the same Faction keeps the clock it had.
+It is a **delay, not a prohibition**. Measured before it was adopted, the Prospectors held nine of their nine Regions for three turns or more, and issued their permits at an age of nought or one turn; the rule moves those permits later rather than abolishing them.
+_Avoid_: cooldown, lockout, occupation, tenure, grace period
 
 **Mothball**:
 The Orders-phase order that stands a Facility or a Module down. A mothballed building produces nothing, pays no Energy upkeep, emits nothing, is online for no rule, and keeps its slot. It is free, it takes effect at the Resolution, it raises the Unrest of a Region it happens in, and only a Restart brings the building back, for Materials and a turn.

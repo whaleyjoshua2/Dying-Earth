@@ -278,6 +278,25 @@ draw_return = 0.9
 # would have burned the country twice as fast -- deepening the very thing that leaves them winning
 # 3 games of 80. The designer chose the reading that moves people without eating the source faster
 # than any other Faction does.
+# Ticket #238 (version 0.08.3): a Faction must have held a Region for this many whole turns before
+# it may remake it -- the Strip Permit, the Leapfrog and the Exodus Call. The turn of the taking
+# does not count, so a Region taken on turn 10 opens on turn 13, and a starting Region on turn 4.
+#
+# Measured before it was taken, over five whole games: it would have refused 31 of 31 Strip Permits
+# and 2 of 36 Leapfrogs as those orders were ACTUALLY issued. Every Strip Permit goes on a Region
+# held nought or one turns, while the Prospectors hold NINE Regions of nine for three turns or more
+# by mid-game. They are not losing their grip; the AI simply strips each new Region the turn it
+# arrives, a fresh one being the obvious unstripped candidate, so the rule pushes strips onto the
+# pile of long-held Regions the seat is already sitting on.
+#
+# That projection UNDERSTATED the cost, and the A/B says so. Flipping this value between 0 and 3
+# over the same twenty seeds, six parameter rows, Leapfrogs issued over the batch fall 378 -> 177,
+# a little under HALF. A refused order does not simply wait: the Ducats go elsewhere that turn and
+# the board diverges. The share kept rises with the length of the game -- 20% on the shortest row,
+# 51% on the longest -- which is the delay showing through where there are turns enough to spend it.
+[faction_orders]
+min_turns_held = 3
+
 [exodus_call]
 turns = 2
 muster_multiplier = 2

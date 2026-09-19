@@ -1090,6 +1090,7 @@ struct FactionsFile {
     research_directive: ResearchDirectiveCard,
     venture_capital: VentureCard,
     emigrants: EmigrantsCard,
+    faction_orders: FactionOrdersCard,
     exodus_call: ExodusCallCard,
     relations: RelationsCard,
 }
@@ -1182,6 +1183,11 @@ fn scar_floor_default() -> i64 {
 /// Ticket #73 (version 0.05.5): Emigrants, the built Colonists: how many a Faction musters a turn,
 /// the population each takes, what a batch takes off the state's Unrest, and how many turns the sea
 /// crossing to Antarctica takes.
+#[derive(Debug, Clone, Deserialize)]
+pub struct FactionOrdersCard {
+    pub min_turns_held: u32,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct ExodusCallCard {
     pub turns: u32,
@@ -1283,6 +1289,7 @@ pub struct Tables {
     pub start: StartCard,
     pub research_directive: ResearchDirectiveCard,
     pub exodus_call: ExodusCallCard,
+    pub faction_orders: FactionOrdersCard,
     pub ducats: DucatsCard,
     pub venture: VentureCard,
     pub emigrants: EmigrantsCard,
@@ -1392,6 +1399,7 @@ impl Tables {
             start: factions.start,
             ducats: factions.ducats,
             exodus_call: factions.exodus_call,
+            faction_orders: factions.faction_orders,
             research_directive: factions.research_directive,
             venture: factions.venture_capital,
             emigrants: factions.emigrants,
