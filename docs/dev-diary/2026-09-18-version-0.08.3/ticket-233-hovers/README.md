@@ -46,12 +46,19 @@ are the dominant change and are plainly the difference.
 
 ## What is not photographed, and why that is settled
 
-The hovers themselves. `shot:` mode cannot park a pointer, so no capture can open a tooltip — the
-gap that [A shot aid that opens a window and parks a pointer](https://github.com/whaleyjoshua2/Dying-Earth/issues/242)
-was raised for and then closed without code, because the designer verifies tooltips at the machine
-(*"I've seen the tooltips and confirm they are functioning"*) and required this one to use the same
-mechanism as every existing hover. There is no novel behaviour here for a picture to check: it is
-`on_hover_text` on a label, the same call made dozens of times elsewhere in this file.
+The hovers themselves. The designer verifies tooltips at the machine (*"I've seen the tooltips and
+confirm they are functioning"*) and required this one to use the same mechanism as every existing
+hover, so there is no novel behaviour here for a picture to check: it is `on_hover_text` on a
+label, the same call made dozens of times elsewhere in this file.
+
+**A correction, made on ticket #238.** This paragraph first read *"`shot:` mode cannot park a
+pointer, so no capture can open a tooltip"*, and gave that as the reason
+[A shot aid that opens a window and parks a pointer](https://github.com/whaleyjoshua2/Dying-Earth/issues/242)
+closed without code. **The sentence was false.** The `tip:<word>` aid has been in `src/ui.rs` since
+ticket #153 (version 0.07.4) and shows the first tooltip whose text contains that word with no
+pointer at all. #242 closed for the right reason — nothing needed building — but the reason
+recorded was a gap that was already filled. The two pictures below are still the right pictures for
+this ticket, which was about how much shorter the page reads; only the sentence was wrong.
 
 What a picture *can* show is the thing the ticket was actually for — how much shorter the page
 reads — and that is the pair above.
