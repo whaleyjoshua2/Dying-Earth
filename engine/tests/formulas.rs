@@ -9029,6 +9029,53 @@ fn the_arkwrights_signature_rule_is_coach_class_and_says_steerage_nowhere() {
     }
 }
 
+// -------------------------------------------- 0.08.4 ticket #261: the rival's Moment
+
+/// Ticket #261 (version 0.08.4): a rival crossing three quarters of the way to its Victory
+/// Condition, or meeting one part of it with the other short, interrupts the player once a step.
+/// The player's own seat never does; rank 5, between a Battle and a Tech.
+#[test]
+fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() {
+    let mut g = game();
+    calm(&mut g);
+    let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
+    assert_ne!(pro, Seat(0), "the Prospectors are a rival in this game");
+    let fired = |g: &Game| g.report.moments.iter().filter(|m| m.kind == MomentKind::RivalProgress).count();
+    // Presence 9 of 12 (0.75) and the Fund at 2000 of 2500 (0.8): the score is 0.75.
+    colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 9);
+    g.seats[pro.index()].venture_fund = 2000;
+    assert!((g.progress(pro).score() - 0.75).abs() < 1e-9, "{}", g.progress(pro).score());
+    g.end_phase();
+    assert_eq!(fired(&g), 1, "three quarters: the Moment fires: {:?}", g.report.moments);
+    let m = g.report.moments.iter().find(|m| m.kind == MomentKind::RivalProgress).unwrap();
+    assert!(m.text.contains("Prospectors") && m.text.contains("three quarters"), "{}", m.text);
+    assert!(m.text.contains("9 of 12"), "the part still short is the figure: {}", m.text);
+    assert_eq!(m.figure, "9 of 12");
+    g.end_phase();
+    assert_eq!(fired(&g), 1, "once: it does not fire again while the seat sits there");
+    // The Fund full but its gate shut is held back, not met.
+    g.seats[pro.index()].venture_fund = 2500;
+    g.end_phase();
+    assert_eq!(fired(&g), 1, "a part held back by its gate Tech is not a part met");
+    // The gate open: one part met, the other short.
+    open_gates(&mut g);
+    g.end_phase();
+    assert_eq!(fired(&g), 2, "one part met: the second step fires: {:?}", g.report.moments);
+    let m = g.report.moments.iter().rev().find(|m| m.kind == MomentKind::RivalProgress).unwrap();
+    assert!(m.text.contains("met half") && m.text.contains("Venture Capital Fund") && m.text.contains("9 of 12"), "{}", m.text);
+    g.end_phase();
+    assert_eq!(fired(&g), 2, "once");
+    assert!(g.outcome.is_none(), "nobody has won");
+    // The player's own seat, at the same steps, never interrupts itself.
+    colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 9);
+    g.seats[0].stabilization_run = 3;
+    g.end_phase();
+    assert_eq!(fired(&g), 2, "rivals only: {:?}", g.report.moments);
+    assert_eq!(MomentKind::RivalProgress.rank(), 5, "between a Battle (4) and a Tech (6)");
+    assert_eq!(MomentKind::ALL.len(), 9);
+    assert!(g.tables.report.moment_on(MomentKind::RivalProgress), "on by default");
+}
+
 // -------------------------------------------- 0.08.4 ticket #260: a motto on every card
 
 /// Ticket #260 (version 0.08.4): every Faction's card carries a motto, one line, its own. A guard,

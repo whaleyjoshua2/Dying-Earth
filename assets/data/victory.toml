@@ -18,3 +18,9 @@ turns = 36
 start_year = 2030
 start_month = 1
 months_per_turn = 2
+
+# Ticket #261 (version 0.08.4): the rival's Moment fires when a rival's score -- the lower of its
+# two parts' fractions -- reaches this share, and again when one part is met with the other short.
+# Once a step, rivals only. The suggestion said half, three quarters and one turn from; the designer
+# took three quarters and the one step the engine can state exactly.
+rival_moment_share = 0.75

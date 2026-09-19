@@ -81,6 +81,7 @@ fn moment_from_id(name: &str) -> Option<MomentKind> {
         "antarctica" => Some(MomentKind::Antarctica),
         "archive" => Some(MomentKind::ArchiveComplete),
         "lost" => Some(MomentKind::LostInTransit),
+        "rival" => Some(MomentKind::RivalProgress),
         _ => None,
     }
 }
@@ -258,6 +259,20 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.materials = 120;
             g.seats[0].stockpile.energy = 60;
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
+        }
+        // `rival:1` (a building aid, ticket #261, version 0.08.4): seat 1 stands three quarters of
+        // the way to its Victory Condition -- nine Colonists on the Moon of twelve, and, for the
+        // Prospectors it usually is, the Fund at 2000 of 2500 -- and a quiet turn runs so the
+        // rival's Moment fires and `moment:rival` can open it in the Report picture.
+        if std::env::args().any(|a| a == "rival:1") {
+            let rival = Seat(1);
+            let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
+            let id = ColonyId(g.fresh_id());
+            let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat)];
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(rival), modules, colonists: 9, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.seats[1].venture_fund = 2000;
+            g.seats[1].stabilization_run = 3;
+            run_one_quiet_turn(g);
         }
         // `observatory:<n>` (a building aid, ticket #80): seat 0 gets a Colony on Mars with three
         // Habitats, a Generator, a Mine and an Observatory, n Colonists living there, and its card

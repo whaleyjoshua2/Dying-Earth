@@ -98,6 +98,9 @@ game_over_collapse = "Game over on turn {turn}: Collapse at {temperature} C. Nob
 event_drawn = "{text}"
 # Ticket #259 (version 0.08.4): the turn the off-Earth cards are shuffled into the deck.
 deck_joined = "The {n} Events that can only land off Earth join the deck: Grid Failure, Reactor Leak, Dust Storm, Moonquake, Helium-3 Vein, Rich Seam and Ice Deposit."
+# Ticket #261 (version 0.08.4): the rival's Moment, two steps. {part} is the part still short.
+rival_three_quarters = "The {faction} are three quarters of the way to their Victory Condition: {part} at {value} of {bar}."
+rival_one_part_met = "The {faction} have met half of their Victory Condition, {met}. Only {part} stands between them and the game, at {value} of {bar}."
 break_fired = "Break at {temperature} C - {name}. {happened} {text}"
 break_coastal = "{states}: every state at Coastal Exposure {exposure} lost {percent}% of its people and took {unrest} Unrest."
 break_baseline = "{state}: its Baseline Emissions rise by {rise} for good."
@@ -221,6 +224,13 @@ figure = "{figure}"
 [moments.decisive_battle]
 on = true
 text = "A Battle at {place}: {result}"
+figure = "{figure}"
+
+# Ticket #261 (version 0.08.4): a rival closing on its Victory Condition -- three quarters of the
+# way, or one part met with the other short -- once a step, rivals only, in the rival's colour.
+[moments.rival_progress]
+on = true
+text = "{text}"
 figure = "{figure}"
 
 # Ticket #86 (version 0.06.0): Colonists lost to crowding on a Colony Ship's arrival.

@@ -760,6 +760,9 @@ pub struct VictoryTable {
     pub start_month: i64,
     #[serde(default = "one_month")]
     pub months_per_turn: i64,
+    /// Ticket #261 (version 0.08.4): the share of the way to its Victory Condition at which a
+    /// rival's Moment fires.
+    pub rival_moment_share: f64,
 }
 
 fn twenty_thirty() -> i64 {

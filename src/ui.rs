@@ -6931,7 +6931,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             let count = shown.len();
             egui::Modal::new("moment".into()).show(ctx, |ui| {
                 ui.set_width(if m.tech.is_some() { 780.0 } else { 460.0 });
-                ui.label(RichText::new(&m.figure).size(30.0).strong().color(Color32::from_rgb(255, 220, 150)));
+                // Ticket #261 (version 0.08.4): a rival's Moment wears that Faction's colour on its figure.
+                let figure_colour = m.seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::from_rgb(255, 220, 150));
+                ui.label(RichText::new(&m.figure).size(30.0).strong().color(figure_colour));
                 ui.label(RichText::new(&m.text).size(17.0));
                 if let Some(note) = &m.note {
                     ui.label(RichText::new(note).size(15.0).color(Color32::from_rgb(200, 220, 255)));

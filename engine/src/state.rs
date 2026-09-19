@@ -692,6 +692,11 @@ pub struct SeatState {
     /// here and the whole Materials are paid as they accrue; nothing is lost to rounding.
     #[serde(default)]
     pub sea_wall_upkeep_owed: f64,
+    /// Ticket #261 (version 0.08.4): which steps of the rival's Moment this seat has fired -- three
+    /// quarters of the way, and one part met. Once each, so a seat that dips and recrosses is not
+    /// announced twice.
+    #[serde(default)]
+    pub rival_steps_announced: [bool; 2],
     /// Ticket #227 (version 0.08.2): units this seat has bought and sold through the Trading window
     /// over the whole game. Kept because floating prices are only fair if more than one hand is on
     /// them, and the sweep had no way to say whose were.
@@ -1018,6 +1023,7 @@ impl Game {
             venture_share: 0.0,
             venture_banked_last_turn: 0,
             sea_wall_upkeep_owed: 0.0,
+            rival_steps_announced: [false; 2],
             bought_units: 0,
             sold_units: 0,
             spaceport_influence: 0,
@@ -3439,7 +3445,7 @@ impl Game {
     pub fn moment(&mut self, kind: MomentKind, args: &[(&str, String)], place: Option<ReportPlace>) {
         let Some(card) = self.tables.report.moment(kind) else { return };
         let (text, figure) = (crate::report::render(&card.text, args), crate::report::render(&card.figure, args));
-        self.report.moments.push(Moment { kind, text, figure, place, tech: None, note: None });
+        self.report.moments.push(Moment { kind, text, figure, place, tech: None, note: None, seat: None });
     }
 
     /// A sentence about what one AI seat's turn came to, appended to that Faction's paragraph.

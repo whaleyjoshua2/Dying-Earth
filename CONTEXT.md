@@ -529,7 +529,7 @@ The guided first turns, since version 0.07.5, asked for by the `Play Tutorial` t
 _Avoid_: walkthrough, onboarding, training mission, guided mode
 
 **Moment**:
-A short modal that stops the turn before the Report, for one sentence and one number: a Colony founded, a Break or the sea rising, a Battle that cost a unit, a place changing hands, a Tech completed, Antarctica opening, the Archive finished, or Colonists lost in transit. At most two a turn, the most serious first, and every kind can be switched off.
+A short modal that stops the turn before the Report, for one sentence and one number: a Colony founded, a Break or the sea rising, a Battle that cost a unit, a place changing hands, a Tech completed, Antarctica opening, the Archive finished, Colonists lost in transit, or, since version 0.08.4, **a rival closing on its Victory Condition** -- three quarters of the way there, or one part met with the other short, once each, and never the player's own seat. At most two a turn, the most serious first, and every kind can be switched off.
 _Avoid_: popup, alert, notification, cutscene, interruption
 
 **Spectator**:
