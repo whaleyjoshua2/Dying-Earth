@@ -101,7 +101,9 @@ pub enum FacilityKind {
     /// the Natural Sink while it is online, and is destroyed if its state changes hands.
     Scrubber,
     /// Version 0.05 (ticket #56): the Sea Wall. Always stands in a coastal slot, at most one per
-    /// Nation State, and it absorbs the state's next Sea Level threshold and is destroyed doing it.
+    /// Nation State, and it absorbs every Sea Level threshold that reaches the state. Ticket #257
+    /// (version 0.08.4): it stands through them -- it was destroyed absorbing one before -- and each
+    /// rise it has held adds to its keep.
     SeaWall,
     /// Version 0.08.0 (ticket #185): the School. At most one per Nation State. While it stands and is
     /// online it raises its state's Education Level by a step a turn to a ceiling, and the figure

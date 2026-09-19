@@ -424,7 +424,10 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("break_fired", &["temperature", "name", "happened", "text"]),
     ("break_coastal", &["states", "exposure", "percent", "unrest"]),
     ("break_baseline", &["state", "rise"]),
-    ("sea_wall", &["temperature", "state"]),
+    // Ticket #257 (version 0.08.4): the wall stands and its keep rises; a surge it holds; a keep unpaid.
+    ("sea_wall", &["temperature", "state", "keep"]),
+    ("storm_surge_wall", &["state", "percent"]),
+    ("sea_wall_unkept", &["faction", "states"]),
     ("sea_nothing_left", &["temperature", "state"]),
     ("sea_took", &["n", "slots", "state", "temperature"]),
     ("sea_took_destroying", &["n", "slots", "state", "temperature", "destroyed"]),

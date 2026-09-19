@@ -147,6 +147,13 @@ pub struct ScrubberCard {
     pub max: u32,
 }
 
+/// Ticket #257 (version 0.08.4): what each Sea Level rise a Sea Wall has held back adds to its
+/// keep, in Materials a turn (`facilities.toml`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct SeaWallCard {
+    pub upkeep_per_rise: f64,
+}
+
 /// Ticket #187 (version 0.08.0): the band a place's Education Level bends its Resistance through,
 /// and the two anchors it is measured between (`influence.toml`).
 #[derive(Debug, Clone, Deserialize)]
@@ -338,6 +345,9 @@ pub struct EventsTable {
     pub drought_output_multiplier: f64,
     pub drought_unrest: f64,
     pub volcanic_co2: f64,
+    /// Ticket #257 (version 0.08.4): what a Storm Surge does to a state whose Sea Wall holds --
+    /// the Facilities in its coastal slots make this much of their output at the next Income.
+    pub storm_surge_coastal_multiplier: f64,
     pub event: Vec<EventCard>,
 }
 
@@ -1004,6 +1014,7 @@ struct FacilitiesFile {
     facility: Vec<FacilityCard>,
     industry_level: IndustryLevelCard,
     scrubber: ScrubberCard,
+    sea_wall: SeaWallCard,
     mothball: MothballCard,
     school: SchoolCard,
     unique: UniqueCard,
@@ -1268,6 +1279,8 @@ pub struct Tables {
     /// Ticket #54: the Scrubber cap and the Mothball prices (`facilities.toml`).
     pub scrubber: ScrubberCard,
     pub mothball: MothballCard,
+    /// Ticket #257: the Sea Wall's keep per rise held.
+    pub sea_wall: SeaWallCard,
     /// Ticket #185: the School's step and ceiling.
     pub school: SchoolCard,
     /// Tickets #182, #184, #186: the three Unique Facility clause figures that have one.
@@ -1388,6 +1401,7 @@ impl Tables {
             industry_level: facilities.industry_level,
             scrubber: facilities.scrubber,
             mothball: facilities.mothball,
+            sea_wall: facilities.sea_wall,
             school: facilities.school,
             unique: facilities.unique,
             slots: modules.slots,

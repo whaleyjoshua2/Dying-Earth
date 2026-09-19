@@ -202,6 +202,12 @@ impl Game {
                     .filter(|s| t.state(*s).coastal_exposure > 0 && self.state(*s).thresholds_fired.iter().any(|f| !f))
                     .collect();
                 match self.pick_uniform(&states) {
+                    // Ticket #257 (version 0.08.4): on a walled state the wall holds, and the
+                    // coastal Facilities make less at the next Income instead.
+                    Some(s) if self.sea_wall_working(s) => {
+                        let cut = ((1.0 - t.events.storm_surge_coastal_multiplier) * 100.0).round();
+                        (EventTarget::State(s), format!("{} in {}: the Sea Wall holds; its coastal Facilities make {cut:.0}% less at the next Income.", card.name, t.state(s).name))
+                    }
                     Some(s) => (EventTarget::State(s), format!("{} in {}: its next sea-level threshold applies now.", card.name, t.state(s).name)),
                     None => (EventTarget::None, format!("{}: no exposed coast has a threshold ahead, so nothing happens.", card.name)),
                 }
@@ -414,7 +420,16 @@ impl Game {
                 }
             }
             (EventId::StormSurge, EventTarget::State(s)) => {
-                if let Some(i) = self.state(s).thresholds_fired.iter().position(|f| !f) {
+                // Ticket #257 (version 0.08.4): a standing, working Sea Wall holds the surge as it
+                // holds a threshold, and the state's coastal Facilities make less at the next Income.
+                if self.sea_wall_working(s) {
+                    self.state_mut(s).storm_surge = true;
+                    let cut = ((1.0 - self.tables.events.storm_surge_coastal_multiplier) * 100.0).round();
+                    let name = self.tables.state(s).name.clone();
+                    self.log(format!("Storm Surge in {name}: the Sea Wall held; its coastal Facilities make {cut:.0}% less at the next Income."));
+                    let text = self.say("storm_surge_wall", &[("state", name), ("percent", format!("{cut:.0}"))]);
+                    self.report_line(LineKind::Event, Some(ReportPlace::State(s)), text);
+                } else if let Some(i) = self.state(s).thresholds_fired.iter().position(|f| !f) {
                     self.apply_sea_threshold(s, i);
                 }
                 // Ticket #52: a Storm Surge is one of the three Climate cards that raise Unrest,

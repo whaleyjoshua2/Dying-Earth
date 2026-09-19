@@ -316,17 +316,22 @@ impl Game {
         if exposure == 0 {
             return;
         }
-        // Ticket #56: a Sea Wall standing and working takes the whole threshold and is destroyed
-        // doing it; no coastal slot is lost. A mothballed wall is not working and absorbs nothing.
+        // Ticket #56: a Sea Wall standing and working takes the whole threshold; no coastal slot is
+        // lost. A mothballed wall is not working and absorbs nothing.
+        // Ticket #257 (version 0.08.4): and it STANDS -- from #56 to here it was destroyed absorbing
+        // the one threshold, so the computer built 52 a game and the sea still took a median 32
+        // slots. At the designer's word it holds every threshold that reaches its state, and each
+        // rise it holds adds `sea_wall.upkeep_per_rise` Materials a turn to its keep (economy.rs).
         let wall = self.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::SeaWall && f.working());
         let temperature = format!("{thr:+.1}");
         // Ticket #58: the dispatch says the same thing in the words of report.toml; the log keeps its own.
         let said;
         let mut figure = "the Sea Wall".to_string();
         let mut headline = if let Some(i) = wall {
-            self.state_mut(sid).facilities.remove(i);
-            said = self.say("sea_wall", &[("temperature", temperature.clone()), ("state", name.clone())]);
-            format!("Sea level at {thr:+.1} C: the Sea Wall in {name} took the sea and was destroyed; no coastal slots were lost.")
+            self.state_mut(sid).facilities[i].rises_held += 1;
+            let keep = self.state(sid).facilities[i].rises_held as f64 * self.tables.sea_wall.upkeep_per_rise;
+            said = self.say("sea_wall", &[("temperature", temperature.clone()), ("state", name.clone()), ("keep", format!("{keep:.1}"))]);
+            format!("Sea level at {thr:+.1} C: the Sea Wall in {name} took the sea and stands; it costs {keep:.1} Materials a turn to keep now.")
         } else {
             // Ticket #56: the sea takes COASTAL slots only, and nothing once they are gone.
             let take = exposure.min(self.coastal_slots(sid));

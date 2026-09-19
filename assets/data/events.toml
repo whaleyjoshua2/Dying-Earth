@@ -33,6 +33,12 @@ wildfire_emissions = 2.0
 # figures above, as Rich Seam does.
 drought_output_multiplier = 0.5
 drought_unrest = 1.0
+# Ticket #257 (version 0.08.4): a Storm Surge that breaks on a standing Sea Wall no longer brings the
+# state's next threshold forward -- the wall holds it, as it holds every threshold now. Instead the
+# Facilities in the state's coastal slots make this much of their output at the next Income, once,
+# at the designer's word: "reduce by 30% the output of coastal slots for the next turn". The card's
+# Unrest lands as before. An unwalled state takes the threshold early, as it always has.
+storm_surge_coastal_multiplier = 0.7
 volcanic_co2 = 5.0
 
 [[event]]

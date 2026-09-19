@@ -3958,6 +3958,18 @@ fn facility_figures(game: &Game, sid: StateId, f: &Facility, director: Option<Se
     }
     // Ticket #69: a Lab in a state nobody holds, or under Occupation, works for the world.
     let world_lab = f.kind == FacilityKind::ResearchLab && f.working() && !f.offline_until_resolution && matches!(game.state(sid).control, Control::Neutral | Control::Occupied { .. });
+    // Ticket #257 (version 0.08.4): a Sea Wall says what it has held back and what that costs.
+    if f.kind == FacilityKind::SeaWall {
+        let yield_text = director.map(|d| game.facility_yield(d, sid, f.kind).text()).unwrap_or_else(|| "idle, nobody directs this state".to_string());
+        let keep = f.rises_held as f64 * game.tables.sea_wall.upkeep_per_rise;
+        let held = match f.rises_held {
+            0 => "has held back no rise yet".to_string(),
+            1 => format!("has held back 1 rise: {keep:.1} Materials a turn to keep"),
+            n => format!("has held back {n} rises: {keep:.1} Materials a turn to keep"),
+        };
+        let unkept = if !f.online && !f.mothballed { "; unkept this turn, holding nothing" } else { "" };
+        return format!("{yield_text}; {held}{unkept}");
+    }
     match director {
         Some(d) if world_lab => format!("{} (the Lab works for the world: {} Research a turn to the Tech under research)", game.facility_yield(d, sid, f.kind).text(), game.world_lab_yield(sid) / 2),
         Some(d) => game.facility_yield(d, sid, f.kind).text(),
@@ -4093,7 +4105,13 @@ fn no_slot_section(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mi
                     &session.pending,
                     Order::BuildFacility { state: sid, kind: FacilityKind::SeaWall },
                     "Sea Wall",
-                    Some(format!("{hover}. No build slot, at most one to a state; while it works, this state's next Sea Level threshold takes no slots, and the wall is destroyed absorbing it.")),
+                    // Ticket #257 (version 0.08.4): the wall stands and holds every threshold; each
+                    // rise held adds to its keep; a Storm Surge it holds cuts the coast's output.
+                    Some(format!(
+                        "{hover}. No build slot, at most one to a state. While it works, every Sea Level threshold takes no slots from this state and the wall stands; each rise it has held adds {} Materials a turn to its keep, and a Storm Surge it holds cuts its coastal Facilities' output by {:.0}% for one turn.",
+                        game.tables.sea_wall.upkeep_per_rise,
+                        (1.0 - game.tables.events.storm_surge_coastal_multiplier) * 100.0
+                    )),
                     actions,
                 );
                 cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::SeaWall }, "or", actions);
@@ -4193,7 +4211,7 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             }
             SlotBoxKind::Flooded(k) => {
                 let tip = format!(
-                    "{}lost to the sea: a Sea Level threshold took this coastal slot.\nA working Sea Wall holds the state's next threshold off, at most one to a state.",
+                    "{}lost to the sea: a Sea Level threshold took this coastal slot.\nA working Sea Wall holds every threshold off, at most one to a state.",
                     k.map(|k| format!("{}, ", k.name())).unwrap_or_else(|| "A slot ".to_string())
                 );
                 hab_tile(ui, rect, id, k.map(crate::icons::facility_icon), k.map(|k| k.name()).unwrap_or(""), TileState::Flooded, false, edge, tip);

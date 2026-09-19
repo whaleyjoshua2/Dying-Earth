@@ -570,7 +570,11 @@ fn build_board(session: &mut Session) {
             if let Some(i) = g.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::Bank) {
                 g.state_mut(sid).facilities.remove(i);
             }
-            g.state_mut(sid).facilities.push(Facility::new(FacilityKind::SeaWall));
+            // Ticket #257 (version 0.08.4): the wall stands through a rise now, so the aid's wall
+            // has held one, and its row says what that costs.
+            let mut wall = Facility::new(FacilityKind::SeaWall);
+            wall.rises_held = 1;
+            g.state_mut(sid).facilities.push(wall);
             g.seats[0].stockpile.materials = 300;
             g.seats[0].stockpile.energy = 400;
             g.seats[0].stockpile.ducats = 300;

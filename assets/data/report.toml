@@ -99,7 +99,12 @@ event_drawn = "{text}"
 break_fired = "Break at {temperature} C - {name}. {happened} {text}"
 break_coastal = "{states}: every state at Coastal Exposure {exposure} lost {percent}% of its people and took {unrest} Unrest."
 break_baseline = "{state}: its Baseline Emissions rise by {rise} for good."
-sea_wall = "The Sea Wall in {state} took the sea at {temperature} C and was destroyed; no coastal slot was lost."
+# Ticket #257 (version 0.08.4): the wall stands, and each rise it holds makes it dearer to keep.
+# The designer's line: "The Sea Wall in China took the sea, rising sea levels have increased the
+# cost to maintain this Sea Wall".
+sea_wall = "The Sea Wall in {state} took the sea at {temperature} C; the risen water makes it dearer to keep, {keep} Materials a turn now."
+storm_surge_wall = "Storm Surge in {state}: the Sea Wall held. Its coastal Facilities make {percent}% less at the next Income."
+sea_wall_unkept = "Materials ran short: the Sea Wall in {states} stands unkept this turn and holds nothing."
 sea_nothing_left = "Sea level at {temperature} C: {state} has no coastal slots left to lose."
 sea_took = "The sea took {n} coastal {slots} from {state} at {temperature} C."
 sea_took_destroying = "The sea took {n} coastal {slots} from {state} at {temperature} C: {destroyed}."

@@ -401,7 +401,7 @@ How much of a Region stands on the coast, a figure on its card. It sets how many
 _Avoid_: coastline, vulnerability, flood risk
 
 **Sea Wall**:
-The Facility that holds one threshold off: it takes no build slot (since version 0.05.5; a Coastal Slot before), at most one to a state, and while it is working the state's next Sea Level threshold of any kind takes no slots at all. The wall is destroyed absorbing it. It needs Coastal Engineering.
+The Facility that holds the sea off: it takes no build slot (since version 0.05.5; a Coastal Slot before), at most one to a state, and while it is working every Sea Level threshold of any kind takes no slots from the state. Since version 0.08.4 it **stands** through them -- from version 0.05 to 0.08.3 it absorbed one and was destroyed doing it -- and each rise it has held adds half a Material a turn to its keep, paid at Income; a seat short of Materials leaves it unkept that turn, and an unkept wall holds nothing. A Storm Surge that breaks on a standing wall no longer brings a threshold forward: the wall holds, and the Facilities in the state's Coastal Slots make three tenths less at the next Income. It needs Coastal Engineering.
 _Avoid_: dyke, levee, barrier, flood defence
 
 **Coastal Engineering**:
@@ -629,7 +629,7 @@ The amount of CO2 the oceans and forests remove from the CO2 Stock every turn. N
 _Avoid_: absorption, offset, carbon capture
 
 **Sea Level**:
-How far the oceans have risen with the Temperature. It is drawn on the globe as a creeping waterline, and at each of its thresholds it permanently takes Coastal Slots from every Region, as many as the state's Coastal Exposure and never more than it has left. It takes nothing else: an Inland Slot is out of its reach, and so is a state whose coast is already gone.
+How far the oceans have risen with the Temperature. It is drawn on the globe as a band of drowned land along every coast, widening with each threshold, and at each of its thresholds it permanently takes Coastal Slots from every Region, as many as the state's Coastal Exposure and never more than it has left. It takes nothing else: an Inland Slot is out of its reach, and so is a state whose coast is already gone.
 _Avoid_: flooding, water line, ocean rise
 
 **Break**:

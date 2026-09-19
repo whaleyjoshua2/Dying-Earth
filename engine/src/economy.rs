@@ -140,9 +140,10 @@ impl Game {
         self.run_schools();
         self.neutral_research();
         self.solar_maximum_next = false;
-        // Ticket #76: a Drought lasts one Income.
+        // Ticket #76: a Drought lasts one Income. Ticket #257: so does a Storm Surge on a wall.
         for s in &mut self.states {
             s.drought = false;
+            s.storm_surge = false;
         }
         for d in &mut self.discoveries {
             d.turns_left = d.turns_left.saturating_sub(1);
@@ -481,8 +482,12 @@ impl Game {
                 }
                 let y = self.facility_yield(seat, sid, f.kind);
                 // Ticket #76: a Drought halves what the state's Facilities make at this Income.
+                // Ticket #257 (version 0.08.4): a Storm Surge that broke on the state's Sea Wall cuts
+                // what its COASTAL Facilities make at this Income; an inland one is untouched.
                 let dry = if st.drought { self.tables.events.drought_output_multiplier } else { 1.0 };
-                let halve = |v: i64| if st.drought { (v as f64 * dry).floor() as i64 } else { v };
+                let surge = if st.storm_surge && f.coastal { self.tables.events.storm_surge_coastal_multiplier } else { 1.0 };
+                let scale = dry * surge;
+                let halve = |v: i64| if scale < 1.0 { (v as f64 * scale).floor() as i64 } else { v };
                 out.push(Producer {
                     place: ProducerPlace::Facility(sid, i),
                     name: f.kind.name(),
@@ -831,6 +836,33 @@ impl Game {
                 research = lifted;
             }
         }
+        // Ticket #257 (version 0.08.4): the Sea Walls' keep. Each rise a working wall has held adds
+        // `upkeep_per_rise` Materials a turn -- half a Material, which is not a whole number, so the
+        // fraction is carried on the seat and whole Materials are paid as they accrue; nothing is
+        // lost to rounding. Paid out of this Income's Materials, and short of Materials the walls
+        // stand unkept this turn and hold nothing -- the Energy shortfall rule's shape, for
+        // Materials, since a wall nobody pays for is a wall nobody mans.
+        let rises: u32 = self.directed_states(seat).iter().flat_map(|sid| self.state(*sid).facilities.iter()).filter(|f| f.kind == FacilityKind::SeaWall && f.working()).map(|f| f.rises_held).sum();
+        let mut keep_due = 0i64;
+        if rises > 0 {
+            let per = self.tables.sea_wall.upkeep_per_rise;
+            let s = self.seat_mut(seat);
+            s.sea_wall_upkeep_owed += rises as f64 * per;
+            keep_due = s.sea_wall_upkeep_owed.floor() as i64;
+            if keep_due > 0 {
+                s.sea_wall_upkeep_owed -= keep_due as f64;
+                sources.push(("Sea Walls (keep)".to_string(), Resource::Materials, -keep_due));
+            }
+        }
+        let keep_short = keep_due > 0 && self.seat(seat).stockpile.materials + gained.materials < keep_due;
+        if keep_short {
+            // Nothing is paid: the Materials stay, the walls go unkept, and the fraction they would
+            // have paid is not owed twice.
+            sources.retain(|(n, _, _)| n != "Sea Walls (keep)");
+            self.seat_mut(seat).sea_wall_upkeep_owed = 0.0;
+            keep_due = 0;
+        }
+        gained.materials -= keep_due;
         self.seat_mut(seat).income_sources = sources;
         let before = self.seat(seat).stockpile;
         let clamped = balance.max(0);
@@ -854,6 +886,26 @@ impl Game {
             s.doubled_module_turns += doubled_turns;
             s.venture_fund += banked + interest_to_fund;
             s.venture_banked_last_turn = banked;
+        }
+        if keep_short {
+            let mut names = Vec::new();
+            for sid in self.directed_states(seat) {
+                let name = self.tables.state(sid).name.clone();
+                let mut any = false;
+                for f in self.state_mut(sid).facilities.iter_mut() {
+                    if f.kind == FacilityKind::SeaWall && f.working() {
+                        f.online = false;
+                        any = true;
+                    }
+                }
+                if any {
+                    names.push(name);
+                }
+            }
+            let line = format!("{}: Materials ran short; the Sea Wall in {} stands unkept this turn and holds nothing.", self.seat_name(seat), Game::and_list(&names));
+            self.log(line.clone());
+            let text = self.say("sea_wall_unkept", &[("faction", self.seat_name(seat)), ("states", Game::and_list(&names))]);
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
         }
         if !shut.is_empty() {
             let line = format!("{}: Energy ran short; shut down {}.", self.seat_name(seat), shut.join(", "));

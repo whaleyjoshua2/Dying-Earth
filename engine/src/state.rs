@@ -114,11 +114,16 @@ pub struct Facility {
     /// Ticket #56: whether this Facility stands in one of its state's coastal slots. The sea takes
     /// coastal slots only, so a coastal Facility is the one it can destroy.
     pub coastal: bool,
+    /// Ticket #257 (version 0.08.4): a Sea Wall's count of the Sea Level thresholds it has held
+    /// back. The wall is not destroyed absorbing one any more; each rise it holds adds
+    /// `sea_wall_upkeep_per_rise` Materials a turn to its keep. Zero on every other kind.
+    #[serde(default)]
+    pub rises_held: u32,
 }
 
 impl Facility {
     pub fn new(kind: FacilityKind) -> Facility {
-        Facility { kind, online: true, offline_until_resolution: false, self_run: false, mothballed: false, change: None, coastal: false }
+        Facility { kind, online: true, offline_until_resolution: false, self_run: false, mothballed: false, change: None, coastal: false, rises_held: 0 }
     }
     /// Ticket #56: a Facility standing in a coastal slot.
     pub fn in_coastal_slot(kind: FacilityKind) -> Facility {
@@ -201,6 +206,10 @@ pub struct NationState {
     /// Ticket #76 (version 0.05.5): a Drought landed here: its Facilities make half at the next Income.
     #[serde(default)]
     pub drought: bool,
+    /// Ticket #257 (version 0.08.4): a Storm Surge broke on this state's Sea Wall: the wall held, and
+    /// the Facilities in its coastal slots make less at the next Income.
+    #[serde(default)]
+    pub storm_surge: bool,
     /// Ticket #73 (version 0.05.5): Emigrants waiting here, mustered and not yet lifted or sent.
     /// They are people of this state until they leave it: a new holder gets them.
     #[serde(default)]
@@ -673,6 +682,11 @@ pub struct SeatState {
     pub venture_share: f64,
     #[serde(default)]
     pub venture_banked_last_turn: i64,
+    /// Ticket #257 (version 0.08.4): Materials the seat's Sea Walls are owed in keep and have not yet
+    /// paid. Half a Material a turn per rise held is not a whole number, so the fraction is carried
+    /// here and the whole Materials are paid as they accrue; nothing is lost to rounding.
+    #[serde(default)]
+    pub sea_wall_upkeep_owed: f64,
     /// Ticket #227 (version 0.08.2): units this seat has bought and sold through the Trading window
     /// over the whole game. Kept because floating prices are only fair if more than one hand is on
     /// them, and the sweep had no way to say whose were.
@@ -998,6 +1012,7 @@ impl Game {
             venture_fund: 0,
             venture_share: 0.0,
             venture_banked_last_turn: 0,
+            sea_wall_upkeep_owed: 0.0,
             bought_units: 0,
             sold_units: 0,
             spaceport_influence: 0,
@@ -1069,6 +1084,7 @@ impl Game {
                 thresholds_fired: vec![false; tables.climate.sea_level_thresholds.len()],
                 wildfire_emissions_next: 0.0,
                 drought: false,
+                storm_surge: false,
                 emigrants: 0,
                 unrest: c.unrest,
                 changed_hands: false,
@@ -2303,6 +2319,12 @@ impl Game {
         // asymmetry the Constabulary itself has carried since ticket #190.
         let garrison = if self.has_tech(TechId::CivilDefense) { t.constabulary_margin_defended } else { t.constabulary_margin };
         t.challenge_margin + relations + if guarded { garrison } else { 0 }
+    }
+
+    /// Ticket #257 (version 0.08.4): does a Sea Wall stand and work in this state? The Climate
+    /// phase, the Storm Surge card and the card all ask the same question.
+    pub fn sea_wall_working(&self, sid: StateId) -> bool {
+        self.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::SeaWall && f.working())
     }
 
     /// Ticket #53: Blame raises this seat's threshold on a Nation State it does not control, and

@@ -4002,7 +4002,8 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
     assert_eq!(g2.free_slots(s2), 0, "and takes none once it stands");
     assert_eq!(g2.tables.facility(FacilityKind::SeaWall).materials, 20, "20 Materials since ticket #77");
 
-    // It absorbs a scheduled threshold and is destroyed doing it.
+    // Ticket #257 (version 0.08.4): it absorbs a scheduled threshold and STANDS -- it was destroyed
+    // doing it from ticket #56 to here -- counting the rise it held, and the next one is held too.
     let mut g = game();
     calm(&mut g);
     sea_ahead(&mut g);
@@ -4013,11 +4014,13 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
     let before = g.coastal_slots(sid);
     g.apply_sea_threshold(sid, 0);
     assert_eq!(g.coastal_slots(sid), before, "the wall took the sea: no coastal slot lost");
-    assert!(!g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::SeaWall), "and it was destroyed doing it");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("Sea Wall") && l.text.contains("destroyed")), "the Report says so: {:?}", g.report.lines);
-    // The next one lands as normal.
+    let wall = g.state(sid).facilities.iter().find(|f| f.kind == FacilityKind::SeaWall).expect("the wall stands");
+    assert_eq!(wall.rises_held, 1, "and counts the rise it held");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Sea Wall") && l.text.contains("dearer to keep")), "the Report says so: {:?}", g.report.lines);
+    // The next one is held too.
     g.apply_sea_threshold(sid, 1);
-    assert_eq!(g.coastal_slots(sid), before - 2, "the wall absorbed one threshold, not two");
+    assert_eq!(g.coastal_slots(sid), before, "the wall holds every threshold, not one");
+    assert_eq!(g.state(sid).facilities.iter().find(|f| f.kind == FacilityKind::SeaWall).unwrap().rises_held, 2);
 
     // The Ice Sheets Break is a threshold of a kind too.
     let mut g = game();
@@ -4029,7 +4032,7 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
     hold_temperature(&mut g, 2.25);
     g.climate_phase();
     assert_eq!(g.coastal_slots(sid), before, "the wall took the Ice Sheets Break");
-    assert!(!g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::SeaWall), "and went with it");
+    assert!(g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::SeaWall && f.rises_held >= 1), "and stands, counting it (ticket #257)");
 
     // A mothballed wall absorbs nothing.
     let mut g = game();
@@ -4131,6 +4134,76 @@ fn g_antarctica_opens_at_one_point_six_and_stays_open() {
 }
 
 /// (h) The AI enumerates a Sea Wall once Coastal Engineering is in and a threshold is near.
+/// Ticket #257 (version 0.08.4): each rise a Sea Wall has held adds half a Material a turn to its
+/// keep, paid at Income; the half is carried, so two rises pay one a turn and one rise pays one
+/// every other turn. Short of Materials, the wall stands unkept that turn and holds nothing.
+#[test]
+fn a_sea_wall_costs_half_a_material_a_turn_for_every_rise_it_has_held() {
+    let sid = StateId::Australia;
+    let mut g = game();
+    calm(&mut g);
+    directed(&mut g, sid);
+    let mut wall = Facility::new(FacilityKind::SeaWall);
+    wall.rises_held = 1;
+    g.state_mut(sid).facilities = vec![wall];
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 0, "half a Material owed, none paid yet");
+    assert_eq!(income_of(&mut g, Seat(0)).materials, -1, "the second half makes one");
+    assert!(g.seat(Seat(0)).income_sources.iter().any(|(n, _, v)| n.contains("Sea Wall") && *v == -1), "a source line while it pays: {:?}", g.seat(Seat(0)).income_sources);
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 0, "and the count starts again");
+    g.state_mut(sid).facilities[0].rises_held = 3;
+    g.seats[0].sea_wall_upkeep_owed = 0.0;
+    assert_eq!(income_of(&mut g, Seat(0)).materials, -1, "three rises: 1.5 a turn, 1 paid");
+    assert_eq!(income_of(&mut g, Seat(0)).materials, -2, "then 2, the half carried");
+    assert!(g.state(sid).facilities[0].working(), "kept, so it works");
+    // A mothballed wall pays nothing.
+    g.state_mut(sid).facilities[0].mothballed = true;
+    g.seats[0].sea_wall_upkeep_owed = 0.0;
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 0, "mothballed: no keep");
+    g.state_mut(sid).facilities[0].mothballed = false;
+    // Short of Materials: the wall stands unkept this turn and holds nothing.
+    g.seats[0].stockpile.materials = 0;
+    g.seats[0].sea_wall_upkeep_owed = 0.0;
+    g.state_mut(sid).facilities[0].rises_held = 2;
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 0, "nothing to pay with, nothing paid");
+    assert_eq!(g.seat(Seat(0)).stockpile.materials, 0, "never below nothing");
+    assert!(!g.state(sid).facilities[0].working(), "unkept: it holds nothing this turn");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Sea Wall") && l.text.contains("unkept")), "the Report says so: {:?}", g.report.lines);
+}
+
+/// Ticket #257 (version 0.08.4): a Storm Surge that breaks on a standing Sea Wall no longer brings
+/// the next threshold forward; the coastal Facilities make 30% less at the next Income, once. An
+/// unwalled state takes the threshold early as it always has.
+#[test]
+fn a_storm_surge_on_a_walled_state_cuts_its_coastal_facilities_by_a_third_for_one_income() {
+    let sid = StateId::Europe;
+    let mut g = game();
+    calm(&mut g);
+    sea_ahead(&mut g);
+    for s in &mut g.states {
+        s.population = 0.0;
+    }
+    g.take_control(sid, Seat(0));
+    g.seats[0].stockpile.materials = 500;
+    g.state_mut(sid).facilities = vec![Facility::in_coastal_slot(FacilityKind::Factory), facility(FacilityKind::Factory), Facility::new(FacilityKind::SeaWall)];
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 8, "two Custodian Factories make 4 each");
+    let slots = g.coastal_slots(sid);
+    drawn(&mut g, EventId::StormSurge, EventTarget::State(sid));
+    g.apply_event_now();
+    assert!(g.state(sid).thresholds_fired.iter().all(|f| !f), "no threshold brought forward: the wall held");
+    assert_eq!(g.coastal_slots(sid), slots, "no slot lost");
+    assert!(g.state(sid).storm_surge, "the surge is on the state");
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 6, "the coastal Factory makes floor(4 x 0.7) = 2; the inland one 4");
+    assert!(!g.state(sid).storm_surge, "spent");
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 8, "one Income only");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Sea Wall held")), "the Report says so: {:?}", g.report.lines);
+    // Without a wall, the threshold comes forward as before.
+    g.state_mut(sid).facilities.retain(|f| f.kind != FacilityKind::SeaWall);
+    drawn(&mut g, EventId::StormSurge, EventTarget::State(sid));
+    g.apply_event_now();
+    assert!(g.state(sid).thresholds_fired[0], "unwalled: the next threshold applies now");
+    assert!(!g.state(sid).storm_surge);
+}
+
 #[test]
 fn h_the_ai_raises_a_sea_wall_when_the_sea_is_close() {
     let sid = StateId::Australia;
