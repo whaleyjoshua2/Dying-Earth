@@ -180,6 +180,14 @@ pub struct UniqueCard {
     pub reactor_upkeep: f64,
     /// What an Academy pays its holder a turn, flat, wherever it stands.
     pub academy_ducats: i64,
+    /// Ticket #239 (version 0.08.3): what a Heliostat makes over a Solar Array, after sun scaling.
+    pub heliostat_energy: i64,
+    /// Ticket #239 (version 0.08.3): what an Exchange pays over a Trade Post, flat, after the
+    /// output multiplier.
+    pub exchange_ducats: i64,
+    /// Ticket #239 (version 0.08.3): how many Colonists at a Chorus's own Colony buy it one more
+    /// Influence in its holder's Allotment, rounded down.
+    pub chorus_colonists: i64,
 }
 
 /// Ticket #54 (version 0.05): what a Restart and a Decommission cost (`facilities.toml`). A
@@ -386,13 +394,13 @@ pub struct FactionCard {
     /// Transit Fuel times this, before Efficient Transit.
     #[serde(default = "one_f64")]
     pub transit_fuel_multiplier: f64,
-    /// Steerage: what a Colony Ship carries, times this.
+    /// Coach Class: what a Colony Ship carries, times this.
     #[serde(default = "one_f64")]
     pub colony_ship_capacity_multiplier: f64,
-    /// Steerage: the population a lift from a Launch Site takes, times this.
+    /// Coach Class: the population a lift from a Launch Site takes, times this.
     #[serde(default = "one_f64")]
     pub lift_population_multiplier: f64,
-    /// Steerage: what a Colony Ship costs, in place of the units.toml figure.
+    /// Coach Class: what a Colony Ship costs, in place of the units.toml figure.
     #[serde(default)]
     pub colony_ship_materials: Option<i64>,
     /// Ticket #83 (version 0.06.0): every Ship's Materials, times this, rounded down (the
@@ -423,7 +431,7 @@ pub struct FactionCard {
     /// Ticket #72 (version 0.05.5): a Facility's Materials, times this (the Prospectors' 0.85).
     #[serde(default = "one_f64")]
     pub facility_materials_multiplier: f64,
-    /// Ticket #73 (version 0.05.5): Emigrants mustered a turn, times this (Steerage's 2.0).
+    /// Ticket #73 (version 0.05.5): Emigrants mustered a turn, times this (Coach Class's 2.0).
     #[serde(default = "one_f64")]
     pub emigrants_multiplier: f64,
 }
@@ -515,10 +523,21 @@ pub struct StartCard {
 
 /// Ticket #35: what Ducats buy.
 #[derive(Debug, Clone, Deserialize)]
+pub struct ResearchDirectiveCard {
+    pub max: u8,
+    pub archivists_max: u8,
+    pub provisional_min_contribution: u8,
+    pub custodians_ppm_per_point: f64,
+    pub prospectors_ducats_per_point: f64,
+    pub arkwrights_fuel_per_point: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct DucatsCard {
     pub per_influence: i64,
     /// Ticket #54: what one Leapfrog costs the Custodians; it replaced `per_restoration_step`.
     pub per_leapfrog: i64,
+    pub per_exodus_call: i64,
     pub per_repair_point: i64,
     /// Version 0.04 (ticket #42): the trading window's prices.
     pub per_materials: i64,
@@ -883,6 +902,11 @@ pub struct AiThresholds {
     /// part is past this fraction of its bar, or from this turn, whichever comes first.
     pub gate_pick_fraction: f64,
     pub gate_pick_turn: u32,
+    /// Ticket #236 (version 0.08.3): what a seat directs away from the shared Tech, by how much it
+    /// wants the Tech under research. Before this it went to its cap on turn 2 and never moved,
+    /// which made any contribution threshold unreachable and the shared-pot rule a flat tax.
+    pub directive_when_wanted: u8,
+    pub directive_when_indifferent: u8,
 }
 
 /// Ticket #50: one pick list per Faction. `order` is tried first, then the cheapest available
@@ -1071,14 +1095,23 @@ struct FactionsFile {
     faction: Vec<FactionCard>,
     start: StartCard,
     ducats: DucatsCard,
+    research_directive: ResearchDirectiveCard,
     venture_capital: VentureCard,
     emigrants: EmigrantsCard,
+    faction_orders: FactionOrdersCard,
+    exodus_call: ExodusCallCard,
     relations: RelationsCard,
 }
 
 /// Ticket #191 (version 0.08.0): the Relations scale and what moves it (`factions.toml`).
 #[derive(Debug, Clone, Deserialize)]
 pub struct RelationsCard {
+    /// Ticket #236 (version 0.08.3): the share of its Research a Faction must still give the
+    /// shared Tech to escape the shared-pot penalty, the size of the term either way, and the
+    /// ceiling the reward may lift a pair to.
+    pub directive_min_contribution: u8,
+    pub directive_step: i64,
+    pub directive_boost_ceiling: i64,
     pub best: i64,
     pub worst: i64,
     pub start: i64,
@@ -1158,6 +1191,17 @@ fn scar_floor_default() -> i64 {
 /// Ticket #73 (version 0.05.5): Emigrants, the built Colonists: how many a Faction musters a turn,
 /// the population each takes, what a batch takes off the state's Unrest, and how many turns the sea
 /// crossing to Antarctica takes.
+#[derive(Debug, Clone, Deserialize)]
+pub struct FactionOrdersCard {
+    pub min_turns_held: u32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ExodusCallCard {
+    pub turns: u32,
+    pub muster_multiplier: u32,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct EmigrantsCard {
     pub per_turn: u32,
@@ -1251,6 +1295,9 @@ pub struct Tables {
     pub events: EventsTable,
     pub factions: Vec<FactionCard>,
     pub start: StartCard,
+    pub research_directive: ResearchDirectiveCard,
+    pub exodus_call: ExodusCallCard,
+    pub faction_orders: FactionOrdersCard,
     pub ducats: DucatsCard,
     pub venture: VentureCard,
     pub emigrants: EmigrantsCard,
@@ -1359,6 +1406,9 @@ impl Tables {
             factions: factions.faction,
             start: factions.start,
             ducats: factions.ducats,
+            exodus_call: factions.exodus_call,
+            faction_orders: factions.faction_orders,
+            research_directive: factions.research_directive,
             venture: factions.venture_capital,
             emigrants: factions.emigrants,
             relations: factions.relations,

@@ -454,13 +454,14 @@ fn a_controlled_state_pays_ducats_from_gdp_times_industry_and_a_bank_adds_more()
     let mars = colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::TradePost], 0);
     assert_eq!(g.module_yield(Seat(0), moon, ModuleKind::TradePost).amount, 6);
     assert_eq!(g.module_yield(Seat(0), mars, ModuleKind::TradePost).amount, 6);
-    // Ticket #72: Ducats are not Materials output, so a Bank banks nothing in the Venture Capital
-    // Fund however high the share is set.
+    // Ticket #72 had it that Ducats are not Materials output, so a Bank banked nothing in the
+    // Venture Capital Fund however high the share was set. Ticket #240 (version 0.08.3) turns that
+    // exactly around: the Fund banks DUCAT INCOME, so a Bank is now one of the things filling it.
     g.seats[1].venture_share = 0.8;
     let before = g.seats[1].venture_fund;
     g.state_mut(StateId::Europe).facilities = vec![facility(FacilityKind::Bank)];
     income_of(&mut g, Seat(1));
-    assert_eq!(g.seats[1].venture_fund, before);
+    assert!(g.seats[1].venture_fund > before, "a Bank's Ducats reach the Fund now: {} -> {}", before, g.seats[1].venture_fund);
 }
 
 #[test]
@@ -870,7 +871,7 @@ fn occupation_of_a_controlled_state_returns_it_to_its_owner_when_broken() {
 
 fn meet_first(g: &mut Game, seat: Seat) {
     match g.kind(seat) {
-        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 1000,
+        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 2000,
         FactionKind::Custodians => g.seats[seat.index()].stabilization_run = 3,
         FactionKind::Arkwrights => {}
         FactionKind::Archivists => g.seats[seat.index()].research_total = 150,
@@ -894,7 +895,7 @@ fn both_met_the_larger_margin_wins() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
     g.seats[0].stabilization_run = 3; // parts 1.0 and 1.0 -> margin 1.0
-    g.seats[1].venture_fund = 1200; // parts 1.2 and 1.25 -> margin 1.2
+    g.seats[1].venture_fund = 2400; // parts 1.2 and 1.25 -> margin 1.2
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
@@ -906,7 +907,7 @@ fn both_met_by_the_same_margin_is_a_draw() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     g.seats[0].stabilization_run = 3;
-    g.seats[1].venture_fund = 1200; // the lower fraction is the presence, 1.0, on both sides
+    g.seats[1].venture_fund = 2400; // the lower fraction is the presence, 1.0, on both sides
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Draw { .. })), "{:?}", g.outcome);
@@ -927,7 +928,7 @@ fn the_last_turn_scores_the_lower_fraction_of_the_two_parts() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 6); // presence 0.5, run 0 -> score 0
     g.seats[0].stabilization_run = 3;
     colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat], 3); // presence 0.25
-    g.seats[1].venture_fund = 750; // first 1.0 -> score 0.25
+    g.seats[1].venture_fund = 1500; // first 1.0 -> score 0.25
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(0), .. })), "0.5 beats 0.25: {:?}", g.outcome);
 }
@@ -1147,6 +1148,14 @@ fn reactor_leak_stops_generators_until_resolution_and_costs_five_energy() {
 }
 
 // ---------------------------------------------------------------- 12.3 Every Tech effect
+
+/// Ticket #238 (version 0.08.3): the Strip Permit, the Leapfrog and the Exodus Call all want the
+/// Region held three whole turns. A test that issues one on turn 1 is testing the clock, not the
+/// order, so it backdates the hold instead.
+fn held_long_enough(g: &mut Game, s: StateId) {
+    g.turn = g.turn.max(g.tables.faction_orders.min_turns_held + 1);
+    g.state_mut(s).held_since = Some(0);
+}
 
 fn with_tech(g: &mut Game, t: TechId) {
     g.research.done.push(t);
@@ -1670,7 +1679,7 @@ fn more_than_one_seat_meeting_its_condition_gives_the_game_to_the_larger_margin(
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
     g.seats[0].stabilization_run = 3; // parts 1.0 and 1.0 -> margin 1.0
-    g.seats[1].venture_fund = 1200; // parts 1.2 and 1.25 -> margin 1.2
+    g.seats[1].venture_fund = 2400; // parts 1.2 and 1.25 -> margin 1.2
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
@@ -1687,7 +1696,7 @@ fn the_last_turn_ranks_every_seat_by_score() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 6);
     let p = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 9);
     let _ = p;
-    g.seats[1].venture_fund = 750;
+    g.seats[1].venture_fund = 1500;
     colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat], 3);
     assert!((g.progress(Seat(1)).score() - 0.75).abs() < 1e-9, "{:?}", g.progress(Seat(1)).score());
     g.end_phase();
@@ -1879,12 +1888,12 @@ fn archive_at(g: &mut Game, seat: Seat, body: BodyId, paid: i64, colonists: u32)
 }
 
 #[test]
-fn steerage_doubles_an_arkwright_colony_ships_load_and_cuts_its_price() {
+fn coach_class_doubles_an_arkwright_colony_ships_load_and_cuts_its_price() {
     let mut g = game();
     // Capacity: the card figure for everyone else, twice it for the Arkwrights, and Expanded
     // Habitats adds its two before the doubling.
     assert_eq!(g.colony_ship_capacity(Seat(0)), 4);
-    assert_eq!(g.colony_ship_capacity(Seat(2)), 8, "Steerage carries twice");
+    assert_eq!(g.colony_ship_capacity(Seat(2)), 8, "Coach Class carries twice");
     g.research.done.push(TechId::ExpandedHabitats);
     assert_eq!(g.colony_ship_capacity(Seat(0)), 6);
     assert_eq!(g.colony_ship_capacity(Seat(2)), 12, "(4 + 2) doubled");
@@ -1913,12 +1922,12 @@ fn an_arkwright_muster_takes_twice_the_population_out_of_its_state() {
     g.state_mut(StateId::NorthAfrica).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
     g.state_mut(StateId::NorthAfrica).facilities.push(facility(FacilityKind::LaunchSite));
     assert!((g.lift_population(Seat(0), 4) - 4.0).abs() < 1e-9, "one unit of five million each since ticket #143 (version 0.07.3)");
-    assert!((g.lift_population(Seat(2), 4) - 8.0).abs() < 1e-9, "Steerage costs the state twice");
+    assert!((g.lift_population(Seat(2), 4) - 8.0).abs() < 1e-9, "Coach Class costs the state twice");
     // Ticket #73: the population is paid when the Emigrants muster, and the lift takes none.
     let before = g.state(StateId::NorthAfrica).population;
     g.commit_orders(Seat(2), &[Order::BuildEmigrants { state: StateId::NorthAfrica, n: 4 }]);
     let taken = before - g.state(StateId::NorthAfrica).population;
-    assert!((taken - 8.0).abs() < 1e-9, "the muster took {taken}, not 8.0 (two units of five million per Emigrant under Steerage)");
+    assert!((taken - 8.0).abs() < 1e-9, "the recruit took {taken}, not 8.0 (two units of five million per Pioneer under Coach Class)");
     let after_muster = g.state(StateId::NorthAfrica).population;
     let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
     g.commit_orders(Seat(2), &[Order::Load { ship, colonists: 4, from: LoadSource::State(StateId::NorthAfrica), army: None }]);
@@ -2014,8 +2023,8 @@ fn funding_the_archive_banks_this_turns_research_and_contributes_nothing_to_the_
     g.pick_tech(Seat(0), TechId::PublicScience).unwrap();
     // Version 0.07.0: the declaration is made before Income and read by the next one. Nothing is
     // taken back out of the shared Tech, because nothing of the Archivists' ever goes in.
-    g.commit_orders(Seat(3), &[Order::SetArchiveFunding { on: true }]);
-    assert!(g.seats[3].archive_funding, "the declaration stands");
+    g.commit_orders(Seat(3), &[Order::SetResearchDirective { percent: 100 }]);
+    assert_eq!(g.seats[3].research_directive, 100, "the directive stands at all of it");
     assert_eq!(g.seats[3].archive_fund, 0, "and banks nothing until Income");
     g.income_phase();
     let made = g.seats[3].research_last_turn;
@@ -2024,8 +2033,13 @@ fn funding_the_archive_banks_this_turns_research_and_contributes_nothing_to_the_
     assert_eq!(g.research.contributions[3], 0, "and none of it reached the shared Tech");
     assert!(g.funding_archive(Seat(3)));
     assert!(g.report.lines.iter().any(|l| l.text.contains("Archivists are funding the Archive")), "{:?}", g.report.lines);
-    // Nobody else may.
-    assert_eq!(g.check_order(Seat(0), &[], &Order::SetArchiveFunding { on: true }).unwrap_err().0, "only the Archivists fund the Archive");
+    // Ticket #235 (version 0.08.3): "nobody else may" is gone -- every Faction directs Research
+    // now. What is still the Archivists' alone is the REACH: theirs runs to 100, everyone else's
+    // stops at half, because their switch always sent all of it and the slider keeps that.
+    assert_eq!(g.check_order(Seat(0), &[], &Order::SetResearchDirective { percent: 100 }).unwrap_err().0, "a Research Directive may not pass 50 per cent for this Faction");
+    assert!(g.check_order(Seat(0), &[], &Order::SetResearchDirective { percent: 50 }).is_ok(), "a Custodian may direct half");
+    assert_eq!(g.research_directive_cap(Seat(0)), 50);
+    assert_eq!(g.research_directive_cap(Seat(3)), 100, "the Archivists alone reach all of it");
     // Ticket #68: until the Module stands the fund holds a quarter of the 80, and what it has no
     // room for goes on to the shared Tech rather than being wasted.
     assert_eq!(g.archive_fund_cap(Seat(3)), 20, "a quarter of 80 before the Archive stands");
@@ -2037,18 +2051,18 @@ fn funding_the_archive_banks_this_turns_research_and_contributes_nothing_to_the_
     assert_eq!(g.seats[3].archive_fund, 20, "only the room under the cap is banked");
     assert_eq!(g.research.contributions[3], made - 3, "the rest counts toward the Lead as usual");
     // At the cap the declaration is refused outright.
-    g.seats[3].archive_funding = false;
+    g.seats[3].research_directive = 0;
     assert_eq!(
-        g.check_order(Seat(3), &[], &Order::SetArchiveFunding { on: true }).unwrap_err().0,
+        g.check_order(Seat(3), &[], &Order::SetResearchDirective { percent: 100 }).unwrap_err().0,
         "the Archive fund holds its quarter (20) until the Archive stands at a Colony off Earth"
     );
     // Once the Module stands the fund opens to the whole 80, and is refused again only when full.
     let mars = colony(&mut g, Seat(3), BodyId::Mars, &[ModuleKind::Habitat], 4);
     g.colony_mut(mars).unwrap().modules.push(Module::new(ModuleKind::Archive));
     assert_eq!(g.archive_fund_cap(Seat(3)), 80);
-    assert!(g.check_order(Seat(3), &[], &Order::SetArchiveFunding { on: true }).is_ok());
+    assert!(g.check_order(Seat(3), &[], &Order::SetResearchDirective { percent: 100 }).is_ok());
     g.seats[3].archive_fund = 80;
-    assert_eq!(g.check_order(Seat(3), &[], &Order::SetArchiveFunding { on: true }).unwrap_err().0, "the Archive's Research is paid in full");
+    assert_eq!(g.check_order(Seat(3), &[], &Order::SetResearchDirective { percent: 100 }).unwrap_err().0, "the Archive's Research is paid in full");
 }
 
 /// Ticket #68 (version 0.05.5): the Archive is one Module of 50 Materials and three turns, built
@@ -2103,7 +2117,7 @@ fn the_archive_is_one_module_of_fifty_materials_and_three_turns_built_once_off_e
     // No upkeep until it is complete; the payment that fills the fund completes it, with its Moment.
     assert_eq!(g.module_yield(Seat(3), mars, ModuleKind::Archive).upkeep, 0);
     g.seats[3].archive_fund = 76;
-    g.seats[3].archive_funding = true;
+    g.seats[3].research_directive = 100;
     let banked = g.bank_archive_research(Seat(3), 10);
     assert_eq!(banked, 4, "only the four still owed are banked");
     assert_eq!(g.seats[3].archive_fund, 80);
@@ -2132,12 +2146,12 @@ fn provisional_findings_halves_the_tech_under_research_and_goes_off_the_turn_aft
     let with = g.facility_yield(Seat(3), StateId::Europe, FacilityKind::ResearchLab).research;
     // Version 0.07.0: the declaration is made in one turn and paid at the next Income, so it is
     // that Income which funds, and the Income after it that finds Provisional Findings gone.
-    g.commit_orders(Seat(3), &[Order::SetArchiveFunding { on: true }]);
+    g.commit_orders(Seat(3), &[Order::SetResearchDirective { percent: 100 }]);
     g.income_phase();
     assert!(g.funding_archive(Seat(3)), "this Income paid the fund");
     assert!(g.provisional_findings(Seat(3)), "and the turn that funds still has it");
     // Back to the shared Tech, so the Income after this one restores it.
-    g.commit_orders(Seat(3), &[Order::SetArchiveFunding { on: false }]);
+    g.commit_orders(Seat(3), &[Order::SetResearchDirective { percent: 0 }]);
     g.income_phase();
     assert!(!g.provisional_findings(Seat(3)), "they funded last turn");
     assert_eq!(g.tech_multiplier(Seat(3), TechId::PublicScience), 1.0);
@@ -2237,7 +2251,7 @@ fn the_archivist_ai_funds_the_archive_before_it_holds_a_colony() {
     assert!(g.colonies.iter().all(|c| c.in_orbit || c.control.director() != Some(arc)));
     g.seats[arc.index()].research_last_turn = 6;
     let orders = g.ai_orders(arc);
-    assert!(orders.iter().any(|o| matches!(o, Order::SetArchiveFunding { on: true })), "no funding order: {orders:?}");
+    assert!(orders.iter().any(|o| matches!(o, Order::SetResearchDirective { percent: 100 })), "no funding order: {orders:?}");
 }
 
 /// Ticket #68 (version 0.05.5): the Archivist AI builds its way off Earth before the Archive. With
@@ -3335,6 +3349,9 @@ fn d_leapfrog_is_custodian_only_and_never_goes_below_the_base() {
     assert!(g.check_order(Seat(1), &[], &Order::Leapfrog { state: StateId::SouthAmerica }).is_err(), "only the Custodians Leapfrog");
     // And the Custodians need to control the state.
     assert!(g.check_order(Seat(0), &[], &Order::Leapfrog { state: StateId::SouthAmerica }).is_err(), "and only on a state they control");
+    // Ticket #238 (version 0.08.3): three whole turns in hand before a Faction may remake a
+    // country, so this test ages the hold rather than measuring the clock by accident.
+    held_long_enough(&mut g, sid);
     let o = Order::Leapfrog { state: sid };
     assert_eq!(g.order_cost(Seat(0), &o).ducats, 50, "50 Ducats a Leapfrog");
     let before = g.population_coefficient(sid);
@@ -4036,15 +4053,15 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
 fn f_coastal_engineering_is_the_thirteenth_tech() {
     let g = fresh();
     // Ticket #201 (version 0.08.1): eighteen, with Civil Defense on Society rung 2.
-    assert_eq!(TechId::ALL.len(), 18, "thirteen Techs, the four gates, and Civil Defense");
-    assert_eq!(g.tables.techs.len(), 18, "and eighteen rows in techs.toml");
+    assert_eq!(TechId::ALL.len(), 20, "thirteen Techs, the four gates, Civil Defense, and ticket #232's two");
+    assert_eq!(g.tables.techs.len(), 20, "and twenty rows in techs.toml");
     let c = g.tables.tech(TechId::CoastalEngineering);
     assert_eq!(c.name, "Coastal Engineering");
     assert_eq!(c.branch, "Industry");
     // Ticket #69 (version 0.05.5): moved from rung 2 at 25 to rung 1 at 10 with no prerequisite.
     // Ticket #117 (version 0.07.1): 10 to 11, with every other cost, a tenth rounded to the nearest.
     assert_eq!(c.rung, 1, "rung 1, beside Efficient Grids");
-    assert_eq!(c.cost, 14, "14 since ticket #201 (version 0.08.1); 12 from #142, 11 from #117, 10 before");
+    assert_eq!(c.cost, 15, "15 since ticket #231 (version 0.08.3); 14 from #201, 12 from #142, 11 from #117, 10 before");
     assert!(c.needs.is_empty(), "it needs nothing");
     assert!(c.effect.contains("Sea Wall"), "its effect names the Sea Wall: {}", c.effect);
     // Two boxes on Industry rung 1, and Clean Power alone on rung 2.
@@ -4744,7 +4761,7 @@ fn a_rivals_paragraph_names_its_visible_orders_and_none_of_its_scores() {
         Order::BuildArmy { place: Place::State(StateId::EastAsia) },
         Order::BuildStation { body: BodyId::Mars, slot: 0 },
         Order::BuildArchive { colony },
-        Order::SetArchiveFunding { on: true },
+        Order::SetResearchDirective { percent: 100 },
         Order::Repair { unit: UnitRef::Ship(ship), points: 1 },
         Order::RepairWithDucats { unit: UnitRef::Ship(ship), points: 1 },
         Order::Transit { ship, to: BodyId::Moon, slot: None },
@@ -5193,11 +5210,17 @@ fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
 fn coastal_engineering_sits_on_rung_one_below_its_rungs_cost_with_no_prerequisite() {
     let g = game();
     let t = g.tables.tech(TechId::CoastalEngineering);
-    assert_eq!((t.rung, t.cost), (1, 14), "14 since ticket #201, still below the rung it shares");
+    assert_eq!((t.rung, t.cost), (1, 15), "15 since ticket #231, still below the rung it shares");
     assert!(t.cost < g.tables.tech(TechId::EfficientGrids).cost, "cheaper than the rung it shares, or the Sea Wall arrives too late");
     assert!(t.needs.is_empty(), "no prerequisite: {:?}", t.needs);
     assert!(g.available_techs().contains(&TechId::CoastalEngineering), "pickable from the first turn");
     assert_eq!(g.tables.tech(TechId::CleanPower).needs, vec![TechId::EfficientGrids]);
+    // Ticket #242 (version 0.08.3): Green Consensus dropped Clean Power, and with it the whole
+    // foot of the Industry branch, at the designer's word -- "Efficient grids is no longer
+    // required for green consensus". Pinned because it moves the Custodians' Victory gate:
+    // Planetary Stewardship now hangs off Society alone.
+    assert_eq!(g.tables.tech(TechId::GreenConsensus).needs, vec![TechId::PublicScience], "Society alone since ticket #242");
+    assert_eq!(g.tables.tech(TechId::PlanetaryStewardship).needs, vec![TechId::GreenConsensus], "and the gate above it is unchanged");
     let w = g.tables.facility(FacilityKind::SeaWall);
     assert_eq!((w.materials, w.build_turns), (20, 2), "20 Materials since ticket #77");
 }
@@ -5223,19 +5246,26 @@ fn the_prospectors_pay_fifteen_percent_less_for_facilities_and_modules_and_nothi
     assert_eq!(g.order_cost(pro, &Order::RaiseIndustry { state: StateId::Europe }).materials, 15, "Cheap Industry is its own clause");
 }
 
-/// Ticket #72 (b): the Venture Capital Fund. A share of the Materials the Prospectors' Factories
-/// and Mines pay at Income goes into it, set on any turn in steps of 10% from 0 to 80; a draw
-/// returns nine tenths, rounded down; nobody else has one.
+/// Ticket #72 (b), rewritten on ticket #240 (version 0.08.3): the Venture Capital Fund banks a
+/// share of the Prospectors' **Ducat income**, set on any turn in steps of 10% from 0 to 80; a draw
+/// returns nine tenths of it in Ducats, rounded down; nobody else has one.
+///
+/// It banked a share of Materials OUTPUT until version 0.08.3. The designer moved the hoard to
+/// Ducats — *"now require duckets rather than materials"* — and chose income over a relabelled
+/// share of output, because that makes the Condition a decision the seat takes every turn
+/// (bank it or spend it) rather than a consequence of digging.
 #[test]
-fn the_venture_capital_fund_banks_a_share_of_materials_output_and_a_draw_returns_nine_tenths() {
+fn the_venture_capital_fund_banks_a_share_of_ducat_income_and_a_draw_returns_nine_tenths() {
     let mut g = game();
     let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
     g.take_control(StateId::Europe, pro);
     g.state_mut(StateId::Europe).facilities = vec![facility(FacilityKind::Factory)];
     let moon = colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Mine], 0);
     let _ = moon;
-    // Output: a Factory at 4 x 1.25 = 5, a Mine at 4 x 1.65 x 1.25 = 8 (rounded down): 13 a turn.
-    assert_eq!(income_of(&mut g, pro).materials, 13, "at 0% nothing is banked");
+    // Europe's economy pays 14 Ducats a turn to this seat. Materials output is 13 and is now
+    // beside the point: a Factory at 4 x 1.25 = 5 and a Mine at 4 x 1.65 x 1.25 = 8.
+    let inc = income_of(&mut g, pro);
+    assert_eq!((inc.ducats, inc.materials), (14, 13), "at 0% nothing is banked and every Ducat lands");
     assert_eq!(g.seats[pro.index()].venture_fund, 0);
     // The share is an order, refused off the steps and to anyone else.
     assert_eq!(g.check_order(Seat(0), &[], &Order::SetVentureShare { share: 50 }).unwrap_err().0, "only the Prospectors have a Venture Capital Fund");
@@ -5245,24 +5275,29 @@ fn the_venture_capital_fund_banks_a_share_of_materials_output_and_a_draw_returns
     assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 80 }).is_ok());
     g.commit_orders(pro, &[Order::SetVentureShare { share: 50 }]);
     assert!((g.seats[pro.index()].venture_share - 0.5).abs() < 1e-9);
-    // Half of 13, rounded down, is banked: 6 to the Fund, 7 to the Stockpile.
-    assert_eq!(income_of(&mut g, pro).materials, 7);
-    assert_eq!(g.seats[pro.index()].venture_fund, 6);
-    assert!(g.seat(pro).income_sources.iter().any(|(name, _, n)| name.contains("Venture Capital Fund") && *n == -6), "{:?}", g.seat(pro).income_sources);
-    // Bought Materials are not output.
-    g.seats[pro.index()].stockpile.ducats = 100;
-    g.commit_orders(pro, &[Order::Buy { resource: Resource::Materials, amount: 10 }]);
-    assert_eq!(g.seats[pro.index()].venture_fund, 6, "a purchase banks nothing");
-    // 80% of 13 is 10, rounded down.
+    // Half of 14 is 7 to the Fund and 7 to the Stockpile. Materials are untouched by the share now.
+    let inc = income_of(&mut g, pro);
+    assert_eq!((inc.ducats, inc.materials), (7, 13));
+    assert_eq!(g.seats[pro.index()].venture_fund, 7);
+    assert!(g.seat(pro).income_sources.iter().any(|(name, r, n)| name.contains("Venture Capital Fund") && *r == Resource::Ducats && *n == -7), "{:?}", g.seat(pro).income_sources);
+    // Ducats taken by SELLING are not income, so the Fund never sees them. This is the clause that
+    // kept a Materials fund honest -- bought Materials were not output -- pointed at the new
+    // resource: a hoard you can fill by trading is not a hoard.
+    let fund = g.seats[pro.index()].venture_fund;
+    g.seats[pro.index()].stockpile.materials = 100;
+    g.commit_orders(pro, &[Order::Sell { resource: Resource::Materials, amount: 10 }]);
+    assert_eq!(g.seats[pro.index()].venture_fund, fund, "a sale banks nothing");
+    // 80% of 14 is 11, rounded down: 3 lands, 11 banks, taking the Fund to 18.
     g.commit_orders(pro, &[Order::SetVentureShare { share: 80 }]);
-    assert_eq!(income_of(&mut g, pro).materials, 3);
-    assert_eq!(g.seats[pro.index()].venture_fund, 16);
-    // A draw: 10 out, 9 back; never more than the Fund holds.
-    let before = g.seats[pro.index()].stockpile.materials;
-    assert!(g.check_order(pro, &[], &Order::DrawVenture { amount: 17 }).is_err(), "the Fund holds 16");
+    let inc = income_of(&mut g, pro);
+    assert_eq!(inc.ducats, 3);
+    assert_eq!(g.seats[pro.index()].venture_fund, 18);
+    // A draw: 10 out, 9 back IN DUCATS; never more than the Fund holds.
+    let before = g.seats[pro.index()].stockpile.ducats;
+    assert!(g.check_order(pro, &[], &Order::DrawVenture { amount: 19 }).is_err(), "the Fund holds 18");
     g.commit_orders(pro, &[Order::DrawVenture { amount: 10 }]);
-    assert_eq!(g.seats[pro.index()].venture_fund, 6);
-    assert_eq!(g.seats[pro.index()].stockpile.materials, before + 9, "nine tenths come back");
+    assert_eq!(g.seats[pro.index()].venture_fund, 8);
+    assert_eq!(g.seats[pro.index()].stockpile.ducats, before + 9, "nine tenths come back, in Ducats");
     assert_eq!(g.check_order(Seat(0), &[], &Order::DrawVenture { amount: 1 }).unwrap_err().0, "only the Prospectors have a Venture Capital Fund");
 }
 
@@ -5271,18 +5306,18 @@ fn the_venture_capital_fund_banks_a_share_of_materials_output_and_a_draw_returns
 /// moved that bar from 750 to 1000, because the Investment Bank pays uncapped interest into the Fund
 /// and, measured over 40 games, nobody had ever reached 750 at all.
 #[test]
-fn a_thousand_in_the_fund_is_the_prospectors_first_part() {
+fn two_thousand_ducats_in_the_fund_is_the_prospectors_first_part() {
     let mut g = game();
     let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
     let card = g.tables.faction(FactionKind::Prospectors).victory_first;
-    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 1000.0));
+    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 2000.0));
     assert_eq!(card.kind.name(), "Venture Capital Fund");
-    g.seats[pro.index()].venture_fund = 400;
+    g.seats[pro.index()].venture_fund = 800;
     let p = g.progress(pro);
-    assert_eq!((p.first_value, p.first_bar), (400.0, 1000.0));
+    assert_eq!((p.first_value, p.first_bar), (800.0, 2000.0));
     assert!((p.first_fraction() - 0.4).abs() < 1e-9);
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 12);
-    g.seats[pro.index()].venture_fund = 1000;
+    g.seats[pro.index()].venture_fund = 2000;
     open_gates(&mut g);
     assert!(g.progress(pro).met());
     g.end_phase();
@@ -5309,7 +5344,8 @@ fn the_prospector_ai_sets_its_share_to_reach_the_fund_in_time_and_maxes_it_when_
     while g.free_slots(StateId::Europe) > 0 {
         g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::Factory));
     }
-    g.seats[pro.index()].income_last_turn.materials = 60;
+    // Ticket #240 (version 0.08.3): DUCAT income is what the share is weighed against now.
+    g.seats[pro.index()].income_last_turn.ducats = 120;
     g.seats[pro.index()].stockpile.energy = 500;
     g.turn = 4;
     let orders = g.ai_orders(pro);
@@ -5321,7 +5357,7 @@ fn the_prospector_ai_sets_its_share_to_reach_the_fund_in_time_and_maxes_it_when_
     // Late and far behind, everything it may: 80.
     g.turn = 30;
     g.seats[pro.index()].venture_share = 0.0;
-    g.seats[pro.index()].income_last_turn.materials = 10;
+    g.seats[pro.index()].income_last_turn.ducats = 10;
     let orders = g.ai_orders(pro);
     let share = orders.iter().find_map(|o| if let Order::SetVentureShare { share } = o { Some(*share) } else { None });
     assert_eq!(share, Some(80), "{orders:?}");
@@ -5419,7 +5455,7 @@ fn a_helium_three_vein_doubles_the_moons_generators_for_two_turns_and_triples_wi
 
 /// Ticket #73 (a): Colonists are built. Up to four Emigrants a turn per Faction muster in one state
 /// it directs, at 0.1 population each, landing on the card at End Turn (a turn to muster: nothing
-/// lifts them the turn they are ordered), and the batch takes 0.5 off the state's Unrest. Steerage:
+/// lifts them the turn they are ordered), and the batch takes 0.5 off the state's Unrest. Coach Class:
 /// eight a turn at twice the population.
 #[test]
 fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_one_unit_of_population_each_and_calm_it() {
@@ -5437,10 +5473,10 @@ fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_one_unit_of_populati
     assert_eq!(g.state(StateId::EastAsia).emigrants, 4, "on the card at End Turn");
     assert!((pop - g.state(StateId::EastAsia).population - 4.0).abs() < 1e-9, "one unit of five million each (ticket #143)");
     assert_eq!(g.state(StateId::EastAsia).unrest, 2.5, "the batch took 0.5 off");
-    assert!(g.log.to_vec().iter().any(|l| l.contains("Emigrants mustered in China")), "{:?}", g.log.to_vec());
-    // Steerage: eight a turn at twice the population.
+    assert!(g.log.to_vec().iter().any(|l| l.contains("Pioneers recruited in China")), "{:?}", g.log.to_vec());
+    // Coach Class: eight a turn at twice the population.
     assert_eq!(g.emigrants_per_turn(Seat(0)), 4);
-    assert_eq!(g.emigrants_per_turn(Seat(2)), 8, "the Arkwrights muster eight");
+    assert_eq!(g.emigrants_per_turn(Seat(2)), 8, "the Arkwrights recruit eight");
     assert!((g.lift_population(Seat(2), 8) - 16.0).abs() < 1e-9, "at twice the population");
 }
 
@@ -5451,7 +5487,7 @@ fn a_launch_site_lifts_only_the_emigrants_waiting_in_its_state() {
     let mut g = game();
     let ship = a_colony_ship(&mut g, Seat(0), BodyId::Earth);
     let load = Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::EastAsia), army: None };
-    assert_eq!(g.check_order(Seat(0), &[], &load).unwrap_err().0, "only 0 Emigrants are waiting there");
+    assert_eq!(g.check_order(Seat(0), &[], &load).unwrap_err().0, "only 0 Pioneers are waiting there");
     g.state_mut(StateId::EastAsia).emigrants = 3;
     let pop = g.state(StateId::EastAsia).population;
     assert!(g.check_order(Seat(0), &[], &load).is_ok());
@@ -5502,7 +5538,7 @@ fn emigrants_lift_straight_to_a_station_over_earth_by_a_launch_site() {
     assert_eq!(g.state(home).emigrants, 2, "they have left");
     assert_eq!(g.climate.launches_pending[0], launches + 1, "a lift is a launch");
     assert_eq!(g.colony(iss).unwrap().colonists, before + 4, "aboard now");
-    assert!(g.log.to_vec().iter().any(|l| l.contains("4 Emigrants lifted from")), "{:?}", g.log.to_vec());
+    assert!(g.log.to_vec().iter().any(|l| l.contains("4 Pioneers lifted from")), "{:?}", g.log.to_vec());
 }
 
 /// must be open.
@@ -5530,7 +5566,7 @@ fn emigrants_go_to_antarctica_by_sea_from_any_state_and_arrive_a_turn_later() {
     g.resolution_phase();
     let col = g.colonies.iter().find(|c| c.body == BodyId::Earth && !c.in_orbit).expect("founded").clone();
     assert_eq!((col.slot, col.colonists, col.control), (slot, 4, Control::Controlled(Seat(0))));
-    assert!(g.log.to_vec().iter().any(|l| l.contains("in Antarctica with 4 Emigrants from The European Union")), "{:?}", g.log.to_vec());
+    assert!(g.log.to_vec().iter().any(|l| l.contains("in Antarctica with 4 Pioneers from The European Union")), "{:?}", g.log.to_vec());
     // The last two join it, once it has room.
     g.colony_mut(col.id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     g.commit_orders(Seat(0), &[Order::SendToAntarctica { state: StateId::Europe, n: 2, into: UnloadTarget::Colony(col.id) }]);
@@ -5551,7 +5587,7 @@ fn the_ai_musters_emigrants_then_lifts_them_or_sends_them_to_antarctica() {
     let _ = ship;
     g.seats[0].stockpile.energy = 200;
     let orders = g.ai_orders(Seat(0));
-    assert!(orders.iter().any(|o| matches!(o, Order::BuildEmigrants { state: StateId::EastAsia, .. })), "an empty Colony Ship at Earth and nobody waiting: it musters: {orders:?}");
+    assert!(orders.iter().any(|o| matches!(o, Order::BuildEmigrants { state: StateId::EastAsia, .. })), "an empty Colony Ship at Earth and nobody waiting: it recruits: {orders:?}");
     assert!(!orders.iter().any(|o| matches!(o, Order::Load { .. })), "and cannot load yet: {orders:?}");
     g.state_mut(StateId::EastAsia).emigrants = 4;
     // Ticket #164 (version 0.07.5): with a station that holds four from the day it stands, the lift
@@ -5953,15 +5989,21 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
     let g = game();
     let gates = [
         (FactionKind::Custodians, TechId::PlanetaryStewardship, vec![TechId::GreenConsensus]),
-        (FactionKind::Prospectors, TechId::ExtractionCharter, vec![TechId::AutomatedRefining]),
+        // Ticket #242 (version 0.08.3): Beneficiation joined, so the new Tech sits in the
+        // branch's spine rather than being a leaf nobody has to take.
+        (FactionKind::Prospectors, TechId::ExtractionCharter, vec![TechId::AutomatedRefining, TechId::Beneficiation]),
         (FactionKind::Arkwrights, TechId::GenerationShips, vec![TechId::ClosedLoopColonies]),
-        (FactionKind::Archivists, TechId::TheUpload, vec![TechId::PublicScience, TechId::ExpandedHabitats]),
+        // Ticket #245 (version 0.08.3): Expanded Habitats dropped, and with it the edge that read
+        // on screen as an unrelated line into Generation Ships. Ticket #246: and Public Science
+        // dropped too, for Closed-Loop Colonies -- the Archive stands at a Colony off Earth, so the
+        // Tech that makes such a Colony liveable is what opens its door.
+        (FactionKind::Archivists, TechId::TheUpload, vec![TechId::ClosedLoopColonies]),
     ];
     // Ticket #117 (version 0.07.1): rung 3 went 40 to 44, a tenth rounded to the nearest. What the
     // ticket guards is that no Faction's gate is dearer than another's, so the figure is checked
     // against the rung rather than against a literal repeated four times.
     let rung_three = g.tables.tech(TechId::PlanetaryStewardship).cost;
-    assert_eq!(rung_three, 45, "rung 3 costs 45 since ticket #142 (version 0.07.3): 44 rounded to the nearest 5; 44 from ticket #117, 40 before");
+    assert_eq!(rung_three, 48, "rung 3 costs 48 since ticket #231 (version 0.08.3); 45 from #142, 44 from #117, 40 before");
     for (kind, t, needs) in gates {
         let card = g.tables.tech(t);
         assert_eq!(card.rung, 3, "{t:?}");
@@ -5970,7 +6012,27 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         assert_eq!(card.needs, needs, "{t:?}");
         assert_eq!(g.tables.victory_gate(kind), Some(t));
     }
-    assert_eq!(TechId::ALL.len(), 18, "seventeen, and Civil Defense since ticket #201");
+    assert_eq!(TechId::ALL.len(), 20, "eighteen, and Beneficiation and Relay Networks since ticket #232");
+    // Version 0.08.3 moved three of the four gates' prerequisites in three separate tickets, and
+    // nothing watched how deep each gate ended up. Counted as Techs that must stand before the
+    // gate is reachable, the gate excluded.
+    let depth = |t: TechId| -> usize {
+        let mut seen = std::collections::BTreeSet::new();
+        let mut stack: Vec<TechId> = g.tables.tech(t).needs.clone();
+        while let Some(n) = stack.pop() {
+            if seen.insert(n) {
+                stack.extend(g.tables.tech(n).needs.iter().copied());
+            }
+        }
+        seen.len()
+    };
+    // Ticket #246: four, and the deepest tier -- Closed-Loop Colonies waits on Expanded Habitats
+    // and Clean Power, and Clean Power on Efficient Grids. This gate also bars the Archive ORDER,
+    // so the whole Archive chain sits behind those four.
+    assert_eq!(depth(TechId::TheUpload), 4, "the Archivists' gate, four deep since ticket #246");
+    assert_eq!(depth(TechId::PlanetaryStewardship), 2, "the Custodians', two since ticket #242 freed Green Consensus from Industry");
+    assert_eq!(depth(TechId::GenerationShips), 4, "the Arkwrights', through Closed-Loop Colonies, which itself pulls in Clean Power and Efficient Grids");
+    assert_eq!(depth(TechId::ExtractionCharter), 4, "the Prospectors', deepest since Beneficiation joined on ticket #232");
 }
 
 /// Ticket #84: with both parts at their bars the Custodians still do not win until Planetary
@@ -6719,7 +6781,7 @@ fn funding_the_archive_pays_even_when_the_turn_completes_a_tech() {
     g.pick_tech(Seat(0), TechId::CoastalEngineering).unwrap();
     // One point short, so this turn's Research would finish the Tech during Income.
     g.research.progress = g.tables.tech(TechId::CoastalEngineering).cost - 1;
-    g.commit_orders(Seat(3), &[Order::SetArchiveFunding { on: true }]);
+    g.commit_orders(Seat(3), &[Order::SetResearchDirective { percent: 100 }]);
     g.income_phase();
     let made = g.seats[3].research_last_turn;
     assert!(made > 0, "the Lab made {made} Research");
@@ -7268,11 +7330,11 @@ fn a_seat_with_room_on_a_station_musters_before_antarctica_opens() {
     let orders = g.ai_orders(seat);
     assert!(
         orders.iter().any(|o| matches!(o, Order::BuildEmigrants { .. })),
-        "with room on a station and the ice shut, the AI should still muster: {orders:?}"
+        "with room on a station and the ice shut, the AI should still recruit: {orders:?}"
     );
 }
 
-/// Ticket #196: a Steerage batch costs 8 x 2.0 = 16.0 population, and Australia carries 10.1 to
+/// Ticket #196: a Coach Class batch costs 8 x 2.0 = 16.0 population, and Australia carries 10.1 to
 /// 12.6 -- the only one of the fourteen Regions below 16 -- so the Arkwright AI was refused every
 /// turn it held it, 243 times across twenty measured games, and mustered nothing at all. A muster
 /// now takes as many as the Region can pay for.
@@ -7305,8 +7367,8 @@ fn a_muster_takes_as_many_as_the_region_can_pay_for() {
     // And the AI asks for what it can afford rather than for nothing.
     let orders = g.ai_orders(ark);
     match orders.iter().find_map(|o| if let Order::BuildEmigrants { n, .. } = o { Some(*n) } else { None }) {
-        Some(n) => assert!(n <= want, "the AI mustered {n}, more than the {want} the Region can pay for"),
-        None => panic!("the Arkwright AI mustered nothing in a Region that can pay for {want}: {orders:?}"),
+        Some(n) => assert!(n <= want, "the AI recruited {n}, more than the {want} the Region can pay for"),
+        None => panic!("the Arkwright AI recruited nothing in a Region that can pay for {want}: {orders:?}"),
     }
 }
 
@@ -7761,6 +7823,115 @@ fn a_unique_facility_costs_and_makes_what_the_common_one_does() {
     let i = g.tables.module(ModuleKind::Institute);
     assert_eq!((a.materials, a.build_turns, a.energy_upkeep), (i.materials, i.build_turns, i.energy_upkeep));
     assert_eq!(ModuleKind::Academy.common(), Some(ModuleKind::Institute));
+    // Ticket #239 (version 0.08.3): and the three that complete the set, each against its sibling.
+    // The whole point of a Unique is that it is the common building at the common price with one
+    // clause, so a row that drifts is the defect this catches.
+    for (unique, common) in [
+        (ModuleKind::Heliostat, ModuleKind::SolarArray),
+        (ModuleKind::Exchange, ModuleKind::TradePost),
+        (ModuleKind::Chorus, ModuleKind::Relay),
+    ] {
+        let u = g.tables.module(unique);
+        let c = g.tables.module(common);
+        assert_eq!(unique.common(), Some(common), "{}", unique.name());
+        assert_eq!((u.materials, u.build_turns, u.energy_upkeep), (c.materials, c.build_turns, c.energy_upkeep), "{} is priced as its sibling", unique.name());
+        assert_eq!(u.station_only, c.station_only, "{}", unique.name());
+        assert_eq!(u.sun_scaled, c.sun_scaled, "{}", unique.name());
+        assert_eq!(u.influence_allotment, c.influence_allotment, "{}", unique.name());
+        assert_eq!(u.standing_per_turn, c.standing_per_turn, "{}", unique.name());
+        assert_eq!(u.produces.as_ref().map(|p| (p.resource, p.amount)), c.produces.as_ref().map(|p| (p.resource, p.amount)), "{}", unique.name());
+    }
+    // Every Faction now has one Unique Module as well as one Unique Facility, which is what this
+    // ticket was for; the Custodians' Academy is deliberately both, and wears one name.
+    for faction in FactionKind::ALL {
+        assert!(ModuleKind::ALL.into_iter().any(|k| k.unique_to() == Some(faction)), "{faction:?} has no Unique Module");
+        assert!(FacilityKind::ALL.into_iter().any(|k| k.unique_to() == Some(faction)), "{faction:?} has no Unique Facility");
+    }
+}
+
+/// Ticket #239 (version 0.08.3): the three new Unique Modules' clauses, in EXACT figures.
+///
+/// Written first against `g.tables.unique.*` and witnessed to prove nothing: with all three
+/// figures zeroed in the data it still passed, because both sides of the assertion read the same
+/// table. The numbers below are therefore literals, and a clause that stops paying fails here.
+#[test]
+fn the_three_unique_modules_each_pay_their_one_clause() {
+    let mut g = game();
+    let arch = seat_of(&g, FactionKind::Archivists);
+    let pros = seat_of(&g, FactionKind::Prospectors);
+    let ark = seat_of(&g, FactionKind::Arkwrights);
+
+    // The Heliostat: one more Energy than a Solar Array, AFTER the inverse square scaling. Mars
+    // is the case that discriminates -- its sun factor is 0.43, so a Solar Array's 6 rounds to 3,
+    // and the extra point added BEFORE the scaling would give (6 + 1) x 0.43 = 3 as well. Only
+    // adding it after yields 4. The Moon, at full sunlight, cannot tell the two apart.
+    for (body, array, heliostat) in [(BodyId::Mars, 3, 4), (BodyId::Moon, 6, 7)] {
+        let cid = colony(&mut g, arch, body, &[ModuleKind::SolarArray], 0);
+        assert_eq!(g.module_yield(arch, cid, ModuleKind::SolarArray).amount, array, "a Solar Array at {body:?}");
+        assert_eq!(g.module_yield(arch, cid, ModuleKind::Heliostat).amount, heliostat, "a Heliostat at {body:?} is a Solar Array and one more, after the scaling");
+    }
+
+    // The Exchange: one more Ducat than a Trade Post at the same Colony, flat and AFTER the
+    // Prospectors' x1.25 -- which is the whole reason it is flat, since 1 through x1.25 floors
+    // back to 1 and a captured Exchange pays its captor what it paid its builder.
+    let cid = colony(&mut g, pros, BodyId::Mars, &[ModuleKind::TradePost], 6);
+    assert_eq!(g.module_yield(pros, cid, ModuleKind::TradePost).amount, 18, "a Trade Post at a Colony of 6");
+    assert_eq!(g.module_yield(pros, cid, ModuleKind::Exchange).amount, 19, "an Exchange is a Trade Post and one more Ducat");
+
+    // The Chorus: one more Influence in the Allotment for every 6 Colonists at its OWN Colony,
+    // rounded down. Three populations across the boundary pin the rounding: one short pays
+    // nothing, the step itself pays one, and a figure well past two steps pays two.
+    let cid = colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Relay], 0);
+    for (people, relay, chorus) in [(5u32, 1, 1), (6, 1, 2), (13, 1, 3)] {
+        g.colony_mut(cid).expect("the Colony just made").colonists = people;
+        assert_eq!(g.module_yield(ark, cid, ModuleKind::Relay).allotment, relay, "a plain Relay is unmoved by {people} Colonists");
+        assert_eq!(g.module_yield(ark, cid, ModuleKind::Chorus).allotment, chorus, "a Chorus at a Colony of {people}");
+        // Standing is untouched: "+1 Influence" has meant the Allotment since ticket #232, which
+        // is the Faction's budget everywhere rather than a hold on one place.
+        assert_eq!(g.module_yield(ark, cid, ModuleKind::Chorus).standing, 2, "a Chorus holds its place no harder than a Relay");
+    }
+}
+
+/// Ticket #239 (version 0.08.3): a Unique Module stands wherever its common sibling stands.
+///
+/// This is the guard for a bug a PICTURE found and no test did. The rule for what may stand on a
+/// Space Station was written out twice, in the interface's build list and the computer's, as a
+/// list of KINDS -- and a list of kinds cannot know about a Unique. With three new Uniques the
+/// Prospectors lost the Trade Post row from every station without gaining the Exchange, and the
+/// Archivists lost the Solar Array without gaining the Heliostat.
+#[test]
+fn a_unique_module_stands_where_its_sibling_stands() {
+    for unique in ModuleKind::ALL {
+        let Some(common) = unique.common() else { continue };
+        assert_eq!(
+            unique.stands_on_a_station(),
+            common.stands_on_a_station(),
+            "{} must stand exactly where a {} stands",
+            unique.name(),
+            common.name()
+        );
+    }
+    // And the four that a station takes, named, so the set itself cannot drift unnoticed.
+    assert!(ModuleKind::Exchange.stands_on_a_station(), "a station takes a Trade Post, so it takes an Exchange");
+    assert!(ModuleKind::Heliostat.stands_on_a_station(), "a Solar Array stands nowhere else, so a Heliostat must");
+    assert!(!ModuleKind::Chorus.stands_on_a_station(), "a Relay is a ground Module, so a Chorus is too");
+    assert!(!ModuleKind::Mine.stands_on_a_station(), "nobody digs in orbit");
+}
+
+/// Ticket #239 (version 0.08.3): a Unique Module does its COMMON sibling's job, so everything
+/// keyed by kind reaches it. The Chorus is the case that would have broken silently: Relay
+/// Networks takes a Relay's Allotment from 1 to 2, and written against the wrong kind the
+/// Arkwrights' own Relay would have been the one Relay in the game the Tech never reached.
+#[test]
+fn relay_networks_reaches_the_arkwrights_chorus() {
+    let mut g = game();
+    let ark = seat_of(&g, FactionKind::Arkwrights);
+    let cid = colony(&mut g, ark, BodyId::Moon, &[ModuleKind::Relay], 0);
+    let before = g.module_yield(ark, cid, ModuleKind::Chorus).allotment;
+    with_tech(&mut g, TechId::RelayNetworks);
+    let after = g.module_yield(ark, cid, ModuleKind::Chorus).allotment;
+    assert!(after > before, "Relay Networks must reach a Chorus as it reaches a Relay: {before} -> {after}");
+    assert_eq!(after, g.module_yield(ark, cid, ModuleKind::Relay).allotment, "and reach it by exactly as much");
 }
 
 /// Ticket #181: a Faction's start Region's Facilities come up as that Faction's own versions, the
@@ -7891,7 +8062,7 @@ fn a_spaceport_pays_an_influence_for_every_emigrant_it_launches() {
     let base = g.influence_allotment(ark);
     g.state_mut(sid).emigrants = 3;
     g.commit_orders(ark, &[Order::LiftToStation { state: sid, n: 3, colony: st }]);
-    assert_eq!(g.seats[ark.index()].spaceport_influence, 3, "one for each Emigrant lifted");
+    assert_eq!(g.seats[ark.index()].spaceport_influence, 3, "one for each Pioneer lifted");
     assert_eq!(g.influence_allotment(ark), base + 3, "at face value, never through the x0.8");
 
     // The sea is not a launch.
@@ -8072,6 +8243,13 @@ fn relations_fall_once_a_turn_for_spending_on_a_place_a_rival_holds() {
     let mut g = game();
     let victim = Seat(0);
     let offender = Seat(1);
+    // Ticket #236 (version 0.08.3): park the shared-pot term. Every Faction starts contributing
+    // ALL of its Research, which earns the reward, so without this each score below reads one
+    // higher and the test measures two rules at once. A directive of 10 leaves a 90% contribution:
+    // past the 85% line, short of the 100% that pays.
+    for s in Seat::ALL {
+        g.seats[s.index()].research_directive = 10;
+    }
     let held = Place::State(g.controlled_states(victim)[0]);
     let neutral = Place::State(StateId::ALL.into_iter().find(|s| g.state(*s).control == Control::Neutral).expect("a neutral Region"));
 
@@ -8102,6 +8280,11 @@ fn relations_fall_once_a_turn_for_spending_on_a_place_a_rival_holds() {
 fn relations_recover_slowly_and_never_rise_above_neutral() {
     let mut g = game();
     let (victim, offender) = (Seat(0), Seat(1));
+    // Ticket #236 (version 0.08.3): park the shared-pot term out of the way. Every Faction starts
+    // contributing ALL of its Research, which earns the reward, so without this every score below
+    // would read one higher and this test would be measuring two rules at once. A directive of 10
+    // leaves a 90% contribution: past the 85% line, short of the 100% that pays.
+    g.seats[offender.index()].research_directive = 10;
     g.relations.score[victim.index()][offender.index()] = -3;
 
     for _ in 0..3 {
@@ -8429,8 +8612,12 @@ fn civil_defense_doubles_what_a_constabulary_is_worth_at_the_gate() {
 
 /// Ticket #201: the tree's costs, which this ticket set and whose header comment had been wrong
 /// since version 0.07.1 -- it claimed 16, 28, 44 while the data said 15, 30, 45.
+///
+/// Ticket #231 (version 0.08.3): rungs 2 and 3 to 32 and 48, RUNG 1 LEFT AT 18. The total is the
+/// figure the ticket was decided on -- 554 to 585, a rise of 5.6%, about 1.8 turns of late-game
+/// Research -- so it is pinned here and not left to be re-derived.
 #[test]
-fn the_tree_costs_eighteen_thirty_and_forty_five_by_rung() {
+fn the_tree_costs_eighteen_thirty_two_and_forty_eight_by_rung() {
     let g = game();
     for t in TechId::ALL {
         let card = g.tables.tech(t);
@@ -8439,13 +8626,13 @@ fn the_tree_costs_eighteen_thirty_and_forty_five_by_rung() {
         }
         let want = match card.rung {
             1 => 18,
-            2 => 30,
-            _ => 45,
+            2 => 32,
+            _ => 48,
         };
         assert_eq!(card.cost, want, "rung {} costs {want}: {t:?}", card.rung);
     }
     let total: i64 = TechId::ALL.into_iter().map(|t| g.tables.tech(t).cost).sum();
-    assert_eq!(total, 554, "the whole tree, 507 over seventeen Techs before ticket #201");
+    assert_eq!(total, 649, "the whole tree since ticket #232's two rung-2 Techs; 585 from #231, 554 from #201, 507 before that");
 }
 
 // ------------------------------------------------------- 0.08.1 ticket #208: the School's step
@@ -8533,6 +8720,13 @@ fn market_prices_move_with_the_table() {
 fn blame_costs_a_faction_its_friends() {
     let mut g = game();
     let (cus, pro, ark) = (Seat(0), Seat(1), Seat(2));
+    // Ticket #236 (version 0.08.3): park the shared-pot term. Every Faction starts contributing
+    // ALL of its Research, which earns the reward, so without this each score below reads one
+    // higher and the test measures two rules at once. A directive of 10 leaves a 90% contribution:
+    // past the 85% line, short of the 100% that pays.
+    for s in Seat::ALL {
+        g.seats[s.index()].research_directive = 10;
+    }
     // A Prospector share of about 0.40 is one step above the 0.35 gate.
     for s in Seat::ALL {
         g.seats[s.index()].blame_emitted = if s == pro { 40.0 } else { 20.0 };
@@ -8612,3 +8806,463 @@ fn a_research_agreement_wants_friendship_first() {
     g.relations.score[cus.index()][pro.index()] = -9;
     assert!((g.research_agreement_multiplier(cus) - 1.10).abs() < 1e-9, "once made, it stands");
 }
+
+// ------------------------------------------- 0.08.3 ticket #232: Beneficiation and Relay Networks
+
+/// Ticket #232 (version 0.08.3): Beneficiation gives every Mine a tenth more, stacked inside the
+/// same multiplier chain as Deep Mining and the Extraction Charter so the product is floored ONCE.
+///
+/// The figures are pinned exactly, and the reason is a defect this test had in its first draft: it
+/// asserted `after >= before`, which PASSES with the Tech's effect deleted. Watched to fail with
+/// the multiplier removed, it did not fail, and that is how the weak assertion was found. A tenth
+/// is small enough to vanish into a floor, so nothing less than an exact figure guards it.
+///
+/// Measured while deciding, with a Mine alone on the slot: a tenth ON ITS OWN is invisible on Earth
+/// (7 -> 7) and Mars (5 -> 5) and shows only on the Moon (6 -> 7). That case cannot arise in play,
+/// because Beneficiation NEEDS Deep Mining -- and with Deep Mining standing it is +1 Materials per
+/// Mine on every Body measured. The prerequisite is load-bearing, not decoration.
+#[test]
+fn beneficiation_adds_one_to_every_mine_once_deep_mining_stands() {
+    for (body, deep, with_ben, all_three) in [(BodyId::Earth, 10, 11, 14), (BodyId::Moon, 9, 10, 13), (BodyId::Mars, 7, 8, 10), (BodyId::Phobos, 10, 11, 14)] {
+        let mut g = game();
+        let seat = Seat(0);
+        let c = colony(&mut g, seat, body, &[ModuleKind::Mine], 4);
+        with_tech(&mut g, TechId::DeepMining);
+        assert_eq!(g.module_yield(seat, c, ModuleKind::Mine).amount, deep, "Deep Mining alone at {body:?}");
+        with_tech(&mut g, TechId::Beneficiation);
+        assert_eq!(g.module_yield(seat, c, ModuleKind::Mine).amount, with_ben, "and Beneficiation adds one at {body:?}");
+        with_tech(&mut g, TechId::ExtractionCharter);
+        assert_eq!(g.module_yield(seat, c, ModuleKind::Mine).amount, all_three, "and all three chain at {body:?}");
+    }
+    let g = game();
+    assert_eq!(g.tables.tech(TechId::Beneficiation).needs, vec![TechId::DeepMining], "the prerequisite the figures above depend on");
+}
+
+/// Ticket #232: ANTARCTICA IS INCLUDED -- the clause a reader of the designer's words ("off world
+/// mines") would get wrong, and the whole value of the Tech. Measured while deciding: of sixteen
+/// Mines standing at the end of twenty games, THIRTEEN were Antarctic and three were off Earth, so
+/// an off-world-only clause would have reached 0.15 Mines a game. The designer, told that: "count
+/// Antarctica and change the tech's name".
+#[test]
+fn beneficiation_reaches_an_antarctic_mine_too() {
+    let mut g = game();
+    let seat = Seat(0);
+    let c = colony(&mut g, seat, BodyId::Earth, &[ModuleKind::Mine], 4);
+    with_tech(&mut g, TechId::DeepMining);
+    let before = g.module_yield(seat, c, ModuleKind::Mine).amount;
+    with_tech(&mut g, TechId::Beneficiation);
+    assert_eq!(g.module_yield(seat, c, ModuleKind::Mine).amount, before + 1, "an Antarctic Mine reads the Tech exactly as one off Earth does");
+    assert_eq!(g.tables.tech(TechId::Beneficiation).effect, "Mine output x1.1, wherever the Mine stands", "and the effect line says so, because the name no longer can");
+    assert!(!g.tables.tech(TechId::Beneficiation).name.to_lowercase().contains("orbit"), "the name carries no space word: it would be a lie");
+}
+
+/// Ticket #232: Relay Networks takes a Relay's Influence Allotment from 1 to 2 and leaves its
+/// Standing alone. The designer asked for the +1 on the Habitat, then moved it here.
+#[test]
+fn relay_networks_takes_a_relay_from_one_influence_to_two() {
+    let mut g = game();
+    let seat = Seat(0);
+    let c = colony(&mut g, seat, BodyId::Moon, &[ModuleKind::Relay], 4);
+    let before = g.module_yield(seat, c, ModuleKind::Relay);
+    assert_eq!(before.allotment, 1, "a Relay pays 1 into the Allotment without the Tech");
+
+    with_tech(&mut g, TechId::RelayNetworks);
+    let after = g.module_yield(seat, c, ModuleKind::Relay);
+    assert_eq!(after.allotment, 2, "and 2 with it");
+    assert_eq!(after.standing, before.standing, "its Standing is untouched: Standing holds one place, the Allotment is the budget");
+
+    // A Habitat gets nothing: the designer moved the clause OFF the Habitat deliberately.
+    let h = colony(&mut g, seat, BodyId::Mars, &[ModuleKind::Habitat], 4);
+    assert_eq!(g.module_yield(seat, h, ModuleKind::Habitat).allotment, 0, "a Habitat pays no Influence");
+}
+
+/// Ticket #232: the AI's appetite. Both weights were FLAT and read nothing about what the building
+/// would actually make, so no Tech in the game had ever moved a computer seat's build choice. The
+/// sweep that found 26 Mines and 1 Relay standing across forty games is the evidence. These two
+/// assert the yields the weights now read, which is the thing that was missing.
+#[test]
+fn the_yields_the_ai_weights_now_read_actually_move_with_their_techs() {
+    let mut g = game();
+    let seat = Seat(0);
+    let mine = colony(&mut g, seat, BodyId::Moon, &[ModuleKind::Mine], 4);
+    let relay = colony(&mut g, seat, BodyId::Mars, &[ModuleKind::Relay], 4);
+    let mine_before = g.module_yield(seat, mine, ModuleKind::Mine).amount;
+    let relay_before = g.module_yield(seat, relay, ModuleKind::Relay).allotment;
+
+    for t in [TechId::DeepMining, TechId::Beneficiation, TechId::ExtractionCharter, TechId::RelayNetworks] {
+        with_tech(&mut g, t);
+    }
+    let mine_after = g.module_yield(seat, mine, ModuleKind::Mine).amount;
+    let relay_after = g.module_yield(seat, relay, ModuleKind::Relay).allotment;
+
+    assert!(mine_after > mine_before, "a Mine's yield moves with its Techs: {mine_before} -> {mine_after}");
+    assert!(relay_after > relay_before, "and a Relay's: {relay_before} -> {relay_after}");
+    // The Mine's weight is scaled by yield-over-card, so the card figure must stay reachable.
+    let card = g.tables.module(ModuleKind::Mine).produces.as_ref().map(|p| p.amount).unwrap_or(0);
+    assert_eq!(card, 4, "the Mine's card figure, which the AI weight divides by");
+}
+
+/// Ticket #244 (version 0.08.3): the Arkwrights' signature rule is COACH CLASS, and the word
+/// Steerage appears on no Faction card. Renamed for the reason the Emigrant became the Pioneer --
+/// steerage is the cheapest class of passage on an emigrant ship, and this rule's own avoid list
+/// had been warning off "cattle class" since it was written.
+///
+/// This test exists because the rename moved no MECHANIC: every figure Coach Class controls is
+/// unchanged, so the tests that guard the rule stayed green throughout and witnessed nothing. A
+/// rename with no guard is exactly how a word creeps back.
+#[test]
+fn the_arkwrights_signature_rule_is_coach_class_and_says_steerage_nowhere() {
+    let g = game();
+    let card = g.tables.faction(FactionKind::Arkwrights);
+    assert!(card.signature.starts_with("Coach Class"), "the card leads with the rule's name: {}", card.signature);
+    for kind in FactionKind::ALL {
+        let c = g.tables.faction(kind);
+        for text in [&c.signature, &c.victory, &c.blurb, &c.unique] {
+            assert!(!text.to_lowercase().contains("steerage"), "{kind:?} still says Steerage: {text}");
+        }
+    }
+}
+
+// -------------------------------------------- 0.08.3 ticket #235: the Research Directive
+
+/// Ticket #235 (version 0.08.3): every Faction may send a share of its Research somewhere other
+/// than the shared Tech, and each of the four goes somewhere different.
+///
+/// The rates were fitted against a measurement, not guessed: Research made over a whole game,
+/// median by Faction over 20 seeds, is Custodians 131, Prospectors 442, Arkwrights 149,
+/// Archivists 453. Half a turn's Research is therefore about 1.8 points for the Custodians and 6.2
+/// for the Prospectors -- far less than the rule was first drafted against, which is why the
+/// Custodians' rate came down from 0.05 ppm a point to 0.01 and why the Prospectors' "10-1" had to
+/// be settled at 0.8 rather than either of the readings it could bear.
+#[test]
+fn a_research_directive_sends_a_share_of_the_turns_research_somewhere_else() {
+    let seat_of = |g: &Game, k: FactionKind| Seat::ALL.into_iter().find(|s| g.kind(*s) == k).expect("every Faction is seated");
+    // A fresh game makes no Research at all, so every arm below needs a Lab before there is
+    // anything to direct. The Archive test has needed the same since version 0.07.0.
+    let with_lab = |g: &mut Game, seat: Seat| {
+        g.state_mut(StateId::Europe).control = Control::Controlled(seat);
+        g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+        g.pick_tech(Seat(0), TechId::PublicScience).ok();
+    };
+
+    // The Custodians: the Natural Sink itself moves, and it STAYS moved.
+    let mut g = game();
+    let cus = seat_of(&g, FactionKind::Custodians);
+    with_lab(&mut g, cus);
+    let before_sink = g.climate.natural_sink;
+    g.seats[cus.index()].research_directive = 50;
+    g.income_phase();
+    let made = g.seats[cus.index()].research_last_turn;
+    let want = made * 50 / 100;
+    assert!(made > 0, "the seat made Research to direct");
+    let rate = g.tables.research_directive.custodians_ppm_per_point;
+    assert!((g.climate.natural_sink - (before_sink + want as f64 * rate)).abs() < 1e-9, "the Sink took {want} points at {rate} a point: {} -> {}", before_sink, g.climate.natural_sink);
+    let held = g.climate.natural_sink;
+    g.income_phase();
+    assert!(g.climate.natural_sink > held, "and it is PERMANENT -- a second turn adds again rather than replacing");
+
+    // The Prospectors: Ducats, at a fractional rate that carries rather than flooring away.
+    // Against a CONTROL run: Income pays ordinary Ducat income too, so the directive's share is
+    // the difference between two identical games, one directing and one not.
+    let ducats_at = |percent: u8| -> (i64, i64, f64) {
+        let mut g = game();
+        let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
+        g.state_mut(StateId::Europe).control = Control::Controlled(pro);
+        g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+        g.pick_tech(Seat(0), TechId::PublicScience).ok();
+        g.seats[pro.index()].research_directive = percent;
+        g.income_phase();
+        (g.seat(pro).stockpile.ducats, g.seats[pro.index()].research_last_turn, g.seat(pro).directive_remainder)
+    };
+    let (plain, made, _) = ducats_at(0);
+    let (directed, made2, carried) = ducats_at(50);
+    assert_eq!(made, made2, "the same game either way");
+    let want = made * 50 / 100;
+    let earned = want as f64 * game().tables.research_directive.prospectors_ducats_per_point;
+    assert!(want > 0, "{made} Research, half of it directed");
+    assert_eq!(directed - plain, earned.floor() as i64, "{want} points at 0.8 is {earned}, paid whole");
+    assert!((carried - (earned - earned.floor())).abs() < 1e-9, "and the fraction is carried, not lost");
+
+    // The Arkwrights: Fuel, same carry.
+    let fuel_at = |percent: u8| -> (i64, i64) {
+        let mut g = game();
+        let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+        g.state_mut(StateId::Europe).control = Control::Controlled(ark);
+        g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+        g.pick_tech(Seat(0), TechId::PublicScience).ok();
+        g.seats[ark.index()].research_directive = percent;
+        g.income_phase();
+        (g.seat(ark).stockpile.fuel, g.seats[ark.index()].research_last_turn)
+    };
+    let (plain, made) = fuel_at(0);
+    let (directed, _) = fuel_at(50);
+    let want = made * 50 / 100;
+    let earned = want as f64 * game().tables.research_directive.arkwrights_fuel_per_point;
+    assert_eq!(directed - plain, earned.floor() as i64, "{want} points at 0.2 is {earned}");
+}
+
+/// Ticket #235: what is directed never reaches the shared Tech, so it counts nothing toward the
+/// Research Lead. This is the cost that makes the directive a decision rather than free money, and
+/// it is the same rule the Archive fund has had since version 0.07.0.
+#[test]
+fn directed_research_never_reaches_the_shared_tech() {
+    let mut g = game();
+    let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    g.state_mut(StateId::Europe).control = Control::Controlled(cus);
+    g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+    g.pick_tech(Seat(0), TechId::PublicScience).ok();
+    g.research.contributions = [0; 4];
+    g.seats[cus.index()].research_directive = 50;
+    g.income_phase();
+    let made = g.seats[cus.index()].research_last_turn;
+    let directed = made * 50 / 100;
+    assert_eq!(g.research.contributions[cus.index()], made - directed, "only what was not directed reached the Tech");
+}
+
+/// Ticket #235: Provisional Findings was BINARY because its control was a switch -- any funding at
+/// all turned it off. With a slider it takes a threshold, at the designer's word "make it a
+/// threshold 75%": the rule holds while at least that share still goes to the shared Tech.
+///
+/// Both of the old positions are unchanged, which is the point of choosing a threshold over a
+/// scaling rule: 0 keeps it and 100 loses it, exactly as the switch did.
+#[test]
+fn provisional_findings_holds_while_three_quarters_still_goes_to_the_tech() {
+    let floor = game().tables.research_directive.provisional_min_contribution;
+    assert_eq!(floor, 75, "the threshold the rest of this test is written against");
+    for (directive, expected) in [(0u8, true), (25, true), (26, false), (50, false), (100, false)] {
+        let mut g = game();
+        let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
+        // Enough Research that the share is not lost to rounding, and room in the fund for it.
+        g.state_mut(StateId::Europe).control = Control::Controlled(arc);
+        for _ in 0..4 {
+            g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+        }
+        g.pick_tech(Seat(0), TechId::PublicScience).ok();
+        g.seats[arc.index()].research_directive = directive;
+        g.income_phase();
+        g.income_phase();
+        assert_eq!(
+            g.provisional_findings(arc),
+            expected,
+            "a directive of {directive} should leave Provisional Findings {expected}"
+        );
+    }
+}
+
+// ------------------------------------------------- 0.08.3 ticket #236: the shared pot
+
+/// Ticket #236 (version 0.08.3): what everyone makes of how much of its Research a Faction gives
+/// the shared Tech. A TERM and not a deed, at the designer's word "plus/minus 1 but only for that
+/// turn" -- read afresh every time, gone the moment they contribute again.
+///
+/// The shape matters and was chosen against a measurement. With the Research Directive shipped and
+/// the AI going to its cap on turn 2 -- 24 to 28 turns of 36 below any threshold -- a PERMANENT
+/// -1 against every rival every turn would have been about 78 points of damage a seat over a
+/// game, on a scale that bottoms at -10.
+#[test]
+fn the_shared_pot_is_a_term_read_afresh_and_never_banked() {
+    let mut g = game();
+    let (viewer, subject) = (Seat(0), Seat(1));
+    let c = &g.tables.relations;
+    let (floor, step) = (c.directive_min_contribution, c.directive_step);
+    assert_eq!((floor, step), (85, 1), "the figures the rest of this test is written against");
+
+    // Contributing all of it: the reward. This is also the state every game OPENS in.
+    g.seats[subject.index()].research_directive = 0;
+    assert_eq!(g.directive_relations_term(subject), 1, "all of it pays");
+    assert_eq!(g.relations_score(viewer, subject), 1);
+
+    // Above the line but short of all of it: nothing either way.
+    g.seats[subject.index()].research_directive = 15;
+    assert_eq!(g.directive_relations_term(subject), 0, "90% contributed is past the line and short of the reward");
+    assert_eq!(g.relations_score(viewer, subject), 0);
+
+    // Below the line: the penalty, and it is gone again the moment they contribute.
+    g.seats[subject.index()].research_directive = 16;
+    assert_eq!(g.directive_relations_term(subject), -1, "84% contributed is below the line");
+    g.seats[subject.index()].research_directive = 50;
+    assert_eq!(g.directive_relations_term(subject), -1, "and no worse for being far below it");
+    assert_eq!(g.relations_deeds(viewer, subject), 0, "NOTHING is banked: the deeds figure never moved");
+    g.seats[subject.index()].research_directive = 0;
+    assert_eq!(g.relations_score(viewer, subject), 1, "forgiven the same turn they contribute again");
+}
+
+/// Ticket #236: the reward may not lift a pair past the top of Cordial, the step above Neutral, at
+/// the designer's word. Version 0.08.2 settled that a pair which never strikes an Accord can never
+/// rise above Neutral; this bends that by one band rather than breaking it.
+#[test]
+fn the_shared_pots_reward_stops_at_the_top_of_cordial() {
+    let mut g = game();
+    let (viewer, subject) = (Seat(0), Seat(1));
+    let ceiling = g.tables.relations.directive_boost_ceiling;
+    assert_eq!(ceiling, 6, "the top of Cordial");
+    g.seats[subject.index()].research_directive = 0;
+
+    g.relations.score[viewer.index()][subject.index()] = ceiling;
+    assert_eq!(g.relations_score(viewer, subject), ceiling, "the reward adds nothing at the ceiling");
+    assert_eq!(g.relations_level(viewer, subject), "Cordial");
+
+    g.relations.score[viewer.index()][subject.index()] = ceiling - 1;
+    assert_eq!(g.relations_score(viewer, subject), ceiling, "and only up to it from below");
+
+    // A pair already higher by DEEDS is not dragged down to the ceiling: it binds the boost only.
+    g.relations.score[viewer.index()][subject.index()] = 9;
+    assert_eq!(g.relations_score(viewer, subject), 9, "Friendly by deeds stays Friendly");
+}
+
+/// Ticket #236: the penalty is not an offence. It must not feed the scar ratchet, at the
+/// designer's word -- "this doesn't count towards scar" -- because a Faction spending its own
+/// Research on its own business has done nothing to anybody.
+#[test]
+fn the_shared_pots_penalty_never_scars_a_pair() {
+    let mut g = game();
+    let (viewer, subject) = (Seat(0), Seat(1));
+    g.seats[subject.index()].research_directive = 50;
+    for _ in 0..12 {
+        g.settle_relations();
+    }
+    assert_eq!(g.directive_relations_term(subject), -1, "twelve turns of keeping it back");
+    assert_eq!(g.relations.floor[viewer.index()][subject.index()], 0, "and not one step of scar");
+    assert_eq!(g.relations_deeds(viewer, subject), 0, "nor a single banked point");
+}
+
+// ------------------------------------------------- 0.08.3 ticket #237: the Exodus Call
+
+/// Ticket #237 (version 0.08.3): the Arkwrights' own order. Two turns of a doubled muster in one
+/// Region, once per Region ever, for the price of a Leapfrog.
+///
+/// The second clause is the ticket, and it was chosen against a measurement. Their home state runs
+/// from 20 units of population to 1 over a game ALREADY, because Coach Class charges them twice a
+/// head; an order that doubled only the count would have burned the country twice as fast and
+/// deepened the very thing that leaves them winning 3 games of 80. So a Call SUSPENDS the double
+/// charge while it runs: they move twice the people at the ordinary price in population.
+#[test]
+fn an_exodus_call_doubles_the_muster_and_suspends_the_double_cost() {
+    let mut g = game();
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+    let sid = g.controlled_states(ark)[0];
+    let plain = g.emigrants_per_turn(ark);
+    assert_eq!(plain, 8, "Coach Class musters eight where others muster four");
+    assert!((g.muster_population_in(ark, sid, plain) - g.lift_population(ark, plain)).abs() < 1e-9, "and pays double for them until the Call");
+
+    g.seats[ark.index()].stockpile.ducats = 500;
+    held_long_enough(&mut g, sid);
+    g.commit_orders(ark, &[Order::ExodusCall { state: sid }]);
+    assert!(g.exodus_call_running(sid), "it runs from the turn it is sounded");
+    assert_eq!(g.emigrants_per_turn_in(ark, sid), plain * 2, "sixteen, not eight");
+
+    // The whole point: sixteen people cost what sixteen people cost anybody else.
+    let each = g.tables.emigrants.population_each;
+    assert!((g.muster_population_in(ark, sid, 16) - each * 16.0).abs() < 1e-9, "the ordinary price, not their double");
+    assert!(g.muster_population_in(ark, sid, 16) < g.lift_population(ark, 16), "which is strictly less than Coach Class charges");
+
+    // Elsewhere they are unchanged: the Call is a Region's, not a Faction's.
+    let other = g.controlled_states(ark).into_iter().find(|s| *s != sid);
+    if let Some(other) = other {
+        assert_eq!(g.emigrants_per_turn_in(ark, other), plain, "only the Region that answered");
+    }
+}
+
+/// Ticket #237: once per Region, ever -- the shape the Strip Permit has had since ticket #54 --
+/// and the Arkwrights alone.
+#[test]
+fn an_exodus_call_is_once_per_region_and_the_arkwrights_alone() {
+    let mut g = game();
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+    let sid = g.controlled_states(ark)[0];
+    g.seats[ark.index()].stockpile.ducats = 500;
+    held_long_enough(&mut g, sid);
+
+    g.commit_orders(ark, &[Order::ExodusCall { state: sid }]);
+    assert!(g.state(sid).exodus_call_used, "the Region is marked for good");
+    assert_eq!(
+        g.check_order(ark, &[], &Order::ExodusCall { state: sid }).unwrap_err().0,
+        "this Region has answered an Exodus Call once already, and may not again"
+    );
+
+    let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    let theirs = g.controlled_states(cus)[0];
+    g.seats[cus.index()].stockpile.ducats = 500;
+    held_long_enough(&mut g, theirs);
+    assert_eq!(
+        g.check_order(cus, &[], &Order::ExodusCall { state: theirs }).unwrap_err().0,
+        "only the Arkwrights sound an Exodus Call"
+    );
+    assert_eq!(g.order_cost(ark, &Order::ExodusCall { state: sid }).ducats, g.tables.ducats.per_leapfrog, "priced as a Leapfrog, the other Faction-only order on a state you hold");
+}
+
+// ------------------------------------------- 0.08.3 ticket #238: three turns before you remake
+
+/// Ticket #238 (version 0.08.3): the Strip Permit, the Leapfrog and the Exodus Call all change a
+/// country for good, and a Faction that has just walked in does not get to do that. Three whole
+/// turns in hand, the turn of the taking not counting.
+///
+/// Measured before it was taken, over five whole games: the rule would have refused 31 of 31 Strip
+/// Permits and 2 of 36 Leapfrogs AS ISSUED. That figure overstates the harm, and the second
+/// measurement is why: every Strip Permit goes on a Region held nought or one turns, while the
+/// Prospectors hold nine Regions of nine for three turns or more by mid-game. The rule delays a
+/// strip onto the pile of long-held Regions the seat already sits on; it does not abolish it.
+#[test]
+fn three_turns_in_hand_before_a_faction_remakes_a_region() {
+    let mut g = game();
+    let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    let min = g.tables.faction_orders.min_turns_held;
+    assert_eq!(min, 3, "the figure the rest of this test is written against");
+    // Taken BEFORE the Region below is seized, or `controlled_states` hands back the new one.
+    let home = g.controlled_states(cus)[0];
+
+    // A Region taken this turn: refused, and the refusal names the turn it opens.
+    let fresh = StateId::ALL.into_iter().find(|s| g.state(*s).control == Control::Neutral).unwrap();
+    g.turn = 10;
+    g.take_control(fresh, cus);
+    g.seats[cus.index()].stockpile.ducats = 500;
+    assert_eq!(g.turns_held(cus, fresh), Some(0), "the turn of the taking does not count");
+    let refusal = g.check_order(cus, &[], &Order::Leapfrog { state: fresh }).unwrap_err().0;
+    assert!(refusal.contains("from turn 13"), "the refusal says when, not just no: {refusal}");
+
+    // Turn by turn until it opens.
+    for (turn, open) in [(11, false), (12, false), (13, true)] {
+        g.turn = turn;
+        assert_eq!(g.may_remake(cus, fresh), open, "turn {turn}, held {:?}", g.turns_held(cus, fresh));
+    }
+
+    // A starting Region is held from turn 1, so it opens on turn 4 -- no special case.
+    assert_eq!(g.state(home).held_since, Some(1), "held from the first turn");
+    g.turn = 3;
+    assert!(!g.may_remake(cus, home), "turn 3 is too soon");
+    g.turn = 4;
+    assert!(g.may_remake(cus, home), "and turn 4 opens it");
+}
+
+/// Ticket #238: losing the Region resets the clock, and a save written before this version -- which
+/// has no clock at all -- counts as held long enough rather than silently losing three orders.
+#[test]
+fn the_hold_clock_resets_on_a_change_of_hands_and_an_old_save_passes() {
+    let mut g = game();
+    let (cus, pro) = (
+        Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap(),
+        Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap(),
+    );
+    let sid = g.controlled_states(cus)[0];
+    g.turn = 20;
+    assert!(g.may_remake(cus, sid), "long held by its founder");
+
+    g.take_control(sid, pro);
+    assert_eq!(g.turns_held(pro, sid), Some(0), "the new holder starts from nothing");
+    assert!(!g.may_remake(pro, sid));
+    assert_eq!(g.turns_held(cus, sid), None, "and the old holder has no clock here at all");
+
+    // Written back to the SAME holder, the clock does not restart: a repeated write nobody can see
+    // must not deny an order forever.
+    g.turn = 25;
+    let before = g.state(sid).held_since;
+    g.take_control(sid, pro);
+    assert_eq!(g.state(sid).held_since, before, "same holder, same clock");
+    assert!(g.may_remake(pro, sid));
+
+    // An old save carries no clock.
+    g.state_mut(sid).held_since = None;
+    assert!(g.may_remake(pro, sid), "a missing clock counts as held long enough");
+}
+
+

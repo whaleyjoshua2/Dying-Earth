@@ -35,7 +35,12 @@ pub const SAVE_VERSION: u32 = 1;
 /// a file written by an earlier build describes a market this one cannot read -- its prices are
 /// absent, and the three base figures it was played at have each risen by one besides. A refusal
 /// naming both versions is the right answer; a silent partial load is not.
-pub const GAME_VERSION: &str = "0.08.2";
+/// Ticket #241 (version 0.08.3): moved again, and this version has more reason than most. A seat
+/// carries a **Research Directive** where it carried a single Archive-funding flag (#235); a Region
+/// carries a hold clock and an Exodus Call (#237, #238); and three new **Unique Modules** were
+/// appended to `ModuleKind` (#239), so a colony written by an older build describes a Module list
+/// this one indexes differently. A refusal naming both versions is the right answer.
+pub const GAME_VERSION: &str = "0.08.3";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;

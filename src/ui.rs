@@ -1910,7 +1910,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             if game.kind(Seat(0)) == FactionKind::Prospectors {
                 let s = game.seat(Seat(0));
                 ui.label(RichText::new(format!("Fund {} ({}%)", s.venture_fund, (s.venture_share * 100.0).round() as u32)).strong())
-                    .on_hover_text("The Venture Capital Fund: Materials banked toward the 1000 your Victory Condition asks for, and the share of your Factories' and Mines' output going in each turn. Set it on the Victory panel.");
+                    .on_hover_text(format!("The Venture Capital Fund: Ducats banked toward the {} your Victory Condition asks for, and the share of your Ducat income going in each turn. Set it on the Victory panel.", game.tables.faction(FactionKind::Prospectors).victory_first.bar));
             }
             ui.separator();
             bar_resource(ui, icons, "fuel", "Fuel", format!("{} ({})", left.fuel, signed(inc.fuel)), sources(dying_earth_engine::Resource::Fuel));
@@ -2040,7 +2040,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             // Ticket #166 (version 0.07.5): the figure's hover draws the population history under
             // its sentence, as the Emissions figure's does.
             let pop_sentence = format!(
-                "On Earth: {}.\nOff Earth: {}.\nOne Colonist is five million people; a station over Earth is off Earth and Antarctica is on it.\nEmigrants waiting on a card and Colonists aboard a Ship are in neither line.",
+                "On Earth: {}.\nOff Earth: {}.\nOne Colonist is five million people; a station over Earth is off Earth and Antarctica is on it.\nPioneers waiting on a card and Colonists aboard a Ship are in neither line.",
                 earth_lines.join(", "),
                 space_lines.join(", ")
             );
@@ -3269,13 +3269,13 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildArchive { colony } => format!("Build the Archive at {}", game.place_name(Place::Colony(*colony))),
         Order::SetMaxStanding { target: Some(p) } => format!("Spend your whole Allotment on {}, every turn", game.place_name(*p)),
         Order::SetMaxStanding { target: None } => "Place your Influence by hand again".to_string(),
-        Order::SetArchiveFunding { on: true } => "Pay your Labs into the Archive fund from the next Income".to_string(),
-        Order::SetArchiveFunding { on: false } => "Pay your Labs into the shared Tech from the next Income".to_string(),
+        Order::SetResearchDirective { percent: 0 } => "Pay all your Research into the shared Tech from the next Income".to_string(),
+        Order::SetResearchDirective { percent } => format!("Direct {percent}% of your Research from the next Income"),
         // Ticket #73.
-        Order::BuildEmigrants { state, n } => format!("Muster {n} Emigrants in {}", game.tables.state(*state).name),
-        Order::LiftToStation { state, n, colony } => format!("Send {n} Emigrants from {} to {} by lift", game.tables.state(*state).name, game.place_name(Place::Colony(*colony))),
+        Order::BuildEmigrants { state, n } => format!("Recruit {n} Pioneers in {}", game.tables.state(*state).name),
+        Order::LiftToStation { state, n, colony } => format!("Send {n} Pioneers from {} to {} by lift", game.tables.state(*state).name, game.place_name(Place::Colony(*colony))),
         Order::SendToAntarctica { state, n, into } => format!(
-            "Send {n} Emigrants from {} to {} by sea",
+            "Send {n} Pioneers from {} to {} by sea",
             game.tables.state(*state).name,
             match into {
                 UnloadTarget::Slot(_, slot) => game.tables.body(BodyId::Earth).slots[*slot as usize].name.clone(),
@@ -3283,8 +3283,8 @@ fn order_text(game: &Game, o: &Order) -> String {
             }
         ),
         // Ticket #72.
-        Order::SetVentureShare { share } => format!("Bank {share}% of Materials output in the Venture Capital Fund"),
-        Order::DrawVenture { amount } => format!("Draw {amount} Materials from the Venture Capital Fund"),
+        Order::SetVentureShare { share } => format!("Bank {share}% of Ducat income in the Venture Capital Fund"),
+        Order::DrawVenture { amount } => format!("Draw {amount} Ducats from the Venture Capital Fund"),
         // Ticket #52.
         Order::Relief { state } => format!("Relief in {}: Unrest -1", game.tables.state(*state).name),
         Order::Resettle { state } => format!("Resettle this turn's refugees in {}", game.tables.state(*state).name),
@@ -3292,6 +3292,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::Change { building, what } => format!("{} the {} at {}", what.name(), building_name(game, *building), game.place_name(building.place())),
         Order::Leapfrog { state } => format!("Leapfrog {}: its people emit {:.2} less per hundred million", game.tables.state(*state).name, game.tables.climate.population_emissions_per_level * Game::UNITS_PER_HUNDRED_MILLION),
         Order::StripPermit { state } => format!("Strip Permit in {}: three turns of double output", game.tables.state(*state).name),
+        Order::ExodusCall { state } => format!("Exodus Call in {}: a doubled muster at the ordinary cost in people", game.tables.state(*state).name),
         // Ticket #192 (version 0.08.0): the Upload.
         Order::Upload { colony, n } => format!("Upload {} Colonists into the Archive at {}", n, game.place_name(Place::Colony(*colony))),
     }
@@ -3661,7 +3662,11 @@ fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Or
         resp = rule_tip(resp, whole).on_disabled_hover_ui(move |ui| hover_with_icons(ui, &b));
     }
     if let Err(e) = &check {
-        resp.clone().on_disabled_hover_text(&e.0);
+        // Ticket #238 (version 0.08.3): through `rule_tip`, so a REFUSAL can be photographed like
+        // any other tooltip. It could not be before -- a plain `on_disabled_hover_text` needs a
+        // pointer, and the shot window never has one -- which left every refusal in the game
+        // unlookable-at, this version's three-turn rule among them.
+        rule_tip(resp.clone(), e.0.clone());
     }
     if resp.clicked() {
         actions.push(Action::Place(order));
@@ -4312,9 +4317,9 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     let live = game.education_level(sid);
     let schooled = live - card.education_level;
     let hover = if schooled > 0.005 {
-        format!("{:.2} on the card, and {:+.2} from a School. It multiplies a Research Lab twice over, stiffens this Region against an outsider's Influence, and goes with any Colonist mustered here.", card.education_level, schooled)
+        format!("{:.2} on the card, and {:+.2} from a School. It multiplies a Research Lab twice over, stiffens this Region against an outsider's Influence, and goes with any Colonist recruited here.", card.education_level, schooled)
     } else {
-        format!("{:.2} on the card, and no School standing. It multiplies a Research Lab twice over, stiffens this Region against an outsider's Influence, and goes with any Colonist mustered here.", card.education_level)
+        format!("{:.2} on the card, and no School standing. It multiplies a Research Lab twice over, stiffens this Region against an outsider's Influence, and goes with any Colonist recruited here.", card.education_level)
     };
     rule_tip(ui.label(format!("Education Level {live:.2}")), hover);
     // Ticket #52: Unrest, and what it is doing here in words.
@@ -4446,6 +4451,23 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 ui.label(RichText::new(format!("lowers its people to {:.2} per hundred million, for good", (game.population_coefficient(sid) - game.tables.climate.population_emissions_per_level).max(game.tables.climate.population_emissions_base) * Game::UNITS_PER_HUNDRED_MILLION)).weak());
             });
         }
+        // Ticket #237 (version 0.08.3): the Arkwrights' own order, beside the Custodians' Leapfrog
+        // and the Prospectors' Strip Permit, and guarded the same way -- once per state, ever.
+        if game.kind(Seat(0)) == FactionKind::Arkwrights && !st.exodus_call_used {
+            let t = &game.tables.exodus_call;
+            ui.horizontal(|ui| {
+                cost_button(ui, game, &session.pending, Order::ExodusCall { state: sid }, "Exodus Call", actions);
+                ui.label(
+                    RichText::new(format!(
+                        "{} turns recruiting {} Pioneers here instead of {}, and each costs this Region the ordinary population rather than your double. Once per Region, ever.",
+                        t.turns,
+                        game.emigrants_per_turn(Seat(0)) * t.muster_multiplier,
+                        game.emigrants_per_turn(Seat(0))
+                    ))
+                    .weak(),
+                );
+            });
+        }
         if game.kind(Seat(0)) == FactionKind::Prospectors && !st.strip_permit_used {
             let t = &game.tables.strip_permit;
             ui.horizontal(|ui| {
@@ -4457,17 +4479,17 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         ui.label(RichText::new("Raising the Industry Level adds an inland slot, which the sea never reaches.").weak());
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
         // Ticket #73: muster Emigrants here, and send them to Antarctica by sea once the ice is open.
-        ui.label(RichText::new("Emigrants").strong());
+        ui.label(RichText::new("Pioneers").strong());
         // Ticket #211 (version 0.08.1): the figure stands at the HEAD of this block, above the
         // button that changes it, and is shown at every value including nought. It existed before
         // -- in the Influence block, some way up the card, and only while it was above zero -- so a
         // player who mustered and then looked for the result found the line had simply not been
         // there a moment ago. At nought it now says so, which is the answer to "did that work?".
-        ui.label(format!("Emigrants waiting: {}", st.emigrants)).on_hover_text(
-            "Mustered here and not yet lifted or sent: a working Launch Site lifts them onto a Ship or straight to a station of yours over Earth, and once the ice is open the sea takes them to Antarctica.",
+        ui.label(format!("Pioneers waiting: {}", st.emigrants)).on_hover_text(
+            "Recruited here and not yet lifted or sent: a working Launch Site lifts them onto a Ship or straight to a station of yours over Earth, and once the ice is open the sea takes them to Antarctica.",
         );
         // Ticket #196 (version 0.08.0): as many as this state's people can pay for, where the button
-        // always asked for the whole batch. Steerage costs the Arkwrights twice the population for
+        // always asked for the whole batch. Coach Class costs the Arkwrights twice the population for
         // twice the batch -- 16.0 people -- and Australia carries 10.1 to 12.6, so the button was dead
         // there with nothing on screen to say why. Where the state cannot pay for even one, it still
         // offers one, so the refusal a player reads is "not enough people there" rather than silence.
@@ -4477,7 +4499,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             game,
             &session.pending,
             Order::BuildEmigrants { state: sid, n: per },
-            &format!("Muster {per} Emigrants"),
+            &format!("Recruit {per} Pioneers"),
             Some(format!(
                 "{} people, on the card at End Turn, and {} off this state's Unrest. A working Launch Site lifts them onto a Ship or straight to a station of yours over Earth; once the ice is open the sea takes them to Antarctica.",
                 Game::people_text(game.lift_population(Seat(0), per)),
@@ -4670,24 +4692,24 @@ fn emigrant_loader(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
         // picture: at `Colonists 4 of 4 room` the sea button came up white and clickable.
         if n == 0 {
             let why = if waiting == 0 {
-                format!("Nobody is waiting in {}. Muster Emigrants there first.", game.tables.state(chosen).name)
+                format!("Nobody is waiting in {}. Recruit Pioneers there first.", game.tables.state(chosen).name)
             } else {
                 format!("{} is full: {} Colonists in {} of room.", game.place_name(Place::Colony(col.id)), col.colonists, game.habitat_room(col))
             };
-            let label = if by_sea { "Bring Emigrants by sea" } else { "Lift Emigrants" };
+            let label = if by_sea { "Bring Pioneers by sea" } else { "Lift Pioneers" };
             ui.add_enabled(false, egui::Button::new(label)).on_disabled_hover_text(why);
             return;
         }
         let (order, label, hover) = if by_sea {
             (
                 Order::SendToAntarctica { state: chosen, n, into: UnloadTarget::Colony(col.id) },
-                format!("Bring {n} Emigrants by sea"),
+                format!("Bring {n} Pioneers by sea"),
                 format!("They land here at NEXT turn's Resolution: a sea crossing takes a turn. {} has room for {room} more.", game.place_name(Place::Colony(col.id))),
             )
         } else {
             (
                 Order::LiftToStation { state: chosen, n, colony: col.id },
-                format!("Lift {n} Emigrants"),
+                format!("Lift {n} Pioneers"),
                 format!("Aboard at this turn's Resolution. A launch: it emits like any lift. {} has room for {room} more.", game.place_name(Place::Colony(col.id))),
             )
         };
@@ -4794,34 +4816,16 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                 format!("Archive fund {fund} of {cap} (a quarter of the {research} until the Archive stands)")
             };
             ui.label(fund_line);
-            // Version 0.07.0: a standing declaration, read at the next Income, not a per-turn order.
-            let declared = game.seat(Seat(0)).archive_funding;
-            let pending_set = session.pending.iter().find_map(|o| match o {
-                Order::SetArchiveFunding { on } => Some(*on),
-                _ => None,
-            });
-            let mut on = pending_set.unwrap_or(declared);
-            let flip = Order::SetArchiveFunding { on: !on };
-            let may_flip = pending_set.is_some() || game.check_order(Seat(0), &session.pending, &flip).is_ok();
-            let box_ = ui.add_enabled(
-                may_flip,
-                egui::Checkbox::new(&mut on, "Pay your Labs into the Archive fund (from the next Income, until you set it back)"),
-            );
-            if !may_flip {
-                box_.clone().on_disabled_hover_text("The fund is at its cap; your Labs' Research goes to the shared Tech.");
-            }
-            if box_.changed() {
-                if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetArchiveFunding { .. })) {
-                    actions.push(Action::Cancel(i));
-                } else {
-                    actions.push(Action::Place(Order::SetArchiveFunding { on }));
-                }
-            }
+            // Ticket #235 (version 0.08.3): the switch that stood here is a SLIDER now, and it
+            // lives in the Tech Tree window with the other three Factions' -- at the designer's
+            // word, *"yeah tech tree - put the archive's slider there too"*. One control, one
+            // place, for a decision every Faction now makes about the same thing.
+            let directive = game.seat(Seat(0)).research_directive;
             ui.label(
-                egui::RichText::new(if on {
-                    "Your Labs pay the fund from the next Income."
+                egui::RichText::new(if directive == 0 {
+                    "Your Labs pay the shared Tech. Set a Research Directive in the Tech Tree window to pay this fund instead.".to_string()
                 } else {
-                    "Your Labs pay the shared Tech."
+                    format!("Your Research Directive sends {directive}% of your Research to this fund, from the next Income. It is set in the Tech Tree window.")
                 })
                 .weak(),
             );
@@ -5080,7 +5084,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                             });
                             // Ticket #73: a Launch Site lifts the Emigrants waiting there, no more.
                             let lift = n.min(game.state(chosen).emigrants).max(1);
-                            cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(chosen), army: None }, &format!("Load {lift} Emigrants"), actions);
+                            cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(chosen), army: None }, &format!("Load {lift} Pioneers"), actions);
                         });
                     }
                 }
@@ -5238,12 +5242,35 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
 /// branch, one column per rung**, so time runs left to right the way a tree is read, the branch
 /// names as row headings down the left edge. The designer's line: *"Transpose tech tree."*
 fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, actions: &mut Vec<Action>) {
-    const COL: f32 = 160.0;
-    const ROW: f32 = 96.0;
-    const BOX_W: f32 = 136.0;
-    const BOX_H: f32 = 64.0;
+    // Ticket #242 (version 0.08.3): every figure here is a TENTH SMALLER than it was, at the
+    // designer's word -- "let's reduce the size of the tech boxes by 10%". The spacing went with
+    // the boxes deliberately: the tree's height is `rows x ROW`, so shrinking the boxes alone would
+    // have put more air around smaller boxes and saved not one pixel, which is not what the change
+    // was for. Ticket #232's two new Techs had taken the tree from 672 pixels to 864; at nine
+    // tenths it is 774, which clears 1080 with room and leaves less to scroll at 800.
+    //
+    // The two font sizes below came down with them, 13 to 12 and 11 to 10, and the text offsets
+    // inside a box with them. Box text is drawn centred and is NOT clipped, so a name that no
+    // longer fits spills over the box edge rather than being cut -- "Closed-Loop Colonies" and
+    // "The Extraction Charter" are the two that would have shown it.
+    const COL: f32 = 144.0;
+    const ROW: f32 = 86.0;
+    const BOX_W: f32 = 122.0;
+    const BOX_H: f32 = 58.0;
     /// The row-heading column on the left, wide enough for "Off-world Living".
     const HEAD_W: f32 = 128.0;
+    // Ticket #250 (version 0.08.3): the order the BANDS are drawn in, settled over five turns of
+    // the designer looking at the tree -- #247 gave Extraction its place under Industry, #248
+    // lifted Off-world Living to the top, #249 set the middle three, and this is the last word:
+    // *"now swap industry and extraction and move society to the top"*.
+    //
+    // It happens to undo the damage #249 counted. Society and Off-world Living are ADJACENT again,
+    // and those are the two bands the Closed-Loop Colonies -> The Upload edge runs between, so the
+    // edge is a hop between neighbours rather than a line down the whole tree behind four boxes.
+    //
+    // A branch not named here keeps its first-appearance place, after the named ones, so a new
+    // branch cannot vanish by being forgotten.
+    const BAND_ORDER: [&str; 5] = ["Society", "Off-world Living", "Extraction", "Industry", "Propulsion"];
     let mut branches: Vec<String> = Vec::new();
     for t in TechId::ALL {
         let b = &game.tables.tech(t).branch;
@@ -5251,6 +5278,7 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
             branches.push(b.clone());
         }
     }
+    branches.sort_by_key(|b| BAND_ORDER.iter().position(|x| x == b).unwrap_or(BAND_ORDER.len()));
     let rungs = TechId::ALL.iter().map(|t| game.tables.tech(*t).rung).max().unwrap_or(1).max(1) as usize;
     // Ticket #56: a branch may hold more than one Tech on a rung (Efficient Grids and Coastal
     // Engineering both sit on Industry 1). Ticket #133: they sat SIDE BY SIDE. Ticket #156
@@ -5271,7 +5299,20 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
                 .collect()
         })
         .collect();
-    let stacked = |r: usize| r + 1 < rungs;
+    // Ticket #250 (version 0.08.3): EVERY rung stacks, the last one included. It did not before --
+    // `r + 1 < rungs` left the final rung laying its boxes side by side -- and the consequence was
+    // that a band with two rung-3 Techs split the column between them, so Society's Planetary
+    // Stewardship and The Upload sat at two x positions that no other band's rung-3 box shared.
+    //
+    // The designer: *"there is no reason upload needs to be on the same line as society ... and I
+    // want all level three techs to appear on the same column"*. Stacking gives both at once: The
+    // Upload takes a row of its own inside the Society band, and every rung-3 box in the tree now
+    // sits at `left[2] + COL / 2`, one column.
+    //
+    // It costs nothing in height -- a band is already as tall as its fullest stacked cell, and
+    // Society's rung 2 already held two -- and it makes the tree one COL narrower, since the last
+    // rung no longer claims width for the widest cell in it.
+    let stacked = |_r: usize| true;
     let span: Vec<f32> = (0..rungs).map(|r| if stacked(r) { 1.0 } else { (0..branches.len()).map(|b| cell[r * branches.len() + b].len()).max().unwrap_or(1).max(1) as f32 }).collect();
     let left: Vec<f32> = (0..rungs).map(|r| HEAD_W + span[..r].iter().sum::<f32>() * COL).collect();
     let width: f32 = HEAD_W + span.iter().sum::<f32>() * COL;
@@ -5363,13 +5404,13 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
             None => egui::Stroke::new(1.0, Color32::from_gray(200)),
         };
         painter.rect(r, 6.0, fill, stroke, egui::StrokeKind::Inside);
-        painter.text(r.center_top() + egui::vec2(0.0, 14.0), egui::Align2::CENTER_CENTER, &card.name, FontId::proportional(13.0), Color32::WHITE);
-        painter.text(r.center_top() + egui::vec2(0.0, 32.0), egui::Align2::CENTER_CENTER, format!("cost {} - {}", card.cost, status), FontId::proportional(11.0), Color32::from_gray(230));
+        painter.text(r.center_top() + egui::vec2(0.0, 13.0), egui::Align2::CENTER_CENTER, &card.name, FontId::proportional(12.0), Color32::WHITE);
+        painter.text(r.center_top() + egui::vec2(0.0, 29.0), egui::Align2::CENTER_CENTER, format!("cost {} - {}", card.cost, status), FontId::proportional(10.0), Color32::from_gray(230));
         let needs = if card.needs.is_empty() { "nothing".to_string() } else { card.needs.iter().map(|n| game.tables.tech(*n).name.clone()).collect::<Vec<_>>().join(" and ") };
         ui.interact(r, ui.id().with(format!("tech-{t:?}")), egui::Sense::hover()).on_hover_text(format!("{} (rung {}, cost {} Research)\n{}\nNeeds: {}", card.name, card.rung, card.cost, card.effect, needs));
         if must_pick && available.contains(&t) && game.research.current != Some(t) {
-            let b = egui::Rect::from_center_size(r.center_bottom() - egui::vec2(0.0, 11.0), egui::vec2(56.0, 18.0));
-            if ui.put(b, egui::Button::new(RichText::new("Pick").size(11.0))).clicked() {
+            let b = egui::Rect::from_center_size(r.center_bottom() - egui::vec2(0.0, 10.0), egui::vec2(50.0, 16.0));
+            if ui.put(b, egui::Button::new(RichText::new("Pick").size(10.0))).clicked() {
                 actions.push(Action::PickTech(t));
             }
         }
@@ -5721,9 +5762,16 @@ fn module_build_buttons(ui: &mut Ui, session: &Session, game: &Game, cid: Colony
         }
         // Ticket #80: a station holds a Shipyard, Habitats and Observatories; ticket #89: and
         // Solar Arrays, which stand nowhere else.
-        // Ticket #185 (version 0.08.0): and an Institute -- or the Custodians' Academy -- since a
-        // station carries Observatories and the Institute is what multiplies them.
-        if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Academy) {
+        // Ticket #185 (version 0.08.0): and an Institute, since a station carries Observatories
+        // and the Institute is what multiplies them.
+        //
+        // Ticket #239 (version 0.08.3): the list names the JOB, never the kind. Written with the
+        // kinds it had to name the Academy too, and the next three Unique Modules broke it
+        // silently -- the Prospectors lost the Trade Post row from every station without gaining
+        // the Exchange, and the Archivists lost the Solar Array without gaining the Heliostat,
+        // because `built_by` above swaps the common kind out and this list then threw the Unique
+        // away. A picture of the build list found it; no test did.
+        if col.in_orbit && !mk.stands_on_a_station() {
             continue;
         }
         if !col.in_orbit && game.tables.module(mk).station_only {
@@ -5788,10 +5836,152 @@ fn relations_row(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSta
                 tip.push_str(&format!("
 Scarred: this pair can never recover above {floor:+}."));
             }
+            // Ticket #233 (version 0.08.3): and what STANDS between the pair -- never what they
+            // could strike. The designer chose the narrower line: the hover answers the glance,
+            // and the Accords block a few rows below is where a player acts, already listing every
+            // term with its own explanation and greying out the research agreement when the pair
+            // is not Friendly. Saying it twice, a scroll apart, is how a figure drifts.
+            //
+            // The SAME rule covers a pair the player is not in, which this grid shows on every
+            // Faction's page: what stands between two rivals is visible on the board once it bites,
+            // where what they COULD strike is intelligence. It is the line the Faction window's
+            // disclosure rule already draws.
+            if let Some(acc) = game.accords.iter().find(|a| (a.a == viewer && a.b == subject) || (a.a == subject && a.b == viewer)) {
+                let terms: Vec<&str> = acc
+                    .terms
+                    .iter()
+                    .map(|t| match t {
+                        Term::NonAggression => "non-aggression",
+                        Term::Passage => "passage",
+                        Term::Refuel => "refuel",
+                        Term::ResearchAgreement => "a research agreement",
+                    })
+                    .collect();
+                if acc.ending {
+                    tip.push_str(&format!("
+An Accord between them is over: it lapses at the next turn ({}).", terms.join(", ")));
+                } else {
+                    tip.push_str(&format!("
+An Accord stands: {}.", terms.join(", ")));
+                }
+            }
             ui.label(RichText::new(game.relations_level(viewer, subject)).color(colour)).on_hover_text(tip);
             ui.add_space(10.0);
         }
     });
+}
+
+/// Ticket #235 (version 0.08.3): the **Research Directive** -- the share of a Faction's Research
+/// that goes somewhere other than the shared Tech, chosen as a percentage and standing until it is
+/// changed.
+///
+/// A PERCENTAGE rather than a count of points, because Research grows all game: a setting made on
+/// turn 5 in points is meaningless by turn 25, where a share keeps its meaning and reads directly
+/// against the shared-pot rule -- the player sees what they are contributing, not just what they
+/// are taking.
+///
+/// The Archivists' cap is 100 and everyone else's 50. Theirs was a switch until this version and
+/// that switch always sent ALL of it, so the slider keeps the reach.
+fn research_directive_control(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec<Action>) {
+    let me = Seat(0);
+    let cap = game.research_directive_cap(me);
+    // Ticket #235 gave this control the DIRECTIVE -- the share diverted. Ticket #251 turns it the
+    // other way up, at the designer's word: the slider carries the **contribution to the shared
+    // Tech**, which is what "will not extend below 50%" and "the selected contribution in the
+    // header" both describe, and what the shared-pot rule of ticket #236 is written in. A player
+    // reading "78%" can compare it to that rule's 85 without doing the subtraction in their head.
+    let floor = 100 - cap;
+    let standing = 100 - game.seat(me).research_directive;
+    let pending_set = session.pending.iter().find_map(|o| match o {
+        Order::SetResearchDirective { percent } => Some(100 - *percent),
+        _ => None,
+    });
+    let mut contribution = pending_set.unwrap_or(standing);
+
+    ui.label(RichText::new(format!("Research Directive: {contribution}%")).strong()).on_hover_text(
+        "The share of your Research that goes to the shared Tech, from the next Income until you set it again. What you keep back never reaches the Tech, so it counts nothing toward the Research Lead -- and the Lead is the only seat that picks what the table researches next.",
+    );
+
+    // The scale is 0 to 100 for EVERY Faction, so the four controls read alike and the Archivists'
+    // extra reach is visible rather than implied: their slider runs the whole way, and everyone
+    // else's is stopped at half with the unreachable part dimmed behind it.
+    // A fifth larger than the default, at the designer's word. Both figures matter: `slider_width`
+    // is the rail's length and `slider_rail_height` its thickness, and raising only the first
+    // makes a long thin bar rather than a bigger control.
+    let full = ui.available_width();
+    let (was_width, was_rail, was_interact) = (ui.spacing().slider_width, ui.spacing().slider_rail_height, ui.spacing().interact_size);
+    ui.spacing_mut().slider_width = full;
+    ui.spacing_mut().slider_rail_height = was_rail * 1.2;
+    ui.spacing_mut().interact_size.y = was_interact.y * 1.2;
+    let resp = ui.add(egui::Slider::new(&mut contribution, 0..=100).show_value(false));
+    ui.spacing_mut().slider_width = was_width;
+    ui.spacing_mut().slider_rail_height = was_rail;
+    ui.spacing_mut().interact_size = was_interact;
+    if floor > 0 {
+        // The share no Faction but the Archivists may reach, painted OVER the rail so the scale
+        // still reads 0 to 100 for everyone and their extra reach is visible rather than implied.
+        // The colour took three goes and only a picture could settle it. A translucent black over
+        // an already dark rail was invisible, and so was a grey close to the rail's own; a
+        // diagnostic pass in bright red proved the geometry had been right all along, so the fault
+        // was never the rectangle. A dark grey read as a hole in the control rather than a bound,
+        // so at the designer's word it is now the grey this game already uses for NOBODY'S --
+        // `from_gray(110)`, the unattributed segment of the race bar a few lines above -- leaned a
+        // little red to say "not yours to take" rather than "nothing here".
+        let r = resp.rect;
+        let dim = egui::Rect::from_min_max(
+            egui::pos2(r.min.x, r.center().y - ui.spacing().slider_rail_height * 0.6),
+            egui::pos2(r.min.x + r.width() * floor as f32 / 100.0, r.center().y + ui.spacing().slider_rail_height * 0.6),
+        );
+        ui.painter().rect_filled(dim, 2.0, Color32::from_rgb(124, 104, 104));
+        ui.painter().line_segment(
+            [egui::pos2(dim.max.x, r.center().y - 9.0), egui::pos2(dim.max.x, r.center().y + 9.0)],
+            egui::Stroke::new(1.5, Color32::from_gray(120)),
+        );
+    }
+    contribution = contribution.max(floor);
+
+    let (what, rate) = match game.kind(me) {
+        FactionKind::Custodians => ("the Natural Sink", format!("{} ppm for good, per point", game.tables.research_directive.custodians_ppm_per_point)),
+        FactionKind::Prospectors => ("your coffers", format!("{} Ducats per point", game.tables.research_directive.prospectors_ducats_per_point)),
+        FactionKind::Arkwrights => ("propellant", format!("{} Fuel per point", game.tables.research_directive.arkwrights_fuel_per_point)),
+        FactionKind::Archivists => ("the Archive fund", "one for one, to the fund's cap".to_string()),
+    };
+    let made = game.seat(me).research_last_turn;
+    let directive = 100 - contribution;
+    let taken = made * directive as i64 / 100;
+    ui.label(
+        RichText::new(if directive == 0 {
+            format!("All of it to the shared Tech. {made} Research last turn.")
+        } else {
+            format!("{contribution}% to the shared Tech; {directive}% to {what} ({rate}). On last turn's {made} Research that is {taken} directed.")
+        })
+        .weak(),
+    );
+    // Ticket #236 (version 0.08.3): what the table makes of this setting, said on the control that
+    // sets it. The rule is a term read afresh every settle, so this line is always the truth about
+    // right now rather than a forecast -- and it is the reason the slider carries the CONTRIBUTION
+    // rather than the share taken: the player compares one number to one line.
+    let pot = &game.tables.relations;
+    let (pot_text, pot_colour) = if contribution >= 100 {
+        ("Every rival thinks a little better of you for giving all of it.".to_string(), Color32::from_rgb(140, 200, 140))
+    } else if contribution < pot.directive_min_contribution {
+        (format!("Below {}%, every rival thinks a little worse of you while it lasts.", pot.directive_min_contribution), Color32::from_rgb(230, 150, 130))
+    } else {
+        (format!("Above the {}% line: nobody minds, and nobody is grateful.", pot.directive_min_contribution), ui.visuals().weak_text_color())
+    };
+    ui.label(RichText::new(pot_text).color(pot_colour));
+
+    if contribution != pending_set.unwrap_or(standing) {
+        if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetResearchDirective { .. })) {
+            actions.push(Action::Cancel(i));
+        }
+        if contribution != standing {
+            let order = Order::SetResearchDirective { percent: directive };
+            if game.check_order(me, &session.pending, &order).is_ok() {
+                actions.push(Action::Place(order));
+            }
+        }
+    }
 }
 
 /// **The Faction window** (ticket #203, version 0.08.1), opened by `Factions (F)` on the top bar and
@@ -6015,7 +6205,19 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         // its own fuller four-Faction breakdown, and the two are not duplicates: that one is the
         // comparison view and this is the detail view, the same relation the Victory window's four
         // progress bars now have with the Victory progress block above.
-        ui.label(RichText::new("Blame").strong());
+        // Ticket #233 (version 0.08.3): the sentence that stood under this block is on the heading's
+        // hover now, at the designer's word -- and with NO marker to advertise it: *"no other mouse
+        // overs have any ? - the convention here is the same, mouseovers are common AF in 4x
+        // games"*. It is an ordinary `on_hover_text`, the same call every other hover in the game
+        // makes: *"I want this new mouseover to work exactly like all the others have been
+        // working"*.
+        //
+        // Only THIS copy moves. The Climate Panel keeps its own version of the sentence on the page
+        // (*"faction windows leave climate as is"*), being a four-Faction comparison read
+        // occasionally rather than a page a player sits on, and the top bar's Influence hover keeps
+        // its longer wording. Nothing is deleted.
+        ui.label(RichText::new("Blame").strong())
+            .on_hover_text("A share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again.");
         let share = game.blame_share(seat);
         ui.horizontal(|ui| {
             ui.add(
@@ -6028,35 +6230,26 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
             let line = if credit > 0.0 { format!("Blame 0 ppm, credit {credit:.0} ppm") } else { format!("Blame {:.0} ppm, thresholds x{:.2}", game.blame(seat), game.blame_threshold_multiplier(seat)) };
             figures_with_icons(ui, &line, 14.0, ui.visuals().weak_text_color(), &[("ppm", "emissions")]);
         });
-        ui.label(RichText::new("A share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again.").weak());
         ui.add_space(6.0);
 
         // 4. Relations, as TWO ROWS rather than the twelve-pair grid this window took off the
         // Victory window. Twelve ordered pairs as a grid made a player find the right cell; two
         // rows tell them the answer, and a figure kept in two places drifts.
-        ui.label(RichText::new("Relations").strong());
+        // Ticket #233 (version 0.08.3): the two paragraphs that stood under this block are one
+        // hover on the heading now. Five or six lines of standing prose came off a page the 0.08.1
+        // mockups measured at about 950 pixels of content in a 524-wide panel.
+        let r = &game.tables.relations;
+        let relations_note = format!(
+            "{:+} to {:+} from a neutral {}, read as six levels from Friendly to Hostile. A score is what the pair have DONE to each other plus what this Faction makes of the other's Blame -- hover a level for the two figures. Offences differ in weight and a turn charges every one, to {} at most; quiet mends {} every {} turns below neutral and lapses half as fast above it. A pair crossed on {} turns can never fully recover again.
+A rival that holds you at less than neutral defends its places against you a little harder, and an Accord wants a level it will not strike below.",
+            r.best, r.worst, r.start, r.turn_cap, r.recover, r.quiet_turns, r.scar_turns
+        );
+        ui.label(RichText::new("Relations").strong()).on_hover_text(relations_note);
         let name = game.seat_name(seat);
         ui.label(RichText::new(format!("What the {name} think of the others")).weak());
         relations_row(ui, session, game, view, seat, true);
         ui.label(RichText::new(format!("What the others think of the {name}")).weak());
         relations_row(ui, session, game, view, seat, false);
-        // The note the grid carried, kept word for word in substance: the scale, and that nothing
-        // reads these figures.
-        // Ticket #221/#222/#224 (version 0.08.2): rewritten, because the old note ended "nothing in
-        // this version reads these figures: they are a record, not a rule", and that is now flatly
-        // false. Blame feeds them, they bite the challenge margin, and they gate the Accords.
-        let r = &game.tables.relations;
-        ui.label(
-            RichText::new(format!(
-                "{:+} to {:+} from a neutral {}, read as six levels from Friendly to Hostile. A score is what the pair have DONE to each other plus what this Faction makes of the other's Blame -- hover a level for the two figures. Offences differ in weight and a turn charges every one, to {} at most; quiet mends {} every {} turns below neutral and lapses half as fast above it. A pair crossed on {} turns can never fully recover again.",
-                r.best, r.worst, r.start, r.turn_cap, r.recover, r.quiet_turns, r.scar_turns
-            ))
-            .weak(),
-        );
-        ui.label(
-            RichText::new("A rival that holds you at less than neutral defends its places against you a little harder, and an Accord wants a level it will not strike below.")
-                .weak(),
-        );
         ui.add_space(6.0);
 
         // 4b. Ticket #226 (version 0.08.2): the Accords, where the designer put them -- "add
@@ -6113,7 +6306,13 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         // and four of the five legend swatches, and the first two captures were useless because of
         // it. `default_pos` only places it the first time, so a window the player has dragged stays
         // where they put it.
-        egui::Window::new("Tech Tree").open(&mut open).resizable(false).default_pos(egui::pos2(if session.spectator { 840.0 } else { 430.0 }, 120.0)).show(ctx, |ui| {
+        // Ticket #242 (version 0.08.3): the window is bounded by the SCREEN and its tree scrolls
+        // inside it. The bound is on the window rather than on the ScrollArea because that is what
+        // egui actually constrains: a `max_height` on the ScrollArea alone left the window 535
+        // pixels tall on an 800-pixel screen, showing two branches where four had fitted before.
+        let top = 120.0;
+        let room = (ctx.content_rect().height() - top - 40.0).max(240.0);
+        egui::Window::new("Tech Tree").open(&mut open).resizable(false).default_pos(egui::pos2(if session.spectator { 840.0 } else { 430.0 }, top)).show(ctx, |ui| {
             // Ticket #211 (version 0.08.1): the race bar stands where this window's first SENTENCE
             // stood, at the designer's word, and the sentence moves onto its hover. One wrinkle,
             // handled rather than lived with: when NO Tech is under research the bar is not drawn at
@@ -6125,6 +6324,12 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // legend follows it, so the top never goes empty and never half-empties either.
             match game.research.current {
                 Some(_) => {
+                    // Ticket #242 (version 0.08.3): the bar says what it is. Ticket #219 put it at
+                    // the top of this window with its shares and legend beneath, and nothing there
+                    // named the quantity -- a reader saw a coloured bar and four percentages and
+                    // had to infer that the subject was Research. The designer: "let's add a
+                    // subheading at the top of the tech tree indicating the bar is research share".
+                    ui.label(RichText::new("Research share").strong());
                     research_race_bar(ui, session, game, ui.available_width(), true);
                     research_shares(ui, session, game);
                 }
@@ -6134,6 +6339,12 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             }
             tech_legend(ui);
             ui.separator();
+            // Ticket #235 (version 0.08.3): the Research Directive, for every Faction, in the one
+            // window whose subject is Research.
+            if !session.spectator {
+                research_directive_control(ui, session, game, actions);
+                ui.separator();
+            }
             // Ticket #51: an Archivist player is told whether Provisional Findings is in force.
             if game.kind(Seat(0)) == FactionKind::Archivists {
                 let on = game.provisional_findings(Seat(0));
@@ -6149,7 +6360,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         }
                     ),
                 );
-                if game.seat(Seat(0)).archive_funding || session.pending.iter().any(|o| matches!(o, Order::SetArchiveFunding { on: true })) {
+                if game.seat(Seat(0)).research_directive > 0 || session.pending.iter().any(|o| matches!(o, Order::SetResearchDirective { percent } if *percent > 0)) {
                     ui.colored_label(Color32::YELLOW, "Your Labs pay the Archive fund: the turn after they next pay it, Provisional Findings is off.");
                 }
             }
@@ -6165,7 +6376,31 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             }
             // Ticket #98: the Lead chooses from the drawn shortlist, so that is what the tree offers.
             let available = game.pickable_techs();
-            tech_tree(ui, game, &available, must_pick, actions);
+            // Ticket #242 (version 0.08.3): the tree SCROLLS when it does not fit, the scrollbar
+            // showing only when it is needed -- the decision ticket #217 already took for the
+            // Faction selection screen, so the game answers this problem the same way twice.
+            //
+            // It became necessary here because ticket #232's two new Techs gave Off-world Living
+            // and Extraction a second row each: the tree was 672 pixels tall and is now 864. A
+            // headless capture at 1280x800 showed the WHOLE SOCIETY BRANCH off the bottom of the
+            // screen -- Public Science, Green Consensus, Civil Defense and two Victory gates -- with
+            // no scrollbar and the window fixed at `resizable(false)`. At 1920x1080, which is what
+            // the game opens maximised into, it fitted with about thirty pixels to spare.
+            //
+            // The height is set from the screen rather than left to egui's default, and the first
+            // attempt is why: a bare `ScrollArea::vertical()` took a default height and showed TWO
+            // branches where four had fitted before, which is a worse window than the one it
+            // replaced. It takes everything between the cursor and the bottom of the screen, less
+            // a margin for the window's own frame, and `auto_shrink` upward so a tree that fits is
+            // drawn whole with no scrollbar at all.
+            // The bound is computed from the SCREEN and the window's own top, never from
+            // `ui.cursor()`: the first attempt used the cursor and left the window 535 pixels tall
+            // on an 800-pixel screen, showing two branches where four had fitted before. A
+            // `max_height` on the Window does not help either -- it is a cap, and a window sizes
+            // itself to its content, so the ScrollArea is what has to be told.
+            egui::ScrollArea::vertical().auto_shrink([false, true]).max_height(room).min_scrolled_height(room).show(ui, |ui| {
+                tech_tree(ui, game, &available, must_pick, actions);
+            });
         });
         view.show_tech = open;
     }
@@ -6352,7 +6587,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                     let now = (game.seat(Seat(0)).venture_share * 100.0).round() as u32;
                     let pending_share = session.pending.iter().find_map(|o| if let Order::SetVentureShare { share } = o { Some(*share) } else { None });
                     ui.horizontal_wrapped(|ui| {
-                        ui.label(format!("Banking {now}% of Materials output{}:", pending_share.map(|p| format!(" ({p}% from next turn)")).unwrap_or_default()));
+                        ui.label(format!("Banking {now}% of Ducat income{}:", pending_share.map(|p| format!(" ({p}% from next turn)")).unwrap_or_default()));
                         let step = (v.share_step * 100.0).round().max(1.0) as u32;
                         let max = (v.max_share * 100.0).round() as u32;
                         let mut pct = 0u32;
@@ -6371,7 +6606,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                     let draw = Order::DrawVenture { amount: 10 };
                     let ok = game.check_order(Seat(0), &session.pending, &draw).is_ok();
                     let back = (10.0 * v.draw_return).floor() as i64;
-                    if ui.add_enabled(ok, egui::Button::new("Draw 10 from the Fund")).on_hover_text(format!("{back} Materials come back to the Stockpile; a tenth is lost.")).clicked() {
+                    if ui.add_enabled(ok, egui::Button::new("Draw 10 from the Fund")).on_hover_text(format!("{back} Ducats come back to the Stockpile; a tenth is lost.")).clicked() {
                         actions.push(Action::Place(draw));
                     }
                 }

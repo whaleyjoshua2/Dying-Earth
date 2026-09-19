@@ -1285,7 +1285,7 @@ impl Game {
                 let st = self.state_mut(s.from);
                 st.emigrants += s.n;
                 st.emigrants_education = blended;
-                let line = format!("{} Emigrants from {} found no room in Antarctica and came home.", s.n, self.tables.state(s.from).name);
+                let line = format!("{} Pioneers from {} found no room in Antarctica and came home.", s.n, self.tables.state(s.from).name);
                 self.log(line);
                 let text = self.say("emigrants_returned", &[("n", s.n.to_string()), ("state", self.tables.state(s.from).name.clone())]);
                 self.report_line_of(s.seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::State(s.from)), text);
@@ -1326,7 +1326,7 @@ impl Game {
             st.emigrants_education = blended;
         }
         let slot_name = self.tables.body(BodyId::Earth).slots[slot as usize].name.clone();
-        let line = format!("The {} founded a Colony at {} in Antarctica with {} Emigrants from {}.", self.seat_name(seat), slot_name, moved, self.tables.state(from).name);
+        let line = format!("The {} founded a Colony at {} in Antarctica with {} Pioneers from {}.", self.seat_name(seat), slot_name, moved, self.tables.state(from).name);
         self.log(line);
         let text = self.say(
             "colony_founded",
@@ -1368,7 +1368,7 @@ impl Game {
             st.emigrants += back;
             st.emigrants_education = blended;
         }
-        let line = format!("{} Emigrants from {} landed in Antarctica and joined {}.", moved, self.tables.state(from).name, self.place_name(Place::Colony(c)));
+        let line = format!("{} Pioneers from {} landed in Antarctica and joined {}.", moved, self.tables.state(from).name, self.place_name(Place::Colony(c)));
         self.log(line);
         let text = self.say("emigrants_arrived", &[("n", moved.to_string()), ("state", self.tables.state(from).name.clone()), ("colony", self.place_name(Place::Colony(c)))]);
         self.report_line(LineKind::Antarctica, Some(ReportPlace::Colony(c)), text);

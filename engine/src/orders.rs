@@ -92,7 +92,10 @@ pub enum Order {
     /// their Labs' Research goes into the Archive fund instead of the shared Tech, where it counts
     /// nothing toward the Research Lead. Set once, it holds until it is set again, and it is read
     /// at the next Income; it never moves Research that Income has already paid out.
-    SetArchiveFunding { on: bool },
+    /// Ticket #235 (version 0.08.3): set the **Research Directive** -- the share of this seat's
+    /// Research, as a percentage, that goes somewhere other than the shared Tech. It replaces
+    /// `SetArchiveFunding { on }`, which was this order with two positions.
+    SetResearchDirective { percent: u8 },
     /// Ticket #226 (version 0.08.2): offer an Accord to another Faction. A computer seat answers at
     /// the Resolution by its own weights; a refused offer is NOT an offence, since punishing a
     /// refusal would make every offer a threat.
@@ -144,6 +147,10 @@ pub enum Order {
     /// State ever: three turns of doubled Facility output, then a permanent price in Baseline
     /// Emissions and Unrest.
     StripPermit { state: StateId },
+    /// Ticket #237 (version 0.08.3): the Exodus Call. The Arkwrights only, on a state they
+    /// control, once per state EVER. While it runs it doubles what they may recruit there and
+    /// suspends Coach Class's double population charge.
+    ExodusCall { state: StateId },
 }
 
 impl Order {
@@ -263,6 +270,7 @@ impl Game {
             // Leapfrog Ducats; a Decommission pays Materials back, which arrive at its Resolution.
             Order::Change { what: BuildingChange::Restart, .. } => Cost { materials: t.mothball.restart_materials, ..Default::default() },
             Order::Leapfrog { .. } => Cost { ducats: t.ducats.per_leapfrog, ..Default::default() },
+            Order::ExodusCall { .. } => Cost { ducats: t.ducats.per_exodus_call, ..Default::default() },
             Order::BuyInfluence { amount } => Cost { ducats: t.ducats.per_influence * *amount, ..Default::default() },
             // A purchase is a negative cost in the resource bought, so `remaining` and `commit_orders`
             // add it without a special case; a sale is the mirror, with a negative Ducat cost.
@@ -520,19 +528,22 @@ impl Game {
                 }
                 Ok(cost)
             }
-            Order::SetArchiveFunding { on } => {
-                if self.kind(seat) != FactionKind::Archivists {
-                    return fail("only the Archivists fund the Archive");
+            Order::SetResearchDirective { percent } => {
+                let cap = self.research_directive_cap(seat);
+                if *percent > cap {
+                    return fail(format!("a Research Directive may not pass {cap} per cent for this Faction"));
                 }
-                if pending.iter().any(|o| matches!(o, Order::SetArchiveFunding { .. })) {
-                    return fail("the Archive's funding is already set this turn");
+                if pending.iter().any(|o| matches!(o, Order::SetResearchDirective { .. })) {
+                    return fail("the Research Directive is already set this turn");
                 }
-                if *on == self.seat(seat).archive_funding {
-                    return fail(if *on { "the Archive is already being funded" } else { "the Archive is not being funded" });
+                if *percent == self.seat(seat).research_directive {
+                    return fail("the Research Directive is already there");
                 }
                 // Ticket #68: at the cap there is nothing to declare, and the Research stays with
                 // the shared Tech; until the Module stands the cap is a quarter of the requirement.
-                if *on && self.seat(seat).archive_fund >= self.archive_fund_cap(seat) {
+                // Ticket #235: the Archivists alone, since they are the only Faction whose
+                // directive fills a fund that can be full.
+                if *percent > 0 && self.kind(seat) == FactionKind::Archivists && self.seat(seat).archive_fund >= self.archive_fund_cap(seat) {
                     return if self.archive_built(seat) {
                         fail("the Archive's Research is paid in full")
                     } else {
@@ -1042,7 +1053,7 @@ impl Game {
                 }
                 let ShipAt::Body(body) = s.at else { return fail("in transit") };
                 let card = self.tables.unit(s.kind);
-                // Ticket #51: what a Colony Ship carries is a Faction figure (Steerage doubles it)
+                // Ticket #51: what a Colony Ship carries is a Faction figure (Coach Class doubles it)
                 // and rises with Expanded Habitats; nothing else carries Colonists.
                 // Ticket #86: at Earth a warming world crowds a Colony Ship beyond its capacity.
                 let capacity = if s.kind == UnitKind::ColonyShip {
@@ -1075,7 +1086,7 @@ impl Game {
                             // Ticket #73: a Launch Site lifts only the Emigrants waiting there; the
                             // population was paid when they mustered.
                             if self.state(*st).emigrants < *colonists {
-                                return fail(format!("only {} Emigrants are waiting there", self.state(*st).emigrants));
+                                return fail(format!("only {} Pioneers are waiting there", self.state(*st).emigrants));
                             }
                         }
                         LoadSource::Colony(c) => {
@@ -1190,12 +1201,12 @@ impl Game {
                 if self.state(*state).control.director() != Some(seat) {
                     return fail("you do not direct that Nation State");
                 }
-                let cap = self.emigrants_per_turn(seat);
+                let cap = self.emigrants_per_turn_in(seat, *state);
                 if *n == 0 || *n > cap {
-                    return fail(format!("up to {cap} Emigrants a turn"));
+                    return fail(format!("up to {cap} Pioneers a turn"));
                 }
                 if pending.iter().any(|o| matches!(o, Order::BuildEmigrants { .. })) {
-                    return fail("Emigrants are already mustering this turn: one state a turn");
+                    return fail("Pioneers are already recruiting this turn: one state a turn");
                 }
                 if self.state(*state).population < self.lift_population(seat, *n) {
                     return fail("not enough people there");
@@ -1213,7 +1224,7 @@ impl Game {
                 let sending = self.emigrants_leaving(pending, *state);
                 let waiting = self.state(*state).emigrants.saturating_sub(sending);
                 if *n == 0 || *n > waiting {
-                    return fail(format!("{waiting} Emigrants are waiting there"));
+                    return fail(format!("{waiting} Pioneers are waiting there"));
                 }
                 match into {
                     UnloadTarget::Slot(b, slot) => {
@@ -1221,7 +1232,7 @@ impl Game {
                             return fail("that Antarctic slot is not free");
                         }
                         if pending.iter().any(|o| matches!(o, Order::SendToAntarctica { into: UnloadTarget::Slot(_, s), .. } if s == slot)) {
-                            return fail("Emigrants are already bound for that slot this turn");
+                            return fail("Pioneers are already bound for that slot this turn");
                         }
                     }
                     UnloadTarget::Colony(c) => {
@@ -1245,7 +1256,7 @@ impl Game {
                 let sending = self.emigrants_leaving(pending, *state);
                 let waiting = self.state(*state).emigrants.saturating_sub(sending);
                 if *n == 0 || *n > waiting {
-                    return fail(format!("{waiting} Emigrants are waiting there"));
+                    return fail(format!("{waiting} Pioneers are waiting there"));
                 }
                 let Some(col) = self.colony(*colony) else { return fail("no such station") };
                 if col.body != BodyId::Earth || !col.in_orbit || col.control.director() != Some(seat) {
@@ -1295,6 +1306,11 @@ impl Game {
                 if self.state(*state).control != Control::Controlled(seat) {
                     return fail("Leapfrog needs a Nation State you control");
                 }
+                // Ticket #238 (version 0.08.3): three whole turns in hand before a Faction may
+                // remake a country. The turn of the taking does not count.
+                if !self.may_remake(seat, *state) {
+                    return fail(format!("{} has been yours for less than {} turns; you may act there from turn {}", self.tables.state(*state).name, self.tables.faction_orders.min_turns_held, self.may_remake_on_turn(*state)));
+                }
                 // Every Leapfrog already pending this turn has to come off before the next one bites.
                 let per = self.tables.climate.population_emissions_per_level;
                 let queued = pending.iter().filter(|o| matches!(o, Order::Leapfrog { state: s } if s == state)).count() as f64;
@@ -1310,12 +1326,37 @@ impl Game {
                 Ok(cost)
             }
             // Ticket #54: the Strip Permit, the Prospectors only, once per state ever.
+            Order::ExodusCall { state } => {
+                if self.kind(seat) != FactionKind::Arkwrights {
+                    return fail("only the Arkwrights sound an Exodus Call");
+                }
+                if self.state(*state).control.controller() != Some(seat) {
+                    return fail("an Exodus Call needs a Nation State you control");
+                }
+                // Ticket #238 (version 0.08.3): three whole turns in hand before a Faction may
+                // remake a country. The turn of the taking does not count.
+                if !self.may_remake(seat, *state) {
+                    return fail(format!("{} has been yours for less than {} turns; you may act there from turn {}", self.tables.state(*state).name, self.tables.faction_orders.min_turns_held, self.may_remake_on_turn(*state)));
+                }
+                if self.state(*state).exodus_call_used {
+                    return fail("this Region has answered an Exodus Call once already, and may not again");
+                }
+                if pending.iter().any(|o| matches!(o, Order::ExodusCall { state: s } if s == state)) {
+                    return fail("an Exodus Call is already being sounded there this turn");
+                }
+                Ok(cost)
+            }
             Order::StripPermit { state } => {
                 if self.kind(seat) != FactionKind::Prospectors {
                     return fail("only the Prospectors issue a Strip Permit");
                 }
                 if self.state(*state).control != Control::Controlled(seat) {
                     return fail("a Strip Permit needs a Nation State you control");
+                }
+                // Ticket #238 (version 0.08.3): three whole turns in hand before a Faction may
+                // remake a country. The turn of the taking does not count.
+                if !self.may_remake(seat, *state) {
+                    return fail(format!("{} has been yours for less than {} turns; you may act there from turn {}", self.tables.state(*state).name, self.tables.faction_orders.min_turns_held, self.may_remake_on_turn(*state)));
                 }
                 if self.state(*state).strip_permit_used {
                     return fail("this Nation State has had its Strip Permit");
@@ -1540,12 +1581,12 @@ impl Game {
                     };
                     self.log(line);
                 }
-                Order::SetArchiveFunding { on } => {
-                    self.seat_mut(seat).archive_funding = *on;
-                    let line = if *on {
-                        format!("The {} will pay their Labs into the Archive fund from the next Income.", self.seat_name(seat))
+                Order::SetResearchDirective { percent } => {
+                    self.seat_mut(seat).research_directive = *percent;
+                    let line = if *percent == 0 {
+                        format!("The {} will pay all their Research into the shared Tech from the next Income.", self.seat_name(seat))
                     } else {
-                        format!("The {} will pay their Labs into the shared Tech from the next Income.", self.seat_name(seat))
+                        format!("The {} set a Research Directive of {percent} per cent from the next Income.", self.seat_name(seat))
                     };
                     self.log(line);
                 }
@@ -1585,14 +1626,14 @@ impl Game {
                 // Ticket #73: Emigrants muster now, at the population's cost, and calm the state;
                 // nothing lifts them before next turn, which is the turn to muster.
                 Order::BuildEmigrants { state, n } => {
-                    let cost = self.lift_population(seat, *n);
+                    let cost = self.muster_population_in(seat, *state, *n);
                     self.state_mut(*state).population = (self.state(*state).population - cost).max(0.0);
                     // Ticket #189 (version 0.08.0): they take their Region's schooling AS IT STANDS
                     // NOW, so a batch mustered after a School has run knows more than one before it,
                     // and the two average together on the card.
                     self.muster_emigrants(*state, *n);
                     let fell = self.lower_unrest(*state, self.tables.emigrants.unrest_fall);
-                    let line = format!("{} Emigrants mustered in {} for the {}; its Unrest fell by {} to {}.", n, self.tables.state(*state).name, self.seat_name(seat), Game::unrest_figure(fell), self.unrest_text(*state));
+                    let line = format!("{} Pioneers recruited in {} for the {}; its Unrest fell by {} to {}.", n, self.tables.state(*state).name, self.seat_name(seat), Game::unrest_figure(fell), self.unrest_text(*state));
                     self.log(line);
                     let text = self.say(
                         "emigrants_mustered",
@@ -1606,7 +1647,7 @@ impl Game {
                     let taught = self.take_emigrants(*state, *n);
                     let due = turn + self.tables.emigrants.antarctica_turns;
                     self.antarctic_sends.push(AntarcticSend { seat, from: *state, n: *n, into: *into, due_turn: due, education: taught });
-                    let line = format!("{} Emigrants left {} for Antarctica by sea, for the {}.", n, self.tables.state(*state).name, self.seat_name(seat));
+                    let line = format!("{} Pioneers left {} for Antarctica by sea, for the {}.", n, self.tables.state(*state).name, self.seat_name(seat));
                     self.log(line);
                 }
                 // Ticket #141 (version 0.07.3): Emigrants lift straight to the seat's station over
@@ -1619,7 +1660,7 @@ impl Game {
                     self.pay_spaceport(seat, *state, *n);
                     self.settle_people(*colony, *n, taught);
                     let station = self.place_name(Place::Colony(*colony));
-                    let line = format!("{} Emigrants lifted from {} to {}, for the {}.", n, self.tables.state(*state).name, station, self.seat_name(seat));
+                    let line = format!("{} Pioneers lifted from {} to {}, for the {}.", n, self.tables.state(*state).name, station, self.seat_name(seat));
                     self.log(line);
                     let text = self.say("emigrants_lifted", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone()), ("station", station)]);
                     self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::Colony(*colony)), text);
@@ -1627,7 +1668,7 @@ impl Game {
                 // Ticket #72: the Fund's orders land now; the share is read at the next Income.
                 Order::SetVentureShare { share } => {
                     self.seat_mut(seat).venture_share = *share as f64 / 100.0;
-                    let line = format!("The {} set the Venture Capital Fund to bank {}% of their Materials output.", self.seat_name(seat), share);
+                    let line = format!("The {} set the Venture Capital Fund to bank {}% of their Ducat income.", self.seat_name(seat), share);
                     self.log(line);
                 }
                 Order::DrawVenture { amount } => {
@@ -1635,9 +1676,11 @@ impl Game {
                     {
                         let s = self.seat_mut(seat);
                         s.venture_fund -= amount;
-                        s.stockpile.materials += back;
+                        // Ticket #240 (version 0.08.3): the Fund holds Ducats, so a draw returns
+                        // Ducats. `draw_return` is unchanged: a tenth is still lost on the way out.
+                        s.stockpile.ducats += back;
                     }
-                    let line = format!("The {} drew {} Materials from the Venture Capital Fund; {} came back to the Stockpile.", self.seat_name(seat), amount, back);
+                    let line = format!("The {} drew {} Ducats from the Venture Capital Fund; {} came back to the Stockpile.", self.seat_name(seat), amount, back);
                     self.log(line);
                 }
                 Order::Leapfrog { state } => {
@@ -1661,6 +1704,25 @@ impl Game {
                     self.report_line(LineKind::Climate, Some(ReportPlace::State(*state)), text);
                 }
                 // Ticket #54: the Strip Permit runs from the next Income for `turns` turns.
+                Order::ExodusCall { state } => {
+                    let turns = self.tables.exodus_call.turns;
+                    {
+                        let st = self.state_mut(*state);
+                        st.exodus_call_used = true;
+                        st.exodus_call_ends = Some(turn + turns - 1);
+                    }
+                    let per = self.emigrants_per_turn_in(seat, *state);
+                    let line = format!(
+                        "The {} sounded an Exodus Call in {}: {} Pioneers a turn for {} turns, at the ordinary cost in people.",
+                        self.seat_name(seat),
+                        self.tables.state(*state).name,
+                        per,
+                        turns
+                    );
+                    self.log(line);
+                    let text = self.say("exodus_call", &[("faction", self.seat_name(seat)), ("state", self.tables.state(*state).name.clone()), ("n", per.to_string()), ("turns", turns.to_string())]);
+                    self.report_line(LineKind::YourWorks, Some(ReportPlace::State(*state)), text);
+                }
                 Order::StripPermit { state } => {
                     let turns = self.tables.strip_permit.turns;
                     {
@@ -1834,7 +1896,7 @@ impl Game {
             }
             Order::BuildArchive { colony } => r("build_archive", &[("colony", place(Place::Colony(*colony)))]),
             Order::Upload { colony, n } => r("upload", &[("n", n.to_string()), ("colony", place(Place::Colony(*colony)))]),
-            Order::SetArchiveFunding { on } => r(if *on { "fund_archive" } else { "unfund_archive" }, &[]),
+            Order::SetResearchDirective { percent } => r(if *percent == 0 { "unfund_archive" } else { "fund_archive" }, &[]),
             Order::SetMaxStanding { target } => match target {
                 Some(p) => r("max_on", &[("place", place(*p))]),
                 None => r("max_off", &[]),
@@ -1896,6 +1958,7 @@ impl Game {
             Order::DrawVenture { amount } => r("draw_venture", &[("n", amount.to_string())]),
             Order::Leapfrog { state } => r("leapfrog", &[("state", self.tables.state(*state).name.clone())]),
             Order::StripPermit { state } => r("strip_permit", &[("state", self.tables.state(*state).name.clone())]),
+            Order::ExodusCall { state } => r("exodus_call_order", &[("state", self.tables.state(*state).name.clone())]),
         }
     }
 }

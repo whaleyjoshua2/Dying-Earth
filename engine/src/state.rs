@@ -253,6 +253,25 @@ pub struct NationState {
     pub strip_permit_used: bool,
     /// Ticket #54: the last turn whose Income this state's Facilities double, while one runs.
     pub strip_permit_ends: Option<u32>,
+    /// Ticket #237 (version 0.08.3): an Exodus Call has been made here; one per state, ever, the
+    /// shape ticket #54 gave the Strip Permit.
+    #[serde(default)]
+    pub exodus_call_used: bool,
+    /// Ticket #237: the last turn a Call here doubles the muster and suspends its double cost.
+    #[serde(default)]
+    pub exodus_call_ends: Option<u32>,
+    /// Ticket #238 (version 0.08.3): the turn this state's CURRENT holder took it, and who that is.
+    /// Nothing recorded how long a Region had been held before this -- `changed_hands` is true for
+    /// the single turn of a handover and `neutral_since` counts a run of neutrality -- so the
+    /// three-turn rule needed a clock of its own.
+    ///
+    /// Both are maintained in `restart_neutrality_clock`, which runs after EVERY write to
+    /// `control`: there are exactly two in the engine and the second calls it explicitly, so a new
+    /// way of taking a Region cannot quietly forget to reset the clock.
+    #[serde(default)]
+    pub held_since: Option<u32>,
+    #[serde(default)]
+    pub held_by: Option<Seat>,
 }
 
 /// Ticket #57: a calendar month of game time. Turn 1 is January 2030.
@@ -697,11 +716,31 @@ pub struct SeatState {
     /// fund and contributed nothing to the Research Lead. Version 0.07.0: set at Income by
     /// `bank_archive_research`, and true only when a point was actually banked.
     pub funding_archive: bool,
-    /// Version 0.07.0: the Archivists' standing declaration that their Labs pay the Archive fund
-    /// rather than the shared Tech. Set by an order, read at the NEXT Income, and it holds until it
-    /// is set again.
+    /// Ticket #235 (version 0.08.3): the **Research Directive** -- the share of this seat's
+    /// Research, as a percentage, that goes somewhere other than the shared Tech. It replaces the
+    /// Archivists' `archive_funding` bool, which was the same idea with two positions: their
+    /// directive runs to 100 (all of it to the Archive) where every other Faction's stops at 50.
+    ///
+    /// Set by an order, read at the NEXT Income, and it holds until it is set again -- the shape
+    /// version 0.07.0 gave the Archivists' switch, kept because a per-turn order would mean
+    /// re-deciding this thirty-six times a game.
     #[serde(default)]
-    pub archive_funding: bool,
+    pub research_directive: u8,
+    /// Ticket #235: the directive that was in force at the LAST Income, which is what Provisional
+    /// Findings is settled from. It is kept apart from `research_directive` for the lag: the rule
+    /// reads what happened to *last* turn's Research, so a directive set this turn is paid at this
+    /// Income and felt at the next one -- the shape version 0.07.0 gave the Archivists' switch.
+    ///
+    /// It holds what was DECLARED rather than what landed. Rounding means a 26% directive on 14
+    /// Research takes 3 points, which is 21% of them, and a player who set 26 would otherwise keep
+    /// a rule they had chosen to trade away with nothing on screen to explain it.
+    #[serde(default)]
+    pub directive_last_income: u8,
+    /// Ticket #235: the fraction of a Ducat or a Fuel a conversion has earned and not yet paid.
+    /// The Prospectors' rate is 0.8 a point and the Arkwrights' 0.2, so flooring every turn would
+    /// quietly lose up to a fifth of what was diverted. It is carried instead.
+    #[serde(default)]
+    pub directive_remainder: f64,
     /// Ticket #114 (version 0.07.1): the Defence split is set to repeat. It is a STANDING ORDER and
     /// not an automatic spend: the interface places this turn's split as ordinary pending orders
     /// every turn while it is on, so the player sees exactly what it did and can cancel any of it
@@ -976,7 +1015,9 @@ impl Game {
             income_sources: Vec::new(),
             archive_fund: 0,
             funding_archive: false,
-            archive_funding: false,
+            research_directive: 0,
+            directive_last_income: 0,
+            directive_remainder: 0.0,
             max_standing: None,
             provisional_findings: true,
             resettle_to: None,
@@ -1041,6 +1082,10 @@ impl Game {
                 baseline_rise: 0.0,
                 baseline_cut: 0.0,
                 strip_permit_used: false,
+            exodus_call_used: false,
+            held_since: None,
+            held_by: None,
+            exodus_call_ends: None,
                 strip_permit_ends: None,
             })
             .collect();
@@ -1447,15 +1492,44 @@ impl Game {
             && !self.colonies.iter().any(|c| c.control.director() == Some(seat) && self.may_hold_archive(c))
     }
 
-    // ---------------------------------------------------------------- Ticket #51: Steerage and the rest
+    // ---------------------------------------------------------------- Ticket #51: Coach Class and the rest
 
-    /// Ticket #73: how many Emigrants this seat may muster in a turn (Steerage doubles it).
+    /// Ticket #73: how many Emigrants this seat may muster in a turn (Coach Class doubles it).
     pub fn emigrants_per_turn(&self, seat: Seat) -> u32 {
         (self.tables.emigrants.per_turn as f64 * self.tables.faction(self.kind(seat)).emigrants_multiplier).floor() as u32
     }
 
+    /// Ticket #237 (version 0.08.3): is an Exodus Call running here this turn?
+    pub fn exodus_call_running(&self, s: StateId) -> bool {
+        self.state(s).exodus_call_ends.is_some_and(|last| self.turn <= last)
+    }
+
+    /// Ticket #237: what this seat may recruit in THIS state this turn. A Call doubles it -- the
+    /// Arkwrights' eight becomes sixteen, doubling the figure they actually use rather than the
+    /// base nobody else's Faction changes.
+    pub fn emigrants_per_turn_in(&self, seat: Seat, s: StateId) -> u32 {
+        let per = self.emigrants_per_turn(seat);
+        if self.exodus_call_running(s) { per * self.tables.exodus_call.muster_multiplier } else { per }
+    }
+
+    /// Ticket #237: the population a muster takes HERE. A Call suspends Coach Class's double
+    /// charge for as long as it runs, which is the whole point of it.
+    ///
+    /// Measured before it was decided: the Arkwrights' home state runs 20 units to 1 over a game
+    /// as it is, because Coach Class charges them twice a head, so an order that only doubled the
+    /// COUNT would have burned the country twice as fast and deepened the thing that already caps
+    /// them at 3 wins of 80. The designer took this reading -- the Call moves people without
+    /// eating the source faster than anyone else does.
+    pub fn muster_population_in(&self, seat: Seat, s: StateId, colonists: u32) -> f64 {
+        if self.exodus_call_running(s) {
+            self.tables.emigrants.population_each * colonists as f64
+        } else {
+            self.lift_population(seat, colonists)
+        }
+    }
+
     /// What one Colony Ship of this seat carries: the card figure, +2 with Expanded Habitats
-    /// (version 0.04 section 4), times the Faction's own multiplier (Steerage doubles it).
+    /// (version 0.04 section 4), times the Faction's own multiplier (Coach Class doubles it).
     pub fn colony_ship_capacity(&self, seat: Seat) -> u32 {
         // Ticket #84: Generation Ships stacks on Expanded Habitats.
         let base = self.tables.unit(UnitKind::ColonyShip).carries_colonists as i64 + self.tech_addition(seat, TechId::ExpandedHabitats) + self.tech_addition(seat, TechId::GenerationShips);
@@ -1554,7 +1628,7 @@ impl Game {
             .sum()
     }
 
-    /// The population a lift from a Launch Site takes for this many Colonists (Steerage doubles it).
+    /// The population a lift from a Launch Site takes for this many Colonists (Coach Class doubles it).
     pub fn lift_population(&self, seat: Seat, colonists: u32) -> f64 {
         // Ticket #73: paid when the Emigrants muster, not when a Ship lifts them.
         self.tables.emigrants.population_each * colonists as f64 * self.tables.faction(self.kind(seat)).lift_population_multiplier
@@ -1717,7 +1791,7 @@ impl Game {
     /// Ticket #196 (version 0.08.0): how many Emigrants this seat could muster in this state right
     /// now -- its per-turn cap, or what the state's people can pay for, whichever is smaller.
     ///
-    /// A batch was all-or-nothing until now, and Steerage costs the Arkwrights twice the population
+    /// A batch was all-or-nothing until now, and Coach Class costs the Arkwrights twice the population
     /// for twice the batch: 8 x 2.0 = 16.0 people, where Australia carries 10.1 to 12.6 and is the
     /// only one of the fourteen Regions below 16. Measured, an Arkwright AI holding it was refused
     /// on all 243 turns it tried and mustered nothing in twenty games. A muster takes what the
@@ -1854,6 +1928,46 @@ impl Game {
         let turn = self.turn;
         let st = self.state_mut(s);
         st.neutral_since = if st.control == Control::Neutral { Some(turn + 1) } else { None };
+        // Ticket #238 (version 0.08.3): and the hold clock, reset only when the HOLDER changes.
+        // A state written back to the same seat -- which happens -- keeps its clock, or the three
+        // faction-only orders could be denied forever by a repeated write nobody can see.
+        let who = st.control.controller();
+        if who != st.held_by {
+            st.held_by = who;
+            st.held_since = who.map(|_| turn);
+        }
+    }
+
+    /// Ticket #238 (version 0.08.3): may this seat remake this Region yet? The Strip Permit, the
+    /// Leapfrog and the Exodus Call all change a country for good, and a Faction that has just
+    /// walked in does not get to do that.
+    ///
+    /// A Region with NO clock recorded passes. That is every Region in a save written before this
+    /// version, and the alternative -- treating a missing clock as "just arrived" -- would silently
+    /// disable three Faction orders in every old save, which is a worse surprise than a save that
+    /// is briefly generous.
+    pub fn may_remake(&self, seat: Seat, s: StateId) -> bool {
+        match self.turns_held(seat, s) {
+            None => true,
+            Some(held) => held >= self.tables.faction_orders.min_turns_held,
+        }
+    }
+
+    /// Ticket #238: the turn this seat may first remake this Region, for the refusal to name.
+    pub fn may_remake_on_turn(&self, s: StateId) -> u32 {
+        let min = self.tables.faction_orders.min_turns_held;
+        self.state(s).held_since.map(|since| since + min).unwrap_or(self.turn)
+    }
+
+    /// Ticket #238 (version 0.08.3): how many whole turns this seat has held this Region, or None
+    /// if it does not hold it. The turn of the taking does not count, so a Region taken on turn 10
+    /// answers 0 that turn, 1 on turn 11, and opens its Faction-only order on turn 13.
+    pub fn turns_held(&self, seat: Seat, s: StateId) -> Option<u32> {
+        let st = self.state(s);
+        if st.control.controller() != Some(seat) {
+            return None;
+        }
+        st.held_since.map(|since| self.turn.saturating_sub(since))
     }
 
     pub fn controlled_states(&self, seat: Seat) -> Vec<StateId> {
@@ -3025,7 +3139,34 @@ impl Game {
     /// challenge margin and the Accords' Friendly gate.
     pub fn relations_score(&self, viewer: Seat, subject: Seat) -> i64 {
         let c = &self.tables.relations;
-        (self.relations_deeds(viewer, subject) + self.blame_relations_term(viewer, subject)).clamp(c.worst, c.best)
+        let base = self.relations_deeds(viewer, subject) + self.blame_relations_term(viewer, subject);
+        let pot = self.directive_relations_term(subject);
+        // Ticket #236 (version 0.08.3): the reward may not lift a pair past the top of Cordial, the
+        // step above Neutral. A pair already higher than that by deeds is not dragged DOWN to it --
+        // the ceiling binds the boost, not the score.
+        let with_pot = if pot > 0 { (base + pot).min(base.max(c.directive_boost_ceiling)) } else { base + pot };
+        with_pot.clamp(c.worst, c.best)
+    }
+
+    /// Ticket #236 (version 0.08.3): what everyone else makes of how much of its Research `subject`
+    /// gives the shared Tech. A TERM, like Blame's, read afresh every time rather than banked: a
+    /// Faction that starts contributing again is forgiven the same turn, and one that stops is
+    /// resented only while it does.
+    ///
+    /// It does not depend on the viewer. Blame's term reads a `resentment` coefficient per Faction
+    /// because Factions care about pollution by different amounts; nothing in the designer's rule
+    /// says they weigh generosity differently, and inventing a second coefficient would be a rule
+    /// nobody asked for.
+    pub fn directive_relations_term(&self, subject: Seat) -> i64 {
+        let c = &self.tables.relations;
+        let contribution = 100u8.saturating_sub(self.seat(subject).research_directive);
+        if contribution >= 100 {
+            c.directive_step
+        } else if contribution < c.directive_min_contribution {
+            -c.directive_step
+        } else {
+            0
+        }
     }
 
     /// Ticket #221 (version 0.08.2): how much `viewer` holds `subject`'s Blame against them, as a

@@ -32,7 +32,7 @@ strip_permit = 7
 relief = 4
 build_constabulary = 5
 resettle = 2
-fund_archive = 0
+fund_archive = 6
 build_archive = 0
 upload = 0
 build_producer = 5
@@ -71,7 +71,7 @@ strip_permit = 0
 relief = 6
 build_constabulary = 6
 resettle = 2
-fund_archive = 0
+fund_archive = 6
 build_archive = 0
 upload = 0
 build_producer = 6
@@ -107,7 +107,7 @@ strip_permit = 0
 relief = 4
 build_constabulary = 4
 resettle = 2
-fund_archive = 0
+fund_archive = 6
 build_archive = 0
 upload = 0
 build_producer = 6
@@ -258,6 +258,17 @@ held_state_weight = 0.3
 # Ticket #84 (version 0.06.0): as Research Lead the AI picks its Victory gate once its first part
 # is past this fraction of its bar, or from this turn, whichever comes first.
 gate_pick_fraction = 0.5
+# Ticket #236 (version 0.08.3): the AI weighs the Tech under research before deciding what to keep
+# back. A Tech it wants -- its own Victory gate, or anything on its `order` list -- and it gives
+# everything, which also earns the shared pot's reward. A Tech it is indifferent to and it keeps a
+# little, staying above the 85% line. A Tech it never wanted, or leaves until last, and it takes
+# its whole cap and wears the penalty knowingly.
+#
+# The designer asked for exactly this: "the ai need to weigh the benefit of the new tech to which
+# they contributing". Before it, every seat sat at its cap from turn 2 -- measured, 24 to 28 turns
+# of 36 below any threshold worth having -- so the shared-pot rule had no line left to draw.
+directive_when_wanted = 0
+directive_when_indifferent = 10
 gate_pick_turn = 24
 
 # Tech picks as Research Lead (spec 16.4): `order` first, then the cheapest available that is not

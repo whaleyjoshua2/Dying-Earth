@@ -145,7 +145,7 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   sell <resource> <amount>             materials|fuel
   relief <state>
   resettle <state>
-  emigrants <state> <n>                muster Emigrants
+  emigrants <state> <n>                recruit Pioneers
   send-antarctica <state> <n> slot earth <slot>
   send-antarctica <state> <n> colony <n>
   change facility <state> <index> <mothball|restart|decommission>
@@ -244,8 +244,8 @@ fn parse_line(line: &str) -> Result<Line, String> {
             };
             Order::Change { building, what: change }
         }
-        "fund-archive" => Order::SetArchiveFunding { on: true },
-        "unfund-archive" => Order::SetArchiveFunding { on: false },
+        "fund-archive" => Order::SetResearchDirective { percent: 100 },
+        "unfund-archive" => Order::SetResearchDirective { percent: 0 },
         "venture-share" => Order::SetVentureShare { share: count(at(1)?)? },
         "draw-venture" => Order::DrawVenture { amount: number(at(1)?)? },
         "leapfrog" => Order::Leapfrog { state: pick(&StateId::ALL, at(1)?)? },
@@ -644,7 +644,7 @@ fn print_board(g: &Game) {
         println!("{}", g.window_text(b));
     }
     println!(
-        "Colony Ship capacity: {} safe, {} crowded; lifting one Colonist costs {:.2} population; Emigrants a turn: {}",
+        "Colony Ship capacity: {} safe, {} crowded; lifting one Colonist costs {:.2} population; Pioneers a turn: {}",
         g.colony_ship_capacity(me),
         g.colony_ship_crowded_capacity(me),
         g.lift_population(me, 1),

@@ -31,7 +31,7 @@ pub struct Credit {
 
 /// The icons in use, their authors, and the names they carry at game-icons.net. Anything added to
 /// `assets/icons/` belongs here too: the credit is the licence's price, not a courtesy.
-pub const CREDITS: [Credit; 40] = [
+pub const CREDITS: [Credit; 43] = [
     Credit { resource: "Materials", icon: "Mine Wagon", author: "Delapouite" },
     Credit { resource: "Fuel", icon: "Jerrycan", author: "Delapouite" },
     Credit { resource: "Energy", icon: "Electric", author: "Sbed" },
@@ -71,6 +71,14 @@ pub const CREDITS: [Credit; 40] = [
     Credit { resource: "Module Solar Array", icon: "Solar Power", author: "Skoll" },
     Credit { resource: "Module Mass Driver", icon: "Mass Driver", author: "Sbed" },
     Credit { resource: "Module Archive", icon: "Archive Register", author: "Delapouite" },
+    // Ticket #239 (version 0.08.3): the three Unique Modules. Each was judged against its common
+    // sibling at 16 and 22 pixels on a rendered sheet before it was taken, which is how the
+    // Exchange lost its first pick -- Strongbox is already the Prospectors' Investment Bank, so
+    // their two Uniques would have worn one picture -- and how the Heliostat lost Sun, whose
+    // sibling the Solar Array already carries a sun and which on a climate board reads as heat.
+    Credit { resource: "Module Heliostat", icon: "Radar Dish", author: "Lorc" },
+    Credit { resource: "Module Exchange", icon: "Shop", author: "Delapouite" },
+    Credit { resource: "Module Chorus", icon: "Satellite Communication", author: "Delapouite" },
     // Ticket #146 (version 0.07.3): the slot boxes' pictures on a Region's card, the first candidate
     // of each kind on ticket #144's sheets except where the research warned -- a control tower for
     // the Launch Site (the shuttle is the Colony Ship's rocket family), a handshake for the Embassy
@@ -150,6 +158,13 @@ pub fn module_icon(kind: dying_earth_engine::ModuleKind) -> &'static str {
         // Ticket #186 (version 0.08.0): the Custodians' Unique Module wears their Unique Facility's
         // picture, as the Institute wears the School's.
         Academy => "facility_academy",
+        // Ticket #239 (version 0.08.3): the two Unique Modules whose Faction's Unique FACILITY is
+        // no help -- a Reactor is not a solar mirror and an Investment Bank is not a shop -- so
+        // each takes a picture of its own from the candidate set, chosen to be unmistakable from
+        // its common sibling at build-tile size rather than a variation on it.
+        Heliostat => "module_heliostat",
+        Exchange => "module_exchange",
+        Chorus => "module_chorus",
         Archive => "module_archive",
         // Ticket #164 (version 0.07.5): the Core Module wears the station glyph the game drew for
         // itself on ticket #135 -- two solar panels on a bar with a module between them, which is

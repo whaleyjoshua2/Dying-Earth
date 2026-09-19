@@ -67,17 +67,17 @@ ducats_multiplier = 1.2
 market_multiplier = 0.85
 # Ticket #221: zero. They do not mind another Faction's Blame at all, which is a statement about them.
 resentment = 0.0
-signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit is free and may be taken once in a Region's whole life: for three turns every Facility there produces double, and when it ends that Region's Baseline Emissions rise by 0.2 for good and its Unrest by 3. The Venture Capital Fund: each turn they set what share of their Factories' and Mines' Materials is banked in it, 0% to 80% in tenths; a draw returns nine tenths."
+signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit is free and may be taken once in a Region's whole life: for three turns every Facility there produces double, and when it ends that Region's Baseline Emissions rise by 0.2 for good and its Unrest by 3. The Venture Capital Fund: each turn they set what share of their Ducat income is banked in it, 0% to 80% in tenths; a draw returns nine tenths."
 # Ticket #203 (version 0.08.1). The building is ticket #182's.
-unique = "Investment Bank -- replaces the Bank, and banks 1% interest a turn on the Venture Capital Fund's balance, one building per Region paying, never less than 1 Material in all."
+unique = "Investment Bank -- replaces the Bank, and banks 1% interest a turn on the Venture Capital Fund's balance, one building per Region paying, never less than 1 Material in all. Off Earth, the Exchange -- replaces the Trade Post, and pays 1 more Ducat a turn."
 # Ticket #72: the Extraction Total is retired; the first part is Materials banked in the Fund.
-victory = "1000 Materials in the Venture Capital Fund, plus 12 Colonists living off Earth."
+victory = "2000 Ducats in the Venture Capital Fund, plus 12 Colonists living off Earth."
 # Ticket #182 (version 0.08.0): 750 to 1000, because the Investment Bank pays uncapped interest
 # on the Fund. Measured first: in 40 games nobody EVER reached 750 -- the highest balance ever
 # seen was 745, the median game ended around turn 28 with the Fund in the 400s, and the
 # Prospectors won 0 of 80. The bar rises to keep the Fund a race rather than a formality now
 # that a Bank in each of ten Regions pays around 44 Materials a turn by turn 24.
-victory_first = { kind = "venture_fund", bar = 1000 }
+victory_first = { kind = "venture_fund", bar = 2000 }
 victory_second = { kind = "off_world_presence", bar = 12 }
 colour = [0.85, 0.5, 0.2]
 
@@ -89,7 +89,7 @@ id = "arkwrights"
 # screen opens the globe on for this Faction. It changes nothing else -- no starting position, and
 # any of the fourteen may still be chosen -- which is what the old name `home` did not say.
 # Population 388, the largest on Earth -- 19.4 in the units used before ticket #143 (version
-# 0.07.3) put population in units of five million people -- and Steerage musters eight a turn at
+# 0.07.3) put population in units of five million people -- and Coach Class recruits eight a turn at
 # twice the population cost.
 opens_on = "south_asia"
 name = "Arkwrights"
@@ -109,10 +109,10 @@ influence_multiplier = 0.8
 # (applied before Efficient Transit, multiplicative).
 habitat_capacity_multiplier = 1.5
 transit_fuel_multiplier = 0.75
-# Ticket #51, Steerage: double loads at double the population cost, and cheap Colony Ships.
+# Ticket #51, Coach Class: double loads at double the population cost, and cheap Colony Ships.
 colony_ship_capacity_multiplier = 2.0
 lift_population_multiplier = 2.0
-# Ticket #73 (version 0.05.5): Steerage musters eight Emigrants a turn where everyone else musters
+# Ticket #73 (version 0.05.5): Coach Class recruits eight Pioneers a turn where everyone else recruits
 # four, at the doubled population above.
 emigrants_multiplier = 2.0
 # Ticket #83 (version 0.06.0): the 20-Materials Colony Ship is retired for the common 30, and
@@ -123,9 +123,9 @@ ship_materials_multiplier = 0.85
 # three quarters (both rounded down).
 station_materials_multiplier = 0.5
 module_materials_multiplier = 0.75
-signature = "Steerage. A Colony Ship carries 8 Colonists, 12 with Expanded Habitats, and their Habitats hold half again as many, 6 and 12. They muster 8 Emigrants a turn where others muster 4, but every Emigrant takes twice the population. Every Ship costs them 15% less, a Colony Ship 25 Materials; a transit burns three quarters of the Fuel; and, starting with no station, a Space Station costs them 20 Materials and a Module three quarters."
+signature = "Coach Class. A Colony Ship carries 8 Colonists, 12 with Expanded Habitats, and their Habitats hold half again as many, 6 and 12. They recruit 8 Pioneers a turn where others recruit 4, but every Pioneer takes twice the population. Every Ship costs them 15% less, a Colony Ship 25 Materials; a transit burns three quarters of the Fuel; and, starting with no station, a Space Station costs them 20 Materials and a Module three quarters."
 # Ticket #203 (version 0.08.1). The building is ticket #183's.
-unique = "Spaceport -- replaces the Launch Site, and pays +1 Influence into next turn's Allotment for every Emigrant it lifts off Earth."
+unique = "Spaceport -- replaces the Launch Site, and pays +1 Influence into next turn's Allotment for every Pioneer it lifts off Earth. Off Earth, the Chorus -- replaces the Relay, and adds +1 Influence to the Allotment for every 6 Colonists at its Colony."
 victory = "Diaspora: 30 Colonists living off Earth, on Colonies spread over at least three Bodies with at least 4 Colonists each (Antarctica and stations over Earth do not count)."
 victory_first = { kind = "colonists_off_earth", bar = 30 }
 victory_second = { kind = "colonies_on_bodies", bodies = 3, colonists_each = 4 }
@@ -157,7 +157,7 @@ research_multiplier_off_earth = 1.75
 influence_multiplier = 1.0
 signature = "Provisional Findings. While their Research went to the shared Tech last turn, they already have half the effect of the Tech under research: a multiplier x reads 1 + (x - 1) / 2, an addition reads half rounded down, and immunities do not carry. A turn of funding the Archive switches it off for the turn after. Their Research is x1.5 on Earth and x1.75 off it, an Observatory on a station over Earth counting as off."
 # Ticket #203 (version 0.08.1). The building is ticket #184's.
-unique = "Reactor -- replaces the Power Plant, and takes 75% off the Energy upkeep of everything its holder owns, the Archive excepted."
+unique = "Reactor -- replaces the Power Plant, and takes 75% off the Energy upkeep of everything its holder owns, the Archive excepted. Off Earth, the Heliostat -- replaces the Solar Array, and makes 1 more Energy wherever it stands."
 # Ticket #68 (version 0.05.5): the first part is the Research paid into the Archive, 80 in all,
 # which the fund holds only a quarter of until the Archive Module stands at a Colony off Earth.
 victory = "Build the Archive at a Colony off Earth (50 Materials, three turns, and four Colonists must live there to begin it), pay 80 Research into it and keep it running, then upload 12 Colonists into it from the people living where it stands."
@@ -169,8 +169,14 @@ colour = [0.871, 0.322, 0.439]
 # Ticket #54 (version 0.05): the [restoration] table is retired with the order; the Custodians'
 # signature rule is the Scrubber (facilities.toml) and Leapfrog (per_leapfrog below).
 
-# Ticket #72 (version 0.05.5): the Prospectors' Venture Capital Fund. The largest share of Materials
-# output that may be banked a turn, the step the share moves in, and what a draw gives back.
+# Ticket #72 (version 0.05.5): the Prospectors' Venture Capital Fund. The largest share that may be
+# banked a turn, the step the share moves in, and what a draw gives back.
+# Ticket #240 (version 0.08.3): the share is of DUCAT INCOME, not Materials output, and the Fund
+# holds Ducats. max_share is left at 0.8 at the designer's word -- "keep 80" -- with the note that
+# the top of the slider is now a real trade-off rather than nearly free: measured over 120 games
+# every seat ends every game holding about five Ducats, so banking four fifths of income starves
+# Influence, Relief and repairs. The computer weighs it by taking the SMALLEST share that still
+# reaches the bar by its pace's last turn, so it banks the least it can.
 # Ticket #191 (version 0.08.0): Relations. One score per ORDERED PAIR, so twelve in a four-seat
 # game: the Arkwrights' view of the Prospectors is a different number from the Prospectors' view of
 # the Arkwrights. Measured over 80 games, of the 317 pairs where anything happened 49% were purely
@@ -184,6 +190,27 @@ colour = [0.871, 0.322, 0.439]
 [relations]
 # The scale. The +10 half is RESERVED and nothing fills it in this version; it exists so the scale
 # reads naturally and 0 is genuinely neutral. An all-zero-or-negative grid is the rule working.
+# Ticket #236 (version 0.08.3): the shared pot. A Faction that keeps too much of its Research is
+# resented for it, and one that gives all of it is thought the better of.
+#
+# It is a TERM, not a deed -- recomputed every settle from what the Faction is doing NOW, exactly
+# as the Blame term is, and gone the moment they contribute again. The designer's words were "plus/
+# minus 1 but only for that turn", and the measurement is why that shape matters: with the Research
+# Directive shipped, the computer seats set their directive on turn 2 and never move it, so a
+# PERMANENT deed of -1 against every rival every turn would be about 78 points of damage a seat
+# over a game, on a scale that bottoms at -10. As a term it is at most -1 at any moment.
+#
+# 85 is the designer's figure. It is only a meaningful line because the same ticket taught the AI
+# to weigh the Tech under research: before that every seat sat at its cap from turn 2 and was
+# permanently below any threshold worth having.
+directive_min_contribution = 85
+directive_step = 1
+# The reward may not lift a pair past the TOP OF CORDIAL, the step above Neutral, at the designer's
+# word. Version 0.08.2 settled deliberately that a pair which never strikes an Accord can never
+# rise above Neutral; this bends that by exactly one band rather than breaking it, so generosity
+# stops a rival resenting you and still does not make them a friend.
+directive_boost_ceiling = 6
+
 best = 10
 worst = -10
 start = 0
@@ -243,11 +270,43 @@ max_share = 0.8
 share_step = 0.1
 draw_return = 0.9
 
-# Ticket #73 (version 0.05.5): Emigrants. Colonists are built: a Faction musters up to `per_turn` a
+# Ticket #73 (version 0.05.5): Pioneers. Colonists are built: a Faction recruits up to `per_turn` a
 # turn in one Nation State it directs, at `population_each` population apiece (times the Faction's
-# lift multiplier: Steerage doubles it), landing on the state's card at End Turn; a batch takes
-# `unrest_fall` off the state's Unrest. Emigrants sent to Antarctica by sea arrive `antarctica_turns`
+# lift multiplier: Coach Class doubles it), landing on the state's card at End Turn; a batch takes
+# `unrest_fall` off the state's Unrest. Pioneers sent to Antarctica by sea arrive `antarctica_turns`
 # later, with no launch.
+# Ticket #237 (version 0.08.3): the Exodus Call. The Arkwrights only, on a state they control, once
+# per state EVER -- the shape the Strip Permit has had since ticket #54. While it runs it doubles
+# what they may recruit there AND suspends Coach Class's double population charge.
+#
+# That second clause is the ticket. Measured first: their home state runs from 20 units to 1 over a
+# game already, because Coach Class charges twice a head, and an order that doubled only the count
+# would have burned the country twice as fast -- deepening the very thing that leaves them winning
+# 3 games of 80. The designer chose the reading that moves people without eating the source faster
+# than any other Faction does.
+# Ticket #238 (version 0.08.3): a Faction must have held a Region for this many whole turns before
+# it may remake it -- the Strip Permit, the Leapfrog and the Exodus Call. The turn of the taking
+# does not count, so a Region taken on turn 10 opens on turn 13, and a starting Region on turn 4.
+#
+# Measured before it was taken, over five whole games: it would have refused 31 of 31 Strip Permits
+# and 2 of 36 Leapfrogs as those orders were ACTUALLY issued. Every Strip Permit goes on a Region
+# held nought or one turns, while the Prospectors hold NINE Regions of nine for three turns or more
+# by mid-game. They are not losing their grip; the AI simply strips each new Region the turn it
+# arrives, a fresh one being the obvious unstripped candidate, so the rule pushes strips onto the
+# pile of long-held Regions the seat is already sitting on.
+#
+# That projection UNDERSTATED the cost, and the A/B says so. Flipping this value between 0 and 3
+# over the same twenty seeds, six parameter rows, Leapfrogs issued over the batch fall 378 -> 177,
+# a little under HALF. A refused order does not simply wait: the Ducats go elsewhere that turn and
+# the board diverges. The share kept rises with the length of the game -- 20% on the shortest row,
+# 51% on the longest -- which is the delay showing through where there are turns enough to spend it.
+[faction_orders]
+min_turns_held = 3
+
+[exodus_call]
+turns = 2
+muster_multiplier = 2
+
 [emigrants]
 per_turn = 4
 population_each = 1.0
@@ -265,12 +324,51 @@ ducats = 0
 # Ticket #35 (version 0.03): Ducats. A controlled Nation State makes gdp x Industry Level / 10 a turn
 # (gdp on its card); a Bank adds bank_per_gdp_tenth x gdp / 10; a Trade Post makes trade_post_base x
 # the Body's Habitat yield. Ducats buy Influence, Leapfrogs and repair points at these rates.
+# Ticket #235 (version 0.08.3): the Research Directive. A Faction may send a share of its Research
+# somewhere other than the shared Tech, chosen as a percentage and standing until changed. The
+# Archivists had this since version 0.07.0 as a switch with two positions; it is a slider now, and
+# theirs is the only one that runs to 100.
+#
+# The rates were fitted against a measurement rather than guessed. Research made over a whole
+# 36-turn game, median by Faction over 20 seeds: Custodians 131, Prospectors 442, Arkwrights 149,
+# Archivists 453 -- so half a turn's Research is about 1.8 points for the Custodians, 6.2 for the
+# Prospectors and 2.1 for the Arkwrights, which is far less than the rule was first drafted against.
+[research_directive]
+# The most any Faction but the Archivists may divert. Theirs is `archivists_max`.
+max = 50
+archivists_max = 100
+# Provisional Findings holds while at least this share still goes to the shared Tech. At the
+# designer's word, "make it a threshold 75%" -- so a directive of 25 or less keeps the rule and
+# anything above it trades the rule away. Before this the answer was binary, because the control
+# was: any funding at all turned Provisional Findings off.
+provisional_min_contribution = 75
+# The Custodians: ppm added to the Natural Sink per point diverted, FOR GOOD. Permanent at the
+# designer's word, and cut from the 0.05 first proposed to 0.01 when the measurement showed what
+# their Research really is: at 0.05 permanent it was +2.7 ppm over a game, a 45% enlargement of a
+# 6.0 Sink, on the Faction that already wins 37 of 80 on exactly this condition. At 0.01 it is
+# about +0.5 ppm over a game if they divert half throughout -- half a Planetary Stewardship, earned
+# over thirty turns of not researching. Per-turn instead of permanent was measured at 0.09 ppm a
+# turn, which is one and a half per cent of the Sink: invisible, and the reason permanent won.
+custodians_ppm_per_point = 0.01
+# The Prospectors: Ducats per point. "10-1" was ambiguous by a factor of a hundred -- ten points to
+# a Ducat is 22 Ducats over a game, less than half a Leapfrog, and one point to ten Ducats is 2,200,
+# larger than their whole economy. The designer chose 0.8, about 5 Ducats a turn and 178 over a
+# game: real money, roughly three Leapfrogs, without dwarfing the Regions.
+prospectors_ducats_per_point = 0.8
+# The Arkwrights: Fuel per point, the designer's "+1 fuel every 5 research" unchanged. About 0.4 a
+# turn and 15 over a game -- two or three extra Moon transits, pointed at the thing they actually
+# lack, which is the range to move people.
+arkwrights_fuel_per_point = 0.2
+
 [ducats]
 per_influence = 2
 # Version 0.04 (ticket #41): two Ducats for one of the thing bought, as with Influence. A repair
 # point is 5 Materials, so 10 Ducats. Ticket #54 retired `per_restoration_step` with Restoration and
 # put `per_leapfrog` in its place: what one Leapfrog costs the Custodians on a state they control.
 per_leapfrog = 50
+# Ticket #237 (version 0.08.3): what an Exodus Call costs the Arkwrights, matched to a Leapfrog --
+# the other Faction-only order bought with Ducats on a state you control.
+per_exodus_call = 50
 per_repair_point = 10
 # Version 0.04 (ticket #42): the trading window. Ducats per unit bought; a sale returns the buying
 # price divided by sell_divisor (rounded down over the lot); a building bought for Ducats costs its

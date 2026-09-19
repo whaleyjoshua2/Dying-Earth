@@ -803,7 +803,16 @@ impl Game {
                 // Ticket #46: a station holds only a Shipyard and Habitats; ticket #80: and an
                 // Observatory. Ticket #81: a Habitat over Earth now houses people who count as off
                 // Earth, so the AI builds them there too.
-                if col.in_orbit && !matches!(mk, ModuleKind::Shipyard | ModuleKind::Observatory | ModuleKind::Habitat | ModuleKind::SolarArray | ModuleKind::TradePost) {
+                //
+                // Ticket #239 (version 0.08.3): by JOB, for the reason the same list in `ui.rs`
+                // carries -- a Unique Module is not its common kind, so a list of kinds throws
+                // every Unique away the moment `built_by` swaps one in.
+                // The Institute is excluded here and NOT in the interface's copy of this rule.
+                // That difference predates ticket #239 -- ticket #185 added the Institute to the
+                // player's station list and not to this one -- so the computer has never raised an
+                // Institute on a station while a player may. It is left standing rather than
+                // quietly changed, because changing it changes what the computer builds.
+                if col.in_orbit && (!mk.stands_on_a_station() || mk.does_the_job_of(ModuleKind::Institute)) {
                     continue;
                 }
                 // Ticket #90: one Trade Post per Body; worth more once a second Body is held, since
@@ -846,12 +855,27 @@ impl Game {
                         // science is, the way it digs where the ore is.
                         (Cat::Observatory, self.base_weight(seat, Cat::Observatory) * self.production_moved_boost(seat, &col, mk) * self.research_yield_at(&col))
                     }
-                    // Ticket #90: a Trade Post pays for the network, so it is worth half again once
-                    // the seat holds two Bodies or more.
+                    // Ticket #90: a Trade Post pays for the network. Ticket #239 (version 0.08.3):
+                    // and the weight now READS that network instead of taking a step at two Bodies.
+                    //
+                    // It had the disease tickets #232 named on the Mine and the Relay, in its worst
+                    // form: a Trade Post is the only Producer whose resource is Ducats, and the
+                    // Producer bonus fires only for a resource the seat is SHORT of -- `scarcest`
+                    // returns only Energy, Materials or Fuel and `needs` holds only Materials or
+                    // Energy, deliberately, since ticket #41 measured Ducats on that list as
+                    // costing the Custodians every win. So a Trade Post could never earn the x1.5
+                    // its rivals routinely earn, and the sweep found ZERO standing in 120 games --
+                    // on a building worth about 20 Ducats a turn to the Prospectors at their
+                    // busiest Body, which is nearly two Regions' income.
+                    //
+                    // The ratio is its real yield here against its card's bare figure, CLAMPED to
+                    // the same band the Mine's tech factor runs in (1.0 to 2.06). Unclamped it
+                    // reaches 5 at a four-Colonist Colony and 12 at a rich one, which is how
+                    // ticket #232's first attempt at the Mine put 329 Mines on the board.
                     ModuleKind::TradePost => {
-                        let bodies = self.bodies_held(seat).len();
-                        let w = self.base_weight(seat, Cat::Producer) * if bodies >= 2 { 1.5 } else { 1.0 };
-                        (Cat::Producer, w)
+                        let bare = self.tables.module(ModuleKind::TradePost).produces.as_ref().map(|p| p.amount).unwrap_or(1).max(1) as f64;
+                        let with = self.module_yield(seat, cid, ModuleKind::TradePost).amount as f64;
+                        (Cat::Producer, self.base_weight(seat, Cat::Producer) * (with / bare).clamp(0.25, 2.0))
                     }
                     // Ticket #92: a Mass Driver at a low-gravity ground Colony with a Mine, once the
                     // Tech stands, one per Colony; and a Mine beside one weighs what the driver adds.
@@ -870,6 +894,22 @@ impl Game {
                     }
                     ModuleKind::Mine => {
                         let mut w = self.base_weight(seat, Cat::Producer) * self.production_moved_boost(seat, &col, mk);
+                        // Ticket #232 (version 0.08.3): a Mine's weight reads WHAT ITS TECHS ARE
+                        // WORTH, so every multiplier on it moves the seat's appetite. Before this
+                        // the weight was flat, and the consequence was not small: Deep Mining's
+                        // x1.5 and the Extraction Charter's x1.25 had never once made a computer
+                        // seat want a Mine more, which is the likeliest reason the sweep found 26
+                        // Mines standing across forty games. The designer, asked whether to fix
+                        // Beneficiation alone or the whole gap: "let's fix that one outright".
+                        //
+                        // It reads the TECH factor and never the finished yield. The finished
+                        // yield carries the SLOT's own yield, which is at least 1 everywhere, so a
+                        // weight scaled by it lifts every Mine on the board with no Tech at all.
+                        // Built that way first and measured: Mines standing over twenty games went
+                        // 16 to 329, and the seating's win column swung from [14, 2, 0, 0] to
+                        // [0, 18, 0, 0]. With the tech factor alone it is 1.0 until Deep Mining
+                        // lands and 2.06 with all three.
+                        w *= self.tech_output_multiplier_module(seat, ModuleKind::Mine);
                         if col.modules.iter().any(|m| m.kind == ModuleKind::MassDriver && m.working()) {
                             // The yield here already carries the bonus; weigh it against the bare figure.
                             let with = self.module_yield(seat, cid, ModuleKind::Mine).amount as f64;
@@ -879,7 +919,26 @@ impl Game {
                         (Cat::Producer, w)
                     }
                     ModuleKind::Generator | ModuleKind::Refinery => (Cat::Producer, self.base_weight(seat, Cat::Producer) * self.production_moved_boost(seat, &col, mk)),
-                    ModuleKind::Relay => (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence)),
+                    // Ticket #232 (version 0.08.3): the Relay has the same disease the Mine had and
+                    // worse -- a flat weight reading nothing about what a Relay produces, and ONE
+                    // Relay built in forty games. Relay Networks would have changed the computer's
+                    // behaviour by exactly zero without this. The designer: "this should resolve
+                    // with Q5 full fix".
+                    ModuleKind::Relay => {
+                        // A Relay's Allotment has no slot component -- it is the card figure plus
+                        // Relay Networks -- so this ratio IS the tech factor: 1.0 until the Tech
+                        // lands, 2.0 after.
+                        //
+                        // Ticket #239 (version 0.08.3): weighed as `mk`, the kind this seat would
+                        // ACTUALLY build, not as the common Relay. Written with `ModuleKind::Relay`
+                        // hard-coded it read the common card twice and the Arkwrights' Chorus --
+                        // whose whole clause is an Allotment that grows with the Colony -- would
+                        // have been weighed as though the clause did not exist, which is the
+                        // mistake ticket #232 found on the Mine wearing different clothes.
+                        let bare = self.tables.module(mk).influence_allotment.max(1) as f64;
+                        let with = self.module_yield(seat, cid, mk).allotment as f64;
+                        (Cat::BuildInfluence, self.base_weight(seat, Cat::BuildInfluence) * (with / bare).max(0.25))
+                    }
                     // Ticket #51: the Archive is never an ordinary Module build; it has its own order.
                     // Ticket #164 (version 0.07.5): nor is the Core Module, which a founding gives.
                     ModuleKind::Archive | ModuleKind::Core => continue,
@@ -897,7 +956,7 @@ impl Game {
                         (Cat::ArmyOrBarracks, self.base_weight(seat, Cat::ArmyOrBarracks))
                     }
                     // Unreachable: every Unique Module was mapped to its common job above.
-                    ModuleKind::Academy => continue,
+                    ModuleKind::Academy | ModuleKind::Heliostat | ModuleKind::Exchange | ModuleKind::Chorus => continue,
                 };
                 // Ticket #181: the slight bias toward a seat's own Unique Module, as on Earth.
                 if mk.unique_to().is_some() {
@@ -1064,12 +1123,54 @@ impl Game {
         // its cap, from turn one if it likes, and otherwise contributes to the shared Tech. Ticket
         // #68: it builds the one Module at the first Colony off Earth it took, and the fund's cap
         // is a quarter until that Module stands, so the Module is what opens the rest.
+        // Ticket #235 (version 0.08.3): every Faction directs Research, not only the Archivists.
+        // Ticket #236: and it weighs the Tech under research before deciding how much, at the
+        // designer's word -- "the ai need to weigh the benefit of the new tech to which they
+        // contributing". Without that a seat went to its cap on turn 2 and never moved, which was
+        // measured at 24 to 28 turns of 36 below any contribution threshold, and left the
+        // shared-pot rule of this ticket with no line worth drawing.
+        //
+        // The valuation is the pick list the AI already has: its own Victory gate and its `order`
+        // are Techs it wants, its `last` and `never` are ones it does not, and anything else is
+        // indifference. The three figures are in `ai.toml`, so the sweep can fit them.
+        // The ARCHIVISTS are not in this: their directive is not a judgement about the Tech under
+        // research at all, it is how they pay for the Archive, and their own branch below governs
+        // it against the fund's cap. Weighing Techs for them would switch their Victory funding
+        // off whenever the table researched something they liked.
+        if kind != FactionKind::Archivists && self.seat(seat).research_last_turn > 0 {
+            let th = &self.tables.ai.thresholds;
+            let cap = self.research_directive_cap(seat);
+            let want = match self.research.current {
+                None => th.directive_when_indifferent,
+                Some(t) => {
+                    let picks = self.tables.ai_tech_picks(kind);
+                    let mine = self.tables.victory_gate(kind) == Some(t);
+                    if mine || picks.order.contains(&t) {
+                        th.directive_when_wanted
+                    } else if picks.never == Some(t) || picks.last == Some(t) {
+                        cap
+                    } else {
+                        th.directive_when_indifferent
+                    }
+                }
+            };
+            let want = want.min(cap);
+            if want != self.seat(seat).research_directive {
+                let what = match kind {
+                    FactionKind::Custodians => "the Natural Sink",
+                    FactionKind::Prospectors => "their coffers",
+                    FactionKind::Arkwrights => "propellant",
+                    FactionKind::Archivists => "the Archive fund",
+                };
+                push(vec![Order::SetResearchDirective { percent: want }], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, 1.0, format!("direct {want} per cent of their Research into {what} from the next Income"), None);
+            }
+        }
         if kind == FactionKind::Archivists {
             let fund = self.seat(seat).archive_fund;
             let cap = self.archive_fund_cap(seat);
-            if fund < cap && self.seat(seat).research_last_turn > 0 && !self.seat(seat).archive_funding {
+            if fund < cap && self.seat(seat).research_last_turn > 0 && self.seat(seat).research_directive == 0 {
                 let opp = if fund + self.seat(seat).research_last_turn >= cap { m.opportunity } else { 1.0 };
-                push(vec![Order::SetArchiveFunding { on: true }], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, opp, format!("pay the Labs into the Archive fund from the next Income, {} Research a turn", self.seat(seat).research_last_turn), None);
+                push(vec![Order::SetResearchDirective { percent: self.research_directive_cap(seat) }], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, opp, format!("pay the Labs into the Archive fund from the next Income, {} Research a turn", self.seat(seat).research_last_turn), None);
             }
             // Ticket #199 (version 0.08.0): the Archive also waits on the gate Tech, and the computer
             // is deliberately NOT taught that here. Every candidate goes through `check_order` before
@@ -1366,6 +1467,29 @@ impl Game {
         // working Launch Site, or, with the ice open, the most populous. It musters while fewer
         // wait than two Ship loads (and one more while the ice is open), and never for nothing.
         let presence_needed = self.tables.victory.off_world_presence.saturating_sub(self.off_world_colonists(seat));
+        // Ticket #237 (version 0.08.3): the Exodus Call. Sounded where the Arkwrights hold their
+        // MOST populous Region, since a Call is once per Region ever and a doubled muster is worth
+        // most where there are most people to take -- and since the measured problem is that their
+        // home state runs from 20 units to 1 over a game, spending the Call on a small Region
+        // wastes it. Not sounded at all while they already have more waiting than they can lift.
+        if kind == FactionKind::Arkwrights && self.seat(seat).stockpile.ducats >= self.tables.ducats.per_exodus_call {
+            let waiting_now: u32 = self.directed_states(seat).iter().map(|s| self.state(*s).emigrants).sum();
+            let best = self
+                .directed_states(seat)
+                .into_iter()
+                .filter(|s| !self.state(*s).exodus_call_used && self.state(*s).control.controller() == Some(seat))
+                .max_by(|a, b| self.state(*a).population.partial_cmp(&self.state(*b).population).unwrap_or(std::cmp::Ordering::Equal));
+            // Gated on almost nothing on purpose. A first attempt also required fewer waiting than
+            // a Ship holds and a population above twice a doubled muster, and over a whole
+            // headless game the Call fired ZERO times: the Arkwrights spend their Ducats on
+            // Influence and their one Region is already draining, so every extra condition closed
+            // the door. `check_order` refuses what they cannot afford and the weighting decides
+            // whether it is worth doing, which is where those judgements belong.
+            let _ = waiting_now;
+            if let Some(sid) = best {
+                push(vec![Order::ExodusCall { state: sid }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, 1.0, format!("sound an Exodus Call in {}", self.tables.state(sid).name), None);
+            }
+        }
         {
             let per = self.emigrants_per_turn(seat);
             let capacity = self.colony_ship_capacity(seat);
@@ -1395,14 +1519,14 @@ impl Game {
                     .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()))
                     .max_by(by_population);
                 let target = with_site.or_else(|| if self.antarctica_open { self.directed_states(seat).into_iter().max_by(by_population) } else { None });
-                // Ticket #196: as many as the state can pay for, not all or nothing. A Steerage batch
+                // Ticket #196: as many as the state can pay for, not all or nothing. A Coach Class batch
                 // costs the Arkwrights 16.0 people and Australia carries 10.1 to 12.6.
                 if let Some(st) = target
                     && let n = self.emigrants_affordable(seat, st)
                     && n > 0
                 {
                     let opp = if presence_needed > 0 && waiting == 0 { m.opportunity } else { 1.0 };
-                    push(vec![Order::BuildEmigrants { state: st, n }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("muster {n} Emigrants in {}", self.tables.state(st).name), None);
+                    push(vec![Order::BuildEmigrants { state: st, n }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("recruit {n} Pioneers in {}", self.tables.state(st).name), None);
                 }
             }
             // Ticket #141 (version 0.07.3): waiting Emigrants lift straight to the seat's own station
@@ -1421,7 +1545,7 @@ impl Game {
                 if let Some(c) = station {
                     let k = n.min(self.habitat_room(c) - c.colonists);
                     let opp = if presence_needed > 0 { m.opportunity } else { 1.0 };
-                    push(vec![Order::LiftToStation { state: sid, n: k, colony: c.id }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("lift {} Emigrants from {} to {}", k, self.tables.state(sid).name, self.place_name(Place::Colony(c.id))), None);
+                    push(vec![Order::LiftToStation { state: sid, n: k, colony: c.id }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("lift {} Pioneers from {} to {}", k, self.tables.state(sid).name, self.place_name(Place::Colony(c.id))), None);
                 }
             }
             // With the ice open, waiting Emigrants go to Antarctica by sea: a free slot first, else
@@ -1434,10 +1558,10 @@ impl Game {
                         continue;
                     }
                     if let Some(slot) = self.best_slot_for(seat, BodyId::Earth, behind) {
-                        push(vec![Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, format!("send {} Emigrants from {} to {} by sea", n, self.tables.state(sid).name, self.tables.body(BodyId::Earth).slots[slot as usize].name), None);
+                        push(vec![Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, format!("send {} Pioneers from {} to {} by sea", n, self.tables.state(sid).name, self.tables.body(BodyId::Earth).slots[slot as usize].name), None);
                     } else if let Some(c) = self.colonies.iter().find(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(seat) && self.habitat_room(c) > c.colonists) {
                         let k = n.min(self.habitat_room(c) - c.colonists);
-                        push(vec![Order::SendToAntarctica { state: sid, n: k, into: UnloadTarget::Colony(c.id) }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload) * 0.5, 1.0, 1.0, 1.0, format!("send {} Emigrants from {} to {} by sea", k, self.tables.state(sid).name, self.place_name(Place::Colony(c.id))), None);
+                        push(vec![Order::SendToAntarctica { state: sid, n: k, into: UnloadTarget::Colony(c.id) }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload) * 0.5, 1.0, 1.0, 1.0, format!("send {} Pioneers from {} to {} by sea", k, self.tables.state(sid).name, self.place_name(Place::Colony(c.id))), None);
                     }
                 }
             }
@@ -1837,7 +1961,14 @@ impl Game {
             let last = pace.first.last().map(|p| p[0]).unwrap_or(self.tables.victory.turns as i64) as u32;
             let turns_to = last.saturating_sub(self.turn).max(1) as f64;
             let s0 = self.seat(seat);
-            let gross = (s0.income_last_turn.materials + s0.venture_banked_last_turn).max(0) as f64;
+            // Ticket #240 (version 0.08.3): against DUCAT income, which is what the Fund banks
+            // now. The rule itself is unchanged and is the weighing the designer asked for -- the
+            // SMALLEST share that still reaches the bar by the pace's last turn -- so a seat banks
+            // the least it can and leaves the rest of its Ducats to spend on Influence, Relief and
+            // repairs. It matters more than it did: measured over 120 games every seat ends every
+            // game holding about five Ducats, so an over-large share starves the whole economy
+            // where an over-large Materials share only slowed a build.
+            let gross = (s0.income_last_turn.ducats + s0.venture_banked_last_turn).max(0) as f64;
             let need = (bar - s0.venture_fund as f64).max(0.0);
             let share = if self.turn < first_waypoint || need <= 0.0 {
                 0.0

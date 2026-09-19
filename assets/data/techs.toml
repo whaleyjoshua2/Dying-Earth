@@ -1,4 +1,28 @@
-# COSTS BY RUNG: 18, 30, 45. Coastal Engineering, priced off the rungs, is 14.
+# COSTS BY RUNG: 18, 32, 48. Coastal Engineering, priced off the rungs, is 15.
+#
+# Ticket #231 (version 0.08.3): rungs 2 and 3 went 30 to 32 and 45 to 48, and Coastal Engineering
+# 14 to 15, at the designer word. RUNG 1 IS UNCHANGED AT 18, deliberately: the first Tech of the
+# game is a free choice from the whole of rung 1, so a dearer rung 1 slows all four seats
+# identically and moves nobody relative to anybody, which is not what the asymmetry version wants.
+#
+# The size of it, measured before it was taken. The tree is six Techs a rung: five at 18 and
+# Coastal Engineering at 14 on rung 1, six at 30, six at 45. That is 554 Research for the whole
+# tree, and 585 after -- A RISE OF 5.6%, or about 1.8 turns of late-game Research at the ~17 a turn
+# a median game makes. Ticket #117 measured the comparable case at a tenth more: completion fell
+# from 79 of 80 games to 75 of 80 and a median game ran nought to three turns longer. So this is
+# rather over half of that, and the designer took it as a NUDGE knowingly -- asked whether they
+# wanted Research to genuinely constrain (a tree that does not finish, which wants a third or more,
+# not seven per cent), the answer was "nudge".
+#
+# Coastal Engineering stays the cheapest thing in the tree by three and will still be taken by the
+# median turn 5 to 8 it is taken by today, in 20 of 20 seeds. The designer was asked whether the
+# intent was to stop it being an automatic first pick and answered "tidy": the number is being
+# tidied, not the behaviour changed.
+#
+# WATCH THIS WITH TICKET #232. The two new Techs that ticket adds are priced off these rungs, and
+# at rung 2 they add 64 more, taking the whole tree to 649 -- a rise of 17% over 0.08.2, which is
+# larger than the 10% ticket #117 measured as "a nudge and not a lever". The designer, told the
+# combined figure: "proceed we will correct any overcorrection later." The sweep reports it.
 #
 # Ticket #201 (version 0.08.1) set those and corrected this comment, which had claimed 16, 28, 44
 # and a Coastal Engineering of 11 since version 0.07.1 while the data underneath said 15, 30, 45
@@ -46,7 +70,7 @@ id = "clean_power"
 name = "Clean Power"
 branch = "Industry"
 rung = 2
-cost = 30
+cost = 32
 needs = ["efficient_grids"]
 effect = "Power Plant Emissions x0.4"
 value = 0.4
@@ -56,7 +80,7 @@ id = "clean_manufacturing"
 name = "Clean Manufacturing"
 branch = "Industry"
 rung = 3
-cost = 45
+cost = 48
 needs = ["clean_power"]
 effect = "Factory and Refinery Emissions x0.4; Wildfire adds no Emissions"
 value = 0.4
@@ -76,7 +100,7 @@ id = "efficient_transit"
 name = "Efficient Transit"
 branch = "Propulsion"
 rung = 2
-cost = 30
+cost = 32
 needs = ["clean_propellant"]
 effect = "Transit Fuel x0.6; transits advance through Solar Storm"
 value = 0.6
@@ -86,7 +110,7 @@ id = "hardened_hulls"
 name = "Hardened Hulls"
 branch = "Propulsion"
 rung = 3
-cost = 45
+cost = 48
 needs = ["efficient_transit"]
 effect = "Every Ship +2 strength; immune to Radiation Surge"
 value = 2.0
@@ -114,7 +138,7 @@ id = "closed_loop_colonies"
 name = "Closed-Loop Colonies"
 branch = "Off-world Living"
 rung = 2
-cost = 30
+cost = 32
 needs = ["expanded_habitats", "clean_power"]
 effect = "Module Energy upkeep x0.5; immune to Grid Failure"
 value = 0.5
@@ -134,7 +158,7 @@ id = "automated_refining"
 name = "Automated Refining"
 branch = "Extraction"
 rung = 2
-cost = 30
+cost = 32
 needs = ["deep_mining", "efficient_grids"]
 effect = "Refinery output x1.5; Ice Deposit gives x3"
 value = 1.5
@@ -154,8 +178,13 @@ id = "green_consensus"
 name = "Green Consensus"
 branch = "Society"
 rung = 2
-cost = 30
-needs = ["public_science", "clean_power"]
+cost = 32
+# Ticket #242 (version 0.08.3): Clean Power is no longer a prerequisite, at the designer's word --
+# "Efficient grids is no longer required for green consensus". Clean Power NEEDS Efficient Grids,
+# so requiring it required the whole foot of the Industry branch; dropping it frees the Society
+# line, and with it PLANETARY STEWARDSHIP, the Custodians' Victory gate, from Industry altogether.
+# That makes the Custodians' gate cheaper to reach, and they are the seat winning 37 of 80.
+needs = ["public_science"]
 effect = "Per-person Emissions x0.5; Influence thresholds x0.75; Heatwave loss halved"
 value = 0.5
 influence_threshold_multiplier = 0.75
@@ -169,7 +198,7 @@ id = "coastal_engineering"
 name = "Coastal Engineering"
 branch = "Industry"
 rung = 1
-cost = 14
+cost = 15
 needs = []
 effect = "Unlocks the Sea Wall."
 value = 1.0
@@ -191,7 +220,7 @@ id = "civil_defense"
 name = "Civil Defense"
 branch = "Society"
 rung = 2
-cost = 30
+cost = 32
 needs = ["public_science"]
 effect = "A Constabulary adds 10 to the challenge margin instead of 5"
 value = 10.0
@@ -206,7 +235,7 @@ id = "planetary_stewardship"
 name = "Planetary Stewardship"
 branch = "Society"
 rung = 3
-cost = 45
+cost = 48
 needs = ["green_consensus"]
 effect = "Opens the Custodians' Victory Condition; the Natural Sink grows by 1.0 ppm a turn for the world"
 value = 1.0
@@ -217,8 +246,11 @@ id = "extraction_charter"
 name = "The Extraction Charter"
 branch = "Extraction"
 rung = 3
-cost = 45
-needs = ["automated_refining"]
+cost = 48
+# Ticket #242 (version 0.08.3): Beneficiation joins Automated Refining as a prerequisite, at the
+# designer's word -- "beneficiation is now required for extraction charter". It gives the new Tech
+# a place in the branch's spine rather than leaving it a leaf nobody has to take.
+needs = ["automated_refining", "beneficiation"]
 effect = "Opens the Prospectors' Victory Condition; Mine output x1.25"
 value = 1.25
 gate_for = "prospectors"
@@ -228,7 +260,7 @@ id = "generation_ships"
 name = "Generation Ships"
 branch = "Off-world Living"
 rung = 3
-cost = 45
+cost = 48
 needs = ["closed_loop_colonies"]
 effect = "Opens the Arkwrights' Victory Condition; a Colony Ship carries +2 Colonists"
 value = 2.0
@@ -239,8 +271,70 @@ id = "the_upload"
 name = "The Upload"
 branch = "Society"
 rung = 3
-cost = 45
-needs = ["public_science", "expanded_habitats"]
+cost = 48
+# Ticket #245 (version 0.08.3): Expanded Habitats was removed for a DRAWING reason that turned into
+# a rules decision -- the edge from Expanded Habitats ran right, passed underneath the Generation
+# Ships box (lines are painted before boxes) and turned down to here, so on screen it read as an
+# edge into Generation Ships that nobody had drawn. That left the gate needing Public Science alone.
+#
+# Ticket #246 (version 0.08.3): and then Public Science went too, replaced by CLOSED-LOOP COLONIES,
+# at the designer's word -- "Make the upload require closed loop colonies drop public science all
+# together". Thematically it is the better parent: the Archive stands at a Colony off Earth, so the
+# Tech that makes off-world Colonies liveable is what should open its door, where Public Science
+# only ever meant "you have done some research".
+#
+# THE PRICE, stated before it was taken. The gate went 2 (before #245), to 1, to FOUR here: this
+# Tech now waits on Closed-Loop Colonies, which waits on Expanded Habitats and Clean Power, which
+# waits on Efficient Grids. That is the deepest tier in the tree, level with the Arkwrights' and
+# the Prospectors' gates. And it is not only a Victory gate -- `orders.rs` refuses the Archive
+# ORDER until this Tech stands, so the whole Archive chain moves back with it. The Archive already
+# completed in just 28 of 80 games at the 0.08.2 baseline. Expect later and fewer; the sweep says.
+needs = ["closed_loop_colonies"]
 effect = "Opens the Archivists' Victory Condition; Research Lab and Observatory output x1.25"
 value = 1.25
 gate_for = "archivists"
+
+# Ticket #232 (version 0.08.3): the nineteenth and twentieth Techs, both on rung 2 at the rung's
+# price. Appended last, and their enum variants with them: `Tables::tech` indexes TechId by
+# discriminant, so a row inserted in the middle would silently re-point every Tech after it.
+
+# Beneficiation, Extraction rung 2. Every Mine makes a tenth more, ANTARCTICA INCLUDED.
+#
+# The designer's list said "a tech under extraction that boosts off world mines by 10%", and the
+# measurement is why this counts Antarctica anyway. Of sixteen Mines standing at the end of twenty
+# games, THIRTEEN were Antarctic and three were off Earth -- so an off-world-only clause would have
+# reached 0.15 Mines a game, and there would have been nothing for the AI nudge the designer asked
+# for in the same breath to bite on. Told that, the designer: "count Antarctica and change the
+# tech's name". Hence a name with no space word in it.
+#
+# It stacks on Deep Mining's x1.5 and the Extraction Charter's x1.25, inside the same multiplier
+# chain, so the whole product is floored once and a tenth is never lost to rounding.
+[[tech]]
+id = "beneficiation"
+name = "Beneficiation"
+branch = "Extraction"
+rung = 2
+cost = 32
+needs = ["deep_mining"]
+effect = "Mine output x1.1, wherever the Mine stands"
+value = 1.1
+
+# Relay Networks, Off-world Living rung 2. A Relay's Influence Allotment goes from 1 to 2.
+#
+# Asked for as "+1 influence" on every Habitat. Moved to the Relay at the designer's word -- "I
+# forgot about the relay - let's give the +1 influence to the relay instead" -- which is the better
+# home for it twice over: a Habitat paying Influence is the Relay's whole job, and a Tech that gave
+# it to Habitats would have left the Relay with no reason to exist at all.
+#
+# `value` is ADDITIVE here, read through `tech_addition`, so Provisional Findings gives the
+# Archivists half of it rounded down -- which is nothing until the Tech is actually done. That is
+# the same reading every additive Tech in the tree gets.
+[[tech]]
+id = "relay_networks"
+name = "Relay Networks"
+branch = "Off-world Living"
+rung = 2
+cost = 32
+needs = ["expanded_habitats"]
+effect = "A Relay adds 2 Influence to the Allotment instead of 1"
+value = 1.0

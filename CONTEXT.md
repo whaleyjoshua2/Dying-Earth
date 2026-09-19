@@ -17,20 +17,26 @@ The Faction that colonizes the solar system while limiting ecological damage to 
 _Avoid_: Stewards (the retired name), environmentalists, greens, moderates, eco-terrorists
 
 **Prospectors**:
-The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry and the Strip Permit, their Unique Facility is the Investment Bank, and since version 0.05.5 they win on a hoard: 1000 Materials in their Venture Capital Fund, and expansion.
+The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry and the Strip Permit, their Unique Facility is the Investment Bank, and since version 0.05.5 they win on a hoard: **2000 Ducats** in their Venture Capital Fund since version 0.08.3, and expansion. It was 1000 Materials before that.
 _Avoid_: Extractors (the retired name), capitalists, industrialists, exploiters
 
 **Arkwrights**:
-The Faction that exists to get people off Earth and spread them as widely as it can. Their signature rule is Steerage, and they win on Diaspora.
+The Faction that exists to get people off Earth and spread them as widely as it can. Their signature rule is Coach Class, and they win on Diaspora.
 _Avoid_: settlers, arks, exodus, nomads
 
 **Archivists**:
 The Faction that means to save what humanity knows, and as many of its people as it can, in one place off Earth. Their signature rule is Provisional Findings, their Unique Facility is the Reactor, and they win by completing the Archive and Uploading twelve Colonists into it. Since version 0.08.0 they may not begin the Archive until The Upload, their own gate Tech, stands -- so their Labs' Research is a choice between the monument and the tree that opens its door.
 _Avoid_: scholars, librarians, scientists, the Academy
 
-**Steerage**:
-The Arkwrights' signature rule: their Colony Ships carry twice the Colonists and cost less to build, and they muster eight Emigrants a turn where others muster four, but every Emigrant costs their Region twice the population.
-_Avoid_: mass transit, cattle class, overcrowding, packing them in
+**Exodus Call**:
+The Arkwrights' signature order, since version 0.08.3: on a Nation State they control, for the price of a Leapfrog, **two turns of a doubled muster** -- sixteen **Pioneers** a turn where they otherwise recruit eight. **Once per Region, ever**, the shape the **Strip Permit** has had since version 0.05, and like both older orders it needs **Three Turns Held**.
+While it runs it also **suspends Coach Class's double charge**: those sixteen cost the Region the ordinary population a Pioneer costs anybody else, not the Arkwrights' double. That clause is the order's point rather than a sweetener. Measured before it was decided, their home Region runs from twenty units of population to **one** over a game as it is, so an order that doubled only the count would have emptied the country twice as fast -- deepening the very thing that leaves them the thinnest seat at the table.
+_Avoid_: mass evacuation, the call (alone), lifeboat, rapture
+
+**Coach Class**:
+The Arkwrights' signature rule: their Colony Ships carry twice the Colonists and cost less to build, and they recruit eight Pioneers a turn where others recruit four, but every Pioneer costs their Region twice the population.
+Called **Steerage** until version 0.08.3, and renamed for the same reason the Emigrant became the **Pioneer**: steerage is literally the cheapest class of passage on an emigrant ship, and this entry's own avoid list had been warning off *cattle class* and *packing them in* since it was written. **Coach Class** keeps the metaphor that is honest about the rule -- bulk passage at low cost -- and drops the history. The designer rejected **Stowaway**, which was considered and argued down: a stowaway hides aboard without permission or payment, where the Arkwrights' people are recruited openly, counted, and carried in ships built for the purpose.
+_Avoid_: steerage, mass transit, cattle class, overcrowding, packing them in
 
 **Diaspora**:
 The Arkwrights' Victory Condition: thirty Colonists living off Earth, spread over at least three Bodies with at least four Colonists on each. Antarctica counts toward neither part; since version 0.06.0 Colonists on a station over Earth count toward the thirty, but Earth is never one of the three Bodies.
@@ -233,7 +239,7 @@ The Module, since version 0.07.5, that every Colony and every Space Station is f
 _Avoid_: hub, base, the core, starter module, command module
 
 **Module**:
-A building placed inside a Colony. Thirteen kinds since version 0.07.5, when the Core Module joined the twelve of version 0.06.0: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, the Solar Array (a Space Station's alone), the Mass Driver (a small world's alone), and the Archive, which only the Archivists raise, one to a Faction, from its own button. A Habitat holds **four** Colonists since version 0.08.1 and eight with Expanded Habitats, which raises it by four; it held eight from version 0.06.0, and since version 0.07.3 it holds the same everywhere, no world's slot making it hold more or fewer. The Core Module's flat four is reached by neither the Tech nor the Arkwrights' multiplier. Since version 0.07.5 a Colony's Modules are drawn on its own card as a grid of tiles in the same shape a Region's build slots use -- one tile per Module with its picture, dimmed while mothballed and hatched while building, a dashed tile for every free place under the cap, and the Archive on a row of its own outside the count. Clicking a tile puts that Module's figures and its Mothball, Restart and Decommission buttons in the strip beneath; clicking a free tile puts the build buttons there, and that is the only place a Module is ordered.
+A building placed inside a Colony. **Eighteen kinds** since version 0.08.3. Twelve are common to everybody: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, the Institute, the Solar Array (a Space Station's alone) and the Mass Driver (a small world's alone). The Core Module, which every founding gives, stands outside the count of what may be built. The Archive only the Archivists raise, one to a Faction, from its own button. The last four are the **Unique Modules**, one per Faction. (The figure read 'thirteen' from version 0.07.5 until version 0.08.3 and was wrong from the moment the Institute and the Academy were added in 0.08.0.) A Habitat holds **four** Colonists since version 0.08.1 and eight with Expanded Habitats, which raises it by four; it held eight from version 0.06.0, and since version 0.07.3 it holds the same everywhere, no world's slot making it hold more or fewer. The Core Module's flat four is reached by neither the Tech nor the Arkwrights' multiplier. Since version 0.07.5 a Colony's Modules are drawn on its own card as a grid of tiles in the same shape a Region's build slots use -- one tile per Module with its picture, dimmed while mothballed and hatched while building, a dashed tile for every free place under the cap, and the Archive on a row of its own outside the count. Clicking a tile puts that Module's figures and its Mothball, Restart and Decommission buttons in the strip beneath; clicking a free tile puts the build buttons there, and that is the only place a Module is ordered.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:
@@ -249,7 +255,7 @@ _Avoid_: transport, colony (that is the settlement), settler ship
 
 **Crowding**:
 The extra Colonists a warming Earth puts aboard a Colony Ship lifting at Earth, beyond its capacity, since version 0.06.0, and the risk they run: rolled once at arrival, each crowded Colonist dies with a chance that grows with the size of the crowd. The player chooses whether to take them; the sea to Antarctica carries no crowd.
-_Avoid_: overloading, steerage (that is the Arkwrights' rule), refugees aboard
+_Avoid_: overloading, coach class (that is the Arkwrights' rule), refugees aboard
 
 **Carrier**:
 The Ship type that carries one Army and nothing else, since version 0.04. Unarmed, it needs an escort and is a target for Intercept like a Colony Ship. Every landing needs one.
@@ -276,12 +282,14 @@ The Module that lets a Colony hold and build a defensive Army. A Colony without 
 _Avoid_: fort, garrison, base
 
 **Colonist**:
-A person counted in the population of a Colony or Region. Since version 0.05.5 Colonists are built: they muster in a Region as Emigrants, are carried by Ships and held by Habitats, and are never spent as a resource. One Colonist is one unit of population, five million people since version 0.07.3, and the top bar counts every Colonist living off Earth as the space population beside Earth's.
-
-**Emigrant**:
-A Colonist mustered in a Region and not yet gone: up to four a turn per Faction (eight for the Arkwrights), in one state the Faction directs, each taking one unit of the state's population -- five million people, since version 0.07.3; a tenth of a hundred million, ten million, before -- on the state's card at End Turn. A batch takes half a point off the state's Unrest. A working Launch Site lifts Emigrants onto a Ship, or, since version 0.07.3, straight onto a Space Station of their Faction's over Earth, as many as its Habitats have room for, aboard at that turn's Resolution -- a launch, with no crowd; and once the Antarctic ice is open the sea takes them to Antarctica in a turn with no launch. They are people of their state until they leave it.
-_Avoid_: settler, recruit, migrant, passenger, colonist-in-waiting
+A person counted in the population of a Colony or Region. Since version 0.05.5 Colonists are built: they are recruited in a Region as Pioneers, are carried by Ships and held by Habitats, and are never spent as a resource. One Colonist is one unit of population, five million people since version 0.07.3, and the top bar counts every Colonist living off Earth as the space population beside Earth's.
 _Avoid_: settler, crew, worker, population resource
+
+**Pioneer**:
+A Colonist recruited in a Region and not yet gone: up to four a turn per Faction (eight for the Arkwrights), in one state the Faction directs, each taking one unit of the state's population -- five million people, since version 0.07.3; a tenth of a hundred million, ten million, before -- on the state's card at End Turn. A batch takes half a point off the state's Unrest. A working Launch Site lifts Pioneers onto a Ship, or, since version 0.07.3, straight onto a Space Station of their Faction's over Earth, as many as its Habitats have room for, aboard at that turn's Resolution -- a launch, with no crowd; and once the Antarctic ice is open the sea takes them to Antarctica in a turn with no launch. They are people of their state until they leave it.
+Called an **Emigrant** until version 0.08.3, and **recruited** where it was mustered. The designer's reason was the word rather than the rule: *"it's more about the word being politically loaded and racked with connotation"*. The rule is untouched -- a Pioneer is the same stage of a Colonist's life the Emigrant was, which is why the distinction was kept rather than folded into Colonist: **Coach Class** and the **Spaceport** are both stated in terms of it, and "every Colonist costs their Region twice the population" would have been false.
+The engine still spells the field, the order and the Report keys `emigrant`: they are not read by a player, and renaming the two serialized fields on every Nation State would have broken every save for no visible gain.
+_Avoid_: emigrant, settler, migrant, passenger, colonist-in-waiting, pilgrim
 
 **Region**:
 One of fourteen territories of the Earth Map that a Faction can control and build in, called a Region until version 0.07.2 and since then **named for its Nation** -- the power that leads it -- so the territory that was South Asia is India and the one that was Europe is the European Union. Eight until version 0.05, which split Africa at the Sahara, Asia into East, South and South-East, and Central America and the Caribbean out of North America; Antarctica left the list in version 0.04 to become Earth's Colony Slots. Each carries a population -- the whole territory's, not its Nation's alone, counted in units of five million people since version 0.07.3 (hundreds of millions before) and written on its card as `Region population 228.0 (1.14B)` -- an Industry Level, a Resource Lean, a Baseline Emissions figure, an Education Level, a GDP, an Influence value, an Unrest figure and a Standing Army. Armies move only between neighbouring Regions.
@@ -294,7 +302,7 @@ _Avoid_: primary power (the charting phrase; not the game's word), country, capi
 ### Earth
 
 **Facility**:
-A building placed in a Region. Fifteen kinds since version 0.08.0: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, the School, the four Unique Facilities, and the Sea Wall and the Scrubber, which take no build slot (the Sea Wall stood in a Coastal Slot until version 0.05.5). Since version 0.04 a Launch Site builds no Ship: it lifts Emigrants and Armies from its state into orbit, and each lift is a launch.
+A building placed in a Region. Fifteen kinds since version 0.08.0: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, the School, the four Unique Facilities, and the Sea Wall and the Scrubber, which take no build slot (the Sea Wall stood in a Coastal Slot until version 0.05.5). Since version 0.04 a Launch Site builds no Ship: it lifts Pioneers and Armies from its state into orbit, and each lift is a launch.
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Cheap Industry**:
@@ -311,20 +319,38 @@ It is **never destroyed when its place changes hands**: it keeps standing and pa
 _Avoid_: unique building (the glossary keeps Facility and Module apart), signature building, faction building, wonder
 
 **Unique Module**:
-The same idea off Earth: a Module one Faction builds in place of a common one, at the common price. Version 0.08.0 has one, the Custodians' Academy, which replaces the Institute and wears the same name their Unique Facility does on Earth. The Archive is NOT one: it is a Faction-only Module that is destroyed on capture, which is the opposite rule.
+The same idea off Earth: a Module one Faction builds in place of a common one, at the common price. Since version 0.08.3 there are **four, one for every Faction**, so each Faction now has a Unique Facility on Earth and a Unique Module off it. The Custodians' **Academy** replaces the Institute and wears the same name their Unique Facility does on Earth; the Archivists' **Heliostat** replaces the Solar Array; the Prospectors' **Exchange** replaces the Trade Post; the Arkwrights' **Chorus** replaces the Relay. Version 0.08.0 had only the Academy.
+A Unique does its common sibling's **job**, which is what makes the rest of the game reach it: a Tech that lifts a Relay lifts a Chorus, a Discovery on a Solar Array lands on a Heliostat, and a cap counting Trade Posts counts Exchanges. The Archive is NOT one: it is a Faction-only Module that is destroyed on capture, which is the opposite rule.
 _Avoid_: unique building, signature module
+
+**Heliostat**:
+The Archivists' Unique Module since version 0.08.3, replacing the Solar Array at the common price: a Space Station's alone, 25 Materials, two turns, no Energy upkeep, and the same 6 Energy scaled by the inverse square of its Body's distance from the Sun. Its clause is **one more Energy, added after that scaling**, so the extra point is worth the same at Mars as at Venus rather than 0.43 of a point at one and 1.91 at the other. A Solar Storm silences it as it silences a Solar Array.
+_Avoid_: mirror, solar farm, collector, panel
+
+**Exchange**:
+The Prospectors' Unique Module since version 0.08.3, replacing the Trade Post at the common price and paying by the same network rule. Its clause is **one more Ducat a turn, flat, added after the output multiplier** — flat for the Academy's reason: one run through the largest output multiplier in the game floors back to one, so a captured Exchange pays its captor exactly what it paid its builder. One per Faction per Body still applies.
+_Avoid_: market, bourse, trading house, the Trading window (which is a different thing entirely)
+
+**Chorus**:
+The Arkwrights' Unique Module since version 0.08.3, replacing the Relay at the common price and carrying everything a Relay carries, Relay Networks included. Its clause is **one more Influence in its holder's Allotment for every six Colonists at its own Colony, rounded down** — its own Colony, as an Observatory reads its own Colony's people, not its whole Body. The more people stand there, the further the voice carries, which is the Faction whose entire game is moving people. It adds nothing to **Standing**: "+1 Influence" has meant the Allotment, the Faction's diplomatic budget everywhere, since version 0.08.3 settled it on the Relay.
+_Avoid_: choir, broadcast, transmitter, crowd
 
 **Scrubber**:
 The Custodians' signature Facility, which only they build and only in a Region they control. It takes no build slot, draws Energy, emits nothing, and while it is online it enlarges the Natural Sink and lowers its state's Unrest every turn. How many one state may hold follows its population, and they are destroyed outright if the state changes hands.
 _Avoid_: carbon capture, cleanup, restoration (the retired rule), terraforming, filter
 
 **Leapfrog**:
-The Custodians' other signature clause: an Orders-phase order paid in Ducats on a Region they control, which lowers that state's per-person Emissions coefficient by one Industry Level's worth, for good. It may be bought any number of times, and never takes the figure below the base every state pays.
+The Custodians' other signature clause: an Orders-phase order paid in Ducats on a Region they control, which lowers that state's per-person Emissions coefficient by one Industry Level's worth, for good. It may be bought any number of times, and never takes the figure below the base every state pays. Since version 0.08.3 it needs **Three Turns Held**.
 _Avoid_: clean development, technology transfer, offset, upgrade
 
 **Strip Permit**:
-The Prospectors' other signature clause: an Orders-phase order, free, that may be taken once in a Region's whole life. For three turns every Facility there produces double; when it ends, that state's Baseline Emissions and its Unrest rise for good.
+The Prospectors' other signature clause: an Orders-phase order, free, that may be taken once in a Region's whole life. For three turns every Facility there produces double; when it ends, that state's Baseline Emissions and its Unrest rise for good. Since version 0.08.3 it needs **Three Turns Held**.
 _Avoid_: licence, boom, overdrive, exploitation
+
+**Three Turns Held**:
+The condition the three orders that remake a Region for good -- the **Leapfrog**, the **Strip Permit** and the **Exodus Call** -- have carried since version 0.08.3: the Faction must have held that Region for three whole turns. The turn of the taking does not count, so a Region taken on turn 10 opens its Faction order on turn 13. Holding is what the clock measures, not holding continuously by that Faction alone: it restarts whenever the **controller changes**, and a Region written back to the same Faction keeps the clock it had.
+It is a **delay, not a prohibition**. Measured before it was adopted, the Prospectors held nine of their nine Regions for three turns or more, and issued their permits at an age of nought or one turn; the rule moves those permits later rather than abolishing them.
+_Avoid_: cooldown, lockout, occupation, tenure, grace period
 
 **Mothball**:
 The Orders-phase order that stands a Facility or a Module down. A mothballed building produces nothing, pays no Energy upkeep, emits nothing, is online for no rule, and keeps its slot. It is free, it takes effect at the Resolution, it raises the Unrest of a Region it happens in, and only a Restart brings the building back, for Materials and a turn.
@@ -450,6 +476,20 @@ _Avoid_: clause, article, condition (that is close to Victory Condition), provis
 The amount of Influence a Faction receives each turn, split freely across any number of targets during the Orders phase. It is a base plus the Influence value of every Region the Faction controls (since version 0.03 each state carries its own value, from its economic and military weight), and it does not carry over.
 _Avoid_: influence budget, diplomacy pool, action points
 
+**Research Directive**:
+The share of a Faction's Research, chosen as a percentage and standing until it is changed, that goes somewhere other than the shared Tech. Read at Income before a point reaches the Tech, so what is directed **contributes nothing to the Research Lead** -- and the Lead is the only seat that picks what the table researches next. That is the price, and it is what makes the directive a decision rather than free income.
+Each Faction's goes somewhere of its own: the **Custodians** enlarge the **Natural Sink**, permanently, by 0.01 ppm a point; the **Prospectors** take 0.8 **Ducats** a point; the **Arkwrights** take a **Fuel** for every five points; and the **Archivists** pay the **Archive** fund, which they have done since version 0.07.0 and which was the only version of this until 0.08.3. Fractions of a Ducat or a Fuel are carried between turns rather than floored away.
+Every Faction may direct up to **half**. The **Archivists alone may direct all of it**, because their switch always sent all of it and the slider that replaced it keeps that reach.
+Since version 0.08.3 **Provisional Findings** takes a threshold rather than a yes or no: it holds while at least **75%** of last turn's Research still went to the shared Tech, so a directive of 25 or less keeps the rule and anything above trades it away.
+Since version 0.08.3 the table has an opinion about it: see **the shared pot**.
+_Avoid_: research split, funding (that is the Archive's own word), taxing your labs, siphoning
+
+**the shared pot**:
+What every other Faction makes of how much of its Research a Faction gives the common Tech. Contribute **all** of it and every rival thinks **one point** better of you; contribute less than **85%** and every rival thinks one point worse. Between the two, nobody minds and nobody is grateful.
+It is a **term**, not a deed: read afresh at every settle from what the Faction is doing now, exactly as the **Blame** term is, so it is gone the turn they contribute again and nothing is ever banked. It **does not scar a pair** -- a Faction spending its own Research on its own business has done nothing to anybody -- and it does not consume the pair's one act a turn, because it is not an act.
+The reward may not lift a pair past the top of **Cordial**, the step above Neutral. Version 0.08.2 settled that a pair which never strikes an **Accord** can never rise above Neutral; this bends that by one band rather than breaking it, so generosity stops a rival resenting you and still does not make them a friend. A pair already higher by deeds is not dragged down to the ceiling.
+_Avoid_: the pot (alone), research tax, tithe, generosity score
+
 **Research**:
 Points produced by Research Labs on Earth and, since version 0.06.0, by Observatories at Colonies and Space Stations, and spent only on Techs. Since version 0.08.2 two Factions holding a research agreement between them each make a tenth more. Since version 0.08.0 a place's Education Level moderates what its population adds as well as multiplying the building's own figure, so schooling applies twice to a Lab. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship. Since version 0.05.5 a Lab in a Region nobody holds, or one under Occupation, runs itself and pays half its yield into the Tech under research for no Faction; North America and South-East Asia begin with such a Lab.
 _Avoid_: science, research points, RP, fourth resource
@@ -553,7 +593,9 @@ Retired in version 0.05.5 for the Venture Capital Fund. It was the Prospectors' 
 _Avoid_: extraction total, production score, output total, wealth
 
 **Venture Capital Fund**:
-The Prospectors' own pool beside the Stockpile, and their measure since version 0.05.5: 1000 Materials in it is the first part of their Victory Condition (750 until version 0.08.0, which raised the bar when the Investment Bank began paying interest into it). On any turn they set the share of their Factories' and Mines' Materials output that goes into it at Income, from nothing to four fifths in steps of a tenth; Materials bought, refunded or found are not output. A draw takes Materials back out at a tenth's loss.
+The Prospectors' own pool beside the Stockpile, and their measure since version 0.05.5. **Since version 0.08.3 it holds Ducats, and 2000 of them is the first part of their Victory Condition**; it held Materials before that, with a bar of 750 and then 1000.
+On any turn they set the share of their **Ducat income** that goes into it at Income, from nothing to four fifths in steps of a tenth, taken before they can spend a coin of it; Ducats got by selling are not income and never reach it. A draw takes Ducats back out at a tenth's loss.
+The change is more than a change of units. A share of Materials output skimmed a resource they stockpile anyway, so the hoard cost them little; Ducats are what everybody spends on Influence, Relief, Resettle and repairs, so the Fund now competes with the Faction's whole economy and the share is a **decision taken every turn** — bank it or spend it — which is what a venture fund is. The bar was set by measurement rather than by converting the old one at the market rate: 2000 leaves the median long game just across the line, exactly as 1000 Materials did.
 _Avoid_: the pool, savings, treasury, war chest, bank
 
 **Stabilization**:
