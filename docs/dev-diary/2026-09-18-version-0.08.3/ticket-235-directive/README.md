@@ -98,8 +98,12 @@ at half with the unreachable part dimmed behind the rail.
 **Two goes at the dimming, and the picture is why.** A translucent black over an already dark rail
 was invisible in the first capture, and so was a grey close to the rail's own. A diagnostic pass in
 bright red proved the geometry was right all along — the overlay sat exactly across the left half,
-ending at the handle — so the fault was only the colour. It is `gray(30)` now, plainly darker than
-the rail. Nothing but looking at it would have told me which of the two possible faults it was.
+ending at the handle — so the fault was only the colour. Nothing but looking at it would have told me which of the two possible faults it was.
+
+A dark grey was the third attempt and the designer rejected that too: it read as a **hole in the
+control** rather than a bound on it. What ships is the grey this game already uses for **nobody's**
+-- `from_gray(110)`, the unattributed segment of the race bar a few lines above in the same file --
+leaned a little red, so the region says *not yours to take* rather than *nothing here*.
 
 "20% larger" needed **both** `slider_width` and `slider_rail_height`: raising only the first makes
 a long thin bar rather than a bigger control.

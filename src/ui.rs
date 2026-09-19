@@ -5891,14 +5891,19 @@ fn research_directive_control(ui: &mut Ui, session: &Session, game: &Game, actio
     if floor > 0 {
         // The share no Faction but the Archivists may reach, painted OVER the rail so the scale
         // still reads 0 to 100 for everyone and their extra reach is visible rather than implied.
-        // It is opaque rather than a dim wash: a translucent black over an already dark rail was
-        // invisible in the first capture, which is the sort of thing only a picture tells you.
+        // The colour took three goes and only a picture could settle it. A translucent black over
+        // an already dark rail was invisible, and so was a grey close to the rail's own; a
+        // diagnostic pass in bright red proved the geometry had been right all along, so the fault
+        // was never the rectangle. A dark grey read as a hole in the control rather than a bound,
+        // so at the designer's word it is now the grey this game already uses for NOBODY'S --
+        // `from_gray(110)`, the unattributed segment of the race bar a few lines above -- leaned a
+        // little red to say "not yours to take" rather than "nothing here".
         let r = resp.rect;
         let dim = egui::Rect::from_min_max(
             egui::pos2(r.min.x, r.center().y - ui.spacing().slider_rail_height * 0.6),
             egui::pos2(r.min.x + r.width() * floor as f32 / 100.0, r.center().y + ui.spacing().slider_rail_height * 0.6),
         );
-        ui.painter().rect_filled(dim, 2.0, Color32::from_gray(30));
+        ui.painter().rect_filled(dim, 2.0, Color32::from_rgb(124, 104, 104));
         ui.painter().line_segment(
             [egui::pos2(dim.max.x, r.center().y - 9.0), egui::pos2(dim.max.x, r.center().y + 9.0)],
             egui::Stroke::new(1.5, Color32::from_gray(120)),
