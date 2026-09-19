@@ -2040,7 +2040,7 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             // Ticket #166 (version 0.07.5): the figure's hover draws the population history under
             // its sentence, as the Emissions figure's does.
             let pop_sentence = format!(
-                "On Earth: {}.\nOff Earth: {}.\nOne Colonist is five million people; a station over Earth is off Earth and Antarctica is on it.\nEmigrants waiting on a card and Colonists aboard a Ship are in neither line.",
+                "On Earth: {}.\nOff Earth: {}.\nOne Colonist is five million people; a station over Earth is off Earth and Antarctica is on it.\nPioneers waiting on a card and Colonists aboard a Ship are in neither line.",
                 earth_lines.join(", "),
                 space_lines.join(", ")
             );
@@ -3272,10 +3272,10 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::SetArchiveFunding { on: true } => "Pay your Labs into the Archive fund from the next Income".to_string(),
         Order::SetArchiveFunding { on: false } => "Pay your Labs into the shared Tech from the next Income".to_string(),
         // Ticket #73.
-        Order::BuildEmigrants { state, n } => format!("Muster {n} Emigrants in {}", game.tables.state(*state).name),
-        Order::LiftToStation { state, n, colony } => format!("Send {n} Emigrants from {} to {} by lift", game.tables.state(*state).name, game.place_name(Place::Colony(*colony))),
+        Order::BuildEmigrants { state, n } => format!("Recruit {n} Pioneers in {}", game.tables.state(*state).name),
+        Order::LiftToStation { state, n, colony } => format!("Send {n} Pioneers from {} to {} by lift", game.tables.state(*state).name, game.place_name(Place::Colony(*colony))),
         Order::SendToAntarctica { state, n, into } => format!(
-            "Send {n} Emigrants from {} to {} by sea",
+            "Send {n} Pioneers from {} to {} by sea",
             game.tables.state(*state).name,
             match into {
                 UnloadTarget::Slot(_, slot) => game.tables.body(BodyId::Earth).slots[*slot as usize].name.clone(),
@@ -4312,9 +4312,9 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     let live = game.education_level(sid);
     let schooled = live - card.education_level;
     let hover = if schooled > 0.005 {
-        format!("{:.2} on the card, and {:+.2} from a School. It multiplies a Research Lab twice over, stiffens this Region against an outsider's Influence, and goes with any Colonist mustered here.", card.education_level, schooled)
+        format!("{:.2} on the card, and {:+.2} from a School. It multiplies a Research Lab twice over, stiffens this Region against an outsider's Influence, and goes with any Colonist recruited here.", card.education_level, schooled)
     } else {
-        format!("{:.2} on the card, and no School standing. It multiplies a Research Lab twice over, stiffens this Region against an outsider's Influence, and goes with any Colonist mustered here.", card.education_level)
+        format!("{:.2} on the card, and no School standing. It multiplies a Research Lab twice over, stiffens this Region against an outsider's Influence, and goes with any Colonist recruited here.", card.education_level)
     };
     rule_tip(ui.label(format!("Education Level {live:.2}")), hover);
     // Ticket #52: Unrest, and what it is doing here in words.
@@ -4457,14 +4457,14 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         ui.label(RichText::new("Raising the Industry Level adds an inland slot, which the sea never reaches.").weak());
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
         // Ticket #73: muster Emigrants here, and send them to Antarctica by sea once the ice is open.
-        ui.label(RichText::new("Emigrants").strong());
+        ui.label(RichText::new("Pioneers").strong());
         // Ticket #211 (version 0.08.1): the figure stands at the HEAD of this block, above the
         // button that changes it, and is shown at every value including nought. It existed before
         // -- in the Influence block, some way up the card, and only while it was above zero -- so a
         // player who mustered and then looked for the result found the line had simply not been
         // there a moment ago. At nought it now says so, which is the answer to "did that work?".
-        ui.label(format!("Emigrants waiting: {}", st.emigrants)).on_hover_text(
-            "Mustered here and not yet lifted or sent: a working Launch Site lifts them onto a Ship or straight to a station of yours over Earth, and once the ice is open the sea takes them to Antarctica.",
+        ui.label(format!("Pioneers waiting: {}", st.emigrants)).on_hover_text(
+            "Recruited here and not yet lifted or sent: a working Launch Site lifts them onto a Ship or straight to a station of yours over Earth, and once the ice is open the sea takes them to Antarctica.",
         );
         // Ticket #196 (version 0.08.0): as many as this state's people can pay for, where the button
         // always asked for the whole batch. Steerage costs the Arkwrights twice the population for
@@ -4477,7 +4477,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             game,
             &session.pending,
             Order::BuildEmigrants { state: sid, n: per },
-            &format!("Muster {per} Emigrants"),
+            &format!("Recruit {per} Pioneers"),
             Some(format!(
                 "{} people, on the card at End Turn, and {} off this state's Unrest. A working Launch Site lifts them onto a Ship or straight to a station of yours over Earth; once the ice is open the sea takes them to Antarctica.",
                 Game::people_text(game.lift_population(Seat(0), per)),
@@ -4670,24 +4670,24 @@ fn emigrant_loader(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
         // picture: at `Colonists 4 of 4 room` the sea button came up white and clickable.
         if n == 0 {
             let why = if waiting == 0 {
-                format!("Nobody is waiting in {}. Muster Emigrants there first.", game.tables.state(chosen).name)
+                format!("Nobody is waiting in {}. Recruit Pioneers there first.", game.tables.state(chosen).name)
             } else {
                 format!("{} is full: {} Colonists in {} of room.", game.place_name(Place::Colony(col.id)), col.colonists, game.habitat_room(col))
             };
-            let label = if by_sea { "Bring Emigrants by sea" } else { "Lift Emigrants" };
+            let label = if by_sea { "Bring Pioneers by sea" } else { "Lift Pioneers" };
             ui.add_enabled(false, egui::Button::new(label)).on_disabled_hover_text(why);
             return;
         }
         let (order, label, hover) = if by_sea {
             (
                 Order::SendToAntarctica { state: chosen, n, into: UnloadTarget::Colony(col.id) },
-                format!("Bring {n} Emigrants by sea"),
+                format!("Bring {n} Pioneers by sea"),
                 format!("They land here at NEXT turn's Resolution: a sea crossing takes a turn. {} has room for {room} more.", game.place_name(Place::Colony(col.id))),
             )
         } else {
             (
                 Order::LiftToStation { state: chosen, n, colony: col.id },
-                format!("Lift {n} Emigrants"),
+                format!("Lift {n} Pioneers"),
                 format!("Aboard at this turn's Resolution. A launch: it emits like any lift. {} has room for {room} more.", game.place_name(Place::Colony(col.id))),
             )
         };
@@ -5080,7 +5080,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                             });
                             // Ticket #73: a Launch Site lifts the Emigrants waiting there, no more.
                             let lift = n.min(game.state(chosen).emigrants).max(1);
-                            cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(chosen), army: None }, &format!("Load {lift} Emigrants"), actions);
+                            cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: lift, from: LoadSource::State(chosen), army: None }, &format!("Load {lift} Pioneers"), actions);
                         });
                     }
                 }

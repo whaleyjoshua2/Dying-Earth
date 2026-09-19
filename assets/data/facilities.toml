@@ -131,7 +131,7 @@ emissions = 0.0
 # build turns, the same upkeep, the same output, the same slot -- so every row below is its common
 # sibling's row with a new id and a new name. The clause each carries is in code, not here, because
 # every one of them reads something no facility row can say (the Venture Capital Fund's balance, the
-# Emigrants a turn lifted, the holder's whole Energy bill, a flat Ducat).
+# Pioneers a turn lifted, the holder's whole Energy bill, a flat Ducat).
 #
 # Order matters: `Tables::facility` indexes FacilityKind by discriminant, so these four sit after
 # `school` here exactly as they do in the enum.
@@ -148,7 +148,7 @@ produces = { resource = "ducats", amount = 4 }
 emissions = 0.0
 
 # Ticket #183: the Arkwrights' Launch Site. Pays +1 Influence into next turn's Allotment for every
-# Emigrant it lifts off Earth -- onto a Ship in orbit or a station over Earth, never by sea.
+# Pioneer it lifts off Earth -- onto a Ship in orbit or a station over Earth, never by sea.
 [[facility]]
 id = "spaceport"
 name = "Spaceport"
@@ -223,7 +223,7 @@ per_turn = 0.20
 ceiling = 2.0
 
 # Tickets #182, #184 and #186 (version 0.08.0): the three figures the Unique Facility clauses read.
-# The Spaceport's is not here: +1 Influence per Emigrant is the whole of it, and the designer refused
+# The Spaceport's is not here: +1 Influence per Pioneer is the whole of it, and the designer refused
 # a cap ("8 a turn is already the brake"), so there is nothing left to tune.
 [unique]
 # The share of the Venture Capital Fund's balance an Investment Bank banks back into it each turn,

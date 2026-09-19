@@ -291,7 +291,7 @@ fn main() {
                         println!("      The sea: median {} coastal slots lost a game, {} Facilities drowned", median_u(&mut slots_lost), median_u(&mut drowned));
                         println!("      The Prospectors' Venture Capital Fund at the end: median {}", median_u(&mut venture));
                         println!("      The deck: median {} cards drawn a game, empty at the end in {deck_empty}/{seeds} seeds", median_u(&mut cards_drawn));
-                        println!("      Emigrants: {emigrant_batches} batches mustered, {by_sea} Antarctic Colonies founded by sea");
+                        println!("      Pioneers: {emigrant_batches} batches recruited, {by_sea} Antarctic Colonies founded by sea");
                         println!("      Seat 0 lost its start state in {}/{seeds} seeds (median turn {})", home_lost.len(), median_u(&mut home_lost));
                         println!(
                             "      Victory Conditions met outright: {}",

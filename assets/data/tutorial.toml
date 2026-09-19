@@ -21,7 +21,7 @@
 # five notes spent TWO of them asking for nothing -- "You are the Custodians" and "Read the board"
 # -- so the first instruction landed on turn 3 and getting off Earth, the thing the designer wanted
 # taught, on turn 5. Now **the first three turns each ask for one thing, and they are one chain**:
-# spend, muster, launch. Turns 4 and 5 keep their place but ask for NOTHING, at the designer's word:
+# spend, recruit, launch. Turns 4 and 5 keep their place but ask for NOTHING, at the designer's word:
 # they point at the climate and at the Research race, which are the two things that have started
 # happening to the player by then.
 #
@@ -31,9 +31,9 @@
 #     adds one to each seat's start Region at setup (`add_start_facility`, engine/src/state.rs), so
 #     the player always has one whichever Region they pick. Checked against a headless picture of
 #     turn 1, not against the data file, after the data file said otherwise and was wrong.
-#   - A muster is **4** for the Custodians, and the Emigrants are on the Region's card at End Turn --
-#     so mustering on turn 2 means they are waiting on turn 3.
-#   - The ISS begins bare, and **a Core Module holds exactly 4**. Four mustered fill it precisely.
+#   - A recruit is **4** for the Custodians, and the Pioneers are on the Region's card at End Turn --
+#     so recruiting on turn 2 means they are waiting on turn 3.
+#   - The ISS begins bare, and **a Core Module holds exactly 4**. Four recruited fill it precisely.
 #
 # The Reactor is NOT what a Custodian builds: it is the Archivists' Unique Facility since ticket
 # #184. Nothing here asks for one.
@@ -46,8 +46,8 @@ note = "You are the Custodians: colonise the solar system without wrecking Earth
 
 [[note]]
 turn = 2
-figure = "Muster Emigrants"
-text = "The Region you started in has a Launch Site, so it can put people into orbit. Click it, and under Emigrants muster four: they take people from the Region and appear on its card when the turn ends."
+figure = "Recruit Pioneers"
+text = "The Region you started in has a Launch Site, so it can put people into orbit. Click it, and under Pioneers recruit four: they take people from the Region and appear on its card when the turn ends."
 note = "Every figure on a card explains itself. Rest the pointer on a number and the rule behind it appears."
 
 [[note]]

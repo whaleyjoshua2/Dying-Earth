@@ -467,7 +467,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         cards_drawn: game.deck.drawn.len() as u32,
         deck_empty: game.deck.cards.is_empty(),
         start_state_lost_turn,
-        emigrant_batches: game.log.iter().filter(|l| l.contains("Emigrants mustered in")).count() as u32,
+        emigrant_batches: game.log.iter().filter(|l| l.contains("Pioneers recruited in")).count() as u32,
         antarctic_by_sea: game.log.iter().filter(|l| l.contains("in Antarctica with")).count() as u32,
         moments_earned,
         moments_shown,

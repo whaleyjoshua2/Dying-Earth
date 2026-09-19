@@ -29,7 +29,7 @@ The Faction that means to save what humanity knows, and as many of its people as
 _Avoid_: scholars, librarians, scientists, the Academy
 
 **Steerage**:
-The Arkwrights' signature rule: their Colony Ships carry twice the Colonists and cost less to build, and they muster eight Emigrants a turn where others muster four, but every Emigrant costs their Region twice the population.
+The Arkwrights' signature rule: their Colony Ships carry twice the Colonists and cost less to build, and they recruit eight Pioneers a turn where others recruit four, but every Pioneer costs their Region twice the population.
 _Avoid_: mass transit, cattle class, overcrowding, packing them in
 
 **Diaspora**:
@@ -276,12 +276,14 @@ The Module that lets a Colony hold and build a defensive Army. A Colony without 
 _Avoid_: fort, garrison, base
 
 **Colonist**:
-A person counted in the population of a Colony or Region. Since version 0.05.5 Colonists are built: they muster in a Region as Emigrants, are carried by Ships and held by Habitats, and are never spent as a resource. One Colonist is one unit of population, five million people since version 0.07.3, and the top bar counts every Colonist living off Earth as the space population beside Earth's.
-
-**Emigrant**:
-A Colonist mustered in a Region and not yet gone: up to four a turn per Faction (eight for the Arkwrights), in one state the Faction directs, each taking one unit of the state's population -- five million people, since version 0.07.3; a tenth of a hundred million, ten million, before -- on the state's card at End Turn. A batch takes half a point off the state's Unrest. A working Launch Site lifts Emigrants onto a Ship, or, since version 0.07.3, straight onto a Space Station of their Faction's over Earth, as many as its Habitats have room for, aboard at that turn's Resolution -- a launch, with no crowd; and once the Antarctic ice is open the sea takes them to Antarctica in a turn with no launch. They are people of their state until they leave it.
-_Avoid_: settler, recruit, migrant, passenger, colonist-in-waiting
+A person counted in the population of a Colony or Region. Since version 0.05.5 Colonists are built: they are recruited in a Region as Pioneers, are carried by Ships and held by Habitats, and are never spent as a resource. One Colonist is one unit of population, five million people since version 0.07.3, and the top bar counts every Colonist living off Earth as the space population beside Earth's.
 _Avoid_: settler, crew, worker, population resource
+
+**Pioneer**:
+A Colonist recruited in a Region and not yet gone: up to four a turn per Faction (eight for the Arkwrights), in one state the Faction directs, each taking one unit of the state's population -- five million people, since version 0.07.3; a tenth of a hundred million, ten million, before -- on the state's card at End Turn. A batch takes half a point off the state's Unrest. A working Launch Site lifts Pioneers onto a Ship, or, since version 0.07.3, straight onto a Space Station of their Faction's over Earth, as many as its Habitats have room for, aboard at that turn's Resolution -- a launch, with no crowd; and once the Antarctic ice is open the sea takes them to Antarctica in a turn with no launch. They are people of their state until they leave it.
+Called an **Emigrant** until version 0.08.3, and **recruited** where it was mustered. The designer's reason was the word rather than the rule: *"it's more about the word being politically loaded and racked with connotation"*. The rule is untouched -- a Pioneer is the same stage of a Colonist's life the Emigrant was, which is why the distinction was kept rather than folded into Colonist: **Steerage** and the **Spaceport** are both stated in terms of it, and "every Colonist costs their Region twice the population" would have been false.
+The engine still spells the field, the order and the Report keys `emigrant`: they are not read by a player, and renaming the two serialized fields on every Nation State would have broken every save for no visible gain.
+_Avoid_: emigrant, settler, migrant, passenger, colonist-in-waiting, pilgrim
 
 **Region**:
 One of fourteen territories of the Earth Map that a Faction can control and build in, called a Region until version 0.07.2 and since then **named for its Nation** -- the power that leads it -- so the territory that was South Asia is India and the one that was Europe is the European Union. Eight until version 0.05, which split Africa at the Sahara, Asia into East, South and South-East, and Central America and the Caribbean out of North America; Antarctica left the list in version 0.04 to become Earth's Colony Slots. Each carries a population -- the whole territory's, not its Nation's alone, counted in units of five million people since version 0.07.3 (hundreds of millions before) and written on its card as `Region population 228.0 (1.14B)` -- an Industry Level, a Resource Lean, a Baseline Emissions figure, an Education Level, a GDP, an Influence value, an Unrest figure and a Standing Army. Armies move only between neighbouring Regions.
@@ -294,7 +296,7 @@ _Avoid_: primary power (the charting phrase; not the game's word), country, capi
 ### Earth
 
 **Facility**:
-A building placed in a Region. Fifteen kinds since version 0.08.0: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, the School, the four Unique Facilities, and the Sea Wall and the Scrubber, which take no build slot (the Sea Wall stood in a Coastal Slot until version 0.05.5). Since version 0.04 a Launch Site builds no Ship: it lifts Emigrants and Armies from its state into orbit, and each lift is a launch.
+A building placed in a Region. Fifteen kinds since version 0.08.0: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, the School, the four Unique Facilities, and the Sea Wall and the Scrubber, which take no build slot (the Sea Wall stood in a Coastal Slot until version 0.05.5). Since version 0.04 a Launch Site builds no Ship: it lifts Pioneers and Armies from its state into orbit, and each lift is a launch.
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Cheap Industry**:

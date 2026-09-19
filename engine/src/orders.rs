@@ -1075,7 +1075,7 @@ impl Game {
                             // Ticket #73: a Launch Site lifts only the Emigrants waiting there; the
                             // population was paid when they mustered.
                             if self.state(*st).emigrants < *colonists {
-                                return fail(format!("only {} Emigrants are waiting there", self.state(*st).emigrants));
+                                return fail(format!("only {} Pioneers are waiting there", self.state(*st).emigrants));
                             }
                         }
                         LoadSource::Colony(c) => {
@@ -1192,10 +1192,10 @@ impl Game {
                 }
                 let cap = self.emigrants_per_turn(seat);
                 if *n == 0 || *n > cap {
-                    return fail(format!("up to {cap} Emigrants a turn"));
+                    return fail(format!("up to {cap} Pioneers a turn"));
                 }
                 if pending.iter().any(|o| matches!(o, Order::BuildEmigrants { .. })) {
-                    return fail("Emigrants are already mustering this turn: one state a turn");
+                    return fail("Pioneers are already recruiting this turn: one state a turn");
                 }
                 if self.state(*state).population < self.lift_population(seat, *n) {
                     return fail("not enough people there");
@@ -1213,7 +1213,7 @@ impl Game {
                 let sending = self.emigrants_leaving(pending, *state);
                 let waiting = self.state(*state).emigrants.saturating_sub(sending);
                 if *n == 0 || *n > waiting {
-                    return fail(format!("{waiting} Emigrants are waiting there"));
+                    return fail(format!("{waiting} Pioneers are waiting there"));
                 }
                 match into {
                     UnloadTarget::Slot(b, slot) => {
@@ -1221,7 +1221,7 @@ impl Game {
                             return fail("that Antarctic slot is not free");
                         }
                         if pending.iter().any(|o| matches!(o, Order::SendToAntarctica { into: UnloadTarget::Slot(_, s), .. } if s == slot)) {
-                            return fail("Emigrants are already bound for that slot this turn");
+                            return fail("Pioneers are already bound for that slot this turn");
                         }
                     }
                     UnloadTarget::Colony(c) => {
@@ -1245,7 +1245,7 @@ impl Game {
                 let sending = self.emigrants_leaving(pending, *state);
                 let waiting = self.state(*state).emigrants.saturating_sub(sending);
                 if *n == 0 || *n > waiting {
-                    return fail(format!("{waiting} Emigrants are waiting there"));
+                    return fail(format!("{waiting} Pioneers are waiting there"));
                 }
                 let Some(col) = self.colony(*colony) else { return fail("no such station") };
                 if col.body != BodyId::Earth || !col.in_orbit || col.control.director() != Some(seat) {
@@ -1592,7 +1592,7 @@ impl Game {
                     // and the two average together on the card.
                     self.muster_emigrants(*state, *n);
                     let fell = self.lower_unrest(*state, self.tables.emigrants.unrest_fall);
-                    let line = format!("{} Emigrants mustered in {} for the {}; its Unrest fell by {} to {}.", n, self.tables.state(*state).name, self.seat_name(seat), Game::unrest_figure(fell), self.unrest_text(*state));
+                    let line = format!("{} Pioneers recruited in {} for the {}; its Unrest fell by {} to {}.", n, self.tables.state(*state).name, self.seat_name(seat), Game::unrest_figure(fell), self.unrest_text(*state));
                     self.log(line);
                     let text = self.say(
                         "emigrants_mustered",
@@ -1606,7 +1606,7 @@ impl Game {
                     let taught = self.take_emigrants(*state, *n);
                     let due = turn + self.tables.emigrants.antarctica_turns;
                     self.antarctic_sends.push(AntarcticSend { seat, from: *state, n: *n, into: *into, due_turn: due, education: taught });
-                    let line = format!("{} Emigrants left {} for Antarctica by sea, for the {}.", n, self.tables.state(*state).name, self.seat_name(seat));
+                    let line = format!("{} Pioneers left {} for Antarctica by sea, for the {}.", n, self.tables.state(*state).name, self.seat_name(seat));
                     self.log(line);
                 }
                 // Ticket #141 (version 0.07.3): Emigrants lift straight to the seat's station over
@@ -1619,7 +1619,7 @@ impl Game {
                     self.pay_spaceport(seat, *state, *n);
                     self.settle_people(*colony, *n, taught);
                     let station = self.place_name(Place::Colony(*colony));
-                    let line = format!("{} Emigrants lifted from {} to {}, for the {}.", n, self.tables.state(*state).name, station, self.seat_name(seat));
+                    let line = format!("{} Pioneers lifted from {} to {}, for the {}.", n, self.tables.state(*state).name, station, self.seat_name(seat));
                     self.log(line);
                     let text = self.say("emigrants_lifted", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone()), ("station", station)]);
                     self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::Colony(*colony)), text);

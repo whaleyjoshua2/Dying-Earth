@@ -1918,7 +1918,7 @@ fn an_arkwright_muster_takes_twice_the_population_out_of_its_state() {
     let before = g.state(StateId::NorthAfrica).population;
     g.commit_orders(Seat(2), &[Order::BuildEmigrants { state: StateId::NorthAfrica, n: 4 }]);
     let taken = before - g.state(StateId::NorthAfrica).population;
-    assert!((taken - 8.0).abs() < 1e-9, "the muster took {taken}, not 8.0 (two units of five million per Emigrant under Steerage)");
+    assert!((taken - 8.0).abs() < 1e-9, "the recruit took {taken}, not 8.0 (two units of five million per Pioneer under Steerage)");
     let after_muster = g.state(StateId::NorthAfrica).population;
     let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
     g.commit_orders(Seat(2), &[Order::Load { ship, colonists: 4, from: LoadSource::State(StateId::NorthAfrica), army: None }]);
@@ -5443,10 +5443,10 @@ fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_one_unit_of_populati
     assert_eq!(g.state(StateId::EastAsia).emigrants, 4, "on the card at End Turn");
     assert!((pop - g.state(StateId::EastAsia).population - 4.0).abs() < 1e-9, "one unit of five million each (ticket #143)");
     assert_eq!(g.state(StateId::EastAsia).unrest, 2.5, "the batch took 0.5 off");
-    assert!(g.log.to_vec().iter().any(|l| l.contains("Emigrants mustered in China")), "{:?}", g.log.to_vec());
+    assert!(g.log.to_vec().iter().any(|l| l.contains("Pioneers recruited in China")), "{:?}", g.log.to_vec());
     // Steerage: eight a turn at twice the population.
     assert_eq!(g.emigrants_per_turn(Seat(0)), 4);
-    assert_eq!(g.emigrants_per_turn(Seat(2)), 8, "the Arkwrights muster eight");
+    assert_eq!(g.emigrants_per_turn(Seat(2)), 8, "the Arkwrights recruit eight");
     assert!((g.lift_population(Seat(2), 8) - 16.0).abs() < 1e-9, "at twice the population");
 }
 
@@ -5457,7 +5457,7 @@ fn a_launch_site_lifts_only_the_emigrants_waiting_in_its_state() {
     let mut g = game();
     let ship = a_colony_ship(&mut g, Seat(0), BodyId::Earth);
     let load = Order::Load { ship, colonists: 2, from: LoadSource::State(StateId::EastAsia), army: None };
-    assert_eq!(g.check_order(Seat(0), &[], &load).unwrap_err().0, "only 0 Emigrants are waiting there");
+    assert_eq!(g.check_order(Seat(0), &[], &load).unwrap_err().0, "only 0 Pioneers are waiting there");
     g.state_mut(StateId::EastAsia).emigrants = 3;
     let pop = g.state(StateId::EastAsia).population;
     assert!(g.check_order(Seat(0), &[], &load).is_ok());
@@ -5508,7 +5508,7 @@ fn emigrants_lift_straight_to_a_station_over_earth_by_a_launch_site() {
     assert_eq!(g.state(home).emigrants, 2, "they have left");
     assert_eq!(g.climate.launches_pending[0], launches + 1, "a lift is a launch");
     assert_eq!(g.colony(iss).unwrap().colonists, before + 4, "aboard now");
-    assert!(g.log.to_vec().iter().any(|l| l.contains("4 Emigrants lifted from")), "{:?}", g.log.to_vec());
+    assert!(g.log.to_vec().iter().any(|l| l.contains("4 Pioneers lifted from")), "{:?}", g.log.to_vec());
 }
 
 /// must be open.
@@ -5536,7 +5536,7 @@ fn emigrants_go_to_antarctica_by_sea_from_any_state_and_arrive_a_turn_later() {
     g.resolution_phase();
     let col = g.colonies.iter().find(|c| c.body == BodyId::Earth && !c.in_orbit).expect("founded").clone();
     assert_eq!((col.slot, col.colonists, col.control), (slot, 4, Control::Controlled(Seat(0))));
-    assert!(g.log.to_vec().iter().any(|l| l.contains("in Antarctica with 4 Emigrants from The European Union")), "{:?}", g.log.to_vec());
+    assert!(g.log.to_vec().iter().any(|l| l.contains("in Antarctica with 4 Pioneers from The European Union")), "{:?}", g.log.to_vec());
     // The last two join it, once it has room.
     g.colony_mut(col.id).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     g.commit_orders(Seat(0), &[Order::SendToAntarctica { state: StateId::Europe, n: 2, into: UnloadTarget::Colony(col.id) }]);
@@ -5557,7 +5557,7 @@ fn the_ai_musters_emigrants_then_lifts_them_or_sends_them_to_antarctica() {
     let _ = ship;
     g.seats[0].stockpile.energy = 200;
     let orders = g.ai_orders(Seat(0));
-    assert!(orders.iter().any(|o| matches!(o, Order::BuildEmigrants { state: StateId::EastAsia, .. })), "an empty Colony Ship at Earth and nobody waiting: it musters: {orders:?}");
+    assert!(orders.iter().any(|o| matches!(o, Order::BuildEmigrants { state: StateId::EastAsia, .. })), "an empty Colony Ship at Earth and nobody waiting: it recruits: {orders:?}");
     assert!(!orders.iter().any(|o| matches!(o, Order::Load { .. })), "and cannot load yet: {orders:?}");
     g.state_mut(StateId::EastAsia).emigrants = 4;
     // Ticket #164 (version 0.07.5): with a station that holds four from the day it stands, the lift
@@ -7276,7 +7276,7 @@ fn a_seat_with_room_on_a_station_musters_before_antarctica_opens() {
     let orders = g.ai_orders(seat);
     assert!(
         orders.iter().any(|o| matches!(o, Order::BuildEmigrants { .. })),
-        "with room on a station and the ice shut, the AI should still muster: {orders:?}"
+        "with room on a station and the ice shut, the AI should still recruit: {orders:?}"
     );
 }
 
@@ -7313,8 +7313,8 @@ fn a_muster_takes_as_many_as_the_region_can_pay_for() {
     // And the AI asks for what it can afford rather than for nothing.
     let orders = g.ai_orders(ark);
     match orders.iter().find_map(|o| if let Order::BuildEmigrants { n, .. } = o { Some(*n) } else { None }) {
-        Some(n) => assert!(n <= want, "the AI mustered {n}, more than the {want} the Region can pay for"),
-        None => panic!("the Arkwright AI mustered nothing in a Region that can pay for {want}: {orders:?}"),
+        Some(n) => assert!(n <= want, "the AI recruited {n}, more than the {want} the Region can pay for"),
+        None => panic!("the Arkwright AI recruited nothing in a Region that can pay for {want}: {orders:?}"),
     }
 }
 
@@ -7899,7 +7899,7 @@ fn a_spaceport_pays_an_influence_for_every_emigrant_it_launches() {
     let base = g.influence_allotment(ark);
     g.state_mut(sid).emigrants = 3;
     g.commit_orders(ark, &[Order::LiftToStation { state: sid, n: 3, colony: st }]);
-    assert_eq!(g.seats[ark.index()].spaceport_influence, 3, "one for each Emigrant lifted");
+    assert_eq!(g.seats[ark.index()].spaceport_influence, 3, "one for each Pioneer lifted");
     assert_eq!(g.influence_allotment(ark), base + 3, "at face value, never through the x0.8");
 
     // The sea is not a launch.

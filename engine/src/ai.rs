@@ -1430,7 +1430,7 @@ impl Game {
                     && n > 0
                 {
                     let opp = if presence_needed > 0 && waiting == 0 { m.opportunity } else { 1.0 };
-                    push(vec![Order::BuildEmigrants { state: st, n }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("muster {n} Emigrants in {}", self.tables.state(st).name), None);
+                    push(vec![Order::BuildEmigrants { state: st, n }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("recruit {n} Pioneers in {}", self.tables.state(st).name), None);
                 }
             }
             // Ticket #141 (version 0.07.3): waiting Emigrants lift straight to the seat's own station
@@ -1449,7 +1449,7 @@ impl Game {
                 if let Some(c) = station {
                     let k = n.min(self.habitat_room(c) - c.colonists);
                     let opp = if presence_needed > 0 { m.opportunity } else { 1.0 };
-                    push(vec![Order::LiftToStation { state: sid, n: k, colony: c.id }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("lift {} Emigrants from {} to {}", k, self.tables.state(sid).name, self.place_name(Place::Colony(c.id))), None);
+                    push(vec![Order::LiftToStation { state: sid, n: k, colony: c.id }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("lift {} Pioneers from {} to {}", k, self.tables.state(sid).name, self.place_name(Place::Colony(c.id))), None);
                 }
             }
             // With the ice open, waiting Emigrants go to Antarctica by sea: a free slot first, else
@@ -1462,10 +1462,10 @@ impl Game {
                         continue;
                     }
                     if let Some(slot) = self.best_slot_for(seat, BodyId::Earth, behind) {
-                        push(vec![Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, format!("send {} Emigrants from {} to {} by sea", n, self.tables.state(sid).name, self.tables.body(BodyId::Earth).slots[slot as usize].name), None);
+                        push(vec![Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, format!("send {} Pioneers from {} to {} by sea", n, self.tables.state(sid).name, self.tables.body(BodyId::Earth).slots[slot as usize].name), None);
                     } else if let Some(c) = self.colonies.iter().find(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(seat) && self.habitat_room(c) > c.colonists) {
                         let k = n.min(self.habitat_room(c) - c.colonists);
-                        push(vec![Order::SendToAntarctica { state: sid, n: k, into: UnloadTarget::Colony(c.id) }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload) * 0.5, 1.0, 1.0, 1.0, format!("send {} Emigrants from {} to {} by sea", k, self.tables.state(sid).name, self.place_name(Place::Colony(c.id))), None);
+                        push(vec![Order::SendToAntarctica { state: sid, n: k, into: UnloadTarget::Colony(c.id) }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload) * 0.5, 1.0, 1.0, 1.0, format!("send {} Pioneers from {} to {} by sea", k, self.tables.state(sid).name, self.place_name(Place::Colony(c.id))), None);
                     }
                 }
             }
