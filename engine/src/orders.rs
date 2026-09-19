@@ -147,6 +147,10 @@ pub enum Order {
     /// State ever: three turns of doubled Facility output, then a permanent price in Baseline
     /// Emissions and Unrest.
     StripPermit { state: StateId },
+    /// Ticket #237 (version 0.08.3): the Exodus Call. The Arkwrights only, on a state they
+    /// control, once per state EVER. While it runs it doubles what they may recruit there and
+    /// suspends Coach Class's double population charge.
+    ExodusCall { state: StateId },
 }
 
 impl Order {
@@ -266,6 +270,7 @@ impl Game {
             // Leapfrog Ducats; a Decommission pays Materials back, which arrive at its Resolution.
             Order::Change { what: BuildingChange::Restart, .. } => Cost { materials: t.mothball.restart_materials, ..Default::default() },
             Order::Leapfrog { .. } => Cost { ducats: t.ducats.per_leapfrog, ..Default::default() },
+            Order::ExodusCall { .. } => Cost { ducats: t.ducats.per_exodus_call, ..Default::default() },
             Order::BuyInfluence { amount } => Cost { ducats: t.ducats.per_influence * *amount, ..Default::default() },
             // A purchase is a negative cost in the resource bought, so `remaining` and `commit_orders`
             // add it without a special case; a sale is the mirror, with a negative Ducat cost.
@@ -1196,7 +1201,7 @@ impl Game {
                 if self.state(*state).control.director() != Some(seat) {
                     return fail("you do not direct that Nation State");
                 }
-                let cap = self.emigrants_per_turn(seat);
+                let cap = self.emigrants_per_turn_in(seat, *state);
                 if *n == 0 || *n > cap {
                     return fail(format!("up to {cap} Pioneers a turn"));
                 }
@@ -1316,6 +1321,21 @@ impl Game {
                 Ok(cost)
             }
             // Ticket #54: the Strip Permit, the Prospectors only, once per state ever.
+            Order::ExodusCall { state } => {
+                if self.kind(seat) != FactionKind::Arkwrights {
+                    return fail("only the Arkwrights sound an Exodus Call");
+                }
+                if self.state(*state).control.controller() != Some(seat) {
+                    return fail("an Exodus Call needs a Nation State you control");
+                }
+                if self.state(*state).exodus_call_used {
+                    return fail("this Region has answered an Exodus Call once already, and may not again");
+                }
+                if pending.iter().any(|o| matches!(o, Order::ExodusCall { state: s } if s == state)) {
+                    return fail("an Exodus Call is already being sounded there this turn");
+                }
+                Ok(cost)
+            }
             Order::StripPermit { state } => {
                 if self.kind(seat) != FactionKind::Prospectors {
                     return fail("only the Prospectors issue a Strip Permit");
@@ -1591,7 +1611,7 @@ impl Game {
                 // Ticket #73: Emigrants muster now, at the population's cost, and calm the state;
                 // nothing lifts them before next turn, which is the turn to muster.
                 Order::BuildEmigrants { state, n } => {
-                    let cost = self.lift_population(seat, *n);
+                    let cost = self.muster_population_in(seat, *state, *n);
                     self.state_mut(*state).population = (self.state(*state).population - cost).max(0.0);
                     // Ticket #189 (version 0.08.0): they take their Region's schooling AS IT STANDS
                     // NOW, so a batch mustered after a School has run knows more than one before it,
@@ -1667,6 +1687,25 @@ impl Game {
                     self.report_line(LineKind::Climate, Some(ReportPlace::State(*state)), text);
                 }
                 // Ticket #54: the Strip Permit runs from the next Income for `turns` turns.
+                Order::ExodusCall { state } => {
+                    let turns = self.tables.exodus_call.turns;
+                    {
+                        let st = self.state_mut(*state);
+                        st.exodus_call_used = true;
+                        st.exodus_call_ends = Some(turn + turns - 1);
+                    }
+                    let per = self.emigrants_per_turn_in(seat, *state);
+                    let line = format!(
+                        "The {} sounded an Exodus Call in {}: {} Pioneers a turn for {} turns, at the ordinary cost in people.",
+                        self.seat_name(seat),
+                        self.tables.state(*state).name,
+                        per,
+                        turns
+                    );
+                    self.log(line);
+                    let text = self.say("exodus_call", &[("faction", self.seat_name(seat)), ("state", self.tables.state(*state).name.clone()), ("n", per.to_string()), ("turns", turns.to_string())]);
+                    self.report_line(LineKind::YourWorks, Some(ReportPlace::State(*state)), text);
+                }
                 Order::StripPermit { state } => {
                     let turns = self.tables.strip_permit.turns;
                     {
@@ -1902,6 +1941,7 @@ impl Game {
             Order::DrawVenture { amount } => r("draw_venture", &[("n", amount.to_string())]),
             Order::Leapfrog { state } => r("leapfrog", &[("state", self.tables.state(*state).name.clone())]),
             Order::StripPermit { state } => r("strip_permit", &[("state", self.tables.state(*state).name.clone())]),
+            Order::ExodusCall { state } => r("exodus_call_order", &[("state", self.tables.state(*state).name.clone())]),
         }
     }
 }

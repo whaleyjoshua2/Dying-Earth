@@ -44,6 +44,8 @@ archive_destroyed = "The Archive at {place} was destroyed when the Colony passed
 archive_funded = "The {faction} are funding the Archive: {banked} Research banked, {fund} of {cap} in the fund."
 # Ticket #235 (version 0.08.3): the other three Research Directives. Each says what was given up as
 # well as what was got, because the whole of the decision is the trade.
+exodus_call = "The {faction} sounded an Exodus Call in {state}: {n} Pioneers a turn for {turns} turns, at the ordinary cost in people."
+exodus_call_order = "sounded an Exodus Call in {state}"
 directive_sink = "The {faction} directed {research} Research into the Natural Sink: {ppm} ppm more, for good, and the Sink now takes {sink} ppm a turn."
 directive_ducats = "The {faction} directed {research} Research into their coffers: {n} Ducats."
 directive_fuel = "The {faction} directed {research} Research into propellant: {n} Fuel."

@@ -1436,6 +1436,29 @@ impl Game {
         // working Launch Site, or, with the ice open, the most populous. It musters while fewer
         // wait than two Ship loads (and one more while the ice is open), and never for nothing.
         let presence_needed = self.tables.victory.off_world_presence.saturating_sub(self.off_world_colonists(seat));
+        // Ticket #237 (version 0.08.3): the Exodus Call. Sounded where the Arkwrights hold their
+        // MOST populous Region, since a Call is once per Region ever and a doubled muster is worth
+        // most where there are most people to take -- and since the measured problem is that their
+        // home state runs from 20 units to 1 over a game, spending the Call on a small Region
+        // wastes it. Not sounded at all while they already have more waiting than they can lift.
+        if kind == FactionKind::Arkwrights && self.seat(seat).stockpile.ducats >= self.tables.ducats.per_exodus_call {
+            let waiting_now: u32 = self.directed_states(seat).iter().map(|s| self.state(*s).emigrants).sum();
+            let best = self
+                .directed_states(seat)
+                .into_iter()
+                .filter(|s| !self.state(*s).exodus_call_used && self.state(*s).control.controller() == Some(seat))
+                .max_by(|a, b| self.state(*a).population.partial_cmp(&self.state(*b).population).unwrap_or(std::cmp::Ordering::Equal));
+            // Gated on almost nothing on purpose. A first attempt also required fewer waiting than
+            // a Ship holds and a population above twice a doubled muster, and over a whole
+            // headless game the Call fired ZERO times: the Arkwrights spend their Ducats on
+            // Influence and their one Region is already draining, so every extra condition closed
+            // the door. `check_order` refuses what they cannot afford and the weighting decides
+            // whether it is worth doing, which is where those judgements belong.
+            let _ = waiting_now;
+            if let Some(sid) = best {
+                push(vec![Order::ExodusCall { state: sid }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, 1.0, format!("sound an Exodus Call in {}", self.tables.state(sid).name), None);
+            }
+        }
         {
             let per = self.emigrants_per_turn(seat);
             let capacity = self.colony_ship_capacity(seat);

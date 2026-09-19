@@ -529,6 +529,7 @@ pub struct DucatsCard {
     pub per_influence: i64,
     /// Ticket #54: what one Leapfrog costs the Custodians; it replaced `per_restoration_step`.
     pub per_leapfrog: i64,
+    pub per_exodus_call: i64,
     pub per_repair_point: i64,
     /// Version 0.04 (ticket #42): the trading window's prices.
     pub per_materials: i64,
@@ -1089,6 +1090,7 @@ struct FactionsFile {
     research_directive: ResearchDirectiveCard,
     venture_capital: VentureCard,
     emigrants: EmigrantsCard,
+    exodus_call: ExodusCallCard,
     relations: RelationsCard,
 }
 
@@ -1180,6 +1182,12 @@ fn scar_floor_default() -> i64 {
 /// Ticket #73 (version 0.05.5): Emigrants, the built Colonists: how many a Faction musters a turn,
 /// the population each takes, what a batch takes off the state's Unrest, and how many turns the sea
 /// crossing to Antarctica takes.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ExodusCallCard {
+    pub turns: u32,
+    pub muster_multiplier: u32,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct EmigrantsCard {
     pub per_turn: u32,
@@ -1274,6 +1282,7 @@ pub struct Tables {
     pub factions: Vec<FactionCard>,
     pub start: StartCard,
     pub research_directive: ResearchDirectiveCard,
+    pub exodus_call: ExodusCallCard,
     pub ducats: DucatsCard,
     pub venture: VentureCard,
     pub emigrants: EmigrantsCard,
@@ -1382,6 +1391,7 @@ impl Tables {
             factions: factions.faction,
             start: factions.start,
             ducats: factions.ducats,
+            exodus_call: factions.exodus_call,
             research_directive: factions.research_directive,
             venture: factions.venture_capital,
             emigrants: factions.emigrants,

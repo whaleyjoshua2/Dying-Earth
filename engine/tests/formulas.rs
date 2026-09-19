@@ -8991,3 +8991,65 @@ fn the_shared_pots_penalty_never_scars_a_pair() {
     assert_eq!(g.relations.floor[viewer.index()][subject.index()], 0, "and not one step of scar");
     assert_eq!(g.relations_deeds(viewer, subject), 0, "nor a single banked point");
 }
+
+// ------------------------------------------------- 0.08.3 ticket #237: the Exodus Call
+
+/// Ticket #237 (version 0.08.3): the Arkwrights' own order. Two turns of a doubled muster in one
+/// Region, once per Region ever, for the price of a Leapfrog.
+///
+/// The second clause is the ticket, and it was chosen against a measurement. Their home state runs
+/// from 20 units of population to 1 over a game ALREADY, because Coach Class charges them twice a
+/// head; an order that doubled only the count would have burned the country twice as fast and
+/// deepened the very thing that leaves them winning 3 games of 80. So a Call SUSPENDS the double
+/// charge while it runs: they move twice the people at the ordinary price in population.
+#[test]
+fn an_exodus_call_doubles_the_muster_and_suspends_the_double_cost() {
+    let mut g = game();
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+    let sid = g.controlled_states(ark)[0];
+    let plain = g.emigrants_per_turn(ark);
+    assert_eq!(plain, 8, "Coach Class musters eight where others muster four");
+    assert!((g.muster_population_in(ark, sid, plain) - g.lift_population(ark, plain)).abs() < 1e-9, "and pays double for them until the Call");
+
+    g.seats[ark.index()].stockpile.ducats = 500;
+    g.commit_orders(ark, &[Order::ExodusCall { state: sid }]);
+    assert!(g.exodus_call_running(sid), "it runs from the turn it is sounded");
+    assert_eq!(g.emigrants_per_turn_in(ark, sid), plain * 2, "sixteen, not eight");
+
+    // The whole point: sixteen people cost what sixteen people cost anybody else.
+    let each = g.tables.emigrants.population_each;
+    assert!((g.muster_population_in(ark, sid, 16) - each * 16.0).abs() < 1e-9, "the ordinary price, not their double");
+    assert!(g.muster_population_in(ark, sid, 16) < g.lift_population(ark, 16), "which is strictly less than Coach Class charges");
+
+    // Elsewhere they are unchanged: the Call is a Region's, not a Faction's.
+    let other = g.controlled_states(ark).into_iter().find(|s| *s != sid);
+    if let Some(other) = other {
+        assert_eq!(g.emigrants_per_turn_in(ark, other), plain, "only the Region that answered");
+    }
+}
+
+/// Ticket #237: once per Region, ever -- the shape the Strip Permit has had since ticket #54 --
+/// and the Arkwrights alone.
+#[test]
+fn an_exodus_call_is_once_per_region_and_the_arkwrights_alone() {
+    let mut g = game();
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+    let sid = g.controlled_states(ark)[0];
+    g.seats[ark.index()].stockpile.ducats = 500;
+
+    g.commit_orders(ark, &[Order::ExodusCall { state: sid }]);
+    assert!(g.state(sid).exodus_call_used, "the Region is marked for good");
+    assert_eq!(
+        g.check_order(ark, &[], &Order::ExodusCall { state: sid }).unwrap_err().0,
+        "this Region has answered an Exodus Call once already, and may not again"
+    );
+
+    let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    let theirs = g.controlled_states(cus)[0];
+    g.seats[cus.index()].stockpile.ducats = 500;
+    assert_eq!(
+        g.check_order(cus, &[], &Order::ExodusCall { state: theirs }).unwrap_err().0,
+        "only the Arkwrights sound an Exodus Call"
+    );
+    assert_eq!(g.order_cost(ark, &Order::ExodusCall { state: sid }).ducats, g.tables.ducats.per_leapfrog, "priced as a Leapfrog, the other Faction-only order on a state you hold");
+}

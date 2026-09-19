@@ -269,6 +269,19 @@ draw_return = 0.9
 # lift multiplier: Coach Class doubles it), landing on the state's card at End Turn; a batch takes
 # `unrest_fall` off the state's Unrest. Pioneers sent to Antarctica by sea arrive `antarctica_turns`
 # later, with no launch.
+# Ticket #237 (version 0.08.3): the Exodus Call. The Arkwrights only, on a state they control, once
+# per state EVER -- the shape the Strip Permit has had since ticket #54. While it runs it doubles
+# what they may recruit there AND suspends Coach Class's double population charge.
+#
+# That second clause is the ticket. Measured first: their home state runs from 20 units to 1 over a
+# game already, because Coach Class charges twice a head, and an order that doubled only the count
+# would have burned the country twice as fast -- deepening the very thing that leaves them winning
+# 3 games of 80. The designer chose the reading that moves people without eating the source faster
+# than any other Faction does.
+[exodus_call]
+turns = 2
+muster_multiplier = 2
+
 [emigrants]
 per_turn = 4
 population_each = 1.0
@@ -328,6 +341,9 @@ per_influence = 2
 # point is 5 Materials, so 10 Ducats. Ticket #54 retired `per_restoration_step` with Restoration and
 # put `per_leapfrog` in its place: what one Leapfrog costs the Custodians on a state they control.
 per_leapfrog = 50
+# Ticket #237 (version 0.08.3): what an Exodus Call costs the Arkwrights, matched to a Leapfrog --
+# the other Faction-only order bought with Ducats on a state you control.
+per_exodus_call = 50
 per_repair_point = 10
 # Version 0.04 (ticket #42): the trading window. Ducats per unit bought; a sale returns the buying
 # price divided by sell_divisor (rounded down over the lot); a building bought for Ducats costs its

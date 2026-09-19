@@ -28,6 +28,11 @@ _Avoid_: settlers, arks, exodus, nomads
 The Faction that means to save what humanity knows, and as many of its people as it can, in one place off Earth. Their signature rule is Provisional Findings, their Unique Facility is the Reactor, and they win by completing the Archive and Uploading twelve Colonists into it. Since version 0.08.0 they may not begin the Archive until The Upload, their own gate Tech, stands -- so their Labs' Research is a choice between the monument and the tree that opens its door.
 _Avoid_: scholars, librarians, scientists, the Academy
 
+**Exodus Call**:
+The Arkwrights' signature order, since version 0.08.3: on a Nation State they control, for the price of a Leapfrog, **two turns of a doubled muster** -- sixteen **Pioneers** a turn where they otherwise recruit eight. **Once per Region, ever**, the shape the **Strip Permit** has had since version 0.05.
+While it runs it also **suspends Coach Class's double charge**: those sixteen cost the Region the ordinary population a Pioneer costs anybody else, not the Arkwrights' double. That clause is the order's point rather than a sweetener. Measured before it was decided, their home Region runs from twenty units of population to **one** over a game as it is, so an order that doubled only the count would have emptied the country twice as fast -- deepening the very thing that leaves them the thinnest seat at the table.
+_Avoid_: mass evacuation, the call (alone), lifeboat, rapture
+
 **Coach Class**:
 The Arkwrights' signature rule: their Colony Ships carry twice the Colonists and cost less to build, and they recruit eight Pioneers a turn where others recruit four, but every Pioneer costs their Region twice the population.
 Called **Steerage** until version 0.08.3, and renamed for the same reason the Emigrant became the **Pioneer**: steerage is literally the cheapest class of passage on an emigrant ship, and this entry's own avoid list had been warning off *cattle class* and *packing them in* since it was written. **Coach Class** keeps the metaphor that is honest about the rule -- bulk passage at low cost -- and drops the history. The designer rejected **Stowaway**, which was considered and argued down: a stowaway hides aboard without permission or payment, where the Arkwrights' people are recruited openly, counted, and carried in ships built for the purpose.

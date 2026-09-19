@@ -3292,6 +3292,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::Change { building, what } => format!("{} the {} at {}", what.name(), building_name(game, *building), game.place_name(building.place())),
         Order::Leapfrog { state } => format!("Leapfrog {}: its people emit {:.2} less per hundred million", game.tables.state(*state).name, game.tables.climate.population_emissions_per_level * Game::UNITS_PER_HUNDRED_MILLION),
         Order::StripPermit { state } => format!("Strip Permit in {}: three turns of double output", game.tables.state(*state).name),
+        Order::ExodusCall { state } => format!("Exodus Call in {}: a doubled muster at the ordinary cost in people", game.tables.state(*state).name),
         // Ticket #192 (version 0.08.0): the Upload.
         Order::Upload { colony, n } => format!("Upload {} Colonists into the Archive at {}", n, game.place_name(Place::Colony(*colony))),
     }
@@ -4444,6 +4445,23 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             ui.horizontal(|ui| {
                 cost_button(ui, game, &session.pending, Order::Leapfrog { state: sid }, "Leapfrog", actions);
                 ui.label(RichText::new(format!("lowers its people to {:.2} per hundred million, for good", (game.population_coefficient(sid) - game.tables.climate.population_emissions_per_level).max(game.tables.climate.population_emissions_base) * Game::UNITS_PER_HUNDRED_MILLION)).weak());
+            });
+        }
+        // Ticket #237 (version 0.08.3): the Arkwrights' own order, beside the Custodians' Leapfrog
+        // and the Prospectors' Strip Permit, and guarded the same way -- once per state, ever.
+        if game.kind(Seat(0)) == FactionKind::Arkwrights && !st.exodus_call_used {
+            let t = &game.tables.exodus_call;
+            ui.horizontal(|ui| {
+                cost_button(ui, game, &session.pending, Order::ExodusCall { state: sid }, "Exodus Call", actions);
+                ui.label(
+                    RichText::new(format!(
+                        "{} turns recruiting {} Pioneers here instead of {}, and each costs this Region the ordinary population rather than your double. Once per Region, ever.",
+                        t.turns,
+                        game.emigrants_per_turn(Seat(0)) * t.muster_multiplier,
+                        game.emigrants_per_turn(Seat(0))
+                    ))
+                    .weak(),
+                );
             });
         }
         if game.kind(Seat(0)) == FactionKind::Prospectors && !st.strip_permit_used {

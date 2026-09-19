@@ -253,6 +253,13 @@ pub struct NationState {
     pub strip_permit_used: bool,
     /// Ticket #54: the last turn whose Income this state's Facilities double, while one runs.
     pub strip_permit_ends: Option<u32>,
+    /// Ticket #237 (version 0.08.3): an Exodus Call has been made here; one per state, ever, the
+    /// shape ticket #54 gave the Strip Permit.
+    #[serde(default)]
+    pub exodus_call_used: bool,
+    /// Ticket #237: the last turn a Call here doubles the muster and suspends its double cost.
+    #[serde(default)]
+    pub exodus_call_ends: Option<u32>,
 }
 
 /// Ticket #57: a calendar month of game time. Turn 1 is January 2030.
@@ -1063,6 +1070,8 @@ impl Game {
                 baseline_rise: 0.0,
                 baseline_cut: 0.0,
                 strip_permit_used: false,
+            exodus_call_used: false,
+            exodus_call_ends: None,
                 strip_permit_ends: None,
             })
             .collect();
@@ -1474,6 +1483,35 @@ impl Game {
     /// Ticket #73: how many Emigrants this seat may muster in a turn (Coach Class doubles it).
     pub fn emigrants_per_turn(&self, seat: Seat) -> u32 {
         (self.tables.emigrants.per_turn as f64 * self.tables.faction(self.kind(seat)).emigrants_multiplier).floor() as u32
+    }
+
+    /// Ticket #237 (version 0.08.3): is an Exodus Call running here this turn?
+    pub fn exodus_call_running(&self, s: StateId) -> bool {
+        self.state(s).exodus_call_ends.is_some_and(|last| self.turn <= last)
+    }
+
+    /// Ticket #237: what this seat may recruit in THIS state this turn. A Call doubles it -- the
+    /// Arkwrights' eight becomes sixteen, doubling the figure they actually use rather than the
+    /// base nobody else's Faction changes.
+    pub fn emigrants_per_turn_in(&self, seat: Seat, s: StateId) -> u32 {
+        let per = self.emigrants_per_turn(seat);
+        if self.exodus_call_running(s) { per * self.tables.exodus_call.muster_multiplier } else { per }
+    }
+
+    /// Ticket #237: the population a muster takes HERE. A Call suspends Coach Class's double
+    /// charge for as long as it runs, which is the whole point of it.
+    ///
+    /// Measured before it was decided: the Arkwrights' home state runs 20 units to 1 over a game
+    /// as it is, because Coach Class charges them twice a head, so an order that only doubled the
+    /// COUNT would have burned the country twice as fast and deepened the thing that already caps
+    /// them at 3 wins of 80. The designer took this reading -- the Call moves people without
+    /// eating the source faster than anyone else does.
+    pub fn muster_population_in(&self, seat: Seat, s: StateId, colonists: u32) -> f64 {
+        if self.exodus_call_running(s) {
+            self.tables.emigrants.population_each * colonists as f64
+        } else {
+            self.lift_population(seat, colonists)
+        }
     }
 
     /// What one Colony Ship of this seat carries: the card figure, +2 with Expanded Habitats
