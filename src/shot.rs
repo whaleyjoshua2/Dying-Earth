@@ -494,6 +494,16 @@ fn build_board(session: &mut Session) {
                 g.seat_mut(Seat(1)).influence.insert(place, theirs);
             }
         }
+        // `challenger:1` (a building aid, ticket #262, version 0.08.4): a rival stands on seat 0's
+        // start state, well short of its price, so the challenger line on the held card has a name
+        // and two figures to show. `threat:1` puts a rival OVER the price; this one keeps it under.
+        if std::env::args().any(|a| a == "challenger:1")
+            && let Some(sid) = g.directed_states(Seat(0)).first().copied()
+        {
+            let place = Place::State(sid);
+            let price = g.influence_needed_for(Seat(1), place);
+            g.seat_mut(Seat(1)).influence.insert(place, (price - 23).max(1));
+        }
         // Ticket #127 (version 0.07.2): `attend:1` (a building aid, not part of the spec) turns the
         // standing order on for seat 0, so the side panel places an Influence order and a roster
         // ring can be photographed FILLED. Since ticket #134 (version 0.07.3) the standing order is

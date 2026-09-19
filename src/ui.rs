@@ -3883,6 +3883,44 @@ fn threshold_breakdown(ui: &mut Ui, game: &Game, target: Place) {
             second.push_str(&format!(" comes to {}, under the threshold, so the threshold stands", standing + margin));
         }
         ui.label(RichText::new(second).weak());
+        // Ticket #262 (version 0.08.4): **the challenger line**, on a place the player holds: the
+        // rival nearest to taking it -- nearest its OWN price, since Blame and Relations move one
+        // rival's price and not another's -- and how far off it stands. The designer's sentence,
+        // kept: "The Prospectors stand at 31; they take this at 54." The arithmetic rides on the
+        // hover, within the six-line rule; the line carries the two figures. Held places only.
+        if c == Seat(0) {
+            match game.nearest_challenger(target) {
+                Some((who, theirs, price)) => {
+                    let name = game.seat_name(who);
+                    let line = format!("The {name} stand at {theirs}; they take this at {price}.");
+                    let their_threshold = game.influence_threshold_for(who, target);
+                    let their_margin = game.challenge_margin_for(Some(who), target);
+                    let their_blame = game.blame_threshold_multiplier_on(who, target);
+                    let resistance = game.resistance(target);
+                    let gap = (price - theirs).max(0);
+                    let spend = ((gap as f64) * resistance).ceil() as i64;
+                    // Ticket #75's warning, folded in: within two steps of the holder's Standing the
+                    // line turns amber and says what to do about it.
+                    let step = game.tables.ai.thresholds.influence_step;
+                    let pressing = theirs + 2 * step >= standing;
+                    let line = if pressing { format!("{line} Spend here to stay ahead.") } else { line };
+                    let tip = format!(
+                        "The {name}'s price here is the greater of their own threshold, {their_threshold}{}, and your Standing plus the margin they face, {standing} + {their_margin}.
+They are {gap} short. An outsider's Influence converts at {:.2} here, so that is about {spend} Influence spent.
+Spending here raises the bar; doing nothing lowers it, yours decaying {} a turn and theirs {}.",
+                        if their_blame > 1.0 { format!(" (x{their_blame:.2} for their Blame)") } else { String::new() },
+                        1.0 / resistance.max(1e-9),
+                        game.tables.influence.decay_controlled,
+                        game.tables.influence.decay
+                    );
+                    let colour = if pressing { Color32::from_rgb(255, 160, 60) } else { rgb(game.tables.faction(game.kind(who)).colour) };
+                    rule_tip(ui.label(RichText::new(line).color(colour)), tip);
+                }
+                None => {
+                    ui.label(RichText::new("No rival has a Standing here.").weak());
+                }
+            }
+        }
     }
 
     // The third: Resistance, which taxes the spending rather than the gate.
@@ -4389,37 +4427,10 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 u.max, u.army_threshold, u.facility_threshold, u.max, u.natural_fall
             ),
         );
-        // Ticket #75: a rival's Standing within two steps of the player's own, at the top of the
-        // card where it is seen, not in the Influence section below the fold.
-        if game.place_control(Place::State(sid)).controller() == Some(Seat(0)) {
-            let target = Place::State(sid);
-            let mine = game.seat(Seat(0)).influence.get(&target).copied().unwrap_or(0);
-            let step = game.tables.ai.thresholds.influence_step;
-            let pressing = Seat(0).others().iter().map(|s| (*s, game.seat(*s).influence.get(&target).copied().unwrap_or(0))).max_by_key(|(_, n)| *n).filter(|(_, n)| *n > 0 && *n + 2 * step >= mine);
-            if let Some((rival, standing)) = pressing {
-                let warn = ui.label(
-                    RichText::new(format!(
-                        "The {} stand at {} here against your {}: they take it at {}. Spend here to stay ahead.",
-                        game.seat_name(rival),
-                        standing,
-                        mine,
-                        mine + game.tables.influence.challenge_margin
-                    ))
-                    .color(Color32::from_rgb(255, 160, 60)),
-                );
-                // Ticket #161 (version 0.07.5): the challenge margin is the rule behind this warning
-                // and the warning never names it.
-                rule_tip(
-                    warn,
-                    format!(
-                        "A rival takes a place you hold at your Standing plus the challenge margin of {}, and never below their own threshold.\nSpending here raises the bar; doing nothing lowers it, yours decaying {} a turn and theirs {}.",
-                        game.tables.influence.challenge_margin,
-                        game.tables.influence.decay_controlled,
-                        game.tables.influence.decay
-                    ),
-                );
-            }
-        }
+        // Ticket #75's warning line -- a rival within two steps, at the top of the card -- stood here
+        // until ticket #262 (version 0.08.4) folded it into the challenger line in the Standings block
+        // below, which reads the engine's own price (ticket #60) where this one added the margin to the
+        // holder's Standing and could disagree with the Resolution. One line, one arithmetic.
         // Ticket #114 (version 0.07.1): Influence is the card's FIRST business, not its last. The
         // designer: "Influence spend should be much higher and more prominent in the side bar when
         // countries are selected as well." It used to sit under the Facility list, the Army orders

@@ -9029,6 +9029,46 @@ fn the_arkwrights_signature_rule_is_coach_class_and_says_steerage_nowhere() {
     }
 }
 
+// -------------------------------------------- 0.08.4 ticket #262: the challenger line
+
+/// Ticket #262 (version 0.08.4): the rival named on a held place's card is the one NEAREST ITS OWN
+/// PRICE, not the one with the highest Standing -- they differ when Blame or Relations move one
+/// rival's price and not another's, and the nearer one takes the place first. None where nobody
+/// holds the place or no rival has a Standing.
+#[test]
+fn the_challenger_line_names_the_rival_nearest_its_own_price() {
+    let sid = StateId::Europe;
+    let place = Place::State(sid);
+    let mut g = game();
+    calm(&mut g);
+    directed(&mut g, sid);
+    // Every seat starts with a Standing on its own start state (ticket #75); cleared, so the place
+    // begins with nobody standing on it.
+    for s in Seat::ALL {
+        g.seat_mut(s).influence.remove(&place);
+    }
+    assert_eq!(g.nearest_challenger(place), None, "no rival has a Standing yet");
+    let (a, b) = (Seat(1), Seat(2));
+    // Seat 1 stands higher but pays a Blame-raised threshold; seat 2 stands lower and clean.
+    g.seats[a.index()].blame_emitted = 900.0;
+    for s in [Seat(0), b, Seat(3)] {
+        g.seats[s.index()].blame_emitted = 10.0;
+    }
+    assert!(g.blame_threshold_multiplier(a) > 1.2, "{}", g.blame_threshold_multiplier(a));
+    g.seat_mut(Seat(0)).influence.insert(place, 10);
+    let price_a = g.influence_needed_for(a, place);
+    let price_b = g.influence_needed_for(b, place);
+    assert!(price_a > price_b, "Blame makes seat 1's price the dearer: {price_a} against {price_b}");
+    g.seat_mut(a).influence.insert(place, price_b - 5); // the higher Standing, the farther from its own price
+    g.seat_mut(b).influence.insert(place, price_b - 8); // the lower Standing, the nearer
+    assert!(price_a - (price_b - 5) > 8, "seat 1 is farther off than seat 2's 8");
+    let (who, standing, price) = g.nearest_challenger(place).expect("a rival stands here");
+    assert_eq!((who, standing, price), (b, price_b - 8, price_b), "the nearer rival, not the higher");
+    // A place nobody holds has no challenger line.
+    let nobody = StateId::ALL.into_iter().find(|s| matches!(g.state(*s).control, Control::Neutral)).expect("a neutral Region");
+    assert_eq!(g.nearest_challenger(Place::State(nobody)), None);
+}
+
 // -------------------------------------------- 0.08.4 ticket #261: the rival's Moment
 
 /// Ticket #261 (version 0.08.4): a rival crossing three quarters of the way to its Victory

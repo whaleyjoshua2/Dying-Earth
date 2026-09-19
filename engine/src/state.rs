@@ -2332,6 +2332,25 @@ impl Game {
         t.challenge_margin + relations + if guarded { garrison } else { 0 }
     }
 
+    /// Ticket #262 (version 0.08.4): the rival nearest to taking a held place -- its seat, its
+    /// Standing there, and the price it must reach (`influence_needed_for`, its own threshold with
+    /// Blame inside it, or the holder's Standing plus the margin for that pair). None on a place
+    /// nobody holds, or where no rival has a Standing.
+    pub fn nearest_challenger(&self, place: Place) -> Option<(Seat, i64, i64)> {
+        let holder = self.place_control(place).controller()?;
+        Seat::ALL
+            .into_iter()
+            .filter(|s| *s != holder)
+            .filter_map(|s| {
+                let standing = self.seat(s).influence.get(&place).copied().unwrap_or(0);
+                (standing > 0).then(|| (s, standing, self.influence_needed_for(s, place)))
+            })
+            // The nearest to its OWN price, at the designer's word -- not the highest Standing. They
+            // differ when Blame or Relations move one rival's price and not another's, and the
+            // nearer one takes the place first, which is what the line is warning of.
+            .min_by_key(|(_, standing, price)| *price - *standing)
+    }
+
     /// Ticket #257 (version 0.08.4): does a Sea Wall stand and work in this state? The Climate
     /// phase, the Storm Surge card and the card all ask the same question.
     pub fn sea_wall_working(&self, sid: StateId) -> bool {
