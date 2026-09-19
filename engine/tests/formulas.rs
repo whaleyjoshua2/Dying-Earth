@@ -2014,8 +2014,8 @@ fn funding_the_archive_banks_this_turns_research_and_contributes_nothing_to_the_
     g.pick_tech(Seat(0), TechId::PublicScience).unwrap();
     // Version 0.07.0: the declaration is made before Income and read by the next one. Nothing is
     // taken back out of the shared Tech, because nothing of the Archivists' ever goes in.
-    g.commit_orders(Seat(3), &[Order::SetArchiveFunding { on: true }]);
-    assert!(g.seats[3].archive_funding, "the declaration stands");
+    g.commit_orders(Seat(3), &[Order::SetResearchDirective { percent: 100 }]);
+    assert_eq!(g.seats[3].research_directive, 100, "the directive stands at all of it");
     assert_eq!(g.seats[3].archive_fund, 0, "and banks nothing until Income");
     g.income_phase();
     let made = g.seats[3].research_last_turn;
@@ -2024,8 +2024,13 @@ fn funding_the_archive_banks_this_turns_research_and_contributes_nothing_to_the_
     assert_eq!(g.research.contributions[3], 0, "and none of it reached the shared Tech");
     assert!(g.funding_archive(Seat(3)));
     assert!(g.report.lines.iter().any(|l| l.text.contains("Archivists are funding the Archive")), "{:?}", g.report.lines);
-    // Nobody else may.
-    assert_eq!(g.check_order(Seat(0), &[], &Order::SetArchiveFunding { on: true }).unwrap_err().0, "only the Archivists fund the Archive");
+    // Ticket #235 (version 0.08.3): "nobody else may" is gone -- every Faction directs Research
+    // now. What is still the Archivists' alone is the REACH: theirs runs to 100, everyone else's
+    // stops at half, because their switch always sent all of it and the slider keeps that.
+    assert_eq!(g.check_order(Seat(0), &[], &Order::SetResearchDirective { percent: 100 }).unwrap_err().0, "a Research Directive may not pass 50 per cent for this Faction");
+    assert!(g.check_order(Seat(0), &[], &Order::SetResearchDirective { percent: 50 }).is_ok(), "a Custodian may direct half");
+    assert_eq!(g.research_directive_cap(Seat(0)), 50);
+    assert_eq!(g.research_directive_cap(Seat(3)), 100, "the Archivists alone reach all of it");
     // Ticket #68: until the Module stands the fund holds a quarter of the 80, and what it has no
     // room for goes on to the shared Tech rather than being wasted.
     assert_eq!(g.archive_fund_cap(Seat(3)), 20, "a quarter of 80 before the Archive stands");
@@ -2037,18 +2042,18 @@ fn funding_the_archive_banks_this_turns_research_and_contributes_nothing_to_the_
     assert_eq!(g.seats[3].archive_fund, 20, "only the room under the cap is banked");
     assert_eq!(g.research.contributions[3], made - 3, "the rest counts toward the Lead as usual");
     // At the cap the declaration is refused outright.
-    g.seats[3].archive_funding = false;
+    g.seats[3].research_directive = 0;
     assert_eq!(
-        g.check_order(Seat(3), &[], &Order::SetArchiveFunding { on: true }).unwrap_err().0,
+        g.check_order(Seat(3), &[], &Order::SetResearchDirective { percent: 100 }).unwrap_err().0,
         "the Archive fund holds its quarter (20) until the Archive stands at a Colony off Earth"
     );
     // Once the Module stands the fund opens to the whole 80, and is refused again only when full.
     let mars = colony(&mut g, Seat(3), BodyId::Mars, &[ModuleKind::Habitat], 4);
     g.colony_mut(mars).unwrap().modules.push(Module::new(ModuleKind::Archive));
     assert_eq!(g.archive_fund_cap(Seat(3)), 80);
-    assert!(g.check_order(Seat(3), &[], &Order::SetArchiveFunding { on: true }).is_ok());
+    assert!(g.check_order(Seat(3), &[], &Order::SetResearchDirective { percent: 100 }).is_ok());
     g.seats[3].archive_fund = 80;
-    assert_eq!(g.check_order(Seat(3), &[], &Order::SetArchiveFunding { on: true }).unwrap_err().0, "the Archive's Research is paid in full");
+    assert_eq!(g.check_order(Seat(3), &[], &Order::SetResearchDirective { percent: 100 }).unwrap_err().0, "the Archive's Research is paid in full");
 }
 
 /// Ticket #68 (version 0.05.5): the Archive is one Module of 50 Materials and three turns, built
@@ -2103,7 +2108,7 @@ fn the_archive_is_one_module_of_fifty_materials_and_three_turns_built_once_off_e
     // No upkeep until it is complete; the payment that fills the fund completes it, with its Moment.
     assert_eq!(g.module_yield(Seat(3), mars, ModuleKind::Archive).upkeep, 0);
     g.seats[3].archive_fund = 76;
-    g.seats[3].archive_funding = true;
+    g.seats[3].research_directive = 100;
     let banked = g.bank_archive_research(Seat(3), 10);
     assert_eq!(banked, 4, "only the four still owed are banked");
     assert_eq!(g.seats[3].archive_fund, 80);
@@ -2132,12 +2137,12 @@ fn provisional_findings_halves_the_tech_under_research_and_goes_off_the_turn_aft
     let with = g.facility_yield(Seat(3), StateId::Europe, FacilityKind::ResearchLab).research;
     // Version 0.07.0: the declaration is made in one turn and paid at the next Income, so it is
     // that Income which funds, and the Income after it that finds Provisional Findings gone.
-    g.commit_orders(Seat(3), &[Order::SetArchiveFunding { on: true }]);
+    g.commit_orders(Seat(3), &[Order::SetResearchDirective { percent: 100 }]);
     g.income_phase();
     assert!(g.funding_archive(Seat(3)), "this Income paid the fund");
     assert!(g.provisional_findings(Seat(3)), "and the turn that funds still has it");
     // Back to the shared Tech, so the Income after this one restores it.
-    g.commit_orders(Seat(3), &[Order::SetArchiveFunding { on: false }]);
+    g.commit_orders(Seat(3), &[Order::SetResearchDirective { percent: 0 }]);
     g.income_phase();
     assert!(!g.provisional_findings(Seat(3)), "they funded last turn");
     assert_eq!(g.tech_multiplier(Seat(3), TechId::PublicScience), 1.0);
@@ -2237,7 +2242,7 @@ fn the_archivist_ai_funds_the_archive_before_it_holds_a_colony() {
     assert!(g.colonies.iter().all(|c| c.in_orbit || c.control.director() != Some(arc)));
     g.seats[arc.index()].research_last_turn = 6;
     let orders = g.ai_orders(arc);
-    assert!(orders.iter().any(|o| matches!(o, Order::SetArchiveFunding { on: true })), "no funding order: {orders:?}");
+    assert!(orders.iter().any(|o| matches!(o, Order::SetResearchDirective { percent: 100 })), "no funding order: {orders:?}");
 }
 
 /// Ticket #68 (version 0.05.5): the Archivist AI builds its way off Earth before the Archive. With
@@ -4744,7 +4749,7 @@ fn a_rivals_paragraph_names_its_visible_orders_and_none_of_its_scores() {
         Order::BuildArmy { place: Place::State(StateId::EastAsia) },
         Order::BuildStation { body: BodyId::Mars, slot: 0 },
         Order::BuildArchive { colony },
-        Order::SetArchiveFunding { on: true },
+        Order::SetResearchDirective { percent: 100 },
         Order::Repair { unit: UnitRef::Ship(ship), points: 1 },
         Order::RepairWithDucats { unit: UnitRef::Ship(ship), points: 1 },
         Order::Transit { ship, to: BodyId::Moon, slot: None },
@@ -6751,7 +6756,7 @@ fn funding_the_archive_pays_even_when_the_turn_completes_a_tech() {
     g.pick_tech(Seat(0), TechId::CoastalEngineering).unwrap();
     // One point short, so this turn's Research would finish the Tech during Income.
     g.research.progress = g.tables.tech(TechId::CoastalEngineering).cost - 1;
-    g.commit_orders(Seat(3), &[Order::SetArchiveFunding { on: true }]);
+    g.commit_orders(Seat(3), &[Order::SetResearchDirective { percent: 100 }]);
     g.income_phase();
     let made = g.seats[3].research_last_turn;
     assert!(made > 0, "the Lab made {made} Research");
@@ -8762,5 +8767,131 @@ fn the_arkwrights_signature_rule_is_coach_class_and_says_steerage_nowhere() {
         for text in [&c.signature, &c.victory, &c.blurb, &c.unique] {
             assert!(!text.to_lowercase().contains("steerage"), "{kind:?} still says Steerage: {text}");
         }
+    }
+}
+
+// -------------------------------------------- 0.08.3 ticket #235: the Research Directive
+
+/// Ticket #235 (version 0.08.3): every Faction may send a share of its Research somewhere other
+/// than the shared Tech, and each of the four goes somewhere different.
+///
+/// The rates were fitted against a measurement, not guessed: Research made over a whole game,
+/// median by Faction over 20 seeds, is Custodians 131, Prospectors 442, Arkwrights 149,
+/// Archivists 453. Half a turn's Research is therefore about 1.8 points for the Custodians and 6.2
+/// for the Prospectors -- far less than the rule was first drafted against, which is why the
+/// Custodians' rate came down from 0.05 ppm a point to 0.01 and why the Prospectors' "10-1" had to
+/// be settled at 0.8 rather than either of the readings it could bear.
+#[test]
+fn a_research_directive_sends_a_share_of_the_turns_research_somewhere_else() {
+    let seat_of = |g: &Game, k: FactionKind| Seat::ALL.into_iter().find(|s| g.kind(*s) == k).expect("every Faction is seated");
+    // A fresh game makes no Research at all, so every arm below needs a Lab before there is
+    // anything to direct. The Archive test has needed the same since version 0.07.0.
+    let with_lab = |g: &mut Game, seat: Seat| {
+        g.state_mut(StateId::Europe).control = Control::Controlled(seat);
+        g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+        g.pick_tech(Seat(0), TechId::PublicScience).ok();
+    };
+
+    // The Custodians: the Natural Sink itself moves, and it STAYS moved.
+    let mut g = game();
+    let cus = seat_of(&g, FactionKind::Custodians);
+    with_lab(&mut g, cus);
+    let before_sink = g.climate.natural_sink;
+    g.seats[cus.index()].research_directive = 50;
+    g.income_phase();
+    let made = g.seats[cus.index()].research_last_turn;
+    let want = made * 50 / 100;
+    assert!(made > 0, "the seat made Research to direct");
+    let rate = g.tables.research_directive.custodians_ppm_per_point;
+    assert!((g.climate.natural_sink - (before_sink + want as f64 * rate)).abs() < 1e-9, "the Sink took {want} points at {rate} a point: {} -> {}", before_sink, g.climate.natural_sink);
+    let held = g.climate.natural_sink;
+    g.income_phase();
+    assert!(g.climate.natural_sink > held, "and it is PERMANENT -- a second turn adds again rather than replacing");
+
+    // The Prospectors: Ducats, at a fractional rate that carries rather than flooring away.
+    // Against a CONTROL run: Income pays ordinary Ducat income too, so the directive's share is
+    // the difference between two identical games, one directing and one not.
+    let ducats_at = |percent: u8| -> (i64, i64, f64) {
+        let mut g = game();
+        let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
+        g.state_mut(StateId::Europe).control = Control::Controlled(pro);
+        g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+        g.pick_tech(Seat(0), TechId::PublicScience).ok();
+        g.seats[pro.index()].research_directive = percent;
+        g.income_phase();
+        (g.seat(pro).stockpile.ducats, g.seats[pro.index()].research_last_turn, g.seat(pro).directive_remainder)
+    };
+    let (plain, made, _) = ducats_at(0);
+    let (directed, made2, carried) = ducats_at(50);
+    assert_eq!(made, made2, "the same game either way");
+    let want = made * 50 / 100;
+    let earned = want as f64 * game().tables.research_directive.prospectors_ducats_per_point;
+    assert!(want > 0, "{made} Research, half of it directed");
+    assert_eq!(directed - plain, earned.floor() as i64, "{want} points at 0.8 is {earned}, paid whole");
+    assert!((carried - (earned - earned.floor())).abs() < 1e-9, "and the fraction is carried, not lost");
+
+    // The Arkwrights: Fuel, same carry.
+    let fuel_at = |percent: u8| -> (i64, i64) {
+        let mut g = game();
+        let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+        g.state_mut(StateId::Europe).control = Control::Controlled(ark);
+        g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+        g.pick_tech(Seat(0), TechId::PublicScience).ok();
+        g.seats[ark.index()].research_directive = percent;
+        g.income_phase();
+        (g.seat(ark).stockpile.fuel, g.seats[ark.index()].research_last_turn)
+    };
+    let (plain, made) = fuel_at(0);
+    let (directed, _) = fuel_at(50);
+    let want = made * 50 / 100;
+    let earned = want as f64 * game().tables.research_directive.arkwrights_fuel_per_point;
+    assert_eq!(directed - plain, earned.floor() as i64, "{want} points at 0.2 is {earned}");
+}
+
+/// Ticket #235: what is directed never reaches the shared Tech, so it counts nothing toward the
+/// Research Lead. This is the cost that makes the directive a decision rather than free money, and
+/// it is the same rule the Archive fund has had since version 0.07.0.
+#[test]
+fn directed_research_never_reaches_the_shared_tech() {
+    let mut g = game();
+    let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    g.state_mut(StateId::Europe).control = Control::Controlled(cus);
+    g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+    g.pick_tech(Seat(0), TechId::PublicScience).ok();
+    g.research.contributions = [0; 4];
+    g.seats[cus.index()].research_directive = 50;
+    g.income_phase();
+    let made = g.seats[cus.index()].research_last_turn;
+    let directed = made * 50 / 100;
+    assert_eq!(g.research.contributions[cus.index()], made - directed, "only what was not directed reached the Tech");
+}
+
+/// Ticket #235: Provisional Findings was BINARY because its control was a switch -- any funding at
+/// all turned it off. With a slider it takes a threshold, at the designer's word "make it a
+/// threshold 75%": the rule holds while at least that share still goes to the shared Tech.
+///
+/// Both of the old positions are unchanged, which is the point of choosing a threshold over a
+/// scaling rule: 0 keeps it and 100 loses it, exactly as the switch did.
+#[test]
+fn provisional_findings_holds_while_three_quarters_still_goes_to_the_tech() {
+    let floor = game().tables.research_directive.provisional_min_contribution;
+    assert_eq!(floor, 75, "the threshold the rest of this test is written against");
+    for (directive, expected) in [(0u8, true), (25, true), (26, false), (50, false), (100, false)] {
+        let mut g = game();
+        let arc = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Archivists).unwrap();
+        // Enough Research that the share is not lost to rounding, and room in the fund for it.
+        g.state_mut(StateId::Europe).control = Control::Controlled(arc);
+        for _ in 0..4 {
+            g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+        }
+        g.pick_tech(Seat(0), TechId::PublicScience).ok();
+        g.seats[arc.index()].research_directive = directive;
+        g.income_phase();
+        g.income_phase();
+        assert_eq!(
+            g.provisional_findings(arc),
+            expected,
+            "a directive of {directive} should leave Provisional Findings {expected}"
+        );
     }
 }

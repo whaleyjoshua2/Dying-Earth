@@ -1092,12 +1092,29 @@ impl Game {
         // its cap, from turn one if it likes, and otherwise contributes to the shared Tech. Ticket
         // #68: it builds the one Module at the first Colony off Earth it took, and the fund's cap
         // is a quarter until that Module stands, so the Module is what opens the rest.
+        // Ticket #235 (version 0.08.3): the other three Factions direct Research too, at the
+        // designer's word -- "yes they use it". Without this they would be three player-only
+        // abilities and the sweep would say so, which is exactly what happened to the Trading
+        // window in 0.08.2: over 80 games the computer seats bought 29,440 units and sold nothing.
+        //
+        // A seat goes to its cap or not at all, as the Archivists' switch always did. How hard it
+        // should lean is a fitting question that wants the sweep, and it is data rather than code
+        // (`fund_archive` in `ai.toml`) so that fitting it needs no rebuild.
+        if kind != FactionKind::Archivists && self.seat(seat).research_directive == 0 && self.seat(seat).research_last_turn > 0 {
+            let cap = self.research_directive_cap(seat);
+            let what = match kind {
+                FactionKind::Custodians => "the Natural Sink",
+                FactionKind::Prospectors => "their coffers",
+                _ => "propellant",
+            };
+            push(vec![Order::SetResearchDirective { percent: cap }], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, 1.0, format!("direct {cap} per cent of their Research into {what} from the next Income"), None);
+        }
         if kind == FactionKind::Archivists {
             let fund = self.seat(seat).archive_fund;
             let cap = self.archive_fund_cap(seat);
-            if fund < cap && self.seat(seat).research_last_turn > 0 && !self.seat(seat).archive_funding {
+            if fund < cap && self.seat(seat).research_last_turn > 0 && self.seat(seat).research_directive == 0 {
                 let opp = if fund + self.seat(seat).research_last_turn >= cap { m.opportunity } else { 1.0 };
-                push(vec![Order::SetArchiveFunding { on: true }], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, opp, format!("pay the Labs into the Archive fund from the next Income, {} Research a turn", self.seat(seat).research_last_turn), None);
+                push(vec![Order::SetResearchDirective { percent: self.research_directive_cap(seat) }], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, opp, format!("pay the Labs into the Archive fund from the next Income, {} Research a turn", self.seat(seat).research_last_turn), None);
             }
             // Ticket #199 (version 0.08.0): the Archive also waits on the gate Tech, and the computer
             // is deliberately NOT taught that here. Every candidate goes through `check_order` before

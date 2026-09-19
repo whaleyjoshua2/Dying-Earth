@@ -244,8 +244,8 @@ fn parse_line(line: &str) -> Result<Line, String> {
             };
             Order::Change { building, what: change }
         }
-        "fund-archive" => Order::SetArchiveFunding { on: true },
-        "unfund-archive" => Order::SetArchiveFunding { on: false },
+        "fund-archive" => Order::SetResearchDirective { percent: 100 },
+        "unfund-archive" => Order::SetResearchDirective { percent: 0 },
         "venture-share" => Order::SetVentureShare { share: count(at(1)?)? },
         "draw-venture" => Order::DrawVenture { amount: number(at(1)?)? },
         "leapfrog" => Order::Leapfrog { state: pick(&StateId::ALL, at(1)?)? },

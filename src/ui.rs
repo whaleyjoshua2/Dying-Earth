@@ -3269,8 +3269,8 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildArchive { colony } => format!("Build the Archive at {}", game.place_name(Place::Colony(*colony))),
         Order::SetMaxStanding { target: Some(p) } => format!("Spend your whole Allotment on {}, every turn", game.place_name(*p)),
         Order::SetMaxStanding { target: None } => "Place your Influence by hand again".to_string(),
-        Order::SetArchiveFunding { on: true } => "Pay your Labs into the Archive fund from the next Income".to_string(),
-        Order::SetArchiveFunding { on: false } => "Pay your Labs into the shared Tech from the next Income".to_string(),
+        Order::SetResearchDirective { percent: 0 } => "Pay all your Research into the shared Tech from the next Income".to_string(),
+        Order::SetResearchDirective { percent } => format!("Direct {percent}% of your Research from the next Income"),
         // Ticket #73.
         Order::BuildEmigrants { state, n } => format!("Recruit {n} Pioneers in {}", game.tables.state(*state).name),
         Order::LiftToStation { state, n, colony } => format!("Send {n} Pioneers from {} to {} by lift", game.tables.state(*state).name, game.place_name(Place::Colony(*colony))),
@@ -4794,34 +4794,16 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                 format!("Archive fund {fund} of {cap} (a quarter of the {research} until the Archive stands)")
             };
             ui.label(fund_line);
-            // Version 0.07.0: a standing declaration, read at the next Income, not a per-turn order.
-            let declared = game.seat(Seat(0)).archive_funding;
-            let pending_set = session.pending.iter().find_map(|o| match o {
-                Order::SetArchiveFunding { on } => Some(*on),
-                _ => None,
-            });
-            let mut on = pending_set.unwrap_or(declared);
-            let flip = Order::SetArchiveFunding { on: !on };
-            let may_flip = pending_set.is_some() || game.check_order(Seat(0), &session.pending, &flip).is_ok();
-            let box_ = ui.add_enabled(
-                may_flip,
-                egui::Checkbox::new(&mut on, "Pay your Labs into the Archive fund (from the next Income, until you set it back)"),
-            );
-            if !may_flip {
-                box_.clone().on_disabled_hover_text("The fund is at its cap; your Labs' Research goes to the shared Tech.");
-            }
-            if box_.changed() {
-                if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetArchiveFunding { .. })) {
-                    actions.push(Action::Cancel(i));
-                } else {
-                    actions.push(Action::Place(Order::SetArchiveFunding { on }));
-                }
-            }
+            // Ticket #235 (version 0.08.3): the switch that stood here is a SLIDER now, and it
+            // lives in the Tech Tree window with the other three Factions' -- at the designer's
+            // word, *"yeah tech tree - put the archive's slider there too"*. One control, one
+            // place, for a decision every Faction now makes about the same thing.
+            let directive = game.seat(Seat(0)).research_directive;
             ui.label(
-                egui::RichText::new(if on {
-                    "Your Labs pay the fund from the next Income."
+                egui::RichText::new(if directive == 0 {
+                    "Your Labs pay the shared Tech. Set a Research Directive in the Tech Tree window to pay this fund instead.".to_string()
                 } else {
-                    "Your Labs pay the shared Tech."
+                    format!("Your Research Directive sends {directive}% of your Research to this fund, from the next Income. It is set in the Tech Tree window.")
                 })
                 .weak(),
             );
@@ -5860,6 +5842,60 @@ An Accord stands: {}.", terms.join(", ")));
     });
 }
 
+/// Ticket #235 (version 0.08.3): the **Research Directive** -- the share of a Faction's Research
+/// that goes somewhere other than the shared Tech, chosen as a percentage and standing until it is
+/// changed.
+///
+/// A PERCENTAGE rather than a count of points, because Research grows all game: a setting made on
+/// turn 5 in points is meaningless by turn 25, where a share keeps its meaning and reads directly
+/// against the shared-pot rule -- the player sees what they are contributing, not just what they
+/// are taking.
+///
+/// The Archivists' cap is 100 and everyone else's 50. Theirs was a switch until this version and
+/// that switch always sent ALL of it, so the slider keeps the reach.
+fn research_directive_control(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec<Action>) {
+    let me = Seat(0);
+    let cap = game.research_directive_cap(me);
+    let standing = game.seat(me).research_directive;
+    let pending_set = session.pending.iter().find_map(|o| match o {
+        Order::SetResearchDirective { percent } => Some(*percent),
+        _ => None,
+    });
+    let mut percent = pending_set.unwrap_or(standing);
+
+    ui.label(RichText::new("Research Directive").strong()).on_hover_text(
+        "The share of your Research that goes somewhere other than the shared Tech, from the next Income until you set it again. What is directed never reaches the Tech, so it counts nothing toward the Research Lead -- and the Lead is the only seat that picks what the table researches next.",
+    );
+    let (what, rate) = match game.kind(me) {
+        FactionKind::Custodians => ("the Natural Sink", format!("{} ppm for good, per point", game.tables.research_directive.custodians_ppm_per_point)),
+        FactionKind::Prospectors => ("your coffers", format!("{} Ducats per point", game.tables.research_directive.prospectors_ducats_per_point)),
+        FactionKind::Arkwrights => ("propellant", format!("{} Fuel per point", game.tables.research_directive.arkwrights_fuel_per_point)),
+        FactionKind::Archivists => ("the Archive fund", "one for one, to the fund's cap".to_string()),
+    };
+    let made = game.seat(me).research_last_turn;
+    let taken = made * percent as i64 / 100;
+    ui.add(egui::Slider::new(&mut percent, 0..=cap).suffix("%").text(format!("to {what}")));
+    ui.label(
+        RichText::new(if percent == 0 {
+            format!("All of it goes to the shared Tech. {made} Research last turn.")
+        } else {
+            format!("{percent}% to {what} ({rate}); {}% to the shared Tech. On last turn's {made} Research that is {taken} directed.", 100 - percent, )
+        })
+        .weak(),
+    );
+    if percent != pending_set.unwrap_or(standing) {
+        if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetResearchDirective { .. })) {
+            actions.push(Action::Cancel(i));
+        }
+        if percent != standing {
+            let order = Order::SetResearchDirective { percent };
+            if game.check_order(me, &session.pending, &order).is_ok() {
+                actions.push(Action::Place(order));
+            }
+        }
+    }
+}
+
 /// **The Faction window** (ticket #203, version 0.08.1), opened by `Factions (F)` on the top bar and
 /// by the F key. One Faction a page, chosen by the dropdown in its top right, which opens on the
 /// player's own seat.
@@ -6215,6 +6251,12 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             }
             tech_legend(ui);
             ui.separator();
+            // Ticket #235 (version 0.08.3): the Research Directive, for every Faction, in the one
+            // window whose subject is Research.
+            if !session.spectator {
+                research_directive_control(ui, session, game, actions);
+                ui.separator();
+            }
             // Ticket #51: an Archivist player is told whether Provisional Findings is in force.
             if game.kind(Seat(0)) == FactionKind::Archivists {
                 let on = game.provisional_findings(Seat(0));
@@ -6230,7 +6272,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                         }
                     ),
                 );
-                if game.seat(Seat(0)).archive_funding || session.pending.iter().any(|o| matches!(o, Order::SetArchiveFunding { on: true })) {
+                if game.seat(Seat(0)).research_directive > 0 || session.pending.iter().any(|o| matches!(o, Order::SetResearchDirective { percent } if *percent > 0)) {
                     ui.colored_label(Color32::YELLOW, "Your Labs pay the Archive fund: the turn after they next pay it, Provisional Findings is off.");
                 }
             }

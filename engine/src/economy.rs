@@ -93,9 +93,21 @@ impl Game {
         // Ticket #51: Provisional Findings holds this turn only if last turn's Research went to the
         // shared Tech, so it is settled before any yield reads a Tech.
         for seat in Seat::ALL {
-            let funded = self.seat(seat).funding_archive;
+            // Ticket #235 (version 0.08.3): a THRESHOLD, where this was binary. The control was a
+            // switch, so any funding at all turned Provisional Findings off; it is a slider now,
+            // and at the designer's word -- "make it a threshold 75%" -- the rule holds while at
+            // least that share of last turn's Research still went to the shared Tech. A directive
+            // of 25 or less keeps it; anything above trades it away. Both old positions are
+            // unchanged: 0 keeps the rule and 100 loses it.
+            // It reads the DECLARED directive, not what was actually taken. Two reasons, and the
+            // test that made the difference visible is in the suite: rounding means a 26% directive
+            // on 14 Research takes 3 points, which is 21% applied, so a player who set 26 would
+            // keep a rule they had chosen to trade away -- and nothing on screen would explain it.
+            // What a player sets is what they are answerable for.
+            let contributed = 100u32.saturating_sub(self.seat(seat).directive_last_income as u32);
+            let floor = self.tables.research_directive.provisional_min_contribution as u32;
             let s = self.seat_mut(seat);
-            s.provisional_findings = !funded;
+            s.provisional_findings = contributed >= floor;
             s.funding_archive = false;
         }
         self.replenish_standing_armies();
@@ -819,7 +831,7 @@ impl Game {
         // Version 0.07.0: the Archivists' standing declaration is read here, before a point of
         // Research reaches the shared Tech. What the fund has room for never enters the Tech at
         // all, so a turn that completes a Tech can no longer swallow the whole payment.
-        let banked = self.bank_archive_research(seat, research);
+        let banked = self.spend_research_directive(seat, research);
         self.accrue_research(seat, research - banked);
         self.log(format!(
             "Income {}: +{} Materials, +{} Fuel, Energy {} -> {}, Research {}.",

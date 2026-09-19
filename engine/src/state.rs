@@ -697,11 +697,31 @@ pub struct SeatState {
     /// fund and contributed nothing to the Research Lead. Version 0.07.0: set at Income by
     /// `bank_archive_research`, and true only when a point was actually banked.
     pub funding_archive: bool,
-    /// Version 0.07.0: the Archivists' standing declaration that their Labs pay the Archive fund
-    /// rather than the shared Tech. Set by an order, read at the NEXT Income, and it holds until it
-    /// is set again.
+    /// Ticket #235 (version 0.08.3): the **Research Directive** -- the share of this seat's
+    /// Research, as a percentage, that goes somewhere other than the shared Tech. It replaces the
+    /// Archivists' `archive_funding` bool, which was the same idea with two positions: their
+    /// directive runs to 100 (all of it to the Archive) where every other Faction's stops at 50.
+    ///
+    /// Set by an order, read at the NEXT Income, and it holds until it is set again -- the shape
+    /// version 0.07.0 gave the Archivists' switch, kept because a per-turn order would mean
+    /// re-deciding this thirty-six times a game.
     #[serde(default)]
-    pub archive_funding: bool,
+    pub research_directive: u8,
+    /// Ticket #235: the directive that was in force at the LAST Income, which is what Provisional
+    /// Findings is settled from. It is kept apart from `research_directive` for the lag: the rule
+    /// reads what happened to *last* turn's Research, so a directive set this turn is paid at this
+    /// Income and felt at the next one -- the shape version 0.07.0 gave the Archivists' switch.
+    ///
+    /// It holds what was DECLARED rather than what landed. Rounding means a 26% directive on 14
+    /// Research takes 3 points, which is 21% of them, and a player who set 26 would otherwise keep
+    /// a rule they had chosen to trade away with nothing on screen to explain it.
+    #[serde(default)]
+    pub directive_last_income: u8,
+    /// Ticket #235: the fraction of a Ducat or a Fuel a conversion has earned and not yet paid.
+    /// The Prospectors' rate is 0.8 a point and the Arkwrights' 0.2, so flooring every turn would
+    /// quietly lose up to a fifth of what was diverted. It is carried instead.
+    #[serde(default)]
+    pub directive_remainder: f64,
     /// Ticket #114 (version 0.07.1): the Defence split is set to repeat. It is a STANDING ORDER and
     /// not an automatic spend: the interface places this turn's split as ordinary pending orders
     /// every turn while it is on, so the player sees exactly what it did and can cancel any of it
@@ -976,7 +996,9 @@ impl Game {
             income_sources: Vec::new(),
             archive_fund: 0,
             funding_archive: false,
-            archive_funding: false,
+            research_directive: 0,
+            directive_last_income: 0,
+            directive_remainder: 0.0,
             max_standing: None,
             provisional_findings: true,
             resettle_to: None,

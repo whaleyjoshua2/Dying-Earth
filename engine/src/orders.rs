@@ -92,7 +92,10 @@ pub enum Order {
     /// their Labs' Research goes into the Archive fund instead of the shared Tech, where it counts
     /// nothing toward the Research Lead. Set once, it holds until it is set again, and it is read
     /// at the next Income; it never moves Research that Income has already paid out.
-    SetArchiveFunding { on: bool },
+    /// Ticket #235 (version 0.08.3): set the **Research Directive** -- the share of this seat's
+    /// Research, as a percentage, that goes somewhere other than the shared Tech. It replaces
+    /// `SetArchiveFunding { on }`, which was this order with two positions.
+    SetResearchDirective { percent: u8 },
     /// Ticket #226 (version 0.08.2): offer an Accord to another Faction. A computer seat answers at
     /// the Resolution by its own weights; a refused offer is NOT an offence, since punishing a
     /// refusal would make every offer a threat.
@@ -520,19 +523,22 @@ impl Game {
                 }
                 Ok(cost)
             }
-            Order::SetArchiveFunding { on } => {
-                if self.kind(seat) != FactionKind::Archivists {
-                    return fail("only the Archivists fund the Archive");
+            Order::SetResearchDirective { percent } => {
+                let cap = self.research_directive_cap(seat);
+                if *percent > cap {
+                    return fail(format!("a Research Directive may not pass {cap} per cent for this Faction"));
                 }
-                if pending.iter().any(|o| matches!(o, Order::SetArchiveFunding { .. })) {
-                    return fail("the Archive's funding is already set this turn");
+                if pending.iter().any(|o| matches!(o, Order::SetResearchDirective { .. })) {
+                    return fail("the Research Directive is already set this turn");
                 }
-                if *on == self.seat(seat).archive_funding {
-                    return fail(if *on { "the Archive is already being funded" } else { "the Archive is not being funded" });
+                if *percent == self.seat(seat).research_directive {
+                    return fail("the Research Directive is already there");
                 }
                 // Ticket #68: at the cap there is nothing to declare, and the Research stays with
                 // the shared Tech; until the Module stands the cap is a quarter of the requirement.
-                if *on && self.seat(seat).archive_fund >= self.archive_fund_cap(seat) {
+                // Ticket #235: the Archivists alone, since they are the only Faction whose
+                // directive fills a fund that can be full.
+                if *percent > 0 && self.kind(seat) == FactionKind::Archivists && self.seat(seat).archive_fund >= self.archive_fund_cap(seat) {
                     return if self.archive_built(seat) {
                         fail("the Archive's Research is paid in full")
                     } else {
@@ -1540,12 +1546,12 @@ impl Game {
                     };
                     self.log(line);
                 }
-                Order::SetArchiveFunding { on } => {
-                    self.seat_mut(seat).archive_funding = *on;
-                    let line = if *on {
-                        format!("The {} will pay their Labs into the Archive fund from the next Income.", self.seat_name(seat))
+                Order::SetResearchDirective { percent } => {
+                    self.seat_mut(seat).research_directive = *percent;
+                    let line = if *percent == 0 {
+                        format!("The {} will pay all their Research into the shared Tech from the next Income.", self.seat_name(seat))
                     } else {
-                        format!("The {} will pay their Labs into the shared Tech from the next Income.", self.seat_name(seat))
+                        format!("The {} set a Research Directive of {percent} per cent from the next Income.", self.seat_name(seat))
                     };
                     self.log(line);
                 }
@@ -1834,7 +1840,7 @@ impl Game {
             }
             Order::BuildArchive { colony } => r("build_archive", &[("colony", place(Place::Colony(*colony)))]),
             Order::Upload { colony, n } => r("upload", &[("n", n.to_string()), ("colony", place(Place::Colony(*colony)))]),
-            Order::SetArchiveFunding { on } => r(if *on { "fund_archive" } else { "unfund_archive" }, &[]),
+            Order::SetResearchDirective { percent } => r(if *percent == 0 { "unfund_archive" } else { "fund_archive" }, &[]),
             Order::SetMaxStanding { target } => match target {
                 Some(p) => r("max_on", &[("place", place(*p))]),
                 None => r("max_off", &[]),

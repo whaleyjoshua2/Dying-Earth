@@ -42,6 +42,11 @@ archive_built = "The {faction} raised the Archive at {place}; it wants {left} mo
 archive_complete = "The {faction} completed the Archive at {place}: it stands, and every point of its Research is paid."
 archive_destroyed = "The Archive at {place} was destroyed when the Colony passed out of the {faction}' hands; their Archive fund is kept."
 archive_funded = "The {faction} are funding the Archive: {banked} Research banked, {fund} of {cap} in the fund."
+# Ticket #235 (version 0.08.3): the other three Research Directives. Each says what was given up as
+# well as what was got, because the whole of the decision is the trade.
+directive_sink = "The {faction} directed {research} Research into the Natural Sink: {ppm} ppm more, for good, and the Sink now takes {sink} ppm a turn."
+directive_ducats = "The {faction} directed {research} Research into their coffers: {n} Ducats."
+directive_fuel = "The {faction} directed {research} Research into propellant: {n} Fuel."
 
 # On Earth
 army_moved = "{faction} Army moved from {from} to {to}{attacks}."

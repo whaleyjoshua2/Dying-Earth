@@ -265,6 +265,42 @@ ducats = 0
 # Ticket #35 (version 0.03): Ducats. A controlled Nation State makes gdp x Industry Level / 10 a turn
 # (gdp on its card); a Bank adds bank_per_gdp_tenth x gdp / 10; a Trade Post makes trade_post_base x
 # the Body's Habitat yield. Ducats buy Influence, Leapfrogs and repair points at these rates.
+# Ticket #235 (version 0.08.3): the Research Directive. A Faction may send a share of its Research
+# somewhere other than the shared Tech, chosen as a percentage and standing until changed. The
+# Archivists had this since version 0.07.0 as a switch with two positions; it is a slider now, and
+# theirs is the only one that runs to 100.
+#
+# The rates were fitted against a measurement rather than guessed. Research made over a whole
+# 36-turn game, median by Faction over 20 seeds: Custodians 131, Prospectors 442, Arkwrights 149,
+# Archivists 453 -- so half a turn's Research is about 1.8 points for the Custodians, 6.2 for the
+# Prospectors and 2.1 for the Arkwrights, which is far less than the rule was first drafted against.
+[research_directive]
+# The most any Faction but the Archivists may divert. Theirs is `archivists_max`.
+max = 50
+archivists_max = 100
+# Provisional Findings holds while at least this share still goes to the shared Tech. At the
+# designer's word, "make it a threshold 75%" -- so a directive of 25 or less keeps the rule and
+# anything above it trades the rule away. Before this the answer was binary, because the control
+# was: any funding at all turned Provisional Findings off.
+provisional_min_contribution = 75
+# The Custodians: ppm added to the Natural Sink per point diverted, FOR GOOD. Permanent at the
+# designer's word, and cut from the 0.05 first proposed to 0.01 when the measurement showed what
+# their Research really is: at 0.05 permanent it was +2.7 ppm over a game, a 45% enlargement of a
+# 6.0 Sink, on the Faction that already wins 37 of 80 on exactly this condition. At 0.01 it is
+# about +0.5 ppm over a game if they divert half throughout -- half a Planetary Stewardship, earned
+# over thirty turns of not researching. Per-turn instead of permanent was measured at 0.09 ppm a
+# turn, which is one and a half per cent of the Sink: invisible, and the reason permanent won.
+custodians_ppm_per_point = 0.01
+# The Prospectors: Ducats per point. "10-1" was ambiguous by a factor of a hundred -- ten points to
+# a Ducat is 22 Ducats over a game, less than half a Leapfrog, and one point to ten Ducats is 2,200,
+# larger than their whole economy. The designer chose 0.8, about 5 Ducats a turn and 178 over a
+# game: real money, roughly three Leapfrogs, without dwarfing the Regions.
+prospectors_ducats_per_point = 0.8
+# The Arkwrights: Fuel per point, the designer's "+1 fuel every 5 research" unchanged. About 0.4 a
+# turn and 15 over a game -- two or three extra Moon transits, pointed at the thing they actually
+# lack, which is the range to move people.
+arkwrights_fuel_per_point = 0.2
+
 [ducats]
 per_influence = 2
 # Version 0.04 (ticket #41): two Ducats for one of the thing bought, as with Influence. A repair

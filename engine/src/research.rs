@@ -295,7 +295,7 @@ impl Game {
     /// Archivists banked nothing while the Report still said they had funded the Archive. Measured
     /// in playtest at about 32 of the Archive's 80 Research lost over one game.
     pub fn bank_archive_research(&mut self, seat: Seat, research: i64) -> i64 {
-        if research <= 0 || !self.seat(seat).archive_funding || self.kind(seat) != FactionKind::Archivists {
+        if research <= 0 || self.seat(seat).research_directive == 0 || self.kind(seat) != FactionKind::Archivists {
             return 0;
         }
         let cap = self.archive_fund_cap(seat);
@@ -321,6 +321,75 @@ impl Game {
             self.archive_completed(seat);
         }
         banked
+    }
+
+    /// Ticket #235 (version 0.08.3): the **Research Directive**. A Faction sends a share of its
+    /// Research, chosen as a percentage and standing until changed, somewhere other than the shared
+    /// Tech. Read HERE, at Income, before a point reaches the Tech -- the shape version 0.07.0 gave
+    /// the Archivists' switch, and for the reason recorded on `bank_archive_research`.
+    ///
+    /// Returns what was actually taken, which the caller keeps back from `accrue_research`. It can
+    /// be less than the directive asked for: the Archive fund has a cap, and nothing is taken that
+    /// cannot be used.
+    pub fn spend_research_directive(&mut self, seat: Seat, research: i64) -> i64 {
+        let percent = self.seat(seat).research_directive.min(self.research_directive_cap(seat));
+        // Recorded BEFORE anything is spent and whatever comes of it: this is the directive that
+        // was in force at this Income, and the next one settles Provisional Findings from it.
+        self.seat_mut(seat).directive_last_income = percent;
+        let want = if research > 0 && percent > 0 { research * percent as i64 / 100 } else { 0 };
+        if want <= 0 {
+            return 0;
+        }
+        let t = self.tables.research_directive.clone();
+        let name = self.seat_name(seat);
+        match self.kind(seat) {
+            FactionKind::Archivists => self.bank_archive_research(seat, want),
+            FactionKind::Custodians => {
+                // For GOOD, not for the turn. The Sink itself moves, as a Break moves it.
+                let ppm = want as f64 * t.custodians_ppm_per_point;
+                self.climate.natural_sink += ppm;
+                let sink = self.climate.natural_sink;
+                let text = self.say("directive_sink", &[("faction", name), ("research", want.to_string()), ("ppm", format!("{ppm:.2}")), ("sink", format!("{sink:.2}"))]);
+                self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
+                want
+            }
+            FactionKind::Prospectors => {
+                let paid = self.pay_directive_remainder(seat, want as f64 * t.prospectors_ducats_per_point);
+                self.seat_mut(seat).stockpile.ducats += paid;
+                let text = self.say("directive_ducats", &[("faction", name), ("research", want.to_string()), ("n", paid.to_string())]);
+                self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
+                want
+            }
+            FactionKind::Arkwrights => {
+                let paid = self.pay_directive_remainder(seat, want as f64 * t.arkwrights_fuel_per_point);
+                self.seat_mut(seat).stockpile.fuel += paid;
+                let text = self.say("directive_fuel", &[("faction", name), ("research", want.to_string()), ("n", paid.to_string())]);
+                self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
+                want
+            }
+        }
+    }
+
+    /// Ticket #235: pay out a fractional rate, carrying what is left over to the next turn. The
+    /// Prospectors earn 0.8 of a Ducat a point and the Arkwrights 0.2 of a Fuel, so flooring every
+    /// turn would quietly lose up to a fifth of everything diverted.
+    fn pay_directive_remainder(&mut self, seat: Seat, earned: f64) -> i64 {
+        let s = self.seat_mut(seat);
+        s.directive_remainder += earned;
+        let whole = s.directive_remainder.floor();
+        s.directive_remainder -= whole;
+        whole as i64
+    }
+
+    /// Ticket #235: the most this seat may direct away from the shared Tech. The Archivists' runs
+    /// to 100 -- their switch always sent ALL of it to the Archive, and the slider that replaced it
+    /// keeps that reach -- where every other Faction stops at half.
+    pub fn research_directive_cap(&self, seat: Seat) -> u8 {
+        if self.kind(seat) == FactionKind::Archivists {
+            self.tables.research_directive.archivists_max
+        } else {
+            self.tables.research_directive.max
+        }
     }
 
     /// Ticket #68: the Archive is complete, whether the last Research or the Module came last.

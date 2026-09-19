@@ -453,6 +453,13 @@ _Avoid_: clause, article, condition (that is close to Victory Condition), provis
 The amount of Influence a Faction receives each turn, split freely across any number of targets during the Orders phase. It is a base plus the Influence value of every Region the Faction controls (since version 0.03 each state carries its own value, from its economic and military weight), and it does not carry over.
 _Avoid_: influence budget, diplomacy pool, action points
 
+**Research Directive**:
+The share of a Faction's Research, chosen as a percentage and standing until it is changed, that goes somewhere other than the shared Tech. Read at Income before a point reaches the Tech, so what is directed **contributes nothing to the Research Lead** -- and the Lead is the only seat that picks what the table researches next. That is the price, and it is what makes the directive a decision rather than free income.
+Each Faction's goes somewhere of its own: the **Custodians** enlarge the **Natural Sink**, permanently, by 0.01 ppm a point; the **Prospectors** take 0.8 **Ducats** a point; the **Arkwrights** take a **Fuel** for every five points; and the **Archivists** pay the **Archive** fund, which they have done since version 0.07.0 and which was the only version of this until 0.08.3. Fractions of a Ducat or a Fuel are carried between turns rather than floored away.
+Every Faction may direct up to **half**. The **Archivists alone may direct all of it**, because their switch always sent all of it and the slider that replaced it keeps that reach.
+Since version 0.08.3 **Provisional Findings** takes a threshold rather than a yes or no: it holds while at least **75%** of last turn's Research still went to the shared Tech, so a directive of 25 or less keeps the rule and anything above trades it away.
+_Avoid_: research split, funding (that is the Archive's own word), taxing your labs, siphoning
+
 **Research**:
 Points produced by Research Labs on Earth and, since version 0.06.0, by Observatories at Colonies and Space Stations, and spent only on Techs. Since version 0.08.2 two Factions holding a research agreement between them each make a tenth more. Since version 0.08.0 a place's Education Level moderates what its population adds as well as multiplying the building's own figure, so schooling applies twice to a Lab. Held outside the Stockpile; it is not one of the three resources and never buys a Facility, Module or Ship. Since version 0.05.5 a Lab in a Region nobody holds, or one under Occupation, runs itself and pays half its yield into the Tech under research for no Faction; North America and South-East Asia begin with such a Lab.
 _Avoid_: science, research points, RP, fourth resource

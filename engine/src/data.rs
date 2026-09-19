@@ -515,6 +515,16 @@ pub struct StartCard {
 
 /// Ticket #35: what Ducats buy.
 #[derive(Debug, Clone, Deserialize)]
+pub struct ResearchDirectiveCard {
+    pub max: u8,
+    pub archivists_max: u8,
+    pub provisional_min_contribution: u8,
+    pub custodians_ppm_per_point: f64,
+    pub prospectors_ducats_per_point: f64,
+    pub arkwrights_fuel_per_point: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct DucatsCard {
     pub per_influence: i64,
     /// Ticket #54: what one Leapfrog costs the Custodians; it replaced `per_restoration_step`.
@@ -1071,6 +1081,7 @@ struct FactionsFile {
     faction: Vec<FactionCard>,
     start: StartCard,
     ducats: DucatsCard,
+    research_directive: ResearchDirectiveCard,
     venture_capital: VentureCard,
     emigrants: EmigrantsCard,
     relations: RelationsCard,
@@ -1251,6 +1262,7 @@ pub struct Tables {
     pub events: EventsTable,
     pub factions: Vec<FactionCard>,
     pub start: StartCard,
+    pub research_directive: ResearchDirectiveCard,
     pub ducats: DucatsCard,
     pub venture: VentureCard,
     pub emigrants: EmigrantsCard,
@@ -1359,6 +1371,7 @@ impl Tables {
             factions: factions.faction,
             start: factions.start,
             ducats: factions.ducats,
+            research_directive: factions.research_directive,
             venture: factions.venture_capital,
             emigrants: factions.emigrants,
             relations: factions.relations,

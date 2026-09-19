@@ -378,6 +378,10 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("archive_complete", &["faction", "place"]),
     ("archive_destroyed", &["place", "faction"]),
     ("archive_funded", &["faction", "banked", "fund", "cap"]),
+    // Ticket #235 (version 0.08.3): the three Research Directives that are not the Archive's.
+    ("directive_sink", &["faction", "research", "ppm", "sink"]),
+    ("directive_ducats", &["faction", "research", "n"]),
+    ("directive_fuel", &["faction", "research", "n"]),
     ("army_moved", &["faction", "from", "to", "attacks"]),
     ("army_landed", &["faction", "colony"]),
     ("units_destroyed", &["place", "why", "lost"]),
