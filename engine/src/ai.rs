@@ -1423,7 +1423,7 @@ impl Game {
                     .filter(|s| self.state(*s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()))
                     .max_by(by_population);
                 let target = with_site.or_else(|| if self.antarctica_open { self.directed_states(seat).into_iter().max_by(by_population) } else { None });
-                // Ticket #196: as many as the state can pay for, not all or nothing. A Steerage batch
+                // Ticket #196: as many as the state can pay for, not all or nothing. A Coach Class batch
                 // costs the Arkwrights 16.0 people and Australia carries 10.1 to 12.6.
                 if let Some(st) = target
                     && let n = self.emigrants_affordable(seat, st)

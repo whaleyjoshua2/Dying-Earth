@@ -386,13 +386,13 @@ pub struct FactionCard {
     /// Transit Fuel times this, before Efficient Transit.
     #[serde(default = "one_f64")]
     pub transit_fuel_multiplier: f64,
-    /// Steerage: what a Colony Ship carries, times this.
+    /// Coach Class: what a Colony Ship carries, times this.
     #[serde(default = "one_f64")]
     pub colony_ship_capacity_multiplier: f64,
-    /// Steerage: the population a lift from a Launch Site takes, times this.
+    /// Coach Class: the population a lift from a Launch Site takes, times this.
     #[serde(default = "one_f64")]
     pub lift_population_multiplier: f64,
-    /// Steerage: what a Colony Ship costs, in place of the units.toml figure.
+    /// Coach Class: what a Colony Ship costs, in place of the units.toml figure.
     #[serde(default)]
     pub colony_ship_materials: Option<i64>,
     /// Ticket #83 (version 0.06.0): every Ship's Materials, times this, rounded down (the
@@ -423,7 +423,7 @@ pub struct FactionCard {
     /// Ticket #72 (version 0.05.5): a Facility's Materials, times this (the Prospectors' 0.85).
     #[serde(default = "one_f64")]
     pub facility_materials_multiplier: f64,
-    /// Ticket #73 (version 0.05.5): Emigrants mustered a turn, times this (Steerage's 2.0).
+    /// Ticket #73 (version 0.05.5): Emigrants mustered a turn, times this (Coach Class's 2.0).
     #[serde(default = "one_f64")]
     pub emigrants_multiplier: f64,
 }

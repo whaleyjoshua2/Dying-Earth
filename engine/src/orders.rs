@@ -1042,7 +1042,7 @@ impl Game {
                 }
                 let ShipAt::Body(body) = s.at else { return fail("in transit") };
                 let card = self.tables.unit(s.kind);
-                // Ticket #51: what a Colony Ship carries is a Faction figure (Steerage doubles it)
+                // Ticket #51: what a Colony Ship carries is a Faction figure (Coach Class doubles it)
                 // and rises with Expanded Habitats; nothing else carries Colonists.
                 // Ticket #86: at Earth a warming world crowds a Colony Ship beyond its capacity.
                 let capacity = if s.kind == UnitKind::ColonyShip {

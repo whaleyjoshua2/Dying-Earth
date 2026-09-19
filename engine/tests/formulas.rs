@@ -1879,12 +1879,12 @@ fn archive_at(g: &mut Game, seat: Seat, body: BodyId, paid: i64, colonists: u32)
 }
 
 #[test]
-fn steerage_doubles_an_arkwright_colony_ships_load_and_cuts_its_price() {
+fn coach_class_doubles_an_arkwright_colony_ships_load_and_cuts_its_price() {
     let mut g = game();
     // Capacity: the card figure for everyone else, twice it for the Arkwrights, and Expanded
     // Habitats adds its two before the doubling.
     assert_eq!(g.colony_ship_capacity(Seat(0)), 4);
-    assert_eq!(g.colony_ship_capacity(Seat(2)), 8, "Steerage carries twice");
+    assert_eq!(g.colony_ship_capacity(Seat(2)), 8, "Coach Class carries twice");
     g.research.done.push(TechId::ExpandedHabitats);
     assert_eq!(g.colony_ship_capacity(Seat(0)), 6);
     assert_eq!(g.colony_ship_capacity(Seat(2)), 12, "(4 + 2) doubled");
@@ -1913,12 +1913,12 @@ fn an_arkwright_muster_takes_twice_the_population_out_of_its_state() {
     g.state_mut(StateId::NorthAfrica).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
     g.state_mut(StateId::NorthAfrica).facilities.push(facility(FacilityKind::LaunchSite));
     assert!((g.lift_population(Seat(0), 4) - 4.0).abs() < 1e-9, "one unit of five million each since ticket #143 (version 0.07.3)");
-    assert!((g.lift_population(Seat(2), 4) - 8.0).abs() < 1e-9, "Steerage costs the state twice");
+    assert!((g.lift_population(Seat(2), 4) - 8.0).abs() < 1e-9, "Coach Class costs the state twice");
     // Ticket #73: the population is paid when the Emigrants muster, and the lift takes none.
     let before = g.state(StateId::NorthAfrica).population;
     g.commit_orders(Seat(2), &[Order::BuildEmigrants { state: StateId::NorthAfrica, n: 4 }]);
     let taken = before - g.state(StateId::NorthAfrica).population;
-    assert!((taken - 8.0).abs() < 1e-9, "the recruit took {taken}, not 8.0 (two units of five million per Pioneer under Steerage)");
+    assert!((taken - 8.0).abs() < 1e-9, "the recruit took {taken}, not 8.0 (two units of five million per Pioneer under Coach Class)");
     let after_muster = g.state(StateId::NorthAfrica).population;
     let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
     g.commit_orders(Seat(2), &[Order::Load { ship, colonists: 4, from: LoadSource::State(StateId::NorthAfrica), army: None }]);
@@ -5425,7 +5425,7 @@ fn a_helium_three_vein_doubles_the_moons_generators_for_two_turns_and_triples_wi
 
 /// Ticket #73 (a): Colonists are built. Up to four Emigrants a turn per Faction muster in one state
 /// it directs, at 0.1 population each, landing on the card at End Turn (a turn to muster: nothing
-/// lifts them the turn they are ordered), and the batch takes 0.5 off the state's Unrest. Steerage:
+/// lifts them the turn they are ordered), and the batch takes 0.5 off the state's Unrest. Coach Class:
 /// eight a turn at twice the population.
 #[test]
 fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_one_unit_of_population_each_and_calm_it() {
@@ -5444,7 +5444,7 @@ fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_one_unit_of_populati
     assert!((pop - g.state(StateId::EastAsia).population - 4.0).abs() < 1e-9, "one unit of five million each (ticket #143)");
     assert_eq!(g.state(StateId::EastAsia).unrest, 2.5, "the batch took 0.5 off");
     assert!(g.log.to_vec().iter().any(|l| l.contains("Pioneers recruited in China")), "{:?}", g.log.to_vec());
-    // Steerage: eight a turn at twice the population.
+    // Coach Class: eight a turn at twice the population.
     assert_eq!(g.emigrants_per_turn(Seat(0)), 4);
     assert_eq!(g.emigrants_per_turn(Seat(2)), 8, "the Arkwrights recruit eight");
     assert!((g.lift_population(Seat(2), 8) - 16.0).abs() < 1e-9, "at twice the population");
@@ -7280,7 +7280,7 @@ fn a_seat_with_room_on_a_station_musters_before_antarctica_opens() {
     );
 }
 
-/// Ticket #196: a Steerage batch costs 8 x 2.0 = 16.0 population, and Australia carries 10.1 to
+/// Ticket #196: a Coach Class batch costs 8 x 2.0 = 16.0 population, and Australia carries 10.1 to
 /// 12.6 -- the only one of the fourteen Regions below 16 -- so the Arkwright AI was refused every
 /// turn it held it, 243 times across twenty measured games, and mustered nothing at all. A muster
 /// now takes as many as the Region can pay for.
@@ -8718,4 +8718,25 @@ fn the_yields_the_ai_weights_now_read_actually_move_with_their_techs() {
     // The Mine's weight is scaled by yield-over-card, so the card figure must stay reachable.
     let card = g.tables.module(ModuleKind::Mine).produces.as_ref().map(|p| p.amount).unwrap_or(0);
     assert_eq!(card, 4, "the Mine's card figure, which the AI weight divides by");
+}
+
+/// Ticket #244 (version 0.08.3): the Arkwrights' signature rule is COACH CLASS, and the word
+/// Steerage appears on no Faction card. Renamed for the reason the Emigrant became the Pioneer --
+/// steerage is the cheapest class of passage on an emigrant ship, and this rule's own avoid list
+/// had been warning off "cattle class" since it was written.
+///
+/// This test exists because the rename moved no MECHANIC: every figure Coach Class controls is
+/// unchanged, so the tests that guard the rule stayed green throughout and witnessed nothing. A
+/// rename with no guard is exactly how a word creeps back.
+#[test]
+fn the_arkwrights_signature_rule_is_coach_class_and_says_steerage_nowhere() {
+    let g = game();
+    let card = g.tables.faction(FactionKind::Arkwrights);
+    assert!(card.signature.starts_with("Coach Class"), "the card leads with the rule's name: {}", card.signature);
+    for kind in FactionKind::ALL {
+        let c = g.tables.faction(kind);
+        for text in [&c.signature, &c.victory, &c.blurb, &c.unique] {
+            assert!(!text.to_lowercase().contains("steerage"), "{kind:?} still says Steerage: {text}");
+        }
+    }
 }

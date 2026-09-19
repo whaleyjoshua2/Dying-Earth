@@ -21,16 +21,17 @@ The Faction that maximizes resource extraction without regard for ecological cos
 _Avoid_: Extractors (the retired name), capitalists, industrialists, exploiters
 
 **Arkwrights**:
-The Faction that exists to get people off Earth and spread them as widely as it can. Their signature rule is Steerage, and they win on Diaspora.
+The Faction that exists to get people off Earth and spread them as widely as it can. Their signature rule is Coach Class, and they win on Diaspora.
 _Avoid_: settlers, arks, exodus, nomads
 
 **Archivists**:
 The Faction that means to save what humanity knows, and as many of its people as it can, in one place off Earth. Their signature rule is Provisional Findings, their Unique Facility is the Reactor, and they win by completing the Archive and Uploading twelve Colonists into it. Since version 0.08.0 they may not begin the Archive until The Upload, their own gate Tech, stands -- so their Labs' Research is a choice between the monument and the tree that opens its door.
 _Avoid_: scholars, librarians, scientists, the Academy
 
-**Steerage**:
+**Coach Class**:
 The Arkwrights' signature rule: their Colony Ships carry twice the Colonists and cost less to build, and they recruit eight Pioneers a turn where others recruit four, but every Pioneer costs their Region twice the population.
-_Avoid_: mass transit, cattle class, overcrowding, packing them in
+Called **Steerage** until version 0.08.3, and renamed for the same reason the Emigrant became the **Pioneer**: steerage is literally the cheapest class of passage on an emigrant ship, and this entry's own avoid list had been warning off *cattle class* and *packing them in* since it was written. **Coach Class** keeps the metaphor that is honest about the rule -- bulk passage at low cost -- and drops the history. The designer rejected **Stowaway**, which was considered and argued down: a stowaway hides aboard without permission or payment, where the Arkwrights' people are recruited openly, counted, and carried in ships built for the purpose.
+_Avoid_: steerage, mass transit, cattle class, overcrowding, packing them in
 
 **Diaspora**:
 The Arkwrights' Victory Condition: thirty Colonists living off Earth, spread over at least three Bodies with at least four Colonists on each. Antarctica counts toward neither part; since version 0.06.0 Colonists on a station over Earth count toward the thirty, but Earth is never one of the three Bodies.
@@ -249,7 +250,7 @@ _Avoid_: transport, colony (that is the settlement), settler ship
 
 **Crowding**:
 The extra Colonists a warming Earth puts aboard a Colony Ship lifting at Earth, beyond its capacity, since version 0.06.0, and the risk they run: rolled once at arrival, each crowded Colonist dies with a chance that grows with the size of the crowd. The player chooses whether to take them; the sea to Antarctica carries no crowd.
-_Avoid_: overloading, steerage (that is the Arkwrights' rule), refugees aboard
+_Avoid_: overloading, coach class (that is the Arkwrights' rule), refugees aboard
 
 **Carrier**:
 The Ship type that carries one Army and nothing else, since version 0.04. Unarmed, it needs an escort and is a target for Intercept like a Colony Ship. Every landing needs one.
@@ -281,7 +282,7 @@ _Avoid_: settler, crew, worker, population resource
 
 **Pioneer**:
 A Colonist recruited in a Region and not yet gone: up to four a turn per Faction (eight for the Arkwrights), in one state the Faction directs, each taking one unit of the state's population -- five million people, since version 0.07.3; a tenth of a hundred million, ten million, before -- on the state's card at End Turn. A batch takes half a point off the state's Unrest. A working Launch Site lifts Pioneers onto a Ship, or, since version 0.07.3, straight onto a Space Station of their Faction's over Earth, as many as its Habitats have room for, aboard at that turn's Resolution -- a launch, with no crowd; and once the Antarctic ice is open the sea takes them to Antarctica in a turn with no launch. They are people of their state until they leave it.
-Called an **Emigrant** until version 0.08.3, and **recruited** where it was mustered. The designer's reason was the word rather than the rule: *"it's more about the word being politically loaded and racked with connotation"*. The rule is untouched -- a Pioneer is the same stage of a Colonist's life the Emigrant was, which is why the distinction was kept rather than folded into Colonist: **Steerage** and the **Spaceport** are both stated in terms of it, and "every Colonist costs their Region twice the population" would have been false.
+Called an **Emigrant** until version 0.08.3, and **recruited** where it was mustered. The designer's reason was the word rather than the rule: *"it's more about the word being politically loaded and racked with connotation"*. The rule is untouched -- a Pioneer is the same stage of a Colonist's life the Emigrant was, which is why the distinction was kept rather than folded into Colonist: **Coach Class** and the **Spaceport** are both stated in terms of it, and "every Colonist costs their Region twice the population" would have been false.
 The engine still spells the field, the order and the Report keys `emigrant`: they are not read by a player, and renaming the two serialized fields on every Nation State would have broken every save for no visible gain.
 _Avoid_: emigrant, settler, migrant, passenger, colonist-in-waiting, pilgrim
 

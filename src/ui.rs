@@ -4467,7 +4467,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             "Recruited here and not yet lifted or sent: a working Launch Site lifts them onto a Ship or straight to a station of yours over Earth, and once the ice is open the sea takes them to Antarctica.",
         );
         // Ticket #196 (version 0.08.0): as many as this state's people can pay for, where the button
-        // always asked for the whole batch. Steerage costs the Arkwrights twice the population for
+        // always asked for the whole batch. Coach Class costs the Arkwrights twice the population for
         // twice the batch -- 16.0 people -- and Australia carries 10.1 to 12.6, so the button was dead
         // there with nothing on screen to say why. Where the state cannot pay for even one, it still
         // offers one, so the refusal a player reads is "not enough people there" rather than silence.

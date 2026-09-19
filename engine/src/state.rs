@@ -1447,15 +1447,15 @@ impl Game {
             && !self.colonies.iter().any(|c| c.control.director() == Some(seat) && self.may_hold_archive(c))
     }
 
-    // ---------------------------------------------------------------- Ticket #51: Steerage and the rest
+    // ---------------------------------------------------------------- Ticket #51: Coach Class and the rest
 
-    /// Ticket #73: how many Emigrants this seat may muster in a turn (Steerage doubles it).
+    /// Ticket #73: how many Emigrants this seat may muster in a turn (Coach Class doubles it).
     pub fn emigrants_per_turn(&self, seat: Seat) -> u32 {
         (self.tables.emigrants.per_turn as f64 * self.tables.faction(self.kind(seat)).emigrants_multiplier).floor() as u32
     }
 
     /// What one Colony Ship of this seat carries: the card figure, +2 with Expanded Habitats
-    /// (version 0.04 section 4), times the Faction's own multiplier (Steerage doubles it).
+    /// (version 0.04 section 4), times the Faction's own multiplier (Coach Class doubles it).
     pub fn colony_ship_capacity(&self, seat: Seat) -> u32 {
         // Ticket #84: Generation Ships stacks on Expanded Habitats.
         let base = self.tables.unit(UnitKind::ColonyShip).carries_colonists as i64 + self.tech_addition(seat, TechId::ExpandedHabitats) + self.tech_addition(seat, TechId::GenerationShips);
@@ -1554,7 +1554,7 @@ impl Game {
             .sum()
     }
 
-    /// The population a lift from a Launch Site takes for this many Colonists (Steerage doubles it).
+    /// The population a lift from a Launch Site takes for this many Colonists (Coach Class doubles it).
     pub fn lift_population(&self, seat: Seat, colonists: u32) -> f64 {
         // Ticket #73: paid when the Emigrants muster, not when a Ship lifts them.
         self.tables.emigrants.population_each * colonists as f64 * self.tables.faction(self.kind(seat)).lift_population_multiplier
@@ -1717,7 +1717,7 @@ impl Game {
     /// Ticket #196 (version 0.08.0): how many Emigrants this seat could muster in this state right
     /// now -- its per-turn cap, or what the state's people can pay for, whichever is smaller.
     ///
-    /// A batch was all-or-nothing until now, and Steerage costs the Arkwrights twice the population
+    /// A batch was all-or-nothing until now, and Coach Class costs the Arkwrights twice the population
     /// for twice the batch: 8 x 2.0 = 16.0 people, where Australia carries 10.1 to 12.6 and is the
     /// only one of the fourteen Regions below 16. Measured, an Arkwright AI holding it was refused
     /// on all 243 turns it tried and mustered nothing in twenty games. A muster takes what the
