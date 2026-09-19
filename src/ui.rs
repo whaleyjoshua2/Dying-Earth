@@ -5255,26 +5255,18 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     const BOX_H: f32 = 58.0;
     /// The row-heading column on the left, wide enough for "Off-world Living".
     const HEAD_W: f32 = 128.0;
-    // Ticket #249 (version 0.08.3): the order the BANDS are drawn in, settled over four turns of
-    // the designer looking at it -- ticket #247 gave Extraction its place under Industry and The
-    // Upload a place above Generation Ships, #248 lifted Off-world Living to the top, and this is
-    // the order asked for last: *"keep off world living first than I want industry followed
-    // extraction and then propulsion and finally society"*.
+    // Ticket #250 (version 0.08.3): the order the BANDS are drawn in, settled over five turns of
+    // the designer looking at the tree -- #247 gave Extraction its place under Industry, #248
+    // lifted Off-world Living to the top, #249 set the middle three, and this is the last word:
+    // *"now swap industry and extraction and move society to the top"*.
     //
-    // THE PRICE, said before it was taken and taken anyway. Society is at the BOTTOM and Off-world
-    // Living at the TOP, which are the two bands the Closed-Loop Colonies -> The Upload edge runs
-    // between since ticket #246 made that a prerequisite. So that edge spans the whole height of
-    // the tree and passes behind every box in its column on the way -- the state #246 shipped and
-    // #247 briefly cured by putting those two bands side by side. Reading order won over the line.
-    //
-    // The line is a DRAWING problem and has a drawing answer: `tech_tree`'s elbow routing sends an
-    // edge down the gap to the left of the needing box's column, which avoids crossing boxes
-    // sideways but not vertically. Routing around, offsetting or dimming a passing edge is on the
-    // map as the fix, and this order is the strongest argument yet for taking it.
+    // It happens to undo the damage #249 counted. Society and Off-world Living are ADJACENT again,
+    // and those are the two bands the Closed-Loop Colonies -> The Upload edge runs between, so the
+    // edge is a hop between neighbours rather than a line down the whole tree behind four boxes.
     //
     // A branch not named here keeps its first-appearance place, after the named ones, so a new
     // branch cannot vanish by being forgotten.
-    const BAND_ORDER: [&str; 5] = ["Off-world Living", "Industry", "Extraction", "Propulsion", "Society"];
+    const BAND_ORDER: [&str; 5] = ["Society", "Off-world Living", "Extraction", "Industry", "Propulsion"];
     let mut branches: Vec<String> = Vec::new();
     for t in TechId::ALL {
         let b = &game.tables.tech(t).branch;
@@ -5303,7 +5295,20 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
                 .collect()
         })
         .collect();
-    let stacked = |r: usize| r + 1 < rungs;
+    // Ticket #250 (version 0.08.3): EVERY rung stacks, the last one included. It did not before --
+    // `r + 1 < rungs` left the final rung laying its boxes side by side -- and the consequence was
+    // that a band with two rung-3 Techs split the column between them, so Society's Planetary
+    // Stewardship and The Upload sat at two x positions that no other band's rung-3 box shared.
+    //
+    // The designer: *"there is no reason upload needs to be on the same line as society ... and I
+    // want all level three techs to appear on the same column"*. Stacking gives both at once: The
+    // Upload takes a row of its own inside the Society band, and every rung-3 box in the tree now
+    // sits at `left[2] + COL / 2`, one column.
+    //
+    // It costs nothing in height -- a band is already as tall as its fullest stacked cell, and
+    // Society's rung 2 already held two -- and it makes the tree one COL narrower, since the last
+    // rung no longer claims width for the widest cell in it.
+    let stacked = |_r: usize| true;
     let span: Vec<f32> = (0..rungs).map(|r| if stacked(r) { 1.0 } else { (0..branches.len()).map(|b| cell[r * branches.len() + b].len()).max().unwrap_or(1).max(1) as f32 }).collect();
     let left: Vec<f32> = (0..rungs).map(|r| HEAD_W + span[..r].iter().sum::<f32>() * COL).collect();
     let width: f32 = HEAD_W + span.iter().sum::<f32>() * COL;
