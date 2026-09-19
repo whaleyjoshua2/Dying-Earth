@@ -5255,24 +5255,26 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     const BOX_H: f32 = 58.0;
     /// The row-heading column on the left, wide enough for "Off-world Living".
     const HEAD_W: f32 = 128.0;
-    // Ticket #248 (version 0.08.3): the order the BANDS are drawn in, which until ticket #247 fell
-    // out of the order Techs happen to sit in `TechId::ALL`. The designer has asked for three
-    // things across two turns: Extraction below Industry, The Upload above Generation Ships, and
-    // then *"lets move off world living to the top"*.
+    // Ticket #249 (version 0.08.3): the order the BANDS are drawn in, settled over four turns of
+    // the designer looking at it -- ticket #247 gave Extraction its place under Industry and The
+    // Upload a place above Generation Ships, #248 lifted Off-world Living to the top, and this is
+    // the order asked for last: *"keep off world living first than I want industry followed
+    // extraction and then propulsion and finally society"*.
     //
-    // THE LAST OF THOSE COSTS THE SECOND, and the trade is recorded here so it is not rediscovered.
-    // Nothing can sit above the top band, so with Off-world Living there, Society cannot be above
-    // it and The Upload cannot be above Generation Ships: the two have swapped, and The Upload now
-    // sits directly BELOW it.
+    // THE PRICE, said before it was taken and taken anyway. Society is at the BOTTOM and Off-world
+    // Living at the TOP, which are the two bands the Closed-Loop Colonies -> The Upload edge runs
+    // between since ticket #246 made that a prerequisite. So that edge spans the whole height of
+    // the tree and passes behind every box in its column on the way -- the state #246 shipped and
+    // #247 briefly cured by putting those two bands side by side. Reading order won over the line.
     //
-    // What is preserved is the part that mattered more. Society stays IMMEDIATELY ADJACENT to
-    // Off-world Living, so the Closed-Loop Colonies -> The Upload edge that ticket #246 left
-    // running the whole height of the tree, underneath two unrelated boxes, stays a short hop
-    // between neighbours crossing nothing. Extraction stays directly below Industry.
+    // The line is a DRAWING problem and has a drawing answer: `tech_tree`'s elbow routing sends an
+    // edge down the gap to the left of the needing box's column, which avoids crossing boxes
+    // sideways but not vertically. Routing around, offsetting or dimming a passing edge is on the
+    // map as the fix, and this order is the strongest argument yet for taking it.
     //
     // A branch not named here keeps its first-appearance place, after the named ones, so a new
     // branch cannot vanish by being forgotten.
-    const BAND_ORDER: [&str; 5] = ["Off-world Living", "Society", "Industry", "Extraction", "Propulsion"];
+    const BAND_ORDER: [&str; 5] = ["Off-world Living", "Industry", "Extraction", "Propulsion", "Society"];
     let mut branches: Vec<String> = Vec::new();
     for t in TechId::ALL {
         let b = &game.tables.tech(t).branch;
