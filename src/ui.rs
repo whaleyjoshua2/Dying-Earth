@@ -5238,10 +5238,21 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
 /// branch, one column per rung**, so time runs left to right the way a tree is read, the branch
 /// names as row headings down the left edge. The designer's line: *"Transpose tech tree."*
 fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, actions: &mut Vec<Action>) {
-    const COL: f32 = 160.0;
-    const ROW: f32 = 96.0;
-    const BOX_W: f32 = 136.0;
-    const BOX_H: f32 = 64.0;
+    // Ticket #242 (version 0.08.3): every figure here is a TENTH SMALLER than it was, at the
+    // designer's word -- "let's reduce the size of the tech boxes by 10%". The spacing went with
+    // the boxes deliberately: the tree's height is `rows x ROW`, so shrinking the boxes alone would
+    // have put more air around smaller boxes and saved not one pixel, which is not what the change
+    // was for. Ticket #232's two new Techs had taken the tree from 672 pixels to 864; at nine
+    // tenths it is 774, which clears 1080 with room and leaves less to scroll at 800.
+    //
+    // The two font sizes below came down with them, 13 to 12 and 11 to 10, and the text offsets
+    // inside a box with them. Box text is drawn centred and is NOT clipped, so a name that no
+    // longer fits spills over the box edge rather than being cut -- "Closed-Loop Colonies" and
+    // "The Extraction Charter" are the two that would have shown it.
+    const COL: f32 = 144.0;
+    const ROW: f32 = 86.0;
+    const BOX_W: f32 = 122.0;
+    const BOX_H: f32 = 58.0;
     /// The row-heading column on the left, wide enough for "Off-world Living".
     const HEAD_W: f32 = 128.0;
     let mut branches: Vec<String> = Vec::new();
@@ -5363,13 +5374,13 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
             None => egui::Stroke::new(1.0, Color32::from_gray(200)),
         };
         painter.rect(r, 6.0, fill, stroke, egui::StrokeKind::Inside);
-        painter.text(r.center_top() + egui::vec2(0.0, 14.0), egui::Align2::CENTER_CENTER, &card.name, FontId::proportional(13.0), Color32::WHITE);
-        painter.text(r.center_top() + egui::vec2(0.0, 32.0), egui::Align2::CENTER_CENTER, format!("cost {} - {}", card.cost, status), FontId::proportional(11.0), Color32::from_gray(230));
+        painter.text(r.center_top() + egui::vec2(0.0, 13.0), egui::Align2::CENTER_CENTER, &card.name, FontId::proportional(12.0), Color32::WHITE);
+        painter.text(r.center_top() + egui::vec2(0.0, 29.0), egui::Align2::CENTER_CENTER, format!("cost {} - {}", card.cost, status), FontId::proportional(10.0), Color32::from_gray(230));
         let needs = if card.needs.is_empty() { "nothing".to_string() } else { card.needs.iter().map(|n| game.tables.tech(*n).name.clone()).collect::<Vec<_>>().join(" and ") };
         ui.interact(r, ui.id().with(format!("tech-{t:?}")), egui::Sense::hover()).on_hover_text(format!("{} (rung {}, cost {} Research)\n{}\nNeeds: {}", card.name, card.rung, card.cost, card.effect, needs));
         if must_pick && available.contains(&t) && game.research.current != Some(t) {
-            let b = egui::Rect::from_center_size(r.center_bottom() - egui::vec2(0.0, 11.0), egui::vec2(56.0, 18.0));
-            if ui.put(b, egui::Button::new(RichText::new("Pick").size(11.0))).clicked() {
+            let b = egui::Rect::from_center_size(r.center_bottom() - egui::vec2(0.0, 10.0), egui::vec2(50.0, 16.0));
+            if ui.put(b, egui::Button::new(RichText::new("Pick").size(10.0))).clicked() {
                 actions.push(Action::PickTech(t));
             }
         }
@@ -6113,7 +6124,13 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         // and four of the five legend swatches, and the first two captures were useless because of
         // it. `default_pos` only places it the first time, so a window the player has dragged stays
         // where they put it.
-        egui::Window::new("Tech Tree").open(&mut open).resizable(false).default_pos(egui::pos2(if session.spectator { 840.0 } else { 430.0 }, 120.0)).show(ctx, |ui| {
+        // Ticket #242 (version 0.08.3): the window is bounded by the SCREEN and its tree scrolls
+        // inside it. The bound is on the window rather than on the ScrollArea because that is what
+        // egui actually constrains: a `max_height` on the ScrollArea alone left the window 535
+        // pixels tall on an 800-pixel screen, showing two branches where four had fitted before.
+        let top = 120.0;
+        let room = (ctx.content_rect().height() - top - 40.0).max(240.0);
+        egui::Window::new("Tech Tree").open(&mut open).resizable(false).default_pos(egui::pos2(if session.spectator { 840.0 } else { 430.0 }, top)).show(ctx, |ui| {
             // Ticket #211 (version 0.08.1): the race bar stands where this window's first SENTENCE
             // stood, at the designer's word, and the sentence moves onto its hover. One wrinkle,
             // handled rather than lived with: when NO Tech is under research the bar is not drawn at
@@ -6165,7 +6182,31 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             }
             // Ticket #98: the Lead chooses from the drawn shortlist, so that is what the tree offers.
             let available = game.pickable_techs();
-            tech_tree(ui, game, &available, must_pick, actions);
+            // Ticket #242 (version 0.08.3): the tree SCROLLS when it does not fit, the scrollbar
+            // showing only when it is needed -- the decision ticket #217 already took for the
+            // Faction selection screen, so the game answers this problem the same way twice.
+            //
+            // It became necessary here because ticket #232's two new Techs gave Off-world Living
+            // and Extraction a second row each: the tree was 672 pixels tall and is now 864. A
+            // headless capture at 1280x800 showed the WHOLE SOCIETY BRANCH off the bottom of the
+            // screen -- Public Science, Green Consensus, Civil Defense and two Victory gates -- with
+            // no scrollbar and the window fixed at `resizable(false)`. At 1920x1080, which is what
+            // the game opens maximised into, it fitted with about thirty pixels to spare.
+            //
+            // The height is set from the screen rather than left to egui's default, and the first
+            // attempt is why: a bare `ScrollArea::vertical()` took a default height and showed TWO
+            // branches where four had fitted before, which is a worse window than the one it
+            // replaced. It takes everything between the cursor and the bottom of the screen, less
+            // a margin for the window's own frame, and `auto_shrink` upward so a tree that fits is
+            // drawn whole with no scrollbar at all.
+            // The bound is computed from the SCREEN and the window's own top, never from
+            // `ui.cursor()`: the first attempt used the cursor and left the window 535 pixels tall
+            // on an 800-pixel screen, showing two branches where four had fitted before. A
+            // `max_height` on the Window does not help either -- it is a cap, and a window sizes
+            // itself to its content, so the ScrollArea is what has to be told.
+            egui::ScrollArea::vertical().auto_shrink([false, true]).max_height(room).min_scrolled_height(room).show(ui, |ui| {
+                tech_tree(ui, game, &available, must_pick, actions);
+            });
         });
         view.show_tech = open;
     }
