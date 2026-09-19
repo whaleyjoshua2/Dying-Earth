@@ -272,18 +272,24 @@ name = "The Upload"
 branch = "Society"
 rung = 3
 cost = 48
-# Ticket #245 (version 0.08.3): Expanded Habitats is no longer a prerequisite. It was removed for
-# a DRAWING reason that turned into a rules decision: the edge from Expanded Habitats ran right,
-# passed underneath the Generation Ships box -- lines are painted before boxes -- and turned down
-# to here, so on screen it read as an edge into Generation Ships that nobody had drawn. The
-# designer asked for that line gone; told that the edge was really this one and that removing it
-# would weaken the Archivists' gate rather than tidy a duplicate, they answered: "remove expanded
-# habitats from the upload I accept the weakend gate."
+# Ticket #245 (version 0.08.3): Expanded Habitats was removed for a DRAWING reason that turned into
+# a rules decision -- the edge from Expanded Habitats ran right, passed underneath the Generation
+# Ships box (lines are painted before boxes) and turned down to here, so on screen it read as an
+# edge into Generation Ships that nobody had drawn. That left the gate needing Public Science alone.
 #
-# The gate is now ONE Tech deep -- Public Science, rung 1, then this. It is the shallowest of the
-# four Victory gates: the Custodians' is two (Public Science, Green Consensus) since ticket #242,
-# the Arkwrights' two, and the Prospectors' three since Beneficiation joined. The sweep reads it.
-needs = ["public_science"]
+# Ticket #246 (version 0.08.3): and then Public Science went too, replaced by CLOSED-LOOP COLONIES,
+# at the designer's word -- "Make the upload require closed loop colonies drop public science all
+# together". Thematically it is the better parent: the Archive stands at a Colony off Earth, so the
+# Tech that makes off-world Colonies liveable is what should open its door, where Public Science
+# only ever meant "you have done some research".
+#
+# THE PRICE, stated before it was taken. The gate went 2 (before #245), to 1, to FOUR here: this
+# Tech now waits on Closed-Loop Colonies, which waits on Expanded Habitats and Clean Power, which
+# waits on Efficient Grids. That is the deepest tier in the tree, level with the Arkwrights' and
+# the Prospectors' gates. And it is not only a Victory gate -- `orders.rs` refuses the Archive
+# ORDER until this Tech stands, so the whole Archive chain moves back with it. The Archive already
+# completed in just 28 of 80 games at the 0.08.2 baseline. Expect later and fewer; the sweep says.
+needs = ["closed_loop_colonies"]
 effect = "Opens the Archivists' Victory Condition; Research Lab and Observatory output x1.25"
 value = 1.25
 gate_for = "archivists"

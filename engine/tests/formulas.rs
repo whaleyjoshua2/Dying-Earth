@@ -5964,9 +5964,10 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         (FactionKind::Prospectors, TechId::ExtractionCharter, vec![TechId::AutomatedRefining, TechId::Beneficiation]),
         (FactionKind::Arkwrights, TechId::GenerationShips, vec![TechId::ClosedLoopColonies]),
         // Ticket #245 (version 0.08.3): Expanded Habitats dropped, and with it the edge that read
-        // on screen as an unrelated line into Generation Ships. The gate is one Tech deep now --
-        // the shallowest of the four -- and the designer took that knowingly.
-        (FactionKind::Archivists, TechId::TheUpload, vec![TechId::PublicScience]),
+        // on screen as an unrelated line into Generation Ships. Ticket #246: and Public Science
+        // dropped too, for Closed-Loop Colonies -- the Archive stands at a Colony off Earth, so the
+        // Tech that makes such a Colony liveable is what opens its door.
+        (FactionKind::Archivists, TechId::TheUpload, vec![TechId::ClosedLoopColonies]),
     ];
     // Ticket #117 (version 0.07.1): rung 3 went 40 to 44, a tenth rounded to the nearest. What the
     // ticket guards is that no Faction's gate is dearer than another's, so the figure is checked
@@ -5995,7 +5996,10 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         }
         seen.len()
     };
-    assert_eq!(depth(TechId::TheUpload), 1, "the Archivists' gate, one deep since ticket #245");
+    // Ticket #246: four, and the deepest tier -- Closed-Loop Colonies waits on Expanded Habitats
+    // and Clean Power, and Clean Power on Efficient Grids. This gate also bars the Archive ORDER,
+    // so the whole Archive chain sits behind those four.
+    assert_eq!(depth(TechId::TheUpload), 4, "the Archivists' gate, four deep since ticket #246");
     assert_eq!(depth(TechId::PlanetaryStewardship), 2, "the Custodians', two since ticket #242 freed Green Consensus from Industry");
     assert_eq!(depth(TechId::GenerationShips), 4, "the Arkwrights', through Closed-Loop Colonies, which itself pulls in Clean Power and Efficient Grids");
     assert_eq!(depth(TechId::ExtractionCharter), 4, "the Prospectors', deepest since Beneficiation joined on ticket #232");
