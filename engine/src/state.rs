@@ -731,6 +731,11 @@ pub struct SeatState {
     /// much CO2 out of the air every turn it stands.
     #[serde(default)]
     pub directive_sink: f64,
+    /// Ticket #267 (version 0.08.4): ppm laid on this seat's Blame ledger by rivals' Smear
+    /// campaigns, for good. Counted in `blame` and shown as its own figure, so the panel never
+    /// says the seat put it in the air.
+    #[serde(default)]
+    pub blame_smeared: f64,
     /// Ticket #227 (version 0.08.2): units this seat has bought and sold through the Trading window
     /// over the whole game. Kept because floating prices are only fair if more than one hand is on
     /// them, and the sweep had no way to say whose were.
@@ -1060,6 +1065,7 @@ impl Game {
             rival_steps_announced: [false; 2],
             victory_history: Vec::new(),
             directive_sink: 0.0,
+            blame_smeared: 0.0,
             bought_units: 0,
             sold_units: 0,
             spaceport_influence: 0,
@@ -2435,7 +2441,10 @@ impl Game {
     /// controlled emitted, less what it removed, floored at zero.
     pub fn blame(&self, seat: Seat) -> f64 {
         let s = self.seat(seat);
-        (s.blame_emitted - s.blame_removed).max(0.0)
+        // Ticket #267 (version 0.08.4): the ledger, not the physics -- what rivals have laid on
+        // this seat by Smear counts, at the designer's word, so the share the rules read diverges
+        // from what the seat put in the air.
+        (s.blame_emitted - s.blame_removed + s.blame_smeared).max(0.0)
     }
 
     /// Ticket #53 defined the credit as the ppm removed BEYOND everything ever emitted -- and

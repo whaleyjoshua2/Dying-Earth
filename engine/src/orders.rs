@@ -66,6 +66,12 @@ pub enum Order {
     /// Version 0.03 (ticket #35): Ducats buy Influence for this turn's Allotment, and pay for
     /// repairs in place of Materials. Ticket #54 retired Restoration and both its orders.
     BuyInfluence { amount: i64 },
+    /// Ticket #267 (version 0.08.4): a Smear campaign -- Influence spent on a rival Faction rather
+    /// than a place, laying ppm on the rival's Blame ledger for good at `smear.ppm_per_influence`.
+    /// One a turn per target, any amount the Allotment covers. An offence, and the Report names
+    /// who paid. "Smear", the designer said, because it inflates Blame above the ppm produced and
+    /// is thus a kind of a lie.
+    Smear { target: Seat, amount: i64 },
     RepairWithDucats { unit: UnitRef, points: u32 },
     /// Version 0.04 (ticket #42): the trading window. Buy Materials, Fuel or Energy for Ducats;
     /// sell Materials or Fuel for half the buying price; buy a building outright for Ducats at
@@ -240,6 +246,9 @@ pub struct Pending {
     /// Ticket #52: Resettle orders paid this turn, one per Faction at most.
     pub resettle: Vec<(Seat, StateId)>,
     pub influence: Vec<(Seat, Target, i64)>,
+    /// Ticket #267 (version 0.08.4): Smear campaigns paid this turn -- who, whom, how much Influence.
+    #[serde(default)]
+    pub smears: Vec<(Seat, Seat, i64)>,
     /// Attack orders in the order given, for battle ordering (spec 10.1).
     pub attack_sequence: u32,
 }
@@ -266,6 +275,7 @@ impl Game {
             Order::Transit { .. } => Cost::default(),
             Order::Refuel { ship } => Cost { fuel: self.refuel_amount(seat, *ship), ..Default::default() },
             Order::Influence { amount, .. } => Cost { influence: *amount, ..Default::default() },
+            Order::Smear { amount, .. } => Cost { influence: *amount, ..Default::default() },
             // Ticket #54: a Mothball and a Strip Permit are free; a Restart costs Materials and a
             // Leapfrog Ducats; a Decommission pays Materials back, which arrive at its Resolution.
             Order::Change { what: BuildingChange::Restart, .. } => Cost { materials: t.mothball.restart_materials, ..Default::default() },
@@ -1179,6 +1189,19 @@ impl Game {
                 }
                 Ok(cost)
             }
+            // Ticket #267: a Smear is one a turn per target, on a rival, of a positive amount.
+            Order::Smear { target, amount } => {
+                if *amount <= 0 {
+                    return fail("spend a positive amount");
+                }
+                if *target == seat {
+                    return fail("a Faction cannot smear itself");
+                }
+                if pending.iter().any(|o| matches!(o, Order::Smear { target: t, .. } if t == target)) {
+                    return fail(format!("the {} are already being smeared this turn", self.seat_name(*target)));
+                }
+                Ok(cost)
+            }
             Order::Influence { target, amount } => {
                 if *amount <= 0 {
                     return fail("spend a positive amount");
@@ -1598,6 +1621,7 @@ impl Game {
                     self.pending.resettle.push((seat, *state));
                 }
                 Order::Influence { target, amount } => self.pending.influence.push((seat, *target, *amount)),
+                Order::Smear { target, amount } => self.pending.smears.push((seat, *target, *amount)),
                 // Ticket #54: the change is written on the building itself and lands at the
                 // Resolution of its due turn, so nothing has to track a position between turns.
                 Order::Change { building, what } => {
@@ -1935,6 +1959,7 @@ impl Game {
                 r("unload", &[("place", where_)])
             }
             Order::Influence { target, amount } => r("influence", &[("n", amount.to_string()), ("place", place(*target))]),
+            Order::Smear { target, amount } => r("smear", &[("n", amount.to_string()), ("faction", self.seat_name(*target))]),
             Order::BuyInfluence { amount } => r("buy_influence", &[("n", amount.to_string())]),
             Order::ProposeAccord { to, .. } => r("propose_accord", &[("faction", self.seat_name(*to))]),
             Order::EndAccord { with } => r("end_accord", &[("faction", self.seat_name(*with))]),

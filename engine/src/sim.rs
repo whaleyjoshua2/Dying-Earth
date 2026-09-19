@@ -39,6 +39,8 @@ pub struct SimResult {
     /// beyond everything emitted -- it holds at the end. Both were unmeasured before this ticket.
     pub blame_removed: [f64; SEAT_COUNT],
     pub blame_credit: [f64; SEAT_COUNT],
+    /// Ticket #267 (version 0.08.4): ppm laid on each seat by rivals' Smear campaigns.
+    pub blame_smeared: [f64; SEAT_COUNT],
     pub threshold_multiplier: [f64; SEAT_COUNT],
     pub developments: u32,
     /// Ticket #54: Scrubbers completed, Mothballs, Restarts and Decommissions landed, Leapfrogs
@@ -387,6 +389,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let blame_share = Seat::ALL.map(|s| game.blame_share(s));
     let blame_removed = Seat::ALL.map(|s| game.seat(s).blame_removed);
     let blame_credit = Seat::ALL.map(|s| game.blame_credit(s));
+    let blame_smeared = Seat::ALL.map(|s| game.seat(s).blame_smeared);
     let threshold_multiplier = Seat::ALL.map(|s| game.blame_threshold_multiplier(s));
     let developments = game.log.iter().filter(|l| l.contains(" raised its Industry Level to ")).count() as u32;
     // Ticket #54, read off the log the same way the #52 and #53 figures are.
@@ -491,6 +494,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         blame_share,
         blame_removed,
         blame_credit,
+        blame_smeared,
         threshold_multiplier,
         developments,
         scrubbers,

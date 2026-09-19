@@ -9029,6 +9029,62 @@ fn the_arkwrights_signature_rule_is_coach_class_and_says_steerage_nowhere() {
     }
 }
 
+// -------------------------------------------- 0.08.4 ticket #267: the Smear campaign
+
+/// Ticket #267 (version 0.08.4): a Smear lays ppm on a rival's Blame ledger for good, at the
+/// table's rate per Influence, moving the share every rule reads; one a turn per target, never
+/// on oneself; an offence the Report names.
+#[test]
+fn a_smear_campaign_lays_ppm_on_a_rivals_blame_ledger_and_is_an_offence() {
+    let mut g = game();
+    calm(&mut g);
+    let target = Seat(1);
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = 100.0;
+        g.seats[s.index()].blame_removed = 0.0;
+    }
+    assert!((g.blame_share(target) - 0.25).abs() < 1e-9, "an even quarter each to begin");
+    g.seats[0].allotment = 20;
+    assert!(g.check_order(Seat(0), &[], &Order::Smear { target: Seat(0), amount: 5 }).is_err(), "not oneself");
+    assert!(g.check_order(Seat(0), &[], &Order::Smear { target, amount: 0 }).is_err(), "a positive amount");
+    assert!(g.check_order(Seat(0), &[], &Order::Smear { target, amount: 10 }).is_ok());
+    let first = Order::Smear { target, amount: 10 };
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&first), &Order::Smear { target, amount: 5 }).is_err(), "one a turn per target");
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&first), &Order::Smear { target: Seat(2), amount: 5 }).is_ok(), "another target is another campaign");
+    g.commit_orders(Seat(0), &[first]);
+    g.resolution_phase();
+    let rate = g.tables.influence.smear.ppm_per_influence;
+    assert!((g.seats[target.index()].blame_smeared - 10.0 * rate).abs() < 1e-9, "20 ppm laid on: {}", g.seats[target.index()].blame_smeared);
+    assert!((g.blame(target) - (100.0 + 10.0 * rate)).abs() < 1e-9, "the ledger counts it");
+    assert!(g.blame_share(target) > 0.25, "and the share the rules read has moved: {}", g.blame_share(target));
+    assert!(g.relations.offended[target.index()][0], "an offence against the target");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("smeared")), "the Report names who paid: {:?}", g.report.lines);
+    // Permanent: nothing takes it back off.
+    g.resolution_phase();
+    assert!((g.seats[target.index()].blame_smeared - 10.0 * rate).abs() < 1e-9, "for good");
+}
+
+/// Ticket #267 (version 0.08.4): a computer seat Cold or Hostile toward a rival whose Blame share
+/// stands above the fair quarter proposes a Smear against it; toward nobody it hates, none.
+#[test]
+fn the_computer_smears_a_dirty_rival_it_is_cold_toward() {
+    let mut g = game();
+    calm(&mut g);
+    let (smearer, dirty) = (Seat(3), Seat(1));
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = 50.0;
+    }
+    g.seats[dirty.index()].blame_emitted = 500.0;
+    assert!(g.blame_share(dirty) > 0.5);
+    g.seats[smearer.index()].allotment = 20;
+    let orders = g.ai_orders(smearer);
+    assert!(!orders.iter().any(|o| matches!(o, Order::Smear { .. })), "nothing against a rival it does not resent: {orders:?}");
+    g.relations.score[smearer.index()][dirty.index()] = -8;
+    assert!(g.relations_score(smearer, dirty) <= -5, "Cold or worse: {}", g.relations_score(smearer, dirty));
+    let orders = g.ai_orders(smearer);
+    assert!(orders.iter().any(|o| matches!(o, Order::Smear { target, amount } if *target == dirty && *amount > 0)), "a Smear against the dirty rival it is Cold toward: {orders:?}");
+}
+
 // -------------------------------------------- 0.08.4 ticket #266: Blame moderates decay
 
 /// Ticket #266 (version 0.08.4): on a Region a Faction does not hold, its Standing decays 3 a turn

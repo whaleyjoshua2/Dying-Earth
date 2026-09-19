@@ -29,6 +29,8 @@ enum Cat {
     Constabulary,
     Relief,
     Resettle,
+    /// Ticket #267 (version 0.08.4): a Smear campaign against a rival.
+    Smear,
     /// Ticket #51: divert this turn's Research into the Archive fund.
     FundArchive,
     /// Ticket #51: build the Archive; one Module since ticket #68.
@@ -116,6 +118,7 @@ impl Game {
             Cat::Constabulary => w.build_constabulary,
             Cat::Relief => w.relief,
             Cat::Resettle => w.resettle,
+            Cat::Smear => w.smear,
             Cat::Accord => w.accord,
             Cat::FundArchive => w.fund_archive,
             Cat::BuildArchive => w.build_archive,
@@ -1247,6 +1250,34 @@ impl Game {
                     format!("pay Relief in {} (Unrest {})", self.tables.state(sid).name, Game::unrest_figure(n)),
                     None,
                 );
+            }
+        }
+        // Ticket #267 (version 0.08.4): a Smear campaign against a rival the seat is Cold or Hostile
+        // toward whose Blame share stands above the fair quarter -- one step of Influence, weighed
+        // by how far above the quarter it stands, at the opportunity multiplier when Hostile. It
+        // competes with a place for the same Allotment, which is the whole price of it.
+        {
+            let fair = self.tables.influence.blame.fair_share;
+            let step = th.influence_step;
+            if allotment >= step {
+                for rival in Seat::ALL.into_iter().filter(|r| *r != seat) {
+                    let score = self.relations_score(seat, rival);
+                    let over = self.blame_share(rival) - fair;
+                    if score > -5 || over <= 0.0 {
+                        continue;
+                    }
+                    let opp = if score <= -8 { m.opportunity } else { 1.0 };
+                    push(
+                        vec![Order::Smear { target: rival, amount: step }],
+                        Cat::Smear,
+                        self.base_weight(seat, Cat::Smear) * (1.0 + over / fair),
+                        1.0,
+                        1.0,
+                        opp,
+                        format!("smear the {} (share {:.2}, {})", self.seat_name(rival), self.blame_share(rival), self.relations_level(seat, rival)),
+                        None,
+                    );
+                }
             }
         }
         // Resettle: while the world's population is falling there are flows to steer, and the

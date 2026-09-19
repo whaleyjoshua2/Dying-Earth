@@ -444,6 +444,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #261: the two steps a rival's Moment fires on.
     ("rival_three_quarters", &["faction", "part", "value", "bar"]),
     ("rival_one_part_met", &["faction", "met", "part", "value", "bar"]),
+    // Ticket #267: a Smear campaign landed.
+    ("smear", &["faction", "target", "ppm"]),
     ("storm_surge_wall", &["state", "percent"]),
     ("sea_wall_unkept", &["faction", "states"]),
     ("sea_nothing_left", &["temperature", "state"]),
@@ -536,6 +538,7 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("buy", &["n", "resource"]),
     ("sell", &["n", "resource"]),
     ("relief", &["state"]),
+    ("smear", &["n", "faction"]),
     ("resettle", &["state"]),
     ("mothball", &["building", "place"]),
     ("restart", &["building", "place"]),

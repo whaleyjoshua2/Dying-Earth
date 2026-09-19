@@ -692,6 +692,15 @@ pub struct InfluenceTable {
     pub resistance: ResistanceCard,
     /// Ticket #53: what a Faction's share of the table's Blame does to its Influence thresholds.
     pub blame: BlameTable,
+    /// Ticket #267: the Smear campaign's rate.
+    pub smear: SmearTable,
+}
+
+/// Ticket #267 (version 0.08.4): the Smear campaign, in `influence.toml` under `[smear]`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SmearTable {
+    /// ppm laid on the target's Blame ledger per Influence spent.
+    pub ppm_per_influence: f64,
 }
 
 /// Ticket #53 (version 0.05): Blame, in `influence.toml` under `[blame]`.
@@ -860,6 +869,9 @@ pub struct AiWeights {
     pub relief: f64,
     /// Ticket #52: raise a Constabulary in a restive state.
     pub build_constabulary: f64,
+    /// Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward whose Blame
+    /// share stands above the fair quarter.
+    pub smear: f64,
     /// Ticket #52: steer this turn's refugee flows into one calm state.
     pub resettle: f64,
     /// Ticket #227 (version 0.08.2): how readily this seat offers an Accord. Modest by default: an

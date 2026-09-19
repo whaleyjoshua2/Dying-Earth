@@ -32,6 +32,8 @@ strip_permit = 7
 relief = 4
 build_constabulary = 5
 resettle = 2
+# Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward, above a fair share.
+smear = 4
 fund_archive = 6
 build_archive = 0
 upload = 0
@@ -71,6 +73,8 @@ strip_permit = 0
 relief = 6
 build_constabulary = 6
 resettle = 2
+# Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward, above a fair share.
+smear = 4
 fund_archive = 6
 build_archive = 0
 upload = 0
@@ -107,6 +111,8 @@ strip_permit = 0
 relief = 4
 build_constabulary = 4
 resettle = 2
+# Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward, above a fair share.
+smear = 4
 fund_archive = 6
 build_archive = 0
 upload = 0
@@ -142,6 +148,8 @@ strip_permit = 0
 relief = 5
 build_constabulary = 5
 resettle = 2
+# Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward, above a fair share.
+smear = 4
 fund_archive = 8
 build_archive = 9
 # Ticket #192 (version 0.08.0): the Upload is the Archivists' second Victory part now, not a

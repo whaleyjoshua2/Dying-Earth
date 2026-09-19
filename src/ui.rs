@@ -3406,6 +3406,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         // Ticket #72.
         Order::SetVentureShare { share } => format!("Bank {share}% of Ducat income in the Venture Capital Fund"),
         Order::DrawVenture { amount } => format!("Withdraw {amount} Ducats from the Venture Capital Fund"),
+        Order::Smear { target, amount } => format!("Smear the {} with {amount} Influence", game.seat_name(*target)),
         // Ticket #52.
         Order::Relief { state } => format!("Relief in {}: Unrest -1", game.tables.state(*state).name),
         Order::Resettle { state } => format!("Resettle this turn's refugees in {}", game.tables.state(*state).name),
@@ -6251,6 +6252,34 @@ fn venture_fund_control(ui: &mut Ui, session: &Session, game: &Game, view: &mut 
 /// acts that raise Relations. The terms are ticked and offered together, because an Accord is one
 /// bargain rather than four; the computer seat answers at the Resolution by its own weights, and a
 /// refusal is not an offence.
+/// Ticket #267 (version 0.08.4): **the Smear campaign**, on a rival's page beside the Accords:
+/// a field for the Influence and a button, the Influence cluster's shape. The hover names the
+/// rate, the ledger it lands on, and the offence.
+fn smear_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, other: Seat, actions: &mut Vec<Action>) {
+    let me = Seat(0);
+    let rate = game.tables.influence.smear.ppm_per_influence;
+    ui.label(RichText::new("Smear campaign").strong()).on_hover_text(format!(
+        "Influence spent on this Faction rather than a place: every point lays {rate} ppm on their Blame for good, and the share every rule reads moves with it.\nOne campaign a turn against each rival, from this turn's Allotment. They will know who paid: it is an offence."
+    ));
+    let laid = game.seat(other).blame_smeared;
+    if laid > 0.0 {
+        ui.label(RichText::new(format!("{laid:.0} ppm of their Blame was laid on them by rivals.")).weak());
+    }
+    ui.horizontal(|ui| {
+        let left = game.seat(me).allotment - session.pending.iter().map(|o| game.order_cost(me, o).influence).sum::<i64>();
+        ui.add(egui::DragValue::new(&mut view.smear_amount).range(1..=left.max(1)));
+        let order = Order::Smear { target: other, amount: view.smear_amount };
+        let check = game.check_order(me, &session.pending, &order);
+        let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Smear the {}", game.seat_name(other))));
+        if let Err(e) = &check {
+            resp.clone().on_disabled_hover_text(&e.0);
+        }
+        if resp.on_hover_text(format!("{:.0} ppm on their Blame at End Turn.", view.smear_amount as f64 * rate)).clicked() {
+            actions.push(Action::Place(order));
+        }
+    });
+}
+
 fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actions: &mut Vec<Action>) {
     let me = Seat(0);
     let r = &game.tables.relations;
@@ -6478,8 +6507,11 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
             );
             // Ticket #265 (version 0.08.4): answerable for, then how it got there, then the credit.
             let s = game.seat(seat);
+            // Ticket #267: what rivals laid on by Smear, when any, so the line never says the seat
+            // put it in the air.
+            let smeared = if s.blame_smeared > 0.0 { format!(", {:.0} laid on by rivals", s.blame_smeared) } else { String::new() };
             let line = format!(
-                "Answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit), thresholds x{:.2}",
+                "Answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit{smeared}), thresholds x{:.2}",
                 game.blame(seat),
                 s.blame_emitted,
                 game.blame_credit(seat),
@@ -6518,6 +6550,8 @@ A rival that holds you at less than neutral defends its places against you a lit
         // player's seat and somebody else. Your own page has nobody to strike one with.
         if !session.spectator && seat != Seat(0) {
             accords_block(ui, session, game, seat, actions);
+            ui.add_space(6.0);
+            smear_block(ui, session, game, view, seat, actions);
             ui.add_space(6.0);
         }
 
@@ -6810,8 +6844,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 let s = game.seat(seat);
                 // Ticket #265 (version 0.08.4): one form for every seat -- answerable for, how it
                 // got there, and what it holds in credit -- at the designer's word.
+                let smeared = if s.blame_smeared > 0.0 { format!(", {:.0} laid on by rivals", s.blame_smeared) } else { String::new() };
                 let line = format!(
-                    "{}: answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit); share {:.2}, thresholds x{:.2}",
+                    "{}: answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit{smeared}); share {:.2}, thresholds x{:.2}",
                     game.seat_name(seat),
                     game.blame(seat),
                     s.blame_emitted,

@@ -101,6 +101,8 @@ deck_joined = "The {n} Events that can only land off Earth join the deck: Grid F
 # Ticket #261 (version 0.08.4): the rival's Moment, two steps. {part} is the part still short.
 rival_three_quarters = "The {faction} are three quarters of the way to their Victory Condition: {part} at {value} of {bar}."
 rival_one_part_met = "The {faction} have met half of their Victory Condition, {met}. Only {part} stands between them and the game, at {value} of {bar}."
+# Ticket #267 (version 0.08.4): a Smear campaign, named for who paid.
+smear = "The {faction} smeared the {target}: {ppm} ppm laid on their Blame."
 break_fired = "Break at {temperature} C - {name}. {happened} {text}"
 break_coastal = "{states}: every state at Coastal Exposure {exposure} lost {percent}% of its people and took {unrest} Unrest."
 break_baseline = "{state}: its Baseline Emissions rise by {rise} for good."
@@ -193,6 +195,7 @@ buy_influence = "bought {n} Influence"
 buy = "bought {n} {resource}"
 sell = "sold {n} {resource}"
 relief = "paid Relief in {state}"
+smear = "spent {n} Influence smearing the {faction}"
 resettle = "resettled its refugees in {state}"
 mothball = "mothballed the {building} at {place}"
 restart = "restarted the {building} at {place}"

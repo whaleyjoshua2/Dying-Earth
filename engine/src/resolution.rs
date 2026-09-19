@@ -1699,6 +1699,18 @@ impl Game {
             );
             self.report_line(LineKind::Refugees, Some(ReportPlace::State(sid)), text);
         }
+        // Ticket #267 (version 0.08.4): Smear campaigns land -- ppm on the target's ledger for good,
+        // an offence at an Influence push's weight, and a Report line naming who paid.
+        for (seat, target, amount) in std::mem::take(&mut self.pending.smears) {
+            let ppm = amount as f64 * self.tables.influence.smear.ppm_per_influence;
+            self.seat_mut(target).blame_smeared += ppm;
+            self.offend_by(seat, target, 1);
+            let (who, whom) = (self.seat_name(seat), self.seat_name(target));
+            self.log(format!("The {who} smeared the {whom}: {ppm:.0} ppm laid on their Blame."));
+            let text = self.say("smear", &[("faction", who), ("target", whom.clone()), ("ppm", format!("{ppm:.0}"))]);
+            self.report_line(LineKind::Note, None, text);
+            self.ai_deed(seat, "smear", &[("n", amount.to_string()), ("faction", whom)]);
+        }
         // Relief (rule 3): one point per order, paid for in Ducats at the Orders phase.
         let mut relieved: Vec<(Seat, StateId, f64)> = Vec::new();
         for (seat, sid) in std::mem::take(&mut self.pending.relief) {
