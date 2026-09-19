@@ -5255,6 +5255,20 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     const BOX_H: f32 = 58.0;
     /// The row-heading column on the left, wide enough for "Off-world Living".
     const HEAD_W: f32 = 128.0;
+    // Ticket #247 (version 0.08.3): the order the BANDS are drawn in, which until now fell out of
+    // the order Techs happen to sit in `TechId::ALL` -- Industry, Propulsion, Off-world Living,
+    // Extraction, Society. The designer asked for two things: *"move the upload box to above
+    // generation ships and move the entier extraction tree to below industry"*.
+    //
+    // Both are had by reordering the bands alone, touching no rule and no Tech's branch. Extraction
+    // moves up under Industry; and putting SOCIETY directly above OFF-WORLD LIVING places The
+    // Upload (Society, rung 3) in the same column as, and immediately above, Generation Ships
+    // (Off-world Living, rung 3) -- while also shortening the Closed-Loop Colonies edge that
+    // ticket #246 left running the height of the tree.
+    //
+    // A branch not named here keeps its first-appearance place, after the named ones, so a new
+    // branch cannot vanish by being forgotten.
+    const BAND_ORDER: [&str; 5] = ["Industry", "Extraction", "Propulsion", "Society", "Off-world Living"];
     let mut branches: Vec<String> = Vec::new();
     for t in TechId::ALL {
         let b = &game.tables.tech(t).branch;
@@ -5262,6 +5276,7 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
             branches.push(b.clone());
         }
     }
+    branches.sort_by_key(|b| BAND_ORDER.iter().position(|x| x == b).unwrap_or(BAND_ORDER.len()));
     let rungs = TechId::ALL.iter().map(|t| game.tables.tech(*t).rung).max().unwrap_or(1).max(1) as usize;
     // Ticket #56: a branch may hold more than one Tech on a rung (Efficient Grids and Coastal
     // Engineering both sit on Industry 1). Ticket #133: they sat SIDE BY SIDE. Ticket #156
