@@ -11,13 +11,16 @@ use rand_chacha::ChaCha8Rng;
 /// The deck as the table deals it, shuffled with the game seed; never reshuffled.
 pub fn new_deck(tables: &Tables, rng: &mut ChaCha8Rng) -> Deck {
     let mut cards: Vec<Card> = Vec::new();
-    for e in &tables.events.event {
+    // Ticket #259 (version 0.08.4): the cards that can only land off Earth are not dealt at the
+    // start; `join_off_earth_cards` shuffles them in on `off_earth_join_turn`. Measured before the
+    // change: a fifth of the cards drawn in a game found nowhere to land and were spent for good.
+    for e in tables.events.event.iter().filter(|e| !e.off_earth) {
         for _ in 0..e.copies {
             cards.push(Card::Event(e.id));
         }
     }
     cards.shuffle(rng);
-    Deck { cards, drawn: Vec::new() }
+    Deck { cards, drawn: Vec::new(), off_earth_joined: false }
 }
 
 impl Game {
@@ -35,8 +38,32 @@ impl Game {
         self.rng.random::<f64>() < p
     }
 
+    /// Ticket #259 (version 0.08.4): on the joining turn, the off-Earth cards go into the deck --
+    /// shuffled into whatever remains of it, so the next draw may be one of them -- once, and the
+    /// Report says so. A save from before this version has never dealt them and joins them on its
+    /// next Event phase past the turn.
+    fn join_off_earth_cards(&mut self) {
+        if self.deck.off_earth_joined || self.turn < self.tables.events.off_earth_join_turn {
+            return;
+        }
+        let mut n = 0usize;
+        for e in self.tables.events.event.iter().filter(|e| e.off_earth) {
+            for _ in 0..e.copies {
+                self.deck.cards.push(Card::Event(e.id));
+                n += 1;
+            }
+        }
+        self.deck.cards.shuffle(&mut self.rng);
+        self.deck.off_earth_joined = true;
+        let line = format!("The {n} Events that can only land off Earth join the deck, shuffled in among the {} left.", self.deck.cards.len() - n);
+        self.log(line.clone());
+        let text = self.say("deck_joined", &[("n", n.to_string())]);
+        self.report_line(LineKind::Event, None, text);
+    }
+
     /// Phase 5: maybe draw one card and choose its target. The effect applies in Resolution.
     pub fn event_phase(&mut self) {
+        self.join_off_earth_cards();
         let chance = self.draw_chance();
         if !self.rolls_a_card() {
             self.last_event = None;

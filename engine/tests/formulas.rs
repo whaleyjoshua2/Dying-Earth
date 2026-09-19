@@ -969,11 +969,39 @@ fn a_card_comes_on_about_half_the_turns_at_the_start_and_more_when_warm() {
 
 #[test]
 fn the_deck_is_twenty_six_cards_as_the_table_deals_them_and_no_calm() {
-    let g = game();
+    let mut g = game();
     // Ticket #76 (version 0.05.5): forty cards for thirty-six turns. The 28 of #25 and #32, a third
     // copy of Heatwave, Wildfire, Rich Seam and Solar Storm, a second of Unrest, Methane Burst,
     // Labour Dispute and Dust Storm, and four new Events once each.
-    assert_eq!(g.deck.cards.len(), 40, "forty cards for thirty-six turns (#76)");
+    // Ticket #259 (version 0.08.4): the twelve cards that can only land off Earth are not dealt at
+    // the start; they join on turn 12. So the deck begins at 28 and is 40 only once they are in.
+    assert_eq!(g.deck.cards.len(), 28, "twenty-eight at the start: the twelve off-Earth cards join on turn 12 (#259)");
+    assert!(!g.deck.off_earth_joined);
+    for id in [EventId::GridFailure, EventId::ReactorLeak, EventId::DustStorm, EventId::Moonquake, EventId::HeliumVein, EventId::RichSeam, EventId::IceDeposit] {
+        assert!(g.tables.events.event.iter().find(|e| e.id == id).unwrap().off_earth, "{id:?} is flagged off Earth");
+        assert_eq!(g.deck.count(id), 0, "{id:?} not dealt at the start");
+    }
+    assert_eq!(g.tables.events.off_earth_join_turn, 12);
+    // A card may or may not be drawn on any turn (the chance is never nought), so the deck and its
+    // drawn pile are counted together.
+    let dealt = |g: &Game| g.deck.cards.len() + g.deck.drawn.len();
+    g.turn = 11;
+    g.event_phase();
+    assert_eq!(dealt(&g), 28, "turn 11: not yet");
+    g.turn = 12;
+    g.event_phase();
+    assert!(g.deck.off_earth_joined);
+    assert_eq!(dealt(&g), 40, "turn 12: the twelve join, and the deck is the forty of #76");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("join the deck")), "the Report says so: {:?}", g.report.lines);
+    g.event_phase();
+    assert_eq!(dealt(&g), 40, "and they join once");
+    // The rest of this test reads the deck as dealt, so a fresh one -- with the off-Earth cards
+    // in -- is what the copy counts below are checked against.
+    let mut g = game();
+    g.turn = 12;
+    g.deck.cards.append(&mut g.deck.drawn);
+    g.event_phase();
+    g.deck.cards.append(&mut g.deck.drawn);
     let copies = |id: EventId| g.deck.cards.iter().filter(|c| **c == Card::Event(id)).count();
     for id in [EventId::Heatwave, EventId::Wildfire, EventId::RichSeam, EventId::SolarStorm] {
         assert_eq!(copies(id), 3, "{id:?} three times");

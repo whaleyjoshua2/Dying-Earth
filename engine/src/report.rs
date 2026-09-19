@@ -426,6 +426,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("break_baseline", &["state", "rise"]),
     // Ticket #257 (version 0.08.4): the wall stands and its keep rises; a surge it holds; a keep unpaid.
     ("sea_wall", &["temperature", "state", "keep"]),
+    // Ticket #259 (version 0.08.4): the off-Earth cards join the deck.
+    ("deck_joined", &["n"]),
     ("storm_surge_wall", &["state", "percent"]),
     ("sea_wall_unkept", &["faction", "states"]),
     ("sea_nothing_left", &["temperature", "state"]),

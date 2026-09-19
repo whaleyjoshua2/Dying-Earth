@@ -123,7 +123,7 @@ An unplanned occurrence drawn from the Event Deck after orders are committed and
 _Avoid_: incident, crisis, card
 
 **Event Deck**:
-The deck a card may be drawn from each turn, holding only Events: forty cards since version 0.05.5 for a game of thirty-six turns (twenty-eight before), twenty-two Events in one to three copies each. It is never reshuffled. Whether a card is drawn at all is the Draw Chance.
+The deck a card may be drawn from each turn, holding only Events: forty cards since version 0.05.5 for a game of thirty-six turns (twenty-eight before), twenty-two Events in one to three copies each. Since version 0.08.4 the twelve cards that can only land off Earth -- Grid Failure, Reactor Leak, Dust Storm, Moonquake, Helium-3 Vein, Rich Seam and Ice Deposit, in their copies -- are not dealt at the start: they are shuffled into what remains of the deck on turn 12, once. It is never otherwise reshuffled, and a card drawn with nowhere to land is spent. Whether a card is drawn at all is the Draw Chance.
 _Avoid_: event pool, random table, encounter deck, calm card (retired in version 0.02)
 
 **Draw Chance**:

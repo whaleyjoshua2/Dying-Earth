@@ -612,6 +612,11 @@ pub enum Card {
 pub struct Deck {
     pub cards: Vec<Card>,
     pub drawn: Vec<Card>,
+    /// Ticket #259 (version 0.08.4): whether the off-Earth cards have been shuffled in yet. A save
+    /// from before this version loads with them never joined -- and never dealt, so a game already
+    /// past the joining turn gets them on its next Event phase.
+    #[serde(default)]
+    pub off_earth_joined: bool,
 }
 
 impl Deck {

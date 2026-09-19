@@ -312,6 +312,10 @@ pub struct EventCard {
     /// How many copies sit in the deck (ticket #25).
     #[serde(default = "one")]
     pub copies: u32,
+    /// Ticket #259 (version 0.08.4): a card that can only land off Earth. Out of the deck at the
+    /// start, joining it on `off_earth_join_turn`.
+    #[serde(default)]
+    pub off_earth: bool,
 }
 
 fn one() -> u32 {
@@ -348,6 +352,8 @@ pub struct EventsTable {
     /// Ticket #257 (version 0.08.4): what a Storm Surge does to a state whose Sea Wall holds --
     /// the Facilities in its coastal slots make this much of their output at the next Income.
     pub storm_surge_coastal_multiplier: f64,
+    /// Ticket #259: the turn the off-Earth cards are shuffled into the deck.
+    pub off_earth_join_turn: u32,
     pub event: Vec<EventCard>,
 }
 
