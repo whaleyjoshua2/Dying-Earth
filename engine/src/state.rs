@@ -736,6 +736,16 @@ pub struct SeatState {
     /// says the seat put it in the air.
     #[serde(default)]
     pub blame_smeared: f64,
+    /// Ticket #268 (version 0.08.4): ppm of carbon credit this seat has bought over the game, which
+    /// comes off its Blame ledger; ppm it has sold, which comes off its credit and, past what it
+    /// held, goes onto its ledger as Blame taken; and the ppm it offers a turn, standing until
+    /// changed -- the Custodians' alone.
+    #[serde(default)]
+    pub credits_bought: f64,
+    #[serde(default)]
+    pub credits_sold: f64,
+    #[serde(default)]
+    pub credits_offered: i64,
     /// Ticket #227 (version 0.08.2): units this seat has bought and sold through the Trading window
     /// over the whole game. Kept because floating prices are only fair if more than one hand is on
     /// them, and the sweep had no way to say whose were.
@@ -1066,6 +1076,9 @@ impl Game {
             victory_history: Vec::new(),
             directive_sink: 0.0,
             blame_smeared: 0.0,
+            credits_bought: 0.0,
+            credits_sold: 0.0,
+            credits_offered: 0,
             bought_units: 0,
             sold_units: 0,
             spaceport_influence: 0,
@@ -2444,7 +2457,9 @@ impl Game {
         // Ticket #267 (version 0.08.4): the ledger, not the physics -- what rivals have laid on
         // this seat by Smear counts, at the designer's word, so the share the rules read diverges
         // from what the seat put in the air.
-        (s.blame_emitted - s.blame_removed + s.blame_smeared).max(0.0)
+        // Ticket #268: credits bought come off; credits sold past what was held go on.
+        let oversold = (s.credits_sold - s.blame_removed).max(0.0);
+        (s.blame_emitted - s.blame_removed + s.blame_smeared + oversold - s.credits_bought).max(0.0)
     }
 
     /// Ticket #53 defined the credit as the ppm removed BEYOND everything ever emitted -- and
@@ -2455,7 +2470,36 @@ impl Game {
     /// a carbon credit has a supply that exists. Blame itself is unchanged: emitted less removed,
     /// never below nothing.
     pub fn blame_credit(&self, seat: Seat) -> f64 {
-        self.seat(seat).blame_removed.max(0.0)
+        // Ticket #268: less what has been sold as carbon credits.
+        let s = self.seat(seat);
+        (s.blame_removed - s.credits_sold).max(0.0)
+    }
+
+    /// Ticket #268 (version 0.08.4): the seat that sells carbon credits -- the Custodians'.
+    pub fn credit_seller(&self) -> Option<Seat> {
+        Seat::ALL.into_iter().find(|s| self.kind(*s) == FactionKind::Custodians)
+    }
+
+    /// Ticket #268: the price multiplier the seller's Relations level toward `buyer` sets, or None
+    /// where the seller refuses -- Hostile, or no seller at the table.
+    pub fn credit_price_multiplier(&self, buyer: Seat) -> Option<f64> {
+        let seller = self.credit_seller()?;
+        let c = &self.tables.carbon_credits;
+        match self.relations_level(seller, buyer) {
+            "Friendly" => Some(c.friendly),
+            "Cordial" => Some(c.cordial),
+            "Neutral" => Some(c.neutral),
+            "Wary" => Some(c.wary),
+            "Cold" => Some(c.cold),
+            _ => None,
+        }
+    }
+
+    /// Ticket #268: what `ppm` of carbon credit costs `buyer` in Ducats, at the table price times
+    /// the seller's view of them, rounded up so a lot is never free.
+    pub fn credit_cost(&self, buyer: Seat, ppm: i64) -> Option<i64> {
+        let m = self.credit_price_multiplier(buyer)?;
+        Some(((ppm * self.tables.carbon_credits.price_per_ppm) as f64 * m).ceil() as i64)
     }
 
     /// Ticket #53: the four Factions' Blame added together.

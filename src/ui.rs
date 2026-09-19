@@ -3407,6 +3407,8 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::SetVentureShare { share } => format!("Bank {share}% of Ducat income in the Venture Capital Fund"),
         Order::DrawVenture { amount } => format!("Withdraw {amount} Ducats from the Venture Capital Fund"),
         Order::Smear { target, amount } => format!("Smear the {} with {amount} Influence", game.seat_name(*target)),
+        Order::OfferCredits { ppm } => format!("Offer {ppm} ppm of carbon credit a turn"),
+        Order::BuyCredits { ppm } => format!("Buy {ppm} ppm of carbon credit from the Custodians"),
         // Ticket #52.
         Order::Relief { state } => format!("Relief in {}: Unrest -1", game.tables.state(*state).name),
         Order::Resettle { state } => format!("Resettle this turn's refugees in {}", game.tables.state(*state).name),
@@ -5384,13 +5386,81 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
         }
     });
     ui.separator();
+    carbon_credits_block(ui, session, game, view, actions);
+    ui.separator();
     ui.label(format!("Buildings: every build button on a Region or Colony card has an \"or\" beside it that buys the building outright for Ducats, at {} times its Materials cost.", game.tables.ducats.per_building_material));
-    let trades: Vec<String> = session.pending.iter().filter(|o| matches!(o, Order::Buy { .. } | Order::Sell { .. } | Order::BuyInfluence { .. } | Order::BuildFacilityWithDucats { .. } | Order::BuildModuleWithDucats { .. })).map(|o| order_text(game, o)).collect();
+    let trades: Vec<String> = session.pending.iter().filter(|o| matches!(o, Order::Buy { .. } | Order::Sell { .. } | Order::BuyInfluence { .. } | Order::BuildFacilityWithDucats { .. } | Order::BuildModuleWithDucats { .. } | Order::BuyCredits { .. } | Order::OfferCredits { .. })).map(|o| order_text(game, o)).collect();
     if !trades.is_empty() {
         ui.separator();
         ui.label(RichText::new("Trades this turn (undo them in the orders list)").strong());
         for t in trades {
             ui.label(t);
+        }
+    }
+}
+
+/// Ticket #268 (version 0.08.4): **carbon credits**, the Trading window's fourth line. For the
+/// Custodians a field and a button to set the ppm they offer a turn, standing until changed, with
+/// their credit and what overselling costs them beside it; for everyone else what the Custodians
+/// offer this turn, how they think of you and the price that makes, and a field and a Buy button
+/// up to the cap. The Custodians' view of you can refuse you outright.
+fn carbon_credits_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    let me = Seat(0);
+    let c = game.tables.carbon_credits.clone();
+    ui.label(RichText::new("Carbon credits").strong()).on_hover_text(format!(
+        "A ppm of carbon credit bought comes off your Blame for good. The Custodians sell it at {} Ducats a ppm, times how they think of you -- Friendly x{}, Cordial x{}, Neutral x{}, Wary x{}, Cold x{}; Hostile refuses -- up to {} ppm a turn.\nA purchase is an act of friendship both ways.",
+        c.price_per_ppm, c.friendly, c.cordial, c.neutral, c.wary, c.cold, c.cap_per_turn
+    ));
+    let Some(seller) = game.credit_seller() else {
+        ui.label(RichText::new("Nobody at this table sells carbon credits.").weak());
+        return;
+    };
+    if seller == me {
+        let credit = game.blame_credit(me);
+        let standing = game.seat(me).credits_offered;
+        let pending = session.pending.iter().find_map(|o| if let Order::OfferCredits { ppm } = o { Some(*ppm) } else { None });
+        ui.label(format!(
+            "You hold {credit:.0} ppm in credit. You offer {standing} ppm a turn{}; what you sell past your credit goes onto your own Blame.",
+            pending.map(|p| format!(" ({p} from next turn)")).unwrap_or_default()
+        ));
+        ui.horizontal(|ui| {
+            ui.add(egui::DragValue::new(&mut view.credits_offer).range(0..=999));
+            let order = Order::OfferCredits { ppm: view.credits_offer };
+            let check = game.check_order(me, &session.pending, &order);
+            let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Offer {} ppm a turn", view.credits_offer)));
+            if let Err(e) = &check {
+                resp.clone().on_disabled_hover_text(&e.0);
+            }
+            if resp.on_hover_text("Stands from next turn until you set it again; nought refuses everyone.").clicked() {
+                actions.push(Action::Place(order));
+            }
+        });
+        return;
+    }
+    let offer = game.seat(seller).credits_offered;
+    let level = game.relations_level(seller, me);
+    match game.credit_price_multiplier(me) {
+        None => {
+            ui.label(RichText::new(format!("The Custodians will not sell to you: they are {level} toward you.")).weak());
+        }
+        Some(m) if offer <= 0 => {
+            ui.label(RichText::new(format!("The Custodians are not selling this turn. They are {level} toward you (x{m}).")).weak());
+        }
+        Some(m) => {
+            ui.label(format!("The Custodians offer {offer} ppm this turn. They are {level} toward you, so a ppm costs {} Ducats (x{m}).", game.credit_cost(me, 1).unwrap_or(0)));
+            ui.horizontal(|ui| {
+                ui.add(egui::DragValue::new(&mut view.credits_amount).range(1..=c.cap_per_turn.max(1)));
+                let order = Order::BuyCredits { ppm: view.credits_amount };
+                let cost = game.order_cost(me, &order).ducats;
+                let check = game.check_order(me, &session.pending, &order);
+                let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Buy {} ppm for {cost} Ducats", view.credits_amount)));
+                if let Err(e) = &check {
+                    resp.clone().on_disabled_hover_text(&e.0);
+                }
+                if resp.on_hover_text("Off your Blame at End Turn. If others buy first and the offer runs out, the Ducats for what you did not get come back.").clicked() {
+                    actions.push(Action::Place(order));
+                }
+            });
         }
     }
 }
@@ -6510,6 +6580,7 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
             // Ticket #267: what rivals laid on by Smear, when any, so the line never says the seat
             // put it in the air.
             let smeared = if s.blame_smeared > 0.0 { format!(", {:.0} laid on by rivals", s.blame_smeared) } else { String::new() };
+            let smeared = format!("{smeared}{}{}", if s.credits_bought > 0.0 { format!(", {:.0} bought as carbon credits", s.credits_bought) } else { String::new() }, if s.credits_sold > 0.0 { format!(", {:.0} sold as carbon credits", s.credits_sold) } else { String::new() });
             let line = format!(
                 "Answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit{smeared}), thresholds x{:.2}",
                 game.blame(seat),
@@ -6845,6 +6916,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // Ticket #265 (version 0.08.4): one form for every seat -- answerable for, how it
                 // got there, and what it holds in credit -- at the designer's word.
                 let smeared = if s.blame_smeared > 0.0 { format!(", {:.0} laid on by rivals", s.blame_smeared) } else { String::new() };
+                let smeared = format!("{smeared}{}{}", if s.credits_bought > 0.0 { format!(", {:.0} bought as carbon credits", s.credits_bought) } else { String::new() }, if s.credits_sold > 0.0 { format!(", {:.0} sold as carbon credits", s.credits_sold) } else { String::new() });
                 let line = format!(
                     "{}: answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit{smeared}); share {:.2}, thresholds x{:.2}",
                     game.seat_name(seat),

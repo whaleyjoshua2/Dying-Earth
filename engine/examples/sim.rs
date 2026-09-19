@@ -193,11 +193,13 @@ fn main() {
             r.throw_offs, r.peak_unrest, r.constabularies, r.relief_orders, r.population_moved
         );
         println!(
-            "         | blame {:?} | share {:?} | credit {:?} | smeared {:?} | thresholds {:?} | neutral developments {}",
+            "         | blame {:?} | share {:?} | credit {:?} | smeared {:?} | credits bought {:?} sold {:?} | thresholds {:?} | neutral developments {}",
             r.blame.map(|b| format!("{b:.0}")),
             r.blame_share.map(|b| format!("{b:.2}")),
             r.blame_credit.map(|b| format!("{b:.0}")),
             r.blame_smeared.map(|b| format!("{b:.0}")),
+            r.credits_bought.map(|b| format!("{b:.0}")),
+            r.credits_sold.map(|b| format!("{b:.0}")),
             r.threshold_multiplier.map(|b| format!("x{b:.2}")),
             r.developments
         );

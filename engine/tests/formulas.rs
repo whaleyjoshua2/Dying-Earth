@@ -8418,6 +8418,12 @@ fn relations_recover_slowly_and_never_rise_above_neutral() {
 /// teeth has to come past this test and say so.
 #[test]
 fn relations_do_nothing_mechanical_in_this_version() {
+    // Ticket #268 (version 0.08.4): the premise of this test -- written on ticket #191 when Relations
+    // were only read -- is dead, and this is the first version where six computer turns say so on
+    // the board: with every pair Hostile the Custodians refuse to sell carbon credits, so the seat
+    // that bought them in the neutral game keeps its Ducats and its Blame in the hostile one. The
+    // test is kept, inverted, as the record of the moment Relations became mechanical to the
+    // computer seats and not only to a player reading a card.
     let mut a = with_seed(11);
     let mut b = with_seed(11);
     for viewer in Seat::ALL {
@@ -8442,7 +8448,10 @@ fn relations_do_nothing_mechanical_in_this_version() {
             })
             .collect()
     };
-    assert_eq!(picture(&a), picture(&b), "six turns of the worst possible blood changed nothing about the board");
+    // The hostile game proposes no purchase at all -- the Custodians will not sell to a Hostile
+    // buyer -- so the computer seats' choices, and with them the board, part from the neutral game's.
+    assert_ne!(picture(&a), picture(&b), "six turns of the worst possible blood now change the board: {:?}", picture(&a));
+    assert_eq!(Seat::ALL.into_iter().map(|s| b.seat(s).credits_bought).sum::<f64>(), 0.0, "and nobody bought a credit in it");
 }
 
 // ------------------------------------------- 0.08.0 ticket #192: the Archive's gate and the Upload
@@ -9027,6 +9036,112 @@ fn the_arkwrights_signature_rule_is_coach_class_and_says_steerage_nowhere() {
             assert!(!text.to_lowercase().contains("steerage"), "{kind:?} still says Steerage: {text}");
         }
     }
+}
+
+// -------------------------------------------- 0.08.4 ticket #268: carbon credits
+
+/// Ticket #268 (version 0.08.4): a carbon credit bought comes off the buyer's Blame ledger for
+/// good and off the seller's credit; the Ducats land with the Custodians, at the table price times
+/// their view of the buyer -- Hostile refuses -- up to a cap a turn; and a purchase is an act of
+/// friendship both ways.
+#[test]
+fn a_carbon_credit_bought_moves_ppm_off_the_buyers_ledger_and_pays_the_custodians() {
+    let mut g = game();
+    calm(&mut g);
+    let cus = g.credit_seller().expect("the Custodians sit at the table");
+    let buyer = Seat::ALL.into_iter().find(|s| *s != cus).unwrap();
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = 100.0;
+    }
+    g.seats[cus.index()].blame_removed = 40.0;
+    g.seats[buyer.index()].stockpile.ducats = 100;
+    let c = g.tables.carbon_credits.clone();
+    assert_eq!((c.price_per_ppm, c.cap_per_turn), (1, 10));
+    // Nothing on offer: refused.
+    assert!(g.check_order(buyer, &[], &Order::BuyCredits { ppm: 5 }).is_err(), "nothing on offer yet");
+    g.seats[cus.index()].credits_offered = 15;
+    assert!(g.check_order(buyer, &[], &Order::BuyCredits { ppm: 11 }).is_err(), "over the cap");
+    assert!(g.check_order(cus, &[], &Order::BuyCredits { ppm: 5 }).is_err(), "not from oneself");
+    assert_eq!(g.credit_cost(buyer, 10), Some(10), "Neutral: the table price");
+    g.relations.score[cus.index()][buyer.index()] = 8;
+    assert_eq!(g.credit_cost(buyer, 10), Some(5), "Friendly: half");
+    // The worst deeds can be: the shared-pot reward lifts a full contributor one point, so -9 reads Cold.
+    g.relations.score[cus.index()][buyer.index()] = -10;
+    assert_eq!(g.relations_level(cus, buyer), "Hostile", "{}", g.relations_score(cus, buyer));
+    assert!(g.check_order(buyer, &[], &Order::BuyCredits { ppm: 5 }).is_err(), "Hostile: the Custodians refuse");
+    g.relations.score[cus.index()][buyer.index()] = 0;
+    let order = Order::BuyCredits { ppm: 10 };
+    assert!(g.check_order(buyer, &[], &order).is_ok());
+    assert!(g.check_order(buyer, std::slice::from_ref(&order), &Order::BuyCredits { ppm: 1 }).is_err(), "one purchase a turn");
+    let (cus_ducats, buyer_ducats) = (g.seats[cus.index()].stockpile.ducats, g.seats[buyer.index()].stockpile.ducats);
+    g.commit_orders(buyer, &[order]);
+    assert_eq!(g.seats[buyer.index()].stockpile.ducats, buyer_ducats - 10, "paid at the Orders phase");
+    g.resolution_phase();
+    assert!((g.blame(buyer) - 90.0).abs() < 1e-9, "10 ppm off the buyer's ledger: {}", g.blame(buyer));
+    assert!((g.blame_credit(cus) - 30.0).abs() < 1e-9, "10 ppm off the seller's credit: {}", g.blame_credit(cus));
+    assert!((g.blame(cus) - 60.0).abs() < 1e-9, "the seller's own Blame is untouched within its credit: {}", g.blame(cus));
+    assert_eq!(g.seats[cus.index()].stockpile.ducats, cus_ducats + 10, "the Ducats land with the Custodians");
+    assert!(g.relations.credited[cus.index()][buyer.index()] && g.relations.credited[buyer.index()][cus.index()], "an act of friendship both ways");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("carbon credit")), "{:?}", g.report.lines);
+    assert_eq!(g.seats[cus.index()].credits_offered, 15, "the offer stands until changed");
+    g.resolution_phase();
+    assert!((g.blame(buyer) - 90.0).abs() < 1e-9, "for good");
+}
+
+/// Ticket #268 (version 0.08.4): the Custodians may sell more than they hold in credit -- the
+/// excess goes onto their own ledger as Blame taken -- and an offer is shared first come first
+/// served, a buyer left short getting its Ducats back.
+#[test]
+fn overselling_carbon_credits_puts_the_excess_on_the_custodians_ledger_and_a_short_buyer_is_refunded() {
+    let mut g = game();
+    calm(&mut g);
+    let cus = g.credit_seller().unwrap();
+    let others: Vec<Seat> = Seat::ALL.into_iter().filter(|s| *s != cus).collect();
+    let (a, b) = (others[0], others[1]);
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = 100.0;
+        g.seats[s.index()].stockpile.ducats = 100;
+    }
+    g.seats[cus.index()].blame_removed = 5.0;
+    g.seats[cus.index()].credits_offered = 12;
+    g.commit_orders(a, &[Order::BuyCredits { ppm: 10 }]);
+    g.commit_orders(b, &[Order::BuyCredits { ppm: 10 }]);
+    g.resolution_phase();
+    assert!((g.blame(a) - 90.0).abs() < 1e-9, "the first buyer got its ten");
+    assert_eq!(g.blame_credit(cus), 0.0, "the seller's five of credit are gone");
+    assert!((g.blame(b) - 98.0).abs() < 1e-9, "the second buyer got the two left: {}", g.blame(b));
+    assert!((g.blame(cus) - 102.0).abs() < 1e-9, "twelve sold against five held: seven oversold are Blame taken, 100 - 5 + 7: {}", g.blame(cus));
+    assert_eq!(g.seats[b.index()].stockpile.ducats, 98, "paid ten, eight back for the eight it did not get");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("came back")), "{:?}", g.report.lines);
+}
+
+/// Ticket #268 (version 0.08.4): the computer Custodians offer their credit while their own share
+/// is under the fair quarter and refuse when it is not; a computer seat above a fair share with an
+/// offer standing buys.
+#[test]
+fn the_computer_custodians_offer_their_credit_when_clean_and_a_dirty_seat_buys() {
+    let mut g = game();
+    calm(&mut g);
+    let cus = g.credit_seller().unwrap();
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = 100.0;
+        g.seats[s.index()].stockpile.ducats = 100;
+    }
+    g.seats[cus.index()].blame_removed = 30.0;
+    assert!(g.blame_share(cus) < g.tables.influence.blame.fair_share);
+    let orders = g.ai_orders(cus);
+    assert!(orders.iter().any(|o| matches!(o, Order::OfferCredits { ppm } if *ppm == 30)), "clean: the whole credit on offer: {orders:?}");
+    g.seats[cus.index()].blame_emitted = 900.0;
+    g.seats[cus.index()].credits_offered = 30;
+    let orders = g.ai_orders(cus);
+    assert!(orders.iter().any(|o| matches!(o, Order::OfferCredits { ppm } if *ppm == 0)), "dirty: it withdraws the offer: {orders:?}");
+    // A dirty rival buys while the offer stands.
+    g.seats[cus.index()].blame_emitted = 100.0;
+    let dirty = Seat::ALL.into_iter().find(|s| *s != cus).unwrap();
+    g.seats[dirty.index()].blame_emitted = 600.0;
+    assert!(g.blame_share(dirty) > 0.5);
+    let orders = g.ai_orders(dirty);
+    assert!(orders.iter().any(|o| matches!(o, Order::BuyCredits { ppm } if *ppm > 0)), "a dirty seat buys: {orders:?}");
 }
 
 // -------------------------------------------- 0.08.4 ticket #267: the Smear campaign

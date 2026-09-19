@@ -72,6 +72,12 @@ pub enum Order {
     /// who paid. "Smear", the designer said, because it inflates Blame above the ppm produced and
     /// is thus a kind of a lie.
     Smear { target: Seat, amount: i64 },
+    /// Ticket #268 (version 0.08.4): the Custodians set the ppm of carbon credit they offer a turn,
+    /// standing until changed; nought refuses everyone.
+    OfferCredits { ppm: i64 },
+    /// Ticket #268: buy ppm of carbon credit from the Custodians, up to the cap, at the price their
+    /// view of the buyer sets; it comes off the buyer's Blame ledger at Resolution.
+    BuyCredits { ppm: i64 },
     RepairWithDucats { unit: UnitRef, points: u32 },
     /// Version 0.04 (ticket #42): the trading window. Buy Materials, Fuel or Energy for Ducats;
     /// sell Materials or Fuel for half the buying price; buy a building outright for Ducats at
@@ -249,6 +255,11 @@ pub struct Pending {
     /// Ticket #267 (version 0.08.4): Smear campaigns paid this turn -- who, whom, how much Influence.
     #[serde(default)]
     pub smears: Vec<(Seat, Seat, i64)>,
+    /// Ticket #268 (version 0.08.4): offers set and credits bought this turn -- buyer, ppm, Ducats paid.
+    #[serde(default)]
+    pub credit_offers: Vec<(Seat, i64)>,
+    #[serde(default)]
+    pub credit_buys: Vec<(Seat, i64, i64)>,
     /// Attack orders in the order given, for battle ordering (spec 10.1).
     pub attack_sequence: u32,
 }
@@ -276,6 +287,7 @@ impl Game {
             Order::Refuel { ship } => Cost { fuel: self.refuel_amount(seat, *ship), ..Default::default() },
             Order::Influence { amount, .. } => Cost { influence: *amount, ..Default::default() },
             Order::Smear { amount, .. } => Cost { influence: *amount, ..Default::default() },
+            Order::BuyCredits { ppm } => Cost { ducats: self.credit_cost(seat, *ppm).unwrap_or(0), ..Default::default() },
             // Ticket #54: a Mothball and a Strip Permit are free; a Restart costs Materials and a
             // Leapfrog Ducats; a Decommission pays Materials back, which arrive at its Resolution.
             Order::Change { what: BuildingChange::Restart, .. } => Cost { materials: t.mothball.restart_materials, ..Default::default() },
@@ -1189,6 +1201,44 @@ impl Game {
                 }
                 Ok(cost)
             }
+            // Ticket #268: an offer is the Custodians' alone, one a turn, never negative.
+            Order::OfferCredits { ppm } => {
+                if self.kind(seat) != FactionKind::Custodians {
+                    return fail("only the Custodians sell carbon credits");
+                }
+                if *ppm < 0 {
+                    return fail("offer nought or more");
+                }
+                if pending.iter().any(|o| matches!(o, Order::OfferCredits { .. })) {
+                    return fail("the offer is already being set this turn");
+                }
+                Ok(cost)
+            }
+            // Ticket #268: a purchase wants a seller offering, a buyer they will sell to, a positive
+            // amount within the cap, and one order a turn.
+            Order::BuyCredits { ppm } => {
+                let Some(seller) = self.credit_seller() else { return fail("nobody sells carbon credits") };
+                if seller == seat {
+                    return fail("the Custodians do not buy their own credits");
+                }
+                if *ppm <= 0 {
+                    return fail("buy a positive amount");
+                }
+                let c = &self.tables.carbon_credits;
+                if *ppm > c.cap_per_turn {
+                    return fail(format!("at most {} ppm a turn", c.cap_per_turn));
+                }
+                if self.seat(seller).credits_offered <= 0 {
+                    return fail("the Custodians are not selling this turn");
+                }
+                if self.credit_price_multiplier(seat).is_none() {
+                    return fail("the Custodians will not sell to you: they are Hostile");
+                }
+                if pending.iter().any(|o| matches!(o, Order::BuyCredits { .. })) {
+                    return fail("one purchase a turn");
+                }
+                Ok(cost)
+            }
             // Ticket #267: a Smear is one a turn per target, on a rival, of a positive amount.
             Order::Smear { target, amount } => {
                 if *amount <= 0 {
@@ -1622,6 +1672,11 @@ impl Game {
                 }
                 Order::Influence { target, amount } => self.pending.influence.push((seat, *target, *amount)),
                 Order::Smear { target, amount } => self.pending.smears.push((seat, *target, *amount)),
+                Order::OfferCredits { ppm } => self.pending.credit_offers.push((seat, *ppm)),
+                Order::BuyCredits { ppm } => {
+                    let paid = self.credit_cost(seat, *ppm).unwrap_or(0);
+                    self.pending.credit_buys.push((seat, *ppm, paid));
+                }
                 // Ticket #54: the change is written on the building itself and lands at the
                 // Resolution of its due turn, so nothing has to track a position between turns.
                 Order::Change { building, what } => {
@@ -1960,6 +2015,8 @@ impl Game {
             }
             Order::Influence { target, amount } => r("influence", &[("n", amount.to_string()), ("place", place(*target))]),
             Order::Smear { target, amount } => r("smear", &[("n", amount.to_string()), ("faction", self.seat_name(*target))]),
+            Order::OfferCredits { ppm } => r("offer_credits", &[("n", ppm.to_string())]),
+            Order::BuyCredits { ppm } => r("buy_credits", &[("n", ppm.to_string())]),
             Order::BuyInfluence { amount } => r("buy_influence", &[("n", amount.to_string())]),
             Order::ProposeAccord { to, .. } => r("propose_accord", &[("faction", self.seat_name(*to))]),
             Order::EndAccord { with } => r("end_accord", &[("faction", self.seat_name(*with))]),

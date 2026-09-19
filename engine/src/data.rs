@@ -872,6 +872,8 @@ pub struct AiWeights {
     /// Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward whose Blame
     /// share stands above the fair quarter.
     pub smear: f64,
+    /// Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
+    pub buy_credits: f64,
     /// Ticket #52: steer this turn's refugee flows into one calm state.
     pub resettle: f64,
     /// Ticket #227 (version 0.08.2): how readily this seat offers an Accord. Modest by default: an
@@ -1141,6 +1143,7 @@ struct FactionsFile {
     ducats: DucatsCard,
     research_directive: ResearchDirectiveCard,
     venture_capital: VentureCard,
+    carbon_credits: CarbonCreditsCard,
     emigrants: EmigrantsCard,
     faction_orders: FactionOrdersCard,
     exodus_call: ExodusCallCard,
@@ -1256,6 +1259,23 @@ pub struct EmigrantsCard {
 
 /// Ticket #72 (version 0.05.5): the Prospectors' Venture Capital Fund: the largest share of their
 /// Materials output that may be banked a turn, the step the share moves in, and what a draw returns.
+/// Ticket #268 (version 0.08.4): carbon credits, in `factions.toml` under `[carbon_credits]`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CarbonCreditsCard {
+    /// Ducats per ppm, before the seller's view of the buyer multiplies it.
+    pub price_per_ppm: i64,
+    /// The most ppm one buyer may take in a turn.
+    pub cap_per_turn: i64,
+    /// The price multiplier by the seller's Relations level toward the buyer; Hostile refuses.
+    pub friendly: f64,
+    pub cordial: f64,
+    pub neutral: f64,
+    pub wary: f64,
+    pub cold: f64,
+    /// The computer Custodians oversell by the cap when their Ducats stand below this.
+    pub ai_oversell_when_ducats_below: i64,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct VentureCard {
     pub max_share: f64,
@@ -1346,6 +1366,8 @@ pub struct Tables {
     pub faction_orders: FactionOrdersCard,
     pub ducats: DucatsCard,
     pub venture: VentureCard,
+    /// Ticket #268: carbon credits.
+    pub carbon_credits: CarbonCreditsCard,
     pub emigrants: EmigrantsCard,
     /// Ticket #191: the Relations scale and what moves it.
     pub relations: RelationsCard,
@@ -1457,6 +1479,7 @@ impl Tables {
             faction_orders: factions.faction_orders,
             research_directive: factions.research_directive,
             venture: factions.venture_capital,
+            carbon_credits: factions.carbon_credits,
             emigrants: factions.emigrants,
             relations: factions.relations,
             climate,

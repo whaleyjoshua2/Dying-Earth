@@ -274,6 +274,25 @@ tribute_ducats = 25
 tribute_materials = 15
 accord_kept_turns = 4
 
+# Ticket #268 (version 0.08.4): carbon credits. The Custodians -- and only they -- may offer ppm of
+# carbon credit a turn, standing until changed; any other Faction may buy up to `cap_per_turn` ppm
+# of it at `price_per_ppm` Ducats each, times the Custodians' view of the buyer (Hostile refuses).
+# A credit bought comes OFF the buyer's Blame ledger for good. On the seller's side it comes off
+# their Blame credit -- what their Scrubbers and Directive removed -- and, at the designer's word,
+# they may sell MORE than they hold: the excess goes onto their own ledger as Blame taken. "Any
+# amount and take the blame": forcing them to sell only what they hold would deprive them of any
+# reason to get credit, and forbidding overselling would gimp a strategic choice. A purchase is an
+# act of friendship both ways. The Ducats land in the Custodians' Stockpile.
+[carbon_credits]
+price_per_ppm = 1
+cap_per_turn = 10
+friendly = 0.5
+cordial = 0.75
+neutral = 1.0
+wary = 1.5
+cold = 2.0
+ai_oversell_when_ducats_below = 20
+
 [venture_capital]
 max_share = 0.8
 # Ticket #256 (version 0.08.4): a tenth to a hundredth. The share is a slider now, mirroring the

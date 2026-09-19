@@ -31,6 +31,8 @@ enum Cat {
     Resettle,
     /// Ticket #267 (version 0.08.4): a Smear campaign against a rival.
     Smear,
+    /// Ticket #268 (version 0.08.4): carbon credits bought from the Custodians.
+    BuyCredits,
     /// Ticket #51: divert this turn's Research into the Archive fund.
     FundArchive,
     /// Ticket #51: build the Archive; one Module since ticket #68.
@@ -119,6 +121,7 @@ impl Game {
             Cat::Relief => w.relief,
             Cat::Resettle => w.resettle,
             Cat::Smear => w.smear,
+            Cat::BuyCredits => w.buy_credits,
             Cat::Accord => w.accord,
             Cat::FundArchive => w.fund_archive,
             Cat::BuildArchive => w.build_archive,
@@ -1280,6 +1283,32 @@ impl Game {
                 }
             }
         }
+        // Ticket #268 (version 0.08.4): carbon credits, while the seat stands above a fair share, the
+        // Custodians are offering and will sell to it, and it can pay -- as much as the cap or the
+        // offer allows, weighed by how far above the quarter it stands.
+        if let Some(seller) = self.credit_seller().filter(|s| *s != seat) {
+            let c = self.tables.carbon_credits.clone();
+            let fair = self.tables.influence.blame.fair_share;
+            let over = self.blame_share(seat) - fair;
+            let offer = self.seat(seller).credits_offered;
+            let ppm = c.cap_per_turn.min(offer);
+            if over > 0.0
+                && ppm > 0
+                && let Some(cost) = self.credit_cost(seat, ppm)
+                && self.seat(seat).stockpile.ducats >= cost
+            {
+                push(
+                    vec![Order::BuyCredits { ppm }],
+                    Cat::BuyCredits,
+                    self.base_weight(seat, Cat::BuyCredits) * (1.0 + over / fair),
+                    1.0,
+                    1.0,
+                    1.0,
+                    format!("buy {ppm} ppm of carbon credit for {cost} Ducats (share {:.2})", self.blame_share(seat)),
+                    None,
+                );
+            }
+        }
         // Resettle: while the world's population is falling there are flows to steer, and the
         // calmest state the seat directs is the one that can take them.
         if self.population_growth_rate() < 0.0
@@ -1975,6 +2004,25 @@ impl Game {
                 lines.push(format!("  take  {:6.1}  {}", c.score(), c.note));
                 chosen = trial;
                 stacks_done.push(key);
+            }
+        }
+        // Ticket #268 (version 0.08.4): the computer Custodians' carbon-credit offer, a standing
+        // figure re-set whenever it should move. They offer their whole credit while their own share
+        // of the table's Blame is under the fair quarter, and withdraw the offer when it is not --
+        // "I want them to refuse sometimes", the designer said: a seat that needs its credit keeps
+        // it. Short of Ducats and clean, they oversell by the cap and take the Blame for the money.
+        if kind == FactionKind::Custodians {
+            let c = self.tables.carbon_credits.clone();
+            let fair = self.tables.influence.blame.fair_share;
+            let share = self.blame_share(seat);
+            let credit = self.blame_credit(seat).floor() as i64;
+            let mut offer = if share < fair { credit } else { 0 };
+            if share < fair / 2.0 && self.seat(seat).stockpile.ducats < c.ai_oversell_when_ducats_below {
+                offer += c.cap_per_turn;
+            }
+            if offer != self.seat(seat).credits_offered {
+                lines.push(format!("  take          offer {offer} ppm of carbon credit a turn (was {}; share {share:.2}, credit {credit})", self.seat(seat).credits_offered));
+                chosen.push(Order::OfferCredits { ppm: offer });
             }
         }
         // Ticket #72 (version 0.05.5): the Venture Capital Fund's share, played as the designer put
