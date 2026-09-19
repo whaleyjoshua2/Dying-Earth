@@ -3998,11 +3998,13 @@ fn threshold_breakdown(ui: &mut Ui, game: &Game, target: Place) {
                     let tip = format!(
                         "The {name}'s price here is the greater of their own threshold, {their_threshold}{}, and your Standing plus the margin they face, {standing} + {their_margin}.
 They are {gap} short. An outsider's Influence converts at {:.2} here, so that is about {spend} Influence spent.
-Spending here raises the bar; doing nothing lowers it, yours decaying {} a turn and theirs {}.",
+Spending here raises the bar; doing nothing lowers it, yours decaying {} a turn and theirs {}{}.",
                         if their_blame > 1.0 { format!(" (x{their_blame:.2} for their Blame)") } else { String::new() },
                         1.0 / resistance.max(1e-9),
-                        game.tables.influence.decay_controlled,
-                        game.tables.influence.decay
+                        game.standing_decay_for(Seat(0), target),
+                        game.standing_decay_for(who, target),
+                        // Ticket #266 (version 0.08.4): a rival's decay on a Region reads its Blame.
+                        if matches!(target, Place::State(_)) && game.standing_decay_for(who, target) != game.tables.influence.decay { " for their Blame" } else { "" }
                     );
                     let colour = if pressing { Color32::from_rgb(255, 160, 60) } else { rgb(game.tables.faction(game.kind(who)).colour) };
                     rule_tip(ui.label(RichText::new(line).color(colour)), tip);

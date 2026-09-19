@@ -322,7 +322,10 @@ fn influence_threshold_takes_control_and_decay_takes_two_from_untouched_targets(
     g.resolution_phase();
     assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(0)));
     assert_eq!(g.seats[0].influence[&Place::State(StateId::NorthAfrica)], 40, "the standing persists through the transfer (#33)");
-    assert_eq!(g.seats[0].influence[&Place::State(StateId::Europe)], 8);
+    // Ticket #266 (version 0.08.4): 1, not 2. With no Blame on the table yet every seat's share is
+    // nought, at or below the eighth where a Standing on a Region you do not hold decays slowly;
+    // from the first Climate phase on, shares exist and the plain 2 returns for everyone between.
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::Europe)], 9, "decay 1 while nobody has any Blame (#266)");
 }
 
 // ---------------------------------------------------------------- #33 standings that persist
@@ -9024,6 +9027,50 @@ fn the_arkwrights_signature_rule_is_coach_class_and_says_steerage_nowhere() {
             assert!(!text.to_lowercase().contains("steerage"), "{kind:?} still says Steerage: {text}");
         }
     }
+}
+
+// -------------------------------------------- 0.08.4 ticket #266: Blame moderates decay
+
+/// Ticket #266 (version 0.08.4): on a Region a Faction does not hold, its Standing decays 3 a turn
+/// when its Blame share stands at or above a half, 1 when at or below an eighth, and 2 between;
+/// a held place keeps its 1 and a Colony its 2 whatever the share.
+#[test]
+fn blame_moderates_the_decay_of_a_standing_on_regions_a_faction_does_not_hold() {
+    let mut g = game();
+    calm(&mut g);
+    let t = g.tables.influence.blame.clone();
+    assert_eq!((t.decay_slow_below, t.decay_fast_from, t.decay_slow, t.decay_fast), (0.125, 0.5, 1, 3));
+    let (dirty, clean, plain) = (Seat(1), Seat(2), Seat(3));
+    // Shares: seat 1 at 0.6, seat 2 at 0.05, seat 3 at 0.3, seat 0 the rest.
+    for (s, ppm) in [(Seat(0), 5.0), (dirty, 60.0), (clean, 5.0), (plain, 30.0)] {
+        g.seats[s.index()].blame_emitted = ppm;
+        g.seats[s.index()].blame_removed = 0.0;
+    }
+    assert!(g.blame_share(dirty) >= 0.5 && g.blame_share(clean) <= 0.125 && g.blame_share(plain) > 0.125 && g.blame_share(plain) < 0.5);
+    let region = Place::State(StateId::NorthAfrica);
+    let held = Place::State(StateId::Europe);
+    g.take_control(StateId::Europe, Seat(0));
+    g.take_control(StateId::NorthAfrica, Seat(0));
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 4);
+    let col = Place::Colony(c);
+    for s in [dirty, clean, plain] {
+        g.seat_mut(s).influence.insert(region, 30);
+        g.seat_mut(s).influence.insert(col, 30);
+        g.seat_mut(s).influenced_this_turn.clear();
+    }
+    g.seat_mut(Seat(0)).influence.insert(held, 30);
+    g.seat_mut(Seat(0)).influenced_this_turn.clear();
+    assert_eq!(g.standing_decay_for(dirty, region), 3, "dirty, elsewhere");
+    assert_eq!(g.standing_decay_for(clean, region), 1, "clean, elsewhere");
+    assert_eq!(g.standing_decay_for(plain, region), 2, "between, elsewhere");
+    assert_eq!(g.standing_decay_for(dirty, col), 2, "a Colony is untouched");
+    assert_eq!(g.standing_decay_for(Seat(0), held), 1, "a held place keeps its 1");
+    g.resolution_phase();
+    assert_eq!(g.seat(dirty).influence[&region], 27, "3 off a dirty seat's Standing on a Region it does not hold");
+    assert_eq!(g.seat(clean).influence[&region], 29, "1 off a clean seat's");
+    assert_eq!(g.seat(plain).influence[&region], 28, "2 off everyone between");
+    assert_eq!(g.seat(dirty).influence[&col], 28, "2 off on a Colony, however dirty");
+    assert_eq!(g.seat(Seat(0)).influence[&held], 29, "1 off on a held place");
 }
 
 // -------------------------------------------- 0.08.4 ticket #265: Blame and Blame credit

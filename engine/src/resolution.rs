@@ -776,16 +776,17 @@ impl Game {
             *s.influence.entry(place).or_insert(0) += r;
             s.influenced_this_turn.push(place);
         }
-        // Decay on every standing that received nothing this turn: 1 on a place you control, 2 elsewhere.
-        let decay = self.tables.influence.decay;
-        let decay_own = self.tables.influence.decay_controlled;
+        // Decay on every standing that received nothing this turn: 1 on a place you control, 2
+        // elsewhere -- and, since ticket #266 (version 0.08.4), 1 or 3 on a Region you do not hold
+        // by your Blame share, which `standing_decay_for` reads for every place.
         for seat in Seat::ALL {
-            let owned: Vec<Place> = self.seat(seat).influence.keys().filter(|t| self.place_control(**t).controller() == Some(seat)).copied().collect();
+            let decays: Vec<(Place, i64)> = self.seat(seat).influence.keys().map(|t| (*t, self.standing_decay_for(seat, *t))).collect();
             let s = self.seat_mut(seat);
             let touched = std::mem::take(&mut s.influenced_this_turn);
-            for (t, v) in s.influence.iter_mut() {
-                if !touched.contains(t) {
-                    let d = if owned.contains(t) { decay_own } else { decay };
+            for (t, d) in decays {
+                if !touched.contains(&t)
+                    && let Some(v) = s.influence.get_mut(&t)
+                {
                     *v = (*v - d).max(0);
                 }
             }

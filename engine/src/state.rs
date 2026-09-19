@@ -2460,6 +2460,29 @@ impl Game {
         if total <= 0.0 { 0.0 } else { self.blame(seat) / total }
     }
 
+    /// Ticket #266 (version 0.08.4): what a seat's Standing on `place` loses in a turn it received
+    /// nothing. A held place decays `decay_controlled`; a Colony or a station `decay`; a Region the
+    /// seat does not hold reads the seat's Blame share by the step rule -- `decay_slow` at or below
+    /// `decay_slow_below`, `decay_fast` at or above `decay_fast_from`, `decay` between. Ticket #53
+    /// wrote "never on Standing decay" into the Blame rule; the designer reversed that here.
+    pub fn standing_decay_for(&self, seat: Seat, place: Place) -> i64 {
+        let t = &self.tables.influence;
+        if self.place_control(place).controller() == Some(seat) {
+            return t.decay_controlled;
+        }
+        if !matches!(place, Place::State(_)) {
+            return t.decay;
+        }
+        let share = self.blame_share(seat);
+        if share <= t.blame.decay_slow_below {
+            t.blame.decay_slow
+        } else if share >= t.blame.decay_fast_from {
+            t.blame.decay_fast
+        } else {
+            t.decay
+        }
+    }
+
     /// Ticket #53: 1 + (share - a fair quarter), floored at x1.0 and capped by the table.
     pub fn blame_threshold_multiplier(&self, seat: Seat) -> f64 {
         let b = &self.tables.influence.blame;

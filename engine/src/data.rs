@@ -701,6 +701,14 @@ pub struct BlameTable {
     pub fair_share: f64,
     /// The most a Faction's thresholds can be multiplied by, however dirty it is.
     pub cap: f64,
+    /// Ticket #266 (version 0.08.4): Blame moderates the decay of a Standing on a Region the
+    /// Faction does not hold -- a step rule, at the designer's word. A share at or below
+    /// `decay_slow_below` decays `decay_slow` a turn; at or above `decay_fast_from`, `decay_fast`;
+    /// between, the plain `decay`. Never on a Colony or a station, never on a held place.
+    pub decay_slow_below: f64,
+    pub decay_fast_from: f64,
+    pub decay_slow: i64,
+    pub decay_fast: i64,
 }
 
 /// Ticket #52 (version 0.05): every number that moves a Nation State's Unrest (`unrest.toml`).
