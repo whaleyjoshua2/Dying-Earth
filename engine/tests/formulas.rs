@@ -5963,7 +5963,10 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         // branch's spine rather than being a leaf nobody has to take.
         (FactionKind::Prospectors, TechId::ExtractionCharter, vec![TechId::AutomatedRefining, TechId::Beneficiation]),
         (FactionKind::Arkwrights, TechId::GenerationShips, vec![TechId::ClosedLoopColonies]),
-        (FactionKind::Archivists, TechId::TheUpload, vec![TechId::PublicScience, TechId::ExpandedHabitats]),
+        // Ticket #245 (version 0.08.3): Expanded Habitats dropped, and with it the edge that read
+        // on screen as an unrelated line into Generation Ships. The gate is one Tech deep now --
+        // the shallowest of the four -- and the designer took that knowingly.
+        (FactionKind::Archivists, TechId::TheUpload, vec![TechId::PublicScience]),
     ];
     // Ticket #117 (version 0.07.1): rung 3 went 40 to 44, a tenth rounded to the nearest. What the
     // ticket guards is that no Faction's gate is dearer than another's, so the figure is checked
@@ -5979,6 +5982,23 @@ fn the_four_gates_stand_on_rung_three_at_one_price_with_their_prerequisites() {
         assert_eq!(g.tables.victory_gate(kind), Some(t));
     }
     assert_eq!(TechId::ALL.len(), 20, "eighteen, and Beneficiation and Relay Networks since ticket #232");
+    // Version 0.08.3 moved three of the four gates' prerequisites in three separate tickets, and
+    // nothing watched how deep each gate ended up. Counted as Techs that must stand before the
+    // gate is reachable, the gate excluded.
+    let depth = |t: TechId| -> usize {
+        let mut seen = std::collections::BTreeSet::new();
+        let mut stack: Vec<TechId> = g.tables.tech(t).needs.clone();
+        while let Some(n) = stack.pop() {
+            if seen.insert(n) {
+                stack.extend(g.tables.tech(n).needs.iter().copied());
+            }
+        }
+        seen.len()
+    };
+    assert_eq!(depth(TechId::TheUpload), 1, "the Archivists' gate, one deep since ticket #245");
+    assert_eq!(depth(TechId::PlanetaryStewardship), 2, "the Custodians', two since ticket #242 freed Green Consensus from Industry");
+    assert_eq!(depth(TechId::GenerationShips), 4, "the Arkwrights', through Closed-Loop Colonies, which itself pulls in Clean Power and Efficient Grids");
+    assert_eq!(depth(TechId::ExtractionCharter), 4, "the Prospectors', deepest since Beneficiation joined on ticket #232");
 }
 
 /// Ticket #84: with both parts at their bars the Custodians still do not win until Planetary

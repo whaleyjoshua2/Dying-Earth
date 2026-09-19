@@ -272,7 +272,18 @@ name = "The Upload"
 branch = "Society"
 rung = 3
 cost = 48
-needs = ["public_science", "expanded_habitats"]
+# Ticket #245 (version 0.08.3): Expanded Habitats is no longer a prerequisite. It was removed for
+# a DRAWING reason that turned into a rules decision: the edge from Expanded Habitats ran right,
+# passed underneath the Generation Ships box -- lines are painted before boxes -- and turned down
+# to here, so on screen it read as an edge into Generation Ships that nobody had drawn. The
+# designer asked for that line gone; told that the edge was really this one and that removing it
+# would weaken the Archivists' gate rather than tidy a duplicate, they answered: "remove expanded
+# habitats from the upload I accept the weakend gate."
+#
+# The gate is now ONE Tech deep -- Public Science, rung 1, then this. It is the shallowest of the
+# four Victory gates: the Custodians' is two (Public Science, Green Consensus) since ticket #242,
+# the Arkwrights' two, and the Prospectors' three since Beneficiation joined. The sweep reads it.
+needs = ["public_science"]
 effect = "Opens the Archivists' Victory Condition; Research Lab and Observatory output x1.25"
 value = 1.25
 gate_for = "archivists"
