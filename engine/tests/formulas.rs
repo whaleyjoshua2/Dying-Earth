@@ -9029,6 +9029,48 @@ fn the_arkwrights_signature_rule_is_coach_class_and_says_steerage_nowhere() {
     }
 }
 
+// -------------------------------------------- 0.08.4 ticket #263: what a Faction has under way
+
+/// Ticket #263 (version 0.08.4): a seat's builds begun and Ships in transit, with turns, soonest
+/// first; a build is the seat's that ordered it; a Ship at a Body is not in transit.
+#[test]
+fn what_a_faction_has_under_way_lists_its_builds_and_transits_soonest_first() {
+    let sid = StateId::Europe;
+    let mut g = game();
+    calm(&mut g);
+    directed(&mut g, sid);
+    assert_eq!(g.under_way(Seat(0)), UnderWay::default(), "nothing under way at the start");
+    let turn = g.turn;
+    // A Factory in Europe landing in three turns, then a Module at a Colony landing next turn.
+    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Factory), seat: Seat(0), due_turn: turn + 2, coastal: false });
+    let cid = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 4);
+    g.colony_mut(cid).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), due_turn: turn, coastal: false });
+    // A rival's build in a Region the player directs is the rival's, not the player's.
+    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(1), due_turn: turn + 1, coastal: false });
+    // Two Ships: one on the road to Mars with three turns left, one arriving next turn, and one at rest.
+    let put = |g: &mut Game, kind: UnitKind| -> ShipId {
+        let id = ShipId(g.fresh_id());
+        let name = g.next_ship_name(kind);
+        g.ships.push(Ship { name, id, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+        id
+    };
+    let far = put(&mut g, UnitKind::Frigate);
+    let near = put(&mut g, UnitKind::ColonyShip);
+    let _rest = put(&mut g, UnitKind::Carrier);
+    g.ships.iter_mut().find(|s| s.id == far).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 3 };
+    g.ships.iter_mut().find(|s| s.id == near).unwrap().at = ShipAt::Transit { from: BodyId::Moon, to: BodyId::Earth, turns_left: 1 };
+    let u = g.under_way(Seat(0));
+    assert_eq!(u.builds.len(), 2, "the rival's Bank is not the player's: {:?}", u.builds);
+    assert_eq!(u.builds[0], ("Mine".to_string(), Place::Colony(cid), 1), "soonest first: {:?}", u.builds);
+    assert_eq!(u.builds[1], ("Factory".to_string(), Place::State(sid), 3), "{:?}", u.builds);
+    assert_eq!(u.transits.len(), 2, "a Ship at rest is not in transit: {:?}", u.transits);
+    assert_eq!(u.transits[0].3, 1, "soonest first: {:?}", u.transits);
+    assert_eq!((u.transits[0].1.as_str(), u.transits[0].2.as_str()), ("the Moon", "Earth"));
+    assert_eq!(u.transits[1].3, 3);
+    assert!(u.transits[1].0.contains("TSV "), "the name carries the flag's prefix: {}", u.transits[1].0);
+    assert_eq!(g.under_way(Seat(1)).builds.len(), 1, "the rival sees its own Bank");
+}
+
 // -------------------------------------------- 0.08.4 ticket #262: the challenger line
 
 /// Ticket #262 (version 0.08.4): the rival named on a held place's card is the one NEAREST ITS OWN

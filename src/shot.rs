@@ -494,6 +494,38 @@ fn build_board(session: &mut Session) {
                 g.seat_mut(Seat(1)).influence.insert(place, theirs);
             }
         }
+        // `underway:1` (a building aid, ticket #263, version 0.08.4): seat 0 has a Factory on order
+        // in its start state, a Module on order at a Colony on the Moon, and a Frigate three turns
+        // out on the road to Mars, so the Faction window's Under way block has both lines to show.
+        if std::env::args().any(|a| a == "underway:1") {
+            let turn = g.turn;
+            if let Some(sid) = g.directed_states(Seat(0)).first().copied() {
+                g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Factory), seat: Seat(0), due_turn: turn + 2, coastal: false });
+            }
+            let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
+            let id = ColonyId(g.fresh_id());
+            let queue = vec![Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), due_turn: turn, coastal: false }];
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Habitat)], colonists: 4, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
+            let sid = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::Frigate);
+            g.ships.push(Ship {
+                id: sid,
+                name,
+                slot: None,
+                kind: UnitKind::Frigate,
+                seat: Seat(0),
+                damage: 0,
+                at: ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 3 },
+                colonists: 0,
+                colonists_education: 1.0,
+                army: None,
+                stance: Stance::Hold,
+                escaped: false,
+                arrived_this_turn: false,
+                built_turn: turn,
+                fuel: g.tables.unit(UnitKind::Frigate).tank,
+            });
+        }
         // `challenger:1` (a building aid, ticket #262, version 0.08.4): a rival stands on seat 0's
         // start state, well short of its price, so the challenger line on the held card has a name
         // and two figures to show. `threat:1` puts a rival OVER the price; this one keeps it under.

@@ -386,6 +386,14 @@ pub struct Colony {
     pub in_orbit: bool,
 }
 
+/// Ticket #263 (version 0.08.4): a seat's builds begun and Ships in transit, soonest first --
+/// `(what, where, turns until it lands)` and `(name, from, to, turns left)`.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct UnderWay {
+    pub builds: Vec<(String, Place, u32)>,
+    pub transits: Vec<(String, String, String, u32)>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ShipAt {
     Body(BodyId),
@@ -2330,6 +2338,35 @@ impl Game {
         // asymmetry the Constabulary itself has carried since ticket #190.
         let garrison = if self.has_tech(TechId::CivilDefense) { t.constabulary_margin_defended } else { t.constabulary_margin };
         t.challenge_margin + relations + if guarded { garrison } else { 0 }
+    }
+
+    /// Ticket #263 (version 0.08.4): what a seat has under way -- every build it has begun, with
+    /// the turns until it lands, and every Ship of its in transit, with its name, its road and the
+    /// turns left. The Faction window's Under way block reads this; the Report or the AI could.
+    /// Builds are counted by the seat that ORDERED them (`Build.seat`), so a build begun in a Region
+    /// that has since changed hands stays with whoever paid for it.
+    pub fn under_way(&self, seat: Seat) -> UnderWay {
+        let mut builds: Vec<(String, Place, u32)> = Vec::new();
+        for sid in StateId::ALL {
+            for b in self.state(sid).queue.iter().filter(|b| b.seat == seat) {
+                builds.push((b.item.name(), Place::State(sid), b.due_turn.saturating_sub(self.turn) + 1));
+            }
+        }
+        for c in &self.colonies {
+            for b in c.queue.iter().filter(|b| b.seat == seat) {
+                builds.push((b.item.name(), Place::Colony(c.id), b.due_turn.saturating_sub(self.turn) + 1));
+            }
+        }
+        let mut transits: Vec<(String, String, String, u32)> = Vec::new();
+        for s in self.ships.iter().filter(|s| s.seat == seat) {
+            if let ShipAt::Transit { from, to, turns_left } = s.at {
+                transits.push((self.ship_name(s), self.tables.body(from).name.clone(), self.tables.body(to).name.clone(), turns_left));
+            }
+        }
+        // Soonest first, at the designer's word; the name breaks a tie so the order is stable.
+        builds.sort_by(|a, b| a.2.cmp(&b.2).then_with(|| a.0.cmp(&b.0)));
+        transits.sort_by(|a, b| a.3.cmp(&b.3).then_with(|| a.0.cmp(&b.0)));
+        UnderWay { builds, transits }
     }
 
     /// Ticket #262 (version 0.08.4): the rival nearest to taking a held place -- its seat, its

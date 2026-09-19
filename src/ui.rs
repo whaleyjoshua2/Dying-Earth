@@ -505,6 +505,17 @@ fn rgb(c: [f32; 3]) -> Color32 {
     Color32::from_rgb((c[0] * 255.0) as u8, (c[1] * 255.0) as u8, (c[2] * 255.0) as u8)
 }
 
+/// Ticket #263 (version 0.08.4): "a Mine", "an Observatory", "the Industry Level" -- the article a
+/// build's name wants in a sentence.
+fn with_article(what: &str) -> String {
+    let lower = what.to_lowercase();
+    if lower == "industry level" {
+        return format!("the {what}");
+    }
+    let vowel = lower.starts_with(['a', 'e', 'i', 'o', 'u']);
+    format!("{} {what}", if vowel { "an" } else { "a" })
+}
+
 fn seat_colour(session: &Session, seat: Seat) -> Color32 {
     rgb(session.colours()[seat.index()])
 }
@@ -6432,6 +6443,30 @@ A rival that holds you at less than neutral defends its places against you a lit
             plural(ships, "Ship", "Ships"),
             plural(armies, "Army", "Armies")
         ));
+        ui.add_space(6.0);
+
+        // 6. Ticket #263 (version 0.08.4): **Under way** -- what this Faction has begun and not yet
+        // finished: builds with the turns until they land, Ships in transit with their names and
+        // their roads, soonest first. The list in full on every page, at the designer's word: a
+        // build stands hatched on its card and a transit is drawn on the Solar System Map for
+        // anyone to see, so the disclosure rule hides nothing here; it only saves the clicks.
+        ui.label(RichText::new("Under way").strong());
+        let u = game.under_way(seat);
+        if u.builds.is_empty() && u.transits.is_empty() {
+            ui.label(RichText::new("Nothing under way.").weak());
+        } else {
+            let turns = |n: u32| if n == 1 { "1 turn".to_string() } else { format!("{n} turns") };
+            if !u.builds.is_empty() {
+                // "in China", "at Tycho on the Moon": a Region is a country, a Colony a place.
+                let items: Vec<String> = u.builds.iter().map(|(what, place, n)| format!("{} {} {} ({})", with_article(what), if matches!(place, Place::State(_)) { "in" } else { "at" }, game.place_name(*place), turns(*n))).collect();
+                ui.label(format!("Building: {}", items.join(", ")));
+            }
+            if !u.transits.is_empty() {
+                // "Earth to Mars" in words: the interface font has no arrow and drew a box for one.
+                let items: Vec<String> = u.transits.iter().map(|(name, from, to, n)| format!("{name}, {from} to {to}, {}", turns(*n))).collect();
+                ui.label(format!("In transit: {}", items.join("; ")));
+            }
+        }
         ui.add_space(8.0);
 
         // The rulebook, SHUT by default: the setup screen's Faction card, the same code, brought
