@@ -426,6 +426,32 @@ fn build_board(session: &mut Session) {
                 fuel: g.tables.unit(UnitKind::ColonyShip).tank,
             });
         }
+        // `settler:<body id>` (a building aid, ticket #258, version 0.08.4): a Colony Ship of seat 0's
+        // with eight Colonists aboard sits at that Body, and that Body's picture selects the stack,
+        // so the Ship card's founding buttons -- one per free slot, yields on their faces -- can be
+        // photographed. Nothing else composes a loaded Colony Ship at a world with free slots.
+        if let Some(body) = std::env::args().find_map(|a| a.strip_prefix("settler:").and_then(body_from_id)) {
+            let id = ShipId(g.fresh_id());
+            let turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            g.ships.push(Ship {
+                id,
+                name,
+                slot: None,
+                kind: UnitKind::ColonyShip,
+                seat: Seat(0),
+                damage: 0,
+                at: ShipAt::Body(body),
+                colonists: 8,
+                colonists_education: 1.0,
+                army: None,
+                stance: Stance::Hold,
+                escaped: false,
+                arrived_this_turn: false,
+                built_turn: turn,
+                fuel: g.tables.unit(UnitKind::ColonyShip).tank,
+            });
+        }
         // `venture:<n>` (a building aid, ticket #72): seat 0 as the Prospectors holds n Materials in
         // the Venture Capital Fund and banks half its output.
         if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("venture:").and_then(|v| v.parse::<i64>().ok()))
@@ -1035,6 +1061,19 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         if let Some(s) = wanted {
             view.selection = Selection::State(s);
             view.show_climate = false;
+        }
+        // `site:<body id>,<slot>` (a building aid, ticket #258): that Body's picture opens the empty
+        // Colony Slot's panel, the one place the yields were still in words. `settler:<body id>`
+        // (the same ticket): that Body's picture selects seat 0's Ship stack there.
+        if let View::Surface(body) = v {
+            if let Some((b, slot)) = std::env::args().find_map(|a| a.strip_prefix("site:").and_then(|v| v.split_once(',')).and_then(|(b, n)| Some((body_from_id(b)?, n.parse::<u32>().ok()?))))
+                && b == body
+            {
+                view.selection = Selection::Slot(body, slot);
+            }
+            if std::env::args().any(|a| a.strip_prefix("settler:").and_then(body_from_id) == Some(body)) {
+                view.selection = Selection::ShipStack(body, Seat(0));
+            }
         }
         plan.next_at = t + 2.5;
     }

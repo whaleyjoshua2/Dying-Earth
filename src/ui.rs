@@ -628,7 +628,8 @@ fn found_button(ui: &mut Ui, yields: &dying_earth_engine::SlotYields, label: &st
             .show(ui, |ui| {
                 ui.vertical(|ui| {
                     ui.label(RichText::new(label).color(visuals.text_color()));
-                    text_with_icons(ui, &slot_yield_hover(yields), 13.0, visuals.text_color());
+                    // Ticket #258 (version 0.08.4): drawn glyph-first; see `slot_yield_row`.
+                    slot_yield_row(ui, slot_yield_figures(yields), 13.0, visuals.text_color());
                 });
             });
     })
@@ -2440,12 +2441,36 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
 /// tooltip behind it -- it is the whole of what is shown -- so it must never be able to go mute.
 const SLOT_YIELD_SIZE: f32 = 14.0;
 
-/// Ticket #211 (version 0.08.1): a slot's four yields as one line for a hover, in the form the
-/// glyph rule reads -- each figure's word heading its own multiplier, which `text_with_icons`
-/// trades for the glyph. The designer asked for the yields and nothing else: "no need for the
-/// clause just yeilds and use the glyps".
-fn slot_yield_hover(y: &dying_earth_engine::SlotYields) -> String {
-    format!("Materials x{:.2} - Energy x{:.2} - Fuel x{:.2} - Research x{:.2}", y.mine, y.generator, y.refinery, y.research)
+/// Ticket #258 (version 0.08.4): four yields as a row of glyph-and-figure pairs in a Ui -- the
+/// notation `slot_yield_label` paints under every slot on the map, brought onto the panel and the
+/// founding button. It replaces `slot_yield_hover` (ticket #211), a line of words in the form
+/// "Materials x1.37". The line of WORDS that stood here before this ticket never became glyphs at
+/// all: the one glyph rule (`draw_with_icons`) trades a word only where it follows a figure, and
+/// "Materials x1.37" has the figure after the word. Ticket #218 promised glyphs on the button's
+/// face and a picture on this ticket was the first to show it had none. Drawn directly, glyph then
+/// figure, so it cannot fall through that rule again.
+fn slot_yield_row(ui: &mut Ui, figures: [(&str, f64); 4], size: f32, tint: Color32) {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 3.0;
+        for (i, (key, v)) in figures.iter().enumerate() {
+            if i > 0 {
+                ui.add_space(6.0);
+            }
+            match Icons::from_ctx(ui.ctx(), key, size) {
+                Some(image) => {
+                    ui.add(image);
+                }
+                None => {
+                    ui.label(RichText::new(*key).size(size).color(tint));
+                }
+            }
+            ui.label(RichText::new(format!("x{v:.2}")).size(size).color(tint));
+        }
+    });
+}
+
+fn slot_yield_figures(y: &dying_earth_engine::SlotYields) -> [(&'static str, f64); 4] {
+    [("materials", y.mine), ("energy", y.generator), ("fuel", y.refinery), ("research", y.research)]
 }
 
 fn slot_yield_label(painter: &egui::Painter, pos: Pos2, yields: &dying_earth_engine::SlotYields) {
@@ -4933,14 +4958,19 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
     // Ticket #57: the slot's own four yields, drawn when the game started, beside its Body's.
     let card = game.tables.body(body);
     let y = game.slot_yields(body, slot);
-    ui.label(format!("Yields here: Mine x{:.2}, Generator x{:.2}, Refinery x{:.2}, Observatory x{:.2}", y.mine, y.generator, y.refinery, y.research));
-    ui.label(
-        RichText::new(format!(
-            "{} as a whole: Mine x{}, Generator x{}, Refinery x{}, Observatory x{}",
-            card.name, card.mine_yield, card.generator_yield, card.refinery_yield, card.research_yield
-        ))
-        .weak(),
-    );
+    // Ticket #258 (version 0.08.4): both lines in the glyph-and-number row the founding button and
+    // the map labels already use, at the designer's word -- "both", and the Body's line kept, weak.
+    // A player read the yields here in words and then again in glyphs on the button beneath.
+    let ink = ui.visuals().text_color();
+    ui.horizontal(|ui| {
+        ui.label("Yields here:");
+        slot_yield_row(ui, slot_yield_figures(&y), 14.0, ink);
+    });
+    let weak = ui.visuals().weak_text_color();
+    ui.horizontal(|ui| {
+        ui.label(RichText::new(format!("{} as a whole:", card.name)).weak());
+        slot_yield_row(ui, [("materials", card.mine_yield), ("energy", card.generator_yield), ("fuel", card.refinery_yield), ("research", card.research_yield)], 14.0, weak);
+    });
     for s in game.ships.iter().filter(|s| !session.spectator && s.seat == Seat(0) && s.at == ShipAt::Body(body) && s.kind == UnitKind::ColonyShip && s.colonists > 0) {
         let order = Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) };
         // Ticket #211 (version 0.08.1): what the site is worth, at the moment of choosing it. The
