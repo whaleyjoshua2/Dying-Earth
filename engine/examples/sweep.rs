@@ -54,281 +54,344 @@ fn main() {
     let sink_afters = list("--sink-after=", &[f64::NAN]);
     let balance = std::env::args().any(|a| a == "--balance");
     let base = Tables::load(&default_data_dir()).expect("tables");
-    println!("seat 0: {} starting in {start:?}", player.name());
-    println!("sink  step  perm  after | collapses/{seeds} | collapse turns (median, min..max) | temp at end (median) | wins by seat");
-    for &sink in &sinks {
-        for &step in &steps {
-            for &permafrost in &permafrosts {
-                for &sink_after in &sink_afters {
-                    let mut t = base.clone();
-                    t.climate.natural_sink = sink;
-                    t.climate.ppm_step = step;
-                    for b in &mut t.climate.breaks {
-                        match b.effect {
-                            BreakEffect::EmissionsPerTurn if permafrost.is_finite() => b.emissions = permafrost,
-                            BreakEffect::WeakenSink if sink_after.is_finite() => b.sink_after = sink_after,
-                            _ => {}
-                        }
-                    }
-                    let shown = |v: f64, from: f64| if v.is_finite() { v } else { from };
-                    let perm_shown = shown(permafrost, t.climate.breaks.iter().find(|b| b.effect == BreakEffect::EmissionsPerTurn).map(|b| b.emissions).unwrap_or(0.0));
-                    let after_shown = shown(sink_after, t.climate.breaks.iter().find(|b| b.effect == BreakEffect::WeakenSink).map(|b| b.sink_after).unwrap_or(0.0));
-                    let tables = Arc::new(t);
-                    let mut turns = Vec::new();
-                    let mut temps = Vec::new();
-                    let mut wins = [0u32; 4];
-                    // Ticket #60: the balance counters, for the one-cell runs of the balance report.
-                    let (mut draws, mut scrubbers, mut leapfrogs, mut constabularies, mut sea_walls) = (0u32, 0u32, 0u32, 0u32, 0u32);
-                    let (mut first_colony, mut off_earth, mut techs) = (Vec::new(), Vec::new(), Vec::new());
-                    let mut breaks_fired = vec![0u32; tables.climate.breaks.len()];
-                    let mut highest_rung = 0u32;
-                    let mut victory_met: Vec<String> = Vec::new();
-                    // Ticket #67 (version 0.05.5): whether the Mars system is reached now that the
-                    // game holds three windows, and how many Antarctic Colonies are founded.
-                    let (mut mars_turns, mut antarctic) = (Vec::new(), 0u32);
-                    // Ticket #68: how far the Archivists' Archive gets.
-                    let (mut archive_built, mut archive_complete, mut archive_funds) = (Vec::new(), Vec::new(), Vec::new());
-                    // Ticket #69: the neutral Labs' Research and the Sea Wall's Tech.
-                    let (mut neutral_research, mut coastal_engineering) = (Vec::new(), Vec::new());
-                    // Ticket #70: what the sea took.
-                    let (mut slots_lost, mut drowned) = (Vec::new(), Vec::new());
-                    // Ticket #72: the Prospectors' Fund.
-                    let mut venture = Vec::new();
-                    // Ticket #227 (version 0.08.2): the six figures the version's rules depend on.
-                    let mut blame_shares: [Vec<f64>; 4] = Default::default();
-                    let mut rel_end: Vec<i64> = Vec::new();
-                    let mut rel_floored = 0u32;
-                    let mut accords = 0u32;
-                    let mut accord_terms = [0u32; 4];
-                    let mut bought: [i64; 4] = [0; 4];
-                    let mut sold: [i64; 4] = [0; 4];
-                    let mut takes = 0u32;
-                    let mut tree_turns: Vec<u32> = Vec::new();
-                    // Ticket #76: the deck.
-                    let (mut cards_drawn, mut deck_empty) = (Vec::new(), 0u32);
-                    // Ticket #73: Emigrants.
-                    let (mut emigrant_batches, mut by_sea) = (0u32, 0u32);
-                    // Ticket #80: Observatories and Research off Earth, per seat.
-                    let mut observatories = [0u32; 4];
-                    let mut research_off_earth: [Vec<u32>; 4] = Default::default();
-                    // Ticket #82: Module-turns doubled by an idle Facility on Earth, per seat.
-                    let mut doubled_turns: [Vec<u32>; 4] = Default::default();
-                    // Ticket #84: the turn each seat's Victory gate completed, over the seeds it did.
-                    let mut gate_turns: [Vec<u32>; 4] = Default::default();
-                    // Ticket #86: Colonists lost in transit to crowding, per seat, over the batch.
-                    let mut lost_in_transit = [0i64; 4];
-                    // Ticket #87: stranded Ships at the end, Refuel orders and stations off Earth.
-                    let mut stranded = [0u32; 4];
-                    let (mut refuels, mut stations_off_earth) = (0u32, 0u32);
-                    // Ticket #88: Colonies with two or more working Mines, and Modules per ground Colony.
-                    let (mut deep_colonies, mut ground_modules, mut ground_colonies) = (0u32, 0u32, 0u32);
-                    // Ticket #89: Solar Arrays standing at the end over the batch.
-                    let mut solar_arrays = 0u32;
-                    // Ticket #90: Trade Posts standing at the end over the batch.
-                    let mut trade_posts = 0u32;
-                    // Ticket #92: Mass Drivers at the end, and Colonies on Phobos or Deimos.
-                    let (mut mass_drivers, mut martian_moon_colonies) = (0u32, 0u32);
-                    // Ticket #93: stations at Venus at the end, and Colonists living there.
-                    let (mut venus_stations, mut venus_colonists) = (0u32, 0u32);
-                    // Ticket #75: seat 0's start state.
-                    let mut home_lost = Vec::new();
-                    for seed in 1..=seeds {
-                        let r = dying_earth_engine::sim::run_from(tables.clone(), seed, player, start);
-                        match r.outcome {
-                            Some(Outcome::Collapse) => turns.push(r.last_turn),
-                            Some(Outcome::Win { seat, .. }) => wins[seat.index()] += 1,
-                            Some(Outcome::Draw { .. }) => draws += 1,
-                            _ => {}
-                        }
-                        temps.push(r.temperature);
-                        for i in 0..4 {
-                            blame_shares[i].push(r.blame_share[i]);
-                            bought[i] += r.bought[i];
-                            sold[i] += r.sold[i];
-                        }
-                        rel_end.extend(r.relations_end.iter().copied());
-                        rel_floored += r.relations_floored;
-                        accords += r.accords_end;
-                        for (i, a) in accord_terms.iter_mut().enumerate() {
-                            *a += r.accord_terms[i];
-                        }
-                        takes += r.influence_transfers;
-                        if let Some(t) = r.tree_done_turn {
-                            tree_turns.push(t);
-                        }
-                        scrubbers += r.scrubbers;
-                        leapfrogs += r.leapfrogs;
-                        constabularies += r.constabularies;
-                        sea_walls += r.sea_walls_built;
-                        if let Some(t) = r.first_colony_turn {
-                            first_colony.push(t);
-                        }
-                        off_earth.push(r.colonists_off_earth.iter().sum::<u32>());
-                        techs.push(r.techs_completed);
-                        highest_rung = highest_rung.max(r.highest_rung);
-                        // Ticket #80: Observatories at the end and Research made off Earth, per seat.
-                        for s in 0..4 {
-                            observatories[s] += r.observatories[s];
-                            research_off_earth[s].push(r.research_off_earth[s].max(0) as u32);
-                            doubled_turns[s].push(r.doubled_module_turns[s].max(0) as u32);
-                            if let Some(t) = r.gate_turn[s] {
-                                gate_turns[s].push(t);
-                            }
-                            lost_in_transit[s] += r.lost_in_transit[s];
-                            stranded[s] += r.stranded_at_end[s];
-                        }
-                        refuels += r.refuels;
-                        stations_off_earth += r.stations_off_earth;
-                        deep_colonies += r.deep_colonies;
-                        ground_modules += r.ground_modules;
-                        ground_colonies += r.ground_colonies;
-                        solar_arrays += r.solar_arrays;
-                        trade_posts += r.trade_posts;
-                        mass_drivers += r.mass_drivers;
-                        martian_moon_colonies += r.martian_moon_colonies;
-                        venus_stations += r.venus_stations;
-                        venus_colonists += r.venus_colonists;
-                        if let Some(t) = r.first_mars_colony_turn {
-                            mars_turns.push(t);
-                        }
-                        antarctic += r.antarctic_colonies;
-                        if let Some(t) = r.archive_built_turn {
-                            archive_built.push(t);
-                        }
-                        if let Some(t) = r.archive_complete_turn {
-                            archive_complete.push(t);
-                        }
-                        archive_funds.push(r.archive_fund_at_end.max(0) as u32);
-                        neutral_research.push(r.neutral_research.max(0) as u32);
-                        slots_lost.push(r.coastal_slots_lost);
-                        drowned.push(r.facilities_drowned);
-                        venture.push(r.venture_fund_at_end.max(0) as u32);
-                        cards_drawn.push(r.cards_drawn);
-                        if r.deck_empty {
-                            deck_empty += 1;
-                        }
-                        emigrant_batches += r.emigrant_batches;
-                        by_sea += r.antarctic_by_sea;
-                        if let Some(t) = r.start_state_lost_turn {
-                            home_lost.push(t);
-                        }
-                        if let Some(t) = r.coastal_engineering_turn {
-                            coastal_engineering.push(t);
-                        }
-                        if let Some((seat, kind)) = r.victory_met {
-                            victory_met.push(format!("seed {seed} {} (seat {})", kind.name(), seat.0));
-                        }
-                        for (i, t) in r.break_turns.iter().enumerate() {
-                            if t.is_some() {
-                                breaks_fired[i] += 1;
+    // Ticket #241 (version 0.08.3): `--seatings` runs all four Factions as seat 0 in one
+    // process and prints ONE win column of `4 x seeds` at the end. Version 0.08.2 ended by
+    // naming this as missing: its figures were per seating, and a win column of 80 had to be
+    // added up by hand from four of 20, which is how a baseline gets misquoted.
+    let all_seatings = std::env::args().any(|a| a == "--seatings");
+    let players: Vec<FactionKind> = if all_seatings { FactionKind::ALL.to_vec() } else { vec![player] };
+    // Indexed by the Faction's place in `FactionKind::ALL`, never by seat: seat 0 is a
+    // different Faction in every seating, which is the whole point of running four.
+    let mut all_wins = [0u32; 4];
+    let (mut all_games, mut all_collapses) = (0u32, 0u32);
+    for player in players {
+        println!("seat 0: {} starting in {start:?}", player.name());
+        println!("sink  step  perm  after | collapses/{seeds} | collapse turns (median, min..max) | temp at end (median) | wins by seat");
+        for &sink in &sinks {
+            for &step in &steps {
+                for &permafrost in &permafrosts {
+                    for &sink_after in &sink_afters {
+                        let mut t = base.clone();
+                        t.climate.natural_sink = sink;
+                        t.climate.ppm_step = step;
+                        for b in &mut t.climate.breaks {
+                            match b.effect {
+                                BreakEffect::EmissionsPerTurn if permafrost.is_finite() => b.emissions = permafrost,
+                                BreakEffect::WeakenSink if sink_after.is_finite() => b.sink_after = sink_after,
+                                _ => {}
                             }
                         }
-                    }
-                    turns.sort_unstable();
-                    temps.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                    let median = turns.get(turns.len() / 2).map(|t| t.to_string()).unwrap_or("-".into());
-                    let range = if turns.is_empty() { "-".to_string() } else { format!("{}..{}", turns[0], turns[turns.len() - 1]) };
-                    println!(
-                        "{sink:4.0}  {step:4.0}  {perm_shown:4.1}  {after_shown:5.1} | {:2}/{seeds} | {median:>3} ({range}) | {:+.2} | {:?}",
-                        turns.len(),
-                        temps[temps.len() / 2],
-                        wins
-                    );
-                    if balance {
-                        let kinds: Vec<String> = {
-                            let mut ks: Vec<FactionKind> = vec![player];
-                            ks.extend(FactionKind::ALL.into_iter().filter(|k| *k != player));
-                            ks.iter().map(|k| k.name().to_string()).collect()
-                        };
-                        for s in Seat::ALL {
-                            println!("      {:>12} (seat {}): {:2} win(s)", kinds[s.index()], s.0, wins[s.index()]);
-                        }
-                        println!("      draws {draws}, collapses {}/{seeds}, median collapse turn {median}", turns.len());
-                        println!("      median turn of first Colony {}", median_u(&mut first_colony));
-                        println!("      median Colonists off Earth at the end, all seats {}", median_u(&mut off_earth));
-                        println!("      Scrubbers {scrubbers}, Leapfrogs {leapfrogs}, Constabularies {constabularies}, Sea Walls {sea_walls}");
-                        println!("      Techs: median {} completed, highest rung reached {highest_rung}", median_u(&mut techs));
-                        println!(
-                            "      Observatories standing at the end, all seeds, by seat {observatories:?}; median Research made off Earth a game, by seat {:?}",
-                            research_off_earth.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
-                        );
-                        println!(
-                            "      Production Moved: median Module-turns doubled by an idle Facility a game, by seat {:?}",
-                            doubled_turns.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
-                        );
-                        println!(
-                            "      Victory gates: completed in {:?} seeds by seat, median turn {:?}",
-                            gate_turns.iter().map(|v| v.len()).collect::<Vec<_>>(),
-                            gate_turns.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
-                        );
-                        println!("      Crowded ships: Colonists lost in transit over the batch, by seat {lost_in_transit:?}");
-                        println!("      Tanks: Ships stranded at the end over the batch, by seat {stranded:?}; {refuels} Refuel orders; {stations_off_earth} stations standing off Earth at the end");
-                        println!(
-                            "      Build it where you dig: {deep_colonies} ground Colonies with two or more working Mines at the end over the batch; {:.1} Modules per ground Colony",
-                            if ground_colonies > 0 { ground_modules as f64 / ground_colonies as f64 } else { 0.0 }
-                        );
-                        println!("      Solar Arrays standing at the end over the batch: {solar_arrays}; Trade Posts {trade_posts}; Mass Drivers {mass_drivers}; Colonies on Phobos or Deimos {martian_moon_colonies}");
-                        println!("      Venus: {venus_stations} stations at the end over the batch, {venus_colonists} Colonists living there");
-                        println!(
-                            "      Mars system: a Colony founded in {}/{seeds} seeds, median first turn {}; Antarctic Colonies founded {antarctic}",
-                            mars_turns.len(),
-                            median_u(&mut mars_turns)
-                        );
-                        println!(
-                            "      The Archive: standing in {}/{seeds} seeds (median turn {}), complete in {}/{seeds} (median turn {}), median fund at the end {}",
-                            archive_built.len(),
-                            median_u(&mut archive_built),
-                            archive_complete.len(),
-                            median_u(&mut archive_complete),
-                            median_u(&mut archive_funds)
-                        );
-                        println!(
-                            "      Neutral Labs paid a median {} Research a game; Coastal Engineering complete in {}/{seeds} seeds (median turn {})",
-                            median_u(&mut neutral_research),
-                            coastal_engineering.len(),
-                            median_u(&mut coastal_engineering)
-                        );
-                        println!("      The sea: median {} coastal slots lost a game, {} Facilities drowned", median_u(&mut slots_lost), median_u(&mut drowned));
-                        println!("      The Prospectors' Venture Capital Fund at the end: median {} Ducats of the {} their Victory Condition asks", median_u(&mut venture), base.faction(FactionKind::Prospectors).victory_first.bar);
-                        println!("      The deck: median {} cards drawn a game, empty at the end in {deck_empty}/{seeds} seeds", median_u(&mut cards_drawn));
-                        println!("      Pioneers: {emigrant_batches} batches recruited, {by_sea} Antarctic Colonies founded by sea");
-                        println!("      Seat 0 lost its start state in {}/{seeds} seeds (median turn {})", home_lost.len(), median_u(&mut home_lost));
-                        println!(
-                            "      Victory Conditions met outright: {}",
-                            if victory_met.is_empty() { "none in any seed".to_string() } else { victory_met.join(", ") }
-                        );
-                        let fired: Vec<String> = tables.climate.breaks.iter().zip(&breaks_fired).map(|(b, n)| format!("{} {n}/{seeds}", b.name)).collect();
-                        // Ticket #227 (version 0.08.2): the six the spec asks for, in one block.
-                        let med = |v: &mut Vec<f64>| {
-                            if v.is_empty() {
-                                return "-".to_string();
+                        let shown = |v: f64, from: f64| if v.is_finite() { v } else { from };
+                        let perm_shown = shown(permafrost, t.climate.breaks.iter().find(|b| b.effect == BreakEffect::EmissionsPerTurn).map(|b| b.emissions).unwrap_or(0.0));
+                        let after_shown = shown(sink_after, t.climate.breaks.iter().find(|b| b.effect == BreakEffect::WeakenSink).map(|b| b.sink_after).unwrap_or(0.0));
+                        let tables = Arc::new(t);
+                        let mut turns = Vec::new();
+                        let mut temps = Vec::new();
+                        let mut wins = [0u32; 4];
+                        // Ticket #60: the balance counters, for the one-cell runs of the balance report.
+                        let (mut draws, mut scrubbers, mut leapfrogs, mut constabularies, mut sea_walls) = (0u32, 0u32, 0u32, 0u32, 0u32);
+                        let (mut first_colony, mut off_earth, mut techs) = (Vec::new(), Vec::new(), Vec::new());
+                        let mut breaks_fired = vec![0u32; tables.climate.breaks.len()];
+                        let mut highest_rung = 0u32;
+                        let mut victory_met: Vec<String> = Vec::new();
+                        // Ticket #67 (version 0.05.5): whether the Mars system is reached now that the
+                        // game holds three windows, and how many Antarctic Colonies are founded.
+                        let (mut mars_turns, mut antarctic) = (Vec::new(), 0u32);
+                        // Ticket #68: how far the Archivists' Archive gets.
+                        let (mut archive_built, mut archive_complete, mut archive_funds) = (Vec::new(), Vec::new(), Vec::new());
+                        // Ticket #69: the neutral Labs' Research and the Sea Wall's Tech.
+                        let (mut neutral_research, mut coastal_engineering) = (Vec::new(), Vec::new());
+                        // Ticket #70: what the sea took.
+                        let (mut slots_lost, mut drowned) = (Vec::new(), Vec::new());
+                        // Ticket #72: the Prospectors' Fund.
+                        let mut venture = Vec::new();
+                        // Ticket #227 (version 0.08.2): the six figures the version's rules depend on.
+                        let mut blame_shares: [Vec<f64>; 4] = Default::default();
+                        let mut rel_end: Vec<i64> = Vec::new();
+                        let mut rel_floored = 0u32;
+                        let mut accords = 0u32;
+                        let mut accord_terms = [0u32; 4];
+                        let mut bought: [i64; 4] = [0; 4];
+                        let mut sold: [i64; 4] = [0; 4];
+                        let mut takes = 0u32;
+                        let mut tree_turns: Vec<u32> = Vec::new();
+                        // Ticket #76: the deck.
+                        let (mut cards_drawn, mut deck_empty) = (Vec::new(), 0u32);
+                        // Ticket #73: Emigrants.
+                        let (mut emigrant_batches, mut by_sea) = (0u32, 0u32);
+                        // Ticket #80: Observatories and Research off Earth, per seat.
+                        let mut observatories = [0u32; 4];
+                        let mut research_off_earth: [Vec<u32>; 4] = Default::default();
+                        // Ticket #82: Module-turns doubled by an idle Facility on Earth, per seat.
+                        let mut doubled_turns: [Vec<u32>; 4] = Default::default();
+                        // Ticket #84: the turn each seat's Victory gate completed, over the seeds it did.
+                        let mut gate_turns: [Vec<u32>; 4] = Default::default();
+                        // Ticket #86: Colonists lost in transit to crowding, per seat, over the batch.
+                        let mut lost_in_transit = [0i64; 4];
+                        // Ticket #87: stranded Ships at the end, Refuel orders and stations off Earth.
+                        let mut stranded = [0u32; 4];
+                        let (mut refuels, mut stations_off_earth) = (0u32, 0u32);
+                        // Ticket #88: Colonies with two or more working Mines, and Modules per ground Colony.
+                        let (mut deep_colonies, mut ground_modules, mut ground_colonies) = (0u32, 0u32, 0u32);
+                        // Ticket #241 (version 0.08.3): the figures 0.08.2 named as missing, and this
+                        // version's own.
+                        let (mut d_made, mut d_spent): (Vec<[i64; 4]>, Vec<[i64; 4]>) = (vec![], vec![]);
+                        let mut d_mean: Vec<[f64; 4]> = vec![];
+                        let mut d_below = [0u32; 4];
+                        let (mut ex_calls, mut ex_pioneers, mut acc_struck) = (0u32, 0u32, 0u32);
+                        let mut uniq = [0u32; 4];
+                        // Ticket #89: Solar Arrays standing at the end over the batch.
+                        let mut solar_arrays = 0u32;
+                        // Ticket #90: Trade Posts standing at the end over the batch.
+                        let mut trade_posts = 0u32;
+                        // Ticket #92: Mass Drivers at the end, and Colonies on Phobos or Deimos.
+                        let (mut mass_drivers, mut martian_moon_colonies) = (0u32, 0u32);
+                        // Ticket #93: stations at Venus at the end, and Colonists living there.
+                        let (mut venus_stations, mut venus_colonists) = (0u32, 0u32);
+                        // Ticket #75: seat 0's start state.
+                        let mut home_lost = Vec::new();
+                        for seed in 1..=seeds {
+                            let r = dying_earth_engine::sim::run_from(tables.clone(), seed, player, start);
+                            match r.outcome {
+                                Some(Outcome::Collapse) => turns.push(r.last_turn),
+                                Some(Outcome::Win { seat, .. }) => wins[seat.index()] += 1,
+                                Some(Outcome::Draw { .. }) => draws += 1,
+                                _ => {}
                             }
-                            v.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                            format!("{:.2}", v[v.len() / 2])
-                        };
-                        let shares: Vec<String> = (0..4).map(|i| med(&mut blame_shares[i])).collect();
-                        println!("      Blame share at the end, by seat (median): [{}]", shares.join(", "));
-                        let floored_pct = if rel_end.is_empty() { 0.0 } else { rel_floored as f64 * 100.0 / rel_end.len() as f64 };
-                        let mut sorted = rel_end.clone();
-                        sorted.sort_unstable();
-                        let rel_med = if sorted.is_empty() { 0 } else { sorted[sorted.len() / 2] };
-                        let hostile = rel_end.iter().filter(|v| **v <= -6).count();
+                            temps.push(r.temperature);
+                            for i in 0..4 {
+                                blame_shares[i].push(r.blame_share[i]);
+                                bought[i] += r.bought[i];
+                                sold[i] += r.sold[i];
+                            }
+                            rel_end.extend(r.relations_end.iter().copied());
+                            rel_floored += r.relations_floored;
+                            accords += r.accords_end;
+                            for (i, a) in accord_terms.iter_mut().enumerate() {
+                                *a += r.accord_terms[i];
+                            }
+                            takes += r.influence_transfers;
+                            if let Some(t) = r.tree_done_turn {
+                                tree_turns.push(t);
+                            }
+                            scrubbers += r.scrubbers;
+                            leapfrogs += r.leapfrogs;
+                            constabularies += r.constabularies;
+                            sea_walls += r.sea_walls_built;
+                            if let Some(t) = r.first_colony_turn {
+                                first_colony.push(t);
+                            }
+                            off_earth.push(r.colonists_off_earth.iter().sum::<u32>());
+                            techs.push(r.techs_completed);
+                            highest_rung = highest_rung.max(r.highest_rung);
+                            // Ticket #80: Observatories at the end and Research made off Earth, per seat.
+                            for s in 0..4 {
+                                observatories[s] += r.observatories[s];
+                                research_off_earth[s].push(r.research_off_earth[s].max(0) as u32);
+                                doubled_turns[s].push(r.doubled_module_turns[s].max(0) as u32);
+                                if let Some(t) = r.gate_turn[s] {
+                                    gate_turns[s].push(t);
+                                }
+                                lost_in_transit[s] += r.lost_in_transit[s];
+                                stranded[s] += r.stranded_at_end[s];
+                            }
+                            refuels += r.refuels;
+                            stations_off_earth += r.stations_off_earth;
+                            deep_colonies += r.deep_colonies;
+                            ground_modules += r.ground_modules;
+                            ground_colonies += r.ground_colonies;
+                            solar_arrays += r.solar_arrays;
+                            d_made.push(r.ducats_made);
+                            d_spent.push(r.ducats_spent);
+                            d_mean.push(r.directive_mean);
+                            ex_calls += r.exodus_calls;
+                            ex_pioneers += r.exodus_pioneers;
+                            acc_struck += r.accords_struck;
+                            for i in 0..4 {
+                                d_below[i] += r.directive_turns_below[i];
+                                uniq[i] += r.uniques[i];
+                            }
+                            trade_posts += r.trade_posts;
+                            mass_drivers += r.mass_drivers;
+                            martian_moon_colonies += r.martian_moon_colonies;
+                            venus_stations += r.venus_stations;
+                            venus_colonists += r.venus_colonists;
+                            if let Some(t) = r.first_mars_colony_turn {
+                                mars_turns.push(t);
+                            }
+                            antarctic += r.antarctic_colonies;
+                            if let Some(t) = r.archive_built_turn {
+                                archive_built.push(t);
+                            }
+                            if let Some(t) = r.archive_complete_turn {
+                                archive_complete.push(t);
+                            }
+                            archive_funds.push(r.archive_fund_at_end.max(0) as u32);
+                            neutral_research.push(r.neutral_research.max(0) as u32);
+                            slots_lost.push(r.coastal_slots_lost);
+                            drowned.push(r.facilities_drowned);
+                            venture.push(r.venture_fund_at_end.max(0) as u32);
+                            cards_drawn.push(r.cards_drawn);
+                            if r.deck_empty {
+                                deck_empty += 1;
+                            }
+                            emigrant_batches += r.emigrant_batches;
+                            by_sea += r.antarctic_by_sea;
+                            if let Some(t) = r.start_state_lost_turn {
+                                home_lost.push(t);
+                            }
+                            if let Some(t) = r.coastal_engineering_turn {
+                                coastal_engineering.push(t);
+                            }
+                            if let Some((seat, kind)) = r.victory_met {
+                                victory_met.push(format!("seed {seed} {} (seat {})", kind.name(), seat.0));
+                            }
+                            for (i, t) in r.break_turns.iter().enumerate() {
+                                if t.is_some() {
+                                    breaks_fired[i] += 1;
+                                }
+                            }
+                        }
+                        turns.sort_unstable();
+                        temps.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                        let median = turns.get(turns.len() / 2).map(|t| t.to_string()).unwrap_or("-".into());
+                        let range = if turns.is_empty() { "-".to_string() } else { format!("{}..{}", turns[0], turns[turns.len() - 1]) };
                         println!(
-                            "      Relations at the end over {} ordered pairs: median {rel_med}, {hostile} at Cold or worse, {:.0}% carrying a scar floor",
-                            rel_end.len(),
-                            floored_pct
+                            "{sink:4.0}  {step:4.0}  {perm_shown:4.1}  {after_shown:5.1} | {:2}/{seeds} | {median:>3} ({range}) | {:+.2} | {:?}",
+                            turns.len(),
+                            temps[temps.len() / 2],
+                            wins
                         );
-                        println!(
-                            "      Accords standing at the end: {accords} (non-aggression {}, passage {}, refuel {}, research {})",
-                            accord_terms[0], accord_terms[1], accord_terms[2], accord_terms[3]
-                        );
-                        println!("      Trading window units, by seat: bought {bought:?}, sold {sold:?}");
-                        println!("      Places taken by Influence over the batch: {takes}");
-                        println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
-                        println!("      Breaks fired: {}", fired.join(", "));
+                        // Ticket #241 (version 0.08.3): fold this cell into the all-seatings
+                        // tally, keyed by the Faction rather than by the seat it happens to sit in.
+                        {
+                            let order: Vec<FactionKind> = {
+                                let mut ks: Vec<FactionKind> = vec![player];
+                                ks.extend(FactionKind::ALL.into_iter().filter(|k| *k != player));
+                                ks
+                            };
+                            for s in Seat::ALL {
+                                let at = FactionKind::ALL.into_iter().position(|k| k == order[s.index()]).unwrap_or(0);
+                                all_wins[at] += wins[s.index()];
+                            }
+                            all_games += seeds as u32;
+                            all_collapses += turns.len() as u32;
+                        }
+                        if balance {
+                            let kinds: Vec<String> = {
+                                let mut ks: Vec<FactionKind> = vec![player];
+                                ks.extend(FactionKind::ALL.into_iter().filter(|k| *k != player));
+                                ks.iter().map(|k| k.name().to_string()).collect()
+                            };
+                            for s in Seat::ALL {
+                                println!("      {:>12} (seat {}): {:2} win(s)", kinds[s.index()], s.0, wins[s.index()]);
+                            }
+                            println!("      draws {draws}, collapses {}/{seeds}, median collapse turn {median}", turns.len());
+                            println!("      median turn of first Colony {}", median_u(&mut first_colony));
+                            println!("      median Colonists off Earth at the end, all seats {}", median_u(&mut off_earth));
+                            println!("      Scrubbers {scrubbers}, Leapfrogs {leapfrogs}, Constabularies {constabularies}, Sea Walls {sea_walls}");
+                            println!("      Techs: median {} completed, highest rung reached {highest_rung}", median_u(&mut techs));
+                            println!(
+                                "      Observatories standing at the end, all seeds, by seat {observatories:?}; median Research made off Earth a game, by seat {:?}",
+                                research_off_earth.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
+                            );
+                            println!(
+                                "      Production Moved: median Module-turns doubled by an idle Facility a game, by seat {:?}",
+                                doubled_turns.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
+                            );
+                            println!(
+                                "      Victory gates: completed in {:?} seeds by seat, median turn {:?}",
+                                gate_turns.iter().map(|v| v.len()).collect::<Vec<_>>(),
+                                gate_turns.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
+                            );
+                            println!("      Crowded ships: Colonists lost in transit over the batch, by seat {lost_in_transit:?}");
+                            println!("      Tanks: Ships stranded at the end over the batch, by seat {stranded:?}; {refuels} Refuel orders; {stations_off_earth} stations standing off Earth at the end");
+                            println!(
+                                "      Build it where you dig: {deep_colonies} ground Colonies with two or more working Mines at the end over the batch; {:.1} Modules per ground Colony",
+                                if ground_colonies > 0 { ground_modules as f64 / ground_colonies as f64 } else { 0.0 }
+                            );
+                            println!("      Solar Arrays standing at the end over the batch: {solar_arrays}; Trade Posts {trade_posts}; Mass Drivers {mass_drivers}; Colonies on Phobos or Deimos {martian_moon_colonies}");
+                            // Ticket #241 (version 0.08.3): the three figures version 0.08.2 ended by
+                            // naming as unreported, and the three this version's own rules need.
+                            let med_i = |v: &Vec<[i64; 4]>, seat: usize| { let mut c: Vec<i64> = v.iter().map(|x| x[seat]).collect(); c.sort(); if c.is_empty() { 0 } else { c[c.len() / 2] } };
+                            let q_i = |v: &Vec<[i64; 4]>| [med_i(v, 0), med_i(v, 1), med_i(v, 2), med_i(v, 3)];
+                            let mean_f = |v: &Vec<[f64; 4]>, seat: usize| if v.is_empty() { 0.0 } else { v.iter().map(|x| x[seat]).sum::<f64>() / v.len() as f64 };
+                            println!("      Ducats over a game (median), by seat -- made {:?}, spent {:?}", q_i(&d_made), q_i(&d_spent));
+                            println!("      Research Directive: mean % KEPT BACK from the shared pot, by seat [{:.0}, {:.0}, {:.0}, {:.0}]; turns under an 85% contribution over the batch {:?}",
+                                mean_f(&d_mean, 0), mean_f(&d_mean, 1), mean_f(&d_mean, 2), mean_f(&d_mean, 3), d_below);
+                            println!("      Accords STRUCK over the batch: {acc_struck} (against {accords} standing at the end)");
+                            println!("      Exodus Calls sounded over the batch: {ex_calls}, worth {ex_pioneers} Pioneers");
+                            println!("      Unique Modules standing at the end over the batch: Academy {}, Heliostat {}, Exchange {}, Chorus {}", uniq[0], uniq[1], uniq[2], uniq[3]);
+                            println!("      Venus: {venus_stations} stations at the end over the batch, {venus_colonists} Colonists living there");
+                            println!(
+                                "      Mars system: a Colony founded in {}/{seeds} seeds, median first turn {}; Antarctic Colonies founded {antarctic}",
+                                mars_turns.len(),
+                                median_u(&mut mars_turns)
+                            );
+                            println!(
+                                "      The Archive: standing in {}/{seeds} seeds (median turn {}), complete in {}/{seeds} (median turn {}), median fund at the end {}",
+                                archive_built.len(),
+                                median_u(&mut archive_built),
+                                archive_complete.len(),
+                                median_u(&mut archive_complete),
+                                median_u(&mut archive_funds)
+                            );
+                            println!(
+                                "      Neutral Labs paid a median {} Research a game; Coastal Engineering complete in {}/{seeds} seeds (median turn {})",
+                                median_u(&mut neutral_research),
+                                coastal_engineering.len(),
+                                median_u(&mut coastal_engineering)
+                            );
+                            println!("      The sea: median {} coastal slots lost a game, {} Facilities drowned", median_u(&mut slots_lost), median_u(&mut drowned));
+                            println!("      The Prospectors' Venture Capital Fund at the end: median {} Ducats of the {} their Victory Condition asks", median_u(&mut venture), base.faction(FactionKind::Prospectors).victory_first.bar);
+                            println!("      The deck: median {} cards drawn a game, empty at the end in {deck_empty}/{seeds} seeds", median_u(&mut cards_drawn));
+                            println!("      Pioneers: {emigrant_batches} batches recruited, {by_sea} Antarctic Colonies founded by sea");
+                            println!("      Seat 0 lost its start state in {}/{seeds} seeds (median turn {})", home_lost.len(), median_u(&mut home_lost));
+                            println!(
+                                "      Victory Conditions met outright: {}",
+                                if victory_met.is_empty() { "none in any seed".to_string() } else { victory_met.join(", ") }
+                            );
+                            let fired: Vec<String> = tables.climate.breaks.iter().zip(&breaks_fired).map(|(b, n)| format!("{} {n}/{seeds}", b.name)).collect();
+                            // Ticket #227 (version 0.08.2): the six the spec asks for, in one block.
+                            let med = |v: &mut Vec<f64>| {
+                                if v.is_empty() {
+                                    return "-".to_string();
+                                }
+                                v.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                                format!("{:.2}", v[v.len() / 2])
+                            };
+                            let shares: Vec<String> = (0..4).map(|i| med(&mut blame_shares[i])).collect();
+                            println!("      Blame share at the end, by seat (median): [{}]", shares.join(", "));
+                            let floored_pct = if rel_end.is_empty() { 0.0 } else { rel_floored as f64 * 100.0 / rel_end.len() as f64 };
+                            let mut sorted = rel_end.clone();
+                            sorted.sort_unstable();
+                            let rel_med = if sorted.is_empty() { 0 } else { sorted[sorted.len() / 2] };
+                            let hostile = rel_end.iter().filter(|v| **v <= -6).count();
+                            println!(
+                                "      Relations at the end over {} ordered pairs: median {rel_med}, {hostile} at Cold or worse, {:.0}% carrying a scar floor",
+                                rel_end.len(),
+                                floored_pct
+                            );
+                            println!(
+                                "      Accords standing at the end: {accords} (non-aggression {}, passage {}, refuel {}, research {})",
+                                accord_terms[0], accord_terms[1], accord_terms[2], accord_terms[3]
+                            );
+                            println!("      Trading window units, by seat: bought {bought:?}, sold {sold:?}");
+                            println!("      Places taken by Influence over the batch: {takes}");
+                            println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
+                            println!("      Breaks fired: {}", fired.join(", "));
+                        }
                     }
                 }
             }
         }
+    }
+    if all_seatings {
+        println!();
+        println!("ACROSS ALL FOUR SEATINGS, {all_games} games:");
+        for (i, k) in FactionKind::ALL.into_iter().enumerate() {
+            println!("  {:>12}: {:2} win(s) of {all_games}", k.name(), all_wins[i]);
+        }
+        println!("  collapses {all_collapses} of {all_games}");
     }
 }

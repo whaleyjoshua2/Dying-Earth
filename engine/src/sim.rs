@@ -146,6 +146,29 @@ pub struct SimResult {
     /// unfair if only one seat trades.
     pub bought: [i64; SEAT_COUNT],
     pub sold: [i64; SEAT_COUNT],
+    /// Ticket #241 (version 0.08.3): **Ducats made and Ducats spent** over a whole game, per seat.
+    /// Named as missing at the end of version 0.08.2's sweep and wanted before this version could
+    /// price anything: the Prospectors' Victory Condition is now counted in Ducats, and the price
+    /// rise of 0.08.2 has never been shown to be what moved the collapse rate. Spending is measured
+    /// rather than inferred -- held before the turn, plus the turn's income, less held after.
+    pub ducats_made: [i64; SEAT_COUNT],
+    pub ducats_spent: [i64; SEAT_COUNT],
+    /// Ticket #241: the **Research Directive** each seat actually ran, as the mean percentage kept
+    /// back from the shared pot over the game, and the turns it sat below the 85% contribution the
+    /// shared-pot rule asks for. Tickets #235 and #236 cannot be read without these two.
+    pub directive_mean: [f64; SEAT_COUNT],
+    pub directive_turns_below: [u32; SEAT_COUNT],
+    /// Ticket #241: **Exodus Calls sounded** over the game and the Pioneers they were worth, read
+    /// off the log as the Scrubber and Leapfrog counts are. An order measured to fire rarely needs
+    /// a figure rather than an expectation.
+    pub exodus_calls: u32,
+    pub exodus_pioneers: u32,
+    /// Ticket #241: **Accords STRUCK** over the game, against the number standing at its end. Named
+    /// as missing at the end of 0.08.2: a term struck and then broken was invisible.
+    pub accords_struck: u32,
+    /// Ticket #241: the four **Unique Modules** standing at the end -- Academy, Heliostat, Exchange,
+    /// Chorus -- so that ticket #239's three can be read beside the Custodians' original.
+    pub uniques: [u32; 4],
     /// The turn the whole Tech Tree completed, if it did. A research agreement pays two seats a
     /// tenth more, and the tree already finished with the game half run.
     pub tree_done_turn: Option<u32>,
@@ -210,16 +233,38 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let mut guard = 0;
     // Ticket #58: what the Moments did over the game.
     let (mut moments_earned, mut moments_shown, mut turns_with_moment, mut most_moments_in_a_turn) = (0u32, 0u32, 0u32, 0u32);
+    // Ticket #241 (version 0.08.3): the figures 0.08.2 named as missing, and this version's own.
+    let (mut ducats_made, mut ducats_spent) = ([0i64; SEAT_COUNT], [0i64; SEAT_COUNT]);
+    let (mut directive_sum, mut directive_turns_below, mut directive_samples) = ([0f64; SEAT_COUNT], [0u32; SEAT_COUNT], 0u32);
     // Ticket #60: the first seat to meet its Victory Condition outright, at any point in the game.
     let mut victory_met: Option<(Seat, FactionKind)> = None;
     while !game.is_over() && guard < max_turns + 2 {
         guard += 1;
         // Ticket #105: every seat here is an AI, which picks the moment it leads, so the refusal
         // cannot fire. If it ever did, the loop would spin, so it stops.
+        let held_before: [i64; SEAT_COUNT] = Seat::ALL.map(|s| game.seat(s).stockpile.ducats);
         if let Err(why) = game.end_turn(std::array::from_fn(|_| Vec::new())) {
             game.log(format!("simulate stopped: {why}"));
             break;
         }
+        // Ticket #241: Ducats made and spent. Spending is what did NOT survive the turn: what was
+        // held going in, plus what came in, less what is held coming out. Measured rather than
+        // inferred, because a seat that ends a game holding five Ducats tells you nothing about
+        // whether it made fifty or five thousand.
+        for s_ in Seat::ALL {
+            let i = s_.index();
+            let income = game.seat(s_).income_last_turn.ducats;
+            ducats_made[i] += income;
+            ducats_spent[i] += (held_before[i] + income - game.seat(s_).stockpile.ducats).max(0);
+            // The share KEPT BACK from the shared pot, sampled every turn, and the turns spent
+            // under the 85% contribution the shared-pot rule asks for.
+            let kept = game.seat(s_).directive_last_income as f64;
+            directive_sum[i] += kept;
+            if 100.0 - kept < 85.0 {
+                directive_turns_below[i] += 1;
+            }
+        }
+        directive_samples += 1;
         moments_earned += game.report.moments.len() as u32;
         let shown = game.report.moments_shown(&|k| tables.report.moment_on(k)).len() as u32;
         moments_shown += shown;
@@ -381,6 +426,27 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
             accord_terms[i] += 1;
         }
     }
+    // Ticket #241 (version 0.08.3): Accords STRUCK over the game and Exodus Calls sounded, read off
+    // the log as the Scrubber, Leapfrog and Sea Wall counts are. An Accord standing at the end hides
+    // every one that was struck and then broken.
+    let accords_struck = game.log.iter().filter(|l| l.contains("struck an Accord")).count() as u32;
+    let mut exodus_calls = 0u32;
+    let mut exodus_pioneers = 0u32;
+    for l in game.log.iter().filter(|l| l.contains("sounded an Exodus Call")) {
+        exodus_calls += 1;
+        // "... : N Pioneers a turn for T turns, ..." -- the two figures the line already carries.
+        if let Some((_, rest)) = l.split_once(": ")
+            && let Some(per) = rest.split(' ').next().and_then(|n| n.parse::<u32>().ok())
+            && let Some((_, after)) = rest.split_once(" for ")
+            && let Some(turns) = after.split(' ').next().and_then(|n| n.parse::<u32>().ok())
+        {
+            exodus_pioneers += per * turns;
+        }
+    }
+    // Ticket #241: the four Unique Modules standing at the end, in card order.
+    let uniques: [u32; 4] = [ModuleKind::Academy, ModuleKind::Heliostat, ModuleKind::Exchange, ModuleKind::Chorus]
+        .map(|k| game.colonies.iter().map(|c| c.modules.iter().filter(|m| m.kind == k).count() as u32).sum());
+    let directive_mean: [f64; SEAT_COUNT] = std::array::from_fn(|i| if directive_samples == 0 { 0.0 } else { directive_sum[i] / directive_samples as f64 });
     let tree_done_turn = if game.research.done.len() == game.tables.techs.len() { Some(game.turn) } else { None };
     let highest_rung = game.research.done.iter().map(|t| tables.tech(*t).rung).max().unwrap_or(0);
     // Ticket #56, read off the log as the #52 to #55 figures are.
@@ -480,6 +546,14 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         accord_terms,
         bought,
         sold,
+        ducats_made,
+        ducats_spent,
+        directive_mean,
+        directive_turns_below,
+        exodus_calls,
+        exodus_pioneers,
+        accords_struck,
+        uniques,
         tree_done_turn,
         highest_rung,
         victory_met,
