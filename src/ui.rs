@@ -5825,6 +5825,35 @@ fn relations_row(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSta
                 tip.push_str(&format!("
 Scarred: this pair can never recover above {floor:+}."));
             }
+            // Ticket #233 (version 0.08.3): and what STANDS between the pair -- never what they
+            // could strike. The designer chose the narrower line: the hover answers the glance,
+            // and the Accords block a few rows below is where a player acts, already listing every
+            // term with its own explanation and greying out the research agreement when the pair
+            // is not Friendly. Saying it twice, a scroll apart, is how a figure drifts.
+            //
+            // The SAME rule covers a pair the player is not in, which this grid shows on every
+            // Faction's page: what stands between two rivals is visible on the board once it bites,
+            // where what they COULD strike is intelligence. It is the line the Faction window's
+            // disclosure rule already draws.
+            if let Some(acc) = game.accords.iter().find(|a| (a.a == viewer && a.b == subject) || (a.a == subject && a.b == viewer)) {
+                let terms: Vec<&str> = acc
+                    .terms
+                    .iter()
+                    .map(|t| match t {
+                        Term::NonAggression => "non-aggression",
+                        Term::Passage => "passage",
+                        Term::Refuel => "refuel",
+                        Term::ResearchAgreement => "a research agreement",
+                    })
+                    .collect();
+                if acc.ending {
+                    tip.push_str(&format!("
+An Accord between them is over: it lapses at the next turn ({}).", terms.join(", ")));
+                } else {
+                    tip.push_str(&format!("
+An Accord stands: {}.", terms.join(", ")));
+                }
+            }
             ui.label(RichText::new(game.relations_level(viewer, subject)).color(colour)).on_hover_text(tip);
             ui.add_space(10.0);
         }
@@ -6052,7 +6081,19 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         // its own fuller four-Faction breakdown, and the two are not duplicates: that one is the
         // comparison view and this is the detail view, the same relation the Victory window's four
         // progress bars now have with the Victory progress block above.
-        ui.label(RichText::new("Blame").strong());
+        // Ticket #233 (version 0.08.3): the sentence that stood under this block is on the heading's
+        // hover now, at the designer's word -- and with NO marker to advertise it: *"no other mouse
+        // overs have any ? - the convention here is the same, mouseovers are common AF in 4x
+        // games"*. It is an ordinary `on_hover_text`, the same call every other hover in the game
+        // makes: *"I want this new mouseover to work exactly like all the others have been
+        // working"*.
+        //
+        // Only THIS copy moves. The Climate Panel keeps its own version of the sentence on the page
+        // (*"faction windows leave climate as is"*), being a four-Faction comparison read
+        // occasionally rather than a page a player sits on, and the top bar's Influence hover keeps
+        // its longer wording. Nothing is deleted.
+        ui.label(RichText::new("Blame").strong())
+            .on_hover_text("A share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again.");
         let share = game.blame_share(seat);
         ui.horizontal(|ui| {
             ui.add(
@@ -6065,35 +6106,26 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
             let line = if credit > 0.0 { format!("Blame 0 ppm, credit {credit:.0} ppm") } else { format!("Blame {:.0} ppm, thresholds x{:.2}", game.blame(seat), game.blame_threshold_multiplier(seat)) };
             figures_with_icons(ui, &line, 14.0, ui.visuals().weak_text_color(), &[("ppm", "emissions")]);
         });
-        ui.label(RichText::new("A share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again.").weak());
         ui.add_space(6.0);
 
         // 4. Relations, as TWO ROWS rather than the twelve-pair grid this window took off the
         // Victory window. Twelve ordered pairs as a grid made a player find the right cell; two
         // rows tell them the answer, and a figure kept in two places drifts.
-        ui.label(RichText::new("Relations").strong());
+        // Ticket #233 (version 0.08.3): the two paragraphs that stood under this block are one
+        // hover on the heading now. Five or six lines of standing prose came off a page the 0.08.1
+        // mockups measured at about 950 pixels of content in a 524-wide panel.
+        let r = &game.tables.relations;
+        let relations_note = format!(
+            "{:+} to {:+} from a neutral {}, read as six levels from Friendly to Hostile. A score is what the pair have DONE to each other plus what this Faction makes of the other's Blame -- hover a level for the two figures. Offences differ in weight and a turn charges every one, to {} at most; quiet mends {} every {} turns below neutral and lapses half as fast above it. A pair crossed on {} turns can never fully recover again.
+A rival that holds you at less than neutral defends its places against you a little harder, and an Accord wants a level it will not strike below.",
+            r.best, r.worst, r.start, r.turn_cap, r.recover, r.quiet_turns, r.scar_turns
+        );
+        ui.label(RichText::new("Relations").strong()).on_hover_text(relations_note);
         let name = game.seat_name(seat);
         ui.label(RichText::new(format!("What the {name} think of the others")).weak());
         relations_row(ui, session, game, view, seat, true);
         ui.label(RichText::new(format!("What the others think of the {name}")).weak());
         relations_row(ui, session, game, view, seat, false);
-        // The note the grid carried, kept word for word in substance: the scale, and that nothing
-        // reads these figures.
-        // Ticket #221/#222/#224 (version 0.08.2): rewritten, because the old note ended "nothing in
-        // this version reads these figures: they are a record, not a rule", and that is now flatly
-        // false. Blame feeds them, they bite the challenge margin, and they gate the Accords.
-        let r = &game.tables.relations;
-        ui.label(
-            RichText::new(format!(
-                "{:+} to {:+} from a neutral {}, read as six levels from Friendly to Hostile. A score is what the pair have DONE to each other plus what this Faction makes of the other's Blame -- hover a level for the two figures. Offences differ in weight and a turn charges every one, to {} at most; quiet mends {} every {} turns below neutral and lapses half as fast above it. A pair crossed on {} turns can never fully recover again.",
-                r.best, r.worst, r.start, r.turn_cap, r.recover, r.quiet_turns, r.scar_turns
-            ))
-            .weak(),
-        );
-        ui.label(
-            RichText::new("A rival that holds you at less than neutral defends its places against you a little harder, and an Accord wants a level it will not strike below.")
-                .weak(),
-        );
         ui.add_space(6.0);
 
         // 4b. Ticket #226 (version 0.08.2): the Accords, where the designer put them -- "add
