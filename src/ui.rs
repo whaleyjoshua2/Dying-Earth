@@ -5856,16 +5856,56 @@ An Accord stands: {}.", terms.join(", ")));
 fn research_directive_control(ui: &mut Ui, session: &Session, game: &Game, actions: &mut Vec<Action>) {
     let me = Seat(0);
     let cap = game.research_directive_cap(me);
-    let standing = game.seat(me).research_directive;
+    // Ticket #235 gave this control the DIRECTIVE -- the share diverted. Ticket #251 turns it the
+    // other way up, at the designer's word: the slider carries the **contribution to the shared
+    // Tech**, which is what "will not extend below 50%" and "the selected contribution in the
+    // header" both describe, and what the shared-pot rule of ticket #236 is written in. A player
+    // reading "78%" can compare it to that rule's 85 without doing the subtraction in their head.
+    let floor = 100 - cap;
+    let standing = 100 - game.seat(me).research_directive;
     let pending_set = session.pending.iter().find_map(|o| match o {
-        Order::SetResearchDirective { percent } => Some(*percent),
+        Order::SetResearchDirective { percent } => Some(100 - *percent),
         _ => None,
     });
-    let mut percent = pending_set.unwrap_or(standing);
+    let mut contribution = pending_set.unwrap_or(standing);
 
-    ui.label(RichText::new("Research Directive").strong()).on_hover_text(
-        "The share of your Research that goes somewhere other than the shared Tech, from the next Income until you set it again. What is directed never reaches the Tech, so it counts nothing toward the Research Lead -- and the Lead is the only seat that picks what the table researches next.",
+    ui.label(RichText::new(format!("Research Directive: {contribution}%")).strong()).on_hover_text(
+        "The share of your Research that goes to the shared Tech, from the next Income until you set it again. What you keep back never reaches the Tech, so it counts nothing toward the Research Lead -- and the Lead is the only seat that picks what the table researches next.",
     );
+
+    // The scale is 0 to 100 for EVERY Faction, so the four controls read alike and the Archivists'
+    // extra reach is visible rather than implied: their slider runs the whole way, and everyone
+    // else's is stopped at half with the unreachable part dimmed behind it.
+    // A fifth larger than the default, at the designer's word. Both figures matter: `slider_width`
+    // is the rail's length and `slider_rail_height` its thickness, and raising only the first
+    // makes a long thin bar rather than a bigger control.
+    let full = ui.available_width();
+    let (was_width, was_rail, was_interact) = (ui.spacing().slider_width, ui.spacing().slider_rail_height, ui.spacing().interact_size);
+    ui.spacing_mut().slider_width = full;
+    ui.spacing_mut().slider_rail_height = was_rail * 1.2;
+    ui.spacing_mut().interact_size.y = was_interact.y * 1.2;
+    let resp = ui.add(egui::Slider::new(&mut contribution, 0..=100).show_value(false));
+    ui.spacing_mut().slider_width = was_width;
+    ui.spacing_mut().slider_rail_height = was_rail;
+    ui.spacing_mut().interact_size = was_interact;
+    if floor > 0 {
+        // The share no Faction but the Archivists may reach, painted OVER the rail so the scale
+        // still reads 0 to 100 for everyone and their extra reach is visible rather than implied.
+        // It is opaque rather than a dim wash: a translucent black over an already dark rail was
+        // invisible in the first capture, which is the sort of thing only a picture tells you.
+        let r = resp.rect;
+        let dim = egui::Rect::from_min_max(
+            egui::pos2(r.min.x, r.center().y - ui.spacing().slider_rail_height * 0.6),
+            egui::pos2(r.min.x + r.width() * floor as f32 / 100.0, r.center().y + ui.spacing().slider_rail_height * 0.6),
+        );
+        ui.painter().rect_filled(dim, 2.0, Color32::from_gray(30));
+        ui.painter().line_segment(
+            [egui::pos2(dim.max.x, r.center().y - 9.0), egui::pos2(dim.max.x, r.center().y + 9.0)],
+            egui::Stroke::new(1.5, Color32::from_gray(120)),
+        );
+    }
+    contribution = contribution.max(floor);
+
     let (what, rate) = match game.kind(me) {
         FactionKind::Custodians => ("the Natural Sink", format!("{} ppm for good, per point", game.tables.research_directive.custodians_ppm_per_point)),
         FactionKind::Prospectors => ("your coffers", format!("{} Ducats per point", game.tables.research_directive.prospectors_ducats_per_point)),
@@ -5873,22 +5913,23 @@ fn research_directive_control(ui: &mut Ui, session: &Session, game: &Game, actio
         FactionKind::Archivists => ("the Archive fund", "one for one, to the fund's cap".to_string()),
     };
     let made = game.seat(me).research_last_turn;
-    let taken = made * percent as i64 / 100;
-    ui.add(egui::Slider::new(&mut percent, 0..=cap).suffix("%").text(format!("to {what}")));
+    let directive = 100 - contribution;
+    let taken = made * directive as i64 / 100;
     ui.label(
-        RichText::new(if percent == 0 {
-            format!("All of it goes to the shared Tech. {made} Research last turn.")
+        RichText::new(if directive == 0 {
+            format!("All of it to the shared Tech. {made} Research last turn.")
         } else {
-            format!("{percent}% to {what} ({rate}); {}% to the shared Tech. On last turn's {made} Research that is {taken} directed.", 100 - percent, )
+            format!("{contribution}% to the shared Tech; {directive}% to {what} ({rate}). On last turn's {made} Research that is {taken} directed.")
         })
         .weak(),
     );
-    if percent != pending_set.unwrap_or(standing) {
+
+    if contribution != pending_set.unwrap_or(standing) {
         if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetResearchDirective { .. })) {
             actions.push(Action::Cancel(i));
         }
-        if percent != standing {
-            let order = Order::SetResearchDirective { percent };
+        if contribution != standing {
+            let order = Order::SetResearchDirective { percent: directive };
             if game.check_order(me, &session.pending, &order).is_ok() {
                 actions.push(Action::Place(order));
             }

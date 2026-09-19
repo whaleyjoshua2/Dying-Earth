@@ -76,7 +76,33 @@ it. The directive in force at each Income is now recorded and the next Income se
 
 | picture | what it shows |
 |---|---|
-| [`the-control.png`](the-control.png) | The Tech Tree window with the slider, reading *"50% to the Natural Sink (0.01 ppm for good, per point); 50% to the shared Tech. On last turn's 11 Research that is 5 directed."* |
+| [`the-control.png`](the-control.png) | The control as ticket #235 first built it: a half-width slider carrying the **directive**, the share taken away. |
+| [`the-slider.png`](the-slider.png) | The control as it ships, after ticket #251 turned it over: the **contribution** to the shared Tech, the window's full width, a fifth larger, the header reading `Research Directive: 50%`, and the half no Faction but the Archivists may reach dimmed behind the rail. |
+
+## Ticket #251: the slider turned the other way up
+
+The designer, looking at the first version: *"make it 20% larger ... the width of the window and
+bounded between 0 and 100 for everyone but the archivist the bottom half of the slider is greyed
+out and the slide itself will not extend below 50%. Put the selected contrabution in the header"*.
+
+Only one reading makes all of that true at once: **the slider carries the contribution to the
+shared Tech, not the share diverted**. "Will not extend below 50%" is a floor on what you give the
+table, and the header shows the selected *contribution*. It is the better way round, too, because
+it is the unit the shared-pot rule of ticket #236 is written in — a player reading `78%` can
+compare it to that rule's 85 without doing the subtraction.
+
+The scale runs **0 to 100 for every Faction** so the four controls read alike and the Archivists'
+extra reach is visible rather than implied: theirs runs the whole way, everyone else's is stopped
+at half with the unreachable part dimmed behind the rail.
+
+**Two goes at the dimming, and the picture is why.** A translucent black over an already dark rail
+was invisible in the first capture, and so was a grey close to the rail's own. A diagnostic pass in
+bright red proved the geometry was right all along — the overlay sat exactly across the left half,
+ending at the handle — so the fault was only the colour. It is `gray(30)` now, plainly darker than
+the rail. Nothing but looking at it would have told me which of the two possible faults it was.
+
+"20% larger" needed **both** `slider_width` and `slider_rail_height`: raising only the first makes
+a long thin bar rather than a bigger control.
 
 The slider sits at 50% in that capture because **the computer set it** — evidence the AI branch
 works. The designer asked for that directly (*"yes they use it"*), against the memory of the
