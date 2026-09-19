@@ -68,7 +68,11 @@ pub fn setup_scene(
     let mut flat = |c: [f32; 3], unlit: bool| {
         materials.add(StandardMaterial { base_color: Color::srgb(c[0], c[1], c[2]), unlit, double_sided: true, cull_mode: None, ..default() })
     };
-    // Ticket #50: one material per seat, four of them.
+    // Ticket #50: one material per Faction, four of them. Ticket #255 (version 0.08.4): this runs at
+    // Startup, before any game exists, so `colours()` answers in `FactionKind::ALL` order -- and for
+    // eleven versions the lookups below indexed these by SEAT, so seat 0 was always Custodian teal
+    // whoever sat there. Invisible while the player was the Custodians, which every shot and the
+    // tutorial are. They are looked up by Faction now, `game.kind(seat).index()`, everywhere.
     let flats: Vec<Handle<StandardMaterial>> = colours.iter().map(|c| flat(*c, true)).collect();
     let grey = flat([0.45, 0.45, 0.5], true);
     let sun = flat([1.0, 0.85, 0.3], true);
@@ -112,10 +116,10 @@ pub fn setup_scene(
                 for slot in 0..n {
                     p.spawn((Mesh3d(small_sphere.clone()), MeshMaterial3d(grey.clone()), Transform::from_scale(Vec3::splat(0.05)), SlotMarker { body, slot, on_surface: false }));
                 }
-                // One stack marker per seat.
+                // One stack marker per seat. Its material is assigned in `sync_scene` once a game says
+                // which Faction sits there (ticket #255); grey until then, and hidden anyway.
                 for seat in Seat::ALL {
-                    let mat = flats[seat.index() % flats.len()].clone();
-                    p.spawn((Mesh3d(marker.clone()), MeshMaterial3d(mat), Transform::from_scale(Vec3::splat(0.09)), Visibility::Hidden, StackMarker { body, seat }));
+                    p.spawn((Mesh3d(marker.clone()), MeshMaterial3d(grey.clone()), Transform::from_scale(Vec3::splat(0.09)), Visibility::Hidden, StackMarker { body, seat }));
                 }
             }
         });
@@ -161,7 +165,7 @@ type RootQuery<'w, 's> = Query<'w, 's, (&'static mut Visibility, Option<&'static
 type GlobeQuery<'w, 's> = Query<'w, 's, (&'static Globe, &'static mut Transform), (Without<SolarBody>, Without<MainCamera>)>;
 type BodyQuery<'w, 's> = Query<'w, 's, (&'static SolarBody, &'static mut Transform), (Without<Globe>, Without<MainCamera>)>;
 type SlotQuery<'w, 's> = Query<'w, 's, (&'static SlotMarker, &'static mut Transform, &'static mut MeshMaterial3d<StandardMaterial>, &'static mut Visibility), (Without<Globe>, Without<SolarBody>, Without<MainCamera>, Without<SolarRoot>, Without<SurfaceRoot>, Without<StackMarker>, Without<ControlRing>)>;
-type StackQuery<'w, 's> = Query<'w, 's, (&'static StackMarker, &'static mut Transform, &'static mut Visibility), (Without<Globe>, Without<SolarBody>, Without<SlotMarker>, Without<ControlRing>, Without<SolarRoot>, Without<SurfaceRoot>, Without<MainCamera>)>;
+type StackQuery<'w, 's> = Query<'w, 's, (&'static StackMarker, &'static mut Transform, &'static mut Visibility, &'static mut MeshMaterial3d<StandardMaterial>), (Without<Globe>, Without<SolarBody>, Without<SlotMarker>, Without<ControlRing>, Without<SolarRoot>, Without<SurfaceRoot>, Without<MainCamera>)>;
 type RingQuery<'w, 's> = Query<'w, 's, (&'static ControlRing, &'static mut Transform, &'static mut Visibility, &'static mut MeshMaterial3d<StandardMaterial>), (Without<Globe>, Without<SolarBody>, Without<SlotMarker>, Without<StackMarker>, Without<SolarRoot>, Without<SurfaceRoot>, Without<MainCamera>)>;
 
 /// Every frame: show the right root, place bodies and markers, colour them from the board.
@@ -234,7 +238,8 @@ pub fn sync_scene(
         let under_ice = m.body == BodyId::Earth && m.on_surface && !game.antarctica_open;
         *vis = if under_ice { Visibility::Hidden } else { Visibility::Inherited };
         let want = match owner {
-            Some(s) => handles.flat[s.index()].clone(),
+            // Ticket #255: by FACTION, not by seat -- the materials were built in Faction order.
+            Some(s) => handles.flat[game.kind(s).index()].clone(),
             None => handles.grey.clone(),
         };
         if mat.0 != want {
@@ -250,13 +255,18 @@ pub fn sync_scene(
             t.scale = Vec3::splat(if owner.is_some() { 0.065 } else { 0.045 });
         }
     }
-    for (m, mut t, mut vis) in &mut stacks {
+    for (m, mut t, mut vis, mut mat) in &mut stacks {
         let ships = game.ships_at(m.seat, m.body);
         if ships.is_empty() {
             *vis = Visibility::Hidden;
             continue;
         }
         *vis = Visibility::Inherited;
+        // Ticket #255: the seat's Faction's colour, looked up now that a game says which it is.
+        let want = handles.flat[game.kind(m.seat).index()].clone();
+        if mat.0 != want {
+            mat.0 = want;
+        }
         // Ticket #50: one of four fixed angles round the Body, by seat.
         t.translation = place(m.body) + geo::stack_offset(m.seat, geo::solar_radius(m.body));
     }
@@ -265,7 +275,8 @@ pub fn sync_scene(
         match game.orbital_control(r.0) {
             Some(s) => {
                 *vis = Visibility::Inherited;
-                let want = handles.ring_materials[s.index() % handles.ring_materials.len()].clone();
+                // Ticket #255: by Faction, as the slot markers above.
+                let want = handles.ring_materials[game.kind(s).index()].clone();
                 if mat.0 != want {
                     mat.0 = want;
                 }
