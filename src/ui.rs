@@ -155,6 +155,86 @@ fn population_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
     }
 }
 
+/// Ticket #264 (version 0.08.4): **the Victory history**, the Emissions history's fourth sibling,
+/// on the Faction window under the Victory progress block: one Faction's progress turn by turn --
+/// its score, the lower of its two parts' fractions, in the Faction's own colour -- and a second
+/// line for its share of the table's Blame, on a scale of its own at the right with the fair
+/// quarter as a faint line across it. The Breaks ticked red on the date axis as every sibling has
+/// them; Antarctica's opening ticked in the ice's blue on every Faction's chart; the Faction's gate
+/// Tech done, and the Archive complete, ticked in white on the chart of the Faction they belong
+/// to. Drawn from the per-seat record the Climate phase writes beside the Emissions record.
+fn victory_history(ui: &mut Ui, game: &Game, seat: Seat, size: egui::Vec2) {
+    const BLAME: Color32 = Color32::from_rgb(190, 150, 210);
+    const BREAK: Color32 = Color32::from_rgb(236, 88, 76);
+    const ICE: Color32 = Color32::from_rgb(150, 195, 235);
+    const MARK: Color32 = Color32::from_rgb(235, 235, 240);
+    let own = rgb(game.tables.faction(game.kind(seat)).colour);
+    let h = &game.seat(seat).victory_history;
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 6.0;
+        ui.label(RichText::new("progress").color(own).small());
+        ui.label(RichText::new("Blame share").color(BLAME).small());
+        ui.label(RichText::new("ticks: a Break red, Antarctica blue, the gate Tech and the Archive white").weak().small());
+    });
+    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    let painter = ui.painter();
+    painter.rect_filled(rect, 3.0, Color32::from_rgb(38, 38, 44));
+    if h.is_empty() {
+        painter.text(rect.center(), egui::Align2::CENTER_CENTER, "No turn resolved yet.", FontId::proportional(12.0), Color32::from_gray(150));
+        return;
+    }
+    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(34.0, 6.0), rect.max - egui::vec2(34.0, 20.0));
+    let (first, last) = (h[0].turn, h[h.len() - 1].turn);
+    let span = (last.max(first + 1) - first) as f32;
+    let x = |turn: u32| plot.left() + (turn - first) as f32 / span * plot.width();
+    // Both lines run 0 to 1 and are drawn on that whole range, so a chart reads the same for every
+    // Faction and across a game: a rising line is progress, and the height means the same thing on
+    // turn 3 as on turn 30.
+    let y = |v: f64| plot.bottom() - (v.clamp(0.0, 1.0) as f32) * plot.height();
+    // The fair quarter of the table's Blame, the one figure on the share's axis that means anything.
+    let fair = game.tables.influence.blame.fair_share;
+    painter.line_segment([Pos2::new(plot.left(), y(fair)), Pos2::new(plot.right(), y(fair))], egui::Stroke::new(1.0, BLAME.gamma_multiply(0.35)));
+    let line = |values: Vec<Pos2>, colour: Color32| {
+        if values.len() == 1 {
+            painter.circle_filled(values[0], 3.0, colour);
+        } else {
+            painter.add(egui::Shape::line(values, egui::Stroke::new(2.0, colour)));
+        }
+    };
+    line(h.iter().map(|r| Pos2::new(x(r.turn), y(r.blame_share))).collect(), BLAME);
+    line(h.iter().map(|r| Pos2::new(x(r.turn), y(r.score))).collect(), own);
+    // The ticks along the foot: a Break in red from the world's record on the same turn; the first
+    // turn each flag stands, in its colour, a little taller so two on one turn both show.
+    let tick = |turn: u32, colour: Color32, tall: f32| {
+        let bx = x(turn);
+        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 2.0 + tall)], egui::Stroke::new(2.0, colour));
+    };
+    for r in game.climate.history.iter().filter(|r| !r.breaks.is_empty() && r.turn >= first && r.turn <= last) {
+        tick(r.turn, BREAK, 4.0);
+    }
+    let first_where = |pick: &dyn Fn(&dying_earth_engine::VictoryRecord) -> bool| h.iter().find(|r| pick(r)).map(|r| r.turn);
+    if let Some(t) = first_where(&|r| r.antarctica_open) {
+        tick(t, ICE, 7.0);
+    }
+    if let Some(t) = first_where(&|r| r.gate_done).filter(|_| game.tables.victory_gate(game.kind(seat)).is_some()) {
+        tick(t, MARK, 10.0);
+    }
+    if let Some(t) = first_where(&|r| r.archive_complete) {
+        tick(t, MARK, 10.0);
+    }
+    // Each scale's ends at its own side, in its own colour.
+    let small = FontId::proportional(9.0);
+    painter.text(Pos2::new(plot.left() - 3.0, plot.top()), egui::Align2::RIGHT_TOP, "100%", small.clone(), own);
+    painter.text(Pos2::new(plot.left() - 3.0, plot.bottom()), egui::Align2::RIGHT_BOTTOM, "0%", small.clone(), own);
+    painter.text(Pos2::new(plot.right() + 3.0, plot.top()), egui::Align2::LEFT_TOP, "all", small.clone(), BLAME);
+    painter.text(Pos2::new(plot.right() + 3.0, y(fair)), egui::Align2::LEFT_CENTER, "fair", small.clone(), BLAME);
+    painter.text(Pos2::new(plot.right() + 3.0, plot.bottom()), egui::Align2::LEFT_BOTTOM, "none", small.clone(), BLAME);
+    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, game.date(first).text(), small.clone(), Color32::from_gray(150));
+    if last > first {
+        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, game.date(last).text(), small, Color32::from_gray(150));
+    }
+}
+
 /// Ticket #158 (version 0.07.4): **the Temperature history**, the Emissions history's sibling on
 /// the top bar's Temperature figure: the Temperature turn by turn on the data's own range (the
 /// designer's choice over the base-to-Collapse scale, for the detail); the Breaks' Temperatures
@@ -6320,6 +6400,10 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         ui.add(egui::ProgressBar::new(p.first_fraction() as f32));
         ui.label(format!("{}: {}", p.second_name, p.second_text));
         ui.add(egui::ProgressBar::new(p.second_fraction() as f32));
+        // Ticket #264 (version 0.08.4): the Victory history under the progress bars, on every
+        // Faction's page, the player's own included, at the population chart's size.
+        ui.add_space(4.0);
+        victory_history(ui, game, seat, egui::vec2(ui.available_width(), 90.0));
         ui.add_space(6.0);
 
         // 2. Income last turn, under the disclosure rule in this function's doc comment.

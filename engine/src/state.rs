@@ -520,6 +520,23 @@ pub struct EmissionsRecord {
     pub space_population: u32,
 }
 
+/// Ticket #264 (version 0.08.4): one Faction's standing at the end of one Climate phase -- how far
+/// along its Victory Condition it is (the score, the lower of its two parts' fractions) and its
+/// share of the table's Blame -- with the three things the chart ticks on its axis: Antarctica
+/// open (the world's), the Faction's gate Tech done, the Archive complete. One record per seat per
+/// Climate phase, written beside the Emissions record so the two charts share an axis, saved with
+/// the game; a save from before this version loads with an empty history and the chart grows from
+/// there. The first per-Faction history the game keeps.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct VictoryRecord {
+    pub turn: u32,
+    pub score: f64,
+    pub blame_share: f64,
+    pub gate_done: bool,
+    pub archive_complete: bool,
+    pub antarctica_open: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Climate {
     pub co2: f64,
@@ -705,6 +722,9 @@ pub struct SeatState {
     /// announced twice.
     #[serde(default)]
     pub rival_steps_announced: [bool; 2],
+    /// Ticket #264 (version 0.08.4): this seat's Victory history, one record per Climate phase.
+    #[serde(default)]
+    pub victory_history: Vec<VictoryRecord>,
     /// Ticket #227 (version 0.08.2): units this seat has bought and sold through the Trading window
     /// over the whole game. Kept because floating prices are only fair if more than one hand is on
     /// them, and the sweep had no way to say whose were.
@@ -1032,6 +1052,7 @@ impl Game {
             venture_banked_last_turn: 0,
             sea_wall_upkeep_owed: 0.0,
             rival_steps_announced: [false; 2],
+            victory_history: Vec::new(),
             bought_units: 0,
             sold_units: 0,
             spaceport_influence: 0,

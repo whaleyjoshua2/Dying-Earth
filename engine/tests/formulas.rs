@@ -9029,6 +9029,33 @@ fn the_arkwrights_signature_rule_is_coach_class_and_says_steerage_nowhere() {
     }
 }
 
+// -------------------------------------------- 0.08.4 ticket #264: the Victory history
+
+/// Ticket #264 (version 0.08.4): after every Climate phase each seat gets a record -- its score,
+/// its Blame share, and the three tick flags -- on the same turn as the Emissions record, so the
+/// Victory history and the Emissions history share an axis.
+#[test]
+fn the_victory_history_is_written_for_every_seat_after_each_climate_phase() {
+    let mut g = game();
+    calm(&mut g);
+    assert!(Seat::ALL.iter().all(|s| g.seat(*s).victory_history.is_empty()), "nothing before the first phase");
+    g.climate_phase();
+    for s in Seat::ALL {
+        let h = &g.seat(s).victory_history;
+        assert_eq!(h.len(), 1, "{s:?}: one record after one phase");
+        let r = &h[0];
+        assert_eq!(r.turn, g.climate.history[g.climate.history.len() - 1].turn, "the Emissions record's turn");
+        assert!((r.score - g.progress(s).score()).abs() < 1e-9, "{s:?}: the score as the window prints it");
+        assert!((r.blame_share - g.blame_share(s)).abs() < 1e-9, "{s:?}: the share the rules read");
+        assert_eq!(r.antarctica_open, g.antarctica_open);
+        let gate = g.tables.victory_gate(g.kind(s)).map(|t| g.has_tech(t)).unwrap_or(true);
+        assert_eq!(r.gate_done, gate, "{s:?}");
+        assert_eq!(r.archive_complete, g.archive_complete(s), "{s:?}");
+    }
+    g.climate_phase();
+    assert_eq!(g.seat(Seat(0)).victory_history.len(), 2, "one a phase");
+}
+
 // -------------------------------------------- 0.08.4 ticket #263: what a Faction has under way
 
 /// Ticket #263 (version 0.08.4): a seat's builds begun and Ships in transit, with turns, soonest

@@ -114,7 +114,19 @@ impl Game {
             earth_population: self.earth_population(),
             space_population: self.space_population(),
         };
+        let record_turn = record.turn;
         self.climate.history.push(record);
+        // Ticket #264 (version 0.08.4): the Victory history, one record a seat, on the same turn as
+        // the Emissions record so the two charts share an axis. The score is what the Faction
+        // window's heading prints; the share is what the Blame rules read.
+        for seat in Seat::ALL {
+            let score = self.progress(seat).score();
+            let blame_share = self.blame_share(seat);
+            let gate_done = self.tables.victory_gate(self.kind(seat)).map(|t| self.has_tech(t)).unwrap_or(true);
+            let archive_complete = self.archive_complete(seat);
+            let antarctica_open = self.antarctica_open;
+            self.seat_mut(seat).victory_history.push(VictoryRecord { turn: record_turn, score, blame_share, gate_done, archive_complete, antarctica_open });
+        }
         self.neutral_development();
         // Ticket #52: a Resettle order steers only the flows of the Climate phase that follows it.
         for seat in Seat::ALL {
