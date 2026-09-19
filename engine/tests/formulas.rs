@@ -8109,6 +8109,13 @@ fn relations_fall_once_a_turn_for_spending_on_a_place_a_rival_holds() {
     let mut g = game();
     let victim = Seat(0);
     let offender = Seat(1);
+    // Ticket #236 (version 0.08.3): park the shared-pot term. Every Faction starts contributing
+    // ALL of its Research, which earns the reward, so without this each score below reads one
+    // higher and the test measures two rules at once. A directive of 10 leaves a 90% contribution:
+    // past the 85% line, short of the 100% that pays.
+    for s in Seat::ALL {
+        g.seats[s.index()].research_directive = 10;
+    }
     let held = Place::State(g.controlled_states(victim)[0]);
     let neutral = Place::State(StateId::ALL.into_iter().find(|s| g.state(*s).control == Control::Neutral).expect("a neutral Region"));
 
@@ -8139,6 +8146,11 @@ fn relations_fall_once_a_turn_for_spending_on_a_place_a_rival_holds() {
 fn relations_recover_slowly_and_never_rise_above_neutral() {
     let mut g = game();
     let (victim, offender) = (Seat(0), Seat(1));
+    // Ticket #236 (version 0.08.3): park the shared-pot term out of the way. Every Faction starts
+    // contributing ALL of its Research, which earns the reward, so without this every score below
+    // would read one higher and this test would be measuring two rules at once. A directive of 10
+    // leaves a 90% contribution: past the 85% line, short of the 100% that pays.
+    g.seats[offender.index()].research_directive = 10;
     g.relations.score[victim.index()][offender.index()] = -3;
 
     for _ in 0..3 {
@@ -8574,6 +8586,13 @@ fn market_prices_move_with_the_table() {
 fn blame_costs_a_faction_its_friends() {
     let mut g = game();
     let (cus, pro, ark) = (Seat(0), Seat(1), Seat(2));
+    // Ticket #236 (version 0.08.3): park the shared-pot term. Every Faction starts contributing
+    // ALL of its Research, which earns the reward, so without this each score below reads one
+    // higher and the test measures two rules at once. A directive of 10 leaves a 90% contribution:
+    // past the 85% line, short of the 100% that pays.
+    for s in Seat::ALL {
+        g.seats[s.index()].research_directive = 10;
+    }
     // A Prospector share of about 0.40 is one step above the 0.35 gate.
     for s in Seat::ALL {
         g.seats[s.index()].blame_emitted = if s == pro { 40.0 } else { 20.0 };
@@ -8894,4 +8913,81 @@ fn provisional_findings_holds_while_three_quarters_still_goes_to_the_tech() {
             "a directive of {directive} should leave Provisional Findings {expected}"
         );
     }
+}
+
+// ------------------------------------------------- 0.08.3 ticket #236: the shared pot
+
+/// Ticket #236 (version 0.08.3): what everyone makes of how much of its Research a Faction gives
+/// the shared Tech. A TERM and not a deed, at the designer's word "plus/minus 1 but only for that
+/// turn" -- read afresh every time, gone the moment they contribute again.
+///
+/// The shape matters and was chosen against a measurement. With the Research Directive shipped and
+/// the AI going to its cap on turn 2 -- 24 to 28 turns of 36 below any threshold -- a PERMANENT
+/// -1 against every rival every turn would have been about 78 points of damage a seat over a
+/// game, on a scale that bottoms at -10.
+#[test]
+fn the_shared_pot_is_a_term_read_afresh_and_never_banked() {
+    let mut g = game();
+    let (viewer, subject) = (Seat(0), Seat(1));
+    let c = &g.tables.relations;
+    let (floor, step) = (c.directive_min_contribution, c.directive_step);
+    assert_eq!((floor, step), (85, 1), "the figures the rest of this test is written against");
+
+    // Contributing all of it: the reward. This is also the state every game OPENS in.
+    g.seats[subject.index()].research_directive = 0;
+    assert_eq!(g.directive_relations_term(subject), 1, "all of it pays");
+    assert_eq!(g.relations_score(viewer, subject), 1);
+
+    // Above the line but short of all of it: nothing either way.
+    g.seats[subject.index()].research_directive = 15;
+    assert_eq!(g.directive_relations_term(subject), 0, "90% contributed is past the line and short of the reward");
+    assert_eq!(g.relations_score(viewer, subject), 0);
+
+    // Below the line: the penalty, and it is gone again the moment they contribute.
+    g.seats[subject.index()].research_directive = 16;
+    assert_eq!(g.directive_relations_term(subject), -1, "84% contributed is below the line");
+    g.seats[subject.index()].research_directive = 50;
+    assert_eq!(g.directive_relations_term(subject), -1, "and no worse for being far below it");
+    assert_eq!(g.relations_deeds(viewer, subject), 0, "NOTHING is banked: the deeds figure never moved");
+    g.seats[subject.index()].research_directive = 0;
+    assert_eq!(g.relations_score(viewer, subject), 1, "forgiven the same turn they contribute again");
+}
+
+/// Ticket #236: the reward may not lift a pair past the top of Cordial, the step above Neutral, at
+/// the designer's word. Version 0.08.2 settled that a pair which never strikes an Accord can never
+/// rise above Neutral; this bends that by one band rather than breaking it.
+#[test]
+fn the_shared_pots_reward_stops_at_the_top_of_cordial() {
+    let mut g = game();
+    let (viewer, subject) = (Seat(0), Seat(1));
+    let ceiling = g.tables.relations.directive_boost_ceiling;
+    assert_eq!(ceiling, 6, "the top of Cordial");
+    g.seats[subject.index()].research_directive = 0;
+
+    g.relations.score[viewer.index()][subject.index()] = ceiling;
+    assert_eq!(g.relations_score(viewer, subject), ceiling, "the reward adds nothing at the ceiling");
+    assert_eq!(g.relations_level(viewer, subject), "Cordial");
+
+    g.relations.score[viewer.index()][subject.index()] = ceiling - 1;
+    assert_eq!(g.relations_score(viewer, subject), ceiling, "and only up to it from below");
+
+    // A pair already higher by DEEDS is not dragged down to the ceiling: it binds the boost only.
+    g.relations.score[viewer.index()][subject.index()] = 9;
+    assert_eq!(g.relations_score(viewer, subject), 9, "Friendly by deeds stays Friendly");
+}
+
+/// Ticket #236: the penalty is not an offence. It must not feed the scar ratchet, at the
+/// designer's word -- "this doesn't count towards scar" -- because a Faction spending its own
+/// Research on its own business has done nothing to anybody.
+#[test]
+fn the_shared_pots_penalty_never_scars_a_pair() {
+    let mut g = game();
+    let (viewer, subject) = (Seat(0), Seat(1));
+    g.seats[subject.index()].research_directive = 50;
+    for _ in 0..12 {
+        g.settle_relations();
+    }
+    assert_eq!(g.directive_relations_term(subject), -1, "twelve turns of keeping it back");
+    assert_eq!(g.relations.floor[viewer.index()][subject.index()], 0, "and not one step of scar");
+    assert_eq!(g.relations_deeds(viewer, subject), 0, "nor a single banked point");
 }

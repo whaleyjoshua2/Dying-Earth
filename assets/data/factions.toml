@@ -184,6 +184,27 @@ colour = [0.871, 0.322, 0.439]
 [relations]
 # The scale. The +10 half is RESERVED and nothing fills it in this version; it exists so the scale
 # reads naturally and 0 is genuinely neutral. An all-zero-or-negative grid is the rule working.
+# Ticket #236 (version 0.08.3): the shared pot. A Faction that keeps too much of its Research is
+# resented for it, and one that gives all of it is thought the better of.
+#
+# It is a TERM, not a deed -- recomputed every settle from what the Faction is doing NOW, exactly
+# as the Blame term is, and gone the moment they contribute again. The designer's words were "plus/
+# minus 1 but only for that turn", and the measurement is why that shape matters: with the Research
+# Directive shipped, the computer seats set their directive on turn 2 and never move it, so a
+# PERMANENT deed of -1 against every rival every turn would be about 78 points of damage a seat
+# over a game, on a scale that bottoms at -10. As a term it is at most -1 at any moment.
+#
+# 85 is the designer's figure. It is only a meaningful line because the same ticket taught the AI
+# to weigh the Tech under research: before that every seat sat at its cap from turn 2 and was
+# permanently below any threshold worth having.
+directive_min_contribution = 85
+directive_step = 1
+# The reward may not lift a pair past the TOP OF CORDIAL, the step above Neutral, at the designer's
+# word. Version 0.08.2 settled deliberately that a pair which never strikes an Accord can never
+# rise above Neutral; this bends that by exactly one band rather than breaking it, so generosity
+# stops a rival resenting you and still does not make them a friend.
+directive_boost_ceiling = 6
+
 best = 10
 worst = -10
 start = 0

@@ -1092,22 +1092,47 @@ impl Game {
         // its cap, from turn one if it likes, and otherwise contributes to the shared Tech. Ticket
         // #68: it builds the one Module at the first Colony off Earth it took, and the fund's cap
         // is a quarter until that Module stands, so the Module is what opens the rest.
-        // Ticket #235 (version 0.08.3): the other three Factions direct Research too, at the
-        // designer's word -- "yes they use it". Without this they would be three player-only
-        // abilities and the sweep would say so, which is exactly what happened to the Trading
-        // window in 0.08.2: over 80 games the computer seats bought 29,440 units and sold nothing.
+        // Ticket #235 (version 0.08.3): every Faction directs Research, not only the Archivists.
+        // Ticket #236: and it weighs the Tech under research before deciding how much, at the
+        // designer's word -- "the ai need to weigh the benefit of the new tech to which they
+        // contributing". Without that a seat went to its cap on turn 2 and never moved, which was
+        // measured at 24 to 28 turns of 36 below any contribution threshold, and left the
+        // shared-pot rule of this ticket with no line worth drawing.
         //
-        // A seat goes to its cap or not at all, as the Archivists' switch always did. How hard it
-        // should lean is a fitting question that wants the sweep, and it is data rather than code
-        // (`fund_archive` in `ai.toml`) so that fitting it needs no rebuild.
-        if kind != FactionKind::Archivists && self.seat(seat).research_directive == 0 && self.seat(seat).research_last_turn > 0 {
+        // The valuation is the pick list the AI already has: its own Victory gate and its `order`
+        // are Techs it wants, its `last` and `never` are ones it does not, and anything else is
+        // indifference. The three figures are in `ai.toml`, so the sweep can fit them.
+        // The ARCHIVISTS are not in this: their directive is not a judgement about the Tech under
+        // research at all, it is how they pay for the Archive, and their own branch below governs
+        // it against the fund's cap. Weighing Techs for them would switch their Victory funding
+        // off whenever the table researched something they liked.
+        if kind != FactionKind::Archivists && self.seat(seat).research_last_turn > 0 {
+            let th = &self.tables.ai.thresholds;
             let cap = self.research_directive_cap(seat);
-            let what = match kind {
-                FactionKind::Custodians => "the Natural Sink",
-                FactionKind::Prospectors => "their coffers",
-                _ => "propellant",
+            let want = match self.research.current {
+                None => th.directive_when_indifferent,
+                Some(t) => {
+                    let picks = self.tables.ai_tech_picks(kind);
+                    let mine = self.tables.victory_gate(kind) == Some(t);
+                    if mine || picks.order.contains(&t) {
+                        th.directive_when_wanted
+                    } else if picks.never == Some(t) || picks.last == Some(t) {
+                        cap
+                    } else {
+                        th.directive_when_indifferent
+                    }
+                }
             };
-            push(vec![Order::SetResearchDirective { percent: cap }], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, 1.0, format!("direct {cap} per cent of their Research into {what} from the next Income"), None);
+            let want = want.min(cap);
+            if want != self.seat(seat).research_directive {
+                let what = match kind {
+                    FactionKind::Custodians => "the Natural Sink",
+                    FactionKind::Prospectors => "their coffers",
+                    FactionKind::Arkwrights => "propellant",
+                    FactionKind::Archivists => "the Archive fund",
+                };
+                push(vec![Order::SetResearchDirective { percent: want }], Cat::FundArchive, self.base_weight(seat, Cat::FundArchive), gap_for(Cat::FundArchive, None), 1.0, 1.0, format!("direct {want} per cent of their Research into {what} from the next Income"), None);
+            }
         }
         if kind == FactionKind::Archivists {
             let fund = self.seat(seat).archive_fund;

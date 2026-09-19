@@ -5928,6 +5928,19 @@ fn research_directive_control(ui: &mut Ui, session: &Session, game: &Game, actio
         })
         .weak(),
     );
+    // Ticket #236 (version 0.08.3): what the table makes of this setting, said on the control that
+    // sets it. The rule is a term read afresh every settle, so this line is always the truth about
+    // right now rather than a forecast -- and it is the reason the slider carries the CONTRIBUTION
+    // rather than the share taken: the player compares one number to one line.
+    let pot = &game.tables.relations;
+    let (pot_text, pot_colour) = if contribution >= 100 {
+        ("Every rival thinks a little better of you for giving all of it.".to_string(), Color32::from_rgb(140, 200, 140))
+    } else if contribution < pot.directive_min_contribution {
+        (format!("Below {}%, every rival thinks a little worse of you while it lasts.", pot.directive_min_contribution), Color32::from_rgb(230, 150, 130))
+    } else {
+        (format!("Above the {}% line: nobody minds, and nobody is grateful.", pot.directive_min_contribution), ui.visuals().weak_text_color())
+    };
+    ui.label(RichText::new(pot_text).color(pot_colour));
 
     if contribution != pending_set.unwrap_or(standing) {
         if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetResearchDirective { .. })) {

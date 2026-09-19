@@ -893,6 +893,11 @@ pub struct AiThresholds {
     /// part is past this fraction of its bar, or from this turn, whichever comes first.
     pub gate_pick_fraction: f64,
     pub gate_pick_turn: u32,
+    /// Ticket #236 (version 0.08.3): what a seat directs away from the shared Tech, by how much it
+    /// wants the Tech under research. Before this it went to its cap on turn 2 and never moved,
+    /// which made any contribution threshold unreachable and the shared-pot rule a flat tax.
+    pub directive_when_wanted: u8,
+    pub directive_when_indifferent: u8,
 }
 
 /// Ticket #50: one pick list per Faction. `order` is tried first, then the cheapest available
@@ -1090,6 +1095,12 @@ struct FactionsFile {
 /// Ticket #191 (version 0.08.0): the Relations scale and what moves it (`factions.toml`).
 #[derive(Debug, Clone, Deserialize)]
 pub struct RelationsCard {
+    /// Ticket #236 (version 0.08.3): the share of its Research a Faction must still give the
+    /// shared Tech to escape the shared-pot penalty, the size of the term either way, and the
+    /// ceiling the reward may lift a pair to.
+    pub directive_min_contribution: u8,
+    pub directive_step: i64,
+    pub directive_boost_ceiling: i64,
     pub best: i64,
     pub worst: i64,
     pub start: i64,

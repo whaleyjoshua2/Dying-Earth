@@ -3047,7 +3047,34 @@ impl Game {
     /// challenge margin and the Accords' Friendly gate.
     pub fn relations_score(&self, viewer: Seat, subject: Seat) -> i64 {
         let c = &self.tables.relations;
-        (self.relations_deeds(viewer, subject) + self.blame_relations_term(viewer, subject)).clamp(c.worst, c.best)
+        let base = self.relations_deeds(viewer, subject) + self.blame_relations_term(viewer, subject);
+        let pot = self.directive_relations_term(subject);
+        // Ticket #236 (version 0.08.3): the reward may not lift a pair past the top of Cordial, the
+        // step above Neutral. A pair already higher than that by deeds is not dragged DOWN to it --
+        // the ceiling binds the boost, not the score.
+        let with_pot = if pot > 0 { (base + pot).min(base.max(c.directive_boost_ceiling)) } else { base + pot };
+        with_pot.clamp(c.worst, c.best)
+    }
+
+    /// Ticket #236 (version 0.08.3): what everyone else makes of how much of its Research `subject`
+    /// gives the shared Tech. A TERM, like Blame's, read afresh every time rather than banked: a
+    /// Faction that starts contributing again is forgiven the same turn, and one that stops is
+    /// resented only while it does.
+    ///
+    /// It does not depend on the viewer. Blame's term reads a `resentment` coefficient per Faction
+    /// because Factions care about pollution by different amounts; nothing in the designer's rule
+    /// says they weigh generosity differently, and inventing a second coefficient would be a rule
+    /// nobody asked for.
+    pub fn directive_relations_term(&self, subject: Seat) -> i64 {
+        let c = &self.tables.relations;
+        let contribution = 100u8.saturating_sub(self.seat(subject).research_directive);
+        if contribution >= 100 {
+            c.directive_step
+        } else if contribution < c.directive_min_contribution {
+            -c.directive_step
+        } else {
+            0
+        }
     }
 
     /// Ticket #221 (version 0.08.2): how much `viewer` holds `subject`'s Blame against them, as a
