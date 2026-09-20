@@ -407,6 +407,8 @@ Run as `sweep 20 --balance --seatings --steps=300`; the output is
 - **Relations run colder.** 117, 106, 133 and 109 of 240 ordered pairs end at Cold or worse against
   107, 106, 109 and 87, and 40 to 59% carry a scar against 41 to 48% — the Smear and Agitate are
   offences, and the computer seats use both.
-- **Nothing was re-fitted on this sweep.** The candidates, if the designer wants one: Agitate's
-  price (5 a game, all of it from the two rich seats), the Smear rate (a seventh of a dirty ledger),
-  the credit price (every offer sells out). Each is one figure in `assets/data`.
+- **Nothing was re-fitted on this sweep.** The candidates named to the designer: Agitate's price
+  (5 a game, all of it from the two rich seats), the Smear rate (a seventh of a dirty ledger), the
+  credit price (every offer sells out) — each one figure in `assets/data`. The designer, shown the
+  column and the three: **ship and record**, and *none*. Four rules press on one seat at once, and
+  re-fitting any of them against one batch is how a version becomes a balance version.
