@@ -1749,6 +1749,17 @@ impl Game {
             self.report_line(LineKind::Note, None, text);
             self.ai_deed(seat, "smear", &[("n", amount.to_string()), ("faction", whom)]);
         }
+        // Ticket #277 (version 0.08.5): Greenwash campaigns land -- ppm off the seat's own ledger for
+        // good, no offence, and a public Report line, so a rival can answer with a Smear.
+        for (seat, amount) in std::mem::take(&mut self.pending.greenwashes) {
+            let ppm = amount as f64 * self.tables.influence.greenwash.ppm_per_influence;
+            self.seat_mut(seat).blame_cleaned += ppm;
+            let who = self.seat_name(seat);
+            self.log(format!("The {who} greenwashed: {ppm:.0} ppm off their Blame."));
+            let text = self.say("greenwash", &[("faction", who), ("ppm", format!("{ppm:.0}"))]);
+            self.report_line(LineKind::Note, None, text);
+            self.ai_deed(seat, "greenwash", &[("n", amount.to_string())]);
+        }
         // Ticket #269 (version 0.08.4): Agitate lands before Relief, so a holder's Relief the same
         // turn answers it. One point, damped by a working Constabulary, an offence against the
         // holder, and a Report line naming who paid.

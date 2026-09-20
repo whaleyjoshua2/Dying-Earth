@@ -36,6 +36,7 @@ resettle = 2
 smear = 4
 # Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
 buy_credits = 4
+greenwash = 4
 # Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
 agitate = 4
 fund_archive = 6
@@ -81,6 +82,7 @@ resettle = 2
 smear = 4
 # Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
 buy_credits = 4
+greenwash = 4
 # Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
 agitate = 4
 fund_archive = 6
@@ -123,6 +125,7 @@ resettle = 2
 smear = 4
 # Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
 buy_credits = 4
+greenwash = 4
 # Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
 agitate = 4
 fund_archive = 6
@@ -164,6 +167,7 @@ resettle = 2
 smear = 4
 # Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
 buy_credits = 4
+greenwash = 4
 # Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
 agitate = 4
 fund_archive = 8

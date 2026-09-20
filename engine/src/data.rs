@@ -696,6 +696,8 @@ pub struct InfluenceTable {
     pub blame: BlameTable,
     /// Ticket #267: the Smear campaign's rate.
     pub smear: SmearTable,
+    /// Ticket #277 (version 0.08.5): the Greenwash's rate and price.
+    pub greenwash: GreenwashTable,
 }
 
 /// Ticket #267 (version 0.08.4): the Smear campaign, in `influence.toml` under `[smear]`.
@@ -703,6 +705,17 @@ pub struct InfluenceTable {
 pub struct SmearTable {
     /// ppm laid on the target's Blame ledger per Influence spent.
     pub ppm_per_influence: f64,
+}
+
+/// Ticket #277 (version 0.08.5): the Greenwash, in `influence.toml` under `[greenwash]`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct GreenwashTable {
+    /// ppm taken off the seat's own Blame ledger per Influence spent.
+    pub ppm_per_influence: f64,
+    /// Ducats charged beside every Influence spent.
+    pub ducats_per_influence: i64,
+    /// The Ducats a computer seat keeps back past the campaign's price before it will pay for one.
+    pub ai_ducats_reserve: i64,
 }
 
 /// Ticket #53 (version 0.05): Blame, in `influence.toml` under `[blame]`.
@@ -880,6 +893,9 @@ pub struct AiWeights {
     pub smear: f64,
     /// Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
     pub buy_credits: f64,
+    /// Ticket #277 (version 0.08.5): greenwash the seat's own Blame while above a fair share and
+    /// credits are not to be had.
+    pub greenwash: f64,
     /// Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
     pub agitate: f64,
     /// Ticket #52: steer this turn's refugee flows into one calm state.

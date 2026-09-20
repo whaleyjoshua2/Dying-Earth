@@ -446,6 +446,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("rival_one_part_met", &["faction", "met", "part", "value", "bar"]),
     // Ticket #267: a Smear campaign landed.
     ("smear", &["faction", "target", "ppm"]),
+    // Ticket #277 (version 0.08.5): a Greenwash landed.
+    ("greenwash", &["faction", "ppm"]),
     // Ticket #268: carbon credits offered and bought.
     ("credits_offered", &["faction", "n"]),
     ("credits_bought", &["faction", "n", "seller", "ducats"]),
@@ -548,6 +550,7 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("sell", &["n", "resource"]),
     ("relief", &["state"]),
     ("smear", &["n", "faction"]),
+    ("greenwash", &["n"]),
     ("offer_credits", &["n"]),
     ("buy_credits", &["n"]),
     ("agitate", &["state"]),

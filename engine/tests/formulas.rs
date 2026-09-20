@@ -9366,6 +9366,73 @@ fn a_smear_campaign_lays_ppm_on_a_rivals_blame_ledger_and_is_an_offence() {
     assert!((g.seats[target.index()].blame_smeared - 10.0 * rate).abs() < 1e-9, "for good");
 }
 
+/// Ticket #277 (version 0.08.5): a Greenwash takes ppm off the seat's own Blame ledger for good,
+/// at the table's rate per Influence, with a Ducat beside every point; one a turn; the whole
+/// ledger and never below nought; public and no offence.
+#[test]
+fn a_greenwash_takes_ppm_off_your_own_ledger_for_influence_and_ducats_and_offends_nobody() {
+    let mut g = game();
+    calm(&mut g);
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = 100.0;
+        g.seats[s.index()].blame_removed = 0.0;
+    }
+    g.seats[0].allotment = 20;
+    g.seats[0].stockpile.ducats = 12;
+    let t = g.tables.influence.greenwash.clone();
+    assert!((t.ppm_per_influence - 2.0).abs() < 1e-9 && t.ducats_per_influence == 1, "two ppm and one Ducat per Influence");
+    assert!(g.check_order(Seat(0), &[], &Order::Greenwash { amount: 0 }).is_err(), "a positive amount");
+    assert!(g.check_order(Seat(0), &[], &Order::Greenwash { amount: 15 }).is_err(), "15 Influence wants 15 Ducats and the seat has 12");
+    let first = Order::Greenwash { amount: 10 };
+    assert!(g.check_order(Seat(0), &[], &first).is_ok());
+    assert_eq!(g.order_cost(Seat(0), &first).ducats, 10, "a Ducat beside every point");
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&first), &Order::Greenwash { amount: 2 }).is_err(), "one a turn");
+    g.commit_orders(Seat(0), &[first]);
+    g.resolution_phase();
+    assert!((g.seats[0].blame_cleaned - 20.0).abs() < 1e-9, "20 ppm cleaned: {}", g.seats[0].blame_cleaned);
+    assert!((g.blame(Seat(0)) - 80.0).abs() < 1e-9, "off the whole ledger: {}", g.blame(Seat(0)));
+    assert_eq!(g.seats[0].stockpile.ducats, 2, "and the Ducats are spent");
+    assert!(g.blame_share(Seat(0)) < 0.25, "the share the rules read has moved: {}", g.blame_share(Seat(0)));
+    assert!(Seat::ALL.iter().all(|s| !g.relations.offended[s.index()][0]), "no offence against anybody");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("greenwashed")), "the Report says so, in public: {:?}", g.report.lines);
+    // Never below nought: a campaign past the ledger clears it and no more.
+    g.seats[0].blame_cleaned = 500.0;
+    assert!((g.blame(Seat(0)) - 0.0).abs() < 1e-9, "floored at nought");
+}
+
+/// Ticket #277 (version 0.08.5): a computer seat whose own Blame share stands above the fair quarter
+/// greenwashes when carbon credits are not to be had and it holds Ducats past the price; when the
+/// Custodians are offering and will sell, it buys credits instead; clean, it does neither.
+#[test]
+fn the_computer_greenwashes_when_dirty_and_credits_are_not_to_be_had() {
+    let mut g = game();
+    calm(&mut g);
+    let seat = Seat(1);
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = 100.0;
+        g.seats[s.index()].blame_removed = 0.0;
+    }
+    g.seats[seat.index()].blame_emitted = 400.0;
+    g.seats[seat.index()].allotment = 20;
+    g.seats[seat.index()].stockpile.ducats = 200;
+    for s in Seat::ALL {
+        g.seats[s.index()].credits_offered = 0;
+    }
+    let orders = g.ai_orders(seat);
+    assert!(orders.iter().any(|o| matches!(o, Order::Greenwash { .. })), "dirty, rich, no credits on offer: it greenwashes: {orders:?}");
+    // The Custodians offering, and Neutral toward it: it buys credits and does not greenwash.
+    let seller = g.credit_seller().expect("the Custodians sit at the table");
+    g.seats[seller.index()].credits_offered = 10;
+    g.seats[seller.index()].blame_removed = 50.0;
+    let orders = g.ai_orders(seat);
+    assert!(orders.iter().any(|o| matches!(o, Order::BuyCredits { .. })), "credits to be had: it buys: {orders:?}");
+    assert!(!orders.iter().any(|o| matches!(o, Order::Greenwash { .. })), "and does not greenwash beside them: {orders:?}");
+    // Clean, it does neither.
+    g.seats[seat.index()].blame_emitted = 10.0;
+    let orders = g.ai_orders(seat);
+    assert!(!orders.iter().any(|o| matches!(o, Order::Greenwash { .. } | Order::BuyCredits { .. })), "clean: nothing: {orders:?}");
+}
+
 /// Ticket #267 (version 0.08.4): a computer seat Cold or Hostile toward a rival whose Blame share
 /// stands above the fair quarter proposes a Smear against it; toward nobody it hates, none.
 #[test]

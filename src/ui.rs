@@ -3408,6 +3408,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::SetVentureShare { share } => format!("Bank {share}% of Ducat income in the Venture Capital Fund"),
         Order::DrawVenture { amount } => format!("Withdraw {amount} Ducats from the Venture Capital Fund"),
         Order::Smear { target, amount } => format!("Smear the {} with {amount} Influence", game.seat_name(*target)),
+        Order::Greenwash { amount } => format!("Greenwash with {amount} Influence and {} Ducats", amount * game.tables.influence.greenwash.ducats_per_influence),
         Order::Agitate { state } => format!("Agitate in {}", game.tables.state(*state).name),
         Order::OfferCredits { ppm } => format!("Offer {ppm} ppm of carbon credit a turn"),
         Order::BuyCredits { ppm } => format!("Buy {ppm} ppm of carbon credit from the Custodians"),
@@ -6374,6 +6375,38 @@ fn smear_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     });
 }
 
+/// Ticket #277 (version 0.08.5): the Greenwash block on the player's own page: a heading with the
+/// rule on hover, a field for the Influence and a button that names both prices, the Smear block's
+/// shape. Public and no offence, at the designer's word, so the hover says a rival can answer it.
+fn greenwash_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    let me = Seat(0);
+    let g = &game.tables.influence.greenwash;
+    let (rate, per) = (g.ppm_per_influence, g.ducats_per_influence);
+    ui.label(RichText::new("Greenwash campaign").strong()).on_hover_text(format!(
+        "Influence spent on your own name, with {per} Ducat{} beside every point: every point takes {rate} ppm off your Blame for good, and the share every rule reads moves with it. Nothing leaves the air.\nOne campaign a turn, from this turn's Allotment and your Ducats. It is public and no offence: the Report says you greenwashed, and a rival can answer with a Smear.",
+        if per == 1 { "" } else { "s" }
+    ));
+    let cleaned = game.seat(me).blame_cleaned;
+    if cleaned > 0.0 {
+        ui.label(RichText::new(format!("{cleaned:.0} ppm of your Blame has been greenwashed away.")).weak());
+    }
+    ui.horizontal(|ui| {
+        let influence_left = game.seat(me).allotment - session.pending.iter().map(|o| game.order_cost(me, o).influence).sum::<i64>();
+        let ducats_left = game.seat(me).stockpile.ducats - session.pending.iter().map(|o| game.order_cost(me, o).ducats).sum::<i64>();
+        let left = if per > 0 { influence_left.min(ducats_left / per) } else { influence_left };
+        ui.add(egui::DragValue::new(&mut view.greenwash_amount).range(1..=left.max(1)));
+        let order = Order::Greenwash { amount: view.greenwash_amount };
+        let check = game.check_order(me, &session.pending, &order);
+        let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Greenwash for {} Ducats", view.greenwash_amount * per)));
+        if let Err(e) = &check {
+            resp.clone().on_disabled_hover_text(&e.0);
+        }
+        if resp.on_hover_text(format!("{:.0} ppm off your Blame at End Turn.", view.greenwash_amount as f64 * rate)).clicked() {
+            actions.push(Action::Place(order));
+        }
+    });
+}
+
 fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actions: &mut Vec<Action>) {
     let me = Seat(0);
     let r = &game.tables.relations;
@@ -6605,6 +6638,8 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
             // put it in the air.
             let smeared = if s.blame_smeared > 0.0 { format!(", {:.0} laid on by rivals", s.blame_smeared) } else { String::new() };
             let smeared = format!("{smeared}{}{}", if s.credits_bought > 0.0 { format!(", {:.0} bought as carbon credits", s.credits_bought) } else { String::new() }, if s.credits_sold > 0.0 { format!(", {:.0} sold as carbon credits", s.credits_sold) } else { String::new() });
+            // Ticket #277 (version 0.08.5): the sixth clause, at the designer's word.
+            let smeared = format!("{smeared}{}", if s.blame_cleaned > 0.0 { format!(", {:.0} cleaned by campaign", s.blame_cleaned) } else { String::new() });
             let line = format!(
                 "Answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit{smeared}), thresholds x{:.2}",
                 game.blame(seat),
@@ -6647,6 +6682,12 @@ A rival that holds you at less than neutral defends its places against you a lit
             accords_block(ui, session, game, seat, actions);
             ui.add_space(6.0);
             smear_block(ui, session, game, view, seat, actions);
+            ui.add_space(6.0);
+        }
+        // Ticket #277 (version 0.08.5): the Greenwash, on the player's OWN page, the Smear's mirror
+        // in place as well as in rule, beside the Blame line its term shows on.
+        if !session.spectator && seat == Seat(0) {
+            greenwash_block(ui, session, game, view, actions);
             ui.add_space(6.0);
         }
 
@@ -6941,6 +6982,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // got there, and what it holds in credit -- at the designer's word.
                 let smeared = if s.blame_smeared > 0.0 { format!(", {:.0} laid on by rivals", s.blame_smeared) } else { String::new() };
                 let smeared = format!("{smeared}{}{}", if s.credits_bought > 0.0 { format!(", {:.0} bought as carbon credits", s.credits_bought) } else { String::new() }, if s.credits_sold > 0.0 { format!(", {:.0} sold as carbon credits", s.credits_sold) } else { String::new() });
+            // Ticket #277 (version 0.08.5): the sixth clause, at the designer's word.
+            let smeared = format!("{smeared}{}", if s.blame_cleaned > 0.0 { format!(", {:.0} cleaned by campaign", s.blame_cleaned) } else { String::new() });
                 let line = format!(
                     "{}: answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit{smeared}); share {:.2}, thresholds x{:.2}",
                     game.seat_name(seat),

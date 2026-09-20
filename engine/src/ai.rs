@@ -31,6 +31,8 @@ enum Cat {
     Resettle,
     /// Ticket #267 (version 0.08.4): a Smear campaign against a rival.
     Smear,
+    /// Ticket #277 (version 0.08.5): a Greenwash of the seat's own Blame.
+    Greenwash,
     /// Ticket #268 (version 0.08.4): carbon credits bought from the Custodians.
     BuyCredits,
     /// Ticket #269 (version 0.08.4): Agitate in a rival's Region.
@@ -123,6 +125,7 @@ impl Game {
             Cat::Relief => w.relief,
             Cat::Resettle => w.resettle,
             Cat::Smear => w.smear,
+            Cat::Greenwash => w.greenwash,
             Cat::BuyCredits => w.buy_credits,
             Cat::Agitate => w.agitate,
             Cat::Accord => w.accord,
@@ -1316,6 +1319,9 @@ impl Game {
         // Ticket #268 (version 0.08.4): carbon credits, while the seat stands above a fair share, the
         // Custodians are offering and will sell to it, and it can pay -- as much as the cap or the
         // offer allows, weighed by how far above the quarter it stands.
+        // Ticket #277 (version 0.08.5): and where credits are to be had the seat buys them; a
+        // Greenwash is for the seat that cannot -- the seller Hostile or not offering, or itself the seller.
+        let mut credits_to_be_had = false;
         if let Some(seller) = self.credit_seller().filter(|s| *s != seat) {
             let c = self.tables.carbon_credits.clone();
             let fair = self.tables.influence.blame.fair_share;
@@ -1327,6 +1333,7 @@ impl Game {
                 && let Some(cost) = self.credit_cost(seat, ppm)
                 && self.seat(seat).stockpile.ducats >= cost
             {
+                credits_to_be_had = true;
                 push(
                     vec![Order::BuyCredits { ppm }],
                     Cat::BuyCredits,
@@ -1335,6 +1342,30 @@ impl Game {
                     1.0,
                     1.0,
                     format!("buy {ppm} ppm of carbon credit for {cost} Ducats (share {:.2})", self.blame_share(seat)),
+                    None,
+                );
+            }
+        }
+        // Ticket #277 (version 0.08.5): a Greenwash of the seat's own Blame while its share stands
+        // above the fair quarter and credits are not to be had -- one step of Influence with its
+        // Ducats beside it, weighed by how far above the quarter it stands, and only while the seat
+        // keeps a reserve of Ducats past the price. It competes with a place for the Allotment and
+        // with every building for the Ducats, which is the whole price of it.
+        {
+            let g = self.tables.influence.greenwash.clone();
+            let fair = self.tables.influence.blame.fair_share;
+            let over = self.blame_share(seat) - fair;
+            let step = th.influence_step;
+            let price = step * g.ducats_per_influence;
+            if over > 0.0 && !credits_to_be_had && allotment >= step && self.seat(seat).stockpile.ducats >= price + g.ai_ducats_reserve {
+                push(
+                    vec![Order::Greenwash { amount: step }],
+                    Cat::Greenwash,
+                    self.base_weight(seat, Cat::Greenwash) * (1.0 + over / fair),
+                    1.0,
+                    1.0,
+                    1.0,
+                    format!("greenwash {step} Influence and {price} Ducats (share {:.2})", self.blame_share(seat)),
                     None,
                 );
             }

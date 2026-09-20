@@ -754,6 +754,11 @@ pub struct SeatState {
     /// says the seat put it in the air.
     #[serde(default)]
     pub blame_smeared: f64,
+    /// Ticket #277 (version 0.08.5): ppm this seat has taken off its own Blame ledger by Greenwash,
+    /// for good. Comes off in `blame` and is shown as its own figure, so the panel never says the
+    /// seat took it out of the air.
+    #[serde(default)]
+    pub blame_cleaned: f64,
     /// Ticket #268 (version 0.08.4): ppm of carbon credit this seat has bought over the game, which
     /// comes off its Blame ledger; ppm it has sold, which comes off its credit and, past what it
     /// held, goes onto its ledger as Blame taken; and the ppm it offers a turn, standing until
@@ -1099,6 +1104,7 @@ impl Game {
             victory_history: Vec::new(),
             directive_sink: 0.0,
             blame_smeared: 0.0,
+            blame_cleaned: 0.0,
             credits_bought: 0.0,
             credits_sold: 0.0,
             credits_offered: 0,
@@ -2526,8 +2532,10 @@ impl Game {
         // this seat by Smear counts, at the designer's word, so the share the rules read diverges
         // from what the seat put in the air.
         // Ticket #268: credits bought come off; credits sold past what was held go on.
+        // Ticket #277 (version 0.08.5): what the seat has greenwashed comes off, the whole ledger,
+        // floored at nought as ever.
         let oversold = (s.credits_sold - s.blame_removed).max(0.0);
-        (s.blame_emitted - s.blame_removed + s.blame_smeared + oversold - s.credits_bought).max(0.0)
+        (s.blame_emitted - s.blame_removed + s.blame_smeared + oversold - s.credits_bought - s.blame_cleaned).max(0.0)
     }
 
     /// Ticket #53 defined the credit as the ppm removed BEYOND everything ever emitted -- and

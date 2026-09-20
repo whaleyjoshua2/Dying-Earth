@@ -344,6 +344,8 @@ pub struct ViewState {
     pub venture_withdraw: i64,
     /// Ticket #267 (version 0.08.4): the Influence the Smear field on a rival's page asks for.
     pub smear_amount: i64,
+    /// Ticket #277 (version 0.08.5): the Influence in the Greenwash field on the player's own page.
+    pub greenwash_amount: i64,
     /// Ticket #268 (version 0.08.4): the ppm the carbon-credit field asks for, and the offer a
     /// Custodian player is setting.
     pub credits_amount: i64,
@@ -401,6 +403,7 @@ impl Default for ViewState {
             influence_amount: 5,
             venture_withdraw: 10,
             smear_amount: 5,
+            greenwash_amount: 5,
             credits_amount: 10,
             credits_offer: 0,
             attack_preview: false,

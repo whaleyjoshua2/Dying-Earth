@@ -111,6 +111,7 @@ fn main() {
                         let mut blame_ppm: [Vec<f64>; 4] = Default::default();
                         let mut credit_ppm: [Vec<f64>; 4] = Default::default();
                         let mut smeared_ppm: [Vec<f64>; 4] = Default::default();
+                        let mut cleaned_ppm: [Vec<f64>; 4] = Default::default();
                         let mut credits_bought = [0.0f64; 4];
                         let mut credits_sold = [0.0f64; 4];
                         let mut agitates = [0u32; 4];
@@ -175,6 +176,7 @@ fn main() {
                                 blame_ppm[i].push(r.blame[i]);
                                 credit_ppm[i].push(r.blame_credit[i]);
                                 smeared_ppm[i].push(r.blame_smeared[i]);
+                                cleaned_ppm[i].push(r.blame_cleaned[i]);
                                 credits_bought[i] += r.credits_bought[i];
                                 credits_sold[i] += r.credits_sold[i];
                                 agitates[i] += r.agitates[i];
@@ -396,7 +398,14 @@ fn main() {
                             let ppm: Vec<String> = (0..4).map(|i| med0(&mut blame_ppm[i])).collect();
                             let cred: Vec<String> = (0..4).map(|i| med0(&mut credit_ppm[i])).collect();
                             let smear: Vec<String> = (0..4).map(|i| med0(&mut smeared_ppm[i])).collect();
-                            println!("      Blame in ppm at the end, by seat (median): [{}]; in credit [{}]; laid on by Smear [{}]", ppm.join(", "), cred.join(", "), smear.join(", "));
+                            let cleaned: Vec<String> = (0..4).map(|i| med0(&mut cleaned_ppm[i])).collect();
+                            println!(
+                                "      Blame in ppm at the end, by seat (median): [{}]; in credit [{}]; laid on by Smear [{}]; taken off by Greenwash [{}]",
+                                ppm.join(", "),
+                                cred.join(", "),
+                                smear.join(", "),
+                                cleaned.join(", ")
+                            );
                             println!(
                                 "      Carbon credits over the batch: bought by seat [{}], sold by seat [{}]; Agitates landed by seat {agitates:?}",
                                 credits_bought.iter().map(|v| format!("{v:.0}")).collect::<Vec<_>>().join(", "),
