@@ -76,6 +76,9 @@ pub struct SimResult {
     pub events_no_target: u32,
     pub coastal_slots_lost: u32,
     pub facilities_drowned: u32,
+    /// Ticket #276 (version 0.08.5): inland slots the sea turned coastal over the game. Read off the
+    /// state, as the two above now are: the log scrapers they replaced broke whenever a sentence moved.
+    pub slots_converted: u32,
     pub antarctica_turn: Option<u32>,
     pub antarctic_colonies: u32,
     /// Ticket #57: the turn the first Colony in the Mars system was founded, and the turn the Mars
@@ -474,17 +477,11 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let sea_walls_standing = game.states.iter().flat_map(|s| s.facilities.iter()).filter(|f| f.kind == FacilityKind::SeaWall && f.working()).count() as u32;
     let agitates = Seat::ALL.map(|s| game.seat(s).agitates_issued);
     let events_no_target = game.events_no_target;
-    let mut coastal_slots_lost = 0u32;
-    let mut facilities_drowned = 0u32;
-    for l in game.log.iter().filter(|l| l.starts_with("The sea took ")) {
-        if let Some(n) = l.trim_start_matches("The sea took ").split(' ').next().and_then(|n| n.parse::<u32>().ok()) {
-            coastal_slots_lost += n;
-        }
-        if let Some((_, rest)) = l.split_once(" C: ") {
-            let list = rest.split('.').next().unwrap_or("");
-            facilities_drowned += list.split(" and ").flat_map(|p| p.split(", ")).filter(|p| !p.trim().is_empty()).count() as u32;
-        }
-    }
+    // Ticket #276 (version 0.08.5): the three sea figures are counters on the state, not scraped
+    // from the log's sentences as the first two were from #56 to 0.08.4.
+    let coastal_slots_lost: u32 = game.states.iter().map(|s| s.lost_slots).sum();
+    let facilities_drowned: u32 = game.states.iter().map(|s| s.drowned.len() as u32).sum();
+    let slots_converted: u32 = game.states.iter().map(|s| s.converted).sum();
     SimResult {
         seed,
         player,
@@ -531,6 +528,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         sea_walls_spent,
         coastal_slots_lost,
         facilities_drowned,
+        slots_converted,
         antarctica_turn,
         antarctic_colonies,
         first_mars_colony_turn,

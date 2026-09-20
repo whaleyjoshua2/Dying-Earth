@@ -102,7 +102,7 @@ fn main() {
                         // Ticket #69: the neutral Labs' Research and the Sea Wall's Tech.
                         let (mut neutral_research, mut coastal_engineering) = (Vec::new(), Vec::new());
                         // Ticket #70: what the sea took.
-                        let (mut slots_lost, mut drowned) = (Vec::new(), Vec::new());
+                        let (mut slots_lost, mut drowned, mut converted) = (Vec::new(), Vec::new(), Vec::new());
                         // Ticket #72: the Prospectors' Fund.
                         let mut venture = Vec::new();
                         // Ticket #227 (version 0.08.2): the six figures the version's rules depend on.
@@ -247,6 +247,7 @@ fn main() {
                             neutral_research.push(r.neutral_research.max(0) as u32);
                             slots_lost.push(r.coastal_slots_lost);
                             drowned.push(r.facilities_drowned);
+                            converted.push(r.slots_converted);
                             venture.push(r.venture_fund_at_end.max(0) as u32);
                             if r.venture_fund_at_end as f64 >= base.faction(FactionKind::Prospectors).victory_first.bar {
                                 fund_met += 1;
@@ -365,7 +366,12 @@ fn main() {
                                 coastal_engineering.len(),
                                 median_u(&mut coastal_engineering)
                             );
-                            println!("      The sea: median {} coastal slots lost a game, {} Facilities drowned", median_u(&mut slots_lost), median_u(&mut drowned));
+                            println!(
+                                "      The sea: median {} coastal slots lost a game, {} Facilities drowned, {} inland slots turned coastal",
+                                median_u(&mut slots_lost),
+                                median_u(&mut drowned),
+                                median_u(&mut converted)
+                            );
                             println!("      The Prospectors' Venture Capital Fund at the end: median {} Ducats of the {} their Victory Condition asks", median_u(&mut venture), base.faction(FactionKind::Prospectors).victory_first.bar);
                             println!("      The deck: median {} cards drawn a game, empty at the end in {deck_empty}/{seeds} seeds", median_u(&mut cards_drawn));
                             println!("      Pioneers: {emigrant_batches} batches recruited, {by_sea} Antarctic Colonies founded by sea");

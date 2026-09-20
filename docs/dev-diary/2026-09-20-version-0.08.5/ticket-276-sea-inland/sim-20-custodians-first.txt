@@ -1,0 +1,136 @@
+seed   1 | Some(Win { seat: Seat(1), margin_note: "met its Victory Condition" }) | turn 33 | first colony Some(10) | buildings [64, 66, 14, 11] | colonists [4, 17, 19, 12] | temp +2.69 | collapse proj Some(31) | colony hands [(26, 29), (29, 33)] | influence transfers 20 | bank/post/embassy/relay [0, 6, 0, 4]
+         | unrest: threw off 0 | peak 9.5 | constabularies 2 | relief orders 7 | population moved 266.3
+         | blame ["195", "535", "133", "92"] | share ["0.20", "0.56", "0.14", "0.10"] | credit ["58", "0", "0", "0"] | smeared ["0", "150", "0", "0"] | credits bought ["0", "45", "0", "0"] sold ["45", "0", "0", "0"] | thresholds ["x1.00", "x1.31", "x1.00", "x1.00"] | neutral developments 12
+         | scrubbers 25 | mothballs 55 | restarts 6 | decommissions 8 | leapfrogs 39 | strip permits 2 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+28.2") | net at end +10.8
+seed   2 | Some(Win { seat: Seat(1), margin_note: "met its Victory Condition" }) | turn 28 | first colony Some(10) | buildings [2, 160, 6, 8] | colonists [4, 32, 14, 14] | temp +2.65 | collapse proj Some(32) | colony hands [(17, 28)] | influence transfers 21 | bank/post/embassy/relay [0, 4, 2, 10]
+         | unrest: threw off 2 | peak 8.5 | constabularies 0 | relief orders 0 | population moved 238.6
+         | blame ["83", "633", "106", "102"] | share ["0.09", "0.68", "0.11", "0.11"] | credit ["43", "6", "0", "0"] | smeared ["0", "90", "0", "0"] | credits bought ["0", "54", "0", "0"] sold ["54", "0", "0", "0"] | thresholds ["x1.00", "x1.43", "x1.00", "x1.00"] | neutral developments 8
+         | scrubbers 20 | mothballs 43 | restarts 0 | decommissions 6 | leapfrogs 20 | strip permits 8 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+26.5") | net at end +38.5
+seed   3 | Some(Win { seat: Seat(1), margin_note: "met its Victory Condition" }) | turn 28 | first colony Some(10) | buildings [3, 128, 3, 6] | colonists [0, 28, 19, 15] | temp +2.96 | collapse proj Some(31) | colony hands [(1, 28), (10, 28)] | influence transfers 16 | bank/post/embassy/relay [0, 4, 2, 9]
+         | unrest: threw off 0 | peak 9.0 | constabularies 2 | relief orders 20 | population moved 325.7
+         | blame ["95", "875", "116", "94"] | share ["0.08", "0.74", "0.10", "0.08"] | credit ["27", "0", "0", "0"] | smeared ["0", "120", "0", "0"] | credits bought ["0", "3", "0", "0"] sold ["3", "0", "0", "0"] | thresholds ["x1.00", "x1.49", "x1.00", "x1.00"] | neutral developments 6
+         | scrubbers 6 | mothballs 16 | restarts 0 | decommissions 4 | leapfrogs 14 | strip permits 10 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+47.5") | net at end +44.6
+seed   4 | Some(Win { seat: Seat(1), margin_note: "met its Victory Condition" }) | turn 28 | first colony Some(11) | buildings [3, 123, 4, 7] | colonists [0, 20, 19, 12] | temp +2.95 | collapse proj Some(34) | colony hands [(1, 28), (11, 28)] | influence transfers 17 | bank/post/embassy/relay [0, 4, 0, 4]
+         | unrest: threw off 0 | peak 10.0 | constabularies 2 | relief orders 10 | population moved 332.6
+         | blame ["23", "776", "128", "123"] | share ["0.02", "0.74", "0.12", "0.12"] | credit ["0", "0", "0", "0"] | smeared ["0", "90", "0", "0"] | credits bought ["0", "96", "0", "0"] sold ["96", "0", "0", "0"] | thresholds ["x1.00", "x1.49", "x1.00", "x1.00"] | neutral developments 6
+         | scrubbers 8 | mothballs 27 | restarts 10 | decommissions 9 | leapfrogs 12 | strip permits 10 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+64.2") | net at end +46.4
+seed   5 | Some(Win { seat: Seat(1), margin_note: "met its Victory Condition" }) | turn 28 | first colony Some(10) | buildings [3, 111, 4, 17] | colonists [4, 16, 18, 15] | temp +3.03 | collapse proj Some(31) | colony hands [] | influence transfers 14 | bank/post/embassy/relay [0, 4, 2, 2]
+         | unrest: threw off 0 | peak 10.0 | constabularies 0 | relief orders 11 | population moved 334.2
+         | blame ["114", "897", "117", "90"] | share ["0.09", "0.74", "0.10", "0.07"] | credit ["3", "0", "0", "0"] | smeared ["0", "130", "0", "0"] | credits bought ["0", "6", "0", "0"] sold ["6", "0", "0", "0"] | thresholds ["x1.00", "x1.49", "x1.00", "x1.00"] | neutral developments 10
+         | scrubbers 6 | mothballs 20 | restarts 4 | decommissions 6 | leapfrogs 12 | strip permits 8 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+47.1") | net at end +46.6
+seed   6 | Some(Collapse) | turn 32 | first colony Some(10) | buildings [35, 76, 5, 33] | colonists [4, 24, 17, 17] | temp +3.01 | collapse proj Some(31) | colony hands [] | influence transfers 10 | bank/post/embassy/relay [0, 5, 5, 2]
+         | unrest: threw off 1 | peak 10.0 | constabularies 6 | relief orders 10 | population moved 342.9
+         | blame ["177", "721", "127", "155"] | share ["0.15", "0.61", "0.11", "0.13"] | credit ["3", "0", "0", "0"] | smeared ["0", "140", "0", "0"] | credits bought ["0", "45", "0", "0"] sold ["45", "0", "0", "0"] | thresholds ["x1.00", "x1.36", "x1.00", "x1.00"] | neutral developments 4
+         | scrubbers 12 | mothballs 54 | restarts 0 | decommissions 25 | leapfrogs 24 | strip permits 10 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+46.9") | net at end +40.2
+seed   7 | Some(Win { seat: Seat(1), margin_note: "met its Victory Condition" }) | turn 28 | first colony Some(10) | buildings [3, 138, 7, 7] | colonists [4, 28, 16, 8] | temp +2.76 | collapse proj Some(31) | colony hands [] | influence transfers 17 | bank/post/embassy/relay [0, 4, 2, 16]
+         | unrest: threw off 0 | peak 5.5 | constabularies 0 | relief orders 0 | population moved 250.9
+         | blame ["50", "678", "126", "121"] | share ["0.05", "0.70", "0.13", "0.12"] | credit ["3", "0", "0", "0"] | smeared ["0", "100", "0", "0"] | credits bought ["0", "66", "0", "0"] sold ["66", "0", "0", "0"] | thresholds ["x1.00", "x1.45", "x1.00", "x1.00"] | neutral developments 14
+         | scrubbers 6 | mothballs 30 | restarts 4 | decommissions 2 | leapfrogs 18 | strip permits 6 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+46.9") | net at end +48.4
+seed   8 | Some(Collapse) | turn 33 | first colony Some(9) | buildings [12, 105, 8, 22] | colonists [4, 36, 0, 10] | temp +3.02 | collapse proj Some(35) | colony hands [] | influence transfers 10 | bank/post/embassy/relay [0, 4, 4, 4]
+         | unrest: threw off 2 | peak 9.5 | constabularies 2 | relief orders 2 | population moved 350.1
+         | blame ["0", "973", "134", "136"] | share ["0.00", "0.78", "0.11", "0.11"] | credit ["144", "0", "0", "0"] | smeared ["0", "170", "0", "0"] | credits bought ["0", "3", "0", "0"] sold ["3", "0", "0", "0"] | thresholds ["x1.00", "x1.50", "x1.00", "x1.00"] | neutral developments 8
+         | scrubbers 16 | mothballs 39 | restarts 0 | decommissions 12 | leapfrogs 20 | strip permits 8 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+46.5") | net at end +45.0
+seed   9 | Some(Win { seat: Seat(1), margin_note: "met its Victory Condition" }) | turn 33 | first colony Some(10) | buildings [41, 64, 7, 39] | colonists [4, 12, 0, 28] | temp +2.81 | collapse proj Some(31) | colony hands [] | influence transfers 10 | bank/post/embassy/relay [0, 4, 0, 0]
+         | unrest: threw off 0 | peak 9.5 | constabularies 3 | relief orders 4 | population moved 316.1
+         | blame ["95", "709", "142", "147"] | share ["0.09", "0.65", "0.13", "0.13"] | credit ["108", "0", "0", "0"] | smeared ["0", "160", "0", "0"] | credits bought ["0", "26", "0", "0"] sold ["26", "0", "0", "0"] | thresholds ["x1.00", "x1.40", "x1.00", "x1.00"] | neutral developments 6
+         | scrubbers 21 | mothballs 54 | restarts 0 | decommissions 20 | leapfrogs 26 | strip permits 8 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+41.3") | net at end +27.7
+seed  10 | Some(Win { seat: Seat(1), margin_note: "met its Victory Condition" }) | turn 31 | first colony Some(10) | buildings [15, 116, 15, 16] | colonists [4, 38, 0, 4] | temp +2.78 | collapse proj Some(31) | colony hands [(17, 29)] | influence transfers 16 | bank/post/embassy/relay [0, 4, 0, 15]
+         | unrest: threw off 0 | peak 7.0 | constabularies 0 | relief orders 0 | population moved 265.6
+         | blame ["97", "477", "130", "155"] | share ["0.11", "0.56", "0.15", "0.18"] | credit ["1", "0", "0", "0"] | smeared ["0", "50", "0", "0"] | credits bought ["0", "113", "0", "0"] sold ["113", "0", "0", "0"] | thresholds ["x1.00", "x1.31", "x1.00", "x1.00"] | neutral developments 12
+         | scrubbers 24 | mothballs 54 | restarts 0 | decommissions 18 | leapfrogs 28 | strip permits 6 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+30.7") | net at end +38.2
+seed  11 | Some(Win { seat: Seat(1), margin_note: "met its Victory Condition" }) | turn 33 | first colony Some(10) | buildings [14, 91, 5, 29] | colonists [4, 28, 17, 12] | temp +2.88 | collapse proj Some(31) | colony hands [(17, 30)] | influence transfers 14 | bank/post/embassy/relay [0, 4, 4, 6]
+         | unrest: threw off 0 | peak 9.5 | constabularies 2 | relief orders 19 | population moved 326.4
+         | blame ["75", "691", "130", "183"] | share ["0.07", "0.64", "0.12", "0.17"] | credit ["1", "0", "0", "0"] | smeared ["0", "190", "0", "0"] | credits bought ["0", "106", "0", "0"] sold ["106", "0", "0", "0"] | thresholds ["x1.00", "x1.39", "x1.00", "x1.00"] | neutral developments 8
+         | scrubbers 14 | mothballs 48 | restarts 0 | decommissions 4 | leapfrogs 30 | strip permits 6 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+34.5") | net at end +35.0
+seed  12 | Some(Win { seat: Seat(1), margin_note: "met its Victory Condition" }) | turn 35 | first colony Some(10) | buildings [20, 94, 4, 17] | colonists [4, 28, 16, 7] | temp +3.04 | collapse proj Some(31) | colony hands [] | influence transfers 10 | bank/post/embassy/relay [0, 4, 6, 4]
+         | unrest: threw off 0 | peak 10.0 | constabularies 0 | relief orders 6 | population moved 347.4
+         | blame ["140", "983", "115", "133"] | share ["0.10", "0.72", "0.08", "0.10"] | credit ["74", "0", "0", "0"] | smeared ["0", "270", "0", "0"] | credits bought ["0", "3", "0", "0"] sold ["3", "0", "0", "0"] | thresholds ["x1.00", "x1.47", "x1.00", "x1.00"] | neutral developments 8
+         | scrubbers 14 | mothballs 46 | restarts 0 | decommissions 4 | leapfrogs 33 | strip permits 8 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+40.3") | net at end +39.8
+seed  13 | Some(Win { seat: Seat(1), margin_note: "met its Victory Condition" }) | turn 28 | first colony Some(10) | buildings [5, 135, 4, 4] | colonists [0, 40, 20, 0] | temp +3.00 | collapse proj Some(31) | colony hands [(17, 28), (1, 28), (1, 28)] | influence transfers 19 | bank/post/embassy/relay [0, 4, 0, 6]
+         | unrest: threw off 0 | peak 4.0 | constabularies 0 | relief orders 0 | population moved 331.7
+         | blame ["64", "861", "141", "111"] | share ["0.05", "0.73", "0.12", "0.09"] | credit ["3", "0", "0", "0"] | smeared ["0", "170", "0", "0"] | credits bought ["0", "24", "0", "0"] sold ["24", "0", "0", "0"] | thresholds ["x1.00", "x1.48", "x1.00", "x1.00"] | neutral developments 16
+         | scrubbers 4 | mothballs 16 | restarts 10 | decommissions 0 | leapfrogs 14 | strip permits 8 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+36.1") | net at end +51.2
+seed  14 | Some(Win { seat: Seat(1), margin_note: "met its Victory Condition" }) | turn 32 | first colony Some(10) | buildings [28, 90, 19, 9] | colonists [4, 28, 15, 4] | temp +2.80 | collapse proj Some(31) | colony hands [(17, 32)] | influence transfers 12 | bank/post/embassy/relay [0, 4, 5, 6]
+         | unrest: threw off 0 | peak 10.0 | constabularies 3 | relief orders 14 | population moved 312.3
+         | blame ["83", "790", "155", "118"] | share ["0.07", "0.69", "0.14", "0.10"] | credit ["83", "0", "0", "0"] | smeared ["0", "200", "0", "0"] | credits bought ["0", "22", "0", "0"] sold ["22", "0", "0", "0"] | thresholds ["x1.00", "x1.44", "x1.00", "x1.00"] | neutral developments 0
+         | scrubbers 32 | mothballs 54 | restarts 0 | decommissions 21 | leapfrogs 20 | strip permits 10 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+28.1") | net at end +24.8
+seed  15 | Some(Collapse) | turn 27 | first colony Some(9) | buildings [8, 92, 19, 19] | colonists [4, 28, 0, 14] | temp +3.03 | collapse proj Some(31) | colony hands [] | influence transfers 12 | bank/post/embassy/relay [0, 4, 2, 12]
+         | unrest: threw off 1 | peak 9.5 | constabularies 4 | relief orders 1 | population moved 341.8
+         | blame ["101", "785", "145", "104"] | share ["0.09", "0.69", "0.13", "0.09"] | credit ["0", "0", "0", "0"] | smeared ["0", "130", "0", "0"] | credits bought ["0", "45", "0", "0"] sold ["45", "0", "0", "0"] | thresholds ["x1.00", "x1.44", "x1.00", "x1.00"] | neutral developments 14
+         | scrubbers 8 | mothballs 30 | restarts 0 | decommissions 11 | leapfrogs 16 | strip permits 8 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+58.2") | net at end +40.4
+seed  16 | Some(Win { seat: Seat(1), margin_note: "met its Victory Condition" }) | turn 27 | first colony Some(9) | buildings [1, 123, 4, 7] | colonists [0, 28, 17, 19] | temp +2.90 | collapse proj Some(31) | colony hands [(1, 27), (9, 27)] | influence transfers 17 | bank/post/embassy/relay [0, 2, 2, 6]
+         | unrest: threw off 0 | peak 9.0 | constabularies 0 | relief orders 12 | population moved 320.4
+         | blame ["84", "877", "107", "115"] | share ["0.07", "0.74", "0.09", "0.10"] | credit ["15", "0", "0", "0"] | smeared ["0", "180", "0", "0"] | credits bought ["0", "9", "0", "0"] sold ["9", "0", "0", "0"] | thresholds ["x1.00", "x1.49", "x1.00", "x1.00"] | neutral developments 8
+         | scrubbers 6 | mothballs 29 | restarts 0 | decommissions 13 | leapfrogs 10 | strip permits 8 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+47.8") | net at end +40.7
+seed  17 | Some(Win { seat: Seat(1), margin_note: "met its Victory Condition" }) | turn 34 | first colony Some(10) | buildings [23, 89, 4, 32] | colonists [4, 28, 17, 15] | temp +2.95 | collapse proj Some(31) | colony hands [] | influence transfers 10 | bank/post/embassy/relay [0, 4, 2, 6]
+         | unrest: threw off 0 | peak 10.0 | constabularies 4 | relief orders 4 | population moved 335.2
+         | blame ["103", "877", "144", "149"] | share ["0.08", "0.69", "0.11", "0.12"] | credit ["86", "0", "0", "0"] | smeared ["0", "230", "0", "0"] | credits bought ["0", "9", "0", "0"] sold ["9", "0", "0", "0"] | thresholds ["x1.00", "x1.44", "x1.00", "x1.00"] | neutral developments 6
+         | scrubbers 16 | mothballs 43 | restarts 0 | decommissions 4 | leapfrogs 30 | strip permits 8 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+35.3") | net at end +35.6
+seed  18 | Some(Collapse) | turn 28 | first colony Some(10) | buildings [12, 108, 6, 9] | colonists [4, 20, 0, 11] | temp +3.04 | collapse proj Some(31) | colony hands [] | influence transfers 11 | bank/post/embassy/relay [0, 4, 0, 7]
+         | unrest: threw off 0 | peak 9.0 | constabularies 2 | relief orders 2 | population moved 331.3
+         | blame ["96", "859", "111", "125"] | share ["0.08", "0.72", "0.09", "0.10"] | credit ["9", "0", "0", "0"] | smeared ["0", "120", "0", "0"] | credits bought ["0", "24", "0", "0"] sold ["24", "0", "0", "0"] | thresholds ["x1.00", "x1.47", "x1.00", "x1.00"] | neutral developments 8
+         | scrubbers 10 | mothballs 31 | restarts 0 | decommissions 10 | leapfrogs 10 | strip permits 10 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+58.9") | net at end +42.1
+seed  19 | Some(Collapse) | turn 27 | first colony Some(9) | buildings [2, 119, 4, 9] | colonists [4, 20, 16, 12] | temp +3.01 | collapse proj Some(31) | colony hands [] | influence transfers 15 | bank/post/embassy/relay [0, 2, 2, 1]
+         | unrest: threw off 0 | peak 9.0 | constabularies 2 | relief orders 1 | population moved 327.3
+         | blame ["98", "831", "115", "120"] | share ["0.08", "0.71", "0.10", "0.10"] | credit ["0", "0", "0", "0"] | smeared ["0", "110", "0", "0"] | credits bought ["0", "18", "0", "0"] sold ["18", "0", "0", "0"] | thresholds ["x1.00", "x1.46", "x1.00", "x1.00"] | neutral developments 6
+         | scrubbers 6 | mothballs 20 | restarts 0 | decommissions 8 | leapfrogs 8 | strip permits 6 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+50.1") | net at end +46.5
+seed  20 | Some(Win { seat: Seat(1), margin_note: "met its Victory Condition" }) | turn 28 | first colony Some(9) | buildings [12, 79, 16, 17] | colonists [4, 20, 17, 4] | temp +3.01 | collapse proj Some(32) | colony hands [(17, 28)] | influence transfers 11 | bank/post/embassy/relay [0, 2, 2, 1]
+         | unrest: threw off 0 | peak 10.0 | constabularies 4 | relief orders 3 | population moved 332.8
+         | blame ["112", "735", "145", "121"] | share ["0.10", "0.66", "0.13", "0.11"] | credit ["0", "0", "0", "0"] | smeared ["0", "110", "0", "0"] | credits bought ["0", "15", "0", "0"] sold ["15", "0", "0", "0"] | thresholds ["x1.00", "x1.41", "x1.00", "x1.00"] | neutral developments 12
+         | scrubbers 7 | mothballs 22 | restarts 0 | decommissions 6 | leapfrogs 3 | strip permits 8 | longest stabilization [0, 0, 0, 0] | net at 12 Some("+44.3") | net at end +43.2
+
+--- 20 seeds from 1, seat 0 the Custodians ---
+  Custodians (seat 0):  0 win(s)
+ Prospectors (seat 1): 15 win(s)
+  Arkwrights (seat 2):  0 win(s)
+  Archivists (seat 3):  0 win(s)
+       draws         :  0
+   collapses         :  5
+median collapse turn         : 28
+median turn of first Colony         : 10
+states that threw off a controller         : 6
+median peak Unrest         : 9.5
+Constabularies built by the AIs         : 38
+Relief orders paid by the AIs         : 126
+population moved by refugees         : 6329.6
+
+        seat |      Faction | median Blame |      share
+           0 |   Custodians |           96 |      0.08 | thresholds x1.00
+           1 |  Prospectors |          790 |      0.70 | thresholds x1.45
+           2 |   Arkwrights |          130 |      0.12 | thresholds x1.00
+           3 |   Archivists |          121 |      0.11 | thresholds x1.00
+median neutral developments a game         : 8
+
+Scrubbers built         : 261
+   Mothballs         : 731
+    Restarts         : 34
+Decommissions         : 191
+   Leapfrogs         : 387
+Strip Permits         : 156
+Custodians longest Stabilization run         : median 0, max 0
+Prospectors longest Stabilization run         : median 0, max 0
+Arkwrights longest Stabilization run         : median 0, max 0
+Archivists longest Stabilization run         : median 0, max 0
+median world net Emissions at turn 12         : +46.5
+median world net Emissions at the end         : +40.7
+
+                   Break |     at | seeds |  median turn
+           Coral Die-off |   +1.4 |    20 |            5
+         Permafrost Thaw |   +1.6 |    20 |            9
+        The Sink Weakens |   +2.0 |    20 |           14
+    Ice Sheets Committed |   +2.2 |    20 |           18
+          Amazon Dieback |   +2.6 |    20 |           27
+Last Turn at turn 1         : median - (0 seeds), cuts gone in 0, no Collapse on the path in 20
+   Sea Walls         : 537 built, 670 spent absorbing a threshold
+median coastal slots lost a game         : 30
+median Facilities destroyed by the sea         : 10
+median inland slots turned coastal         : 50
+turn Antarctica opened         : median 9 (20 of 20 seeds opened it)
+Antarctic Colonies founded         : 60
+turn of the first Mars-system Colony         : median 26 (4 of 20 seeds founded one)
+Colonists off Earth at the end, all seats         : median 53
+the Mars launch window         : turn 7
+       Techs         : median 20 completed, highest rung reached 3
+Victory Conditions met outright         : seed 1 Prospectors (seat 1), seed 2 Prospectors (seat 1), seed 3 Prospectors (seat 1), seed 4 Prospectors (seat 1), seed 5 Prospectors (seat 1), seed 7 Prospectors (seat 1), seed 9 Prospectors (seat 1), seed 10 Prospectors (seat 1), seed 11 Prospectors (seat 1), seed 12 Prospectors (seat 1), seed 13 Prospectors (seat 1), seed 14 Prospectors (seat 1), seed 16 Prospectors (seat 1), seed 17 Prospectors (seat 1), seed 20 Prospectors (seat 1)
+     Moments         : 2127 earned, 863 shown (1.44 a turn over 601 turns), 509 of those turns stopped for one, most in a turn 2
+Last Turn at turn 12         : median 24 (19 seeds), cuts gone in 0, no Collapse on the path in 1

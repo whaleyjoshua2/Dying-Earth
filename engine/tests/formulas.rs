@@ -3711,11 +3711,14 @@ fn e_ice_sheets_committed_fires_a_threshold_out_of_sequence_and_the_scheduled_on
     assert!(!g.state(StateId::EastAsia).thresholds_fired[1], "and it did not use up the scheduled +2.3");
 
     // +2.3: the scheduled threshold, on its own turn. Ticket #70 (version 0.05.5): East Asia has
-    // four coastal slots now, not six, so by then the coast is gone and it fires and takes nothing.
+    // four coastal slots now, not six, so the Break and +1.8 took all four -- and since ticket #276
+    // (version 0.08.5) each of those rises turned one inland slot coastal after the taking, so +2.3
+    // finds the two turned slots and takes them: the coast never runs out.
     hold_temperature(&mut g, 2.35);
     g.climate_phase();
     assert!(g.state(StateId::EastAsia).thresholds_fired[1], "the scheduled +2.3 still fires on its own turn");
-    assert_eq!(g.build_slots(StateId::EastAsia), after_break, "and finds no coastal slot left to take: the Break and +1.8 took all four");
+    assert_eq!(g.state(StateId::EastAsia).lost_slots, 6, "and takes the two slots the first two rises turned coastal");
+    assert_eq!(g.build_slots(StateId::EastAsia), after_break - 2, "so the state is two slots smaller again");
 }
 
 /// (f) Amazon Dieback: 20 ppm into the CO2 Stock once, and South America's Baseline Emissions up by
@@ -3976,26 +3979,100 @@ fn d_the_sea_takes_coastal_slots_only_oldest_first_and_then_nothing() {
     assert_eq!(g.coastal_slots(sid), 4);
     assert_eq!(g.inland_slots(sid), 3);
 
+    // Ticket #276 (version 0.08.5): every rise also turns one inland slot coastal, AFTER the taking,
+    // so the coast is two taken and one turned each time and never runs out; the "then nothing" of
+    // this test's old name went with it.
     g.apply_sea_threshold(sid, 0);
-    assert_eq!(g.coastal_slots(sid), 2, "Exposure 2 takes two coastal slots");
-    assert_eq!(g.inland_slots(sid), 3, "and no inland slot");
+    assert_eq!(g.state(sid).lost_slots, 2, "Exposure 2 takes two coastal slots");
+    assert_eq!(g.coastal_slots(sid), 3, "two taken, one turned: three coastal");
+    assert_eq!(g.inland_slots(sid), 2, "and one inland slot fewer");
     assert_eq!(standing(&g, sid, true), vec![FacilityKind::Refinery, FacilityKind::PowerPlant], "the oldest coastal Facility went first: the Factory");
 
     g.apply_sea_threshold(sid, 1);
-    assert_eq!(g.coastal_slots(sid), 0, "the coast is gone");
-    assert!(standing(&g, sid, true).is_empty(), "and everything that stood on it with it");
-    assert_eq!(standing(&g, sid, false), vec![FacilityKind::ResearchLab], "the inland Research Lab never moved");
+    assert_eq!(g.state(sid).lost_slots, 4, "two more taken");
+    assert_eq!(g.coastal_slots(sid), 2, "the Power Plant's slot and the one just turned");
+    assert_eq!(standing(&g, sid, true), vec![FacilityKind::PowerPlant], "the Refinery went with the second rise");
+    assert_eq!(standing(&g, sid, false), vec![FacilityKind::ResearchLab], "the inland Research Lab has not moved: an empty slot turned each time");
     assert!(
         g.report.lines.iter().any(|l| l.text.contains("The sea took 2 coastal slots from Australia")),
         "the Report names what the sea took: {:?}",
         g.report.lines
     );
 
-    // Nothing more to take.
-    let slots = g.build_slots(sid);
+    // A third rise takes the two coastal slots that are left, and with no empty inland slot left
+    // the Research Lab's slot turns, Lab and all: the coast has reached the last of the state.
     g.apply_sea_loss(sid, 2.9);
-    assert_eq!(g.build_slots(sid), slots, "once a state's coastal slots are gone it loses nothing more");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("no coastal slots left")), "and the Report says so: {:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("The sea took 2 coastal slots from Australia") && l.text.contains("Power Plant")), "the Power Plant drowned: {:?}", g.report.lines);
+    assert_eq!((g.coastal_slots(sid), g.inland_slots(sid)), (1, 0), "one coastal slot, the turned one, and nothing inland");
+    assert_eq!(standing(&g, sid, true), vec![FacilityKind::ResearchLab], "the Research Lab stands on the coast now");
+    assert_eq!(g.build_slots(sid), 1, "seven slots less six taken");
+
+    // And a fourth takes that too, and turns nothing, since nothing is left inland.
+    g.apply_sea_loss(sid, 3.0);
+    assert_eq!(g.build_slots(sid), 0, "the state is all sea");
+    assert!(g.state(sid).facilities.is_empty(), "the Research Lab drowned with the last slot");
+    g.apply_sea_loss(sid, 3.1);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("no coastal slots left")), "with nothing left the Report says so: {:?}", g.report.lines);
+}
+
+/// Ticket #276 (version 0.08.5): the sea reaches inland. Every rise turns one inland slot coastal
+/// AFTER it has taken what it takes, wall or no wall; an empty inland slot first, else the oldest
+/// inland Facility with its slot; a state with no inland slot left turns nothing.
+#[test]
+fn d2_every_rise_turns_one_inland_slot_coastal_wall_or_no_wall() {
+    let mut g = game();
+    calm(&mut g);
+    sea_ahead(&mut g);
+    for s in &mut g.states {
+        s.population = 0.0;
+    }
+    // Australia again: 7 slots, 4 coastal, 3 inland. Three coastal Facilities, one inland, so two
+    // inland slots are empty.
+    let sid = StateId::Australia;
+    let st = g.state_mut(sid);
+    st.control = Control::Controlled(Seat(0));
+    st.facilities = vec![
+        Facility::in_coastal_slot(FacilityKind::Factory),
+        Facility::in_coastal_slot(FacilityKind::Refinery),
+        Facility::in_coastal_slot(FacilityKind::PowerPlant),
+        Facility::new(FacilityKind::ResearchLab),
+    ];
+    assert_eq!((g.coastal_slots(sid), g.inland_slots(sid)), (4, 3));
+
+    // No wall: the rise takes two coastal slots, then turns one EMPTY inland slot coastal.
+    g.apply_sea_threshold(sid, 0);
+    assert_eq!(g.coastal_slots(sid), 3, "Exposure 2 took two, and one inland slot turned coastal after the taking");
+    assert_eq!(g.inland_slots(sid), 2, "one inland slot fewer");
+    assert_eq!(g.build_slots(sid), 5, "the total is the two taken, and nothing else");
+    assert_eq!(standing(&g, sid, true), vec![FacilityKind::Refinery, FacilityKind::PowerPlant], "the Factory drowned, oldest first, as before");
+    assert_eq!(standing(&g, sid, false), vec![FacilityKind::ResearchLab], "the empty slot turned, not the Research Lab's");
+    assert_eq!(g.free_coastal(sid), 1, "the turned slot is coastal and empty, waiting for the next rise");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("The coast now reaches one slot further in.")), "the Report says the coast moved: {:?}", g.report.lines);
+
+    // A wall: the rise takes nothing, and STILL turns one inland slot -- the last empty one.
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::SeaWall));
+    let before = g.state(sid).facilities.len();
+    g.apply_sea_threshold(sid, 1);
+    assert_eq!(g.state(sid).facilities.len(), before, "the wall held: nothing drowned");
+    assert_eq!((g.coastal_slots(sid), g.inland_slots(sid)), (4, 1), "and one more inland slot turned coastal behind it");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("took the sea") && l.text.contains("one slot further in")), "the held-rise line says both: {:?}", g.report.lines);
+
+    // No empty inland slot left: the oldest inland Facility turns with its slot.
+    g.apply_sea_threshold(sid, 2);
+    assert_eq!((g.coastal_slots(sid), g.inland_slots(sid)), (5, 0), "the last inland slot turned");
+    assert_eq!(standing(&g, sid, false), vec![FacilityKind::SeaWall], "nothing but the wall, which takes no slot, stands inland any more");
+    assert!(standing(&g, sid, true).contains(&FacilityKind::ResearchLab), "the Research Lab stands on the coast now");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("a Research Lab stands on it now")), "the Report names what turned: {:?}", g.report.lines);
+
+    // Nothing inland left to turn: a further rise turns nothing.
+    g.apply_sea_loss(sid, 2.9);
+    assert_eq!((g.coastal_slots(sid), g.inland_slots(sid)), (5, 0), "a state that is all coast turns nothing more");
+
+    // A raised slot turns like any other.
+    g.state_mut(sid).industry_level += 1;
+    assert_eq!(g.inland_slots(sid), 1, "a raise adds an inland slot");
+    g.apply_sea_loss(sid, 3.0);
+    assert_eq!((g.coastal_slots(sid), g.inland_slots(sid)), (6, 0), "and the sea reaches that one too");
 }
 
 /// (e) The Sea Wall: it needs Coastal Engineering and a free coastal slot, one per state, and it
@@ -4041,13 +4118,16 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
     g.state_mut(sid).facilities = vec![Facility::new(FacilityKind::SeaWall)];
     let before = g.coastal_slots(sid);
     g.apply_sea_threshold(sid, 0);
-    assert_eq!(g.coastal_slots(sid), before, "the wall took the sea: no coastal slot lost");
+    assert_eq!(g.state(sid).lost_slots, 0, "the wall took the sea: no coastal slot lost");
+    // Ticket #276 (version 0.08.5): the rise still turns one inland slot coastal behind the wall.
+    assert_eq!(g.coastal_slots(sid), before + 1, "and one inland slot turned coastal behind it, wall or no wall");
     let wall = g.state(sid).facilities.iter().find(|f| f.kind == FacilityKind::SeaWall).expect("the wall stands");
     assert_eq!(wall.rises_held, 1, "and counts the rise it held");
     assert!(g.report.lines.iter().any(|l| l.text.contains("Sea Wall") && l.text.contains("dearer to keep")), "the Report says so: {:?}", g.report.lines);
     // The next one is held too.
     g.apply_sea_threshold(sid, 1);
-    assert_eq!(g.coastal_slots(sid), before, "the wall holds every threshold, not one");
+    assert_eq!(g.state(sid).lost_slots, 0, "the wall holds every threshold, not one");
+    assert_eq!(g.coastal_slots(sid), before + 2, "and the coast moved in again");
     assert_eq!(g.state(sid).facilities.iter().find(|f| f.kind == FacilityKind::SeaWall).unwrap().rises_held, 2);
 
     // The Ice Sheets Break is a threshold of a kind too.
@@ -4059,7 +4139,8 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
     let before = g.coastal_slots(sid);
     hold_temperature(&mut g, 2.25);
     g.climate_phase();
-    assert_eq!(g.coastal_slots(sid), before, "the wall took the Ice Sheets Break");
+    assert_eq!(g.state(sid).lost_slots, 0, "the wall took the Ice Sheets Break");
+    assert_eq!(g.coastal_slots(sid), before + 1, "which turned one inland slot coastal like any rise (ticket #276)");
     assert!(g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::SeaWall && f.rises_held >= 1), "and stands, counting it (ticket #257)");
 
     // A mothballed wall absorbs nothing.
@@ -4073,9 +4154,8 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
     wall.mothballed = true;
     wall.online = false;
     g.state_mut(sid).facilities = vec![wall];
-    let before = g.coastal_slots(sid);
     g.apply_sea_threshold(sid, 0);
-    assert_eq!(g.coastal_slots(sid), before - 2, "a mothballed Sea Wall absorbs nothing");
+    assert_eq!(g.state(sid).lost_slots, 2, "a mothballed Sea Wall absorbs nothing");
 }
 
 /// (f) Coastal Engineering is Industry rung 2, needs Efficient Grids, and the tree holds thirteen;

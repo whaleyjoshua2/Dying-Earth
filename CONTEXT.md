@@ -393,19 +393,19 @@ One of the places a Facility occupies in a Region. A state has Size + Industry L
 _Avoid_: building slot, plot, space, capacity
 
 **Coastal Slot**:
-A build slot on a Region's coast, where the sea can reach it. A state has three per point of Coastal Exposure, never more than its start slots less one, and never gains another. A Facility standing in one the sea takes is destroyed, oldest first.
+A build slot on a Region's coast, where the sea can reach it. A state begins with two per point of Coastal Exposure (three before version 0.05.5), never more than its start slots less one, and since version 0.08.5 it gains one more at every Sea Level rise that reaches it, turned from an Inland Slot, wall or no wall. A Facility standing in one the sea takes is destroyed, oldest first.
 _Avoid_: shore slot, waterfront, flood zone
 
 **Inland Slot**:
-A build slot the sea never reaches: the start slots the coastal ones leave over, and every slot a raise of the Industry Level adds.
+A build slot the sea does not take: the start slots the coastal ones leave over, and every slot a raise of the Industry Level adds. Since version 0.08.5 the sea reaches it another way: every rise turns one Inland Slot of the state into a Coastal Slot, an empty one first and otherwise the oldest inland Facility's with the Facility on it, so the next rise can take it. A raised slot turns like any other.
 _Avoid_: safe slot, interior, highland
 
 **Coastal Exposure**:
-How much of a Region stands on the coast, a figure on its card. It sets how many Coastal Slots the state has, two per point since version 0.05.5 (three before), and how many of them each Sea Level threshold takes. A state with no Coastal Slots left loses no more of them, though the threshold still drives out its people and raises its Unrest.
+How much of a Region stands on the coast, a figure on its card. It sets how many Coastal Slots the state begins with, two per point since version 0.05.5 (three before), and how many of them each Sea Level threshold takes. A state with no Coastal Slots left loses no more of them that rise, though the threshold still drives out its people, raises its Unrest and, since version 0.08.5, turns one Inland Slot coastal. A state at exposure 0 would be landlocked and spared all of it; none on the board is.
 _Avoid_: coastline, vulnerability, flood risk
 
 **Sea Wall**:
-The Facility that holds the sea off: it takes no build slot (since version 0.05.5; a Coastal Slot before), at most one to a state, and while it is working every Sea Level threshold of any kind takes no slots from the state. Since version 0.08.4 it **stands** through them -- from version 0.05 to 0.08.3 it absorbed one and was destroyed doing it -- and each rise it has held adds half a Material a turn to its keep, paid at Income; a seat short of Materials leaves it unkept that turn, and an unkept wall holds nothing. A Storm Surge that breaks on a standing wall no longer brings a threshold forward: the wall holds, and the Facilities in the state's Coastal Slots make three tenths less at the next Income. It needs Coastal Engineering.
+The Facility that holds the sea off: it takes no build slot (since version 0.05.5; a Coastal Slot before), at most one to a state, and while it is working every Sea Level threshold of any kind takes no slots from the state; since version 0.08.5 the threshold still turns one Inland Slot coastal behind the wall, which holds the taking off and not the turning. Since version 0.08.4 it **stands** through them -- from version 0.05 to 0.08.3 it absorbed one and was destroyed doing it -- and each rise it has held adds half a Material a turn to its keep, paid at Income; a seat short of Materials leaves it unkept that turn, and an unkept wall holds nothing. A Storm Surge that breaks on a standing wall no longer brings a threshold forward: the wall holds, and the Facilities in the state's Coastal Slots make three tenths less at the next Income. It needs Coastal Engineering.
 _Avoid_: dyke, levee, barrier, flood defence
 
 **Coastal Engineering**:
@@ -653,7 +653,7 @@ The amount of CO2 the oceans and forests remove from the CO2 Stock every turn. N
 _Avoid_: absorption, offset, carbon capture
 
 **Sea Level**:
-How far the oceans have risen with the Temperature. It is drawn on the globe as a band of drowned land along every coast, widening with each threshold, and at each of its thresholds it permanently takes Coastal Slots from every Region, as many as the state's Coastal Exposure and never more than it has left. It takes nothing else: an Inland Slot is out of its reach, and so is a state whose coast is already gone.
+How far the oceans have risen with the Temperature. It is drawn on the globe as a band of drowned land along every coast, widening with each threshold, and at each of its thresholds it permanently takes Coastal Slots from every Region, as many as the state's Coastal Exposure and never more than it has left, and then, since version 0.08.5, turns one Inland Slot coastal, wall or no wall, so a coast never runs out. It takes nothing else and takes nothing from a state with no Coastal Slots left that rise, but it reaches every state that has a coast at all.
 _Avoid_: flooding, water line, ocean rise
 
 **Break**:

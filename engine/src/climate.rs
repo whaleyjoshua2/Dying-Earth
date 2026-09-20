@@ -368,6 +368,21 @@ impl Game {
             }
         };
         let mut said = said;
+        // Ticket #276 (version 0.08.5): the sea reaches inland. Every rise turns one inland slot
+        // coastal, wall or no wall -- the designer's word was "regardless of sea wall" -- and it does
+        // so AFTER the rise has taken what it takes, so the slot it turns faces the next rise and not
+        // this one. The wall goes on protecting what stands; it no longer fixes the size of the coast.
+        match self.reach_inland(sid) {
+            (false, _) => {}
+            (true, None) => {
+                headline.push_str(" The coast now reaches one slot further in.");
+                said.push_str(&self.phrase("sea_inland", &[]));
+            }
+            (true, Some(what)) => {
+                headline.push_str(&format!(" The coast now reaches one slot further in: {what} stands on it now."));
+                said.push_str(&self.phrase("sea_inland_flipped", &[("what", what)]));
+            }
+        }
         // Ticket #52: the Unrest and the displacement key on the threshold FIRING, not on the slots
         // it managed to take, so a state with nothing left to lose still loses its people and its
         // calm (ticket #56).
@@ -388,6 +403,36 @@ impl Game {
         self.log(headline);
         self.report_line(LineKind::SeaLevel, Some(ReportPlace::State(sid)), said.clone());
         self.moment(MomentKind::ClimateThreshold, &[("what", said), ("figure", figure)], Some(ReportPlace::State(sid)));
+    }
+
+    /// Ticket #276 (version 0.08.5): one inland slot turns coastal. An EMPTY inland slot turns first,
+    /// at the designer's word; when none is empty the OLDEST inland Facility standing turns with its
+    /// slot, and can drown at the next rise -- the mirror of the coast drowning oldest first, so a
+    /// state's oldest works are the last the sea reaches. A state with no inland slot left turns
+    /// nothing. Returns whether a slot turned, and what turned with it, named for the Report.
+    fn reach_inland(&mut self, sid: StateId) -> (bool, Option<String>) {
+        if self.inland_slots(sid) == 0 {
+            return (false, None);
+        }
+        let free = self.free_inland(sid);
+        self.state_mut(sid).converted += 1;
+        if free > 0 {
+            return (true, None);
+        }
+        if let Some(i) = self.state(sid).facilities.iter().position(|f| !f.coastal && self.takes_slot(f.kind)) {
+            let f = &mut self.state_mut(sid).facilities[i];
+            f.coastal = true;
+            let name = Game::with_article(f.kind.name());
+            return (true, Some(name));
+        }
+        // Nothing standing inland: the slot was spoken for by a build, which will stand on the coast.
+        if let Some(i) = self.state(sid).queue.iter().position(|b| !b.coastal && matches!(b.item, BuildItem::Facility(k) if self.takes_slot(k))) {
+            let b = &mut self.state_mut(sid).queue[i];
+            b.coastal = true;
+            let name = format!("{} under construction", Game::with_article(&b.item.name()));
+            return (true, Some(name));
+        }
+        (true, None)
     }
 
     /// Ticket #56: whatever no longer fits the state's coastal slots, oldest first, standing before

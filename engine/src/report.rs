@@ -491,6 +491,8 @@ pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     ("attacks", &[]),
     ("cargo_aboard", &["n"]),
     ("sea_unrest", &["rose", "unrest"]),
+    ("sea_inland", &[]),
+    ("sea_inland_flipped", &["what"]),
     ("first_colony", &[]),
     ("more_colonies", &["ordinal"]),
     ("first_antarctic_colony", &[]),

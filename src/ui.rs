@@ -4593,7 +4593,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     rule_tip(
         ui.label(RichText::new(format!("Facilities ({} of {} slots free)", game.free_slots(sid), game.build_slots(sid))).strong()),
         format!(
-            "Slots: Size {} plus {} plus the Industry Level {} it started at, and one more for every raise since, always inland.\n{} are coastal, and the sea takes those first, oldest Facility with them; a Sea Wall holds one threshold off.\nMothballed and building each keep a slot.",
+            "Slots: Size {} plus {} plus the Industry Level {} it started at, and one more for every raise since, always inland.\n{} are coastal: the sea takes those at a threshold, oldest Facility with them, and turns one inland slot coastal every time, wall or no wall. A Sea Wall holds the taking off, not the turning.\nMothballed and building each keep a slot.",
             game.tables.state(sid).size,
             game.tables.base_slots,
             game.tables.state(sid).industry_level,
@@ -4655,7 +4655,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             });
         }
         cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
-        ui.label(RichText::new("Raising the Industry Level adds an inland slot, which the sea never reaches.").weak());
+        ui.label(RichText::new("Raising the Industry Level adds an inland slot.").weak());
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
         // Ticket #73: muster Emigrants here, and send them to Antarctica by sea once the ice is open.
         ui.label(RichText::new("Pioneers").strong());

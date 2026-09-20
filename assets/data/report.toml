@@ -143,6 +143,10 @@ energy_zero = "{faction}: Energy fell to zero even with every producer off."
 attacks = " and attacks"
 cargo_aboard = " with {n} Colonists aboard"
 sea_unrest = " Unrest there rose by {rose} to {unrest}."
+# Ticket #276 (version 0.08.5): every rise turns one inland slot coastal, wall or no wall; an empty
+# slot first, else the oldest inland Facility with its slot.
+sea_inland = " The coast now reaches one slot further in."
+sea_inland_flipped = " The coast now reaches one slot further in: {what} stands on it now."
 # Ticket #85 (version 0.06.0): the count is an ordinal ("second", "twelfth", "13th"), and a
 # Colony founded in Antarctica has phrases of its own, since Antarctica is on Earth.
 first_colony = "their first Colony off Earth"

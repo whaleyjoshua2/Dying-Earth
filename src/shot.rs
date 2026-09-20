@@ -633,7 +633,9 @@ fn build_board(session: &mut Session) {
         // coastal slots, a Factory drowned with them, a Sea Wall standing in a coastal slot and two
         // Facilities inland, so one card carries both rows and everything the ticket changed. An AI
         // game reaches that board on a turn nobody can choose, and never with a wall.
-        if std::env::args().any(|a| a == "walls:1") {
+        // Ticket #276 (version 0.08.5): `walls:2` is the same board one rise on, the wall standing
+        // through the +2.3 threshold and the coast reaching one slot further in behind it.
+        if std::env::args().any(|a| a == "walls:1" || a == "walls:2") {
             let sid = StateId::EastAsia;
             g.take_control(sid, Seat(0));
             if !g.has_tech(TechId::CoastalEngineering) {
@@ -658,6 +660,9 @@ fn build_board(session: &mut Session) {
             let mut wall = Facility::new(FacilityKind::SeaWall);
             wall.rises_held = 1;
             g.state_mut(sid).facilities.push(wall);
+            if std::env::args().any(|a| a == "walls:2") {
+                g.apply_sea_threshold(sid, 1);
+            }
             g.seats[0].stockpile.materials = 300;
             g.seats[0].stockpile.energy = 400;
             g.seats[0].stockpile.ducats = 300;

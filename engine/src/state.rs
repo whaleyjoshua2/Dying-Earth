@@ -199,6 +199,11 @@ pub struct NationState {
     pub queue: Vec<Build>,
     /// Ticket #56: COASTAL slots the sea has taken, for good. The sea takes nothing else.
     pub lost_slots: u32,
+    /// Ticket #276 (version 0.08.5): inland slots the sea has turned coastal, one at every rise that
+    /// reaches this state, wall or no wall. They are counted on the coastal row from then on and the
+    /// next rise can take them; the total never changes, the drownable share grows.
+    #[serde(default)]
+    pub converted: u32,
     /// Ticket #270 (version 0.08.4): how many Armies have ever been raised from this Region, so a
     /// re-raised Standing Army takes the next number and no name is given twice.
     #[serde(default)]
@@ -1165,6 +1170,7 @@ impl Game {
                 },
                 queue: Vec::new(),
                 lost_slots: 0,
+                converted: 0,
                 armies_raised: 0,
                 drowned: Vec::new(),
                 thresholds_fired: vec![false; tables.climate.sea_level_thresholds.len()],
@@ -2150,15 +2156,17 @@ impl Game {
         (self.tables.coastal_per_exposure * exposure).min(self.start_slots(s).saturating_sub(1))
     }
 
-    /// Ticket #56: the coastal slots it has left, once the sea has had its thresholds.
+    /// Ticket #56: the coastal slots it has left, once the sea has had its thresholds. Ticket #276
+    /// (version 0.08.5): plus every inland slot the sea has turned coastal since.
     pub fn coastal_slots(&self, s: StateId) -> u32 {
-        self.coastal_slots_start(s).saturating_sub(self.state(s).lost_slots)
+        (self.coastal_slots_start(s) + self.state(s).converted).saturating_sub(self.state(s).lost_slots)
     }
 
-    /// Ticket #56: its inland slots, which the sea never touches and a raise always adds to.
+    /// Ticket #56: its inland slots, which a raise always adds to. Ticket #276 (version 0.08.5): the
+    /// sea reaches them too, one turned coastal at every rise, so the row shrinks as the game warms.
     pub fn inland_slots(&self, s: StateId) -> u32 {
         let raised = self.state(s).industry_level.saturating_sub(self.tables.state(s).industry_level);
-        self.start_slots(s) - self.coastal_slots_start(s) + raised
+        (self.start_slots(s) - self.coastal_slots_start(s) + raised).saturating_sub(self.state(s).converted)
     }
 
     /// Ticket #56: coastal slots with something standing or building in them.

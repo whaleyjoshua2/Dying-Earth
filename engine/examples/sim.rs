@@ -85,6 +85,7 @@ fn main() {
     let (mut sea_walls_built, mut sea_walls_spent) = (0u32, 0u32);
     let mut coastal_lost: Vec<u32> = Vec::new();
     let mut drowned: Vec<u32> = Vec::new();
+    let mut converted: Vec<u32> = Vec::new();
     let mut ice_turns: Vec<u32> = Vec::new();
     let mut antarctic_colonies = 0u32;
     // Ticket #57: the first Colony in the Mars system, the Colonists off Earth at the end, and the
@@ -149,6 +150,7 @@ fn main() {
         sea_walls_spent += r.sea_walls_spent;
         coastal_lost.push(r.coastal_slots_lost);
         drowned.push(r.facilities_drowned);
+        converted.push(r.slots_converted);
         if let Some(t) = r.antarctica_turn {
             ice_turns.push(t);
         }
@@ -289,6 +291,7 @@ fn main() {
         );
         println!("{:>12}         : {}", "median coastal slots lost a game", median(&mut coastal_lost));
         println!("{:>12}         : {}", "median Facilities destroyed by the sea", median(&mut drowned));
+        println!("{:>12}         : {}", "median inland slots turned coastal", median(&mut converted));
         println!(
             "{:>12}         : median {} ({} of {} seeds opened it)",
             "turn Antarctica opened",
