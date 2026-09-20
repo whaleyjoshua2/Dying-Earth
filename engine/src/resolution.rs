@@ -1184,12 +1184,8 @@ impl Game {
                 }
             }
             (_, BuildItem::Unit(UnitKind::Army)) => {
-                let id = ArmyId(self.fresh_id());
-                let home = match place {
-                    Place::State(s) => ArmyHome::State(s),
-                    Place::Colony(c) => ArmyHome::Colony(c),
-                };
-                self.armies.push(Army { id, home, at: ArmyAt::Place(place), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+                // Ticket #270 (version 0.08.4): raised through the one door, and named there.
+                self.raise_army(place, false);
             }
             (_, BuildItem::Unit(kind)) => {
                 let body = match place {

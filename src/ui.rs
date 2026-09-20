@@ -3255,7 +3255,8 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
         };
         // Ticket #115: the heading already says "Armies", so every row repeating the word was pure
         // width, and "damage 0" is true of almost every Army almost always.
-        let mut text = format!("{}{}: strength {}", tag("Army"), where_, game.army_strength(a));
+        // Ticket #270 (version 0.08.4): the Army's own name leads the row.
+        let mut text = format!("{}{}, at {}: strength {}", tag("Army"), game.army_name(a), where_, game.army_strength(a));
         if a.damage > 0 {
             text.push_str(&format!(", damage {}", a.damage));
         }
@@ -4612,7 +4613,8 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             Some(s) => game.seat_name(s),
             None => "neutral".to_string(),
         };
-        ui.label(format!("  {} {} strength {}, damage {}/{}", who, if a.standing { "Standing Army" } else { "Army" }, game.army_strength(a), a.damage, game.tables.unit(UnitKind::Army).hit_points));
+        // Ticket #270 (version 0.08.4): named, the Standing Army included.
+        ui.label(format!("  {} ({}{}): strength {}, damage {}/{}", game.army_name(a), who, if a.standing { ", standing" } else { "" }, game.army_strength(a), a.damage, game.tables.unit(UnitKind::Army).hit_points));
     }
     ui.separator();
     if mine {
@@ -4779,7 +4781,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             ui.label(RichText::new("Army orders").strong());
             stance_row(ui, game, &session.pending, my_armies[0].stance, |s| Order::ArmyStance { place: Place::State(sid), stance: s }, false, actions);
             for a in &my_armies {
-                ui.label(format!("{} (strength {}):", if a.standing { "Standing Army" } else { "Army" }, game.army_strength(a)));
+                ui.label(format!("{} (strength {}{}):", game.army_name(a), game.army_strength(a), if a.standing { ", standing" } else { "" }));
                 ui.horizontal_wrapped(|ui| {
                     for n in &card.neighbours {
                         let ctrl = game.state(*n).control;
@@ -4974,7 +4976,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     let armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(cid))).collect();
     for a in &armies {
         let who = game.army_seat(a).map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".into());
-        ui.label(format!("  {} Army strength {}, damage {}", who, game.army_strength(a), a.damage));
+        ui.label(format!("  {} ({}): strength {}, damage {}", game.army_name(a), who, game.army_strength(a), a.damage));
     }
     ui.separator();
     let mine = !session.spectator && col.control.director() == Some(Seat(0));

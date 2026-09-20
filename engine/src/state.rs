@@ -199,6 +199,10 @@ pub struct NationState {
     pub queue: Vec<Build>,
     /// Ticket #56: COASTAL slots the sea has taken, for good. The sea takes nothing else.
     pub lost_slots: u32,
+    /// Ticket #270 (version 0.08.4): how many Armies have ever been raised from this Region, so a
+    /// re-raised Standing Army takes the next number and no name is given twice.
+    #[serde(default)]
+    pub armies_raised: u32,
     /// Ticket #56: what stood in those slots when the sea took them, oldest first, so the state
     /// card can say what a lost slot cost.
     pub drowned: Vec<FacilityKind>,
@@ -453,6 +457,12 @@ pub enum ArmyAt {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Army {
     pub id: ArmyId,
+    /// Ticket #270 (version 0.08.4): its name, given when it is raised -- an ordinal from its home,
+    /// "the 2nd Chinese Army", "the Tycho Garrison" -- Standing Armies included, and kept through
+    /// every change of hands, since an Army is its Region's. Empty on a save from before this
+    /// version, when the old form is read instead.
+    #[serde(default)]
+    pub name: String,
     pub home: ArmyHome,
     pub at: ArmyAt,
     pub damage: u32,
@@ -1149,6 +1159,7 @@ impl Game {
                 },
                 queue: Vec::new(),
                 lost_slots: 0,
+                armies_raised: 0,
                 drowned: Vec::new(),
                 thresholds_fired: vec![false; tables.climate.sea_level_thresholds.len()],
                 wildfire_emissions_next: 0.0,
@@ -1987,18 +1998,57 @@ impl Game {
         base + self.tech_addition(s.seat, TechId::HardenedHulls)
     }
 
-    pub fn spawn_standing_army(&mut self, s: StateId) {
+    /// Ticket #270 (version 0.08.4): every Army is raised here, named as it is raised.
+    pub fn raise_army(&mut self, place: Place, standing: bool) -> ArmyId {
         let id = ArmyId(self.fresh_id());
-        self.armies.push(Army {
-            id,
-            home: ArmyHome::State(s),
-            at: ArmyAt::Place(Place::State(s)),
-            damage: 0,
-            standing: true,
-            stance: Stance::Hold,
-            escaped: false,
-            move_to: None,
-        });
+        let home = match place {
+            Place::State(s) => ArmyHome::State(s),
+            Place::Colony(c) => ArmyHome::Colony(c),
+        };
+        // An ordinal among every Army ever raised from this home, so a re-raised Standing Army is
+        // the next number and no name is ever given twice: the 1st Chinese Army is the one the game
+        // began with, the 2nd the first anyone built. A Colony's is its Garrison, numbered from the
+        // second. At the designer's word: an Army is its Region's, so its name says which Region.
+        let name = match place {
+            Place::State(s) => {
+                let st = self.state_mut(s);
+                st.armies_raised += 1;
+                let nth = st.armies_raised as usize;
+                format!("the {} {} Army", Game::ordinal(nth), self.tables.state(s).demonym)
+            }
+            Place::Colony(c) => {
+                let nth = self.armies.iter().filter(|a| a.home == home).count() + 1;
+                let site = self.colony(c).map(|col| self.tables.body(col.body).slots[col.slot as usize].name.clone()).unwrap_or_else(|| "Colony".to_string());
+                if nth == 1 { format!("the {site} Garrison") } else { format!("the {} {site} Garrison", Game::ordinal(nth)) }
+            }
+        };
+        self.armies.push(Army { id, name, home, at: ArmyAt::Place(place), damage: 0, standing, stance: Stance::Hold, escaped: false, move_to: None });
+        id
+    }
+
+    /// Ticket #270: what an Army is called -- its name, or for a save from before names the old form.
+    pub fn army_name(&self, a: &Army) -> String {
+        if !a.name.is_empty() {
+            return a.name.clone();
+        }
+        if a.standing { "the Standing Army".to_string() } else { "the Army".to_string() }
+    }
+
+    /// Ticket #270: "1st", "2nd", "3rd", "4th", "11th", "21st".
+    pub fn ordinal(n: usize) -> String {
+        let suffix = match (n % 10, n % 100) {
+            (1, 11) | (2, 12) | (3, 13) => "th",
+            (1, _) => "st",
+            (2, _) => "nd",
+            (3, _) => "rd",
+            _ => "th",
+        };
+        format!("{n}{suffix}")
+    }
+
+    pub fn spawn_standing_army(&mut self, s: StateId) {
+        // Ticket #270 (version 0.08.4): raised through the one door, and named there.
+        self.raise_army(Place::State(s), true);
     }
 
     pub fn take_control(&mut self, s: StateId, seat: Seat) {

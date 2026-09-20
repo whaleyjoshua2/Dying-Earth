@@ -684,7 +684,7 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
 fn only_a_carrier_carries_an_army_and_a_colony_ship_carries_only_colonists() {
     let mut g = game();
     let army = ArmyId(g.fresh_id());
-    g.armies.push(Army { id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
     let ship = |id: u32, kind: UnitKind| Ship { name: String::new(), id: ShipId(id), kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None };
     g.ships.extend([ship(101, UnitKind::ColonyShip), ship(102, UnitKind::Battleship), ship(103, UnitKind::Carrier)]);
     let load_army = |s: u32| Order::Load { ship: ShipId(s), colonists: 0, from: LoadSource::State(StateId::EastAsia), army: Some(army) };
@@ -816,7 +816,7 @@ fn embassies_and_relays_add_to_the_allotment_and_raise_their_places_standing_eac
 
 fn occupier_in(g: &mut Game, seat_home: StateId, target: StateId) -> ArmyId {
     let id = ArmyId(g.fresh_id());
-    g.armies.push(Army { id, home: ArmyHome::State(seat_home), at: ArmyAt::Place(Place::State(target)), damage: 0, standing: false, stance: Stance::Attack, escaped: false, move_to: None });
+    g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(seat_home), at: ArmyAt::Place(Place::State(target)), damage: 0, standing: false, stance: Stance::Attack, escaped: false, move_to: None });
     id
 }
 
@@ -1398,14 +1398,14 @@ fn colony_attack_turns(seed: u64) -> Option<u32> {
     // The AI Prospectors hold a Colony on the Moon with a Barracks and its Army.
     let cid = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Barracks], 4);
     let defender = ArmyId(g.fresh_id());
-    g.armies.push(Army { id: defender, home: ArmyHome::Colony(cid), at: ArmyAt::Place(Place::Colony(cid)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+    g.armies.push(Army { name: String::new(), id: defender, home: ArmyHome::Colony(cid), at: ArmyAt::Place(Place::Colony(cid)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
     // The player's two Carriers arrive at the Moon, each carrying an Army: strength 8 against 4.
     let mut attackers = Vec::new();
     let mut ships = Vec::new();
     for kind in [UnitKind::Carrier, UnitKind::Carrier] {
         let attacker = ArmyId(g.fresh_id());
         let ship = ShipId(g.fresh_id());
-        g.armies.push(Army { id: attacker, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+        g.armies.push(Army { name: String::new(), id: attacker, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
         g.ships.push(Ship { name: String::new(), id: ship, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, colonists_education: 1.0, army: Some(attacker), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
         attackers.push(attacker);
         ships.push(ship);
@@ -2644,7 +2644,7 @@ fn e_four_stops_replenishment_seven_halves_output_ten_throws_the_controller_off(
     g.seats[1].influence.insert(Place::State(StateId::NorthAfrica), 17);
     g.state_mut(StateId::NorthAfrica).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(0), coastal: false, due_turn: 99 });
     let id = ArmyId(g.fresh_id());
-    g.armies.push(Army { id, home: ArmyHome::State(StateId::Europe), at: ArmyAt::Place(Place::State(StateId::NorthAfrica)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+    g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(StateId::Europe), at: ArmyAt::Place(Place::State(StateId::NorthAfrica)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
     g.raise_unrest(StateId::NorthAfrica, 10.0, UnrestSource::Plain);
     assert_eq!(g.unrest(StateId::NorthAfrica), 10.0);
     // Ticket #53: the falls run first, so a state at 10 that did not change hands is pulled back
@@ -7319,6 +7319,7 @@ fn an_army_keeps_its_stance_through_resolution_until_something_happens_to_it() {
     let mut g = game();
     let id = ArmyId(g.fresh_id());
     g.armies.push(Army {
+        name: String::new(),
         id,
         home: ArmyHome::State(StateId::EastAsia),
         at: ArmyAt::Place(Place::State(StateId::EastAsia)),
@@ -9036,6 +9037,48 @@ fn the_arkwrights_signature_rule_is_coach_class_and_says_steerage_nowhere() {
             assert!(!text.to_lowercase().contains("steerage"), "{kind:?} still says Steerage: {text}");
         }
     }
+}
+
+// -------------------------------------------- 0.08.4 ticket #270: names for Armies
+
+/// Ticket #270 (version 0.08.4): an Army is named from its home as it is raised -- an ordinal and
+/// the Region's demonym, Standing Armies included, a Colony's a Garrison -- and keeps the name
+/// through a change of hands.
+#[test]
+fn an_army_is_named_from_its_home_as_it_is_raised() {
+    let mut g = game();
+    assert_eq!(Game::ordinal(1), "1st");
+    assert_eq!(Game::ordinal(2), "2nd");
+    assert_eq!(Game::ordinal(3), "3rd");
+    assert_eq!(Game::ordinal(4), "4th");
+    assert_eq!(Game::ordinal(11), "11th");
+    assert_eq!(Game::ordinal(12), "12th");
+    assert_eq!(Game::ordinal(13), "13th");
+    assert_eq!(Game::ordinal(21), "21st");
+    assert_eq!(Game::ordinal(112), "112th");
+    assert_eq!(g.tables.state(StateId::EastAsia).demonym, "Chinese");
+    let standing = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(StateId::EastAsia)).expect("China's Standing Army");
+    assert_eq!(g.army_name(standing), "the 1st Chinese Army", "the Standing Army is the first raised");
+    let raised = g.raise_army(Place::State(StateId::EastAsia), false);
+    let a = g.armies.iter().find(|a| a.id == raised).unwrap();
+    assert_eq!(g.army_name(a), "the 2nd Chinese Army");
+    let third = g.raise_army(Place::State(StateId::EastAsia), false);
+    assert_eq!(g.army_name(g.armies.iter().find(|a| a.id == third).unwrap()), "the 3rd Chinese Army");
+    // The name is the Army's, not the holder's: it survives the Region changing hands.
+    g.take_control(StateId::EastAsia, Seat(2));
+    assert_eq!(g.army_name(g.armies.iter().find(|a| a.id == raised).unwrap()), "the 2nd Chinese Army");
+    // A Colony's is a Garrison, numbered from the second.
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Barracks], 4);
+    let g1 = g.raise_army(Place::Colony(c), false);
+    let g2 = g.raise_army(Place::Colony(c), false);
+    let place = g.tables.body(BodyId::Moon).slots[g.colony(c).unwrap().slot as usize].name.clone();
+    assert_eq!(g.army_name(g.armies.iter().find(|a| a.id == g1).unwrap()), format!("the {place} Garrison"));
+    assert_eq!(g.army_name(g.armies.iter().find(|a| a.id == g2).unwrap()), format!("the 2nd {place} Garrison"));
+    // A save from before names reads the old form.
+    let mut old = g.armies[0].clone();
+    old.name.clear();
+    old.standing = true;
+    assert_eq!(g.army_name(&old), "the Standing Army");
 }
 
 // -------------------------------------------- 0.08.4 ticket #269: Agitate

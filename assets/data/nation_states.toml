@@ -76,8 +76,10 @@ stops_at_temperature = 2.5
 
 # Sub-Saharan Africa: the continent below the Sahara, about 1.2 billion people, little industry,
 # the youngest population on the map and the least schooling.
+# Ticket #270 (version 0.08.4): `demonym` names the Region's Armies -- the 1st Chinese Army, the 2nd.
 [[state]]
 id = "sub_saharan_africa"
+demonym = "Nigerian"
 name = "Nigeria"
 flag = "ng"
 colour = [0.90, 0.71, 0.24]
@@ -98,6 +100,7 @@ unrest = 0.0
 # the Mediterranean, the Nile delta exposed to the sea.
 [[state]]
 id = "north_africa"
+demonym = "Egyptian"
 name = "Egypt"
 flag = "eg"
 colour = [0.94, 0.71, 0.78]
@@ -121,6 +124,7 @@ unrest = 0.0
 # 14.4 + 2.0, 17 + 6 and 3 + 1.
 [[state]]
 id = "east_asia"
+demonym = "Chinese"
 name = "China"
 flag = "cn"
 colour = [0.71, 0.24, 0.16]
@@ -141,6 +145,7 @@ unrest = 0.0
 # state on the map, the least schooling outside Africa, and deltas the sea will take first.
 [[state]]
 id = "south_asia"
+demonym = "Indian"
 name = "India"
 flag = "in"
 colour = [0.47, 0.86, 0.47]
@@ -161,6 +166,7 @@ unrest = 0.0
 # and gas offshore, and more coastline than anywhere.
 [[state]]
 id = "south_east_asia"
+demonym = "Indonesian"
 name = "Indonesia"
 flag = "id"
 colour = [0.71, 0.47, 0.94]
@@ -181,6 +187,7 @@ unrest = 0.0
 
 [[state]]
 id = "australia"
+demonym = "Australian"
 name = "Australia"
 flag = "au"
 colour = [0.78, 0.67, 0.94]
@@ -199,6 +206,7 @@ unrest = 0.0
 
 [[state]]
 id = "europe"
+demonym = "European"
 name = "The European Union"
 flag = "eu"
 colour = [0.27, 0.51, 0.86]
@@ -218,6 +226,7 @@ unrest = 0.0
 # North America: the United States and Canada, about 375 million people.
 [[state]]
 id = "north_america"
+demonym = "American"
 name = "The United States"
 flag = "us"
 colour = [0.31, 0.75, 0.35]
@@ -240,6 +249,7 @@ unrest = 0.0
 # people. Small, poor beside its northern neighbour, and all coast.
 [[state]]
 id = "central_america"
+demonym = "Mexican"
 name = "Mexico"
 flag = "mx"
 colour = [0.98, 0.86, 0.47]
@@ -258,6 +268,7 @@ unrest = 0.0
 
 [[state]]
 id = "south_america"
+demonym = "Brazilian"
 name = "Brazil"
 flag = "br"
 colour = [0.94, 0.59, 0.51]
@@ -278,6 +289,7 @@ unrest = 0.0
 # per unit of industry, well schooled, vast and mostly landlocked in the game's sense.
 [[state]]
 id = "russia"
+demonym = "Russian"
 name = "Russia"
 flag = "ru"
 colour = [0.78, 0.78, 0.35]
@@ -301,6 +313,7 @@ unrest = 0.0
 # with the peninsula.
 [[state]]
 id = "middle_east"
+demonym = "Iranian"
 name = "Iran"
 flag = "ir"
 colour = [0.92, 0.88, 0.71]
@@ -327,6 +340,7 @@ unrest = 0.0
 # and no start Lab, since ticket #69 gave those to North America and South-East Asia alone.
 [[state]]
 id = "japan"
+demonym = "Japanese"
 name = "Japan"
 flag = "jp"
 colour = [0.39, 0.71, 0.94]
@@ -353,6 +367,7 @@ unrest = 0.0
 # Africa across the strait to the Horn, which is the adjacency the Middle East used to hold.
 [[state]]
 id = "arabian_peninsula"
+demonym = "Saudi"
 name = "Saudi Arabia"
 flag = "sa"
 colour = [0.59, 0.43, 1.00]

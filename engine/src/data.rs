@@ -77,6 +77,8 @@ impl BodyCard {
 pub struct StateCard {
     pub id: StateId,
     pub name: String,
+    /// Ticket #270 (version 0.08.4): the adjective its Armies are named by -- "the 2nd Chinese Army".
+    pub demonym: String,
     /// Version 0.07.2 (ticket #122): the two-letter code of the Nation's flag, a file in
     /// `assets/flags/`. Empty where a Region has none, and the card then draws no flag.
     #[serde(default)]
