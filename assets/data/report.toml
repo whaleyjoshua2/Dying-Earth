@@ -96,10 +96,29 @@ game_over_collapse = "Game over on turn {turn}: Collapse at {temperature} C. Nob
 
 # The climate
 event_drawn = "{text}"
+# Ticket #259 (version 0.08.4): the turn the off-Earth cards are shuffled into the deck.
+deck_joined = "The {n} Events that can only land off Earth join the deck: Grid Failure, Reactor Leak, Dust Storm, Moonquake, Helium-3 Vein, Rich Seam and Ice Deposit."
+# Ticket #261 (version 0.08.4): the rival's Moment, two steps. {part} is the part still short.
+rival_three_quarters = "The {faction} are three quarters of the way to their Victory Condition: {part} at {value} of {bar}."
+rival_one_part_met = "The {faction} have met half of their Victory Condition, {met}. Only {part} stands between them and the game, at {value} of {bar}."
+# Ticket #267 (version 0.08.4): a Smear campaign, named for who paid.
+smear = "The {faction} smeared the {target}: {ppm} ppm laid on their Blame."
+# Ticket #268 (version 0.08.4): carbon credits.
+credits_offered = "The {faction} offer {n} ppm of carbon credit a turn."
+credits_bought = "The {faction} bought {n} ppm of carbon credit from the {seller} for {ducats} Ducats: off their Blame, for good."
+credits_short = "The {faction} wanted {n} ppm of carbon credit more than was left on offer; {back} Ducats came back."
+# Ticket #269 (version 0.08.4): Agitate, named for who paid.
+agitate = "The {faction} agitated in {state}: Unrest rose by {rose} to {unrest}."
+agitate_damped = "The {faction} agitated in {state}, and the Constabulary there held it to nothing."
 break_fired = "Break at {temperature} C - {name}. {happened} {text}"
 break_coastal = "{states}: every state at Coastal Exposure {exposure} lost {percent}% of its people and took {unrest} Unrest."
 break_baseline = "{state}: its Baseline Emissions rise by {rise} for good."
-sea_wall = "The Sea Wall in {state} took the sea at {temperature} C and was destroyed; no coastal slot was lost."
+# Ticket #257 (version 0.08.4): the wall stands, and each rise it holds makes it dearer to keep.
+# The designer's line: "The Sea Wall in China took the sea, rising sea levels have increased the
+# cost to maintain this Sea Wall".
+sea_wall = "The Sea Wall in {state} took the sea at {temperature} C; the risen water makes it dearer to keep, {keep} Materials a turn now."
+storm_surge_wall = "Storm Surge in {state}: the Sea Wall held. Its coastal Facilities make {percent}% less at the next Income."
+sea_wall_unkept = "Materials ran short: the Sea Wall in {states} stands unkept this turn and holds nothing."
 sea_nothing_left = "Sea level at {temperature} C: {state} has no coastal slots left to lose."
 sea_took = "The sea took {n} coastal {slots} from {state} at {temperature} C."
 sea_took_destroying = "The sea took {n} coastal {slots} from {state} at {temperature} C: {destroyed}."
@@ -165,7 +184,9 @@ build_emigrants = "recruited {n} Pioneers in {state}"
 send_antarctica = "sent {n} Pioneers from {state} to Antarctica by sea"
 lift_station = "lifted {n} Pioneers from {state} to {station}"
 set_venture_share = "set the Venture Capital Fund to bank {share}% of its Materials output"
-draw_venture = "drew {n} Materials from the Venture Capital Fund"
+# Ticket #256 (version 0.08.4): "withdrew", and DUCATS -- this line still said Materials a version
+# after ticket #240 moved the Fund, which nobody saw because no sweep reads the Report.
+draw_venture = "withdrew {n} Ducats from the Venture Capital Fund"
 repair = "repaired {unit}"
 transit = "sent a {unit} to {body}"
 # Ticket #87 (version 0.06.0): the Refuel order.
@@ -181,6 +202,10 @@ buy_influence = "bought {n} Influence"
 buy = "bought {n} {resource}"
 sell = "sold {n} {resource}"
 relief = "paid Relief in {state}"
+smear = "spent {n} Influence smearing the {faction}"
+offer_credits = "offered {n} ppm of carbon credit a turn"
+buy_credits = "bought {n} ppm of carbon credit"
+agitate = "agitated in {state}"
 resettle = "resettled its refugees in {state}"
 mothball = "mothballed the {building} at {place}"
 restart = "restarted the {building} at {place}"
@@ -212,6 +237,13 @@ figure = "{figure}"
 [moments.decisive_battle]
 on = true
 text = "A Battle at {place}: {result}"
+figure = "{figure}"
+
+# Ticket #261 (version 0.08.4): a rival closing on its Victory Condition -- three quarters of the
+# way, or one part met with the other short -- once a step, rivals only, in the rival's colour.
+[moments.rival_progress]
+on = true
+text = "{text}"
 figure = "{figure}"
 
 # Ticket #86 (version 0.06.0): Colonists lost to crowding on a Colony Ship's arrival.

@@ -56,6 +56,9 @@ pub enum UnrestSource {
     Refugees,
     /// Occupation, a mothball, a decommission, the Unrest card: nothing damps these.
     Plain,
+    /// Ticket #269 (version 0.08.4): a rival's Agitate. A working Constabulary damps it by half, as
+    /// the police would; the green Techs, which moderate the climate's rises, do not.
+    Agitate,
 }
 
 /// Ticket #54 (version 0.05): what a Mothball, Restart or Decommission order does to a building.
@@ -114,11 +117,16 @@ pub struct Facility {
     /// Ticket #56: whether this Facility stands in one of its state's coastal slots. The sea takes
     /// coastal slots only, so a coastal Facility is the one it can destroy.
     pub coastal: bool,
+    /// Ticket #257 (version 0.08.4): a Sea Wall's count of the Sea Level thresholds it has held
+    /// back. The wall is not destroyed absorbing one any more; each rise it holds adds
+    /// `sea_wall_upkeep_per_rise` Materials a turn to its keep. Zero on every other kind.
+    #[serde(default)]
+    pub rises_held: u32,
 }
 
 impl Facility {
     pub fn new(kind: FacilityKind) -> Facility {
-        Facility { kind, online: true, offline_until_resolution: false, self_run: false, mothballed: false, change: None, coastal: false }
+        Facility { kind, online: true, offline_until_resolution: false, self_run: false, mothballed: false, change: None, coastal: false, rises_held: 0 }
     }
     /// Ticket #56: a Facility standing in a coastal slot.
     pub fn in_coastal_slot(kind: FacilityKind) -> Facility {
@@ -191,6 +199,10 @@ pub struct NationState {
     pub queue: Vec<Build>,
     /// Ticket #56: COASTAL slots the sea has taken, for good. The sea takes nothing else.
     pub lost_slots: u32,
+    /// Ticket #270 (version 0.08.4): how many Armies have ever been raised from this Region, so a
+    /// re-raised Standing Army takes the next number and no name is given twice.
+    #[serde(default)]
+    pub armies_raised: u32,
     /// Ticket #56: what stood in those slots when the sea took them, oldest first, so the state
     /// card can say what a lost slot cost.
     pub drowned: Vec<FacilityKind>,
@@ -201,6 +213,10 @@ pub struct NationState {
     /// Ticket #76 (version 0.05.5): a Drought landed here: its Facilities make half at the next Income.
     #[serde(default)]
     pub drought: bool,
+    /// Ticket #257 (version 0.08.4): a Storm Surge broke on this state's Sea Wall: the wall held, and
+    /// the Facilities in its coastal slots make less at the next Income.
+    #[serde(default)]
+    pub storm_surge: bool,
     /// Ticket #73 (version 0.05.5): Emigrants waiting here, mustered and not yet lifted or sent.
     /// They are people of this state until they leave it: a new holder gets them.
     #[serde(default)]
@@ -377,6 +393,14 @@ pub struct Colony {
     pub in_orbit: bool,
 }
 
+/// Ticket #263 (version 0.08.4): a seat's builds begun and Ships in transit, soonest first --
+/// `(what, where, turns until it lands)` and `(name, from, to, turns left)`.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct UnderWay {
+    pub builds: Vec<(String, Place, u32)>,
+    pub transits: Vec<(String, String, String, u32)>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ShipAt {
     Body(BodyId),
@@ -433,6 +457,12 @@ pub enum ArmyAt {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Army {
     pub id: ArmyId,
+    /// Ticket #270 (version 0.08.4): its name, given when it is raised -- an ordinal from its home,
+    /// "the 2nd Chinese Army", "the Tycho Garrison" -- Standing Armies included, and kept through
+    /// every change of hands, since an Army is its Region's. Empty on a save from before this
+    /// version, when the old form is read instead.
+    #[serde(default)]
+    pub name: String,
     pub home: ArmyHome,
     pub at: ArmyAt,
     pub damage: u32,
@@ -501,6 +531,23 @@ pub struct EmissionsRecord {
     pub earth_population: f64,
     #[serde(default)]
     pub space_population: u32,
+}
+
+/// Ticket #264 (version 0.08.4): one Faction's standing at the end of one Climate phase -- how far
+/// along its Victory Condition it is (the score, the lower of its two parts' fractions) and its
+/// share of the table's Blame -- with the three things the chart ticks on its axis: Antarctica
+/// open (the world's), the Faction's gate Tech done, the Archive complete. One record per seat per
+/// Climate phase, written beside the Emissions record so the two charts share an axis, saved with
+/// the game; a save from before this version loads with an empty history and the chart grows from
+/// there. The first per-Faction history the game keeps.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct VictoryRecord {
+    pub turn: u32,
+    pub score: f64,
+    pub blame_share: f64,
+    pub gate_done: bool,
+    pub archive_complete: bool,
+    pub antarctica_open: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -603,6 +650,11 @@ pub enum Card {
 pub struct Deck {
     pub cards: Vec<Card>,
     pub drawn: Vec<Card>,
+    /// Ticket #259 (version 0.08.4): whether the off-Earth cards have been shuffled in yet. A save
+    /// from before this version loads with them never joined -- and never dealt, so a game already
+    /// past the joining turn gets them on its next Event phase.
+    #[serde(default)]
+    pub off_earth_joined: bool,
 }
 
 impl Deck {
@@ -673,6 +725,43 @@ pub struct SeatState {
     pub venture_share: f64,
     #[serde(default)]
     pub venture_banked_last_turn: i64,
+    /// Ticket #257 (version 0.08.4): Materials the seat's Sea Walls are owed in keep and have not yet
+    /// paid. Half a Material a turn per rise held is not a whole number, so the fraction is carried
+    /// here and the whole Materials are paid as they accrue; nothing is lost to rounding.
+    #[serde(default)]
+    pub sea_wall_upkeep_owed: f64,
+    /// Ticket #261 (version 0.08.4): which steps of the rival's Moment this seat has fired -- three
+    /// quarters of the way, and one part met. Once each, so a seat that dips and recrosses is not
+    /// announced twice.
+    #[serde(default)]
+    pub rival_steps_announced: [bool; 2],
+    /// Ticket #264 (version 0.08.4): this seat's Victory history, one record per Climate phase.
+    #[serde(default)]
+    pub victory_history: Vec<VictoryRecord>,
+    /// Ticket #265 (version 0.08.4): the ppm a turn this seat's Research Directive has added to the
+    /// Natural Sink, for good, over the whole game -- the Custodians' alone. Counted as removal at
+    /// every Climate phase, at the designer's word ("credit"), since that enlargement takes that
+    /// much CO2 out of the air every turn it stands.
+    #[serde(default)]
+    pub directive_sink: f64,
+    /// Ticket #267 (version 0.08.4): ppm laid on this seat's Blame ledger by rivals' Smear
+    /// campaigns, for good. Counted in `blame` and shown as its own figure, so the panel never
+    /// says the seat put it in the air.
+    #[serde(default)]
+    pub blame_smeared: f64,
+    /// Ticket #268 (version 0.08.4): ppm of carbon credit this seat has bought over the game, which
+    /// comes off its Blame ledger; ppm it has sold, which comes off its credit and, past what it
+    /// held, goes onto its ledger as Blame taken; and the ppm it offers a turn, standing until
+    /// changed -- the Custodians' alone.
+    #[serde(default)]
+    pub credits_bought: f64,
+    #[serde(default)]
+    pub credits_sold: f64,
+    #[serde(default)]
+    pub credits_offered: i64,
+    /// Ticket #272 (version 0.08.4): Agitates this seat has landed over the game, for the sweep.
+    #[serde(default)]
+    pub agitates_issued: u32,
     /// Ticket #227 (version 0.08.2): units this seat has bought and sold through the Trading window
     /// over the whole game. Kept because floating prices are only fair if more than one hand is on
     /// them, and the sweep had no way to say whose were.
@@ -942,6 +1031,8 @@ pub struct Game {
     pub climate: Climate,
     pub research: Research,
     pub deck: Deck,
+    /// Ticket #272 (version 0.08.4): cards drawn with nowhere to land over the game, for the sweep.
+    pub events_no_target: u32,
     pub discoveries: Vec<Discovery>,
     /// Ticket #73: Emigrants on the sea to Antarctica.
     pub antarctic_sends: Vec<AntarcticSend>,
@@ -998,6 +1089,15 @@ impl Game {
             venture_fund: 0,
             venture_share: 0.0,
             venture_banked_last_turn: 0,
+            sea_wall_upkeep_owed: 0.0,
+            rival_steps_announced: [false; 2],
+            victory_history: Vec::new(),
+            directive_sink: 0.0,
+            blame_smeared: 0.0,
+            credits_bought: 0.0,
+            credits_sold: 0.0,
+            credits_offered: 0,
+            agitates_issued: 0,
             bought_units: 0,
             sold_units: 0,
             spaceport_influence: 0,
@@ -1065,10 +1165,12 @@ impl Game {
                 },
                 queue: Vec::new(),
                 lost_slots: 0,
+                armies_raised: 0,
                 drowned: Vec::new(),
                 thresholds_fired: vec![false; tables.climate.sea_level_thresholds.len()],
                 wildfire_emissions_next: 0.0,
                 drought: false,
+                storm_surge: false,
                 emigrants: 0,
                 unrest: c.unrest,
                 changed_hands: false,
@@ -1139,6 +1241,7 @@ impl Game {
                 findings_tech: None,
             },
             deck,
+            events_no_target: 0,
             discoveries: Vec::new(),
             antarctic_sends: Vec::new(),
             solar_maximum_next: false,
@@ -1902,18 +2005,57 @@ impl Game {
         base + self.tech_addition(s.seat, TechId::HardenedHulls)
     }
 
-    pub fn spawn_standing_army(&mut self, s: StateId) {
+    /// Ticket #270 (version 0.08.4): every Army is raised here, named as it is raised.
+    pub fn raise_army(&mut self, place: Place, standing: bool) -> ArmyId {
         let id = ArmyId(self.fresh_id());
-        self.armies.push(Army {
-            id,
-            home: ArmyHome::State(s),
-            at: ArmyAt::Place(Place::State(s)),
-            damage: 0,
-            standing: true,
-            stance: Stance::Hold,
-            escaped: false,
-            move_to: None,
-        });
+        let home = match place {
+            Place::State(s) => ArmyHome::State(s),
+            Place::Colony(c) => ArmyHome::Colony(c),
+        };
+        // An ordinal among every Army ever raised from this home, so a re-raised Standing Army is
+        // the next number and no name is ever given twice: the 1st Chinese Army is the one the game
+        // began with, the 2nd the first anyone built. A Colony's is its Garrison, numbered from the
+        // second. At the designer's word: an Army is its Region's, so its name says which Region.
+        let name = match place {
+            Place::State(s) => {
+                let st = self.state_mut(s);
+                st.armies_raised += 1;
+                let nth = st.armies_raised as usize;
+                format!("the {} {} Army", Game::ordinal(nth), self.tables.state(s).demonym)
+            }
+            Place::Colony(c) => {
+                let nth = self.armies.iter().filter(|a| a.home == home).count() + 1;
+                let site = self.colony(c).map(|col| self.tables.body(col.body).slots[col.slot as usize].name.clone()).unwrap_or_else(|| "Colony".to_string());
+                if nth == 1 { format!("the {site} Garrison") } else { format!("the {} {site} Garrison", Game::ordinal(nth)) }
+            }
+        };
+        self.armies.push(Army { id, name, home, at: ArmyAt::Place(place), damage: 0, standing, stance: Stance::Hold, escaped: false, move_to: None });
+        id
+    }
+
+    /// Ticket #270: what an Army is called -- its name, or for a save from before names the old form.
+    pub fn army_name(&self, a: &Army) -> String {
+        if !a.name.is_empty() {
+            return a.name.clone();
+        }
+        if a.standing { "the Standing Army".to_string() } else { "the Army".to_string() }
+    }
+
+    /// Ticket #270: "1st", "2nd", "3rd", "4th", "11th", "21st".
+    pub fn ordinal(n: usize) -> String {
+        let suffix = match (n % 10, n % 100) {
+            (1, 11) | (2, 12) | (3, 13) => "th",
+            (1, _) => "st",
+            (2, _) => "nd",
+            (3, _) => "rd",
+            _ => "th",
+        };
+        format!("{n}{suffix}")
+    }
+
+    pub fn spawn_standing_army(&mut self, s: StateId) {
+        // Ticket #270 (version 0.08.4): raised through the one door, and named there.
+        self.raise_army(Place::State(s), true);
     }
 
     pub fn take_control(&mut self, s: StateId, seat: Seat) {
@@ -2305,6 +2447,60 @@ impl Game {
         t.challenge_margin + relations + if guarded { garrison } else { 0 }
     }
 
+    /// Ticket #263 (version 0.08.4): what a seat has under way -- every build it has begun, with
+    /// the turns until it lands, and every Ship of its in transit, with its name, its road and the
+    /// turns left. The Faction window's Under way block reads this; the Report or the AI could.
+    /// Builds are counted by the seat that ORDERED them (`Build.seat`), so a build begun in a Region
+    /// that has since changed hands stays with whoever paid for it.
+    pub fn under_way(&self, seat: Seat) -> UnderWay {
+        let mut builds: Vec<(String, Place, u32)> = Vec::new();
+        for sid in StateId::ALL {
+            for b in self.state(sid).queue.iter().filter(|b| b.seat == seat) {
+                builds.push((b.item.name(), Place::State(sid), b.due_turn.saturating_sub(self.turn) + 1));
+            }
+        }
+        for c in &self.colonies {
+            for b in c.queue.iter().filter(|b| b.seat == seat) {
+                builds.push((b.item.name(), Place::Colony(c.id), b.due_turn.saturating_sub(self.turn) + 1));
+            }
+        }
+        let mut transits: Vec<(String, String, String, u32)> = Vec::new();
+        for s in self.ships.iter().filter(|s| s.seat == seat) {
+            if let ShipAt::Transit { from, to, turns_left } = s.at {
+                transits.push((self.ship_name(s), self.tables.body(from).name.clone(), self.tables.body(to).name.clone(), turns_left));
+            }
+        }
+        // Soonest first, at the designer's word; the name breaks a tie so the order is stable.
+        builds.sort_by(|a, b| a.2.cmp(&b.2).then_with(|| a.0.cmp(&b.0)));
+        transits.sort_by(|a, b| a.3.cmp(&b.3).then_with(|| a.0.cmp(&b.0)));
+        UnderWay { builds, transits }
+    }
+
+    /// Ticket #262 (version 0.08.4): the rival nearest to taking a held place -- its seat, its
+    /// Standing there, and the price it must reach (`influence_needed_for`, its own threshold with
+    /// Blame inside it, or the holder's Standing plus the margin for that pair). None on a place
+    /// nobody holds, or where no rival has a Standing.
+    pub fn nearest_challenger(&self, place: Place) -> Option<(Seat, i64, i64)> {
+        let holder = self.place_control(place).controller()?;
+        Seat::ALL
+            .into_iter()
+            .filter(|s| *s != holder)
+            .filter_map(|s| {
+                let standing = self.seat(s).influence.get(&place).copied().unwrap_or(0);
+                (standing > 0).then(|| (s, standing, self.influence_needed_for(s, place)))
+            })
+            // The nearest to its OWN price, at the designer's word -- not the highest Standing. They
+            // differ when Blame or Relations move one rival's price and not another's, and the
+            // nearer one takes the place first, which is what the line is warning of.
+            .min_by_key(|(_, standing, price)| *price - *standing)
+    }
+
+    /// Ticket #257 (version 0.08.4): does a Sea Wall stand and work in this state? The Climate
+    /// phase, the Storm Surge card and the card all ask the same question.
+    pub fn sea_wall_working(&self, sid: StateId) -> bool {
+        self.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::SeaWall && f.working())
+    }
+
     /// Ticket #53: Blame raises this seat's threshold on a Nation State it does not control, and
     /// on nothing else: never on a Colony, never on a Space Station, never on a place it holds.
     pub fn blame_threshold_multiplier_on(&self, seat: Seat, target: Target) -> f64 {
@@ -2318,14 +2514,52 @@ impl Game {
     /// controlled emitted, less what it removed, floored at zero.
     pub fn blame(&self, seat: Seat) -> f64 {
         let s = self.seat(seat);
-        (s.blame_emitted - s.blame_removed).max(0.0)
+        // Ticket #267 (version 0.08.4): the ledger, not the physics -- what rivals have laid on
+        // this seat by Smear counts, at the designer's word, so the share the rules read diverges
+        // from what the seat put in the air.
+        // Ticket #268: credits bought come off; credits sold past what was held go on.
+        let oversold = (s.credits_sold - s.blame_removed).max(0.0);
+        (s.blame_emitted - s.blame_removed + s.blame_smeared + oversold - s.credits_bought).max(0.0)
     }
 
-    /// Ticket #53: the ppm a Faction removed beyond everything it ever emitted, which is what the
-    /// panels call a credit. Zero for everyone who has emitted more than they took back.
+    /// Ticket #53 defined the credit as the ppm removed BEYOND everything ever emitted -- and
+    /// ticket #265 (version 0.08.4) measured it at zero in ten games of ten: the Custodians scrub a
+    /// third to a half of what they emit, never more than all of it. At the designer's word the
+    /// credit is now what the Faction has REMOVED, full stop -- its Scrubbers' ppm over the game,
+    /// and the Custodians' Directive into the Sink -- so the word has a figure in every game, and
+    /// a carbon credit has a supply that exists. Blame itself is unchanged: emitted less removed,
+    /// never below nothing.
     pub fn blame_credit(&self, seat: Seat) -> f64 {
+        // Ticket #268: less what has been sold as carbon credits.
         let s = self.seat(seat);
-        (s.blame_removed - s.blame_emitted).max(0.0)
+        (s.blame_removed - s.credits_sold).max(0.0)
+    }
+
+    /// Ticket #268 (version 0.08.4): the seat that sells carbon credits -- the Custodians'.
+    pub fn credit_seller(&self) -> Option<Seat> {
+        Seat::ALL.into_iter().find(|s| self.kind(*s) == FactionKind::Custodians)
+    }
+
+    /// Ticket #268: the price multiplier the seller's Relations level toward `buyer` sets, or None
+    /// where the seller refuses -- Hostile, or no seller at the table.
+    pub fn credit_price_multiplier(&self, buyer: Seat) -> Option<f64> {
+        let seller = self.credit_seller()?;
+        let c = &self.tables.carbon_credits;
+        match self.relations_level(seller, buyer) {
+            "Friendly" => Some(c.friendly),
+            "Cordial" => Some(c.cordial),
+            "Neutral" => Some(c.neutral),
+            "Wary" => Some(c.wary),
+            "Cold" => Some(c.cold),
+            _ => None,
+        }
+    }
+
+    /// Ticket #268: what `ppm` of carbon credit costs `buyer` in Ducats, at the table price times
+    /// the seller's view of them, rounded up so a lot is never free.
+    pub fn credit_cost(&self, buyer: Seat, ppm: i64) -> Option<i64> {
+        let m = self.credit_price_multiplier(buyer)?;
+        Some(((ppm * self.tables.carbon_credits.price_per_ppm) as f64 * m).ceil() as i64)
     }
 
     /// Ticket #53: the four Factions' Blame added together.
@@ -2337,6 +2571,29 @@ impl Game {
     pub fn blame_share(&self, seat: Seat) -> f64 {
         let total = self.blame_total();
         if total <= 0.0 { 0.0 } else { self.blame(seat) / total }
+    }
+
+    /// Ticket #266 (version 0.08.4): what a seat's Standing on `place` loses in a turn it received
+    /// nothing. A held place decays `decay_controlled`; a Colony or a station `decay`; a Region the
+    /// seat does not hold reads the seat's Blame share by the step rule -- `decay_slow` at or below
+    /// `decay_slow_below`, `decay_fast` at or above `decay_fast_from`, `decay` between. Ticket #53
+    /// wrote "never on Standing decay" into the Blame rule; the designer reversed that here.
+    pub fn standing_decay_for(&self, seat: Seat, place: Place) -> i64 {
+        let t = &self.tables.influence;
+        if self.place_control(place).controller() == Some(seat) {
+            return t.decay_controlled;
+        }
+        if !matches!(place, Place::State(_)) {
+            return t.decay;
+        }
+        let share = self.blame_share(seat);
+        if share <= t.blame.decay_slow_below {
+            t.blame.decay_slow
+        } else if share >= t.blame.decay_fast_from {
+            t.blame.decay_fast
+        } else {
+            t.decay
+        }
     }
 
     /// Ticket #53: 1 + (share - a fair quarter), floored at x1.0 and capped by the table.
@@ -2962,11 +3219,13 @@ impl Game {
             return 0.0;
         }
         let mut d = 0.0;
-        let done = self.green_techs_done();
-        if done >= 4 {
-            d += u.green_techs_four;
-        } else if done >= 2 {
-            d += u.green_techs_two;
+        if source != UnrestSource::Agitate {
+            let done = self.green_techs_done();
+            if done >= 4 {
+                d += u.green_techs_four;
+            } else if done >= 2 {
+                d += u.green_techs_two;
+            }
         }
         if self.constabulary_online(s) {
             d += u.constabulary_damping;
@@ -3412,7 +3671,7 @@ impl Game {
     pub fn moment(&mut self, kind: MomentKind, args: &[(&str, String)], place: Option<ReportPlace>) {
         let Some(card) = self.tables.report.moment(kind) else { return };
         let (text, figure) = (crate::report::render(&card.text, args), crate::report::render(&card.figure, args));
-        self.report.moments.push(Moment { kind, text, figure, place, tech: None, note: None });
+        self.report.moments.push(Moment { kind, text, figure, place, tech: None, note: None, seat: None });
     }
 
     /// A sentence about what one AI seat's turn came to, appended to that Faction's paragraph.

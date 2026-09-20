@@ -18,6 +18,8 @@ start_station = "ISS"
 # HOLDER, not the hull: the name is the ship's and travels with it, the prefix is whoever flies it.
 ship_prefix = "TSV"
 blurb = "Colonize the solar system while limiting ecological damage to Earth."
+# Ticket #260 (version 0.08.4): the motto, one line under the name on the card, the Faction speaking.
+motto = "Leave it better than we found it."
 output_multiplier = 1.0
 emissions_multiplier = 0.75
 research_multiplier = 1.25
@@ -51,6 +53,7 @@ start_station = "Tiangong"
 # HOLDER, not the hull: the name is the ship's and travels with it, the prefix is whoever flies it.
 ship_prefix = "PMV"
 blurb = "Maximize extraction regardless of ecological cost."
+motto = "Everything has a price. We find it."
 output_multiplier = 1.25
 emissions_multiplier = 1.25
 research_multiplier = 0.75
@@ -67,17 +70,21 @@ ducats_multiplier = 1.2
 market_multiplier = 0.85
 # Ticket #221: zero. They do not mind another Faction's Blame at all, which is a statement about them.
 resentment = 0.0
-signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit is free and may be taken once in a Region's whole life: for three turns every Facility there produces double, and when it ends that Region's Baseline Emissions rise by 0.2 for good and its Unrest by 3. The Venture Capital Fund: each turn they set what share of their Ducat income is banked in it, 0% to 80% in tenths; a draw returns nine tenths."
+signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs them 15 Materials rather than 30, every Facility and Module 15% less; their Regions pay a fifth more Ducats and the Trading window sells to them at 15% off. A Strip Permit is free and may be taken once in a Region's whole life: for three turns every Facility there produces double, and when it ends that Region's Baseline Emissions rise by 0.2 for good and its Unrest by 3. The Venture Capital Fund: each turn they set what share of their Ducat income is banked in it, 0% to 80% in whole percents; a withdrawal returns nine tenths."
 # Ticket #203 (version 0.08.1). The building is ticket #182's.
 unique = "Investment Bank -- replaces the Bank, and banks 1% interest a turn on the Venture Capital Fund's balance, one building per Region paying, never less than 1 Material in all. Off Earth, the Exchange -- replaces the Trade Post, and pays 1 more Ducat a turn."
 # Ticket #72: the Extraction Total is retired; the first part is Materials banked in the Fund.
-victory = "2000 Ducats in the Venture Capital Fund, plus 12 Colonists living off Earth."
+victory = "2500 Ducats in the Venture Capital Fund, plus 12 Colonists living off Earth."
 # Ticket #182 (version 0.08.0): 750 to 1000, because the Investment Bank pays uncapped interest
 # on the Fund. Measured first: in 40 games nobody EVER reached 750 -- the highest balance ever
 # seen was 745, the median game ended around turn 28 with the Fund in the 400s, and the
 # Prospectors won 0 of 80. The bar rises to keep the Fund a race rather than a formality now
 # that a Bank in each of ten Regions pays around 44 Materials a turn by turn 24.
-victory_first = { kind = "venture_fund", bar = 2000 }
+# Ticket #256 (version 0.08.4): 2000 to 2500 at the designer's word, a deliberate stretch. Measured
+# first: at 2000 the median computer seat ended just across the line (2049 and 2145 in the two
+# seatings read) and the Prospectors won 30 of 80, the most of any seat. At 2500 the median game
+# ends short; "other things will bolster their output". The AI reads this figure, not a copy of it.
+victory_first = { kind = "venture_fund", bar = 2500 }
 victory_second = { kind = "off_world_presence", bar = 12 }
 colour = [0.85, 0.5, 0.2]
 
@@ -97,6 +104,7 @@ name = "Arkwrights"
 resentment = 0.5
 # The Arkwrights start with no station over Earth (ticket #50): they leave from the ground.
 blurb = "Leave Earth: the diaspora is the point."
+motto = "Nothing left behind but the Earth."
 # Ticket #210 (version 0.08.1): the prefix every Ship of theirs wears in front of its name --
 # the Ark itself, a word rather than an initialism, because it is theirs. Chosen at the designer's word, "dealers choice". It belongs to the
 # HOLDER, not the hull: the name is the ship's and travels with it, the prefix is whoever flies it.
@@ -147,6 +155,7 @@ start_station = "Axiom"
 # HOLDER, not the hull: the name is the ship's and travels with it, the prefix is whoever flies it.
 ship_prefix = "ACV"
 blurb = "Build the Archive and upload everyone."
+motto = "Everyone remembered."
 # Ticket #81 (version 0.06.0): the output nerf (0.8) is lifted whole, and Research is 1.5 on Earth
 # (every Lab, and an Observatory in Antarctica) and 1.75 off it (an Observatory on any other Body
 # or on a station, a station over Earth included), where 1.6 stood everywhere.
@@ -265,9 +274,30 @@ tribute_ducats = 25
 tribute_materials = 15
 accord_kept_turns = 4
 
+# Ticket #268 (version 0.08.4): carbon credits. The Custodians -- and only they -- may offer ppm of
+# carbon credit a turn, standing until changed; any other Faction may buy up to `cap_per_turn` ppm
+# of it at `price_per_ppm` Ducats each, times the Custodians' view of the buyer (Hostile refuses).
+# A credit bought comes OFF the buyer's Blame ledger for good. On the seller's side it comes off
+# their Blame credit -- what their Scrubbers and Directive removed -- and, at the designer's word,
+# they may sell MORE than they hold: the excess goes onto their own ledger as Blame taken. "Any
+# amount and take the blame": forcing them to sell only what they hold would deprive them of any
+# reason to get credit, and forbidding overselling would gimp a strategic choice. A purchase is an
+# act of friendship both ways. The Ducats land in the Custodians' Stockpile.
+[carbon_credits]
+price_per_ppm = 1
+cap_per_turn = 10
+friendly = 0.5
+cordial = 0.75
+neutral = 1.0
+wary = 1.5
+cold = 2.0
+ai_oversell_when_ducats_below = 20
+
 [venture_capital]
 max_share = 0.8
-share_step = 0.1
+# Ticket #256 (version 0.08.4): a tenth to a hundredth. The share is a slider now, mirroring the
+# Research Directive's, and "the entire point of the slider is to allow finer control".
+share_step = 0.01
 draw_return = 0.9
 
 # Ticket #73 (version 0.05.5): Pioneers. Colonists are built: a Faction recruits up to `per_turn` a

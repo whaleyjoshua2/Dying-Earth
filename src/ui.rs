@@ -155,6 +155,86 @@ fn population_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
     }
 }
 
+/// Ticket #264 (version 0.08.4): **the Victory history**, the Emissions history's fourth sibling,
+/// on the Faction window under the Victory progress block: one Faction's progress turn by turn --
+/// its score, the lower of its two parts' fractions, in the Faction's own colour -- and a second
+/// line for its share of the table's Blame, on a scale of its own at the right with the fair
+/// quarter as a faint line across it. The Breaks ticked red on the date axis as every sibling has
+/// them; Antarctica's opening ticked in the ice's blue on every Faction's chart; the Faction's gate
+/// Tech done, and the Archive complete, ticked in white on the chart of the Faction they belong
+/// to. Drawn from the per-seat record the Climate phase writes beside the Emissions record.
+fn victory_history(ui: &mut Ui, game: &Game, seat: Seat, size: egui::Vec2) {
+    const BLAME: Color32 = Color32::from_rgb(190, 150, 210);
+    const BREAK: Color32 = Color32::from_rgb(236, 88, 76);
+    const ICE: Color32 = Color32::from_rgb(150, 195, 235);
+    const MARK: Color32 = Color32::from_rgb(235, 235, 240);
+    let own = rgb(game.tables.faction(game.kind(seat)).colour);
+    let h = &game.seat(seat).victory_history;
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 6.0;
+        ui.label(RichText::new("progress").color(own).small());
+        ui.label(RichText::new("Blame share").color(BLAME).small());
+        ui.label(RichText::new("ticks: a Break red, Antarctica blue, the gate Tech and the Archive white").weak().small());
+    });
+    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    let painter = ui.painter();
+    painter.rect_filled(rect, 3.0, Color32::from_rgb(38, 38, 44));
+    if h.is_empty() {
+        painter.text(rect.center(), egui::Align2::CENTER_CENTER, "No turn resolved yet.", FontId::proportional(12.0), Color32::from_gray(150));
+        return;
+    }
+    let plot = egui::Rect::from_min_max(rect.min + egui::vec2(34.0, 6.0), rect.max - egui::vec2(34.0, 20.0));
+    let (first, last) = (h[0].turn, h[h.len() - 1].turn);
+    let span = (last.max(first + 1) - first) as f32;
+    let x = |turn: u32| plot.left() + (turn - first) as f32 / span * plot.width();
+    // Both lines run 0 to 1 and are drawn on that whole range, so a chart reads the same for every
+    // Faction and across a game: a rising line is progress, and the height means the same thing on
+    // turn 3 as on turn 30.
+    let y = |v: f64| plot.bottom() - (v.clamp(0.0, 1.0) as f32) * plot.height();
+    // The fair quarter of the table's Blame, the one figure on the share's axis that means anything.
+    let fair = game.tables.influence.blame.fair_share;
+    painter.line_segment([Pos2::new(plot.left(), y(fair)), Pos2::new(plot.right(), y(fair))], egui::Stroke::new(1.0, BLAME.gamma_multiply(0.35)));
+    let line = |values: Vec<Pos2>, colour: Color32| {
+        if values.len() == 1 {
+            painter.circle_filled(values[0], 3.0, colour);
+        } else {
+            painter.add(egui::Shape::line(values, egui::Stroke::new(2.0, colour)));
+        }
+    };
+    line(h.iter().map(|r| Pos2::new(x(r.turn), y(r.blame_share))).collect(), BLAME);
+    line(h.iter().map(|r| Pos2::new(x(r.turn), y(r.score))).collect(), own);
+    // The ticks along the foot: a Break in red from the world's record on the same turn; the first
+    // turn each flag stands, in its colour, a little taller so two on one turn both show.
+    let tick = |turn: u32, colour: Color32, tall: f32| {
+        let bx = x(turn);
+        painter.line_segment([Pos2::new(bx, plot.bottom() + 2.0), Pos2::new(bx, plot.bottom() + 2.0 + tall)], egui::Stroke::new(2.0, colour));
+    };
+    for r in game.climate.history.iter().filter(|r| !r.breaks.is_empty() && r.turn >= first && r.turn <= last) {
+        tick(r.turn, BREAK, 4.0);
+    }
+    let first_where = |pick: &dyn Fn(&dying_earth_engine::VictoryRecord) -> bool| h.iter().find(|r| pick(r)).map(|r| r.turn);
+    if let Some(t) = first_where(&|r| r.antarctica_open) {
+        tick(t, ICE, 7.0);
+    }
+    if let Some(t) = first_where(&|r| r.gate_done).filter(|_| game.tables.victory_gate(game.kind(seat)).is_some()) {
+        tick(t, MARK, 10.0);
+    }
+    if let Some(t) = first_where(&|r| r.archive_complete) {
+        tick(t, MARK, 10.0);
+    }
+    // Each scale's ends at its own side, in its own colour.
+    let small = FontId::proportional(9.0);
+    painter.text(Pos2::new(plot.left() - 3.0, plot.top()), egui::Align2::RIGHT_TOP, "100%", small.clone(), own);
+    painter.text(Pos2::new(plot.left() - 3.0, plot.bottom()), egui::Align2::RIGHT_BOTTOM, "0%", small.clone(), own);
+    painter.text(Pos2::new(plot.right() + 3.0, plot.top()), egui::Align2::LEFT_TOP, "all", small.clone(), BLAME);
+    painter.text(Pos2::new(plot.right() + 3.0, y(fair)), egui::Align2::LEFT_CENTER, "fair", small.clone(), BLAME);
+    painter.text(Pos2::new(plot.right() + 3.0, plot.bottom()), egui::Align2::LEFT_BOTTOM, "none", small.clone(), BLAME);
+    painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, game.date(first).text(), small.clone(), Color32::from_gray(150));
+    if last > first {
+        painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, game.date(last).text(), small, Color32::from_gray(150));
+    }
+}
+
 /// Ticket #158 (version 0.07.4): **the Temperature history**, the Emissions history's sibling on
 /// the top bar's Temperature figure: the Temperature turn by turn on the data's own range (the
 /// designer's choice over the base-to-Collapse scale, for the detail); the Breaks' Temperatures
@@ -505,6 +585,17 @@ fn rgb(c: [f32; 3]) -> Color32 {
     Color32::from_rgb((c[0] * 255.0) as u8, (c[1] * 255.0) as u8, (c[2] * 255.0) as u8)
 }
 
+/// Ticket #263 (version 0.08.4): "a Mine", "an Observatory", "the Industry Level" -- the article a
+/// build's name wants in a sentence.
+fn with_article(what: &str) -> String {
+    let lower = what.to_lowercase();
+    if lower == "industry level" {
+        return format!("the {what}");
+    }
+    let vowel = lower.starts_with(['a', 'e', 'i', 'o', 'u']);
+    format!("{} {what}", if vowel { "an" } else { "a" })
+}
+
 fn seat_colour(session: &Session, seat: Seat) -> Color32 {
     rgb(session.colours()[seat.index()])
 }
@@ -628,7 +719,8 @@ fn found_button(ui: &mut Ui, yields: &dying_earth_engine::SlotYields, label: &st
             .show(ui, |ui| {
                 ui.vertical(|ui| {
                     ui.label(RichText::new(label).color(visuals.text_color()));
-                    text_with_icons(ui, &slot_yield_hover(yields), 13.0, visuals.text_color());
+                    // Ticket #258 (version 0.08.4): drawn glyph-first; see `slot_yield_row`.
+                    slot_yield_row(ui, slot_yield_figures(yields), 13.0, visuals.text_color());
                 });
             });
     })
@@ -1418,6 +1510,11 @@ fn faction_heading(ui: &mut Ui, session: &Session, kind: FactionKind, glyph: f32
 /// belong to the setup screen alone -- the `Play the X` button and the Custodians' tutorial tick.
 fn faction_rulebook(ui: &mut Ui, session: &Session, kind: FactionKind) {
     let card = session.tables.faction(kind);
+    // Ticket #260 (version 0.08.4): the motto, directly under the name -- which the caller has just
+    // drawn -- in italics and the Faction's own colour, before the blurb: the one line on the card
+    // where the Faction speaks rather than the rules describing it. The designer: "yes that
+    // exactly"; and here and nowhere else, since the rulebook is this same code in-game.
+    ui.label(RichText::new(&card.motto).italics().color(rgb(card.colour)));
     ui.label(&card.blurb);
     ui.add_space(6.0);
     ui.label(RichText::new("Multipliers").strong());
@@ -2440,12 +2537,36 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
 /// tooltip behind it -- it is the whole of what is shown -- so it must never be able to go mute.
 const SLOT_YIELD_SIZE: f32 = 14.0;
 
-/// Ticket #211 (version 0.08.1): a slot's four yields as one line for a hover, in the form the
-/// glyph rule reads -- each figure's word heading its own multiplier, which `text_with_icons`
-/// trades for the glyph. The designer asked for the yields and nothing else: "no need for the
-/// clause just yeilds and use the glyps".
-fn slot_yield_hover(y: &dying_earth_engine::SlotYields) -> String {
-    format!("Materials x{:.2} - Energy x{:.2} - Fuel x{:.2} - Research x{:.2}", y.mine, y.generator, y.refinery, y.research)
+/// Ticket #258 (version 0.08.4): four yields as a row of glyph-and-figure pairs in a Ui -- the
+/// notation `slot_yield_label` paints under every slot on the map, brought onto the panel and the
+/// founding button. It replaces `slot_yield_hover` (ticket #211), a line of words in the form
+/// "Materials x1.37". The line of WORDS that stood here before this ticket never became glyphs at
+/// all: the one glyph rule (`draw_with_icons`) trades a word only where it follows a figure, and
+/// "Materials x1.37" has the figure after the word. Ticket #218 promised glyphs on the button's
+/// face and a picture on this ticket was the first to show it had none. Drawn directly, glyph then
+/// figure, so it cannot fall through that rule again.
+fn slot_yield_row(ui: &mut Ui, figures: [(&str, f64); 4], size: f32, tint: Color32) {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 3.0;
+        for (i, (key, v)) in figures.iter().enumerate() {
+            if i > 0 {
+                ui.add_space(6.0);
+            }
+            match Icons::from_ctx(ui.ctx(), key, size) {
+                Some(image) => {
+                    ui.add(image);
+                }
+                None => {
+                    ui.label(RichText::new(*key).size(size).color(tint));
+                }
+            }
+            ui.label(RichText::new(format!("x{v:.2}")).size(size).color(tint));
+        }
+    });
+}
+
+fn slot_yield_figures(y: &dying_earth_engine::SlotYields) -> [(&'static str, f64); 4] {
+    [("materials", y.mine), ("energy", y.generator), ("fuel", y.refinery), ("research", y.research)]
 }
 
 fn slot_yield_label(painter: &egui::Painter, pos: Pos2, yields: &dying_earth_engine::SlotYields) {
@@ -3134,7 +3255,8 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
         };
         // Ticket #115: the heading already says "Armies", so every row repeating the word was pure
         // width, and "damage 0" is true of almost every Army almost always.
-        let mut text = format!("{}{}: strength {}", tag("Army"), where_, game.army_strength(a));
+        // Ticket #270 (version 0.08.4): the Army's own name leads the row.
+        let mut text = format!("{}{}, at {}: strength {}", tag("Army"), game.army_name(a), where_, game.army_strength(a));
         if a.damage > 0 {
             text.push_str(&format!(", damage {}", a.damage));
         }
@@ -3284,7 +3406,11 @@ fn order_text(game: &Game, o: &Order) -> String {
         ),
         // Ticket #72.
         Order::SetVentureShare { share } => format!("Bank {share}% of Ducat income in the Venture Capital Fund"),
-        Order::DrawVenture { amount } => format!("Draw {amount} Ducats from the Venture Capital Fund"),
+        Order::DrawVenture { amount } => format!("Withdraw {amount} Ducats from the Venture Capital Fund"),
+        Order::Smear { target, amount } => format!("Smear the {} with {amount} Influence", game.seat_name(*target)),
+        Order::Agitate { state } => format!("Agitate in {}", game.tables.state(*state).name),
+        Order::OfferCredits { ppm } => format!("Offer {ppm} ppm of carbon credit a turn"),
+        Order::BuyCredits { ppm } => format!("Buy {ppm} ppm of carbon credit from the Custodians"),
         // Ticket #52.
         Order::Relief { state } => format!("Relief in {}: Unrest -1", game.tables.state(*state).name),
         Order::Resettle { state } => format!("Resettle this turn's refugees in {}", game.tables.state(*state).name),
@@ -3853,6 +3979,46 @@ fn threshold_breakdown(ui: &mut Ui, game: &Game, target: Place) {
             second.push_str(&format!(" comes to {}, under the threshold, so the threshold stands", standing + margin));
         }
         ui.label(RichText::new(second).weak());
+        // Ticket #262 (version 0.08.4): **the challenger line**, on a place the player holds: the
+        // rival nearest to taking it -- nearest its OWN price, since Blame and Relations move one
+        // rival's price and not another's -- and how far off it stands. The designer's sentence,
+        // kept: "The Prospectors stand at 31; they take this at 54." The arithmetic rides on the
+        // hover, within the six-line rule; the line carries the two figures. Held places only.
+        if c == Seat(0) {
+            match game.nearest_challenger(target) {
+                Some((who, theirs, price)) => {
+                    let name = game.seat_name(who);
+                    let line = format!("The {name} stand at {theirs}; they take this at {price}.");
+                    let their_threshold = game.influence_threshold_for(who, target);
+                    let their_margin = game.challenge_margin_for(Some(who), target);
+                    let their_blame = game.blame_threshold_multiplier_on(who, target);
+                    let resistance = game.resistance(target);
+                    let gap = (price - theirs).max(0);
+                    let spend = ((gap as f64) * resistance).ceil() as i64;
+                    // Ticket #75's warning, folded in: within two steps of the holder's Standing the
+                    // line turns amber and says what to do about it.
+                    let step = game.tables.ai.thresholds.influence_step;
+                    let pressing = theirs + 2 * step >= standing;
+                    let line = if pressing { format!("{line} Spend here to stay ahead.") } else { line };
+                    let tip = format!(
+                        "The {name}'s price here is the greater of their own threshold, {their_threshold}{}, and your Standing plus the margin they face, {standing} + {their_margin}.
+They are {gap} short. An outsider's Influence converts at {:.2} here, so that is about {spend} Influence spent.
+Spending here raises the bar; doing nothing lowers it, yours decaying {} a turn and theirs {}{}.",
+                        if their_blame > 1.0 { format!(" (x{their_blame:.2} for their Blame)") } else { String::new() },
+                        1.0 / resistance.max(1e-9),
+                        game.standing_decay_for(Seat(0), target),
+                        game.standing_decay_for(who, target),
+                        // Ticket #266 (version 0.08.4): a rival's decay on a Region reads its Blame.
+                        if matches!(target, Place::State(_)) && game.standing_decay_for(who, target) != game.tables.influence.decay { " for their Blame" } else { "" }
+                    );
+                    let colour = if pressing { Color32::from_rgb(255, 160, 60) } else { rgb(game.tables.faction(game.kind(who)).colour) };
+                    rule_tip(ui.label(RichText::new(line).color(colour)), tip);
+                }
+                None => {
+                    ui.label(RichText::new("No rival has a Standing here.").weak());
+                }
+            }
+        }
     }
 
     // The third: Resistance, which taxes the spending rather than the gate.
@@ -3958,6 +4124,18 @@ fn facility_figures(game: &Game, sid: StateId, f: &Facility, director: Option<Se
     }
     // Ticket #69: a Lab in a state nobody holds, or under Occupation, works for the world.
     let world_lab = f.kind == FacilityKind::ResearchLab && f.working() && !f.offline_until_resolution && matches!(game.state(sid).control, Control::Neutral | Control::Occupied { .. });
+    // Ticket #257 (version 0.08.4): a Sea Wall says what it has held back and what that costs.
+    if f.kind == FacilityKind::SeaWall {
+        let yield_text = director.map(|d| game.facility_yield(d, sid, f.kind).text()).unwrap_or_else(|| "idle, nobody directs this state".to_string());
+        let keep = f.rises_held as f64 * game.tables.sea_wall.upkeep_per_rise;
+        let held = match f.rises_held {
+            0 => "has held back no rise yet".to_string(),
+            1 => format!("has held back 1 rise: {keep:.1} Materials a turn to keep"),
+            n => format!("has held back {n} rises: {keep:.1} Materials a turn to keep"),
+        };
+        let unkept = if !f.online && !f.mothballed { "; unkept this turn, holding nothing" } else { "" };
+        return format!("{yield_text}; {held}{unkept}");
+    }
     match director {
         Some(d) if world_lab => format!("{} (the Lab works for the world: {} Research a turn to the Tech under research)", game.facility_yield(d, sid, f.kind).text(), game.world_lab_yield(sid) / 2),
         Some(d) => game.facility_yield(d, sid, f.kind).text(),
@@ -4093,7 +4271,13 @@ fn no_slot_section(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mi
                     &session.pending,
                     Order::BuildFacility { state: sid, kind: FacilityKind::SeaWall },
                     "Sea Wall",
-                    Some(format!("{hover}. No build slot, at most one to a state; while it works, this state's next Sea Level threshold takes no slots, and the wall is destroyed absorbing it.")),
+                    // Ticket #257 (version 0.08.4): the wall stands and holds every threshold; each
+                    // rise held adds to its keep; a Storm Surge it holds cuts the coast's output.
+                    Some(format!(
+                        "{hover}. No build slot, at most one to a state. While it works, every Sea Level threshold takes no slots from this state and the wall stands; each rise it has held adds {} Materials a turn to its keep, and a Storm Surge it holds cuts its coastal Facilities' output by {:.0}% for one turn.",
+                        game.tables.sea_wall.upkeep_per_rise,
+                        (1.0 - game.tables.events.storm_surge_coastal_multiplier) * 100.0
+                    )),
                     actions,
                 );
                 cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::SeaWall }, "or", actions);
@@ -4193,7 +4377,7 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             }
             SlotBoxKind::Flooded(k) => {
                 let tip = format!(
-                    "{}lost to the sea: a Sea Level threshold took this coastal slot.\nA working Sea Wall holds the state's next threshold off, at most one to a state.",
+                    "{}lost to the sea: a Sea Level threshold took this coastal slot.\nA working Sea Wall holds every threshold off, at most one to a state.",
                     k.map(|k| format!("{}, ", k.name())).unwrap_or_else(|| "A slot ".to_string())
                 );
                 hab_tile(ui, rect, id, k.map(crate::icons::facility_icon), k.map(|k| k.name()).unwrap_or(""), TileState::Flooded, false, edge, tip);
@@ -4341,37 +4525,31 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 u.max, u.army_threshold, u.facility_threshold, u.max, u.natural_fall
             ),
         );
-        // Ticket #75: a rival's Standing within two steps of the player's own, at the top of the
-        // card where it is seen, not in the Influence section below the fold.
-        if game.place_control(Place::State(sid)).controller() == Some(Seat(0)) {
-            let target = Place::State(sid);
-            let mine = game.seat(Seat(0)).influence.get(&target).copied().unwrap_or(0);
-            let step = game.tables.ai.thresholds.influence_step;
-            let pressing = Seat(0).others().iter().map(|s| (*s, game.seat(*s).influence.get(&target).copied().unwrap_or(0))).max_by_key(|(_, n)| *n).filter(|(_, n)| *n > 0 && *n + 2 * step >= mine);
-            if let Some((rival, standing)) = pressing {
-                let warn = ui.label(
-                    RichText::new(format!(
-                        "The {} stand at {} here against your {}: they take it at {}. Spend here to stay ahead.",
-                        game.seat_name(rival),
-                        standing,
-                        mine,
-                        mine + game.tables.influence.challenge_margin
-                    ))
-                    .color(Color32::from_rgb(255, 160, 60)),
+        // Ticket #269 (version 0.08.4): Agitate, on a Region a rival holds -- Relief's mirror, at
+        // the top of the card where the holder's Relief would be on their own.
+        if let Some(holder) = game.place_control(Place::State(sid)).controller().filter(|h| *h != Seat(0))
+            && !session.spectator
+        {
+            let ag = &game.tables.unrest;
+            ui.horizontal(|ui| {
+                cost_button_with_hover(
+                    ui,
+                    game,
+                    &session.pending,
+                    Order::Agitate { state: sid },
+                    "Agitate: Unrest +1",
+                    Some(format!(
+                        "Turn its people against the {}: Unrest rises by {} at End Turn, halved by a working Constabulary. Once a turn here. They will know who paid: it is an offence.\nAt {} the Standing Army stops replenishing, at {} every Facility runs at half, at {} the state throws its controller off.",
+                        game.seat_name(holder), Game::unrest_figure(ag.agitate_points), ag.army_threshold, ag.facility_threshold, ag.max
+                    )),
+                    actions,
                 );
-                // Ticket #161 (version 0.07.5): the challenge margin is the rule behind this warning
-                // and the warning never names it.
-                rule_tip(
-                    warn,
-                    format!(
-                        "A rival takes a place you hold at your Standing plus the challenge margin of {}, and never below their own threshold.\nSpending here raises the bar; doing nothing lowers it, yours decaying {} a turn and theirs {}.",
-                        game.tables.influence.challenge_margin,
-                        game.tables.influence.decay_controlled,
-                        game.tables.influence.decay
-                    ),
-                );
-            }
+            });
         }
+        // Ticket #75's warning line -- a rival within two steps, at the top of the card -- stood here
+        // until ticket #262 (version 0.08.4) folded it into the challenger line in the Standings block
+        // below, which reads the engine's own price (ticket #60) where this one added the margin to the
+        // holder's Standing and could disagree with the Resolution. One line, one arithmetic.
         // Ticket #114 (version 0.07.1): Influence is the card's FIRST business, not its last. The
         // designer: "Influence spend should be much higher and more prominent in the side bar when
         // countries are selected as well." It used to sit under the Facility list, the Army orders
@@ -4435,7 +4613,8 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             Some(s) => game.seat_name(s),
             None => "neutral".to_string(),
         };
-        ui.label(format!("  {} {} strength {}, damage {}/{}", who, if a.standing { "Standing Army" } else { "Army" }, game.army_strength(a), a.damage, game.tables.unit(UnitKind::Army).hit_points));
+        // Ticket #270 (version 0.08.4): named, the Standing Army included.
+        ui.label(format!("  {} ({}{}): strength {}, damage {}/{}", game.army_name(a), who, if a.standing { ", standing" } else { "" }, game.army_strength(a), a.damage, game.tables.unit(UnitKind::Army).hit_points));
     }
     ui.separator();
     if mine {
@@ -4602,7 +4781,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             ui.label(RichText::new("Army orders").strong());
             stance_row(ui, game, &session.pending, my_armies[0].stance, |s| Order::ArmyStance { place: Place::State(sid), stance: s }, false, actions);
             for a in &my_armies {
-                ui.label(format!("{} (strength {}):", if a.standing { "Standing Army" } else { "Army" }, game.army_strength(a)));
+                ui.label(format!("{} (strength {}{}):", game.army_name(a), game.army_strength(a), if a.standing { ", standing" } else { "" }));
                 ui.horizontal_wrapped(|ui| {
                     for n in &card.neighbours {
                         let ctrl = game.state(*n).control;
@@ -4797,7 +4976,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     let armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(cid))).collect();
     for a in &armies {
         let who = game.army_seat(a).map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".into());
-        ui.label(format!("  {} Army strength {}, damage {}", who, game.army_strength(a), a.damage));
+        ui.label(format!("  {} ({}): strength {}, damage {}", game.army_name(a), who, game.army_strength(a), a.damage));
     }
     ui.separator();
     let mine = !session.spectator && col.control.director() == Some(Seat(0));
@@ -4915,14 +5094,19 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
     // Ticket #57: the slot's own four yields, drawn when the game started, beside its Body's.
     let card = game.tables.body(body);
     let y = game.slot_yields(body, slot);
-    ui.label(format!("Yields here: Mine x{:.2}, Generator x{:.2}, Refinery x{:.2}, Observatory x{:.2}", y.mine, y.generator, y.refinery, y.research));
-    ui.label(
-        RichText::new(format!(
-            "{} as a whole: Mine x{}, Generator x{}, Refinery x{}, Observatory x{}",
-            card.name, card.mine_yield, card.generator_yield, card.refinery_yield, card.research_yield
-        ))
-        .weak(),
-    );
+    // Ticket #258 (version 0.08.4): both lines in the glyph-and-number row the founding button and
+    // the map labels already use, at the designer's word -- "both", and the Body's line kept, weak.
+    // A player read the yields here in words and then again in glyphs on the button beneath.
+    let ink = ui.visuals().text_color();
+    ui.horizontal(|ui| {
+        ui.label("Yields here:");
+        slot_yield_row(ui, slot_yield_figures(&y), 14.0, ink);
+    });
+    let weak = ui.visuals().weak_text_color();
+    ui.horizontal(|ui| {
+        ui.label(RichText::new(format!("{} as a whole:", card.name)).weak());
+        slot_yield_row(ui, [("materials", card.mine_yield), ("energy", card.generator_yield), ("fuel", card.refinery_yield), ("research", card.research_yield)], 14.0, weak);
+    });
     for s in game.ships.iter().filter(|s| !session.spectator && s.seat == Seat(0) && s.at == ShipAt::Body(body) && s.kind == UnitKind::ColonyShip && s.colonists > 0) {
         let order = Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) };
         // Ticket #211 (version 0.08.1): what the site is worth, at the moment of choosing it. The
@@ -5226,13 +5410,81 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
         }
     });
     ui.separator();
+    carbon_credits_block(ui, session, game, view, actions);
+    ui.separator();
     ui.label(format!("Buildings: every build button on a Region or Colony card has an \"or\" beside it that buys the building outright for Ducats, at {} times its Materials cost.", game.tables.ducats.per_building_material));
-    let trades: Vec<String> = session.pending.iter().filter(|o| matches!(o, Order::Buy { .. } | Order::Sell { .. } | Order::BuyInfluence { .. } | Order::BuildFacilityWithDucats { .. } | Order::BuildModuleWithDucats { .. })).map(|o| order_text(game, o)).collect();
+    let trades: Vec<String> = session.pending.iter().filter(|o| matches!(o, Order::Buy { .. } | Order::Sell { .. } | Order::BuyInfluence { .. } | Order::BuildFacilityWithDucats { .. } | Order::BuildModuleWithDucats { .. } | Order::BuyCredits { .. } | Order::OfferCredits { .. })).map(|o| order_text(game, o)).collect();
     if !trades.is_empty() {
         ui.separator();
         ui.label(RichText::new("Trades this turn (undo them in the orders list)").strong());
         for t in trades {
             ui.label(t);
+        }
+    }
+}
+
+/// Ticket #268 (version 0.08.4): **carbon credits**, the Trading window's fourth line. For the
+/// Custodians a field and a button to set the ppm they offer a turn, standing until changed, with
+/// their credit and what overselling costs them beside it; for everyone else what the Custodians
+/// offer this turn, how they think of you and the price that makes, and a field and a Buy button
+/// up to the cap. The Custodians' view of you can refuse you outright.
+fn carbon_credits_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    let me = Seat(0);
+    let c = game.tables.carbon_credits.clone();
+    ui.label(RichText::new("Carbon credits").strong()).on_hover_text(format!(
+        "A ppm of carbon credit bought comes off your Blame for good. The Custodians sell it at {} Ducats a ppm, times how they think of you -- Friendly x{}, Cordial x{}, Neutral x{}, Wary x{}, Cold x{}; Hostile refuses -- up to {} ppm a turn.\nA purchase is an act of friendship both ways.",
+        c.price_per_ppm, c.friendly, c.cordial, c.neutral, c.wary, c.cold, c.cap_per_turn
+    ));
+    let Some(seller) = game.credit_seller() else {
+        ui.label(RichText::new("Nobody at this table sells carbon credits.").weak());
+        return;
+    };
+    if seller == me {
+        let credit = game.blame_credit(me);
+        let standing = game.seat(me).credits_offered;
+        let pending = session.pending.iter().find_map(|o| if let Order::OfferCredits { ppm } = o { Some(*ppm) } else { None });
+        ui.label(format!(
+            "You hold {credit:.0} ppm in credit. You offer {standing} ppm a turn{}; what you sell past your credit goes onto your own Blame.",
+            pending.map(|p| format!(" ({p} from next turn)")).unwrap_or_default()
+        ));
+        ui.horizontal(|ui| {
+            ui.add(egui::DragValue::new(&mut view.credits_offer).range(0..=999));
+            let order = Order::OfferCredits { ppm: view.credits_offer };
+            let check = game.check_order(me, &session.pending, &order);
+            let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Offer {} ppm a turn", view.credits_offer)));
+            if let Err(e) = &check {
+                resp.clone().on_disabled_hover_text(&e.0);
+            }
+            if resp.on_hover_text("Stands from next turn until you set it again; nought refuses everyone.").clicked() {
+                actions.push(Action::Place(order));
+            }
+        });
+        return;
+    }
+    let offer = game.seat(seller).credits_offered;
+    let level = game.relations_level(seller, me);
+    match game.credit_price_multiplier(me) {
+        None => {
+            ui.label(RichText::new(format!("The Custodians will not sell to you: they are {level} toward you.")).weak());
+        }
+        Some(m) if offer <= 0 => {
+            ui.label(RichText::new(format!("The Custodians are not selling this turn. They are {level} toward you (x{m}).")).weak());
+        }
+        Some(m) => {
+            ui.label(format!("The Custodians offer {offer} ppm this turn. They are {level} toward you, so a ppm costs {} Ducats (x{m}).", game.credit_cost(me, 1).unwrap_or(0)));
+            ui.horizontal(|ui| {
+                ui.add(egui::DragValue::new(&mut view.credits_amount).range(1..=c.cap_per_turn.max(1)));
+                let order = Order::BuyCredits { ppm: view.credits_amount };
+                let cost = game.order_cost(me, &order).ducats;
+                let check = game.check_order(me, &session.pending, &order);
+                let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Buy {} ppm for {cost} Ducats", view.credits_amount)));
+                if let Err(e) = &check {
+                    resp.clone().on_disabled_hover_text(&e.0);
+                }
+                if resp.on_hover_text("Off your Blame at End Turn. If others buy first and the offer runs out, the Ducats for what you did not get come back.").clicked() {
+                    actions.push(Action::Place(order));
+                }
+            });
         }
     }
 }
@@ -5984,6 +6236,94 @@ fn research_directive_control(ui: &mut Ui, session: &Session, game: &Game, actio
     }
 }
 
+/// Ticket #256 (version 0.08.4): **the Venture Capital Fund's controls** on the Victory window, the
+/// Prospectors only -- the share as a slider, and a withdrawal.
+///
+/// The share was a row of nine labels, 0% to 80% in tenths (ticket #72). The designer asked for a
+/// slider *"to allow finer control"*, mirroring the Research Directive's: the same full-width rail
+/// on a 0-to-100 scale in whole percents, with the part of the scale the rule does not allow --
+/// the top fifth, since `max_share` is 0.8 -- painted over in the grey the game uses for nobody's,
+/// so the bound is visible rather than implied. `share_step` in `factions.toml` is a hundredth now
+/// and the order takes whole percents; the AI's smallest-share-that-reaches-the-bar loop walks the
+/// same step.
+///
+/// The draw was one button that took ten, every time. It is **Withdraw** now, with a field for the
+/// amount as the Influence cluster has one, at the designer's word. The tenth lost on the way out is
+/// unchanged and the hover says what comes back.
+fn venture_fund_control(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    let me = Seat(0);
+    let v = game.tables.venture.clone();
+    let cap = (v.max_share * 100.0).round() as u32;
+    let standing = (game.seat(me).venture_share * 100.0).round() as u32;
+    let pending_set = session.pending.iter().find_map(|o| if let Order::SetVentureShare { share } = o { Some(*share) } else { None });
+    let mut share = pending_set.unwrap_or(standing);
+
+    ui.label(RichText::new(format!("Venture Capital Fund: banking {share}% of Ducat income")).strong()).on_hover_text(
+        "The share of each turn's Ducat income that goes into the Fund at Income, before you can spend a coin of it, from the next Income until you set it again. Ducats got by selling are not income and never reach it.",
+    );
+    // The same rail the Research Directive draws, a fifth larger than egui's default in both
+    // dimensions; see `research_directive_control` for why both figures matter.
+    let full = ui.available_width();
+    let (was_width, was_rail, was_interact) = (ui.spacing().slider_width, ui.spacing().slider_rail_height, ui.spacing().interact_size);
+    ui.spacing_mut().slider_width = full;
+    ui.spacing_mut().slider_rail_height = was_rail * 1.2;
+    ui.spacing_mut().interact_size.y = was_interact.y * 1.2;
+    let resp = ui.add(egui::Slider::new(&mut share, 0..=100).show_value(false));
+    ui.spacing_mut().slider_width = was_width;
+    ui.spacing_mut().slider_rail_height = was_rail;
+    ui.spacing_mut().interact_size = was_interact;
+    if cap < 100 {
+        // The fifth no share may reach, painted over the rail's top end in the Directive's grey.
+        let r = resp.rect;
+        let dim = egui::Rect::from_min_max(
+            egui::pos2(r.min.x + r.width() * cap as f32 / 100.0, r.center().y - ui.spacing().slider_rail_height * 0.6),
+            egui::pos2(r.max.x, r.center().y + ui.spacing().slider_rail_height * 0.6),
+        );
+        ui.painter().rect_filled(dim, 2.0, Color32::from_rgb(124, 104, 104));
+        ui.painter().line_segment(
+            [egui::pos2(dim.min.x, r.center().y - 9.0), egui::pos2(dim.min.x, r.center().y + 9.0)],
+            egui::Stroke::new(1.5, Color32::from_gray(120)),
+        );
+    }
+    share = share.min(cap);
+    let fund = game.seat(me).venture_fund;
+    let banked = game.seat(me).venture_banked_last_turn;
+    ui.label(
+        RichText::new(format!(
+            "The Fund holds {fund} Ducats; {banked} went in last turn.{}",
+            pending_set.filter(|p| *p != standing).map(|p| format!(" {p}% from the next Income.")).unwrap_or_default()
+        ))
+        .weak(),
+    );
+    if share != pending_set.unwrap_or(standing) {
+        if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetVentureShare { .. })) {
+            actions.push(Action::Cancel(i));
+        }
+        if share != standing {
+            let order = Order::SetVentureShare { share };
+            if game.check_order(me, &session.pending, &order).is_ok() {
+                actions.push(Action::Place(order));
+            }
+        }
+    }
+
+    // Withdraw: a field and a button, the Influence cluster's shape.
+    ui.horizontal(|ui| {
+        let most = fund - session.pending.iter().map(|o| if let Order::DrawVenture { amount } = o { *amount } else { 0 }).sum::<i64>();
+        ui.add(egui::DragValue::new(&mut view.venture_withdraw).range(1..=most.max(1)));
+        let order = Order::DrawVenture { amount: view.venture_withdraw };
+        let check = game.check_order(me, &session.pending, &order);
+        let back = (view.venture_withdraw as f64 * v.draw_return).floor() as i64;
+        let resp = ui.add_enabled(check.is_ok(), egui::Button::new("Withdraw from the Fund"));
+        if let Err(e) = &check {
+            resp.clone().on_disabled_hover_text(&e.0);
+        }
+        if resp.on_hover_text(format!("{back} Ducats come back to the Stockpile at End Turn; a tenth is lost on the way out.")).clicked() {
+            actions.push(Action::Place(order));
+        }
+    });
+}
+
 /// **The Faction window** (ticket #203, version 0.08.1), opened by `Factions (F)` on the top bar and
 /// by the F key. One Faction a page, chosen by the dropdown in its top right, which opens on the
 /// player's own seat.
@@ -6006,6 +6346,34 @@ fn research_directive_control(ui: &mut Ui, session: &Session, game: &Game, actio
 /// acts that raise Relations. The terms are ticked and offered together, because an Accord is one
 /// bargain rather than four; the computer seat answers at the Resolution by its own weights, and a
 /// refusal is not an offence.
+/// Ticket #267 (version 0.08.4): **the Smear campaign**, on a rival's page beside the Accords:
+/// a field for the Influence and a button, the Influence cluster's shape. The hover names the
+/// rate, the ledger it lands on, and the offence.
+fn smear_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, other: Seat, actions: &mut Vec<Action>) {
+    let me = Seat(0);
+    let rate = game.tables.influence.smear.ppm_per_influence;
+    ui.label(RichText::new("Smear campaign").strong()).on_hover_text(format!(
+        "Influence spent on this Faction rather than a place: every point lays {rate} ppm on their Blame for good, and the share every rule reads moves with it.\nOne campaign a turn against each rival, from this turn's Allotment. They will know who paid: it is an offence."
+    ));
+    let laid = game.seat(other).blame_smeared;
+    if laid > 0.0 {
+        ui.label(RichText::new(format!("{laid:.0} ppm of their Blame was laid on them by rivals.")).weak());
+    }
+    ui.horizontal(|ui| {
+        let left = game.seat(me).allotment - session.pending.iter().map(|o| game.order_cost(me, o).influence).sum::<i64>();
+        ui.add(egui::DragValue::new(&mut view.smear_amount).range(1..=left.max(1)));
+        let order = Order::Smear { target: other, amount: view.smear_amount };
+        let check = game.check_order(me, &session.pending, &order);
+        let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Smear the {}", game.seat_name(other))));
+        if let Err(e) = &check {
+            resp.clone().on_disabled_hover_text(&e.0);
+        }
+        if resp.on_hover_text(format!("{:.0} ppm on their Blame at End Turn.", view.smear_amount as f64 * rate)).clicked() {
+            actions.push(Action::Place(order));
+        }
+    });
+}
+
 fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actions: &mut Vec<Action>) {
     let me = Seat(0);
     let r = &game.tables.relations;
@@ -6157,6 +6525,10 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         ui.add(egui::ProgressBar::new(p.first_fraction() as f32));
         ui.label(format!("{}: {}", p.second_name, p.second_text));
         ui.add(egui::ProgressBar::new(p.second_fraction() as f32));
+        // Ticket #264 (version 0.08.4): the Victory history under the progress bars, on every
+        // Faction's page, the player's own included, at the population chart's size.
+        ui.add_space(4.0);
+        victory_history(ui, game, seat, egui::vec2(ui.available_width(), 90.0));
         ui.add_space(6.0);
 
         // 2. Income last turn, under the disclosure rule in this function's doc comment.
@@ -6216,8 +6588,9 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         // (*"faction windows leave climate as is"*), being a four-Faction comparison read
         // occasionally rather than a page a player sits on, and the top bar's Influence hover keeps
         // its longer wording. Nothing is deleted.
-        ui.label(RichText::new("Blame").strong())
-            .on_hover_text("A share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again.");
+        // Ticket #265 (version 0.08.4): the hover names what Blame is, what the credit is, and the
+        // two rules that read it.
+        ui.label(RichText::new("Blame").strong()).on_hover_text("Blame is the CO2 this Faction is answerable for: everything the sources it controlled emitted, less everything it removed.\nWhat it removed -- its Scrubbers, and for the Custodians what their Research Directive adds to the Natural Sink -- is its Blame credit.\nTwo rules read Blame: a share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again;\nand every rival thinks a point worse of it for each step its share stands above that quarter, each by its own measure.");
         let share = game.blame_share(seat);
         ui.horizontal(|ui| {
             ui.add(
@@ -6226,8 +6599,19 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
                     .fill(seat_colour(session, seat))
                     .text(RichText::new(format!("{:.0}%", share * 100.0)).color(Color32::BLACK)),
             );
-            let credit = game.blame_credit(seat);
-            let line = if credit > 0.0 { format!("Blame 0 ppm, credit {credit:.0} ppm") } else { format!("Blame {:.0} ppm, thresholds x{:.2}", game.blame(seat), game.blame_threshold_multiplier(seat)) };
+            // Ticket #265 (version 0.08.4): answerable for, then how it got there, then the credit.
+            let s = game.seat(seat);
+            // Ticket #267: what rivals laid on by Smear, when any, so the line never says the seat
+            // put it in the air.
+            let smeared = if s.blame_smeared > 0.0 { format!(", {:.0} laid on by rivals", s.blame_smeared) } else { String::new() };
+            let smeared = format!("{smeared}{}{}", if s.credits_bought > 0.0 { format!(", {:.0} bought as carbon credits", s.credits_bought) } else { String::new() }, if s.credits_sold > 0.0 { format!(", {:.0} sold as carbon credits", s.credits_sold) } else { String::new() });
+            let line = format!(
+                "Answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit{smeared}), thresholds x{:.2}",
+                game.blame(seat),
+                s.blame_emitted,
+                game.blame_credit(seat),
+                game.blame_threshold_multiplier(seat)
+            );
             figures_with_icons(ui, &line, 14.0, ui.visuals().weak_text_color(), &[("ppm", "emissions")]);
         });
         ui.add_space(6.0);
@@ -6262,6 +6646,8 @@ A rival that holds you at less than neutral defends its places against you a lit
         if !session.spectator && seat != Seat(0) {
             accords_block(ui, session, game, seat, actions);
             ui.add_space(6.0);
+            smear_block(ui, session, game, view, seat, actions);
+            ui.add_space(6.0);
         }
 
         // 5. Holdings, which no window counted for anybody before this one.
@@ -6280,6 +6666,30 @@ A rival that holds you at less than neutral defends its places against you a lit
             plural(ships, "Ship", "Ships"),
             plural(armies, "Army", "Armies")
         ));
+        ui.add_space(6.0);
+
+        // 6. Ticket #263 (version 0.08.4): **Under way** -- what this Faction has begun and not yet
+        // finished: builds with the turns until they land, Ships in transit with their names and
+        // their roads, soonest first. The list in full on every page, at the designer's word: a
+        // build stands hatched on its card and a transit is drawn on the Solar System Map for
+        // anyone to see, so the disclosure rule hides nothing here; it only saves the clicks.
+        ui.label(RichText::new("Under way").strong());
+        let u = game.under_way(seat);
+        if u.builds.is_empty() && u.transits.is_empty() {
+            ui.label(RichText::new("Nothing under way.").weak());
+        } else {
+            let turns = |n: u32| if n == 1 { "1 turn".to_string() } else { format!("{n} turns") };
+            if !u.builds.is_empty() {
+                // "in China", "at Tycho on the Moon": a Region is a country, a Colony a place.
+                let items: Vec<String> = u.builds.iter().map(|(what, place, n)| format!("{} {} {} ({})", with_article(what), if matches!(place, Place::State(_)) { "in" } else { "at" }, game.place_name(*place), turns(*n))).collect();
+                ui.label(format!("Building: {}", items.join(", ")));
+            }
+            if !u.transits.is_empty() {
+                // "Earth to Mars" in words: the interface font has no arrow and drew a box for one.
+                let items: Vec<String> = u.transits.iter().map(|(name, from, to, n)| format!("{name}, {from} to {to}, {}", turns(*n))).collect();
+                ui.label(format!("In transit: {}", items.join("; ")));
+            }
+        }
         ui.add_space(8.0);
 
         // The rulebook, SHUT by default: the setup screen's Faction card, the same code, brought
@@ -6524,31 +6934,22 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             ui.label(format!("Stabilization run: {} consecutive turn(s) under the Sink.", game.seat(Seat(0)).stabilization_run));
             // Ticket #53: Blame, Faction by Faction, in the panel that attributes the Emissions.
             ui.separator();
-            ui.label(RichText::new("Blame: the CO2 each Faction is answerable for").strong());
+            ui.label(RichText::new("Blame: the CO2 each Faction is answerable for").strong()).on_hover_text("Blame is the CO2 this Faction is answerable for: everything the sources it controlled emitted, less everything it removed.\nWhat it removed -- its Scrubbers, and for the Custodians what their Research Directive adds to the Natural Sink -- is its Blame credit.\nTwo rules read Blame: a share above a fair quarter raises this Faction's Influence thresholds on every Region it does not hold, up to half again;\nand every rival thinks a point worse of it for each step its share stands above that quarter, each by its own measure.");
             for seat in Seat::ALL {
                 let s = game.seat(seat);
-                let credit = game.blame_credit(seat);
-                let line = if credit > 0.0 {
-                    format!(
-                        "{}: emitted {:.0} ppm, removed {:.0} ppm, Blame 0 ppm, credit {:.0} ppm, share {:.2}, thresholds x{:.2}",
-                        game.seat_name(seat),
-                        s.blame_emitted,
-                        s.blame_removed,
-                        credit,
-                        game.blame_share(seat),
-                        game.blame_threshold_multiplier(seat)
-                    )
-                } else {
-                    format!(
-                        "{}: emitted {:.0} ppm, removed {:.0} ppm, Blame {:.0} ppm, share {:.2}, thresholds x{:.2}",
-                        game.seat_name(seat),
-                        s.blame_emitted,
-                        s.blame_removed,
-                        game.blame(seat),
-                        game.blame_share(seat),
-                        game.blame_threshold_multiplier(seat)
-                    )
-                };
+                // Ticket #265 (version 0.08.4): one form for every seat -- answerable for, how it
+                // got there, and what it holds in credit -- at the designer's word.
+                let smeared = if s.blame_smeared > 0.0 { format!(", {:.0} laid on by rivals", s.blame_smeared) } else { String::new() };
+                let smeared = format!("{smeared}{}{}", if s.credits_bought > 0.0 { format!(", {:.0} bought as carbon credits", s.credits_bought) } else { String::new() }, if s.credits_sold > 0.0 { format!(", {:.0} sold as carbon credits", s.credits_sold) } else { String::new() });
+                let line = format!(
+                    "{}: answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit{smeared}); share {:.2}, thresholds x{:.2}",
+                    game.seat_name(seat),
+                    game.blame(seat),
+                    s.blame_emitted,
+                    game.blame_credit(seat),
+                    game.blame_share(seat),
+                    game.blame_threshold_multiplier(seat)
+                );
                 // Ticket #112 (version 0.07.1): each Faction's ppm figures wear the Emissions
                 // glyph, so the figure a Faction is answerable for is marked as the same thing the
                 // Facility lists and the top bar count. "share" and "thresholds" are not ppm and
@@ -6582,33 +6983,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 ui.label(format!("{}: {}", p.second_name, p.second_text));
                 ui.add(egui::ProgressBar::new(p.second_fraction() as f32));
                 // Ticket #72: the Prospectors set their Venture Capital Fund's share here, and draw.
+                // Ticket #256 (version 0.08.4): a slider and a Withdraw field, in their own function.
                 if seat == Seat(0) && !session.spectator && game.kind(Seat(0)) == FactionKind::Prospectors {
-                    let v = game.tables.venture.clone();
-                    let now = (game.seat(Seat(0)).venture_share * 100.0).round() as u32;
-                    let pending_share = session.pending.iter().find_map(|o| if let Order::SetVentureShare { share } = o { Some(*share) } else { None });
-                    ui.horizontal_wrapped(|ui| {
-                        ui.label(format!("Banking {now}% of Ducat income{}:", pending_share.map(|p| format!(" ({p}% from next turn)")).unwrap_or_default()));
-                        let step = (v.share_step * 100.0).round().max(1.0) as u32;
-                        let max = (v.max_share * 100.0).round() as u32;
-                        let mut pct = 0u32;
-                        while pct <= max {
-                            if ui.selectable_label(pending_share.unwrap_or(now) == pct, format!("{pct}%")).clicked() {
-                                if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetVentureShare { .. })) {
-                                    actions.push(Action::Cancel(i));
-                                }
-                                if pct != now {
-                                    actions.push(Action::Place(Order::SetVentureShare { share: pct }));
-                                }
-                            }
-                            pct += step;
-                        }
-                    });
-                    let draw = Order::DrawVenture { amount: 10 };
-                    let ok = game.check_order(Seat(0), &session.pending, &draw).is_ok();
-                    let back = (10.0 * v.draw_return).floor() as i64;
-                    if ui.add_enabled(ok, egui::Button::new("Draw 10 from the Fund")).on_hover_text(format!("{back} Ducats come back to the Stockpile; a tenth is lost.")).clicked() {
-                        actions.push(Action::Place(draw));
-                    }
+                    venture_fund_control(ui, session, game, view, actions);
                 }
                 ui.add_space(8.0);
             }
@@ -6814,7 +7191,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             let count = shown.len();
             egui::Modal::new("moment".into()).show(ctx, |ui| {
                 ui.set_width(if m.tech.is_some() { 780.0 } else { 460.0 });
-                ui.label(RichText::new(&m.figure).size(30.0).strong().color(Color32::from_rgb(255, 220, 150)));
+                // Ticket #261 (version 0.08.4): a rival's Moment wears that Faction's colour on its figure.
+                let figure_colour = m.seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::from_rgb(255, 220, 150));
+                ui.label(RichText::new(&m.figure).size(30.0).strong().color(figure_colour));
                 ui.label(RichText::new(&m.text).size(17.0));
                 if let Some(note) = &m.note {
                     ui.label(RichText::new(note).size(15.0).color(Color32::from_rgb(200, 220, 255)));

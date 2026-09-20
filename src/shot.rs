@@ -81,6 +81,7 @@ fn moment_from_id(name: &str) -> Option<MomentKind> {
         "antarctica" => Some(MomentKind::Antarctica),
         "archive" => Some(MomentKind::ArchiveComplete),
         "lost" => Some(MomentKind::LostInTransit),
+        "rival" => Some(MomentKind::RivalProgress),
         _ => None,
     }
 }
@@ -259,6 +260,20 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.energy = 60;
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
         }
+        // `rival:1` (a building aid, ticket #261, version 0.08.4): seat 1 stands three quarters of
+        // the way to its Victory Condition -- nine Colonists on the Moon of twelve, and, for the
+        // Prospectors it usually is, the Fund at 2000 of 2500 -- and a quiet turn runs so the
+        // rival's Moment fires and `moment:rival` can open it in the Report picture.
+        if std::env::args().any(|a| a == "rival:1") {
+            let rival = Seat(1);
+            let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
+            let id = ColonyId(g.fresh_id());
+            let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat)];
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(rival), modules, colonists: 9, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.seats[1].venture_fund = 2000;
+            g.seats[1].stabilization_run = 3;
+            run_one_quiet_turn(g);
+        }
         // `observatory:<n>` (a building aid, ticket #80): seat 0 gets a Colony on Mars with three
         // Habitats, a Generator, a Mine and an Observatory, n Colonists living there, and its card
         // opens in the Mars picture so the Observatory's line and the build button can be seen.
@@ -426,6 +441,32 @@ fn build_board(session: &mut Session) {
                 fuel: g.tables.unit(UnitKind::ColonyShip).tank,
             });
         }
+        // `settler:<body id>` (a building aid, ticket #258, version 0.08.4): a Colony Ship of seat 0's
+        // with eight Colonists aboard sits at that Body, and that Body's picture selects the stack,
+        // so the Ship card's founding buttons -- one per free slot, yields on their faces -- can be
+        // photographed. Nothing else composes a loaded Colony Ship at a world with free slots.
+        if let Some(body) = std::env::args().find_map(|a| a.strip_prefix("settler:").and_then(body_from_id)) {
+            let id = ShipId(g.fresh_id());
+            let turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            g.ships.push(Ship {
+                id,
+                name,
+                slot: None,
+                kind: UnitKind::ColonyShip,
+                seat: Seat(0),
+                damage: 0,
+                at: ShipAt::Body(body),
+                colonists: 8,
+                colonists_education: 1.0,
+                army: None,
+                stance: Stance::Hold,
+                escaped: false,
+                arrived_this_turn: false,
+                built_turn: turn,
+                fuel: g.tables.unit(UnitKind::ColonyShip).tank,
+            });
+        }
         // `venture:<n>` (a building aid, ticket #72): seat 0 as the Prospectors holds n Materials in
         // the Venture Capital Fund and banks half its output.
         if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("venture:").and_then(|v| v.parse::<i64>().ok()))
@@ -452,6 +493,48 @@ fn build_board(session: &mut Session) {
                 let theirs = threshold.max(mine + margin + 5 + 4 * i as i64);
                 g.seat_mut(Seat(1)).influence.insert(place, theirs);
             }
+        }
+        // `underway:1` (a building aid, ticket #263, version 0.08.4): seat 0 has a Factory on order
+        // in its start state, a Module on order at a Colony on the Moon, and a Frigate three turns
+        // out on the road to Mars, so the Faction window's Under way block has both lines to show.
+        if std::env::args().any(|a| a == "underway:1") {
+            let turn = g.turn;
+            if let Some(sid) = g.directed_states(Seat(0)).first().copied() {
+                g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Factory), seat: Seat(0), due_turn: turn + 2, coastal: false });
+            }
+            let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
+            let id = ColonyId(g.fresh_id());
+            let queue = vec![Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), due_turn: turn, coastal: false }];
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Habitat)], colonists: 4, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
+            let sid = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::Frigate);
+            g.ships.push(Ship {
+                id: sid,
+                name,
+                slot: None,
+                kind: UnitKind::Frigate,
+                seat: Seat(0),
+                damage: 0,
+                at: ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 3 },
+                colonists: 0,
+                colonists_education: 1.0,
+                army: None,
+                stance: Stance::Hold,
+                escaped: false,
+                arrived_this_turn: false,
+                built_turn: turn,
+                fuel: g.tables.unit(UnitKind::Frigate).tank,
+            });
+        }
+        // `challenger:1` (a building aid, ticket #262, version 0.08.4): a rival stands on seat 0's
+        // start state, well short of its price, so the challenger line on the held card has a name
+        // and two figures to show. `threat:1` puts a rival OVER the price; this one keeps it under.
+        if std::env::args().any(|a| a == "challenger:1")
+            && let Some(sid) = g.directed_states(Seat(0)).first().copied()
+        {
+            let place = Place::State(sid);
+            let price = g.influence_needed_for(Seat(1), place);
+            g.seat_mut(Seat(1)).influence.insert(place, (price - 23).max(1));
         }
         // Ticket #127 (version 0.07.2): `attend:1` (a building aid, not part of the spec) turns the
         // standing order on for seat 0, so the side panel places an Influence order and a roster
@@ -570,7 +653,11 @@ fn build_board(session: &mut Session) {
             if let Some(i) = g.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::Bank) {
                 g.state_mut(sid).facilities.remove(i);
             }
-            g.state_mut(sid).facilities.push(Facility::new(FacilityKind::SeaWall));
+            // Ticket #257 (version 0.08.4): the wall stands through a rise now, so the aid's wall
+            // has held one, and its row says what that costs.
+            let mut wall = Facility::new(FacilityKind::SeaWall);
+            wall.rises_held = 1;
+            g.state_mut(sid).facilities.push(wall);
             g.seats[0].stockpile.materials = 300;
             g.seats[0].stockpile.energy = 400;
             g.seats[0].stockpile.ducats = 300;
@@ -1031,6 +1118,19 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         if let Some(s) = wanted {
             view.selection = Selection::State(s);
             view.show_climate = false;
+        }
+        // `site:<body id>,<slot>` (a building aid, ticket #258): that Body's picture opens the empty
+        // Colony Slot's panel, the one place the yields were still in words. `settler:<body id>`
+        // (the same ticket): that Body's picture selects seat 0's Ship stack there.
+        if let View::Surface(body) = v {
+            if let Some((b, slot)) = std::env::args().find_map(|a| a.strip_prefix("site:").and_then(|v| v.split_once(',')).and_then(|(b, n)| Some((body_from_id(b)?, n.parse::<u32>().ok()?))))
+                && b == body
+            {
+                view.selection = Selection::Slot(body, slot);
+            }
+            if std::env::args().any(|a| a.strip_prefix("settler:").and_then(body_from_id) == Some(body)) {
+                view.selection = Selection::ShipStack(body, Seat(0));
+            }
         }
         plan.next_at = t + 2.5;
     }

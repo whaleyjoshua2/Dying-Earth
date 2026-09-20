@@ -77,6 +77,8 @@ impl BodyCard {
 pub struct StateCard {
     pub id: StateId,
     pub name: String,
+    /// Ticket #270 (version 0.08.4): the adjective its Armies are named by -- "the 2nd Chinese Army".
+    pub demonym: String,
     /// Version 0.07.2 (ticket #122): the two-letter code of the Nation's flag, a file in
     /// `assets/flags/`. Empty where a Region has none, and the card then draws no flag.
     #[serde(default)]
@@ -145,6 +147,13 @@ pub struct ScrubberCard {
     pub per_population: f64,
     pub min: u32,
     pub max: u32,
+}
+
+/// Ticket #257 (version 0.08.4): what each Sea Level rise a Sea Wall has held back adds to its
+/// keep, in Materials a turn (`facilities.toml`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct SeaWallCard {
+    pub upkeep_per_rise: f64,
 }
 
 /// Ticket #187 (version 0.08.0): the band a place's Education Level bends its Resistance through,
@@ -305,6 +314,10 @@ pub struct EventCard {
     /// How many copies sit in the deck (ticket #25).
     #[serde(default = "one")]
     pub copies: u32,
+    /// Ticket #259 (version 0.08.4): a card that can only land off Earth. Out of the deck at the
+    /// start, joining it on `off_earth_join_turn`.
+    #[serde(default)]
+    pub off_earth: bool,
 }
 
 fn one() -> u32 {
@@ -338,6 +351,11 @@ pub struct EventsTable {
     pub drought_output_multiplier: f64,
     pub drought_unrest: f64,
     pub volcanic_co2: f64,
+    /// Ticket #257 (version 0.08.4): what a Storm Surge does to a state whose Sea Wall holds --
+    /// the Facilities in its coastal slots make this much of their output at the next Income.
+    pub storm_surge_coastal_multiplier: f64,
+    /// Ticket #259: the turn the off-Earth cards are shuffled into the deck.
+    pub off_earth_join_turn: u32,
     pub event: Vec<EventCard>,
 }
 
@@ -346,6 +364,10 @@ pub struct FactionCard {
     pub id: FactionKind,
     pub name: String,
     pub blurb: String,
+    /// Ticket #260 (version 0.08.4): what the Faction says of itself, one line, on the card under
+    /// its name. The blurb says what it does; the motto is the Faction speaking.
+    #[serde(default)]
+    pub motto: String,
     /// Ticket #210 (version 0.08.1): the prefix every Ship of this Faction wears in front of its
     /// name. It belongs to the HOLDER, not the hull -- a name travels with the ship, a prefix with
     /// whoever flies it -- so it is read from the seat at drawing time and never stored on the Ship.
@@ -672,6 +694,15 @@ pub struct InfluenceTable {
     pub resistance: ResistanceCard,
     /// Ticket #53: what a Faction's share of the table's Blame does to its Influence thresholds.
     pub blame: BlameTable,
+    /// Ticket #267: the Smear campaign's rate.
+    pub smear: SmearTable,
+}
+
+/// Ticket #267 (version 0.08.4): the Smear campaign, in `influence.toml` under `[smear]`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SmearTable {
+    /// ppm laid on the target's Blame ledger per Influence spent.
+    pub ppm_per_influence: f64,
 }
 
 /// Ticket #53 (version 0.05): Blame, in `influence.toml` under `[blame]`.
@@ -681,11 +712,23 @@ pub struct BlameTable {
     pub fair_share: f64,
     /// The most a Faction's thresholds can be multiplied by, however dirty it is.
     pub cap: f64,
+    /// Ticket #266 (version 0.08.4): Blame moderates the decay of a Standing on a Region the
+    /// Faction does not hold -- a step rule, at the designer's word. A share at or below
+    /// `decay_slow_below` decays `decay_slow` a turn; at or above `decay_fast_from`, `decay_fast`;
+    /// between, the plain `decay`. Never on a Colony or a station, never on a held place.
+    pub decay_slow_below: f64,
+    pub decay_fast_from: f64,
+    pub decay_slow: i64,
+    pub decay_fast: i64,
 }
 
 /// Ticket #52 (version 0.05): every number that moves a Nation State's Unrest (`unrest.toml`).
 #[derive(Debug, Clone, Deserialize)]
 pub struct UnrestTable {
+    /// Ticket #269 (version 0.08.4): Agitate's price in Ducats and Influence, and what it adds.
+    pub agitate_ducats: i64,
+    pub agitate_influence: i64,
+    pub agitate_points: f64,
     pub max: f64,
     pub neutral_max: f64,
     pub population_fall: f64,
@@ -740,6 +783,9 @@ pub struct VictoryTable {
     pub start_month: i64,
     #[serde(default = "one_month")]
     pub months_per_turn: i64,
+    /// Ticket #261 (version 0.08.4): the share of the way to its Victory Condition at which a
+    /// rival's Moment fires.
+    pub rival_moment_share: f64,
 }
 
 fn twenty_thirty() -> i64 {
@@ -829,6 +875,13 @@ pub struct AiWeights {
     pub relief: f64,
     /// Ticket #52: raise a Constabulary in a restive state.
     pub build_constabulary: f64,
+    /// Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward whose Blame
+    /// share stands above the fair quarter.
+    pub smear: f64,
+    /// Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
+    pub buy_credits: f64,
+    /// Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
+    pub agitate: f64,
     /// Ticket #52: steer this turn's refugee flows into one calm state.
     pub resettle: f64,
     /// Ticket #227 (version 0.08.2): how readily this seat offers an Accord. Modest by default: an
@@ -1004,6 +1057,7 @@ struct FacilitiesFile {
     facility: Vec<FacilityCard>,
     industry_level: IndustryLevelCard,
     scrubber: ScrubberCard,
+    sea_wall: SeaWallCard,
     mothball: MothballCard,
     school: SchoolCard,
     unique: UniqueCard,
@@ -1097,6 +1151,7 @@ struct FactionsFile {
     ducats: DucatsCard,
     research_directive: ResearchDirectiveCard,
     venture_capital: VentureCard,
+    carbon_credits: CarbonCreditsCard,
     emigrants: EmigrantsCard,
     faction_orders: FactionOrdersCard,
     exodus_call: ExodusCallCard,
@@ -1212,6 +1267,23 @@ pub struct EmigrantsCard {
 
 /// Ticket #72 (version 0.05.5): the Prospectors' Venture Capital Fund: the largest share of their
 /// Materials output that may be banked a turn, the step the share moves in, and what a draw returns.
+/// Ticket #268 (version 0.08.4): carbon credits, in `factions.toml` under `[carbon_credits]`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CarbonCreditsCard {
+    /// Ducats per ppm, before the seller's view of the buyer multiplies it.
+    pub price_per_ppm: i64,
+    /// The most ppm one buyer may take in a turn.
+    pub cap_per_turn: i64,
+    /// The price multiplier by the seller's Relations level toward the buyer; Hostile refuses.
+    pub friendly: f64,
+    pub cordial: f64,
+    pub neutral: f64,
+    pub wary: f64,
+    pub cold: f64,
+    /// The computer Custodians oversell by the cap when their Ducats stand below this.
+    pub ai_oversell_when_ducats_below: i64,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct VentureCard {
     pub max_share: f64,
@@ -1268,6 +1340,8 @@ pub struct Tables {
     /// Ticket #54: the Scrubber cap and the Mothball prices (`facilities.toml`).
     pub scrubber: ScrubberCard,
     pub mothball: MothballCard,
+    /// Ticket #257: the Sea Wall's keep per rise held.
+    pub sea_wall: SeaWallCard,
     /// Ticket #185: the School's step and ceiling.
     pub school: SchoolCard,
     /// Tickets #182, #184, #186: the three Unique Facility clause figures that have one.
@@ -1300,6 +1374,8 @@ pub struct Tables {
     pub faction_orders: FactionOrdersCard,
     pub ducats: DucatsCard,
     pub venture: VentureCard,
+    /// Ticket #268: carbon credits.
+    pub carbon_credits: CarbonCreditsCard,
     pub emigrants: EmigrantsCard,
     /// Ticket #191: the Relations scale and what moves it.
     pub relations: RelationsCard,
@@ -1388,6 +1464,7 @@ impl Tables {
             industry_level: facilities.industry_level,
             scrubber: facilities.scrubber,
             mothball: facilities.mothball,
+            sea_wall: facilities.sea_wall,
             school: facilities.school,
             unique: facilities.unique,
             slots: modules.slots,
@@ -1410,6 +1487,7 @@ impl Tables {
             faction_orders: factions.faction_orders,
             research_directive: factions.research_directive,
             venture: factions.venture_capital,
+            carbon_credits: factions.carbon_credits,
             emigrants: factions.emigrants,
             relations: factions.relations,
             climate,

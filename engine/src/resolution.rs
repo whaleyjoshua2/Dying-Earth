@@ -46,6 +46,7 @@ impl Game {
         self.apply_event_now(); // (h)
         self.resolve_strip_permits(); // (h), ticket #54: a permit that ran out charges its price
         self.resolve_unrest(); // (i), ticket #52
+        self.resolve_credits(); // (j), ticket #268: carbon credits change hands
         self.pending = Pending::default();
         for a in &mut self.armies {
             a.move_to = None;
@@ -776,16 +777,17 @@ impl Game {
             *s.influence.entry(place).or_insert(0) += r;
             s.influenced_this_turn.push(place);
         }
-        // Decay on every standing that received nothing this turn: 1 on a place you control, 2 elsewhere.
-        let decay = self.tables.influence.decay;
-        let decay_own = self.tables.influence.decay_controlled;
+        // Decay on every standing that received nothing this turn: 1 on a place you control, 2
+        // elsewhere -- and, since ticket #266 (version 0.08.4), 1 or 3 on a Region you do not hold
+        // by your Blame share, which `standing_decay_for` reads for every place.
         for seat in Seat::ALL {
-            let owned: Vec<Place> = self.seat(seat).influence.keys().filter(|t| self.place_control(**t).controller() == Some(seat)).copied().collect();
+            let decays: Vec<(Place, i64)> = self.seat(seat).influence.keys().map(|t| (*t, self.standing_decay_for(seat, *t))).collect();
             let s = self.seat_mut(seat);
             let touched = std::mem::take(&mut s.influenced_this_turn);
-            for (t, v) in s.influence.iter_mut() {
-                if !touched.contains(t) {
-                    let d = if owned.contains(t) { decay_own } else { decay };
+            for (t, d) in decays {
+                if !touched.contains(&t)
+                    && let Some(v) = s.influence.get_mut(&t)
+                {
                     *v = (*v - d).max(0);
                 }
             }
@@ -1182,12 +1184,8 @@ impl Game {
                 }
             }
             (_, BuildItem::Unit(UnitKind::Army)) => {
-                let id = ArmyId(self.fresh_id());
-                let home = match place {
-                    Place::State(s) => ArmyHome::State(s),
-                    Place::Colony(c) => ArmyHome::Colony(c),
-                };
-                self.armies.push(Army { id, home, at: ArmyAt::Place(place), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+                // Ticket #270 (version 0.08.4): raised through the one door, and named there.
+                self.raise_army(place, false);
             }
             (_, BuildItem::Unit(kind)) => {
                 let body = match place {
@@ -1665,6 +1663,47 @@ impl Game {
     /// Unrest settles last, once every rise of the turn is in: the refugees the turn's flows
     /// brought, then the falls (Relief, a Constabulary, and the natural fall in a turn nothing
     /// raised it), then the throw-off, then the Report lines for crossing a threshold.
+    /// Ticket #268 (version 0.08.4): **carbon credits.** The Custodians' offer for the turns to come
+    /// is set from their order; then every purchase is filled first come first served out of this
+    /// turn's offer. A ppm bought comes off the buyer's ledger for good and off the seller's credit
+    /// -- and past what the seller held, onto the seller's ledger as Blame taken, at the designer's
+    /// word: "any amount and take the blame". A buyer left short gets the Ducats back for what it
+    /// did not get; the rest land with the Custodians. A purchase is an act of friendship both ways.
+    pub fn resolve_credits(&mut self) {
+        for (seat, ppm) in std::mem::take(&mut self.pending.credit_offers) {
+            self.seat_mut(seat).credits_offered = ppm;
+            let text = self.say("credits_offered", &[("faction", self.seat_name(seat)), ("n", ppm.to_string())]);
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
+            self.ai_deed(seat, "offer_credits", &[("n", ppm.to_string())]);
+        }
+        let Some(seller) = self.credit_seller() else { return };
+        let mut left = self.seat(seller).credits_offered;
+        for (buyer, ppm, paid) in std::mem::take(&mut self.pending.credit_buys) {
+            let take = ppm.min(left).max(0);
+            let kept = if ppm > 0 { paid * take / ppm } else { 0 };
+            let back = paid - kept;
+            if back > 0 {
+                self.seat_mut(buyer).stockpile.ducats += back;
+                let text = self.say("credits_short", &[("faction", self.seat_name(buyer)), ("n", (ppm - take).to_string()), ("back", back.to_string())]);
+                self.report_line_of(buyer, LineKind::YourWorks, LineKind::Note, None, text);
+            }
+            if take <= 0 {
+                continue;
+            }
+            left -= take;
+            self.seat_mut(buyer).credits_bought += take as f64;
+            self.seat_mut(seller).credits_sold += take as f64;
+            self.seat_mut(seller).stockpile.ducats += kept;
+            self.credit(buyer, seller);
+            self.credit(seller, buyer);
+            let (who, whom) = (self.seat_name(buyer), self.seat_name(seller));
+            self.log(format!("The {who} bought {take} ppm of carbon credit from the {whom} for {kept} Ducats."));
+            let text = self.say("credits_bought", &[("faction", who), ("n", take.to_string()), ("seller", whom), ("ducats", kept.to_string())]);
+            self.report_line(LineKind::Note, None, text);
+            self.ai_deed(buyer, "buy_credits", &[("n", take.to_string())]);
+        }
+    }
+
     pub fn resolve_unrest(&mut self) {
         let u = self.tables.unrest.clone();
         // The refugees the turn's flows brought, charged once so the per-turn cap counts them all.
@@ -1697,6 +1736,37 @@ impl Game {
                 &[("faction", self.seat_name(seat)), ("state", self.tables.state(sid).name.clone()), ("standing", gain.to_string())],
             );
             self.report_line(LineKind::Refugees, Some(ReportPlace::State(sid)), text);
+        }
+        // Ticket #267 (version 0.08.4): Smear campaigns land -- ppm on the target's ledger for good,
+        // an offence at an Influence push's weight, and a Report line naming who paid.
+        for (seat, target, amount) in std::mem::take(&mut self.pending.smears) {
+            let ppm = amount as f64 * self.tables.influence.smear.ppm_per_influence;
+            self.seat_mut(target).blame_smeared += ppm;
+            self.offend_by(seat, target, 1);
+            let (who, whom) = (self.seat_name(seat), self.seat_name(target));
+            self.log(format!("The {who} smeared the {whom}: {ppm:.0} ppm laid on their Blame."));
+            let text = self.say("smear", &[("faction", who), ("target", whom.clone()), ("ppm", format!("{ppm:.0}"))]);
+            self.report_line(LineKind::Note, None, text);
+            self.ai_deed(seat, "smear", &[("n", amount.to_string()), ("faction", whom)]);
+        }
+        // Ticket #269 (version 0.08.4): Agitate lands before Relief, so a holder's Relief the same
+        // turn answers it. One point, damped by a working Constabulary, an offence against the
+        // holder, and a Report line naming who paid.
+        for (seat, sid) in std::mem::take(&mut self.pending.agitates) {
+            let Some(holder) = self.place_control(Place::State(sid)).controller() else { continue };
+            let rose = self.raise_unrest(sid, u.agitate_points, UnrestSource::Agitate);
+            self.offend_by(seat, holder, 1);
+            self.seat_mut(seat).agitates_issued += 1;
+            let (who, name) = (self.seat_name(seat), self.tables.state(sid).name.clone());
+            let text = if rose > 0.0 {
+                self.log(format!("The {who} agitated in {name}: Unrest rose by {} to {}.", Game::unrest_figure(rose), self.unrest_text(sid)));
+                self.say("agitate", &[("faction", who), ("state", name.clone()), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(sid))])
+            } else {
+                self.log(format!("The {who} agitated in {name}; the Constabulary held it to nothing."));
+                self.say("agitate_damped", &[("faction", who), ("state", name.clone())])
+            };
+            self.report_line(LineKind::Unrest, Some(ReportPlace::State(sid)), text);
+            self.ai_deed(seat, "agitate", &[("state", name)]);
         }
         // Relief (rule 3): one point per order, paid for in Ducats at the Orders phase.
         let mut relieved: Vec<(Seat, StateId, f64)> = Vec::new();

@@ -322,7 +322,10 @@ fn influence_threshold_takes_control_and_decay_takes_two_from_untouched_targets(
     g.resolution_phase();
     assert_eq!(g.state(StateId::NorthAfrica).control, Control::Controlled(Seat(0)));
     assert_eq!(g.seats[0].influence[&Place::State(StateId::NorthAfrica)], 40, "the standing persists through the transfer (#33)");
-    assert_eq!(g.seats[0].influence[&Place::State(StateId::Europe)], 8);
+    // Ticket #266 (version 0.08.4): 1, not 2. With no Blame on the table yet every seat's share is
+    // nought, at or below the eighth where a Standing on a Region you do not hold decays slowly;
+    // from the first Climate phase on, shares exist and the plain 2 returns for everyone between.
+    assert_eq!(g.seats[0].influence[&Place::State(StateId::Europe)], 9, "decay 1 while nobody has any Blame (#266)");
 }
 
 // ---------------------------------------------------------------- #33 standings that persist
@@ -681,7 +684,7 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
 fn only_a_carrier_carries_an_army_and_a_colony_ship_carries_only_colonists() {
     let mut g = game();
     let army = ArmyId(g.fresh_id());
-    g.armies.push(Army { id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
     let ship = |id: u32, kind: UnitKind| Ship { name: String::new(), id: ShipId(id), kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None };
     g.ships.extend([ship(101, UnitKind::ColonyShip), ship(102, UnitKind::Battleship), ship(103, UnitKind::Carrier)]);
     let load_army = |s: u32| Order::Load { ship: ShipId(s), colonists: 0, from: LoadSource::State(StateId::EastAsia), army: Some(army) };
@@ -813,7 +816,7 @@ fn embassies_and_relays_add_to_the_allotment_and_raise_their_places_standing_eac
 
 fn occupier_in(g: &mut Game, seat_home: StateId, target: StateId) -> ArmyId {
     let id = ArmyId(g.fresh_id());
-    g.armies.push(Army { id, home: ArmyHome::State(seat_home), at: ArmyAt::Place(Place::State(target)), damage: 0, standing: false, stance: Stance::Attack, escaped: false, move_to: None });
+    g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(seat_home), at: ArmyAt::Place(Place::State(target)), damage: 0, standing: false, stance: Stance::Attack, escaped: false, move_to: None });
     id
 }
 
@@ -871,7 +874,7 @@ fn occupation_of_a_controlled_state_returns_it_to_its_owner_when_broken() {
 
 fn meet_first(g: &mut Game, seat: Seat) {
     match g.kind(seat) {
-        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 2000,
+        FactionKind::Prospectors => g.seats[seat.index()].venture_fund = 2500,
         FactionKind::Custodians => g.seats[seat.index()].stabilization_run = 3,
         FactionKind::Arkwrights => {}
         FactionKind::Archivists => g.seats[seat.index()].research_total = 150,
@@ -895,7 +898,7 @@ fn both_met_the_larger_margin_wins() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
     g.seats[0].stabilization_run = 3; // parts 1.0 and 1.0 -> margin 1.0
-    g.seats[1].venture_fund = 2400; // parts 1.2 and 1.25 -> margin 1.2
+    g.seats[1].venture_fund = 3000; // parts 1.2 and 1.25 -> margin 1.2 (ticket #256: the bar is 2500)
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
@@ -907,7 +910,7 @@ fn both_met_by_the_same_margin_is_a_draw() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     g.seats[0].stabilization_run = 3;
-    g.seats[1].venture_fund = 2400; // the lower fraction is the presence, 1.0, on both sides
+    g.seats[1].venture_fund = 3000; // the lower fraction is the presence, 1.0, on both sides (ticket #256: the bar is 2500)
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Draw { .. })), "{:?}", g.outcome);
@@ -969,11 +972,39 @@ fn a_card_comes_on_about_half_the_turns_at_the_start_and_more_when_warm() {
 
 #[test]
 fn the_deck_is_twenty_six_cards_as_the_table_deals_them_and_no_calm() {
-    let g = game();
+    let mut g = game();
     // Ticket #76 (version 0.05.5): forty cards for thirty-six turns. The 28 of #25 and #32, a third
     // copy of Heatwave, Wildfire, Rich Seam and Solar Storm, a second of Unrest, Methane Burst,
     // Labour Dispute and Dust Storm, and four new Events once each.
-    assert_eq!(g.deck.cards.len(), 40, "forty cards for thirty-six turns (#76)");
+    // Ticket #259 (version 0.08.4): the twelve cards that can only land off Earth are not dealt at
+    // the start; they join on turn 12. So the deck begins at 28 and is 40 only once they are in.
+    assert_eq!(g.deck.cards.len(), 28, "twenty-eight at the start: the twelve off-Earth cards join on turn 12 (#259)");
+    assert!(!g.deck.off_earth_joined);
+    for id in [EventId::GridFailure, EventId::ReactorLeak, EventId::DustStorm, EventId::Moonquake, EventId::HeliumVein, EventId::RichSeam, EventId::IceDeposit] {
+        assert!(g.tables.events.event.iter().find(|e| e.id == id).unwrap().off_earth, "{id:?} is flagged off Earth");
+        assert_eq!(g.deck.count(id), 0, "{id:?} not dealt at the start");
+    }
+    assert_eq!(g.tables.events.off_earth_join_turn, 12);
+    // A card may or may not be drawn on any turn (the chance is never nought), so the deck and its
+    // drawn pile are counted together.
+    let dealt = |g: &Game| g.deck.cards.len() + g.deck.drawn.len();
+    g.turn = 11;
+    g.event_phase();
+    assert_eq!(dealt(&g), 28, "turn 11: not yet");
+    g.turn = 12;
+    g.event_phase();
+    assert!(g.deck.off_earth_joined);
+    assert_eq!(dealt(&g), 40, "turn 12: the twelve join, and the deck is the forty of #76");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("join the deck")), "the Report says so: {:?}", g.report.lines);
+    g.event_phase();
+    assert_eq!(dealt(&g), 40, "and they join once");
+    // The rest of this test reads the deck as dealt, so a fresh one -- with the off-Earth cards
+    // in -- is what the copy counts below are checked against.
+    let mut g = game();
+    g.turn = 12;
+    g.deck.cards.append(&mut g.deck.drawn);
+    g.event_phase();
+    g.deck.cards.append(&mut g.deck.drawn);
     let copies = |id: EventId| g.deck.cards.iter().filter(|c| **c == Card::Event(id)).count();
     for id in [EventId::Heatwave, EventId::Wildfire, EventId::RichSeam, EventId::SolarStorm] {
         assert_eq!(copies(id), 3, "{id:?} three times");
@@ -1367,14 +1398,14 @@ fn colony_attack_turns(seed: u64) -> Option<u32> {
     // The AI Prospectors hold a Colony on the Moon with a Barracks and its Army.
     let cid = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Barracks], 4);
     let defender = ArmyId(g.fresh_id());
-    g.armies.push(Army { id: defender, home: ArmyHome::Colony(cid), at: ArmyAt::Place(Place::Colony(cid)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+    g.armies.push(Army { name: String::new(), id: defender, home: ArmyHome::Colony(cid), at: ArmyAt::Place(Place::Colony(cid)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
     // The player's two Carriers arrive at the Moon, each carrying an Army: strength 8 against 4.
     let mut attackers = Vec::new();
     let mut ships = Vec::new();
     for kind in [UnitKind::Carrier, UnitKind::Carrier] {
         let attacker = ArmyId(g.fresh_id());
         let ship = ShipId(g.fresh_id());
-        g.armies.push(Army { id: attacker, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+        g.armies.push(Army { name: String::new(), id: attacker, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
         g.ships.push(Ship { name: String::new(), id: ship, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, colonists_education: 1.0, army: Some(attacker), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
         attackers.push(attacker);
         ships.push(ship);
@@ -1679,7 +1710,7 @@ fn more_than_one_seat_meeting_its_condition_gives_the_game_to_the_larger_margin(
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 15);
     g.seats[0].stabilization_run = 3; // parts 1.0 and 1.0 -> margin 1.0
-    g.seats[1].venture_fund = 2400; // parts 1.2 and 1.25 -> margin 1.2
+    g.seats[1].venture_fund = 3000; // parts 1.2 and 1.25 -> margin 1.2 (ticket #256: the bar is 2500)
     open_gates(&mut g);
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(1), .. })), "{:?}", g.outcome);
@@ -1696,7 +1727,7 @@ fn the_last_turn_ranks_every_seat_by_score() {
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 6);
     let p = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 9);
     let _ = p;
-    g.seats[1].venture_fund = 1500;
+    g.seats[1].venture_fund = 1875; // three quarters of the 2500 bar (ticket #256)
     colony(&mut g, Seat(2), BodyId::Phobos, &[ModuleKind::Habitat], 3);
     assert!((g.progress(Seat(1)).score() - 0.75).abs() < 1e-9, "{:?}", g.progress(Seat(1)).score());
     g.end_phase();
@@ -2613,7 +2644,7 @@ fn e_four_stops_replenishment_seven_halves_output_ten_throws_the_controller_off(
     g.seats[1].influence.insert(Place::State(StateId::NorthAfrica), 17);
     g.state_mut(StateId::NorthAfrica).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(0), coastal: false, due_turn: 99 });
     let id = ArmyId(g.fresh_id());
-    g.armies.push(Army { id, home: ArmyHome::State(StateId::Europe), at: ArmyAt::Place(Place::State(StateId::NorthAfrica)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+    g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(StateId::Europe), at: ArmyAt::Place(Place::State(StateId::NorthAfrica)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
     g.raise_unrest(StateId::NorthAfrica, 10.0, UnrestSource::Plain);
     assert_eq!(g.unrest(StateId::NorthAfrica), 10.0);
     // Ticket #53: the falls run first, so a state at 10 that did not change hands is pulled back
@@ -2951,11 +2982,8 @@ fn b_a_scrubbers_removal_is_credited_and_blame_floors_at_zero() {
     assert_eq!(g.seats[0].blame_removed, removed, "the Climate phase banks what was removed");
     assert!(g.seats[0].blame_emitted > 0.0, "East Asia's industry is still theirs");
     assert_eq!(g.blame(Seat(0)), 0.0, "removing more than you emitted floors Blame at zero");
-    assert!(
-        (g.blame_credit(Seat(0)) - (removed - g.seats[0].blame_emitted)).abs() < 1e-9,
-        "and shows as a credit of {:.1} ppm",
-        g.blame_credit(Seat(0))
-    );
+    // Ticket #265 (version 0.08.4): the credit is what was REMOVED, not the surplus past what was emitted.
+    assert!((g.blame_credit(Seat(0)) - removed).abs() < 1e-9, "and shows what was removed as a credit of {:.1} ppm", g.blame_credit(Seat(0)));
 }
 
 /// (c) The share and the multiplier: an even quarter each is x1.0, half the table x1.25, the whole
@@ -4002,7 +4030,8 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
     assert_eq!(g2.free_slots(s2), 0, "and takes none once it stands");
     assert_eq!(g2.tables.facility(FacilityKind::SeaWall).materials, 20, "20 Materials since ticket #77");
 
-    // It absorbs a scheduled threshold and is destroyed doing it.
+    // Ticket #257 (version 0.08.4): it absorbs a scheduled threshold and STANDS -- it was destroyed
+    // doing it from ticket #56 to here -- counting the rise it held, and the next one is held too.
     let mut g = game();
     calm(&mut g);
     sea_ahead(&mut g);
@@ -4013,11 +4042,13 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
     let before = g.coastal_slots(sid);
     g.apply_sea_threshold(sid, 0);
     assert_eq!(g.coastal_slots(sid), before, "the wall took the sea: no coastal slot lost");
-    assert!(!g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::SeaWall), "and it was destroyed doing it");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("Sea Wall") && l.text.contains("destroyed")), "the Report says so: {:?}", g.report.lines);
-    // The next one lands as normal.
+    let wall = g.state(sid).facilities.iter().find(|f| f.kind == FacilityKind::SeaWall).expect("the wall stands");
+    assert_eq!(wall.rises_held, 1, "and counts the rise it held");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Sea Wall") && l.text.contains("dearer to keep")), "the Report says so: {:?}", g.report.lines);
+    // The next one is held too.
     g.apply_sea_threshold(sid, 1);
-    assert_eq!(g.coastal_slots(sid), before - 2, "the wall absorbed one threshold, not two");
+    assert_eq!(g.coastal_slots(sid), before, "the wall holds every threshold, not one");
+    assert_eq!(g.state(sid).facilities.iter().find(|f| f.kind == FacilityKind::SeaWall).unwrap().rises_held, 2);
 
     // The Ice Sheets Break is a threshold of a kind too.
     let mut g = game();
@@ -4029,7 +4060,7 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
     hold_temperature(&mut g, 2.25);
     g.climate_phase();
     assert_eq!(g.coastal_slots(sid), before, "the wall took the Ice Sheets Break");
-    assert!(!g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::SeaWall), "and went with it");
+    assert!(g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::SeaWall && f.rises_held >= 1), "and stands, counting it (ticket #257)");
 
     // A mothballed wall absorbs nothing.
     let mut g = game();
@@ -4131,6 +4162,76 @@ fn g_antarctica_opens_at_one_point_six_and_stays_open() {
 }
 
 /// (h) The AI enumerates a Sea Wall once Coastal Engineering is in and a threshold is near.
+/// Ticket #257 (version 0.08.4): each rise a Sea Wall has held adds half a Material a turn to its
+/// keep, paid at Income; the half is carried, so two rises pay one a turn and one rise pays one
+/// every other turn. Short of Materials, the wall stands unkept that turn and holds nothing.
+#[test]
+fn a_sea_wall_costs_half_a_material_a_turn_for_every_rise_it_has_held() {
+    let sid = StateId::Australia;
+    let mut g = game();
+    calm(&mut g);
+    directed(&mut g, sid);
+    let mut wall = Facility::new(FacilityKind::SeaWall);
+    wall.rises_held = 1;
+    g.state_mut(sid).facilities = vec![wall];
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 0, "half a Material owed, none paid yet");
+    assert_eq!(income_of(&mut g, Seat(0)).materials, -1, "the second half makes one");
+    assert!(g.seat(Seat(0)).income_sources.iter().any(|(n, _, v)| n.contains("Sea Wall") && *v == -1), "a source line while it pays: {:?}", g.seat(Seat(0)).income_sources);
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 0, "and the count starts again");
+    g.state_mut(sid).facilities[0].rises_held = 3;
+    g.seats[0].sea_wall_upkeep_owed = 0.0;
+    assert_eq!(income_of(&mut g, Seat(0)).materials, -1, "three rises: 1.5 a turn, 1 paid");
+    assert_eq!(income_of(&mut g, Seat(0)).materials, -2, "then 2, the half carried");
+    assert!(g.state(sid).facilities[0].working(), "kept, so it works");
+    // A mothballed wall pays nothing.
+    g.state_mut(sid).facilities[0].mothballed = true;
+    g.seats[0].sea_wall_upkeep_owed = 0.0;
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 0, "mothballed: no keep");
+    g.state_mut(sid).facilities[0].mothballed = false;
+    // Short of Materials: the wall stands unkept this turn and holds nothing.
+    g.seats[0].stockpile.materials = 0;
+    g.seats[0].sea_wall_upkeep_owed = 0.0;
+    g.state_mut(sid).facilities[0].rises_held = 2;
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 0, "nothing to pay with, nothing paid");
+    assert_eq!(g.seat(Seat(0)).stockpile.materials, 0, "never below nothing");
+    assert!(!g.state(sid).facilities[0].working(), "unkept: it holds nothing this turn");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Sea Wall") && l.text.contains("unkept")), "the Report says so: {:?}", g.report.lines);
+}
+
+/// Ticket #257 (version 0.08.4): a Storm Surge that breaks on a standing Sea Wall no longer brings
+/// the next threshold forward; the coastal Facilities make 30% less at the next Income, once. An
+/// unwalled state takes the threshold early as it always has.
+#[test]
+fn a_storm_surge_on_a_walled_state_cuts_its_coastal_facilities_by_a_third_for_one_income() {
+    let sid = StateId::Europe;
+    let mut g = game();
+    calm(&mut g);
+    sea_ahead(&mut g);
+    for s in &mut g.states {
+        s.population = 0.0;
+    }
+    g.take_control(sid, Seat(0));
+    g.seats[0].stockpile.materials = 500;
+    g.state_mut(sid).facilities = vec![Facility::in_coastal_slot(FacilityKind::Factory), facility(FacilityKind::Factory), Facility::new(FacilityKind::SeaWall)];
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 8, "two Custodian Factories make 4 each");
+    let slots = g.coastal_slots(sid);
+    drawn(&mut g, EventId::StormSurge, EventTarget::State(sid));
+    g.apply_event_now();
+    assert!(g.state(sid).thresholds_fired.iter().all(|f| !f), "no threshold brought forward: the wall held");
+    assert_eq!(g.coastal_slots(sid), slots, "no slot lost");
+    assert!(g.state(sid).storm_surge, "the surge is on the state");
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 6, "the coastal Factory makes floor(4 x 0.7) = 2; the inland one 4");
+    assert!(!g.state(sid).storm_surge, "spent");
+    assert_eq!(income_of(&mut g, Seat(0)).materials, 8, "one Income only");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Sea Wall held")), "the Report says so: {:?}", g.report.lines);
+    // Without a wall, the threshold comes forward as before.
+    g.state_mut(sid).facilities.retain(|f| f.kind != FacilityKind::SeaWall);
+    drawn(&mut g, EventId::StormSurge, EventTarget::State(sid));
+    g.apply_event_now();
+    assert!(g.state(sid).thresholds_fired[0], "unwalled: the next threshold applies now");
+    assert!(!g.state(sid).storm_surge);
+}
+
 #[test]
 fn h_the_ai_raises_a_sea_wall_when_the_sea_is_close() {
     let sid = StateId::Australia;
@@ -5269,7 +5370,9 @@ fn the_venture_capital_fund_banks_a_share_of_ducat_income_and_a_draw_returns_nin
     assert_eq!(g.seats[pro.index()].venture_fund, 0);
     // The share is an order, refused off the steps and to anyone else.
     assert_eq!(g.check_order(Seat(0), &[], &Order::SetVentureShare { share: 50 }).unwrap_err().0, "only the Prospectors have a Venture Capital Fund");
-    assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 15 }).is_err(), "not a step of 10");
+    // Ticket #256 (version 0.08.4): whole percents, so 15 is a share now; the cap is still 80.
+    assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 15 }).is_ok(), "a whole percent is a step");
+    assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 81 }).is_err(), "over 80");
     assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 90 }).is_err(), "over 80");
     assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 0 }).is_ok());
     assert!(g.check_order(pro, &[], &Order::SetVentureShare { share: 80 }).is_ok());
@@ -5306,18 +5409,18 @@ fn the_venture_capital_fund_banks_a_share_of_ducat_income_and_a_draw_returns_nin
 /// moved that bar from 750 to 1000, because the Investment Bank pays uncapped interest into the Fund
 /// and, measured over 40 games, nobody had ever reached 750 at all.
 #[test]
-fn two_thousand_ducats_in_the_fund_is_the_prospectors_first_part() {
+fn twenty_five_hundred_ducats_in_the_fund_is_the_prospectors_first_part() {
     let mut g = game();
     let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
     let card = g.tables.faction(FactionKind::Prospectors).victory_first;
-    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 2000.0));
+    assert_eq!((card.kind, card.bar), (dying_earth_engine::data::VictoryFirstKind::VentureFund, 2500.0));
     assert_eq!(card.kind.name(), "Venture Capital Fund");
-    g.seats[pro.index()].venture_fund = 800;
+    g.seats[pro.index()].venture_fund = 1000;
     let p = g.progress(pro);
-    assert_eq!((p.first_value, p.first_bar), (800.0, 2000.0));
+    assert_eq!((p.first_value, p.first_bar), (1000.0, 2500.0));
     assert!((p.first_fraction() - 0.4).abs() < 1e-9);
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 12);
-    g.seats[pro.index()].venture_fund = 2000;
+    g.seats[pro.index()].venture_fund = 2500;
     open_gates(&mut g);
     assert!(g.progress(pro).met());
     g.end_phase();
@@ -5345,7 +5448,10 @@ fn the_prospector_ai_sets_its_share_to_reach_the_fund_in_time_and_maxes_it_when_
         g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::Factory));
     }
     // Ticket #240 (version 0.08.3): DUCAT income is what the share is weighed against now.
-    g.seats[pro.index()].income_last_turn.ducats = 120;
+    // Ticket #256 (version 0.08.4): 120 to 200. At the bar of 2500, 120 a turn over the 24 turns left
+    // wants 87% and the seat maxes -- which is the AI READING the new bar, watched here when the
+    // bar moved and this line had not.
+    g.seats[pro.index()].income_last_turn.ducats = 200;
     g.seats[pro.index()].stockpile.energy = 500;
     g.turn = 4;
     let orders = g.ai_orders(pro);
@@ -7213,6 +7319,7 @@ fn an_army_keeps_its_stance_through_resolution_until_something_happens_to_it() {
     let mut g = game();
     let id = ArmyId(g.fresh_id());
     g.armies.push(Army {
+        name: String::new(),
         id,
         home: ArmyHome::State(StateId::EastAsia),
         at: ArmyAt::Place(Place::State(StateId::EastAsia)),
@@ -8312,6 +8419,12 @@ fn relations_recover_slowly_and_never_rise_above_neutral() {
 /// teeth has to come past this test and say so.
 #[test]
 fn relations_do_nothing_mechanical_in_this_version() {
+    // Ticket #268 (version 0.08.4): the premise of this test -- written on ticket #191 when Relations
+    // were only read -- is dead, and this is the first version where six computer turns say so on
+    // the board: with every pair Hostile the Custodians refuse to sell carbon credits, so the seat
+    // that bought them in the neutral game keeps its Ducats and its Blame in the hostile one. The
+    // test is kept, inverted, as the record of the moment Relations became mechanical to the
+    // computer seats and not only to a player reading a card.
     let mut a = with_seed(11);
     let mut b = with_seed(11);
     for viewer in Seat::ALL {
@@ -8336,7 +8449,10 @@ fn relations_do_nothing_mechanical_in_this_version() {
             })
             .collect()
     };
-    assert_eq!(picture(&a), picture(&b), "six turns of the worst possible blood changed nothing about the board");
+    // The hostile game proposes no purchase at all -- the Custodians will not sell to a Hostile
+    // buyer -- so the computer seats' choices, and with them the board, part from the neutral game's.
+    assert_ne!(picture(&a), picture(&b), "six turns of the worst possible blood now change the board: {:?}", picture(&a));
+    assert_eq!(Seat::ALL.into_iter().map(|s| b.seat(s).credits_bought).sum::<f64>(), 0.0, "and nobody bought a credit in it");
 }
 
 // ------------------------------------------- 0.08.0 ticket #192: the Archive's gate and the Upload
@@ -8920,6 +9036,533 @@ fn the_arkwrights_signature_rule_is_coach_class_and_says_steerage_nowhere() {
         for text in [&c.signature, &c.victory, &c.blurb, &c.unique] {
             assert!(!text.to_lowercase().contains("steerage"), "{kind:?} still says Steerage: {text}");
         }
+    }
+}
+
+// -------------------------------------------- 0.08.4 ticket #270: names for Armies
+
+/// Ticket #270 (version 0.08.4): an Army is named from its home as it is raised -- an ordinal and
+/// the Region's demonym, Standing Armies included, a Colony's a Garrison -- and keeps the name
+/// through a change of hands.
+#[test]
+fn an_army_is_named_from_its_home_as_it_is_raised() {
+    let mut g = game();
+    assert_eq!(Game::ordinal(1), "1st");
+    assert_eq!(Game::ordinal(2), "2nd");
+    assert_eq!(Game::ordinal(3), "3rd");
+    assert_eq!(Game::ordinal(4), "4th");
+    assert_eq!(Game::ordinal(11), "11th");
+    assert_eq!(Game::ordinal(12), "12th");
+    assert_eq!(Game::ordinal(13), "13th");
+    assert_eq!(Game::ordinal(21), "21st");
+    assert_eq!(Game::ordinal(112), "112th");
+    assert_eq!(g.tables.state(StateId::EastAsia).demonym, "Chinese");
+    let standing = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(StateId::EastAsia)).expect("China's Standing Army");
+    assert_eq!(g.army_name(standing), "the 1st Chinese Army", "the Standing Army is the first raised");
+    let raised = g.raise_army(Place::State(StateId::EastAsia), false);
+    let a = g.armies.iter().find(|a| a.id == raised).unwrap();
+    assert_eq!(g.army_name(a), "the 2nd Chinese Army");
+    let third = g.raise_army(Place::State(StateId::EastAsia), false);
+    assert_eq!(g.army_name(g.armies.iter().find(|a| a.id == third).unwrap()), "the 3rd Chinese Army");
+    // The name is the Army's, not the holder's: it survives the Region changing hands.
+    g.take_control(StateId::EastAsia, Seat(2));
+    assert_eq!(g.army_name(g.armies.iter().find(|a| a.id == raised).unwrap()), "the 2nd Chinese Army");
+    // A Colony's is a Garrison, numbered from the second.
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Barracks], 4);
+    let g1 = g.raise_army(Place::Colony(c), false);
+    let g2 = g.raise_army(Place::Colony(c), false);
+    let place = g.tables.body(BodyId::Moon).slots[g.colony(c).unwrap().slot as usize].name.clone();
+    assert_eq!(g.army_name(g.armies.iter().find(|a| a.id == g1).unwrap()), format!("the {place} Garrison"));
+    assert_eq!(g.army_name(g.armies.iter().find(|a| a.id == g2).unwrap()), format!("the 2nd {place} Garrison"));
+    // A save from before names reads the old form.
+    let mut old = g.armies[0].clone();
+    old.name.clear();
+    old.standing = true;
+    assert_eq!(g.army_name(&old), "the Standing Army");
+}
+
+// -------------------------------------------- 0.08.4 ticket #269: Agitate
+
+/// Ticket #269 (version 0.08.4): Agitate raises the Unrest of a Region a rival controls by one for
+/// 15 Ducats and 5 Influence, once a turn per Region per Faction; never on your own or a neutral
+/// Region; an offence the holder's Report names; a working Constabulary halves it.
+#[test]
+fn agitate_raises_a_rivals_regions_unrest_for_ducats_and_influence_once_a_turn() {
+    let sid = StateId::Europe;
+    let mut g = game();
+    calm(&mut g);
+    let holder = Seat(1);
+    g.take_control(sid, holder);
+    g.seats[0].stockpile.ducats = 100;
+    g.seats[0].allotment = 20;
+    let u = g.tables.unrest.clone();
+    assert_eq!((u.agitate_ducats, u.agitate_influence, u.agitate_points), (15, 5, 1.0));
+    let order = Order::Agitate { state: sid };
+    assert_eq!(g.order_cost(Seat(0), &order), Cost { ducats: 15, influence: 5, ..Default::default() });
+    assert!(g.check_order(Seat(0), &[], &order).is_ok());
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&order), &order).is_err(), "one a turn per Region");
+    let neutral = StateId::ALL.into_iter().find(|s| matches!(g.state(*s).control, Control::Neutral)).unwrap();
+    assert!(g.check_order(Seat(0), &[], &Order::Agitate { state: neutral }).is_err(), "nobody to turn them against");
+    assert!(g.check_order(holder, &[], &order).is_err(), "not against yourself");
+    // Unrest falls 1.5 a turn on its own, after every rise, so the rise is read against a state
+    // already restive: 3, plus one, less the fall, is 2.5. (From calm, one Agitate a turn nets out
+    // against the fall -- see the ticket's resolution.)
+    g.state_mut(sid).unrest = 3.0;
+    g.commit_orders(Seat(0), &[order]);
+    assert_eq!((g.seats[0].stockpile.ducats, g.seats[0].allotment), (85, 15), "paid at the Orders phase");
+    g.resolution_phase();
+    assert!((g.state(sid).unrest - 2.5).abs() < 1e-9, "3 + 1 - the fall of 1.5: {}", g.state(sid).unrest);
+    assert!(g.relations.offended[holder.index()][0], "an offence against the holder");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("agitated in")), "the Report names who paid: {:?}", g.report.lines);
+    // A working Constabulary halves it -- and calms a point a turn besides: 3 + 0.5 - 1.0 - 1.5.
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Constabulary));
+    g.state_mut(sid).unrest = 3.0;
+    g.seats[0].stockpile.ducats = 100;
+    g.seats[0].allotment = 20;
+    g.commit_orders(Seat(0), &[Order::Agitate { state: sid }]);
+    g.resolution_phase();
+    assert!((g.state(sid).unrest - 1.0).abs() < 1e-9, "half a point through the police, then the falls: {}", g.state(sid).unrest);
+}
+
+/// Ticket #269 (version 0.08.4): a computer seat Cold or Hostile toward a holder proposes an
+/// Agitate in that holder's Region; toward nobody it resents, none.
+#[test]
+fn the_computer_agitates_in_the_regions_of_a_rival_it_is_cold_toward() {
+    let sid = StateId::Europe;
+    let mut g = game();
+    calm(&mut g);
+    let (agitator, holder) = (Seat(3), Seat(1));
+    g.take_control(sid, holder);
+    g.seats[agitator.index()].stockpile.ducats = 200;
+    g.seats[agitator.index()].allotment = 60;
+    // Restive past the second threshold, where one more point matters most and the appetite is
+    // at its opportunity multiplier; below that the seat spends its Allotment on places first.
+    g.state_mut(sid).unrest = 9.0;
+    let orders = g.ai_orders(agitator);
+    assert!(!orders.iter().any(|o| matches!(o, Order::Agitate { .. })), "nothing against a holder it does not resent: {orders:?}");
+    g.relations.score[agitator.index()][holder.index()] = -8;
+    let orders = g.ai_orders(agitator);
+    assert!(orders.iter().any(|o| matches!(o, Order::Agitate { state } if *state == sid)), "an Agitate in the resented holder's Region: {orders:?}");
+}
+
+// -------------------------------------------- 0.08.4 ticket #268: carbon credits
+
+/// Ticket #268 (version 0.08.4): a carbon credit bought comes off the buyer's Blame ledger for
+/// good and off the seller's credit; the Ducats land with the Custodians, at the table price times
+/// their view of the buyer -- Hostile refuses -- up to a cap a turn; and a purchase is an act of
+/// friendship both ways.
+#[test]
+fn a_carbon_credit_bought_moves_ppm_off_the_buyers_ledger_and_pays_the_custodians() {
+    let mut g = game();
+    calm(&mut g);
+    let cus = g.credit_seller().expect("the Custodians sit at the table");
+    let buyer = Seat::ALL.into_iter().find(|s| *s != cus).unwrap();
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = 100.0;
+    }
+    g.seats[cus.index()].blame_removed = 40.0;
+    g.seats[buyer.index()].stockpile.ducats = 100;
+    let c = g.tables.carbon_credits.clone();
+    assert_eq!((c.price_per_ppm, c.cap_per_turn), (1, 10));
+    // Nothing on offer: refused.
+    assert!(g.check_order(buyer, &[], &Order::BuyCredits { ppm: 5 }).is_err(), "nothing on offer yet");
+    g.seats[cus.index()].credits_offered = 15;
+    assert!(g.check_order(buyer, &[], &Order::BuyCredits { ppm: 11 }).is_err(), "over the cap");
+    assert!(g.check_order(cus, &[], &Order::BuyCredits { ppm: 5 }).is_err(), "not from oneself");
+    assert_eq!(g.credit_cost(buyer, 10), Some(10), "Neutral: the table price");
+    g.relations.score[cus.index()][buyer.index()] = 8;
+    assert_eq!(g.credit_cost(buyer, 10), Some(5), "Friendly: half");
+    // The worst deeds can be: the shared-pot reward lifts a full contributor one point, so -9 reads Cold.
+    g.relations.score[cus.index()][buyer.index()] = -10;
+    assert_eq!(g.relations_level(cus, buyer), "Hostile", "{}", g.relations_score(cus, buyer));
+    assert!(g.check_order(buyer, &[], &Order::BuyCredits { ppm: 5 }).is_err(), "Hostile: the Custodians refuse");
+    g.relations.score[cus.index()][buyer.index()] = 0;
+    let order = Order::BuyCredits { ppm: 10 };
+    assert!(g.check_order(buyer, &[], &order).is_ok());
+    assert!(g.check_order(buyer, std::slice::from_ref(&order), &Order::BuyCredits { ppm: 1 }).is_err(), "one purchase a turn");
+    let (cus_ducats, buyer_ducats) = (g.seats[cus.index()].stockpile.ducats, g.seats[buyer.index()].stockpile.ducats);
+    g.commit_orders(buyer, &[order]);
+    assert_eq!(g.seats[buyer.index()].stockpile.ducats, buyer_ducats - 10, "paid at the Orders phase");
+    g.resolution_phase();
+    assert!((g.blame(buyer) - 90.0).abs() < 1e-9, "10 ppm off the buyer's ledger: {}", g.blame(buyer));
+    assert!((g.blame_credit(cus) - 30.0).abs() < 1e-9, "10 ppm off the seller's credit: {}", g.blame_credit(cus));
+    assert!((g.blame(cus) - 60.0).abs() < 1e-9, "the seller's own Blame is untouched within its credit: {}", g.blame(cus));
+    assert_eq!(g.seats[cus.index()].stockpile.ducats, cus_ducats + 10, "the Ducats land with the Custodians");
+    assert!(g.relations.credited[cus.index()][buyer.index()] && g.relations.credited[buyer.index()][cus.index()], "an act of friendship both ways");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("carbon credit")), "{:?}", g.report.lines);
+    assert_eq!(g.seats[cus.index()].credits_offered, 15, "the offer stands until changed");
+    g.resolution_phase();
+    assert!((g.blame(buyer) - 90.0).abs() < 1e-9, "for good");
+}
+
+/// Ticket #268 (version 0.08.4): the Custodians may sell more than they hold in credit -- the
+/// excess goes onto their own ledger as Blame taken -- and an offer is shared first come first
+/// served, a buyer left short getting its Ducats back.
+#[test]
+fn overselling_carbon_credits_puts_the_excess_on_the_custodians_ledger_and_a_short_buyer_is_refunded() {
+    let mut g = game();
+    calm(&mut g);
+    let cus = g.credit_seller().unwrap();
+    let others: Vec<Seat> = Seat::ALL.into_iter().filter(|s| *s != cus).collect();
+    let (a, b) = (others[0], others[1]);
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = 100.0;
+        g.seats[s.index()].stockpile.ducats = 100;
+    }
+    g.seats[cus.index()].blame_removed = 5.0;
+    g.seats[cus.index()].credits_offered = 12;
+    g.commit_orders(a, &[Order::BuyCredits { ppm: 10 }]);
+    g.commit_orders(b, &[Order::BuyCredits { ppm: 10 }]);
+    g.resolution_phase();
+    assert!((g.blame(a) - 90.0).abs() < 1e-9, "the first buyer got its ten");
+    assert_eq!(g.blame_credit(cus), 0.0, "the seller's five of credit are gone");
+    assert!((g.blame(b) - 98.0).abs() < 1e-9, "the second buyer got the two left: {}", g.blame(b));
+    assert!((g.blame(cus) - 102.0).abs() < 1e-9, "twelve sold against five held: seven oversold are Blame taken, 100 - 5 + 7: {}", g.blame(cus));
+    assert_eq!(g.seats[b.index()].stockpile.ducats, 98, "paid ten, eight back for the eight it did not get");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("came back")), "{:?}", g.report.lines);
+}
+
+/// Ticket #268 (version 0.08.4): the computer Custodians offer their credit while their own share
+/// is under the fair quarter and refuse when it is not; a computer seat above a fair share with an
+/// offer standing buys.
+#[test]
+fn the_computer_custodians_offer_their_credit_when_clean_and_a_dirty_seat_buys() {
+    let mut g = game();
+    calm(&mut g);
+    let cus = g.credit_seller().unwrap();
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = 100.0;
+        g.seats[s.index()].stockpile.ducats = 100;
+    }
+    g.seats[cus.index()].blame_removed = 30.0;
+    assert!(g.blame_share(cus) < g.tables.influence.blame.fair_share);
+    let orders = g.ai_orders(cus);
+    assert!(orders.iter().any(|o| matches!(o, Order::OfferCredits { ppm } if *ppm == 30)), "clean: the whole credit on offer: {orders:?}");
+    g.seats[cus.index()].blame_emitted = 900.0;
+    g.seats[cus.index()].credits_offered = 30;
+    let orders = g.ai_orders(cus);
+    assert!(orders.iter().any(|o| matches!(o, Order::OfferCredits { ppm } if *ppm == 0)), "dirty: it withdraws the offer: {orders:?}");
+    // A dirty rival buys while the offer stands.
+    g.seats[cus.index()].blame_emitted = 100.0;
+    let dirty = Seat::ALL.into_iter().find(|s| *s != cus).unwrap();
+    g.seats[dirty.index()].blame_emitted = 600.0;
+    assert!(g.blame_share(dirty) > 0.5);
+    let orders = g.ai_orders(dirty);
+    assert!(orders.iter().any(|o| matches!(o, Order::BuyCredits { ppm } if *ppm > 0)), "a dirty seat buys: {orders:?}");
+}
+
+// -------------------------------------------- 0.08.4 ticket #267: the Smear campaign
+
+/// Ticket #267 (version 0.08.4): a Smear lays ppm on a rival's Blame ledger for good, at the
+/// table's rate per Influence, moving the share every rule reads; one a turn per target, never
+/// on oneself; an offence the Report names.
+#[test]
+fn a_smear_campaign_lays_ppm_on_a_rivals_blame_ledger_and_is_an_offence() {
+    let mut g = game();
+    calm(&mut g);
+    let target = Seat(1);
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = 100.0;
+        g.seats[s.index()].blame_removed = 0.0;
+    }
+    assert!((g.blame_share(target) - 0.25).abs() < 1e-9, "an even quarter each to begin");
+    g.seats[0].allotment = 20;
+    assert!(g.check_order(Seat(0), &[], &Order::Smear { target: Seat(0), amount: 5 }).is_err(), "not oneself");
+    assert!(g.check_order(Seat(0), &[], &Order::Smear { target, amount: 0 }).is_err(), "a positive amount");
+    assert!(g.check_order(Seat(0), &[], &Order::Smear { target, amount: 10 }).is_ok());
+    let first = Order::Smear { target, amount: 10 };
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&first), &Order::Smear { target, amount: 5 }).is_err(), "one a turn per target");
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&first), &Order::Smear { target: Seat(2), amount: 5 }).is_ok(), "another target is another campaign");
+    g.commit_orders(Seat(0), &[first]);
+    g.resolution_phase();
+    let rate = g.tables.influence.smear.ppm_per_influence;
+    assert!((g.seats[target.index()].blame_smeared - 10.0 * rate).abs() < 1e-9, "20 ppm laid on: {}", g.seats[target.index()].blame_smeared);
+    assert!((g.blame(target) - (100.0 + 10.0 * rate)).abs() < 1e-9, "the ledger counts it");
+    assert!(g.blame_share(target) > 0.25, "and the share the rules read has moved: {}", g.blame_share(target));
+    assert!(g.relations.offended[target.index()][0], "an offence against the target");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("smeared")), "the Report names who paid: {:?}", g.report.lines);
+    // Permanent: nothing takes it back off.
+    g.resolution_phase();
+    assert!((g.seats[target.index()].blame_smeared - 10.0 * rate).abs() < 1e-9, "for good");
+}
+
+/// Ticket #267 (version 0.08.4): a computer seat Cold or Hostile toward a rival whose Blame share
+/// stands above the fair quarter proposes a Smear against it; toward nobody it hates, none.
+#[test]
+fn the_computer_smears_a_dirty_rival_it_is_cold_toward() {
+    let mut g = game();
+    calm(&mut g);
+    let (smearer, dirty) = (Seat(3), Seat(1));
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = 50.0;
+    }
+    g.seats[dirty.index()].blame_emitted = 500.0;
+    assert!(g.blame_share(dirty) > 0.5);
+    g.seats[smearer.index()].allotment = 20;
+    let orders = g.ai_orders(smearer);
+    assert!(!orders.iter().any(|o| matches!(o, Order::Smear { .. })), "nothing against a rival it does not resent: {orders:?}");
+    g.relations.score[smearer.index()][dirty.index()] = -8;
+    assert!(g.relations_score(smearer, dirty) <= -5, "Cold or worse: {}", g.relations_score(smearer, dirty));
+    let orders = g.ai_orders(smearer);
+    assert!(orders.iter().any(|o| matches!(o, Order::Smear { target, amount } if *target == dirty && *amount > 0)), "a Smear against the dirty rival it is Cold toward: {orders:?}");
+}
+
+// -------------------------------------------- 0.08.4 ticket #266: Blame moderates decay
+
+/// Ticket #266 (version 0.08.4): on a Region a Faction does not hold, its Standing decays 3 a turn
+/// when its Blame share stands at or above a half, 1 when at or below an eighth, and 2 between;
+/// a held place keeps its 1 and a Colony its 2 whatever the share.
+#[test]
+fn blame_moderates_the_decay_of_a_standing_on_regions_a_faction_does_not_hold() {
+    let mut g = game();
+    calm(&mut g);
+    let t = g.tables.influence.blame.clone();
+    assert_eq!((t.decay_slow_below, t.decay_fast_from, t.decay_slow, t.decay_fast), (0.125, 0.5, 1, 3));
+    let (dirty, clean, plain) = (Seat(1), Seat(2), Seat(3));
+    // Shares: seat 1 at 0.6, seat 2 at 0.05, seat 3 at 0.3, seat 0 the rest.
+    for (s, ppm) in [(Seat(0), 5.0), (dirty, 60.0), (clean, 5.0), (plain, 30.0)] {
+        g.seats[s.index()].blame_emitted = ppm;
+        g.seats[s.index()].blame_removed = 0.0;
+    }
+    assert!(g.blame_share(dirty) >= 0.5 && g.blame_share(clean) <= 0.125 && g.blame_share(plain) > 0.125 && g.blame_share(plain) < 0.5);
+    let region = Place::State(StateId::NorthAfrica);
+    let held = Place::State(StateId::Europe);
+    g.take_control(StateId::Europe, Seat(0));
+    g.take_control(StateId::NorthAfrica, Seat(0));
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 4);
+    let col = Place::Colony(c);
+    for s in [dirty, clean, plain] {
+        g.seat_mut(s).influence.insert(region, 30);
+        g.seat_mut(s).influence.insert(col, 30);
+        g.seat_mut(s).influenced_this_turn.clear();
+    }
+    g.seat_mut(Seat(0)).influence.insert(held, 30);
+    g.seat_mut(Seat(0)).influenced_this_turn.clear();
+    assert_eq!(g.standing_decay_for(dirty, region), 3, "dirty, elsewhere");
+    assert_eq!(g.standing_decay_for(clean, region), 1, "clean, elsewhere");
+    assert_eq!(g.standing_decay_for(plain, region), 2, "between, elsewhere");
+    assert_eq!(g.standing_decay_for(dirty, col), 2, "a Colony is untouched");
+    assert_eq!(g.standing_decay_for(Seat(0), held), 1, "a held place keeps its 1");
+    g.resolution_phase();
+    assert_eq!(g.seat(dirty).influence[&region], 27, "3 off a dirty seat's Standing on a Region it does not hold");
+    assert_eq!(g.seat(clean).influence[&region], 29, "1 off a clean seat's");
+    assert_eq!(g.seat(plain).influence[&region], 28, "2 off everyone between");
+    assert_eq!(g.seat(dirty).influence[&col], 28, "2 off on a Colony, however dirty");
+    assert_eq!(g.seat(Seat(0)).influence[&held], 29, "1 off on a held place");
+}
+
+// -------------------------------------------- 0.08.4 ticket #265: Blame and Blame credit
+
+/// Ticket #265 (version 0.08.4): Blame credit is what a Faction has REMOVED, not what it removed
+/// beyond everything it emitted -- a figure measured at zero in ten of ten games. A seat that
+/// emitted 100 and removed 40 is answerable for 60 and holds 40 in credit.
+#[test]
+fn blame_credit_is_what_a_faction_has_removed() {
+    let mut g = game();
+    g.seats[0].blame_emitted = 100.0;
+    g.seats[0].blame_removed = 40.0;
+    assert!((g.blame(Seat(0)) - 60.0).abs() < 1e-9, "answerable for what it emitted less what it removed");
+    assert!((g.blame_credit(Seat(0)) - 40.0).abs() < 1e-9, "and holds what it removed in credit: {}", g.blame_credit(Seat(0)));
+    g.seats[0].blame_removed = 0.0;
+    assert_eq!(g.blame_credit(Seat(0)), 0.0, "nothing removed, no credit");
+}
+
+/// Ticket #265 (version 0.08.4): what the Custodians' Research Directive has added to the Natural
+/// Sink counts as their removal at every Climate phase -- "credit", the designer said -- so a
+/// Custodian who has bought half a ppm of Sink is credited half a ppm a turn from then on.
+#[test]
+fn the_custodians_directive_into_the_sink_counts_as_removal_every_climate_phase() {
+    let mut g = game();
+    calm(&mut g);
+    quiet_world(&mut g);
+    let cus = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Custodians).unwrap();
+    g.seats[cus.index()].directive_sink = 0.5;
+    let before = g.seats[cus.index()].blame_removed;
+    g.climate_phase();
+    assert!((g.seats[cus.index()].blame_removed - before - 0.5).abs() < 1e-9, "half a ppm credited: {} -> {}", before, g.seats[cus.index()].blame_removed);
+    g.climate_phase();
+    assert!((g.seats[cus.index()].blame_removed - before - 1.0).abs() < 1e-9, "and again the next phase, for good");
+    // A directive of 10 Research at the card's rate buys that much Sink and that much standing credit.
+    let rate = g.tables.research_directive.custodians_ppm_per_point;
+    g.seats[cus.index()].research_directive = 50;
+    let sink_before = g.climate.natural_sink;
+    let bought = g.spend_research_directive(cus, 20);
+    assert_eq!(bought, 10, "half of 20 directed");
+    assert!((g.climate.natural_sink - sink_before - 10.0 * rate).abs() < 1e-9);
+    assert!((g.seats[cus.index()].directive_sink - 0.5 - 10.0 * rate).abs() < 1e-9, "the enlargement is remembered as theirs: {}", g.seats[cus.index()].directive_sink);
+}
+
+// -------------------------------------------- 0.08.4 ticket #264: the Victory history
+
+/// Ticket #264 (version 0.08.4): after every Climate phase each seat gets a record -- its score,
+/// its Blame share, and the three tick flags -- on the same turn as the Emissions record, so the
+/// Victory history and the Emissions history share an axis.
+#[test]
+fn the_victory_history_is_written_for_every_seat_after_each_climate_phase() {
+    let mut g = game();
+    calm(&mut g);
+    assert!(Seat::ALL.iter().all(|s| g.seat(*s).victory_history.is_empty()), "nothing before the first phase");
+    g.climate_phase();
+    for s in Seat::ALL {
+        let h = &g.seat(s).victory_history;
+        assert_eq!(h.len(), 1, "{s:?}: one record after one phase");
+        let r = &h[0];
+        assert_eq!(r.turn, g.climate.history[g.climate.history.len() - 1].turn, "the Emissions record's turn");
+        assert!((r.score - g.progress(s).score()).abs() < 1e-9, "{s:?}: the score as the window prints it");
+        assert!((r.blame_share - g.blame_share(s)).abs() < 1e-9, "{s:?}: the share the rules read");
+        assert_eq!(r.antarctica_open, g.antarctica_open);
+        let gate = g.tables.victory_gate(g.kind(s)).map(|t| g.has_tech(t)).unwrap_or(true);
+        assert_eq!(r.gate_done, gate, "{s:?}");
+        assert_eq!(r.archive_complete, g.archive_complete(s), "{s:?}");
+    }
+    g.climate_phase();
+    assert_eq!(g.seat(Seat(0)).victory_history.len(), 2, "one a phase");
+}
+
+// -------------------------------------------- 0.08.4 ticket #263: what a Faction has under way
+
+/// Ticket #263 (version 0.08.4): a seat's builds begun and Ships in transit, with turns, soonest
+/// first; a build is the seat's that ordered it; a Ship at a Body is not in transit.
+#[test]
+fn what_a_faction_has_under_way_lists_its_builds_and_transits_soonest_first() {
+    let sid = StateId::Europe;
+    let mut g = game();
+    calm(&mut g);
+    directed(&mut g, sid);
+    assert_eq!(g.under_way(Seat(0)), UnderWay::default(), "nothing under way at the start");
+    let turn = g.turn;
+    // A Factory in Europe landing in three turns, then a Module at a Colony landing next turn.
+    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Factory), seat: Seat(0), due_turn: turn + 2, coastal: false });
+    let cid = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 4);
+    g.colony_mut(cid).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), due_turn: turn, coastal: false });
+    // A rival's build in a Region the player directs is the rival's, not the player's.
+    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(1), due_turn: turn + 1, coastal: false });
+    // Two Ships: one on the road to Mars with three turns left, one arriving next turn, and one at rest.
+    let put = |g: &mut Game, kind: UnitKind| -> ShipId {
+        let id = ShipId(g.fresh_id());
+        let name = g.next_ship_name(kind);
+        g.ships.push(Ship { name, id, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+        id
+    };
+    let far = put(&mut g, UnitKind::Frigate);
+    let near = put(&mut g, UnitKind::ColonyShip);
+    let _rest = put(&mut g, UnitKind::Carrier);
+    g.ships.iter_mut().find(|s| s.id == far).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 3 };
+    g.ships.iter_mut().find(|s| s.id == near).unwrap().at = ShipAt::Transit { from: BodyId::Moon, to: BodyId::Earth, turns_left: 1 };
+    let u = g.under_way(Seat(0));
+    assert_eq!(u.builds.len(), 2, "the rival's Bank is not the player's: {:?}", u.builds);
+    assert_eq!(u.builds[0], ("Mine".to_string(), Place::Colony(cid), 1), "soonest first: {:?}", u.builds);
+    assert_eq!(u.builds[1], ("Factory".to_string(), Place::State(sid), 3), "{:?}", u.builds);
+    assert_eq!(u.transits.len(), 2, "a Ship at rest is not in transit: {:?}", u.transits);
+    assert_eq!(u.transits[0].3, 1, "soonest first: {:?}", u.transits);
+    assert_eq!((u.transits[0].1.as_str(), u.transits[0].2.as_str()), ("the Moon", "Earth"));
+    assert_eq!(u.transits[1].3, 3);
+    assert!(u.transits[1].0.contains("TSV "), "the name carries the flag's prefix: {}", u.transits[1].0);
+    assert_eq!(g.under_way(Seat(1)).builds.len(), 1, "the rival sees its own Bank");
+}
+
+// -------------------------------------------- 0.08.4 ticket #262: the challenger line
+
+/// Ticket #262 (version 0.08.4): the rival named on a held place's card is the one NEAREST ITS OWN
+/// PRICE, not the one with the highest Standing -- they differ when Blame or Relations move one
+/// rival's price and not another's, and the nearer one takes the place first. None where nobody
+/// holds the place or no rival has a Standing.
+#[test]
+fn the_challenger_line_names_the_rival_nearest_its_own_price() {
+    let sid = StateId::Europe;
+    let place = Place::State(sid);
+    let mut g = game();
+    calm(&mut g);
+    directed(&mut g, sid);
+    // Every seat starts with a Standing on its own start state (ticket #75); cleared, so the place
+    // begins with nobody standing on it.
+    for s in Seat::ALL {
+        g.seat_mut(s).influence.remove(&place);
+    }
+    assert_eq!(g.nearest_challenger(place), None, "no rival has a Standing yet");
+    let (a, b) = (Seat(1), Seat(2));
+    // Seat 1 stands higher but pays a Blame-raised threshold; seat 2 stands lower and clean.
+    g.seats[a.index()].blame_emitted = 900.0;
+    for s in [Seat(0), b, Seat(3)] {
+        g.seats[s.index()].blame_emitted = 10.0;
+    }
+    assert!(g.blame_threshold_multiplier(a) > 1.2, "{}", g.blame_threshold_multiplier(a));
+    g.seat_mut(Seat(0)).influence.insert(place, 10);
+    let price_a = g.influence_needed_for(a, place);
+    let price_b = g.influence_needed_for(b, place);
+    assert!(price_a > price_b, "Blame makes seat 1's price the dearer: {price_a} against {price_b}");
+    g.seat_mut(a).influence.insert(place, price_b - 5); // the higher Standing, the farther from its own price
+    g.seat_mut(b).influence.insert(place, price_b - 8); // the lower Standing, the nearer
+    assert!(price_a - (price_b - 5) > 8, "seat 1 is farther off than seat 2's 8");
+    let (who, standing, price) = g.nearest_challenger(place).expect("a rival stands here");
+    assert_eq!((who, standing, price), (b, price_b - 8, price_b), "the nearer rival, not the higher");
+    // A place nobody holds has no challenger line.
+    let nobody = StateId::ALL.into_iter().find(|s| matches!(g.state(*s).control, Control::Neutral)).expect("a neutral Region");
+    assert_eq!(g.nearest_challenger(Place::State(nobody)), None);
+}
+
+// -------------------------------------------- 0.08.4 ticket #261: the rival's Moment
+
+/// Ticket #261 (version 0.08.4): a rival crossing three quarters of the way to its Victory
+/// Condition, or meeting one part of it with the other short, interrupts the player once a step.
+/// The player's own seat never does; rank 5, between a Battle and a Tech.
+#[test]
+fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() {
+    let mut g = game();
+    calm(&mut g);
+    let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
+    assert_ne!(pro, Seat(0), "the Prospectors are a rival in this game");
+    let fired = |g: &Game| g.report.moments.iter().filter(|m| m.kind == MomentKind::RivalProgress).count();
+    // Presence 9 of 12 (0.75) and the Fund at 2000 of 2500 (0.8): the score is 0.75.
+    colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 9);
+    g.seats[pro.index()].venture_fund = 2000;
+    assert!((g.progress(pro).score() - 0.75).abs() < 1e-9, "{}", g.progress(pro).score());
+    g.end_phase();
+    assert_eq!(fired(&g), 1, "three quarters: the Moment fires: {:?}", g.report.moments);
+    let m = g.report.moments.iter().find(|m| m.kind == MomentKind::RivalProgress).unwrap();
+    assert!(m.text.contains("Prospectors") && m.text.contains("three quarters"), "{}", m.text);
+    assert!(m.text.contains("9 of 12"), "the part still short is the figure: {}", m.text);
+    assert_eq!(m.figure, "9 of 12");
+    g.end_phase();
+    assert_eq!(fired(&g), 1, "once: it does not fire again while the seat sits there");
+    // The Fund full but its gate shut is held back, not met.
+    g.seats[pro.index()].venture_fund = 2500;
+    g.end_phase();
+    assert_eq!(fired(&g), 1, "a part held back by its gate Tech is not a part met");
+    // The gate open: one part met, the other short.
+    open_gates(&mut g);
+    g.end_phase();
+    assert_eq!(fired(&g), 2, "one part met: the second step fires: {:?}", g.report.moments);
+    let m = g.report.moments.iter().rev().find(|m| m.kind == MomentKind::RivalProgress).unwrap();
+    assert!(m.text.contains("met half") && m.text.contains("Venture Capital Fund") && m.text.contains("9 of 12"), "{}", m.text);
+    g.end_phase();
+    assert_eq!(fired(&g), 2, "once");
+    assert!(g.outcome.is_none(), "nobody has won");
+    // The player's own seat, at the same steps, never interrupts itself.
+    colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 9);
+    g.seats[0].stabilization_run = 3;
+    g.end_phase();
+    assert_eq!(fired(&g), 2, "rivals only: {:?}", g.report.moments);
+    assert_eq!(MomentKind::RivalProgress.rank(), 5, "between a Battle (4) and a Tech (6)");
+    assert_eq!(MomentKind::ALL.len(), 9);
+    assert!(g.tables.report.moment_on(MomentKind::RivalProgress), "on by default");
+}
+
+// -------------------------------------------- 0.08.4 ticket #260: a motto on every card
+
+/// Ticket #260 (version 0.08.4): every Faction's card carries a motto, one line, its own. A guard,
+/// since a motto moves no mechanic and no other test would notice one going missing or two cards
+/// sharing one.
+#[test]
+fn every_faction_card_carries_a_motto_of_its_own() {
+    let g = game();
+    let mut seen = std::collections::BTreeSet::new();
+    for kind in FactionKind::ALL {
+        let c = g.tables.faction(kind);
+        assert!(!c.motto.trim().is_empty(), "{kind:?} has no motto");
+        assert!(c.motto.len() <= 48, "{kind:?}'s motto is a sentence, not a paragraph: {}", c.motto);
+        assert_ne!(c.motto, c.blurb, "{kind:?}'s motto restates its blurb");
+        assert!(seen.insert(c.motto.clone()), "{kind:?} shares its motto with another Faction");
     }
 }
 

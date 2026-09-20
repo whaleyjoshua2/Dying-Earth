@@ -42,10 +42,12 @@ impl Game {
         // Ticket #53: Blame. Each Faction takes on what the sources it controls emitted this turn
         // and is credited with what it removed; both totals stand for the whole game. Ticket #54:
         // what it removed is its Scrubbers, read off the same board `emissions_now` just read.
+        // Ticket #265 (version 0.08.4): and what its Research Directive has added to the Natural
+        // Sink, which takes that much out of the air every phase it stands.
         let removed_by_seat = self.scrubber_removal_by_seat();
         for seat in Seat::ALL {
             let i = seat.index();
-            let (emitted, removed) = (breakdown.by_seat[i], removed_by_seat[i]);
+            let (emitted, removed) = (breakdown.by_seat[i], removed_by_seat[i] + self.seat(seat).directive_sink);
             let s = self.seat_mut(seat);
             s.blame_emitted += emitted;
             s.blame_removed += removed;
@@ -114,7 +116,19 @@ impl Game {
             earth_population: self.earth_population(),
             space_population: self.space_population(),
         };
+        let record_turn = record.turn;
         self.climate.history.push(record);
+        // Ticket #264 (version 0.08.4): the Victory history, one record a seat, on the same turn as
+        // the Emissions record so the two charts share an axis. The score is what the Faction
+        // window's heading prints; the share is what the Blame rules read.
+        for seat in Seat::ALL {
+            let score = self.progress(seat).score();
+            let blame_share = self.blame_share(seat);
+            let gate_done = self.tables.victory_gate(self.kind(seat)).map(|t| self.has_tech(t)).unwrap_or(true);
+            let archive_complete = self.archive_complete(seat);
+            let antarctica_open = self.antarctica_open;
+            self.seat_mut(seat).victory_history.push(VictoryRecord { turn: record_turn, score, blame_share, gate_done, archive_complete, antarctica_open });
+        }
         self.neutral_development();
         // Ticket #52: a Resettle order steers only the flows of the Climate phase that follows it.
         for seat in Seat::ALL {
@@ -316,17 +330,22 @@ impl Game {
         if exposure == 0 {
             return;
         }
-        // Ticket #56: a Sea Wall standing and working takes the whole threshold and is destroyed
-        // doing it; no coastal slot is lost. A mothballed wall is not working and absorbs nothing.
+        // Ticket #56: a Sea Wall standing and working takes the whole threshold; no coastal slot is
+        // lost. A mothballed wall is not working and absorbs nothing.
+        // Ticket #257 (version 0.08.4): and it STANDS -- from #56 to here it was destroyed absorbing
+        // the one threshold, so the computer built 52 a game and the sea still took a median 32
+        // slots. At the designer's word it holds every threshold that reaches its state, and each
+        // rise it holds adds `sea_wall.upkeep_per_rise` Materials a turn to its keep (economy.rs).
         let wall = self.state(sid).facilities.iter().position(|f| f.kind == FacilityKind::SeaWall && f.working());
         let temperature = format!("{thr:+.1}");
         // Ticket #58: the dispatch says the same thing in the words of report.toml; the log keeps its own.
         let said;
         let mut figure = "the Sea Wall".to_string();
         let mut headline = if let Some(i) = wall {
-            self.state_mut(sid).facilities.remove(i);
-            said = self.say("sea_wall", &[("temperature", temperature.clone()), ("state", name.clone())]);
-            format!("Sea level at {thr:+.1} C: the Sea Wall in {name} took the sea and was destroyed; no coastal slots were lost.")
+            self.state_mut(sid).facilities[i].rises_held += 1;
+            let keep = self.state(sid).facilities[i].rises_held as f64 * self.tables.sea_wall.upkeep_per_rise;
+            said = self.say("sea_wall", &[("temperature", temperature.clone()), ("state", name.clone()), ("keep", format!("{keep:.1}"))]);
+            format!("Sea level at {thr:+.1} C: the Sea Wall in {name} took the sea and stands; it costs {keep:.1} Materials a turn to keep now.")
         } else {
             // Ticket #56: the sea takes COASTAL slots only, and nothing once they are gone.
             let take = exposure.min(self.coastal_slots(sid));

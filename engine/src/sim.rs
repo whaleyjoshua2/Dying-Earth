@@ -35,6 +35,15 @@ pub struct SimResult {
     /// share puts on its Influence thresholds; and how many neutral states developed themselves.
     pub blame: [f64; SEAT_COUNT],
     pub blame_share: [f64; SEAT_COUNT],
+    /// Ticket #265 (version 0.08.4): what each seat removed over the game, and the credit -- removed
+    /// beyond everything emitted -- it holds at the end. Both were unmeasured before this ticket.
+    pub blame_removed: [f64; SEAT_COUNT],
+    pub blame_credit: [f64; SEAT_COUNT],
+    /// Ticket #267 (version 0.08.4): ppm laid on each seat by rivals' Smear campaigns.
+    pub blame_smeared: [f64; SEAT_COUNT],
+    /// Ticket #268 (version 0.08.4): ppm of carbon credit each seat bought, and sold.
+    pub credits_bought: [f64; SEAT_COUNT],
+    pub credits_sold: [f64; SEAT_COUNT],
     pub threshold_multiplier: [f64; SEAT_COUNT],
     pub developments: u32,
     /// Ticket #54: Scrubbers completed, Mothballs, Restarts and Decommissions landed, Leapfrogs
@@ -59,7 +68,12 @@ pub struct SimResult {
     /// sea took over the game and Facilities it destroyed with them; the turn Antarctica opened and
     /// how many Colonies were founded there.
     pub sea_walls_built: u32,
+    /// Since ticket #257 (version 0.08.4) a wall is not destroyed; this counts the thresholds walls held.
     pub sea_walls_spent: u32,
+    /// Ticket #272 (version 0.08.4): walls standing and working at the end.
+    pub sea_walls_standing: u32,
+    pub agitates: [u32; SEAT_COUNT],
+    pub events_no_target: u32,
     pub coastal_slots_lost: u32,
     pub facilities_drowned: u32,
     pub antarctica_turn: Option<u32>,
@@ -381,6 +395,11 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     // Ticket #53: Blame as it stands at the end, and the neutral states that developed themselves.
     let blame = Seat::ALL.map(|s| game.blame(s));
     let blame_share = Seat::ALL.map(|s| game.blame_share(s));
+    let blame_removed = Seat::ALL.map(|s| game.seat(s).blame_removed);
+    let blame_credit = Seat::ALL.map(|s| game.blame_credit(s));
+    let blame_smeared = Seat::ALL.map(|s| game.seat(s).blame_smeared);
+    let credits_bought = Seat::ALL.map(|s| game.seat(s).credits_bought);
+    let credits_sold = Seat::ALL.map(|s| game.seat(s).credits_sold);
     let threshold_multiplier = Seat::ALL.map(|s| game.blame_threshold_multiplier(s));
     let developments = game.log.iter().filter(|l| l.contains(" raised its Industry Level to ")).count() as u32;
     // Ticket #54, read off the log the same way the #52 and #53 figures are.
@@ -451,7 +470,10 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let highest_rung = game.research.done.iter().map(|t| tables.tech(*t).rung).max().unwrap_or(0);
     // Ticket #56, read off the log as the #52 to #55 figures are.
     let sea_walls_built = game.log.iter().filter(|l| l.contains("completed Sea Wall at")).count() as u32;
-    let sea_walls_spent = game.log.iter().filter(|l| l.contains("the Sea Wall in") && l.contains("was destroyed")).count() as u32;
+    let sea_walls_spent = game.log.iter().filter(|l| l.contains("the Sea Wall in") && l.contains("took the sea")).count() as u32;
+    let sea_walls_standing = game.states.iter().flat_map(|s| s.facilities.iter()).filter(|f| f.kind == FacilityKind::SeaWall && f.working()).count() as u32;
+    let agitates = Seat::ALL.map(|s| game.seat(s).agitates_issued);
+    let events_no_target = game.events_no_target;
     let mut coastal_slots_lost = 0u32;
     let mut facilities_drowned = 0u32;
     for l in game.log.iter().filter(|l| l.starts_with("The sea took ")) {
@@ -483,6 +505,11 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         population_moved,
         blame,
         blame_share,
+        blame_removed,
+        blame_credit,
+        blame_smeared,
+        credits_bought,
+        credits_sold,
         threshold_multiplier,
         developments,
         scrubbers,
@@ -498,6 +525,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         last_turn_at_one,
         last_turn_at_twelve,
         sea_walls_built,
+        sea_walls_standing,
+        agitates,
+        events_no_target,
         sea_walls_spent,
         coastal_slots_lost,
         facilities_drowned,

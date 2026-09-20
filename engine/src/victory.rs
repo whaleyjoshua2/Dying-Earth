@@ -31,6 +31,22 @@ impl Progress {
     pub fn score(&self) -> f64 {
         self.first_fraction().min(self.second_fraction())
     }
+    /// Ticket #261: is the first part met on its own terms -- at its bar and not held back?
+    pub fn first_met(&self) -> bool {
+        self.first_value >= self.first_bar && self.first_held_back.is_none()
+    }
+    pub fn second_met(&self) -> bool {
+        self.second_value >= self.second_bar
+    }
+    /// Ticket #261: the part still short -- its name, its value and its bar -- the lower of the two
+    /// by fraction, which is the figure a player can still act on.
+    pub fn short_part(&self) -> (&str, f64, f64) {
+        if self.first_fraction() <= self.second_fraction() {
+            (&self.first_name, self.first_value, self.first_bar)
+        } else {
+            (&self.second_name, self.second_value, self.second_bar)
+        }
+    }
     pub fn met(&self) -> bool {
         self.first_value >= self.first_bar && self.second_value >= self.second_bar && self.first_held_back.is_none()
     }
@@ -41,6 +57,51 @@ impl Progress {
 }
 
 impl Game {
+    /// Ticket #261 (version 0.08.4): **the rival's Moment.** A rival crossing three quarters of the
+    /// way to its Victory Condition, or meeting one part of it with the other still short,
+    /// interrupts the player as the game's other Moments do -- once a step, latched on the seat, so
+    /// a seat that dips and recrosses is not announced twice. Rivals only, at the designer's word:
+    /// the player has the Victory window, and the Moment exists because nothing told them about the
+    /// others. Two suggestions proposed it with different steps (half, three quarters, one turn
+    /// from; and three quarters once plus the gate Tech); the designer took three quarters and the
+    /// one step the engine can state exactly -- one part met -- since "one turn from" wants a
+    /// projection the engine does not make. The gate Tech's own Moment was left as it is.
+    fn rival_moments(&mut self, progress: &[Progress]) {
+        if self.outcome.is_some() {
+            return;
+        }
+        let share = self.tables.victory.rival_moment_share;
+        for seat in Seat::ALL.into_iter().filter(|s| *s != Seat(0)) {
+            let p = &progress[seat.index()];
+            if p.met() {
+                continue;
+            }
+            let (part, value, bar) = p.short_part();
+            let (part, figure) = (part.to_string(), format!("{value:.0} of {bar:.0}"));
+            let faction = self.seat_name(seat);
+            if !self.seat(seat).rival_steps_announced[0] && p.score() >= share {
+                self.seat_mut(seat).rival_steps_announced[0] = true;
+                let text = self.say("rival_three_quarters", &[("faction", faction.clone()), ("part", part.clone()), ("value", format!("{value:.0}")), ("bar", format!("{bar:.0}"))]);
+                self.log(text.clone());
+                self.moment(MomentKind::RivalProgress, &[("text", text), ("figure", figure.clone())], None);
+                if let Some(m) = self.report.moments.last_mut() {
+                    m.seat = Some(seat);
+                }
+            }
+            let one_met = p.first_met() != p.second_met();
+            if !self.seat(seat).rival_steps_announced[1] && one_met {
+                self.seat_mut(seat).rival_steps_announced[1] = true;
+                let met = if p.first_met() { p.first_name.clone() } else { p.second_name.clone() };
+                let text = self.say("rival_one_part_met", &[("faction", faction), ("met", met), ("part", part), ("value", format!("{value:.0}")), ("bar", format!("{bar:.0}"))]);
+                self.log(text.clone());
+                self.moment(MomentKind::RivalProgress, &[("text", text), ("figure", figure)], None);
+                if let Some(m) = self.report.moments.last_mut() {
+                    m.seat = Some(seat);
+                }
+            }
+        }
+    }
+
     pub fn progress(&self, seat: Seat) -> Progress {
         let s = self.seat(seat);
         // Ticket #50: the first part is whatever the Faction's card names, at the bar on the card.
@@ -104,6 +165,7 @@ impl Game {
     /// Phase 7: End. Victory checks in their stated order, then Collapse, then the turn advances.
     pub fn end_phase(&mut self) {
         let progress: Vec<Progress> = Seat::ALL.into_iter().map(|s| self.progress(s)).collect();
+        self.rival_moments(&progress);
         let met: Vec<Seat> = Seat::ALL.into_iter().filter(|s| progress[s.index()].met()).collect();
         if met.len() == 1 {
             self.outcome = Some(Outcome::Win { seat: met[0], margin_note: "met its Victory Condition".into() });

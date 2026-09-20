@@ -164,10 +164,14 @@ pub enum MomentKind {
     ArchiveComplete,
     /// Version 0.06.0 (ticket #86): Colonists lost to crowding on a Colony Ship's arrival.
     LostInTransit,
+    /// Ticket #261 (version 0.08.4): a rival closing on its Victory Condition -- three quarters of
+    /// the way, or one part met with the other short. Rivals only; the player has the Victory
+    /// window. Nothing in the game told a player a rival was about to end it.
+    RivalProgress,
 }
 
 impl MomentKind {
-    pub const ALL: [MomentKind; 8] = [
+    pub const ALL: [MomentKind; 9] = [
         MomentKind::ColonyFounded,
         MomentKind::ControlChanged,
         MomentKind::ClimateThreshold,
@@ -176,6 +180,7 @@ impl MomentKind {
         MomentKind::Antarctica,
         MomentKind::ArchiveComplete,
         MomentKind::LostInTransit,
+        MomentKind::RivalProgress,
     ];
 
     /// The key its table carries in `report.toml`.
@@ -189,6 +194,7 @@ impl MomentKind {
             MomentKind::Antarctica => "antarctica",
             MomentKind::ArchiveComplete => "archive_complete",
             MomentKind::LostInTransit => "lost_in_transit",
+            MomentKind::RivalProgress => "rival_progress",
         }
     }
 
@@ -203,6 +209,7 @@ impl MomentKind {
             MomentKind::Antarctica => "Antarctica opening",
             MomentKind::ArchiveComplete => "The Archive completed",
             MomentKind::LostInTransit => "Colonists lost in transit",
+            MomentKind::RivalProgress => "A rival closing on its Victory Condition",
         }
     }
 
@@ -216,6 +223,8 @@ impl MomentKind {
             MomentKind::ControlChanged => 2,
             MomentKind::ClimateThreshold | MomentKind::Antarctica => 3,
             MomentKind::DecisiveBattle => 4,
+            // Ticket #261: a rival about to win reads before a Tech and after a lost unit.
+            MomentKind::RivalProgress => 5,
             MomentKind::TechComplete => 6,
             MomentKind::ArchiveComplete => 8,
         }
@@ -233,6 +242,10 @@ pub struct Moment {
     pub tech: Option<TechId>,
     /// The line under the sentence: what the AI picked and why, or that the player picks.
     pub note: Option<String>,
+    /// Ticket #261 (version 0.08.4): the seat a Moment is about, when it is about one -- the rival's
+    /// Moment, which wears that Faction's colour on its figure. None for every other kind.
+    #[serde(default)]
+    pub seat: Option<Seat>,
 }
 
 /// How many Moments a turn may stop for.
@@ -424,7 +437,24 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("break_fired", &["temperature", "name", "happened", "text"]),
     ("break_coastal", &["states", "exposure", "percent", "unrest"]),
     ("break_baseline", &["state", "rise"]),
-    ("sea_wall", &["temperature", "state"]),
+    // Ticket #257 (version 0.08.4): the wall stands and its keep rises; a surge it holds; a keep unpaid.
+    ("sea_wall", &["temperature", "state", "keep"]),
+    // Ticket #259 (version 0.08.4): the off-Earth cards join the deck.
+    ("deck_joined", &["n"]),
+    // Ticket #261: the two steps a rival's Moment fires on.
+    ("rival_three_quarters", &["faction", "part", "value", "bar"]),
+    ("rival_one_part_met", &["faction", "met", "part", "value", "bar"]),
+    // Ticket #267: a Smear campaign landed.
+    ("smear", &["faction", "target", "ppm"]),
+    // Ticket #268: carbon credits offered and bought.
+    ("credits_offered", &["faction", "n"]),
+    ("credits_bought", &["faction", "n", "seller", "ducats"]),
+    ("credits_short", &["faction", "n", "back"]),
+    // Ticket #269: an Agitate landed, named for who paid.
+    ("agitate", &["faction", "state", "rose", "unrest"]),
+    ("agitate_damped", &["faction", "state"]),
+    ("storm_surge_wall", &["state", "percent"]),
+    ("sea_wall_unkept", &["faction", "states"]),
     ("sea_nothing_left", &["temperature", "state"]),
     ("sea_took", &["n", "slots", "state", "temperature"]),
     ("sea_took_destroying", &["n", "slots", "state", "temperature", "destroyed"]),
@@ -515,6 +545,10 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("buy", &["n", "resource"]),
     ("sell", &["n", "resource"]),
     ("relief", &["state"]),
+    ("smear", &["n", "faction"]),
+    ("offer_credits", &["n"]),
+    ("buy_credits", &["n"]),
+    ("agitate", &["state"]),
     ("resettle", &["state"]),
     ("mothball", &["building", "place"]),
     ("restart", &["building", "place"]),
@@ -536,6 +570,8 @@ pub const MOMENT_ARGS: &[(&str, &[&str])] = &[
     ("tech_complete", &["tech", "faction", "lead", "cost"]),
     ("antarctica", &["n"]),
     ("archive_complete", &["faction", "place", "research"]),
+    // Ticket #261 (version 0.08.4): the sentence is a line card, as the climate threshold's is.
+    ("rival_progress", &["text", "figure"]),
 ];
 
 impl ReportTable {

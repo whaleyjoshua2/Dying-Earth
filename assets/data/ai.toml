@@ -32,6 +32,12 @@ strip_permit = 7
 relief = 4
 build_constabulary = 5
 resettle = 2
+# Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward, above a fair share.
+smear = 4
+# Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
+buy_credits = 4
+# Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
+agitate = 4
 fund_archive = 6
 build_archive = 0
 upload = 0
@@ -71,6 +77,12 @@ strip_permit = 0
 relief = 6
 build_constabulary = 6
 resettle = 2
+# Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward, above a fair share.
+smear = 4
+# Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
+buy_credits = 4
+# Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
+agitate = 4
 fund_archive = 6
 build_archive = 0
 upload = 0
@@ -107,6 +119,12 @@ strip_permit = 0
 relief = 4
 build_constabulary = 4
 resettle = 2
+# Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward, above a fair share.
+smear = 4
+# Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
+buy_credits = 4
+# Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
+agitate = 4
 fund_archive = 6
 build_archive = 0
 upload = 0
@@ -142,6 +160,12 @@ strip_permit = 0
 relief = 5
 build_constabulary = 5
 resettle = 2
+# Ticket #267 (version 0.08.4): smear a rival the seat is Cold or Hostile toward, above a fair share.
+smear = 4
+# Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
+buy_credits = 4
+# Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
+agitate = 4
 fund_archive = 8
 build_archive = 9
 # Ticket #192 (version 0.08.0): the Upload is the Archivists' second Victory part now, not a

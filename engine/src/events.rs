@@ -11,13 +11,16 @@ use rand_chacha::ChaCha8Rng;
 /// The deck as the table deals it, shuffled with the game seed; never reshuffled.
 pub fn new_deck(tables: &Tables, rng: &mut ChaCha8Rng) -> Deck {
     let mut cards: Vec<Card> = Vec::new();
-    for e in &tables.events.event {
+    // Ticket #259 (version 0.08.4): the cards that can only land off Earth are not dealt at the
+    // start; `join_off_earth_cards` shuffles them in on `off_earth_join_turn`. Measured before the
+    // change: a fifth of the cards drawn in a game found nowhere to land and were spent for good.
+    for e in tables.events.event.iter().filter(|e| !e.off_earth) {
         for _ in 0..e.copies {
             cards.push(Card::Event(e.id));
         }
     }
     cards.shuffle(rng);
-    Deck { cards, drawn: Vec::new() }
+    Deck { cards, drawn: Vec::new(), off_earth_joined: false }
 }
 
 impl Game {
@@ -35,8 +38,32 @@ impl Game {
         self.rng.random::<f64>() < p
     }
 
+    /// Ticket #259 (version 0.08.4): on the joining turn, the off-Earth cards go into the deck --
+    /// shuffled into whatever remains of it, so the next draw may be one of them -- once, and the
+    /// Report says so. A save from before this version has never dealt them and joins them on its
+    /// next Event phase past the turn.
+    fn join_off_earth_cards(&mut self) {
+        if self.deck.off_earth_joined || self.turn < self.tables.events.off_earth_join_turn {
+            return;
+        }
+        let mut n = 0usize;
+        for e in self.tables.events.event.iter().filter(|e| e.off_earth) {
+            for _ in 0..e.copies {
+                self.deck.cards.push(Card::Event(e.id));
+                n += 1;
+            }
+        }
+        self.deck.cards.shuffle(&mut self.rng);
+        self.deck.off_earth_joined = true;
+        let line = format!("The {n} Events that can only land off Earth join the deck, shuffled in among the {} left.", self.deck.cards.len() - n);
+        self.log(line.clone());
+        let text = self.say("deck_joined", &[("n", n.to_string())]);
+        self.report_line(LineKind::Event, None, text);
+    }
+
     /// Phase 5: maybe draw one card and choose its target. The effect applies in Resolution.
     pub fn event_phase(&mut self) {
+        self.join_off_earth_cards();
         let chance = self.draw_chance();
         if !self.rolls_a_card() {
             self.last_event = None;
@@ -54,6 +81,9 @@ impl Game {
         self.deck.drawn.push(card);
         let Card::Event(id) = card;
         let drawn = self.target_event(id);
+        if matches!(drawn.target, EventTarget::None) {
+            self.events_no_target += 1;
+        }
         self.log(format!("Event: {}", drawn.text));
         self.report.event = Some(drawn.text.clone());
         let text = self.say("event_drawn", &[("text", drawn.text.clone())]);
@@ -202,6 +232,12 @@ impl Game {
                     .filter(|s| t.state(*s).coastal_exposure > 0 && self.state(*s).thresholds_fired.iter().any(|f| !f))
                     .collect();
                 match self.pick_uniform(&states) {
+                    // Ticket #257 (version 0.08.4): on a walled state the wall holds, and the
+                    // coastal Facilities make less at the next Income instead.
+                    Some(s) if self.sea_wall_working(s) => {
+                        let cut = ((1.0 - t.events.storm_surge_coastal_multiplier) * 100.0).round();
+                        (EventTarget::State(s), format!("{} in {}: the Sea Wall holds; its coastal Facilities make {cut:.0}% less at the next Income.", card.name, t.state(s).name))
+                    }
                     Some(s) => (EventTarget::State(s), format!("{} in {}: its next sea-level threshold applies now.", card.name, t.state(s).name)),
                     None => (EventTarget::None, format!("{}: no exposed coast has a threshold ahead, so nothing happens.", card.name)),
                 }
@@ -414,7 +450,16 @@ impl Game {
                 }
             }
             (EventId::StormSurge, EventTarget::State(s)) => {
-                if let Some(i) = self.state(s).thresholds_fired.iter().position(|f| !f) {
+                // Ticket #257 (version 0.08.4): a standing, working Sea Wall holds the surge as it
+                // holds a threshold, and the state's coastal Facilities make less at the next Income.
+                if self.sea_wall_working(s) {
+                    self.state_mut(s).storm_surge = true;
+                    let cut = ((1.0 - self.tables.events.storm_surge_coastal_multiplier) * 100.0).round();
+                    let name = self.tables.state(s).name.clone();
+                    self.log(format!("Storm Surge in {name}: the Sea Wall held; its coastal Facilities make {cut:.0}% less at the next Income."));
+                    let text = self.say("storm_surge_wall", &[("state", name), ("percent", format!("{cut:.0}"))]);
+                    self.report_line(LineKind::Event, Some(ReportPlace::State(s)), text);
+                } else if let Some(i) = self.state(s).thresholds_fired.iter().position(|f| !f) {
                     self.apply_sea_threshold(s, i);
                 }
                 // Ticket #52: a Storm Surge is one of the three Climate cards that raise Unrest,

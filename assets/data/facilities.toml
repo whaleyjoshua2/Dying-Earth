@@ -187,6 +187,18 @@ per_population = 40.0
 min = 2
 max = 10
 
+# Ticket #257 (version 0.08.4): the Sea Wall STANDS. It took one threshold and was destroyed doing
+# it from ticket #56 to here; now it holds back every Sea Level threshold that reaches its state --
+# the three scheduled ones, the Ice Sheets Break, a Storm Surge -- and is never destroyed. The
+# designer's price: each rise it has held adds this many Materials a turn to its keep, paid at
+# Income from the Materials the seat makes, the half-Material carried between turns so none is
+# lost to rounding. Short of Materials, the wall stands unkept that turn and holds nothing.
+# Measured before the change: the computer built 1047 walls in one seating of 20 games -- 52 a
+# game -- because every one died absorbing a threshold and was rebuilt; expect that figure to fall
+# to about one per coastal state, and coastal slots lost (a median 32 a game) to fall with it.
+[sea_wall]
+upkeep_per_rise = 0.5
+
 # Ticket #54: Mothball, Restart and Decommission, on any Facility or any Colony Module. A Mothball is
 # free and lands at this Resolution; a Restart costs `restart_materials` and takes `restart_turns`;
 # a Decommission takes `decommission_turns`, refunds half the building's Materials rounded down, and

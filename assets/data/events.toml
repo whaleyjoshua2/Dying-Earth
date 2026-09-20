@@ -33,6 +33,20 @@ wildfire_emissions = 2.0
 # figures above, as Rich Seam does.
 drought_output_multiplier = 0.5
 drought_unrest = 1.0
+# Ticket #257 (version 0.08.4): a Storm Surge that breaks on a standing Sea Wall no longer brings the
+# state's next threshold forward -- the wall holds it, as it holds every threshold now. Instead the
+# Facilities in the state's coastal slots make this much of their output at the next Income, once,
+# at the designer's word: "reduce by 30% the output of coastal slots for the next turn". The card's
+# Unrest lands as before. An unwalled state takes the threshold early, as it always has.
+storm_surge_coastal_multiplier = 0.7
+# Ticket #259 (version 0.08.4): the seven cards that can only land off Earth -- Grid Failure,
+# Reactor Leak, Dust Storm, Moonquake, Helium-3 Vein, Rich Seam, Ice Deposit; `off_earth = true`
+# on each -- are NOT in the deck when the game starts. They join it on this turn, shuffled into
+# whatever remains, at the designer's word: "flag them as off earth and add them to deck on turn
+# 12". Measured before the change over five headless games: about 20 cards drawn a game and 4 of
+# them found nowhere to land, chiefly these seven, each spent for the game -- the deck is never
+# reshuffled. The median first Colony is founded on turn 10.
+off_earth_join_turn = 12
 volcanic_co2 = 5.0
 
 [[event]]
@@ -90,6 +104,7 @@ target = "colony"
 effect = "Its Modules are offline until the next Resolution"
 blunted_by = "closed_loop_colonies"
 copies = 2
+off_earth = true
 
 [[event]]
 id = "rich_seam"
@@ -99,6 +114,7 @@ target = "body"
 effect = "Its Mines produce x2 for two turns"
 blunted_by = "deep_mining"
 copies = 3
+off_earth = true
 
 [[event]]
 id = "ice_deposit"
@@ -108,6 +124,7 @@ target = "body"
 effect = "Its Refineries produce x2 for two turns"
 blunted_by = "automated_refining"
 copies = 2
+off_earth = true
 
 [[event]]
 id = "breakthrough"
@@ -172,6 +189,7 @@ target = "mars"
 effect = "Every Module on Mars is offline until the next Resolution"
 blunted_by = "closed_loop_colonies"
 copies = 2
+off_earth = true
 
 [[event]]
 id = "unrest"
@@ -189,6 +207,7 @@ target = "colony"
 effect = "Its Generators are offline until the next Resolution and its holder loses 5 Energy"
 blunted_by = "closed_loop_colonies"
 copies = 1
+off_earth = true
 
 [[event]]
 id = "methane_burst"
@@ -226,6 +245,7 @@ target = "moon"
 effect = "Every Module on the Moon is offline until the next Resolution"
 blunted_by = "closed_loop_colonies"
 copies = 1
+off_earth = true
 
 [[event]]
 id = "helium_vein"
@@ -235,3 +255,4 @@ target = "moon"
 effect = "The Moon's Generators produce x2 for two turns"
 blunted_by = "efficient_grids"
 copies = 1
+off_earth = true

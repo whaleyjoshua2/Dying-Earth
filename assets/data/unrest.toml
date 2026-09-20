@@ -50,6 +50,17 @@ natural_fall = 1.5
 # One Relief order: this many Ducats lowers Unrest by `relief_points`, any number of times a turn.
 relief_ducats = 10
 relief_points = 1.0
+# Ticket #269 (version 0.08.4): Agitate, Relief's mirror on a Region a RIVAL controls -- this many
+# Ducats AND this much Influence raise its Unrest by `agitate_points`, once a turn per Region per
+# Faction, at the designer's word ("15 ducats at 5 influence"; "one per Region per Faction per
+# turn"). Dearer than Relief so a duel is not a coin flip settled by income -- Ducats made a game
+# run [546, 1361, 27, 424] by seat -- and capped so a Region cannot be bought off its holder in one
+# turn for a hundred Ducats. An offence the holder's Report names. A working Constabulary damps it
+# by `constabulary_damping`, as it damps the climate's rises. Past the second threshold the
+# state's Facilities run at half; at the top it throws its controller off.
+agitate_ducats = 15
+agitate_influence = 5
+agitate_points = 1.0
 # A Constabulary standing and online there, every turn, on top of the natural fall.
 constabulary_fall = 1.0
 # A Scrubber standing and online there, every turn, on top of the natural fall (ticket #54); it

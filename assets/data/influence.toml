@@ -39,10 +39,35 @@ destruction_chance = 0.25
 # less the CO2 it removes; its share of the four Factions' total Blame above `fair_share` multiplies
 # its Influence thresholds on every Nation State it does not hold, by 1 + (share - fair_share),
 # floored at x1.0 and capped at `cap`. Never on a Colony or a Space Station, never on the challenge
-# margin, never on Standing decay, never on Pacification.
+# margin, never on Pacification.
+#
+# Ticket #266 (version 0.08.4): AND on Standing decay, reversing #53's "never" on purpose, at the
+# designer's word ("allow blame to moderate the decay rate of influence"). A step rule, since the
+# multiplier rounded to a whole number could only ever bite at the cap and never slow anything: on
+# a Region the Faction does not hold, a share at or below `decay_slow_below` (half the fair quarter)
+# decays `decay_slow` a turn, a share at or above `decay_fast_from` decays `decay_fast`, and
+# anything between decays the plain `decay` above. A held place keeps `decay_controlled`; a Colony
+# or a station is untouched -- Blame is Earth's resentment. Measured before it was built: the
+# Prospectors sit at 0.54 to 0.73 in every seating and the Custodians at 0.04 to 0.13, so the fast
+# side is a rule about the Prospectors and the slow side one the Custodians can reach.
 [blame]
 fair_share = 0.25
 cap = 1.5
+decay_slow_below = 0.125
+decay_fast_from = 0.5
+decay_slow = 1
+decay_fast = 3
+
+# Ticket #267 (version 0.08.4): the Smear campaign. Influence spent on a rival Faction rather than
+# a place lays this many ppm on the rival's Blame ledger, for good -- "a kind of a lie", in the
+# designer's words, since it inflates Blame above the ppm the rival produced, which is why the
+# ledger and not the physics is what every rule reads. One Smear a turn per target, any amount the
+# Allotment covers; an offence the Report names. For scale, measured before it was built: a table
+# carries 800 to 1100 ppm of Blame at a game's end and an Allotment is 10 to 30 Influence a turn,
+# so a whole Allotment at this rate moves a share by two to six points -- a step of resentment in
+# a few turns of effort, not one. The sweep re-fits it.
+[smear]
+ppm_per_influence = 2.0
 
 # Ticket #187 (version 0.08.0): Resistance. A place's schooling takes a bite out of the Influence an
 # OUTSIDER spends there: Standing gained = spent / resistance, rounded down. The controller converts

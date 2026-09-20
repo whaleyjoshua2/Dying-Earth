@@ -1,0 +1,178 @@
+DYING EARTH - playtest build, version 0.08.3
+============================================
+
+Thanks for playing. This is an early build of a turn-based strategy game about colonizing
+the solar system before global warming wrecks Earth. It is unfinished and unbalanced on
+purpose: the point of this playtest is to find out what is confusing, what is boring,
+and what breaks.
+
+HOW TO RUN
+----------
+1. Unzip the whole folder somewhere (Desktop is fine). Keep dying-earth.exe and the
+   "assets" folder together; the game reads its rules and pictures from there.
+2. Double-click dying-earth.exe.
+3. Windows may show a blue "Windows protected your PC" box because the program is not
+   signed. Click "More info", then "Run anyway".
+4. The very first launch shows a blank dark window for up to ten seconds while it
+   compiles graphics. Later launches are quick.
+5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
+6. ON UBUNTU OR ANOTHER LINUX: take the "-linux" zip instead. There is no .exe in it;
+   open a terminal in the unzipped folder and run   ./dying-earth   . The file
+   RUN-ON-LINUX.txt beside it says what to do if the window does not open, and where
+   the saves go. It is built on Ubuntu 22.04 and wants 22.04 or newer.
+
+WHAT CHANGED SINCE 0.08.2
+-------------------------
+Last version was about what the other three sides think of you. This one is about the
+four sides being DIFFERENT from each other. Each now has something only it can do, and
+two new rules charge everybody for choices they used to get free.
+
+- YOUR RESEARCH NO LONGER HAS TO GO INTO THE TECH TREE. On the Victory panel there is now
+  a slider: RESEARCH DIRECTIVE. Whatever share you keep back goes somewhere useful to your
+  side alone - the Custodians push it into the carbon sink, permanently; the Prospectors
+  turn it into money; the Arkwrights into fuel; the Archivists into their Archive, as
+  before. Everyone may keep back up to half. The Archivists may keep back all of it, and
+  the bottom half of their slider is greyed out because they can never go below half.
+- BUT KEEPING IT BACK COSTS YOU FRIENDS. Contribute less than 85% of your research to the
+  shared tech tree and every other side thinks slightly worse of you, that turn. Give all
+  of it and they think slightly better. It is read fresh each turn, so a side that starts
+  contributing again is forgiven at once, and it never leaves a permanent scar.
+- EVERY SIDE NOW HAS A SPECIAL BUILDING IN SPACE, not just on Earth. The Archivists get
+  the HELIOSTAT (a solar array that makes one more power, anywhere). The Prospectors get
+  the EXCHANGE (a trade post that pays one more coin). The Arkwrights get the CHORUS (a
+  relay that gives you one more influence for every six people living at that colony).
+  The Custodians keep their Academy. Each costs the same as the ordinary building it
+  replaces, and each survives being captured.
+- THE ARKWRIGHTS CAN SOUND AN EXODUS CALL. On a country they hold, 50 coins buys two turns
+  of double recruiting - sixteen pioneers a turn instead of eight - and while it runs those
+  people cost the country the ORDINARY amount rather than the Arkwrights' usual double.
+  Once per country, ever.
+- THE PROSPECTORS NOW HOARD MONEY, NOT ORE. Their Venture Capital Fund holds coins, filled
+  by a share of your income each turn before you can spend any of it, and you win at 2000.
+  The slider goes up to 80%, and that is a real choice now: coins are what buys influence,
+  pays relief and mends ships, so banking a lot genuinely hurts.
+- YOU MUST HOLD A COUNTRY THREE TURNS BEFORE YOU CAN REMAKE IT. The Strip Permit, the
+  Leapfrog and the Exodus Call all now need the country to have been yours for three whole
+  turns. The turn you take it does not count. Hover the greyed button and it tells you the
+  turn it opens.
+- TWO NEW TECHS. BENEFICIATION (extraction) makes every mine produce a tenth more, wherever
+  it stands. RELAY NETWORKS (off-world living) makes a relay worth two influence instead of
+  one.
+- THE TECH TREE COSTS MORE and now SCROLLS. Coastal Engineering is 15, everything on the
+  second rung is 32 and everything on the third is 48. The tree is also drawn a tenth
+  smaller and scrolls if your screen is short, because it had grown taller than a 1280x800
+  window and two victory techs were falling off the bottom.
+- WORDS. "Emigrants" are now PIONEERS and "muster" is now RECRUIT. The Arkwrights' rule
+  called "Steerage" is now COACH CLASS. Nothing about how any of it works has changed.
+- TWO LONG EXPLANATIONS IN THE FACTION WINDOW ARE NOW MOUSE-OVERS, so the page is about a
+  fifth shorter. Hover the "Blame" and "Relations" headings.
+
+HOW TO PLAY, IN SHORT
+---------------------
+- Pick a side on the start screen, then pick where on Earth you begin. Each side wins a
+  different way; its card says how.
+- Click a region or a colony to select it. Its card appears on the right.
+- A region's buildings are the row of boxes on its card. Click an empty box to build.
+- A colony's buildings are the grid of tiles on its card. Click an empty tile to build.
+- INFLUENCE is how you win regions over. Spend it from the bar at the bottom right.
+- The FACTION WINDOW (F) has a page for each side: what they have, what they think of you,
+  and what bargains stand between them.
+- The VICTORY panel (V) shows how far each side is along its own path, and holds your
+  Research Directive slider.
+- The TECH TREE (T) is shared: everyone's research goes into the same tree unless they
+  keep some back.
+- The roster on the right lists everything you own. An open ring at the end of a row
+  means it is still waiting for an order from you this turn.
+- End Turn - bottom right, red, or press Enter. Thirty-six turns. Watch the temperature
+  in the top bar: at +3.0 C the world collapses and nobody wins.
+
+WHAT WE WANT TO KNOW
+--------------------
+Write down anything, however small. Especially:
+- The moment you were not sure what to do next.
+- Anything you clicked that did nothing, or did something you did not expect.
+- THE RESEARCH DIRECTIVE SLIDER: did you find it? Did you understand what keeping research
+  back would GET you, before you moved it? Did the warning about losing friends change
+  what you did, or did you ignore it?
+- THE 85% LINE: did you ever deliberately cross it, or did you just leave the slider alone?
+  If you left it alone, say so - that would mean the choice is not worth taking.
+- YOUR SIDE'S SPECIAL BUILDING IN SPACE: did you ever build it? Did you know you had one?
+- THE THREE-TURN WAIT: did you try to strip or leapfrog a country you had just taken, and
+  get refused? Did the message tell you enough?
+- THE EXODUS CALL, if you played the Arkwrights: could you afford it? Fifty coins is a lot
+  in a poor country, and we suspect it is out of reach where you usually start.
+- THE MONEY HOARD, if you played the Prospectors: what share did you bank, and did banking
+  it leave you unable to do things you wanted to do?
+- THE TECH TREE'S NEW SHAPE: can you still see the whole thing? Did you have to scroll, and
+  did you notice you could?
+- THE NEW WORDS: does "Pioneer" read right? Does "Coach Class"?
+- The turn the game got boring, if it did, and the turn you felt you had lost.
+- Crashes: what you were doing, and the "Seed" number shown on the title screen and
+  the game-over screen. With the seed the game can be replayed exactly.
+
+Screenshots help. Print Screen, then paste into a message.
+
+KNOWN ROUGH EDGES
+-----------------
+All the numbers below come from eighty computer-only games, twenty with each side going
+first.
+
+- THE PROSPECTORS NOW WIN TOO MUCH, AND THE ARCHIVISTS ALMOST NEVER DO. Out of eighty
+  games: Prospectors 30, Custodians 26, Arkwrights 8, Archivists 1. Last version it was
+  Custodians 37, Prospectors 10, Archivists 7, Arkwrights 3. So the side that was running
+  away has come down and the weakest side has nearly tripled, which is what this version
+  was for - but the Prospectors have taken over as the runaway and the Archivists have
+  fallen off a cliff. We know, and we know why (next item). It is the first job of the
+  next version.
+- WHY THE ARCHIVISTS COLLAPSED, since it is not a mystery. Their way to win is to pour
+  research into their Archive - which means they are almost always keeping research back,
+  which means the new 85% rule charges them every single turn of every single game. On top
+  of that their special space building is one they never want to build, and their victory
+  tech moved further away. Three separate changes landed on one side and nobody was
+  watching the total. If you play them and it feels hopeless, that is the reason.
+- TWO OF THE FOUR SPECIAL SPACE BUILDINGS ARE NEVER BUILT BY THE COMPUTER. The Archivists'
+  Heliostat and the Custodians' Academy both stand at zero across all eighty games; the
+  Prospectors' Exchange and the Arkwrights' Chorus work fine. The Heliostat's reason is
+  known - the Archivists' reactor means they are never short of power, so they never want a
+  solar array. The Academy's reason is not known and is older than this version. You can
+  build either by hand.
+- THE WORLD COLLAPSES LESS OFTEN THAN IT DID - 15 games in 80, against 23 last version.
+  That is the one number moving in a direction nobody aimed at. Tell us whether the climate
+  still feels like a threat or whether you stopped watching the temperature.
+- THE EXODUS CALL ALMOST NEVER FIRES unless the Arkwrights happen to start somewhere rich.
+  In eighty games it was sounded 177 times in the twenty where they went first, and ZERO
+  times in the other sixty. Fifty coins is simply more than a poor country makes. Say
+  whether you could ever afford it.
+- NEARLY HALF OF ALL PAIRS END A GAME SCARRED, as last version: 41% to 48% of the twelve
+  relationships carry a permanent floor by the end, and a typical pair ends three to five
+  points below neutral. The scale still says something, but if everyone ends up hating
+  everyone it stops meaning much. Say if it felt that way.
+- ONLY NON-AGGRESSION EVER GETS STRUCK. The computer sides offer and accept that one and
+  nothing else, because passage and refuelling are worth almost nothing on today's board.
+  Both are built for when the game reaches Mars. Roughly three quarters of the bargains
+  struck in a game are later broken.
+- FUEL AND ENERGY PRICES BARELY MOVE, because the computer sides only ever buy materials
+  and NEVER sell anything. So those two prices move only when YOU trade them. Giving the
+  computer an appetite to sell is a later job.
+- THE TECH TREE STILL FINISHES, and now FASTER - around turn 26, where last version it was
+  turn 31 to 36 - even though everything in it costs more. The extra research from the new
+  directive and from research agreements more than pays for the price rise.
+- THE PICTURES ON THE NEW SPACE BUILDINGS ARE FIRST PICKS from a free icon set. The
+  Arkwrights' Chorus in particular is a satellite with signal lines that goes muddy at the
+  small size a build tile draws it. Say which ones misled you.
+- THE SPACEPORT AND THE LAUNCH SITE look alike at the small size a build box draws them
+  at: both are a tall thing over a low thing. Say so if you ever mistook one for the other.
+- A SPECIAL BUILDING SITS AT THE BOTTOM of a colony's build list rather than in the place
+  of the ordinary building it replaces. Cosmetic.
+- A station ring can be edge-on for a moment as you turn the globe; it comes back as
+  you keep turning.
+- The list of station slots on the Solar System Map appears only while you point at
+  the world, because open all the time it covered the Moon.
+- A region's name at the very edge of the globe on the start screen can sit half under
+  the panel. Turn the globe a little.
+- Antarctica's three colony sites have labels that overlap each other when you are zoomed
+  out. Older than this version.
+- WHERE EACH SIDE STARTS IS NOT RANDOM. The computer sides always take the richest free
+  countries in the same order, so the third and fourth sides are always dealt the leftovers.
+  This is being looked at and may explain some of the imbalance above.
+- No sound.

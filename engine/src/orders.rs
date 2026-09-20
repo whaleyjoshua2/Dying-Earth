@@ -66,6 +66,18 @@ pub enum Order {
     /// Version 0.03 (ticket #35): Ducats buy Influence for this turn's Allotment, and pay for
     /// repairs in place of Materials. Ticket #54 retired Restoration and both its orders.
     BuyInfluence { amount: i64 },
+    /// Ticket #267 (version 0.08.4): a Smear campaign -- Influence spent on a rival Faction rather
+    /// than a place, laying ppm on the rival's Blame ledger for good at `smear.ppm_per_influence`.
+    /// One a turn per target, any amount the Allotment covers. An offence, and the Report names
+    /// who paid. "Smear", the designer said, because it inflates Blame above the ppm produced and
+    /// is thus a kind of a lie.
+    Smear { target: Seat, amount: i64 },
+    /// Ticket #268 (version 0.08.4): the Custodians set the ppm of carbon credit they offer a turn,
+    /// standing until changed; nought refuses everyone.
+    OfferCredits { ppm: i64 },
+    /// Ticket #268: buy ppm of carbon credit from the Custodians, up to the cap, at the price their
+    /// view of the buyer sets; it comes off the buyer's Blame ledger at Resolution.
+    BuyCredits { ppm: i64 },
     RepairWithDucats { unit: UnitRef, points: u32 },
     /// Version 0.04 (ticket #42): the trading window. Buy Materials, Fuel or Energy for Ducats;
     /// sell Materials or Fuel for half the buying price; buy a building outright for Ducats at
@@ -134,6 +146,9 @@ pub enum Order {
     /// Version 0.05 (ticket #52): Relief. Ducats spent on a Nation State you direct, lowering its
     /// Unrest by one. Any number of times a turn, cancellable like any order.
     Relief { state: StateId },
+    /// Ticket #269 (version 0.08.4): Relief's mirror -- Ducats and Influence raise the Unrest of a
+    /// Region a rival controls by one, once a turn per Region per Faction. An offence.
+    Agitate { state: StateId },
     /// Version 0.05 (ticket #52): Resettle. Once a turn per Faction: this turn every refugee flow
     /// leaving a state you direct goes entirely to the chosen state, and you gain Standing there.
     Resettle { state: StateId },
@@ -237,9 +252,20 @@ pub struct Pending {
     pub stations: Vec<(Seat, BodyId, u32)>,
     /// Ticket #52: Relief orders paid this turn, one entry per point.
     pub relief: Vec<(Seat, StateId)>,
+    /// Ticket #269 (version 0.08.4): Agitate orders paid this turn -- who, where.
+    #[serde(default)]
+    pub agitates: Vec<(Seat, StateId)>,
     /// Ticket #52: Resettle orders paid this turn, one per Faction at most.
     pub resettle: Vec<(Seat, StateId)>,
     pub influence: Vec<(Seat, Target, i64)>,
+    /// Ticket #267 (version 0.08.4): Smear campaigns paid this turn -- who, whom, how much Influence.
+    #[serde(default)]
+    pub smears: Vec<(Seat, Seat, i64)>,
+    /// Ticket #268 (version 0.08.4): offers set and credits bought this turn -- buyer, ppm, Ducats paid.
+    #[serde(default)]
+    pub credit_offers: Vec<(Seat, i64)>,
+    #[serde(default)]
+    pub credit_buys: Vec<(Seat, i64, i64)>,
     /// Attack orders in the order given, for battle ordering (spec 10.1).
     pub attack_sequence: u32,
 }
@@ -266,6 +292,8 @@ impl Game {
             Order::Transit { .. } => Cost::default(),
             Order::Refuel { ship } => Cost { fuel: self.refuel_amount(seat, *ship), ..Default::default() },
             Order::Influence { amount, .. } => Cost { influence: *amount, ..Default::default() },
+            Order::Smear { amount, .. } => Cost { influence: *amount, ..Default::default() },
+            Order::BuyCredits { ppm } => Cost { ducats: self.credit_cost(seat, *ppm).unwrap_or(0), ..Default::default() },
             // Ticket #54: a Mothball and a Strip Permit are free; a Restart costs Materials and a
             // Leapfrog Ducats; a Decommission pays Materials back, which arrive at its Resolution.
             Order::Change { what: BuildingChange::Restart, .. } => Cost { materials: t.mothball.restart_materials, ..Default::default() },
@@ -300,6 +328,7 @@ impl Game {
             Order::BuildArchive { colony } => Cost { materials: self.module_materials_at(seat, *colony, ModuleKind::Archive), ..Default::default() },
             // Ticket #52: Relief and Resettle are paid in Ducats.
             Order::Relief { .. } => Cost { ducats: t.unrest.relief_ducats, ..Default::default() },
+            Order::Agitate { .. } => Cost { ducats: t.unrest.agitate_ducats, influence: t.unrest.agitate_influence, ..Default::default() },
             Order::Resettle { .. } => Cost { ducats: t.unrest.resettle_ducats, ..Default::default() },
             Order::RepairWithDucats { points, .. } => Cost { ducats: t.ducats.per_repair_point * *points as i64, ..Default::default() },
             _ => Cost::default(),
@@ -752,6 +781,18 @@ impl Game {
                 Ok(cost)
             }
             // Ticket #52: Relief, on a state you direct, any number of times a turn.
+            // Ticket #269: on a Region a RIVAL controls, once a turn per Region.
+            Order::Agitate { state } => {
+                match self.place_control(Place::State(*state)).controller() {
+                    None => return fail("nobody holds it: there is no controller to turn its people against"),
+                    Some(c) if c == seat => return fail("you cannot agitate against yourself"),
+                    Some(_) => {}
+                }
+                if pending.iter().any(|o| matches!(o, Order::Agitate { state: s } if s == state)) {
+                    return fail("one Agitate a turn per Region");
+                }
+                Ok(cost)
+            }
             Order::Relief { state } => {
                 if self.state(*state).control.director() != Some(seat) {
                     return fail("Relief is paid in a Nation State you direct");
@@ -1179,6 +1220,57 @@ impl Game {
                 }
                 Ok(cost)
             }
+            // Ticket #268: an offer is the Custodians' alone, one a turn, never negative.
+            Order::OfferCredits { ppm } => {
+                if self.kind(seat) != FactionKind::Custodians {
+                    return fail("only the Custodians sell carbon credits");
+                }
+                if *ppm < 0 {
+                    return fail("offer nought or more");
+                }
+                if pending.iter().any(|o| matches!(o, Order::OfferCredits { .. })) {
+                    return fail("the offer is already being set this turn");
+                }
+                Ok(cost)
+            }
+            // Ticket #268: a purchase wants a seller offering, a buyer they will sell to, a positive
+            // amount within the cap, and one order a turn.
+            Order::BuyCredits { ppm } => {
+                let Some(seller) = self.credit_seller() else { return fail("nobody sells carbon credits") };
+                if seller == seat {
+                    return fail("the Custodians do not buy their own credits");
+                }
+                if *ppm <= 0 {
+                    return fail("buy a positive amount");
+                }
+                let c = &self.tables.carbon_credits;
+                if *ppm > c.cap_per_turn {
+                    return fail(format!("at most {} ppm a turn", c.cap_per_turn));
+                }
+                if self.seat(seller).credits_offered <= 0 {
+                    return fail("the Custodians are not selling this turn");
+                }
+                if self.credit_price_multiplier(seat).is_none() {
+                    return fail("the Custodians will not sell to you: they are Hostile");
+                }
+                if pending.iter().any(|o| matches!(o, Order::BuyCredits { .. })) {
+                    return fail("one purchase a turn");
+                }
+                Ok(cost)
+            }
+            // Ticket #267: a Smear is one a turn per target, on a rival, of a positive amount.
+            Order::Smear { target, amount } => {
+                if *amount <= 0 {
+                    return fail("spend a positive amount");
+                }
+                if *target == seat {
+                    return fail("a Faction cannot smear itself");
+                }
+                if pending.iter().any(|o| matches!(o, Order::Smear { target: t, .. } if t == target)) {
+                    return fail(format!("the {} are already being smeared this turn", self.seat_name(*target)));
+                }
+                Ok(cost)
+            }
             Order::Influence { target, amount } => {
                 if *amount <= 0 {
                     return fail("spend a positive amount");
@@ -1593,11 +1685,18 @@ impl Game {
                 // Ticket #52: both act at Resolution; Resettle also steers the next Climate phase's
                 // refugee flows, which is the first flow after these orders are given.
                 Order::Relief { state } => self.pending.relief.push((seat, *state)),
+                Order::Agitate { state } => self.pending.agitates.push((seat, *state)),
                 Order::Resettle { state } => {
                     self.seat_mut(seat).resettle_to = Some(*state);
                     self.pending.resettle.push((seat, *state));
                 }
                 Order::Influence { target, amount } => self.pending.influence.push((seat, *target, *amount)),
+                Order::Smear { target, amount } => self.pending.smears.push((seat, *target, *amount)),
+                Order::OfferCredits { ppm } => self.pending.credit_offers.push((seat, *ppm)),
+                Order::BuyCredits { ppm } => {
+                    let paid = self.credit_cost(seat, *ppm).unwrap_or(0);
+                    self.pending.credit_buys.push((seat, *ppm, paid));
+                }
                 // Ticket #54: the change is written on the building itself and lands at the
                 // Resolution of its due turn, so nothing has to track a position between turns.
                 Order::Change { building, what } => {
@@ -1680,7 +1779,7 @@ impl Game {
                         // Ducats. `draw_return` is unchanged: a tenth is still lost on the way out.
                         s.stockpile.ducats += back;
                     }
-                    let line = format!("The {} drew {} Ducats from the Venture Capital Fund; {} came back to the Stockpile.", self.seat_name(seat), amount, back);
+                    let line = format!("The {} withdrew {} Ducats from the Venture Capital Fund; {} came back to the Stockpile.", self.seat_name(seat), amount, back);
                     self.log(line);
                 }
                 Order::Leapfrog { state } => {
@@ -1935,6 +2034,9 @@ impl Game {
                 r("unload", &[("place", where_)])
             }
             Order::Influence { target, amount } => r("influence", &[("n", amount.to_string()), ("place", place(*target))]),
+            Order::Smear { target, amount } => r("smear", &[("n", amount.to_string()), ("faction", self.seat_name(*target))]),
+            Order::OfferCredits { ppm } => r("offer_credits", &[("n", ppm.to_string())]),
+            Order::BuyCredits { ppm } => r("buy_credits", &[("n", ppm.to_string())]),
             Order::BuyInfluence { amount } => r("buy_influence", &[("n", amount.to_string())]),
             Order::ProposeAccord { to, .. } => r("propose_accord", &[("faction", self.seat_name(*to))]),
             Order::EndAccord { with } => r("end_accord", &[("faction", self.seat_name(*with))]),
@@ -1942,6 +2044,7 @@ impl Game {
             Order::Buy { resource, amount } => r("buy", &[("n", amount.to_string()), ("resource", resource.name().to_string())]),
             Order::Sell { resource, amount } => r("sell", &[("n", amount.to_string()), ("resource", resource.name().to_string())]),
             Order::Relief { state } => r("relief", &[("state", self.tables.state(*state).name.clone())]),
+            Order::Agitate { state } => r("agitate", &[("state", self.tables.state(*state).name.clone())]),
             Order::Resettle { state } => r("resettle", &[("state", self.tables.state(*state).name.clone())]),
             Order::Change { building: b, what } => {
                 let key = match what {

@@ -17,7 +17,7 @@ The Faction that colonizes the solar system while limiting ecological damage to 
 _Avoid_: Stewards (the retired name), environmentalists, greens, moderates, eco-terrorists
 
 **Prospectors**:
-The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry and the Strip Permit, their Unique Facility is the Investment Bank, and since version 0.05.5 they win on a hoard: **2000 Ducats** in their Venture Capital Fund since version 0.08.3, and expansion. It was 1000 Materials before that.
+The Faction that maximizes resource extraction without regard for ecological cost. Their signature rule is Cheap Industry and the Strip Permit, their Unique Facility is the Investment Bank, and since version 0.05.5 they win on a hoard: **2500 Ducats** in their Venture Capital Fund since version 0.08.4 (2000 in 0.08.3), and expansion. It was 1000 Materials before that.
 _Avoid_: Extractors (the retired name), capitalists, industrialists, exploiters
 
 **Arkwrights**:
@@ -123,7 +123,7 @@ An unplanned occurrence drawn from the Event Deck after orders are committed and
 _Avoid_: incident, crisis, card
 
 **Event Deck**:
-The deck a card may be drawn from each turn, holding only Events: forty cards since version 0.05.5 for a game of thirty-six turns (twenty-eight before), twenty-two Events in one to three copies each. It is never reshuffled. Whether a card is drawn at all is the Draw Chance.
+The deck a card may be drawn from each turn, holding only Events: forty cards since version 0.05.5 for a game of thirty-six turns (twenty-eight before), twenty-two Events in one to three copies each. Since version 0.08.4 the twelve cards that can only land off Earth -- Grid Failure, Reactor Leak, Dust Storm, Moonquake, Helium-3 Vein, Rich Seam and Ice Deposit, in their copies -- are not dealt at the start: they are shuffled into what remains of the deck on turn 12, once. It is never otherwise reshuffled, and a card drawn with nowhere to land is spent. Whether a card is drawn at all is the Draw Chance.
 _Avoid_: event pool, random table, encounter deck, calm card (retired in version 0.02)
 
 **Draw Chance**:
@@ -245,6 +245,10 @@ _Avoid_: building, structure, facility, improvement
 **Ship**:
 A persistent piece that travels between Bodies. It is one of four types since version 0.04: Colony Ship, Carrier, Frigate or Battleship. It is built only at a Shipyard, on a Space Station or a Colony. It is not consumed on arrival; damage it takes persists until repaired.
 _Avoid_: vessel, rocket, fleet, expedition
+**Motto**:
+One line a Faction says of itself, under its name on the selection card and in the in-game rulebook, since version 0.08.4 -- the Custodians' *Leave it better than we found it*, the Prospectors' *Everything has a price. We find it*, the Arkwrights' *Nothing left behind but the Earth*, the Archivists' *Everyone remembered*. It is the Faction speaking, where the blurb beneath it is the rules describing the Faction; it appears nowhere else.
+_Avoid_: slogan, tagline, catchphrase
+
 **Ship name**:
 The name a Ship is given when it is built, since version 0.08.1, drawn from one of two lists -- the ships of exploration for a Colony Ship, the ships of the line for a Frigate, a Battleship and the Carrier. It is unique across the whole board and is taken as the first unused name in list order, which draws no randomness and so cannot shift a seeded game. The **prefix** in front of it belongs to whoever flies the ship and is its Faction's -- TSV, PMV, ARK, ACV -- where the name belongs to the hull. The Ship's id survives on every hover, since a save file, a log line and the Report all speak in ids.
 _Avoid_: callsign, registry, hull number, designation
@@ -270,11 +274,11 @@ The heavy warship type: the most strength and hit points, low Pursuit, dear and 
 _Avoid_: capital ship, dreadnought, cruiser
 
 **Army**:
-A ground fighting unit. A Region's Armies belong to the state and are directed by the Faction that controls it, following the state if control changes. A Colony's Army belongs to the Colony, exists only where it has a Barracks, and only defends.
+A ground fighting unit. A Region's Armies belong to the state and are directed by the Faction that controls it, following the state if control changes. A Colony's Army belongs to the Colony, exists only where it has a Barracks, and only defends. Since version 0.08.4 every Army has a name given as it is raised, from its home rather than from any Faction: an ordinal and the Region's demonym -- *the 1st Chinese Army*, *the 2nd* -- or for a Colony's, its Garrison -- *the Tycho Garrison*, *the 2nd Tycho Garrison*. The Standing Army is the first raised and so the 1st; a re-raised one takes the next number; the name survives every change of hands, since the Army is its Region's.
 _Avoid_: troops, soldiers, garrison, marines
 
 **Standing Army**:
-The Armies a Region keeps on its own, sized by its card and replenished a little each turn, whether or not any Faction controls it.
+The Armies a Region keeps on its own, sized by its card and replenished a little each turn, whether or not any Faction controls it. Named like any other Army since version 0.08.4 -- the one the game begins with is *the 1st Chinese Army*.
 _Avoid_: garrison, militia, defence value
 
 **Barracks**:
@@ -401,7 +405,7 @@ How much of a Region stands on the coast, a figure on its card. It sets how many
 _Avoid_: coastline, vulnerability, flood risk
 
 **Sea Wall**:
-The Facility that holds one threshold off: it takes no build slot (since version 0.05.5; a Coastal Slot before), at most one to a state, and while it is working the state's next Sea Level threshold of any kind takes no slots at all. The wall is destroyed absorbing it. It needs Coastal Engineering.
+The Facility that holds the sea off: it takes no build slot (since version 0.05.5; a Coastal Slot before), at most one to a state, and while it is working every Sea Level threshold of any kind takes no slots from the state. Since version 0.08.4 it **stands** through them -- from version 0.05 to 0.08.3 it absorbed one and was destroyed doing it -- and each rise it has held adds half a Material a turn to its keep, paid at Income; a seat short of Materials leaves it unkept that turn, and an unkept wall holds nothing. A Storm Surge that breaks on a standing wall no longer brings a threshold forward: the wall holds, and the Facilities in the state's Coastal Slots make three tenths less at the next Income. It needs Coastal Engineering.
 _Avoid_: dyke, levee, barrier, flood defence
 
 **Coastal Engineering**:
@@ -411,6 +415,10 @@ _Avoid_: sea defence, civil engineering, hydrology
 **Unrest**:
 How restive a Region's people are, a figure from 0 to 10 on its card, moving in halves. Heat, the rising sea, the Climate cards, Occupation and arriving Refugees raise it; it falls on its own every turn except the turn the state changed hands, so a rise and the fall net out, and it falls further to Relief, a Constabulary and a Scrubber. Past its first threshold the Standing Army stops replenishing, past its second the state's Facilities run at half, and at the top the state throws its controller off and goes neutral.
 _Avoid_: unhappiness, morale, stability, dissent, revolt meter
+
+**Agitate**:
+Relief's mirror, since version 0.08.4: an order paid in Ducats and Influence on a Region a rival controls, raising its Unrest by one at Resolution -- once a turn per Region per Faction, so a Region cannot be bought off its holder in a turn, and dearer than Relief so a duel is not settled by income alone. A working Constabulary halves it. It is an offence, and the holder's Report names who paid. The computer seats use it in the Regions of a rival they are Cold or Hostile toward, most eagerly where Unrest already stands past the first threshold.
+_Avoid_: incite, destabilise, sabotage, foment
 
 **Relief**:
 The Orders-phase order that buys a Region's calm: Ducats spent on a state you direct to lower its Unrest by one, as many times in a turn as you can pay for.
@@ -441,15 +449,27 @@ The Orders-phase order that steers Refugees: once a turn, for Ducats, every flow
 _Avoid_: relocate, evacuate, transfer, deport
 
 **Blame**:
-The CO2 a Faction is answerable for over the whole game: everything the sources it controlled has emitted, less everything it has taken back, and never less than nothing. What no Faction controls is nobody's. A Faction's share of the four Factions' Blame, when it rises above a fair quarter, makes every Region it does not hold harder for it to win over. Since version 0.08.2 it does a second thing: the other Factions hold it against them, each by its own measure -- the Custodians minding twice as much as the Archivists, the Arkwrights half as much, the Prospectors not at all -- so a dirty Faction loses the room to strike an Accord as well as the ground it wanted.
+The CO2 a Faction is answerable for over the whole game, as a **ledger**: it begins from physics -- everything the sources it controlled has emitted, less everything it has taken back (its Scrubbers' removal, and since version 0.08.4 what the Custodians' Research Directive has added to the Natural Sink, counted every Climate phase it stands) -- and since version 0.08.4 it is moved by deals and words as well: carbon credits bought take ppm off the buyer's ledger and put it on the seller's, and a Smear campaign lays ppm on its target's. The share every rule reads is computed from the ledger, so it can diverge from what a Faction physically put in the air. Never less than nothing. What no Faction controls is nobody's. A Faction's share of the four Factions' Blame, when it rises above a fair quarter, makes every Region it does not hold harder for it to win over; and since version 0.08.4 it moderates how fast the Faction's Standing decays on Regions it does not hold -- 3 a turn at a share of a half or more, 1 at an eighth or less, 2 between. Since version 0.08.2 it does a second thing: the other Factions hold it against them, each by its own measure -- the Custodians minding twice as much as the Archivists, the Arkwrights half as much, the Prospectors not at all -- so a dirty Faction loses the room to strike an Accord as well as the ground it wanted.
 _Avoid_: carbon debt, guilt, pollution score, emissions total, footprint
+
+**Carbon credit**:
+A ppm of Blame bought off a Faction's ledger, since version 0.08.4, from the Custodians and nobody else: they set the ppm they offer a turn, standing until changed, and any other Faction may buy up to ten ppm of it a turn at one Ducat a ppm times how the Custodians think of the buyer (Friendly half, Cordial three quarters, Wary half again, Cold double, Hostile refused). A credit bought comes off the buyer's Blame for good; it comes off the Custodians' Blame Credit, and past what they hold it goes onto their own ledger as Blame taken -- they may sell more than they have, which is their strategic choice to make. An offer is shared first come first served, a buyer left short gets its Ducats back, and a purchase is an act of friendship both ways. The computer Custodians offer their whole credit while their own share is under the fair quarter and refuse when it is not.
+_Avoid_: offset, indulgence, Blame credit (that is what the seller holds), carbon permit
+
+**Smear**:
+Influence spent on a rival Faction rather than a place, since version 0.08.4: every point lays two ppm on the rival's Blame ledger for good, moving the share every rule reads. One campaign a turn against each rival, of any amount the Allotment covers; an offence, and the Report names who paid. Called a smear because it inflates Blame above the ppm the rival actually produced -- a kind of a lie -- which is why the ledger and not the physics is what the rules read. The computer seats use it against a rival they are Cold or Hostile toward whose share stands above the fair quarter.
+_Avoid_: propaganda, denounce, expose, libel
+
+**Blame Credit**:
+The CO2 a Faction has removed over the whole game, in ppm -- what its Scrubbers took out of the air, and for the Custodians what their Research Directive adds to the Natural Sink, counted every Climate phase. Since version 0.08.4; before that the word meant removal beyond everything the Faction had ever emitted, a figure measured at zero in every game, so it was read by no rule and held by nobody. It is the supply a carbon credit is sold from, less what has been sold. The panels read *answerable for N ppm (emitted E, removed R in credit)*.
+_Avoid_: offset, carbon credit (that is the thing bought and sold), removal total
 
 **Influence**:
 A Faction's claim on a Region or a Colony, spent from a per-turn Allotment onto a place, where it becomes the Faction's Standing there. A neutral place goes to the first Standing at its threshold, and when two claimants reach it on the same turn at the same Standing the lot decides between them (since version 0.05.5); a controlled place goes to a rival whose Standing is at least the controller's plus the challenge margin (20 since version 0.05.5, 10 from version 0.04, and 25 since version 0.08.0 in a Region where a Constabulary stands and is online) and at least the threshold, which since version 0.05 each Faction reads for itself, since its Blame raises it on every Region it does not hold. Since version 0.08.0 the Influence an OUTSIDER spends is divided by the place's Resistance before it becomes Standing. A holder is never tied with a challenger, and keeps the place when two challengers tie. Since version 0.05.5 every Faction begins with a Standing on its start state equal to that state's threshold: a claim on its home from turn 1.
 _Avoid_: diplomacy points, favour, reputation
 
 **Standing**:
-How much Influence a Faction has built up on one place. Since version 0.03 it persists: it is never wiped when the place changes hands, it decays 1 a turn on a place the Faction controls and 2 a turn elsewhere when nothing is spent, and spending on a place you hold raises it. Since version 0.08.0 it is no longer simply the Influence spent: an outsider's spending is divided by the place's Resistance first, so 30 Influence on a well-schooled Region buys 27 Standing. A controller converts in full.
+How much Influence a Faction has built up on one place. Since version 0.03 it persists: it is never wiped when the place changes hands, it decays 1 a turn on a place the Faction controls and 2 a turn elsewhere when nothing is spent -- on a Region the Faction does not hold, since version 0.08.4, 3 a turn if its Blame share stands at a half or more and 1 if at an eighth or less -- and spending on a place you hold raises it. Since version 0.08.0 it is no longer simply the Influence spent: an outsider's spending is divided by the place's Resistance first, so 30 Influence on a well-schooled Region buys 27 Standing. A controller converts in full.
 _Avoid_: accumulation, influence points, loyalty
 
 **Threshold**:
@@ -525,7 +545,7 @@ The guided first turns, since version 0.07.5, asked for by the `Play Tutorial` t
 _Avoid_: walkthrough, onboarding, training mission, guided mode
 
 **Moment**:
-A short modal that stops the turn before the Report, for one sentence and one number: a Colony founded, a Break or the sea rising, a Battle that cost a unit, a place changing hands, a Tech completed, Antarctica opening, the Archive finished, or Colonists lost in transit. At most two a turn, the most serious first, and every kind can be switched off.
+A short modal that stops the turn before the Report, for one sentence and one number: a Colony founded, a Break or the sea rising, a Battle that cost a unit, a place changing hands, a Tech completed, Antarctica opening, the Archive finished, Colonists lost in transit, or, since version 0.08.4, **a rival closing on its Victory Condition** -- three quarters of the way there, or one part met with the other short, once each, and never the player's own seat. At most two a turn, the most serious first, and every kind can be switched off.
 _Avoid_: popup, alert, notification, cutscene, interruption
 
 **Spectator**:
@@ -593,9 +613,9 @@ Retired in version 0.05.5 for the Venture Capital Fund. It was the Prospectors' 
 _Avoid_: extraction total, production score, output total, wealth
 
 **Venture Capital Fund**:
-The Prospectors' own pool beside the Stockpile, and their measure since version 0.05.5. **Since version 0.08.3 it holds Ducats, and 2000 of them is the first part of their Victory Condition**; it held Materials before that, with a bar of 750 and then 1000.
-On any turn they set the share of their **Ducat income** that goes into it at Income, from nothing to four fifths in steps of a tenth, taken before they can spend a coin of it; Ducats got by selling are not income and never reach it. A draw takes Ducats back out at a tenth's loss.
-The change is more than a change of units. A share of Materials output skimmed a resource they stockpile anyway, so the hoard cost them little; Ducats are what everybody spends on Influence, Relief, Resettle and repairs, so the Fund now competes with the Faction's whole economy and the share is a **decision taken every turn** — bank it or spend it — which is what a venture fund is. The bar was set by measurement rather than by converting the old one at the market rate: 2000 leaves the median long game just across the line, exactly as 1000 Materials did.
+The Prospectors' own pool beside the Stockpile, and their measure since version 0.05.5. **Since version 0.08.3 it holds Ducats, and since version 0.08.4 2500 of them is the first part of their Victory Condition** (2000 in 0.08.3); it held Materials before that, with a bar of 750 and then 1000.
+On any turn they set the share of their **Ducat income** that goes into it at Income, from nothing to four fifths in whole percents on a slider (since version 0.08.4; in tenths before), taken before they can spend a coin of it; Ducats got by selling are not income and never reach it. A **withdrawal** takes Ducats back out at a tenth's loss.
+The change is more than a change of units. A share of Materials output skimmed a resource they stockpile anyway, so the hoard cost them little; Ducats are what everybody spends on Influence, Relief, Resettle and repairs, so the Fund now competes with the Faction's whole economy and the share is a **decision taken every turn** — bank it or spend it — which is what a venture fund is. The bar of 2000 was set by measurement rather than by converting the old one at the market rate, leaving the median long game just across the line, exactly as 1000 Materials did; 2500 is a deliberate stretch past it, taken in version 0.08.4 with other changes expected to raise their income.
 _Avoid_: the pool, savings, treasury, war chest, bank
 
 **Stabilization**:
@@ -621,15 +641,19 @@ The CO2-equivalent a source adds to the CO2 Stock in a turn. Every source has it
 _Avoid_: output, carbon, footprint
 
 **Emissions history**:
-Since version 0.07.4, the record the engine keeps of every Climate phase -- the breakdown by source, the CO2 Stock, the Temperature and the Breaks that fired -- saved with the game, and the chart drawn from it: what the world emitted, what the Natural Sink and the Scrubbers removed, and the net between them, turn by turn against a zero line, the Breaks ticked red on the turn axis. Drawn small on the top bar's Emissions hover and wide on the Climate Panel under the by-source list. Its siblings are the **Temperature history**, which draws the Temperature turn by turn on the top bar's Temperature hover, on the data's own range with the Breaks' Temperatures as faint lines; and, since version 0.07.5, the **population history**, which draws Earth's people and space's on two scales of their own, since one axis would lay the space line flat. Since version 0.07.5 every chart's time axis carries the in-game date and never the turn number, and the record carries the two population figures, written after the Climate phase has settled them.
+Since version 0.07.4, the record the engine keeps of every Climate phase -- the breakdown by source, the CO2 Stock, the Temperature and the Breaks that fired -- saved with the game, and the chart drawn from it: what the world emitted, what the Natural Sink and the Scrubbers removed, and the net between them, turn by turn against a zero line, the Breaks ticked red on the turn axis. Drawn small on the top bar's Emissions hover and wide on the Climate Panel under the by-source list. Its siblings are the **Temperature history**, which draws the Temperature turn by turn on the top bar's Temperature hover, on the data's own range with the Breaks' Temperatures as faint lines; and, since version 0.07.5, the **population history**, which draws Earth's people and space's on two scales of their own, since one axis would lay the space line flat; and, since version 0.08.4, the **Victory history**, one Faction's progress and Blame share turn by turn on the Faction window. Since version 0.07.5 every chart's time axis carries the in-game date and never the turn number, and the record carries the two population figures, written after the Climate phase has settled them.
 _Avoid_: emissions total, emissions log, graph, chart (as names)
+
+**Victory history**:
+Since version 0.08.4, the record each Faction keeps of every Climate phase -- how far along its Victory Condition it stands, the lower of its two parts' fractions, and its share of the four Factions' Blame -- saved with the game, and the chart drawn from it on the Faction window under the Victory progress: the progress in the Faction's colour, the Blame share on a scale of its own with the fair quarter marked, the in-game date along the foot, and ticked there a Break in red, Antarctica's opening in blue, and in white the turn the Faction's gate Tech was done and, for the Archivists, the Archive completed. Every Faction's page carries its own, the player's included. The first history the game keeps per Faction rather than for the world.
+_Avoid_: progress graph, score chart, victory log
 
 **Natural Sink**:
 The amount of CO2 the oceans and forests remove from the CO2 Stock every turn. Net emissions below it stabilize the stock. Every Scrubber standing and online enlarges it while it stands, and since version 0.05 a Break can weaken it for good.
 _Avoid_: absorption, offset, carbon capture
 
 **Sea Level**:
-How far the oceans have risen with the Temperature. It is drawn on the globe as a creeping waterline, and at each of its thresholds it permanently takes Coastal Slots from every Region, as many as the state's Coastal Exposure and never more than it has left. It takes nothing else: an Inland Slot is out of its reach, and so is a state whose coast is already gone.
+How far the oceans have risen with the Temperature. It is drawn on the globe as a band of drowned land along every coast, widening with each threshold, and at each of its thresholds it permanently takes Coastal Slots from every Region, as many as the state's Coastal Exposure and never more than it has left. It takes nothing else: an Inland Slot is out of its reach, and so is a state whose coast is already gone.
 _Avoid_: flooding, water line, ocean rise
 
 **Break**:
