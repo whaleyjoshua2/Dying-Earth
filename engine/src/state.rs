@@ -759,6 +759,9 @@ pub struct SeatState {
     pub credits_sold: f64,
     #[serde(default)]
     pub credits_offered: i64,
+    /// Ticket #272 (version 0.08.4): Agitates this seat has landed over the game, for the sweep.
+    #[serde(default)]
+    pub agitates_issued: u32,
     /// Ticket #227 (version 0.08.2): units this seat has bought and sold through the Trading window
     /// over the whole game. Kept because floating prices are only fair if more than one hand is on
     /// them, and the sweep had no way to say whose were.
@@ -1028,6 +1031,8 @@ pub struct Game {
     pub climate: Climate,
     pub research: Research,
     pub deck: Deck,
+    /// Ticket #272 (version 0.08.4): cards drawn with nowhere to land over the game, for the sweep.
+    pub events_no_target: u32,
     pub discoveries: Vec<Discovery>,
     /// Ticket #73: Emigrants on the sea to Antarctica.
     pub antarctic_sends: Vec<AntarcticSend>,
@@ -1092,6 +1097,7 @@ impl Game {
             credits_bought: 0.0,
             credits_sold: 0.0,
             credits_offered: 0,
+            agitates_issued: 0,
             bought_units: 0,
             sold_units: 0,
             spaceport_influence: 0,
@@ -1235,6 +1241,7 @@ impl Game {
                 findings_tech: None,
             },
             deck,
+            events_no_target: 0,
             discoveries: Vec::new(),
             antarctic_sends: Vec::new(),
             solar_maximum_next: false,

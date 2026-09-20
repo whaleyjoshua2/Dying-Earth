@@ -40,7 +40,7 @@ pub const SAVE_VERSION: u32 = 1;
 /// carries a hold clock and an Exodus Call (#237, #238); and three new **Unique Modules** were
 /// appended to `ModuleKind` (#239), so a colony written by an older build describes a Module list
 /// this one indexes differently. A refusal naming both versions is the right answer.
-pub const GAME_VERSION: &str = "0.08.3";
+pub const GAME_VERSION: &str = "0.08.4";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;
@@ -137,6 +137,9 @@ pub struct SavedGame {
     /// Ticket #226 (version 0.08.2): the Accords travel with the game.
     #[serde(default)]
     pub accords: Vec<Accord>,
+    /// Ticket #272 (version 0.08.4): the sweep's count of Events drawn with nowhere to land.
+    #[serde(default)]
+    pub events_no_target: u32,
 }
 
 impl SavedGame {
@@ -171,6 +174,7 @@ impl SavedGame {
             relations,
             market,
             accords,
+            events_no_target,
         } = g;
         SavedGame {
             seed: *seed,
@@ -199,6 +203,7 @@ impl SavedGame {
             relations: relations.clone(),
             market: market.clone(),
             accords: accords.clone(),
+            events_no_target: *events_no_target,
         }
     }
 
@@ -231,6 +236,7 @@ impl SavedGame {
             relations: self.relations,
             market: self.market,
             accords: self.accords,
+            events_no_target: self.events_no_target,
             log: self.log,
         }
     }

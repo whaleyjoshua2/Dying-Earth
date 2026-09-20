@@ -81,6 +81,9 @@ impl Game {
         self.deck.drawn.push(card);
         let Card::Event(id) = card;
         let drawn = self.target_event(id);
+        if matches!(drawn.target, EventTarget::None) {
+            self.events_no_target += 1;
+        }
         self.log(format!("Event: {}", drawn.text));
         self.report.event = Some(drawn.text.clone());
         let text = self.say("event_drawn", &[("text", drawn.text.clone())]);

@@ -107,6 +107,17 @@ fn main() {
                         let mut venture = Vec::new();
                         // Ticket #227 (version 0.08.2): the six figures the version's rules depend on.
                         let mut blame_shares: [Vec<f64>; 4] = Default::default();
+                        // Ticket #272 (version 0.08.4): the figures this version's tickets want read.
+                        let mut blame_ppm: [Vec<f64>; 4] = Default::default();
+                        let mut credit_ppm: [Vec<f64>; 4] = Default::default();
+                        let mut smeared_ppm: [Vec<f64>; 4] = Default::default();
+                        let mut credits_bought = [0.0f64; 4];
+                        let mut credits_sold = [0.0f64; 4];
+                        let mut agitates = [0u32; 4];
+                        let mut walls_standing = 0u32;
+                        let mut walls_held = 0u32;
+                        let mut no_target = 0u32;
+                        let mut fund_met = 0u32;
                         let mut rel_end: Vec<i64> = Vec::new();
                         let mut rel_floored = 0u32;
                         let mut accords = 0u32;
@@ -161,6 +172,12 @@ fn main() {
                             temps.push(r.temperature);
                             for i in 0..4 {
                                 blame_shares[i].push(r.blame_share[i]);
+                                blame_ppm[i].push(r.blame[i]);
+                                credit_ppm[i].push(r.blame_credit[i]);
+                                smeared_ppm[i].push(r.blame_smeared[i]);
+                                credits_bought[i] += r.credits_bought[i];
+                                credits_sold[i] += r.credits_sold[i];
+                                agitates[i] += r.agitates[i];
                                 bought[i] += r.bought[i];
                                 sold[i] += r.sold[i];
                             }
@@ -231,6 +248,12 @@ fn main() {
                             slots_lost.push(r.coastal_slots_lost);
                             drowned.push(r.facilities_drowned);
                             venture.push(r.venture_fund_at_end.max(0) as u32);
+                            if r.venture_fund_at_end as f64 >= base.faction(FactionKind::Prospectors).victory_first.bar {
+                                fund_met += 1;
+                            }
+                            walls_standing += r.sea_walls_standing;
+                            walls_held += r.sea_walls_spent;
+                            no_target += r.events_no_target;
                             cards_drawn.push(r.cards_drawn);
                             if r.deck_empty {
                                 deck_empty += 1;
@@ -362,6 +385,19 @@ fn main() {
                             };
                             let shares: Vec<String> = (0..4).map(|i| med(&mut blame_shares[i])).collect();
                             println!("      Blame share at the end, by seat (median): [{}]", shares.join(", "));
+                            // Ticket #272 (version 0.08.4): the figures this version's tickets asked the sweep to say.
+                            let med0 = |v: &mut Vec<f64>| if v.is_empty() { "-".to_string() } else { v.sort_by(|a, b| a.partial_cmp(b).unwrap()); format!("{:.0}", v[v.len() / 2]) };
+                            let ppm: Vec<String> = (0..4).map(|i| med0(&mut blame_ppm[i])).collect();
+                            let cred: Vec<String> = (0..4).map(|i| med0(&mut credit_ppm[i])).collect();
+                            let smear: Vec<String> = (0..4).map(|i| med0(&mut smeared_ppm[i])).collect();
+                            println!("      Blame in ppm at the end, by seat (median): [{}]; in credit [{}]; laid on by Smear [{}]", ppm.join(", "), cred.join(", "), smear.join(", "));
+                            println!(
+                                "      Carbon credits over the batch: bought by seat [{}], sold by seat [{}]; Agitates landed by seat {agitates:?}",
+                                credits_bought.iter().map(|v| format!("{v:.0}")).collect::<Vec<_>>().join(", "),
+                                credits_sold.iter().map(|v| format!("{v:.0}")).collect::<Vec<_>>().join(", ")
+                            );
+                            println!("      Sea Walls: {sea_walls} built over the batch, {walls_standing} standing at the end, {walls_held} thresholds held");
+                            println!("      Events drawn with nowhere to land over the batch: {no_target}; the Fund at or past its bar in {fund_met}/{seeds} seeds");
                             let floored_pct = if rel_end.is_empty() { 0.0 } else { rel_floored as f64 * 100.0 / rel_end.len() as f64 };
                             let mut sorted = rel_end.clone();
                             sorted.sort_unstable();

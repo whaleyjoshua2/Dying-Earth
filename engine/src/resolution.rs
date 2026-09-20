@@ -1756,6 +1756,7 @@ impl Game {
             let Some(holder) = self.place_control(Place::State(sid)).controller() else { continue };
             let rose = self.raise_unrest(sid, u.agitate_points, UnrestSource::Agitate);
             self.offend_by(seat, holder, 1);
+            self.seat_mut(seat).agitates_issued += 1;
             let (who, name) = (self.seat_name(seat), self.tables.state(sid).name.clone());
             let text = if rose > 0.0 {
                 self.log(format!("The {who} agitated in {name}: Unrest rose by {} to {}.", Game::unrest_figure(rose), self.unrest_text(sid)));
