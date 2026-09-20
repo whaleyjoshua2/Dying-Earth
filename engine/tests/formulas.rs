@@ -9038,6 +9038,70 @@ fn the_arkwrights_signature_rule_is_coach_class_and_says_steerage_nowhere() {
     }
 }
 
+// -------------------------------------------- 0.08.4 ticket #269: Agitate
+
+/// Ticket #269 (version 0.08.4): Agitate raises the Unrest of a Region a rival controls by one for
+/// 15 Ducats and 5 Influence, once a turn per Region per Faction; never on your own or a neutral
+/// Region; an offence the holder's Report names; a working Constabulary halves it.
+#[test]
+fn agitate_raises_a_rivals_regions_unrest_for_ducats_and_influence_once_a_turn() {
+    let sid = StateId::Europe;
+    let mut g = game();
+    calm(&mut g);
+    let holder = Seat(1);
+    g.take_control(sid, holder);
+    g.seats[0].stockpile.ducats = 100;
+    g.seats[0].allotment = 20;
+    let u = g.tables.unrest.clone();
+    assert_eq!((u.agitate_ducats, u.agitate_influence, u.agitate_points), (15, 5, 1.0));
+    let order = Order::Agitate { state: sid };
+    assert_eq!(g.order_cost(Seat(0), &order), Cost { ducats: 15, influence: 5, ..Default::default() });
+    assert!(g.check_order(Seat(0), &[], &order).is_ok());
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&order), &order).is_err(), "one a turn per Region");
+    let neutral = StateId::ALL.into_iter().find(|s| matches!(g.state(*s).control, Control::Neutral)).unwrap();
+    assert!(g.check_order(Seat(0), &[], &Order::Agitate { state: neutral }).is_err(), "nobody to turn them against");
+    assert!(g.check_order(holder, &[], &order).is_err(), "not against yourself");
+    // Unrest falls 1.5 a turn on its own, after every rise, so the rise is read against a state
+    // already restive: 3, plus one, less the fall, is 2.5. (From calm, one Agitate a turn nets out
+    // against the fall -- see the ticket's resolution.)
+    g.state_mut(sid).unrest = 3.0;
+    g.commit_orders(Seat(0), &[order]);
+    assert_eq!((g.seats[0].stockpile.ducats, g.seats[0].allotment), (85, 15), "paid at the Orders phase");
+    g.resolution_phase();
+    assert!((g.state(sid).unrest - 2.5).abs() < 1e-9, "3 + 1 - the fall of 1.5: {}", g.state(sid).unrest);
+    assert!(g.relations.offended[holder.index()][0], "an offence against the holder");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("agitated in")), "the Report names who paid: {:?}", g.report.lines);
+    // A working Constabulary halves it -- and calms a point a turn besides: 3 + 0.5 - 1.0 - 1.5.
+    g.state_mut(sid).facilities.push(facility(FacilityKind::Constabulary));
+    g.state_mut(sid).unrest = 3.0;
+    g.seats[0].stockpile.ducats = 100;
+    g.seats[0].allotment = 20;
+    g.commit_orders(Seat(0), &[Order::Agitate { state: sid }]);
+    g.resolution_phase();
+    assert!((g.state(sid).unrest - 1.0).abs() < 1e-9, "half a point through the police, then the falls: {}", g.state(sid).unrest);
+}
+
+/// Ticket #269 (version 0.08.4): a computer seat Cold or Hostile toward a holder proposes an
+/// Agitate in that holder's Region; toward nobody it resents, none.
+#[test]
+fn the_computer_agitates_in_the_regions_of_a_rival_it_is_cold_toward() {
+    let sid = StateId::Europe;
+    let mut g = game();
+    calm(&mut g);
+    let (agitator, holder) = (Seat(3), Seat(1));
+    g.take_control(sid, holder);
+    g.seats[agitator.index()].stockpile.ducats = 200;
+    g.seats[agitator.index()].allotment = 60;
+    // Restive past the second threshold, where one more point matters most and the appetite is
+    // at its opportunity multiplier; below that the seat spends its Allotment on places first.
+    g.state_mut(sid).unrest = 9.0;
+    let orders = g.ai_orders(agitator);
+    assert!(!orders.iter().any(|o| matches!(o, Order::Agitate { .. })), "nothing against a holder it does not resent: {orders:?}");
+    g.relations.score[agitator.index()][holder.index()] = -8;
+    let orders = g.ai_orders(agitator);
+    assert!(orders.iter().any(|o| matches!(o, Order::Agitate { state } if *state == sid)), "an Agitate in the resented holder's Region: {orders:?}");
+}
+
 // -------------------------------------------- 0.08.4 ticket #268: carbon credits
 
 /// Ticket #268 (version 0.08.4): a carbon credit bought comes off the buyer's Blame ledger for

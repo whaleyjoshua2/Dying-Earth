@@ -450,6 +450,9 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("credits_offered", &["faction", "n"]),
     ("credits_bought", &["faction", "n", "seller", "ducats"]),
     ("credits_short", &["faction", "n", "back"]),
+    // Ticket #269: an Agitate landed, named for who paid.
+    ("agitate", &["faction", "state", "rose", "unrest"]),
+    ("agitate_damped", &["faction", "state"]),
     ("storm_surge_wall", &["state", "percent"]),
     ("sea_wall_unkept", &["faction", "states"]),
     ("sea_nothing_left", &["temperature", "state"]),
@@ -545,6 +548,7 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("smear", &["n", "faction"]),
     ("offer_credits", &["n"]),
     ("buy_credits", &["n"]),
+    ("agitate", &["state"]),
     ("resettle", &["state"]),
     ("mothball", &["building", "place"]),
     ("restart", &["building", "place"]),

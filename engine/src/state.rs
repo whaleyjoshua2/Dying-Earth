@@ -56,6 +56,9 @@ pub enum UnrestSource {
     Refugees,
     /// Occupation, a mothball, a decommission, the Unrest card: nothing damps these.
     Plain,
+    /// Ticket #269 (version 0.08.4): a rival's Agitate. A working Constabulary damps it by half, as
+    /// the police would; the green Techs, which moderate the climate's rises, do not.
+    Agitate,
 }
 
 /// Ticket #54 (version 0.05): what a Mothball, Restart or Decommission order does to a building.
@@ -3159,11 +3162,13 @@ impl Game {
             return 0.0;
         }
         let mut d = 0.0;
-        let done = self.green_techs_done();
-        if done >= 4 {
-            d += u.green_techs_four;
-        } else if done >= 2 {
-            d += u.green_techs_two;
+        if source != UnrestSource::Agitate {
+            let done = self.green_techs_done();
+            if done >= 4 {
+                d += u.green_techs_four;
+            } else if done >= 2 {
+                d += u.green_techs_two;
+            }
         }
         if self.constabulary_online(s) {
             d += u.constabulary_damping;

@@ -36,6 +36,8 @@ resettle = 2
 smear = 4
 # Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
 buy_credits = 4
+# Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
+agitate = 4
 fund_archive = 6
 build_archive = 0
 upload = 0
@@ -79,6 +81,8 @@ resettle = 2
 smear = 4
 # Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
 buy_credits = 4
+# Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
+agitate = 4
 fund_archive = 6
 build_archive = 0
 upload = 0
@@ -119,6 +123,8 @@ resettle = 2
 smear = 4
 # Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
 buy_credits = 4
+# Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
+agitate = 4
 fund_archive = 6
 build_archive = 0
 upload = 0
@@ -158,6 +164,8 @@ resettle = 2
 smear = 4
 # Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
 buy_credits = 4
+# Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
+agitate = 4
 fund_archive = 8
 build_archive = 9
 # Ticket #192 (version 0.08.0): the Upload is the Archivists' second Victory part now, not a

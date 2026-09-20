@@ -416,6 +416,10 @@ _Avoid_: sea defence, civil engineering, hydrology
 How restive a Region's people are, a figure from 0 to 10 on its card, moving in halves. Heat, the rising sea, the Climate cards, Occupation and arriving Refugees raise it; it falls on its own every turn except the turn the state changed hands, so a rise and the fall net out, and it falls further to Relief, a Constabulary and a Scrubber. Past its first threshold the Standing Army stops replenishing, past its second the state's Facilities run at half, and at the top the state throws its controller off and goes neutral.
 _Avoid_: unhappiness, morale, stability, dissent, revolt meter
 
+**Agitate**:
+Relief's mirror, since version 0.08.4: an order paid in Ducats and Influence on a Region a rival controls, raising its Unrest by one at Resolution -- once a turn per Region per Faction, so a Region cannot be bought off its holder in a turn, and dearer than Relief so a duel is not settled by income alone. A working Constabulary halves it. It is an offence, and the holder's Report names who paid. The computer seats use it in the Regions of a rival they are Cold or Hostile toward, most eagerly where Unrest already stands past the first threshold.
+_Avoid_: incite, destabilise, sabotage, foment
+
 **Relief**:
 The Orders-phase order that buys a Region's calm: Ducats spent on a state you direct to lower its Unrest by one, as many times in a turn as you can pay for.
 _Avoid_: aid, welfare, subsidy, bribe, appeasement

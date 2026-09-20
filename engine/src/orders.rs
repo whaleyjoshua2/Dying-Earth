@@ -146,6 +146,9 @@ pub enum Order {
     /// Version 0.05 (ticket #52): Relief. Ducats spent on a Nation State you direct, lowering its
     /// Unrest by one. Any number of times a turn, cancellable like any order.
     Relief { state: StateId },
+    /// Ticket #269 (version 0.08.4): Relief's mirror -- Ducats and Influence raise the Unrest of a
+    /// Region a rival controls by one, once a turn per Region per Faction. An offence.
+    Agitate { state: StateId },
     /// Version 0.05 (ticket #52): Resettle. Once a turn per Faction: this turn every refugee flow
     /// leaving a state you direct goes entirely to the chosen state, and you gain Standing there.
     Resettle { state: StateId },
@@ -249,6 +252,9 @@ pub struct Pending {
     pub stations: Vec<(Seat, BodyId, u32)>,
     /// Ticket #52: Relief orders paid this turn, one entry per point.
     pub relief: Vec<(Seat, StateId)>,
+    /// Ticket #269 (version 0.08.4): Agitate orders paid this turn -- who, where.
+    #[serde(default)]
+    pub agitates: Vec<(Seat, StateId)>,
     /// Ticket #52: Resettle orders paid this turn, one per Faction at most.
     pub resettle: Vec<(Seat, StateId)>,
     pub influence: Vec<(Seat, Target, i64)>,
@@ -322,6 +328,7 @@ impl Game {
             Order::BuildArchive { colony } => Cost { materials: self.module_materials_at(seat, *colony, ModuleKind::Archive), ..Default::default() },
             // Ticket #52: Relief and Resettle are paid in Ducats.
             Order::Relief { .. } => Cost { ducats: t.unrest.relief_ducats, ..Default::default() },
+            Order::Agitate { .. } => Cost { ducats: t.unrest.agitate_ducats, influence: t.unrest.agitate_influence, ..Default::default() },
             Order::Resettle { .. } => Cost { ducats: t.unrest.resettle_ducats, ..Default::default() },
             Order::RepairWithDucats { points, .. } => Cost { ducats: t.ducats.per_repair_point * *points as i64, ..Default::default() },
             _ => Cost::default(),
@@ -774,6 +781,18 @@ impl Game {
                 Ok(cost)
             }
             // Ticket #52: Relief, on a state you direct, any number of times a turn.
+            // Ticket #269: on a Region a RIVAL controls, once a turn per Region.
+            Order::Agitate { state } => {
+                match self.place_control(Place::State(*state)).controller() {
+                    None => return fail("nobody holds it: there is no controller to turn its people against"),
+                    Some(c) if c == seat => return fail("you cannot agitate against yourself"),
+                    Some(_) => {}
+                }
+                if pending.iter().any(|o| matches!(o, Order::Agitate { state: s } if s == state)) {
+                    return fail("one Agitate a turn per Region");
+                }
+                Ok(cost)
+            }
             Order::Relief { state } => {
                 if self.state(*state).control.director() != Some(seat) {
                     return fail("Relief is paid in a Nation State you direct");
@@ -1666,6 +1685,7 @@ impl Game {
                 // Ticket #52: both act at Resolution; Resettle also steers the next Climate phase's
                 // refugee flows, which is the first flow after these orders are given.
                 Order::Relief { state } => self.pending.relief.push((seat, *state)),
+                Order::Agitate { state } => self.pending.agitates.push((seat, *state)),
                 Order::Resettle { state } => {
                     self.seat_mut(seat).resettle_to = Some(*state);
                     self.pending.resettle.push((seat, *state));
@@ -2024,6 +2044,7 @@ impl Game {
             Order::Buy { resource, amount } => r("buy", &[("n", amount.to_string()), ("resource", resource.name().to_string())]),
             Order::Sell { resource, amount } => r("sell", &[("n", amount.to_string()), ("resource", resource.name().to_string())]),
             Order::Relief { state } => r("relief", &[("state", self.tables.state(*state).name.clone())]),
+            Order::Agitate { state } => r("agitate", &[("state", self.tables.state(*state).name.clone())]),
             Order::Resettle { state } => r("resettle", &[("state", self.tables.state(*state).name.clone())]),
             Order::Change { building: b, what } => {
                 let key = match what {

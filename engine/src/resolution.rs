@@ -1753,6 +1753,24 @@ impl Game {
             self.report_line(LineKind::Note, None, text);
             self.ai_deed(seat, "smear", &[("n", amount.to_string()), ("faction", whom)]);
         }
+        // Ticket #269 (version 0.08.4): Agitate lands before Relief, so a holder's Relief the same
+        // turn answers it. One point, damped by a working Constabulary, an offence against the
+        // holder, and a Report line naming who paid.
+        for (seat, sid) in std::mem::take(&mut self.pending.agitates) {
+            let Some(holder) = self.place_control(Place::State(sid)).controller() else { continue };
+            let rose = self.raise_unrest(sid, u.agitate_points, UnrestSource::Agitate);
+            self.offend_by(seat, holder, 1);
+            let (who, name) = (self.seat_name(seat), self.tables.state(sid).name.clone());
+            let text = if rose > 0.0 {
+                self.log(format!("The {who} agitated in {name}: Unrest rose by {} to {}.", Game::unrest_figure(rose), self.unrest_text(sid)));
+                self.say("agitate", &[("faction", who), ("state", name.clone()), ("rose", Game::unrest_figure(rose).to_string()), ("unrest", self.unrest_text(sid))])
+            } else {
+                self.log(format!("The {who} agitated in {name}; the Constabulary held it to nothing."));
+                self.say("agitate_damped", &[("faction", who), ("state", name.clone())])
+            };
+            self.report_line(LineKind::Unrest, Some(ReportPlace::State(sid)), text);
+            self.ai_deed(seat, "agitate", &[("state", name)]);
+        }
         // Relief (rule 3): one point per order, paid for in Ducats at the Orders phase.
         let mut relieved: Vec<(Seat, StateId, f64)> = Vec::new();
         for (seat, sid) in std::mem::take(&mut self.pending.relief) {

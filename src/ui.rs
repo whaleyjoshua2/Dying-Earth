@@ -3407,6 +3407,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::SetVentureShare { share } => format!("Bank {share}% of Ducat income in the Venture Capital Fund"),
         Order::DrawVenture { amount } => format!("Withdraw {amount} Ducats from the Venture Capital Fund"),
         Order::Smear { target, amount } => format!("Smear the {} with {amount} Influence", game.seat_name(*target)),
+        Order::Agitate { state } => format!("Agitate in {}", game.tables.state(*state).name),
         Order::OfferCredits { ppm } => format!("Offer {ppm} ppm of carbon credit a turn"),
         Order::BuyCredits { ppm } => format!("Buy {ppm} ppm of carbon credit from the Custodians"),
         // Ticket #52.
@@ -4523,6 +4524,27 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 u.max, u.army_threshold, u.facility_threshold, u.max, u.natural_fall
             ),
         );
+        // Ticket #269 (version 0.08.4): Agitate, on a Region a rival holds -- Relief's mirror, at
+        // the top of the card where the holder's Relief would be on their own.
+        if let Some(holder) = game.place_control(Place::State(sid)).controller().filter(|h| *h != Seat(0))
+            && !session.spectator
+        {
+            let ag = &game.tables.unrest;
+            ui.horizontal(|ui| {
+                cost_button_with_hover(
+                    ui,
+                    game,
+                    &session.pending,
+                    Order::Agitate { state: sid },
+                    "Agitate: Unrest +1",
+                    Some(format!(
+                        "Turn its people against the {}: Unrest rises by {} at End Turn, halved by a working Constabulary. Once a turn here. They will know who paid: it is an offence.\nAt {} the Standing Army stops replenishing, at {} every Facility runs at half, at {} the state throws its controller off.",
+                        game.seat_name(holder), Game::unrest_figure(ag.agitate_points), ag.army_threshold, ag.facility_threshold, ag.max
+                    )),
+                    actions,
+                );
+            });
+        }
         // Ticket #75's warning line -- a rival within two steps, at the top of the card -- stood here
         // until ticket #262 (version 0.08.4) folded it into the challenger line in the Standings block
         // below, which reads the engine's own price (ticket #60) where this one added the margin to the

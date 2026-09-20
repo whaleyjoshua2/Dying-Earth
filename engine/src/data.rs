@@ -723,6 +723,10 @@ pub struct BlameTable {
 /// Ticket #52 (version 0.05): every number that moves a Nation State's Unrest (`unrest.toml`).
 #[derive(Debug, Clone, Deserialize)]
 pub struct UnrestTable {
+    /// Ticket #269 (version 0.08.4): Agitate's price in Ducats and Influence, and what it adds.
+    pub agitate_ducats: i64,
+    pub agitate_influence: i64,
+    pub agitate_points: f64,
     pub max: f64,
     pub neutral_max: f64,
     pub population_fall: f64,
@@ -874,6 +878,8 @@ pub struct AiWeights {
     pub smear: f64,
     /// Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
     pub buy_credits: f64,
+    /// Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
+    pub agitate: f64,
     /// Ticket #52: steer this turn's refugee flows into one calm state.
     pub resettle: f64,
     /// Ticket #227 (version 0.08.2): how readily this seat offers an Accord. Modest by default: an

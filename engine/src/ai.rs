@@ -33,6 +33,8 @@ enum Cat {
     Smear,
     /// Ticket #268 (version 0.08.4): carbon credits bought from the Custodians.
     BuyCredits,
+    /// Ticket #269 (version 0.08.4): Agitate in a rival's Region.
+    Agitate,
     /// Ticket #51: divert this turn's Research into the Archive fund.
     FundArchive,
     /// Ticket #51: build the Archive; one Module since ticket #68.
@@ -122,6 +124,7 @@ impl Game {
             Cat::Resettle => w.resettle,
             Cat::Smear => w.smear,
             Cat::BuyCredits => w.buy_credits,
+            Cat::Agitate => w.agitate,
             Cat::Accord => w.accord,
             Cat::FundArchive => w.fund_archive,
             Cat::BuildArchive => w.build_archive,
@@ -1253,6 +1256,33 @@ impl Game {
                     format!("pay Relief in {} (Unrest {})", self.tables.state(sid).name, Game::unrest_figure(n)),
                     None,
                 );
+            }
+        }
+        // Ticket #269 (version 0.08.4): Agitate in a Region held by a rival the seat is Cold or
+        // Hostile toward -- most eagerly where Unrest already stands past the first threshold, a
+        // cheap finish -- competing with Relief, Influence and the rest for the same Ducats and
+        // Allotment, which is the whole price of it.
+        {
+            let ag = self.tables.unrest.clone();
+            if ducats >= ag.agitate_ducats && allotment >= ag.agitate_influence {
+                for sid in StateId::ALL {
+                    let Some(holder) = self.state(sid).control.controller() else { continue };
+                    if holder == seat || self.relations_score(seat, holder) > -5 {
+                        continue;
+                    }
+                    let n = self.state(sid).unrest;
+                    let opp = if n >= ag.facility_threshold { m.opportunity } else { 1.0 };
+                    push(
+                        vec![Order::Agitate { state: sid }],
+                        Cat::Agitate,
+                        self.base_weight(seat, Cat::Agitate) * (1.0 + n / ag.max),
+                        1.0,
+                        1.0,
+                        opp,
+                        format!("agitate in {} ({}, Unrest {})", self.tables.state(sid).name, self.relations_level(seat, holder), Game::unrest_figure(n)),
+                        None,
+                    );
+                }
             }
         }
         // Ticket #267 (version 0.08.4): a Smear campaign against a rival the seat is Cold or Hostile
