@@ -922,6 +922,8 @@ pub struct AiWeights {
     pub stance_intercept: f64,
     pub stance_hold: f64,
     pub stance_evade: f64,
+    /// Ticket #278 (version 0.08.5): blockade the rival station whose slot the stack sits in.
+    pub stance_blockade: f64,
 }
 
 

@@ -7239,6 +7239,11 @@ fn a_warship_blockades_the_orbital_slot_it_sits_in_and_nothing_more() {
     assert!(g.may_land(Seat(0), body), "and so is the ground");
     // It moves into the station's own slot: now that one slot is shut, and only that one.
     g.ship_mut(rival).unwrap().slot = Some(slot);
+    // Ticket #278 (version 0.08.5): only once it is ORDERED to blockade. Sitting there on Hold it
+    // blockades nothing: "the blockade needs to be positively chosen, not just the presence of a ship".
+    assert!(!g.slot_blockaded_against(Seat(0), body, slot), "a warship in the slot on Hold blockades nothing");
+    assert!(g.may_unload_into(Seat(0), station), "and the station is open");
+    g.ship_mut(rival).unwrap().stance = Stance::Blockade;
     assert!(g.slot_blockaded_against(Seat(0), body, slot));
     assert!(!g.may_unload_into(Seat(0), station), "the station in the blockaded slot is shut");
     assert!(g.may_land(Seat(0), body), "the ground is untouched by a slot blockade");
@@ -7276,6 +7281,97 @@ fn only_a_rival_holding_orbital_control_shuts_the_ground() {
     assert!(g.may_land(Seat(0), body), "a contested orbit no longer punishes the bystander");
 }
 
+/// Ticket #278 (version 0.08.5): a Blockade is a stance a warship stack is ordered into, refused
+/// where no warship of the seat's sits in a slot to blockade; a station under one makes nothing and
+/// still pays its upkeep, its holder is offended at weight 1 each Income, the Report says so, and
+/// the sweep's counters move.
+#[test]
+fn a_blockade_is_ordered_and_starves_the_station_in_its_slot_upkeep_still_paid() {
+    let mut g = game();
+    calm(&mut g);
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("a station over Earth");
+    let (body, slot) = { let c = g.colony(station).unwrap(); (c.body, c.slot) };
+    // Something to starve: a Solar Array making Energy for 0 upkeep would hide the upkeep, so an
+    // Observatory (Research, 2 Energy upkeep) and a Solar Array (Energy) both.
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::SolarArray));
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Observatory));
+    let rival = ShipId(g.fresh_id());
+    g.ships.push(Ship {
+        name: String::new(), id: rival, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None,
+        stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
+    });
+    // The order wants a warship in a slot: at the Body at large it is refused.
+    let err = g.check_order(Seat(1), &[], &Order::ShipStance { body, stance: Stance::Blockade }).unwrap_err().0;
+    assert!(err.contains("no warship of yours sits in a slot"), "{err}");
+    g.ship_mut(rival).unwrap().slot = Some(slot);
+    assert!(g.check_order(Seat(1), &[], &Order::ShipStance { body, stance: Stance::Blockade }).is_ok(), "in the station's slot it may be ordered");
+    assert_eq!(g.starved_by(station), None, "on Hold it starves nothing");
+
+    // Two futures from the same board: the Frigate on Hold, and ordered to Blockade.
+    let mut held = g.clone();
+    let mut blockaded = g.clone();
+    blockaded.commit_orders(Seat(1), &[Order::ShipStance { body, stance: Stance::Blockade }]);
+    assert_eq!(blockaded.ship(rival).unwrap().stance, Stance::Blockade);
+    assert_eq!(blockaded.starved_by(station), Some(Seat(1)), "ordered, it starves the station");
+    let before = g.seats[0].stockpile.energy;
+    held.income_phase();
+    blockaded.income_phase();
+    let (gain_held, gain_blockaded) = (held.seats[0].stockpile.energy - before, blockaded.seats[0].stockpile.energy - before);
+    let array = g.module_yield_at(Seat(0), station, 1).amount;
+    assert!(array > 0, "the Solar Array makes Energy: {array}");
+    assert_eq!(gain_held - gain_blockaded, array, "starved, the station made nothing and paid the same upkeep: {gain_held} against {gain_blockaded}");
+    assert!(blockaded.relations.offended[0][1], "each Income under a Blockade is an offence against the holder");
+    assert!(!held.relations.offended[0][1], "and a Frigate on Hold offends nobody");
+    assert_eq!((blockaded.seats[0].blockade_turns_suffered, blockaded.seats[1].blockade_turns_imposed), (1, 1), "counted for the sweep");
+    assert!(blockaded.report.lines.iter().any(|l| l.text.contains("is blockaded by the") && l.text.contains("made nothing")), "the Report says so: {:?}", blockaded.report.lines);
+    // Nothing died and nothing burned.
+    assert_eq!(blockaded.colony(station).unwrap().modules.len(), g.colony(station).unwrap().modules.len());
+}
+
+/// Ticket #278 (version 0.08.5): a Colony on the ground starves only while one rival holds Orbital
+/// Control of its Body outright AND has a stack there on Blockade; a contested orbit starves nobody.
+#[test]
+fn a_ground_colony_starves_under_outright_orbital_control_with_a_blockading_stack_and_not_under_a_contested_orbit() {
+    let mut g = game();
+    calm(&mut g);
+    let body = BodyId::Moon;
+    let cid = colony(&mut g, Seat(0), body, &[ModuleKind::Mine], 4);
+    let push = |g: &mut Game, seat: Seat, stance: Stance| {
+        let id = ShipId(g.fresh_id());
+        g.ships.push(Ship {
+            id,
+            name: String::new(), kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None,
+            stance, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
+        });
+        id
+    };
+    let rival = push(&mut g, Seat(1), Stance::Hold);
+    assert_eq!(g.orbital_control(body), Some(Seat(1)), "held outright");
+    assert_eq!(g.starved_by(cid), None, "held outright on Hold: the ground is shut to landings and nothing more");
+    g.ship_mut(rival).unwrap().stance = Stance::Blockade;
+    assert_eq!(g.starved_by(cid), Some(Seat(1)), "ordered to Blockade, the Colony on the ground starves");
+    push(&mut g, Seat(2), Stance::Hold);
+    assert_eq!(g.orbital_control(body), None, "contested");
+    assert_eq!(g.starved_by(cid), None, "a contested orbit starves nobody, as it lands nobody");
+}
+
+/// Ticket #278 (version 0.08.5): a computer seat whose warship sits in a rival station's slot is
+/// offered the Blockade stance; one whose Colony is starved wants a warship there more.
+#[test]
+fn the_computer_orders_a_blockade_where_its_warship_sits_in_a_rival_stations_slot() {
+    let mut g = game();
+    calm(&mut g);
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("a station over Earth");
+    let (body, slot) = { let c = g.colony(station).unwrap(); (c.body, c.slot) };
+    let id = ShipId(g.fresh_id());
+    g.ships.push(Ship {
+        name: String::new(), id, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None,
+        stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(slot),
+    });
+    let orders = g.ai_orders(Seat(1));
+    assert!(orders.iter().any(|o| matches!(o, Order::ShipStance { body: b, stance: Stance::Blockade } if *b == body)), "a Blockade of the station whose slot it sits in: {orders:?}");
+}
+
 /// Ticket #99: a Refuel needs a station of yours that is not blockaded, and a rival warship sitting
 /// in an empty Orbital Slot denies that slot to a builder.
 #[test]
@@ -7294,7 +7390,7 @@ fn a_blockade_stops_refuelling_and_holds_an_empty_slot_against_a_builder() {
     let rival = ShipId(g.fresh_id());
     g.ships.push(Ship {
         name: String::new(), id: rival, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None,
-        stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(slot),
+        stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(slot),
     });
     let err = g.check_order(Seat(0), &[], &Order::Refuel { ship: mine }).unwrap_err().0;
     assert!(err.contains("blockaded"), "a blockaded station fuels nothing: {err}");

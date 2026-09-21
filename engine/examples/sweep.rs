@@ -115,6 +115,7 @@ fn main() {
                         let mut credits_bought = [0.0f64; 4];
                         let mut credits_sold = [0.0f64; 4];
                         let mut agitates = [0u32; 4];
+                        let (mut blockade_suffered, mut blockade_imposed) = ([0u32; 4], [0u32; 4]);
                         let mut walls_standing = 0u32;
                         let mut walls_held = 0u32;
                         let mut no_target = 0u32;
@@ -180,6 +181,8 @@ fn main() {
                                 credits_bought[i] += r.credits_bought[i];
                                 credits_sold[i] += r.credits_sold[i];
                                 agitates[i] += r.agitates[i];
+                                blockade_suffered[i] += r.blockade_suffered[i];
+                                blockade_imposed[i] += r.blockade_imposed[i];
                                 bought[i] += r.bought[i];
                                 sold[i] += r.sold[i];
                             }
@@ -411,6 +414,8 @@ fn main() {
                                 credits_bought.iter().map(|v| format!("{v:.0}")).collect::<Vec<_>>().join(", "),
                                 credits_sold.iter().map(|v| format!("{v:.0}")).collect::<Vec<_>>().join(", ")
                             );
+                            // Ticket #278 (version 0.08.5): Colony-turns starved under a Blockade, suffered and imposed.
+                            println!("      Blockade-turns over the batch: suffered by seat {blockade_suffered:?}, imposed by seat {blockade_imposed:?}");
                             println!("      Sea Walls: {sea_walls} built over the batch, {walls_standing} standing at the end, {walls_held} thresholds held");
                             println!("      Events drawn with nowhere to land over the batch: {no_target}; the Fund at or past its bar in {fund_met}/{seeds} seeds");
                             let floored_pct = if rel_end.is_empty() { 0.0 } else { rel_floored as f64 * 100.0 / rel_end.len() as f64 };

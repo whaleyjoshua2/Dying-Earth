@@ -211,6 +211,18 @@ fn build_board(session: &mut Session) {
             let name = g.next_ship_name(kind);
             g.ships.push(Ship { id, name, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
         }
+        // `blockade:1` (a building aid, ticket #278, version 0.08.5): a Prospector Frigate sits in
+        // the slot of seat 0's station over Earth on Blockade, so the station's button and card say
+        // it is starved. With `hab:1` the station's card is open in the Earth picture.
+        if std::env::args().any(|a| a == "blockade:1")
+            && let Some(station) = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).cloned()
+            && let Some(seat) = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors && *s != Seat(0))
+        {
+            let id = ShipId(g.fresh_id());
+            let built_turn = g.turn;
+            let name = g.next_ship_name(UnitKind::Frigate);
+            g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: Some(station.slot) });
+        }
         // `battle:1` (a building aid): three seats bring a Frigate to Mars with Attack stances and
         // one more turn runs, so the Report carries a three-party Battle (ticket #50).
         if std::env::args().any(|a| a == "battle:1") {

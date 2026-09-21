@@ -133,6 +133,7 @@ impl Game {
         for a in &mut self.armies {
             a.escaped = false;
         }
+        self.starve_blockaded_colonies();
         for seat in Seat::ALL {
             self.income_for(seat);
         }
@@ -470,6 +471,24 @@ impl Game {
         y
     }
 
+    /// Ticket #278 (version 0.08.5): every Colony starved this Income is named in its holder's
+    /// Report, counted for the sweep, and charged as an offence at weight 1 against the blockader --
+    /// the rung the 0.08.2 spec promised and nothing fired until now. Read live, once an Income, as
+    /// every blockade test is; `income_for` makes the Colony's Modules yield nothing.
+    fn starve_blockaded_colonies(&mut self) {
+        let starved: Vec<(ColonyId, Seat, Seat)> =
+            self.colonies.iter().filter_map(|c| Some((c.id, c.control.director()?, self.starved_by(c.id)?))).collect();
+        for (cid, holder, by) in starved {
+            self.seat_mut(holder).blockade_turns_suffered += 1;
+            self.seat_mut(by).blockade_turns_imposed += 1;
+            self.offend_by(by, holder, 1);
+            let (place, who) = (self.place_name(Place::Colony(cid)), self.seat_name(by));
+            self.log(format!("{place} is blockaded by the {who}: it makes nothing this turn."));
+            let text = self.say("starved", &[("place", place), ("faction", who)]);
+            self.report_line(LineKind::Note, Some(ReportPlace::Colony(cid)), text);
+        }
+    }
+
     fn producers_of(&self, seat: Seat) -> Vec<Producer> {
         let mut out = Vec::new();
         for sid in self.directed_states(seat) {
@@ -504,6 +523,11 @@ impl Game {
             let col = self.colony(cid).unwrap();
             // Ticket #51: an Occupied Colony's Archive is offline, whoever is directing the Colony.
             let occupied = col.control.is_occupied();
+            // Ticket #278 (version 0.08.5): a starved Colony -- a station under a rival's Blockade,
+            // a ground Colony under a rival's outright Orbital Control with a blockading stack --
+            // makes NOTHING and still pays its upkeep, at the designer's word: the squeeze is the
+            // point, and the offline switch below, which forgives the upkeep, is the wrong shape.
+            let starved = self.starved_by(cid).is_some();
             for (i, m) in col.modules.iter().enumerate() {
                 // Ticket #54: a mothballed Module, the same way.
                 if m.mothballed {
@@ -516,9 +540,9 @@ impl Game {
                     name: m.kind.name(),
                     is_module: true,
                     upkeep: y.upkeep,
-                    output: y.resource.map(|r| (r, y.amount)),
+                    output: if starved { None } else { y.resource.map(|r| (r, y.amount)) },
                     // Ticket #80: an Observatory's Research.
-                    research: y.research,
+                    research: if starved { 0 } else { y.research },
                     online: !col.grid_failed && !m.offline_until_resolution && !(m.kind == ModuleKind::Archive && occupied),
                     doubled_by: y.doubled_by,
                 });

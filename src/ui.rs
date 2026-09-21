@@ -2663,7 +2663,12 @@ A station is where Ships refuel and where a Shipyard can stand, and a Warship ho
         // every station has one, so naming it says nothing about this one; and a station that holds
         // only its Core Module is exactly what the words below have always called a bare core module.
         let mods: Vec<&str> = c.modules.iter().filter(|m| m.kind != ModuleKind::Core).map(|m| m.kind.name()).collect();
-        let text = format!("{}: {}, {} Colonists, {}", game.station_name(body, c.slot), owner, c.colonists, if mods.is_empty() { "a bare core module".to_string() } else { mods.join(", ") });
+        // Ticket #278 (version 0.08.5): a station under a Blockade says so, and by whom.
+        let starved = match game.starved_by(c.id) {
+            Some(by) => format!("; blockaded by the {}: producing nothing", game.seat_name(by)),
+            None => String::new(),
+        };
+        let text = format!("{}: {}, {} Colonists, {}{starved}", game.station_name(body, c.slot), owner, c.colonists, if mods.is_empty() { "a bare core module".to_string() } else { mods.join(", ") });
         if ui.button(text).clicked() {
             view.selection = Selection::Colony(c.id);
         }
@@ -3273,6 +3278,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
                 Stance::Attack => "On Attack, it strikes at the place it was sent to.",
                 Stance::Intercept => "On Intercept, it meets what arrives.",
                 Stance::Evade => "Evading, it avoids battle where it can.",
+                Stance::Blockade => "An Army cannot blockade; it holds.",
             },
             game.tables.unrest.army_threshold
         );
@@ -3803,8 +3809,9 @@ fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Or
 fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make: impl Fn(Stance) -> Order, ships: bool, actions: &mut Vec<Action>) {
     ui.horizontal(|ui| {
         ui.label("Stance:");
-        for st in [Stance::Attack, Stance::Hold, Stance::Intercept, Stance::Evade] {
-            if st == Stance::Intercept && !ships {
+        // Ticket #278 (version 0.08.5): Blockade, Ships only, beside Intercept.
+        for st in [Stance::Attack, Stance::Hold, Stance::Intercept, Stance::Blockade, Stance::Evade] {
+            if matches!(st, Stance::Intercept | Stance::Blockade) && !ships {
                 continue;
             }
             let pending_stance = pending.iter().rev().find_map(|o| match (o, &make(st)) {
@@ -4917,6 +4924,13 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         Control::Occupied { occupier, turns, .. } => format!("Occupied by the {} (turn {})", game.seat_name(occupier), turns),
     };
     ui.label(owner);
+    // Ticket #278 (version 0.08.5): a starved Colony says so, in the designer's words, and how.
+    if let Some(by) = game.starved_by(cid) {
+        let how = if col.in_orbit { format!("Blockaded by the {}", game.seat_name(by)) } else { format!("Under the {}' Orbital Control", game.seat_name(by)) };
+        ui.label(RichText::new(format!("{how}: producing nothing, upkeep still paid.")).color(Color32::from_rgb(230, 110, 90))).on_hover_text(
+            "A warship stack ordered to Blockade the slot of a station starves it; a Colony on the ground starves while one rival holds Orbital Control outright and has a stack there on Blockade. Every Module makes nothing and pays its upkeep; nobody dies and nothing is destroyed. Each turn of it is an offence against you.",
+        );
+    }
     // Ticket #164 (version 0.07.5): the room is the Core Module's four and the Habitats' eight
     // each, so the line no longer names Habitats alone.
     ui.label(format!("Colonists {} of {} room", col.colonists, game.habitat_room(col)));

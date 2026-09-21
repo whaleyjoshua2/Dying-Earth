@@ -105,6 +105,8 @@ rival_one_part_met = "The {faction} have met half of their Victory Condition, {m
 smear = "The {faction} smeared the {target}: {ppm} ppm laid on their Blame."
 # Ticket #277 (version 0.08.5): a Greenwash, public so a rival can answer it.
 greenwash = "The {faction} greenwashed: {ppm} ppm off their Blame."
+# Ticket #278 (version 0.08.5): a Colony under a Blockade makes nothing and pays its upkeep.
+starved = "{place} is blockaded by the {faction}: it made nothing this turn, and its upkeep was paid."
 # Ticket #268 (version 0.08.4): carbon credits.
 credits_offered = "The {faction} offer {n} ppm of carbon credit a turn."
 credits_bought = "The {faction} bought {n} ppm of carbon credit from the {seller} for {ducats} Ducats: off their Blame, for good."

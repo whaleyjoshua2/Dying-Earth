@@ -772,6 +772,12 @@ pub struct SeatState {
     /// Ticket #272 (version 0.08.4): Agitates this seat has landed over the game, for the sweep.
     #[serde(default)]
     pub agitates_issued: u32,
+    /// Ticket #278 (version 0.08.5): Colony-turns this seat's Colonies have spent starved under a
+    /// rival's Blockade, and Colony-turns its Blockades have starved a rival's, over the game.
+    #[serde(default)]
+    pub blockade_turns_suffered: u32,
+    #[serde(default)]
+    pub blockade_turns_imposed: u32,
     /// Ticket #227 (version 0.08.2): units this seat has bought and sold through the Trading window
     /// over the whole game. Kept because floating prices are only fair if more than one hand is on
     /// them, and the sweep had no way to say whose were.
@@ -1109,6 +1115,8 @@ impl Game {
             credits_sold: 0.0,
             credits_offered: 0,
             agitates_issued: 0,
+            blockade_turns_suffered: 0,
+            blockade_turns_imposed: 0,
             bought_units: 0,
             sold_units: 0,
             spaceport_influence: 0,
@@ -2660,9 +2668,11 @@ impl Game {
             .filter(|f| f.working())
             .map(|f| self.tables.facility(f.kind).influence_allotment)
             .sum();
+        // Ticket #278 (version 0.08.5): a starved Colony's Relay and Chorus give nothing either.
         let space: i64 = self
             .owned_colonies(seat)
             .iter()
+            .filter(|c| self.starved_by(**c).is_none())
             .flat_map(|c| self.colony(*c).into_iter().flat_map(|c| c.modules.iter()))
             .filter(|m| m.working())
             .map(|m| self.tables.module(m.kind).influence_allotment)
@@ -2829,23 +2839,44 @@ impl Game {
     /// Ticket #99 (version 0.07.0): a rival warship sitting in this Orbital Slot blockades it. The
     /// blockade stops Colonists and Armies being unloaded into the station standing there, and stops
     /// that station refuelling a Ship; it reaches no further, and never touches the ground.
+    /// Ticket #278 (version 0.08.5): only a warship ORDERED to Blockade blockades -- "the blockade
+    /// needs to be positively chosen, not just the presence of a ship" -- and a blockaded station
+    /// makes nothing (`starved_by`).
     pub fn slot_blockaded_against(&self, seat: Seat, body: BodyId, slot: u32) -> bool {
-        self.ships
-            .iter()
-            .any(|s| s.seat != seat && s.kind.is_warship() && !s.escaped && s.at == ShipAt::Body(body) && s.slot == Some(slot))
+        self.ships.iter().any(|s| s.seat != seat && self.blockading(s) && s.at == ShipAt::Body(body) && s.slot == Some(slot))
+    }
+
+    /// Ticket #278: a warship on Blockade, still engaged. The one test every blockade reads.
+    fn blockading(&self, s: &Ship) -> bool {
+        s.kind.is_warship() && !s.escaped && s.stance == Stance::Blockade
     }
 
     /// Ticket #99: the seats blockading this slot, for the card and the Report.
     pub fn slot_blockaders(&self, body: BodyId, slot: u32) -> Vec<Seat> {
-        let mut v: Vec<Seat> = self
-            .ships
-            .iter()
-            .filter(|s| s.kind.is_warship() && !s.escaped && s.at == ShipAt::Body(body) && s.slot == Some(slot))
-            .map(|s| s.seat)
-            .collect();
+        let mut v: Vec<Seat> = self.ships.iter().filter(|s| self.blockading(s) && s.at == ShipAt::Body(body) && s.slot == Some(slot)).map(|s| s.seat).collect();
         v.sort();
         v.dedup();
         v
+    }
+
+    /// Ticket #278 (version 0.08.5): whether this seat has a blockading warship at the Body at all,
+    /// in any slot -- what starves a Colony on the GROUND under its outright Orbital Control.
+    pub fn blockading_at(&self, seat: Seat, body: BodyId) -> bool {
+        self.ships.iter().any(|s| s.seat == seat && self.blockading(s) && s.at == ShipAt::Body(body))
+    }
+
+    /// Ticket #278 (version 0.08.5): the seat starving this Colony, if any. A station starves under
+    /// a Blockade of its own slot by a rival; a Colony on the ground starves while one rival holds
+    /// Orbital Control of its Body outright AND has a stack there on Blockade -- a contested orbit
+    /// starves nobody, as it lands nobody. Nobody's Colony starves, having nobody to squeeze.
+    pub fn starved_by(&self, cid: ColonyId) -> Option<Seat> {
+        let col = self.colony(cid)?;
+        let holder = col.control.director()?;
+        if col.in_orbit {
+            self.slot_blockaders(col.body, col.slot).into_iter().find(|s| *s != holder)
+        } else {
+            self.orbital_control(col.body).filter(|o| *o != holder && self.blockading_at(*o, col.body))
+        }
     }
 
     /// Ticket #99: a station of this seat's at this Body that a rival warship is not blockading, so

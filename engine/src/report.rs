@@ -448,6 +448,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("smear", &["faction", "target", "ppm"]),
     // Ticket #277 (version 0.08.5): a Greenwash landed.
     ("greenwash", &["faction", "ppm"]),
+    // Ticket #278 (version 0.08.5): a Colony starved under a Blockade this Income.
+    ("starved", &["place", "faction"]),
     // Ticket #268: carbon credits offered and bought.
     ("credits_offered", &["faction", "n"]),
     ("credits_bought", &["faction", "n", "seller", "ducats"]),

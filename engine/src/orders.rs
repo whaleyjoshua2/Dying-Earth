@@ -1064,9 +1064,22 @@ impl Game {
                 }
                 Ok(cost)
             }
-            Order::ShipStance { body, .. } => {
+            Order::ShipStance { body, stance } => {
                 if self.ships_at(seat, *body).is_empty() {
                     return fail("no Ships of yours there");
+                }
+                // Ticket #278 (version 0.08.5): a Blockade is chosen against a slot, so it wants a
+                // warship of the seat's sitting in an Orbital Slot that is not its own station's --
+                // a rival's, or an empty one held against a builder.
+                if *stance == Stance::Blockade
+                    && !self.ships.iter().any(|s| {
+                        s.seat == seat
+                            && s.at == ShipAt::Body(*body)
+                            && s.kind.is_warship()
+                            && s.slot.is_some_and(|sl| self.station_at(*body, sl).is_none_or(|c| c.control.director() != Some(seat)))
+                    })
+                {
+                    return fail("no warship of yours sits in a slot to blockade here");
                 }
                 Ok(cost)
             }
@@ -1629,7 +1642,9 @@ impl Game {
                 }
                 Order::ShipStance { body, stance } => {
                     for s in self.ships.iter_mut().filter(|s| s.seat == seat && s.at == ShipAt::Body(*body)) {
-                        s.stance = *stance;
+                        // Ticket #278 (version 0.08.5): only a warship can blockade; the rest of a
+                        // stack ordered to Blockade holds.
+                        s.stance = if *stance == Stance::Blockade && !s.kind.is_warship() { Stance::Hold } else { *stance };
                     }
                     if *stance == Stance::Attack {
                         self.pending.attack_sequence += 1;

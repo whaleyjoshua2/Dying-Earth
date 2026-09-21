@@ -65,6 +65,7 @@ stance_attack = 4
 stance_intercept = 3
 stance_hold = 2
 stance_evade = 1
+stance_blockade = 3
 
 [weights.custodians]
 build_scrubber = 8
@@ -107,6 +108,7 @@ stance_attack = 2
 stance_intercept = 3
 stance_hold = 3
 stance_evade = 1
+stance_blockade = 3
 
 # Ticket #51: the Arkwrights spread. Habitats, Colony Ships, stations and founding are all 9;
 # Influence is 5, since they buy passage rather than allegiance.
@@ -150,6 +152,7 @@ stance_attack = 2
 stance_intercept = 3
 stance_hold = 3
 stance_evade = 1
+stance_blockade = 3
 
 # Ticket #51: the Archivists research and build the Archive.
 [weights.archivists]
@@ -197,6 +200,7 @@ stance_attack = 2
 stance_intercept = 3
 stance_hold = 3
 stance_evade = 1
+stance_blockade = 3
 
 [multipliers]
 victory_gap_max = 3.0

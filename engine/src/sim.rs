@@ -75,6 +75,9 @@ pub struct SimResult {
     /// Ticket #272 (version 0.08.4): walls standing and working at the end.
     pub sea_walls_standing: u32,
     pub agitates: [u32; SEAT_COUNT],
+    /// Ticket #278 (version 0.08.5): Colony-turns starved under a rival's Blockade, and imposed.
+    pub blockade_suffered: [u32; SEAT_COUNT],
+    pub blockade_imposed: [u32; SEAT_COUNT],
     pub events_no_target: u32,
     pub coastal_slots_lost: u32,
     pub facilities_drowned: u32,
@@ -479,6 +482,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let sea_walls_spent = game.log.iter().filter(|l| l.contains("the Sea Wall in") && l.contains("took the sea")).count() as u32;
     let sea_walls_standing = game.states.iter().flat_map(|s| s.facilities.iter()).filter(|f| f.kind == FacilityKind::SeaWall && f.working()).count() as u32;
     let agitates = Seat::ALL.map(|s| game.seat(s).agitates_issued);
+    let blockade_suffered = Seat::ALL.map(|s| game.seat(s).blockade_turns_suffered);
+    let blockade_imposed = Seat::ALL.map(|s| game.seat(s).blockade_turns_imposed);
     let events_no_target = game.events_no_target;
     // Ticket #276 (version 0.08.5): the three sea figures are counters on the state, not scraped
     // from the log's sentences as the first two were from #56 to 0.08.4.
@@ -528,6 +533,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         sea_walls_built,
         sea_walls_standing,
         agitates,
+        blockade_suffered,
+        blockade_imposed,
         events_no_target,
         sea_walls_spent,
         coastal_slots_lost,

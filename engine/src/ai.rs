@@ -62,6 +62,8 @@ enum Cat {
     StanceIntercept,
     StanceHold,
     StanceEvade,
+    /// Ticket #278 (version 0.08.5): a warship stack blockading a rival station's slot.
+    StanceBlockade,
 }
 
 /// Ticket #50 removed the denial multiplier: every AI pursues its own Victory Condition and never
@@ -147,6 +149,7 @@ impl Game {
             Cat::StanceIntercept => w.stance_intercept,
             Cat::StanceHold => w.stance_hold,
             Cat::StanceEvade => w.stance_evade,
+            Cat::StanceBlockade => w.stance_blockade,
         }
     }
 
@@ -799,7 +802,9 @@ impl Game {
         // --- Colony builds
         for cid in self.directed_colonies(seat) {
             let col = self.colony(cid).unwrap().clone();
-            let threat = if self.enemy_present_or_inbound(seat, col.body) || self.enemy_army_near(seat, Place::Colony(cid)) { m.threat } else { 1.0 };
+            // Ticket #278 (version 0.08.5): a starved Colony is the threat made good; the seat
+            // learns to want a warship where it is blockaded.
+            let threat = if self.enemy_present_or_inbound(seat, col.body) || self.enemy_army_near(seat, Place::Colony(cid)) || self.starved_by(cid).is_some() { m.threat } else { 1.0 };
             // Ticket #97 (version 0.07.0): no room, nothing to enumerate. Without this the AI scores
             // Modules it cannot build, spends its list on them and has them dropped at commit.
             if self.free_module_slots(&col) == 0 {
@@ -1885,6 +1890,21 @@ impl Game {
             }
             if total_hp > 0 && (total_dmg as f64) / (total_hp as f64) >= th.evade_damage_fraction {
                 push(vec![Order::ShipStance { body, stance: Stance::Evade }], Cat::StanceEvade, self.base_weight(seat, Cat::StanceEvade) * 10.0, 1.0, 1.0, 1.0, format!("Evade at {}", self.tables.body(body).name), Some(key.clone()));
+            }
+            // Ticket #278 (version 0.08.5): a Blockade must be chosen, so the stack that landed in a
+            // rival station's slot (ai_blockade_slot) is offered the stance that makes it one. The
+            // richest rival station is already the slot it took.
+            if let Some(target) = stack.iter().filter(|s| s.kind.is_warship()).find_map(|s| self.station_at(body, s.slot?).filter(|c| self.rival_holds(seat, c))) {
+                push(
+                    vec![Order::ShipStance { body, stance: Stance::Blockade }],
+                    Cat::StanceBlockade,
+                    self.base_weight(seat, Cat::StanceBlockade),
+                    1.0,
+                    1.0,
+                    1.0,
+                    format!("Blockade {} at {}", self.place_name(Place::Colony(target.id)), self.tables.body(body).name),
+                    Some(key.clone()),
+                );
             }
         }
 

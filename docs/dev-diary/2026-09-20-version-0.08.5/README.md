@@ -12,6 +12,7 @@ and the measurements that decided it. The rules as decided are in
 |---|---|---|
 | [`ticket-276-sea-inland/`](ticket-276-sea-inland/README.md) | [The sea reaches inland](https://github.com/whaleyjoshua2/Dying-Earth/issues/276) | China's card after a bare rise and behind a standing wall, the coast one slot further in each time; a batch of twenty with the turned slots counted. |
 | [`ticket-277-greenwash/`](ticket-277-greenwash/README.md) | [The Greenwash](https://github.com/whaleyjoshua2/Dying-Earth/issues/277) | The block on the player's own Faction page, and a batch in which the Prospectors greenwash 90 ppm a game and buy more credits, not fewer. |
+| [`ticket-278-blockade/`](ticket-278-blockade/README.md) | [A Blockade that starves](https://github.com/whaleyjoshua2/Dying-Earth/issues/278) | The ISS's card reading *Blockaded by the Prospectors: producing nothing, upkeep still paid*, and a batch in which the Prospectors blockade in four seeds of twenty. |
 
 Everything here was captured headlessly in `shot:` mode. **Nothing was opened on the designer's
 desktop.**
