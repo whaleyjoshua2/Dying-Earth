@@ -45,7 +45,12 @@ pub const SAVE_VERSION: u32 = 1;
 /// #278); an Army carries a levy flag (#282); the climate carries a war bucket (#279); a Battle
 /// carries a place (#281); and the game carries the war's counters (#286). A refusal naming both
 /// versions is the right answer.
-pub const GAME_VERSION: &str = "0.08.5";
+/// Ticket #301 (version 0.08.6): moved again. An Army carries a Dig In stance and a fixed raised
+/// strength (#297, #302); a Region carries a threat flag (#302); an Occupation carries the Standing
+/// it banked (#299); the war's counters gained escapes, Dig Ins and landings (#295, #297, #300);
+/// and the tables gained figures a save does not carry but a board from before would disagree
+/// with. A refusal naming both versions is the right answer.
+pub const GAME_VERSION: &str = "0.08.6";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;

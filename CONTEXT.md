@@ -163,7 +163,7 @@ The strip along the foot of the side panel, since version 0.07.1, holding the co
 _Avoid_: action bar, toolbar, HUD, control panel
 
 **Max**:
-The button in the Command Cluster, since version 0.07.3, that spends everything left of the turn's Allotment on the selected place in one press, as one order to be read and cancelled like any other; greyed out while nothing is selected. **Every turn** makes it a standing order on the place selected when it was ticked: at the start of each turn the whole Allotment is placed on that place as an ordinary order, never spent unwatched, until the box is unticked, the placed order is cancelled, or the place is no longer the player's.
+The button in the Command Cluster, since version 0.07.3, that spends everything left of the turn's Allotment on the selected place in one press, as one order to be read and cancelled like any other, and since version 0.08.6 moves the spend slider beside it to the bound as well; greyed out while nothing is selected. **Every turn** makes it a standing order on the place selected when it was ticked: at the start of each turn the whole Allotment is placed on that place as an ordinary order, never spent unwatched, until the box is unticked, the placed order is cancelled, or the place is no longer the player's.
 _Avoid_: all-in, spend all, auto-spend, Defence (the retired button)
 
 **Defence**:
@@ -290,7 +290,7 @@ Retired in version 0.08.6. From version 0.08.5 it was the second Army a neutral 
 _Avoid_: militia, reserves, conscripts, second Standing Army
 
 **Barracks**:
-The Module that lets a Colony hold and build a defensive Army. A Colony without one has no defenders.
+The Module that lets a Colony hold and build a defensive Army. A Colony without one has no defenders. Since version 0.08.6 the Army it raises is worth the rounded average Industry Level of the Regions its Faction holds, plus one, fixed at the raise; the Barracks is not a police force, so that Army defends with Dig In alone.
 _Avoid_: fort, garrison, base
 
 **Colonist**:
