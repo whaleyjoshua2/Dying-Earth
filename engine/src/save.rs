@@ -40,7 +40,12 @@ pub const SAVE_VERSION: u32 = 1;
 /// carries a hold clock and an Exodus Call (#237, #238); and three new **Unique Modules** were
 /// appended to `ModuleKind` (#239), so a colony written by an older build describes a Module list
 /// this one indexes differently. A refusal naming both versions is the right answer.
-pub const GAME_VERSION: &str = "0.08.4";
+/// Ticket #287 (version 0.08.5): moved again. A Region carries a converted-slot count and an
+/// armed step (#276, #282); a seat carries Blame cleaned by Greenwash and blockade-turns (#277,
+/// #278); an Army carries a levy flag (#282); the climate carries a war bucket (#279); a Battle
+/// carries a place (#281); and the game carries the war's counters (#286). A refusal naming both
+/// versions is the right answer.
+pub const GAME_VERSION: &str = "0.08.5";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;

@@ -10,6 +10,8 @@ and the measurements that decided it. The rules as decided are in
 
 | folder | ticket | what is in it |
 |---|---|---|
+| [`sweeps/`](sweeps/) | [Write the 0.08.5 amendments and build them](https://github.com/whaleyjoshua2/Dying-Earth/issues/287) | `final-0.08.5.txt`: the closing sweep, 20 seeds × four seatings at the shipped climate cell, the first with a military block. Win column 28 / 26 / 9 / 2 against 26 / 28 / 7 / 0, collapses 15 of 80 against 19. `baseline-0.08.4-military.txt`: the same sweep on `main` with the counters ported into a throwaway worktree, so the 0.08.4 rules have the military figure the map asked for: 113 Battles over eighty games against 172. |
+| [`../../playtest/PLAYTEST.txt`](../../playtest/PLAYTEST.txt) | [Write the 0.08.5 amendments and build them](https://github.com/whaleyjoshua2/Dying-Earth/issues/287) | The playtest note that ships in both kits as `README.txt`. It lives at `docs/playtest/` while this is the current version, because the kit workflow copies it from there; 0.08.4's is filed under [`playtest/`](../2026-09-19-version-0.08.4/playtest/PLAYTEST.txt) in its own folder. |
 | [`ticket-276-sea-inland/`](ticket-276-sea-inland/README.md) | [The sea reaches inland](https://github.com/whaleyjoshua2/Dying-Earth/issues/276) | China's card after a bare rise and behind a standing wall, the coast one slot further in each time; a batch of twenty with the turned slots counted. |
 | [`ticket-277-greenwash/`](ticket-277-greenwash/README.md) | [The Greenwash](https://github.com/whaleyjoshua2/Dying-Earth/issues/277) | The block on the player's own Faction page, and a batch in which the Prospectors greenwash 90 ppm a game and buy more credits, not fewer. |
 | [`ticket-278-blockade/`](ticket-278-blockade/README.md) | [A Blockade that starves](https://github.com/whaleyjoshua2/Dying-Earth/issues/278) | The ISS's card reading *Blockaded by the Prospectors: producing nothing, upkeep still paid*, and a batch in which the Prospectors blockade in four seeds of twenty. |
@@ -24,3 +26,24 @@ and the measurements that decided it. The rules as decided are in
 
 Everything here was captured headlessly in `shot:` mode. **Nothing was opened on the designer's
 desktop.**
+
+## What the pictures changed
+
+Once in this version a picture found something reading the code had not: **the Battle's line did
+not headline** ([#281](https://github.com/whaleyjoshua2/Dying-Earth/issues/281)). The first Report
+picture after a Battle at Mars showed the destroyed Ship's own line heading the turn and the Battle
+under it, because the Battle line was written after the losses were applied and ranked behind
+them. The line is now written first. Nothing in the suite reads a Report's order.
+
+## What the batches found
+
+- **No Battle in eighty games is against a neutral Region**, at either rule set. Every Region is
+  taken by Influence in the first turns and the first Army appears around turn 20, so *Battles
+  pollute* puts nothing on nobody's ledger and *Neutral states arm* raised three Levies and held
+  nothing. Both are rules for a human who marches early ([#279](https://github.com/whaleyjoshua2/Dying-Earth/issues/279),
+  [#282](https://github.com/whaleyjoshua2/Dying-Earth/issues/282)).
+- **The attack rule freed the Arkwrights, not the timid seats.** The Custodians and Archivists build
+  few Armies; the Arkwrights where they go first were already building sixty a batch and fighting
+  none, and now fight 52 ([#284](https://github.com/whaleyjoshua2/Dying-Earth/issues/284), [#286](https://github.com/whaleyjoshua2/Dying-Earth/issues/286)).
+- **The two Blame levers add.** Credits bought rose in every seating and the Greenwash takes 70 to
+  90 ppm a game on top ([#277](https://github.com/whaleyjoshua2/Dying-Earth/issues/277)).
