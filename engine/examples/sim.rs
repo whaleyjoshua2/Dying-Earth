@@ -195,7 +195,7 @@ fn main() {
             r.throw_offs, r.peak_unrest, r.constabularies, r.relief_orders, r.population_moved
         );
         println!(
-            "         | blame {:?} | share {:?} | credit {:?} | smeared {:?} | greenwashed {:?} | credits bought {:?} sold {:?} | thresholds {:?} | neutral developments {} | blockade-turns suffered {:?} imposed {:?} | war ppm {:?} nobody's {:.1} | levies {} neutral holds {}",
+            "         | blame {:?} | share {:?} | credit {:?} | smeared {:?} | greenwashed {:?} | credits bought {:?} sold {:?} | thresholds {:?} | neutral developments {} | blockade-turns suffered {:?} imposed {:?} | war ppm {:?} nobody's {:.1} | levies {} neutral holds {} | battles by seat {:?} ({} vs neutrals) | armies built {:?} lost {:?} | force takes {:?}",
             r.blame.map(|b| format!("{b:.0}")),
             r.blame_share.map(|b| format!("{b:.2}")),
             r.blame_credit.map(|b| format!("{b:.0}")),
@@ -210,7 +210,12 @@ fn main() {
             r.war_ppm.map(|v| format!("{v:.1}")),
             r.war_ppm_nobody,
             r.levies_raised,
-            r.neutral_holds
+            r.neutral_holds,
+            r.war.battles,
+            r.war.battles_vs_neutral,
+            r.war.armies_built,
+            r.war.armies_lost,
+            r.war.takes_by_force
         );
         println!(
             "         | scrubbers {} | mothballs {} | restarts {} | decommissions {} | leapfrogs {} | strip permits {} | longest stabilization {:?} | net at 12 {:?} | net at end {:+.1}",

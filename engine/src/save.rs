@@ -145,6 +145,9 @@ pub struct SavedGame {
     pub levies_raised: u32,
     #[serde(default)]
     pub neutral_holds: u32,
+    /// Ticket #286 (version 0.08.5): the war's counters.
+    #[serde(default)]
+    pub war: WarCounters,
 }
 
 impl SavedGame {
@@ -161,6 +164,7 @@ impl SavedGame {
             colonies,
             ships,
             armies,
+            war,
             levies_raised,
             neutral_holds,
             climate,
@@ -213,6 +217,7 @@ impl SavedGame {
             events_no_target: *events_no_target,
             levies_raised: *levies_raised,
             neutral_holds: *neutral_holds,
+            war: war.clone(),
         }
     }
 
@@ -228,6 +233,7 @@ impl SavedGame {
             colonies: self.colonies,
             ships: self.ships,
             armies: self.armies,
+            war: self.war,
             levies_raised: self.levies_raised,
             neutral_holds: self.neutral_holds,
             climate: self.climate,

@@ -117,6 +117,7 @@ fn main() {
                         let mut agitates = [0u32; 4];
                         let (mut blockade_suffered, mut blockade_imposed) = ([0u32; 4], [0u32; 4]);
                         let (mut levies, mut neutral_holds) = (0u32, 0u32);
+                        let mut warc = dying_earth_engine::state::WarCounters::default();
                         let mut war_ppm: [Vec<f64>; 4] = Default::default();
                         let mut war_nobody: Vec<f64> = Vec::new();
                         let mut walls_standing = 0u32;
@@ -268,6 +269,7 @@ fn main() {
                             war_nobody.push(r.war_ppm_nobody);
                             levies += r.levies_raised;
                             neutral_holds += r.neutral_holds;
+                            warc.add(&r.war);
                             if r.deck_empty {
                                 deck_empty += 1;
                             }
@@ -446,6 +448,16 @@ fn main() {
                             );
                             println!("      Trading window units, by seat: bought {bought:?}, sold {sold:?}");
                             println!("      Places taken by Influence over the batch: {takes}");
+                            // Ticket #286 (version 0.08.5): the war, over the batch, by seat; printed as the military block after the Influence line.
+                            // Blockade-turns are printed above under ticket #278.
+                            println!(
+                                "      War over the batch: Battles opened by seat {:?}, {} against neutrals; attacks in orbit {:?}; marches on neutrals {:?}, on held Regions {:?}",
+                                warc.battles, warc.battles_vs_neutral, warc.orbit_attacks, warc.marches_neutral, warc.marches_held
+                            );
+                            println!(
+                                "      Armies built {:?}, lost {:?}, Standing Armies lost {}; warships built {:?}, lost {:?}; Occupations begun {:?}, broken {:?}; places taken by force {:?}",
+                                warc.armies_built, warc.armies_lost, warc.standing_armies_lost, warc.warships_built, warc.warships_lost, warc.occupations_begun, warc.occupations_broken, warc.takes_by_force
+                            );
                             println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
                             println!("      Breaks fired: {}", fired.join(", "));
                         }

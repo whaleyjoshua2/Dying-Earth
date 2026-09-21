@@ -20,6 +20,7 @@ and the measurements that decided it. The rules as decided are in
 | [`ticket-283-yields-in-glyphs/`](ticket-283-yields-in-glyphs/README.md) | [Yields in glyphs on the planet card](https://github.com/whaleyjoshua2/Dying-Earth/issues/283) | The Mars planet card with its Colonies block, the Olympus Mons card with its yields, the slot panel without the planet line, and the Ship card's doors unchanged. |
 | [`ticket-284-ai-attack/`](ticket-284-ai-attack/README.md) | [The computer seats may attack a Region they did not lose](https://github.com/whaleyjoshua2/Dying-Earth/issues/284) | The batch in which the freed seats still do not fight, because they never build an Army: the build weight, not the gate, is the binding constraint. |
 | [`ticket-285-credits-move/`](ticket-285-credits-move/README.md) | [Carbon credits move from the Trading window to the Faction window](https://github.com/whaleyjoshua2/Dying-Earth/issues/285) | The Offer block on the Custodians' own page, the Request block on their page as a rival sees it, and the Trading window with four lines. |
+| [`ticket-286-count-the-war/`](ticket-286-count-the-war/README.md) | [Teach the sim and the sweep to count the war](https://github.com/whaleyjoshua2/Dying-Earth/issues/286) | No picture; a batch of twenty with every seed's Battles, Armies built and lost, and places taken by force counted at the event, and the sweep's new military block under the Influence line. |
 
 Everything here was captured headlessly in `shot:` mode. **Nothing was opened on the designer's
 desktop.**

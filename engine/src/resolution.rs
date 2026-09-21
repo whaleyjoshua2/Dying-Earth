@@ -229,6 +229,12 @@ impl Game {
             if !entering_own {
                 a.stance = Stance::Attack;
             }
+            // Ticket #286 (version 0.08.5): a march on a neutral, or on a Region a rival holds.
+            match self.state(to).control {
+                Control::Neutral => self.war.marches_neutral[seat.index()] += 1,
+                Control::Controlled(r) if r != seat => self.war.marches_held[seat.index()] += 1,
+                _ => {}
+            }
             let line = format!(
                 "{} Army moved from {} to {}{}.",
                 self.seat_name(seat),
@@ -410,6 +416,11 @@ impl Game {
         let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
             parties.iter().map(|(seat, agg, ids)| (Some(*seat), *agg, ids.iter().map(|id| self.ship_combatant(*id)).collect())).collect();
         let mut line = self.run_melee(place, Some(ReportPlace::Body(body)), units);
+        // Ticket #286 (version 0.08.5): counted by the seat that opened it.
+        for (seat, _, _) in parties.iter().filter(|(_, agg, _)| *agg) {
+            self.war.battles[seat.index()] += 1;
+            self.war.orbit_attacks[seat.index()] += 1;
+        }
         match self.orbital_control(body) {
             Some(s) if parties.iter().any(|(seat, agg, _)| *agg && *seat == s) => {
                 line.result.push_str(&format!(" The {} hold Orbital Control.", self.seat_name(s)))
@@ -435,6 +446,13 @@ impl Game {
         let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
             parties.iter().map(|(seat, agg, ids)| (*seat, *agg, ids.iter().map(|id| self.army_combatant(*id)).collect())).collect();
         let mut line = self.run_melee(place_name, Some(place.into()), units);
+        // Ticket #286 (version 0.08.5): counted by the seat that opened it, and against a neutral.
+        for seat in aggressors {
+            self.war.battles[seat.index()] += 1;
+        }
+        if parties.iter().any(|(seat, _, _)| seat.is_none()) {
+            self.war.battles_vs_neutral += 1;
+        }
         self.charge_war_hits(self.on_earth_place(place), &line);
         // Ticket #284 (version 0.08.5): the same predicate `resolve_occupation` reads, so the line
         // never promises an Occupation an escaped attacker will not begin (a measured defect).
@@ -550,6 +568,9 @@ impl Game {
     pub fn destroy_ship(&mut self, id: ShipId, why: &str) {
         let Some(pos) = self.ships.iter().position(|s| s.id == id) else { return };
         let ship = self.ships.remove(pos);
+        if ship.kind.is_warship() {
+            self.war.warships_lost[ship.seat.index()] += 1;
+        }
         if let Some(a) = ship.army {
             let at = match ship.at {
                 ShipAt::Body(b) => Some(ReportPlace::Body(b)),
@@ -582,6 +603,12 @@ impl Game {
     pub fn destroy_army(&mut self, id: ArmyId, why: &str, at: Option<ReportPlace>) {
         let Some(pos) = self.armies.iter().position(|a| a.id == id) else { return };
         let army = self.armies.remove(pos);
+        // Ticket #286 (version 0.08.5): counted for the sweep, by the seat it fought for.
+        match (self.army_seat(&army), army.standing) {
+            (Some(s), false) => self.war.armies_lost[s.index()] += 1,
+            (_, true) if !army.levy => self.war.standing_armies_lost += 1,
+            _ => {}
+        }
         // Ticket #282 (version 0.08.5): THE Standing Army returns two Incomes later, not the next.
         if army.standing && !army.levy && let ArmyHome::State(sid) = army.home {
             self.state_mut(sid).respawn_wait = 1;
@@ -681,6 +708,7 @@ impl Game {
                             None => Control::Neutral,
                         };
                         self.set_place_control(place, back);
+                        self.war.occupations_broken[occupier.index()] += 1;
                         let line = format!("Occupation of {} by the {} ended.", self.place_name(place), self.seat_name(occupier));
                         self.log(line);
                         let text = self.say("occupation_ended", &[("place", self.place_name(place)), ("faction", self.seat_name(occupier))]);
@@ -714,6 +742,7 @@ impl Game {
                         }
                         let previous = control.controller();
                         self.set_place_control(place, Control::Occupied { occupier: seat, previous, turns: 1 });
+                        self.war.occupations_begun[seat.index()] += 1;
                         // Ticket #52: an Occupation begins at +3 Unrest, damped by nothing.
                         if let Place::State(sid) = place {
                             let n = self.tables.unrest.occupation_start;
@@ -795,6 +824,10 @@ impl Game {
 
     /// Control passes to `seat` (spec 8.3, 8.5): rivals' Influence wiped, a destruction roll, Armies follow.
     pub fn transfer_control(&mut self, place: Place, seat: Seat, why: &str) {
+        // Ticket #286 (version 0.08.5): a take that was not by Influence was by force.
+        if why != "Influence" && self.place_control(place).controller() != Some(seat) {
+            self.war.takes_by_force[seat.index()] += 1;
+        }
         // Ticket #282 (version 0.08.5): a Levy was the neutral Region's; it stands down the moment
         // the Region is somebody's.
         if let Place::State(sid) = place {
@@ -1315,6 +1348,9 @@ impl Game {
             (_, BuildItem::Unit(UnitKind::Army)) => {
                 // Ticket #270 (version 0.08.4): raised through the one door, and named there.
                 self.raise_army(place, false);
+                if let Some(s) = self.place_director(place) {
+                    self.war.armies_built[s.index()] += 1;
+                }
             }
             (_, BuildItem::Unit(kind)) => {
                 let body = match place {
@@ -1326,6 +1362,9 @@ impl Game {
                 // from, taking the first name no Ship on the board is using. This is the ONE place a
                 // Ship comes into a real game, so it is the one place a name is given.
                 let name = self.next_ship_name(kind);
+                if kind.is_warship() {
+                    self.war.warships_built[b.seat.index()] += 1;
+                }
                 self.ships.push(Ship {
                     id,
                     name,

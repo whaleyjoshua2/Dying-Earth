@@ -84,6 +84,8 @@ pub struct SimResult {
     /// Ticket #282 (version 0.08.5): Levies raised by neutral Regions, and neutral Regions that held.
     pub levies_raised: u32,
     pub neutral_holds: u32,
+    /// Ticket #286 (version 0.08.5): the war's counters, whole.
+    pub war: WarCounters,
     pub events_no_target: u32,
     pub coastal_slots_lost: u32,
     pub facilities_drowned: u32,
@@ -547,6 +549,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         blockade_imposed,
         levies_raised: game.levies_raised,
         neutral_holds: game.neutral_holds,
+        war: game.war.clone(),
         events_no_target,
         sea_walls_spent,
         coastal_slots_lost,

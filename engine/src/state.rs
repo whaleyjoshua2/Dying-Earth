@@ -907,6 +907,50 @@ pub enum Outcome {
 
 /// One party in a Battle (ticket #50): a Battle is a melee of every Faction present, so the
 /// Battle Report lists each of them rather than an attacker and a defender.
+/// Ticket #286 (version 0.08.5): the war, counted where it happens. Until this version the sweep
+/// printed no military figure of any kind and the engine's only count of Battles was a comment.
+/// Every figure is a counter incremented at the event, never a sentence scraped from the log; by
+/// seat where a seat is the actor.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WarCounters {
+    /// Battles opened, by the seat that opened them; and Battles fought against a neutral Region's own Army.
+    pub battles: [u32; SEAT_COUNT],
+    pub battles_vs_neutral: u32,
+    pub armies_built: [u32; SEAT_COUNT],
+    pub armies_lost: [u32; SEAT_COUNT],
+    pub standing_armies_lost: u32,
+    pub warships_built: [u32; SEAT_COUNT],
+    pub warships_lost: [u32; SEAT_COUNT],
+    pub occupations_begun: [u32; SEAT_COUNT],
+    pub occupations_broken: [u32; SEAT_COUNT],
+    /// Places taken by force: an Occupation completed or Pacified. A take by Influence is counted elsewhere.
+    pub takes_by_force: [u32; SEAT_COUNT],
+    pub marches_neutral: [u32; SEAT_COUNT],
+    pub marches_held: [u32; SEAT_COUNT],
+    pub orbit_attacks: [u32; SEAT_COUNT],
+}
+
+impl WarCounters {
+    /// Sum another game's counters into this one, for the sweep.
+    pub fn add(&mut self, o: &WarCounters) {
+        for i in 0..SEAT_COUNT {
+            self.battles[i] += o.battles[i];
+            self.armies_built[i] += o.armies_built[i];
+            self.armies_lost[i] += o.armies_lost[i];
+            self.warships_built[i] += o.warships_built[i];
+            self.warships_lost[i] += o.warships_lost[i];
+            self.occupations_begun[i] += o.occupations_begun[i];
+            self.occupations_broken[i] += o.occupations_broken[i];
+            self.takes_by_force[i] += o.takes_by_force[i];
+            self.marches_neutral[i] += o.marches_neutral[i];
+            self.marches_held[i] += o.marches_held[i];
+            self.orbit_attacks[i] += o.orbit_attacks[i];
+        }
+        self.battles_vs_neutral += o.battles_vs_neutral;
+        self.standing_armies_lost += o.standing_armies_lost;
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BattleParty {
     /// None for a neutral state's own Armies.
@@ -1087,6 +1131,8 @@ pub struct Game {
     pub colonies: Vec<Colony>,
     pub ships: Vec<Ship>,
     pub armies: Vec<Army>,
+    /// Ticket #286 (version 0.08.5): the war, counted on the game so the sweep can say it.
+    pub war: WarCounters,
     /// Ticket #282 (version 0.08.5): Levies raised and neutral Regions that held against an attack
     /// over the game, for the sweep.
     pub levies_raised: u32,
@@ -1280,6 +1326,7 @@ impl Game {
             colonies: Vec::new(),
             ships: Vec::new(),
             armies: Vec::new(),
+            war: WarCounters::default(),
             levies_raised: 0,
             neutral_holds: 0,
             climate: Climate {

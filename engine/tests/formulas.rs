@@ -7281,6 +7281,51 @@ fn only_a_rival_holding_orbital_control_shuts_the_ground() {
     assert!(g.may_land(Seat(0), body), "a contested orbit no longer punishes the bystander");
 }
 
+/// Ticket #286 (version 0.08.5): the war is counted on the game, at the event, never scraped: a
+/// Battle by its aggressor and against a neutral, an Occupation begun and a place taken by force,
+/// an Army lost by the seat it fought for, a warship lost; and the counters ride through the save.
+#[test]
+fn the_war_is_counted_at_the_event() {
+    let mut g = game();
+    calm(&mut g);
+    let target = StateId::NorthAfrica;
+    assert_eq!(g.state(target).control, Control::Neutral);
+    occupier_in(&mut g, StateId::EastAsia, target);
+    g.resolution_phase();
+    assert_eq!(g.war.battles[0], 1, "one Battle, opened by seat 0");
+    assert_eq!(g.war.battles_vs_neutral, 1, "against a neutral Region's own Army");
+    assert_eq!(g.war.battles[1..], [0, 0, 0], "nobody else opened one");
+    // An Occupation begun and completed is a place taken by force.
+    let mut g = game();
+    calm(&mut g);
+    g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
+    occupier_in(&mut g, StateId::EastAsia, StateId::Europe);
+    g.resolution_phase();
+    assert_eq!(g.war.occupations_begun[0], 1);
+    g.resolution_phase();
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::Europe).control, Control::Controlled(Seat(0)));
+    assert_eq!(g.war.takes_by_force[0], 1, "taken by force, once");
+    assert_eq!(g.war.occupations_broken[0], 0);
+    // Losses by the seat they fought for; a Standing Army under its own figure.
+    let mut g = game();
+    let standing = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(StateId::EastAsia)).map(|a| a.id).unwrap();
+    g.destroy_army(standing, "battle", None);
+    assert_eq!((g.war.standing_armies_lost, g.war.armies_lost[0]), (1, 0));
+    let built = ArmyId(g.fresh_id());
+    g.armies.push(Army { name: String::new(), id: built, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    g.destroy_army(built, "battle", None);
+    assert_eq!(g.war.armies_lost[0], 1, "a built Army of seat 0's");
+    let frigate = ShipId(g.fresh_id());
+    g.ships.push(Ship { name: String::new(), id: frigate, kind: UnitKind::Frigate, seat: Seat(2), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    g.destroy_ship(frigate, "battle");
+    assert_eq!(g.war.warships_lost[2], 1);
+    // Through the save.
+    let saved = dying_earth_engine::save::SavedGame::of(&g);
+    let back = saved.into_game(g.tables.clone());
+    assert_eq!(back.war.armies_lost[0], 1, "the counters ride through the save");
+}
+
 /// Ticket #284 (version 0.08.5): every computer seat may attack a Region it did not lose, on the
 /// Prospectors' odds, given a cause: a neutral needs none; a rival's Region only when the seat is
 /// Cold or worse toward that rival; an occupier stays where it is; and the Battle line and the
