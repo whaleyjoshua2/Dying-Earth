@@ -1002,11 +1002,38 @@ impl Game {
                     }
                 }
                 // A Habitat is only worth building when Colonists are coming.
+                //
+                // Ticket #290 (version 0.08.6): the opening, at the designer's word ("the computer
+                // should know this"). While a STARTING station -- one over Earth that stood when the
+                // game opened -- has a slot free and under four berths empty, its Habitat is pushed
+                // at the opportunity weight so it comes before the Power Plants and Trade Posts it
+                // used to lose to; the muster then follows the room aboard, as it always has. A
+                // station with two aboard passes the gate above that a bare one, with four berths
+                // empty, never did, which is why the opening had no need to exist before.
+                //
+                // Measured before the second clause: the Prospectors ranked their first Shipyard
+                // and a Research Lab, both counted as advancing their Victory pace, above a Habitat
+                // at twice its base weight, and opened with no Habitat. So the opening Habitat also
+                // counts as advancing whatever the seat is behind on, as the first Shipyard does
+                // (`gap_for`), and stands first in every seat. Not while Energy is tight: a
+                // Habitat draws Energy, and the Solar Array a starved station wants would otherwise
+                // lose its slot to the opening (measured on the ticket #89 test with Energy at
+                // nought).
+                //
+                // And ONCE: only until the station's first Habitat stands or is on order. Written
+                // without that clause it fired again every time the muster filled the station, so
+                // the Prospectors put Habitat after Habitat on Tiangong at the head of every list
+                // and never the Trade Post that earns their Ducats -- measured over twenty seeds
+                // with the Custodians first, 330 Ducats a game against 2287 with the rule off, and
+                // ten wins against nineteen. An opening is played once.
+                let mut opening = false;
                 if mk == ModuleKind::Habitat {
                     let room = self.habitat_room(&col).saturating_sub(col.colonists);
                     if room >= 4 {
                         continue;
                     }
+                    let first_habitat = !col.modules.iter().any(|m| m.kind == ModuleKind::Habitat) && !col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Habitat));
+                    opening = col.in_orbit && col.body == BodyId::Earth && col.founded_turn == 1 && first_habitat && !tight;
                 }
                 // Ticket #41: the first Relay at a Colony is a threat answer while the rival's standing
                 // presses on the seat's own there, once the Colony has a producer Module (a Relay before
@@ -1023,7 +1050,8 @@ impl Game {
                 } else {
                     1.0
                 };
-                push(vec![Order::BuildModule { colony: cid, kind: mk }], cat, base, gap_for(cat, Some(mk.name())), t, 1.0, format!("build {} at {}", mk.name(), self.place_name(Place::Colony(cid))), None);
+                let (pull, opp) = if opening { (gap, m.opportunity) } else { (gap_for(cat, Some(mk.name())), 1.0) };
+                push(vec![Order::BuildModule { colony: cid, kind: mk }], cat, base, pull, t, opp, format!("build {} at {}", mk.name(), self.place_name(Place::Colony(cid))), None);
             }
             if col.modules.iter().any(|m| m.kind == ModuleKind::Barracks) && !self.armies.iter().any(|a| a.home == ArmyHome::Colony(cid)) {
                 push(vec![Order::BuildArmy { place: Place::Colony(cid) }], Cat::ArmyOrBarracks, self.base_weight(seat, Cat::ArmyOrBarracks), 1.0, threat, 1.0, format!("build Army at {}", self.place_name(Place::Colony(cid))), None);

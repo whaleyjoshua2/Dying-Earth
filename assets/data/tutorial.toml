@@ -20,10 +20,16 @@
 # should direct user for first three turns that takes them though important mechanics."* The old
 # five notes spent TWO of them asking for nothing -- "You are the Custodians" and "Read the board"
 # -- so the first instruction landed on turn 3 and getting off Earth, the thing the designer wanted
-# taught, on turn 5. Now **the first three turns each ask for one thing, and they are one chain**:
-# spend, recruit, launch. Turns 4 and 5 keep their place but ask for NOTHING, at the designer's word:
-# they point at the climate and at the Research race, which are the two things that have started
-# happening to the player by then.
+# taught, on turn 5. Now **each of the first turns asks for one thing, and they are one chain**.
+# The last two notes keep their place but ask for NOTHING, at the designer's word: they point at the
+# climate and at the Research race, which are the two things that have started happening to the
+# player by then.
+#
+# Ticket #290 (version 0.08.6): six notes, from five. The ISS opens with two Colonists aboard now,
+# so it has two Module slots free from turn one, and the designer moved a Habitat to the front of
+# the chain: *"shift the tutorial to have them build a habitat first then the four, you can add a
+# turn of guidance if necessary."* The chain is spend, build, recruit, launch, then the two notes
+# that ask for nothing.
 #
 # The chain closes exactly, and the arithmetic is worth keeping here because the notes depend on it:
 #
@@ -31,9 +37,13 @@
 #     adds one to each seat's start Region at setup (`add_start_facility`, engine/src/state.rs), so
 #     the player always has one whichever Region they pick. Checked against a headless picture of
 #     turn 1, not against the data file, after the data file said otherwise and was wrong.
+#   - **The ISS opens with two aboard** (`start_colonists` in `factions.toml`), a Colony's Module
+#     cap is one slot per Colonist, so the ISS has **two slots free** on turn 1.
+#   - A Habitat is **25 Materials** of the **80** the game starts with, takes one turn, and holds 4
+#     -- so a Habitat ordered on turn 2 stands on turn 3, and the ISS then holds **8**: the Core
+#     Module's 4 and the Habitat's 4, with two already aboard.
 #   - A recruit is **4** for the Custodians, and the Pioneers are on the Region's card at End Turn --
-#     so recruiting on turn 2 means they are waiting on turn 3.
-#   - The ISS begins bare, and **a Core Module holds exactly 4**. Four recruited fill it precisely.
+#     so recruiting on turn 3 means they are waiting on turn 4, and four fit with two berths to spare.
 #
 # The Reactor is NOT what a Custodian builds: it is the Archivists' Unique Facility since ticket
 # #184. Nothing here asks for one.
@@ -46,24 +56,30 @@ note = "You are the Custodians: colonise the solar system without wrecking Earth
 
 [[note]]
 turn = 2
+figure = "Build a Habitat on the ISS"
+text = "The ISS is yours, in orbit over Earth, with two people already aboard and room to build. Click it on the globe, click a free tile on its card, and order a Habitat: 25 Materials, ready next turn, and it holds four more."
+note = "A station builds one Module for every Colonist living on it. The two aboard are what let you build at all; the people you send up next will let you build more."
+
+[[note]]
+turn = 3
 figure = "Recruit Pioneers"
 text = "The Region you started in has a Launch Site, so it can put people into orbit. Click it, and under Pioneers recruit four: they take people from the Region and appear on its card when the turn ends."
 note = "Every figure on a card explains itself. Rest the pointer on a number and the rule behind it appears."
 
 [[note]]
-turn = 3
+turn = 4
 figure = "Send them to the ISS"
-text = "The ISS is yours, in orbit over Earth, and its Core Module holds exactly four. Send them up from the Region's own card, or ask for them from the ISS's."
+text = "The ISS holds eight now, two of them already there, so all four fit. Send them up from the Region's own card, or ask for them from the ISS's."
 note = "That is the last of these notes that asks you for anything. Twelve people living off Earth is half your Victory Condition."
 
 [[note]]
-turn = 4
+turn = 5
 figure = "Watch the temperature"
 text = "The bar along the top carries the world's figures: rest the pointer on the ppm and the temperature for their histories. The Climate Panel (C) holds the whole picture, and says what the air is already committed to whatever anybody does now."
 note = "The Scrubber is yours alone. It takes no build slot, it pulls carbon back out of the air and it calms the state it stands in -- and it is the only thing in the game that visibly moves the climate."
 
 [[note]]
-turn = 5
+turn = 6
 figure = "The Research race"
 text = "The bar beside the Research figure is the race: each Faction's share of the Tech under research, in its own colour. Whoever gave the most picks the next one. Click the bar for the Tech Tree."
 note = "Planetary Stewardship is your gate: with both parts of your Victory Condition at their bars, you still do not win until it stands. That is the last of these notes; the game carries on from here."

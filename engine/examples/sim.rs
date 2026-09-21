@@ -187,8 +187,8 @@ fn main() {
             }
         }
         println!(
-            "seed {:3} | {:?} | turn {:2} | first colony {:?} | buildings {:?} | colonists {:?} | temp {:+.2} | collapse proj {:?} | colony hands {:?} | influence transfers {:2} | bank/post/embassy/relay {:?}",
-            r.seed, r.outcome, r.last_turn, r.first_colony_turn, r.buildings, r.colonists_off_earth, r.temperature, r.collapse_projected_turn, r.colony_changed_hands, r.influence_transfers, r.new_buildings
+            "seed {:3} | {:?} | turn {:2} | first colony {:?} | buildings {:?} | colonists {:?} | temp {:+.2} | collapse proj {:?} | colony hands {:?} | influence transfers {:2} | bank/post/embassy/relay {:?} | opening modules by turn 3 {:?}",
+            r.seed, r.outcome, r.last_turn, r.first_colony_turn, r.buildings, r.colonists_off_earth, r.temperature, r.collapse_projected_turn, r.colony_changed_hands, r.influence_transfers, r.new_buildings, r.opening_modules
         );
         println!(
             "         | unrest: threw off {} | peak {:.1} | constabularies {} | relief orders {} | population moved {:.1}",

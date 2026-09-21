@@ -1395,7 +1395,10 @@ impl Game {
             let Some(slot) = game.tables.body(BodyId::Earth).stations.iter().position(|n| *n == want) else { continue };
             let id = ColonyId(game.fresh_id());
             // Ticket #164 (version 0.07.5): the three starting stations stand with their Core Modules.
-            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+            // Ticket #290 (version 0.08.6): and with the card's Colonists aboard, from nowhere, so a
+            // starting station has Module slots to build in from turn one; bare, it had none.
+            let aboard = game.tables.faction(game.kind(seat)).start_colonists;
+            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: aboard, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
         }
         // Starting positions (spec 14.3, ticket #50): the player's pick, then each AI seat in turn.
         let mut taken = vec![setup.player_start];
@@ -1417,6 +1420,10 @@ impl Game {
             for f in game.state_mut(*sid).facilities.iter_mut() {
                 f.kind = f.kind.built_by(faction);
             }
+            // Ticket #290 (version 0.08.6): the card's Pioneers waiting on turn one, a gift outside
+            // the recruit rate that takes no population -- the Arkwrights' two, the mirror of the
+            // two Colonists the other three seats have aboard a station they do not have.
+            game.state_mut(*sid).emigrants += game.tables.faction(faction).start_emigrants;
             // Ticket #75 (version 0.05.5): a claim on its home from turn 1. The seat's Standing on its
             // start state begins at the state's threshold, so a challenger needs the threshold plus
             // the margin at once and the holder's spending counts from a real footing; with nothing

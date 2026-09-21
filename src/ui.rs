@@ -1640,7 +1640,9 @@ fn faction_card(ui: &mut Ui, session: &Session, kind: FactionKind, want: f32, ac
             // -- ticket #174 put it at the foot of this card deliberately.
             if ui
                 .checkbox(&mut on, RichText::new("Play Tutorial").size(TUTORIAL_TICK))
-                .on_hover_text("A note at the head of each of the first five turns, saying what that turn is for. Nothing is forced, and it stops after the fifth.")
+                // Ticket #290 (version 0.08.6): the count is the table's, since it moved from five
+                // to six and a literal would have gone stale a second time.
+                .on_hover_text(format!("A note at the head of each of the first {} turns, saying what that turn is for. Nothing is forced, and it stops after the last one.", session.tables.tutorial.note.len()))
                 .changed()
             {
                 actions.push(Action::SetTutorialTick(on));

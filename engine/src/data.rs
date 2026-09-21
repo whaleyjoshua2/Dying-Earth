@@ -416,6 +416,17 @@ pub struct FactionCard {
     /// Ticket #50: the Arkwrights start with none, so this is optional.
     #[serde(default)]
     pub start_station: Option<String>,
+    /// Ticket #290 (version 0.08.6): the Colonists aboard that station when the game opens, from
+    /// nowhere -- no Region is debited for them. Two, so a starting station has two Module slots
+    /// free at once where a bare one had none. Nothing without a `start_station`.
+    #[serde(default)]
+    pub start_colonists: u32,
+    /// Ticket #290 (version 0.08.6): Pioneers waiting in the Faction's start Region on turn one, a
+    /// gift outside the recruit rate that takes no population. The Arkwrights' two, since they have
+    /// no station for two Colonists to be aboard. Spelled `emigrants` as the engine spells the
+    /// field it fills (see **Pioneer** in `CONTEXT.md`).
+    #[serde(default)]
+    pub start_emigrants: u32,
     // Ticket #51: the per-Faction figures the Arkwrights' card carries. Every one is neutral by
     // default, so a card that names none plays exactly as it did before.
     /// What a Habitat here holds, times this.
@@ -1569,6 +1580,14 @@ impl Tables {
                 && !self.body(BodyId::Earth).stations.contains(name)
             {
                 return Err(err("factions.toml", format!("row {}: start_station {:?} is no orbital slot over Earth", f.name, name)));
+            }
+            // Ticket #290 (version 0.08.6): the people aboard at the start need a station to be
+            // aboard, and fit in its Core Module.
+            if f.start_colonists > 0 && f.start_station.is_none() {
+                return Err(err("factions.toml", format!("row {}: start_colonists without a start_station", f.name)));
+            }
+            if f.start_colonists > self.module(ModuleKind::Core).holds_colonists {
+                return Err(err("factions.toml", format!("row {}: start_colonists {} would not fit in the Core Module", f.name, f.start_colonists)));
             }
             if f.victory_first.bar <= 0.0 {
                 return Err(err("factions.toml", format!("row {}: victory_first.bar must be positive", f.name)));

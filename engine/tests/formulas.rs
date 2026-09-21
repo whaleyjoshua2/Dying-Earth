@@ -97,6 +97,15 @@ fn station_of(g: &Game, seat: Seat, body: BodyId) -> Option<ColonyId> {
     g.colonies.iter().find(|c| c.in_orbit && c.body == body && c.control == Control::Controlled(seat)).map(|c| c.id)
 }
 
+/// Ticket #290 (version 0.08.6): every starting station opens with two Colonists aboard. A test
+/// that counts people off Earth, or reasons about the board with the ISS bare, empties the
+/// starting stations first and says so, rather than carrying two strangers in its arithmetic.
+fn bare_stations(g: &mut Game) {
+    for c in g.colonies.iter_mut().filter(|c| c.in_orbit && c.body == BodyId::Earth && c.founded_turn == 1) {
+        c.colonists = 0;
+    }
+}
+
 // ---------------------------------------------------------------- 7.2 Income shortfall order
 
 #[test]
@@ -519,7 +528,8 @@ fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard
     // Ticket #93 (version 0.06.0): and three over Venus.
     assert_eq!(slots, vec![5, 2, 3, 1, 1, 3], "ticket #50: five orbital slots over Earth");
     // The start (ticket #50): the Custodians' ISS, the Prospectors' Tiangong and the Archivists'
-    // Axiom over Earth, bare; the Arkwrights start with no station, so two slots stand free.
+    // Axiom over Earth (bare until ticket #290, version 0.08.6, put two aboard); the Arkwrights
+    // start with no station, so two slots stand free.
     let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the Custodians start with a station");
     let tiangong = station_of(&g, Seat(1), BodyId::Earth).expect("the Prospectors start with a station");
     let axiom = station_of(&g, Seat(3), BodyId::Earth).expect("the Archivists start with a station");
@@ -547,8 +557,10 @@ fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard
     assert_eq!(reef.control, Control::Controlled(Seat(0)));
     assert_eq!(reef.colonists, 0);
     // Only a Shipyard and Habitats stand on a station.
-    // A bare station is not free to take: its threshold starts at the station base.
-    assert_eq!(g.influence_threshold(Place::Colony(iss)), 20);
+    // A station is not free to take: its threshold starts at the station base, plus 10 a Colonist
+    // -- and the ISS opens with two aboard since ticket #290 (version 0.08.6), so 40 where a bare
+    // one read 20. A consequence of the two aboard, not a rule of its own.
+    assert_eq!(g.influence_threshold(Place::Colony(iss)), 40);
     // Ticket #164 (version 0.07.5): a station nobody lives on has no slots, and the lines below are
     // about which kinds stand in orbit, so give it somebody first.
     g.colony_mut(iss).unwrap().colonists = 2;
@@ -627,6 +639,7 @@ fn phobos_and_deimos_are_small_different_bodies_one_hop_past_mars() {
     assert_eq!(moon_turns, mars_turns, "one flight home, whichever rock it leaves from");
     assert!(from_deimos > from_mars, "Deimos reads the dearer card: {from_deimos} Fuel against {from_mars}");
     // Their Colonists are off Earth.
+    bare_stations(&mut g);
     colony(&mut g, Seat(0), BodyId::Phobos, &[ModuleKind::Habitat], 4);
     assert_eq!(g.off_world_colonists(Seat(0)), 4);
 }
@@ -666,6 +679,7 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
     assert_eq!(StateId::ALL.len(), 14, "fourteen Regions since ticket #125, and Antarctica is none of them");
     let m = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
     let before = g.emissions_now();
+    bare_stations(&mut g);
     colony(&mut g, Seat(0), BodyId::Earth, &[ModuleKind::Habitat, ModuleKind::Mine, ModuleKind::Refinery, ModuleKind::Generator], 4);
     assert_eq!(g.off_world_colonists(Seat(0)), 0, "Antarctic Colonists live on Earth");
     let after = g.emissions_now();
@@ -907,6 +921,7 @@ fn both_met_the_larger_margin_wins() {
 #[test]
 fn both_met_by_the_same_margin_is_a_draw() {
     let mut g = game();
+    bare_stations(&mut g);
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     g.seats[0].stabilization_run = 3;
@@ -2296,15 +2311,16 @@ fn the_archivist_ai_builds_its_way_off_earth_and_then_the_archive() {
     g.seats[arc.index()].stockpile.materials = 200;
     g.seats[arc.index()].stockpile.energy = 200;
     the_upload(&mut g);
-    // Ticket #192 (version 0.08.0): the station is bare, so the Archive is not orderable there, and
-    // the computer must not spend the turn on an order that would be refused. Measured, it ordered
-    // the Archive on turn 1 at an empty station in 80 of 80 games before this gate.
+    // Ticket #192 (version 0.08.0): the Archive is not orderable there, and the computer must not
+    // spend the turn on an order that would be refused. Measured, it ordered the Archive on turn 1
+    // at an empty station in 80 of 80 games before this gate. Ticket #290 (version 0.08.6): Axiom
+    // opens with two aboard now, and ticket #209 keeps the Archive off Earth's orbit regardless.
     let axiom = station_of(&g, arc, BodyId::Earth).unwrap();
-    assert_eq!(g.colony(axiom).unwrap().colonists, 0, "the premise: Axiom is founded bare");
+    assert_eq!(g.colony(axiom).unwrap().colonists, 2, "the premise: Axiom opens with two aboard");
     let orders = g.ai_orders(arc);
     assert!(!orders.iter().any(|o| matches!(o, Order::BuildArchive { .. })), "it should not order what would be refused: {orders:?}");
 
-    // With the Core Module's four living there, it orders the Module at once.
+    // With the Core Module's four more living there, it orders the Module at once.
     g.colony_mut(axiom).unwrap().modules.push(Module::new(ModuleKind::Core));
     g.settle_people(axiom, 4, 1.0);
     let orders = g.ai_orders(arc);
@@ -4367,6 +4383,9 @@ fn h_the_ai_raises_a_sea_wall_when_the_sea_is_close() {
     sea_ahead(&mut g);
     directed(&mut g, sid);
     assert_eq!(g.kind(Seat(0)), FactionKind::Custodians, "seat 0 is the Custodians in this fixture");
+    // Ticket #290 (version 0.08.6): with two aboard the ISS, its opening Habitat would be a third
+    // contender for the forty Materials; this fixture is about the wall against the Scrubber.
+    bare_stations(&mut g);
     g.research.done.push(TechId::CoastalEngineering);
     hold_temperature(&mut g, 1.65);
     g.seats[0].stockpile.materials = 40;
@@ -5769,6 +5788,9 @@ fn emigrants_go_to_antarctica_by_sea_from_any_state_and_arrive_a_turn_later() {
 #[test]
 fn the_ai_musters_emigrants_then_lifts_them_or_sends_them_to_antarctica() {
     let mut g = game();
+    // Ticket #290 (version 0.08.6): the ISS opens with two aboard; this test lifts four into a
+    // station with four berths free, so it starts from the bare one it was written against.
+    bare_stations(&mut g);
     let ship = a_colony_ship(&mut g, Seat(0), BodyId::Earth);
     let _ = ship;
     g.seats[0].stockpile.energy = 200;
@@ -6834,6 +6856,7 @@ fn a_venus_station_is_built_from_a_ship_in_orbit_and_its_colonists_are_off_earth
     assert!(g.check_order(Seat(0), &[], &build).is_ok(), "a Ship in orbit is the foothold");
     g.commit_orders(Seat(0), std::slice::from_ref(&build));
     g.resolution_phase();
+    bare_stations(&mut g);
     let station = g.colonies.iter().find(|c| c.body == BodyId::Venus && c.in_orbit).expect("Ishtar stands").id;
     g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     let land = Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Colony(station) };
@@ -7028,7 +7051,10 @@ fn a_station_builds_nothing_until_someone_lives_on_it_and_its_core_module_holds_
     let mut g = game();
     g.seats[0].stockpile.materials = 2000;
     let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("a station over Earth");
-    assert_eq!(g.colony(station).unwrap().colonists, 0, "it starts with nobody on it");
+    // Ticket #290 (version 0.08.6): it opens with two aboard now; this test is the cap rule from
+    // nobody upward, so it empties the station first.
+    bare_stations(&mut g);
+    assert_eq!(g.colony(station).unwrap().colonists, 0, "emptied, for the rule from nought");
     assert_eq!(g.colony(station).unwrap().modules.len(), 1, "and with its Core Module");
     assert_eq!(g.colony(station).unwrap().modules[0].kind, ModuleKind::Core);
     assert_eq!(g.module_slots(g.colony(station).unwrap()), 0, "no slots, and no people yet");
@@ -8111,6 +8137,9 @@ fn schooling_travels_from_the_region_to_the_station_it_is_lifted_to() {
     let card = g.tables.state(sid).education_level;
     g.state_mut(sid).population = 10_000.0;
     let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("seat 0 starts with a station");
+    // Ticket #290 (version 0.08.6): the two aboard would blend into the mean; the test is about
+    // the schooling the four carry, so the station is emptied first.
+    bare_stations(&mut g);
     g.state_mut(sid).facilities.push(Facility { online: true, ..Facility::new(FacilityKind::LaunchSite) });
 
     g.commit_orders(Seat(0), &[Order::BuildEmigrants { state: sid, n: 4 }]);
@@ -10058,7 +10087,9 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
     assert_ne!(pro, Seat(0), "the Prospectors are a rival in this game");
     let fired = |g: &Game| g.report.moments.iter().filter(|m| m.kind == MomentKind::RivalProgress).count();
-    // Presence 9 of 12 (0.75) and the Fund at 2000 of 2500 (0.8): the score is 0.75.
+    // Presence 9 of 12 (0.75) and the Fund at 2000 of 2500 (0.8): the score is 0.75. Ticket #290
+    // (version 0.08.6): Tiangong's two aboard would make it 11 of 12, so it is emptied first.
+    bare_stations(&mut g);
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 9);
     g.seats[pro.index()].venture_fund = 2000;
     assert!((g.progress(pro).score() - 0.75).abs() < 1e-9, "{}", g.progress(pro).score());
@@ -10451,6 +10482,54 @@ fn the_hold_clock_resets_on_a_change_of_hands_and_an_old_save_passes() {
     // An old save carries no clock.
     g.state_mut(sid).held_since = None;
     assert!(g.may_remake(pro, sid), "a missing clock counts as held long enough");
+}
+
+// ---------------------------------------------------------------- #290 (version 0.08.6) the opening board
+
+/// Ticket #290 (version 0.08.6): every starting station opens with two Colonists aboard, from
+/// nowhere, so it has two Module slots free at once and two berths left in its Core Module; the
+/// Arkwrights, who have no station, open with two Pioneers waiting in their start Region, a gift
+/// outside Coach Class that takes no population. A station BUILT during the game is still bare.
+#[test]
+fn a_starting_station_opens_with_two_aboard_and_the_arkwrights_with_two_pioneers() {
+    let g = fresh();
+    for (seat, name) in [(Seat(0), "ISS over Earth"), (Seat(1), "Tiangong over Earth"), (Seat(3), "Axiom over Earth")] {
+        let id = station_of(&g, seat, BodyId::Earth).expect("a starting station");
+        let c = g.colony(id).unwrap();
+        assert_eq!(g.place_name(Place::Colony(id)), name);
+        assert_eq!(c.colonists, 2, "two aboard from the start");
+        assert_eq!(g.free_module_slots(c), 2, "one slot per Colonist, so two to build in at once");
+        assert_eq!(g.habitat_room(c) - c.colonists, 2, "two berths of the Core Module's four left");
+    }
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+    assert!(station_of(&g, ark, BodyId::Earth).is_none(), "the Arkwrights still start with no station");
+    for sid in StateId::ALL {
+        let st = g.state(sid);
+        let card = g.tables.state(sid);
+        assert_eq!(st.population, card.population, "no start Region is debited for anybody's people");
+        if st.control == Control::Controlled(ark) {
+            assert_eq!(st.emigrants, 2, "two Pioneers waiting in the Arkwrights' start Region");
+        } else {
+            assert_eq!(st.emigrants, 0, "nobody else starts with a Pioneer waiting");
+        }
+    }
+}
+
+/// Ticket #290 (version 0.08.6): the computer's opening. While its starting station has a slot free
+/// and under four berths empty, the Habitat is pushed at the opportunity weight, so it comes first:
+/// on turn one every seat with a station orders one there.
+#[test]
+fn the_computer_opens_with_a_habitat_on_its_starting_station() {
+    let mut g = fresh();
+    for seat in Seat::ALL {
+        let Some(id) = station_of(&g, seat, BodyId::Earth) else { continue };
+        let orders = g.ai_orders(seat);
+        assert!(
+            orders.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: ModuleKind::Habitat } if *colony == id)),
+            "the {} should open with a Habitat on their station: {orders:?}",
+            g.kind(seat).name()
+        );
+    }
 }
 
 

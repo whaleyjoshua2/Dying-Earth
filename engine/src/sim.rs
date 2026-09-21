@@ -123,6 +123,10 @@ pub struct SimResult {
     pub stranded_at_end: [u32; 4],
     pub refuels: u32,
     pub stations_off_earth: u32,
+    /// Ticket #290 (version 0.08.6): Modules standing beyond the Core Module on each seat's
+    /// STARTING station at the end of turn three, so the batch can say whether the opening -- two
+    /// aboard, a Habitat first -- took. Nought for a seat with no starting station.
+    pub opening_modules: [u32; 4],
     /// Ticket #88: Colonies on the ground with two or more working Mines at the end, and Modules
     /// standing at ground Colonies, all seats, so the batch can say whether Colonies deepen.
     pub deep_colonies: u32,
@@ -266,6 +270,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     // Ticket #241 (version 0.08.3): the figures 0.08.2 named as missing, and this version's own.
     let (mut ducats_made, mut ducats_spent) = ([0i64; SEAT_COUNT], [0i64; SEAT_COUNT]);
     let (mut directive_sum, mut directive_turns_below, mut directive_samples) = ([0f64; SEAT_COUNT], [0u32; SEAT_COUNT], 0u32);
+    // Ticket #290 (version 0.08.6): the opening, sampled once turn three has resolved.
+    let mut opening_modules = [0u32; SEAT_COUNT];
     // Ticket #60: the first seat to meet its Victory Condition outright, at any point in the game.
     let mut victory_met: Option<(Seat, FactionKind)> = None;
     while !game.is_over() && guard < max_turns + 2 {
@@ -295,6 +301,18 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
             }
         }
         directive_samples += 1;
+        // Ticket #290: turn three has just resolved when the turn counter reads four. A starting
+        // station is one over Earth that stood when the game opened; the Core Module is not counted.
+        if game.turn == 4 {
+            for s_ in Seat::ALL {
+                opening_modules[s_.index()] = game
+                    .colonies
+                    .iter()
+                    .filter(|c| c.in_orbit && c.body == BodyId::Earth && c.founded_turn == 1 && c.control.director() == Some(s_))
+                    .map(|c| c.modules.iter().filter(|m| m.kind != ModuleKind::Core).count() as u32)
+                    .sum();
+            }
+        }
         moments_earned += game.report.moments.len() as u32;
         let shown = game.report.moments_shown(&|k| tables.report.moment_on(k)).len() as u32;
         moments_shown += shown;
@@ -574,6 +592,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         stranded_at_end: Seat::ALL.map(|s| game.ships.iter().filter(|sh| sh.seat == s && game.stranded(sh.id)).count() as u32),
         refuels: game.log.iter().filter(|l| l.contains(" refuels ")).count() as u32,
         stations_off_earth: game.colonies.iter().filter(|c| c.in_orbit && c.body != BodyId::Earth).count() as u32,
+        opening_modules,
         deep_colonies: game.colonies.iter().filter(|c| !c.in_orbit && game.working_mines(c) >= 2).count() as u32,
         ground_modules: game.colonies.iter().filter(|c| !c.in_orbit).map(|c| c.modules.len() as u32).sum(),
         ground_colonies: game.colonies.iter().filter(|c| !c.in_orbit).count() as u32,
