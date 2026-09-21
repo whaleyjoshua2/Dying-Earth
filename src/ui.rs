@@ -2822,7 +2822,9 @@ fn apply_hit(hit: Hit, view: &mut ViewState) {
 
 /// Ticket #211 (version 0.08.1): what the command cluster is multiplied by, the designer's own
 /// figure. One constant, so the next such request is one number.
-const CLUSTER_SCALE: f32 = 1.15;
+/// Ticket #294 (version 0.08.6): a tenth larger again, at the designer's word -- *"everything on
+/// the command cluster 10% larger"* -- so 1.15 times 1.1.
+const CLUSTER_SCALE: f32 = 1.265;
 
 /// Ticket #114 (version 0.07.1): **the command cluster**, a strip along the foot of the side panel
 /// that never scrolls away. The designer asked for a corner like the one CK3 and other 4X games put
@@ -2879,14 +2881,20 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
         Selection::Colony(cid) => Some((Place::Colony(cid), game.place_name(Place::Colony(cid)))),
         _ => None,
     };
+    // Ticket #294 (version 0.08.6): the amount is set on the rail the Smear and the Greenwash use
+    // (`influence_rail`, ticket #293), at the designer's word -- *"spending influence on the
+    // command cluster is now a slider"* -- so the three Influence spends read alike: single points
+    // from nought to the turn's whole Influence, what is already ordered greyed from the right.
+    // The rail is drawn whether or not a place is selected, so the strip never changes shape; the
+    // Spend button below it is what needs the place.
+    let (whole, left) = influence_this_turn(game, session);
+    let amount = influence_rail(ui, &mut view.influence_amount, whole, left, None);
     ui.horizontal(|ui| {
         match &target {
             Some((place, name)) => {
-                let most = influence_left.max(0);
-                ui.add(egui::DragValue::new(&mut view.influence_amount).range(0..=most.max(1)));
-                let order = Order::Influence { target: *place, amount: view.influence_amount };
+                let order = Order::Influence { target: *place, amount };
                 let check = game.check_order(Seat(0), &session.pending, &order);
-                let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Spend on {name}")));
+                let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Spend {amount} on {name}")));
                 if let Err(e) = &check {
                     resp.clone().on_disabled_hover_text(&e.0);
                 }
@@ -2903,7 +2911,8 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
     // Ticket #134 (version 0.07.3): Max, exactly where Defence stood. The designer: *"Get rid of
     // defense button replace with a max spend button that just say Max."* One press places one
     // order spending everything left this turn on the selected place; greyed with a hint when
-    // nothing is selected.
+    // nothing is selected. Ticket #294 (version 0.08.6): and the rail follows it to the bound --
+    // *"it also moves the slider to max"* -- and End Turn shares this row, at its right.
     ui.horizontal(|ui| {
         let button = egui::Button::new(RichText::new("Max").strong());
         match &target {
@@ -2915,6 +2924,7 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
                     resp.clone().on_disabled_hover_text(&e.0);
                 }
                 if resp.on_hover_text(format!("Spend all {influence_left} left this turn on {name}.")).clicked() {
+                    view.influence_amount = influence_left;
                     actions.push(Action::Place(order));
                 }
             }
@@ -2953,14 +2963,69 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
                 actions.push(Action::Place(Order::SetMaxStanding { target }));
             }
         }
+        // End Turn, where a hand already is. Ticket #128 (version 0.07.2): named for its key.
+        // Ticket #294 (version 0.08.6): a sun at the right edge of this row, the words beneath it
+        // and the key on the hover, at the designer's word. Right-to-left inside the horizontal,
+        // which takes one row; on its own it would take the whole remaining height (the Faction
+        // window's dropdown learned that first).
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let resp = sun_button(ui, can_end_turn(game, view), 42.0 * CLUSTER_SCALE, "End Turn");
+            if resp.on_hover_text("End the turn (Enter).").on_disabled_hover_text("Pick a Tech first").clicked() {
+                press_end_turn(session, game, view, actions);
+            }
+        });
     });
-
-    // End Turn, where a hand already is. Ticket #128 (version 0.07.2): named for its key.
-    let button = egui::Button::new(RichText::new("End Turn (Enter)").strong().size(16.0 * CLUSTER_SCALE)).fill(TURN_RED);
-    if ui.add_enabled(can_end_turn(game, view), button).on_disabled_hover_text("Pick a Tech first").clicked() {
-        press_end_turn(session, game, view, actions);
-    }
     ui.add_space(4.0);
+}
+
+/// Ticket #294 (version 0.08.6): **End Turn as a sun** -- a shaded disc with sunspots and a
+/// darkened limb, the word beneath it -- at the designer's word: *"make it resemble the sun with
+/// sun spots and what not, put the words below the disk."* Drawn by hand with the painter, as
+/// the roster's order ring is, because nothing round and clickable existed in the interface and
+/// an SVG would have needed the icon ledger. The shading is concentric discs brightening toward a
+/// point above and left of centre, which is how a sphere is drawn without a gradient; the limb is
+/// a darker outer ring; the spots are a few small dark discs, fixed so the sun does not flicker.
+/// Dimmed to embers while it cannot be pressed. Returns the click response.
+fn sun_button(ui: &mut Ui, enabled: bool, diameter: f32, word: &str) -> egui::Response {
+    let label_h = 16.0 * CLUSTER_SCALE;
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(diameter + 8.0, diameter + label_h + 4.0), if enabled { egui::Sense::click() } else { egui::Sense::hover() });
+    let centre = egui::pos2(rect.center().x, rect.min.y + 4.0 + diameter / 2.0);
+    let r = diameter / 2.0;
+    let p = ui.painter();
+    let lit = enabled && resp.hovered();
+    // The palette: a sun, or its embers while End Turn is dead.
+    let (glow, limb, rings, spot, ink): (Color32, Color32, [Color32; 4], Color32, Color32) = if enabled {
+        (
+            Color32::from_rgba_unmultiplied(255, 170, 60, if lit { 70 } else { 40 }),
+            Color32::from_rgb(190, 80, 20),
+            [Color32::from_rgb(235, 130, 35), Color32::from_rgb(250, 175, 55), Color32::from_rgb(255, 215, 110), Color32::from_rgb(255, 245, 190)],
+            Color32::from_rgba_unmultiplied(110, 40, 10, 210),
+            Color32::from_rgb(255, 225, 160),
+        )
+    } else {
+        (
+            Color32::from_rgba_unmultiplied(120, 70, 40, 20),
+            Color32::from_rgb(70, 40, 30),
+            [Color32::from_rgb(90, 55, 35), Color32::from_rgb(105, 65, 40), Color32::from_rgb(120, 80, 50), Color32::from_rgb(135, 95, 60)],
+            Color32::from_rgba_unmultiplied(40, 20, 10, 210),
+            Color32::from_gray(120),
+        )
+    };
+    p.circle_filled(centre, r * 1.25, glow);
+    p.circle_filled(centre, r, limb);
+    // Four discs, each smaller and brighter, drifting toward the light above and to the left.
+    for (i, colour) in rings.iter().enumerate() {
+        let k = (i + 1) as f32;
+        let shrink = 1.0 - 0.17 * k;
+        let off = egui::vec2(-r * 0.09 * k, -r * 0.11 * k);
+        p.circle_filled(centre + off, r * shrink, *colour);
+    }
+    // Sunspots: two pairs low on the disc where the light does not reach, and one alone.
+    for (dx, dy, s) in [(0.30, 0.28, 0.13), (0.42, 0.18, 0.08), (-0.34, 0.36, 0.11), (-0.22, 0.44, 0.07), (0.05, -0.45, 0.06)] {
+        p.circle_filled(centre + egui::vec2(r * dx, r * dy), r * s, spot);
+    }
+    p.text(egui::pos2(rect.center().x, centre.y + r + 3.0), egui::Align2::CENTER_TOP, word, FontId::proportional(13.0 * CLUSTER_SCALE), ink);
+    resp
 }
 
 /// End Turn is dead while a Tech pick is owed and while a popup is up.
