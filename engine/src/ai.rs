@@ -806,7 +806,10 @@ impl Game {
             let base = self.base_weight(seat, Cat::RaiseIndustry);
             push(vec![Order::RaiseIndustry { state: sid }], Cat::RaiseIndustry, base, gap_for(Cat::RaiseIndustry, Some("Industry Level")), 1.0, 1.0, format!("raise Industry Level in {}", self.tables.state(sid).name), None);
             // Ticket #46: no Ship is built at a Launch Site; Shipyards on stations and Colonies build them.
-            if self.state(sid).control == Control::Controlled(seat) {
+            // Ticket #302 (version 0.08.6): an Army is worth its home's Industry + 1, fixed, so it is
+            // raised where that is highest among the Regions the seat controls.
+            let best_industry = self.controlled_states(seat).into_iter().map(|s| self.state(s).industry_level).max().unwrap_or(0);
+            if self.state(sid).control == Control::Controlled(seat) && self.state(sid).industry_level == best_industry {
                 let threat = if self.enemy_army_near(seat, Place::State(sid)) { m.threat } else { 1.0 };
                 let armies = self.armies.iter().filter(|a| !a.standing && self.army_seat(a) == Some(seat)).count();
                 if armies < 2 {
@@ -1884,7 +1887,7 @@ impl Game {
                             let mine = c.control.director() == Some(seat);
                             if enemy || mine {
                                 let defence: i64 =
-                                    self.defenders_at(Place::Colony(c.id), seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_strength(a)).sum();
+                                    self.defenders_at(Place::Colony(c.id), seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_defended_strength(a)).sum();
                                 let odds = first_round_odds(self.army_strength(self.army(aid).unwrap()), defence);
                                 if enemy && odds < th.attack_odds {
                                     continue;
@@ -1991,7 +1994,8 @@ impl Game {
             // toward -- and the attack, when allowed, IS the stance; Hold is the candidate otherwise.
             let mut attack: Option<f64> = None;
             if self.place_director(place) != Some(seat) {
-                let def: i64 = self.defenders_at(place, seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_strength(a)).sum();
+                // Ticket #302 (version 0.08.6): against what the defenders FIGHT at, not their bare strength.
+                let def: i64 = self.defenders_at(place, seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_defended_strength(a)).sum();
                 let odds = first_round_odds(my_str, def);
                 let held_by_rival = matches!(self.place_control(place), Control::Controlled(r) if r != seat);
                 if (odds >= th.attack_odds || def == 0) && self.war_cause_at(seat, place, th.war_cause) && (!held_by_rival || wars_opened < 1) {
@@ -2026,7 +2030,7 @@ impl Game {
                         if ctrl == Control::Controlled(seat) {
                             continue;
                         }
-                        let def: i64 = self.defenders_at(Place::State(*n), seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_strength(a)).sum();
+                        let def: i64 = self.defenders_at(Place::State(*n), seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_defended_strength(a)).sum();
                         let odds = first_round_odds(self.army_strength(a), def);
                         let held_by_rival = matches!(ctrl, Control::Controlled(r) if r != seat);
                         let allowed = odds >= th.attack_odds && self.war_cause_at(seat, Place::State(*n), th.war_cause) && (!held_by_rival || wars_opened < 1);

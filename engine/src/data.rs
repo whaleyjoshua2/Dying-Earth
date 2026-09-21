@@ -1171,14 +1171,16 @@ pub struct DisengageCard {
     pub divisor: f64,
 }
 
-/// Ticket #296 (version 0.08.6): what a Region's people add to its own Armies' strength -- a
-/// Standing Army's and a Levy's, never a built Army's: `constabulary` while a working Constabulary
-/// stands there, `calm` while Unrest is under the Standing Army's threshold. Hit points equal the
-/// strength these make, so a calm, policed Region is a wall and a restive one soft.
+/// Ticket #296 (version 0.08.6): what a Region's people add to its own Army -- `constabulary`
+/// while a working Constabulary stands there, `calm` while Unrest is under the Standing Army's
+/// threshold. Ticket #302: as DEFENCE, while it defends, never as hit points; and the steps a
+/// neutral arms by: `threat_steps` at the Income a threat begins, `held_step` for an attack held.
 #[derive(Debug, Clone, Deserialize)]
 pub struct StandingArmyCard {
     pub constabulary: u32,
     pub calm: u32,
+    pub threat_steps: u32,
+    pub held_step: u32,
 }
 
 /// Ticket #297 (version 0.08.6): what an Army dug in adds to its strength while it defends. Hit

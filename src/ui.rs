@@ -4810,37 +4810,41 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         };
         // Ticket #270 (version 0.08.4): named, the Standing Army included.
         // Ticket #282 (version 0.08.5): a Levy says so, and a standing row's hover names the rule.
-        // Ticket #297 (version 0.08.6): a dug-in Army says so, and what it fights at.
-        let dug = if game.army_dug_in(a) { format!(", dug in: +{} defending", game.tables.dig_in.defence) } else { String::new() };
+        // Ticket #297 (version 0.08.6): a dug-in Army says so. Ticket #302: and every Army says
+        // what it defends at -- its strength, its Region's people, Dig In -- beside its strength.
+        let defended = game.army_defended_strength(a);
+        let defends = if defended != game.army_strength(a) { format!(", defends at {defended}") } else { String::new() };
+        let dug = if game.army_dug_in(a) { ", dug in" } else { "" };
         let row = ui.label(format!(
-            "  {} ({}{}): strength {}, damage {}/{}{dug}",
+            "  {} ({}{}): strength {}, damage {}/{}{defends}{dug}",
             game.army_name(a),
             who,
-            if a.levy { ", levy" } else if a.standing { ", standing" } else { "" },
+            if a.standing { ", standing" } else { "" },
             game.army_strength(a),
             a.damage,
             game.army_hit_points(a)
         ));
-        if a.standing {
-            // Ticket #296 (version 0.08.6): the hover names the four terms and which are live.
-            let earned = game.state(sid).armed;
-            let t = &game.tables.standing_army;
-            let police = if game.constabulary_online(sid) { format!(", +{} for the working Constabulary", t.constabulary) } else { format!(", +{} if a Constabulary were working here", t.constabulary) };
+        // Ticket #302 (version 0.08.6): the hover names every term of the one Army system.
+        let t = &game.tables.standing_army;
+        let tip = if a.standing {
+            let armed = game.state(sid).armed;
+            let police = if game.constabulary_online(sid) { format!(" +{} for the working Constabulary", t.constabulary) } else { format!(" +{} if a Constabulary were working here", t.constabulary) };
             let calm = if game.army_replenishes(sid) { format!(", +{} while Unrest is under {:.0}", t.calm, game.tables.unrest.army_threshold) } else { format!(", +{} lost to Unrest at {:.0} or more", t.calm, game.tables.unrest.army_threshold) };
-            let tip = if a.levy {
-                format!(
-                    "A Levy: the second Army a neutral Region raises while a foreign Army stands in a neighbouring Region or a neighbour is under Occupation. Its strength is Industry Level + 2{police}{calm}, and its hit points equal that strength. It heals 1 a turn while Unrest is under {:.0}, never marches, and stands down when the threat passes.",
-                    game.tables.unrest.army_threshold
-                )
-            } else {
-                format!(
-                    "A Standing Army: Industry Level + 1{}{police}{calm}, and its hit points equal that strength -- a calm, policed Region is a wall, a restive one soft. It heals 1 a turn while Unrest is under {:.0}; at its strength in damage it is destroyed, and returns at strength 1 two Incomes later. A neutral Region that is attacked and holds gains +1 for good, to Industry + 4.",
-                    if earned > 0 { format!(", +{earned} earned holding against attack") } else { String::new() },
-                    game.tables.unrest.army_threshold
-                )
-            };
-            row.on_hover_text(tip);
-        }
+            format!(
+                "A Region's own Army. Its strength and hit points are Industry Level + 1{}; it stays at home. Defending, it fights at that{police}{calm}{}. It heals 1 a turn while Unrest is under {:.0}; at its strength in damage it is destroyed, and returns at strength 1 two Incomes later. A neutral Region arms for good, +{} when a threat appears next door and +{} for every attack it holds against, with no ceiling.",
+                if armed > 0 { format!(" and +{armed} armed") } else { String::new() },
+                if game.army_dug_in(a) { format!(", +{} dug in", game.tables.dig_in.defence) } else { String::new() },
+                game.tables.unrest.army_threshold,
+                t.threat_steps,
+                t.held_step
+            )
+        } else {
+            format!(
+                "A raised Army: its strength and hit points were its home's Industry Level + 1 when it was raised, fixed since. It belongs to its home Region and changes hands with it; it marches, and it may Dig In for +{} while defending.",
+                game.tables.dig_in.defence
+            )
+        };
+        row.on_hover_text(tip);
     }
     ui.separator();
     if mine {
@@ -5012,13 +5016,15 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         if !my_armies.is_empty() {
             ui.label(RichText::new("Army orders").strong());
             stance_row(ui, game, &session.pending, my_armies[0].stance, |s| Order::ArmyStance { place: Place::State(sid), stance: s }, false, actions);
-            for a in &my_armies {
-                ui.label(format!("{} (strength {}{}):", game.army_name(a), game.army_strength(a), if a.standing { ", standing" } else { "" }));
+            // Ticket #302 (version 0.08.6): a Region's own Army stays at home, so only a raised
+            // Army has march buttons, and the odds read what the defenders FIGHT at.
+            for a in my_armies.iter().filter(|a| !a.standing) {
+                ui.label(format!("{} (strength {}):", game.army_name(a), game.army_strength(a)));
                 ui.horizontal_wrapped(|ui| {
                     for n in &card.neighbours {
                         let ctrl = game.state(*n).control;
                         let verb = if ctrl == Control::Controlled(Seat(0)) { "move to" } else { "attack" };
-                        let def: i64 = game.defenders_at(Place::State(*n), Seat(0)).iter().filter_map(|id| game.army(*id)).map(|x| game.army_strength(x)).sum();
+                        let def: i64 = game.defenders_at(Place::State(*n), Seat(0)).iter().filter_map(|id| game.army(*id)).map(|x| game.army_defended_strength(x)).sum();
                         let odds = first_round_odds(game.army_strength(a), def);
                         let label = if verb == "attack" { format!("{} {} ({:.0}%)", verb, game.tables.state(*n).name, odds * 100.0) } else { format!("{} {}", verb, game.tables.state(*n).name) };
                         cost_button(ui, game, &session.pending, Order::MoveArmy { army: a.id, to: *n }, &label, actions);
@@ -5559,7 +5565,7 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     let label = if own {
                         format!("Land the Army at {slot_name}")
                     } else {
-                        let defence: i64 = game.defenders_at(Place::Colony(c.id), Seat(0)).iter().filter_map(|id| game.army(*id)).map(|a| game.army_strength(a)).sum();
+                        let defence: i64 = game.defenders_at(Place::Colony(c.id), Seat(0)).iter().filter_map(|id| game.army(*id)).map(|a| game.army_defended_strength(a)).sum();
                         let mine = game.army(aid).map(|a| game.army_strength(a)).unwrap_or(0);
                         format!("Land the Army to attack {slot_name} ({:.0}%)", first_round_odds(mine, defence) * 100.0)
                     };

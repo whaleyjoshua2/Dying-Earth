@@ -349,12 +349,10 @@ impl Game {
     }
 
     /// Ticket #282: the step a neutral Region earns by holding, and the Report line that says so.
+    /// Ticket #302 (version 0.08.6): no ceiling, and the step is the table's.
     pub fn neutral_held(&mut self, sid: StateId) {
         self.neutral_holds += 1;
-        if self.state(sid).armed >= Game::MAX_ARMED {
-            return;
-        }
-        self.state_mut(sid).armed += 1;
+        self.state_mut(sid).armed += self.tables.standing_army.held_step;
         let (state, n) = (self.tables.state(sid).name.clone(), self.standing_army_cap(sid));
         self.log(format!("{state} held against the attack and arms: its Standing Army will stand at {n}."));
         let text = self.say("neutral_held", &[("state", state), ("n", n.to_string())]);
@@ -422,17 +420,19 @@ impl Game {
         Combatant::new(UnitRef::Ship(id), self.ship_name(s), self.ship_strength(s), card.hit_points, s.damage, card.pursuit, s.stance == Stance::Evade)
     }
 
-    fn army_combatant(&self, id: ArmyId) -> Combatant {
+    /// `defending`: the Army is not on the aggressor's side of this melee. Ticket #302 (version
+    /// 0.08.6): a defender fights at its strength plus its defence -- a Region's own Army's
+    /// Constabulary and calm -- plus Dig In's term if dug in; an aggressor at its strength alone.
+    fn army_combatant(&self, id: ArmyId, defending: bool) -> Combatant {
         let a = self.army(id).unwrap();
         let card = self.tables.unit(UnitKind::Army);
         // Ticket #281 (version 0.08.5): by name -- the 1st Chinese Army -- as every other surface has
         // it since 0.08.4; a neutral Region's own Army is named the same way.
         let name = self.army_name(a);
-        // Ticket #296 (version 0.08.6): hit points are the Army's own, not the card's, for a
-        // Region's Standing Army and Levy. Ticket #297: dug in, it fights at +defence and never
-        // rolls to disengage; a dug-in Army is never an aggressor, so the bonus is a defender's.
+        // Ticket #296 (version 0.08.6): hit points are the Army's own, not the card's. Ticket #297:
+        // dug in, it never rolls to disengage.
         let dug_in = self.army_dug_in(a);
-        let strength = self.army_strength(a) + if dug_in { self.tables.dig_in.defence } else { 0 };
+        let strength = if defending { self.army_defended_strength(a) } else { self.army_strength(a) };
         Combatant::new(UnitRef::Army(id), name, strength, self.army_hit_points(a), a.damage, card.pursuit, a.stance == Stance::Evade).dug_in(dug_in)
     }
 
@@ -476,7 +476,7 @@ impl Game {
             }
         }
         let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
-            parties.iter().map(|(seat, agg, ids)| (*seat, *agg, ids.iter().map(|id| self.army_combatant(*id)).collect())).collect();
+            parties.iter().map(|(seat, agg, ids)| (*seat, *agg, ids.iter().map(|id| self.army_combatant(*id, !*agg)).collect())).collect();
         let mut line = self.run_melee(place_name, Some(place.into()), units);
         // Ticket #286 (version 0.08.5): counted by the seat that opened it, and against a neutral.
         for seat in aggressors {

@@ -1105,6 +1105,11 @@ impl Game {
                 if self.army_stands_down(a) {
                     return fail("this Army stands down");
                 }
+                // Ticket #302 (version 0.08.6): a Region's own Army stays at home; only a raised
+                // Army marches. The holder could march the Standing Army before this version.
+                if a.standing {
+                    return fail("a Region's own Army stays at home; raise one to march");
+                }
                 // Ticket #297 (version 0.08.6): dug in, it goes nowhere until its stance has been
                 // changed and the turn has passed; a stance order this turn takes effect at the
                 // Resolution, after the march would have gone, so it does not lift this.
@@ -1185,8 +1190,12 @@ impl Game {
                         return fail("this Ship already carries an Army");
                     }
                     let Some(a) = self.army(*aid) else { return fail("no such Army") };
-                    if self.army_seat(a) != Some(seat) || a.standing && self.army_stands_down(a) {
+                    if self.army_seat(a) != Some(seat) {
                         return fail("not your Army");
+                    }
+                    // Ticket #302 (version 0.08.6): a Region's own Army stays at home.
+                    if a.standing {
+                        return fail("a Region's own Army stays at home; raise one to carry");
                     }
                     // Ticket #297 (version 0.08.6): a Carrier is the other way out of a trench.
                     if a.stance == Stance::DigIn {

@@ -28,8 +28,8 @@ ship_destroyed = "{faction} {ship} destroyed ({why}){cargo}."
 army_destroyed = "{army} ({faction}) destroyed ({why})."
 # Ticket #282 (version 0.08.5): neutral states arm when threatened -- a Levy raised, stood down,
 # and a Region that held against an attack arming for good.
-levy_raised = "{state} arms: {army} is raised at strength {n} while a foreign Army stands next door."
-levy_disbanded = "{state} stands down {army}: the threat has passed."
+# Ticket #302 (version 0.08.6): the Levy is retired; a threatened neutral arms for good instead.
+neutral_armed = "{state} arms while a foreign Army stands next door: its Standing Army will stand at {n} from now on."
 neutral_held = "{state} held against the attack, and arms: its Standing Army will stand at {n} from now on."
 battle = "Battle at {place}: the {faction} attacked at {odds}% first-round odds; {outcome}."
 event_damaged_ships = "{event} damaged {n} Ship(s)."

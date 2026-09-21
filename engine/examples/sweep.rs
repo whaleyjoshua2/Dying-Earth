@@ -436,7 +436,7 @@ fn main() {
                             let war: Vec<String> = (0..4).map(|i| med0(&mut war_ppm[i])).collect();
                             println!("      War in ppm a game, by seat (median): [{}]; nobody's (median) {}", war.join(", "), med0(&mut war_nobody));
                             // Ticket #282 (version 0.08.5): neutral states arming.
-                            println!("      Neutral states: {levies} Levies raised over the batch, {neutral_holds} attacks held against");
+                            println!("      Neutral states: {levies} threat episodes armed for over the batch, {neutral_holds} attacks held against");
                             println!("      Sea Walls: {sea_walls} built over the batch, {walls_standing} standing at the end, {walls_held} thresholds held");
                             println!("      Events drawn with nowhere to land over the batch: {no_target}; the Fund at or past its bar in {fund_met}/{seeds} seeds");
                             let floored_pct = if rel_end.is_empty() { 0.0 } else { rel_floored as f64 * 100.0 / rel_end.len() as f64 };
