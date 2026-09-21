@@ -40,7 +40,12 @@ the Ducats that went with it; and on the seats at the bottom, whose two and nine
 by-product. Collapses **14 of 80** against 15, but the Arkwrights-first seating collapses **12 of
 20** where it collapsed 7, at a median end of +3.01 C; the other three end cooler.
 
-The designer's closing decisions are recorded on the ticket.
+The designer, shown the column and the three re-fit candidates (the two defence points and the
+threat steps in `units.toml`, the computer's 60% attack bar, the Ducat side of the opening):
+**ship**, **re-fit none now**, and the version ships as the **Windows kit alone**, built on this
+machine (`dist/dying-earth-0.08.6-windows.zip`); the designer's word on the closing ticket was
+*"ship, none now, just windows"*. The balance is the next version's, with this sweep as its
+baseline. No Linux kit was built.
 
 ---
 

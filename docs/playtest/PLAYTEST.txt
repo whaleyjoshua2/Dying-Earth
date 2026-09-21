@@ -16,7 +16,8 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. Saves from 0.08.5 will not load in this version; the Load screen says so.
+6. Saves from 0.08.5 will not load in this version; the Load screen says so. This version
+   ships for Windows only.
 
 WHAT CHANGED SINCE 0.08.5
 -------------------------
