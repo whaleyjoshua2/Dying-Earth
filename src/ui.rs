@@ -1978,7 +1978,7 @@ const BAR_BUTTON_TEXT: f32 = 15.0;
 const BAR_BUTTON_PADDING: egui::Vec2 = egui::vec2(10.0, 5.0);
 
 fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, icons: &Icons, actions: &mut Vec<Action>) {
-    egui::Panel::top("top_bar").show(root, |ui| {
+    let bar = egui::Panel::top("top_bar").show(root, |ui| {
         // Ticket #64: the spectator's bar names the table instead of a Faction of their own, and
         // says whose Stockpile the numbers beside it are.
         if session.spectator {
@@ -2221,6 +2221,8 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             }
         });
     });
+    // Ticket #292 (version 0.08.6): the bar's foot, measured, for every window that opens under it.
+    view.top_bar_bottom = bar.response.rect.max.y;
 }
 
 /// Ticket #58: the four Factions' shares of the Tech under research, drawn as one bar in Faction
@@ -6703,7 +6705,8 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
     // the Tech Tree, whose left third the Climate Panel was covering. The designer, seeing the first
     // capture: *"shift the faction window down so it doesn't block."* `default_pos` places it only
     // the first time, so a window the player has dragged stays where they put it.
-    egui::Window::new("Factions").open(&mut open).default_width(524.0).default_pos(egui::pos2(16.0, 120.0)).show(ctx, |ui| {
+    // Ticket #292 (version 0.08.6): under the measured bar, where 120 stood.
+    egui::Window::new("Factions").open(&mut open).default_width(524.0).default_pos(egui::pos2(16.0, view.below_bar())).show(ctx, |ui| {
         // The dropdown, in the top right, at the designer's word. Under the hood it names SEATS --
         // every live figure below is a seat's -- but each seat holds one Faction, so its four rows
         // are the four Factions, each with its small glyph in its own colour.
@@ -6947,7 +6950,11 @@ A rival that holds you at less than neutral defends its places against you a lit
 fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
     if view.show_trade && !session.spectator {
         let mut open = true;
-        egui::Window::new("Trading").open(&mut open).default_width(470.0).show(ctx, |ui| trading_window(ui, session, game, view, actions));
+        // Ticket #292 (version 0.08.6): under the bar and to the right of the Faction window's
+        // home, at the designer's word. With no position it took egui's fallback, sixteen pixels
+        // from the corner, over the bar's figures row.
+        let home = view.beside_faction_window();
+        egui::Window::new("Trading").open(&mut open).default_width(470.0).default_pos(home).show(ctx, |ui| trading_window(ui, session, game, view, actions));
         view.show_trade = open;
     }
     if view.show_tech {
@@ -6962,8 +6969,10 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         // inside it. The bound is on the window rather than on the ScrollArea because that is what
         // egui actually constrains: a `max_height` on the ScrollArea alone left the window 535
         // pixels tall on an 800-pixel screen, showing two branches where four had fitted before.
-        let top = 120.0;
-        let room = (ctx.content_rect().height() - top - 40.0).max(240.0);
+        // Ticket #292 (version 0.08.6): under the measured bar, where 120 stood. The tree's own
+        // bound is measured inside the window, at the line the tree starts on, below.
+        let top = view.below_bar();
+        let screen_bottom = ctx.content_rect().bottom();
         egui::Window::new("Tech Tree").open(&mut open).resizable(false).default_pos(egui::pos2(if session.spectator { 840.0 } else { 430.0 }, top)).show(ctx, |ui| {
             // Ticket #211 (version 0.08.1): the race bar stands where this window's first SENTENCE
             // stood, at the designer's word, and the sentence moves onto its hover. One wrinkle,
@@ -7050,6 +7059,11 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // on an 800-pixel screen, showing two branches where four had fitted before. A
             // `max_height` on the Window does not help either -- it is a cap, and a window sizes
             // itself to its content, so the ScrollArea is what has to be told.
+            // Ticket #292 (version 0.08.6): the bound is the screen's foot less the line the tree
+            // starts on, read from the cursor now that the window's top is measured rather than
+            // guessed; with the guess retired the old sum (top plus forty) pushed the window past
+            // the foot of an 800-pixel screen and egui shoved it up over the bar.
+            let room = (screen_bottom - ui.cursor().top() - 40.0).max(240.0);
             egui::ScrollArea::vertical().auto_shrink([false, true]).max_height(room).min_scrolled_height(room).show(ui, |ui| {
                 tech_tree(ui, game, &available, must_pick, actions);
             });
@@ -7072,7 +7086,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
         // opened four hundred tall, four hundred rows off the bottom, so two thirds of it -- the
         // whole Blame block among them -- were below the fold before the player touched it. Opened
         // this way a maximised window shows the lot and a small one still scrolls.
-        let bar = 104.0;
+        // Ticket #292 (version 0.08.6): under the measured bar, where 104 stood.
+        let bar = view.below_bar();
         let home = (if session.spectator { 420.0 } else { 10.0 }, if top { 10.0 } else { bar });
         let tall = (bottom - home.1 - 12.0).max(300.0);
         // Ticket #104 (version 0.07.0): the panel could be dragged larger but not back down. Its
@@ -7213,7 +7228,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
     }
     if view.show_victory {
         let mut open = true;
-        egui::Window::new("Victory").open(&mut open).default_width(470.0).show(ctx, |ui| {
+        // Ticket #292 (version 0.08.6): the same home as Trading, for the same reason.
+        let home = view.beside_faction_window();
+        egui::Window::new("Victory").open(&mut open).default_width(470.0).default_pos(home).show(ctx, |ui| {
             // Ticket #50: a row per seat, in seat order, each headed by its Faction in its colour.
             for seat in Seat::ALL {
                 let p = game.progress(seat);

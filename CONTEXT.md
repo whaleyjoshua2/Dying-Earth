@@ -154,6 +154,10 @@ _Avoid_: options, candidates, draft, offer
 The window, since version 0.08.1, that says everything about one Faction: opened by `Factions (F)` and picked from a dropdown in its own top right, defaulting to the player's own. It wears the Faction's symbol at its head and holds the live figures -- Victory progress, the income of its last turn, Blame, its **Relations** as two rows, and what it holds -- above a collapsing section carrying the Faction card itself, which the setup screen shows before a game and which had been unreachable once one began. A rival's income is shown as totals only; the building-by-building breakdown is the player's alone, and a spectator sees every seat in full.
 _Avoid_: faction panel, player info, empire screen, diplomacy screen
 
+**Top bar**:
+The strip across the head of the game screen: a row of the world's and the player's figures -- Materials, Fuel, Energy, Ducats, Influence, Research and the race bar, the turn and its date, the temperature, the net ppm and the two populations -- and under it the row of buttons that open the Tech Tree, the Climate Panel, Victory, Factions and Trading, save the game and swap the map. Its height is not fixed: a Pick a Tech button or a save notice makes it taller. Since version 0.08.6 every window that opens under it reads its measured height rather than a guess of its own, so none opens over the figures.
+_Avoid_: HUD, header, status bar, ribbon
+
 **Command Cluster**:
 The strip along the foot of the side panel, since version 0.07.1, holding the controls a player reaches for every turn: the Influence still unspent, Spend on whatever place is selected, Max (Defence until version 0.07.3), and End Turn. It does not scroll: the card or the Roster scrolls above it. It is the only place End Turn stands.
 _Avoid_: action bar, toolbar, HUD, control panel
