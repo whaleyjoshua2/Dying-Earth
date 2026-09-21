@@ -948,6 +948,10 @@ pub struct WarCounters {
     /// Ticket #297 (version 0.08.6): Dig In orders committed, by seat.
     #[serde(default)]
     pub dig_ins: [u32; SEAT_COUNT],
+    /// Ticket #300 (version 0.08.6): Armies landed from a Carrier at a Colony, by seat. Never
+    /// counted before; the reviews measured no Army carried by anybody in eighty games.
+    #[serde(default)]
+    pub armies_landed: [u32; SEAT_COUNT],
 }
 
 impl WarCounters {
@@ -967,6 +971,7 @@ impl WarCounters {
             self.orbit_attacks[i] += o.orbit_attacks[i];
             self.escapes[i] += o.escapes[i];
             self.dig_ins[i] += o.dig_ins[i];
+            self.armies_landed[i] += o.armies_landed[i];
         }
         self.battles_vs_neutral += o.battles_vs_neutral;
         self.standing_armies_lost += o.standing_armies_lost;

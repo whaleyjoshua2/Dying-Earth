@@ -5552,8 +5552,17 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                         cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: k, army: false, into: UnloadTarget::Colony(c.id) }, &format!("Unload {} Colonists into {}", k, game.tables.body(c.body).slots[c.slot as usize].name), actions);
                     }
                 }
-                if s.army.is_some() {
-                    let label = if own { format!("Land the Army at {}", game.tables.body(c.body).slots[c.slot as usize].name) } else { format!("Land the Army to attack {}", game.tables.body(c.body).slots[c.slot as usize].name) };
+                if let Some(aid) = s.army {
+                    // Ticket #300 (version 0.08.6): the attack happens the turn it lands, so the
+                    // button quotes the first-round odds as the march buttons do.
+                    let slot_name = &game.tables.body(c.body).slots[c.slot as usize].name;
+                    let label = if own {
+                        format!("Land the Army at {slot_name}")
+                    } else {
+                        let defence: i64 = game.defenders_at(Place::Colony(c.id), Seat(0)).iter().filter_map(|id| game.army(*id)).map(|a| game.army_strength(a)).sum();
+                        let mine = game.army(aid).map(|a| game.army_strength(a)).unwrap_or(0);
+                        format!("Land the Army to attack {slot_name} ({:.0}%)", first_round_odds(mine, defence) * 100.0)
+                    };
                     cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: 0, army: true, into: UnloadTarget::Colony(c.id) }, &label, actions);
                 }
             }

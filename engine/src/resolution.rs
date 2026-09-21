@@ -40,6 +40,16 @@ impl Game {
         // in this same Resolution denied a landing to the seat that had just won the orbit -- which
         // cost a playtested Archivist the turn they had fought three ships for.
         self.resolve_cargo(); // (g)
+        // Ticket #300 (version 0.08.6): a landed Army may Attack on the turn it lands. Until this
+        // version it came down after the Battles at Hold, so an invasion of a Colony was a landing
+        // turn and then an Attack turn. Now the Armies that landed this turn on Attack fight a
+        // second ground pass at their Colonies, and a landing that met nobody occupies at once.
+        let landed = std::mem::take(&mut self.pending.landed);
+        if !landed.is_empty() {
+            let places: Vec<Place> = self.colonies.iter().map(|c| Place::Colony(c.id)).collect();
+            self.ground_battles(places.clone(), Some(&landed));
+            self.resolve_occupation_at(places);
+        }
         self.resolve_builds(); // (e)
         self.resolve_repairs(); // (f)
         self.resolve_antarctic(); // (g), ticket #73: Emigrants by sea land a turn after they left
@@ -258,7 +268,21 @@ impl Game {
         // place, and two Factions attacking the same place the same turn make one melee of all parties.
         let mut places: Vec<Place> = StateId::ALL.into_iter().map(Place::State).collect();
         places.extend(self.colonies.iter().map(|c| Place::Colony(c.id)));
+        self.ground_battles(places, None);
+    }
+
+    /// The ground melees at `places`. Ticket #300 (version 0.08.6): called a second time after
+    /// cargo has landed, with `only_landed` naming the Armies that came down this turn, so a
+    /// landed Army fights the turn it lands; the orbit is fought first, at (b), and the ground is
+    /// reached by whoever won it. Only a place where one of those Armies stands on Attack fights
+    /// in the second pass, so nothing already fought at (b) is fought twice.
+    fn ground_battles(&mut self, places: Vec<Place>, only_landed: Option<&[ArmyId]>) {
         for place in places {
+            if let Some(landed) = only_landed
+                && !self.armies.iter().any(|a| landed.contains(&a.id) && a.at == ArmyAt::Place(place) && a.stance == Stance::Attack && !a.escaped)
+            {
+                continue;
+            }
             let aggressors: Vec<Seat> = Seat::ALL
                 .into_iter()
                 .filter(|seat| {
@@ -721,6 +745,13 @@ impl Game {
     fn resolve_occupation(&mut self) {
         let mut places: Vec<Place> = StateId::ALL.into_iter().map(Place::State).collect();
         places.extend(self.colonies.iter().map(|c| Place::Colony(c.id)));
+        self.resolve_occupation_at(places);
+    }
+
+    /// Ticket #300 (version 0.08.6): the Occupation pass over a given set of places, so the
+    /// Colonies a landing reached this turn can be checked again after the second ground pass --
+    /// a landing that meets nobody begins its Occupation the same turn.
+    fn resolve_occupation_at(&mut self, places: Vec<Place>) {
         for place in places {
             let control = self.place_control(place);
             match control {
@@ -1823,6 +1854,7 @@ impl Game {
                                 self.report_line_of(seat, LineKind::YourWorks, LineKind::Ship, Some(ReportPlace::Colony(cid)), text);
                             }
                             if let Some(aid) = aboard_army.filter(|_| army) {
+                                self.war.armies_landed[seat.index()] += 1;
                                 self.land_army(aid, ship, Place::Colony(cid));
                                 let line = format!("{} landed an Army at {}.", self.seat_name(seat), self.place_name(Place::Colony(cid)));
                                 self.log(line);
@@ -2125,13 +2157,19 @@ impl Game {
         if divisor <= 0 { threshold } else { (threshold + divisor - 1) / divisor }
     }
 
+    /// Ticket #300 (version 0.08.6): the stance is inferred from whose place it is, no new field --
+    /// Attack at a Colony this seat does not direct, which is what the landing button says, Hold at
+    /// its own -- and the Army is remembered for the second ground pass of this Resolution.
     fn land_army(&mut self, aid: ArmyId, ship: ShipId, place: Place) {
+        let seat = self.army(aid).and_then(|a| self.army_seat(a));
+        let attacking = seat.is_some() && self.place_director(place) != seat;
         if let Some(a) = self.army_mut(aid) {
             a.at = ArmyAt::Place(place);
-            a.stance = Stance::Hold;
+            a.stance = if attacking { Stance::Attack } else { Stance::Hold };
         }
         if let Some(s) = self.ship_mut(ship) {
             s.army = None;
         }
+        self.pending.landed.push(aid);
     }
 }

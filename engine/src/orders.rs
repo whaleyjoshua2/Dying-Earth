@@ -272,6 +272,10 @@ pub struct Pending {
     /// Ticket #268 (version 0.08.4): offers set and credits bought this turn -- buyer, ppm, Ducats paid.
     #[serde(default)]
     pub credit_offers: Vec<(Seat, i64)>,
+    /// Ticket #300 (version 0.08.6): Armies that landed from a Carrier this Resolution, for the
+    /// second ground pass that lets them fight the turn they land.
+    #[serde(default)]
+    pub landed: Vec<ArmyId>,
     #[serde(default)]
     pub credit_buys: Vec<(Seat, i64, i64)>,
     /// Attack orders in the order given, for battle ordering (spec 10.1).

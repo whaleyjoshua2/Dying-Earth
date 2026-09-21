@@ -1393,9 +1393,12 @@ fn a_defended_colony_changes_hands_in_about_four_turns() {
     assert!(taken.len() >= 6, "only {} of 12 attacks took the Colony", taken.len());
     taken.sort();
     let median = taken[taken.len() / 2];
-    assert!((3..=5).contains(&median), "median {median} turns: {taken:?}");
+    // Ticket #300 (version 0.08.6): the landing turn is the first Battle turn now, so the window
+    // moved a turn earlier: three-to-five was two-to-four, and nothing changes hands before the
+    // third turn's Resolution, since an Occupation begun on the landing turn runs its three.
+    assert!((2..=4).contains(&median), "median {median} turns: {taken:?}");
     for t in &taken {
-        assert!(*t >= 3, "changed hands after only {t} turns, faster than the rules allow: {taken:?}");
+        assert!(*t >= 2, "changed hands after only {t} turns, faster than the rules allow: {taken:?}");
     }
 }
 
@@ -10579,6 +10582,53 @@ fn a_standing_army_reads_its_industry_its_constabulary_and_its_calm_and_dies_at_
     let built = g.raise_army(Place::State(sid), false);
     let b = g.armies.iter().find(|a| a.id == built).unwrap().clone();
     assert_eq!((g.army_strength(&b), g.army_hit_points(&b)), (4, 5), "a built Army is the card's 4 and 5 wherever it stands");
+}
+
+/// Ticket #300 (version 0.08.6): a landed Army may Attack on the turn it lands. Landed at a
+/// rival's Colony it lands on Attack and fights in the same Resolution, after the orbit; landed
+/// where nobody defends, it occupies the Colony the same turn; landed at its own, it lands on Hold.
+#[test]
+fn an_army_landed_at_a_rivals_colony_fights_or_occupies_the_turn_it_lands() {
+    // Nobody defends: the Occupation begins the turn of the landing.
+    let mut g = game();
+    calm(&mut g);
+    let cid = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat], 4);
+    let army = ArmyId(g.fresh_id());
+    let ship = ShipId(g.fresh_id());
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    g.ships.push(Ship { name: String::new(), id: ship, kind: UnitKind::Carrier, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, colonists_education: 1.0, army: Some(army), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    g.commit_orders(Seat(0), &[Order::Unload { ship, colonists: 0, army: true, into: UnloadTarget::Colony(cid) }]);
+    g.resolution_phase();
+    let a = g.army(army).unwrap();
+    assert_eq!(a.at, ArmyAt::Place(Place::Colony(cid)), "landed");
+    assert_eq!(a.stance, Stance::Attack, "at a rival's Colony it lands on Attack");
+    assert!(matches!(g.colony(cid).unwrap().control, Control::Occupied { occupier: Seat(0), .. }), "alone at the place, it occupies the same turn: {:?}", g.colony(cid).unwrap().control);
+    assert_eq!(g.war.armies_landed[0], 1, "counted");
+    // Defended: the Battle is fought the turn of the landing.
+    let mut g = game();
+    calm(&mut g);
+    let cid = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Barracks], 4);
+    let defender = ArmyId(g.fresh_id());
+    g.armies.push(Army { name: String::new(), id: defender, home: ArmyHome::Colony(cid), at: ArmyAt::Place(Place::Colony(cid)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    let army = ArmyId(g.fresh_id());
+    let ship = ShipId(g.fresh_id());
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    g.ships.push(Ship { name: String::new(), id: ship, kind: UnitKind::Carrier, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, colonists_education: 1.0, army: Some(army), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    let battles = g.war.battles[0];
+    g.commit_orders(Seat(0), &[Order::Unload { ship, colonists: 0, army: true, into: UnloadTarget::Colony(cid) }]);
+    g.resolution_phase();
+    assert_eq!(g.war.battles[0], battles + 1, "the Battle was fought the turn it landed");
+    // At its own Colony it lands on Hold.
+    let mut g = game();
+    calm(&mut g);
+    let cid = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 4);
+    let army = ArmyId(g.fresh_id());
+    let ship = ShipId(g.fresh_id());
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    g.ships.push(Ship { name: String::new(), id: ship, kind: UnitKind::Carrier, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, colonists_education: 1.0, army: Some(army), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    g.commit_orders(Seat(0), &[Order::Unload { ship, colonists: 0, army: true, into: UnloadTarget::Colony(cid) }]);
+    g.resolution_phase();
+    assert_eq!(g.army(army).unwrap().stance, Stance::Hold, "at its own Colony it lands on Hold");
 }
 
 /// Ticket #299 (version 0.08.6): an Occupation that must be held. A break -- here the last Army
