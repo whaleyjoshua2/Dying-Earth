@@ -43,6 +43,9 @@ pub enum LineKind {
     SeaLevel,
     /// A Battle in which a unit was destroyed, or one that changed Orbital Control.
     DecisiveBattle,
+    /// Ticket #281 (version 0.08.5): a Battle nobody lost a unit in. A line at its place, so it is
+    /// read and can be clicked to; never a headline, so a skirmish does not read over a Break.
+    Battle,
     Occupation,
     TechComplete,
     Event,
@@ -131,7 +134,7 @@ impl LineKind {
             LineKind::Unrest | LineKind::Refugees | LineKind::Army | LineKind::Occupation => Section::OnEarth,
             LineKind::Break | LineKind::SeaLevel | LineKind::Event | LineKind::Development | LineKind::Climate => Section::TheClimate,
             LineKind::TechComplete | LineKind::YourBuild | LineKind::YourWorks => Section::YourWorks,
-            LineKind::ControlChanged | LineKind::DecisiveBattle | LineKind::BuildComplete | LineKind::Note | LineKind::Seating => by_place(),
+            LineKind::ControlChanged | LineKind::DecisiveBattle | LineKind::Battle | LineKind::BuildComplete | LineKind::Note | LineKind::Seating => by_place(),
         }
     }
 }
@@ -168,10 +171,13 @@ pub enum MomentKind {
     /// the way, or one part met with the other short. Rivals only; the player has the Victory
     /// window. Nothing in the game told a player a rival was about to end it.
     RivalProgress,
+    /// Ticket #281 (version 0.08.5): buildings burned in the rolls after a taking. It wore the
+    /// Battle's name from ticket #50 to here, and fired for a Pacified transfer that fought nobody.
+    PlaceTakenByForce,
 }
 
 impl MomentKind {
-    pub const ALL: [MomentKind; 9] = [
+    pub const ALL: [MomentKind; 10] = [
         MomentKind::ColonyFounded,
         MomentKind::ControlChanged,
         MomentKind::ClimateThreshold,
@@ -181,6 +187,7 @@ impl MomentKind {
         MomentKind::ArchiveComplete,
         MomentKind::LostInTransit,
         MomentKind::RivalProgress,
+        MomentKind::PlaceTakenByForce,
     ];
 
     /// The key its table carries in `report.toml`.
@@ -195,6 +202,7 @@ impl MomentKind {
             MomentKind::ArchiveComplete => "archive_complete",
             MomentKind::LostInTransit => "lost_in_transit",
             MomentKind::RivalProgress => "rival_progress",
+            MomentKind::PlaceTakenByForce => "taken_by_force",
         }
     }
 
@@ -210,6 +218,7 @@ impl MomentKind {
             MomentKind::ArchiveComplete => "The Archive completed",
             MomentKind::LostInTransit => "Colonists lost in transit",
             MomentKind::RivalProgress => "A rival closing on its Victory Condition",
+            MomentKind::PlaceTakenByForce => "A place taken by force",
         }
     }
 
@@ -222,7 +231,7 @@ impl MomentKind {
             MomentKind::LostInTransit => 2,
             MomentKind::ControlChanged => 2,
             MomentKind::ClimateThreshold | MomentKind::Antarctica => 3,
-            MomentKind::DecisiveBattle => 4,
+            MomentKind::DecisiveBattle | MomentKind::PlaceTakenByForce => 4,
             // Ticket #261: a rival about to win reads before a Tech and after a lost unit.
             MomentKind::RivalProgress => 5,
             MomentKind::TechComplete => 6,
@@ -372,6 +381,13 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("solar_storm", &[]),
     ("ship_arrived", &["faction", "ship", "body"]),
     ("ship_destroyed", &["faction", "ship", "why", "cargo"]),
+    // Ticket #281 (version 0.08.5): an Army destroyed, by name; and every Battle, as a line.
+    ("army_destroyed", &["faction", "army", "why"]),
+    // Ticket #282 (version 0.08.5): neutral states arm when threatened.
+    ("levy_raised", &["state", "army", "n"]),
+    ("levy_disbanded", &["state", "army"]),
+    ("neutral_held", &["state", "n"]),
+    ("battle", &["place", "faction", "odds", "outcome"]),
     ("event_damaged_ships", &["event", "n"]),
     ("loaded", &["faction", "cargo", "body"]),
     ("slot_taken", &["faction"]),
@@ -446,6 +462,10 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("rival_one_part_met", &["faction", "met", "part", "value", "bar"]),
     // Ticket #267: a Smear campaign landed.
     ("smear", &["faction", "target", "ppm"]),
+    // Ticket #277 (version 0.08.5): a Greenwash landed.
+    ("greenwash", &["faction", "ppm"]),
+    // Ticket #278 (version 0.08.5): a Colony starved under a Blockade this Income.
+    ("starved", &["place", "faction"]),
     // Ticket #268: carbon credits offered and bought.
     ("credits_offered", &["faction", "n"]),
     ("credits_bought", &["faction", "n", "seller", "ducats"]),
@@ -491,6 +511,8 @@ pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     ("attacks", &[]),
     ("cargo_aboard", &["n"]),
     ("sea_unrest", &["rose", "unrest"]),
+    ("sea_inland", &[]),
+    ("sea_inland_flipped", &["what"]),
     ("first_colony", &[]),
     ("more_colonies", &["ordinal"]),
     ("first_antarctic_colony", &[]),
@@ -546,6 +568,7 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("sell", &["n", "resource"]),
     ("relief", &["state"]),
     ("smear", &["n", "faction"]),
+    ("greenwash", &["n"]),
     ("offer_credits", &["n"]),
     ("buy_credits", &["n"]),
     ("agitate", &["state"]),
@@ -567,6 +590,7 @@ pub const MOMENT_ARGS: &[(&str, &[&str])] = &[
     ("control_changed", &["place", "faction"]),
     ("climate_threshold", &["what", "figure"]),
     ("decisive_battle", &["place", "result", "figure"]),
+    ("taken_by_force", &["place", "result", "figure"]),
     ("tech_complete", &["tech", "faction", "lead", "cost"]),
     ("antarctica", &["n"]),
     ("archive_complete", &["faction", "place", "research"]),

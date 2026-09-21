@@ -211,25 +211,51 @@ fn build_board(session: &mut Session) {
             let name = g.next_ship_name(kind);
             g.ships.push(Ship { id, name, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
         }
+        // `levy:1` (a building aid, ticket #282, version 0.08.5): seat 0 raises a built Army in
+        // China, so the neutral neighbours -- India among them -- are threatened, and a quiet turn
+        // runs so their Levies stand. With `select:southasia` India's card shows two Armies.
+        if std::env::args().any(|a| a == "levy:1") {
+            g.raise_army(Place::State(StateId::EastAsia), false);
+            run_one_quiet_turn(g);
+        }
+        // `blockade:1` (a building aid, ticket #278, version 0.08.5): a Prospector Frigate sits in
+        // the slot of seat 0's station over Earth on Blockade, so the station's button and card say
+        // it is starved. With `hab:1` the station's card is open in the Earth picture.
+        if std::env::args().any(|a| a == "blockade:1")
+            && let Some(station) = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).cloned()
+            && let Some(seat) = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors && *s != Seat(0))
+        {
+            let id = ShipId(g.fresh_id());
+            let built_turn = g.turn;
+            let name = g.next_ship_name(UnitKind::Frigate);
+            g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: Some(station.slot) });
+        }
         // `battle:1` (a building aid): three seats bring a Frigate to Mars with Attack stances and
         // one more turn runs, so the Report carries a three-party Battle (ticket #50).
-        if std::env::args().any(|a| a == "battle:1") {
+        // Ticket #279 (version 0.08.5): `battle:earth` fights it in Earth orbit instead and runs a
+        // second quiet turn, so the Climate Panel's War line has last turn's Battle to show.
+        let earth_battle = std::env::args().any(|a| a == "battle:earth");
+        if std::env::args().any(|a| a == "battle:1") || earth_battle {
+            let body = if earth_battle { BodyId::Earth } else { BodyId::Mars };
             for seat in [Seat(0), Seat(1), Seat(2)] {
                 let id = ShipId(g.fresh_id());
                 let built_turn = g.turn;
                 let name = g.next_ship_name(UnitKind::Frigate);
-                g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
+                g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
             }
-            for s in g.ships.iter_mut().filter(|s| s.at == ShipAt::Body(BodyId::Mars)) {
+            for s in g.ships.iter_mut().filter(|s| s.at == ShipAt::Body(body)) {
                 s.stance = Stance::Attack;
             }
-            // The rivals sit still for this one turn, so their stacks are all at Mars when it runs.
+            // The rivals sit still for this one turn, so their stacks are all at the Body when it runs.
             for seat in Seat::ALL.into_iter().skip(1) {
                 g.seats[seat.index()].ai = false;
             }
             let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
-            orders[0] = vec![Order::ShipStance { body: BodyId::Mars, stance: Stance::Attack }];
+            orders[0] = vec![Order::ShipStance { body, stance: Stance::Attack }];
             g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
+            if earth_battle {
+                run_one_quiet_turn(g);
+            }
             for seat in Seat::ALL.into_iter().skip(1) {
                 g.seats[seat.index()].ai = true;
             }
@@ -633,7 +659,9 @@ fn build_board(session: &mut Session) {
         // coastal slots, a Factory drowned with them, a Sea Wall standing in a coastal slot and two
         // Facilities inland, so one card carries both rows and everything the ticket changed. An AI
         // game reaches that board on a turn nobody can choose, and never with a wall.
-        if std::env::args().any(|a| a == "walls:1") {
+        // Ticket #276 (version 0.08.5): `walls:2` is the same board one rise on, the wall standing
+        // through the +2.3 threshold and the coast reaching one slot further in behind it.
+        if std::env::args().any(|a| a == "walls:1" || a == "walls:2") {
             let sid = StateId::EastAsia;
             g.take_control(sid, Seat(0));
             if !g.has_tech(TechId::CoastalEngineering) {
@@ -658,6 +686,9 @@ fn build_board(session: &mut Session) {
             let mut wall = Facility::new(FacilityKind::SeaWall);
             wall.rises_held = 1;
             g.state_mut(sid).facilities.push(wall);
+            if std::env::args().any(|a| a == "walls:2") {
+                g.apply_sea_threshold(sid, 1);
+            }
             g.seats[0].stockpile.materials = 300;
             g.seats[0].stockpile.energy = 400;
             g.seats[0].stockpile.ducats = 300;

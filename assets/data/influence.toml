@@ -69,6 +69,20 @@ decay_fast = 3
 [smear]
 ppm_per_influence = 2.0
 
+# Ticket #277 (version 0.08.5): the Greenwash, the Smear's mirror. Influence and Ducats spent on
+# a Faction's own name take this many ppm off its own Blame ledger per Influence, for good, and
+# every Influence spent costs `ducats_per_influence` Ducats beside it, so cleaning your name costs
+# strictly more than dirtying a rival's and half a carbon credit's Ducat price per ppm, which keeps
+# credits the cheap route when the Custodians are willing. One campaign a turn, any amount the two
+# purses cover; public, no offence -- the Report says who greenwashed, so a rival can answer with a
+# Smear. Called a greenwash because the Blame falls without a gram of CO2 leaving the air. The
+# computer seats use it when their own share stands above the fair quarter, credits are not to be
+# had, and they hold `ai_ducats_reserve` Ducats past the price.
+[greenwash]
+ppm_per_influence = 2.0
+ducats_per_influence = 1
+ai_ducats_reserve = 20
+
 # Ticket #187 (version 0.08.0): Resistance. A place's schooling takes a bite out of the Influence an
 # OUTSIDER spends there: Standing gained = spent / resistance, rounded down. The controller converts
 # in full. It touches neither the threshold nor the challenge margin -- measured, the margin is the

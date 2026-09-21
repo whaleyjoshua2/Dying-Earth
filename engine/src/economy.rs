@@ -37,6 +37,11 @@ pub struct Yield {
     /// Ticket #90 (version 0.06.0): how the figure was reached, for the card ("2 x 12 Colonists +
     /// 3 x 2 Bodies"), when a Module's arithmetic is worth showing.
     pub detail: Option<String>,
+    /// Ticket #280 (version 0.08.5): what the building DOES when that is not a resource, or beside
+    /// one -- the `does` sentence on its row in `facilities.toml` or `modules.toml`, written where
+    /// "no output" was written before, at the designer's word. Static prose from the data, so a
+    /// figure in it is a data figure and cannot drift as a hand-written hover did.
+    pub does: Option<String>,
 }
 
 impl Yield {
@@ -60,6 +65,10 @@ impl Yield {
         // Ticket #82: the Custodians' Production Moved.
         if let Some(f) = self.doubled_by {
             parts.push(format!("doubled by an idle {f} on Earth"));
+        }
+        // Ticket #280 (version 0.08.5): what it does, in the data's words.
+        if let Some(d) = &self.does {
+            parts.push(d.clone());
         }
         if self.allotment > 0 {
             parts.push(format!("+{} Influence Allotment", self.allotment));
@@ -110,6 +119,7 @@ impl Game {
             s.funding_archive = false;
         }
         self.replenish_standing_armies();
+        self.arm_neutrals();
         // Ticket #134 (version 0.07.3): a standing Max order ends by itself when its place is no
         // longer the seat's to spend on, and the Report says so.
         for seat in Seat::ALL {
@@ -133,6 +143,7 @@ impl Game {
         for a in &mut self.armies {
             a.escaped = false;
         }
+        self.starve_blockaded_colonies();
         for seat in Seat::ALL {
             self.income_for(seat);
         }
@@ -207,14 +218,22 @@ impl Game {
     fn replenish_standing_armies(&mut self) {
         for sid in StateId::ALL {
             let occupied = self.state(sid).control.is_occupied();
-            let has = self.armies.iter().any(|a| a.standing && a.home == ArmyHome::State(sid));
+            // Ticket #282 (version 0.08.5): a Levy is standing too, but it is not THE Standing Army,
+            // so its presence never suppresses the raising of one.
+            let has = self.armies.iter().any(|a| a.standing && !a.levy && a.home == ArmyHome::State(sid));
             if !has {
-                // A destroyed Standing Army is raised again at strength 1 (an assumption, see the ticket).
+                // A destroyed Standing Army is raised again at strength 1. Ticket #282: two Incomes
+                // after it died, not the next -- the assumption this comment carried from ticket
+                // #50 was settled at the designer's word -- so a won Battle opens a window.
+                if self.state(sid).respawn_wait > 0 {
+                    self.state_mut(sid).respawn_wait -= 1;
+                    continue;
+                }
                 let cap = self.standing_army_cap(sid);
                 let hp = self.tables.unit(UnitKind::Army).hit_points;
                 self.spawn_standing_army(sid);
                 let dmg = cap.saturating_sub(1).min(hp - 1);
-                if let Some(a) = self.armies.iter_mut().find(|a| a.standing && a.home == ArmyHome::State(sid)) {
+                if let Some(a) = self.armies.iter_mut().find(|a| a.standing && !a.levy && a.home == ArmyHome::State(sid)) {
                     a.damage = dmg;
                 }
                 continue;
@@ -223,7 +242,11 @@ impl Game {
             if occupied || !self.army_replenishes(sid) {
                 continue;
             }
-            if let Some(a) = self.armies.iter_mut().find(|a| a.standing && a.home == ArmyHome::State(sid)) {
+            // Ticket #282: a Levy heals on the same terms.
+            for a in self.armies.iter_mut().filter(|a| a.levy && a.home == ArmyHome::State(sid)) {
+                a.damage = a.damage.saturating_sub(1);
+            }
+            if let Some(a) = self.armies.iter_mut().find(|a| a.standing && !a.levy && a.home == ArmyHome::State(sid)) {
                 a.damage = a.damage.saturating_sub(1);
             }
         }
@@ -236,7 +259,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let card = t.state(sid);
         let fc = t.facility(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None };
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None, does: fc.does.clone() };
         if let Some(p) = &fc.produces {
             match p.resource {
                 Resource::Research => {
@@ -302,7 +325,7 @@ impl Game {
         let t = &self.tables;
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None };
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None, does: mc.does.clone() };
         // Ticket #239 (version 0.08.3): a Unique Module does its sibling's job, so every lookup
         // keyed by kind -- the Techs that multiply it, the slot's yield, a Discovery on it --
         // reads the COMMON kind. Without this the Arkwrights' Chorus would be the one Relay in
@@ -458,7 +481,7 @@ impl Game {
     /// `doubled_modules`, named for the Facility whose mothball pays for it.
     pub fn module_yield_at(&self, seat: Seat, cid: ColonyId, index: usize) -> Yield {
         let Some(kind) = self.colony(cid).and_then(|c| c.modules.get(index)).map(|m| m.kind) else {
-            return Yield { resource: None, amount: 0, research: 0, upkeep: 0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None };
+            return Yield { resource: None, amount: 0, research: 0, upkeep: 0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None, does: None };
         };
         let mut y = self.module_yield(seat, cid, kind);
         if self.doubled_modules(seat).contains(&(cid, index)) {
@@ -468,6 +491,55 @@ impl Game {
             y.doubled_by = pairs.iter().find(|(_, m)| **m == kind).map(|(f, _)| f.name());
         }
         y
+    }
+
+    /// Ticket #282 (version 0.08.5): neutral states arm when threatened. A neutral Region with a
+    /// foreign Army next door, or a neighbour under Occupation, raises a Levy at Industry + 2 --
+    /// while its Unrest is under the Standing Army's threshold, since a restive state musters
+    /// nothing -- and stands it down at the Income after the threat has passed, or the moment the
+    /// Region is no longer neutral. The Report says both.
+    fn arm_neutrals(&mut self) {
+        for sid in StateId::ALL {
+            let threatened = self.neutral_threatened(sid);
+            let levy = self.levy_at(sid);
+            match (threatened, levy) {
+                (true, None) if self.army_replenishes(sid) => {
+                    let id = self.raise_levy(sid);
+                    let (state, army) = (self.tables.state(sid).name.clone(), self.armies.iter().find(|a| a.id == id).map(|a| self.army_name(a)).unwrap_or_default());
+                    let n = self.levy_cap(sid);
+                    self.log(format!("{state} arms: {army} is raised at strength {n} while a foreign Army stands next door."));
+                    let text = self.say("levy_raised", &[("state", state), ("army", army), ("n", n.to_string())]);
+                    self.report_line(LineKind::Army, Some(ReportPlace::State(sid)), text);
+                }
+                (false, Some(id)) => {
+                    let army = self.armies.iter().find(|a| a.id == id).map(|a| self.army_name(a)).unwrap_or_default();
+                    self.armies.retain(|a| a.id != id);
+                    let state = self.tables.state(sid).name.clone();
+                    self.log(format!("{state} stands down {army}: the threat has passed."));
+                    let text = self.say("levy_disbanded", &[("state", state), ("army", army)]);
+                    self.report_line(LineKind::Army, Some(ReportPlace::State(sid)), text);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Ticket #278 (version 0.08.5): every Colony starved this Income is named in its holder's
+    /// Report, counted for the sweep, and charged as an offence at weight 1 against the blockader --
+    /// the rung the 0.08.2 spec promised and nothing fired until now. Read live, once an Income, as
+    /// every blockade test is; `income_for` makes the Colony's Modules yield nothing.
+    fn starve_blockaded_colonies(&mut self) {
+        let starved: Vec<(ColonyId, Seat, Seat)> =
+            self.colonies.iter().filter_map(|c| Some((c.id, c.control.director()?, self.starved_by(c.id)?))).collect();
+        for (cid, holder, by) in starved {
+            self.seat_mut(holder).blockade_turns_suffered += 1;
+            self.seat_mut(by).blockade_turns_imposed += 1;
+            self.offend_by(by, holder, 1);
+            let (place, who) = (self.place_name(Place::Colony(cid)), self.seat_name(by));
+            self.log(format!("{place} is blockaded by the {who}: it makes nothing this turn."));
+            let text = self.say("starved", &[("place", place), ("faction", who)]);
+            self.report_line(LineKind::Note, Some(ReportPlace::Colony(cid)), text);
+        }
     }
 
     fn producers_of(&self, seat: Seat) -> Vec<Producer> {
@@ -504,6 +576,11 @@ impl Game {
             let col = self.colony(cid).unwrap();
             // Ticket #51: an Occupied Colony's Archive is offline, whoever is directing the Colony.
             let occupied = col.control.is_occupied();
+            // Ticket #278 (version 0.08.5): a starved Colony -- a station under a rival's Blockade,
+            // a ground Colony under a rival's outright Orbital Control with a blockading stack --
+            // makes NOTHING and still pays its upkeep, at the designer's word: the squeeze is the
+            // point, and the offline switch below, which forgives the upkeep, is the wrong shape.
+            let starved = self.starved_by(cid).is_some();
             for (i, m) in col.modules.iter().enumerate() {
                 // Ticket #54: a mothballed Module, the same way.
                 if m.mothballed {
@@ -516,9 +593,9 @@ impl Game {
                     name: m.kind.name(),
                     is_module: true,
                     upkeep: y.upkeep,
-                    output: y.resource.map(|r| (r, y.amount)),
+                    output: if starved { None } else { y.resource.map(|r| (r, y.amount)) },
                     // Ticket #80: an Observatory's Research.
-                    research: y.research,
+                    research: if starved { 0 } else { y.research },
                     online: !col.grid_failed && !m.offline_until_resolution && !(m.kind == ModuleKind::Archive && occupied),
                     doubled_by: y.doubled_by,
                 });

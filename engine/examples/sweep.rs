@@ -102,7 +102,7 @@ fn main() {
                         // Ticket #69: the neutral Labs' Research and the Sea Wall's Tech.
                         let (mut neutral_research, mut coastal_engineering) = (Vec::new(), Vec::new());
                         // Ticket #70: what the sea took.
-                        let (mut slots_lost, mut drowned) = (Vec::new(), Vec::new());
+                        let (mut slots_lost, mut drowned, mut converted) = (Vec::new(), Vec::new(), Vec::new());
                         // Ticket #72: the Prospectors' Fund.
                         let mut venture = Vec::new();
                         // Ticket #227 (version 0.08.2): the six figures the version's rules depend on.
@@ -111,9 +111,15 @@ fn main() {
                         let mut blame_ppm: [Vec<f64>; 4] = Default::default();
                         let mut credit_ppm: [Vec<f64>; 4] = Default::default();
                         let mut smeared_ppm: [Vec<f64>; 4] = Default::default();
+                        let mut cleaned_ppm: [Vec<f64>; 4] = Default::default();
                         let mut credits_bought = [0.0f64; 4];
                         let mut credits_sold = [0.0f64; 4];
                         let mut agitates = [0u32; 4];
+                        let (mut blockade_suffered, mut blockade_imposed) = ([0u32; 4], [0u32; 4]);
+                        let (mut levies, mut neutral_holds) = (0u32, 0u32);
+                        let mut warc = dying_earth_engine::state::WarCounters::default();
+                        let mut war_ppm: [Vec<f64>; 4] = Default::default();
+                        let mut war_nobody: Vec<f64> = Vec::new();
                         let mut walls_standing = 0u32;
                         let mut walls_held = 0u32;
                         let mut no_target = 0u32;
@@ -175,9 +181,13 @@ fn main() {
                                 blame_ppm[i].push(r.blame[i]);
                                 credit_ppm[i].push(r.blame_credit[i]);
                                 smeared_ppm[i].push(r.blame_smeared[i]);
+                                cleaned_ppm[i].push(r.blame_cleaned[i]);
                                 credits_bought[i] += r.credits_bought[i];
                                 credits_sold[i] += r.credits_sold[i];
                                 agitates[i] += r.agitates[i];
+                                blockade_suffered[i] += r.blockade_suffered[i];
+                                blockade_imposed[i] += r.blockade_imposed[i];
+                                war_ppm[i].push(r.war_ppm[i]);
                                 bought[i] += r.bought[i];
                                 sold[i] += r.sold[i];
                             }
@@ -247,6 +257,7 @@ fn main() {
                             neutral_research.push(r.neutral_research.max(0) as u32);
                             slots_lost.push(r.coastal_slots_lost);
                             drowned.push(r.facilities_drowned);
+                            converted.push(r.slots_converted);
                             venture.push(r.venture_fund_at_end.max(0) as u32);
                             if r.venture_fund_at_end as f64 >= base.faction(FactionKind::Prospectors).victory_first.bar {
                                 fund_met += 1;
@@ -255,6 +266,10 @@ fn main() {
                             walls_held += r.sea_walls_spent;
                             no_target += r.events_no_target;
                             cards_drawn.push(r.cards_drawn);
+                            war_nobody.push(r.war_ppm_nobody);
+                            levies += r.levies_raised;
+                            neutral_holds += r.neutral_holds;
+                            warc.add(&r.war);
                             if r.deck_empty {
                                 deck_empty += 1;
                             }
@@ -365,7 +380,12 @@ fn main() {
                                 coastal_engineering.len(),
                                 median_u(&mut coastal_engineering)
                             );
-                            println!("      The sea: median {} coastal slots lost a game, {} Facilities drowned", median_u(&mut slots_lost), median_u(&mut drowned));
+                            println!(
+                                "      The sea: median {} coastal slots lost a game, {} Facilities drowned, {} inland slots turned coastal",
+                                median_u(&mut slots_lost),
+                                median_u(&mut drowned),
+                                median_u(&mut converted)
+                            );
                             println!("      The Prospectors' Venture Capital Fund at the end: median {} Ducats of the {} their Victory Condition asks", median_u(&mut venture), base.faction(FactionKind::Prospectors).victory_first.bar);
                             println!("      The deck: median {} cards drawn a game, empty at the end in {deck_empty}/{seeds} seeds", median_u(&mut cards_drawn));
                             println!("      Pioneers: {emigrant_batches} batches recruited, {by_sea} Antarctic Colonies founded by sea");
@@ -390,12 +410,26 @@ fn main() {
                             let ppm: Vec<String> = (0..4).map(|i| med0(&mut blame_ppm[i])).collect();
                             let cred: Vec<String> = (0..4).map(|i| med0(&mut credit_ppm[i])).collect();
                             let smear: Vec<String> = (0..4).map(|i| med0(&mut smeared_ppm[i])).collect();
-                            println!("      Blame in ppm at the end, by seat (median): [{}]; in credit [{}]; laid on by Smear [{}]", ppm.join(", "), cred.join(", "), smear.join(", "));
+                            let cleaned: Vec<String> = (0..4).map(|i| med0(&mut cleaned_ppm[i])).collect();
+                            println!(
+                                "      Blame in ppm at the end, by seat (median): [{}]; in credit [{}]; laid on by Smear [{}]; taken off by Greenwash [{}]",
+                                ppm.join(", "),
+                                cred.join(", "),
+                                smear.join(", "),
+                                cleaned.join(", ")
+                            );
                             println!(
                                 "      Carbon credits over the batch: bought by seat [{}], sold by seat [{}]; Agitates landed by seat {agitates:?}",
                                 credits_bought.iter().map(|v| format!("{v:.0}")).collect::<Vec<_>>().join(", "),
                                 credits_sold.iter().map(|v| format!("{v:.0}")).collect::<Vec<_>>().join(", ")
                             );
+                            // Ticket #278 (version 0.08.5): Colony-turns starved under a Blockade, suffered and imposed.
+                            println!("      Blockade-turns over the batch: suffered by seat {blockade_suffered:?}, imposed by seat {blockade_imposed:?}");
+                            // Ticket #279 (version 0.08.5): what war put in the air, by seat and nobody's.
+                            let war: Vec<String> = (0..4).map(|i| med0(&mut war_ppm[i])).collect();
+                            println!("      War in ppm a game, by seat (median): [{}]; nobody's (median) {}", war.join(", "), med0(&mut war_nobody));
+                            // Ticket #282 (version 0.08.5): neutral states arming.
+                            println!("      Neutral states: {levies} Levies raised over the batch, {neutral_holds} attacks held against");
                             println!("      Sea Walls: {sea_walls} built over the batch, {walls_standing} standing at the end, {walls_held} thresholds held");
                             println!("      Events drawn with nowhere to land over the batch: {no_target}; the Fund at or past its bar in {fund_met}/{seeds} seeds");
                             let floored_pct = if rel_end.is_empty() { 0.0 } else { rel_floored as f64 * 100.0 / rel_end.len() as f64 };
@@ -414,6 +448,16 @@ fn main() {
                             );
                             println!("      Trading window units, by seat: bought {bought:?}, sold {sold:?}");
                             println!("      Places taken by Influence over the batch: {takes}");
+                            // Ticket #286 (version 0.08.5): the war, over the batch, by seat; printed as the military block after the Influence line.
+                            // Blockade-turns are printed above under ticket #278.
+                            println!(
+                                "      War over the batch: Battles opened by seat {:?}, {} against neutrals; attacks in orbit {:?}; marches on neutrals {:?}, on held Regions {:?}",
+                                warc.battles, warc.battles_vs_neutral, warc.orbit_attacks, warc.marches_neutral, warc.marches_held
+                            );
+                            println!(
+                                "      Armies built {:?}, lost {:?}, Standing Armies lost {}; warships built {:?}, lost {:?}; Occupations begun {:?}, broken {:?}; places taken by force {:?}",
+                                warc.armies_built, warc.armies_lost, warc.standing_armies_lost, warc.warships_built, warc.warships_lost, warc.occupations_begun, warc.occupations_broken, warc.takes_by_force
+                            );
                             println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
                             println!("      Breaks fired: {}", fired.join(", "));
                         }

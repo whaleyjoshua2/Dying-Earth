@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.08.4
+DYING EARTH - playtest build, version 0.08.5
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,64 +16,57 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. ON UBUNTU OR ANOTHER LINUX: take the "-linux" zip instead. There is no .exe in it;
-   open a terminal in the unzipped folder and run   ./dying-earth   . The file
-   RUN-ON-LINUX.txt beside it says what to do if the window does not open, and where
-   the saves go. It is built on Ubuntu 22.04 and wants 22.04 or newer.
-7. Saves from 0.08.3 will not load in this version; the Load screen says so.
+6. Saves from 0.08.4 will not load in this version; the Load screen says so. This version
+   ships for Windows only.
 
-WHAT CHANGED SINCE 0.08.3
+WHAT CHANGED SINCE 0.08.4
 -------------------------
-Last version made the four sides different from each other. This one is about what the
-sides can DO to each other, and what they can SEE of each other.
+Last version was about what the sides can do to each other with influence and money.
+This one is about the war: it is louder, it is dirtier, and the computer is finally
+allowed to start one.
 
-- BLAME IS NOW A LEDGER, NOT A MEASUREMENT. Your blame is still the carbon you put in
-  the air less the carbon you took out - but now other sides can write on it. Hover the
-  "Blame" heading on the Faction window and it tells you what you are answerable for and
-  where every part of it came from.
-- SMEAR A RIVAL. On any rival's page in the Faction window (F) you can spend influence to
-  lay blame on them: one influence puts two ppm on their ledger, for good. They are told
-  who did it and think worse of you. It is a lie, which is the point.
-- BUY CARBON CREDITS FROM THE CUSTODIANS. A fourth line in the Trading window (M). Each
-  ppm you buy comes off your blame and costs about a coin, cheaper if the Custodians like
-  you and dearer if they do not; if they hate you they will not sell at all. Ten a turn at
-  most. Buying is an act of friendship both ways. If you ARE the Custodians you set the
-  offer there - and you may sell more credit than you actually hold, in which case the
-  difference lands on your own ledger as blame.
-- AGITATE. On a country a rival holds, 15 coins and 5 influence raise its unrest by one
-  point. Once a turn per country. The holder is told who did it. Note that unrest also
-  falls by 1.5 a turn on its own, so one agitate a turn on a calm country does nothing
-  lasting - it works on a country that is already restless, or when several sides lean on
-  it together.
-- BLAME NOW CHANGES HOW FAST YOUR INFLUENCE FADES. On countries you do NOT hold, a side
-  answerable for less than an eighth of the world's blame loses 1 standing a turn instead
-  of 2; a side answerable for half or more loses 3. Countries you hold still lose 1.
-- SEA WALLS ARE NEVER DESTROYED. A wall now holds every sea-level rise, forever - but each
-  rise it has held costs half a material a turn to keep, on top of its power. Miss the
-  materials and it stands idle that turn. A storm surge no longer breaks a walled country;
-  instead the coastal buildings there make 30% less next turn.
-- THE PROSPECTORS' FUND. The share you bank is now a proper slider in single percents (the
-  top fifth is greyed because 80% is the cap), the draw is called WITHDRAW and takes an
-  amount, and the winning total is 2500 coins, up from 2000. The computer Prospectors play
-  to 2500 too.
-- YOU ARE WARNED WHEN A RIVAL IS CLOSE TO WINNING. A new interruption fires when a rival
-  reaches three quarters of the way, and again when they have completed one half of their
-  victory condition outright. It names the part they still need.
-- EVERY PLACE YOU HOLD NAMES ITS CHALLENGER. The card of a country, colony or station you
-  hold now says which rival is nearest to taking it and at what price: "The Prospectors
-  stand at 47; they take this at 70." Hover it for the arithmetic. The old amber warning at
-  the top of the card is gone - it was using out-of-date arithmetic.
-- THE FACTION WINDOW SHOWS WHAT EACH SIDE HAS UNDER WAY: buildings begun and turns to go,
-  ships in transit and where to. For rivals too.
-- A VICTORY HISTORY CHART on every side's page: their progress turn by turn, with their
-  blame share as a second line, and the big events ticked on the axis.
-- EVENTS THAT CAN ONLY HAPPEN IN SPACE (dust storms, moonquakes, reactor leaks and so on)
-  are held out of the deck until turn 12, so fewer cards are wasted early.
-- ARMIES HAVE NAMES: the 1st Chinese Army, the 2nd Chinese Army, the Tycho Garrison.
-- EACH SIDE HAS A MOTTO on its selection card.
-- FIXED: a colony held by whoever went first was always drawn in Custodian teal, even when
-  they were the Prospectors. An eleven-version-old bug, spotted in play.
-- FIXED: the yields on the "Found a colony" button were words instead of pictures.
+- THE COMPUTER CAN ATTACK ANY COUNTRY, INCLUDING YOURS. Until now a computer side only
+  marched on a country it had lost. Now any side attacks a neutral country when the odds
+  are good, and a country you hold when the odds are good AND they are Cold toward you
+  or worse. Keep your neighbours friendly, or keep an army. The computer opens at most
+  one new war a turn.
+- BATTLES POLLUTE. Every hit landed in a battle on Earth or over it puts half a ppm of
+  carbon in the air, and every building burned in a conquest puts two. It counts as
+  emissions for whoever landed the hits, so it goes on their blame and it breaks a
+  stabilisation run. Fighting over Mars fouls nobody's air. The Climate panel (C) has a
+  "War" line when there is any.
+- BATTLE REPORTS. A battle is now its own line in the turn report, at its place, and it
+  interrupts the turn when a ship or an army is destroyed. It names every ship and army
+  that fought, what each one took ("PMV Aurora escaped after 3 hits"), and the odds the
+  attacker faced in the first round. Armies that die are named in the report too.
+- NEUTRAL COUNTRIES ARM WHEN THREATENED. Park an army next to a country nobody holds and
+  it raises a second army, a levy, at its industry level plus two, as long as it is not
+  too restless to muster. The levy never marches and stands down when you go away. A
+  neutral country that is attacked and holds gets +1 to its standing army for good, up
+  to +3. And a standing army you destroy now takes two turns to come back, not one.
+- A BLOCKADE STARVES. A blockade is now an ORDER you give a warship (a stance, like Hold
+  or Attack), not something that happens because your ship is parked there. A blockaded
+  station makes nothing - no goods, no research, no coins - and still pays its upkeep.
+  A colony on the ground starves the same way when one rival owns the orbit above it
+  outright and has a warship there on Blockade. Nobody dies. Each turn of it is a small
+  offence against the owner.
+- GREENWASH. On your own page in the Faction window (F) you can spend influence and coins
+  to take blame off your own ledger: one influence and one coin per two ppm. No carbon
+  actually leaves the air. It is the mirror of the smear, and everyone can see you did it.
+- CARBON CREDITS MOVED. They are no longer in the Trading window. If you are the
+  Custodians you set your offer on your own page of the Faction window; everyone else
+  requests them from the Custodians' page there, under the accords and the smear.
+- THE SEA REACHES INLAND. Every sea-level rise now also turns one inland building slot
+  into a coastal one, in every country, whether or not it has a sea wall. The wall stops
+  the sea taking a slot; it does not stop the coast creeping in. An empty slot turns
+  first; if none is empty, the oldest inland building becomes a coastal one. There is no
+  floor: a country can end up all coast.
+- BUILDINGS SAY WHAT THEY DO. A school, a launch site, a constabulary and every other
+  building that makes no resource now says what it is for on its row, instead of "no
+  output".
+- THE PLANET CARD LISTS COLONIES AND SITES WITH THEIR YIELDS as pictures, and the "found
+  a colony" panel no longer repeats the planet-wide yields - the planet card has them
+  at its head instead.
 
 HOW TO PLAY, IN SHORT
 ---------------------
@@ -83,11 +76,15 @@ HOW TO PLAY, IN SHORT
 - A region's buildings are the row of boxes on its card. Click an empty box to build.
 - A colony's buildings are the grid of tiles on its card. Click an empty tile to build.
 - INFLUENCE is how you win regions over. Spend it from the bar at the bottom right.
+- ARMIES are built from a region's card and march to a neighbouring region. Arriving in
+  a region you do not hold is an attack. Warships are built at a launch site and fight
+  in orbit; a warship in a rival station's slot can be ordered to Blockade.
 - The FACTION WINDOW (F) has a page for each side: what they have, what they think of you,
-  what they have under way, what bargains stand between them - and where you smear them.
+  what they have under way, what bargains stand between them, where you smear them, and
+  where you request carbon credits. Your own page is where you greenwash.
 - The VICTORY panel (V) shows how far each side is along its own path, and holds your
   Research Directive slider (and the Prospectors' Fund slider).
-- The TRADING window (M) buys and sells goods, and carbon credits.
+- The TRADING window (M) buys and sells goods.
 - The TECH TREE (T) is shared: everyone's research goes into the same tree unless they
   keep some back.
 - The roster on the right lists everything you own. An open ring at the end of a row
@@ -100,20 +97,22 @@ WHAT WE WANT TO KNOW
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- SMEAR: did you use it? On whom, and why? Did being smeared yourself feel unfair, or
-  like part of the game? Was two ppm per influence worth it?
-- CARBON CREDITS: did you buy any? Did the price make sense? If you played the Custodians,
-  did you ever oversell on purpose?
-- AGITATE: did you try it, and did anything happen? We suspect a single agitate is too
-  weak against the natural calming and want to hear whether it ever felt worth 15 coins.
-- THE CHALLENGER LINE: did it change what you spent influence on? Did the numbers agree
-  with what actually happened when a rival took a place?
-- THE RIVAL WARNING: did it fire? Did you know what to do about it? Did it fire too late?
-- THE VICTORY HISTORY CHART: could you read it? Was the second line (blame) useful or noise?
-- SEA WALLS: with walls now permanent, did you build them everywhere? Did the upkeep ever
-  bite? Did you notice the storm-surge penalty?
-- THE FUND SLIDER, if you played the Prospectors: is 2500 reachable? What share did you
-  run at?
+- BEING ATTACKED: did the computer ever march on a country you held? Did you see it
+  coming? Did the Relations gate (they must be Cold toward you) make sense, or did it
+  feel random?
+- THE BATTLE REPORT: could you tell who fought whom and who lost? Was the "odds" figure
+  useful? Did the interruption fire when you wanted it to, or too often?
+- BATTLES POLLUTE: did you notice the War line on the Climate panel? Did it ever change
+  a decision about fighting?
+- NEUTRAL LEVIES: did you ever see a country raise one? Did it stop you attacking, or
+  did you attack anyway? Did the +1 for holding feel earned?
+- THE BLOCKADE: did you order one? Did you suffer one? Was it clear on the station's card
+  what was happening and who was doing it?
+- GREENWASH: did you use it? Was two ppm per influence-and-coin worth it, and did it feel
+  like cheating?
+- CARBON CREDITS: could you find them in their new place? Was the "request" button clear?
+- THE SEA REACHING INLAND: did you notice the coastal boxes growing? Did it change where
+  you built, or whether you built a wall?
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.
@@ -125,41 +124,49 @@ KNOWN ROUGH EDGES
 All the numbers below come from eighty computer-only games, twenty with each side going
 first.
 
-- THE WIN COLUMN DID NOT MOVE. Out of eighty games: Prospectors 28, Custodians 26,
-  Arkwrights 7, Archivists 0. Last version it was 30, 26, 8 and 1. Three of this version's
-  four new weapons land on the Prospectors, and the fourth - agitate - turns out to be
-  mostly THEIRS, because they have the coins. None of it dented them. The Archivists' one
-  win became none, for last version's reasons: their way to win keeps their research out
-  of the shared pool, and the 85% rule charges them for it every turn.
-- THE WORLD COLLAPSES A LITTLE MORE OFTEN: 19 games in 80, against 15. Every seating ends
-  about a tenth of a degree hotter. Our best guess is that permanent sea walls keep
-  coastal factories alive, and factories emit. Tell us whether the climate feels like a
-  threat again.
-- EVERYONE ENDS UP HATING EVERYONE, a bit more than before: 40% to 59% of relationships
-  end scarred (41% to 48% last version), because smear and agitate are both offences and
-  the computer uses both. Say if it felt that way.
-- AGITATE ON ITS OWN IS WEAK. See above: unrest falls 1.5 a turn naturally, so one agitate
-  a turn on a calm country nets out. Whether that calming should skip an agitated country
-  is an open question; say what you think.
-- THE COMPUTER CUSTODIANS SELL EVERY CREDIT THEY OFFER, and only the Prospectors (and a
-  rich Arkwright side) ever buy. Nobody has been seen overselling.
-- THE REPORT STILL SAYS "ARMY". Armies are named everywhere else - roster, cards, orders -
-  but the turn report's own lines ("Custodian Army moved from China to India") do not use
-  the name yet.
-- SPACE EVENTS CAN STILL FIND NOTHING TO HIT: about three cards a game are drawn with
-  nowhere to land, down from four. Most of what is left is Dust Storm, which needs someone
-  living on Mars.
-- RENAMING SHIPS, COLONIES AND STATIONS WAS CUT from this version - it was a much bigger
-  job than it looked. It may come back.
+- THE WIN COLUMN MOVED, A LITTLE, AND TOWARD THE CUSTODIANS. Out of eighty games:
+  Custodians 28, Prospectors 26, Arkwrights 9, Archivists 2. Last version it was 26, 28,
+  7 and 0. The war is a money sink for whoever has the money - the Prospectors built 46
+  armies and 72 warships across the twenty games where they go second, and made a third
+  less coin doing it - and when the Prospectors go first the Custodians now win 5 of 20
+  where they won none. The Archivists have two wins for the first time since 0.08.3.
+- THE WORLD COLLAPSES LESS OFTEN: 15 games in 80, against 19. Every seating ends a bit
+  cooler. Our guess is that the sea reaching inland drowns more buildings' work over a
+  game (27 to 36 coastal slots lost a game, against 22 to 29), and a starved station
+  makes nothing. Tell us whether the climate still feels like a threat.
+- THE WAR IS ONE SIDE'S. Whoever starts in East Asia with the coins fights: the
+  Prospectors opened 57 and 49 battles a batch when they hold it, the Arkwrights 52 when
+  they do. Every other seat and seating together opened fourteen. No battle in eighty
+  games was against a neutral country: every country is taken by influence in the first
+  turns, and the first army appears around turn 20, so the levy rule fired only three
+  times in eighty games and never stopped an attack. It will matter to YOU if you march
+  early; the computer does not.
+- THE COMPUTER NEVER LOSES A WARSHIP. A hundred and twenty-nine were built over the batch
+  and none was destroyed, the same as last version: the computer's warships blockade and
+  rarely meet another warship that fights back.
+- THE BLOCKADE IS THE PROSPECTORS' ALONE, and only when they go second: 139 colony-turns
+  starved in that seating, most of them the Archivists' and Arkwrights' stations, and
+  none anywhere else. We plan a counter (an orbital battery) in a later version.
+- THE CREDIT TRADE ROSE, NOT FELL: the Prospectors buy 1214 to 1740 ppm of credit a batch
+  (733 to 1408 before) AND greenwash 70 to 90 ppm a game on top. Both levers together
+  take a fifth off their blame at the end (669 against 813 where they go second). The
+  Custodians sell every credit they offer, still.
+- EVERYONE HATES EVERYONE A LITTLE MORE: 45% to 62% of relationships end scarred (40% to
+  59% last version). War, blockade and smear are all offences.
+- ONLY THE PROSPECTORS EVER GREENWASH. The other computer sides are rarely dirty enough
+  to want to.
+- THE REPORT STILL SAYS "ARMY" in its march lines ("Custodian Army moved from China to
+  India"), though battle lines and destroyed armies use the army's name now.
+- SPACE EVENTS CAN STILL FIND NOTHING TO HIT: about three cards a game.
 - TWO OF THE FOUR SPECIAL SPACE BUILDINGS ARE STILL NEVER BUILT BY THE COMPUTER (the
   Archivists' Heliostat and the Custodians' Academy). You can build either by hand.
-- ONLY NON-AGGRESSION EVER GETS STRUCK between computer sides, and roughly three quarters
-  of bargains are later broken. As last version.
+- ONLY NON-AGGRESSION EVER GETS STRUCK between computer sides, and most bargains are
+  later broken. As last version.
 - FUEL AND ENERGY PRICES BARELY MOVE, because the computer sides never sell goods. As last
   version.
 - WHERE EACH SIDE STARTS IS NOT RANDOM. The computer sides always take the richest free
-  countries in the same order, so the third and fourth sides are dealt the leftovers. The
-  Prospectors win almost only when they go first or second.
+  countries in the same order, so the third and fourth sides are dealt the leftovers.
+- RENAMING SHIPS, COLONIES AND STATIONS is still cut, from last version.
 - A station ring can be edge-on for a moment as you turn the globe; it comes back as
   you keep turning.
 - The list of station slots on the Solar System Map appears only while you point at

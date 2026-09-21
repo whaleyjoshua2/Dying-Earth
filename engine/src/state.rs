@@ -199,6 +199,19 @@ pub struct NationState {
     pub queue: Vec<Build>,
     /// Ticket #56: COASTAL slots the sea has taken, for good. The sea takes nothing else.
     pub lost_slots: u32,
+    /// Ticket #276 (version 0.08.5): inland slots the sea has turned coastal, one at every rise that
+    /// reaches this state, wall or no wall. They are counted on the coastal row from then on and the
+    /// next rise can take them; the total never changes, the drownable share grows.
+    #[serde(default)]
+    pub converted: u32,
+    /// Ticket #282 (version 0.08.5): steps a neutral Region has earned holding against an attack,
+    /// each +1 to its Standing Army's strength for good, to Industry + 4.
+    #[serde(default)]
+    pub armed: u32,
+    /// Ticket #282: Incomes still to wait before a destroyed Standing Army is raised again -- one,
+    /// so it returns two Incomes after it died rather than the next, and a won Battle opens a window.
+    #[serde(default)]
+    pub respawn_wait: u32,
     /// Ticket #270 (version 0.08.4): how many Armies have ever been raised from this Region, so a
     /// re-raised Standing Army takes the next number and no name is given twice.
     #[serde(default)]
@@ -471,6 +484,11 @@ pub struct Army {
     pub escaped: bool,
     /// Ordered to move or attack this turn; consumed in Resolution.
     pub move_to: Option<StateId>,
+    /// Ticket #282 (version 0.08.5): a Levy -- the second Army a neutral Region raises while a
+    /// foreign Army stands next door or a neighbour is Occupied, at Industry + 2, and stands down
+    /// when the threat passes. Standing, so it fights for the Region and never marches.
+    #[serde(default)]
+    pub levy: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -486,6 +504,12 @@ pub struct EmissionsBreakdown {
     /// Ticket #55: what the Permafrost Thaw Break adds every Climate phase once it has fired. Its
     /// own line: nobody's Blame, and never counted against a Stabilization run.
     pub permafrost: f64,
+    /// Ticket #279 (version 0.08.5): what the Battles fought on Earth and in Earth orbit last turn
+    /// put in the air -- so many ppm a hit landed and so many a building burned. A Faction's own
+    /// hits are its Blame; a neutral Region's Army's are nobody's. Counted against a Stabilization
+    /// run, at the designer's word: a war a Faction chose is not the weather.
+    #[serde(default)]
+    pub war: f64,
     pub sink: f64,
     /// Ticket #54: what the Scrubbers standing and online this Climate phase add to the Sink. It
     /// took Restoration's place in the breakdown and in the Stabilization sum.
@@ -496,9 +520,10 @@ pub struct EmissionsBreakdown {
 }
 
 impl EmissionsBreakdown {
-    /// Emissions that count against a Stabilization run: buildings, launches and population, not cards.
+    /// Emissions that count against a Stabilization run: buildings, launches, population and, since
+    /// ticket #279, war -- not cards and not the permafrost.
     pub fn counted(&self) -> f64 {
-        self.state_industry + self.factories + self.power_plants + self.refineries + self.launches + self.population
+        self.state_industry + self.factories + self.power_plants + self.refineries + self.launches + self.population + self.war
     }
     pub fn total(&self) -> f64 {
         self.counted() + self.cards + self.permafrost
@@ -565,6 +590,15 @@ pub struct Climate {
     /// Ticket #54: `removal_next` went with Restoration. What a Faction takes back is now the
     /// Scrubbers standing at the Climate phase, read off the board (`scrubber_removal_by_seat`).
     pub card_emissions_next: f64,
+    /// Ticket #279 (version 0.08.5): what last turn's Battles on Earth put in the air, charged at
+    /// the next Climate phase -- by the seat whose hits (and whose taking) it was, and nobody's for
+    /// a neutral Region's own Army. And the running total of nobody's, for the sweep.
+    #[serde(default)]
+    pub war_next: [f64; SEAT_COUNT],
+    #[serde(default)]
+    pub war_next_nobody: f64,
+    #[serde(default)]
+    pub war_nobody_total: f64,
     /// Ticket #55: the Natural Sink as it stands. It opens at the table's figure and the Sink
     /// Weakens Break lowers it for good; every reader of the Sink reads this, so a weakened Sink
     /// moves the Stabilization bar and the Custodian AI's own pace with it.
@@ -749,6 +783,15 @@ pub struct SeatState {
     /// says the seat put it in the air.
     #[serde(default)]
     pub blame_smeared: f64,
+    /// Ticket #277 (version 0.08.5): ppm this seat has taken off its own Blame ledger by Greenwash,
+    /// for good. Comes off in `blame` and is shown as its own figure, so the panel never says the
+    /// seat took it out of the air.
+    #[serde(default)]
+    pub blame_cleaned: f64,
+    /// Ticket #279 (version 0.08.5): the ppm this seat's Battles on Earth have put in the air over
+    /// the game, for the sweep; it is inside `blame_emitted` already.
+    #[serde(default)]
+    pub war_ppm: f64,
     /// Ticket #268 (version 0.08.4): ppm of carbon credit this seat has bought over the game, which
     /// comes off its Blame ledger; ppm it has sold, which comes off its credit and, past what it
     /// held, goes onto its ledger as Blame taken; and the ppm it offers a turn, standing until
@@ -762,6 +805,12 @@ pub struct SeatState {
     /// Ticket #272 (version 0.08.4): Agitates this seat has landed over the game, for the sweep.
     #[serde(default)]
     pub agitates_issued: u32,
+    /// Ticket #278 (version 0.08.5): Colony-turns this seat's Colonies have spent starved under a
+    /// rival's Blockade, and Colony-turns its Blockades have starved a rival's, over the game.
+    #[serde(default)]
+    pub blockade_turns_suffered: u32,
+    #[serde(default)]
+    pub blockade_turns_imposed: u32,
     /// Ticket #227 (version 0.08.2): units this seat has bought and sold through the Trading window
     /// over the whole game. Kept because floating prices are only fair if more than one hand is on
     /// them, and the sweep had no way to say whose were.
@@ -858,17 +907,67 @@ pub enum Outcome {
 
 /// One party in a Battle (ticket #50): a Battle is a melee of every Faction present, so the
 /// Battle Report lists each of them rather than an attacker and a defender.
+/// Ticket #286 (version 0.08.5): the war, counted where it happens. Until this version the sweep
+/// printed no military figure of any kind and the engine's only count of Battles was a comment.
+/// Every figure is a counter incremented at the event, never a sentence scraped from the log; by
+/// seat where a seat is the actor.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WarCounters {
+    /// Battles opened, by the seat that opened them; and Battles fought against a neutral Region's own Army.
+    pub battles: [u32; SEAT_COUNT],
+    pub battles_vs_neutral: u32,
+    pub armies_built: [u32; SEAT_COUNT],
+    pub armies_lost: [u32; SEAT_COUNT],
+    pub standing_armies_lost: u32,
+    pub warships_built: [u32; SEAT_COUNT],
+    pub warships_lost: [u32; SEAT_COUNT],
+    pub occupations_begun: [u32; SEAT_COUNT],
+    pub occupations_broken: [u32; SEAT_COUNT],
+    /// Places taken by force: an Occupation completed or Pacified. A take by Influence is counted elsewhere.
+    pub takes_by_force: [u32; SEAT_COUNT],
+    pub marches_neutral: [u32; SEAT_COUNT],
+    pub marches_held: [u32; SEAT_COUNT],
+    pub orbit_attacks: [u32; SEAT_COUNT],
+}
+
+impl WarCounters {
+    /// Sum another game's counters into this one, for the sweep.
+    pub fn add(&mut self, o: &WarCounters) {
+        for i in 0..SEAT_COUNT {
+            self.battles[i] += o.battles[i];
+            self.armies_built[i] += o.armies_built[i];
+            self.armies_lost[i] += o.armies_lost[i];
+            self.warships_built[i] += o.warships_built[i];
+            self.warships_lost[i] += o.warships_lost[i];
+            self.occupations_begun[i] += o.occupations_begun[i];
+            self.occupations_broken[i] += o.occupations_broken[i];
+            self.takes_by_force[i] += o.takes_by_force[i];
+            self.marches_neutral[i] += o.marches_neutral[i];
+            self.marches_held[i] += o.marches_held[i];
+            self.orbit_attacks[i] += o.orbit_attacks[i];
+        }
+        self.battles_vs_neutral += o.battles_vs_neutral;
+        self.standing_armies_lost += o.standing_armies_lost;
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BattleParty {
     /// None for a neutral state's own Armies.
     pub seat: Option<Seat>,
     /// True for the party whose Attack or Intercept started the Battle.
     pub aggressor: bool,
+    /// Ticket #281 (version 0.08.5): every unit by name and what it took -- "TSV Valiant took 2
+    /// hits; PMV Aurora escaped" -- where it was the roster's types before.
     pub units: String,
     pub strength: i64,
     pub hits: u32,
     pub destroyed: Vec<String>,
     pub escaped: Vec<String>,
+    /// Ticket #281: an aggressor's first-round odds against everyone else present, as the attack
+    /// button quoted them; None for a party that did not open the Battle.
+    #[serde(default)]
+    pub odds: Option<f64>,
 }
 
 /// One line of the Battle Report (spec 10.3), amended by ticket #50: every party present.
@@ -877,6 +976,10 @@ pub struct BattleLine {
     pub place: String,
     pub parties: Vec<BattleParty>,
     pub result: String,
+    /// Ticket #281 (version 0.08.5): the real place, so the Report's line can jump to it; the name
+    /// above stays for the log and old saves.
+    #[serde(default)]
+    pub at: Option<ReportPlace>,
 }
 
 impl BattleLine {
@@ -1028,6 +1131,12 @@ pub struct Game {
     pub colonies: Vec<Colony>,
     pub ships: Vec<Ship>,
     pub armies: Vec<Army>,
+    /// Ticket #286 (version 0.08.5): the war, counted on the game so the sweep can say it.
+    pub war: WarCounters,
+    /// Ticket #282 (version 0.08.5): Levies raised and neutral Regions that held against an attack
+    /// over the game, for the sweep.
+    pub levies_raised: u32,
+    pub neutral_holds: u32,
     pub climate: Climate,
     pub research: Research,
     pub deck: Deck,
@@ -1094,10 +1203,14 @@ impl Game {
             victory_history: Vec::new(),
             directive_sink: 0.0,
             blame_smeared: 0.0,
+            blame_cleaned: 0.0,
+            war_ppm: 0.0,
             credits_bought: 0.0,
             credits_sold: 0.0,
             credits_offered: 0,
             agitates_issued: 0,
+            blockade_turns_suffered: 0,
+            blockade_turns_imposed: 0,
             bought_units: 0,
             sold_units: 0,
             spaceport_influence: 0,
@@ -1165,6 +1278,9 @@ impl Game {
                 },
                 queue: Vec::new(),
                 lost_slots: 0,
+                converted: 0,
+                armed: 0,
+                respawn_wait: 0,
                 armies_raised: 0,
                 drowned: Vec::new(),
                 thresholds_fired: vec![false; tables.climate.sea_level_thresholds.len()],
@@ -1210,6 +1326,9 @@ impl Game {
             colonies: Vec::new(),
             ships: Vec::new(),
             armies: Vec::new(),
+            war: WarCounters::default(),
+            levies_raised: 0,
+            neutral_holds: 0,
             climate: Climate {
                 co2: tables.climate.starting_co2,
                 temperature: tables.climate.base_temperature,
@@ -1217,6 +1336,9 @@ impl Game {
                 history: Vec::new(),
                 launches_pending: [0; SEAT_COUNT],
                 card_emissions_next: 0.0,
+                war_next: [0.0; SEAT_COUNT],
+                war_next_nobody: 0.0,
+                war_nobody_total: 0.0,
                 natural_sink: tables.climate.natural_sink,
                 permafrost: 0.0,
                 breaks_fired: vec![false; tables.climate.breaks.len()],
@@ -1981,13 +2103,51 @@ impl Game {
         }
     }
 
+    /// Industry Level + 1, plus every step the Region has earned holding against an attack
+    /// (ticket #282, version 0.08.5; neutral Regions only earn them).
     pub fn standing_army_cap(&self, s: StateId) -> u32 {
-        self.state(s).industry_level + 1
+        self.state(s).industry_level + 1 + self.state(s).armed
+    }
+
+    /// Ticket #282: a Levy's strength, Industry + 2, at the designer's word.
+    pub fn levy_cap(&self, s: StateId) -> u32 {
+        self.state(s).industry_level + 2
+    }
+
+    /// Ticket #282: the most steps a neutral Region may earn, so its Standing Army never passes
+    /// Industry + 4.
+    pub const MAX_ARMED: u32 = 3;
+
+    /// Ticket #282: whether a neutral Region is threatened -- a built Army of any Faction stands in
+    /// a neighbouring Region, or a neighbour is under Occupation. Stance-blind, at the designer's
+    /// word: a rival's orders are not disclosed by a Region arming.
+    pub fn neutral_threatened(&self, s: StateId) -> bool {
+        self.state(s).control == Control::Neutral
+            && self.tables.state(s).neighbours.iter().any(|n| {
+                self.state(*n).control.is_occupied() || self.armies.iter().any(|a| !a.standing && a.at == ArmyAt::Place(Place::State(*n)))
+            })
+    }
+
+    /// Ticket #282: the Levy standing at a Region, if one does.
+    pub fn levy_at(&self, s: StateId) -> Option<ArmyId> {
+        self.armies.iter().find(|a| a.levy && a.home == ArmyHome::State(s)).map(|a| a.id)
+    }
+
+    /// Ticket #282: raise a Region's Levy, named as any Army from its home and at full strength.
+    pub fn raise_levy(&mut self, s: StateId) -> ArmyId {
+        let id = self.raise_army(Place::State(s), true);
+        if let Some(a) = self.army_mut(id) {
+            a.levy = true;
+        }
+        self.levies_raised += 1;
+        id
     }
 
     pub fn army_strength(&self, a: &Army) -> i64 {
         if a.standing {
             let cap = match a.home {
+                // Ticket #282 (version 0.08.5): a Levy stands at Industry + 2.
+                ArmyHome::State(s) if a.levy => self.levy_cap(s) as i64,
                 ArmyHome::State(s) => self.standing_army_cap(s) as i64,
                 ArmyHome::Colony(_) => self.tables.unit(UnitKind::Army).strength,
             };
@@ -2029,7 +2189,7 @@ impl Game {
                 if nth == 1 { format!("the {site} Garrison") } else { format!("the {} {site} Garrison", Game::ordinal(nth)) }
             }
         };
-        self.armies.push(Army { id, name, home, at: ArmyAt::Place(place), damage: 0, standing, stance: Stance::Hold, escaped: false, move_to: None });
+        self.armies.push(Army { id, name, home, at: ArmyAt::Place(place), damage: 0, standing, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
         id
     }
 
@@ -2150,15 +2310,17 @@ impl Game {
         (self.tables.coastal_per_exposure * exposure).min(self.start_slots(s).saturating_sub(1))
     }
 
-    /// Ticket #56: the coastal slots it has left, once the sea has had its thresholds.
+    /// Ticket #56: the coastal slots it has left, once the sea has had its thresholds. Ticket #276
+    /// (version 0.08.5): plus every inland slot the sea has turned coastal since.
     pub fn coastal_slots(&self, s: StateId) -> u32 {
-        self.coastal_slots_start(s).saturating_sub(self.state(s).lost_slots)
+        (self.coastal_slots_start(s) + self.state(s).converted).saturating_sub(self.state(s).lost_slots)
     }
 
-    /// Ticket #56: its inland slots, which the sea never touches and a raise always adds to.
+    /// Ticket #56: its inland slots, which a raise always adds to. Ticket #276 (version 0.08.5): the
+    /// sea reaches them too, one turned coastal at every rise, so the row shrinks as the game warms.
     pub fn inland_slots(&self, s: StateId) -> u32 {
         let raised = self.state(s).industry_level.saturating_sub(self.tables.state(s).industry_level);
-        self.start_slots(s) - self.coastal_slots_start(s) + raised
+        (self.start_slots(s) - self.coastal_slots_start(s) + raised).saturating_sub(self.state(s).converted)
     }
 
     /// Ticket #56: coastal slots with something standing or building in them.
@@ -2518,8 +2680,10 @@ impl Game {
         // this seat by Smear counts, at the designer's word, so the share the rules read diverges
         // from what the seat put in the air.
         // Ticket #268: credits bought come off; credits sold past what was held go on.
+        // Ticket #277 (version 0.08.5): what the seat has greenwashed comes off, the whole ledger,
+        // floored at nought as ever.
         let oversold = (s.credits_sold - s.blame_removed).max(0.0);
-        (s.blame_emitted - s.blame_removed + s.blame_smeared + oversold - s.credits_bought).max(0.0)
+        (s.blame_emitted - s.blame_removed + s.blame_smeared + oversold - s.credits_bought - s.blame_cleaned).max(0.0)
     }
 
     /// Ticket #53 defined the credit as the ppm removed BEYOND everything ever emitted -- and
@@ -2644,9 +2808,11 @@ impl Game {
             .filter(|f| f.working())
             .map(|f| self.tables.facility(f.kind).influence_allotment)
             .sum();
+        // Ticket #278 (version 0.08.5): a starved Colony's Relay and Chorus give nothing either.
         let space: i64 = self
             .owned_colonies(seat)
             .iter()
+            .filter(|c| self.starved_by(**c).is_none())
             .flat_map(|c| self.colony(*c).into_iter().flat_map(|c| c.modules.iter()))
             .filter(|m| m.working())
             .map(|m| self.tables.module(m.kind).influence_allotment)
@@ -2813,23 +2979,44 @@ impl Game {
     /// Ticket #99 (version 0.07.0): a rival warship sitting in this Orbital Slot blockades it. The
     /// blockade stops Colonists and Armies being unloaded into the station standing there, and stops
     /// that station refuelling a Ship; it reaches no further, and never touches the ground.
+    /// Ticket #278 (version 0.08.5): only a warship ORDERED to Blockade blockades -- "the blockade
+    /// needs to be positively chosen, not just the presence of a ship" -- and a blockaded station
+    /// makes nothing (`starved_by`).
     pub fn slot_blockaded_against(&self, seat: Seat, body: BodyId, slot: u32) -> bool {
-        self.ships
-            .iter()
-            .any(|s| s.seat != seat && s.kind.is_warship() && !s.escaped && s.at == ShipAt::Body(body) && s.slot == Some(slot))
+        self.ships.iter().any(|s| s.seat != seat && self.blockading(s) && s.at == ShipAt::Body(body) && s.slot == Some(slot))
+    }
+
+    /// Ticket #278: a warship on Blockade, still engaged. The one test every blockade reads.
+    fn blockading(&self, s: &Ship) -> bool {
+        s.kind.is_warship() && !s.escaped && s.stance == Stance::Blockade
     }
 
     /// Ticket #99: the seats blockading this slot, for the card and the Report.
     pub fn slot_blockaders(&self, body: BodyId, slot: u32) -> Vec<Seat> {
-        let mut v: Vec<Seat> = self
-            .ships
-            .iter()
-            .filter(|s| s.kind.is_warship() && !s.escaped && s.at == ShipAt::Body(body) && s.slot == Some(slot))
-            .map(|s| s.seat)
-            .collect();
+        let mut v: Vec<Seat> = self.ships.iter().filter(|s| self.blockading(s) && s.at == ShipAt::Body(body) && s.slot == Some(slot)).map(|s| s.seat).collect();
         v.sort();
         v.dedup();
         v
+    }
+
+    /// Ticket #278 (version 0.08.5): whether this seat has a blockading warship at the Body at all,
+    /// in any slot -- what starves a Colony on the GROUND under its outright Orbital Control.
+    pub fn blockading_at(&self, seat: Seat, body: BodyId) -> bool {
+        self.ships.iter().any(|s| s.seat == seat && self.blockading(s) && s.at == ShipAt::Body(body))
+    }
+
+    /// Ticket #278 (version 0.08.5): the seat starving this Colony, if any. A station starves under
+    /// a Blockade of its own slot by a rival; a Colony on the ground starves while one rival holds
+    /// Orbital Control of its Body outright AND has a stack there on Blockade -- a contested orbit
+    /// starves nobody, as it lands nobody. Nobody's Colony starves, having nobody to squeeze.
+    pub fn starved_by(&self, cid: ColonyId) -> Option<Seat> {
+        let col = self.colony(cid)?;
+        let holder = col.control.director()?;
+        if col.in_orbit {
+            self.slot_blockaders(col.body, col.slot).into_iter().find(|s| *s != holder)
+        } else {
+            self.orbital_control(col.body).filter(|o| *o != holder && self.blockading_at(*o, col.body))
+        }
     }
 
     /// Ticket #99: a station of this seat's at this Body that a rival warship is not blockading, so

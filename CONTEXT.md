@@ -278,8 +278,12 @@ A ground fighting unit. A Region's Armies belong to the state and are directed b
 _Avoid_: troops, soldiers, garrison, marines
 
 **Standing Army**:
-The Armies a Region keeps on its own, sized by its card and replenished a little each turn, whether or not any Faction controls it. Named like any other Army since version 0.08.4 -- the one the game begins with is *the 1st Chinese Army*.
+The Armies a Region keeps on its own, sized by its card and replenished a little each turn, whether or not any Faction controls it. Named like any other Army since version 0.08.4 -- the one the game begins with is *the 1st Chinese Army*. Its strength is the Region's Industry Level plus one, and since version 0.08.5 plus a step for every attack a neutral Region has held against, to Industry Level plus four; destroyed, it returns at strength one two Incomes later rather than the next, so a won Battle opens a window.
 _Avoid_: garrison, militia, defence value
+
+**Levy**:
+The second Army a neutral Region raises while it is threatened, since version 0.08.5: a built Army of any Faction standing in a neighbouring Region, or a neighbour under Occupation, and the Region's Unrest under the Standing Army's threshold. It stands at Industry Level plus two, heals as a Standing Army does, never marches, and stands down at the Income after the threat has passed or the moment the Region is somebody's. A Region arms whatever the neighbouring Army's stance, so nobody's orders are disclosed by it.
+_Avoid_: militia, reserves, conscripts, second Standing Army
 
 **Barracks**:
 The Module that lets a Colony hold and build a defensive Army. A Colony without one has no defenders.
@@ -393,19 +397,19 @@ One of the places a Facility occupies in a Region. A state has Size + Industry L
 _Avoid_: building slot, plot, space, capacity
 
 **Coastal Slot**:
-A build slot on a Region's coast, where the sea can reach it. A state has three per point of Coastal Exposure, never more than its start slots less one, and never gains another. A Facility standing in one the sea takes is destroyed, oldest first.
+A build slot on a Region's coast, where the sea can reach it. A state begins with two per point of Coastal Exposure (three before version 0.05.5), never more than its start slots less one, and since version 0.08.5 it gains one more at every Sea Level rise that reaches it, turned from an Inland Slot, wall or no wall. A Facility standing in one the sea takes is destroyed, oldest first.
 _Avoid_: shore slot, waterfront, flood zone
 
 **Inland Slot**:
-A build slot the sea never reaches: the start slots the coastal ones leave over, and every slot a raise of the Industry Level adds.
+A build slot the sea does not take: the start slots the coastal ones leave over, and every slot a raise of the Industry Level adds. Since version 0.08.5 the sea reaches it another way: every rise turns one Inland Slot of the state into a Coastal Slot, an empty one first and otherwise the oldest inland Facility's with the Facility on it, so the next rise can take it. A raised slot turns like any other.
 _Avoid_: safe slot, interior, highland
 
 **Coastal Exposure**:
-How much of a Region stands on the coast, a figure on its card. It sets how many Coastal Slots the state has, two per point since version 0.05.5 (three before), and how many of them each Sea Level threshold takes. A state with no Coastal Slots left loses no more of them, though the threshold still drives out its people and raises its Unrest.
+How much of a Region stands on the coast, a figure on its card. It sets how many Coastal Slots the state begins with, two per point since version 0.05.5 (three before), and how many of them each Sea Level threshold takes. A state with no Coastal Slots left loses no more of them that rise, though the threshold still drives out its people, raises its Unrest and, since version 0.08.5, turns one Inland Slot coastal. A state at exposure 0 would be landlocked and spared all of it; none on the board is.
 _Avoid_: coastline, vulnerability, flood risk
 
 **Sea Wall**:
-The Facility that holds the sea off: it takes no build slot (since version 0.05.5; a Coastal Slot before), at most one to a state, and while it is working every Sea Level threshold of any kind takes no slots from the state. Since version 0.08.4 it **stands** through them -- from version 0.05 to 0.08.3 it absorbed one and was destroyed doing it -- and each rise it has held adds half a Material a turn to its keep, paid at Income; a seat short of Materials leaves it unkept that turn, and an unkept wall holds nothing. A Storm Surge that breaks on a standing wall no longer brings a threshold forward: the wall holds, and the Facilities in the state's Coastal Slots make three tenths less at the next Income. It needs Coastal Engineering.
+The Facility that holds the sea off: it takes no build slot (since version 0.05.5; a Coastal Slot before), at most one to a state, and while it is working every Sea Level threshold of any kind takes no slots from the state; since version 0.08.5 the threshold still turns one Inland Slot coastal behind the wall, which holds the taking off and not the turning. Since version 0.08.4 it **stands** through them -- from version 0.05 to 0.08.3 it absorbed one and was destroyed doing it -- and each rise it has held adds half a Material a turn to its keep, paid at Income; a seat short of Materials leaves it unkept that turn, and an unkept wall holds nothing. A Storm Surge that breaks on a standing wall no longer brings a threshold forward: the wall holds, and the Facilities in the state's Coastal Slots make three tenths less at the next Income. It needs Coastal Engineering.
 _Avoid_: dyke, levee, barrier, flood defence
 
 **Coastal Engineering**:
@@ -449,16 +453,20 @@ The Orders-phase order that steers Refugees: once a turn, for Ducats, every flow
 _Avoid_: relocate, evacuate, transfer, deport
 
 **Blame**:
-The CO2 a Faction is answerable for over the whole game, as a **ledger**: it begins from physics -- everything the sources it controlled has emitted, less everything it has taken back (its Scrubbers' removal, and since version 0.08.4 what the Custodians' Research Directive has added to the Natural Sink, counted every Climate phase it stands) -- and since version 0.08.4 it is moved by deals and words as well: carbon credits bought take ppm off the buyer's ledger and put it on the seller's, and a Smear campaign lays ppm on its target's. The share every rule reads is computed from the ledger, so it can diverge from what a Faction physically put in the air. Never less than nothing. What no Faction controls is nobody's. A Faction's share of the four Factions' Blame, when it rises above a fair quarter, makes every Region it does not hold harder for it to win over; and since version 0.08.4 it moderates how fast the Faction's Standing decays on Regions it does not hold -- 3 a turn at a share of a half or more, 1 at an eighth or less, 2 between. Since version 0.08.2 it does a second thing: the other Factions hold it against them, each by its own measure -- the Custodians minding twice as much as the Archivists, the Arkwrights half as much, the Prospectors not at all -- so a dirty Faction loses the room to strike an Accord as well as the ground it wanted.
+The CO2 a Faction is answerable for over the whole game, as a **ledger**: it begins from physics -- everything the sources it controlled has emitted, since version 0.08.5 the hits its Battles on Earth landed and the buildings its takings burned among them, less everything it has taken back (its Scrubbers' removal, and since version 0.08.4 what the Custodians' Research Directive has added to the Natural Sink, counted every Climate phase it stands) -- and since version 0.08.4 it is moved by deals and words as well: carbon credits bought take ppm off the buyer's ledger and put it on the seller's, a Smear campaign lays ppm on its target's, and since version 0.08.5 a Greenwash takes ppm off the campaigner's own. The share every rule reads is computed from the ledger, so it can diverge from what a Faction physically put in the air. Never less than nothing. What no Faction controls is nobody's. A Faction's share of the four Factions' Blame, when it rises above a fair quarter, makes every Region it does not hold harder for it to win over; and since version 0.08.4 it moderates how fast the Faction's Standing decays on Regions it does not hold -- 3 a turn at a share of a half or more, 1 at an eighth or less, 2 between. Since version 0.08.2 it does a second thing: the other Factions hold it against them, each by its own measure -- the Custodians minding twice as much as the Archivists, the Arkwrights half as much, the Prospectors not at all -- so a dirty Faction loses the room to strike an Accord as well as the ground it wanted.
 _Avoid_: carbon debt, guilt, pollution score, emissions total, footprint
 
 **Carbon credit**:
-A ppm of Blame bought off a Faction's ledger, since version 0.08.4, from the Custodians and nobody else: they set the ppm they offer a turn, standing until changed, and any other Faction may buy up to ten ppm of it a turn at one Ducat a ppm times how the Custodians think of the buyer (Friendly half, Cordial three quarters, Wary half again, Cold double, Hostile refused). A credit bought comes off the buyer's Blame for good; it comes off the Custodians' Blame Credit, and past what they hold it goes onto their own ledger as Blame taken -- they may sell more than they have, which is their strategic choice to make. An offer is shared first come first served, a buyer left short gets its Ducats back, and a purchase is an act of friendship both ways. The computer Custodians offer their whole credit while their own share is under the fair quarter and refuse when it is not.
+A ppm of Blame bought off a Faction's ledger, since version 0.08.4, from the Custodians and nobody else: they set the ppm they offer a turn, standing until changed, and any other Faction may buy up to ten ppm of it a turn at one Ducat a ppm times how the Custodians think of the buyer (Friendly half, Cordial three quarters, Wary half again, Cold double, Hostile refused). A credit bought comes off the buyer's Blame for good; it comes off the Custodians' Blame Credit, and past what they hold it goes onto their own ledger as Blame taken -- they may sell more than they have, which is their strategic choice to make. An offer is shared first come first served, a buyer left short gets its Ducats back, and a purchase is an act of friendship both ways. Since version 0.08.5 the trade is made on the Faction window and not the Trading window: the Custodians offer from their own page, and every other Faction requests from the Custodians' page, beside the Accords and the Smear; a request is filled from the standing offer, the word having changed and the rule not. The computer Custodians offer their whole credit while their own share is under the fair quarter and refuse when it is not.
 _Avoid_: offset, indulgence, Blame credit (that is what the seller holds), carbon permit
 
 **Smear**:
 Influence spent on a rival Faction rather than a place, since version 0.08.4: every point lays two ppm on the rival's Blame ledger for good, moving the share every rule reads. One campaign a turn against each rival, of any amount the Allotment covers; an offence, and the Report names who paid. Called a smear because it inflates Blame above the ppm the rival actually produced -- a kind of a lie -- which is why the ledger and not the physics is what the rules read. The computer seats use it against a rival they are Cold or Hostile toward whose share stands above the fair quarter.
 _Avoid_: propaganda, denounce, expose, libel
+
+**Greenwash**:
+Influence spent on a Faction's own name, with a Ducat beside every point, since version 0.08.5: every point takes two ppm off the Faction's own Blame ledger for good, the whole ledger and never below nothing, moving the share every rule reads. One campaign a turn, of any amount the Allotment and the Ducats cover; public and no offence, so the Report says who greenwashed and a rival may answer with a Smear. The Smear's mirror, at the designer's word, and open to every Faction, the Custodians included. Called a greenwash because the Blame falls without a gram of CO2 leaving the air. The computer seats use it when their own share stands above the fair quarter and carbon credits are not to be had.
+_Avoid_: propaganda, PR, spin, whitewash, clean-up, self-smear
 
 **Blame Credit**:
 The CO2 a Faction has removed over the whole game, in ppm -- what its Scrubbers took out of the air, and for the Custodians what their Research Directive adds to the Natural Sink, counted every Climate phase. Since version 0.08.4; before that the word meant removal beyond everything the Faction had ever emitted, a figure measured at zero in every game, so it was read by no rule and held by nobody. It is the supply a carbon credit is sold from, less what has been sold. The panels read *answerable for N ppm (emitted E, removed R in credit)*.
@@ -545,7 +553,7 @@ The guided first turns, since version 0.07.5, asked for by the `Play Tutorial` t
 _Avoid_: walkthrough, onboarding, training mission, guided mode
 
 **Moment**:
-A short modal that stops the turn before the Report, for one sentence and one number: a Colony founded, a Break or the sea rising, a Battle that cost a unit, a place changing hands, a Tech completed, Antarctica opening, the Archive finished, Colonists lost in transit, or, since version 0.08.4, **a rival closing on its Victory Condition** -- three quarters of the way there, or one part met with the other short, once each, and never the player's own seat. At most two a turn, the most serious first, and every kind can be switched off.
+A short modal that stops the turn before the Report, for one sentence and one number: a Colony founded, a Break or the sea rising, a Battle that cost a unit (since version 0.08.5 any unit, an Army included, named), a place taken by force with buildings burned (its own kind since 0.08.5), a place changing hands, a Tech completed, Antarctica opening, the Archive finished, Colonists lost in transit, or, since version 0.08.4, **a rival closing on its Victory Condition** -- three quarters of the way there, or one part met with the other short, once each, and never the player's own seat. At most two a turn, the most serious first, and every kind can be switched off.
 _Avoid_: popup, alert, notification, cutscene, interruption
 
 **Spectator**:
@@ -559,7 +567,7 @@ _Avoid_: checkpoint, snapshot, savegame
 ### Combat
 
 **Battle**:
-A melee at one Body, Region or Colony in which every Faction present is hostile to every other, resolved automatically in rounds during end-of-turn processing and always finished inside the turn. Each round a party's chance to hit is its share of the total strength present, and its hits are spread across the other parties in proportion to theirs.
+A melee at one Body, Region or Colony in which every Faction present is hostile to every other, resolved automatically in rounds during end-of-turn processing and always finished inside the turn. Each round a party's chance to hit is its share of the total strength present, and its hits are spread across the other parties in proportion to theirs. Since version 0.08.5 a Battle on Earth pollutes: its hits and the buildings it burns are Emissions at the next Climate phase, and Blame for those who landed them.
 _Avoid_: fight, engagement, skirmish, encounter
 
 **Stance**:
@@ -583,15 +591,15 @@ A damaged unit's attempt to leave a Battle, more likely the more damage it carri
 _Avoid_: retreat, rout, flee, break
 
 **Battle Report**:
-The account of every Battle from the last end-of-turn processing, read at the start of the next turn.
+The account of every Battle from the last end-of-turn processing, read at the start of the next turn. Since version 0.08.5 every Battle is also a line of the Report at its place, ranked with a Ship destroyed when a unit died and unranked when nobody lost one, so a skirmish never reads over a Break; its parties name every unit and what it took, and an attacker's first-round odds as the button quoted them; and an Army destroyed is a line by name, as a Ship has been.
 _Avoid_: combat log, after-action report
 
 **Orbital Control**:
-Held at a Body by a Faction that has a Frigate or Battleship there with no enemy warship still engaged. Since version 0.07.0 it governs the GROUND alone: Armies and Colonists land freely unless a rival holds it outright, so an orbit two Factions contest shuts out neither. What a station suffers is a Blockade, which is a different thing.
+Held at a Body by a Faction that has a Frigate or Battleship there with no enemy warship still engaged. Since version 0.07.0 it governs the GROUND alone: Armies and Colonists land freely unless a rival holds it outright, so an orbit two Factions contest shuts out neither. What a station suffers is a Blockade, which is a different thing; but since version 0.08.5 a Colony on the ground is starved -- every Module making nothing and paying its upkeep -- while one rival holds Orbital Control of its Body outright and has a stack there ordered to Blockade. A contested orbit starves nobody, as it lands nobody.
 _Avoid_: blockade, orbital supremacy, space superiority
 
 **Blockade**:
-What a warship does by sitting in an Orbital Slot, since version 0.07.0. A Ship chooses the Slot it arrives into when its leg is ordered, before it can see who will be there; a Frigate or Battleship sitting in one shuts that Slot to every other Faction, and nothing else. Nobody may unload Colonists or Armies into the station standing there, nobody may refuel from it, and an empty Slot under blockade cannot be built into. It never touches the ground, never reaches another Slot at the same Body, and never shuts a Faction out of a place no warship is sitting on.
+What a warship stack does when it is ORDERED to, since version 0.08.5, in the Orbital Slot it sits in: a Ship chooses the Slot it arrives into when its leg is ordered, before it can see who will be there, and from version 0.07.0 to 0.08.4 a Frigate or Battleship sitting in a Slot blockaded it by presence alone; now a Blockade is a stance, chosen against the rival station standing there, and a stack on any other stance blockades nothing. A blockading stack shuts that Slot to every other Faction: nobody may unload Colonists or Armies into the station standing there, nobody may refuel from it, and an empty Slot under blockade cannot be built into. Since version 0.08.5 the station standing there is starved as well: every Module makes nothing and still pays its upkeep, its Relay gives no Allotment, nobody dies and nothing is destroyed, and each turn of it is an offence at weight 1 against the station's holder, read live at each Income. It never reaches another Slot at the same Body and never shuts a Faction out of a place no warship is sitting on; the ground is Orbital Control's business.
 _Avoid_: siege, embargo, interdiction, orbital control
 
 **Occupation**:
@@ -637,7 +645,7 @@ Degrees above pre-industrial. It follows the CO2 Stock with a lag of one to two 
 _Avoid_: heat, warming percentage
 
 **Emissions**:
-The CO2-equivalent a source adds to the CO2 Stock in a turn. Every source has its own figure and the Climate Panel shows them one by one before the sum; methane-heavy sources carry a heavier weight. Since version 0.05 a Region's people emit more the more built-up the state is, and a Leapfrog lowers that state's figure for good.
+The CO2-equivalent a source adds to the CO2 Stock in a turn. Every source has its own figure and the Climate Panel shows them one by one before the sum; methane-heavy sources carry a heavier weight. Since version 0.05 a Region's people emit more the more built-up the state is, and a Leapfrog lowers that state's figure for good. Since version 0.08.5 war is a source: every hit landed in a Battle on Earth or in Earth orbit, and every building burned in the rolls after a ground Battle or a taking, puts ppm in the air at the next Climate phase, worn as Blame by whoever landed the hit or made the taking, nobody's for a neutral Region's own Army, and counted against a Stabilization run. A Battle at any other Body fouls nobody's air.
 _Avoid_: output, carbon, footprint
 
 **Emissions history**:
@@ -653,7 +661,7 @@ The amount of CO2 the oceans and forests remove from the CO2 Stock every turn. N
 _Avoid_: absorption, offset, carbon capture
 
 **Sea Level**:
-How far the oceans have risen with the Temperature. It is drawn on the globe as a band of drowned land along every coast, widening with each threshold, and at each of its thresholds it permanently takes Coastal Slots from every Region, as many as the state's Coastal Exposure and never more than it has left. It takes nothing else: an Inland Slot is out of its reach, and so is a state whose coast is already gone.
+How far the oceans have risen with the Temperature. It is drawn on the globe as a band of drowned land along every coast, widening with each threshold, and at each of its thresholds it permanently takes Coastal Slots from every Region, as many as the state's Coastal Exposure and never more than it has left, and then, since version 0.08.5, turns one Inland Slot coastal, wall or no wall, so a coast never runs out. It takes nothing else and takes nothing from a state with no Coastal Slots left that rise, but it reaches every state that has a coast at all.
 _Avoid_: flooding, water line, ocean rise
 
 **Break**:

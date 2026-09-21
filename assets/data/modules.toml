@@ -34,6 +34,7 @@ name = "Habitat"
 materials = 25
 build_turns = 1
 energy_upkeep = 2
+does = "holds 4 Colonists (8 with Expanded Habitats)"
 # Ticket #80 (version 0.06.0): 8, from 4 (the Arkwrights 12; Expanded Habitats still +2).
 # Ticket #207 (version 0.08.1): back to 4, at the designer's word -- "Habs back to 4" -- with
 # Expanded Habitats raised to +4 in its place (`habitat_colonists` in techs.toml), so a RESEARCHED
@@ -49,6 +50,7 @@ name = "Shipyard"
 materials = 35
 build_turns = 2
 energy_upkeep = 4
+does = "the only place a Ship can be built"
 
 [[module]]
 id = "barracks"
@@ -56,6 +58,7 @@ name = "Barracks"
 materials = 20
 build_turns = 1
 energy_upkeep = 2
+does = "the only place a Colony Army is raised and repaired; holds one"
 
 # Ticket #35 (version 0.03): made 3 Ducats x the Body's Habitat yield. Ticket #90 (version 0.06.0):
 # trade is a network. It makes `amount` Ducats per Colonist of its Faction at its Body (stations
@@ -199,6 +202,7 @@ name = "Core Module"
 materials = 0
 build_turns = 0
 energy_upkeep = 1
+does = "holds 4 Colonists and never counts against the Colony's room for Modules"
 holds_colonists = 4
 
 # Ticket #185 (version 0.08.0): the Institute, the School's form off Earth. At most one per Colony
@@ -211,6 +215,7 @@ name = "Institute"
 materials = 25
 build_turns = 2
 energy_upkeep = 2
+does = "raises this place's Education Level 0.20 a turn, to 2.0; it falls back at the same rate when the Institute stops"
 
 # Ticket #186 (version 0.08.0): the Academy, the Custodians' Unique Module, replacing the Institute
 # on their build list at the common price. It does everything an Institute does and pays
@@ -223,6 +228,7 @@ name = "Academy"
 materials = 25
 build_turns = 2
 energy_upkeep = 2
+does = "does an Institute's work and pays 1 Ducat a turn while it is online"
 
 # Ticket #239 (version 0.08.3): the Heliostat, the Archivists' Unique Module, replacing the Solar
 # Array on their build list at the common price -- the same 25 Materials, two turns, no upkeep,
@@ -249,6 +255,7 @@ name = "Exchange"
 materials = 25
 build_turns = 1
 energy_upkeep = 2
+does = "pays 1 Ducat more a turn than a Trade Post"
 produces = { resource = "ducats", amount = 2 }
 per_other_body = 3
 fuel_off = 4

@@ -23,6 +23,15 @@ start_rivals = "Your rivals are {rivals}. Build, spread Influence, and get twelv
 solar_storm = "Solar Storm: no transit advanced this turn."
 ship_arrived = "{faction} {ship} arrived at {body}."
 ship_destroyed = "{faction} {ship} destroyed ({why}){cargo}."
+# Ticket #281 (version 0.08.5): an Army destroyed, by name, as a Ship has been; and every Battle
+# as a line of its own, ranked when a unit died and unranked otherwise.
+army_destroyed = "{army} ({faction}) destroyed ({why})."
+# Ticket #282 (version 0.08.5): neutral states arm when threatened -- a Levy raised, stood down,
+# and a Region that held against an attack arming for good.
+levy_raised = "{state} arms: {army} is raised at strength {n} while a foreign Army stands next door."
+levy_disbanded = "{state} stands down {army}: the threat has passed."
+neutral_held = "{state} held against the attack, and arms: its Standing Army will stand at {n} from now on."
+battle = "Battle at {place}: the {faction} attacked at {odds}% first-round odds; {outcome}."
 event_damaged_ships = "{event} damaged {n} Ship(s)."
 loaded = "{faction} loaded {cargo} at {body}."
 slot_taken = "{faction}: another Faction took that Colony Slot first."
@@ -103,6 +112,10 @@ rival_three_quarters = "The {faction} are three quarters of the way to their Vic
 rival_one_part_met = "The {faction} have met half of their Victory Condition, {met}. Only {part} stands between them and the game, at {value} of {bar}."
 # Ticket #267 (version 0.08.4): a Smear campaign, named for who paid.
 smear = "The {faction} smeared the {target}: {ppm} ppm laid on their Blame."
+# Ticket #277 (version 0.08.5): a Greenwash, public so a rival can answer it.
+greenwash = "The {faction} greenwashed: {ppm} ppm off their Blame."
+# Ticket #278 (version 0.08.5): a Colony under a Blockade makes nothing and pays its upkeep.
+starved = "{place} is blockaded by the {faction}: it made nothing this turn, and its upkeep was paid."
 # Ticket #268 (version 0.08.4): carbon credits.
 credits_offered = "The {faction} offer {n} ppm of carbon credit a turn."
 credits_bought = "The {faction} bought {n} ppm of carbon credit from the {seller} for {ducats} Ducats: off their Blame, for good."
@@ -143,6 +156,10 @@ energy_zero = "{faction}: Energy fell to zero even with every producer off."
 attacks = " and attacks"
 cargo_aboard = " with {n} Colonists aboard"
 sea_unrest = " Unrest there rose by {rose} to {unrest}."
+# Ticket #276 (version 0.08.5): every rise turns one inland slot coastal, wall or no wall; an empty
+# slot first, else the oldest inland Facility with its slot.
+sea_inland = " The coast now reaches one slot further in."
+sea_inland_flipped = " The coast now reaches one slot further in: {what} stands on it now."
 # Ticket #85 (version 0.06.0): the count is an ordinal ("second", "twelfth", "13th"), and a
 # Colony founded in Antarctica has phrases of its own, since Antarctica is on Earth.
 first_colony = "their first Colony off Earth"
@@ -203,6 +220,7 @@ buy = "bought {n} {resource}"
 sell = "sold {n} {resource}"
 relief = "paid Relief in {state}"
 smear = "spent {n} Influence smearing the {faction}"
+greenwash = "spent {n} Influence and as many Ducats greenwashing their Blame"
 offer_credits = "offered {n} ppm of carbon credit a turn"
 buy_credits = "bought {n} ppm of carbon credit"
 agitate = "agitated in {state}"
@@ -237,6 +255,13 @@ figure = "{figure}"
 [moments.decisive_battle]
 on = true
 text = "A Battle at {place}: {result}"
+figure = "{figure}"
+
+# Ticket #281 (version 0.08.5): buildings burned on a taking, under their own name. The Battle's
+# Moment fires when a unit dies now, an Army included, and names it.
+[moments.taken_by_force]
+on = true
+text = "{place} taken by force: {result}"
 figure = "{figure}"
 
 # Ticket #261 (version 0.08.4): a rival closing on its Victory Condition -- three quarters of the

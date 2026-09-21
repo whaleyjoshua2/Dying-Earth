@@ -57,10 +57,13 @@
 # less the coastal slots the sea has taken. Its START slots (Size + base_slots + the Industry Level
 # on its card) hold `coastal_per_exposure` x Coastal Exposure coastal slots, never more than the
 # start slots minus one; the rest are inland, and every slot a raise of the Industry Level adds is
-# inland. The sea takes only coastal slots.
+# inland. The sea takes only coastal slots -- and since ticket #276 (version 0.08.5) it TURNS one
+# inland slot coastal at every rise that reaches a state, wall or no wall, so the coast never runs
+# out: an empty inland slot first, else the oldest inland Facility with its slot.
 base_slots = 3
 # Ticket #70 (version 0.05.5): 3 to 2, moving fifteen of the world's 49 coastal slots inland at the
-# start (34 remain); Europe's Refinery and North America's Factory stand inland from turn 1.
+# start (34 remained on the twelve Regions of the day; 40 since ticket #125 split out Japan and the
+# Arabian Peninsula); Europe's Refinery and North America's Factory stand inland from turn 1.
 coastal_per_exposure = 2
 
 [strip_permit]

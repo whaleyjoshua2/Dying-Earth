@@ -660,6 +660,10 @@ pub enum Stance {
     Hold,
     Intercept,
     Evade,
+    /// Ticket #278 (version 0.08.5): a warship stack ordered to blockade the rival station in the
+    /// Orbital Slot it sits in. Ships only. A Blockade is chosen, at the designer's word, never a
+    /// side effect of a Ship's presence: a stack on any other stance blockades nothing.
+    Blockade,
 }
 
 impl Stance {
@@ -669,6 +673,7 @@ impl Stance {
             Stance::Hold => "Hold",
             Stance::Intercept => "Intercept",
             Stance::Evade => "Evade",
+            Stance::Blockade => "Blockade",
         }
     }
 }

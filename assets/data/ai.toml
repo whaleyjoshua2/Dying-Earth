@@ -36,6 +36,7 @@ resettle = 2
 smear = 4
 # Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
 buy_credits = 4
+greenwash = 4
 # Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
 agitate = 4
 fund_archive = 6
@@ -64,6 +65,7 @@ stance_attack = 4
 stance_intercept = 3
 stance_hold = 2
 stance_evade = 1
+stance_blockade = 3
 
 [weights.custodians]
 build_scrubber = 8
@@ -81,6 +83,7 @@ resettle = 2
 smear = 4
 # Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
 buy_credits = 4
+greenwash = 4
 # Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
 agitate = 4
 fund_archive = 6
@@ -105,6 +108,7 @@ stance_attack = 2
 stance_intercept = 3
 stance_hold = 3
 stance_evade = 1
+stance_blockade = 3
 
 # Ticket #51: the Arkwrights spread. Habitats, Colony Ships, stations and founding are all 9;
 # Influence is 5, since they buy passage rather than allegiance.
@@ -123,6 +127,7 @@ resettle = 2
 smear = 4
 # Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
 buy_credits = 4
+greenwash = 4
 # Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
 agitate = 4
 fund_archive = 6
@@ -147,6 +152,7 @@ stance_attack = 2
 stance_intercept = 3
 stance_hold = 3
 stance_evade = 1
+stance_blockade = 3
 
 # Ticket #51: the Archivists research and build the Archive.
 [weights.archivists]
@@ -164,6 +170,7 @@ resettle = 2
 smear = 4
 # Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
 buy_credits = 4
+greenwash = 4
 # Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
 agitate = 4
 fund_archive = 8
@@ -193,6 +200,7 @@ stance_attack = 2
 stance_intercept = 3
 stance_hold = 3
 stance_evade = 1
+stance_blockade = 3
 
 [multipliers]
 victory_gap_max = 3.0
@@ -273,6 +281,11 @@ colonists = [[12, 4], [22, 12]]
 
 [thresholds]
 attack_odds = 0.6
+# Ticket #284 (version 0.08.5): every seat may attack a place it did not lose, on the odds, given a
+# cause: a neutral place needs none, and a place a rival holds wants Relations toward that rival at
+# or below this score -- Cold or worse, the Smear's gate. A seat that keeps every rival Neutral is
+# marched on by nobody. One new war a turn per seat.
+war_cause = -5
 evade_damage_fraction = 0.6667
 influence_step = 5
 # Ticket #75 (version 0.05.5): what a state another Faction holds is worth on the AI's Influence

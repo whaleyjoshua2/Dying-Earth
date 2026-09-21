@@ -41,6 +41,11 @@ pub struct SimResult {
     pub blame_credit: [f64; SEAT_COUNT],
     /// Ticket #267 (version 0.08.4): ppm laid on each seat by rivals' Smear campaigns.
     pub blame_smeared: [f64; SEAT_COUNT],
+    /// Ticket #277 (version 0.08.5): ppm each seat took off its own ledger by Greenwash.
+    pub blame_cleaned: [f64; SEAT_COUNT],
+    /// Ticket #279 (version 0.08.5): ppm each seat's Battles on Earth put in the air, and nobody's.
+    pub war_ppm: [f64; SEAT_COUNT],
+    pub war_ppm_nobody: f64,
     /// Ticket #268 (version 0.08.4): ppm of carbon credit each seat bought, and sold.
     pub credits_bought: [f64; SEAT_COUNT],
     pub credits_sold: [f64; SEAT_COUNT],
@@ -73,9 +78,20 @@ pub struct SimResult {
     /// Ticket #272 (version 0.08.4): walls standing and working at the end.
     pub sea_walls_standing: u32,
     pub agitates: [u32; SEAT_COUNT],
+    /// Ticket #278 (version 0.08.5): Colony-turns starved under a rival's Blockade, and imposed.
+    pub blockade_suffered: [u32; SEAT_COUNT],
+    pub blockade_imposed: [u32; SEAT_COUNT],
+    /// Ticket #282 (version 0.08.5): Levies raised by neutral Regions, and neutral Regions that held.
+    pub levies_raised: u32,
+    pub neutral_holds: u32,
+    /// Ticket #286 (version 0.08.5): the war's counters, whole.
+    pub war: WarCounters,
     pub events_no_target: u32,
     pub coastal_slots_lost: u32,
     pub facilities_drowned: u32,
+    /// Ticket #276 (version 0.08.5): inland slots the sea turned coastal over the game. Read off the
+    /// state, as the two above now are: the log scrapers they replaced broke whenever a sentence moved.
+    pub slots_converted: u32,
     pub antarctica_turn: Option<u32>,
     pub antarctic_colonies: u32,
     /// Ticket #57: the turn the first Colony in the Mars system was founded, and the turn the Mars
@@ -398,6 +414,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let blame_removed = Seat::ALL.map(|s| game.seat(s).blame_removed);
     let blame_credit = Seat::ALL.map(|s| game.blame_credit(s));
     let blame_smeared = Seat::ALL.map(|s| game.seat(s).blame_smeared);
+    let blame_cleaned = Seat::ALL.map(|s| game.seat(s).blame_cleaned);
+    let war_ppm = Seat::ALL.map(|s| game.seat(s).war_ppm);
+    let war_ppm_nobody = game.climate.war_nobody_total;
     let credits_bought = Seat::ALL.map(|s| game.seat(s).credits_bought);
     let credits_sold = Seat::ALL.map(|s| game.seat(s).credits_sold);
     let threshold_multiplier = Seat::ALL.map(|s| game.blame_threshold_multiplier(s));
@@ -473,18 +492,14 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let sea_walls_spent = game.log.iter().filter(|l| l.contains("the Sea Wall in") && l.contains("took the sea")).count() as u32;
     let sea_walls_standing = game.states.iter().flat_map(|s| s.facilities.iter()).filter(|f| f.kind == FacilityKind::SeaWall && f.working()).count() as u32;
     let agitates = Seat::ALL.map(|s| game.seat(s).agitates_issued);
+    let blockade_suffered = Seat::ALL.map(|s| game.seat(s).blockade_turns_suffered);
+    let blockade_imposed = Seat::ALL.map(|s| game.seat(s).blockade_turns_imposed);
     let events_no_target = game.events_no_target;
-    let mut coastal_slots_lost = 0u32;
-    let mut facilities_drowned = 0u32;
-    for l in game.log.iter().filter(|l| l.starts_with("The sea took ")) {
-        if let Some(n) = l.trim_start_matches("The sea took ").split(' ').next().and_then(|n| n.parse::<u32>().ok()) {
-            coastal_slots_lost += n;
-        }
-        if let Some((_, rest)) = l.split_once(" C: ") {
-            let list = rest.split('.').next().unwrap_or("");
-            facilities_drowned += list.split(" and ").flat_map(|p| p.split(", ")).filter(|p| !p.trim().is_empty()).count() as u32;
-        }
-    }
+    // Ticket #276 (version 0.08.5): the three sea figures are counters on the state, not scraped
+    // from the log's sentences as the first two were from #56 to 0.08.4.
+    let coastal_slots_lost: u32 = game.states.iter().map(|s| s.lost_slots).sum();
+    let facilities_drowned: u32 = game.states.iter().map(|s| s.drowned.len() as u32).sum();
+    let slots_converted: u32 = game.states.iter().map(|s| s.converted).sum();
     SimResult {
         seed,
         player,
@@ -508,6 +523,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         blame_removed,
         blame_credit,
         blame_smeared,
+        blame_cleaned,
+        war_ppm,
+        war_ppm_nobody,
         credits_bought,
         credits_sold,
         threshold_multiplier,
@@ -527,10 +545,16 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         sea_walls_built,
         sea_walls_standing,
         agitates,
+        blockade_suffered,
+        blockade_imposed,
+        levies_raised: game.levies_raised,
+        neutral_holds: game.neutral_holds,
+        war: game.war.clone(),
         events_no_target,
         sea_walls_spent,
         coastal_slots_lost,
         facilities_drowned,
+        slots_converted,
         antarctica_turn,
         antarctic_colonies,
         first_mars_colony_turn,

@@ -85,6 +85,7 @@ fn main() {
     let (mut sea_walls_built, mut sea_walls_spent) = (0u32, 0u32);
     let mut coastal_lost: Vec<u32> = Vec::new();
     let mut drowned: Vec<u32> = Vec::new();
+    let mut converted: Vec<u32> = Vec::new();
     let mut ice_turns: Vec<u32> = Vec::new();
     let mut antarctic_colonies = 0u32;
     // Ticket #57: the first Colony in the Mars system, the Colonists off Earth at the end, and the
@@ -149,6 +150,7 @@ fn main() {
         sea_walls_spent += r.sea_walls_spent;
         coastal_lost.push(r.coastal_slots_lost);
         drowned.push(r.facilities_drowned);
+        converted.push(r.slots_converted);
         if let Some(t) = r.antarctica_turn {
             ice_turns.push(t);
         }
@@ -193,15 +195,27 @@ fn main() {
             r.throw_offs, r.peak_unrest, r.constabularies, r.relief_orders, r.population_moved
         );
         println!(
-            "         | blame {:?} | share {:?} | credit {:?} | smeared {:?} | credits bought {:?} sold {:?} | thresholds {:?} | neutral developments {}",
+            "         | blame {:?} | share {:?} | credit {:?} | smeared {:?} | greenwashed {:?} | credits bought {:?} sold {:?} | thresholds {:?} | neutral developments {} | blockade-turns suffered {:?} imposed {:?} | war ppm {:?} nobody's {:.1} | levies {} neutral holds {} | battles by seat {:?} ({} vs neutrals) | armies built {:?} lost {:?} | force takes {:?}",
             r.blame.map(|b| format!("{b:.0}")),
             r.blame_share.map(|b| format!("{b:.2}")),
             r.blame_credit.map(|b| format!("{b:.0}")),
             r.blame_smeared.map(|b| format!("{b:.0}")),
+            r.blame_cleaned.map(|b| format!("{b:.0}")),
             r.credits_bought.map(|b| format!("{b:.0}")),
             r.credits_sold.map(|b| format!("{b:.0}")),
             r.threshold_multiplier.map(|b| format!("x{b:.2}")),
-            r.developments
+            r.developments,
+            r.blockade_suffered,
+            r.blockade_imposed,
+            r.war_ppm.map(|v| format!("{v:.1}")),
+            r.war_ppm_nobody,
+            r.levies_raised,
+            r.neutral_holds,
+            r.war.battles,
+            r.war.battles_vs_neutral,
+            r.war.armies_built,
+            r.war.armies_lost,
+            r.war.takes_by_force
         );
         println!(
             "         | scrubbers {} | mothballs {} | restarts {} | decommissions {} | leapfrogs {} | strip permits {} | longest stabilization {:?} | net at 12 {:?} | net at end {:+.1}",
@@ -289,6 +303,7 @@ fn main() {
         );
         println!("{:>12}         : {}", "median coastal slots lost a game", median(&mut coastal_lost));
         println!("{:>12}         : {}", "median Facilities destroyed by the sea", median(&mut drowned));
+        println!("{:>12}         : {}", "median inland slots turned coastal", median(&mut converted));
         println!(
             "{:>12}         : median {} ({} of {} seeds opened it)",
             "turn Antarctica opened",

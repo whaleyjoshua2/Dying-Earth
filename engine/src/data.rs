@@ -119,6 +119,10 @@ pub struct FacilityCard {
     pub build_turns: u32,
     pub energy_upkeep: i64,
     pub produces: Option<Produces>,
+    /// Ticket #280 (version 0.08.5): what the building does, in a sentence, where it is not a
+    /// resource or beside one; drawn where the row said "no output" before.
+    #[serde(default)]
+    pub does: Option<String>,
     pub emissions: f64,
     /// Ticket #36: what it adds to its controller's Allotment while it stands and is online.
     #[serde(default)]
@@ -223,6 +227,10 @@ pub struct ModuleCard {
     pub build_turns: u32,
     pub energy_upkeep: i64,
     pub produces: Option<Produces>,
+    /// Ticket #280 (version 0.08.5): what the Module does, in a sentence, where it is not a
+    /// resource or beside one.
+    #[serde(default)]
+    pub does: Option<String>,
     #[serde(default)]
     pub holds_colonists: u32,
     #[serde(default)]
@@ -656,6 +664,10 @@ pub struct ClimateTable {
     pub population_emissions_base: f64,
     pub population_emissions_per_level: f64,
     pub launch_emissions: f64,
+    /// Ticket #279 (version 0.08.5): what a Battle on Earth puts in the air, per hit landed and
+    /// per building burned in the rolls after one.
+    pub war_ppm_per_hit: f64,
+    pub war_ppm_per_building: f64,
     pub sea_level_thresholds: Vec<f64>,
     /// Ticket #55: the Temperature at which Antarctica's Colony Slots open. The sea-level ticket
     /// will read it; the Climate Panel's Temperature bar draws its notch here already.
@@ -696,6 +708,8 @@ pub struct InfluenceTable {
     pub blame: BlameTable,
     /// Ticket #267: the Smear campaign's rate.
     pub smear: SmearTable,
+    /// Ticket #277 (version 0.08.5): the Greenwash's rate and price.
+    pub greenwash: GreenwashTable,
 }
 
 /// Ticket #267 (version 0.08.4): the Smear campaign, in `influence.toml` under `[smear]`.
@@ -703,6 +717,17 @@ pub struct InfluenceTable {
 pub struct SmearTable {
     /// ppm laid on the target's Blame ledger per Influence spent.
     pub ppm_per_influence: f64,
+}
+
+/// Ticket #277 (version 0.08.5): the Greenwash, in `influence.toml` under `[greenwash]`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct GreenwashTable {
+    /// ppm taken off the seat's own Blame ledger per Influence spent.
+    pub ppm_per_influence: f64,
+    /// Ducats charged beside every Influence spent.
+    pub ducats_per_influence: i64,
+    /// The Ducats a computer seat keeps back past the campaign's price before it will pay for one.
+    pub ai_ducats_reserve: i64,
 }
 
 /// Ticket #53 (version 0.05): Blame, in `influence.toml` under `[blame]`.
@@ -880,6 +905,9 @@ pub struct AiWeights {
     pub smear: f64,
     /// Ticket #268 (version 0.08.4): buy carbon credits from the Custodians while above a fair share.
     pub buy_credits: f64,
+    /// Ticket #277 (version 0.08.5): greenwash the seat's own Blame while above a fair share and
+    /// credits are not to be had.
+    pub greenwash: f64,
     /// Ticket #269 (version 0.08.4): agitate in a Region held by a rival the seat is Cold or Hostile toward.
     pub agitate: f64,
     /// Ticket #52: steer this turn's refugee flows into one calm state.
@@ -906,6 +934,8 @@ pub struct AiWeights {
     pub stance_intercept: f64,
     pub stance_hold: f64,
     pub stance_evade: f64,
+    /// Ticket #278 (version 0.08.5): blockade the rival station whose slot the stack sits in.
+    pub stance_blockade: f64,
 }
 
 
@@ -947,6 +977,9 @@ pub struct AiPace {
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiThresholds {
     pub attack_odds: f64,
+    /// Ticket #284 (version 0.08.5): the Relations score at or below which a seat has cause to
+    /// attack a place a rival holds -- Cold or worse.
+    pub war_cause: i64,
     pub evade_damage_fraction: f64,
     pub influence_step: i64,
     /// Ticket #75: a held state's worth on the Influence target list, as a share of a neutral one's.

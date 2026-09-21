@@ -2636,6 +2636,48 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
 }
 
 /// Ticket #46: the stations over the Body on screen, and the orbital slots still free.
+/// Ticket #283 (version 0.08.5): the planet card's Colonies block. The Body's own four figures
+/// first, weak, then one row per Colony on the ground and per open site, in slot order, with the
+/// slot's glyph row beneath as the map label draws it; clicking a row selects it. Every row goes
+/// through `slot_yield_row`, since the one glyph rule only swaps a word that follows a figure and
+/// a line written "Materials x1.37" would silently come out in words (ticket #258's lesson).
+fn colonies_block(ui: &mut Ui, game: &Game, view: &mut ViewState, body: BodyId) {
+    let card = game.tables.body(body);
+    let (ink, weak) = (ui.visuals().text_color(), ui.visuals().weak_text_color());
+    ui.horizontal(|ui| {
+        ui.label(RichText::new(format!("{} as a whole:", card.name)).weak());
+        slot_yield_row(ui, [("materials", card.mine_yield), ("energy", card.generator_yield), ("fuel", card.refinery_yield), ("research", card.research_yield)], 14.0, weak);
+    });
+    let rows: Vec<u32> = (0..card.colony_slots()).filter(|s| body != BodyId::Earth || game.colony_at(body, *s).is_some()).collect();
+    if rows.is_empty() {
+        return;
+    }
+    ui.label(RichText::new("Colonies and sites").strong()).on_hover_text(
+        "Every Colony on the ground and every site still open, each with its own four yields: what a Mine, a Generator, a Refinery and an Observatory make there, against the figure for the whole Body above. A station reads the Body's figures, so its row below carries none.",
+    );
+    for slot in rows {
+        let (text, select) = match game.colony_at(body, slot) {
+            Some(c) => {
+                let owner = match c.control {
+                    Control::Neutral => "nobody's".to_string(),
+                    Control::Controlled(s) => game.seat_name(s),
+                    Control::Occupied { occupier, .. } => format!("occupied by the {}", game.seat_name(occupier)),
+                };
+                (format!("{}: {}, {} Colonists", game.place_name(Place::Colony(c.id)), owner, c.colonists), Selection::Colony(c.id))
+            }
+            None => (format!("{}: empty", card.slots[slot as usize].name), Selection::Slot(body, slot)),
+        };
+        if ui.button(text).clicked() {
+            view.selection = select;
+        }
+        ui.horizontal(|ui| {
+            ui.add_space(12.0);
+            slot_yield_row(ui, slot_yield_figures(&game.slot_yields(body, slot)), 13.0, ink);
+        });
+    }
+    ui.add_space(4.0);
+}
+
 fn stations_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
     let View::Surface(body) = view.view else { return };
     let card = game.tables.body(body);
@@ -2663,7 +2705,12 @@ A station is where Ships refuel and where a Shipyard can stand, and a Warship ho
         // every station has one, so naming it says nothing about this one; and a station that holds
         // only its Core Module is exactly what the words below have always called a bare core module.
         let mods: Vec<&str> = c.modules.iter().filter(|m| m.kind != ModuleKind::Core).map(|m| m.kind.name()).collect();
-        let text = format!("{}: {}, {} Colonists, {}", game.station_name(body, c.slot), owner, c.colonists, if mods.is_empty() { "a bare core module".to_string() } else { mods.join(", ") });
+        // Ticket #278 (version 0.08.5): a station under a Blockade says so, and by whom.
+        let starved = match game.starved_by(c.id) {
+            Some(by) => format!("; blockaded by the {}: producing nothing", game.seat_name(by)),
+            None => String::new(),
+        };
+        let text = format!("{}: {}, {} Colonists, {}{starved}", game.station_name(body, c.slot), owner, c.colonists, if mods.is_empty() { "a bare core module".to_string() } else { mods.join(", ") });
         if ui.button(text).clicked() {
             view.selection = Selection::Colony(c.id);
         }
@@ -3024,6 +3071,14 @@ fn selection_card(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             if let Some(e) = &session.last_error {
                 ui.colored_label(Color32::LIGHT_RED, e);
             }
+            // Ticket #283 (version 0.08.5): the planet's own figure at the head of its card, moved
+            // here from the founding door at the designer's word, and a block of every Colony on
+            // the ground and every site still open, each with its own yields in glyphs. A station
+            // reads the Body's figures, so the In orbit rows beneath carry none. On Earth only the
+            // Colonies stand here: Antarctica's shut sites are the ice's business.
+            if let View::Surface(b) = view.view {
+                colonies_block(ui, game, view, b);
+            }
             stations_panel(ui, session, game, view, actions);
             ui.separator();
         }
@@ -3273,6 +3328,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
                 Stance::Attack => "On Attack, it strikes at the place it was sent to.",
                 Stance::Intercept => "On Intercept, it meets what arrives.",
                 Stance::Evade => "Evading, it avoids battle where it can.",
+                Stance::Blockade => "An Army cannot blockade; it holds.",
             },
             game.tables.unrest.army_threshold
         );
@@ -3408,9 +3464,10 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::SetVentureShare { share } => format!("Bank {share}% of Ducat income in the Venture Capital Fund"),
         Order::DrawVenture { amount } => format!("Withdraw {amount} Ducats from the Venture Capital Fund"),
         Order::Smear { target, amount } => format!("Smear the {} with {amount} Influence", game.seat_name(*target)),
+        Order::Greenwash { amount } => format!("Greenwash with {amount} Influence and {} Ducats", amount * game.tables.influence.greenwash.ducats_per_influence),
         Order::Agitate { state } => format!("Agitate in {}", game.tables.state(*state).name),
         Order::OfferCredits { ppm } => format!("Offer {ppm} ppm of carbon credit a turn"),
-        Order::BuyCredits { ppm } => format!("Buy {ppm} ppm of carbon credit from the Custodians"),
+        Order::BuyCredits { ppm } => format!("Request {ppm} ppm of carbon credit from the Custodians"),
         // Ticket #52.
         Order::Relief { state } => format!("Relief in {}: Unrest -1", game.tables.state(*state).name),
         Order::Resettle { state } => format!("Resettle this turn's refugees in {}", game.tables.state(*state).name),
@@ -3802,8 +3859,9 @@ fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Or
 fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make: impl Fn(Stance) -> Order, ships: bool, actions: &mut Vec<Action>) {
     ui.horizontal(|ui| {
         ui.label("Stance:");
-        for st in [Stance::Attack, Stance::Hold, Stance::Intercept, Stance::Evade] {
-            if st == Stance::Intercept && !ships {
+        // Ticket #278 (version 0.08.5): Blockade, Ships only, beside Intercept.
+        for st in [Stance::Attack, Stance::Hold, Stance::Intercept, Stance::Blockade, Stance::Evade] {
+            if matches!(st, Stance::Intercept | Stance::Blockade) && !ships {
                 continue;
             }
             let pending_stance = pending.iter().rev().find_map(|o| match (o, &make(st)) {
@@ -4244,7 +4302,8 @@ fn no_slot_section(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mi
         return;
     }
     if game.kind(Seat(0)) == FactionKind::Custodians {
-        let sink = game.tables.facility(FacilityKind::Scrubber).sink_per_turn;
+        // Ticket #280 (version 0.08.5): the hover is the row's own sentence, from the data. The one
+        // written here by hand said 4 Energy upkeep for two versions while the data said 3.
         ui.horizontal(|ui| {
             cost_button_with_hover(
                 ui,
@@ -4252,7 +4311,7 @@ fn no_slot_section(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mi
                 &session.pending,
                 Order::BuildFacility { state: sid, kind: FacilityKind::Scrubber },
                 "Scrubber",
-                Some(format!("+{sink:.1} ppm on the Natural Sink and 1 off this state's Unrest a turn, no build slot, 4 Energy upkeep. Destroyed if this state changes hands.")),
+                Some(game.facility_yield(Seat(0), sid, FacilityKind::Scrubber).text()),
                 actions,
             );
             cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::Scrubber }, "or", actions);
@@ -4273,11 +4332,8 @@ fn no_slot_section(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mi
                     "Sea Wall",
                     // Ticket #257 (version 0.08.4): the wall stands and holds every threshold; each
                     // rise held adds to its keep; a Storm Surge it holds cuts the coast's output.
-                    Some(format!(
-                        "{hover}. No build slot, at most one to a state. While it works, every Sea Level threshold takes no slots from this state and the wall stands; each rise it has held adds {} Materials a turn to its keep, and a Storm Surge it holds cuts its coastal Facilities' output by {:.0}% for one turn.",
-                        game.tables.sea_wall.upkeep_per_rise,
-                        (1.0 - game.tables.events.storm_surge_coastal_multiplier) * 100.0
-                    )),
+                    // Ticket #280 (version 0.08.5): all of it said by the row's own sentence now.
+                    Some(hover),
                     actions,
                 );
                 cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::SeaWall }, "or", actions);
@@ -4593,7 +4649,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     rule_tip(
         ui.label(RichText::new(format!("Facilities ({} of {} slots free)", game.free_slots(sid), game.build_slots(sid))).strong()),
         format!(
-            "Slots: Size {} plus {} plus the Industry Level {} it started at, and one more for every raise since, always inland.\n{} are coastal, and the sea takes those first, oldest Facility with them; a Sea Wall holds one threshold off.\nMothballed and building each keep a slot.",
+            "Slots: Size {} plus {} plus the Industry Level {} it started at, and one more for every raise since, always inland.\n{} are coastal: the sea takes those at a threshold, oldest Facility with them, and turns one inland slot coastal every time, wall or no wall. A Sea Wall holds the taking off, not the turning.\nMothballed and building each keep a slot.",
             game.tables.state(sid).size,
             game.tables.base_slots,
             game.tables.state(sid).industry_level,
@@ -4614,7 +4670,33 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             None => "neutral".to_string(),
         };
         // Ticket #270 (version 0.08.4): named, the Standing Army included.
-        ui.label(format!("  {} ({}{}): strength {}, damage {}/{}", game.army_name(a), who, if a.standing { ", standing" } else { "" }, game.army_strength(a), a.damage, game.tables.unit(UnitKind::Army).hit_points));
+        // Ticket #282 (version 0.08.5): a Levy says so, and a standing row's hover names the rule.
+        let row = ui.label(format!(
+            "  {} ({}{}): strength {}, damage {}/{}",
+            game.army_name(a),
+            who,
+            if a.levy { ", levy" } else if a.standing { ", standing" } else { "" },
+            game.army_strength(a),
+            a.damage,
+            game.tables.unit(UnitKind::Army).hit_points
+        ));
+        if a.standing {
+            let earned = game.state(sid).armed;
+            let tip = if a.levy {
+                format!(
+                    "A Levy: the second Army a neutral Region raises, at Industry Level + 2, while a foreign Army stands in a neighbouring Region or a neighbour is under Occupation. It heals 1 a turn while Unrest is under {:.0}, never marches, and stands down when the threat passes.",
+                    game.tables.unrest.army_threshold
+                )
+            } else {
+                format!(
+                    "A Standing Army: Industry Level + 1 strong{}, with the Army card's {} hit points. It heals 1 a turn while Unrest is under {:.0}; destroyed, it returns at strength 1 two Incomes later. A neutral Region that is attacked and holds gains +1 for good, to Industry + 4.",
+                    if earned > 0 { format!(" and +{earned} earned holding against attack") } else { String::new() },
+                    game.tables.unit(UnitKind::Army).hit_points,
+                    game.tables.unrest.army_threshold
+                )
+            };
+            row.on_hover_text(tip);
+        }
     }
     ui.separator();
     if mine {
@@ -4655,7 +4737,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             });
         }
         cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
-        ui.label(RichText::new("Raising the Industry Level adds an inland slot, which the sea never reaches.").weak());
+        ui.label(RichText::new("Raising the Industry Level adds an inland slot.").weak());
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
         // Ticket #73: muster Emigrants here, and send them to Antarctica by sea once the ice is open.
         ui.label(RichText::new("Pioneers").strong());
@@ -4689,7 +4771,13 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         if game.antarctica_open && st.emigrants > 0 {
             let n = st.emigrants;
             for slot in game.free_slots_on(BodyId::Earth) {
-                cost_button(ui, game, &session.pending, Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) }, &format!("Send {n} to {} by sea", game.tables.body(BodyId::Earth).slots[slot as usize].name), actions);
+                // Ticket #283 (version 0.08.5): the third founding door wears the same face as the
+                // two Ship doors, the site's yields in glyphs, at the designer's word.
+                let order = Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) };
+                let label = format!("Send {n} to {} by sea", game.tables.body(BodyId::Earth).slots[slot as usize].name);
+                if found_button(ui, &game.slot_yields(BodyId::Earth, slot), &label).clicked() {
+                    actions.push(Action::Place(order));
+                }
             }
             // Ticket #204 (version 0.08.1): capped at the room there. A sea crossing checks no room
             // at the order -- it lands `min(n, room)` a turn later and sends the surplus home with a
@@ -4910,12 +4998,28 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         faction_glyph(ui, session, game, col.control.controller(), 22.0);
         ui.label(RichText::new(game.place_name(Place::Colony(cid))).size(22.0).strong());
     });
+    // Ticket #283 (version 0.08.5): what the ground is worth, under the heading, in glyphs. A
+    // station reads the Body's figures, which the planet card shows, so it carries no row.
+    if !col.in_orbit {
+        let ink = ui.visuals().text_color();
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Yields here:").weak());
+            slot_yield_row(ui, slot_yield_figures(&game.slot_yields(col.body, col.slot)), 13.0, ink);
+        });
+    }
     let owner = match col.control {
         Control::Neutral => "Nobody's".to_string(),
         Control::Controlled(s) => format!("Held by the {}", game.seat_name(s)),
         Control::Occupied { occupier, turns, .. } => format!("Occupied by the {} (turn {})", game.seat_name(occupier), turns),
     };
     ui.label(owner);
+    // Ticket #278 (version 0.08.5): a starved Colony says so, in the designer's words, and how.
+    if let Some(by) = game.starved_by(cid) {
+        let how = if col.in_orbit { format!("Blockaded by the {}", game.seat_name(by)) } else { format!("Under the {}' Orbital Control", game.seat_name(by)) };
+        ui.label(RichText::new(format!("{how}: producing nothing, upkeep still paid.")).color(Color32::from_rgb(230, 110, 90))).on_hover_text(
+            "A warship stack ordered to Blockade the slot of a station starves it; a Colony on the ground starves while one rival holds Orbital Control outright and has a stack there on Blockade. Every Module makes nothing and pays its upkeep; nobody dies and nothing is destroyed. Each turn of it is an offence against you.",
+        );
+    }
     // Ticket #164 (version 0.07.5): the room is the Core Module's four and the Habitats' eight
     // each, so the line no longer names Habitats alone.
     ui.label(format!("Colonists {} of {} room", col.colonists, game.habitat_room(col)));
@@ -5092,20 +5196,15 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
     }
     ui.label("Empty. A Colony Ship carrying Colonists founds a Colony here; a Habitat comes with it.");
     // Ticket #57: the slot's own four yields, drawn when the game started, beside its Body's.
-    let card = game.tables.body(body);
     let y = game.slot_yields(body, slot);
-    // Ticket #258 (version 0.08.4): both lines in the glyph-and-number row the founding button and
-    // the map labels already use, at the designer's word -- "both", and the Body's line kept, weak.
-    // A player read the yields here in words and then again in glyphs on the button beneath.
+    // Ticket #258 (version 0.08.4): the site's line in the glyph-and-number row the founding button
+    // and the map labels already use, at the designer's word. Ticket #283 (version 0.08.5): the
+    // Body's line, kept here on #258, has moved to the head of the planet card -- "when founding a
+    // colony from a ship we don't need to know the yields of the planet as a whole".
     let ink = ui.visuals().text_color();
     ui.horizontal(|ui| {
         ui.label("Yields here:");
         slot_yield_row(ui, slot_yield_figures(&y), 14.0, ink);
-    });
-    let weak = ui.visuals().weak_text_color();
-    ui.horizontal(|ui| {
-        ui.label(RichText::new(format!("{} as a whole:", card.name)).weak());
-        slot_yield_row(ui, [("materials", card.mine_yield), ("energy", card.generator_yield), ("fuel", card.refinery_yield), ("research", card.research_yield)], 14.0, weak);
     });
     for s in game.ships.iter().filter(|s| !session.spectator && s.seat == Seat(0) && s.at == ShipAt::Body(body) && s.kind == UnitKind::ColonyShip && s.colonists > 0) {
         let order = Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) };
@@ -5410,7 +5509,8 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
         }
     });
     ui.separator();
-    carbon_credits_block(ui, session, game, view, actions);
+    // Ticket #285 (version 0.08.5): the carbon-credit line is gone from here; the Custodians offer
+    // from their own Faction page and everyone else requests from theirs.
     ui.separator();
     ui.label(format!("Buildings: every build button on a Region or Colony card has an \"or\" beside it that buys the building outright for Ducats, at {} times its Materials cost.", game.tables.ducats.per_building_material));
     let trades: Vec<String> = session.pending.iter().filter(|o| matches!(o, Order::Buy { .. } | Order::Sell { .. } | Order::BuyInfluence { .. } | Order::BuildFacilityWithDucats { .. } | Order::BuildModuleWithDucats { .. } | Order::BuyCredits { .. } | Order::OfferCredits { .. })).map(|o| order_text(game, o)).collect();
@@ -5423,44 +5523,51 @@ fn trading_window(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
     }
 }
 
-/// Ticket #268 (version 0.08.4): **carbon credits**, the Trading window's fourth line. For the
-/// Custodians a field and a button to set the ppm they offer a turn, standing until changed, with
-/// their credit and what overselling costs them beside it; for everyone else what the Custodians
-/// offer this turn, how they think of you and the price that makes, and a field and a Buy button
-/// up to the cap. The Custodians' view of you can refuse you outright.
-fn carbon_credits_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
-    let me = Seat(0);
-    let c = game.tables.carbon_credits.clone();
-    ui.label(RichText::new("Carbon credits").strong()).on_hover_text(format!(
+/// Ticket #268 (version 0.08.4): **carbon credits**. Ticket #285 (version 0.08.5): off the Trading
+/// window and onto the Faction window, at the designer's word -- the Custodians OFFER from their own
+/// page, beside the Blame line whose credit they sell and the Greenwash that is its neighbour, and
+/// everyone else REQUESTS from the Custodians' page, under the Accords and the Smear, the things one
+/// asks of that Faction. The rule did not move: a request is filled at End Turn from the standing
+/// offer, or refunded where the offer ran out.
+fn credits_hover(game: &Game) -> String {
+    let c = &game.tables.carbon_credits;
+    format!(
         "A ppm of carbon credit bought comes off your Blame for good. The Custodians sell it at {} Ducats a ppm, times how they think of you -- Friendly x{}, Cordial x{}, Neutral x{}, Wary x{}, Cold x{}; Hostile refuses -- up to {} ppm a turn.\nA purchase is an act of friendship both ways.",
         c.price_per_ppm, c.friendly, c.cordial, c.neutral, c.wary, c.cold, c.cap_per_turn
+    )
+}
+
+/// The seller's side, on the Custodians' own page: the ppm they offer a turn, standing until changed.
+fn credits_offer_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    let me = Seat(0);
+    ui.label(RichText::new("Carbon credits").strong()).on_hover_text(credits_hover(game));
+    let credit = game.blame_credit(me);
+    let standing = game.seat(me).credits_offered;
+    let pending = session.pending.iter().find_map(|o| if let Order::OfferCredits { ppm } = o { Some(*ppm) } else { None });
+    ui.label(format!(
+        "You hold {credit:.0} ppm in credit. You offer {standing} ppm a turn{}; what you sell past your credit goes onto your own Blame.",
+        pending.map(|p| format!(" ({p} from next turn)")).unwrap_or_default()
     ));
-    let Some(seller) = game.credit_seller() else {
-        ui.label(RichText::new("Nobody at this table sells carbon credits.").weak());
-        return;
-    };
-    if seller == me {
-        let credit = game.blame_credit(me);
-        let standing = game.seat(me).credits_offered;
-        let pending = session.pending.iter().find_map(|o| if let Order::OfferCredits { ppm } = o { Some(*ppm) } else { None });
-        ui.label(format!(
-            "You hold {credit:.0} ppm in credit. You offer {standing} ppm a turn{}; what you sell past your credit goes onto your own Blame.",
-            pending.map(|p| format!(" ({p} from next turn)")).unwrap_or_default()
-        ));
-        ui.horizontal(|ui| {
-            ui.add(egui::DragValue::new(&mut view.credits_offer).range(0..=999));
-            let order = Order::OfferCredits { ppm: view.credits_offer };
-            let check = game.check_order(me, &session.pending, &order);
-            let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Offer {} ppm a turn", view.credits_offer)));
-            if let Err(e) = &check {
-                resp.clone().on_disabled_hover_text(&e.0);
-            }
-            if resp.on_hover_text("Stands from next turn until you set it again; nought refuses everyone.").clicked() {
-                actions.push(Action::Place(order));
-            }
-        });
-        return;
-    }
+    ui.horizontal(|ui| {
+        ui.add(egui::DragValue::new(&mut view.credits_offer).range(0..=999));
+        let order = Order::OfferCredits { ppm: view.credits_offer };
+        let check = game.check_order(me, &session.pending, &order);
+        let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Offer {} ppm a turn", view.credits_offer)));
+        if let Err(e) = &check {
+            resp.clone().on_disabled_hover_text(&e.0);
+        }
+        if resp.on_hover_text("Stands from next turn until you set it again; nought refuses everyone.").clicked() {
+            actions.push(Action::Place(order));
+        }
+    });
+}
+
+/// The buyer's side, on the Custodians' page: what they offer this turn, how they think of you and
+/// the price that makes, and a Request button up to the cap. Their view of you can refuse outright.
+fn credits_request_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, seller: Seat, actions: &mut Vec<Action>) {
+    let me = Seat(0);
+    let c = game.tables.carbon_credits.clone();
+    ui.label(RichText::new("Carbon credits").strong()).on_hover_text(credits_hover(game));
     let offer = game.seat(seller).credits_offered;
     let level = game.relations_level(seller, me);
     match game.credit_price_multiplier(me) {
@@ -5477,11 +5584,11 @@ fn carbon_credits_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut 
                 let order = Order::BuyCredits { ppm: view.credits_amount };
                 let cost = game.order_cost(me, &order).ducats;
                 let check = game.check_order(me, &session.pending, &order);
-                let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Buy {} ppm for {cost} Ducats", view.credits_amount)));
+                let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Request {} ppm for {cost} Ducats", view.credits_amount)));
                 if let Err(e) = &check {
                     resp.clone().on_disabled_hover_text(&e.0);
                 }
-                if resp.on_hover_text("Off your Blame at End Turn. If others buy first and the offer runs out, the Ducats for what you did not get come back.").clicked() {
+                if resp.on_hover_text("Off your Blame at End Turn. If others request first and the offer runs out, the Ducats for what you did not get come back.").clicked() {
                     actions.push(Action::Place(order));
                 }
             });
@@ -6374,6 +6481,38 @@ fn smear_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     });
 }
 
+/// Ticket #277 (version 0.08.5): the Greenwash block on the player's own page: a heading with the
+/// rule on hover, a field for the Influence and a button that names both prices, the Smear block's
+/// shape. Public and no offence, at the designer's word, so the hover says a rival can answer it.
+fn greenwash_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    let me = Seat(0);
+    let g = &game.tables.influence.greenwash;
+    let (rate, per) = (g.ppm_per_influence, g.ducats_per_influence);
+    ui.label(RichText::new("Greenwash campaign").strong()).on_hover_text(format!(
+        "Influence spent on your own name, with {per} Ducat{} beside every point: every point takes {rate} ppm off your Blame for good, and the share every rule reads moves with it. Nothing leaves the air.\nOne campaign a turn, from this turn's Allotment and your Ducats. It is public and no offence: the Report says you greenwashed, and a rival can answer with a Smear.",
+        if per == 1 { "" } else { "s" }
+    ));
+    let cleaned = game.seat(me).blame_cleaned;
+    if cleaned > 0.0 {
+        ui.label(RichText::new(format!("{cleaned:.0} ppm of your Blame has been greenwashed away.")).weak());
+    }
+    ui.horizontal(|ui| {
+        let influence_left = game.seat(me).allotment - session.pending.iter().map(|o| game.order_cost(me, o).influence).sum::<i64>();
+        let ducats_left = game.seat(me).stockpile.ducats - session.pending.iter().map(|o| game.order_cost(me, o).ducats).sum::<i64>();
+        let left = if per > 0 { influence_left.min(ducats_left / per) } else { influence_left };
+        ui.add(egui::DragValue::new(&mut view.greenwash_amount).range(1..=left.max(1)));
+        let order = Order::Greenwash { amount: view.greenwash_amount };
+        let check = game.check_order(me, &session.pending, &order);
+        let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Greenwash for {} Ducats", view.greenwash_amount * per)));
+        if let Err(e) = &check {
+            resp.clone().on_disabled_hover_text(&e.0);
+        }
+        if resp.on_hover_text(format!("{:.0} ppm off your Blame at End Turn.", view.greenwash_amount as f64 * rate)).clicked() {
+            actions.push(Action::Place(order));
+        }
+    });
+}
+
 fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actions: &mut Vec<Action>) {
     let me = Seat(0);
     let r = &game.tables.relations;
@@ -6605,6 +6744,8 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
             // put it in the air.
             let smeared = if s.blame_smeared > 0.0 { format!(", {:.0} laid on by rivals", s.blame_smeared) } else { String::new() };
             let smeared = format!("{smeared}{}{}", if s.credits_bought > 0.0 { format!(", {:.0} bought as carbon credits", s.credits_bought) } else { String::new() }, if s.credits_sold > 0.0 { format!(", {:.0} sold as carbon credits", s.credits_sold) } else { String::new() });
+            // Ticket #277 (version 0.08.5): the sixth clause, at the designer's word.
+            let smeared = format!("{smeared}{}", if s.blame_cleaned > 0.0 { format!(", {:.0} cleaned by campaign", s.blame_cleaned) } else { String::new() });
             let line = format!(
                 "Answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit{smeared}), thresholds x{:.2}",
                 game.blame(seat),
@@ -6648,6 +6789,22 @@ A rival that holds you at less than neutral defends its places against you a lit
             ui.add_space(6.0);
             smear_block(ui, session, game, view, seat, actions);
             ui.add_space(6.0);
+            // Ticket #285 (version 0.08.5): and a request for carbon credits, on the Custodians' page.
+            if game.credit_seller() == Some(seat) {
+                credits_request_block(ui, session, game, view, seat, actions);
+                ui.add_space(6.0);
+            }
+        }
+        // Ticket #277 (version 0.08.5): the Greenwash, on the player's OWN page, the Smear's mirror
+        // in place as well as in rule, beside the Blame line its term shows on.
+        if !session.spectator && seat == Seat(0) {
+            greenwash_block(ui, session, game, view, actions);
+            ui.add_space(6.0);
+            // Ticket #285 (version 0.08.5): the Custodians offer their credit from their own page.
+            if game.credit_seller() == Some(Seat(0)) {
+                credits_offer_block(ui, session, game, view, actions);
+                ui.add_space(6.0);
+            }
         }
 
         // 5. Holdings, which no window counted for anybody before this one.
@@ -6879,6 +7036,13 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             if e.cards > 0.0 {
                 ui.label(format!("Event cards {:.1}", e.cards));
             }
+            // Ticket #279 (version 0.08.5): war's own line, when there was one.
+            if e.war > 0.0 {
+                ui.label(format!("War {:.1}", e.war)).on_hover_text(format!(
+                    "Last turn's Battles on Earth and in Earth orbit: {} ppm for every hit landed, worn as Blame by whoever landed it, and {} for every building burned after a ground Battle or a taking, worn by the attackers. A neutral Region's Army's hits are nobody's. It counts against a Stabilization run: a war a Faction chose is not the weather.",
+                    game.tables.climate.war_ppm_per_hit, game.tables.climate.war_ppm_per_building
+                ));
+            }
             // Ticket #55: the Permafrost Thaw Break's own line, once it has fired. It is the world's
             // carbon: nobody's Blame, and it never counts against a Stabilization run.
             if e.permafrost > 0.0 {
@@ -6941,6 +7105,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // got there, and what it holds in credit -- at the designer's word.
                 let smeared = if s.blame_smeared > 0.0 { format!(", {:.0} laid on by rivals", s.blame_smeared) } else { String::new() };
                 let smeared = format!("{smeared}{}{}", if s.credits_bought > 0.0 { format!(", {:.0} bought as carbon credits", s.credits_bought) } else { String::new() }, if s.credits_sold > 0.0 { format!(", {:.0} sold as carbon credits", s.credits_sold) } else { String::new() });
+            // Ticket #277 (version 0.08.5): the sixth clause, at the designer's word.
+            let smeared = format!("{smeared}{}", if s.blame_cleaned > 0.0 { format!(", {:.0} cleaned by campaign", s.blame_cleaned) } else { String::new() });
                 let line = format!(
                     "{}: answerable for {:.0} ppm (emitted {:.0}, removed {:.0} in credit{smeared}); share {:.2}, thresholds x{:.2}",
                     game.seat_name(seat),
@@ -7124,19 +7290,14 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                             for party in &b.parties {
                                 let who = party.seat.map(|s| game.seat_name(s)).unwrap_or_else(|| "Neutral".to_string());
                                 let colour = party.seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY);
-                                ui.label(
-                                    RichText::new(format!(
-                                        "   {}{}: {}, strength {}, {} hit(s) landed; destroyed: {}; escaped: {}",
-                                        who,
-                                        if party.aggressor { ", attacking" } else { "" },
-                                        party.units,
-                                        party.strength,
-                                        party.hits,
-                                        if party.destroyed.is_empty() { "none".to_string() } else { party.destroyed.join(", ") },
-                                        if party.escaped.is_empty() { "none".to_string() } else { party.escaped.join(", ") },
-                                    ))
-                                    .color(colour),
-                                );
+                                // Ticket #281 (version 0.08.5): every unit by name and what it took,
+                                // and the odds the attacker faced, labelled for what they are.
+                                let attacking = match (party.aggressor, party.odds) {
+                                    (true, Some(o)) => format!(", attacking at {:.0}% first-round odds", o * 100.0),
+                                    (true, None) => ", attacking".to_string(),
+                                    _ => String::new(),
+                                };
+                                ui.label(RichText::new(format!("   {who}{attacking}: {} (strength {}, {} hit(s) landed)", party.units, party.strength, party.hits)).color(colour));
                             }
                             ui.label(format!("   {}", b.result));
                         }

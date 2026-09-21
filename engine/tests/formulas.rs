@@ -684,7 +684,7 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
 fn only_a_carrier_carries_an_army_and_a_colony_ship_carries_only_colonists() {
     let mut g = game();
     let army = ArmyId(g.fresh_id());
-    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
     let ship = |id: u32, kind: UnitKind| Ship { name: String::new(), id: ShipId(id), kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None };
     g.ships.extend([ship(101, UnitKind::ColonyShip), ship(102, UnitKind::Battleship), ship(103, UnitKind::Carrier)]);
     let load_army = |s: u32| Order::Load { ship: ShipId(s), colonists: 0, from: LoadSource::State(StateId::EastAsia), army: Some(army) };
@@ -816,7 +816,7 @@ fn embassies_and_relays_add_to_the_allotment_and_raise_their_places_standing_eac
 
 fn occupier_in(g: &mut Game, seat_home: StateId, target: StateId) -> ArmyId {
     let id = ArmyId(g.fresh_id());
-    g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(seat_home), at: ArmyAt::Place(Place::State(target)), damage: 0, standing: false, stance: Stance::Attack, escaped: false, move_to: None });
+    g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(seat_home), at: ArmyAt::Place(Place::State(target)), damage: 0, standing: false, stance: Stance::Attack, escaped: false, move_to: None, levy: false });
     id
 }
 
@@ -1398,14 +1398,14 @@ fn colony_attack_turns(seed: u64) -> Option<u32> {
     // The AI Prospectors hold a Colony on the Moon with a Barracks and its Army.
     let cid = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Barracks], 4);
     let defender = ArmyId(g.fresh_id());
-    g.armies.push(Army { name: String::new(), id: defender, home: ArmyHome::Colony(cid), at: ArmyAt::Place(Place::Colony(cid)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+    g.armies.push(Army { name: String::new(), id: defender, home: ArmyHome::Colony(cid), at: ArmyAt::Place(Place::Colony(cid)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
     // The player's two Carriers arrive at the Moon, each carrying an Army: strength 8 against 4.
     let mut attackers = Vec::new();
     let mut ships = Vec::new();
     for kind in [UnitKind::Carrier, UnitKind::Carrier] {
         let attacker = ArmyId(g.fresh_id());
         let ship = ShipId(g.fresh_id());
-        g.armies.push(Army { name: String::new(), id: attacker, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+        g.armies.push(Army { name: String::new(), id: attacker, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
         g.ships.push(Ship { name: String::new(), id: ship, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, colonists_education: 1.0, army: Some(attacker), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
         attackers.push(attacker);
         ships.push(ship);
@@ -2644,7 +2644,7 @@ fn e_four_stops_replenishment_seven_halves_output_ten_throws_the_controller_off(
     g.seats[1].influence.insert(Place::State(StateId::NorthAfrica), 17);
     g.state_mut(StateId::NorthAfrica).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(0), coastal: false, due_turn: 99 });
     let id = ArmyId(g.fresh_id());
-    g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(StateId::Europe), at: ArmyAt::Place(Place::State(StateId::NorthAfrica)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+    g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(StateId::Europe), at: ArmyAt::Place(Place::State(StateId::NorthAfrica)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
     g.raise_unrest(StateId::NorthAfrica, 10.0, UnrestSource::Plain);
     assert_eq!(g.unrest(StateId::NorthAfrica), 10.0);
     // Ticket #53: the falls run first, so a state at 10 that did not change hands is pulled back
@@ -3711,11 +3711,14 @@ fn e_ice_sheets_committed_fires_a_threshold_out_of_sequence_and_the_scheduled_on
     assert!(!g.state(StateId::EastAsia).thresholds_fired[1], "and it did not use up the scheduled +2.3");
 
     // +2.3: the scheduled threshold, on its own turn. Ticket #70 (version 0.05.5): East Asia has
-    // four coastal slots now, not six, so by then the coast is gone and it fires and takes nothing.
+    // four coastal slots now, not six, so the Break and +1.8 took all four -- and since ticket #276
+    // (version 0.08.5) each of those rises turned one inland slot coastal after the taking, so +2.3
+    // finds the two turned slots and takes them: the coast never runs out.
     hold_temperature(&mut g, 2.35);
     g.climate_phase();
     assert!(g.state(StateId::EastAsia).thresholds_fired[1], "the scheduled +2.3 still fires on its own turn");
-    assert_eq!(g.build_slots(StateId::EastAsia), after_break, "and finds no coastal slot left to take: the Break and +1.8 took all four");
+    assert_eq!(g.state(StateId::EastAsia).lost_slots, 6, "and takes the two slots the first two rises turned coastal");
+    assert_eq!(g.build_slots(StateId::EastAsia), after_break - 2, "so the state is two slots smaller again");
 }
 
 /// (f) Amazon Dieback: 20 ppm into the CO2 Stock once, and South America's Baseline Emissions up by
@@ -3976,26 +3979,100 @@ fn d_the_sea_takes_coastal_slots_only_oldest_first_and_then_nothing() {
     assert_eq!(g.coastal_slots(sid), 4);
     assert_eq!(g.inland_slots(sid), 3);
 
+    // Ticket #276 (version 0.08.5): every rise also turns one inland slot coastal, AFTER the taking,
+    // so the coast is two taken and one turned each time and never runs out; the "then nothing" of
+    // this test's old name went with it.
     g.apply_sea_threshold(sid, 0);
-    assert_eq!(g.coastal_slots(sid), 2, "Exposure 2 takes two coastal slots");
-    assert_eq!(g.inland_slots(sid), 3, "and no inland slot");
+    assert_eq!(g.state(sid).lost_slots, 2, "Exposure 2 takes two coastal slots");
+    assert_eq!(g.coastal_slots(sid), 3, "two taken, one turned: three coastal");
+    assert_eq!(g.inland_slots(sid), 2, "and one inland slot fewer");
     assert_eq!(standing(&g, sid, true), vec![FacilityKind::Refinery, FacilityKind::PowerPlant], "the oldest coastal Facility went first: the Factory");
 
     g.apply_sea_threshold(sid, 1);
-    assert_eq!(g.coastal_slots(sid), 0, "the coast is gone");
-    assert!(standing(&g, sid, true).is_empty(), "and everything that stood on it with it");
-    assert_eq!(standing(&g, sid, false), vec![FacilityKind::ResearchLab], "the inland Research Lab never moved");
+    assert_eq!(g.state(sid).lost_slots, 4, "two more taken");
+    assert_eq!(g.coastal_slots(sid), 2, "the Power Plant's slot and the one just turned");
+    assert_eq!(standing(&g, sid, true), vec![FacilityKind::PowerPlant], "the Refinery went with the second rise");
+    assert_eq!(standing(&g, sid, false), vec![FacilityKind::ResearchLab], "the inland Research Lab has not moved: an empty slot turned each time");
     assert!(
         g.report.lines.iter().any(|l| l.text.contains("The sea took 2 coastal slots from Australia")),
         "the Report names what the sea took: {:?}",
         g.report.lines
     );
 
-    // Nothing more to take.
-    let slots = g.build_slots(sid);
+    // A third rise takes the two coastal slots that are left, and with no empty inland slot left
+    // the Research Lab's slot turns, Lab and all: the coast has reached the last of the state.
     g.apply_sea_loss(sid, 2.9);
-    assert_eq!(g.build_slots(sid), slots, "once a state's coastal slots are gone it loses nothing more");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("no coastal slots left")), "and the Report says so: {:?}", g.report.lines);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("The sea took 2 coastal slots from Australia") && l.text.contains("Power Plant")), "the Power Plant drowned: {:?}", g.report.lines);
+    assert_eq!((g.coastal_slots(sid), g.inland_slots(sid)), (1, 0), "one coastal slot, the turned one, and nothing inland");
+    assert_eq!(standing(&g, sid, true), vec![FacilityKind::ResearchLab], "the Research Lab stands on the coast now");
+    assert_eq!(g.build_slots(sid), 1, "seven slots less six taken");
+
+    // And a fourth takes that too, and turns nothing, since nothing is left inland.
+    g.apply_sea_loss(sid, 3.0);
+    assert_eq!(g.build_slots(sid), 0, "the state is all sea");
+    assert!(g.state(sid).facilities.is_empty(), "the Research Lab drowned with the last slot");
+    g.apply_sea_loss(sid, 3.1);
+    assert!(g.report.lines.iter().any(|l| l.text.contains("no coastal slots left")), "with nothing left the Report says so: {:?}", g.report.lines);
+}
+
+/// Ticket #276 (version 0.08.5): the sea reaches inland. Every rise turns one inland slot coastal
+/// AFTER it has taken what it takes, wall or no wall; an empty inland slot first, else the oldest
+/// inland Facility with its slot; a state with no inland slot left turns nothing.
+#[test]
+fn d2_every_rise_turns_one_inland_slot_coastal_wall_or_no_wall() {
+    let mut g = game();
+    calm(&mut g);
+    sea_ahead(&mut g);
+    for s in &mut g.states {
+        s.population = 0.0;
+    }
+    // Australia again: 7 slots, 4 coastal, 3 inland. Three coastal Facilities, one inland, so two
+    // inland slots are empty.
+    let sid = StateId::Australia;
+    let st = g.state_mut(sid);
+    st.control = Control::Controlled(Seat(0));
+    st.facilities = vec![
+        Facility::in_coastal_slot(FacilityKind::Factory),
+        Facility::in_coastal_slot(FacilityKind::Refinery),
+        Facility::in_coastal_slot(FacilityKind::PowerPlant),
+        Facility::new(FacilityKind::ResearchLab),
+    ];
+    assert_eq!((g.coastal_slots(sid), g.inland_slots(sid)), (4, 3));
+
+    // No wall: the rise takes two coastal slots, then turns one EMPTY inland slot coastal.
+    g.apply_sea_threshold(sid, 0);
+    assert_eq!(g.coastal_slots(sid), 3, "Exposure 2 took two, and one inland slot turned coastal after the taking");
+    assert_eq!(g.inland_slots(sid), 2, "one inland slot fewer");
+    assert_eq!(g.build_slots(sid), 5, "the total is the two taken, and nothing else");
+    assert_eq!(standing(&g, sid, true), vec![FacilityKind::Refinery, FacilityKind::PowerPlant], "the Factory drowned, oldest first, as before");
+    assert_eq!(standing(&g, sid, false), vec![FacilityKind::ResearchLab], "the empty slot turned, not the Research Lab's");
+    assert_eq!(g.free_coastal(sid), 1, "the turned slot is coastal and empty, waiting for the next rise");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("The coast now reaches one slot further in.")), "the Report says the coast moved: {:?}", g.report.lines);
+
+    // A wall: the rise takes nothing, and STILL turns one inland slot -- the last empty one.
+    g.state_mut(sid).facilities.push(Facility::new(FacilityKind::SeaWall));
+    let before = g.state(sid).facilities.len();
+    g.apply_sea_threshold(sid, 1);
+    assert_eq!(g.state(sid).facilities.len(), before, "the wall held: nothing drowned");
+    assert_eq!((g.coastal_slots(sid), g.inland_slots(sid)), (4, 1), "and one more inland slot turned coastal behind it");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("took the sea") && l.text.contains("one slot further in")), "the held-rise line says both: {:?}", g.report.lines);
+
+    // No empty inland slot left: the oldest inland Facility turns with its slot.
+    g.apply_sea_threshold(sid, 2);
+    assert_eq!((g.coastal_slots(sid), g.inland_slots(sid)), (5, 0), "the last inland slot turned");
+    assert_eq!(standing(&g, sid, false), vec![FacilityKind::SeaWall], "nothing but the wall, which takes no slot, stands inland any more");
+    assert!(standing(&g, sid, true).contains(&FacilityKind::ResearchLab), "the Research Lab stands on the coast now");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("a Research Lab stands on it now")), "the Report names what turned: {:?}", g.report.lines);
+
+    // Nothing inland left to turn: a further rise turns nothing.
+    g.apply_sea_loss(sid, 2.9);
+    assert_eq!((g.coastal_slots(sid), g.inland_slots(sid)), (5, 0), "a state that is all coast turns nothing more");
+
+    // A raised slot turns like any other.
+    g.state_mut(sid).industry_level += 1;
+    assert_eq!(g.inland_slots(sid), 1, "a raise adds an inland slot");
+    g.apply_sea_loss(sid, 3.0);
+    assert_eq!((g.coastal_slots(sid), g.inland_slots(sid)), (6, 0), "and the sea reaches that one too");
 }
 
 /// (e) The Sea Wall: it needs Coastal Engineering and a free coastal slot, one per state, and it
@@ -4041,13 +4118,16 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
     g.state_mut(sid).facilities = vec![Facility::new(FacilityKind::SeaWall)];
     let before = g.coastal_slots(sid);
     g.apply_sea_threshold(sid, 0);
-    assert_eq!(g.coastal_slots(sid), before, "the wall took the sea: no coastal slot lost");
+    assert_eq!(g.state(sid).lost_slots, 0, "the wall took the sea: no coastal slot lost");
+    // Ticket #276 (version 0.08.5): the rise still turns one inland slot coastal behind the wall.
+    assert_eq!(g.coastal_slots(sid), before + 1, "and one inland slot turned coastal behind it, wall or no wall");
     let wall = g.state(sid).facilities.iter().find(|f| f.kind == FacilityKind::SeaWall).expect("the wall stands");
     assert_eq!(wall.rises_held, 1, "and counts the rise it held");
     assert!(g.report.lines.iter().any(|l| l.text.contains("Sea Wall") && l.text.contains("dearer to keep")), "the Report says so: {:?}", g.report.lines);
     // The next one is held too.
     g.apply_sea_threshold(sid, 1);
-    assert_eq!(g.coastal_slots(sid), before, "the wall holds every threshold, not one");
+    assert_eq!(g.state(sid).lost_slots, 0, "the wall holds every threshold, not one");
+    assert_eq!(g.coastal_slots(sid), before + 2, "and the coast moved in again");
     assert_eq!(g.state(sid).facilities.iter().find(|f| f.kind == FacilityKind::SeaWall).unwrap().rises_held, 2);
 
     // The Ice Sheets Break is a threshold of a kind too.
@@ -4059,7 +4139,8 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
     let before = g.coastal_slots(sid);
     hold_temperature(&mut g, 2.25);
     g.climate_phase();
-    assert_eq!(g.coastal_slots(sid), before, "the wall took the Ice Sheets Break");
+    assert_eq!(g.state(sid).lost_slots, 0, "the wall took the Ice Sheets Break");
+    assert_eq!(g.coastal_slots(sid), before + 1, "which turned one inland slot coastal like any rise (ticket #276)");
     assert!(g.state(sid).facilities.iter().any(|f| f.kind == FacilityKind::SeaWall && f.rises_held >= 1), "and stands, counting it (ticket #257)");
 
     // A mothballed wall absorbs nothing.
@@ -4073,9 +4154,8 @@ fn e_the_sea_wall_needs_its_tech_takes_no_slot_and_takes_one_threshold() {
     wall.mothballed = true;
     wall.online = false;
     g.state_mut(sid).facilities = vec![wall];
-    let before = g.coastal_slots(sid);
     g.apply_sea_threshold(sid, 0);
-    assert_eq!(g.coastal_slots(sid), before - 2, "a mothballed Sea Wall absorbs nothing");
+    assert_eq!(g.state(sid).lost_slots, 2, "a mothballed Sea Wall absorbs nothing");
 }
 
 /// (f) Coastal Engineering is Industry rung 2, needs Efficient Grids, and the tree holds thirteen;
@@ -7159,6 +7239,11 @@ fn a_warship_blockades_the_orbital_slot_it_sits_in_and_nothing_more() {
     assert!(g.may_land(Seat(0), body), "and so is the ground");
     // It moves into the station's own slot: now that one slot is shut, and only that one.
     g.ship_mut(rival).unwrap().slot = Some(slot);
+    // Ticket #278 (version 0.08.5): only once it is ORDERED to blockade. Sitting there on Hold it
+    // blockades nothing: "the blockade needs to be positively chosen, not just the presence of a ship".
+    assert!(!g.slot_blockaded_against(Seat(0), body, slot), "a warship in the slot on Hold blockades nothing");
+    assert!(g.may_unload_into(Seat(0), station), "and the station is open");
+    g.ship_mut(rival).unwrap().stance = Stance::Blockade;
     assert!(g.slot_blockaded_against(Seat(0), body, slot));
     assert!(!g.may_unload_into(Seat(0), station), "the station in the blockaded slot is shut");
     assert!(g.may_land(Seat(0), body), "the ground is untouched by a slot blockade");
@@ -7196,6 +7281,399 @@ fn only_a_rival_holding_orbital_control_shuts_the_ground() {
     assert!(g.may_land(Seat(0), body), "a contested orbit no longer punishes the bystander");
 }
 
+/// Ticket #286 (version 0.08.5): the war is counted on the game, at the event, never scraped: a
+/// Battle by its aggressor and against a neutral, an Occupation begun and a place taken by force,
+/// an Army lost by the seat it fought for, a warship lost; and the counters ride through the save.
+#[test]
+fn the_war_is_counted_at_the_event() {
+    let mut g = game();
+    calm(&mut g);
+    let target = StateId::NorthAfrica;
+    assert_eq!(g.state(target).control, Control::Neutral);
+    occupier_in(&mut g, StateId::EastAsia, target);
+    g.resolution_phase();
+    assert_eq!(g.war.battles[0], 1, "one Battle, opened by seat 0");
+    assert_eq!(g.war.battles_vs_neutral, 1, "against a neutral Region's own Army");
+    assert_eq!(g.war.battles[1..], [0, 0, 0], "nobody else opened one");
+    // An Occupation begun and completed is a place taken by force.
+    let mut g = game();
+    calm(&mut g);
+    g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
+    occupier_in(&mut g, StateId::EastAsia, StateId::Europe);
+    g.resolution_phase();
+    assert_eq!(g.war.occupations_begun[0], 1);
+    g.resolution_phase();
+    g.resolution_phase();
+    assert_eq!(g.state(StateId::Europe).control, Control::Controlled(Seat(0)));
+    assert_eq!(g.war.takes_by_force[0], 1, "taken by force, once");
+    assert_eq!(g.war.occupations_broken[0], 0);
+    // Losses by the seat they fought for; a Standing Army under its own figure.
+    let mut g = game();
+    let standing = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(StateId::EastAsia)).map(|a| a.id).unwrap();
+    g.destroy_army(standing, "battle", None);
+    assert_eq!((g.war.standing_armies_lost, g.war.armies_lost[0]), (1, 0));
+    let built = ArmyId(g.fresh_id());
+    g.armies.push(Army { name: String::new(), id: built, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    g.destroy_army(built, "battle", None);
+    assert_eq!(g.war.armies_lost[0], 1, "a built Army of seat 0's");
+    let frigate = ShipId(g.fresh_id());
+    g.ships.push(Ship { name: String::new(), id: frigate, kind: UnitKind::Frigate, seat: Seat(2), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    g.destroy_ship(frigate, "battle");
+    assert_eq!(g.war.warships_lost[2], 1);
+    // Through the save.
+    let saved = dying_earth_engine::save::SavedGame::of(&g);
+    let back = saved.into_game(g.tables.clone());
+    assert_eq!(back.war.armies_lost[0], 1, "the counters ride through the save");
+}
+
+/// Ticket #284 (version 0.08.5): every computer seat may attack a Region it did not lose, on the
+/// Prospectors' odds, given a cause: a neutral needs none; a rival's Region only when the seat is
+/// Cold or worse toward that rival; an occupier stays where it is; and the Battle line and the
+/// Occupation agree that an escaped attacker is not alone at the place.
+#[test]
+fn a_cold_seat_marches_on_a_rivals_region_a_cordial_one_does_not_and_an_occupier_stays() {
+    let mut g = game();
+    calm(&mut g);
+    let (home, target) = (StateId::EastAsia, StateId::Russia);
+    assert!(g.tables.state(home).neighbours.contains(&target));
+    assert_eq!(g.kind(Seat(0)), FactionKind::Custodians, "a seat the old rule forbade");
+    // Russia held by the Prospectors, its Standing Army weak; seat 0 has a built Army in China.
+    g.take_control(target, Seat(1));
+    for a in g.armies.iter_mut().filter(|a| a.standing && a.home == ArmyHome::State(target)) {
+        a.damage = 2;
+    }
+    let army = ArmyId(g.fresh_id());
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(home), at: ArmyAt::Place(Place::State(home)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    let def: i64 = g.defenders_at(Place::State(target), Seat(0)).iter().filter_map(|id| g.army(*id)).map(|a| g.army_strength(a)).sum();
+    assert!(combat::first_round_odds(4, def) >= g.tables.ai.thresholds.attack_odds, "the odds clear the bar: {def}");
+    let marches = |g: &mut Game| g.ai_orders(Seat(0)).iter().any(|o| matches!(o, Order::MoveArmy { army: a, to } if *a == army && *to == target));
+    assert!(!marches(&mut g), "Neutral toward the Prospectors: no cause, no march");
+    g.relations.score[0][1] = -8;
+    assert!(g.relations_score(Seat(0), Seat(1)) <= g.tables.ai.thresholds.war_cause, "Cold or worse");
+    assert!(marches(&mut g), "Cold toward the Prospectors: the Custodians march on Russia: {:?}", g.ai_orders(Seat(0)));
+    // A neutral neighbour needs no cause.
+    g.relations.score[0][1] = 0;
+    g.take_control(target, Seat(1));
+    let neutral = StateId::SouthAsia;
+    assert_eq!(g.state(neutral).control, Control::Neutral);
+    for a in g.armies.iter_mut().filter(|a| a.standing && a.home == ArmyHome::State(neutral)) {
+        a.damage = 2;
+    }
+    assert!(g.ai_orders(Seat(0)).iter().any(|o| matches!(o, Order::MoveArmy { to, .. } if *to == neutral)), "a weak neutral next door is marched on with no cause: {:?}", g.ai_orders(Seat(0)));
+
+    // An occupier stays: an Army at a place this seat occupies is offered no march.
+    let mut g = game();
+    calm(&mut g);
+    g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
+    let occ = occupier_in(&mut g, StateId::EastAsia, StateId::Europe);
+    g.resolution_phase();
+    assert!(matches!(g.state(StateId::Europe).control, Control::Occupied { occupier: Seat(0), .. }));
+    assert!(!g.ai_orders(Seat(0)).iter().any(|o| matches!(o, Order::MoveArmy { army, .. } if *army == occ)), "the occupier holds what it takes: {:?}", g.ai_orders(Seat(0)));
+
+    // Alone at the place: an escaped attacker is not.
+    let mut g = game();
+    calm(&mut g);
+    g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
+    let id = occupier_in(&mut g, StateId::EastAsia, StateId::Europe);
+    assert!(g.alone_at(Place::State(StateId::Europe), Seat(0)), "on Attack, unescaped, nobody defending");
+    g.army_mut(id).unwrap().escaped = true;
+    assert!(!g.alone_at(Place::State(StateId::Europe), Seat(0)), "escaped, it occupies nothing and the line must not promise it");
+}
+
+/// Ticket #282 (version 0.08.5): neutral states arm when threatened. A neutral Region with a built
+/// Army of any Faction next door raises a Levy at Industry + 2 at Income, a second standing Army
+/// that fights for it and never marches; when the threat passes the Levy stands down at the next
+/// Income; a neutral that is attacked and holds gains +1 to its Standing Army for good, to
+/// Industry + 4; and a destroyed Standing Army returns two Incomes later, not the next.
+#[test]
+fn a_threatened_neutral_raises_a_levy_and_stands_it_down_and_holding_arms_it_for_good() {
+    let mut g = game();
+    calm(&mut g);
+    // Egypt is neutral and borders Saudi Arabia; a built Army of seat 0's stands there.
+    let (egypt, next_door) = (StateId::NorthAfrica, StateId::ArabianPeninsula);
+    assert_eq!(g.state(egypt).control, Control::Neutral);
+    assert!(g.tables.state(egypt).neighbours.contains(&next_door), "adjacent");
+    assert!(!g.neutral_threatened(egypt), "nobody next door yet");
+    let army = ArmyId(g.fresh_id());
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(next_door)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    assert!(g.neutral_threatened(egypt), "a foreign built Army next door threatens it, whatever its stance");
+    g.income_phase();
+    let levy = g.levy_at(egypt).expect("a Levy raised at Income");
+    let l = g.armies.iter().find(|a| a.id == levy).unwrap().clone();
+    assert!(l.standing && l.levy && l.at == ArmyAt::Place(Place::State(egypt)));
+    assert_eq!(g.army_strength(&l), (g.state(egypt).industry_level + 2) as i64, "Industry + 2");
+    assert!(g.army_name(&l).contains("Egyptian"), "named from its home: {}", g.army_name(&l));
+    assert_eq!(g.armies.iter().filter(|a| a.standing && !a.levy && a.home == ArmyHome::State(egypt)).count(), 1, "the Standing Army is still one");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Egypt arms")), "the Report says so: {:?}", g.report.lines);
+    assert!(g.levies_raised >= 1, "counted for the sweep; every neutral bordering that Army arms, so more than Egypt may have");
+    g.income_phase();
+    assert_eq!(g.levy_at(egypt), Some(levy), "one Levy, not one a turn");
+    // The threat leaves: the Levy stands down at the next Income.
+    g.armies.retain(|a| a.id != army);
+    g.income_phase();
+    assert!(g.levy_at(egypt).is_none(), "stood down");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Egypt stands down")), "{:?}", g.report.lines);
+    // A Region that changes hands stands its Levy down at once.
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(next_door)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    g.income_phase();
+    assert!(g.levy_at(egypt).is_some());
+    g.transfer_control(Place::State(egypt), Seat(1), "Influence");
+    assert!(g.levy_at(egypt).is_none(), "a held Region has no Levy");
+
+    // Holding: +1 for good, to Industry + 4.
+    let mut g = game();
+    calm(&mut g);
+    let cap = g.standing_army_cap(egypt);
+    g.neutral_held(egypt);
+    assert_eq!(g.standing_army_cap(egypt), cap + 1, "one step earned");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Egypt held against the attack")), "{:?}", g.report.lines);
+    for _ in 0..5 {
+        g.neutral_held(egypt);
+    }
+    assert_eq!(g.standing_army_cap(egypt), g.state(egypt).industry_level + 4, "never past Industry + 4");
+    assert_eq!(g.neutral_holds, 6, "every hold is counted for the sweep");
+
+    // The respawn: a destroyed Standing Army returns two Incomes later, not the next.
+    let mut g = game();
+    calm(&mut g);
+    let standing = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(egypt)).map(|a| a.id).unwrap();
+    g.destroy_army(standing, "battle", Some(ReportPlace::State(egypt)));
+    g.income_phase();
+    assert!(!g.armies.iter().any(|a| a.standing && !a.levy && a.home == ArmyHome::State(egypt)), "not the next Income");
+    g.income_phase();
+    let back = g.armies.iter().find(|a| a.standing && !a.levy && a.home == ArmyHome::State(egypt)).expect("but the one after");
+    assert_eq!(g.army_strength(back), 1, "at strength 1");
+}
+
+/// Ticket #281 (version 0.08.5): a Battle is a line of the Report at its real place, its parties
+/// name every unit and what it took, an aggressor carries its first-round odds; when a unit died
+/// the line ranks with a Ship destroyed and a Moment names the loss, and when nobody lost one the
+/// line is unranked and no Moment fires; an Army destroyed is a line by name.
+#[test]
+fn a_battle_is_a_report_line_at_its_place_by_name_with_odds_and_a_moment_when_a_unit_dies() {
+    let mut g = game();
+    calm(&mut g);
+    let target = StateId::NorthAfrica;
+    let defender = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(target)).cloned().expect("Egypt's Standing Army");
+    let defender_name = g.army_name(&defender);
+    assert!(defender_name.contains("Egyptian"), "named from its home: {defender_name}");
+    occupier_in(&mut g, StateId::EastAsia, target);
+    g.resolution_phase();
+    let line = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::State(target))).expect("a Battle at Egypt, with its real place");
+    let agg = line.parties.iter().find(|p| p.aggressor).expect("an aggressor");
+    assert_eq!(agg.seat, Some(Seat(0)));
+    let odds = agg.odds.expect("the odds the aggressor faced");
+    assert!(odds > 0.0 && odds < 1.0, "first-round odds: {odds}");
+    let neutral = line.parties.iter().find(|p| p.seat.is_none()).expect("the neutral party");
+    assert!(neutral.odds.is_none(), "a defender carries no odds");
+    assert!(neutral.units.starts_with(&defender_name), "the party text names the unit: {}", neutral.units);
+    assert!(neutral.units.contains("took") || neutral.units.contains("escaped") || neutral.units.contains("destroyed"), "and says what it took: {}", neutral.units);
+    let lost: Vec<&String> = line.parties.iter().flat_map(|p| p.destroyed.iter()).collect();
+    let report = g.report.lines.iter().find(|l| l.text.starts_with("Battle at Egypt")).expect("a Report line for the Battle");
+    assert_eq!(report.place, Some(ReportPlace::State(target)), "the line jumps to the place");
+    assert!(report.text.contains(&format!("{:.0}% first-round odds", odds * 100.0)), "and says the odds, labelled: {}", report.text);
+    let moments = g.report.moments.iter().filter(|m| m.kind == MomentKind::DecisiveBattle).count();
+    if lost.is_empty() {
+        assert_eq!(report.kind, LineKind::Battle, "a bloodless Battle is unranked");
+        assert!(report.text.contains("nobody lost a unit"), "{}", report.text);
+        assert_eq!(moments, 0, "and stops nobody's turn");
+    } else {
+        assert_eq!(report.kind, LineKind::DecisiveBattle, "a Battle that cost a unit ranks with a Ship destroyed");
+        assert!(report.text.contains(lost[0].as_str()), "and names the loss: {}", report.text);
+        assert_eq!(moments, 1, "and is a Moment");
+        assert!(g.report.moments.iter().any(|m| m.kind == MomentKind::DecisiveBattle && m.text.contains(lost[0].as_str())), "the Moment names it: {:?}", g.report.moments);
+    }
+    assert!(LineKind::Battle.headline_rank().is_none() && LineKind::DecisiveBattle.headline_rank() == Some(4));
+    assert_eq!(LineKind::Battle.section(Some(ReportPlace::Body(BodyId::Mars))), Section::InSpace, "a Battle in orbit files under In space");
+
+    // An Army destroyed is a line by name, wherever it dies.
+    let mut g = game();
+    let a = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(StateId::EastAsia)).cloned().unwrap();
+    let name = g.army_name(&a);
+    g.destroy_army(a.id, "battle", Some(ReportPlace::State(StateId::EastAsia)));
+    assert!(g.armies.iter().all(|x| x.id != a.id));
+    let line = g.report.lines.iter().find(|l| l.kind == LineKind::DecisiveBattle && l.text.contains(&name)).expect("a line naming the Army");
+    assert!(line.text.contains("destroyed (battle)") && line.place == Some(ReportPlace::State(StateId::EastAsia)), "{}", line.text);
+}
+
+/// Ticket #280 (version 0.08.5): a building that makes no resource says what it does, in the
+/// sentence on its row in the data, where the row said "no output"; a Unique that makes a resource
+/// says its clause beside it; the Scrubber's row reads the data's upkeep, not a hand-written one;
+/// and the School's sentence carries the `[school]` figures, so the two cannot drift apart.
+#[test]
+fn a_building_with_no_output_says_what_it_does_in_the_datas_words() {
+    let g = game();
+    let sid = StateId::EastAsia;
+    let school = g.facility_yield(Seat(0), sid, FacilityKind::School).text();
+    assert!(!school.contains("no output"), "no longer 'no output': {school}");
+    let s = &g.tables.school;
+    assert!(school.contains(&format!("{:.2} a turn", s.per_turn)) && school.contains(&format!("to {:.1}", s.ceiling)), "the School's sentence carries the [school] figures: {school}");
+    assert!(school.ends_with("2 Energy upkeep"), "and the upkeep still closes the line: {school}");
+    let constabulary = g.facility_yield(Seat(0), sid, FacilityKind::Constabulary).text();
+    assert!(constabulary.contains("Unrest") && !constabulary.contains("no output"), "{constabulary}");
+    let scrubber = g.facility_yield(Seat(0), sid, FacilityKind::Scrubber).text();
+    assert!(scrubber.contains(&format!("{} Energy upkeep", g.tables.facility(FacilityKind::Scrubber).energy_upkeep)) && scrubber.contains("Natural Sink"), "{scrubber}");
+    let bank = g.facility_yield(Seat(0), sid, FacilityKind::InvestmentBank).text();
+    assert!(bank.contains(" Ducats, banks 1%"), "a Unique says its clause beside its resource: {bank}");
+    // Modules the same way, at a station over Earth.
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("a station");
+    for (kind, word) in [(ModuleKind::Habitat, "Colonists"), (ModuleKind::Shipyard, "Ship"), (ModuleKind::Barracks, "Army"), (ModuleKind::Institute, "Education")] {
+        let text = g.module_yield(Seat(0), station, kind).text();
+        assert!(text.contains(word) && !text.contains("no output"), "{}: {text}", kind.name());
+    }
+    // A Mine still reads as it did: a resource, no sentence.
+    let mine = g.module_yield(Seat(0), station, ModuleKind::Mine).text();
+    assert!(mine.starts_with("+") && !mine.contains("no output"), "{mine}");
+}
+
+/// Ticket #279 (version 0.08.5): Battles pollute. Every hit landed in a Battle on Earth puts the
+/// table's ppm per hit into next Climate phase's war bucket, worn by the seat that landed it and
+/// by nobody for a neutral Region's own Army; every building burned in the rolls after it puts the
+/// table's ppm per building on the aggressors; the Climate phase adds it to the stock as its own
+/// source, counted against Stabilization, and to the seat's Blame as emitted. Mars orbit charges nothing.
+#[test]
+fn a_battle_on_earth_pollutes_by_hits_and_buildings_burned_and_one_at_mars_does_not() {
+    let mut g = game();
+    calm(&mut g);
+    let (per_hit, per_building) = (g.tables.climate.war_ppm_per_hit, g.tables.climate.war_ppm_per_building);
+    assert!((per_hit - 0.5).abs() < 1e-9 && (per_building - 2.0).abs() < 1e-9, "half a ppm a hit, two a building");
+    // Seat 0's Army attacks neutral Europe, whose Standing Army defends: hits on both sides.
+    let target = StateId::NorthAfrica;
+    assert_eq!(g.state(target).control, Control::Neutral, "Egypt is neutral at the start");
+    let before = g.state(target).facilities.len();
+    occupier_in(&mut g, StateId::EastAsia, target);
+    g.resolution_phase();
+    let line = g.report.battles.iter().find(|b| b.place == g.tables.state(target).name).expect("a Battle in Europe");
+    let mine: u32 = line.parties.iter().filter(|p| p.seat == Some(Seat(0))).map(|p| p.hits).sum();
+    let theirs: u32 = line.parties.iter().filter(|p| p.seat.is_none()).map(|p| p.hits).sum();
+    assert!(mine + theirs > 0, "three rolls a round land somewhere: {line:?}");
+    let burned = (before - g.state(target).facilities.len()) as f64;
+    let want_mine = mine as f64 * per_hit + burned * per_building;
+    assert!((g.climate.war_next[0] - want_mine).abs() < 1e-9, "seat 0 wears its {mine} hits and the {burned} buildings it burned: {} against {want_mine}", g.climate.war_next[0]);
+    assert!((g.climate.war_next_nobody - theirs as f64 * per_hit).abs() < 1e-9, "the neutral Army's {theirs} hits are nobody's: {}", g.climate.war_next_nobody);
+    assert!(g.climate.war_next[1..].iter().all(|v| *v == 0.0), "nobody else fought");
+
+    // The next Climate phase: its own source, on the stock, counted, and seat 0's Blame.
+    let want_total = want_mine + theirs as f64 * per_hit;
+    let (co2_before, emitted_before) = (g.climate.co2, g.seats[0].blame_emitted);
+    g.climate_phase();
+    let b = &g.climate.last;
+    assert!((b.war - want_total).abs() < 1e-9, "the War source: {} against {want_total}", b.war);
+    let rest = b.state_industry + b.factories + b.power_plants + b.refineries + b.launches + b.population;
+    assert!((b.counted() - rest - b.war).abs() < 1e-9, "counted against Stabilization, beside the buildings, launches and people");
+    assert!((g.climate.co2 - co2_before - b.net()).abs() < 1e-9, "and on the stock");
+    assert!((g.seats[0].blame_emitted - emitted_before - b.by_seat[0]).abs() < 1e-9 && b.by_seat[0] >= want_mine - 1e-9, "seat 0's share is its Blame, emitted");
+    assert!((g.seats[0].war_ppm - want_mine).abs() < 1e-9 && (g.climate.war_nobody_total - theirs as f64 * per_hit).abs() < 1e-9, "kept for the sweep");
+    assert!(g.climate.war_next.iter().all(|v| *v == 0.0) && g.climate.war_next_nobody == 0.0, "the bucket is drained");
+
+    // A Battle in Mars orbit fouls nobody's air.
+    let push = |g: &mut Game, seat: Seat| {
+        let id = ShipId(g.fresh_id());
+        g.ships.push(Ship {
+            id,
+            name: String::new(), kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None,
+            stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
+        });
+    };
+    push(&mut g, Seat(0));
+    push(&mut g, Seat(1));
+    g.armies.retain(|a| a.standing);
+    g.resolution_phase();
+    assert!(g.report.battles.iter().any(|b| b.place.contains("Mars")), "a Battle in Mars orbit: {:?}", g.report.battles);
+    assert!(g.climate.war_next.iter().all(|v| *v == 0.0) && g.climate.war_next_nobody == 0.0, "and nothing in the war bucket");
+}
+
+/// Ticket #278 (version 0.08.5): a Blockade is a stance a warship stack is ordered into, refused
+/// where no warship of the seat's sits in a slot to blockade; a station under one makes nothing and
+/// still pays its upkeep, its holder is offended at weight 1 each Income, the Report says so, and
+/// the sweep's counters move.
+#[test]
+fn a_blockade_is_ordered_and_starves_the_station_in_its_slot_upkeep_still_paid() {
+    let mut g = game();
+    calm(&mut g);
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("a station over Earth");
+    let (body, slot) = { let c = g.colony(station).unwrap(); (c.body, c.slot) };
+    // Something to starve: a Solar Array making Energy for 0 upkeep would hide the upkeep, so an
+    // Observatory (Research, 2 Energy upkeep) and a Solar Array (Energy) both.
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::SolarArray));
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Observatory));
+    let rival = ShipId(g.fresh_id());
+    g.ships.push(Ship {
+        name: String::new(), id: rival, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None,
+        stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
+    });
+    // The order wants a warship in a slot: at the Body at large it is refused.
+    let err = g.check_order(Seat(1), &[], &Order::ShipStance { body, stance: Stance::Blockade }).unwrap_err().0;
+    assert!(err.contains("no warship of yours sits in a slot"), "{err}");
+    g.ship_mut(rival).unwrap().slot = Some(slot);
+    assert!(g.check_order(Seat(1), &[], &Order::ShipStance { body, stance: Stance::Blockade }).is_ok(), "in the station's slot it may be ordered");
+    assert_eq!(g.starved_by(station), None, "on Hold it starves nothing");
+
+    // Two futures from the same board: the Frigate on Hold, and ordered to Blockade.
+    let mut held = g.clone();
+    let mut blockaded = g.clone();
+    blockaded.commit_orders(Seat(1), &[Order::ShipStance { body, stance: Stance::Blockade }]);
+    assert_eq!(blockaded.ship(rival).unwrap().stance, Stance::Blockade);
+    assert_eq!(blockaded.starved_by(station), Some(Seat(1)), "ordered, it starves the station");
+    let before = g.seats[0].stockpile.energy;
+    held.income_phase();
+    blockaded.income_phase();
+    let (gain_held, gain_blockaded) = (held.seats[0].stockpile.energy - before, blockaded.seats[0].stockpile.energy - before);
+    let array = g.module_yield_at(Seat(0), station, 1).amount;
+    assert!(array > 0, "the Solar Array makes Energy: {array}");
+    assert_eq!(gain_held - gain_blockaded, array, "starved, the station made nothing and paid the same upkeep: {gain_held} against {gain_blockaded}");
+    assert!(blockaded.relations.offended[0][1], "each Income under a Blockade is an offence against the holder");
+    assert!(!held.relations.offended[0][1], "and a Frigate on Hold offends nobody");
+    assert_eq!((blockaded.seats[0].blockade_turns_suffered, blockaded.seats[1].blockade_turns_imposed), (1, 1), "counted for the sweep");
+    assert!(blockaded.report.lines.iter().any(|l| l.text.contains("is blockaded by the") && l.text.contains("made nothing")), "the Report says so: {:?}", blockaded.report.lines);
+    // Nothing died and nothing burned.
+    assert_eq!(blockaded.colony(station).unwrap().modules.len(), g.colony(station).unwrap().modules.len());
+}
+
+/// Ticket #278 (version 0.08.5): a Colony on the ground starves only while one rival holds Orbital
+/// Control of its Body outright AND has a stack there on Blockade; a contested orbit starves nobody.
+#[test]
+fn a_ground_colony_starves_under_outright_orbital_control_with_a_blockading_stack_and_not_under_a_contested_orbit() {
+    let mut g = game();
+    calm(&mut g);
+    let body = BodyId::Moon;
+    let cid = colony(&mut g, Seat(0), body, &[ModuleKind::Mine], 4);
+    let push = |g: &mut Game, seat: Seat, stance: Stance| {
+        let id = ShipId(g.fresh_id());
+        g.ships.push(Ship {
+            id,
+            name: String::new(), kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None,
+            stance, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
+        });
+        id
+    };
+    let rival = push(&mut g, Seat(1), Stance::Hold);
+    assert_eq!(g.orbital_control(body), Some(Seat(1)), "held outright");
+    assert_eq!(g.starved_by(cid), None, "held outright on Hold: the ground is shut to landings and nothing more");
+    g.ship_mut(rival).unwrap().stance = Stance::Blockade;
+    assert_eq!(g.starved_by(cid), Some(Seat(1)), "ordered to Blockade, the Colony on the ground starves");
+    push(&mut g, Seat(2), Stance::Hold);
+    assert_eq!(g.orbital_control(body), None, "contested");
+    assert_eq!(g.starved_by(cid), None, "a contested orbit starves nobody, as it lands nobody");
+}
+
+/// Ticket #278 (version 0.08.5): a computer seat whose warship sits in a rival station's slot is
+/// offered the Blockade stance; one whose Colony is starved wants a warship there more.
+#[test]
+fn the_computer_orders_a_blockade_where_its_warship_sits_in_a_rival_stations_slot() {
+    let mut g = game();
+    calm(&mut g);
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("a station over Earth");
+    let (body, slot) = { let c = g.colony(station).unwrap(); (c.body, c.slot) };
+    let id = ShipId(g.fresh_id());
+    g.ships.push(Ship {
+        name: String::new(), id, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None,
+        stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(slot),
+    });
+    let orders = g.ai_orders(Seat(1));
+    assert!(orders.iter().any(|o| matches!(o, Order::ShipStance { body: b, stance: Stance::Blockade } if *b == body)), "a Blockade of the station whose slot it sits in: {orders:?}");
+}
+
 /// Ticket #99: a Refuel needs a station of yours that is not blockaded, and a rival warship sitting
 /// in an empty Orbital Slot denies that slot to a builder.
 #[test]
@@ -7214,7 +7692,7 @@ fn a_blockade_stops_refuelling_and_holds_an_empty_slot_against_a_builder() {
     let rival = ShipId(g.fresh_id());
     g.ships.push(Ship {
         name: String::new(), id: rival, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None,
-        stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(slot),
+        stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(slot),
     });
     let err = g.check_order(Seat(0), &[], &Order::Refuel { ship: mine }).unwrap_err().0;
     assert!(err.contains("blockaded"), "a blockaded station fuels nothing: {err}");
@@ -7327,7 +7805,7 @@ fn an_army_keeps_its_stance_through_resolution_until_something_happens_to_it() {
         standing: false,
         stance: Stance::Evade,
         escaped: false,
-        move_to: None,
+        move_to: None, levy: false,
     });
     for turn in 1..=3 {
         g.resolution_phase();
@@ -9286,6 +9764,73 @@ fn a_smear_campaign_lays_ppm_on_a_rivals_blame_ledger_and_is_an_offence() {
     assert!((g.seats[target.index()].blame_smeared - 10.0 * rate).abs() < 1e-9, "for good");
 }
 
+/// Ticket #277 (version 0.08.5): a Greenwash takes ppm off the seat's own Blame ledger for good,
+/// at the table's rate per Influence, with a Ducat beside every point; one a turn; the whole
+/// ledger and never below nought; public and no offence.
+#[test]
+fn a_greenwash_takes_ppm_off_your_own_ledger_for_influence_and_ducats_and_offends_nobody() {
+    let mut g = game();
+    calm(&mut g);
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = 100.0;
+        g.seats[s.index()].blame_removed = 0.0;
+    }
+    g.seats[0].allotment = 20;
+    g.seats[0].stockpile.ducats = 12;
+    let t = g.tables.influence.greenwash.clone();
+    assert!((t.ppm_per_influence - 2.0).abs() < 1e-9 && t.ducats_per_influence == 1, "two ppm and one Ducat per Influence");
+    assert!(g.check_order(Seat(0), &[], &Order::Greenwash { amount: 0 }).is_err(), "a positive amount");
+    assert!(g.check_order(Seat(0), &[], &Order::Greenwash { amount: 15 }).is_err(), "15 Influence wants 15 Ducats and the seat has 12");
+    let first = Order::Greenwash { amount: 10 };
+    assert!(g.check_order(Seat(0), &[], &first).is_ok());
+    assert_eq!(g.order_cost(Seat(0), &first).ducats, 10, "a Ducat beside every point");
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&first), &Order::Greenwash { amount: 2 }).is_err(), "one a turn");
+    g.commit_orders(Seat(0), &[first]);
+    g.resolution_phase();
+    assert!((g.seats[0].blame_cleaned - 20.0).abs() < 1e-9, "20 ppm cleaned: {}", g.seats[0].blame_cleaned);
+    assert!((g.blame(Seat(0)) - 80.0).abs() < 1e-9, "off the whole ledger: {}", g.blame(Seat(0)));
+    assert_eq!(g.seats[0].stockpile.ducats, 2, "and the Ducats are spent");
+    assert!(g.blame_share(Seat(0)) < 0.25, "the share the rules read has moved: {}", g.blame_share(Seat(0)));
+    assert!(Seat::ALL.iter().all(|s| !g.relations.offended[s.index()][0]), "no offence against anybody");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("greenwashed")), "the Report says so, in public: {:?}", g.report.lines);
+    // Never below nought: a campaign past the ledger clears it and no more.
+    g.seats[0].blame_cleaned = 500.0;
+    assert!((g.blame(Seat(0)) - 0.0).abs() < 1e-9, "floored at nought");
+}
+
+/// Ticket #277 (version 0.08.5): a computer seat whose own Blame share stands above the fair quarter
+/// greenwashes when carbon credits are not to be had and it holds Ducats past the price; when the
+/// Custodians are offering and will sell, it buys credits instead; clean, it does neither.
+#[test]
+fn the_computer_greenwashes_when_dirty_and_credits_are_not_to_be_had() {
+    let mut g = game();
+    calm(&mut g);
+    let seat = Seat(1);
+    for s in Seat::ALL {
+        g.seats[s.index()].blame_emitted = 100.0;
+        g.seats[s.index()].blame_removed = 0.0;
+    }
+    g.seats[seat.index()].blame_emitted = 400.0;
+    g.seats[seat.index()].allotment = 20;
+    g.seats[seat.index()].stockpile.ducats = 200;
+    for s in Seat::ALL {
+        g.seats[s.index()].credits_offered = 0;
+    }
+    let orders = g.ai_orders(seat);
+    assert!(orders.iter().any(|o| matches!(o, Order::Greenwash { .. })), "dirty, rich, no credits on offer: it greenwashes: {orders:?}");
+    // The Custodians offering, and Neutral toward it: it buys credits and does not greenwash.
+    let seller = g.credit_seller().expect("the Custodians sit at the table");
+    g.seats[seller.index()].credits_offered = 10;
+    g.seats[seller.index()].blame_removed = 50.0;
+    let orders = g.ai_orders(seat);
+    assert!(orders.iter().any(|o| matches!(o, Order::BuyCredits { .. })), "credits to be had: it buys: {orders:?}");
+    assert!(!orders.iter().any(|o| matches!(o, Order::Greenwash { .. })), "and does not greenwash beside them: {orders:?}");
+    // Clean, it does neither.
+    g.seats[seat.index()].blame_emitted = 10.0;
+    let orders = g.ai_orders(seat);
+    assert!(!orders.iter().any(|o| matches!(o, Order::Greenwash { .. } | Order::BuyCredits { .. })), "clean: nothing: {orders:?}");
+}
+
 /// Ticket #267 (version 0.08.4): a computer seat Cold or Hostile toward a rival whose Blame share
 /// stands above the fair quarter proposes a Smear against it; toward nobody it hates, none.
 #[test]
@@ -9544,7 +10089,7 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     g.end_phase();
     assert_eq!(fired(&g), 2, "rivals only: {:?}", g.report.moments);
     assert_eq!(MomentKind::RivalProgress.rank(), 5, "between a Battle (4) and a Tech (6)");
-    assert_eq!(MomentKind::ALL.len(), 9);
+    assert_eq!(MomentKind::ALL.len(), 10, "ticket #281 (version 0.08.5) added a place taken by force");
     assert!(g.tables.report.moment_on(MomentKind::RivalProgress), "on by default");
 }
 

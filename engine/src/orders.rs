@@ -72,6 +72,11 @@ pub enum Order {
     /// who paid. "Smear", the designer said, because it inflates Blame above the ppm produced and
     /// is thus a kind of a lie.
     Smear { target: Seat, amount: i64 },
+    /// Ticket #277 (version 0.08.5): a Greenwash -- Influence spent on the seat's own name, with a
+    /// Ducat beside every point (`greenwash.ducats_per_influence`), taking ppm off its own Blame
+    /// ledger for good at `greenwash.ppm_per_influence`. One a turn, any amount the two purses
+    /// cover; public, no offence. The Smear's mirror, at the designer's word.
+    Greenwash { amount: i64 },
     /// Ticket #268 (version 0.08.4): the Custodians set the ppm of carbon credit they offer a turn,
     /// standing until changed; nought refuses everyone.
     OfferCredits { ppm: i64 },
@@ -261,6 +266,9 @@ pub struct Pending {
     /// Ticket #267 (version 0.08.4): Smear campaigns paid this turn -- who, whom, how much Influence.
     #[serde(default)]
     pub smears: Vec<(Seat, Seat, i64)>,
+    /// Ticket #277 (version 0.08.5): Greenwash campaigns paid this turn -- who, how much Influence.
+    #[serde(default)]
+    pub greenwashes: Vec<(Seat, i64)>,
     /// Ticket #268 (version 0.08.4): offers set and credits bought this turn -- buyer, ppm, Ducats paid.
     #[serde(default)]
     pub credit_offers: Vec<(Seat, i64)>,
@@ -293,6 +301,7 @@ impl Game {
             Order::Refuel { ship } => Cost { fuel: self.refuel_amount(seat, *ship), ..Default::default() },
             Order::Influence { amount, .. } => Cost { influence: *amount, ..Default::default() },
             Order::Smear { amount, .. } => Cost { influence: *amount, ..Default::default() },
+            Order::Greenwash { amount } => Cost { influence: *amount, ducats: *amount * self.tables.influence.greenwash.ducats_per_influence, ..Default::default() },
             Order::BuyCredits { ppm } => Cost { ducats: self.credit_cost(seat, *ppm).unwrap_or(0), ..Default::default() },
             // Ticket #54: a Mothball and a Strip Permit are free; a Restart costs Materials and a
             // Leapfrog Ducats; a Decommission pays Materials back, which arrive at its Resolution.
@@ -1055,9 +1064,22 @@ impl Game {
                 }
                 Ok(cost)
             }
-            Order::ShipStance { body, .. } => {
+            Order::ShipStance { body, stance } => {
                 if self.ships_at(seat, *body).is_empty() {
                     return fail("no Ships of yours there");
+                }
+                // Ticket #278 (version 0.08.5): a Blockade is chosen against a slot, so it wants a
+                // warship of the seat's sitting in an Orbital Slot that is not its own station's --
+                // a rival's, or an empty one held against a builder.
+                if *stance == Stance::Blockade
+                    && !self.ships.iter().any(|s| {
+                        s.seat == seat
+                            && s.at == ShipAt::Body(*body)
+                            && s.kind.is_warship()
+                            && s.slot.is_some_and(|sl| self.station_at(*body, sl).is_none_or(|c| c.control.director() != Some(seat)))
+                    })
+                {
+                    return fail("no warship of yours sits in a slot to blockade here");
                 }
                 Ok(cost)
             }
@@ -1268,6 +1290,16 @@ impl Game {
                 }
                 if pending.iter().any(|o| matches!(o, Order::Smear { target: t, .. } if t == target)) {
                     return fail(format!("the {} are already being smeared this turn", self.seat_name(*target)));
+                }
+                Ok(cost)
+            }
+            // Ticket #277 (version 0.08.5): a Greenwash is one a turn, of a positive amount.
+            Order::Greenwash { amount } => {
+                if *amount <= 0 {
+                    return fail("spend a positive amount");
+                }
+                if pending.iter().any(|o| matches!(o, Order::Greenwash { .. })) {
+                    return fail("one Greenwash a turn");
                 }
                 Ok(cost)
             }
@@ -1610,7 +1642,9 @@ impl Game {
                 }
                 Order::ShipStance { body, stance } => {
                     for s in self.ships.iter_mut().filter(|s| s.seat == seat && s.at == ShipAt::Body(*body)) {
-                        s.stance = *stance;
+                        // Ticket #278 (version 0.08.5): only a warship can blockade; the rest of a
+                        // stack ordered to Blockade holds.
+                        s.stance = if *stance == Stance::Blockade && !s.kind.is_warship() { Stance::Hold } else { *stance };
                     }
                     if *stance == Stance::Attack {
                         self.pending.attack_sequence += 1;
@@ -1692,6 +1726,7 @@ impl Game {
                 }
                 Order::Influence { target, amount } => self.pending.influence.push((seat, *target, *amount)),
                 Order::Smear { target, amount } => self.pending.smears.push((seat, *target, *amount)),
+                Order::Greenwash { amount } => self.pending.greenwashes.push((seat, *amount)),
                 Order::OfferCredits { ppm } => self.pending.credit_offers.push((seat, *ppm)),
                 Order::BuyCredits { ppm } => {
                     let paid = self.credit_cost(seat, *ppm).unwrap_or(0);
@@ -2035,6 +2070,7 @@ impl Game {
             }
             Order::Influence { target, amount } => r("influence", &[("n", amount.to_string()), ("place", place(*target))]),
             Order::Smear { target, amount } => r("smear", &[("n", amount.to_string()), ("faction", self.seat_name(*target))]),
+            Order::Greenwash { amount } => r("greenwash", &[("n", amount.to_string())]),
             Order::OfferCredits { ppm } => r("offer_credits", &[("n", ppm.to_string())]),
             Order::BuyCredits { ppm } => r("buy_credits", &[("n", ppm.to_string())]),
             Order::BuyInfluence { amount } => r("buy_influence", &[("n", amount.to_string())]),

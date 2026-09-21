@@ -40,7 +40,12 @@ pub const SAVE_VERSION: u32 = 1;
 /// carries a hold clock and an Exodus Call (#237, #238); and three new **Unique Modules** were
 /// appended to `ModuleKind` (#239), so a colony written by an older build describes a Module list
 /// this one indexes differently. A refusal naming both versions is the right answer.
-pub const GAME_VERSION: &str = "0.08.4";
+/// Ticket #287 (version 0.08.5): moved again. A Region carries a converted-slot count and an
+/// armed step (#276, #282); a seat carries Blame cleaned by Greenwash and blockade-turns (#277,
+/// #278); an Army carries a levy flag (#282); the climate carries a war bucket (#279); a Battle
+/// carries a place (#281); and the game carries the war's counters (#286). A refusal naming both
+/// versions is the right answer.
+pub const GAME_VERSION: &str = "0.08.5";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;
@@ -140,6 +145,14 @@ pub struct SavedGame {
     /// Ticket #272 (version 0.08.4): the sweep's count of Events drawn with nowhere to land.
     #[serde(default)]
     pub events_no_target: u32,
+    /// Ticket #282 (version 0.08.5): the sweep's counts of Levies raised and neutral Regions that held.
+    #[serde(default)]
+    pub levies_raised: u32,
+    #[serde(default)]
+    pub neutral_holds: u32,
+    /// Ticket #286 (version 0.08.5): the war's counters.
+    #[serde(default)]
+    pub war: WarCounters,
 }
 
 impl SavedGame {
@@ -156,6 +169,9 @@ impl SavedGame {
             colonies,
             ships,
             armies,
+            war,
+            levies_raised,
+            neutral_holds,
             climate,
             research,
             deck,
@@ -204,6 +220,9 @@ impl SavedGame {
             market: market.clone(),
             accords: accords.clone(),
             events_no_target: *events_no_target,
+            levies_raised: *levies_raised,
+            neutral_holds: *neutral_holds,
+            war: war.clone(),
         }
     }
 
@@ -219,6 +238,9 @@ impl SavedGame {
             colonies: self.colonies,
             ships: self.ships,
             armies: self.armies,
+            war: self.war,
+            levies_raised: self.levies_raised,
+            neutral_holds: self.neutral_holds,
             climate: self.climate,
             research: self.research,
             deck: self.deck,

@@ -229,6 +229,12 @@ impl Game {
             if !entering_own {
                 a.stance = Stance::Attack;
             }
+            // Ticket #286 (version 0.08.5): a march on a neutral, or on a Region a rival holds.
+            match self.state(to).control {
+                Control::Neutral => self.war.marches_neutral[seat.index()] += 1,
+                Control::Controlled(r) if r != seat => self.war.marches_held[seat.index()] += 1,
+                _ => {}
+            }
             let line = format!(
                 "{} Army moved from {} to {}{}.",
                 self.seat_name(seat),
@@ -302,7 +308,58 @@ impl Game {
             }
             let name = self.place_name(place);
             self.army_melee(&name, place, &aggressors, &parties);
-            self.destruction_rolls(place, "attacked");
+            self.destruction_rolls(place, "attacked", &aggressors);
+            // Ticket #282 (version 0.08.5): a neutral Region attacked that still has a defender
+            // standing, unescaped, has held, and arms for good: +1 to its Standing Army, to
+            // Industry + 4, at the designer's word.
+            if let Place::State(sid) = place
+                && self.state(sid).control == Control::Neutral
+                && self.armies.iter().any(|a| a.at == ArmyAt::Place(place) && self.army_seat(a).is_none() && !a.escaped && self.army_strength(a) > 0)
+            {
+                self.neutral_held(sid);
+            }
+        }
+    }
+
+    /// Ticket #282: the step a neutral Region earns by holding, and the Report line that says so.
+    pub fn neutral_held(&mut self, sid: StateId) {
+        self.neutral_holds += 1;
+        if self.state(sid).armed >= Game::MAX_ARMED {
+            return;
+        }
+        self.state_mut(sid).armed += 1;
+        let (state, n) = (self.tables.state(sid).name.clone(), self.standing_army_cap(sid));
+        self.log(format!("{state} held against the attack and arms: its Standing Army will stand at {n}."));
+        let text = self.say("neutral_held", &[("state", state), ("n", n.to_string())]);
+        self.report_line(LineKind::Army, Some(ReportPlace::State(sid)), text);
+    }
+
+    /// Ticket #279 (version 0.08.5): Battles pollute. Whether a place is on Earth -- a Region, Earth
+    /// orbit, or a Colony on Earth (Antarctica) -- since Mars orbit fouls nobody's air.
+    fn on_earth_place(&self, place: Place) -> bool {
+        match place {
+            Place::State(_) => true,
+            Place::Colony(c) => self.colony(c).is_some_and(|c| c.body == BodyId::Earth),
+        }
+    }
+
+    /// Ticket #279: so many ppm into next Climate phase's war bucket, worn by `seat` -- or by nobody,
+    /// for a neutral Region's own Army -- and only for a Battle on Earth.
+    fn charge_war(&mut self, on_earth: bool, seat: Option<Seat>, ppm: f64) {
+        if !on_earth || ppm <= 0.0 {
+            return;
+        }
+        match seat {
+            Some(s) => self.climate.war_next[s.index()] += ppm,
+            None => self.climate.war_next_nobody += ppm,
+        }
+    }
+
+    /// Ticket #279: every party's hits in a Battle, charged by the table's rate per hit.
+    fn charge_war_hits(&mut self, on_earth: bool, line: &BattleLine) {
+        let per_hit = self.tables.climate.war_ppm_per_hit;
+        for p in &line.parties {
+            self.charge_war(on_earth, p.seat, p.hits as f64 * per_hit);
         }
     }
 
@@ -311,6 +368,14 @@ impl Game {
             Place::State(s) => self.state(s).control.director(),
             Place::Colony(c) => self.colony(c).and_then(|c| c.control.director()),
         }
+    }
+
+    /// Ticket #284 (version 0.08.5): a seat is alone at a place when it has an Army there on Attack
+    /// that did not escape, and no defender is left engaged. Read by the Battle line and by the
+    /// Occupation alike, so the two can never disagree about `escaped` again.
+    pub fn alone_at(&self, place: Place, seat: Seat) -> bool {
+        let attacking = self.armies.iter().any(|a| a.at == ArmyAt::Place(place) && self.army_seat(a) == Some(seat) && a.stance == Stance::Attack && !a.escaped);
+        attacking && self.defenders_at(place, seat).is_empty()
     }
 
     /// Armies at a place that fight against `attacker`: every Army not of that seat, not standing down, not escaped.
@@ -326,17 +391,16 @@ impl Game {
     fn ship_combatant(&self, id: ShipId) -> Combatant {
         let s = self.ship(id).unwrap();
         let card = self.tables.unit(s.kind);
-        Combatant::new(UnitRef::Ship(id), format!("{} {}", self.seat_name(s.seat), s.kind.name()), self.ship_strength(s), card.hit_points, s.damage, card.pursuit, s.stance == Stance::Evade)
+        // Ticket #281 (version 0.08.5): by name, as every other surface has it since 0.08.1.
+        Combatant::new(UnitRef::Ship(id), self.ship_name(s), self.ship_strength(s), card.hit_points, s.damage, card.pursuit, s.stance == Stance::Evade)
     }
 
     fn army_combatant(&self, id: ArmyId) -> Combatant {
         let a = self.army(id).unwrap();
         let card = self.tables.unit(UnitKind::Army);
-        let owner = match self.army_seat(a) {
-            Some(s) => self.seat_name(s),
-            None => "neutral".to_string(),
-        };
-        let name = if a.standing { format!("{owner} Standing Army") } else { format!("{owner} Army") };
+        // Ticket #281 (version 0.08.5): by name -- the 1st Chinese Army -- as every other surface has
+        // it since 0.08.4; a neutral Region's own Army is named the same way.
+        let name = self.army_name(a);
         Combatant::new(UnitRef::Army(id), name, self.army_strength(a), card.hit_points, a.damage, card.pursuit, a.stance == Stance::Evade)
     }
 
@@ -351,7 +415,12 @@ impl Game {
         }
         let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
             parties.iter().map(|(seat, agg, ids)| (Some(*seat), *agg, ids.iter().map(|id| self.ship_combatant(*id)).collect())).collect();
-        let mut line = self.run_melee(place, units);
+        let mut line = self.run_melee(place, Some(ReportPlace::Body(body)), units);
+        // Ticket #286 (version 0.08.5): counted by the seat that opened it.
+        for (seat, _, _) in parties.iter().filter(|(_, agg, _)| *agg) {
+            self.war.battles[seat.index()] += 1;
+            self.war.orbit_attacks[seat.index()] += 1;
+        }
         match self.orbital_control(body) {
             Some(s) if parties.iter().any(|(seat, agg, _)| *agg && *seat == s) => {
                 line.result.push_str(&format!(" The {} hold Orbital Control.", self.seat_name(s)))
@@ -359,6 +428,7 @@ impl Game {
             Some(s) => line.result.push_str(&format!(" The {} keep Orbital Control.", self.seat_name(s))),
             None => line.result.push_str(" Nobody holds Orbital Control."),
         }
+        self.charge_war_hits(body == BodyId::Earth, &line);
         self.log(line.text(&|s| self.seat_name(s), "neutral"));
         self.report.battles.push(line);
     }
@@ -375,9 +445,19 @@ impl Game {
         }
         let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
             parties.iter().map(|(seat, agg, ids)| (*seat, *agg, ids.iter().map(|id| self.army_combatant(*id)).collect())).collect();
-        let mut line = self.run_melee(place_name, units);
+        let mut line = self.run_melee(place_name, Some(place.into()), units);
+        // Ticket #286 (version 0.08.5): counted by the seat that opened it, and against a neutral.
         for seat in aggressors {
-            if self.defenders_at(place, *seat).is_empty() && !self.armies_of_seat_at(*seat, place).is_empty() {
+            self.war.battles[seat.index()] += 1;
+        }
+        if parties.iter().any(|(seat, _, _)| seat.is_none()) {
+            self.war.battles_vs_neutral += 1;
+        }
+        self.charge_war_hits(self.on_earth_place(place), &line);
+        // Ticket #284 (version 0.08.5): the same predicate `resolve_occupation` reads, so the line
+        // never promises an Occupation an escaped attacker will not begin (a measured defect).
+        for seat in aggressors {
+            if self.alone_at(place, *seat) {
                 line.result.push_str(&format!(" The {} are alone at the place; Occupation begins.", self.seat_name(*seat)));
             }
         }
@@ -385,15 +465,14 @@ impl Game {
         self.report.battles.push(line);
     }
 
-    fn run_melee(&mut self, place: &str, parties: Vec<(Option<Seat>, bool, Vec<Combatant>)>) -> BattleLine {
-        let describe = |side: &[Combatant]| -> String {
-            let mut names: Vec<String> = side.iter().map(|c| c.name.split(' ').skip(1).collect::<Vec<_>>().join(" ")).collect();
-            names.sort();
-            names.join(", ")
-        };
+    /// Ticket #281 (version 0.08.5): `at` is the real place, for the Report's line to jump to; the
+    /// party text names every unit and what it took; an aggressor carries the first-round odds it
+    /// faced, as the attack button quoted them.
+    fn run_melee(&mut self, place: &str, at: Option<ReportPlace>, parties: Vec<(Option<Seat>, bool, Vec<Combatant>)>) -> BattleLine {
         let mut parties = parties;
-        let described: Vec<String> = parties.iter().map(|(_, _, c)| describe(c)).collect();
+        let before: Vec<Vec<u32>> = parties.iter().map(|(_, _, c)| c.iter().map(|x| x.damage).collect()).collect();
         let strengths: Vec<i64> = parties.iter().map(|(_, _, c)| c.iter().map(|x| x.strength).sum()).collect();
+        let total: i64 = strengths.iter().sum();
         let stats = {
             let mut slices: Vec<&mut [Combatant]> = parties.iter_mut().map(|(_, _, c)| c.as_mut_slice()).collect();
             let mut rng = self.rng.clone();
@@ -401,26 +480,69 @@ impl Game {
             self.rng = rng;
             stats
         };
+        // What each unit took, by name: "TSV Valiant took 2 hits; PMV Aurora escaped".
+        let describe = |side: &[Combatant], before: &[u32]| -> String {
+            side.iter()
+                .zip(before)
+                .map(|(c, b)| {
+                    let took = c.damage.saturating_sub(*b);
+                    let hits = format!("{took} hit{}", if took == 1 { "" } else { "s" });
+                    if c.destroyed() {
+                        format!("{} destroyed", c.name)
+                    } else if c.escaped {
+                        format!("{} escaped{}", c.name, if took > 0 { format!(" after {hits}") } else { String::new() })
+                    } else {
+                        format!("{} took {hits}", c.name)
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("; ")
+        };
         let listed: Vec<BattleParty> = parties
             .iter()
             .enumerate()
-            .map(|(i, (seat, agg, _))| BattleParty {
+            .map(|(i, (seat, agg, c))| BattleParty {
                 seat: *seat,
                 aggressor: *agg,
-                units: described[i].clone(),
+                units: describe(c, &before[i]),
                 strength: strengths[i],
                 hits: stats.hits_of(i),
                 destroyed: stats.destroyed.get(i).cloned().unwrap_or_default(),
                 escaped: stats.escaped.get(i).cloned().unwrap_or_default(),
+                odds: if *agg { Some(combat::first_round_odds(strengths[i], total - strengths[i])) } else { None },
             })
             .collect();
+        let line = BattleLine { place: place.to_string(), parties: listed, result: format!("{} round(s).", stats.rounds), at };
+        // The Battle's own line goes in BEFORE the losses are applied, so among the rank-4 lines a
+        // turn holds it is the earliest and headlines over "PMV Magellan destroyed (battle)".
+        self.battle_line_and_moment(&line);
         for (_, _, c) in &parties {
-            self.apply_combatants(c);
+            self.apply_combatants(c, at);
         }
-        BattleLine { place: place.to_string(), parties: listed, result: format!("{} round(s).", stats.rounds) }
+        line
     }
 
-    fn apply_combatants(&mut self, side: &[Combatant]) {
+    /// Ticket #281 (version 0.08.5): every Battle is a line of the Report at its place -- ranked
+    /// with a Ship destroyed when a unit died, unranked when nobody lost one -- and a Moment when a
+    /// unit died, naming it. Until now a Battle was a block at the foot of the dispatch and nothing
+    /// else: no headline, and no Moment unless a building burned.
+    fn battle_line_and_moment(&mut self, line: &BattleLine) {
+        let lost: Vec<String> = line.parties.iter().flat_map(|p| p.destroyed.iter().cloned()).collect();
+        let aggressors: Vec<String> = line.parties.iter().filter(|p| p.aggressor).map(|p| p.seat.map(|s| self.seat_name(s)).unwrap_or_else(|| "neutral".to_string())).collect();
+        let odds = line.parties.iter().find(|p| p.aggressor).and_then(|p| p.odds).unwrap_or(0.0);
+        let outcome = if lost.is_empty() { "nobody lost a unit".to_string() } else { format!("{} destroyed", Game::and_list(&lost)) };
+        let text = self.say(
+            "battle",
+            &[("place", line.place.clone()), ("faction", aggressors.join(" and the ")), ("odds", format!("{:.0}", odds * 100.0)), ("outcome", outcome.clone())],
+        );
+        let kind = if lost.is_empty() { LineKind::Battle } else { LineKind::DecisiveBattle };
+        self.report_line(kind, line.at, text);
+        if !lost.is_empty() {
+            self.moment(MomentKind::DecisiveBattle, &[("place", line.place.clone()), ("result", outcome), ("figure", format!("{} lost", lost.len()))], line.at);
+        }
+    }
+
+    fn apply_combatants(&mut self, side: &[Combatant], at: Option<ReportPlace>) {
         for c in side {
             match c.unit {
                 UnitRef::Ship(id) => {
@@ -433,7 +555,7 @@ impl Game {
                 }
                 UnitRef::Army(id) => {
                     if c.destroyed() {
-                        self.destroy_army(id);
+                        self.destroy_army(id, "battle", at);
                     } else if let Some(a) = self.army_mut(id) {
                         a.damage = c.damage;
                         a.escaped = c.escaped;
@@ -446,8 +568,15 @@ impl Game {
     pub fn destroy_ship(&mut self, id: ShipId, why: &str) {
         let Some(pos) = self.ships.iter().position(|s| s.id == id) else { return };
         let ship = self.ships.remove(pos);
+        if ship.kind.is_warship() {
+            self.war.warships_lost[ship.seat.index()] += 1;
+        }
         if let Some(a) = ship.army {
-            self.destroy_army(a);
+            let at = match ship.at {
+                ShipAt::Body(b) => Some(ReportPlace::Body(b)),
+                _ => None,
+            };
+            self.destroy_army(a, "lost with its Carrier", at);
         }
         let line = format!(
             "{} {} destroyed ({}){}.",
@@ -469,17 +598,37 @@ impl Game {
         self.report_line(LineKind::DecisiveBattle, place, text);
     }
 
-    pub fn destroy_army(&mut self, id: ArmyId) {
-        self.armies.retain(|a| a.id != id);
+    /// Ticket #281 (version 0.08.5): an Army destroyed is a line of the Report by name, as a Ship
+    /// has been since 0.08.1; from ticket #50 to here it left no trace but the Battle block's list.
+    pub fn destroy_army(&mut self, id: ArmyId, why: &str, at: Option<ReportPlace>) {
+        let Some(pos) = self.armies.iter().position(|a| a.id == id) else { return };
+        let army = self.armies.remove(pos);
+        // Ticket #286 (version 0.08.5): counted for the sweep, by the seat it fought for.
+        match (self.army_seat(&army), army.standing) {
+            (Some(s), false) => self.war.armies_lost[s.index()] += 1,
+            (_, true) if !army.levy => self.war.standing_armies_lost += 1,
+            _ => {}
+        }
+        // Ticket #282 (version 0.08.5): THE Standing Army returns two Incomes later, not the next.
+        if army.standing && !army.levy && let ArmyHome::State(sid) = army.home {
+            self.state_mut(sid).respawn_wait = 1;
+        }
         for s in &mut self.ships {
             if s.army == Some(id) {
                 s.army = None;
             }
         }
+        let who = self.army_seat(&army).map(|s| self.seat_name(s)).unwrap_or_else(|| "neutral".to_string());
+        let name = self.army_name(&army);
+        self.log(format!("{who} {name} destroyed ({why})."));
+        let text = self.say("army_destroyed", &[("faction", who), ("army", name), ("why", why.to_string())]);
+        self.report_line(LineKind::DecisiveBattle, at, text);
     }
 
     /// Spec 8.5: every Facility or Module at a place rolls a 1-in-4 chance to be destroyed.
-    fn destruction_rolls(&mut self, place: Place, why: &str) {
+    /// Ticket #279 (version 0.08.5): `charged` are the seats that wear what burns -- the aggressors
+    /// after a Battle, the taker on a transfer -- at the table's ppm per building, split between them.
+    fn destruction_rolls(&mut self, place: Place, why: &str, charged: &[Seat]) {
         let p = self.tables.influence.destruction_chance;
         let mut lost = Vec::new();
         match place {
@@ -519,6 +668,13 @@ impl Game {
                 }
             }
         }
+        if !lost.is_empty() && !charged.is_empty() {
+            let each = lost.len() as f64 * self.tables.climate.war_ppm_per_building / charged.len() as f64;
+            let on_earth = self.on_earth_place(place);
+            for s in charged {
+                self.charge_war(on_earth, Some(*s), each);
+            }
+        }
         if !lost.is_empty() {
             let line = format!("{} was {}: {} destroyed.", self.place_name(place), why, lost.join(", "));
             self.log(line);
@@ -527,8 +683,9 @@ impl Game {
                 &[("place", self.place_name(place)), ("why", why.to_string()), ("lost", lost.join(", "))],
             );
             self.report_line(LineKind::DecisiveBattle, Some(place.into()), text.clone());
+            // Ticket #281 (version 0.08.5): under its own name. The Battle's Moment is the Battle's.
             self.moment(
-                MomentKind::DecisiveBattle,
+                MomentKind::PlaceTakenByForce,
                 &[("place", self.place_name(place)), ("result", text), ("figure", format!("{} lost", lost.len()))],
                 Some(place.into()),
             );
@@ -551,6 +708,7 @@ impl Game {
                             None => Control::Neutral,
                         };
                         self.set_place_control(place, back);
+                        self.war.occupations_broken[occupier.index()] += 1;
                         let line = format!("Occupation of {} by the {} ended.", self.place_name(place), self.seat_name(occupier));
                         self.log(line);
                         let text = self.say("occupation_ended", &[("place", self.place_name(place)), ("faction", self.seat_name(occupier))]);
@@ -579,17 +737,12 @@ impl Game {
                         if control.director() == Some(seat) {
                             continue;
                         }
-                        let attackers: Vec<ArmyId> = self
-                            .armies
-                            .iter()
-                            .filter(|a| a.at == ArmyAt::Place(place) && self.army_seat(a) == Some(seat) && a.stance == Stance::Attack && !a.escaped)
-                            .map(|a| a.id)
-                            .collect();
-                        if attackers.is_empty() || !self.defenders_at(place, seat).is_empty() {
+                        if !self.alone_at(place, seat) {
                             continue;
                         }
                         let previous = control.controller();
                         self.set_place_control(place, Control::Occupied { occupier: seat, previous, turns: 1 });
+                        self.war.occupations_begun[seat.index()] += 1;
                         // Ticket #52: an Occupation begins at +3 Unrest, damped by nothing.
                         if let Place::State(sid) = place {
                             let n = self.tables.unrest.occupation_start;
@@ -671,6 +824,15 @@ impl Game {
 
     /// Control passes to `seat` (spec 8.3, 8.5): rivals' Influence wiped, a destruction roll, Armies follow.
     pub fn transfer_control(&mut self, place: Place, seat: Seat, why: &str) {
+        // Ticket #286 (version 0.08.5): a take that was not by Influence was by force.
+        if why != "Influence" && self.place_control(place).controller() != Some(seat) {
+            self.war.takes_by_force[seat.index()] += 1;
+        }
+        // Ticket #282 (version 0.08.5): a Levy was the neutral Region's; it stands down the moment
+        // the Region is somebody's.
+        if let Place::State(sid) = place {
+            self.armies.retain(|a| !(a.levy && a.home == ArmyHome::State(sid)));
+        }
         // Ticket #54: the Scrubbers go first, before the place has a new owner to hold them.
         if let Place::State(sid) = place
             && self.place_control(place).controller() != Some(seat)
@@ -711,7 +873,7 @@ impl Game {
         // Version 0.03 (ticket #31): a place taken by Influence keeps everything; only a place
         // that Occupation transfers rolls for destruction.
         if why != "Influence" {
-            self.destruction_rolls(place, "taken");
+            self.destruction_rolls(place, "taken", &[seat]);
         }
         // Armies at the place that fought for the old owner stand for the new one only if they are the place's own.
         // Foreign Armies keep their own home and seat; nothing to do.
@@ -1186,6 +1348,9 @@ impl Game {
             (_, BuildItem::Unit(UnitKind::Army)) => {
                 // Ticket #270 (version 0.08.4): raised through the one door, and named there.
                 self.raise_army(place, false);
+                if let Some(s) = self.place_director(place) {
+                    self.war.armies_built[s.index()] += 1;
+                }
             }
             (_, BuildItem::Unit(kind)) => {
                 let body = match place {
@@ -1197,6 +1362,9 @@ impl Game {
                 // from, taking the first name no Ship on the board is using. This is the ONE place a
                 // Ship comes into a real game, so it is the one place a name is given.
                 let name = self.next_ship_name(kind);
+                if kind.is_warship() {
+                    self.war.warships_built[b.seat.index()] += 1;
+                }
                 self.ships.push(Ship {
                     id,
                     name,
@@ -1748,6 +1916,17 @@ impl Game {
             let text = self.say("smear", &[("faction", who), ("target", whom.clone()), ("ppm", format!("{ppm:.0}"))]);
             self.report_line(LineKind::Note, None, text);
             self.ai_deed(seat, "smear", &[("n", amount.to_string()), ("faction", whom)]);
+        }
+        // Ticket #277 (version 0.08.5): Greenwash campaigns land -- ppm off the seat's own ledger for
+        // good, no offence, and a public Report line, so a rival can answer with a Smear.
+        for (seat, amount) in std::mem::take(&mut self.pending.greenwashes) {
+            let ppm = amount as f64 * self.tables.influence.greenwash.ppm_per_influence;
+            self.seat_mut(seat).blame_cleaned += ppm;
+            let who = self.seat_name(seat);
+            self.log(format!("The {who} greenwashed: {ppm:.0} ppm off their Blame."));
+            let text = self.say("greenwash", &[("faction", who), ("ppm", format!("{ppm:.0}"))]);
+            self.report_line(LineKind::Note, None, text);
+            self.ai_deed(seat, "greenwash", &[("n", amount.to_string())]);
         }
         // Ticket #269 (version 0.08.4): Agitate lands before Relief, so a holder's Relief the same
         // turn answers it. One point, damped by a working Constabulary, an offence against the
