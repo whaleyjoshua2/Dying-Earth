@@ -2455,21 +2455,29 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         }
                         hotspots.push(Hotspot { pos: p, radius: 30.0, hit: Hit::Select(Selection::State(sid)) });
                         // Army shields (ticket #31): one per Faction present, grey for a neutral Standing Army.
-                        let mut shields: Vec<(Option<Seat>, i64)> = Vec::new();
+                        // Ticket #297 (version 0.08.6): a shield whose Army is dug in carries a
+                        // trench line beneath it, in its own colour.
+                        let mut shields: Vec<(Option<Seat>, i64, bool)> = Vec::new();
                         for seat in Seat::ALL {
                             let s = game.army_stack_strength(seat, Place::State(sid));
-                            if s > 0 || !game.armies_of_seat_at(seat, Place::State(sid)).is_empty() {
-                                shields.push((Some(seat), s));
+                            let ids = game.armies_of_seat_at(seat, Place::State(sid));
+                            if s > 0 || !ids.is_empty() {
+                                let dug = ids.iter().filter_map(|id| game.army(*id)).any(|a| game.army_dug_in(a));
+                                shields.push((Some(seat), s, dug));
                             }
                         }
-                        let neutral: i64 = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid)) && game.army_seat(a).is_none() && !game.army_stands_down(a)).map(|a| game.army_strength(a)).sum();
+                        let neutral_armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid)) && game.army_seat(a).is_none() && !game.army_stands_down(a)).collect();
+                        let neutral: i64 = neutral_armies.iter().map(|a| game.army_strength(a)).sum();
                         if neutral > 0 {
-                            shields.push((None, neutral));
+                            shields.push((None, neutral, neutral_armies.iter().any(|a| game.army_dug_in(a))));
                         }
-                        for (i, (seat, strength)) in shields.iter().enumerate() {
+                        for (i, (seat, strength, dug)) in shields.iter().enumerate() {
                             let centre = p + egui::vec2(-38.0 + 26.0 * i as f32, 36.0);
                             let fill = seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
                             shield(painter, centre, fill, &strength.to_string());
+                            if *dug {
+                                painter.line_segment([centre + egui::vec2(-10.0, 15.0), centre + egui::vec2(10.0, 15.0)], egui::Stroke::new(3.0, fill));
+                            }
                             hotspots.push(Hotspot { pos: centre, radius: 12.0, hit: Hit::Select(Selection::State(sid)) });
                         }
                     }
@@ -3403,6 +3411,7 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
                 Stance::Intercept => "On Intercept, it meets what arrives.",
                 Stance::Evade => "Evading, it avoids battle where it can.",
                 Stance::Blockade => "An Army cannot blockade; it holds.",
+                Stance::DigIn => "Dug in, it fights two stronger in defence and never disengages, and it cannot march or board a Carrier until its stance is changed and the turn has passed.",
             },
             game.tables.unrest.army_threshold
         );
@@ -3934,8 +3943,12 @@ fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make
     ui.horizontal(|ui| {
         ui.label("Stance:");
         // Ticket #278 (version 0.08.5): Blockade, Ships only, beside Intercept.
-        for st in [Stance::Attack, Stance::Hold, Stance::Intercept, Stance::Blockade, Stance::Evade] {
+        // Ticket #297 (version 0.08.6): Dig In, Armies only, after Hold.
+        for st in [Stance::Attack, Stance::Hold, Stance::DigIn, Stance::Intercept, Stance::Blockade, Stance::Evade] {
             if matches!(st, Stance::Intercept | Stance::Blockade) && !ships {
+                continue;
+            }
+            if st == Stance::DigIn && ships {
                 continue;
             }
             let pending_stance = pending.iter().rev().find_map(|o| match (o, &make(st)) {
@@ -4797,8 +4810,10 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         };
         // Ticket #270 (version 0.08.4): named, the Standing Army included.
         // Ticket #282 (version 0.08.5): a Levy says so, and a standing row's hover names the rule.
+        // Ticket #297 (version 0.08.6): a dug-in Army says so, and what it fights at.
+        let dug = if game.army_dug_in(a) { format!(", dug in: +{} defending", game.tables.dig_in.defence) } else { String::new() };
         let row = ui.label(format!(
-            "  {} ({}{}): strength {}, damage {}/{}",
+            "  {} ({}{}): strength {}, damage {}/{}{dug}",
             game.army_name(a),
             who,
             if a.levy { ", levy" } else if a.standing { ", standing" } else { "" },

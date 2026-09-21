@@ -91,6 +91,13 @@ divisor = 3.0
 constabulary = 1
 calm = 1
 
+# Ticket #297 (version 0.08.6): Dig In, the third live stance an Army has. Dug in, an Army adds
+# `defence` to its strength while it defends and never rolls to disengage; its hit points do not
+# follow the bonus ("no bonus to hitpoints"). It cannot march or board a Carrier until its stance
+# is changed and the turn has passed. A neutral Region's own Armies are always dug in.
+[dig_in]
+defence = 2
+
 # Ticket #86 (version 0.06.0): a warming Earth fills the Colony Ships. A Colony Ship lifting at
 # Earth may take `per_step` Colonist beyond its capacity for every full `step` degrees the
 # Temperature stands above `above`, at most `cap` extra, the same for every Faction. At arrival

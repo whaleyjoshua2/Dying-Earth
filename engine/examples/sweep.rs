@@ -471,6 +471,8 @@ fn main() {
                                 "      Escapes over the batch: units escaped by seat {:?}, neutral {}; Battles with an escape {} of {}",
                                 warc.escapes, warc.escapes_neutral, warc.battles_with_escape, warc.battles.iter().sum::<u32>()
                             );
+                            // Ticket #297 (version 0.08.6): Dig In orders committed, by seat.
+                            println!("      Dig In orders over the batch, by seat {:?}", warc.dig_ins);
                             println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
                             println!("      Breaks fired: {}", fired.join(", "));
                         }

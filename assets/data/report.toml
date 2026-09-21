@@ -61,6 +61,8 @@ directive_fuel = "The {faction} directed {research} Research into propellant: {n
 
 # On Earth
 army_moved = "{faction} Army moved from {from} to {to}{attacks}."
+# Ticket #297 (version 0.08.6): the turn an Army digs in.
+army_dug_in = "{faction} Armies dig in at {place}."
 army_landed = "{faction} landed an Army at {colony}."
 units_destroyed = "{place} was {why}: {lost} destroyed."
 occupation_begun = "The {faction} occupy {place}."

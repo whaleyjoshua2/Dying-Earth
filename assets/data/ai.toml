@@ -66,6 +66,9 @@ stance_intercept = 3
 stance_hold = 2
 stance_evade = 1
 stance_blockade = 3
+# Ticket #297 (version 0.08.6): dig in where a rival's Army stands next door and there is no cause
+# to attack, and wherever this seat occupies; in place of Hold, at Hold's weight.
+stance_dig_in = 3
 
 [weights.custodians]
 build_scrubber = 8
@@ -109,6 +112,9 @@ stance_intercept = 3
 stance_hold = 3
 stance_evade = 1
 stance_blockade = 3
+# Ticket #297 (version 0.08.6): dig in where a rival's Army stands next door and there is no cause
+# to attack, and wherever this seat occupies; in place of Hold, at Hold's weight.
+stance_dig_in = 3
 
 # Ticket #51: the Arkwrights spread. Habitats, Colony Ships, stations and founding are all 9;
 # Influence is 5, since they buy passage rather than allegiance.
@@ -153,6 +159,9 @@ stance_intercept = 3
 stance_hold = 3
 stance_evade = 1
 stance_blockade = 3
+# Ticket #297 (version 0.08.6): dig in where a rival's Army stands next door and there is no cause
+# to attack, and wherever this seat occupies; in place of Hold, at Hold's weight.
+stance_dig_in = 3
 
 # Ticket #51: the Archivists research and build the Archive.
 [weights.archivists]
@@ -201,6 +210,9 @@ stance_intercept = 3
 stance_hold = 3
 stance_evade = 1
 stance_blockade = 3
+# Ticket #297 (version 0.08.6): dig in where a rival's Army stands next door and there is no cause
+# to attack, and wherever this seat occupies; in place of Hold, at Hold's weight.
+stance_dig_in = 3
 
 [multipliers]
 victory_gap_max = 3.0

@@ -947,6 +947,9 @@ pub struct AiWeights {
     pub stance_evade: f64,
     /// Ticket #278 (version 0.08.5): blockade the rival station whose slot the stack sits in.
     pub stance_blockade: f64,
+    /// Ticket #297 (version 0.08.6): dig in where a rival's Army stands next door and the seat has
+    /// no cause to attack, and wherever it occupies.
+    pub stance_dig_in: f64,
 }
 
 
@@ -1176,6 +1179,13 @@ pub struct StandingArmyCard {
     pub calm: u32,
 }
 
+/// Ticket #297 (version 0.08.6): what an Army dug in adds to its strength while it defends. Hit
+/// points do not follow it, at the designer's word.
+#[derive(Debug, Clone, Deserialize)]
+pub struct DigInCard {
+    pub defence: i64,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct UnitsFile {
     unit: Vec<UnitCard>,
@@ -1183,6 +1193,7 @@ struct UnitsFile {
     crowding: CrowdingCard,
     disengage: DisengageCard,
     standing_army: StandingArmyCard,
+    dig_in: DigInCard,
 }
 
 /// Ticket #86 (version 0.06.0): a warming Earth fills the Colony Ships. `per_step` Colonists
@@ -1433,6 +1444,8 @@ pub struct Tables {
     pub disengage: DisengageCard,
     /// Ticket #296 (version 0.08.6): what a Region's people add to its own Armies.
     pub standing_army: StandingArmyCard,
+    /// Ticket #297 (version 0.08.6): what digging in adds to a defending Army.
+    pub dig_in: DigInCard,
     pub techs: Vec<TechCard>,
     pub events: EventsTable,
     pub factions: Vec<FactionCard>,
@@ -1547,6 +1560,7 @@ impl Tables {
             crowding: units.crowding,
             disengage: units.disengage,
             standing_army: units.standing_army,
+            dig_in: units.dig_in,
             techs: techs.tech,
             shortlist: techs.shortlist,
             events,

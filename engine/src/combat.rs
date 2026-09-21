@@ -48,11 +48,20 @@ pub struct Combatant {
     pub escaped: bool,
     /// Set once the enemy's pursuer has had its chance at this unit.
     pub pursued: bool,
+    /// Ticket #297 (version 0.08.6): dug in, it never rolls to disengage. Its defence bonus is
+    /// already in `strength`; the caller adds it.
+    pub dug_in: bool,
 }
 
 impl Combatant {
     pub fn new(unit: UnitRef, name: impl Into<String>, strength: i64, hit_points: u32, damage: u32, pursuit: u32, evade: bool) -> Combatant {
-        Combatant { unit, name: name.into(), strength, hit_points, damage, pursuit, evade, engaged: true, escaped: false, pursued: false }
+        Combatant { unit, name: name.into(), strength, hit_points, damage, pursuit, evade, engaged: true, escaped: false, pursued: false, dug_in: false }
+    }
+
+    /// Ticket #297: the same unit, dug in.
+    pub fn dug_in(mut self, dug_in: bool) -> Combatant {
+        self.dug_in = dug_in;
+        self
     }
 }
 
@@ -198,9 +207,9 @@ pub fn melee(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, divisor: f64
                 stats.hits[hitter] += 1;
             }
         }
-        // Disengage.
+        // Disengage. Ticket #297 (version 0.08.6): a dug-in unit never rolls.
         for party in parties.iter_mut() {
-            for c in party.iter_mut().filter(|c| c.engaged && !c.destroyed()) {
+            for c in party.iter_mut().filter(|c| c.engaged && !c.destroyed() && !c.dug_in) {
                 let p = disengage_chance(c, divisor);
                 if p > 0.0 && dice.chance(p) {
                     c.engaged = false;

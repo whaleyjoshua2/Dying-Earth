@@ -664,6 +664,11 @@ pub enum Stance {
     /// Orbital Slot it sits in. Ships only. A Blockade is chosen, at the designer's word, never a
     /// side effect of a Ship's presence: a stack on any other stance blockades nothing.
     Blockade,
+    /// Ticket #297 (version 0.08.6): an Army dug in. Armies only: +2 strength while defending and
+    /// no disengage roll, and it can neither march nor board a Carrier until its stance is changed
+    /// and the turn has passed. A neutral Region's own Armies are always dug in, since nobody can
+    /// order them. The third live stance an Army has, after Attack and Evade; Hold does nothing.
+    DigIn,
 }
 
 impl Stance {
@@ -674,6 +679,7 @@ impl Stance {
             Stance::Intercept => "Intercept",
             Stance::Evade => "Evade",
             Stance::Blockade => "Blockade",
+            Stance::DigIn => "Dig In",
         }
     }
 }

@@ -1068,6 +1068,10 @@ impl Game {
                 if self.ships_at(seat, *body).is_empty() {
                     return fail("no Ships of yours there");
                 }
+                // Ticket #297 (version 0.08.6): Dig In is an Army's stance.
+                if *stance == Stance::DigIn {
+                    return fail("a Ship cannot dig in");
+                }
                 // Ticket #278 (version 0.08.5): a Blockade is chosen against a slot, so it wants a
                 // warship of the seat's sitting in an Orbital Slot that is not its own station's --
                 // a rival's, or an empty one held against a builder.
@@ -1096,6 +1100,12 @@ impl Game {
                 }
                 if self.army_stands_down(a) {
                     return fail("this Army stands down");
+                }
+                // Ticket #297 (version 0.08.6): dug in, it goes nowhere until its stance has been
+                // changed and the turn has passed; a stance order this turn takes effect at the
+                // Resolution, after the march would have gone, so it does not lift this.
+                if a.stance == Stance::DigIn {
+                    return fail("this Army is dug in: change its stance and wait the turn");
                 }
                 let ArmyAt::Place(Place::State(from)) = a.at else { return fail("this Army is not in a Nation State") };
                 if matches!(a.home, ArmyHome::Colony(_)) {
@@ -1173,6 +1183,10 @@ impl Game {
                     let Some(a) = self.army(*aid) else { return fail("no such Army") };
                     if self.army_seat(a) != Some(seat) || a.standing && self.army_stands_down(a) {
                         return fail("not your Army");
+                    }
+                    // Ticket #297 (version 0.08.6): a Carrier is the other way out of a trench.
+                    if a.stance == Stance::DigIn {
+                        return fail("this Army is dug in: change its stance and wait the turn");
                     }
                     if matches!(a.at, ArmyAt::Place(Place::State(st)) if !self.state(st).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working())) {
                         return fail("a lift to orbit needs a working Launch Site there");
@@ -1652,8 +1666,15 @@ impl Game {
                 }
                 Order::ArmyStance { place, stance } => {
                     let ids = self.armies_of_seat_at(seat, *place);
+                    let was_dug_in = self.armies.iter().any(|a| ids.contains(&a.id) && a.stance == Stance::DigIn);
                     for a in self.armies.iter_mut().filter(|a| ids.contains(&a.id)) {
                         a.stance = *stance;
+                    }
+                    // Ticket #297 (version 0.08.6): digging in is counted and said in the Report.
+                    if *stance == Stance::DigIn && !was_dug_in {
+                        self.war.dig_ins[seat.index()] += 1;
+                        let text = self.say("army_dug_in", &[("faction", self.seat_name(seat)), ("place", self.place_name(*place))]);
+                        self.report_line(LineKind::Army, Some((*place).into()), text);
                     }
                 }
                 Order::MoveArmy { army, to } => {

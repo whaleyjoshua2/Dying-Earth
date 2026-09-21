@@ -64,6 +64,8 @@ enum Cat {
     StanceEvade,
     /// Ticket #278 (version 0.08.5): a warship stack blockading a rival station's slot.
     StanceBlockade,
+    /// Ticket #297 (version 0.08.6): dig in.
+    StanceDigIn,
 }
 
 /// Ticket #50 removed the denial multiplier: every AI pursues its own Victory Condition and never
@@ -163,6 +165,7 @@ impl Game {
             Cat::StanceHold => w.stance_hold,
             Cat::StanceEvade => w.stance_evade,
             Cat::StanceBlockade => w.stance_blockade,
+            Cat::StanceDigIn => w.stance_dig_in,
         }
     }
 
@@ -2000,7 +2003,11 @@ impl Game {
             }
             match attack {
                 Some(odds) => push(vec![Order::ArmyStance { place, stance: Stance::Attack }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * 1.5, 1.0, 1.0, 1.0, format!("Attack at {} (odds {:.0}%)", self.place_name(place), odds * 100.0), Some(key.clone())),
-                None => push(vec![Order::ArmyStance { place, stance: Stance::Hold }], Cat::StanceHold, self.base_weight(seat, Cat::StanceHold) * if occupying { 3.0 } else { 1.0 }, 1.0, threat, 1.0, format!("Hold at {}", self.place_name(place)), Some(key.clone())),
+                // Ticket #297 (version 0.08.6): dig in rather than hold where a rival's Army stands
+                // next door and there is no cause to attack, and wherever this seat occupies -- an
+                // occupier stays (#284), and dug in it cannot leave. Hold is what is left.
+                None if occupying || self.enemy_army_near(seat, place) => push(vec![Order::ArmyStance { place, stance: Stance::DigIn }], Cat::StanceDigIn, self.base_weight(seat, Cat::StanceDigIn) * if occupying { 3.0 } else { 1.0 }, 1.0, threat, 1.0, format!("Dig in at {}", self.place_name(place)), Some(key.clone())),
+                None => push(vec![Order::ArmyStance { place, stance: Stance::Hold }], Cat::StanceHold, self.base_weight(seat, Cat::StanceHold), 1.0, threat, 1.0, format!("Hold at {}", self.place_name(place)), Some(key.clone())),
             }
             // Moves into neighbouring states with a non-standing Army. Ticket #284 (version 0.08.5):
             // any seat, on the odds, given a cause; an occupier marches nowhere.
@@ -2009,7 +2016,9 @@ impl Game {
             {
                 for aid in &mine {
                     let a = self.army(*aid).unwrap();
-                    if a.standing || a.damage > 2 {
+                    // Ticket #297 (version 0.08.6): a dug-in Army is refused a march until its stance
+                    // has changed and a turn has passed, so no march is offered for it.
+                    if a.standing || a.damage > 2 || a.stance == Stance::DigIn {
                         continue;
                     }
                     for n in &self.tables.state(sid).neighbours {

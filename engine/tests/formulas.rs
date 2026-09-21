@@ -10581,6 +10581,56 @@ fn a_standing_army_reads_its_industry_its_constabulary_and_its_calm_and_dies_at_
     assert_eq!((g.army_strength(&b), g.army_hit_points(&b)), (4, 5), "a built Army is the card's 4 and 5 wherever it stands");
 }
 
+/// Ticket #297 (version 0.08.6): Dig In. A dug-in Army fights at +2 while defending and never
+/// rolls to disengage; hit points do not follow; it cannot march or board a Carrier until its
+/// stance is changed and the turn has passed; a neutral Region's own Army is always dug in; a
+/// held Region's is not until ordered.
+#[test]
+fn a_dug_in_army_fights_two_stronger_never_disengages_and_cannot_march_until_it_digs_out() {
+    // In the melee: a dug-in unit at three damage of four would roll at (3/4)/2; scripted true,
+    // it would leave. Dug in, no roll is made and it stays. Hit rolls: attacker lands none.
+    let mut a = vec![frigate(1)];
+    let mut d = vec![Combatant::new(UnitRef::Army(ArmyId(2)), "the 1st Trench Army", 4, 4, 3, 2, false).dug_in(true)];
+    let mut dice = Script { chances: VecDeque::from(vec![false, false, false, true, true, true, true, true, true]), d6s: VecDeque::from(vec![1, 1, 1]), picks: VecDeque::new() };
+    let stats = combat::fight(&mut a, &mut d, &mut dice, 2.0);
+    assert!(!d[0].escaped, "dug in, it never rolls to disengage");
+    assert!(stats.all_escaped().is_empty());
+
+    let mut g = fresh();
+    calm(&mut g);
+    let sid = StateId::EastAsia;
+    let id = g.armies.iter().find(|a| a.standing && !a.levy && a.home == ArmyHome::State(sid)).map(|a| a.id).unwrap();
+    let army = |g: &Game| g.armies.iter().find(|a| a.id == id).unwrap().clone();
+    assert!(!g.army_dug_in(&army(&g)), "a held Region's Standing Army is not dug in until ordered");
+    let egypt = StateId::NorthAfrica;
+    let neutral = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(egypt)).unwrap().clone();
+    assert_eq!(g.state(egypt).control, Control::Neutral);
+    assert!(g.army_dug_in(&neutral), "a neutral's is always dug in");
+    // Ordered to Dig In: the stance lands at commit, the bonus is a defender's in the Battle.
+    let before = g.army_strength(&army(&g));
+    g.commit_orders(Seat(0), &[Order::ArmyStance { place: Place::State(sid), stance: Stance::DigIn }]);
+    assert!(g.army_dug_in(&army(&g)));
+    assert_eq!(g.army_strength(&army(&g)), before, "the card's strength does not carry the bonus");
+    assert_eq!(g.army_hit_points(&army(&g)), before as u32, "and the hit points do not follow it");
+    assert_eq!(g.war.dig_ins[0], 1, "counted for the sweep");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("dig in at China")), "{:?}", g.report.lines.iter().map(|l| l.text.clone()).collect::<Vec<_>>());
+    // Dug in, it may not march, nor be loaded; a stance change this turn does not lift that.
+    let to = g.tables.state(sid).neighbours[0];
+    let march = Order::MoveArmy { army: id, to };
+    let refused = g.check_order(Seat(0), &[], &march).unwrap_err().0;
+    assert!(refused.contains("dug in"), "{refused}");
+    let refused = g.check_order(Seat(0), &[Order::ArmyStance { place: Place::State(sid), stance: Stance::Hold }], &march).unwrap_err().0;
+    assert!(refused.contains("dug in"), "a stance order beside it does not lift it this turn: {refused}");
+    // Dug out at the Resolution, it marches the turn after.
+    g.commit_orders(Seat(0), &[Order::ArmyStance { place: Place::State(sid), stance: Stance::Hold }]);
+    assert!(g.check_order(Seat(0), &[], &march).is_ok(), "the stance changed and the turn passed");
+    // A Ship cannot dig in.
+    let ship = a_colony_ship(&mut g, Seat(0), BodyId::Earth);
+    let _ = ship;
+    let refused = g.check_order(Seat(0), &[], &Order::ShipStance { body: BodyId::Earth, stance: Stance::DigIn }).unwrap_err().0;
+    assert!(refused.contains("cannot dig in"), "{refused}");
+}
+
 /// Ticket #290 (version 0.08.6): the computer's opening. While its starting station has a slot free
 /// and under four berths empty, the Habitat is pushed at the opportunity weight, so it comes first:
 /// on turn one every seat with a station orders one there.

@@ -415,6 +415,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("directive_fuel", &["faction", "research", "n"]),
     ("army_moved", &["faction", "from", "to", "attacks"]),
     ("army_landed", &["faction", "colony"]),
+    // Ticket #297 (version 0.08.6): the turn an Army digs in.
+    ("army_dug_in", &["faction", "place"]),
     ("units_destroyed", &["place", "why", "lost"]),
     ("occupation_begun", &["faction", "place"]),
     ("occupation_ended", &["place", "faction"]),

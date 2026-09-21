@@ -402,8 +402,11 @@ impl Game {
         // it since 0.08.4; a neutral Region's own Army is named the same way.
         let name = self.army_name(a);
         // Ticket #296 (version 0.08.6): hit points are the Army's own, not the card's, for a
-        // Region's Standing Army and Levy.
-        Combatant::new(UnitRef::Army(id), name, self.army_strength(a), self.army_hit_points(a), a.damage, card.pursuit, a.stance == Stance::Evade)
+        // Region's Standing Army and Levy. Ticket #297: dug in, it fights at +defence and never
+        // rolls to disengage; a dug-in Army is never an aggressor, so the bonus is a defender's.
+        let dug_in = self.army_dug_in(a);
+        let strength = self.army_strength(a) + if dug_in { self.tables.dig_in.defence } else { 0 };
+        Combatant::new(UnitRef::Army(id), name, strength, self.army_hit_points(a), a.damage, card.pursuit, a.stance == Stance::Evade).dug_in(dug_in)
     }
 
     /// One melee of Ship stacks at a Body (ticket #50).

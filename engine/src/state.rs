@@ -937,6 +937,9 @@ pub struct WarCounters {
     pub escapes_neutral: u32,
     #[serde(default)]
     pub battles_with_escape: u32,
+    /// Ticket #297 (version 0.08.6): Dig In orders committed, by seat.
+    #[serde(default)]
+    pub dig_ins: [u32; SEAT_COUNT],
 }
 
 impl WarCounters {
@@ -955,6 +958,7 @@ impl WarCounters {
             self.marches_held[i] += o.marches_held[i];
             self.orbit_attacks[i] += o.orbit_attacks[i];
             self.escapes[i] += o.escapes[i];
+            self.dig_ins[i] += o.dig_ins[i];
         }
         self.battles_vs_neutral += o.battles_vs_neutral;
         self.standing_armies_lost += o.standing_armies_lost;
@@ -2173,6 +2177,14 @@ impl Game {
         }
         self.levies_raised += 1;
         id
+    }
+
+    /// Ticket #297 (version 0.08.6): whether an Army is dug in -- ordered to Dig In, or a neutral
+    /// Region's own Army, which is always dug in since nobody can order it and its escape was the
+    /// accident the stance exists to end. Read by the Battle (the defence bonus, no disengage), by
+    /// the march and the Carrier lift (refused), and by every surface that shows it.
+    pub fn army_dug_in(&self, a: &Army) -> bool {
+        a.stance == Stance::DigIn || (a.standing && matches!(a.home, ArmyHome::State(s) if self.state(s).control == Control::Neutral))
     }
 
     /// An Army's hit points. Ticket #296 (version 0.08.6): a Region's own Army -- its Standing Army

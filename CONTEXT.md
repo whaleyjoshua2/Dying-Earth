@@ -575,8 +575,12 @@ A melee at one Body, Region or Colony in which every Faction present is hostile 
 _Avoid_: fight, engagement, skirmish, encounter
 
 **Stance**:
-The one order a stack carries into end-of-turn processing: Attack, Hold, Intercept (Ships only, engaging arrivals before they unload) or Evade.
+The one order a stack carries into end-of-turn processing: Attack, Hold, Intercept (Ships only, engaging arrivals before they unload), Blockade (Ships only, since version 0.08.5), Evade, or, for Armies since version 0.08.6, **Dig In**. A stance persists until it is changed; Hold does nothing of its own.
 _Avoid_: order, mode, posture, aggression setting
+
+**Dig In**:
+An Army's third live stance, since version 0.08.6. Dug in, an Army fights two stronger while it defends and never rolls to disengage; its hit points do not follow the bonus. It cannot march or board a Carrier until its stance has been changed and the turn has passed, so digging out costs a turn. It takes effect at the Resolution of the turn it is ordered, like every stance. A neutral Region's own Armies -- its Standing Army and its Levy -- are always dug in, since nobody can order them; a held Region's take the holder's order. The computer digs in where a rival's Army stands next door and it has no cause to attack, and wherever it occupies. Shown as a word on the stance row, a trench line under the Army's shield on the map, and a Report line the turn it happens.
+_Avoid_: entrench, fortify, defend, garrison mode
 
 **Strength**:
 How hard a unit hits. A unit's type sets it; Hardened Hulls raises it for every Ship. A Region's own Armies are the exception: a Standing Army's and a Levy's strength is the Region's -- its Industry Level, its earned steps, and since version 0.08.6 its working Constabulary and its calm.
