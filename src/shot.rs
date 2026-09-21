@@ -808,6 +808,33 @@ fn build_board(session: &mut Session) {
     if std::env::args().any(|a| a == "saved:1") {
         session.save_now();
     }
+    // `order:<facility kind>` and `morder:<module kind>` (building aids, ticket #291, version
+    // 0.08.6): an order is PLACED and left pending -- a Facility in seat 0's start state, a Module
+    // on seat 0's first station over Earth -- so the box that shows an ordered building before End
+    // Turn can be photographed. The kind is the enum name, case-insensitive, as `select:` takes it.
+    if let Some(name) = std::env::args().find_map(|a| a.strip_prefix("order:").map(str::to_owned))
+        && let Some(kind) = FacilityKind::ALL.into_iter().find(|k| format!("{k:?}").eq_ignore_ascii_case(&name))
+        && let Some(sid) = session.game.as_ref().and_then(|g| g.directed_states(Seat(0)).first().copied())
+        && !session.place(Order::BuildFacility { state: sid, kind })
+    {
+        eprintln!("order:{name} was refused");
+        std::process::exit(3);
+    }
+    if let Some(name) = std::env::args().find_map(|a| a.strip_prefix("morder:").map(str::to_owned))
+        && let Some(kind) = ModuleKind::ALL.into_iter().find(|k| format!("{k:?}").eq_ignore_ascii_case(&name))
+        && let Some(cid) = session.game.as_ref().and_then(|g| g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.id))
+        && !session.place(Order::BuildModule { colony: cid, kind })
+    {
+        eprintln!("morder:{name} was refused");
+        std::process::exit(3);
+    }
+    // `commit:1` (a building aid, ticket #291): the turn is ended WITH the orders the aids above
+    // placed, the way the End Turn button ends it, so a building under way -- the turn after the
+    // order, with its turns to go -- can be photographed. `turns:<n>` cannot do this: it hands
+    // seat 0 to the computer, which throws the placed orders away.
+    if std::env::args().any(|a| a == "commit:1") {
+        session.end_turn();
+    }
     session.earth_dirty = true;
 }
 

@@ -4361,6 +4361,9 @@ enum SlotBoxKind {
     Standing(usize),
     /// The kind building and the turn it is ready.
     Building(FacilityKind, u32),
+    /// Ticket #291 (version 0.08.6): the kind ORDERED this turn and not yet committed, with its
+    /// index in the pending list, so a right-click on the box can cancel it.
+    Ordered(FacilityKind, usize),
     Free,
     Flooded(Option<FacilityKind>),
 }
@@ -4375,6 +4378,36 @@ enum SlotBoxKind {
 #[allow(clippy::too_many_arguments)]
 fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, sid: StateId, mine: bool, director: Option<Seat>, actions: &mut Vec<Action>) {
     let st = game.state(sid);
+    // Ticket #291 (version 0.08.6): the builds ORDERED this turn, each with the side its slot will
+    // take -- decided the way the rule decides it at End Turn (`next_slot_is_coastal`, the pending
+    // orders ahead of it taking theirs first), and shown as the Faction's own kind, which is what
+    // the order raises (#181). Until this ticket the boxes read the queue alone, so an ordered
+    // building was invisible on the card until the turn ended while the rule already counted its
+    // slot as taken.
+    let mut ordered: Vec<(FacilityKind, usize, bool)> = Vec::new();
+    if mine {
+        let (mut taken_coastal, mut taken_inland) = (0u32, 0u32);
+        for (i, o) in session.pending.iter().enumerate() {
+            if o.build_state() != Some(sid) {
+                continue;
+            }
+            let Some(k) = o.build_facility().map(|k| k.built_by(game.kind(Seat(0)))) else { continue };
+            if !game.takes_slot(k) {
+                continue;
+            }
+            match game.next_slot_is_coastal(sid, k, taken_coastal, taken_inland) {
+                Some(true) => {
+                    taken_coastal += 1;
+                    ordered.push((k, i, true));
+                }
+                Some(false) => {
+                    taken_inland += 1;
+                    ordered.push((k, i, false));
+                }
+                None => {}
+            }
+        }
+    }
     let mut boxes: Vec<(SlotBoxKind, bool)> = Vec::new();
     for coastal in [true, false] {
         for (i, f) in st.facilities.iter().enumerate() {
@@ -4390,8 +4423,12 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                 boxes.push((SlotBoxKind::Building(k, b.due_turn + 1), coastal));
             }
         }
+        let ordered_here = ordered.iter().filter(|(_, _, c)| *c == coastal).count() as u32;
+        for (k, i, _) in ordered.iter().filter(|(_, _, c)| *c == coastal) {
+            boxes.push((SlotBoxKind::Ordered(*k, *i), coastal));
+        }
         let free = if coastal { game.coastal_slots(sid).saturating_sub(game.coastal_used(sid)) } else { game.inland_slots(sid).saturating_sub(game.inland_used(sid)) };
-        for _ in 0..free {
+        for _ in 0..free.saturating_sub(ordered_here) {
             boxes.push((SlotBoxKind::Free, coastal));
         }
         if coastal {
@@ -4423,8 +4460,19 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                 }
             }
             SlotBoxKind::Building(k, ready) => {
-                let tip = format!("{} ({side}): building, ready turn {ready}.{}", k.name(), if *coastal { "\nOn the coast, the sea can take it at a threshold." } else { "" });
-                hab_tile(ui, rect, id, Some(crate::icons::facility_icon(*k)), k.name(), TileState::Building, false, edge, tip);
+                let turns = ready.saturating_sub(game.turn).max(1);
+                let tip = format!("{} ({side}): building, {turns} turn{} to go, ready turn {ready}.{}", k.name(), if turns == 1 { "" } else { "s" }, if *coastal { "\nOn the coast, the sea can take it at a threshold." } else { "" });
+                hab_tile(ui, rect, id, Some(crate::icons::facility_icon(*k)), k.name(), TileState::Building { ordered: false, turns }, false, edge, tip);
+            }
+            SlotBoxKind::Ordered(k, i) => {
+                // Ticket #291: ordered this turn. Right-click takes the order back, the same
+                // cancel the orders list's button does; the count is the card's build time, which
+                // starts at End Turn.
+                let turns = game.tables.facility(*k).build_turns.max(1);
+                let tip = format!("{} ({side}): ordered this turn, {turns} turn{} once the turn ends.\nRight-click to cancel the order.{}", k.name(), if turns == 1 { "" } else { "s" }, if *coastal { "\nOn the coast, the sea can take it at a threshold." } else { "" });
+                if hab_tile(ui, rect, id, Some(crate::icons::facility_icon(*k)), k.name(), TileState::Building { ordered: true, turns }, false, edge, tip).secondary_clicked() {
+                    actions.push(Action::Cancel(*i));
+                }
             }
             SlotBoxKind::Free => {
                 let first_free = boxes.iter().position(|(k, _)| matches!(k, SlotBoxKind::Free)) == Some(n);
@@ -4648,8 +4696,12 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // Ticket #146 (version 0.07.3): the slots the sea took are drawn under water among the boxes
     // below, so the sea-blue count that stood here is gone.
     // Ticket #56: the two rows of slots, with what stands in each and what the sea has taken.
+    // Ticket #291 (version 0.08.6): a slot an order placed this turn will take is not free, and the
+    // boxes below no longer draw it as one, so the count agrees with them and with the rule.
+    let ordered_slots = session.pending.iter().filter(|o| o.build_state() == Some(sid) && o.build_facility().is_some_and(|k| game.takes_slot(k.built_by(game.kind(Seat(0)))))).count() as u32;
+    let free_now = game.free_slots(sid).saturating_sub(ordered_slots);
     rule_tip(
-        ui.label(RichText::new(format!("Facilities ({} of {} slots free)", game.free_slots(sid), game.build_slots(sid))).strong()),
+        ui.label(RichText::new(format!("Facilities ({free_now} of {} slots free{})", game.build_slots(sid), if ordered_slots > 0 { format!(", {ordered_slots} ordered this turn") } else { String::new() })).strong()),
         format!(
             "Slots: Size {} plus {} plus the Industry Level {} it started at, and one more for every raise since, always inland.\n{} are coastal: the sea takes those at a threshold, oldest Facility with them, and turns one inland slot coastal every time, wall or no wall. A Sea Wall holds the taking off, not the turning.\nMothballed and building each keep a slot.",
             game.tables.state(sid).size,
@@ -5875,7 +5927,12 @@ const HAB_LABEL: f32 = 18.0;
 enum TileState {
     Standing,
     Mothballed,
-    Building,
+    /// Ticket #291 (version 0.08.6): a building ordered this turn (`ordered`, before End Turn) or
+    /// under way (after it), with the turns until it stands. Both are drawn hatched AND dimmed,
+    /// with the count on the face, at the designer's word: *"hatch stays but greyed out with turns
+    /// to complete indicated."* Until this ticket an ordered building did not show in its box at
+    /// all, and a building one was drawn bright under the hatch with no count.
+    Building { ordered: bool, turns: u32 },
     /// Ticket #218 (version 0.08.2): the flag says whether the PLAYER could actually build here --
     /// their own place, and not a slot the sea has taken. A tile they can use invites the click;
     /// one they cannot keeps the old word, because telling somebody to click a thing that will do
@@ -5930,15 +5987,20 @@ Build", Color32::from_gray(165)) } else { ("free", Color32::from_gray(130)) };
             painter.text(rect.center(), egui::Align2::CENTER_CENTER, word, FontId::proportional(12.0), ink);
         }
         _ => {
-            let fill = if state == TileState::Mothballed { Color32::from_rgb(36, 36, 42) } else { Color32::from_rgb(48, 48, 58) };
+            // Ticket #291 (version 0.08.6): a building ordered or under way takes the mothballed
+            // tile's darker fill and dimmed picture as well as its hatch.
+            let dim = matches!(state, TileState::Mothballed | TileState::Flooded | TileState::Building { .. });
+            let fill = if matches!(state, TileState::Mothballed | TileState::Building { .. }) { Color32::from_rgb(36, 36, 42) } else { Color32::from_rgb(48, 48, 58) };
             painter.rect(rect, 6.0, fill, egui::Stroke::new(if edge.is_some() { 2.0 } else { 1.0 }, outline), egui::StrokeKind::Inside);
             if let Some(image) = key.and_then(|k| Icons::from_ctx(ui.ctx(), k, 48.0)) {
-                let tint = if matches!(state, TileState::Mothballed | TileState::Flooded) { crate::icons::kind_fill().gamma_multiply(0.4) } else { crate::icons::kind_fill() };
+                let tint = if dim { crate::icons::kind_fill().gamma_multiply(0.4) } else { crate::icons::kind_fill() };
                 let art = egui::Rect::from_center_size(rect.center() - egui::vec2(0.0, 4.0), egui::vec2(48.0, 48.0));
                 image.tint(tint).paint_at(ui, art);
             }
-            if state == TileState::Building {
-                // Hatched, clipped to the tile, with the word in its corner.
+            if let TileState::Building { ordered, turns } = state {
+                // Hatched, clipped to the tile, with the word in the bottom-left corner and the
+                // turns to go in the top-right, where neither crosses the picture: the picture
+                // spans the tile's middle 48 pixels and each corner word is one 11pt line.
                 let clipped = ui.painter().with_clip_rect(rect);
                 let stroke = egui::Stroke::new(2.0, Color32::from_rgba_unmultiplied(200, 170, 90, 110));
                 let mut k = -rect.width();
@@ -5946,7 +6008,9 @@ Build", Color32::from_gray(165)) } else { ("free", Color32::from_gray(130)) };
                     clipped.line_segment([Pos2::new(rect.min.x + k, rect.max.y), Pos2::new(rect.min.x + k + rect.width(), rect.min.y)], stroke);
                     k += 8.0;
                 }
-                clipped.text(rect.left_bottom() + egui::vec2(4.0, -4.0), egui::Align2::LEFT_BOTTOM, "building", FontId::proportional(11.0), Color32::from_rgb(250, 210, 130));
+                let gold = Color32::from_rgb(250, 210, 130);
+                clipped.text(rect.left_bottom() + egui::vec2(4.0, -4.0), egui::Align2::LEFT_BOTTOM, if ordered { "ordered" } else { "building" }, FontId::proportional(11.0), gold);
+                clipped.text(rect.right_top() + egui::vec2(-4.0, 4.0), egui::Align2::RIGHT_TOP, format!("{turns} turn{}", if turns == 1 { "" } else { "s" }), FontId::proportional(11.0), gold);
             }
             if state == TileState::Mothballed {
                 ui.painter().text(rect.left_bottom() + egui::vec2(4.0, -4.0), egui::Align2::LEFT_BOTTOM, "mothballed", FontId::proportional(11.0), Color32::from_rgb(170, 170, 190));
@@ -6039,8 +6103,17 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // The tiles, in the order the cap counts them: standing (the Archive apart), building, free.
     let standing: Vec<usize> = (0..col.modules.len()).filter(|i| col.modules[*i].kind != ModuleKind::Archive).collect();
     let building: Vec<(ModuleKind, u32)> = col.queue.iter().filter_map(|b| if let BuildItem::Module(k) = b.item { if k == ModuleKind::Archive { None } else { Some((k, b.due_turn + 1)) } } else { None }).collect();
-    let free = cap.saturating_sub(used) as usize;
-    let total = standing.len() + building.len() + free;
+    // Ticket #291 (version 0.08.6): the Modules ORDERED this turn and not yet committed, as the
+    // Faction's own kind (#186), each with its index in the pending list for the right-click that
+    // cancels it. They take their places from the free count, as the rule already did at the
+    // order (`orders.rs`, the Module cap), so the grid and the refusal agree.
+    let ordered: Vec<(ModuleKind, usize)> = if mine {
+        session.pending.iter().enumerate().filter_map(|(i, o)| o.build_module().filter(|(c, _)| *c == cid).map(|(_, k)| (k.built_by(game.kind(Seat(0))), i))).collect()
+    } else {
+        Vec::new()
+    };
+    let free = (cap.saturating_sub(used) as usize).saturating_sub(ordered.len());
+    let total = standing.len() + building.len() + ordered.len() + free;
     let rows = total.div_ceil(MODULE_COLS).max(1);
     let archive = col.modules.iter().position(|m| m.kind == ModuleKind::Archive);
     let archive_rows = if archive.is_some() { 1 } else { 0 };
@@ -6064,8 +6137,18 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         i += 1;
     }
     for (bi, (kind, ready)) in building.iter().enumerate() {
-        let tip = format!("{}: building, ready turn {ready}.", kind.name());
-        hab_tile(ui, tile_rect(i), ui.id().with(("hab-building", bi)), Some(crate::icons::module_icon(*kind)), kind.name(), TileState::Building, false, None, tip);
+        let turns = ready.saturating_sub(game.turn).max(1);
+        let tip = format!("{}: building, {turns} turn{} to go, ready turn {ready}.", kind.name(), if turns == 1 { "" } else { "s" });
+        hab_tile(ui, tile_rect(i), ui.id().with(("hab-building", bi)), Some(crate::icons::module_icon(*kind)), kind.name(), TileState::Building { ordered: false, turns }, false, None, tip);
+        i += 1;
+    }
+    for (oi, (kind, pi)) in ordered.iter().enumerate() {
+        // Ticket #291: ordered this turn; right-click takes the order back.
+        let turns = game.tables.module(*kind).build_turns.max(1);
+        let tip = format!("{}: ordered this turn, {turns} turn{} once the turn ends.\nRight-click to cancel the order.", kind.name(), if turns == 1 { "" } else { "s" });
+        if hab_tile(ui, tile_rect(i), ui.id().with(("hab-ordered", oi)), Some(crate::icons::module_icon(*kind)), kind.name(), TileState::Building { ordered: true, turns }, false, None, tip).secondary_clicked() {
+            actions.push(Action::Cancel(*pi));
+        }
         i += 1;
     }
     for fi in 0..free {
