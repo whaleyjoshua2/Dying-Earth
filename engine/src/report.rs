@@ -420,6 +420,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("units_destroyed", &["place", "why", "lost"]),
     ("occupation_begun", &["faction", "place"]),
     ("occupation_ended", &["place", "faction"]),
+    // Ticket #299 (version 0.08.6): a broken Occupation, at a cost.
+    ("occupation_broken", &["place", "faction", "holder", "unrest", "standing"]),
     ("control_changed", &["place", "faction", "why"]),
     ("claim_tied", &["place", "factions"]),
     ("threw_off", &["state", "faction", "unrest"]),

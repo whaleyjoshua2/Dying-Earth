@@ -40,6 +40,10 @@ report_net_floor = 0.5
 # Occupation: when it begins, and each turn it lasts. Unchanged: Occupation should hurt.
 occupation_start = 3.0
 occupation_per_turn = 1.0
+# Ticket #299 (version 0.08.6): and when it BREAKS -- the occupier's last Army gone, by march, lift
+# or death -- the place hands back to its previous holder at this much more, undamped like the two
+# above. Regions only; a Colony has no Unrest.
+occupation_break = 2.0
 # The Unrest Event card. Unchanged.
 unrest_card = 3.0
 

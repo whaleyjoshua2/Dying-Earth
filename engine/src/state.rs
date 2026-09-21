@@ -22,7 +22,15 @@ pub struct Stockpile {
 pub enum Control {
     Neutral,
     Controlled(Seat),
-    Occupied { occupier: Seat, previous: Option<Seat>, turns: u32 },
+    /// Ticket #299 (version 0.08.6): `banked` is the Standing the Occupation itself has brought
+    /// the occupier so far, wiped if the Occupation breaks; a save from before carries nought.
+    Occupied {
+        occupier: Seat,
+        previous: Option<Seat>,
+        turns: u32,
+        #[serde(default)]
+        banked: i64,
+    },
 }
 
 impl Control {

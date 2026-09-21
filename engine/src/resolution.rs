@@ -724,18 +724,45 @@ impl Game {
         for place in places {
             let control = self.place_control(place);
             match control {
-                Control::Occupied { occupier, previous, turns } => {
+                Control::Occupied { occupier, previous, turns, banked } => {
                     if self.armies_of_seat_at(occupier, place).is_empty() {
-                        // Occupation broken.
+                        // Occupation broken. Ticket #299 (version 0.08.6): at a cost, whether the
+                        // last Army marched off, was lifted or was destroyed -- the place hands back
+                        // at +2 Unrest, the occupier takes a rung-2 offence from the previous holder
+                        // (a neutral charges nobody), and the Standing the Occupation banked is wiped.
+                        // Until this version a break was silent and free.
                         let back = match previous {
                             Some(p) => Control::Controlled(p),
                             None => Control::Neutral,
                         };
                         self.set_place_control(place, back);
                         self.war.occupations_broken[occupier.index()] += 1;
-                        let line = format!("Occupation of {} by the {} ended.", self.place_name(place), self.seat_name(occupier));
+                        if let Place::State(sid) = place {
+                            let n = self.tables.unrest.occupation_break;
+                            self.raise_unrest(sid, n, UnrestSource::Plain);
+                        }
+                        if let Some(p) = previous {
+                            self.offend_by(occupier, p, self.tables.relations.occupation_broken_offence);
+                        }
+                        if banked > 0 {
+                            let s = self.seat_mut(occupier);
+                            if let Some(v) = s.influence.get_mut(&place) {
+                                *v = (*v - banked).max(0);
+                            }
+                        }
+                        let holder = previous.map(|p| self.seat_name(p)).unwrap_or_else(|| "nobody".to_string());
+                        let line = format!("Occupation of {} by the {} broke: back to the {} at +{:.0} Unrest, an offence.", self.place_name(place), self.seat_name(occupier), holder, self.tables.unrest.occupation_break);
                         self.log(line);
-                        let text = self.say("occupation_ended", &[("place", self.place_name(place)), ("faction", self.seat_name(occupier))]);
+                        let text = self.say(
+                            "occupation_broken",
+                            &[
+                                ("place", self.place_name(place)),
+                                ("faction", self.seat_name(occupier)),
+                                ("holder", holder),
+                                ("unrest", Game::unrest_figure(self.tables.unrest.occupation_break)),
+                                ("standing", banked.to_string()),
+                            ],
+                        );
                         self.report_line(LineKind::Occupation, Some(place.into()), text);
                         continue;
                     }
@@ -743,13 +770,13 @@ impl Game {
                         continue; // defenders re-engaged; the count does not advance
                     }
                     let turns = turns + 1;
-                    self.set_place_control(place, Control::Occupied { occupier, previous, turns });
                     // Ticket #52: every turn of Occupation adds one to the state's Unrest.
                     if let Place::State(sid) = place {
                         let n = self.tables.unrest.occupation_per_turn;
                         self.raise_unrest(sid, n, UnrestSource::Plain);
                     }
-                    self.occupation_gain(place, occupier);
+                    let gain = self.occupation_gain(place, occupier);
+                    self.set_place_control(place, Control::Occupied { occupier, previous, turns, banked: banked + gain });
                     let have = self.seat(occupier).influence.get(&place).copied().unwrap_or(0);
                     let pacified = have > 0 && have >= self.influence_threshold(place);
                     if pacified || turns >= self.tables.influence.occupation_turns {
@@ -765,7 +792,7 @@ impl Game {
                             continue;
                         }
                         let previous = control.controller();
-                        self.set_place_control(place, Control::Occupied { occupier: seat, previous, turns: 1 });
+                        self.set_place_control(place, Control::Occupied { occupier: seat, previous, turns: 1, banked: 0 });
                         self.war.occupations_begun[seat.index()] += 1;
                         // Ticket #52: an Occupation begins at +3 Unrest, damped by nothing.
                         if let Place::State(sid) = place {
@@ -776,7 +803,8 @@ impl Game {
                         self.log(line);
                         let text = self.say("occupation_begun", &[("faction", self.seat_name(seat)), ("place", self.place_name(place))]);
                         self.report_line(LineKind::Occupation, Some(place.into()), text);
-                        self.occupation_gain(place, seat);
+                        let gain = self.occupation_gain(place, seat);
+                        self.set_place_control(place, Control::Occupied { occupier: seat, previous, turns: 1, banked: gain });
                         let have = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
                         let pacified = have > 0 && have >= self.influence_threshold(place);
                         if pacified || self.tables.influence.occupation_turns <= 1 {
@@ -789,13 +817,15 @@ impl Game {
         }
     }
 
-    fn occupation_gain(&mut self, place: Place, seat: Seat) {
+    /// Returns the Standing gained, which the Occupation banks (ticket #299).
+    fn occupation_gain(&mut self, place: Place, seat: Seat) -> i64 {
         // Ticket #187 (version 0.08.0): an occupier's Standing is an outsider's by definition, so
         // Resistance bites it. Otherwise invading would be the way round a well-schooled population.
         let gain = self.standing_from(place, self.pacification_gain(place));
         let s = self.seat_mut(seat);
         *s.influence.entry(place).or_insert(0) += gain;
         s.influenced_this_turn.push(place);
+        gain
     }
 
     pub fn place_control(&self, place: Place) -> Control {

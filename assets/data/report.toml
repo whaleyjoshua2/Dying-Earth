@@ -67,6 +67,8 @@ army_landed = "{faction} landed an Army at {colony}."
 units_destroyed = "{place} was {why}: {lost} destroyed."
 occupation_begun = "The {faction} occupy {place}."
 occupation_ended = "Occupation of {place} by the {faction} ended."
+# Ticket #299 (version 0.08.6): a break costs. {holder} is the previous holder, or nobody.
+occupation_broken = "The {faction}' Occupation of {place} broke: it goes back to the {holder} at +{unrest} Unrest, an offence against them, and the {standing} Standing the Occupation had won is gone."
 control_changed = "{place} now belongs to the {faction} ({why})."
 claim_tied = "{place} is claimed by {factions} at the same Standing; it stays as it is."
 threw_off = "{state} threw off the {faction}: it is neutral again, its Armies are its own, and its Unrest settles at {unrest}."

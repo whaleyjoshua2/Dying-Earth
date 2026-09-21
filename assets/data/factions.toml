@@ -241,6 +241,11 @@ start = 0
 # that offends puts in a median 15.6 Influence across about three orders, and charging per order
 # would make a big push and a small one differ by a factor nobody can read off the board.
 fall_per_offending_turn = 1
+# Ticket #299 (version 0.08.6): the rung an Occupation broken sits on -- between a bid, a Smear, an
+# Agitate or a Blockade turn at 1 and a Battle opened or an Accord broken at 3 -- charged to the
+# occupier by the previous holder the turn its last Army leaves the place. The first weight-2
+# offence in the game.
+occupation_broken_offence = 2
 # Recovery: this much every `quiet_turns` quiet turns, stopping at `start` and never rising past it.
 # Letting peace accrue goodwill was measured and rejected: half of all ordered pairs never interact
 # at all in a whole game, so goodwill earned by mere quiet would mostly be between Factions on

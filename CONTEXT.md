@@ -611,8 +611,12 @@ What a warship stack does when it is ORDERED to, since version 0.08.5, in the Or
 _Avoid_: siege, embargo, interdiction, orbital control
 
 **Occupation**:
-The state of a Region or Colony whose defenders were beaten by an Army. The occupier chooses build orders but does not direct its Armies; control transfers after the lesser of three turns or the population being Pacified. Since version 0.08.6 the two ends differ: a transfer by the three-turn clock rolls a quarter of the buildings to burn, a transfer by Pacified takes the place **whole**, and either fires the Moment for a place taken by force.
+The state of a Region or Colony whose defenders were beaten by an Army. The occupier chooses build orders but does not direct its Armies; control transfers after the lesser of three turns or the population being Pacified. Since version 0.08.6 the two ends differ: a transfer by the three-turn clock rolls a quarter of the buildings to burn, a transfer by Pacified takes the place **whole**, and either fires the Moment for a place taken by force. An Occupation **breaks** the moment the occupier has no Army at the place, whether the last one marched off, was lifted or was destroyed, and since version 0.08.6 a break costs: the place hands back to its previous holder at +2 Unrest, the occupier takes a rung-2 Offence from that holder (a neutral charges nobody), and the Standing the Occupation had banked for the occupier is wiped. The march itself stays legal: an occupier may leave, and pays.
 _Avoid_: conquest, annexation, capture
+
+**Offence**:
+An act against a rival that costs Relations, weighed on a ladder: **1** for Influence spent on a place the rival holds (once per place per turn), a Smear, an Agitate, or a turn of Blockade; **2**, since version 0.08.6, for an Occupation of the rival's place that broke; **3** for opening a Battle against them or breaking an Accord with them. A turn charges the sum of every offence in it, to a cap, and an offence against a non-aggression partner breaks the Accord as well. The rival's Report names who paid.
+_Avoid_: crime, aggression score, penalty, grievance
 
 **Pacified**:
 An occupied population whose occupier's Influence, gained automatically each turn of Occupation, has passed the place's threshold. The gain is halved while the state's Unrest is past its first threshold. Control transfers at the moment the threshold is passed, and since version 0.08.6 the place is taken whole: nothing rolls to burn. Pacified is a condition of the place's people, not of any building.

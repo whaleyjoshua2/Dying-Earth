@@ -867,7 +867,7 @@ fn occupation_ends_when_the_occupier_leaves() {
     g.armies.retain(|a| a.home != ArmyHome::State(StateId::NorthAfrica));
     let a = occupier_in(&mut g, StateId::EastAsia, StateId::NorthAfrica);
     g.resolution_phase();
-    assert!(matches!(g.state(StateId::NorthAfrica).control, Control::Occupied { occupier: Seat(0), previous: None, turns: 1 }));
+    assert!(matches!(g.state(StateId::NorthAfrica).control, Control::Occupied { occupier: Seat(0), previous: None, turns: 1, .. }));
     g.armies.retain(|x| x.id != a);
     g.resolution_phase();
     assert_eq!(g.state(StateId::NorthAfrica).control, Control::Neutral);
@@ -879,7 +879,7 @@ fn occupation_of_a_controlled_state_returns_it_to_its_owner_when_broken() {
     g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
     let a = occupier_in(&mut g, StateId::EastAsia, StateId::Europe);
     g.resolution_phase();
-    assert!(matches!(g.state(StateId::Europe).control, Control::Occupied { occupier: Seat(0), previous: Some(Seat(1)), turns: 1 }));
+    assert!(matches!(g.state(StateId::Europe).control, Control::Occupied { occupier: Seat(0), previous: Some(Seat(1)), turns: 1, .. }));
     g.armies.retain(|x| x.id != a);
     g.resolution_phase();
     assert_eq!(g.state(StateId::Europe).control, Control::Controlled(Seat(1)));
@@ -2247,7 +2247,7 @@ fn the_archive_is_destroyed_when_its_colony_changes_hands_and_the_fund_is_kept()
     g.seats[3].stockpile.energy = 400;
     g.income_phase();
     assert!(g.archive_online(Seat(3)));
-    g.colony_mut(again).unwrap().control = Control::Occupied { occupier: Seat(1), previous: Some(Seat(3)), turns: 1 };
+    g.colony_mut(again).unwrap().control = Control::Occupied { occupier: Seat(1), previous: Some(Seat(3)), turns: 1, banked: 0 };
     g.income_phase();
     assert!(!g.archive_online(Seat(3)), "an Occupied Colony's Archive is offline");
 }
@@ -2863,7 +2863,7 @@ fn the_ai_pays_relief_and_raises_a_constabulary_where_unrest_has_taken_hold() {
     calm(&mut g);
     // A state the seat has just Occupied, restive enough that one more turn would throw it off:
     // Relief takes the opportunity multiplier at 9, a Constabulary the threat multiplier here.
-    g.state_mut(StateId::NorthAfrica).control = Control::Occupied { occupier: Seat(1), previous: None, turns: 1 };
+    g.state_mut(StateId::NorthAfrica).control = Control::Occupied { occupier: Seat(1), previous: None, turns: 1, banked: 0 };
     g.seats[1].stockpile.ducats = 200;
     g.seats[1].stockpile.materials = 200;
     // On pace, so the victory gap is not multiplying every producer past everything else.
@@ -5388,7 +5388,7 @@ fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
     assert_eq!(g.research.contributions, [0; 4], "and nobody's Lead");
     assert!(g.report.lines.iter().any(|l| l.text.contains("The United States") && l.text.contains("Research")), "the Report says so: {:?}", g.report.lines);
     // Occupied: the half still flows; the occupier pays the 3 Energy and draws nothing from it.
-    g.state_mut(StateId::NorthAmerica).control = Control::Occupied { occupier: Seat(2), previous: None, turns: 1 };
+    g.state_mut(StateId::NorthAmerica).control = Control::Occupied { occupier: Seat(2), previous: None, turns: 1, banked: 0 };
     let y = g.facility_yield(Seat(2), StateId::NorthAmerica, FacilityKind::ResearchLab);
     assert_eq!((y.research, y.upkeep), (0, 3), "the occupier pays for a Lab that works for the world");
     let before = g.research.progress;
@@ -8802,7 +8802,7 @@ fn an_occupier_draws_nothing_from_a_unique_facilitys_clause() {
     let controlled = g.seats[cus.index()].income_last_turn.ducats;
 
     let economy = g.state_ducats(sid);
-    g.state_mut(sid).control = Control::Occupied { occupier: cus, previous: Some(pro), turns: 1 };
+    g.state_mut(sid).control = Control::Occupied { occupier: cus, previous: Some(pro), turns: 1, banked: 0 };
     g.income_phase();
     let occupied = g.seats[cus.index()].income_last_turn.ducats;
     assert_eq!(controlled - occupied, 1 + economy, "the clause and the economy both wait for control");
@@ -10579,6 +10579,51 @@ fn a_standing_army_reads_its_industry_its_constabulary_and_its_calm_and_dies_at_
     let built = g.raise_army(Place::State(sid), false);
     let b = g.armies.iter().find(|a| a.id == built).unwrap().clone();
     assert_eq!((g.army_strength(&b), g.army_hit_points(&b)), (4, 5), "a built Army is the card's 4 and 5 wherever it stands");
+}
+
+/// Ticket #299 (version 0.08.6): an Occupation that must be held. A break -- here the last Army
+/// gone -- hands the place back at +2 Unrest, charges the occupier a rung-2 offence from the
+/// previous holder, and wipes the Standing the Occupation banked; a neutral previous holder
+/// charges nobody. The march stays legal.
+#[test]
+fn a_broken_occupation_hands_the_place_back_at_a_cost() {
+    let mut g = game();
+    calm(&mut g);
+    // Europe is the Prospectors' (seat 1). Seat 0 held 10 Standing there before it marched.
+    let europe = StateId::Europe;
+    assert_eq!(g.state(europe).control, Control::Controlled(Seat(1)));
+    g.armies.retain(|a| a.home != ArmyHome::State(europe));
+    g.seats[0].influence.insert(Place::State(europe), 10);
+    let a = occupier_in(&mut g, StateId::EastAsia, europe);
+    g.resolution_phase();
+    let Control::Occupied { occupier: Seat(0), banked, .. } = g.state(europe).control else { panic!("occupied: {:?}", g.state(europe).control) };
+    assert!(banked > 0, "the first turn banked Standing");
+    assert_eq!(g.seats[0].influence[&Place::State(europe)], 10 + banked);
+    // The march is still legal for an occupier.
+    let to = g.tables.state(europe).neighbours.iter().copied().find(|n| *n != StateId::EastAsia).unwrap();
+    assert!(g.check_order(Seat(0), &[], &Order::MoveArmy { army: a, to }).is_ok(), "an occupier may march away");
+    let unrest_before = g.state(europe).unrest;
+    let owed_before = g.relations.owed[1][0];
+    g.armies.retain(|x| x.id != a);
+    g.resolution_phase();
+    assert_eq!(g.state(europe).control, Control::Controlled(Seat(1)), "handed back");
+    assert!((g.state(europe).unrest - unrest_before - g.tables.unrest.occupation_break).abs() < 1e-9 || g.state(europe).unrest >= unrest_before + g.tables.unrest.occupation_break - 1e-9, "+2 Unrest: {} from {}", g.state(europe).unrest, unrest_before);
+    assert_eq!(g.relations.owed[1][0] - owed_before, g.tables.relations.occupation_broken_offence, "a rung-2 offence from the previous holder");
+    let left = g.seats[0].influence[&Place::State(europe)];
+    assert!((7..=10).contains(&left), "the banked Standing is wiped; what is left is the 10 from before less the turn's ordinary decay: {left}");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Occupation of The European Union broke")), "{:?}", g.report.lines.iter().map(|l| l.text.clone()).collect::<Vec<_>>());
+    // A neutral previous holder charges nobody.
+    let mut g = game();
+    calm(&mut g);
+    let egypt = StateId::NorthAfrica;
+    g.armies.retain(|a| a.home != ArmyHome::State(egypt));
+    let a = occupier_in(&mut g, StateId::EastAsia, egypt);
+    g.resolution_phase();
+    let owed: i64 = (0..4).map(|v| g.relations.owed[v][0]).sum();
+    g.armies.retain(|x| x.id != a);
+    g.resolution_phase();
+    assert_eq!(g.state(egypt).control, Control::Neutral);
+    assert_eq!((0..4).map(|v| g.relations.owed[v][0]).sum::<i64>(), owed, "nobody to offend");
 }
 
 /// Ticket #298 (version 0.08.6): a place taken whole. With the roll set to a certainty: a Battle

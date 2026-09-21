@@ -781,6 +781,8 @@ pub struct UnrestTable {
     pub report_net_floor: f64,
     pub occupation_start: f64,
     pub occupation_per_turn: f64,
+    /// Ticket #299 (version 0.08.6): what a broken Occupation adds when the place hands back.
+    pub occupation_break: f64,
     pub unrest_card: f64,
     pub natural_fall: f64,
     pub relief_ducats: i64,
@@ -1246,6 +1248,9 @@ pub struct RelationsCard {
     pub worst: i64,
     pub start: i64,
     pub fall_per_offending_turn: i64,
+    /// Ticket #299 (version 0.08.6): the weight of an Occupation broken, the rung between a bid
+    /// (1) and a Battle (3).
+    pub occupation_broken_offence: i64,
     pub recover: i64,
     pub quiet_turns: u32,
     /// Ticket #222 (version 0.08.2): the most a single turn may charge, however much was done in it.
