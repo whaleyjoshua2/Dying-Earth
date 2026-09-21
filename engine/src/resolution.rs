@@ -303,7 +303,29 @@ impl Game {
             let name = self.place_name(place);
             self.army_melee(&name, place, &aggressors, &parties);
             self.destruction_rolls(place, "attacked", &aggressors);
+            // Ticket #282 (version 0.08.5): a neutral Region attacked that still has a defender
+            // standing, unescaped, has held, and arms for good: +1 to its Standing Army, to
+            // Industry + 4, at the designer's word.
+            if let Place::State(sid) = place
+                && self.state(sid).control == Control::Neutral
+                && self.armies.iter().any(|a| a.at == ArmyAt::Place(place) && self.army_seat(a).is_none() && !a.escaped && self.army_strength(a) > 0)
+            {
+                self.neutral_held(sid);
+            }
         }
+    }
+
+    /// Ticket #282: the step a neutral Region earns by holding, and the Report line that says so.
+    pub fn neutral_held(&mut self, sid: StateId) {
+        self.neutral_holds += 1;
+        if self.state(sid).armed >= Game::MAX_ARMED {
+            return;
+        }
+        self.state_mut(sid).armed += 1;
+        let (state, n) = (self.tables.state(sid).name.clone(), self.standing_army_cap(sid));
+        self.log(format!("{state} held against the attack and arms: its Standing Army will stand at {n}."));
+        let text = self.say("neutral_held", &[("state", state), ("n", n.to_string())]);
+        self.report_line(LineKind::Army, Some(ReportPlace::State(sid)), text);
     }
 
     /// Ticket #279 (version 0.08.5): Battles pollute. Whether a place is on Earth -- a Region, Earth
@@ -550,6 +572,10 @@ impl Game {
     pub fn destroy_army(&mut self, id: ArmyId, why: &str, at: Option<ReportPlace>) {
         let Some(pos) = self.armies.iter().position(|a| a.id == id) else { return };
         let army = self.armies.remove(pos);
+        // Ticket #282 (version 0.08.5): THE Standing Army returns two Incomes later, not the next.
+        if army.standing && !army.levy && let ArmyHome::State(sid) = army.home {
+            self.state_mut(sid).respawn_wait = 1;
+        }
         for s in &mut self.ships {
             if s.army == Some(id) {
                 s.army = None;
@@ -765,6 +791,11 @@ impl Game {
 
     /// Control passes to `seat` (spec 8.3, 8.5): rivals' Influence wiped, a destruction roll, Armies follow.
     pub fn transfer_control(&mut self, place: Place, seat: Seat, why: &str) {
+        // Ticket #282 (version 0.08.5): a Levy was the neutral Region's; it stands down the moment
+        // the Region is somebody's.
+        if let Place::State(sid) = place {
+            self.armies.retain(|a| !(a.levy && a.home == ArmyHome::State(sid)));
+        }
         // Ticket #54: the Scrubbers go first, before the place has a new owner to hold them.
         if let Place::State(sid) = place
             && self.place_control(place).controller() != Some(seat)

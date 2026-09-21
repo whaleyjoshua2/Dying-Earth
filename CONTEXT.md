@@ -278,8 +278,12 @@ A ground fighting unit. A Region's Armies belong to the state and are directed b
 _Avoid_: troops, soldiers, garrison, marines
 
 **Standing Army**:
-The Armies a Region keeps on its own, sized by its card and replenished a little each turn, whether or not any Faction controls it. Named like any other Army since version 0.08.4 -- the one the game begins with is *the 1st Chinese Army*.
+The Armies a Region keeps on its own, sized by its card and replenished a little each turn, whether or not any Faction controls it. Named like any other Army since version 0.08.4 -- the one the game begins with is *the 1st Chinese Army*. Its strength is the Region's Industry Level plus one, and since version 0.08.5 plus a step for every attack a neutral Region has held against, to Industry Level plus four; destroyed, it returns at strength one two Incomes later rather than the next, so a won Battle opens a window.
 _Avoid_: garrison, militia, defence value
+
+**Levy**:
+The second Army a neutral Region raises while it is threatened, since version 0.08.5: a built Army of any Faction standing in a neighbouring Region, or a neighbour under Occupation, and the Region's Unrest under the Standing Army's threshold. It stands at Industry Level plus two, heals as a Standing Army does, never marches, and stands down at the Income after the threat has passed or the moment the Region is somebody's. A Region arms whatever the neighbouring Army's stance, so nobody's orders are disclosed by it.
+_Avoid_: militia, reserves, conscripts, second Standing Army
 
 **Barracks**:
 The Module that lets a Colony hold and build a defensive Army. A Colony without one has no defenders.

@@ -81,6 +81,9 @@ pub struct SimResult {
     /// Ticket #278 (version 0.08.5): Colony-turns starved under a rival's Blockade, and imposed.
     pub blockade_suffered: [u32; SEAT_COUNT],
     pub blockade_imposed: [u32; SEAT_COUNT],
+    /// Ticket #282 (version 0.08.5): Levies raised by neutral Regions, and neutral Regions that held.
+    pub levies_raised: u32,
+    pub neutral_holds: u32,
     pub events_no_target: u32,
     pub coastal_slots_lost: u32,
     pub facilities_drowned: u32,
@@ -542,6 +545,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         agitates,
         blockade_suffered,
         blockade_imposed,
+        levies_raised: game.levies_raised,
+        neutral_holds: game.neutral_holds,
         events_no_target,
         sea_walls_spent,
         coastal_slots_lost,

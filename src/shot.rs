@@ -211,6 +211,13 @@ fn build_board(session: &mut Session) {
             let name = g.next_ship_name(kind);
             g.ships.push(Ship { id, name, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
         }
+        // `levy:1` (a building aid, ticket #282, version 0.08.5): seat 0 raises a built Army in
+        // China, so the neutral neighbours -- India among them -- are threatened, and a quiet turn
+        // runs so their Levies stand. With `select:southasia` India's card shows two Armies.
+        if std::env::args().any(|a| a == "levy:1") {
+            g.raise_army(Place::State(StateId::EastAsia), false);
+            run_one_quiet_turn(g);
+        }
         // `blockade:1` (a building aid, ticket #278, version 0.08.5): a Prospector Frigate sits in
         // the slot of seat 0's station over Earth on Blockade, so the station's button and card say
         // it is starved. With `hab:1` the station's card is open in the Earth picture.

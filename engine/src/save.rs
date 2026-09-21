@@ -140,6 +140,11 @@ pub struct SavedGame {
     /// Ticket #272 (version 0.08.4): the sweep's count of Events drawn with nowhere to land.
     #[serde(default)]
     pub events_no_target: u32,
+    /// Ticket #282 (version 0.08.5): the sweep's counts of Levies raised and neutral Regions that held.
+    #[serde(default)]
+    pub levies_raised: u32,
+    #[serde(default)]
+    pub neutral_holds: u32,
 }
 
 impl SavedGame {
@@ -156,6 +161,8 @@ impl SavedGame {
             colonies,
             ships,
             armies,
+            levies_raised,
+            neutral_holds,
             climate,
             research,
             deck,
@@ -204,6 +211,8 @@ impl SavedGame {
             market: market.clone(),
             accords: accords.clone(),
             events_no_target: *events_no_target,
+            levies_raised: *levies_raised,
+            neutral_holds: *neutral_holds,
         }
     }
 
@@ -219,6 +228,8 @@ impl SavedGame {
             colonies: self.colonies,
             ships: self.ships,
             armies: self.armies,
+            levies_raised: self.levies_raised,
+            neutral_holds: self.neutral_holds,
             climate: self.climate,
             research: self.research,
             deck: self.deck,

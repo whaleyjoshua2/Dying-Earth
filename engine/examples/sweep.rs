@@ -116,6 +116,7 @@ fn main() {
                         let mut credits_sold = [0.0f64; 4];
                         let mut agitates = [0u32; 4];
                         let (mut blockade_suffered, mut blockade_imposed) = ([0u32; 4], [0u32; 4]);
+                        let (mut levies, mut neutral_holds) = (0u32, 0u32);
                         let mut war_ppm: [Vec<f64>; 4] = Default::default();
                         let mut war_nobody: Vec<f64> = Vec::new();
                         let mut walls_standing = 0u32;
@@ -265,6 +266,8 @@ fn main() {
                             no_target += r.events_no_target;
                             cards_drawn.push(r.cards_drawn);
                             war_nobody.push(r.war_ppm_nobody);
+                            levies += r.levies_raised;
+                            neutral_holds += r.neutral_holds;
                             if r.deck_empty {
                                 deck_empty += 1;
                             }
@@ -423,6 +426,8 @@ fn main() {
                             // Ticket #279 (version 0.08.5): what war put in the air, by seat and nobody's.
                             let war: Vec<String> = (0..4).map(|i| med0(&mut war_ppm[i])).collect();
                             println!("      War in ppm a game, by seat (median): [{}]; nobody's (median) {}", war.join(", "), med0(&mut war_nobody));
+                            // Ticket #282 (version 0.08.5): neutral states arming.
+                            println!("      Neutral states: {levies} Levies raised over the batch, {neutral_holds} attacks held against");
                             println!("      Sea Walls: {sea_walls} built over the batch, {walls_standing} standing at the end, {walls_held} thresholds held");
                             println!("      Events drawn with nowhere to land over the batch: {no_target}; the Fund at or past its bar in {fund_met}/{seeds} seeds");
                             let floored_pct = if rel_end.is_empty() { 0.0 } else { rel_floored as f64 * 100.0 / rel_end.len() as f64 };

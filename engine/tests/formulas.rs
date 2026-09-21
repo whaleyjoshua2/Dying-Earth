@@ -684,7 +684,7 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
 fn only_a_carrier_carries_an_army_and_a_colony_ship_carries_only_colonists() {
     let mut g = game();
     let army = ArmyId(g.fresh_id());
-    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
     let ship = |id: u32, kind: UnitKind| Ship { name: String::new(), id: ShipId(id), kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None };
     g.ships.extend([ship(101, UnitKind::ColonyShip), ship(102, UnitKind::Battleship), ship(103, UnitKind::Carrier)]);
     let load_army = |s: u32| Order::Load { ship: ShipId(s), colonists: 0, from: LoadSource::State(StateId::EastAsia), army: Some(army) };
@@ -816,7 +816,7 @@ fn embassies_and_relays_add_to_the_allotment_and_raise_their_places_standing_eac
 
 fn occupier_in(g: &mut Game, seat_home: StateId, target: StateId) -> ArmyId {
     let id = ArmyId(g.fresh_id());
-    g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(seat_home), at: ArmyAt::Place(Place::State(target)), damage: 0, standing: false, stance: Stance::Attack, escaped: false, move_to: None });
+    g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(seat_home), at: ArmyAt::Place(Place::State(target)), damage: 0, standing: false, stance: Stance::Attack, escaped: false, move_to: None, levy: false });
     id
 }
 
@@ -1398,14 +1398,14 @@ fn colony_attack_turns(seed: u64) -> Option<u32> {
     // The AI Prospectors hold a Colony on the Moon with a Barracks and its Army.
     let cid = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Barracks], 4);
     let defender = ArmyId(g.fresh_id());
-    g.armies.push(Army { name: String::new(), id: defender, home: ArmyHome::Colony(cid), at: ArmyAt::Place(Place::Colony(cid)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+    g.armies.push(Army { name: String::new(), id: defender, home: ArmyHome::Colony(cid), at: ArmyAt::Place(Place::Colony(cid)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
     // The player's two Carriers arrive at the Moon, each carrying an Army: strength 8 against 4.
     let mut attackers = Vec::new();
     let mut ships = Vec::new();
     for kind in [UnitKind::Carrier, UnitKind::Carrier] {
         let attacker = ArmyId(g.fresh_id());
         let ship = ShipId(g.fresh_id());
-        g.armies.push(Army { name: String::new(), id: attacker, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+        g.armies.push(Army { name: String::new(), id: attacker, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
         g.ships.push(Ship { name: String::new(), id: ship, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, colonists_education: 1.0, army: Some(attacker), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
         attackers.push(attacker);
         ships.push(ship);
@@ -2644,7 +2644,7 @@ fn e_four_stops_replenishment_seven_halves_output_ten_throws_the_controller_off(
     g.seats[1].influence.insert(Place::State(StateId::NorthAfrica), 17);
     g.state_mut(StateId::NorthAfrica).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(0), coastal: false, due_turn: 99 });
     let id = ArmyId(g.fresh_id());
-    g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(StateId::Europe), at: ArmyAt::Place(Place::State(StateId::NorthAfrica)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None });
+    g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(StateId::Europe), at: ArmyAt::Place(Place::State(StateId::NorthAfrica)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
     g.raise_unrest(StateId::NorthAfrica, 10.0, UnrestSource::Plain);
     assert_eq!(g.unrest(StateId::NorthAfrica), 10.0);
     // Ticket #53: the falls run first, so a state at 10 that did not change hands is pulled back
@@ -7281,6 +7281,71 @@ fn only_a_rival_holding_orbital_control_shuts_the_ground() {
     assert!(g.may_land(Seat(0), body), "a contested orbit no longer punishes the bystander");
 }
 
+/// Ticket #282 (version 0.08.5): neutral states arm when threatened. A neutral Region with a built
+/// Army of any Faction next door raises a Levy at Industry + 2 at Income, a second standing Army
+/// that fights for it and never marches; when the threat passes the Levy stands down at the next
+/// Income; a neutral that is attacked and holds gains +1 to its Standing Army for good, to
+/// Industry + 4; and a destroyed Standing Army returns two Incomes later, not the next.
+#[test]
+fn a_threatened_neutral_raises_a_levy_and_stands_it_down_and_holding_arms_it_for_good() {
+    let mut g = game();
+    calm(&mut g);
+    // Egypt is neutral and borders Saudi Arabia; a built Army of seat 0's stands there.
+    let (egypt, next_door) = (StateId::NorthAfrica, StateId::ArabianPeninsula);
+    assert_eq!(g.state(egypt).control, Control::Neutral);
+    assert!(g.tables.state(egypt).neighbours.contains(&next_door), "adjacent");
+    assert!(!g.neutral_threatened(egypt), "nobody next door yet");
+    let army = ArmyId(g.fresh_id());
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(next_door)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    assert!(g.neutral_threatened(egypt), "a foreign built Army next door threatens it, whatever its stance");
+    g.income_phase();
+    let levy = g.levy_at(egypt).expect("a Levy raised at Income");
+    let l = g.armies.iter().find(|a| a.id == levy).unwrap().clone();
+    assert!(l.standing && l.levy && l.at == ArmyAt::Place(Place::State(egypt)));
+    assert_eq!(g.army_strength(&l), (g.state(egypt).industry_level + 2) as i64, "Industry + 2");
+    assert!(g.army_name(&l).contains("Egyptian"), "named from its home: {}", g.army_name(&l));
+    assert_eq!(g.armies.iter().filter(|a| a.standing && !a.levy && a.home == ArmyHome::State(egypt)).count(), 1, "the Standing Army is still one");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Egypt arms")), "the Report says so: {:?}", g.report.lines);
+    assert!(g.levies_raised >= 1, "counted for the sweep; every neutral bordering that Army arms, so more than Egypt may have");
+    g.income_phase();
+    assert_eq!(g.levy_at(egypt), Some(levy), "one Levy, not one a turn");
+    // The threat leaves: the Levy stands down at the next Income.
+    g.armies.retain(|a| a.id != army);
+    g.income_phase();
+    assert!(g.levy_at(egypt).is_none(), "stood down");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Egypt stands down")), "{:?}", g.report.lines);
+    // A Region that changes hands stands its Levy down at once.
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(next_door)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    g.income_phase();
+    assert!(g.levy_at(egypt).is_some());
+    g.transfer_control(Place::State(egypt), Seat(1), "Influence");
+    assert!(g.levy_at(egypt).is_none(), "a held Region has no Levy");
+
+    // Holding: +1 for good, to Industry + 4.
+    let mut g = game();
+    calm(&mut g);
+    let cap = g.standing_army_cap(egypt);
+    g.neutral_held(egypt);
+    assert_eq!(g.standing_army_cap(egypt), cap + 1, "one step earned");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Egypt held against the attack")), "{:?}", g.report.lines);
+    for _ in 0..5 {
+        g.neutral_held(egypt);
+    }
+    assert_eq!(g.standing_army_cap(egypt), g.state(egypt).industry_level + 4, "never past Industry + 4");
+    assert_eq!(g.neutral_holds, 6, "every hold is counted for the sweep");
+
+    // The respawn: a destroyed Standing Army returns two Incomes later, not the next.
+    let mut g = game();
+    calm(&mut g);
+    let standing = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(egypt)).map(|a| a.id).unwrap();
+    g.destroy_army(standing, "battle", Some(ReportPlace::State(egypt)));
+    g.income_phase();
+    assert!(!g.armies.iter().any(|a| a.standing && !a.levy && a.home == ArmyHome::State(egypt)), "not the next Income");
+    g.income_phase();
+    let back = g.armies.iter().find(|a| a.standing && !a.levy && a.home == ArmyHome::State(egypt)).expect("but the one after");
+    assert_eq!(g.army_strength(back), 1, "at strength 1");
+}
+
 /// Ticket #281 (version 0.08.5): a Battle is a line of the Report at its real place, its parties
 /// name every unit and what it took, an aggressor carries its first-round odds; when a unit died
 /// the line ranks with a Ship destroyed and a Moment names the loss, and when nobody lost one the
@@ -7641,7 +7706,7 @@ fn an_army_keeps_its_stance_through_resolution_until_something_happens_to_it() {
         standing: false,
         stance: Stance::Evade,
         escaped: false,
-        move_to: None,
+        move_to: None, levy: false,
     });
     for turn in 1..=3 {
         g.resolution_phase();

@@ -4620,7 +4620,33 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             None => "neutral".to_string(),
         };
         // Ticket #270 (version 0.08.4): named, the Standing Army included.
-        ui.label(format!("  {} ({}{}): strength {}, damage {}/{}", game.army_name(a), who, if a.standing { ", standing" } else { "" }, game.army_strength(a), a.damage, game.tables.unit(UnitKind::Army).hit_points));
+        // Ticket #282 (version 0.08.5): a Levy says so, and a standing row's hover names the rule.
+        let row = ui.label(format!(
+            "  {} ({}{}): strength {}, damage {}/{}",
+            game.army_name(a),
+            who,
+            if a.levy { ", levy" } else if a.standing { ", standing" } else { "" },
+            game.army_strength(a),
+            a.damage,
+            game.tables.unit(UnitKind::Army).hit_points
+        ));
+        if a.standing {
+            let earned = game.state(sid).armed;
+            let tip = if a.levy {
+                format!(
+                    "A Levy: the second Army a neutral Region raises, at Industry Level + 2, while a foreign Army stands in a neighbouring Region or a neighbour is under Occupation. It heals 1 a turn while Unrest is under {:.0}, never marches, and stands down when the threat passes.",
+                    game.tables.unrest.army_threshold
+                )
+            } else {
+                format!(
+                    "A Standing Army: Industry Level + 1 strong{}, with the Army card's {} hit points. It heals 1 a turn while Unrest is under {:.0}; destroyed, it returns at strength 1 two Incomes later. A neutral Region that is attacked and holds gains +1 for good, to Industry + 4.",
+                    if earned > 0 { format!(" and +{earned} earned holding against attack") } else { String::new() },
+                    game.tables.unit(UnitKind::Army).hit_points,
+                    game.tables.unrest.army_threshold
+                )
+            };
+            row.on_hover_text(tip);
+        }
     }
     ui.separator();
     if mine {

@@ -119,6 +119,7 @@ impl Game {
             s.funding_archive = false;
         }
         self.replenish_standing_armies();
+        self.arm_neutrals();
         // Ticket #134 (version 0.07.3): a standing Max order ends by itself when its place is no
         // longer the seat's to spend on, and the Report says so.
         for seat in Seat::ALL {
@@ -217,14 +218,22 @@ impl Game {
     fn replenish_standing_armies(&mut self) {
         for sid in StateId::ALL {
             let occupied = self.state(sid).control.is_occupied();
-            let has = self.armies.iter().any(|a| a.standing && a.home == ArmyHome::State(sid));
+            // Ticket #282 (version 0.08.5): a Levy is standing too, but it is not THE Standing Army,
+            // so its presence never suppresses the raising of one.
+            let has = self.armies.iter().any(|a| a.standing && !a.levy && a.home == ArmyHome::State(sid));
             if !has {
-                // A destroyed Standing Army is raised again at strength 1 (an assumption, see the ticket).
+                // A destroyed Standing Army is raised again at strength 1. Ticket #282: two Incomes
+                // after it died, not the next -- the assumption this comment carried from ticket
+                // #50 was settled at the designer's word -- so a won Battle opens a window.
+                if self.state(sid).respawn_wait > 0 {
+                    self.state_mut(sid).respawn_wait -= 1;
+                    continue;
+                }
                 let cap = self.standing_army_cap(sid);
                 let hp = self.tables.unit(UnitKind::Army).hit_points;
                 self.spawn_standing_army(sid);
                 let dmg = cap.saturating_sub(1).min(hp - 1);
-                if let Some(a) = self.armies.iter_mut().find(|a| a.standing && a.home == ArmyHome::State(sid)) {
+                if let Some(a) = self.armies.iter_mut().find(|a| a.standing && !a.levy && a.home == ArmyHome::State(sid)) {
                     a.damage = dmg;
                 }
                 continue;
@@ -233,7 +242,11 @@ impl Game {
             if occupied || !self.army_replenishes(sid) {
                 continue;
             }
-            if let Some(a) = self.armies.iter_mut().find(|a| a.standing && a.home == ArmyHome::State(sid)) {
+            // Ticket #282: a Levy heals on the same terms.
+            for a in self.armies.iter_mut().filter(|a| a.levy && a.home == ArmyHome::State(sid)) {
+                a.damage = a.damage.saturating_sub(1);
+            }
+            if let Some(a) = self.armies.iter_mut().find(|a| a.standing && !a.levy && a.home == ArmyHome::State(sid)) {
                 a.damage = a.damage.saturating_sub(1);
             }
         }
@@ -478,6 +491,37 @@ impl Game {
             y.doubled_by = pairs.iter().find(|(_, m)| **m == kind).map(|(f, _)| f.name());
         }
         y
+    }
+
+    /// Ticket #282 (version 0.08.5): neutral states arm when threatened. A neutral Region with a
+    /// foreign Army next door, or a neighbour under Occupation, raises a Levy at Industry + 2 --
+    /// while its Unrest is under the Standing Army's threshold, since a restive state musters
+    /// nothing -- and stands it down at the Income after the threat has passed, or the moment the
+    /// Region is no longer neutral. The Report says both.
+    fn arm_neutrals(&mut self) {
+        for sid in StateId::ALL {
+            let threatened = self.neutral_threatened(sid);
+            let levy = self.levy_at(sid);
+            match (threatened, levy) {
+                (true, None) if self.army_replenishes(sid) => {
+                    let id = self.raise_levy(sid);
+                    let (state, army) = (self.tables.state(sid).name.clone(), self.armies.iter().find(|a| a.id == id).map(|a| self.army_name(a)).unwrap_or_default());
+                    let n = self.levy_cap(sid);
+                    self.log(format!("{state} arms: {army} is raised at strength {n} while a foreign Army stands next door."));
+                    let text = self.say("levy_raised", &[("state", state), ("army", army), ("n", n.to_string())]);
+                    self.report_line(LineKind::Army, Some(ReportPlace::State(sid)), text);
+                }
+                (false, Some(id)) => {
+                    let army = self.armies.iter().find(|a| a.id == id).map(|a| self.army_name(a)).unwrap_or_default();
+                    self.armies.retain(|a| a.id != id);
+                    let state = self.tables.state(sid).name.clone();
+                    self.log(format!("{state} stands down {army}: the threat has passed."));
+                    let text = self.say("levy_disbanded", &[("state", state), ("army", army)]);
+                    self.report_line(LineKind::Army, Some(ReportPlace::State(sid)), text);
+                }
+                _ => {}
+            }
+        }
     }
 
     /// Ticket #278 (version 0.08.5): every Colony starved this Income is named in its holder's

@@ -26,6 +26,11 @@ ship_destroyed = "{faction} {ship} destroyed ({why}){cargo}."
 # Ticket #281 (version 0.08.5): an Army destroyed, by name, as a Ship has been; and every Battle
 # as a line of its own, ranked when a unit died and unranked otherwise.
 army_destroyed = "{army} ({faction}) destroyed ({why})."
+# Ticket #282 (version 0.08.5): neutral states arm when threatened -- a Levy raised, stood down,
+# and a Region that held against an attack arming for good.
+levy_raised = "{state} arms: {army} is raised at strength {n} while a foreign Army stands next door."
+levy_disbanded = "{state} stands down {army}: the threat has passed."
+neutral_held = "{state} held against the attack, and arms: its Standing Army will stand at {n} from now on."
 battle = "Battle at {place}: the {faction} attacked at {odds}% first-round odds; {outcome}."
 event_damaged_ships = "{event} damaged {n} Ship(s)."
 loaded = "{faction} loaded {cargo} at {body}."
