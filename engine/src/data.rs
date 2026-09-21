@@ -977,6 +977,9 @@ pub struct AiPace {
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiThresholds {
     pub attack_odds: f64,
+    /// Ticket #284 (version 0.08.5): the Relations score at or below which a seat has cause to
+    /// attack a place a rival holds -- Cold or worse.
+    pub war_cause: i64,
     pub evade_damage_fraction: f64,
     pub influence_step: i64,
     /// Ticket #75: a held state's worth on the Influence target list, as a share of a neutral one's.

@@ -7281,6 +7281,60 @@ fn only_a_rival_holding_orbital_control_shuts_the_ground() {
     assert!(g.may_land(Seat(0), body), "a contested orbit no longer punishes the bystander");
 }
 
+/// Ticket #284 (version 0.08.5): every computer seat may attack a Region it did not lose, on the
+/// Prospectors' odds, given a cause: a neutral needs none; a rival's Region only when the seat is
+/// Cold or worse toward that rival; an occupier stays where it is; and the Battle line and the
+/// Occupation agree that an escaped attacker is not alone at the place.
+#[test]
+fn a_cold_seat_marches_on_a_rivals_region_a_cordial_one_does_not_and_an_occupier_stays() {
+    let mut g = game();
+    calm(&mut g);
+    let (home, target) = (StateId::EastAsia, StateId::Russia);
+    assert!(g.tables.state(home).neighbours.contains(&target));
+    assert_eq!(g.kind(Seat(0)), FactionKind::Custodians, "a seat the old rule forbade");
+    // Russia held by the Prospectors, its Standing Army weak; seat 0 has a built Army in China.
+    g.take_control(target, Seat(1));
+    for a in g.armies.iter_mut().filter(|a| a.standing && a.home == ArmyHome::State(target)) {
+        a.damage = 2;
+    }
+    let army = ArmyId(g.fresh_id());
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(home), at: ArmyAt::Place(Place::State(home)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    let def: i64 = g.defenders_at(Place::State(target), Seat(0)).iter().filter_map(|id| g.army(*id)).map(|a| g.army_strength(a)).sum();
+    assert!(combat::first_round_odds(4, def) >= g.tables.ai.thresholds.attack_odds, "the odds clear the bar: {def}");
+    let marches = |g: &mut Game| g.ai_orders(Seat(0)).iter().any(|o| matches!(o, Order::MoveArmy { army: a, to } if *a == army && *to == target));
+    assert!(!marches(&mut g), "Neutral toward the Prospectors: no cause, no march");
+    g.relations.score[0][1] = -8;
+    assert!(g.relations_score(Seat(0), Seat(1)) <= g.tables.ai.thresholds.war_cause, "Cold or worse");
+    assert!(marches(&mut g), "Cold toward the Prospectors: the Custodians march on Russia: {:?}", g.ai_orders(Seat(0)));
+    // A neutral neighbour needs no cause.
+    g.relations.score[0][1] = 0;
+    g.take_control(target, Seat(1));
+    let neutral = StateId::SouthAsia;
+    assert_eq!(g.state(neutral).control, Control::Neutral);
+    for a in g.armies.iter_mut().filter(|a| a.standing && a.home == ArmyHome::State(neutral)) {
+        a.damage = 2;
+    }
+    assert!(g.ai_orders(Seat(0)).iter().any(|o| matches!(o, Order::MoveArmy { to, .. } if *to == neutral)), "a weak neutral next door is marched on with no cause: {:?}", g.ai_orders(Seat(0)));
+
+    // An occupier stays: an Army at a place this seat occupies is offered no march.
+    let mut g = game();
+    calm(&mut g);
+    g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
+    let occ = occupier_in(&mut g, StateId::EastAsia, StateId::Europe);
+    g.resolution_phase();
+    assert!(matches!(g.state(StateId::Europe).control, Control::Occupied { occupier: Seat(0), .. }));
+    assert!(!g.ai_orders(Seat(0)).iter().any(|o| matches!(o, Order::MoveArmy { army, .. } if *army == occ)), "the occupier holds what it takes: {:?}", g.ai_orders(Seat(0)));
+
+    // Alone at the place: an escaped attacker is not.
+    let mut g = game();
+    calm(&mut g);
+    g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
+    let id = occupier_in(&mut g, StateId::EastAsia, StateId::Europe);
+    assert!(g.alone_at(Place::State(StateId::Europe), Seat(0)), "on Attack, unescaped, nobody defending");
+    g.army_mut(id).unwrap().escaped = true;
+    assert!(!g.alone_at(Place::State(StateId::Europe), Seat(0)), "escaped, it occupies nothing and the line must not promise it");
+}
+
 /// Ticket #282 (version 0.08.5): neutral states arm when threatened. A neutral Region with a built
 /// Army of any Faction next door raises a Levy at Industry + 2 at Income, a second standing Army
 /// that fights for it and never marches; when the threat passes the Levy stands down at the next

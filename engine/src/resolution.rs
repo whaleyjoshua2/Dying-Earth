@@ -364,6 +364,14 @@ impl Game {
         }
     }
 
+    /// Ticket #284 (version 0.08.5): a seat is alone at a place when it has an Army there on Attack
+    /// that did not escape, and no defender is left engaged. Read by the Battle line and by the
+    /// Occupation alike, so the two can never disagree about `escaped` again.
+    pub fn alone_at(&self, place: Place, seat: Seat) -> bool {
+        let attacking = self.armies.iter().any(|a| a.at == ArmyAt::Place(place) && self.army_seat(a) == Some(seat) && a.stance == Stance::Attack && !a.escaped);
+        attacking && self.defenders_at(place, seat).is_empty()
+    }
+
     /// Armies at a place that fight against `attacker`: every Army not of that seat, not standing down, not escaped.
     pub fn defenders_at(&self, place: Place, attacker: Seat) -> Vec<ArmyId> {
         self.armies
@@ -428,8 +436,10 @@ impl Game {
             parties.iter().map(|(seat, agg, ids)| (*seat, *agg, ids.iter().map(|id| self.army_combatant(*id)).collect())).collect();
         let mut line = self.run_melee(place_name, Some(place.into()), units);
         self.charge_war_hits(self.on_earth_place(place), &line);
+        // Ticket #284 (version 0.08.5): the same predicate `resolve_occupation` reads, so the line
+        // never promises an Occupation an escaped attacker will not begin (a measured defect).
         for seat in aggressors {
-            if self.defenders_at(place, *seat).is_empty() && !self.armies_of_seat_at(*seat, place).is_empty() {
+            if self.alone_at(place, *seat) {
                 line.result.push_str(&format!(" The {} are alone at the place; Occupation begins.", self.seat_name(*seat)));
             }
         }
@@ -699,13 +709,7 @@ impl Game {
                         if control.director() == Some(seat) {
                             continue;
                         }
-                        let attackers: Vec<ArmyId> = self
-                            .armies
-                            .iter()
-                            .filter(|a| a.at == ArmyAt::Place(place) && self.army_seat(a) == Some(seat) && a.stance == Stance::Attack && !a.escaped)
-                            .map(|a| a.id)
-                            .collect();
-                        if attackers.is_empty() || !self.defenders_at(place, seat).is_empty() {
+                        if !self.alone_at(place, seat) {
                             continue;
                         }
                         let previous = control.controller();

@@ -99,6 +99,19 @@ impl Game {
     /// `body`: the slot of the richest rival station there, by Modules standing, and nothing for a
     /// Ship that is not a warship or a Body where no rival keeps a station. The slot is chosen with
     /// the leg, so this reads the board as it stands when the Ship departs.
+    /// Ticket #284 (version 0.08.5): whether this seat has cause to open a fight at a place. A
+    /// neutral place needs none; a place it lost to an Occupation still running may be retaken;
+    /// a place a rival holds only if the seat is Cold or worse toward that rival (`war_cause`),
+    /// the AI's first reading of Relations for war. A seat that keeps every rival Neutral is
+    /// marched on by nobody.
+    pub fn war_cause_at(&self, seat: Seat, place: Place, cause: i64) -> bool {
+        match self.place_control(place) {
+            Control::Neutral => true,
+            Control::Controlled(r) => r != seat && self.relations_score(seat, r) <= cause,
+            Control::Occupied { occupier, previous, .. } => previous == Some(seat) || (occupier != seat && self.relations_score(seat, occupier) <= cause),
+        }
+    }
+
     pub fn ai_blockade_slot(&self, seat: Seat, body: BodyId, kind: UnitKind) -> Option<u32> {
         if !kind.is_warship() {
             return None;
@@ -1854,6 +1867,9 @@ impl Game {
             }
         }
 
+        // Ticket #284 (version 0.08.5): one new war a turn per seat -- at most one attack on a place a
+        // rival holds is proposed each turn, so a freed table does not converge on one Region.
+        let mut wars_opened = 0u32;
         // --- Stances for every Ship stack
         for body in BodyId::ALL {
             let stack: Vec<&Ship> = self.ships.iter().filter(|s| s.seat == seat && s.at == ShipAt::Body(body)).collect();
@@ -1869,21 +1885,29 @@ impl Game {
             let total_hp: u32 = stack.iter().map(|s| self.tables.unit(s.kind).hit_points).sum();
             let total_dmg: u32 = stack.iter().map(|s| s.damage).sum();
             let warships = stack.iter().any(|s| s.kind.is_warship());
-            push(vec![Order::ShipStance { body, stance: Stance::Hold }], Cat::StanceHold, self.base_weight(seat, Cat::StanceHold), 1.0, threat, 1.0, format!("Hold at {}", self.tables.body(body).name), Some(key.clone()));
+            // Ticket #284 (version 0.08.5): every seat attacks in orbit on the Prospectors' terms --
+            // the odds clear the bar -- given a cause: Cold or worse toward the seat holding Orbital
+            // Control against it, or toward any enemy present; or, as before, a blockade of a Body
+            // where it has a Colony. And the attack, when allowed, IS the stance: Hold is the candidate
+            // only when it is not, a condition where a score contest let Hold win every tie.
+            let mut attack: Option<f64> = None;
             if warships && enemy_here {
                 // Ticket #50: the odds are against the sum of every other seat's strength present.
                 let odds = first_round_odds(my_str, enemy_str);
                 let my_colony_here = self.colonies.iter().any(|c| c.body == body && c.control.controller() == Some(seat));
                 let held_against_me = self.orbital_control(body).map(|o| o != seat).unwrap_or(false);
-                let allowed = match kind {
-                    FactionKind::Prospectors => odds >= th.attack_odds,
-                    // The Custodians attack only to break a blockade at a Body where they have a
-                    // Colony; the Arkwrights and the Archivists fight on the same terms (ticket #50).
-                    _ => odds >= th.attack_odds && my_colony_here && held_against_me,
+                let cause = match self.orbital_control(body).filter(|o| *o != seat) {
+                    Some(o) => self.relations_score(seat, o) <= th.war_cause,
+                    None => self.ships.iter().any(|s| s.seat != seat && s.at == ShipAt::Body(body) && self.relations_score(seat, s.seat) <= th.war_cause),
                 };
-                if allowed {
-                    push(vec![Order::ShipStance { body, stance: Stance::Attack }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack), 1.0, 1.0, 1.0, format!("Attack at {} (odds {:.0}%)", self.tables.body(body).name, odds * 100.0), Some(key.clone()));
+                if odds >= th.attack_odds && (cause || (my_colony_here && held_against_me)) && wars_opened < 1 {
+                    attack = Some(odds);
+                    wars_opened += 1;
                 }
+            }
+            match attack {
+                Some(odds) => push(vec![Order::ShipStance { body, stance: Stance::Attack }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack), 1.0, 1.0, 1.0, format!("Attack at {} (odds {:.0}%)", self.tables.body(body).name, odds * 100.0), Some(key.clone())),
+                None => push(vec![Order::ShipStance { body, stance: Stance::Hold }], Cat::StanceHold, self.base_weight(seat, Cat::StanceHold), 1.0, threat, 1.0, format!("Hold at {}", self.tables.body(body).name), Some(key.clone())),
             }
             if warships && self.orbital_control(body) == Some(seat) && inbound_target {
                 push(vec![Order::ShipStance { body, stance: Stance::Intercept }], Cat::StanceIntercept, self.base_weight(seat, Cat::StanceIntercept), 1.0, threat, 1.0, format!("Intercept at {}", self.tables.body(body).name), Some(key.clone()));
@@ -1918,29 +1942,41 @@ impl Game {
             }
             let key = format!("armies@{place:?}");
             let threat = if self.enemy_army_near(seat, place) { m.threat } else { 1.0 };
-            push(vec![Order::ArmyStance { place, stance: Stance::Hold }], Cat::StanceHold, self.base_weight(seat, Cat::StanceHold), 1.0, threat, 1.0, format!("Hold at {}", self.place_name(place)), Some(key.clone()));
             let my_str = self.army_stack_strength(seat, place);
+            // Ticket #284 (version 0.08.5): an occupier STAYS. A stack at a place this seat is
+            // occupying holds at three times the weight and marches nowhere -- the measured
+            // hit-and-run (Saudi Arabia abandoned for Nigeria) broke its own Occupation for free.
+            let occupying = matches!(self.place_control(place), Control::Occupied { occupier, .. } if occupier == seat);
             let total_hp: u32 = mine.iter().map(|_| self.tables.unit(UnitKind::Army).hit_points).sum();
             let total_dmg: u32 = mine.iter().filter_map(|id| self.army(*id)).map(|a| a.damage).sum();
             if total_hp > 0 && (total_dmg as f64) / (total_hp as f64) >= th.evade_damage_fraction {
                 push(vec![Order::ArmyStance { place, stance: Stance::Evade }], Cat::StanceEvade, self.base_weight(seat, Cat::StanceEvade) * 10.0, 1.0, 1.0, 1.0, format!("Evade at {}", self.place_name(place)), Some(key.clone()));
             }
-            // Attack where this seat does not direct the place and defenders stand.
+            // Attack where this seat does not direct the place and defenders stand. Ticket #284
+            // (version 0.08.5): every seat on the Prospectors' terms, given a cause -- a neutral
+            // place, a place lost to a running Occupation, or a holder the seat is Cold or worse
+            // toward -- and the attack, when allowed, IS the stance; Hold is the candidate otherwise.
+            let mut attack: Option<f64> = None;
             if self.place_director(place) != Some(seat) {
                 let def: i64 = self.defenders_at(place, seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_strength(a)).sum();
                 let odds = first_round_odds(my_str, def);
-                let lost_place = self.place_control(place).controller() == Some(seat) || matches!(self.place_control(place), Control::Occupied { previous: Some(p), .. } if p == seat);
-                let allowed = match kind {
-                    FactionKind::Prospectors => odds >= th.attack_odds || def == 0,
-                    // Ticket #50: the Arkwrights and the Archivists fight on the Custodians' terms.
-                    _ => lost_place && (odds >= th.attack_odds || def == 0),
-                };
-                if allowed {
-                    push(vec![Order::ArmyStance { place, stance: Stance::Attack }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * 1.5, 1.0, 1.0, 1.0, format!("Attack at {} (odds {:.0}%)", self.place_name(place), odds * 100.0), Some(key.clone()));
+                let held_by_rival = matches!(self.place_control(place), Control::Controlled(r) if r != seat);
+                if (odds >= th.attack_odds || def == 0) && self.war_cause_at(seat, place, th.war_cause) && (!held_by_rival || wars_opened < 1) {
+                    attack = Some(odds);
+                    if held_by_rival {
+                        wars_opened += 1;
+                    }
                 }
             }
-            // Moves into neighbouring states with a non-standing Army: Prospectors take weak neutrals.
-            if let Place::State(sid) = place {
+            match attack {
+                Some(odds) => push(vec![Order::ArmyStance { place, stance: Stance::Attack }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * 1.5, 1.0, 1.0, 1.0, format!("Attack at {} (odds {:.0}%)", self.place_name(place), odds * 100.0), Some(key.clone())),
+                None => push(vec![Order::ArmyStance { place, stance: Stance::Hold }], Cat::StanceHold, self.base_weight(seat, Cat::StanceHold) * if occupying { 3.0 } else { 1.0 }, 1.0, threat, 1.0, format!("Hold at {}", self.place_name(place)), Some(key.clone())),
+            }
+            // Moves into neighbouring states with a non-standing Army. Ticket #284 (version 0.08.5):
+            // any seat, on the odds, given a cause; an occupier marches nowhere.
+            if let Place::State(sid) = place
+                && !occupying
+            {
                 for aid in &mine {
                     let a = self.army(*aid).unwrap();
                     if a.standing || a.damage > 2 {
@@ -1953,11 +1989,12 @@ impl Game {
                         }
                         let def: i64 = self.defenders_at(Place::State(*n), seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_strength(a)).sum();
                         let odds = first_round_odds(self.army_strength(a), def);
-                        let allowed = match kind {
-                            FactionKind::Prospectors => odds >= th.attack_odds,
-                            _ => matches!(ctrl, Control::Occupied { previous: Some(p), .. } if p == seat) && odds >= th.attack_odds,
-                        };
+                        let held_by_rival = matches!(ctrl, Control::Controlled(r) if r != seat);
+                        let allowed = odds >= th.attack_odds && self.war_cause_at(seat, Place::State(*n), th.war_cause) && (!held_by_rival || wars_opened < 1);
                         if allowed {
+                            if held_by_rival {
+                                wars_opened += 1;
+                            }
                             let value = (self.tables.state(*n).industry_level + self.tables.state(*n).size) as f64 / 7.0;
                             push(vec![Order::MoveArmy { army: *aid, to: *n }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * (1.0 + value), 1.0, 1.0, 1.0, format!("march on {} (odds {:.0}%)", self.tables.state(*n).name, odds * 100.0), None);
                         }
