@@ -35,8 +35,8 @@ batch and make a median 1053 Ducats a game where they made 1575; where they go f
 now win 5 of 20 where they won none. The Archivists have two wins, their first since 0.08.3, both in
 the seating where the Prospectors' Ducats went to war. Five rules pressed on one seat and the sum
 took two games of eighty off it, which is inside the noise of a reshuffled deck and is also the
-first version since 0.08.2 in which the column moved *toward* the seats at the bottom. The designer
-decides below whether that ships.
+first version since 0.08.2 in which the column moved *toward* the seats at the bottom. The designer,
+shown the column: *"q1 ship"*.
 
 Collapses fell from **19 of 80 to 15 of 80**, and every seating ends cooler (+2.87, +2.96, +2.89 and
 +2.19 against +2.98, +2.96, +2.93 and +2.25). A falling collapse rate is not by itself good news:
@@ -331,5 +331,8 @@ unchanged with the Archivists first. Collapses 2, 6, 7 and 0 of 20 against 5, 7,
 - **Nothing was re-fitted on this sweep.** The candidates the sweep names: `stance_blockade` (139
   Colony-turns in one seating, none elsewhere), `war_ppm_per_hit` (a signal against a 600-ppm
   ledger), and the build-Army weight for the Custodians and Archivists, which the map's fog holds
-  for the balance version. The designer, shown the column and the three, decides on the map's
-  closing ticket.
+  for the balance version. The designer, shown the column and the three: **ship** and **none**.
+- **The kit.** This version ships as the Windows kit alone, built on this machine
+  (`dist/dying-earth-0.08.5-windows.zip`); the designer's word on the closing ticket was *"just the
+  windows kit done locally no need for linx at this time"*. The Linux kit was built by the
+  release-kits workflow before that word and is not shipped.
