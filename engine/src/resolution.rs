@@ -308,7 +308,10 @@ impl Game {
             }
             let name = self.place_name(place);
             self.army_melee(&name, place, &aggressors, &parties);
-            self.destruction_rolls(place, "attacked", &aggressors);
+            // Ticket #298 (version 0.08.6): the Battle itself burns nothing. Until this version a
+            // quarter of every building at the place rolled after every ground Battle, win or lose,
+            // and again on the transfer, so force burned twice where Influence never did; at the
+            // designer's word only a place that transfers by the three-turn clock rolls now.
             // Ticket #282 (version 0.08.5): a neutral Region attacked that still has a defender
             // standing, unescaped, has held, and arms for good: +1 to its Standing Army, to
             // Industry + 4, at the designer's word.
@@ -648,9 +651,13 @@ impl Game {
     }
 
     /// Spec 8.5: every Facility or Module at a place rolls a 1-in-4 chance to be destroyed.
-    /// Ticket #279 (version 0.08.5): `charged` are the seats that wear what burns -- the aggressors
-    /// after a Battle, the taker on a transfer -- at the table's ppm per building, split between them.
-    fn destruction_rolls(&mut self, place: Place, why: &str, charged: &[Seat]) {
+    /// Ticket #279 (version 0.08.5): `charged` are the seats that wear what burns -- the taker on a
+    /// transfer -- at the table's ppm per building, split between them.
+    /// Ticket #298 (version 0.08.6): called from one place now, the transfer by the three-turn
+    /// clock; a Battle burns nothing and a Pacified transfer rolls nothing. A Unique Facility is
+    /// rolled like any other building, at the designer's word. Returns what burned; the Moment for
+    /// a place taken by force is the transfer's, fired whether or not anything burned.
+    fn destruction_rolls(&mut self, place: Place, why: &str, charged: &[Seat]) -> Vec<String> {
         let p = self.tables.influence.destruction_chance;
         let mut lost = Vec::new();
         match place {
@@ -704,14 +711,9 @@ impl Game {
                 "units_destroyed",
                 &[("place", self.place_name(place)), ("why", why.to_string()), ("lost", lost.join(", "))],
             );
-            self.report_line(LineKind::DecisiveBattle, Some(place.into()), text.clone());
-            // Ticket #281 (version 0.08.5): under its own name. The Battle's Moment is the Battle's.
-            self.moment(
-                MomentKind::PlaceTakenByForce,
-                &[("place", self.place_name(place)), ("result", text), ("figure", format!("{} lost", lost.len()))],
-                Some(place.into()),
-            );
+            self.report_line(LineKind::DecisiveBattle, Some(place.into()), text);
         }
+        lost
     }
 
     // ------------------------------------------------------------------ (c)
@@ -893,9 +895,16 @@ impl Game {
             Some(place.into()),
         );
         // Version 0.03 (ticket #31): a place taken by Influence keeps everything; only a place
-        // that Occupation transfers rolls for destruction.
+        // that Occupation transfers rolls for destruction. Ticket #298 (version 0.08.6): and only
+        // one that the three-turn clock transfers -- a place that transfers by PACIFIED is taken
+        // whole, at the designer's word, so "beat the Army, then win the people" keeps what it wins.
+        // The Moment for a place taken by force fires on every take by force, burned or not: the
+        // taking is the news, not the fire.
         if why != "Influence" {
-            self.destruction_rolls(place, "taken", &[seat]);
+            let lost = if why == "Pacified" { Vec::new() } else { self.destruction_rolls(place, "taken", &[seat]) };
+            let result = if lost.is_empty() { format!("{} taken whole by the {} ({why}).", self.place_name(place), self.seat_name(seat)) } else { format!("{} was taken: {} destroyed.", self.place_name(place), lost.join(", ")) };
+            let figure = if lost.is_empty() { "nothing lost".to_string() } else { format!("{} lost", lost.len()) };
+            self.moment(MomentKind::PlaceTakenByForce, &[("place", self.place_name(place)), ("result", result), ("figure", figure)], Some(place.into()));
         }
         // Armies at the place that fought for the old owner stand for the new one only if they are the place's own.
         // Foreign Armies keep their own home and seat; nothing to do.

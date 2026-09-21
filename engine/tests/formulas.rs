@@ -10581,6 +10581,40 @@ fn a_standing_army_reads_its_industry_its_constabulary_and_its_calm_and_dies_at_
     assert_eq!((g.army_strength(&b), g.army_hit_points(&b)), (4, 5), "a built Army is the card's 4 and 5 wherever it stands");
 }
 
+/// Ticket #298 (version 0.08.6): a place taken whole. With the roll set to a certainty: a Battle
+/// burns nothing; a transfer by Pacified burns nothing and fires the Moment for a place taken by
+/// force all the same; a transfer by the three-turn clock burns every building, the Unique among
+/// them; a take by Influence never rolled.
+#[test]
+fn a_battle_burns_nothing_a_pacified_transfer_takes_the_place_whole_and_the_clock_burns() {
+    let mut t = Tables::load(&default_data_dir()).expect("tables load");
+    t.influence.destruction_chance = 1.0;
+    let mut g = Game::new(Arc::new(t), NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+    calm(&mut g);
+    let europe = StateId::Europe;
+    let standing = g.state(europe).facilities.len();
+    assert!(standing >= 3, "the fixture: Europe keeps its start Facilities ({standing})");
+    let taken = |g: &Game| g.report.moments.iter().filter(|m| m.kind == MomentKind::PlaceTakenByForce).count();
+    // A Battle: seat 0's Army attacks Europe's Standing Army. Every building would have burned
+    // at a certain roll; none does, because the Battle no longer rolls.
+    occupier_in(&mut g, StateId::EastAsia, europe);
+    g.resolution_phase();
+    assert!(g.war.battles[0] >= 1, "a Battle was fought: {:?}", g.war.battles);
+    assert_eq!(g.state(europe).facilities.len(), standing, "the Battle burned nothing");
+    // A transfer by Pacified: taken whole, and the Moment fires with nothing lost.
+    let before = taken(&g);
+    g.transfer_control(Place::State(europe), Seat(0), "Pacified");
+    assert_eq!(g.state(europe).facilities.len(), standing, "Pacified takes the place whole");
+    assert_eq!(taken(&g), before + 1, "and it is still a place taken by force");
+    assert!(g.report.moments.iter().any(|m| m.text.contains("taken whole")), "{:?}", g.report.moments.iter().map(|m| m.text.clone()).collect::<Vec<_>>());
+    // A transfer by the clock: at a certain roll, everything burns, the Unique Facility included.
+    g.state_mut(europe).facilities.push(Facility { online: true, ..Facility::new(FacilityKind::InvestmentBank) });
+    assert!(g.state(europe).facilities.iter().any(|f| f.kind.unique_to().is_some()), "a Unique stands there");
+    g.transfer_control(Place::State(europe), Seat(1), "Occupation complete");
+    assert_eq!(g.state(europe).facilities.len(), 0, "the clock burns, the Unique like any other");
+    assert_eq!(taken(&g), before + 2);
+}
+
 /// Ticket #297 (version 0.08.6): Dig In. A dug-in Army fights at +2 while defending and never
 /// rolls to disengage; hit points do not follow; it cannot march or board a Carrier until its
 /// stance is changed and the turn has passed; a neutral Region's own Army is always dug in; a

@@ -327,7 +327,7 @@ _Avoid_: using it for anything the Scrubber now does
 
 **Unique Facility**:
 A Facility one Faction builds in place of a common one, at the common price -- the same Materials, the same build turns, the same upkeep, the same output, the same slot -- with its own name, its own icon and its own row on that Faction's build list, and one clause the common building does not have. One per Faction as a rule of the system, from version 0.08.0: the Prospectors' Investment Bank, the Arkwrights' Spaceport, the Archivists' Reactor and the Custodians' Academy. A Faction never builds the common version of a job it has a Unique Facility for, and never builds another Faction's.
-It is **never destroyed when its place changes hands**: it keeps standing and pays its new holder the same clause it paid its builder, which is the opposite of the Scrubber and the Archive. The mirror does not hold -- a common building already standing does not convert when the Faction whose Unique version it is takes the place. Only a CONTROLLER collects: an occupier pays the upkeep and draws nothing.
+When its place changes hands it is **rolled like any other building** (since version 0.08.6, and in truth since the roll was written: the glossary said otherwise), and one that survives keeps standing and pays its new holder the same clause it paid its builder, which is the opposite of the Scrubber and the Archive, which are destroyed outright. The mirror does not hold -- a common building already standing does not convert when the Faction whose Unique version it is takes the place. Only a CONTROLLER collects: an occupier pays the upkeep and draws nothing.
 _Avoid_: unique building (the glossary keeps Facility and Module apart), signature building, faction building, wonder
 
 **Unique Module**:
@@ -571,7 +571,7 @@ _Avoid_: checkpoint, snapshot, savegame
 ### Combat
 
 **Battle**:
-A melee at one Body, Region or Colony in which every Faction present is hostile to every other, resolved automatically in rounds during end-of-turn processing and always finished inside the turn. Each round a party's chance to hit is its share of the total strength present, and its hits are spread across the other parties in proportion to theirs. Since version 0.08.5 a Battle on Earth pollutes: its hits and the buildings it burns are Emissions at the next Climate phase, and Blame for those who landed them.
+A melee at one Body, Region or Colony in which every Faction present is hostile to every other, resolved automatically in rounds during end-of-turn processing and always finished inside the turn. Each round a party's chance to hit is its share of the total strength present, and its hits are spread across the other parties in proportion to theirs. Since version 0.08.5 a Battle on Earth pollutes: its hits are Emissions at the next Climate phase, and Blame for those who landed them. Until version 0.08.6 a quarter of the buildings at the place rolled to burn after every ground Battle; a Battle itself burns nothing now, and only a place taken by an Occupation that ran its three turns rolls.
 _Avoid_: fight, engagement, skirmish, encounter
 
 **Stance**:
@@ -611,11 +611,11 @@ What a warship stack does when it is ORDERED to, since version 0.08.5, in the Or
 _Avoid_: siege, embargo, interdiction, orbital control
 
 **Occupation**:
-The state of a Region or Colony whose defenders were beaten by an Army. The occupier chooses build orders but does not direct its Armies; control transfers after the lesser of three turns or the population being Pacified.
+The state of a Region or Colony whose defenders were beaten by an Army. The occupier chooses build orders but does not direct its Armies; control transfers after the lesser of three turns or the population being Pacified. Since version 0.08.6 the two ends differ: a transfer by the three-turn clock rolls a quarter of the buildings to burn, a transfer by Pacified takes the place **whole**, and either fires the Moment for a place taken by force.
 _Avoid_: conquest, annexation, capture
 
 **Pacified**:
-An occupied population whose occupier's Influence, gained automatically each turn of Occupation, has passed the place's threshold. The gain is halved while the state's Unrest is past its first threshold. Control transfers at the moment the threshold is passed.
+An occupied population whose occupier's Influence, gained automatically each turn of Occupation, has passed the place's threshold. The gain is halved while the state's Unrest is past its first threshold. Control transfers at the moment the threshold is passed, and since version 0.08.6 the place is taken whole: nothing rolls to burn. Pacified is a condition of the place's people, not of any building.
 _Avoid_: subdued, loyal, converted
 
 ### Winning
