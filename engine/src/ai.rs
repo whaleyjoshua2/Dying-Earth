@@ -64,6 +64,8 @@ enum Cat {
     StanceEvade,
     /// Ticket #278 (version 0.08.5): a warship stack blockading a rival station's slot.
     StanceBlockade,
+    /// Ticket #297 (version 0.08.6): dig in.
+    StanceDigIn,
 }
 
 /// Ticket #50 removed the denial multiplier: every AI pursues its own Victory Condition and never
@@ -163,6 +165,7 @@ impl Game {
             Cat::StanceHold => w.stance_hold,
             Cat::StanceEvade => w.stance_evade,
             Cat::StanceBlockade => w.stance_blockade,
+            Cat::StanceDigIn => w.stance_dig_in,
         }
     }
 
@@ -803,7 +806,10 @@ impl Game {
             let base = self.base_weight(seat, Cat::RaiseIndustry);
             push(vec![Order::RaiseIndustry { state: sid }], Cat::RaiseIndustry, base, gap_for(Cat::RaiseIndustry, Some("Industry Level")), 1.0, 1.0, format!("raise Industry Level in {}", self.tables.state(sid).name), None);
             // Ticket #46: no Ship is built at a Launch Site; Shipyards on stations and Colonies build them.
-            if self.state(sid).control == Control::Controlled(seat) {
+            // Ticket #302 (version 0.08.6): an Army is worth its home's Industry + 1, fixed, so it is
+            // raised where that is highest among the Regions the seat controls.
+            let best_industry = self.controlled_states(seat).into_iter().map(|s| self.state(s).industry_level).max().unwrap_or(0);
+            if self.state(sid).control == Control::Controlled(seat) && self.state(sid).industry_level == best_industry {
                 let threat = if self.enemy_army_near(seat, Place::State(sid)) { m.threat } else { 1.0 };
                 let armies = self.armies.iter().filter(|a| !a.standing && self.army_seat(a) == Some(seat)).count();
                 if armies < 2 {
@@ -1002,11 +1008,38 @@ impl Game {
                     }
                 }
                 // A Habitat is only worth building when Colonists are coming.
+                //
+                // Ticket #290 (version 0.08.6): the opening, at the designer's word ("the computer
+                // should know this"). While a STARTING station -- one over Earth that stood when the
+                // game opened -- has a slot free and under four berths empty, its Habitat is pushed
+                // at the opportunity weight so it comes before the Power Plants and Trade Posts it
+                // used to lose to; the muster then follows the room aboard, as it always has. A
+                // station with two aboard passes the gate above that a bare one, with four berths
+                // empty, never did, which is why the opening had no need to exist before.
+                //
+                // Measured before the second clause: the Prospectors ranked their first Shipyard
+                // and a Research Lab, both counted as advancing their Victory pace, above a Habitat
+                // at twice its base weight, and opened with no Habitat. So the opening Habitat also
+                // counts as advancing whatever the seat is behind on, as the first Shipyard does
+                // (`gap_for`), and stands first in every seat. Not while Energy is tight: a
+                // Habitat draws Energy, and the Solar Array a starved station wants would otherwise
+                // lose its slot to the opening (measured on the ticket #89 test with Energy at
+                // nought).
+                //
+                // And ONCE: only until the station's first Habitat stands or is on order. Written
+                // without that clause it fired again every time the muster filled the station, so
+                // the Prospectors put Habitat after Habitat on Tiangong at the head of every list
+                // and never the Trade Post that earns their Ducats -- measured over twenty seeds
+                // with the Custodians first, 330 Ducats a game against 2287 with the rule off, and
+                // ten wins against nineteen. An opening is played once.
+                let mut opening = false;
                 if mk == ModuleKind::Habitat {
                     let room = self.habitat_room(&col).saturating_sub(col.colonists);
                     if room >= 4 {
                         continue;
                     }
+                    let first_habitat = !col.modules.iter().any(|m| m.kind == ModuleKind::Habitat) && !col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Habitat));
+                    opening = col.in_orbit && col.body == BodyId::Earth && col.founded_turn == 1 && first_habitat && !tight;
                 }
                 // Ticket #41: the first Relay at a Colony is a threat answer while the rival's standing
                 // presses on the seat's own there, once the Colony has a producer Module (a Relay before
@@ -1023,7 +1056,8 @@ impl Game {
                 } else {
                     1.0
                 };
-                push(vec![Order::BuildModule { colony: cid, kind: mk }], cat, base, gap_for(cat, Some(mk.name())), t, 1.0, format!("build {} at {}", mk.name(), self.place_name(Place::Colony(cid))), None);
+                let (pull, opp) = if opening { (gap, m.opportunity) } else { (gap_for(cat, Some(mk.name())), 1.0) };
+                push(vec![Order::BuildModule { colony: cid, kind: mk }], cat, base, pull, t, opp, format!("build {} at {}", mk.name(), self.place_name(Place::Colony(cid))), None);
             }
             if col.modules.iter().any(|m| m.kind == ModuleKind::Barracks) && !self.armies.iter().any(|a| a.home == ArmyHome::Colony(cid)) {
                 push(vec![Order::BuildArmy { place: Place::Colony(cid) }], Cat::ArmyOrBarracks, self.base_weight(seat, Cat::ArmyOrBarracks), 1.0, threat, 1.0, format!("build Army at {}", self.place_name(Place::Colony(cid))), None);
@@ -1853,7 +1887,7 @@ impl Game {
                             let mine = c.control.director() == Some(seat);
                             if enemy || mine {
                                 let defence: i64 =
-                                    self.defenders_at(Place::Colony(c.id), seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_strength(a)).sum();
+                                    self.defenders_at(Place::Colony(c.id), seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_defended_strength(a)).sum();
                                 let odds = first_round_odds(self.army_strength(self.army(aid).unwrap()), defence);
                                 if enemy && odds < th.attack_odds {
                                     continue;
@@ -1947,7 +1981,9 @@ impl Game {
             // occupying holds at three times the weight and marches nowhere -- the measured
             // hit-and-run (Saudi Arabia abandoned for Nigeria) broke its own Occupation for free.
             let occupying = matches!(self.place_control(place), Control::Occupied { occupier, .. } if occupier == seat);
-            let total_hp: u32 = mine.iter().map(|_| self.tables.unit(UnitKind::Army).hit_points).sum();
+            // Ticket #296 (version 0.08.6): the live figure, since a Region's own Army has as many
+            // hit points as its strength now; the card's 5 read here would have been a lie.
+            let total_hp: u32 = mine.iter().filter_map(|id| self.army(*id)).map(|a| self.army_hit_points(a)).sum();
             let total_dmg: u32 = mine.iter().filter_map(|id| self.army(*id)).map(|a| a.damage).sum();
             if total_hp > 0 && (total_dmg as f64) / (total_hp as f64) >= th.evade_damage_fraction {
                 push(vec![Order::ArmyStance { place, stance: Stance::Evade }], Cat::StanceEvade, self.base_weight(seat, Cat::StanceEvade) * 10.0, 1.0, 1.0, 1.0, format!("Evade at {}", self.place_name(place)), Some(key.clone()));
@@ -1958,7 +1994,8 @@ impl Game {
             // toward -- and the attack, when allowed, IS the stance; Hold is the candidate otherwise.
             let mut attack: Option<f64> = None;
             if self.place_director(place) != Some(seat) {
-                let def: i64 = self.defenders_at(place, seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_strength(a)).sum();
+                // Ticket #302 (version 0.08.6): against what the defenders FIGHT at, not their bare strength.
+                let def: i64 = self.defenders_at(place, seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_defended_strength(a)).sum();
                 let odds = first_round_odds(my_str, def);
                 let held_by_rival = matches!(self.place_control(place), Control::Controlled(r) if r != seat);
                 if (odds >= th.attack_odds || def == 0) && self.war_cause_at(seat, place, th.war_cause) && (!held_by_rival || wars_opened < 1) {
@@ -1970,7 +2007,11 @@ impl Game {
             }
             match attack {
                 Some(odds) => push(vec![Order::ArmyStance { place, stance: Stance::Attack }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * 1.5, 1.0, 1.0, 1.0, format!("Attack at {} (odds {:.0}%)", self.place_name(place), odds * 100.0), Some(key.clone())),
-                None => push(vec![Order::ArmyStance { place, stance: Stance::Hold }], Cat::StanceHold, self.base_weight(seat, Cat::StanceHold) * if occupying { 3.0 } else { 1.0 }, 1.0, threat, 1.0, format!("Hold at {}", self.place_name(place)), Some(key.clone())),
+                // Ticket #297 (version 0.08.6): dig in rather than hold where a rival's Army stands
+                // next door and there is no cause to attack, and wherever this seat occupies -- an
+                // occupier stays (#284), and dug in it cannot leave. Hold is what is left.
+                None if occupying || self.enemy_army_near(seat, place) => push(vec![Order::ArmyStance { place, stance: Stance::DigIn }], Cat::StanceDigIn, self.base_weight(seat, Cat::StanceDigIn) * if occupying { 3.0 } else { 1.0 }, 1.0, threat, 1.0, format!("Dig in at {}", self.place_name(place)), Some(key.clone())),
+                None => push(vec![Order::ArmyStance { place, stance: Stance::Hold }], Cat::StanceHold, self.base_weight(seat, Cat::StanceHold), 1.0, threat, 1.0, format!("Hold at {}", self.place_name(place)), Some(key.clone())),
             }
             // Moves into neighbouring states with a non-standing Army. Ticket #284 (version 0.08.5):
             // any seat, on the odds, given a cause; an occupier marches nowhere.
@@ -1979,7 +2020,9 @@ impl Game {
             {
                 for aid in &mine {
                     let a = self.army(*aid).unwrap();
-                    if a.standing || a.damage > 2 {
+                    // Ticket #297 (version 0.08.6): a dug-in Army is refused a march until its stance
+                    // has changed and a turn has passed, so no march is offered for it.
+                    if a.standing || a.damage > 2 || a.stance == Stance::DigIn {
                         continue;
                     }
                     for n in &self.tables.state(sid).neighbours {
@@ -1987,7 +2030,7 @@ impl Game {
                         if ctrl == Control::Controlled(seat) {
                             continue;
                         }
-                        let def: i64 = self.defenders_at(Place::State(*n), seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_strength(a)).sum();
+                        let def: i64 = self.defenders_at(Place::State(*n), seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_defended_strength(a)).sum();
                         let odds = first_round_odds(self.army_strength(a), def);
                         let held_by_rival = matches!(ctrl, Control::Controlled(r) if r != seat);
                         let allowed = odds >= th.attack_odds && self.war_cause_at(seat, Place::State(*n), th.war_cause) && (!held_by_rival || wars_opened < 1);

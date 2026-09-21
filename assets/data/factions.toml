@@ -13,6 +13,9 @@ name = "Custodians"
 resentment = 2.0
 # Version 0.04 (ticket #46): the bare station over Earth the Faction starts with (named in bodies.toml).
 start_station = "ISS"
+# Ticket #290 (version 0.08.6): the Colonists aboard it when the game opens, from nowhere, so the
+# station has two Module slots free from turn one; bare, it had none.
+start_colonists = 2
 # Ticket #210 (version 0.08.1): the prefix every Ship of theirs wears in front of its name --
 # Terran Stewardship Vessel. Chosen at the designer's word, "dealers choice". It belongs to the
 # HOLDER, not the hull: the name is the ship's and travels with it, the prefix is whoever flies it.
@@ -48,6 +51,9 @@ id = "prospectors"
 opens_on = "east_asia"
 name = "Prospectors"
 start_station = "Tiangong"
+# Ticket #290 (version 0.08.6): the Colonists aboard it when the game opens, from nowhere, so the
+# station has two Module slots free from turn one; bare, it had none.
+start_colonists = 2
 # Ticket #210 (version 0.08.1): the prefix every Ship of theirs wears in front of its name --
 # Prospector Mining Venture. Chosen at the designer's word, "dealers choice". It belongs to the
 # HOLDER, not the hull: the name is the ship's and travels with it, the prefix is whoever flies it.
@@ -103,6 +109,10 @@ name = "Arkwrights"
 # Ticket #221: half. Leaving is the point; the smoke behind them is somebody else's argument.
 resentment = 0.5
 # The Arkwrights start with no station over Earth (ticket #50): they leave from the ground.
+# Ticket #290 (version 0.08.6): so two Pioneers wait in their start Region on turn one instead, a gift
+# outside Coach Class that takes no population -- the mirror of the two Colonists aboard everybody
+# else's station. They wait for the first Ship.
+start_emigrants = 2
 blurb = "Leave Earth: the diaspora is the point."
 motto = "Nothing left behind but the Earth."
 # Ticket #210 (version 0.08.1): the prefix every Ship of theirs wears in front of its name --
@@ -150,6 +160,9 @@ name = "Archivists"
 # Ticket #221: the ordinary rate.
 resentment = 1.0
 start_station = "Axiom"
+# Ticket #290 (version 0.08.6): the Colonists aboard it when the game opens, from nowhere, so the
+# station has two Module slots free from turn one; bare, it had none.
+start_colonists = 2
 # Ticket #210 (version 0.08.1): the prefix every Ship of theirs wears in front of its name --
 # Archive Class Vessel. Chosen at the designer's word, "dealers choice". It belongs to the
 # HOLDER, not the hull: the name is the ship's and travels with it, the prefix is whoever flies it.
@@ -228,6 +241,11 @@ start = 0
 # that offends puts in a median 15.6 Influence across about three orders, and charging per order
 # would make a big push and a small one differ by a factor nobody can read off the board.
 fall_per_offending_turn = 1
+# Ticket #299 (version 0.08.6): the rung an Occupation broken sits on -- between a bid, a Smear, an
+# Agitate or a Blockade turn at 1 and a Battle opened or an Accord broken at 3 -- charged to the
+# occupier by the previous holder the turn its last Army leaves the place. The first weight-2
+# offence in the game.
+occupation_broken_offence = 2
 # Recovery: this much every `quiet_turns` quiet turns, stopping at `start` and never rising past it.
 # Letting peace accrue goodwill was measured and rejected: half of all ordered pairs never interact
 # at all in a whole game, so goodwill earned by mere quiet would mostly be between Factions on

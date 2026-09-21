@@ -97,6 +97,15 @@ fn station_of(g: &Game, seat: Seat, body: BodyId) -> Option<ColonyId> {
     g.colonies.iter().find(|c| c.in_orbit && c.body == body && c.control == Control::Controlled(seat)).map(|c| c.id)
 }
 
+/// Ticket #290 (version 0.08.6): every starting station opens with two Colonists aboard. A test
+/// that counts people off Earth, or reasons about the board with the ISS bare, empties the
+/// starting stations first and says so, rather than carrying two strangers in its arithmetic.
+fn bare_stations(g: &mut Game) {
+    for c in g.colonies.iter_mut().filter(|c| c.in_orbit && c.body == BodyId::Earth && c.founded_turn == 1) {
+        c.colonists = 0;
+    }
+}
+
 // ---------------------------------------------------------------- 7.2 Income shortfall order
 
 #[test]
@@ -230,7 +239,7 @@ fn battle_round_three_hit_rolls_then_disengage_then_pursuit() {
     let mut a = vec![frigate(1)];
     let mut d = vec![colony_ship(2)];
     let mut dice = Script { chances: VecDeque::from(vec![true, true, true]), d6s: VecDeque::new(), picks: VecDeque::new() };
-    let stats = combat::fight(&mut a, &mut d, &mut dice);
+    let stats = combat::fight(&mut a, &mut d, &mut dice, 2.0);
     assert_eq!(stats.rounds, 1);
     assert_eq!(stats.hits_of(0), 3);
     assert_eq!(stats.hits_of(1), 0);
@@ -250,7 +259,7 @@ fn battle_defender_hits_land_on_the_attacker_and_a_damaged_unit_may_disengage() 
         d6s: VecDeque::from(vec![2]),
         picks: VecDeque::new(),
     };
-    let stats = combat::fight(&mut a, &mut d, &mut dice);
+    let stats = combat::fight(&mut a, &mut d, &mut dice, 2.0);
     assert_eq!(stats.rounds, 1, "the attacker escaped, so the battle ended");
     assert_eq!(a[0].damage, 3, "2 from the round and 1 from the pursuit");
     assert!(a[0].escaped && !a[0].engaged);
@@ -261,16 +270,17 @@ fn battle_defender_hits_land_on_the_attacker_and_a_damaged_unit_may_disengage() 
 // ---------------------------------------------------------------- 10.2 Disengage and Pursuit probabilities
 
 #[test]
-fn disengage_probability_is_damage_over_hit_points_halved_and_evade_is_half() {
+fn disengage_probability_is_damage_over_hit_points_over_the_divisor_and_evade_is_half() {
+    // The First Playable's 2, passed explicitly; the table's own figure is ticket #295's test.
     let mut c = frigate(1);
-    assert_eq!(combat::disengage_chance(&c), 0.0);
+    assert_eq!(combat::disengage_chance(&c, 2.0), 0.0);
     c.damage = 2;
-    assert!((combat::disengage_chance(&c) - 0.25).abs() < 1e-12);
+    assert!((combat::disengage_chance(&c, 2.0) - 0.25).abs() < 1e-12);
     c.damage = 3;
-    assert!((combat::disengage_chance(&c) - 0.375).abs() < 1e-12);
+    assert!((combat::disengage_chance(&c, 2.0) - 0.375).abs() < 1e-12);
     c.evade = true;
     c.damage = 0;
-    assert_eq!(combat::disengage_chance(&c), 0.5);
+    assert_eq!(combat::disengage_chance(&c, 2.0), 0.5);
 }
 
 #[test]
@@ -281,7 +291,7 @@ fn pursuit_catches_on_a_d6_at_or_under_pursuit_and_not_above() {
         let mut d = vec![Combatant::new(UnitRef::Ship(ShipId(2)), "Colony Ship 2", 0, 3, 0, 0, true)];
         // Evade roll true at the start; pursuit hit-roll true if caught.
         let mut dice = Script { chances: VecDeque::from(vec![true, true]), d6s: VecDeque::from(vec![roll]), picks: VecDeque::new() };
-        let stats = combat::fight(&mut a, &mut d, &mut dice);
+        let stats = combat::fight(&mut a, &mut d, &mut dice, 2.0);
         assert_eq!(stats.rounds, 0, "nobody was left engaged to fight a round");
         assert_eq!(d[0].damage, if caught { 1 } else { 0 }, "d6 {roll}");
         assert!(d[0].escaped);
@@ -519,7 +529,8 @@ fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard
     // Ticket #93 (version 0.06.0): and three over Venus.
     assert_eq!(slots, vec![5, 2, 3, 1, 1, 3], "ticket #50: five orbital slots over Earth");
     // The start (ticket #50): the Custodians' ISS, the Prospectors' Tiangong and the Archivists'
-    // Axiom over Earth, bare; the Arkwrights start with no station, so two slots stand free.
+    // Axiom over Earth (bare until ticket #290, version 0.08.6, put two aboard); the Arkwrights
+    // start with no station, so two slots stand free.
     let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the Custodians start with a station");
     let tiangong = station_of(&g, Seat(1), BodyId::Earth).expect("the Prospectors start with a station");
     let axiom = station_of(&g, Seat(3), BodyId::Earth).expect("the Archivists start with a station");
@@ -547,8 +558,10 @@ fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard
     assert_eq!(reef.control, Control::Controlled(Seat(0)));
     assert_eq!(reef.colonists, 0);
     // Only a Shipyard and Habitats stand on a station.
-    // A bare station is not free to take: its threshold starts at the station base.
-    assert_eq!(g.influence_threshold(Place::Colony(iss)), 20);
+    // A station is not free to take: its threshold starts at the station base, plus 10 a Colonist
+    // -- and the ISS opens with two aboard since ticket #290 (version 0.08.6), so 40 where a bare
+    // one read 20. A consequence of the two aboard, not a rule of its own.
+    assert_eq!(g.influence_threshold(Place::Colony(iss)), 40);
     // Ticket #164 (version 0.07.5): a station nobody lives on has no slots, and the lines below are
     // about which kinds stand in orbit, so give it somebody first.
     g.colony_mut(iss).unwrap().colonists = 2;
@@ -627,6 +640,7 @@ fn phobos_and_deimos_are_small_different_bodies_one_hop_past_mars() {
     assert_eq!(moon_turns, mars_turns, "one flight home, whichever rock it leaves from");
     assert!(from_deimos > from_mars, "Deimos reads the dearer card: {from_deimos} Fuel against {from_mars}");
     // Their Colonists are off Earth.
+    bare_stations(&mut g);
     colony(&mut g, Seat(0), BodyId::Phobos, &[ModuleKind::Habitat], 4);
     assert_eq!(g.off_world_colonists(Seat(0)), 4);
 }
@@ -666,6 +680,7 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
     assert_eq!(StateId::ALL.len(), 14, "fourteen Regions since ticket #125, and Antarctica is none of them");
     let m = g.tables.faction(FactionKind::Custodians).emissions_multiplier;
     let before = g.emissions_now();
+    bare_stations(&mut g);
     colony(&mut g, Seat(0), BodyId::Earth, &[ModuleKind::Habitat, ModuleKind::Mine, ModuleKind::Refinery, ModuleKind::Generator], 4);
     assert_eq!(g.off_world_colonists(Seat(0)), 0, "Antarctic Colonists live on Earth");
     let after = g.emissions_now();
@@ -684,7 +699,7 @@ fn antarctica_is_three_colony_slots_on_earth_whose_colonists_stay_on_earth_and_w
 fn only_a_carrier_carries_an_army_and_a_colony_ship_carries_only_colonists() {
     let mut g = game();
     let army = ArmyId(g.fresh_id());
-    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
     let ship = |id: u32, kind: UnitKind| Ship { name: String::new(), id: ShipId(id), kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None };
     g.ships.extend([ship(101, UnitKind::ColonyShip), ship(102, UnitKind::Battleship), ship(103, UnitKind::Carrier)]);
     let load_army = |s: u32| Order::Load { ship: ShipId(s), colonists: 0, from: LoadSource::State(StateId::EastAsia), army: Some(army) };
@@ -816,7 +831,7 @@ fn embassies_and_relays_add_to_the_allotment_and_raise_their_places_standing_eac
 
 fn occupier_in(g: &mut Game, seat_home: StateId, target: StateId) -> ArmyId {
     let id = ArmyId(g.fresh_id());
-    g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(seat_home), at: ArmyAt::Place(Place::State(target)), damage: 0, standing: false, stance: Stance::Attack, escaped: false, move_to: None, levy: false });
+    g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(seat_home), at: ArmyAt::Place(Place::State(target)), damage: 0, standing: false, stance: Stance::Attack, escaped: false, move_to: None, levy: false, raised_strength: 0 });
     id
 }
 
@@ -852,7 +867,7 @@ fn occupation_ends_when_the_occupier_leaves() {
     g.armies.retain(|a| a.home != ArmyHome::State(StateId::NorthAfrica));
     let a = occupier_in(&mut g, StateId::EastAsia, StateId::NorthAfrica);
     g.resolution_phase();
-    assert!(matches!(g.state(StateId::NorthAfrica).control, Control::Occupied { occupier: Seat(0), previous: None, turns: 1 }));
+    assert!(matches!(g.state(StateId::NorthAfrica).control, Control::Occupied { occupier: Seat(0), previous: None, turns: 1, .. }));
     g.armies.retain(|x| x.id != a);
     g.resolution_phase();
     assert_eq!(g.state(StateId::NorthAfrica).control, Control::Neutral);
@@ -864,7 +879,7 @@ fn occupation_of_a_controlled_state_returns_it_to_its_owner_when_broken() {
     g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
     let a = occupier_in(&mut g, StateId::EastAsia, StateId::Europe);
     g.resolution_phase();
-    assert!(matches!(g.state(StateId::Europe).control, Control::Occupied { occupier: Seat(0), previous: Some(Seat(1)), turns: 1 }));
+    assert!(matches!(g.state(StateId::Europe).control, Control::Occupied { occupier: Seat(0), previous: Some(Seat(1)), turns: 1, .. }));
     g.armies.retain(|x| x.id != a);
     g.resolution_phase();
     assert_eq!(g.state(StateId::Europe).control, Control::Controlled(Seat(1)));
@@ -907,6 +922,7 @@ fn both_met_the_larger_margin_wins() {
 #[test]
 fn both_met_by_the_same_margin_is_a_draw() {
     let mut g = game();
+    bare_stations(&mut g);
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat, ModuleKind::Habitat], 12);
     g.seats[0].stabilization_run = 3;
@@ -1377,9 +1393,12 @@ fn a_defended_colony_changes_hands_in_about_four_turns() {
     assert!(taken.len() >= 6, "only {} of 12 attacks took the Colony", taken.len());
     taken.sort();
     let median = taken[taken.len() / 2];
-    assert!((3..=5).contains(&median), "median {median} turns: {taken:?}");
+    // Ticket #300 (version 0.08.6): the landing turn is the first Battle turn now, so the window
+    // moved a turn earlier: three-to-five was two-to-four, and nothing changes hands before the
+    // third turn's Resolution, since an Occupation begun on the landing turn runs its three.
+    assert!((2..=4).contains(&median), "median {median} turns: {taken:?}");
     for t in &taken {
-        assert!(*t >= 3, "changed hands after only {t} turns, faster than the rules allow: {taken:?}");
+        assert!(*t >= 2, "changed hands after only {t} turns, faster than the rules allow: {taken:?}");
     }
 }
 
@@ -1398,14 +1417,14 @@ fn colony_attack_turns(seed: u64) -> Option<u32> {
     // The AI Prospectors hold a Colony on the Moon with a Barracks and its Army.
     let cid = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Barracks], 4);
     let defender = ArmyId(g.fresh_id());
-    g.armies.push(Army { name: String::new(), id: defender, home: ArmyHome::Colony(cid), at: ArmyAt::Place(Place::Colony(cid)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    g.armies.push(Army { name: String::new(), id: defender, home: ArmyHome::Colony(cid), at: ArmyAt::Place(Place::Colony(cid)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
     // The player's two Carriers arrive at the Moon, each carrying an Army: strength 8 against 4.
     let mut attackers = Vec::new();
     let mut ships = Vec::new();
     for kind in [UnitKind::Carrier, UnitKind::Carrier] {
         let attacker = ArmyId(g.fresh_id());
         let ship = ShipId(g.fresh_id());
-        g.armies.push(Army { name: String::new(), id: attacker, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+        g.armies.push(Army { name: String::new(), id: attacker, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
         g.ships.push(Ship { name: String::new(), id: ship, kind, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, colonists_education: 1.0, army: Some(attacker), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
         attackers.push(attacker);
         ships.push(ship);
@@ -1626,7 +1645,7 @@ fn a_partys_chance_to_land_a_hit_is_its_share_of_the_total_strength_present() {
         let mut a = party(1, "A Frigate", 6, 10_000, 0);
         let mut b = party(2, "B Frigate", 3, 10_000, 0);
         let mut c = party(3, "C Frigate", 1, 10_000, 0);
-        let stats = combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice);
+        let stats = combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice, 2.0);
         for (i, l) in landed.iter_mut().enumerate() {
             *l += stats.hits_of(i);
         }
@@ -1656,7 +1675,7 @@ fn a_partys_hits_are_spread_across_the_enemy_parties_in_proportion_to_their_stre
         let mut a = party(1, "A Frigate", 6, 10_000, 0);
         let mut b = party(2, "B Frigate", 3, 10_000, 0);
         let mut c = party(3, "C Frigate", 1, 10_000, 0);
-        combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice);
+        combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice, 2.0);
         b_damage += b[0].damage;
         c_damage += c[0].damage;
     }
@@ -2231,7 +2250,7 @@ fn the_archive_is_destroyed_when_its_colony_changes_hands_and_the_fund_is_kept()
     g.seats[3].stockpile.energy = 400;
     g.income_phase();
     assert!(g.archive_online(Seat(3)));
-    g.colony_mut(again).unwrap().control = Control::Occupied { occupier: Seat(1), previous: Some(Seat(3)), turns: 1 };
+    g.colony_mut(again).unwrap().control = Control::Occupied { occupier: Seat(1), previous: Some(Seat(3)), turns: 1, banked: 0 };
     g.income_phase();
     assert!(!g.archive_online(Seat(3)), "an Occupied Colony's Archive is offline");
 }
@@ -2296,15 +2315,16 @@ fn the_archivist_ai_builds_its_way_off_earth_and_then_the_archive() {
     g.seats[arc.index()].stockpile.materials = 200;
     g.seats[arc.index()].stockpile.energy = 200;
     the_upload(&mut g);
-    // Ticket #192 (version 0.08.0): the station is bare, so the Archive is not orderable there, and
-    // the computer must not spend the turn on an order that would be refused. Measured, it ordered
-    // the Archive on turn 1 at an empty station in 80 of 80 games before this gate.
+    // Ticket #192 (version 0.08.0): the Archive is not orderable there, and the computer must not
+    // spend the turn on an order that would be refused. Measured, it ordered the Archive on turn 1
+    // at an empty station in 80 of 80 games before this gate. Ticket #290 (version 0.08.6): Axiom
+    // opens with two aboard now, and ticket #209 keeps the Archive off Earth's orbit regardless.
     let axiom = station_of(&g, arc, BodyId::Earth).unwrap();
-    assert_eq!(g.colony(axiom).unwrap().colonists, 0, "the premise: Axiom is founded bare");
+    assert_eq!(g.colony(axiom).unwrap().colonists, 2, "the premise: Axiom opens with two aboard");
     let orders = g.ai_orders(arc);
     assert!(!orders.iter().any(|o| matches!(o, Order::BuildArchive { .. })), "it should not order what would be refused: {orders:?}");
 
-    // With the Core Module's four living there, it orders the Module at once.
+    // With the Core Module's four more living there, it orders the Module at once.
     g.colony_mut(axiom).unwrap().modules.push(Module::new(ModuleKind::Core));
     g.settle_people(axiom, 4, 1.0);
     let orders = g.ai_orders(arc);
@@ -2644,7 +2664,7 @@ fn e_four_stops_replenishment_seven_halves_output_ten_throws_the_controller_off(
     g.seats[1].influence.insert(Place::State(StateId::NorthAfrica), 17);
     g.state_mut(StateId::NorthAfrica).queue.push(Build { item: BuildItem::Facility(FacilityKind::Bank), seat: Seat(0), coastal: false, due_turn: 99 });
     let id = ArmyId(g.fresh_id());
-    g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(StateId::Europe), at: ArmyAt::Place(Place::State(StateId::NorthAfrica)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    g.armies.push(Army { name: String::new(), id, home: ArmyHome::State(StateId::Europe), at: ArmyAt::Place(Place::State(StateId::NorthAfrica)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
     g.raise_unrest(StateId::NorthAfrica, 10.0, UnrestSource::Plain);
     assert_eq!(g.unrest(StateId::NorthAfrica), 10.0);
     // Ticket #53: the falls run first, so a state at 10 that did not change hands is pulled back
@@ -2846,7 +2866,7 @@ fn the_ai_pays_relief_and_raises_a_constabulary_where_unrest_has_taken_hold() {
     calm(&mut g);
     // A state the seat has just Occupied, restive enough that one more turn would throw it off:
     // Relief takes the opportunity multiplier at 9, a Constabulary the threat multiplier here.
-    g.state_mut(StateId::NorthAfrica).control = Control::Occupied { occupier: Seat(1), previous: None, turns: 1 };
+    g.state_mut(StateId::NorthAfrica).control = Control::Occupied { occupier: Seat(1), previous: None, turns: 1, banked: 0 };
     g.seats[1].stockpile.ducats = 200;
     g.seats[1].stockpile.materials = 200;
     // On pace, so the victory gap is not multiplying every producer past everything else.
@@ -4367,6 +4387,9 @@ fn h_the_ai_raises_a_sea_wall_when_the_sea_is_close() {
     sea_ahead(&mut g);
     directed(&mut g, sid);
     assert_eq!(g.kind(Seat(0)), FactionKind::Custodians, "seat 0 is the Custodians in this fixture");
+    // Ticket #290 (version 0.08.6): with two aboard the ISS, its opening Habitat would be a third
+    // contender for the forty Materials; this fixture is about the wall against the Scrubber.
+    bare_stations(&mut g);
     g.research.done.push(TechId::CoastalEngineering);
     hold_temperature(&mut g, 1.65);
     g.seats[0].stockpile.materials = 40;
@@ -5368,7 +5391,7 @@ fn a_neutral_states_lab_pays_half_its_yield_into_the_tech_and_nobodys_lead() {
     assert_eq!(g.research.contributions, [0; 4], "and nobody's Lead");
     assert!(g.report.lines.iter().any(|l| l.text.contains("The United States") && l.text.contains("Research")), "the Report says so: {:?}", g.report.lines);
     // Occupied: the half still flows; the occupier pays the 3 Energy and draws nothing from it.
-    g.state_mut(StateId::NorthAmerica).control = Control::Occupied { occupier: Seat(2), previous: None, turns: 1 };
+    g.state_mut(StateId::NorthAmerica).control = Control::Occupied { occupier: Seat(2), previous: None, turns: 1, banked: 0 };
     let y = g.facility_yield(Seat(2), StateId::NorthAmerica, FacilityKind::ResearchLab);
     assert_eq!((y.research, y.upkeep), (0, 3), "the occupier pays for a Lab that works for the world");
     let before = g.research.progress;
@@ -5769,6 +5792,9 @@ fn emigrants_go_to_antarctica_by_sea_from_any_state_and_arrive_a_turn_later() {
 #[test]
 fn the_ai_musters_emigrants_then_lifts_them_or_sends_them_to_antarctica() {
     let mut g = game();
+    // Ticket #290 (version 0.08.6): the ISS opens with two aboard; this test lifts four into a
+    // station with four berths free, so it starts from the bare one it was written against.
+    bare_stations(&mut g);
     let ship = a_colony_ship(&mut g, Seat(0), BodyId::Earth);
     let _ = ship;
     g.seats[0].stockpile.energy = 200;
@@ -6834,6 +6860,7 @@ fn a_venus_station_is_built_from_a_ship_in_orbit_and_its_colonists_are_off_earth
     assert!(g.check_order(Seat(0), &[], &build).is_ok(), "a Ship in orbit is the foothold");
     g.commit_orders(Seat(0), std::slice::from_ref(&build));
     g.resolution_phase();
+    bare_stations(&mut g);
     let station = g.colonies.iter().find(|c| c.body == BodyId::Venus && c.in_orbit).expect("Ishtar stands").id;
     g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     let land = Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Colony(station) };
@@ -7028,7 +7055,10 @@ fn a_station_builds_nothing_until_someone_lives_on_it_and_its_core_module_holds_
     let mut g = game();
     g.seats[0].stockpile.materials = 2000;
     let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("a station over Earth");
-    assert_eq!(g.colony(station).unwrap().colonists, 0, "it starts with nobody on it");
+    // Ticket #290 (version 0.08.6): it opens with two aboard now; this test is the cap rule from
+    // nobody upward, so it empties the station first.
+    bare_stations(&mut g);
+    assert_eq!(g.colony(station).unwrap().colonists, 0, "emptied, for the rule from nought");
     assert_eq!(g.colony(station).unwrap().modules.len(), 1, "and with its Core Module");
     assert_eq!(g.colony(station).unwrap().modules[0].kind, ModuleKind::Core);
     assert_eq!(g.module_slots(g.colony(station).unwrap()), 0, "no slots, and no people yet");
@@ -7313,7 +7343,7 @@ fn the_war_is_counted_at_the_event() {
     g.destroy_army(standing, "battle", None);
     assert_eq!((g.war.standing_armies_lost, g.war.armies_lost[0]), (1, 0));
     let built = ArmyId(g.fresh_id());
-    g.armies.push(Army { name: String::new(), id: built, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    g.armies.push(Army { name: String::new(), id: built, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
     g.destroy_army(built, "battle", None);
     assert_eq!(g.war.armies_lost[0], 1, "a built Army of seat 0's");
     let frigate = ShipId(g.fresh_id());
@@ -7342,10 +7372,12 @@ fn a_cold_seat_marches_on_a_rivals_region_a_cordial_one_does_not_and_an_occupier
     for a in g.armies.iter_mut().filter(|a| a.standing && a.home == ArmyHome::State(target)) {
         a.damage = 2;
     }
+    // Ticket #302 (version 0.08.6): a raised Army worth 6 (an Industry-5 home), and the odds read
+    // what the defenders FIGHT at -- their people's calm point, and Dig In for a neutral's.
     let army = ArmyId(g.fresh_id());
-    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(home), at: ArmyAt::Place(Place::State(home)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
-    let def: i64 = g.defenders_at(Place::State(target), Seat(0)).iter().filter_map(|id| g.army(*id)).map(|a| g.army_strength(a)).sum();
-    assert!(combat::first_round_odds(4, def) >= g.tables.ai.thresholds.attack_odds, "the odds clear the bar: {def}");
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(home), at: ArmyAt::Place(Place::State(home)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 6 });
+    let def: i64 = g.defenders_at(Place::State(target), Seat(0)).iter().filter_map(|id| g.army(*id)).map(|a| g.army_defended_strength(a)).sum();
+    assert!(combat::first_round_odds(6, def) >= g.tables.ai.thresholds.attack_odds, "the odds clear the bar: {def}");
     let marches = |g: &mut Game| g.ai_orders(Seat(0)).iter().any(|o| matches!(o, Order::MoveArmy { army: a, to } if *a == army && *to == target));
     assert!(!marches(&mut g), "Neutral toward the Prospectors: no cause, no march");
     g.relations.score[0][1] = -8;
@@ -7357,7 +7389,7 @@ fn a_cold_seat_marches_on_a_rivals_region_a_cordial_one_does_not_and_an_occupier
     let neutral = StateId::SouthAsia;
     assert_eq!(g.state(neutral).control, Control::Neutral);
     for a in g.armies.iter_mut().filter(|a| a.standing && a.home == ArmyHome::State(neutral)) {
-        a.damage = 2;
+        a.damage = 3;
     }
     assert!(g.ai_orders(Seat(0)).iter().any(|o| matches!(o, Order::MoveArmy { to, .. } if *to == neutral)), "a weak neutral next door is marched on with no cause: {:?}", g.ai_orders(Seat(0)));
 
@@ -7395,42 +7427,43 @@ fn a_threatened_neutral_raises_a_levy_and_stands_it_down_and_holding_arms_it_for
     assert!(g.tables.state(egypt).neighbours.contains(&next_door), "adjacent");
     assert!(!g.neutral_threatened(egypt), "nobody next door yet");
     let army = ArmyId(g.fresh_id());
-    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(next_door)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(next_door)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
     assert!(g.neutral_threatened(egypt), "a foreign built Army next door threatens it, whatever its stance");
+    // Ticket #302 (version 0.08.6): the threat ARMS the Standing Army for good, where a Levy was raised.
+    let cap = g.standing_army_cap(egypt);
+    let steps = g.tables.standing_army.threat_steps;
     g.income_phase();
-    let levy = g.levy_at(egypt).expect("a Levy raised at Income");
-    let l = g.armies.iter().find(|a| a.id == levy).unwrap().clone();
-    assert!(l.standing && l.levy && l.at == ArmyAt::Place(Place::State(egypt)));
-    assert_eq!(g.army_strength(&l), (g.state(egypt).industry_level + 2) as i64, "Industry + 2");
-    assert!(g.army_name(&l).contains("Egyptian"), "named from its home: {}", g.army_name(&l));
-    assert_eq!(g.armies.iter().filter(|a| a.standing && !a.levy && a.home == ArmyHome::State(egypt)).count(), 1, "the Standing Army is still one");
+    assert_eq!(g.standing_army_cap(egypt), cap + steps, "two steps for good at the Income the threat appears");
+    assert_eq!(g.armies.iter().filter(|a| a.standing && a.home == ArmyHome::State(egypt)).count(), 1, "one Army, not a second");
     assert!(g.report.lines.iter().any(|l| l.text.contains("Egypt arms")), "the Report says so: {:?}", g.report.lines);
     assert!(g.levies_raised >= 1, "counted for the sweep; every neutral bordering that Army arms, so more than Egypt may have");
     g.income_phase();
-    assert_eq!(g.levy_at(egypt), Some(levy), "one Levy, not one a turn");
-    // The threat leaves: the Levy stands down at the next Income.
+    assert_eq!(g.standing_army_cap(egypt), cap + steps, "once per threat episode, not once a turn");
+    // The threat leaves and comes back: a second episode, two steps more; nothing stands down.
     g.armies.retain(|a| a.id != army);
     g.income_phase();
-    assert!(g.levy_at(egypt).is_none(), "stood down");
-    assert!(g.report.lines.iter().any(|l| l.text.contains("Egypt stands down")), "{:?}", g.report.lines);
-    // A Region that changes hands stands its Levy down at once.
-    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(next_door)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+    assert_eq!(g.standing_army_cap(egypt), cap + steps, "armed for good");
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(next_door)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
     g.income_phase();
-    assert!(g.levy_at(egypt).is_some());
+    assert_eq!(g.standing_army_cap(egypt), cap + 2 * steps, "a second episode arms it again");
+    // A held Region is not a neutral: the threat arms nothing there.
     g.transfer_control(Place::State(egypt), Seat(1), "Influence");
-    assert!(g.levy_at(egypt).is_none(), "a held Region has no Levy");
+    let held_cap = g.standing_army_cap(egypt);
+    g.income_phase();
+    assert_eq!(g.standing_army_cap(egypt), held_cap, "a held Region does not arm by threat");
 
-    // Holding: +1 for good, to Industry + 4.
+    // Holding: +1 for good, with no ceiling.
     let mut g = game();
     calm(&mut g);
     let cap = g.standing_army_cap(egypt);
     g.neutral_held(egypt);
-    assert_eq!(g.standing_army_cap(egypt), cap + 1, "one step earned");
+    assert_eq!(g.standing_army_cap(egypt), cap + g.tables.standing_army.held_step, "one step earned");
     assert!(g.report.lines.iter().any(|l| l.text.contains("Egypt held against the attack")), "{:?}", g.report.lines);
     for _ in 0..5 {
         g.neutral_held(egypt);
     }
-    assert_eq!(g.standing_army_cap(egypt), g.state(egypt).industry_level + 4, "never past Industry + 4");
+    // Ticket #302 (version 0.08.6): no ceiling; the ceiling of Industry + 4 went with the Levy.
+    assert_eq!(g.standing_army_cap(egypt), cap + 6 * g.tables.standing_army.held_step, "six holds, six steps");
     assert_eq!(g.neutral_holds, 6, "every hold is counted for the sweep");
 
     // The respawn: a destroyed Standing Army returns two Incomes later, not the next.
@@ -7806,6 +7839,7 @@ fn an_army_keeps_its_stance_through_resolution_until_something_happens_to_it() {
         stance: Stance::Evade,
         escaped: false,
         move_to: None, levy: false,
+    raised_strength: 0,
     });
     for turn in 1..=3 {
         g.resolution_phase();
@@ -8111,6 +8145,9 @@ fn schooling_travels_from_the_region_to_the_station_it_is_lifted_to() {
     let card = g.tables.state(sid).education_level;
     g.state_mut(sid).population = 10_000.0;
     let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("seat 0 starts with a station");
+    // Ticket #290 (version 0.08.6): the two aboard would blend into the mean; the test is about
+    // the schooling the four carry, so the station is emptied first.
+    bare_stations(&mut g);
     g.state_mut(sid).facilities.push(Facility { online: true, ..Facility::new(FacilityKind::LaunchSite) });
 
     g.commit_orders(Seat(0), &[Order::BuildEmigrants { state: sid, n: 4 }]);
@@ -8770,7 +8807,7 @@ fn an_occupier_draws_nothing_from_a_unique_facilitys_clause() {
     let controlled = g.seats[cus.index()].income_last_turn.ducats;
 
     let economy = g.state_ducats(sid);
-    g.state_mut(sid).control = Control::Occupied { occupier: cus, previous: Some(pro), turns: 1 };
+    g.state_mut(sid).control = Control::Occupied { occupier: cus, previous: Some(pro), turns: 1, banked: 0 };
     g.income_phase();
     let occupied = g.seats[cus.index()].income_last_turn.ducats;
     assert_eq!(controlled - occupied, 1 + economy, "the clause and the economy both wait for control");
@@ -10058,7 +10095,9 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     let pro = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Prospectors).unwrap();
     assert_ne!(pro, Seat(0), "the Prospectors are a rival in this game");
     let fired = |g: &Game| g.report.moments.iter().filter(|m| m.kind == MomentKind::RivalProgress).count();
-    // Presence 9 of 12 (0.75) and the Fund at 2000 of 2500 (0.8): the score is 0.75.
+    // Presence 9 of 12 (0.75) and the Fund at 2000 of 2500 (0.8): the score is 0.75. Ticket #290
+    // (version 0.08.6): Tiangong's two aboard would make it 11 of 12, so it is emptied first.
+    bare_stations(&mut g);
     colony(&mut g, pro, BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Habitat, ModuleKind::Habitat], 9);
     g.seats[pro.index()].venture_fund = 2000;
     assert!((g.progress(pro).score() - 0.75).abs() < 1e-9, "{}", g.progress(pro).score());
@@ -10451,6 +10490,299 @@ fn the_hold_clock_resets_on_a_change_of_hands_and_an_old_save_passes() {
     // An old save carries no clock.
     g.state_mut(sid).held_since = None;
     assert!(g.may_remake(pro, sid), "a missing clock counts as held long enough");
+}
+
+// ---------------------------------------------------------------- #290 (version 0.08.6) the opening board
+
+/// Ticket #290 (version 0.08.6): every starting station opens with two Colonists aboard, from
+/// nowhere, so it has two Module slots free at once and two berths left in its Core Module; the
+/// Arkwrights, who have no station, open with two Pioneers waiting in their start Region, a gift
+/// outside Coach Class that takes no population. A station BUILT during the game is still bare.
+#[test]
+fn a_starting_station_opens_with_two_aboard_and_the_arkwrights_with_two_pioneers() {
+    let g = fresh();
+    for (seat, name) in [(Seat(0), "ISS over Earth"), (Seat(1), "Tiangong over Earth"), (Seat(3), "Axiom over Earth")] {
+        let id = station_of(&g, seat, BodyId::Earth).expect("a starting station");
+        let c = g.colony(id).unwrap();
+        assert_eq!(g.place_name(Place::Colony(id)), name);
+        assert_eq!(c.colonists, 2, "two aboard from the start");
+        assert_eq!(g.free_module_slots(c), 2, "one slot per Colonist, so two to build in at once");
+        assert_eq!(g.habitat_room(c) - c.colonists, 2, "two berths of the Core Module's four left");
+    }
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).unwrap();
+    assert!(station_of(&g, ark, BodyId::Earth).is_none(), "the Arkwrights still start with no station");
+    for sid in StateId::ALL {
+        let st = g.state(sid);
+        let card = g.tables.state(sid);
+        assert_eq!(st.population, card.population, "no start Region is debited for anybody's people");
+        if st.control == Control::Controlled(ark) {
+            assert_eq!(st.emigrants, 2, "two Pioneers waiting in the Arkwrights' start Region");
+        } else {
+            assert_eq!(st.emigrants, 0, "nobody else starts with a Pioneer waiting");
+        }
+    }
+}
+
+/// Ticket #295 (version 0.08.6): the disengage roll's divisor is the table's, and the table says
+/// three: a unit at half its hit points leaves one time in six, where the First Playable's two made
+/// it one in four. Evade's flat half is untouched.
+#[test]
+fn the_disengage_roll_is_a_third_of_the_damage_fraction_from_the_table() {
+    let g = fresh();
+    let d = g.tables.disengage.divisor;
+    assert_eq!(d, 3.0, "the designer's word: a third");
+    let mut c = frigate(1);
+    c.damage = 2;
+    assert!((combat::disengage_chance(&c, d) - 1.0 / 6.0).abs() < 1e-12, "half its hit points: one in six");
+    c.evade = true;
+    c.damage = 0;
+    assert_eq!(combat::disengage_chance(&c, d), 0.5, "Evade is still a flat half");
+}
+
+/// Ticket #296 (version 0.08.6), rewritten by ticket #302: a Region's defence is its people, AS
+/// DEFENCE. A Standing Army's strength and hit points are Industry + 1 plus its armed steps; while
+/// it defends it fights one stronger for a working Constabulary and one while Unrest is under the
+/// threshold, both live and neither adding hit points; an Army whose damage reaches its strength
+/// is destroyed at Income rather than sitting at strength nought. A raised Army is its home's
+/// Industry + 1, fixed; a Colony's the average of its Faction's Regions + 1.
+#[test]
+fn a_standing_army_reads_its_industry_and_defends_with_its_people_and_dies_at_its_strength() {
+    let mut g = fresh();
+    calm(&mut g);
+    let sid = StateId::EastAsia;
+    let industry = g.state(sid).industry_level;
+    assert_eq!(industry, 3, "the fixture: China at Industry 3");
+    let id = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(sid)).map(|a| a.id).unwrap();
+    let army = |g: &Game| g.armies.iter().find(|a| a.id == id).unwrap().clone();
+    // Calm, no Constabulary: strength and hit points Industry + 1; defends one stronger for calm.
+    assert_eq!(g.army_strength(&army(&g)), (industry + 1) as i64, "Industry + 1, and nothing for calm in the strength");
+    assert_eq!(g.army_hit_points(&army(&g)), industry + 1, "hit points equal the strength");
+    assert_eq!(g.army_defended_strength(&army(&g)), (industry + 2) as i64, "defends one stronger for calm");
+    // A working Constabulary: one more to the defence, none to the body.
+    g.state_mut(sid).facilities.push(Facility { online: true, ..Facility::new(FacilityKind::Constabulary) });
+    assert!(g.constabulary_online(sid));
+    assert_eq!(g.army_hit_points(&army(&g)), industry + 1, "the police add no hit points");
+    assert_eq!(g.army_defended_strength(&army(&g)), (industry + 3) as i64, "and one more to the defence");
+    // Restive: the calm point goes, live.
+    g.state_mut(sid).unrest = g.tables.unrest.army_threshold;
+    assert_eq!(g.army_defended_strength(&army(&g)), (industry + 2) as i64, "Unrest at the threshold takes the calm point");
+    // Damage reaching the strength destroys it at Income and starts the two-Income return.
+    g.army_mut(id).unwrap().damage = industry + 1;
+    assert_eq!(g.army_strength(&army(&g)), 0);
+    g.income_phase();
+    assert!(!g.armies.iter().any(|a| a.id == id), "at its strength in damage it is destroyed, not left at nought");
+    assert_eq!(g.state(sid).respawn_wait, 1, "and returns two Incomes later, as a destroyed one does");
+    // A raised Army is its home's Industry + 1, fixed at the raise; it defends with nothing of its own.
+    let mut g = fresh();
+    calm(&mut g);
+    let built = g.raise_army(Place::State(sid), false);
+    let b = g.armies.iter().find(|a| a.id == built).unwrap().clone();
+    assert_eq!((g.army_strength(&b), g.army_hit_points(&b)), ((industry + 1) as i64, industry + 1), "its home's Industry + 1, both figures");
+    assert_eq!(g.army_defended_strength(&b), (industry + 1) as i64, "a raised Army has no people to defend with");
+    g.state_mut(sid).industry_level += 2;
+    assert_eq!(g.army_strength(&b), (industry + 1) as i64, "fixed at the raise");
+    // A Colony's Army: the rounded average Industry of its Faction's Regions, plus one.
+    let cid = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Barracks], 4);
+    let held: Vec<u32> = g.controlled_states(Seat(0)).into_iter().map(|s| g.state(s).industry_level).collect();
+    let avg = (held.iter().sum::<u32>() + held.len() as u32 / 2) / held.len() as u32;
+    let garrison = g.raise_army(Place::Colony(cid), false);
+    let c = g.armies.iter().find(|a| a.id == garrison).unwrap().clone();
+    assert_eq!((g.army_strength(&c), g.army_hit_points(&c)), ((avg + 1) as i64, avg + 1), "the average Industry of the Faction's Regions, plus one");
+}
+
+/// Ticket #300 (version 0.08.6): a landed Army may Attack on the turn it lands. Landed at a
+/// rival's Colony it lands on Attack and fights in the same Resolution, after the orbit; landed
+/// where nobody defends, it occupies the Colony the same turn; landed at its own, it lands on Hold.
+#[test]
+fn an_army_landed_at_a_rivals_colony_fights_or_occupies_the_turn_it_lands() {
+    // Nobody defends: the Occupation begins the turn of the landing.
+    let mut g = game();
+    calm(&mut g);
+    let cid = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat], 4);
+    let army = ArmyId(g.fresh_id());
+    let ship = ShipId(g.fresh_id());
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
+    g.ships.push(Ship { name: String::new(), id: ship, kind: UnitKind::Carrier, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, colonists_education: 1.0, army: Some(army), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    g.commit_orders(Seat(0), &[Order::Unload { ship, colonists: 0, army: true, into: UnloadTarget::Colony(cid) }]);
+    g.resolution_phase();
+    let a = g.army(army).unwrap();
+    assert_eq!(a.at, ArmyAt::Place(Place::Colony(cid)), "landed");
+    assert_eq!(a.stance, Stance::Attack, "at a rival's Colony it lands on Attack");
+    assert!(matches!(g.colony(cid).unwrap().control, Control::Occupied { occupier: Seat(0), .. }), "alone at the place, it occupies the same turn: {:?}", g.colony(cid).unwrap().control);
+    assert_eq!(g.war.armies_landed[0], 1, "counted");
+    // Defended: the Battle is fought the turn of the landing.
+    let mut g = game();
+    calm(&mut g);
+    let cid = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat, ModuleKind::Barracks], 4);
+    let defender = ArmyId(g.fresh_id());
+    g.armies.push(Army { name: String::new(), id: defender, home: ArmyHome::Colony(cid), at: ArmyAt::Place(Place::Colony(cid)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
+    let army = ArmyId(g.fresh_id());
+    let ship = ShipId(g.fresh_id());
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
+    g.ships.push(Ship { name: String::new(), id: ship, kind: UnitKind::Carrier, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, colonists_education: 1.0, army: Some(army), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    let battles = g.war.battles[0];
+    g.commit_orders(Seat(0), &[Order::Unload { ship, colonists: 0, army: true, into: UnloadTarget::Colony(cid) }]);
+    g.resolution_phase();
+    assert_eq!(g.war.battles[0], battles + 1, "the Battle was fought the turn it landed");
+    // At its own Colony it lands on Hold.
+    let mut g = game();
+    calm(&mut g);
+    let cid = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 4);
+    let army = ArmyId(g.fresh_id());
+    let ship = ShipId(g.fresh_id());
+    g.armies.push(Army { name: String::new(), id: army, home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Aboard(ship), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 0 });
+    g.ships.push(Ship { name: String::new(), id: ship, kind: UnitKind::Carrier, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Moon), colonists: 0, colonists_education: 1.0, army: Some(army), stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    g.commit_orders(Seat(0), &[Order::Unload { ship, colonists: 0, army: true, into: UnloadTarget::Colony(cid) }]);
+    g.resolution_phase();
+    assert_eq!(g.army(army).unwrap().stance, Stance::Hold, "at its own Colony it lands on Hold");
+}
+
+/// Ticket #299 (version 0.08.6): an Occupation that must be held. A break -- here the last Army
+/// gone -- hands the place back at +2 Unrest, charges the occupier a rung-2 offence from the
+/// previous holder, and wipes the Standing the Occupation banked; a neutral previous holder
+/// charges nobody. The march stays legal.
+#[test]
+fn a_broken_occupation_hands_the_place_back_at_a_cost() {
+    let mut g = game();
+    calm(&mut g);
+    // Europe is the Prospectors' (seat 1). Seat 0 held 10 Standing there before it marched.
+    let europe = StateId::Europe;
+    assert_eq!(g.state(europe).control, Control::Controlled(Seat(1)));
+    g.armies.retain(|a| a.home != ArmyHome::State(europe));
+    g.seats[0].influence.insert(Place::State(europe), 10);
+    let a = occupier_in(&mut g, StateId::EastAsia, europe);
+    g.resolution_phase();
+    let Control::Occupied { occupier: Seat(0), banked, .. } = g.state(europe).control else { panic!("occupied: {:?}", g.state(europe).control) };
+    assert!(banked > 0, "the first turn banked Standing");
+    assert_eq!(g.seats[0].influence[&Place::State(europe)], 10 + banked);
+    // The march is still legal for an occupier.
+    let to = g.tables.state(europe).neighbours.iter().copied().find(|n| *n != StateId::EastAsia).unwrap();
+    assert!(g.check_order(Seat(0), &[], &Order::MoveArmy { army: a, to }).is_ok(), "an occupier may march away");
+    let unrest_before = g.state(europe).unrest;
+    let owed_before = g.relations.owed[1][0];
+    g.armies.retain(|x| x.id != a);
+    g.resolution_phase();
+    assert_eq!(g.state(europe).control, Control::Controlled(Seat(1)), "handed back");
+    assert!((g.state(europe).unrest - unrest_before - g.tables.unrest.occupation_break).abs() < 1e-9 || g.state(europe).unrest >= unrest_before + g.tables.unrest.occupation_break - 1e-9, "+2 Unrest: {} from {}", g.state(europe).unrest, unrest_before);
+    assert_eq!(g.relations.owed[1][0] - owed_before, g.tables.relations.occupation_broken_offence, "a rung-2 offence from the previous holder");
+    let left = g.seats[0].influence[&Place::State(europe)];
+    assert!((7..=10).contains(&left), "the banked Standing is wiped; what is left is the 10 from before less the turn's ordinary decay: {left}");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("Occupation of The European Union broke")), "{:?}", g.report.lines.iter().map(|l| l.text.clone()).collect::<Vec<_>>());
+    // A neutral previous holder charges nobody.
+    let mut g = game();
+    calm(&mut g);
+    let egypt = StateId::NorthAfrica;
+    g.armies.retain(|a| a.home != ArmyHome::State(egypt));
+    let a = occupier_in(&mut g, StateId::EastAsia, egypt);
+    g.resolution_phase();
+    let owed: i64 = (0..4).map(|v| g.relations.owed[v][0]).sum();
+    g.armies.retain(|x| x.id != a);
+    g.resolution_phase();
+    assert_eq!(g.state(egypt).control, Control::Neutral);
+    assert_eq!((0..4).map(|v| g.relations.owed[v][0]).sum::<i64>(), owed, "nobody to offend");
+}
+
+/// Ticket #298 (version 0.08.6): a place taken whole. With the roll set to a certainty: a Battle
+/// burns nothing; a transfer by Pacified burns nothing and fires the Moment for a place taken by
+/// force all the same; a transfer by the three-turn clock burns every building, the Unique among
+/// them; a take by Influence never rolled.
+#[test]
+fn a_battle_burns_nothing_a_pacified_transfer_takes_the_place_whole_and_the_clock_burns() {
+    let mut t = Tables::load(&default_data_dir()).expect("tables load");
+    t.influence.destruction_chance = 1.0;
+    let mut g = Game::new(Arc::new(t), NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+    calm(&mut g);
+    let europe = StateId::Europe;
+    let standing = g.state(europe).facilities.len();
+    assert!(standing >= 3, "the fixture: Europe keeps its start Facilities ({standing})");
+    let taken = |g: &Game| g.report.moments.iter().filter(|m| m.kind == MomentKind::PlaceTakenByForce).count();
+    // A Battle: seat 0's Army attacks Europe's Standing Army. Every building would have burned
+    // at a certain roll; none does, because the Battle no longer rolls.
+    occupier_in(&mut g, StateId::EastAsia, europe);
+    g.resolution_phase();
+    assert!(g.war.battles[0] >= 1, "a Battle was fought: {:?}", g.war.battles);
+    assert_eq!(g.state(europe).facilities.len(), standing, "the Battle burned nothing");
+    // A transfer by Pacified: taken whole, and the Moment fires with nothing lost.
+    let before = taken(&g);
+    g.transfer_control(Place::State(europe), Seat(0), "Pacified");
+    assert_eq!(g.state(europe).facilities.len(), standing, "Pacified takes the place whole");
+    assert_eq!(taken(&g), before + 1, "and it is still a place taken by force");
+    assert!(g.report.moments.iter().any(|m| m.text.contains("taken whole")), "{:?}", g.report.moments.iter().map(|m| m.text.clone()).collect::<Vec<_>>());
+    // A transfer by the clock: at a certain roll, everything burns, the Unique Facility included.
+    g.state_mut(europe).facilities.push(Facility { online: true, ..Facility::new(FacilityKind::InvestmentBank) });
+    assert!(g.state(europe).facilities.iter().any(|f| f.kind.unique_to().is_some()), "a Unique stands there");
+    g.transfer_control(Place::State(europe), Seat(1), "Occupation complete");
+    assert_eq!(g.state(europe).facilities.len(), 0, "the clock burns, the Unique like any other");
+    assert_eq!(taken(&g), before + 2);
+}
+
+/// Ticket #297 (version 0.08.6): Dig In. A dug-in Army fights at +2 while defending and never
+/// rolls to disengage; hit points do not follow; it cannot march or board a Carrier until its
+/// stance is changed and the turn has passed; a neutral Region's own Army is always dug in; a
+/// held Region's is not until ordered.
+#[test]
+fn a_dug_in_army_fights_two_stronger_never_disengages_and_cannot_march_until_it_digs_out() {
+    // In the melee: a dug-in unit at three damage of four would roll at (3/4)/2; scripted true,
+    // it would leave. Dug in, no roll is made and it stays. Hit rolls: attacker lands none.
+    let mut a = vec![frigate(1)];
+    let mut d = vec![Combatant::new(UnitRef::Army(ArmyId(2)), "the 1st Trench Army", 4, 4, 3, 2, false).dug_in(true)];
+    let mut dice = Script { chances: VecDeque::from(vec![false, false, false, true, true, true, true, true, true]), d6s: VecDeque::from(vec![1, 1, 1]), picks: VecDeque::new() };
+    let stats = combat::fight(&mut a, &mut d, &mut dice, 2.0);
+    assert!(!d[0].escaped, "dug in, it never rolls to disengage");
+    assert!(stats.all_escaped().is_empty());
+
+    let mut g = fresh();
+    calm(&mut g);
+    let sid = StateId::EastAsia;
+    let standing_id = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(sid)).map(|a| a.id).unwrap();
+    assert!(!g.army_dug_in(g.army(standing_id).unwrap()), "a held Region's Standing Army is not dug in until ordered");
+    // Ticket #302 (version 0.08.6): the march is a raised Army's; a Region's own stays at home.
+    let id = g.raise_army(Place::State(sid), false);
+    let army = |g: &Game| g.armies.iter().find(|a| a.id == id).unwrap().clone();
+    let egypt = StateId::NorthAfrica;
+    let neutral = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(egypt)).unwrap().clone();
+    assert_eq!(g.state(egypt).control, Control::Neutral);
+    assert!(g.army_dug_in(&neutral), "a neutral's is always dug in");
+    // Ordered to Dig In: the stance lands at commit, the bonus is a defender's in the Battle.
+    let before = g.army_strength(&army(&g));
+    g.commit_orders(Seat(0), &[Order::ArmyStance { place: Place::State(sid), stance: Stance::DigIn }]);
+    assert!(g.army_dug_in(&army(&g)));
+    assert_eq!(g.army_strength(&army(&g)), before, "the card's strength does not carry the bonus");
+    assert_eq!(g.army_hit_points(&army(&g)), before as u32, "and the hit points do not follow it");
+    assert_eq!(g.war.dig_ins[0], 1, "counted for the sweep");
+    assert!(g.report.lines.iter().any(|l| l.text.contains("dig in at China")), "{:?}", g.report.lines.iter().map(|l| l.text.clone()).collect::<Vec<_>>());
+    // Dug in, it may not march, nor be loaded; a stance change this turn does not lift that.
+    let to = g.tables.state(sid).neighbours[0];
+    let march = Order::MoveArmy { army: id, to };
+    let refused = g.check_order(Seat(0), &[], &march).unwrap_err().0;
+    assert!(refused.contains("dug in"), "{refused}");
+    let refused = g.check_order(Seat(0), &[Order::ArmyStance { place: Place::State(sid), stance: Stance::Hold }], &march).unwrap_err().0;
+    assert!(refused.contains("dug in"), "a stance order beside it does not lift it this turn: {refused}");
+    // Dug out at the Resolution, it marches the turn after.
+    g.commit_orders(Seat(0), &[Order::ArmyStance { place: Place::State(sid), stance: Stance::Hold }]);
+    assert!(g.check_order(Seat(0), &[], &march).is_ok(), "the stance changed and the turn passed");
+    // A Ship cannot dig in.
+    let ship = a_colony_ship(&mut g, Seat(0), BodyId::Earth);
+    let _ = ship;
+    let refused = g.check_order(Seat(0), &[], &Order::ShipStance { body: BodyId::Earth, stance: Stance::DigIn }).unwrap_err().0;
+    assert!(refused.contains("cannot dig in"), "{refused}");
+}
+
+/// Ticket #290 (version 0.08.6): the computer's opening. While its starting station has a slot free
+/// and under four berths empty, the Habitat is pushed at the opportunity weight, so it comes first:
+/// on turn one every seat with a station orders one there.
+#[test]
+fn the_computer_opens_with_a_habitat_on_its_starting_station() {
+    let mut g = fresh();
+    for seat in Seat::ALL {
+        let Some(id) = station_of(&g, seat, BodyId::Earth) else { continue };
+        let orders = g.ai_orders(seat);
+        assert!(
+            orders.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: ModuleKind::Habitat } if *colony == id)),
+            "the {} should open with a Habitat on their station: {orders:?}",
+            g.kind(seat).name()
+        );
+    }
 }
 
 

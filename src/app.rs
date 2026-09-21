@@ -312,6 +312,12 @@ pub struct ViewState {
     pub show_climate: bool,
     /// Ticket #41: the Climate Panel was just reopened; put it back at its home position once.
     pub climate_reopen: bool,
+    /// Ticket #292 (version 0.08.6): where the top bar ENDS this frame, in screen pixels, measured
+    /// from the panel it is drawn in. Every window that opens under the bar reads it through
+    /// `below_bar`, where each used to carry its own guess (120, 120 and 104) and the Trading and
+    /// Victory windows carried none and opened over the bar's figures. The bar is drawn before the
+    /// windows in the same frame, so the figure is never a frame stale.
+    pub top_bar_bottom: f32,
     pub show_victory: bool,
     /// Ticket #203 (version 0.08.1): the Faction window, and which SEAT's page it is open on. The
     /// dropdown in its top right names the four Factions, but every live figure on the page is a
@@ -390,6 +396,7 @@ impl Default for ViewState {
             // a keystroke (C) or a button away.
             show_climate: false,
             climate_reopen: false,
+            top_bar_bottom: 0.0,
             show_victory: false,
             show_factions: false,
             faction_seat: Seat(0),
@@ -419,6 +426,19 @@ impl Default for ViewState {
 }
 
 impl ViewState {
+    /// Ticket #292 (version 0.08.6): the y a window opens at to clear the top bar -- its measured
+    /// foot plus the sixteen pixels egui itself leaves from an edge. Before the first frame has
+    /// measured anything it reads sixteen, which is where egui would have put the window anyway.
+    pub fn below_bar(&self) -> f32 {
+        self.top_bar_bottom + 16.0
+    }
+
+    /// Ticket #292: where the Trading and Victory windows open -- under the bar and to the right
+    /// of the Faction window's home (16 across, 524 wide), so a player with both open sees both.
+    pub fn beside_faction_window(&self) -> bevy_egui::egui::Pos2 {
+        bevy_egui::egui::pos2(560.0, self.below_bar())
+    }
+
     /// Ticket #58: whether a Moment kind stops the turn, the session's answer over the table's.
     pub fn moment_on(&self, tables: &Tables, kind: dying_earth_engine::MomentKind) -> bool {
         match &self.moments_on {

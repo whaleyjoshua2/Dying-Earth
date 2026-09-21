@@ -384,8 +384,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #281 (version 0.08.5): an Army destroyed, by name; and every Battle, as a line.
     ("army_destroyed", &["faction", "army", "why"]),
     // Ticket #282 (version 0.08.5): neutral states arm when threatened.
-    ("levy_raised", &["state", "army", "n"]),
-    ("levy_disbanded", &["state", "army"]),
+    ("neutral_armed", &["state", "n"]),
     ("neutral_held", &["state", "n"]),
     ("battle", &["place", "faction", "odds", "outcome"]),
     ("event_damaged_ships", &["event", "n"]),
@@ -415,9 +414,13 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("directive_fuel", &["faction", "research", "n"]),
     ("army_moved", &["faction", "from", "to", "attacks"]),
     ("army_landed", &["faction", "colony"]),
+    // Ticket #297 (version 0.08.6): the turn an Army digs in.
+    ("army_dug_in", &["faction", "place"]),
     ("units_destroyed", &["place", "why", "lost"]),
     ("occupation_begun", &["faction", "place"]),
     ("occupation_ended", &["place", "faction"]),
+    // Ticket #299 (version 0.08.6): a broken Occupation, at a cost.
+    ("occupation_broken", &["place", "faction", "holder", "unrest", "standing"]),
     ("control_changed", &["place", "faction", "why"]),
     ("claim_tied", &["place", "factions"]),
     ("threw_off", &["state", "faction", "unrest"]),

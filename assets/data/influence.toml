@@ -33,6 +33,10 @@ constabulary_margin_defended = 10
 # Version 0.04 (ticket #46): a station's threshold starts here, plus the per-Colonist figure.
 station_threshold_base = 20
 occupation_turns = 3
+# Spec 8.5: each building at a place rolls this to be destroyed. Ticket #298 (version 0.08.6): on
+# ONE occasion only -- a place transferring by the three-turn clock. A Battle burns nothing, a
+# Pacified transfer rolls nothing, a take by Influence never did; a Unique Facility rolls like any
+# other, a Scrubber and the Archive are destroyed outright by their own rules.
 destruction_chance = 0.25
 
 # Ticket #53 (version 0.05): Blame. Every Faction wears the Emissions of the sources it controls,

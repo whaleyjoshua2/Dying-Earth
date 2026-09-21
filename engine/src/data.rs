@@ -416,6 +416,17 @@ pub struct FactionCard {
     /// Ticket #50: the Arkwrights start with none, so this is optional.
     #[serde(default)]
     pub start_station: Option<String>,
+    /// Ticket #290 (version 0.08.6): the Colonists aboard that station when the game opens, from
+    /// nowhere -- no Region is debited for them. Two, so a starting station has two Module slots
+    /// free at once where a bare one had none. Nothing without a `start_station`.
+    #[serde(default)]
+    pub start_colonists: u32,
+    /// Ticket #290 (version 0.08.6): Pioneers waiting in the Faction's start Region on turn one, a
+    /// gift outside the recruit rate that takes no population. The Arkwrights' two, since they have
+    /// no station for two Colonists to be aboard. Spelled `emigrants` as the engine spells the
+    /// field it fills (see **Pioneer** in `CONTEXT.md`).
+    #[serde(default)]
+    pub start_emigrants: u32,
     // Ticket #51: the per-Faction figures the Arkwrights' card carries. Every one is neutral by
     // default, so a card that names none plays exactly as it did before.
     /// What a Habitat here holds, times this.
@@ -770,6 +781,8 @@ pub struct UnrestTable {
     pub report_net_floor: f64,
     pub occupation_start: f64,
     pub occupation_per_turn: f64,
+    /// Ticket #299 (version 0.08.6): what a broken Occupation adds when the place hands back.
+    pub occupation_break: f64,
     pub unrest_card: f64,
     pub natural_fall: f64,
     pub relief_ducats: i64,
@@ -936,6 +949,9 @@ pub struct AiWeights {
     pub stance_evade: f64,
     /// Ticket #278 (version 0.08.5): blockade the rival station whose slot the stack sits in.
     pub stance_blockade: f64,
+    /// Ticket #297 (version 0.08.6): dig in where a rival's Army stands next door and the seat has
+    /// no cause to attack, and wherever it occupies.
+    pub stance_dig_in: f64,
 }
 
 
@@ -1147,11 +1163,41 @@ struct ModulesFile {
     trade_post: TradePostCard,
     mass_driver: MassDriverCard,
 }
+/// Ticket #295 (version 0.08.6): the disengage roll's figure, in data at last. After every round a
+/// damaged unit leaves with chance damage over hit points over `divisor`; the First Playable wrote
+/// the 2 into the code and never tuned it. Evade's flat half is not this figure.
+#[derive(Debug, Clone, Deserialize)]
+pub struct DisengageCard {
+    pub divisor: f64,
+}
+
+/// Ticket #296 (version 0.08.6): what a Region's people add to its own Army -- `constabulary`
+/// while a working Constabulary stands there, `calm` while Unrest is under the Standing Army's
+/// threshold. Ticket #302: as DEFENCE, while it defends, never as hit points; and the steps a
+/// neutral arms by: `threat_steps` at the Income a threat begins, `held_step` for an attack held.
+#[derive(Debug, Clone, Deserialize)]
+pub struct StandingArmyCard {
+    pub constabulary: u32,
+    pub calm: u32,
+    pub threat_steps: u32,
+    pub held_step: u32,
+}
+
+/// Ticket #297 (version 0.08.6): what an Army dug in adds to its strength while it defends. Hit
+/// points do not follow it, at the designer's word.
+#[derive(Debug, Clone, Deserialize)]
+pub struct DigInCard {
+    pub defence: i64,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct UnitsFile {
     unit: Vec<UnitCard>,
     repair: RepairCard,
     crowding: CrowdingCard,
+    disengage: DisengageCard,
+    standing_army: StandingArmyCard,
+    dig_in: DigInCard,
 }
 
 /// Ticket #86 (version 0.06.0): a warming Earth fills the Colony Ships. `per_step` Colonists
@@ -1204,6 +1250,9 @@ pub struct RelationsCard {
     pub worst: i64,
     pub start: i64,
     pub fall_per_offending_turn: i64,
+    /// Ticket #299 (version 0.08.6): the weight of an Occupation broken, the rung between a bid
+    /// (1) and a Battle (3).
+    pub occupation_broken_offence: i64,
     pub recover: i64,
     pub quiet_turns: u32,
     /// Ticket #222 (version 0.08.2): the most a single turn may charge, however much was done in it.
@@ -1398,6 +1447,12 @@ pub struct Tables {
     pub repair: RepairCard,
     /// Ticket #86: the crowd a warming Earth puts aboard a Colony Ship, and what it risks.
     pub crowding: CrowdingCard,
+    /// Ticket #295 (version 0.08.6): the disengage roll's divisor.
+    pub disengage: DisengageCard,
+    /// Ticket #296 (version 0.08.6): what a Region's people add to its own Armies.
+    pub standing_army: StandingArmyCard,
+    /// Ticket #297 (version 0.08.6): what digging in adds to a defending Army.
+    pub dig_in: DigInCard,
     pub techs: Vec<TechCard>,
     pub events: EventsTable,
     pub factions: Vec<FactionCard>,
@@ -1510,6 +1565,9 @@ impl Tables {
             units: units.unit,
             repair: units.repair,
             crowding: units.crowding,
+            disengage: units.disengage,
+            standing_army: units.standing_army,
+            dig_in: units.dig_in,
             techs: techs.tech,
             shortlist: techs.shortlist,
             events,
@@ -1569,6 +1627,14 @@ impl Tables {
                 && !self.body(BodyId::Earth).stations.contains(name)
             {
                 return Err(err("factions.toml", format!("row {}: start_station {:?} is no orbital slot over Earth", f.name, name)));
+            }
+            // Ticket #290 (version 0.08.6): the people aboard at the start need a station to be
+            // aboard, and fit in its Core Module.
+            if f.start_colonists > 0 && f.start_station.is_none() {
+                return Err(err("factions.toml", format!("row {}: start_colonists without a start_station", f.name)));
+            }
+            if f.start_colonists > self.module(ModuleKind::Core).holds_colonists {
+                return Err(err("factions.toml", format!("row {}: start_colonists {} would not fit in the Core Module", f.name, f.start_colonists)));
             }
             if f.victory_first.bar <= 0.0 {
                 return Err(err("factions.toml", format!("row {}: victory_first.bar must be positive", f.name)));
@@ -1672,6 +1738,10 @@ impl Tables {
         }
         if u.neutral_max > u.max || u.refugees_per <= 0.0 || u.report_net_floor <= 0.0 {
             return Err(err("unrest.toml", "neutral_max must not exceed max, and refugees_per and report_net_floor must be positive"));
+        }
+        // Ticket #295 (version 0.08.6): a divisor of nought would be a certain escape at any damage.
+        if self.disengage.divisor <= 0.0 {
+            return Err(err("units.toml", "[disengage] divisor must be positive"));
         }
         for s in &self.states {
             if s.unrest < 0.0 || s.unrest > u.max {

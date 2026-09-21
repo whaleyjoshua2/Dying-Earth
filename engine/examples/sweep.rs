@@ -148,6 +148,9 @@ fn main() {
                         // Ticket #87: stranded Ships at the end, Refuel orders and stations off Earth.
                         let mut stranded = [0u32; 4];
                         let (mut refuels, mut stations_off_earth) = (0u32, 0u32);
+                        // Ticket #290 (version 0.08.6): Modules beyond the Core on a starting
+                        // station at the end of turn three, per seat, summed over the batch.
+                        let mut opening_modules = [0u32; 4];
                         // Ticket #88: Colonies with two or more working Mines, and Modules per ground Colony.
                         let (mut deep_colonies, mut ground_modules, mut ground_colonies) = (0u32, 0u32, 0u32);
                         // Ticket #241 (version 0.08.3): the figures 0.08.2 named as missing, and this
@@ -224,6 +227,9 @@ fn main() {
                             }
                             refuels += r.refuels;
                             stations_off_earth += r.stations_off_earth;
+                            for (i, n) in opening_modules.iter_mut().enumerate() {
+                                *n += r.opening_modules[i];
+                            }
                             deep_colonies += r.deep_colonies;
                             ground_modules += r.ground_modules;
                             ground_colonies += r.ground_colonies;
@@ -344,6 +350,7 @@ fn main() {
                             );
                             println!("      Crowded ships: Colonists lost in transit over the batch, by seat {lost_in_transit:?}");
                             println!("      Tanks: Ships stranded at the end over the batch, by seat {stranded:?}; {refuels} Refuel orders; {stations_off_earth} stations standing off Earth at the end");
+                            println!("      The opening: Modules beyond the Core on a starting station at the end of turn 3 over the batch, by seat {opening_modules:?}");
                             println!(
                                 "      Build it where you dig: {deep_colonies} ground Colonies with two or more working Mines at the end over the batch; {:.1} Modules per ground Colony",
                                 if ground_colonies > 0 { ground_modules as f64 / ground_colonies as f64 } else { 0.0 }
@@ -429,7 +436,7 @@ fn main() {
                             let war: Vec<String> = (0..4).map(|i| med0(&mut war_ppm[i])).collect();
                             println!("      War in ppm a game, by seat (median): [{}]; nobody's (median) {}", war.join(", "), med0(&mut war_nobody));
                             // Ticket #282 (version 0.08.5): neutral states arming.
-                            println!("      Neutral states: {levies} Levies raised over the batch, {neutral_holds} attacks held against");
+                            println!("      Neutral states: {levies} threat episodes armed for over the batch, {neutral_holds} attacks held against");
                             println!("      Sea Walls: {sea_walls} built over the batch, {walls_standing} standing at the end, {walls_held} thresholds held");
                             println!("      Events drawn with nowhere to land over the batch: {no_target}; the Fund at or past its bar in {fund_met}/{seeds} seeds");
                             let floored_pct = if rel_end.is_empty() { 0.0 } else { rel_floored as f64 * 100.0 / rel_end.len() as f64 };
@@ -458,6 +465,16 @@ fn main() {
                                 "      Armies built {:?}, lost {:?}, Standing Armies lost {}; warships built {:?}, lost {:?}; Occupations begun {:?}, broken {:?}; places taken by force {:?}",
                                 warc.armies_built, warc.armies_lost, warc.standing_armies_lost, warc.warships_built, warc.warships_lost, warc.occupations_begun, warc.occupations_broken, warc.takes_by_force
                             );
+                            // Ticket #295 (version 0.08.6): the escapes, never counted before the
+                            // disengage figure was nudged.
+                            println!(
+                                "      Escapes over the batch: units escaped by seat {:?}, neutral {}; Battles with an escape {} of {}",
+                                warc.escapes, warc.escapes_neutral, warc.battles_with_escape, warc.battles.iter().sum::<u32>()
+                            );
+                            // Ticket #297 (version 0.08.6): Dig In orders committed, by seat.
+                            println!("      Dig In orders over the batch, by seat {:?}", warc.dig_ins);
+                            // Ticket #300 (version 0.08.6): Armies landed from a Carrier, by seat.
+                            println!("      Armies landed at a Colony over the batch, by seat {:?}", warc.armies_landed);
                             println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
                             println!("      Breaks fired: {}", fired.join(", "));
                         }

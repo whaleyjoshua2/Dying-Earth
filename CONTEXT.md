@@ -21,7 +21,7 @@ The Faction that maximizes resource extraction without regard for ecological cos
 _Avoid_: Extractors (the retired name), capitalists, industrialists, exploiters
 
 **Arkwrights**:
-The Faction that exists to get people off Earth and spread them as widely as it can. Their signature rule is Coach Class, and they win on Diaspora.
+The Faction that exists to get people off Earth and spread them as widely as it can. Their signature rule is Coach Class, and they win on Diaspora. Since version 0.08.6 they open with two Pioneers already waiting in their start Region -- a gift outside Coach Class that took no population, the mirror of the two Colonists the other three Factions have aboard the station the Arkwrights do not have -- who wait there for the first Ship.
 _Avoid_: settlers, arks, exodus, nomads
 
 **Archivists**:
@@ -83,7 +83,7 @@ One of a fixed number of places in orbit around a Body where a Space Station can
 _Avoid_: dock, berth, orbit
 
 **Space Station**:
-A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard, Habitats and, since version 0.06.0, Observatories and Solar Arrays. Since version 0.07.5 it stands with a Core Module, so it holds four people from the turn it is built and can be settled at once; until then it was founded bare and could hold nobody. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with a bare one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom); the Arkwrights start with none, and build theirs at half price. Since version 0.06.0 a station over Earth is off Earth and its Colonists count for Off-world Presence; it may **no longer hold the Archive**, which since version 0.08.1 must stand on another Body altogether. A station is also the one place a Ship of its Faction can refuel. It reads the Colony's Module cap since version 0.07.0, so one founded bare holds three and grows only as its people arrive.
+A Colony in orbit, built for Materials into an Orbital Slot with no crew, holding only a Shipyard, Habitats and, since version 0.06.0, Observatories and Solar Arrays. Since version 0.07.5 it stands with a Core Module, so it holds four people from the turn it is built and can be settled at once; until then it was founded bare and could hold nobody. Influence, Occupation and Battles work on it as on a Colony. Three Factions start with one over Earth (the Custodians the ISS, the Prospectors Tiangong, the Archivists Axiom), and since version 0.08.6 with **two Colonists already aboard**, from nowhere, so a starting station has two Module slots free from turn one where the bare one it was until then had none; the Arkwrights start with none, and build theirs at half price. Since version 0.06.0 a station over Earth is off Earth and its Colonists count for Off-world Presence; it may **no longer hold the Archive**, which since version 0.08.1 must stand on another Body altogether. A station is also the one place a Ship of its Faction can refuel. It reads the Colony's Module cap since version 0.07.0, so one founded bare holds three and grows only as its people arrive.
 
 **Tank**:
 The Fuel a Ship carries, since version 0.06.0: a figure per Ship type, filled at the Shipyard for Fuel paid at the build, spent by transits, and refilled only by a Refuel. A Ship whose Tank cannot pay any leg from where it stands, with no Space Station of its Faction there, is stranded until one is built in orbit there.
@@ -154,12 +154,16 @@ _Avoid_: options, candidates, draft, offer
 The window, since version 0.08.1, that says everything about one Faction: opened by `Factions (F)` and picked from a dropdown in its own top right, defaulting to the player's own. It wears the Faction's symbol at its head and holds the live figures -- Victory progress, the income of its last turn, Blame, its **Relations** as two rows, and what it holds -- above a collapsing section carrying the Faction card itself, which the setup screen shows before a game and which had been unreachable once one began. A rival's income is shown as totals only; the building-by-building breakdown is the player's alone, and a spectator sees every seat in full.
 _Avoid_: faction panel, player info, empire screen, diplomacy screen
 
+**Top bar**:
+The strip across the head of the game screen: a row of the world's and the player's figures -- Materials, Fuel, Energy, Ducats, Influence, Research and the race bar, the turn and its date, the temperature, the net ppm and the two populations -- and under it the row of buttons that open the Tech Tree, the Climate Panel, Victory, Factions and Trading, save the game and swap the map. Its height is not fixed: a Pick a Tech button or a save notice makes it taller. Since version 0.08.6 every window that opens under it reads its measured height rather than a guess of its own, so none opens over the figures.
+_Avoid_: HUD, header, status bar, ribbon
+
 **Command Cluster**:
-The strip along the foot of the side panel, since version 0.07.1, holding the controls a player reaches for every turn: the Influence still unspent, Spend on whatever place is selected, Max (Defence until version 0.07.3), and End Turn. It does not scroll: the card or the Roster scrolls above it. It is the only place End Turn stands.
+The strip along the foot of the side panel, since version 0.07.1, holding the controls a player reaches for every turn: the Influence still unspent, Spend on whatever place is selected, Max (Defence until version 0.07.3), and End Turn. It does not scroll: the card or the Roster scrolls above it. It is the only place End Turn stands. Since version 0.08.6 the spend is set on the same slider the Smear and the Greenwash use, Max moves that slider to the bound as well as placing the order, the whole strip is a tenth larger again, and End Turn is the sun at the right of its last row with Max and the every-turn tick on its left.
 _Avoid_: action bar, toolbar, HUD, control panel
 
 **Max**:
-The button in the Command Cluster, since version 0.07.3, that spends everything left of the turn's Allotment on the selected place in one press, as one order to be read and cancelled like any other; greyed out while nothing is selected. **Every turn** makes it a standing order on the place selected when it was ticked: at the start of each turn the whole Allotment is placed on that place as an ordinary order, never spent unwatched, until the box is unticked, the placed order is cancelled, or the place is no longer the player's.
+The button in the Command Cluster, since version 0.07.3, that spends everything left of the turn's Allotment on the selected place in one press, as one order to be read and cancelled like any other, and since version 0.08.6 moves the spend slider beside it to the bound as well; greyed out while nothing is selected. **Every turn** makes it a standing order on the place selected when it was ticked: at the start of each turn the whole Allotment is placed on that place as an ordinary order, never spent unwatched, until the box is unticked, the placed order is cancelled, or the place is no longer the player's.
 _Avoid_: all-in, spend all, auto-spend, Defence (the retired button)
 
 **Defence**:
@@ -239,7 +243,7 @@ The Module, since version 0.07.5, that every Colony and every Space Station is f
 _Avoid_: hub, base, the core, starter module, command module
 
 **Module**:
-A building placed inside a Colony. **Eighteen kinds** since version 0.08.3. Twelve are common to everybody: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, the Institute, the Solar Array (a Space Station's alone) and the Mass Driver (a small world's alone). The Core Module, which every founding gives, stands outside the count of what may be built. The Archive only the Archivists raise, one to a Faction, from its own button. The last four are the **Unique Modules**, one per Faction. (The figure read 'thirteen' from version 0.07.5 until version 0.08.3 and was wrong from the moment the Institute and the Academy were added in 0.08.0.) A Habitat holds **four** Colonists since version 0.08.1 and eight with Expanded Habitats, which raises it by four; it held eight from version 0.06.0, and since version 0.07.3 it holds the same everywhere, no world's slot making it hold more or fewer. The Core Module's flat four is reached by neither the Tech nor the Arkwrights' multiplier. Since version 0.07.5 a Colony's Modules are drawn on its own card as a grid of tiles in the same shape a Region's build slots use -- one tile per Module with its picture, dimmed while mothballed and hatched while building, a dashed tile for every free place under the cap, and the Archive on a row of its own outside the count. Clicking a tile puts that Module's figures and its Mothball, Restart and Decommission buttons in the strip beneath; clicking a free tile puts the build buttons there, and that is the only place a Module is ordered.
+A building placed inside a Colony. **Eighteen kinds** since version 0.08.3. Twelve are common to everybody: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, the Institute, the Solar Array (a Space Station's alone) and the Mass Driver (a small world's alone). The Core Module, which every founding gives, stands outside the count of what may be built. The Archive only the Archivists raise, one to a Faction, from its own button. The last four are the **Unique Modules**, one per Faction. (The figure read 'thirteen' from version 0.07.5 until version 0.08.3 and was wrong from the moment the Institute and the Academy were added in 0.08.0.) A Habitat holds **four** Colonists since version 0.08.1 and eight with Expanded Habitats, which raises it by four; it held eight from version 0.06.0, and since version 0.07.3 it holds the same everywhere, no world's slot making it hold more or fewer. The Core Module's flat four is reached by neither the Tech nor the Arkwrights' multiplier. Since version 0.07.5 a Colony's Modules are drawn on its own card as a grid of tiles in the same shape a Region's build slots use -- one tile per Module with its picture, dimmed while mothballed and hatched while building, a dashed tile for every free place under the cap, and the Archive on a row of its own outside the count. Since version 0.08.6 a Module ordered this turn shows in its tile at once, hatched and dimmed with *ordered* and the turns to complete on its face, and a right-click cancels the order, exactly as a Region's build slots do. Clicking a tile puts that Module's figures and its Mothball, Restart and Decommission buttons in the strip beneath; clicking a free tile puts the build buttons there, and that is the only place a Module is ordered.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:
@@ -262,7 +266,7 @@ The extra Colonists a warming Earth puts aboard a Colony Ship lifting at Earth, 
 _Avoid_: overloading, coach class (that is the Arkwrights' rule), refugees aboard
 
 **Carrier**:
-The Ship type that carries one Army and nothing else, since version 0.04. Unarmed, it needs an escort and is a target for Intercept like a Colony Ship. Every landing needs one.
+The Ship type that carries one Army and nothing else, since version 0.04. Unarmed, it needs an escort and is a target for Intercept like a Colony Ship. Every landing needs one. Since version 0.08.6 an Army landed at a Colony its Faction does not direct lands on Attack and fights the turn it lands, after the orbit has been fought, and a landing that meets nobody occupies the Colony the same turn; landed at its own, it lands on Hold. An Army lands only at a Colony, never in a Region.
 _Avoid_: troopship, transport, landing ship
 
 **Frigate**:
@@ -274,19 +278,19 @@ The heavy warship type: the most strength and hit points, low Pursuit, dear and 
 _Avoid_: capital ship, dreadnought, cruiser
 
 **Army**:
-A ground fighting unit. A Region's Armies belong to the state and are directed by the Faction that controls it, following the state if control changes. A Colony's Army belongs to the Colony, exists only where it has a Barracks, and only defends. Since version 0.08.4 every Army has a name given as it is raised, from its home rather than from any Faction: an ordinal and the Region's demonym -- *the 1st Chinese Army*, *the 2nd* -- or for a Colony's, its Garrison -- *the Tycho Garrison*, *the 2nd Tycho Garrison*. The Standing Army is the first raised and so the 1st; a re-raised one takes the next number; the name survives every change of hands, since the Army is its Region's.
+A ground fighting unit, of one system since version 0.08.6. A Region's Armies belong to the state and are directed by the Faction that controls it, following the state if control changes -- its **Standing Army**, which stays at home, and the Armies **raised** there, which march. A raised Army's strength and hit points are its home's Industry Level plus one when it is raised, fixed for its life. A Colony's Army belongs to the Colony, exists only where it has a Barracks, only defends, and is worth the rounded average Industry Level of the Regions its raising Faction held, plus one, fixed at the raise. Any Army fights at its strength plus what it defends with: a Region's own Army its people (a working Constabulary, and calm), and any Army dug in two more. Since version 0.08.4 every Army has a name given as it is raised, from its home rather than from any Faction: an ordinal and the Region's demonym -- *the 1st Chinese Army*, *the 2nd* -- or for a Colony's, its Garrison -- *the Tycho Garrison*, *the 2nd Tycho Garrison*. The Standing Army is the first raised and so the 1st; a re-raised one takes the next number; the name survives every change of hands, since the Army is its Region's.
 _Avoid_: troops, soldiers, garrison, marines
 
 **Standing Army**:
-The Armies a Region keeps on its own, sized by its card and replenished a little each turn, whether or not any Faction controls it. Named like any other Army since version 0.08.4 -- the one the game begins with is *the 1st Chinese Army*. Its strength is the Region's Industry Level plus one, and since version 0.08.5 plus a step for every attack a neutral Region has held against, to Industry Level plus four; destroyed, it returns at strength one two Incomes later rather than the next, so a won Battle opens a window.
+The Armies a Region keeps on its own, sized by its card and replenished a little each turn, whether or not any Faction controls it. Named like any other Army since version 0.08.4 -- the one the game begins with is *the 1st Chinese Army*. Its strength and hit points are the Region's Industry Level plus one plus the steps it has **armed** by: since version 0.08.5 one for every attack a neutral Region has held against, and since version 0.08.6 two at the Income a threat appears next door (a foreign Army in a neighbouring Region, or a neighbour under Occupation), once per threat, where a Levy used to be raised; there is no ceiling, so a long-neutral Region is a fortress by force and Influence is the cheap way in. Since version 0.08.6 **a Region's defence is its people**, as defence: while it defends it fights one stronger for a working Constabulary and one stronger while Unrest is under its threshold, both read live and neither adding hit points; and an Army whose damage reaches its strength is destroyed rather than standing at nought. It stays at home: since version 0.08.6 its holder cannot march it. Destroyed, it returns at strength one two Incomes later rather than the next, so a won Battle opens a window.
 _Avoid_: garrison, militia, defence value
 
 **Levy**:
-The second Army a neutral Region raises while it is threatened, since version 0.08.5: a built Army of any Faction standing in a neighbouring Region, or a neighbour under Occupation, and the Region's Unrest under the Standing Army's threshold. It stands at Industry Level plus two, heals as a Standing Army does, never marches, and stands down at the Income after the threat has passed or the moment the Region is somebody's. A Region arms whatever the neighbouring Army's stance, so nobody's orders are disclosed by it.
+Retired in version 0.08.6. From version 0.08.5 it was the second Army a neutral Region raised while a foreign Army stood next door or a neighbour was Occupied, at Industry Level plus two, standing down when the threat passed. Now the same threat **arms the Standing Army for good**, two steps at the Income the threat appears, once per threat, with no ceiling. A Region still arms whatever the neighbouring Army's stance, so nobody's orders are disclosed by it.
 _Avoid_: militia, reserves, conscripts, second Standing Army
 
 **Barracks**:
-The Module that lets a Colony hold and build a defensive Army. A Colony without one has no defenders.
+The Module that lets a Colony hold and build a defensive Army. A Colony without one has no defenders. Since version 0.08.6 the Army it raises is worth the rounded average Industry Level of the Regions its Faction holds, plus one, fixed at the raise; the Barracks is not a police force, so that Army defends with Dig In alone.
 _Avoid_: fort, garrison, base
 
 **Colonist**:
@@ -294,7 +298,7 @@ A person counted in the population of a Colony or Region. Since version 0.05.5 C
 _Avoid_: settler, crew, worker, population resource
 
 **Pioneer**:
-A Colonist recruited in a Region and not yet gone: up to four a turn per Faction (eight for the Arkwrights), in one state the Faction directs, each taking one unit of the state's population -- five million people, since version 0.07.3; a tenth of a hundred million, ten million, before -- on the state's card at End Turn. A batch takes half a point off the state's Unrest. A working Launch Site lifts Pioneers onto a Ship, or, since version 0.07.3, straight onto a Space Station of their Faction's over Earth, as many as its Habitats have room for, aboard at that turn's Resolution -- a launch, with no crowd; and once the Antarctic ice is open the sea takes them to Antarctica in a turn with no launch. They are people of their state until they leave it.
+A Colonist recruited in a Region and not yet gone: up to four a turn per Faction (eight for the Arkwrights), in one state the Faction directs, each taking one unit of the state's population -- five million people, since version 0.07.3; a tenth of a hundred million, ten million, before -- on the state's card at End Turn. A batch takes half a point off the state's Unrest. A working Launch Site lifts Pioneers onto a Ship, or, since version 0.07.3, straight onto a Space Station of their Faction's over Earth, as many as its Habitats have room for, aboard at that turn's Resolution -- a launch, with no crowd; and once the Antarctic ice is open the sea takes them to Antarctica in a turn with no launch. They are people of their state until they leave it. The Arkwrights alone begin the game with two already waiting (since version 0.08.6), recruited by nobody and paid for by no population.
 Called an **Emigrant** until version 0.08.3, and **recruited** where it was mustered. The designer's reason was the word rather than the rule: *"it's more about the word being politically loaded and racked with connotation"*. The rule is untouched -- a Pioneer is the same stage of a Colonist's life the Emigrant was, which is why the distinction was kept rather than folded into Colonist: **Coach Class** and the **Spaceport** are both stated in terms of it, and "every Colonist costs their Region twice the population" would have been false.
 The engine still spells the field, the order and the Report keys `emigrant`: they are not read by a player, and renaming the two serialized fields on every Nation State would have broken every save for no visible gain.
 _Avoid_: emigrant, settler, migrant, passenger, colonist-in-waiting, pilgrim
@@ -323,7 +327,7 @@ _Avoid_: using it for anything the Scrubber now does
 
 **Unique Facility**:
 A Facility one Faction builds in place of a common one, at the common price -- the same Materials, the same build turns, the same upkeep, the same output, the same slot -- with its own name, its own icon and its own row on that Faction's build list, and one clause the common building does not have. One per Faction as a rule of the system, from version 0.08.0: the Prospectors' Investment Bank, the Arkwrights' Spaceport, the Archivists' Reactor and the Custodians' Academy. A Faction never builds the common version of a job it has a Unique Facility for, and never builds another Faction's.
-It is **never destroyed when its place changes hands**: it keeps standing and pays its new holder the same clause it paid its builder, which is the opposite of the Scrubber and the Archive. The mirror does not hold -- a common building already standing does not convert when the Faction whose Unique version it is takes the place. Only a CONTROLLER collects: an occupier pays the upkeep and draws nothing.
+When its place changes hands it is **rolled like any other building** (since version 0.08.6, and in truth since the roll was written: the glossary said otherwise), and one that survives keeps standing and pays its new holder the same clause it paid its builder, which is the opposite of the Scrubber and the Archive, which are destroyed outright. The mirror does not hold -- a common building already standing does not convert when the Faction whose Unique version it is takes the place. Only a CONTROLLER collects: an occupier pays the upkeep and draws nothing.
 _Avoid_: unique building (the glossary keeps Facility and Module apart), signature building, faction building, wonder
 
 **Unique Module**:
@@ -393,7 +397,7 @@ How dirty a Region's industry is before any Facility is built there.
 _Avoid_: pollution rating, carbon score
 
 **Build Slot**:
-One of the places a Facility occupies in a Region. A state has Size + Industry Level + three of them, and each is either a **Coastal Slot** or an **Inland Slot**: the sea takes only the first, and every slot a raise of the Industry Level adds is one of the second. Its start Facilities stand on the coast first; a later build fills an inland slot while one is free. Since version 0.07.3 the card draws them as boxes -- a picture on a dark box, dimmed while mothballed, hatched while building, dashed while free, a coastal box outlined in blue and an inland one in grey -- and a slot the sea has taken stands under water, three quarters flooded with the drowned building dimmed beneath. Since version 0.08.2 a free box the player could actually build in says so, where one they could not keeps the bare word. Since version 0.07.4 every box says on hover what its row says -- the kind, its figures, and the upkeep, Emissions and coastal rules -- and a free, building or flooded box says what it is; the Scrubber and the Sea Wall, which take no slot, stand beneath the boxes with their build buttons, and a Facility that takes a slot is built by clicking a free box and nowhere else.
+One of the places a Facility occupies in a Region. A state has Size + Industry Level + three of them, and each is either a **Coastal Slot** or an **Inland Slot**: the sea takes only the first, and every slot a raise of the Industry Level adds is one of the second. Its start Facilities stand on the coast first; a later build fills an inland slot while one is free. Since version 0.07.3 the card draws them as boxes -- a picture on a dark box, dimmed while mothballed, hatched while building, dashed while free, a coastal box outlined in blue and an inland one in grey -- and a slot the sea has taken stands under water, three quarters flooded with the drowned building dimmed beneath. Since version 0.08.6 a building shows in its box **the moment it is ordered**, before End Turn, hatched and dimmed with *ordered* in one corner and the turns to complete in the other, and a right-click on it cancels the order; once the turn ends the word becomes *building* and the count runs down, and the box can no longer be clicked. Since version 0.08.2 a free box the player could actually build in says so, where one they could not keeps the bare word. Since version 0.07.4 every box says on hover what its row says -- the kind, its figures, and the upkeep, Emissions and coastal rules -- and a free, building or flooded box says what it is; the Scrubber and the Sea Wall, which take no slot, stand beneath the boxes with their build buttons, and a Facility that takes a slot is built by clicking a free box and nowhere else.
 _Avoid_: building slot, plot, space, capacity
 
 **Coastal Slot**:
@@ -441,7 +445,7 @@ The Custodians' Unique Facility on Earth and their Unique Module off it -- one n
 _Avoid_: school, institute, university
 
 **Constabulary**:
-The Facility that holds a Region's Unrest down: while it stands and is online it lowers Unrest every turn whatever else happened that turn, and softens what the climate and arriving Refugees add. At most one stands in a state. Since version 0.08.0 it is also a defensive building: while it stands and is online the challenge margin in that Region is 25 instead of 20, for EVERY challenger and whoever built it -- a police force serves the government of the day.
+The Facility that holds a Region's Unrest down: while it stands and is online it lowers Unrest every turn whatever else happened that turn, and softens what the climate and arriving Refugees add. At most one stands in a state. Since version 0.08.0 it is also a defensive building: while it stands and is online the challenge margin in that Region is 25 instead of 20, for EVERY challenger and whoever built it -- a police force serves the government of the day. Since version 0.08.6 it fights too: while it works, the Region's Standing Army defends one stronger; it adds no hit points.
 _Avoid_: police, militia, garrison, barracks (that is the Colony word)
 
 **Refugees**:
@@ -461,11 +465,11 @@ A ppm of Blame bought off a Faction's ledger, since version 0.08.4, from the Cus
 _Avoid_: offset, indulgence, Blame credit (that is what the seller holds), carbon permit
 
 **Smear**:
-Influence spent on a rival Faction rather than a place, since version 0.08.4: every point lays two ppm on the rival's Blame ledger for good, moving the share every rule reads. One campaign a turn against each rival, of any amount the Allotment covers; an offence, and the Report names who paid. Called a smear because it inflates Blame above the ppm the rival actually produced -- a kind of a lie -- which is why the ledger and not the physics is what the rules read. The computer seats use it against a rival they are Cold or Hostile toward whose share stands above the fair quarter.
+Influence spent on a rival Faction rather than a place, since version 0.08.4: every point lays two ppm on the rival's Blame ledger for good, moving the share every rule reads. One campaign a turn against each rival, of any amount the Allotment covers -- set since version 0.08.6 on a slider in single points, from nought to the turn's whole Influence with the part already ordered elsewhere greyed, and spent with a button; an offence, and the Report names who paid. Called a smear because it inflates Blame above the ppm the rival actually produced -- a kind of a lie -- which is why the ledger and not the physics is what the rules read. The computer seats use it against a rival they are Cold or Hostile toward whose share stands above the fair quarter.
 _Avoid_: propaganda, denounce, expose, libel
 
 **Greenwash**:
-Influence spent on a Faction's own name, with a Ducat beside every point, since version 0.08.5: every point takes two ppm off the Faction's own Blame ledger for good, the whole ledger and never below nothing, moving the share every rule reads. One campaign a turn, of any amount the Allotment and the Ducats cover; public and no offence, so the Report says who greenwashed and a rival may answer with a Smear. The Smear's mirror, at the designer's word, and open to every Faction, the Custodians included. Called a greenwash because the Blame falls without a gram of CO2 leaving the air. The computer seats use it when their own share stands above the fair quarter and carbon credits are not to be had.
+Influence spent on a Faction's own name, with a Ducat beside every point, since version 0.08.5: every point takes two ppm off the Faction's own Blame ledger for good, the whole ledger and never below nothing, moving the share every rule reads. One campaign a turn, of any amount the Allotment and the Ducats cover -- set since version 0.08.6 on the Smear's slider with the Ducats painted as a second bound where they bite first; public and no offence, so the Report says who greenwashed and a rival may answer with a Smear. The Smear's mirror, at the designer's word, and open to every Faction, the Custodians included. Called a greenwash because the Blame falls without a gram of CO2 leaving the air. The computer seats use it when their own share stands above the fair quarter and carbon credits are not to be had.
 _Avoid_: propaganda, PR, spin, whitewash, clean-up, self-smear
 
 **Blame Credit**:
@@ -537,7 +541,7 @@ The phase in which a Faction commits everything it will do that turn: building, 
 _Avoid_: commands, moves, actions, player phase
 
 **End Turn**:
-The commitment. Pressing it closes the Orders phase, after which the Event card is drawn and nothing can be taken back.
+The commitment. Pressing it closes the Orders phase, after which the Event card is drawn and nothing can be taken back. Since version 0.08.6 it is a **sun** at the right of the Command Cluster's last row -- a shaded disc with sunspots, the words beneath it, the Enter key on its hover -- that dims to embers while a Tech pick is owed.
 _Avoid_: submit, confirm, next turn
 
 **Resolution**:
@@ -549,7 +553,7 @@ The phase that opens a turn for the player, and the dated dispatch it shows. It 
 _Avoid_: summary, news, digest
 
 **Tutorial**:
-The guided first turns, since version 0.07.5, asked for by the `Play Tutorial` tick at the foot of the Custodians' card on the Faction screen -- since version 0.07.6, which retired the title screen's button -- and played as the Custodians from a start the player chooses as in any other game. It is an ordinary game on an ordinary board: nothing is forced and nothing is checked, and a **tutorial note** -- drawn as a Moment is drawn -- opens each of the first five turns to say what that turn is for. The last note says so and the tutorial ends itself; the game carries on with nothing thrown away. The game does not remember it has been played. Its words live in `assets/data/tutorial.toml`.
+The guided first turns, since version 0.07.5, asked for by the `Play Tutorial` tick at the foot of the Custodians' card on the Faction screen -- since version 0.07.6, which retired the title screen's button -- and played as the Custodians from a start the player chooses as in any other game. It is an ordinary game on an ordinary board: nothing is forced and nothing is checked, and a **tutorial note** -- drawn as a Moment is drawn -- opens each of the first six turns (five until version 0.08.6, which put a Habitat on the ISS before the recruit) to say what that turn is for. The last note says so and the tutorial ends itself; the game carries on with nothing thrown away. The game does not remember it has been played. Its words live in `assets/data/tutorial.toml`.
 _Avoid_: walkthrough, onboarding, training mission, guided mode
 
 **Moment**:
@@ -567,19 +571,23 @@ _Avoid_: checkpoint, snapshot, savegame
 ### Combat
 
 **Battle**:
-A melee at one Body, Region or Colony in which every Faction present is hostile to every other, resolved automatically in rounds during end-of-turn processing and always finished inside the turn. Each round a party's chance to hit is its share of the total strength present, and its hits are spread across the other parties in proportion to theirs. Since version 0.08.5 a Battle on Earth pollutes: its hits and the buildings it burns are Emissions at the next Climate phase, and Blame for those who landed them.
+A melee at one Body, Region or Colony in which every Faction present is hostile to every other, resolved automatically in rounds during end-of-turn processing and always finished inside the turn. Each round a party's chance to hit is its share of the total strength present, and its hits are spread across the other parties in proportion to theirs. Since version 0.08.5 a Battle on Earth pollutes: its hits are Emissions at the next Climate phase, and Blame for those who landed them. Until version 0.08.6 a quarter of the buildings at the place rolled to burn after every ground Battle; a Battle itself burns nothing now, and only a place taken by an Occupation that ran its three turns rolls.
 _Avoid_: fight, engagement, skirmish, encounter
 
 **Stance**:
-The one order a stack carries into end-of-turn processing: Attack, Hold, Intercept (Ships only, engaging arrivals before they unload) or Evade.
+The one order a stack carries into end-of-turn processing: Attack, Hold, Intercept (Ships only, engaging arrivals before they unload), Blockade (Ships only, since version 0.08.5), Evade, or, for Armies since version 0.08.6, **Dig In**. A stance persists until it is changed; Hold does nothing of its own.
 _Avoid_: order, mode, posture, aggression setting
 
+**Dig In**:
+An Army's third live stance, since version 0.08.6. Dug in, an Army fights two stronger while it defends and never rolls to disengage; its hit points do not follow the bonus. It cannot march or board a Carrier until its stance has been changed and the turn has passed, so digging out costs a turn. It takes effect at the Resolution of the turn it is ordered, like every stance. A neutral Region's own Armies -- its Standing Army and its Levy -- are always dug in, since nobody can order them; a held Region's take the holder's order. The computer digs in where a rival's Army stands next door and it has no cause to attack, and wherever it occupies. Shown as a word on the stance row, a trench line under the Army's shield on the map, and a Report line the turn it happens.
+_Avoid_: entrench, fortify, defend, garrison mode
+
 **Strength**:
-How hard a unit hits. A unit's type sets it; Hardened Hulls raises it for every Ship.
+How hard a unit hits. A Ship's type sets it, and Hardened Hulls raises it for every Ship. An Army's is the Region's since version 0.08.6: a Standing Army's is its Region's Industry Level plus one plus its armed steps, read live; a raised Army's the same figure at the raise, fixed; a Colony's the average of its Faction's Regions. What an Army defends at is more: its Region's Constabulary and calm for a Standing Army, and Dig In's two for any Army dug in.
 _Avoid_: attack, power, combat value
 
 **Hit Points**:
-How much damage a unit can take before it is destroyed with everything it carries. Damage persists until repaired at a Shipyard or Launch Site (Ships) or in a controlled Region or a Colony with a Barracks (Armies).
+How much damage a unit can take before it is destroyed with everything it carries. A Ship's type sets it; an Army's equal its strength since version 0.08.6 -- live for a Standing Army, fixed at the raise for a raised or a Colony's -- and never its defence. Damage persists until repaired at a Shipyard or Launch Site (Ships) or in a controlled Region or a Colony with a Barracks (Armies).
 _Avoid_: health, HP, hull, morale
 
 **Pursuit**:
@@ -587,7 +595,7 @@ A unit's ability to catch an enemy unit that disengages, forcing it to take one 
 _Avoid_: speed, chase, initiative
 
 **Disengage**:
-A damaged unit's attempt to leave a Battle, more likely the more damage it carries. A unit that disengages and is not caught survives and cannot be attacked again that turn.
+A damaged unit's attempt to leave a Battle, more likely the more damage it carries: after every round, its damage over its hit points over a figure in the data, three since version 0.08.6 and two before, so a unit at half its hit points leaves one time in six. A unit that disengages and is not caught survives and cannot be attacked again that turn. Evade is a chosen flat half before the first round, not this roll.
 _Avoid_: retreat, rout, flee, break
 
 **Battle Report**:
@@ -603,11 +611,15 @@ What a warship stack does when it is ORDERED to, since version 0.08.5, in the Or
 _Avoid_: siege, embargo, interdiction, orbital control
 
 **Occupation**:
-The state of a Region or Colony whose defenders were beaten by an Army. The occupier chooses build orders but does not direct its Armies; control transfers after the lesser of three turns or the population being Pacified.
+The state of a Region or Colony whose defenders were beaten by an Army. The occupier chooses build orders but does not direct its Armies; control transfers after the lesser of three turns or the population being Pacified. Since version 0.08.6 the two ends differ: a transfer by the three-turn clock rolls a quarter of the buildings to burn, a transfer by Pacified takes the place **whole**, and either fires the Moment for a place taken by force. An Occupation **breaks** the moment the occupier has no Army at the place, whether the last one marched off, was lifted or was destroyed, and since version 0.08.6 a break costs: the place hands back to its previous holder at +2 Unrest, the occupier takes a rung-2 Offence from that holder (a neutral charges nobody), and the Standing the Occupation had banked for the occupier is wiped. The march itself stays legal: an occupier may leave, and pays.
 _Avoid_: conquest, annexation, capture
 
+**Offence**:
+An act against a rival that costs Relations, weighed on a ladder: **1** for Influence spent on a place the rival holds (once per place per turn), a Smear, an Agitate, or a turn of Blockade; **2**, since version 0.08.6, for an Occupation of the rival's place that broke; **3** for opening a Battle against them or breaking an Accord with them. A turn charges the sum of every offence in it, to a cap, and an offence against a non-aggression partner breaks the Accord as well. The rival's Report names who paid.
+_Avoid_: crime, aggression score, penalty, grievance
+
 **Pacified**:
-An occupied population whose occupier's Influence, gained automatically each turn of Occupation, has passed the place's threshold. The gain is halved while the state's Unrest is past its first threshold. Control transfers at the moment the threshold is passed.
+An occupied population whose occupier's Influence, gained automatically each turn of Occupation, has passed the place's threshold. The gain is halved while the state's Unrest is past its first threshold. Control transfers at the moment the threshold is passed, and since version 0.08.6 the place is taken whole: nothing rolls to burn. Pacified is a condition of the place's people, not of any building.
 _Avoid_: subdued, loyal, converted
 
 ### Winning

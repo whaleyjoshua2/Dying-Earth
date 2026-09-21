@@ -40,6 +40,16 @@ impl Game {
         // in this same Resolution denied a landing to the seat that had just won the orbit -- which
         // cost a playtested Archivist the turn they had fought three ships for.
         self.resolve_cargo(); // (g)
+        // Ticket #300 (version 0.08.6): a landed Army may Attack on the turn it lands. Until this
+        // version it came down after the Battles at Hold, so an invasion of a Colony was a landing
+        // turn and then an Attack turn. Now the Armies that landed this turn on Attack fight a
+        // second ground pass at their Colonies, and a landing that met nobody occupies at once.
+        let landed = std::mem::take(&mut self.pending.landed);
+        if !landed.is_empty() {
+            let places: Vec<Place> = self.colonies.iter().map(|c| Place::Colony(c.id)).collect();
+            self.ground_battles(places.clone(), Some(&landed));
+            self.resolve_occupation_at(places);
+        }
         self.resolve_builds(); // (e)
         self.resolve_repairs(); // (f)
         self.resolve_antarctic(); // (g), ticket #73: Emigrants by sea land a turn after they left
@@ -258,7 +268,21 @@ impl Game {
         // place, and two Factions attacking the same place the same turn make one melee of all parties.
         let mut places: Vec<Place> = StateId::ALL.into_iter().map(Place::State).collect();
         places.extend(self.colonies.iter().map(|c| Place::Colony(c.id)));
+        self.ground_battles(places, None);
+    }
+
+    /// The ground melees at `places`. Ticket #300 (version 0.08.6): called a second time after
+    /// cargo has landed, with `only_landed` naming the Armies that came down this turn, so a
+    /// landed Army fights the turn it lands; the orbit is fought first, at (b), and the ground is
+    /// reached by whoever won it. Only a place where one of those Armies stands on Attack fights
+    /// in the second pass, so nothing already fought at (b) is fought twice.
+    fn ground_battles(&mut self, places: Vec<Place>, only_landed: Option<&[ArmyId]>) {
         for place in places {
+            if let Some(landed) = only_landed
+                && !self.armies.iter().any(|a| landed.contains(&a.id) && a.at == ArmyAt::Place(place) && a.stance == Stance::Attack && !a.escaped)
+            {
+                continue;
+            }
             let aggressors: Vec<Seat> = Seat::ALL
                 .into_iter()
                 .filter(|seat| {
@@ -308,7 +332,10 @@ impl Game {
             }
             let name = self.place_name(place);
             self.army_melee(&name, place, &aggressors, &parties);
-            self.destruction_rolls(place, "attacked", &aggressors);
+            // Ticket #298 (version 0.08.6): the Battle itself burns nothing. Until this version a
+            // quarter of every building at the place rolled after every ground Battle, win or lose,
+            // and again on the transfer, so force burned twice where Influence never did; at the
+            // designer's word only a place that transfers by the three-turn clock rolls now.
             // Ticket #282 (version 0.08.5): a neutral Region attacked that still has a defender
             // standing, unescaped, has held, and arms for good: +1 to its Standing Army, to
             // Industry + 4, at the designer's word.
@@ -322,12 +349,10 @@ impl Game {
     }
 
     /// Ticket #282: the step a neutral Region earns by holding, and the Report line that says so.
+    /// Ticket #302 (version 0.08.6): no ceiling, and the step is the table's.
     pub fn neutral_held(&mut self, sid: StateId) {
         self.neutral_holds += 1;
-        if self.state(sid).armed >= Game::MAX_ARMED {
-            return;
-        }
-        self.state_mut(sid).armed += 1;
+        self.state_mut(sid).armed += self.tables.standing_army.held_step;
         let (state, n) = (self.tables.state(sid).name.clone(), self.standing_army_cap(sid));
         self.log(format!("{state} held against the attack and arms: its Standing Army will stand at {n}."));
         let text = self.say("neutral_held", &[("state", state), ("n", n.to_string())]);
@@ -395,13 +420,20 @@ impl Game {
         Combatant::new(UnitRef::Ship(id), self.ship_name(s), self.ship_strength(s), card.hit_points, s.damage, card.pursuit, s.stance == Stance::Evade)
     }
 
-    fn army_combatant(&self, id: ArmyId) -> Combatant {
+    /// `defending`: the Army is not on the aggressor's side of this melee. Ticket #302 (version
+    /// 0.08.6): a defender fights at its strength plus its defence -- a Region's own Army's
+    /// Constabulary and calm -- plus Dig In's term if dug in; an aggressor at its strength alone.
+    fn army_combatant(&self, id: ArmyId, defending: bool) -> Combatant {
         let a = self.army(id).unwrap();
         let card = self.tables.unit(UnitKind::Army);
         // Ticket #281 (version 0.08.5): by name -- the 1st Chinese Army -- as every other surface has
         // it since 0.08.4; a neutral Region's own Army is named the same way.
         let name = self.army_name(a);
-        Combatant::new(UnitRef::Army(id), name, self.army_strength(a), card.hit_points, a.damage, card.pursuit, a.stance == Stance::Evade)
+        // Ticket #296 (version 0.08.6): hit points are the Army's own, not the card's. Ticket #297:
+        // dug in, it never rolls to disengage.
+        let dug_in = self.army_dug_in(a);
+        let strength = if defending { self.army_defended_strength(a) } else { self.army_strength(a) };
+        Combatant::new(UnitRef::Army(id), name, strength, self.army_hit_points(a), a.damage, card.pursuit, a.stance == Stance::Evade).dug_in(dug_in)
     }
 
     /// One melee of Ship stacks at a Body (ticket #50).
@@ -444,7 +476,7 @@ impl Game {
             }
         }
         let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
-            parties.iter().map(|(seat, agg, ids)| (*seat, *agg, ids.iter().map(|id| self.army_combatant(*id)).collect())).collect();
+            parties.iter().map(|(seat, agg, ids)| (*seat, *agg, ids.iter().map(|id| self.army_combatant(*id, !*agg)).collect())).collect();
         let mut line = self.run_melee(place_name, Some(place.into()), units);
         // Ticket #286 (version 0.08.5): counted by the seat that opened it, and against a neutral.
         for seat in aggressors {
@@ -476,7 +508,7 @@ impl Game {
         let stats = {
             let mut slices: Vec<&mut [Combatant]> = parties.iter_mut().map(|(_, _, c)| c.as_mut_slice()).collect();
             let mut rng = self.rng.clone();
-            let stats = combat::melee(&mut slices, &mut rng as &mut dyn Dice);
+            let stats = combat::melee(&mut slices, &mut rng as &mut dyn Dice, self.tables.disengage.divisor);
             self.rng = rng;
             stats
         };
@@ -512,6 +544,23 @@ impl Game {
                 odds: if *agg { Some(combat::first_round_odds(strengths[i], total - strengths[i])) } else { None },
             })
             .collect();
+        // Ticket #295 (version 0.08.6): escapes counted at the event, by the seat the unit fought
+        // for, so the sweep can say what the disengage figure does.
+        let mut any_escape = false;
+        for (i, (seat, _, _)) in parties.iter().enumerate() {
+            let n = stats.escaped.get(i).map(|e| e.len() as u32).unwrap_or(0);
+            if n == 0 {
+                continue;
+            }
+            any_escape = true;
+            match seat {
+                Some(s) => self.war.escapes[s.index()] += n,
+                None => self.war.escapes_neutral += n,
+            }
+        }
+        if any_escape {
+            self.war.battles_with_escape += 1;
+        }
         let line = BattleLine { place: place.to_string(), parties: listed, result: format!("{} round(s).", stats.rounds), at };
         // The Battle's own line goes in BEFORE the losses are applied, so among the rank-4 lines a
         // turn holds it is the earliest and headlines over "PMV Magellan destroyed (battle)".
@@ -626,9 +675,13 @@ impl Game {
     }
 
     /// Spec 8.5: every Facility or Module at a place rolls a 1-in-4 chance to be destroyed.
-    /// Ticket #279 (version 0.08.5): `charged` are the seats that wear what burns -- the aggressors
-    /// after a Battle, the taker on a transfer -- at the table's ppm per building, split between them.
-    fn destruction_rolls(&mut self, place: Place, why: &str, charged: &[Seat]) {
+    /// Ticket #279 (version 0.08.5): `charged` are the seats that wear what burns -- the taker on a
+    /// transfer -- at the table's ppm per building, split between them.
+    /// Ticket #298 (version 0.08.6): called from one place now, the transfer by the three-turn
+    /// clock; a Battle burns nothing and a Pacified transfer rolls nothing. A Unique Facility is
+    /// rolled like any other building, at the designer's word. Returns what burned; the Moment for
+    /// a place taken by force is the transfer's, fired whether or not anything burned.
+    fn destruction_rolls(&mut self, place: Place, why: &str, charged: &[Seat]) -> Vec<String> {
         let p = self.tables.influence.destruction_chance;
         let mut lost = Vec::new();
         match place {
@@ -682,14 +735,9 @@ impl Game {
                 "units_destroyed",
                 &[("place", self.place_name(place)), ("why", why.to_string()), ("lost", lost.join(", "))],
             );
-            self.report_line(LineKind::DecisiveBattle, Some(place.into()), text.clone());
-            // Ticket #281 (version 0.08.5): under its own name. The Battle's Moment is the Battle's.
-            self.moment(
-                MomentKind::PlaceTakenByForce,
-                &[("place", self.place_name(place)), ("result", text), ("figure", format!("{} lost", lost.len()))],
-                Some(place.into()),
-            );
+            self.report_line(LineKind::DecisiveBattle, Some(place.into()), text);
         }
+        lost
     }
 
     // ------------------------------------------------------------------ (c)
@@ -697,21 +745,55 @@ impl Game {
     fn resolve_occupation(&mut self) {
         let mut places: Vec<Place> = StateId::ALL.into_iter().map(Place::State).collect();
         places.extend(self.colonies.iter().map(|c| Place::Colony(c.id)));
+        self.resolve_occupation_at(places);
+    }
+
+    /// Ticket #300 (version 0.08.6): the Occupation pass over a given set of places, so the
+    /// Colonies a landing reached this turn can be checked again after the second ground pass --
+    /// a landing that meets nobody begins its Occupation the same turn.
+    fn resolve_occupation_at(&mut self, places: Vec<Place>) {
         for place in places {
             let control = self.place_control(place);
             match control {
-                Control::Occupied { occupier, previous, turns } => {
+                Control::Occupied { occupier, previous, turns, banked } => {
                     if self.armies_of_seat_at(occupier, place).is_empty() {
-                        // Occupation broken.
+                        // Occupation broken. Ticket #299 (version 0.08.6): at a cost, whether the
+                        // last Army marched off, was lifted or was destroyed -- the place hands back
+                        // at +2 Unrest, the occupier takes a rung-2 offence from the previous holder
+                        // (a neutral charges nobody), and the Standing the Occupation banked is wiped.
+                        // Until this version a break was silent and free.
                         let back = match previous {
                             Some(p) => Control::Controlled(p),
                             None => Control::Neutral,
                         };
                         self.set_place_control(place, back);
                         self.war.occupations_broken[occupier.index()] += 1;
-                        let line = format!("Occupation of {} by the {} ended.", self.place_name(place), self.seat_name(occupier));
+                        if let Place::State(sid) = place {
+                            let n = self.tables.unrest.occupation_break;
+                            self.raise_unrest(sid, n, UnrestSource::Plain);
+                        }
+                        if let Some(p) = previous {
+                            self.offend_by(occupier, p, self.tables.relations.occupation_broken_offence);
+                        }
+                        if banked > 0 {
+                            let s = self.seat_mut(occupier);
+                            if let Some(v) = s.influence.get_mut(&place) {
+                                *v = (*v - banked).max(0);
+                            }
+                        }
+                        let holder = previous.map(|p| self.seat_name(p)).unwrap_or_else(|| "nobody".to_string());
+                        let line = format!("Occupation of {} by the {} broke: back to the {} at +{:.0} Unrest, an offence.", self.place_name(place), self.seat_name(occupier), holder, self.tables.unrest.occupation_break);
                         self.log(line);
-                        let text = self.say("occupation_ended", &[("place", self.place_name(place)), ("faction", self.seat_name(occupier))]);
+                        let text = self.say(
+                            "occupation_broken",
+                            &[
+                                ("place", self.place_name(place)),
+                                ("faction", self.seat_name(occupier)),
+                                ("holder", holder),
+                                ("unrest", Game::unrest_figure(self.tables.unrest.occupation_break)),
+                                ("standing", banked.to_string()),
+                            ],
+                        );
                         self.report_line(LineKind::Occupation, Some(place.into()), text);
                         continue;
                     }
@@ -719,13 +801,13 @@ impl Game {
                         continue; // defenders re-engaged; the count does not advance
                     }
                     let turns = turns + 1;
-                    self.set_place_control(place, Control::Occupied { occupier, previous, turns });
                     // Ticket #52: every turn of Occupation adds one to the state's Unrest.
                     if let Place::State(sid) = place {
                         let n = self.tables.unrest.occupation_per_turn;
                         self.raise_unrest(sid, n, UnrestSource::Plain);
                     }
-                    self.occupation_gain(place, occupier);
+                    let gain = self.occupation_gain(place, occupier);
+                    self.set_place_control(place, Control::Occupied { occupier, previous, turns, banked: banked + gain });
                     let have = self.seat(occupier).influence.get(&place).copied().unwrap_or(0);
                     let pacified = have > 0 && have >= self.influence_threshold(place);
                     if pacified || turns >= self.tables.influence.occupation_turns {
@@ -741,7 +823,7 @@ impl Game {
                             continue;
                         }
                         let previous = control.controller();
-                        self.set_place_control(place, Control::Occupied { occupier: seat, previous, turns: 1 });
+                        self.set_place_control(place, Control::Occupied { occupier: seat, previous, turns: 1, banked: 0 });
                         self.war.occupations_begun[seat.index()] += 1;
                         // Ticket #52: an Occupation begins at +3 Unrest, damped by nothing.
                         if let Place::State(sid) = place {
@@ -752,7 +834,8 @@ impl Game {
                         self.log(line);
                         let text = self.say("occupation_begun", &[("faction", self.seat_name(seat)), ("place", self.place_name(place))]);
                         self.report_line(LineKind::Occupation, Some(place.into()), text);
-                        self.occupation_gain(place, seat);
+                        let gain = self.occupation_gain(place, seat);
+                        self.set_place_control(place, Control::Occupied { occupier: seat, previous, turns: 1, banked: gain });
                         let have = self.seat(seat).influence.get(&place).copied().unwrap_or(0);
                         let pacified = have > 0 && have >= self.influence_threshold(place);
                         if pacified || self.tables.influence.occupation_turns <= 1 {
@@ -765,13 +848,15 @@ impl Game {
         }
     }
 
-    fn occupation_gain(&mut self, place: Place, seat: Seat) {
+    /// Returns the Standing gained, which the Occupation banks (ticket #299).
+    fn occupation_gain(&mut self, place: Place, seat: Seat) -> i64 {
         // Ticket #187 (version 0.08.0): an occupier's Standing is an outsider's by definition, so
         // Resistance bites it. Otherwise invading would be the way round a well-schooled population.
         let gain = self.standing_from(place, self.pacification_gain(place));
         let s = self.seat_mut(seat);
         *s.influence.entry(place).or_insert(0) += gain;
         s.influenced_this_turn.push(place);
+        gain
     }
 
     pub fn place_control(&self, place: Place) -> Control {
@@ -871,9 +956,16 @@ impl Game {
             Some(place.into()),
         );
         // Version 0.03 (ticket #31): a place taken by Influence keeps everything; only a place
-        // that Occupation transfers rolls for destruction.
+        // that Occupation transfers rolls for destruction. Ticket #298 (version 0.08.6): and only
+        // one that the three-turn clock transfers -- a place that transfers by PACIFIED is taken
+        // whole, at the designer's word, so "beat the Army, then win the people" keeps what it wins.
+        // The Moment for a place taken by force fires on every take by force, burned or not: the
+        // taking is the news, not the fire.
         if why != "Influence" {
-            self.destruction_rolls(place, "taken", &[seat]);
+            let lost = if why == "Pacified" { Vec::new() } else { self.destruction_rolls(place, "taken", &[seat]) };
+            let result = if lost.is_empty() { format!("{} taken whole by the {} ({why}).", self.place_name(place), self.seat_name(seat)) } else { format!("{} was taken: {} destroyed.", self.place_name(place), lost.join(", ")) };
+            let figure = if lost.is_empty() { "nothing lost".to_string() } else { format!("{} lost", lost.len()) };
+            self.moment(MomentKind::PlaceTakenByForce, &[("place", self.place_name(place)), ("result", result), ("figure", figure)], Some(place.into()));
         }
         // Armies at the place that fought for the old owner stand for the new one only if they are the place's own.
         // Foreign Armies keep their own home and seat; nothing to do.
@@ -1762,6 +1854,7 @@ impl Game {
                                 self.report_line_of(seat, LineKind::YourWorks, LineKind::Ship, Some(ReportPlace::Colony(cid)), text);
                             }
                             if let Some(aid) = aboard_army.filter(|_| army) {
+                                self.war.armies_landed[seat.index()] += 1;
                                 self.land_army(aid, ship, Place::Colony(cid));
                                 let line = format!("{} landed an Army at {}.", self.seat_name(seat), self.place_name(Place::Colony(cid)));
                                 self.log(line);
@@ -2064,13 +2157,19 @@ impl Game {
         if divisor <= 0 { threshold } else { (threshold + divisor - 1) / divisor }
     }
 
+    /// Ticket #300 (version 0.08.6): the stance is inferred from whose place it is, no new field --
+    /// Attack at a Colony this seat does not direct, which is what the landing button says, Hold at
+    /// its own -- and the Army is remembered for the second ground pass of this Resolution.
     fn land_army(&mut self, aid: ArmyId, ship: ShipId, place: Place) {
+        let seat = self.army(aid).and_then(|a| self.army_seat(a));
+        let attacking = seat.is_some() && self.place_director(place) != seat;
         if let Some(a) = self.army_mut(aid) {
             a.at = ArmyAt::Place(place);
-            a.stance = Stance::Hold;
+            a.stance = if attacking { Stance::Attack } else { Stance::Hold };
         }
         if let Some(s) = self.ship_mut(ship) {
             s.army = None;
         }
+        self.pending.landed.push(aid);
     }
 }

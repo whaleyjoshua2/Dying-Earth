@@ -22,7 +22,15 @@ pub struct Stockpile {
 pub enum Control {
     Neutral,
     Controlled(Seat),
-    Occupied { occupier: Seat, previous: Option<Seat>, turns: u32 },
+    /// Ticket #299 (version 0.08.6): `banked` is the Standing the Occupation itself has brought
+    /// the occupier so far, wiped if the Occupation breaks; a save from before carries nought.
+    Occupied {
+        occupier: Seat,
+        previous: Option<Seat>,
+        turns: u32,
+        #[serde(default)]
+        banked: i64,
+    },
 }
 
 impl Control {
@@ -208,6 +216,10 @@ pub struct NationState {
     /// each +1 to its Standing Army's strength for good, to Industry + 4.
     #[serde(default)]
     pub armed: u32,
+    /// Ticket #302 (version 0.08.6): whether the Region was threatened at the last Income, so a
+    /// threat arms it once per episode rather than once a turn.
+    #[serde(default)]
+    pub threatened: bool,
     /// Ticket #282: Incomes still to wait before a destroyed Standing Army is raised again -- one,
     /// so it returns two Incomes after it died rather than the next, and a won Battle opens a window.
     #[serde(default)]
@@ -489,6 +501,11 @@ pub struct Army {
     /// when the threat passes. Standing, so it fights for the Region and never marches.
     #[serde(default)]
     pub levy: bool,
+    /// Ticket #302 (version 0.08.6): a raised Army's strength and hit points, fixed at the raise --
+    /// its home Region's Industry + 1, or for a Colony's the rounded average Industry of the Regions
+    /// its raising Faction held, + 1. Nought on a save from before, which reads the card's figure.
+    #[serde(default)]
+    pub raised_strength: u32,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -928,6 +945,22 @@ pub struct WarCounters {
     pub marches_neutral: [u32; SEAT_COUNT],
     pub marches_held: [u32; SEAT_COUNT],
     pub orbit_attacks: [u32; SEAT_COUNT],
+    /// Ticket #295 (version 0.08.6): units that escaped a Battle, by the seat they fought for, and
+    /// a neutral Region's own; and Battles in which any unit escaped. The disengage figure was
+    /// never measured before it was nudged.
+    #[serde(default)]
+    pub escapes: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub escapes_neutral: u32,
+    #[serde(default)]
+    pub battles_with_escape: u32,
+    /// Ticket #297 (version 0.08.6): Dig In orders committed, by seat.
+    #[serde(default)]
+    pub dig_ins: [u32; SEAT_COUNT],
+    /// Ticket #300 (version 0.08.6): Armies landed from a Carrier at a Colony, by seat. Never
+    /// counted before; the reviews measured no Army carried by anybody in eighty games.
+    #[serde(default)]
+    pub armies_landed: [u32; SEAT_COUNT],
 }
 
 impl WarCounters {
@@ -945,9 +978,14 @@ impl WarCounters {
             self.marches_neutral[i] += o.marches_neutral[i];
             self.marches_held[i] += o.marches_held[i];
             self.orbit_attacks[i] += o.orbit_attacks[i];
+            self.escapes[i] += o.escapes[i];
+            self.dig_ins[i] += o.dig_ins[i];
+            self.armies_landed[i] += o.armies_landed[i];
         }
         self.battles_vs_neutral += o.battles_vs_neutral;
         self.standing_armies_lost += o.standing_armies_lost;
+        self.escapes_neutral += o.escapes_neutral;
+        self.battles_with_escape += o.battles_with_escape;
     }
 }
 
@@ -1280,6 +1318,7 @@ impl Game {
                 lost_slots: 0,
                 converted: 0,
                 armed: 0,
+                threatened: false,
                 respawn_wait: 0,
                 armies_raised: 0,
                 drowned: Vec::new(),
@@ -1395,7 +1434,10 @@ impl Game {
             let Some(slot) = game.tables.body(BodyId::Earth).stations.iter().position(|n| *n == want) else { continue };
             let id = ColonyId(game.fresh_id());
             // Ticket #164 (version 0.07.5): the three starting stations stand with their Core Modules.
-            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+            // Ticket #290 (version 0.08.6): and with the card's Colonists aboard, from nowhere, so a
+            // starting station has Module slots to build in from turn one; bare, it had none.
+            let aboard = game.tables.faction(game.kind(seat)).start_colonists;
+            game.colonies.push(Colony { id, body: BodyId::Earth, slot: slot as u32, control: Control::Controlled(seat), modules: vec![Module::new(ModuleKind::Core)], colonists: aboard, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
         }
         // Starting positions (spec 14.3, ticket #50): the player's pick, then each AI seat in turn.
         let mut taken = vec![setup.player_start];
@@ -1417,6 +1459,10 @@ impl Game {
             for f in game.state_mut(*sid).facilities.iter_mut() {
                 f.kind = f.kind.built_by(faction);
             }
+            // Ticket #290 (version 0.08.6): the card's Pioneers waiting on turn one, a gift outside
+            // the recruit rate that takes no population -- the Arkwrights' two, the mirror of the
+            // two Colonists the other three seats have aboard a station they do not have.
+            game.state_mut(*sid).emigrants += game.tables.faction(faction).start_emigrants;
             // Ticket #75 (version 0.05.5): a claim on its home from turn 1. The seat's Standing on its
             // start state begins at the state's threshold, so a challenger needs the threshold plus
             // the margin at once and the holder's spending counts from a real footing; with nothing
@@ -2103,20 +2149,24 @@ impl Game {
         }
     }
 
-    /// Industry Level + 1, plus every step the Region has earned holding against an attack
-    /// (ticket #282, version 0.08.5; neutral Regions only earn them).
+    /// Industry Level + 1, plus every step the Region has ARMED by: one for each attack a neutral
+    /// held against (ticket #282, version 0.08.5), and since ticket #302 (version 0.08.6) two for
+    /// each threat episode a neutral lived through, where a Levy used to be raised. No ceiling: a
+    /// long-neutral Region is a fortress by force, and Influence is the cheap way in.
     pub fn standing_army_cap(&self, s: StateId) -> u32 {
         self.state(s).industry_level + 1 + self.state(s).armed
     }
 
-    /// Ticket #282: a Levy's strength, Industry + 2, at the designer's word.
-    pub fn levy_cap(&self, s: StateId) -> u32 {
-        self.state(s).industry_level + 2
+    /// Ticket #302 (version 0.08.6): **a Region's defence is its people**, as defence. What a
+    /// Region's own Army adds to its strength WHILE IT DEFENDS, and never to its hit points: the
+    /// table's `constabulary` while a working Constabulary stands there (the same test its Unrest
+    /// effect uses) and `calm` while Unrest is under the Standing Army's threshold (the same test
+    /// that lets it heal). Read live. Ticket #296 had put these two into strength and hit points;
+    /// the designer moved them: "begin by moving the constabulary and unrest bonuses to defense".
+    pub fn defence_bonus(&self, s: StateId) -> u32 {
+        let t = &self.tables.standing_army;
+        (if self.constabulary_online(s) { t.constabulary } else { 0 }) + (if self.army_replenishes(s) { t.calm } else { 0 })
     }
-
-    /// Ticket #282: the most steps a neutral Region may earn, so its Standing Army never passes
-    /// Industry + 4.
-    pub const MAX_ARMED: u32 = 3;
 
     /// Ticket #282: whether a neutral Region is threatened -- a built Army of any Faction stands in
     /// a neighbouring Region, or a neighbour is under Occupation. Stance-blind, at the designer's
@@ -2128,32 +2178,74 @@ impl Game {
             })
     }
 
-    /// Ticket #282: the Levy standing at a Region, if one does.
-    pub fn levy_at(&self, s: StateId) -> Option<ArmyId> {
-        self.armies.iter().find(|a| a.levy && a.home == ArmyHome::State(s)).map(|a| a.id)
+    /// Ticket #297 (version 0.08.6): whether an Army is dug in -- ordered to Dig In, or a neutral
+    /// Region's own Army, which is always dug in since nobody can order it and its escape was the
+    /// accident the stance exists to end. Read by the Battle (the defence bonus, no disengage), by
+    /// the march and the Carrier lift (refused), and by every surface that shows it.
+    pub fn army_dug_in(&self, a: &Army) -> bool {
+        a.stance == Stance::DigIn || (a.standing && matches!(a.home, ArmyHome::State(s) if self.state(s).control == Control::Neutral))
     }
 
-    /// Ticket #282: raise a Region's Levy, named as any Army from its home and at full strength.
-    pub fn raise_levy(&mut self, s: StateId) -> ArmyId {
-        let id = self.raise_army(Place::State(s), true);
-        if let Some(a) = self.army_mut(id) {
-            a.levy = true;
+    /// An Army's hit points. Ticket #296 (version 0.08.6): a Region's own Army -- its Standing Army
+    /// or its Levy -- has as many as its live strength before damage, so a calm, policed Region is
+    /// a wall and a restive one soft, and an Army whose damage reaches its strength is destroyed
+    /// rather than sitting at strength nought (the limbo the reviews found). A built Army, and a
+    /// Colony's, keep the card's.
+    pub fn army_hit_points(&self, a: &Army) -> u32 {
+        match a.home {
+            ArmyHome::State(s) if a.standing => self.standing_army_cap(s).max(1),
+            // Ticket #302 (version 0.08.6): a raised Army's, fixed at the raise; the card's on a
+            // save from before.
+            _ if !a.standing && a.raised_strength > 0 => a.raised_strength,
+            _ => self.tables.unit(UnitKind::Army).hit_points,
         }
-        self.levies_raised += 1;
-        id
+    }
+
+    /// Ticket #302 (version 0.08.6): what an Army adds to its strength while it defends -- a
+    /// Region's own Army reads its Region's people (`defence_bonus`); a raised Army and a
+    /// Colony's read nothing; Dig In's own term is added by the Battle for any Army dug in.
+    pub fn army_defence(&self, a: &Army) -> i64 {
+        match a.home {
+            ArmyHome::State(s) if a.standing => self.defence_bonus(s) as i64,
+            _ => 0,
+        }
+    }
+
+    /// Ticket #302: what an Army fights at when attacked -- its strength, its defence, and Dig In
+    /// if it is dug in. The figure the computer weighs an attack against and the attack buttons
+    /// quote, and the Army row's "defends at".
+    pub fn army_defended_strength(&self, a: &Army) -> i64 {
+        self.army_strength(a) + self.army_defence(a) + if self.army_dug_in(a) { self.tables.dig_in.defence } else { 0 }
     }
 
     pub fn army_strength(&self, a: &Army) -> i64 {
         if a.standing {
             let cap = match a.home {
-                // Ticket #282 (version 0.08.5): a Levy stands at Industry + 2.
-                ArmyHome::State(s) if a.levy => self.levy_cap(s) as i64,
                 ArmyHome::State(s) => self.standing_army_cap(s) as i64,
                 ArmyHome::Colony(_) => self.tables.unit(UnitKind::Army).strength,
             };
             (cap - a.damage as i64).max(0)
+        } else if a.raised_strength > 0 {
+            // Ticket #302 (version 0.08.6): fixed at the raise.
+            a.raised_strength as i64
         } else {
             self.tables.unit(UnitKind::Army).strength
+        }
+    }
+
+    /// Ticket #302 (version 0.08.6): what an Army raised at `place` is worth, fixed for its life --
+    /// its Region's Industry + 1, or at a Colony the rounded average Industry Level of the Regions
+    /// its raising Faction holds, + 1 (a Faction holding nothing on Earth raises a 1). The same
+    /// figure a Region's own Army reads, so the Army system is one; and one the computer reads
+    /// when it chooses where to raise.
+    pub fn raised_strength_at(&self, place: Place) -> u32 {
+        match place {
+            Place::State(s) => self.state(s).industry_level + 1,
+            Place::Colony(c) => {
+                let seat = self.colony(c).and_then(|col| col.control.controller());
+                let held: Vec<u32> = seat.map(|s| self.controlled_states(s).into_iter().map(|sid| self.state(sid).industry_level).collect()).unwrap_or_default();
+                if held.is_empty() { 1 } else { (held.iter().sum::<u32>() + held.len() as u32 / 2) / held.len() as u32 + 1 }
+            }
         }
     }
 
@@ -2189,7 +2281,8 @@ impl Game {
                 if nth == 1 { format!("the {site} Garrison") } else { format!("the {} {site} Garrison", Game::ordinal(nth)) }
             }
         };
-        self.armies.push(Army { id, name, home, at: ArmyAt::Place(place), damage: 0, standing, stance: Stance::Hold, escaped: false, move_to: None, levy: false });
+        let raised_strength = if standing { 0 } else { self.raised_strength_at(place) };
+        self.armies.push(Army { id, name, home, at: ArmyAt::Place(place), damage: 0, standing, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength });
         id
     }
 

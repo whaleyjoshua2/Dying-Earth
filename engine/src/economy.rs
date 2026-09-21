@@ -229,14 +229,23 @@ impl Game {
                     self.state_mut(sid).respawn_wait -= 1;
                     continue;
                 }
+                // Ticket #296 (version 0.08.6): at strength 1 means damage one under its own hit
+                // points, which are its live strength now rather than the card's 5.
                 let cap = self.standing_army_cap(sid);
-                let hp = self.tables.unit(UnitKind::Army).hit_points;
                 self.spawn_standing_army(sid);
-                let dmg = cap.saturating_sub(1).min(hp - 1);
+                let dmg = cap.saturating_sub(1);
                 if let Some(a) = self.armies.iter_mut().find(|a| a.standing && !a.levy && a.home == ArmyHome::State(sid)) {
                     a.damage = dmg;
                 }
                 continue;
+            }
+            // Ticket #296 (version 0.08.6): a Region's own Army whose damage has reached its
+            // strength is destroyed, not left at nought. Its strength moves live -- a Constabulary
+            // gone offline, Unrest past the threshold -- so the check is made every Income, and the
+            // destroyed Standing Army takes the two-Income road back like one killed in a Battle.
+            let spent: Vec<ArmyId> = self.armies.iter().filter(|a| a.standing && a.home == ArmyHome::State(sid) && a.damage >= self.army_hit_points(a)).map(|a| a.id).collect();
+            for id in spent {
+                self.destroy_army(id, "its strength spent", Some(ReportPlace::State(sid)));
             }
             // Ticket #52: at Unrest 4 the Standing Army stops replenishing.
             if occupied || !self.army_replenishes(sid) {
@@ -498,29 +507,24 @@ impl Game {
     /// while its Unrest is under the Standing Army's threshold, since a restive state musters
     /// nothing -- and stands it down at the Income after the threat has passed, or the moment the
     /// Region is no longer neutral. The Report says both.
+    /// Ticket #302 (version 0.08.6): a threatened neutral ARMS FOR GOOD -- its Standing Army gains
+    /// the table's `threat_steps` at the Income a threat begins, once per threat episode, where
+    /// ticket #282 raised a Levy that stood down again. The threat is the same one: a built Army of
+    /// any Faction next door, or a neighbour Occupied, and a restive Region (Unrest at the
+    /// Standing Army's threshold) does not arm, as it did not raise a Levy.
     fn arm_neutrals(&mut self) {
         for sid in StateId::ALL {
             let threatened = self.neutral_threatened(sid);
-            let levy = self.levy_at(sid);
-            match (threatened, levy) {
-                (true, None) if self.army_replenishes(sid) => {
-                    let id = self.raise_levy(sid);
-                    let (state, army) = (self.tables.state(sid).name.clone(), self.armies.iter().find(|a| a.id == id).map(|a| self.army_name(a)).unwrap_or_default());
-                    let n = self.levy_cap(sid);
-                    self.log(format!("{state} arms: {army} is raised at strength {n} while a foreign Army stands next door."));
-                    let text = self.say("levy_raised", &[("state", state), ("army", army), ("n", n.to_string())]);
-                    self.report_line(LineKind::Army, Some(ReportPlace::State(sid)), text);
-                }
-                (false, Some(id)) => {
-                    let army = self.armies.iter().find(|a| a.id == id).map(|a| self.army_name(a)).unwrap_or_default();
-                    self.armies.retain(|a| a.id != id);
-                    let state = self.tables.state(sid).name.clone();
-                    self.log(format!("{state} stands down {army}: the threat has passed."));
-                    let text = self.say("levy_disbanded", &[("state", state), ("army", army)]);
-                    self.report_line(LineKind::Army, Some(ReportPlace::State(sid)), text);
-                }
-                _ => {}
+            let was = self.state(sid).threatened;
+            if threatened && !was && self.army_replenishes(sid) {
+                self.state_mut(sid).armed += self.tables.standing_army.threat_steps;
+                self.levies_raised += 1;
+                let (state, n) = (self.tables.state(sid).name.clone(), self.standing_army_cap(sid));
+                self.log(format!("{state} arms while a foreign Army stands next door: its Standing Army will stand at {n} from now on."));
+                let text = self.say("neutral_armed", &[("state", state), ("n", n.to_string())]);
+                self.report_line(LineKind::Army, Some(ReportPlace::State(sid)), text);
             }
+            self.state_mut(sid).threatened = threatened;
         }
     }
 

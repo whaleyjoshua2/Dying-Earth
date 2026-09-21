@@ -73,6 +73,37 @@ carries_army = false
 [repair]
 materials_per_point = 5
 
+# Ticket #295 (version 0.08.6): the disengage roll. After every round of a Battle a damaged unit
+# leaves with chance (damage / hit points) / divisor; an undamaged unit never leaves, and Evade's
+# flat half is its own rule. The First Playable wrote 2 into the code and never tuned it; the
+# reviews of 2026-09-19 called the escape "the accident that decides Regions", and the designer
+# nudged it down: "a third". Measured before the nudge, twenty seeds with the Custodians first:
+# 12 units escaped over 37 Battles, 11 of those Battles with an escape in them.
+[disengage]
+divisor = 3.0
+
+# Ticket #296 (version 0.08.6): a Region's defence is its people. Its Standing Army adds
+# `constabulary` while a working Constabulary stands there and `calm` while Unrest is under the
+# Standing Army's threshold. Ticket #302 (version 0.08.6): as DEFENCE -- while it defends, and never
+# as hit points -- at the designer's word: "begin by moving the constabulary and unrest bonuses to
+# defense". Its strength and hit points are Industry + 1 plus the steps it has armed by:
+# `threat_steps` at the Income a threat begins (a built Army next door, a neighbour Occupied), once
+# per threat episode, where a Levy used to be raised and stood down; `held_step` for every attack a
+# neutral holds against. No ceiling. A raised Army is worth its home's Industry + 1, fixed at the
+# raise; a Colony's the rounded average Industry of its Faction's Regions + 1.
+[standing_army]
+constabulary = 1
+calm = 1
+threat_steps = 2
+held_step = 1
+
+# Ticket #297 (version 0.08.6): Dig In, the third live stance an Army has. Dug in, an Army adds
+# `defence` to its strength while it defends and never rolls to disengage; its hit points do not
+# follow the bonus ("no bonus to hitpoints"). It cannot march or board a Carrier until its stance
+# is changed and the turn has passed. A neutral Region's own Armies are always dug in.
+[dig_in]
+defence = 2
+
 # Ticket #86 (version 0.06.0): a warming Earth fills the Colony Ships. A Colony Ship lifting at
 # Earth may take `per_step` Colonist beyond its capacity for every full `step` degrees the
 # Temperature stands above `above`, at most `cap` extra, the same for every Faction. At arrival

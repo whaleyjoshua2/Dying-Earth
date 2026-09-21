@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.08.5
+DYING EARTH - playtest build, version 0.08.6
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,57 +16,59 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. Saves from 0.08.4 will not load in this version; the Load screen says so. This version
+6. Saves from 0.08.5 will not load in this version; the Load screen says so. This version
    ships for Windows only.
 
-WHAT CHANGED SINCE 0.08.4
+WHAT CHANGED SINCE 0.08.5
 -------------------------
-Last version was about what the sides can do to each other with influence and money.
-This one is about the war: it is louder, it is dirtier, and the computer is finally
-allowed to start one.
+Last version made the war real. This one gives the defender a say, and rewrites what an
+army IS.
 
-- THE COMPUTER CAN ATTACK ANY COUNTRY, INCLUDING YOURS. Until now a computer side only
-  marched on a country it had lost. Now any side attacks a neutral country when the odds
-  are good, and a country you hold when the odds are good AND they are Cold toward you
-  or worse. Keep your neighbours friendly, or keep an army. The computer opens at most
-  one new war a turn.
-- BATTLES POLLUTE. Every hit landed in a battle on Earth or over it puts half a ppm of
-  carbon in the air, and every building burned in a conquest puts two. It counts as
-  emissions for whoever landed the hits, so it goes on their blame and it breaks a
-  stabilisation run. Fighting over Mars fouls nobody's air. The Climate panel (C) has a
-  "War" line when there is any.
-- BATTLE REPORTS. A battle is now its own line in the turn report, at its place, and it
-  interrupts the turn when a ship or an army is destroyed. It names every ship and army
-  that fought, what each one took ("PMV Aurora escaped after 3 hits"), and the odds the
-  attacker faced in the first round. Armies that die are named in the report too.
-- NEUTRAL COUNTRIES ARM WHEN THREATENED. Park an army next to a country nobody holds and
-  it raises a second army, a levy, at its industry level plus two, as long as it is not
-  too restless to muster. The levy never marches and stands down when you go away. A
-  neutral country that is attacked and holds gets +1 to its standing army for good, up
-  to +3. And a standing army you destroy now takes two turns to come back, not one.
-- A BLOCKADE STARVES. A blockade is now an ORDER you give a warship (a stance, like Hold
-  or Attack), not something that happens because your ship is parked there. A blockaded
-  station makes nothing - no goods, no research, no coins - and still pays its upkeep.
-  A colony on the ground starves the same way when one rival owns the orbit above it
-  outright and has a warship there on Blockade. Nobody dies. Each turn of it is a small
-  offence against the owner.
-- GREENWASH. On your own page in the Faction window (F) you can spend influence and coins
-  to take blame off your own ledger: one influence and one coin per two ppm. No carbon
-  actually leaves the air. It is the mirror of the smear, and everyone can see you did it.
-- CARBON CREDITS MOVED. They are no longer in the Trading window. If you are the
-  Custodians you set your offer on your own page of the Faction window; everyone else
-  requests them from the Custodians' page there, under the accords and the smear.
-- THE SEA REACHES INLAND. Every sea-level rise now also turns one inland building slot
-  into a coastal one, in every country, whether or not it has a sea wall. The wall stops
-  the sea taking a slot; it does not stop the coast creeping in. An empty slot turns
-  first; if none is empty, the oldest inland building becomes a coastal one. There is no
-  floor: a country can end up all coast.
-- BUILDINGS SAY WHAT THEY DO. A school, a launch site, a constabulary and every other
-  building that makes no resource now says what it is for on its row, instead of "no
-  output".
-- THE PLANET CARD LISTS COLONIES AND SITES WITH THEIR YIELDS as pictures, and the "found
-  a colony" panel no longer repeats the planet-wide yields - the planet card has them
-  at its head instead.
+- ONE ARMY SYSTEM. Every country has ONE army of its own, its standing army, which never
+  leaves home. Its strength AND its hit points are the country's industry level plus one,
+  plus every step it has "armed" by (see below). While it defends it fights harder: one
+  more with a working constabulary, one more while unrest is under 4, and two more if it
+  is dug in. None of that adds hit points. The card says "strength 4, damage 0/4,
+  defends at 5".
+- ARMIES YOU RAISE belong to the country you raised them in, change hands if it does,
+  and are the only ones that march. Each is worth that country's industry level plus one,
+  fixed for its life - so a 25-material army is a 2 in a poor country and a 4 in a rich
+  one. Raise them where industry is highest. An army on a station or colony is worth the
+  average industry of all the countries you hold, plus one.
+- THE LEVY IS GONE. Instead, park an army next to a neutral country and its standing army
+  gets +2 FOR GOOD, once per threat; a neutral that holds against an attack gets +1 for
+  good; there is no ceiling. Neutral countries get harder and harder to take by force as
+  the game goes on. Take them with influence instead - that price does not move.
+- DIG IN is a new army stance beside Attack, Hold and Evade. A dug-in army fights two
+  stronger while defending and never runs from a battle, but it cannot march or board a
+  carrier until you change its stance and wait a turn. Neutral countries' armies are
+  always dug in (a short line under their shield on the map says so).
+- RUNNING FROM A BATTLE IS RARER. The chance a damaged unit slips away each round is a
+  third smaller than it was. Evade is still a coin flip.
+- CONQUEST BURNS LESS. A battle no longer burns a quarter of the buildings where it is
+  fought. A country you occupy for three turns still loses a quarter of its buildings
+  when it becomes yours - but a country you PACIFY (your standing there passes its
+  threshold before the three turns are up) is taken whole, nothing lost. Beat the army,
+  then win the people.
+- AN OCCUPATION YOU ABANDON COSTS YOU. If your last army leaves an occupied country - by
+  marching, by carrier, or by dying - the country goes back to whoever held it at +2
+  unrest, you take an offence from them, and the standing the occupation had won you is
+  wiped. Bring enough to finish the job.
+- A LANDED ARMY ATTACKS THE TURN IT LANDS. Land an army from a carrier at a rival's colony
+  and it fights the same turn (after any fight in orbit); if nobody defends, the
+  occupation starts at once. The landing button now shows the odds.
+- YOUR STATION STARTS WITH TWO COLONISTS ABOARD, so it can build two modules from turn
+  one. The Arkwrights, who have no station, start with two pioneers waiting in their
+  first country. The tutorial builds a habitat before it recruits.
+- ORDERED BUILDINGS SHOW AT ONCE. Order a building and it appears in its box straight
+  away, greyed and marked "ordered" with the turns to complete; after End Turn it says
+  "building" and counts down. Right-click an ordered box to cancel it.
+- SLIDERS for the smear, the greenwash and the influence spend on the command cluster,
+  in single points from zero to everything you have this turn; the part already spent
+  elsewhere is greyed. Max still spends it all in one press.
+- THE COMMAND CLUSTER IS A TENTH LARGER, and End Turn is now the sun in the corner. Enter
+  still works.
+- THE TRADING WINDOW opens below the top bar instead of on top of it.
 
 HOW TO PLAY, IN SHORT
 ---------------------
@@ -75,44 +77,46 @@ HOW TO PLAY, IN SHORT
 - Click a region or a colony to select it. Its card appears on the right.
 - A region's buildings are the row of boxes on its card. Click an empty box to build.
 - A colony's buildings are the grid of tiles on its card. Click an empty tile to build.
-- INFLUENCE is how you win regions over. Spend it from the bar at the bottom right.
-- ARMIES are built from a region's card and march to a neighbouring region. Arriving in
-  a region you do not hold is an attack. Warships are built at a launch site and fight
-  in orbit; a warship in a rival station's slot can be ordered to Blockade.
+- INFLUENCE is how you win regions over. Set the amount on the slider at the bottom right
+  and press Spend, or Max.
+- ARMIES are raised from a region's card and march to a neighbouring region. Arriving in
+  a region you do not hold is an attack. A region's own standing army never marches.
+  Warships are built at a shipyard and fight in orbit; a warship in a rival station's
+  slot can be ordered to Blockade.
 - The FACTION WINDOW (F) has a page for each side: what they have, what they think of you,
   what they have under way, what bargains stand between them, where you smear them, and
   where you request carbon credits. Your own page is where you greenwash.
 - The VICTORY panel (V) shows how far each side is along its own path, and holds your
   Research Directive slider (and the Prospectors' Fund slider).
-- The TRADING window (M) buys and sells goods.
+- The TRADING window (R) buys and sells goods.
 - The TECH TREE (T) is shared: everyone's research goes into the same tree unless they
   keep some back.
 - The roster on the right lists everything you own. An open ring at the end of a row
   means it is still waiting for an order from you this turn.
-- End Turn - bottom right, red, or press Enter. Thirty-six turns. Watch the temperature
-  in the top bar: at +3.0 C the world collapses and nobody wins.
+- End Turn - the sun at the bottom right, or press Enter. Thirty-six turns. Watch the
+  temperature in the top bar: at +3.0 C the world collapses and nobody wins.
 
 WHAT WE WANT TO KNOW
 --------------------
 Write down anything, however small. Especially:
 - The moment you were not sure what to do next.
 - Anything you clicked that did nothing, or did something you did not expect.
-- BEING ATTACKED: did the computer ever march on a country you held? Did you see it
-  coming? Did the Relations gate (they must be Cold toward you) make sense, or did it
-  feel random?
-- THE BATTLE REPORT: could you tell who fought whom and who lost? Was the "odds" figure
-  useful? Did the interruption fire when you wanted it to, or too often?
-- BATTLES POLLUTE: did you notice the War line on the Climate panel? Did it ever change
-  a decision about fighting?
-- NEUTRAL LEVIES: did you ever see a country raise one? Did it stop you attacking, or
-  did you attack anyway? Did the +1 for holding feel earned?
-- THE BLOCKADE: did you order one? Did you suffer one? Was it clear on the station's card
-  what was happening and who was doing it?
-- GREENWASH: did you use it? Was two ppm per influence-and-coin worth it, and did it feel
-  like cheating?
-- CARBON CREDITS: could you find them in their new place? Was the "request" button clear?
-- THE SEA REACHING INLAND: did you notice the coastal boxes growing? Did it change where
-  you built, or whether you built a wall?
+- THE ARMY ROW: does "strength 4, damage 0/4, defends at 5" make sense? Could you tell
+  what an army would fight at before you attacked?
+- DIG IN: did you use it? Did the turn it costs to dig out feel right?
+- RAISING ARMIES: did you notice that where you raise one sets its strength? Did you
+  move your army-building to your richest country?
+- NEUTRALS ARMING: did a neutral country ever become too strong to take by force? Did you
+  switch to influence?
+- CONQUEST: did you ever pacify a country and keep everything? Did you ever abandon an
+  occupation, and was the cost clear?
+- THE LANDING: did you land an army at a rival's colony? Did the same-turn attack surprise
+  you?
+- THE STARTING STATION: did you build on it turn one? Did the tutorial's new order (habitat
+  first) make sense?
+- ORDERED BOXES and the RIGHT-CLICK cancel: did you find them?
+- THE SLIDERS: better or worse than the number fields? Did the greyed part make sense?
+- THE SUN: is End Turn still obvious?
 - The turn the game got boring, if it did, and the turn you felt you had lost.
 - Crashes: what you were doing, and the "Seed" number shown on the title screen and
   the game-over screen. With the seed the game can be replayed exactly.
@@ -124,39 +128,32 @@ KNOWN ROUGH EDGES
 All the numbers below come from eighty computer-only games, twenty with each side going
 first.
 
-- THE WIN COLUMN MOVED, A LITTLE, AND TOWARD THE CUSTODIANS. Out of eighty games:
-  Custodians 28, Prospectors 26, Arkwrights 9, Archivists 2. Last version it was 26, 28,
-  7 and 0. The war is a money sink for whoever has the money - the Prospectors built 46
-  armies and 72 warships across the twenty games where they go second, and made a third
-  less coin doing it - and when the Prospectors go first the Custodians now win 5 of 20
-  where they won none. The Archivists have two wins for the first time since 0.08.3.
-- THE WORLD COLLAPSES LESS OFTEN: 15 games in 80, against 19. Every seating ends a bit
-  cooler. Our guess is that the sea reaching inland drowns more buildings' work over a
-  game (27 to 36 coastal slots lost a game, against 22 to 29), and a starved station
-  makes nothing. Tell us whether the climate still feels like a threat.
-- THE WAR IS ONE SIDE'S. Whoever starts in East Asia with the coins fights: the
-  Prospectors opened 57 and 49 battles a batch when they hold it, the Arkwrights 52 when
-  they do. Every other seat and seating together opened fourteen. No battle in eighty
-  games was against a neutral country: every country is taken by influence in the first
-  turns, and the first army appears around turn 20, so the levy rule fired only three
-  times in eighty games and never stopped an attack. It will matter to YOU if you march
-  early; the computer does not.
-- THE COMPUTER NEVER LOSES A WARSHIP. A hundred and twenty-nine were built over the batch
-  and none was destroyed, the same as last version: the computer's warships blockade and
-  rarely meet another warship that fights back.
-- THE BLOCKADE IS THE PROSPECTORS' ALONE, and only when they go second: 139 colony-turns
-  starved in that seating, most of them the Archivists' and Arkwrights' stations, and
-  none anywhere else. We plan a counter (an orbital battery) in a later version.
-- THE CREDIT TRADE ROSE, NOT FELL: the Prospectors buy 1214 to 1740 ppm of credit a batch
-  (733 to 1408 before) AND greenwash 70 to 90 ppm a game on top. Both levers together
-  take a fifth off their blame at the end (669 against 813 where they go second). The
-  Custodians sell every credit they offer, still.
-- EVERYONE HATES EVERYONE A LITTLE MORE: 45% to 62% of relationships end scarred (40% to
-  59% last version). War, blockade and smear are all offences.
-- ONLY THE PROSPECTORS EVER GREENWASH. The other computer sides are rarely dirty enough
-  to want to.
-- THE REPORT STILL SAYS "ARMY" in its march lines ("Custodian Army moved from China to
-  India"), though battle lines and destroyed armies use the army's name now.
+- THE WIN COLUMN MOVED A LONG WAY TOWARD THE CUSTODIANS. Out of eighty games: Custodians
+  43, Prospectors 21, Arkwrights 2, Archivists 0. Last version it was 28, 26, 9 and 2.
+  Every rule in this version hardens the defender, and the Prospectors were the side
+  that attacked: the computer marched on a held country 5 times in eighty games where
+  it marched 91, and took 2 places by force where it took 51. Without its conquests the
+  Prospectors' money fell where they go first (614 a game against 3580) and the
+  Custodians' rose everywhere. The Arkwrights' and Archivists' few wins last version came
+  from the Prospectors' war, and went with it. Expect the next version to be about
+  balance.
+- THE COMPUTER NO LONGER WINS ON THE GROUND. It marches one army at a time and only at
+  60% odds, and a single raised army now clears that against almost nobody. Two armies
+  together would; it never masses. This is measured behaviour, not a rule: YOU can mass.
+- THE WORLD COLLAPSES ABOUT AS OFTEN: 14 games in 80, against 15 - but when the Arkwrights
+  go first it collapsed 12 times in 20 where it collapsed 7, and that seating ends at
+  +3.0 C. The other three end cooler than before. Tell us whether the climate still feels
+  like a threat.
+- THREE RULES NEVER FIRED IN EIGHTY COMPUTER GAMES: no occupation was abandoned, no army
+  was landed at a colony, and no neutral country was ever threatened (every country is
+  taken by influence before the first army exists). They will matter to YOU if you play
+  that way.
+- THE COMPUTER LOST A WARSHIP for the first time: one, of 228 built.
+- THE BLOCKADE IS STILL MOSTLY THE PROSPECTORS' (107 colony-turns starved where they go
+  second), though the Custodians and Arkwrights each blockaded a little this version.
+- RELATIONS RUN WARMER than last version, because fewer battles are fewer offences: 42% to
+  59% of relationships end scarred (45% to 62% before).
+- THE REPORT STILL SAYS "ARMY" in its march lines.
 - SPACE EVENTS CAN STILL FIND NOTHING TO HIT: about three cards a game.
 - TWO OF THE FOUR SPECIAL SPACE BUILDINGS ARE STILL NEVER BUILT BY THE COMPUTER (the
   Archivists' Heliostat and the Custodians' Academy). You can build either by hand.
@@ -166,7 +163,9 @@ first.
   version.
 - WHERE EACH SIDE STARTS IS NOT RANDOM. The computer sides always take the richest free
   countries in the same order, so the third and fourth sides are dealt the leftovers.
-- RENAMING SHIPS, COLONIES AND STATIONS is still cut, from last version.
+- RENAMING SHIPS, COLONIES AND STATIONS is still cut.
+- On an 800-pixel-tall window the Faction window is taller than the screen and opens at
+  the very top; on a taller window it sits under the top bar.
 - A station ring can be edge-on for a moment as you turn the globe; it comes back as
   you keep turning.
 - The list of station slots on the Solar System Map appears only while you point at
