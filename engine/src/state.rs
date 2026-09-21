@@ -491,6 +491,12 @@ pub struct EmissionsBreakdown {
     /// Ticket #55: what the Permafrost Thaw Break adds every Climate phase once it has fired. Its
     /// own line: nobody's Blame, and never counted against a Stabilization run.
     pub permafrost: f64,
+    /// Ticket #279 (version 0.08.5): what the Battles fought on Earth and in Earth orbit last turn
+    /// put in the air -- so many ppm a hit landed and so many a building burned. A Faction's own
+    /// hits are its Blame; a neutral Region's Army's are nobody's. Counted against a Stabilization
+    /// run, at the designer's word: a war a Faction chose is not the weather.
+    #[serde(default)]
+    pub war: f64,
     pub sink: f64,
     /// Ticket #54: what the Scrubbers standing and online this Climate phase add to the Sink. It
     /// took Restoration's place in the breakdown and in the Stabilization sum.
@@ -501,9 +507,10 @@ pub struct EmissionsBreakdown {
 }
 
 impl EmissionsBreakdown {
-    /// Emissions that count against a Stabilization run: buildings, launches and population, not cards.
+    /// Emissions that count against a Stabilization run: buildings, launches, population and, since
+    /// ticket #279, war -- not cards and not the permafrost.
     pub fn counted(&self) -> f64 {
-        self.state_industry + self.factories + self.power_plants + self.refineries + self.launches + self.population
+        self.state_industry + self.factories + self.power_plants + self.refineries + self.launches + self.population + self.war
     }
     pub fn total(&self) -> f64 {
         self.counted() + self.cards + self.permafrost
@@ -570,6 +577,15 @@ pub struct Climate {
     /// Ticket #54: `removal_next` went with Restoration. What a Faction takes back is now the
     /// Scrubbers standing at the Climate phase, read off the board (`scrubber_removal_by_seat`).
     pub card_emissions_next: f64,
+    /// Ticket #279 (version 0.08.5): what last turn's Battles on Earth put in the air, charged at
+    /// the next Climate phase -- by the seat whose hits (and whose taking) it was, and nobody's for
+    /// a neutral Region's own Army. And the running total of nobody's, for the sweep.
+    #[serde(default)]
+    pub war_next: [f64; SEAT_COUNT],
+    #[serde(default)]
+    pub war_next_nobody: f64,
+    #[serde(default)]
+    pub war_nobody_total: f64,
     /// Ticket #55: the Natural Sink as it stands. It opens at the table's figure and the Sink
     /// Weakens Break lowers it for good; every reader of the Sink reads this, so a weakened Sink
     /// moves the Stabilization bar and the Custodian AI's own pace with it.
@@ -759,6 +775,10 @@ pub struct SeatState {
     /// seat took it out of the air.
     #[serde(default)]
     pub blame_cleaned: f64,
+    /// Ticket #279 (version 0.08.5): the ppm this seat's Battles on Earth have put in the air over
+    /// the game, for the sweep; it is inside `blame_emitted` already.
+    #[serde(default)]
+    pub war_ppm: f64,
     /// Ticket #268 (version 0.08.4): ppm of carbon credit this seat has bought over the game, which
     /// comes off its Blame ledger; ppm it has sold, which comes off its credit and, past what it
     /// held, goes onto its ledger as Blame taken; and the ppm it offers a turn, standing until
@@ -1111,6 +1131,7 @@ impl Game {
             directive_sink: 0.0,
             blame_smeared: 0.0,
             blame_cleaned: 0.0,
+            war_ppm: 0.0,
             credits_bought: 0.0,
             credits_sold: 0.0,
             credits_offered: 0,
@@ -1237,6 +1258,9 @@ impl Game {
                 history: Vec::new(),
                 launches_pending: [0; SEAT_COUNT],
                 card_emissions_next: 0.0,
+                war_next: [0.0; SEAT_COUNT],
+                war_next_nobody: 0.0,
+                war_nobody_total: 0.0,
                 natural_sink: tables.climate.natural_sink,
                 permafrost: 0.0,
                 breaks_fired: vec![false; tables.climate.breaks.len()],

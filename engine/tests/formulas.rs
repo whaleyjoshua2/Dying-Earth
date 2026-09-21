@@ -7281,6 +7281,63 @@ fn only_a_rival_holding_orbital_control_shuts_the_ground() {
     assert!(g.may_land(Seat(0), body), "a contested orbit no longer punishes the bystander");
 }
 
+/// Ticket #279 (version 0.08.5): Battles pollute. Every hit landed in a Battle on Earth puts the
+/// table's ppm per hit into next Climate phase's war bucket, worn by the seat that landed it and
+/// by nobody for a neutral Region's own Army; every building burned in the rolls after it puts the
+/// table's ppm per building on the aggressors; the Climate phase adds it to the stock as its own
+/// source, counted against Stabilization, and to the seat's Blame as emitted. Mars orbit charges nothing.
+#[test]
+fn a_battle_on_earth_pollutes_by_hits_and_buildings_burned_and_one_at_mars_does_not() {
+    let mut g = game();
+    calm(&mut g);
+    let (per_hit, per_building) = (g.tables.climate.war_ppm_per_hit, g.tables.climate.war_ppm_per_building);
+    assert!((per_hit - 0.5).abs() < 1e-9 && (per_building - 2.0).abs() < 1e-9, "half a ppm a hit, two a building");
+    // Seat 0's Army attacks neutral Europe, whose Standing Army defends: hits on both sides.
+    let target = StateId::NorthAfrica;
+    assert_eq!(g.state(target).control, Control::Neutral, "Egypt is neutral at the start");
+    let before = g.state(target).facilities.len();
+    occupier_in(&mut g, StateId::EastAsia, target);
+    g.resolution_phase();
+    let line = g.report.battles.iter().find(|b| b.place == g.tables.state(target).name).expect("a Battle in Europe");
+    let mine: u32 = line.parties.iter().filter(|p| p.seat == Some(Seat(0))).map(|p| p.hits).sum();
+    let theirs: u32 = line.parties.iter().filter(|p| p.seat.is_none()).map(|p| p.hits).sum();
+    assert!(mine + theirs > 0, "three rolls a round land somewhere: {line:?}");
+    let burned = (before - g.state(target).facilities.len()) as f64;
+    let want_mine = mine as f64 * per_hit + burned * per_building;
+    assert!((g.climate.war_next[0] - want_mine).abs() < 1e-9, "seat 0 wears its {mine} hits and the {burned} buildings it burned: {} against {want_mine}", g.climate.war_next[0]);
+    assert!((g.climate.war_next_nobody - theirs as f64 * per_hit).abs() < 1e-9, "the neutral Army's {theirs} hits are nobody's: {}", g.climate.war_next_nobody);
+    assert!(g.climate.war_next[1..].iter().all(|v| *v == 0.0), "nobody else fought");
+
+    // The next Climate phase: its own source, on the stock, counted, and seat 0's Blame.
+    let want_total = want_mine + theirs as f64 * per_hit;
+    let (co2_before, emitted_before) = (g.climate.co2, g.seats[0].blame_emitted);
+    g.climate_phase();
+    let b = &g.climate.last;
+    assert!((b.war - want_total).abs() < 1e-9, "the War source: {} against {want_total}", b.war);
+    let rest = b.state_industry + b.factories + b.power_plants + b.refineries + b.launches + b.population;
+    assert!((b.counted() - rest - b.war).abs() < 1e-9, "counted against Stabilization, beside the buildings, launches and people");
+    assert!((g.climate.co2 - co2_before - b.net()).abs() < 1e-9, "and on the stock");
+    assert!((g.seats[0].blame_emitted - emitted_before - b.by_seat[0]).abs() < 1e-9 && b.by_seat[0] >= want_mine - 1e-9, "seat 0's share is its Blame, emitted");
+    assert!((g.seats[0].war_ppm - want_mine).abs() < 1e-9 && (g.climate.war_nobody_total - theirs as f64 * per_hit).abs() < 1e-9, "kept for the sweep");
+    assert!(g.climate.war_next.iter().all(|v| *v == 0.0) && g.climate.war_next_nobody == 0.0, "the bucket is drained");
+
+    // A Battle in Mars orbit fouls nobody's air.
+    let push = |g: &mut Game, seat: Seat| {
+        let id = ShipId(g.fresh_id());
+        g.ships.push(Ship {
+            id,
+            name: String::new(), kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None,
+            stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
+        });
+    };
+    push(&mut g, Seat(0));
+    push(&mut g, Seat(1));
+    g.armies.retain(|a| a.standing);
+    g.resolution_phase();
+    assert!(g.report.battles.iter().any(|b| b.place.contains("Mars")), "a Battle in Mars orbit: {:?}", g.report.battles);
+    assert!(g.climate.war_next.iter().all(|v| *v == 0.0) && g.climate.war_next_nobody == 0.0, "and nothing in the war bucket");
+}
+
 /// Ticket #278 (version 0.08.5): a Blockade is a stance a warship stack is ordered into, refused
 /// where no warship of the seat's sits in a slot to blockade; a station under one makes nothing and
 /// still pays its upkeep, its holder is offended at weight 1 each Income, the Report says so, and

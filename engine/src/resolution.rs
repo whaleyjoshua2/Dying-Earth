@@ -302,7 +302,36 @@ impl Game {
             }
             let name = self.place_name(place);
             self.army_melee(&name, place, &aggressors, &parties);
-            self.destruction_rolls(place, "attacked");
+            self.destruction_rolls(place, "attacked", &aggressors);
+        }
+    }
+
+    /// Ticket #279 (version 0.08.5): Battles pollute. Whether a place is on Earth -- a Region, Earth
+    /// orbit, or a Colony on Earth (Antarctica) -- since Mars orbit fouls nobody's air.
+    fn on_earth_place(&self, place: Place) -> bool {
+        match place {
+            Place::State(_) => true,
+            Place::Colony(c) => self.colony(c).is_some_and(|c| c.body == BodyId::Earth),
+        }
+    }
+
+    /// Ticket #279: so many ppm into next Climate phase's war bucket, worn by `seat` -- or by nobody,
+    /// for a neutral Region's own Army -- and only for a Battle on Earth.
+    fn charge_war(&mut self, on_earth: bool, seat: Option<Seat>, ppm: f64) {
+        if !on_earth || ppm <= 0.0 {
+            return;
+        }
+        match seat {
+            Some(s) => self.climate.war_next[s.index()] += ppm,
+            None => self.climate.war_next_nobody += ppm,
+        }
+    }
+
+    /// Ticket #279: every party's hits in a Battle, charged by the table's rate per hit.
+    fn charge_war_hits(&mut self, on_earth: bool, line: &BattleLine) {
+        let per_hit = self.tables.climate.war_ppm_per_hit;
+        for p in &line.parties {
+            self.charge_war(on_earth, p.seat, p.hits as f64 * per_hit);
         }
     }
 
@@ -359,6 +388,7 @@ impl Game {
             Some(s) => line.result.push_str(&format!(" The {} keep Orbital Control.", self.seat_name(s))),
             None => line.result.push_str(" Nobody holds Orbital Control."),
         }
+        self.charge_war_hits(body == BodyId::Earth, &line);
         self.log(line.text(&|s| self.seat_name(s), "neutral"));
         self.report.battles.push(line);
     }
@@ -376,6 +406,7 @@ impl Game {
         let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
             parties.iter().map(|(seat, agg, ids)| (*seat, *agg, ids.iter().map(|id| self.army_combatant(*id)).collect())).collect();
         let mut line = self.run_melee(place_name, units);
+        self.charge_war_hits(self.on_earth_place(place), &line);
         for seat in aggressors {
             if self.defenders_at(place, *seat).is_empty() && !self.armies_of_seat_at(*seat, place).is_empty() {
                 line.result.push_str(&format!(" The {} are alone at the place; Occupation begins.", self.seat_name(*seat)));
@@ -479,7 +510,9 @@ impl Game {
     }
 
     /// Spec 8.5: every Facility or Module at a place rolls a 1-in-4 chance to be destroyed.
-    fn destruction_rolls(&mut self, place: Place, why: &str) {
+    /// Ticket #279 (version 0.08.5): `charged` are the seats that wear what burns -- the aggressors
+    /// after a Battle, the taker on a transfer -- at the table's ppm per building, split between them.
+    fn destruction_rolls(&mut self, place: Place, why: &str, charged: &[Seat]) {
         let p = self.tables.influence.destruction_chance;
         let mut lost = Vec::new();
         match place {
@@ -517,6 +550,13 @@ impl Game {
                         col.colonists = col.colonists.min(room);
                     }
                 }
+            }
+        }
+        if !lost.is_empty() && !charged.is_empty() {
+            let each = lost.len() as f64 * self.tables.climate.war_ppm_per_building / charged.len() as f64;
+            let on_earth = self.on_earth_place(place);
+            for s in charged {
+                self.charge_war(on_earth, Some(*s), each);
             }
         }
         if !lost.is_empty() {
@@ -711,7 +751,7 @@ impl Game {
         // Version 0.03 (ticket #31): a place taken by Influence keeps everything; only a place
         // that Occupation transfers rolls for destruction.
         if why != "Influence" {
-            self.destruction_rolls(place, "taken");
+            self.destruction_rolls(place, "taken", &[seat]);
         }
         // Armies at the place that fought for the old owner stand for the new one only if they are the place's own.
         // Foreign Armies keep their own home and seat; nothing to do.

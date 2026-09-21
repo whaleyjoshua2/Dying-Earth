@@ -6934,6 +6934,13 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             if e.cards > 0.0 {
                 ui.label(format!("Event cards {:.1}", e.cards));
             }
+            // Ticket #279 (version 0.08.5): war's own line, when there was one.
+            if e.war > 0.0 {
+                ui.label(format!("War {:.1}", e.war)).on_hover_text(format!(
+                    "Last turn's Battles on Earth and in Earth orbit: {} ppm for every hit landed, worn as Blame by whoever landed it, and {} for every building burned after a ground Battle or a taking, worn by the attackers. A neutral Region's Army's hits are nobody's. It counts against a Stabilization run: a war a Faction chose is not the weather.",
+                    game.tables.climate.war_ppm_per_hit, game.tables.climate.war_ppm_per_building
+                ));
+            }
             // Ticket #55: the Permafrost Thaw Break's own line, once it has fired. It is the world's
             // carbon: nobody's Blame, and it never counts against a Stabilization run.
             if e.permafrost > 0.0 {

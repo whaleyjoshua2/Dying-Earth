@@ -656,6 +656,10 @@ pub struct ClimateTable {
     pub population_emissions_base: f64,
     pub population_emissions_per_level: f64,
     pub launch_emissions: f64,
+    /// Ticket #279 (version 0.08.5): what a Battle on Earth puts in the air, per hit landed and
+    /// per building burned in the rolls after one.
+    pub war_ppm_per_hit: f64,
+    pub war_ppm_per_building: f64,
     pub sea_level_thresholds: Vec<f64>,
     /// Ticket #55: the Temperature at which Antarctica's Colony Slots open. The sea-level ticket
     /// will read it; the Climate Panel's Temperature bar draws its notch here already.

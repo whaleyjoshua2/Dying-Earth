@@ -54,6 +54,14 @@ impl Game {
         }
         self.climate.launches_pending = [0; SEAT_COUNT];
         self.climate.card_emissions_next = 0.0;
+        // Ticket #279 (version 0.08.5): the war bucket is drained, and its figures kept for the sweep.
+        for seat in Seat::ALL {
+            let ppm = self.climate.war_next[seat.index()];
+            self.seat_mut(seat).war_ppm += ppm;
+        }
+        self.climate.war_nobody_total += self.climate.war_next_nobody;
+        self.climate.war_next = [0.0; SEAT_COUNT];
+        self.climate.war_next_nobody = 0.0;
         for s in &mut self.states {
             s.wildfire_emissions_next = 0.0;
         }
@@ -73,7 +81,7 @@ impl Game {
         self.climate.temperature = temp.max(c.base_temperature);
         self.climate.last = breakdown.clone();
         self.log(format!(
-            "Climate: emissions {:.1} (industry {:.1}, factories {:.1}, power {:.1}, refineries {:.1}, launches {:.1}, population {:.1}, cards {:.1}, permafrost {:.1}), sink {:.1} (Scrubbers {:.1}), net {:+.1}; CO2 {:.1} ppm; temperature {:+.2} heading to {:+.2}.",
+            "Climate: emissions {:.1} (industry {:.1}, factories {:.1}, power {:.1}, refineries {:.1}, launches {:.1}, population {:.1}, cards {:.1}, permafrost {:.1}, war {:.1}), sink {:.1} (Scrubbers {:.1}), net {:+.1}; CO2 {:.1} ppm; temperature {:+.2} heading to {:+.2}.",
             breakdown.total(),
             breakdown.state_industry,
             breakdown.factories,
@@ -83,6 +91,7 @@ impl Game {
             breakdown.population,
             breakdown.cards,
             breakdown.permafrost,
+            breakdown.war,
             breakdown.total_sink(),
             breakdown.scrubbers,
             net,
@@ -276,6 +285,14 @@ impl Game {
             }
         }
         b.cards += self.climate.card_emissions_next;
+        // Ticket #279 (version 0.08.5): last turn's Battles on Earth. A seat's hits are its Blame; a
+        // neutral Army's are the world's.
+        for seat in Seat::ALL {
+            let ppm = self.climate.war_next[seat.index()];
+            b.war += ppm;
+            b.by_seat[seat.index()] += ppm;
+        }
+        b.war += self.climate.war_next_nobody;
         let per_launch = if self.has_tech(TechId::CleanPropellant) { t.tech(TechId::CleanPropellant).value } else { c.launch_emissions };
         for seat in Seat::ALL {
             let charged = self.climate.launches_pending[seat.index()] as f64 * per_launch * mult(Some(seat));

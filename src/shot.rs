@@ -225,23 +225,30 @@ fn build_board(session: &mut Session) {
         }
         // `battle:1` (a building aid): three seats bring a Frigate to Mars with Attack stances and
         // one more turn runs, so the Report carries a three-party Battle (ticket #50).
-        if std::env::args().any(|a| a == "battle:1") {
+        // Ticket #279 (version 0.08.5): `battle:earth` fights it in Earth orbit instead and runs a
+        // second quiet turn, so the Climate Panel's War line has last turn's Battle to show.
+        let earth_battle = std::env::args().any(|a| a == "battle:earth");
+        if std::env::args().any(|a| a == "battle:1") || earth_battle {
+            let body = if earth_battle { BodyId::Earth } else { BodyId::Mars };
             for seat in [Seat(0), Seat(1), Seat(2)] {
                 let id = ShipId(g.fresh_id());
                 let built_turn = g.turn;
                 let name = g.next_ship_name(UnitKind::Frigate);
-                g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
+                g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
             }
-            for s in g.ships.iter_mut().filter(|s| s.at == ShipAt::Body(BodyId::Mars)) {
+            for s in g.ships.iter_mut().filter(|s| s.at == ShipAt::Body(body)) {
                 s.stance = Stance::Attack;
             }
-            // The rivals sit still for this one turn, so their stacks are all at Mars when it runs.
+            // The rivals sit still for this one turn, so their stacks are all at the Body when it runs.
             for seat in Seat::ALL.into_iter().skip(1) {
                 g.seats[seat.index()].ai = false;
             }
             let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
-            orders[0] = vec![Order::ShipStance { body: BodyId::Mars, stance: Stance::Attack }];
+            orders[0] = vec![Order::ShipStance { body, stance: Stance::Attack }];
             g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
+            if earth_battle {
+                run_one_quiet_turn(g);
+            }
             for seat in Seat::ALL.into_iter().skip(1) {
                 g.seats[seat.index()].ai = true;
             }

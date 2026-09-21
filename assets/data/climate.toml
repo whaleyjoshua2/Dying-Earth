@@ -84,6 +84,15 @@ leapfrog_baseline_cut = 0.1
 population_emissions_base = 0.002
 population_emissions_per_level = 0.0015
 launch_emissions = 2.0
+# Ticket #279 (version 0.08.5): Battles pollute. Every hit landed in a Battle on Earth or in Earth
+# orbit puts this many ppm in the air at the next Climate phase, worn as Blame by the seat that
+# landed it (nobody's, for a neutral Region's own Army); every building burned in the rolls after a
+# ground Battle, or on a taking, puts this many more, worn by the aggressors. Counted against a
+# Stabilization run. For scale: a Factory emits 1.0 a turn, a Wildfire 2.0 once, so a full
+# three-round Battle is 4.5 and a conquest that burns three Facilities is a Methane Burst. Mars
+# orbit fouls nobody's air. The sweep re-fits it if war becomes common.
+war_ppm_per_hit = 0.5
+war_ppm_per_building = 2.0
 sea_level_thresholds = [1.8, 2.3, 2.8]
 
 # Ticket #55 (version 0.05): the Temperature at which Antarctica's Colony Slots open. The sea-level

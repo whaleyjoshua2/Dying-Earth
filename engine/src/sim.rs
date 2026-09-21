@@ -43,6 +43,9 @@ pub struct SimResult {
     pub blame_smeared: [f64; SEAT_COUNT],
     /// Ticket #277 (version 0.08.5): ppm each seat took off its own ledger by Greenwash.
     pub blame_cleaned: [f64; SEAT_COUNT],
+    /// Ticket #279 (version 0.08.5): ppm each seat's Battles on Earth put in the air, and nobody's.
+    pub war_ppm: [f64; SEAT_COUNT],
+    pub war_ppm_nobody: f64,
     /// Ticket #268 (version 0.08.4): ppm of carbon credit each seat bought, and sold.
     pub credits_bought: [f64; SEAT_COUNT],
     pub credits_sold: [f64; SEAT_COUNT],
@@ -407,6 +410,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let blame_credit = Seat::ALL.map(|s| game.blame_credit(s));
     let blame_smeared = Seat::ALL.map(|s| game.seat(s).blame_smeared);
     let blame_cleaned = Seat::ALL.map(|s| game.seat(s).blame_cleaned);
+    let war_ppm = Seat::ALL.map(|s| game.seat(s).war_ppm);
+    let war_ppm_nobody = game.climate.war_nobody_total;
     let credits_bought = Seat::ALL.map(|s| game.seat(s).credits_bought);
     let credits_sold = Seat::ALL.map(|s| game.seat(s).credits_sold);
     let threshold_multiplier = Seat::ALL.map(|s| game.blame_threshold_multiplier(s));
@@ -514,6 +519,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         blame_credit,
         blame_smeared,
         blame_cleaned,
+        war_ppm,
+        war_ppm_nobody,
         credits_bought,
         credits_sold,
         threshold_multiplier,
