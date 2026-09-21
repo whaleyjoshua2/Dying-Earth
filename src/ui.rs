@@ -2636,6 +2636,48 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
 }
 
 /// Ticket #46: the stations over the Body on screen, and the orbital slots still free.
+/// Ticket #283 (version 0.08.5): the planet card's Colonies block. The Body's own four figures
+/// first, weak, then one row per Colony on the ground and per open site, in slot order, with the
+/// slot's glyph row beneath as the map label draws it; clicking a row selects it. Every row goes
+/// through `slot_yield_row`, since the one glyph rule only swaps a word that follows a figure and
+/// a line written "Materials x1.37" would silently come out in words (ticket #258's lesson).
+fn colonies_block(ui: &mut Ui, game: &Game, view: &mut ViewState, body: BodyId) {
+    let card = game.tables.body(body);
+    let (ink, weak) = (ui.visuals().text_color(), ui.visuals().weak_text_color());
+    ui.horizontal(|ui| {
+        ui.label(RichText::new(format!("{} as a whole:", card.name)).weak());
+        slot_yield_row(ui, [("materials", card.mine_yield), ("energy", card.generator_yield), ("fuel", card.refinery_yield), ("research", card.research_yield)], 14.0, weak);
+    });
+    let rows: Vec<u32> = (0..card.colony_slots()).filter(|s| body != BodyId::Earth || game.colony_at(body, *s).is_some()).collect();
+    if rows.is_empty() {
+        return;
+    }
+    ui.label(RichText::new("Colonies and sites").strong()).on_hover_text(
+        "Every Colony on the ground and every site still open, each with its own four yields: what a Mine, a Generator, a Refinery and an Observatory make there, against the figure for the whole Body above. A station reads the Body's figures, so its row below carries none.",
+    );
+    for slot in rows {
+        let (text, select) = match game.colony_at(body, slot) {
+            Some(c) => {
+                let owner = match c.control {
+                    Control::Neutral => "nobody's".to_string(),
+                    Control::Controlled(s) => game.seat_name(s),
+                    Control::Occupied { occupier, .. } => format!("occupied by the {}", game.seat_name(occupier)),
+                };
+                (format!("{}: {}, {} Colonists", game.place_name(Place::Colony(c.id)), owner, c.colonists), Selection::Colony(c.id))
+            }
+            None => (format!("{}: empty", card.slots[slot as usize].name), Selection::Slot(body, slot)),
+        };
+        if ui.button(text).clicked() {
+            view.selection = select;
+        }
+        ui.horizontal(|ui| {
+            ui.add_space(12.0);
+            slot_yield_row(ui, slot_yield_figures(&game.slot_yields(body, slot)), 13.0, ink);
+        });
+    }
+    ui.add_space(4.0);
+}
+
 fn stations_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
     let View::Surface(body) = view.view else { return };
     let card = game.tables.body(body);
@@ -3028,6 +3070,14 @@ fn selection_card(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             });
             if let Some(e) = &session.last_error {
                 ui.colored_label(Color32::LIGHT_RED, e);
+            }
+            // Ticket #283 (version 0.08.5): the planet's own figure at the head of its card, moved
+            // here from the founding door at the designer's word, and a block of every Colony on
+            // the ground and every site still open, each with its own yields in glyphs. A station
+            // reads the Body's figures, so the In orbit rows beneath carry none. On Earth only the
+            // Colonies stand here: Antarctica's shut sites are the ice's business.
+            if let View::Surface(b) = view.view {
+                colonies_block(ui, game, view, b);
             }
             stations_panel(ui, session, game, view, actions);
             ui.separator();
@@ -4721,7 +4771,13 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         if game.antarctica_open && st.emigrants > 0 {
             let n = st.emigrants;
             for slot in game.free_slots_on(BodyId::Earth) {
-                cost_button(ui, game, &session.pending, Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) }, &format!("Send {n} to {} by sea", game.tables.body(BodyId::Earth).slots[slot as usize].name), actions);
+                // Ticket #283 (version 0.08.5): the third founding door wears the same face as the
+                // two Ship doors, the site's yields in glyphs, at the designer's word.
+                let order = Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) };
+                let label = format!("Send {n} to {} by sea", game.tables.body(BodyId::Earth).slots[slot as usize].name);
+                if found_button(ui, &game.slot_yields(BodyId::Earth, slot), &label).clicked() {
+                    actions.push(Action::Place(order));
+                }
             }
             // Ticket #204 (version 0.08.1): capped at the room there. A sea crossing checks no room
             // at the order -- it lands `min(n, room)` a turn later and sends the surplus home with a
@@ -4942,6 +4998,15 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         faction_glyph(ui, session, game, col.control.controller(), 22.0);
         ui.label(RichText::new(game.place_name(Place::Colony(cid))).size(22.0).strong());
     });
+    // Ticket #283 (version 0.08.5): what the ground is worth, under the heading, in glyphs. A
+    // station reads the Body's figures, which the planet card shows, so it carries no row.
+    if !col.in_orbit {
+        let ink = ui.visuals().text_color();
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Yields here:").weak());
+            slot_yield_row(ui, slot_yield_figures(&game.slot_yields(col.body, col.slot)), 13.0, ink);
+        });
+    }
     let owner = match col.control {
         Control::Neutral => "Nobody's".to_string(),
         Control::Controlled(s) => format!("Held by the {}", game.seat_name(s)),
@@ -5131,20 +5196,15 @@ fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u
     }
     ui.label("Empty. A Colony Ship carrying Colonists founds a Colony here; a Habitat comes with it.");
     // Ticket #57: the slot's own four yields, drawn when the game started, beside its Body's.
-    let card = game.tables.body(body);
     let y = game.slot_yields(body, slot);
-    // Ticket #258 (version 0.08.4): both lines in the glyph-and-number row the founding button and
-    // the map labels already use, at the designer's word -- "both", and the Body's line kept, weak.
-    // A player read the yields here in words and then again in glyphs on the button beneath.
+    // Ticket #258 (version 0.08.4): the site's line in the glyph-and-number row the founding button
+    // and the map labels already use, at the designer's word. Ticket #283 (version 0.08.5): the
+    // Body's line, kept here on #258, has moved to the head of the planet card -- "when founding a
+    // colony from a ship we don't need to know the yields of the planet as a whole".
     let ink = ui.visuals().text_color();
     ui.horizontal(|ui| {
         ui.label("Yields here:");
         slot_yield_row(ui, slot_yield_figures(&y), 14.0, ink);
-    });
-    let weak = ui.visuals().weak_text_color();
-    ui.horizontal(|ui| {
-        ui.label(RichText::new(format!("{} as a whole:", card.name)).weak());
-        slot_yield_row(ui, [("materials", card.mine_yield), ("energy", card.generator_yield), ("fuel", card.refinery_yield), ("research", card.research_yield)], 14.0, weak);
     });
     for s in game.ships.iter().filter(|s| !session.spectator && s.seat == Seat(0) && s.at == ShipAt::Body(body) && s.kind == UnitKind::ColonyShip && s.colonists > 0) {
         let order = Order::Unload { ship: s.id, colonists: s.colonists, army: s.army.is_some(), into: UnloadTarget::Slot(body, slot) };
