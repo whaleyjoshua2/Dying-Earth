@@ -2969,7 +2969,9 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
         // which takes one row; on its own it would take the whole remaining height (the Faction
         // window's dropdown learned that first).
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let resp = sun_button(ui, can_end_turn(game, view), 42.0 * CLUSTER_SCALE, "End Turn");
+            // A tenth larger again at the designer's word, on seeing the first picture: "make it
+            // 10% larger".
+            let resp = sun_button(ui, can_end_turn(game, view), 46.2 * CLUSTER_SCALE, "End Turn");
             if resp.on_hover_text("End the turn (Enter).").on_disabled_hover_text("Pick a Tech first").clicked() {
                 press_end_turn(session, game, view, actions);
             }
@@ -2994,34 +2996,37 @@ fn sun_button(ui: &mut Ui, enabled: bool, diameter: f32, word: &str) -> egui::Re
     let p = ui.painter();
     let lit = enabled && resp.hovered();
     // The palette: a sun, or its embers while End Turn is dead.
+    // Softened on the designer's word at the first picture ("soften the shading"): the rings sit
+    // closer in colour and drift less, so the disc reads as one lit body rather than a target.
     let (glow, limb, rings, spot, ink): (Color32, Color32, [Color32; 4], Color32, Color32) = if enabled {
         (
             Color32::from_rgba_unmultiplied(255, 170, 60, if lit { 70 } else { 40 }),
-            Color32::from_rgb(190, 80, 20),
-            [Color32::from_rgb(235, 130, 35), Color32::from_rgb(250, 175, 55), Color32::from_rgb(255, 215, 110), Color32::from_rgb(255, 245, 190)],
-            Color32::from_rgba_unmultiplied(110, 40, 10, 210),
+            Color32::from_rgb(215, 110, 30),
+            [Color32::from_rgb(238, 150, 45), Color32::from_rgb(248, 180, 70), Color32::from_rgb(252, 205, 105), Color32::from_rgb(255, 228, 150)],
+            Color32::from_rgba_unmultiplied(120, 50, 15, 170),
             Color32::from_rgb(255, 225, 160),
         )
     } else {
         (
             Color32::from_rgba_unmultiplied(120, 70, 40, 20),
-            Color32::from_rgb(70, 40, 30),
-            [Color32::from_rgb(90, 55, 35), Color32::from_rgb(105, 65, 40), Color32::from_rgb(120, 80, 50), Color32::from_rgb(135, 95, 60)],
-            Color32::from_rgba_unmultiplied(40, 20, 10, 210),
+            Color32::from_rgb(80, 48, 34),
+            [Color32::from_rgb(92, 58, 38), Color32::from_rgb(104, 66, 43), Color32::from_rgb(116, 76, 49), Color32::from_rgb(128, 88, 56)],
+            Color32::from_rgba_unmultiplied(40, 20, 10, 170),
             Color32::from_gray(120),
         )
     };
     p.circle_filled(centre, r * 1.25, glow);
     p.circle_filled(centre, r, limb);
-    // Four discs, each smaller and brighter, drifting toward the light above and to the left.
+    // Four discs, each a little smaller and brighter, drifting gently toward the light above and
+    // to the left.
     for (i, colour) in rings.iter().enumerate() {
         let k = (i + 1) as f32;
-        let shrink = 1.0 - 0.17 * k;
-        let off = egui::vec2(-r * 0.09 * k, -r * 0.11 * k);
+        let shrink = 1.0 - 0.14 * k;
+        let off = egui::vec2(-r * 0.05 * k, -r * 0.06 * k);
         p.circle_filled(centre + off, r * shrink, *colour);
     }
     // Sunspots: two pairs low on the disc where the light does not reach, and one alone.
-    for (dx, dy, s) in [(0.30, 0.28, 0.13), (0.42, 0.18, 0.08), (-0.34, 0.36, 0.11), (-0.22, 0.44, 0.07), (0.05, -0.45, 0.06)] {
+    for (dx, dy, s) in [(0.30, 0.28, 0.12), (0.42, 0.18, 0.07), (-0.34, 0.36, 0.10), (-0.22, 0.44, 0.06), (0.05, -0.45, 0.05)] {
         p.circle_filled(centre + egui::vec2(r * dx, r * dy), r * s, spot);
     }
     p.text(egui::pos2(rect.center().x, centre.y + r + 3.0), egui::Align2::CENTER_TOP, word, FontId::proportional(13.0 * CLUSTER_SCALE), ink);
