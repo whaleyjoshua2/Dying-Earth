@@ -6540,9 +6540,59 @@ fn venture_fund_control(ui: &mut Ui, session: &Session, game: &Game, view: &mut 
 /// acts that raise Relations. The terms are ticked and offered together, because an Accord is one
 /// bargain rather than four; the computer seat answers at the Resolution by its own weights, and a
 /// refusal is not an offence.
+/// Ticket #293 (version 0.08.6): **the rail a one-shot Influence spend is set on** -- the Smear's
+/// and the Greenwash's, drawn as the Research Directive's rail is (`research_directive_control`):
+/// full width, single points, the part of the scale the player cannot reach painted over in
+/// nobody's grey so the scale holds still through the turn. The designer: *"runs from 0 to their
+/// max income - width fixed."* `whole` is the rail's end, this turn's Allotment plus any
+/// Influence bought; `left` is what is not yet committed to other orders, greyed from the right;
+/// `second` is a tighter bound of another kind (the Greenwash's Ducats), greyed in a bluer shade
+/// from where it bites to where the Influence would have. Returns the amount, clamped to the
+/// tightest bound. The button that spends it stays with the caller: a spend is pressed.
+fn influence_rail(ui: &mut Ui, value: &mut i64, whole: i64, left: i64, second: Option<i64>) -> i64 {
+    let end = whole.max(1);
+    let mut v = (*value).clamp(0, end);
+    let full = ui.available_width();
+    let (was_width, was_rail, was_interact) = (ui.spacing().slider_width, ui.spacing().slider_rail_height, ui.spacing().interact_size);
+    ui.spacing_mut().slider_width = full;
+    ui.spacing_mut().slider_rail_height = was_rail * 1.2;
+    ui.spacing_mut().interact_size.y = was_interact.y * 1.2;
+    let resp = ui.add(egui::Slider::new(&mut v, 0..=end).show_value(false));
+    ui.spacing_mut().slider_width = was_width;
+    ui.spacing_mut().slider_rail_height = was_rail;
+    ui.spacing_mut().interact_size = was_interact;
+    let r = resp.rect;
+    let x_of = |n: i64| r.min.x + r.width() * (n.clamp(0, end) as f32 / end as f32);
+    let (top, bottom) = (r.center().y - ui.spacing().slider_rail_height * 0.6, r.center().y + ui.spacing().slider_rail_height * 0.6);
+    let tick = |ui: &Ui, x: f32| {
+        ui.painter().line_segment([egui::pos2(x, r.center().y - 9.0), egui::pos2(x, r.center().y + 9.0)], egui::Stroke::new(1.5, Color32::from_gray(120)));
+    };
+    let left = left.clamp(0, end);
+    if left < end {
+        // Committed to other orders already: nobody's grey, from the right, as the Directive's floor
+        // is from the left.
+        ui.painter().rect_filled(egui::Rect::from_min_max(egui::pos2(x_of(left), top), egui::pos2(r.max.x, bottom)), 2.0, Color32::from_rgb(124, 104, 104));
+        tick(ui, x_of(left));
+    }
+    let mut bound = left;
+    if let Some(s) = second
+        && s < left
+    {
+        let s = s.max(0);
+        ui.painter().rect_filled(egui::Rect::from_min_max(egui::pos2(x_of(s), top), egui::pos2(x_of(left), bottom)), 2.0, Color32::from_rgb(104, 104, 124));
+        tick(ui, x_of(s));
+        bound = s;
+    }
+    v = v.min(bound);
+    *value = v;
+    v
+}
+
 /// Ticket #267 (version 0.08.4): **the Smear campaign**, on a rival's page beside the Accords:
 /// a field for the Influence and a button, the Influence cluster's shape. The hover names the
 /// rate, the ledger it lands on, and the offence.
+/// Ticket #293 (version 0.08.6): the field is a rail (`influence_rail`), and what is left reads
+/// the command cluster's own figure, so Influence bought this turn counts -- the field ignored it.
 fn smear_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, other: Seat, actions: &mut Vec<Action>) {
     let me = Seat(0);
     let rate = game.tables.influence.smear.ppm_per_influence;
@@ -6553,19 +6603,28 @@ fn smear_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     if laid > 0.0 {
         ui.label(RichText::new(format!("{laid:.0} ppm of their Blame was laid on them by rivals.")).weak());
     }
-    ui.horizontal(|ui| {
-        let left = game.seat(me).allotment - session.pending.iter().map(|o| game.order_cost(me, o).influence).sum::<i64>();
-        ui.add(egui::DragValue::new(&mut view.smear_amount).range(1..=left.max(1)));
-        let order = Order::Smear { target: other, amount: view.smear_amount };
-        let check = game.check_order(me, &session.pending, &order);
-        let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Smear the {}", game.seat_name(other))));
-        if let Err(e) = &check {
-            resp.clone().on_disabled_hover_text(&e.0);
-        }
-        if resp.on_hover_text(format!("{:.0} ppm on their Blame at End Turn.", view.smear_amount as f64 * rate)).clicked() {
-            actions.push(Action::Place(order));
-        }
-    });
+    let (whole, left) = influence_this_turn(game, session);
+    let amount = influence_rail(ui, &mut view.smear_amount, whole, left, None);
+    ui.label(RichText::new(format!("{amount} of your {whole} Influence this turn; {left} not yet ordered elsewhere.")).weak());
+    let order = Order::Smear { target: other, amount };
+    let check = game.check_order(me, &session.pending, &order);
+    let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Smear the {} with {amount} Influence", game.seat_name(other))));
+    if let Err(e) = &check {
+        resp.clone().on_disabled_hover_text(&e.0);
+    }
+    if resp.on_hover_text(format!("{:.0} ppm on their Blame at End Turn.", amount as f64 * rate)).clicked() {
+        actions.push(Action::Place(order));
+    }
+}
+
+/// Ticket #293 (version 0.08.6): this turn's whole Influence (the Allotment plus what was bought
+/// in the Trading window) and what is left of it once the pending orders have taken theirs -- the
+/// command cluster's figure, read through `remaining`, so the two controls agree with it.
+fn influence_this_turn(game: &Game, session: &Session) -> (i64, i64) {
+    let me = Seat(0);
+    let bought: i64 = session.pending.iter().map(|o| if let Order::BuyInfluence { amount } = o { *amount } else { 0 }).sum();
+    let (_, left) = game.remaining(me, &session.pending);
+    (game.seat(me).allotment + bought, left)
 }
 
 /// Ticket #277 (version 0.08.5): the Greenwash block on the player's own page: a heading with the
@@ -6583,21 +6642,26 @@ fn greenwash_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
     if cleaned > 0.0 {
         ui.label(RichText::new(format!("{cleaned:.0} ppm of your Blame has been greenwashed away.")).weak());
     }
-    ui.horizontal(|ui| {
-        let influence_left = game.seat(me).allotment - session.pending.iter().map(|o| game.order_cost(me, o).influence).sum::<i64>();
-        let ducats_left = game.seat(me).stockpile.ducats - session.pending.iter().map(|o| game.order_cost(me, o).ducats).sum::<i64>();
-        let left = if per > 0 { influence_left.min(ducats_left / per) } else { influence_left };
-        ui.add(egui::DragValue::new(&mut view.greenwash_amount).range(1..=left.max(1)));
-        let order = Order::Greenwash { amount: view.greenwash_amount };
-        let check = game.check_order(me, &session.pending, &order);
-        let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Greenwash for {} Ducats", view.greenwash_amount * per)));
-        if let Err(e) = &check {
-            resp.clone().on_disabled_hover_text(&e.0);
-        }
-        if resp.on_hover_text(format!("{:.0} ppm off your Blame at End Turn.", view.greenwash_amount as f64 * rate)).clicked() {
-            actions.push(Action::Place(order));
-        }
-    });
+    // Ticket #293 (version 0.08.6): the rail, with the Ducats as a second bound painted in a bluer
+    // grey where they bite before the Influence does, and the line under it naming which bites.
+    let (whole, left) = influence_this_turn(game, session);
+    let (stock, _) = game.remaining(me, &session.pending);
+    let by_ducats = if per > 0 { Some((stock.ducats / per).max(0)) } else { None };
+    let amount = influence_rail(ui, &mut view.greenwash_amount, whole, left, by_ducats);
+    let bites = match by_ducats {
+        Some(d) if d < left => format!("your {} Ducats cover {d} of it, which is the bound", stock.ducats),
+        _ => format!("{left} not yet ordered elsewhere, and the Ducats cover it"),
+    };
+    ui.label(RichText::new(format!("{amount} of your {whole} Influence this turn; {bites}.")).weak());
+    let order = Order::Greenwash { amount };
+    let check = game.check_order(me, &session.pending, &order);
+    let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Greenwash with {amount} Influence for {} Ducats", amount * per)));
+    if let Err(e) = &check {
+        resp.clone().on_disabled_hover_text(&e.0);
+    }
+    if resp.on_hover_text(format!("{:.0} ppm off your Blame at End Turn.", amount as f64 * rate)).clicked() {
+        actions.push(Action::Place(order));
+    }
 }
 
 fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actions: &mut Vec<Action>) {
