@@ -119,6 +119,10 @@ pub struct FacilityCard {
     pub build_turns: u32,
     pub energy_upkeep: i64,
     pub produces: Option<Produces>,
+    /// Ticket #280 (version 0.08.5): what the building does, in a sentence, where it is not a
+    /// resource or beside one; drawn where the row said "no output" before.
+    #[serde(default)]
+    pub does: Option<String>,
     pub emissions: f64,
     /// Ticket #36: what it adds to its controller's Allotment while it stands and is online.
     #[serde(default)]
@@ -223,6 +227,10 @@ pub struct ModuleCard {
     pub build_turns: u32,
     pub energy_upkeep: i64,
     pub produces: Option<Produces>,
+    /// Ticket #280 (version 0.08.5): what the Module does, in a sentence, where it is not a
+    /// resource or beside one.
+    #[serde(default)]
+    pub does: Option<String>,
     #[serde(default)]
     pub holds_colonists: u32,
     #[serde(default)]

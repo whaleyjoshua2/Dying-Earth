@@ -14,6 +14,7 @@ and the measurements that decided it. The rules as decided are in
 | [`ticket-277-greenwash/`](ticket-277-greenwash/README.md) | [The Greenwash](https://github.com/whaleyjoshua2/Dying-Earth/issues/277) | The block on the player's own Faction page, and a batch in which the Prospectors greenwash 90 ppm a game and buy more credits, not fewer. |
 | [`ticket-278-blockade/`](ticket-278-blockade/README.md) | [A Blockade that starves](https://github.com/whaleyjoshua2/Dying-Earth/issues/278) | The ISS's card reading *Blockaded by the Prospectors: producing nothing, upkeep still paid*, and a batch in which the Prospectors blockade in four seeds of twenty. |
 | [`ticket-279-battles-pollute/`](ticket-279-battles-pollute/README.md) | [Battles pollute](https://github.com/whaleyjoshua2/Dying-Earth/issues/279) | The Climate Panel's *War 1.0* line after a Battle in Earth orbit, and a batch in which the Prospectors wear 9 ppm a game of war and nobody's share is nought. |
+| [`ticket-280-buildings-say/`](ticket-280-buildings-say/README.md) | [Buildings that say what they do](https://github.com/whaleyjoshua2/Dying-Earth/issues/280) | China's card with the Launch Site's row reading what it does instead of *no output*, and the sixteen sentences. |
 
 Everything here was captured headlessly in `shot:` mode. **Nothing was opened on the designer's
 desktop.**

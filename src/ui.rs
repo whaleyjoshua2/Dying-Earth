@@ -4252,7 +4252,8 @@ fn no_slot_section(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mi
         return;
     }
     if game.kind(Seat(0)) == FactionKind::Custodians {
-        let sink = game.tables.facility(FacilityKind::Scrubber).sink_per_turn;
+        // Ticket #280 (version 0.08.5): the hover is the row's own sentence, from the data. The one
+        // written here by hand said 4 Energy upkeep for two versions while the data said 3.
         ui.horizontal(|ui| {
             cost_button_with_hover(
                 ui,
@@ -4260,7 +4261,7 @@ fn no_slot_section(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mi
                 &session.pending,
                 Order::BuildFacility { state: sid, kind: FacilityKind::Scrubber },
                 "Scrubber",
-                Some(format!("+{sink:.1} ppm on the Natural Sink and 1 off this state's Unrest a turn, no build slot, 4 Energy upkeep. Destroyed if this state changes hands.")),
+                Some(game.facility_yield(Seat(0), sid, FacilityKind::Scrubber).text()),
                 actions,
             );
             cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::Scrubber }, "or", actions);
@@ -4281,11 +4282,8 @@ fn no_slot_section(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mi
                     "Sea Wall",
                     // Ticket #257 (version 0.08.4): the wall stands and holds every threshold; each
                     // rise held adds to its keep; a Storm Surge it holds cuts the coast's output.
-                    Some(format!(
-                        "{hover}. No build slot, at most one to a state. While it works, every Sea Level threshold takes no slots from this state and the wall stands; each rise it has held adds {} Materials a turn to its keep, and a Storm Surge it holds cuts its coastal Facilities' output by {:.0}% for one turn.",
-                        game.tables.sea_wall.upkeep_per_rise,
-                        (1.0 - game.tables.events.storm_surge_coastal_multiplier) * 100.0
-                    )),
+                    // Ticket #280 (version 0.08.5): all of it said by the row's own sentence now.
+                    Some(hover),
                     actions,
                 );
                 cost_button(ui, game, &session.pending, Order::BuildFacilityWithDucats { state: sid, kind: FacilityKind::SeaWall }, "or", actions);

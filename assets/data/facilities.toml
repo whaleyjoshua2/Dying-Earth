@@ -43,6 +43,7 @@ name = "Launch Site"
 materials = 30
 build_turns = 2
 energy_upkeep = 2
+does = "lifts Pioneers and Armies from here to orbit and to a Space Station over Earth, and a station over Earth can be built from here"
 emissions = 0.0
 
 # Ticket #35 (version 0.03). Its output is 4 x the state's gdp / 10 Ducats; `amount` here is that 4.
@@ -76,6 +77,7 @@ name = "Constabulary"
 materials = 25
 build_turns = 1
 energy_upkeep = 2
+does = "takes 1 off this state's Unrest a turn, halves what the climate and an Agitate add to it, and adds 5 to what a rival must reach to take this state (10 with Civil Defense)"
 emissions = 0.0
 
 # Ticket #54 (version 0.05): the Scrubber, the Custodians' signature Facility, which replaces
@@ -90,6 +92,7 @@ name = "Scrubber"
 materials = 30
 build_turns = 2
 energy_upkeep = 3
+does = "+3.0 ppm on the Natural Sink and 1 off this state's Unrest a turn, counted as its holder's removal; no build slot; destroyed if this state changes hands"
 emissions = 0.0
 sink_per_turn = 3.0
 no_slot = true
@@ -109,6 +112,7 @@ name = "Sea Wall"
 materials = 20
 build_turns = 2
 energy_upkeep = 1
+does = "holds every Sea Level threshold off this state while it works, and a Storm Surge it holds cuts its coastal Facilities' output by 30% for one turn; no build slot, one to a state; each rise held adds 0.5 Materials a turn to its keep"
 emissions = 0.0
 needs_tech = "coastal_engineering"
 no_slot = true
@@ -124,6 +128,7 @@ name = "School"
 materials = 25
 build_turns = 2
 energy_upkeep = 2
+does = "raises this state's Education Level 0.20 a turn, to 2.0; it falls back at the same rate when the School stops"
 emissions = 0.0
 
 # Tickets #181 to #186 (version 0.08.0): the four Unique Facilities, one per Faction. Each REPLACES
@@ -144,6 +149,7 @@ name = "Investment Bank"
 materials = 25
 build_turns = 1
 energy_upkeep = 2
+does = "banks 1% of the Venture Capital Fund's balance back into it each turn, never less than 1 across all your Investment Banks"
 produces = { resource = "ducats", amount = 4 }
 emissions = 0.0
 
@@ -155,6 +161,7 @@ name = "Spaceport"
 materials = 30
 build_turns = 2
 energy_upkeep = 2
+does = "does a Launch Site's work, and every Pioneer it lifts off Earth adds 1 Influence to next turn's Allotment"
 emissions = 0.0
 
 # Ticket #184: the Archivists' Power Plant. While one stands and is online, its holder pays 75% of
@@ -165,6 +172,7 @@ name = "Reactor"
 materials = 25
 build_turns = 2
 energy_upkeep = 0
+does = "pays three quarters of your whole Energy upkeep, the Archive excepted; a second Reactor is an ordinary power station"
 produces = { resource = "energy", amount = 6 }
 emissions = 1.5
 
@@ -176,6 +184,7 @@ name = "Academy"
 materials = 25
 build_turns = 2
 energy_upkeep = 2
+does = "does a School's work and pays 1 Ducat a turn while it is online"
 emissions = 0.0
 
 # Ticket #54: the cap on Scrubbers in one Nation State, from its population -- in units of five

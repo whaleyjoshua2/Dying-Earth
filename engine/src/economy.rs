@@ -37,6 +37,11 @@ pub struct Yield {
     /// Ticket #90 (version 0.06.0): how the figure was reached, for the card ("2 x 12 Colonists +
     /// 3 x 2 Bodies"), when a Module's arithmetic is worth showing.
     pub detail: Option<String>,
+    /// Ticket #280 (version 0.08.5): what the building DOES when that is not a resource, or beside
+    /// one -- the `does` sentence on its row in `facilities.toml` or `modules.toml`, written where
+    /// "no output" was written before, at the designer's word. Static prose from the data, so a
+    /// figure in it is a data figure and cannot drift as a hand-written hover did.
+    pub does: Option<String>,
 }
 
 impl Yield {
@@ -60,6 +65,10 @@ impl Yield {
         // Ticket #82: the Custodians' Production Moved.
         if let Some(f) = self.doubled_by {
             parts.push(format!("doubled by an idle {f} on Earth"));
+        }
+        // Ticket #280 (version 0.08.5): what it does, in the data's words.
+        if let Some(d) = &self.does {
+            parts.push(d.clone());
         }
         if self.allotment > 0 {
             parts.push(format!("+{} Influence Allotment", self.allotment));
@@ -237,7 +246,7 @@ impl Game {
         let fac = t.faction(self.kind(seat));
         let card = t.state(sid);
         let fc = t.facility(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None };
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: fc.energy_upkeep, emissions: 0.0, allotment: fc.influence_allotment, standing: fc.standing_per_turn, doubled_by: None, detail: None, does: fc.does.clone() };
         if let Some(p) = &fc.produces {
             match p.resource {
                 Resource::Research => {
@@ -303,7 +312,7 @@ impl Game {
         let t = &self.tables;
         let fac = t.faction(self.kind(seat));
         let mc = t.module(kind);
-        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None };
+        let mut y = Yield { resource: None, amount: 0, research: 0, upkeep: mc.energy_upkeep, emissions: 0.0, allotment: mc.influence_allotment, standing: mc.standing_per_turn, doubled_by: None, detail: None, does: mc.does.clone() };
         // Ticket #239 (version 0.08.3): a Unique Module does its sibling's job, so every lookup
         // keyed by kind -- the Techs that multiply it, the slot's yield, a Discovery on it --
         // reads the COMMON kind. Without this the Arkwrights' Chorus would be the one Relay in
@@ -459,7 +468,7 @@ impl Game {
     /// `doubled_modules`, named for the Facility whose mothball pays for it.
     pub fn module_yield_at(&self, seat: Seat, cid: ColonyId, index: usize) -> Yield {
         let Some(kind) = self.colony(cid).and_then(|c| c.modules.get(index)).map(|m| m.kind) else {
-            return Yield { resource: None, amount: 0, research: 0, upkeep: 0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None };
+            return Yield { resource: None, amount: 0, research: 0, upkeep: 0, emissions: 0.0, allotment: 0, standing: 0, doubled_by: None, detail: None, does: None };
         };
         let mut y = self.module_yield(seat, cid, kind);
         if self.doubled_modules(seat).contains(&(cid, index)) {

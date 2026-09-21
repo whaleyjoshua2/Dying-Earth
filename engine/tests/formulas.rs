@@ -7281,6 +7281,36 @@ fn only_a_rival_holding_orbital_control_shuts_the_ground() {
     assert!(g.may_land(Seat(0), body), "a contested orbit no longer punishes the bystander");
 }
 
+/// Ticket #280 (version 0.08.5): a building that makes no resource says what it does, in the
+/// sentence on its row in the data, where the row said "no output"; a Unique that makes a resource
+/// says its clause beside it; the Scrubber's row reads the data's upkeep, not a hand-written one;
+/// and the School's sentence carries the `[school]` figures, so the two cannot drift apart.
+#[test]
+fn a_building_with_no_output_says_what_it_does_in_the_datas_words() {
+    let g = game();
+    let sid = StateId::EastAsia;
+    let school = g.facility_yield(Seat(0), sid, FacilityKind::School).text();
+    assert!(!school.contains("no output"), "no longer 'no output': {school}");
+    let s = &g.tables.school;
+    assert!(school.contains(&format!("{:.2} a turn", s.per_turn)) && school.contains(&format!("to {:.1}", s.ceiling)), "the School's sentence carries the [school] figures: {school}");
+    assert!(school.ends_with("2 Energy upkeep"), "and the upkeep still closes the line: {school}");
+    let constabulary = g.facility_yield(Seat(0), sid, FacilityKind::Constabulary).text();
+    assert!(constabulary.contains("Unrest") && !constabulary.contains("no output"), "{constabulary}");
+    let scrubber = g.facility_yield(Seat(0), sid, FacilityKind::Scrubber).text();
+    assert!(scrubber.contains(&format!("{} Energy upkeep", g.tables.facility(FacilityKind::Scrubber).energy_upkeep)) && scrubber.contains("Natural Sink"), "{scrubber}");
+    let bank = g.facility_yield(Seat(0), sid, FacilityKind::InvestmentBank).text();
+    assert!(bank.contains(" Ducats, banks 1%"), "a Unique says its clause beside its resource: {bank}");
+    // Modules the same way, at a station over Earth.
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("a station");
+    for (kind, word) in [(ModuleKind::Habitat, "Colonists"), (ModuleKind::Shipyard, "Ship"), (ModuleKind::Barracks, "Army"), (ModuleKind::Institute, "Education")] {
+        let text = g.module_yield(Seat(0), station, kind).text();
+        assert!(text.contains(word) && !text.contains("no output"), "{}: {text}", kind.name());
+    }
+    // A Mine still reads as it did: a resource, no sentence.
+    let mine = g.module_yield(Seat(0), station, ModuleKind::Mine).text();
+    assert!(mine.starts_with("+") && !mine.contains("no output"), "{mine}");
+}
+
 /// Ticket #279 (version 0.08.5): Battles pollute. Every hit landed in a Battle on Earth puts the
 /// table's ppm per hit into next Climate phase's war bucket, worn by the seat that landed it and
 /// by nobody for a neutral Region's own Army; every building burned in the rolls after it puts the
