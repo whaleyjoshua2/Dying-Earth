@@ -7186,19 +7186,14 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                             for party in &b.parties {
                                 let who = party.seat.map(|s| game.seat_name(s)).unwrap_or_else(|| "Neutral".to_string());
                                 let colour = party.seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY);
-                                ui.label(
-                                    RichText::new(format!(
-                                        "   {}{}: {}, strength {}, {} hit(s) landed; destroyed: {}; escaped: {}",
-                                        who,
-                                        if party.aggressor { ", attacking" } else { "" },
-                                        party.units,
-                                        party.strength,
-                                        party.hits,
-                                        if party.destroyed.is_empty() { "none".to_string() } else { party.destroyed.join(", ") },
-                                        if party.escaped.is_empty() { "none".to_string() } else { party.escaped.join(", ") },
-                                    ))
-                                    .color(colour),
-                                );
+                                // Ticket #281 (version 0.08.5): every unit by name and what it took,
+                                // and the odds the attacker faced, labelled for what they are.
+                                let attacking = match (party.aggressor, party.odds) {
+                                    (true, Some(o)) => format!(", attacking at {:.0}% first-round odds", o * 100.0),
+                                    (true, None) => ", attacking".to_string(),
+                                    _ => String::new(),
+                                };
+                                ui.label(RichText::new(format!("   {who}{attacking}: {} (strength {}, {} hit(s) landed)", party.units, party.strength, party.hits)).color(colour));
                             }
                             ui.label(format!("   {}", b.result));
                         }

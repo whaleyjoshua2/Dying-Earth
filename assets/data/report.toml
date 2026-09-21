@@ -23,6 +23,10 @@ start_rivals = "Your rivals are {rivals}. Build, spread Influence, and get twelv
 solar_storm = "Solar Storm: no transit advanced this turn."
 ship_arrived = "{faction} {ship} arrived at {body}."
 ship_destroyed = "{faction} {ship} destroyed ({why}){cargo}."
+# Ticket #281 (version 0.08.5): an Army destroyed, by name, as a Ship has been; and every Battle
+# as a line of its own, ranked when a unit died and unranked otherwise.
+army_destroyed = "{army} ({faction}) destroyed ({why})."
+battle = "Battle at {place}: the {faction} attacked at {odds}% first-round odds; {outcome}."
 event_damaged_ships = "{event} damaged {n} Ship(s)."
 loaded = "{faction} loaded {cargo} at {body}."
 slot_taken = "{faction}: another Faction took that Colony Slot first."
@@ -246,6 +250,13 @@ figure = "{figure}"
 [moments.decisive_battle]
 on = true
 text = "A Battle at {place}: {result}"
+figure = "{figure}"
+
+# Ticket #281 (version 0.08.5): buildings burned on a taking, under their own name. The Battle's
+# Moment fires when a unit dies now, an Army included, and names it.
+[moments.taken_by_force]
+on = true
+text = "{place} taken by force: {result}"
 figure = "{figure}"
 
 # Ticket #261 (version 0.08.4): a rival closing on its Victory Condition -- three quarters of the

@@ -549,7 +549,7 @@ The guided first turns, since version 0.07.5, asked for by the `Play Tutorial` t
 _Avoid_: walkthrough, onboarding, training mission, guided mode
 
 **Moment**:
-A short modal that stops the turn before the Report, for one sentence and one number: a Colony founded, a Break or the sea rising, a Battle that cost a unit, a place changing hands, a Tech completed, Antarctica opening, the Archive finished, Colonists lost in transit, or, since version 0.08.4, **a rival closing on its Victory Condition** -- three quarters of the way there, or one part met with the other short, once each, and never the player's own seat. At most two a turn, the most serious first, and every kind can be switched off.
+A short modal that stops the turn before the Report, for one sentence and one number: a Colony founded, a Break or the sea rising, a Battle that cost a unit (since version 0.08.5 any unit, an Army included, named), a place taken by force with buildings burned (its own kind since 0.08.5), a place changing hands, a Tech completed, Antarctica opening, the Archive finished, Colonists lost in transit, or, since version 0.08.4, **a rival closing on its Victory Condition** -- three quarters of the way there, or one part met with the other short, once each, and never the player's own seat. At most two a turn, the most serious first, and every kind can be switched off.
 _Avoid_: popup, alert, notification, cutscene, interruption
 
 **Spectator**:
@@ -587,7 +587,7 @@ A damaged unit's attempt to leave a Battle, more likely the more damage it carri
 _Avoid_: retreat, rout, flee, break
 
 **Battle Report**:
-The account of every Battle from the last end-of-turn processing, read at the start of the next turn.
+The account of every Battle from the last end-of-turn processing, read at the start of the next turn. Since version 0.08.5 every Battle is also a line of the Report at its place, ranked with a Ship destroyed when a unit died and unranked when nobody lost one, so a skirmish never reads over a Break; its parties name every unit and what it took, and an attacker's first-round odds as the button quoted them; and an Army destroyed is a line by name, as a Ship has been.
 _Avoid_: combat log, after-action report
 
 **Orbital Control**:

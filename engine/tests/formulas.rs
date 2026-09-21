@@ -7281,6 +7281,57 @@ fn only_a_rival_holding_orbital_control_shuts_the_ground() {
     assert!(g.may_land(Seat(0), body), "a contested orbit no longer punishes the bystander");
 }
 
+/// Ticket #281 (version 0.08.5): a Battle is a line of the Report at its real place, its parties
+/// name every unit and what it took, an aggressor carries its first-round odds; when a unit died
+/// the line ranks with a Ship destroyed and a Moment names the loss, and when nobody lost one the
+/// line is unranked and no Moment fires; an Army destroyed is a line by name.
+#[test]
+fn a_battle_is_a_report_line_at_its_place_by_name_with_odds_and_a_moment_when_a_unit_dies() {
+    let mut g = game();
+    calm(&mut g);
+    let target = StateId::NorthAfrica;
+    let defender = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(target)).cloned().expect("Egypt's Standing Army");
+    let defender_name = g.army_name(&defender);
+    assert!(defender_name.contains("Egyptian"), "named from its home: {defender_name}");
+    occupier_in(&mut g, StateId::EastAsia, target);
+    g.resolution_phase();
+    let line = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::State(target))).expect("a Battle at Egypt, with its real place");
+    let agg = line.parties.iter().find(|p| p.aggressor).expect("an aggressor");
+    assert_eq!(agg.seat, Some(Seat(0)));
+    let odds = agg.odds.expect("the odds the aggressor faced");
+    assert!(odds > 0.0 && odds < 1.0, "first-round odds: {odds}");
+    let neutral = line.parties.iter().find(|p| p.seat.is_none()).expect("the neutral party");
+    assert!(neutral.odds.is_none(), "a defender carries no odds");
+    assert!(neutral.units.starts_with(&defender_name), "the party text names the unit: {}", neutral.units);
+    assert!(neutral.units.contains("took") || neutral.units.contains("escaped") || neutral.units.contains("destroyed"), "and says what it took: {}", neutral.units);
+    let lost: Vec<&String> = line.parties.iter().flat_map(|p| p.destroyed.iter()).collect();
+    let report = g.report.lines.iter().find(|l| l.text.starts_with("Battle at Egypt")).expect("a Report line for the Battle");
+    assert_eq!(report.place, Some(ReportPlace::State(target)), "the line jumps to the place");
+    assert!(report.text.contains(&format!("{:.0}% first-round odds", odds * 100.0)), "and says the odds, labelled: {}", report.text);
+    let moments = g.report.moments.iter().filter(|m| m.kind == MomentKind::DecisiveBattle).count();
+    if lost.is_empty() {
+        assert_eq!(report.kind, LineKind::Battle, "a bloodless Battle is unranked");
+        assert!(report.text.contains("nobody lost a unit"), "{}", report.text);
+        assert_eq!(moments, 0, "and stops nobody's turn");
+    } else {
+        assert_eq!(report.kind, LineKind::DecisiveBattle, "a Battle that cost a unit ranks with a Ship destroyed");
+        assert!(report.text.contains(lost[0].as_str()), "and names the loss: {}", report.text);
+        assert_eq!(moments, 1, "and is a Moment");
+        assert!(g.report.moments.iter().any(|m| m.kind == MomentKind::DecisiveBattle && m.text.contains(lost[0].as_str())), "the Moment names it: {:?}", g.report.moments);
+    }
+    assert!(LineKind::Battle.headline_rank().is_none() && LineKind::DecisiveBattle.headline_rank() == Some(4));
+    assert_eq!(LineKind::Battle.section(Some(ReportPlace::Body(BodyId::Mars))), Section::InSpace, "a Battle in orbit files under In space");
+
+    // An Army destroyed is a line by name, wherever it dies.
+    let mut g = game();
+    let a = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(StateId::EastAsia)).cloned().unwrap();
+    let name = g.army_name(&a);
+    g.destroy_army(a.id, "battle", Some(ReportPlace::State(StateId::EastAsia)));
+    assert!(g.armies.iter().all(|x| x.id != a.id));
+    let line = g.report.lines.iter().find(|l| l.kind == LineKind::DecisiveBattle && l.text.contains(&name)).expect("a line naming the Army");
+    assert!(line.text.contains("destroyed (battle)") && line.place == Some(ReportPlace::State(StateId::EastAsia)), "{}", line.text);
+}
+
 /// Ticket #280 (version 0.08.5): a building that makes no resource says what it does, in the
 /// sentence on its row in the data, where the row said "no output"; a Unique that makes a resource
 /// says its clause beside it; the Scrubber's row reads the data's upkeep, not a hand-written one;
@@ -9874,7 +9925,7 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     g.end_phase();
     assert_eq!(fired(&g), 2, "rivals only: {:?}", g.report.moments);
     assert_eq!(MomentKind::RivalProgress.rank(), 5, "between a Battle (4) and a Tech (6)");
-    assert_eq!(MomentKind::ALL.len(), 9);
+    assert_eq!(MomentKind::ALL.len(), 10, "ticket #281 (version 0.08.5) added a place taken by force");
     assert!(g.tables.report.moment_on(MomentKind::RivalProgress), "on by default");
 }
 

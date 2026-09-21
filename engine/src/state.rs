@@ -900,11 +900,17 @@ pub struct BattleParty {
     pub seat: Option<Seat>,
     /// True for the party whose Attack or Intercept started the Battle.
     pub aggressor: bool,
+    /// Ticket #281 (version 0.08.5): every unit by name and what it took -- "TSV Valiant took 2
+    /// hits; PMV Aurora escaped" -- where it was the roster's types before.
     pub units: String,
     pub strength: i64,
     pub hits: u32,
     pub destroyed: Vec<String>,
     pub escaped: Vec<String>,
+    /// Ticket #281: an aggressor's first-round odds against everyone else present, as the attack
+    /// button quoted them; None for a party that did not open the Battle.
+    #[serde(default)]
+    pub odds: Option<f64>,
 }
 
 /// One line of the Battle Report (spec 10.3), amended by ticket #50: every party present.
@@ -913,6 +919,10 @@ pub struct BattleLine {
     pub place: String,
     pub parties: Vec<BattleParty>,
     pub result: String,
+    /// Ticket #281 (version 0.08.5): the real place, so the Report's line can jump to it; the name
+    /// above stays for the log and old saves.
+    #[serde(default)]
+    pub at: Option<ReportPlace>,
 }
 
 impl BattleLine {
