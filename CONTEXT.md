@@ -282,11 +282,11 @@ A ground fighting unit. A Region's Armies belong to the state and are directed b
 _Avoid_: troops, soldiers, garrison, marines
 
 **Standing Army**:
-The Armies a Region keeps on its own, sized by its card and replenished a little each turn, whether or not any Faction controls it. Named like any other Army since version 0.08.4 -- the one the game begins with is *the 1st Chinese Army*. Its strength is the Region's Industry Level plus one, and since version 0.08.5 plus a step for every attack a neutral Region has held against, to Industry Level plus four; destroyed, it returns at strength one two Incomes later rather than the next, so a won Battle opens a window.
+The Armies a Region keeps on its own, sized by its card and replenished a little each turn, whether or not any Faction controls it. Named like any other Army since version 0.08.4 -- the one the game begins with is *the 1st Chinese Army*. Its strength is the Region's Industry Level plus one, and since version 0.08.5 plus a step for every attack a neutral Region has held against, to Industry Level plus four; since version 0.08.6 **a Region's defence is its people**: plus one while a working Constabulary stands there and plus one while Unrest is under the Standing Army's threshold, both read live, and **its hit points equal that strength** rather than the Army card's five, so a calm, policed Region is a wall and a restive one soft, and an Army whose damage reaches its strength is destroyed rather than standing at nought. Destroyed, it returns at strength one two Incomes later rather than the next, so a won Battle opens a window.
 _Avoid_: garrison, militia, defence value
 
 **Levy**:
-The second Army a neutral Region raises while it is threatened, since version 0.08.5: a built Army of any Faction standing in a neighbouring Region, or a neighbour under Occupation, and the Region's Unrest under the Standing Army's threshold. It stands at Industry Level plus two, heals as a Standing Army does, never marches, and stands down at the Income after the threat has passed or the moment the Region is somebody's. A Region arms whatever the neighbouring Army's stance, so nobody's orders are disclosed by it.
+The second Army a neutral Region raises while it is threatened, since version 0.08.5: a built Army of any Faction standing in a neighbouring Region, or a neighbour under Occupation, and the Region's Unrest under the Standing Army's threshold. It stands at Industry Level plus two -- since version 0.08.6 plus the same Constabulary and calm points a Standing Army reads, with hit points equal to that strength -- heals as a Standing Army does, never marches, and stands down at the Income after the threat has passed or the moment the Region is somebody's. A Region arms whatever the neighbouring Army's stance, so nobody's orders are disclosed by it.
 _Avoid_: militia, reserves, conscripts, second Standing Army
 
 **Barracks**:
@@ -445,7 +445,7 @@ The Custodians' Unique Facility on Earth and their Unique Module off it -- one n
 _Avoid_: school, institute, university
 
 **Constabulary**:
-The Facility that holds a Region's Unrest down: while it stands and is online it lowers Unrest every turn whatever else happened that turn, and softens what the climate and arriving Refugees add. At most one stands in a state. Since version 0.08.0 it is also a defensive building: while it stands and is online the challenge margin in that Region is 25 instead of 20, for EVERY challenger and whoever built it -- a police force serves the government of the day.
+The Facility that holds a Region's Unrest down: while it stands and is online it lowers Unrest every turn whatever else happened that turn, and softens what the climate and arriving Refugees add. At most one stands in a state. Since version 0.08.0 it is also a defensive building: while it stands and is online the challenge margin in that Region is 25 instead of 20, for EVERY challenger and whoever built it -- a police force serves the government of the day. Since version 0.08.6 it fights too: while it works, the Region's Standing Army and Levy are one stronger, with the hit points to match.
 _Avoid_: police, militia, garrison, barracks (that is the Colony word)
 
 **Refugees**:
@@ -579,11 +579,11 @@ The one order a stack carries into end-of-turn processing: Attack, Hold, Interce
 _Avoid_: order, mode, posture, aggression setting
 
 **Strength**:
-How hard a unit hits. A unit's type sets it; Hardened Hulls raises it for every Ship.
+How hard a unit hits. A unit's type sets it; Hardened Hulls raises it for every Ship. A Region's own Armies are the exception: a Standing Army's and a Levy's strength is the Region's -- its Industry Level, its earned steps, and since version 0.08.6 its working Constabulary and its calm.
 _Avoid_: attack, power, combat value
 
 **Hit Points**:
-How much damage a unit can take before it is destroyed with everything it carries. Damage persists until repaired at a Shipyard or Launch Site (Ships) or in a controlled Region or a Colony with a Barracks (Armies).
+How much damage a unit can take before it is destroyed with everything it carries. A unit's type sets it, except a Region's own Armies, whose hit points equal their live strength since version 0.08.6. Damage persists until repaired at a Shipyard or Launch Site (Ships) or in a controlled Region or a Colony with a Barracks (Armies).
 _Avoid_: health, HP, hull, morale
 
 **Pursuit**:
@@ -591,7 +591,7 @@ A unit's ability to catch an enemy unit that disengages, forcing it to take one 
 _Avoid_: speed, chase, initiative
 
 **Disengage**:
-A damaged unit's attempt to leave a Battle, more likely the more damage it carries. A unit that disengages and is not caught survives and cannot be attacked again that turn.
+A damaged unit's attempt to leave a Battle, more likely the more damage it carries: after every round, its damage over its hit points over a figure in the data, three since version 0.08.6 and two before, so a unit at half its hit points leaves one time in six. A unit that disengages and is not caught survives and cannot be attacked again that turn. Evade is a chosen flat half before the first round, not this roll.
 _Avoid_: retreat, rout, flee, break
 
 **Battle Report**:

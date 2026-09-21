@@ -4804,20 +4804,23 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             if a.levy { ", levy" } else if a.standing { ", standing" } else { "" },
             game.army_strength(a),
             a.damage,
-            game.tables.unit(UnitKind::Army).hit_points
+            game.army_hit_points(a)
         ));
         if a.standing {
+            // Ticket #296 (version 0.08.6): the hover names the four terms and which are live.
             let earned = game.state(sid).armed;
+            let t = &game.tables.standing_army;
+            let police = if game.constabulary_online(sid) { format!(", +{} for the working Constabulary", t.constabulary) } else { format!(", +{} if a Constabulary were working here", t.constabulary) };
+            let calm = if game.army_replenishes(sid) { format!(", +{} while Unrest is under {:.0}", t.calm, game.tables.unrest.army_threshold) } else { format!(", +{} lost to Unrest at {:.0} or more", t.calm, game.tables.unrest.army_threshold) };
             let tip = if a.levy {
                 format!(
-                    "A Levy: the second Army a neutral Region raises, at Industry Level + 2, while a foreign Army stands in a neighbouring Region or a neighbour is under Occupation. It heals 1 a turn while Unrest is under {:.0}, never marches, and stands down when the threat passes.",
+                    "A Levy: the second Army a neutral Region raises while a foreign Army stands in a neighbouring Region or a neighbour is under Occupation. Its strength is Industry Level + 2{police}{calm}, and its hit points equal that strength. It heals 1 a turn while Unrest is under {:.0}, never marches, and stands down when the threat passes.",
                     game.tables.unrest.army_threshold
                 )
             } else {
                 format!(
-                    "A Standing Army: Industry Level + 1 strong{}, with the Army card's {} hit points. It heals 1 a turn while Unrest is under {:.0}; destroyed, it returns at strength 1 two Incomes later. A neutral Region that is attacked and holds gains +1 for good, to Industry + 4.",
-                    if earned > 0 { format!(" and +{earned} earned holding against attack") } else { String::new() },
-                    game.tables.unit(UnitKind::Army).hit_points,
+                    "A Standing Army: Industry Level + 1{}{police}{calm}, and its hit points equal that strength -- a calm, policed Region is a wall, a restive one soft. It heals 1 a turn while Unrest is under {:.0}; at its strength in damage it is destroyed, and returns at strength 1 two Incomes later. A neutral Region that is attacked and holds gains +1 for good, to Industry + 4.",
+                    if earned > 0 { format!(", +{earned} earned holding against attack") } else { String::new() },
                     game.tables.unrest.army_threshold
                 )
             };

@@ -229,14 +229,23 @@ impl Game {
                     self.state_mut(sid).respawn_wait -= 1;
                     continue;
                 }
+                // Ticket #296 (version 0.08.6): at strength 1 means damage one under its own hit
+                // points, which are its live strength now rather than the card's 5.
                 let cap = self.standing_army_cap(sid);
-                let hp = self.tables.unit(UnitKind::Army).hit_points;
                 self.spawn_standing_army(sid);
-                let dmg = cap.saturating_sub(1).min(hp - 1);
+                let dmg = cap.saturating_sub(1);
                 if let Some(a) = self.armies.iter_mut().find(|a| a.standing && !a.levy && a.home == ArmyHome::State(sid)) {
                     a.damage = dmg;
                 }
                 continue;
+            }
+            // Ticket #296 (version 0.08.6): a Region's own Army whose damage has reached its
+            // strength is destroyed, not left at nought. Its strength moves live -- a Constabulary
+            // gone offline, Unrest past the threshold -- so the check is made every Income, and the
+            // destroyed Standing Army takes the two-Income road back like one killed in a Battle.
+            let spent: Vec<ArmyId> = self.armies.iter().filter(|a| a.standing && a.home == ArmyHome::State(sid) && a.damage >= self.army_hit_points(a)).map(|a| a.id).collect();
+            for id in spent {
+                self.destroy_army(id, "its strength spent", Some(ReportPlace::State(sid)));
             }
             // Ticket #52: at Unrest 4 the Standing Army stops replenishing.
             if occupied || !self.army_replenishes(sid) {

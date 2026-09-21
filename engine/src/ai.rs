@@ -1975,7 +1975,9 @@ impl Game {
             // occupying holds at three times the weight and marches nowhere -- the measured
             // hit-and-run (Saudi Arabia abandoned for Nigeria) broke its own Occupation for free.
             let occupying = matches!(self.place_control(place), Control::Occupied { occupier, .. } if occupier == seat);
-            let total_hp: u32 = mine.iter().map(|_| self.tables.unit(UnitKind::Army).hit_points).sum();
+            // Ticket #296 (version 0.08.6): the live figure, since a Region's own Army has as many
+            // hit points as its strength now; the card's 5 read here would have been a lie.
+            let total_hp: u32 = mine.iter().filter_map(|id| self.army(*id)).map(|a| self.army_hit_points(a)).sum();
             let total_dmg: u32 = mine.iter().filter_map(|id| self.army(*id)).map(|a| a.damage).sum();
             if total_hp > 0 && (total_dmg as f64) / (total_hp as f64) >= th.evade_damage_fraction {
                 push(vec![Order::ArmyStance { place, stance: Stance::Evade }], Cat::StanceEvade, self.base_weight(seat, Cat::StanceEvade) * 10.0, 1.0, 1.0, 1.0, format!("Evade at {}", self.place_name(place)), Some(key.clone()));

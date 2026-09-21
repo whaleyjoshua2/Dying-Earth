@@ -465,6 +465,12 @@ fn main() {
                                 "      Armies built {:?}, lost {:?}, Standing Armies lost {}; warships built {:?}, lost {:?}; Occupations begun {:?}, broken {:?}; places taken by force {:?}",
                                 warc.armies_built, warc.armies_lost, warc.standing_armies_lost, warc.warships_built, warc.warships_lost, warc.occupations_begun, warc.occupations_broken, warc.takes_by_force
                             );
+                            // Ticket #295 (version 0.08.6): the escapes, never counted before the
+                            // disengage figure was nudged.
+                            println!(
+                                "      Escapes over the batch: units escaped by seat {:?}, neutral {}; Battles with an escape {} of {}",
+                                warc.escapes, warc.escapes_neutral, warc.battles_with_escape, warc.battles.iter().sum::<u32>()
+                            );
                             println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
                             println!("      Breaks fired: {}", fired.join(", "));
                         }

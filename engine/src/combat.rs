@@ -143,26 +143,27 @@ pub fn first_round_odds(attacker_strength: i64, defender_strength: i64) -> f64 {
     p * p * p + 3.0 * p * p * (1.0 - p)
 }
 
-/// Spec 10.2: the disengage chance of one unit.
-pub fn disengage_chance(c: &Combatant) -> f64 {
+/// Spec 10.2: the disengage chance of one unit. Ticket #295 (version 0.08.6): over `divisor`,
+/// the table's figure (`[disengage]` in units.toml), where the 2 was written here.
+pub fn disengage_chance(c: &Combatant, divisor: f64) -> f64 {
     if c.evade {
         0.5
-    } else if c.damage == 0 {
+    } else if c.damage == 0 || divisor <= 0.0 {
         0.0
     } else {
-        (c.damage as f64 / c.hit_points as f64) / 2.0
+        (c.damage as f64 / c.hit_points as f64) / divisor
     }
 }
 
 /// Run one battle between two parties to its end. Kept for the two-sided callers and the tests;
 /// it is `melee` with two parties.
-pub fn fight(attackers: &mut [Combatant], defenders: &mut [Combatant], dice: &mut dyn Dice) -> BattleStats {
-    melee(&mut [attackers, defenders], dice)
+pub fn fight(attackers: &mut [Combatant], defenders: &mut [Combatant], dice: &mut dyn Dice, divisor: f64) -> BattleStats {
+    melee(&mut [attackers, defenders], dice, divisor)
 }
 
 /// Run one melee to its end: every party is hostile to every other. Units are mutated in place;
-/// escaped units are marked.
-pub fn melee(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice) -> BattleStats {
+/// escaped units are marked. `divisor` is the disengage roll's (ticket #295).
+pub fn melee(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, divisor: f64) -> BattleStats {
     let n = parties.len();
     let mut stats = BattleStats { rounds: 0, hits: vec![0; n], destroyed: vec![Vec::new(); n], escaped: vec![Vec::new(); n] };
     // Evade rolls at the start of the battle, at current damage (spec 9.2).
@@ -200,7 +201,7 @@ pub fn melee(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice) -> BattleSta
         // Disengage.
         for party in parties.iter_mut() {
             for c in party.iter_mut().filter(|c| c.engaged && !c.destroyed()) {
-                let p = disengage_chance(c);
+                let p = disengage_chance(c, divisor);
                 if p > 0.0 && dice.chance(p) {
                     c.engaged = false;
                     c.escaped = true;

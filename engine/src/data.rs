@@ -1158,11 +1158,31 @@ struct ModulesFile {
     trade_post: TradePostCard,
     mass_driver: MassDriverCard,
 }
+/// Ticket #295 (version 0.08.6): the disengage roll's figure, in data at last. After every round a
+/// damaged unit leaves with chance damage over hit points over `divisor`; the First Playable wrote
+/// the 2 into the code and never tuned it. Evade's flat half is not this figure.
+#[derive(Debug, Clone, Deserialize)]
+pub struct DisengageCard {
+    pub divisor: f64,
+}
+
+/// Ticket #296 (version 0.08.6): what a Region's people add to its own Armies' strength -- a
+/// Standing Army's and a Levy's, never a built Army's: `constabulary` while a working Constabulary
+/// stands there, `calm` while Unrest is under the Standing Army's threshold. Hit points equal the
+/// strength these make, so a calm, policed Region is a wall and a restive one soft.
+#[derive(Debug, Clone, Deserialize)]
+pub struct StandingArmyCard {
+    pub constabulary: u32,
+    pub calm: u32,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct UnitsFile {
     unit: Vec<UnitCard>,
     repair: RepairCard,
     crowding: CrowdingCard,
+    disengage: DisengageCard,
+    standing_army: StandingArmyCard,
 }
 
 /// Ticket #86 (version 0.06.0): a warming Earth fills the Colony Ships. `per_step` Colonists
@@ -1409,6 +1429,10 @@ pub struct Tables {
     pub repair: RepairCard,
     /// Ticket #86: the crowd a warming Earth puts aboard a Colony Ship, and what it risks.
     pub crowding: CrowdingCard,
+    /// Ticket #295 (version 0.08.6): the disengage roll's divisor.
+    pub disengage: DisengageCard,
+    /// Ticket #296 (version 0.08.6): what a Region's people add to its own Armies.
+    pub standing_army: StandingArmyCard,
     pub techs: Vec<TechCard>,
     pub events: EventsTable,
     pub factions: Vec<FactionCard>,
@@ -1521,6 +1545,8 @@ impl Tables {
             units: units.unit,
             repair: units.repair,
             crowding: units.crowding,
+            disengage: units.disengage,
+            standing_army: units.standing_army,
             techs: techs.tech,
             shortlist: techs.shortlist,
             events,
@@ -1691,6 +1717,10 @@ impl Tables {
         }
         if u.neutral_max > u.max || u.refugees_per <= 0.0 || u.report_net_floor <= 0.0 {
             return Err(err("unrest.toml", "neutral_max must not exceed max, and refugees_per and report_net_floor must be positive"));
+        }
+        // Ticket #295 (version 0.08.6): a divisor of nought would be a certain escape at any damage.
+        if self.disengage.divisor <= 0.0 {
+            return Err(err("units.toml", "[disengage] divisor must be positive"));
         }
         for s in &self.states {
             if s.unrest < 0.0 || s.unrest > u.max {

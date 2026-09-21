@@ -239,7 +239,7 @@ fn battle_round_three_hit_rolls_then_disengage_then_pursuit() {
     let mut a = vec![frigate(1)];
     let mut d = vec![colony_ship(2)];
     let mut dice = Script { chances: VecDeque::from(vec![true, true, true]), d6s: VecDeque::new(), picks: VecDeque::new() };
-    let stats = combat::fight(&mut a, &mut d, &mut dice);
+    let stats = combat::fight(&mut a, &mut d, &mut dice, 2.0);
     assert_eq!(stats.rounds, 1);
     assert_eq!(stats.hits_of(0), 3);
     assert_eq!(stats.hits_of(1), 0);
@@ -259,7 +259,7 @@ fn battle_defender_hits_land_on_the_attacker_and_a_damaged_unit_may_disengage() 
         d6s: VecDeque::from(vec![2]),
         picks: VecDeque::new(),
     };
-    let stats = combat::fight(&mut a, &mut d, &mut dice);
+    let stats = combat::fight(&mut a, &mut d, &mut dice, 2.0);
     assert_eq!(stats.rounds, 1, "the attacker escaped, so the battle ended");
     assert_eq!(a[0].damage, 3, "2 from the round and 1 from the pursuit");
     assert!(a[0].escaped && !a[0].engaged);
@@ -270,16 +270,17 @@ fn battle_defender_hits_land_on_the_attacker_and_a_damaged_unit_may_disengage() 
 // ---------------------------------------------------------------- 10.2 Disengage and Pursuit probabilities
 
 #[test]
-fn disengage_probability_is_damage_over_hit_points_halved_and_evade_is_half() {
+fn disengage_probability_is_damage_over_hit_points_over_the_divisor_and_evade_is_half() {
+    // The First Playable's 2, passed explicitly; the table's own figure is ticket #295's test.
     let mut c = frigate(1);
-    assert_eq!(combat::disengage_chance(&c), 0.0);
+    assert_eq!(combat::disengage_chance(&c, 2.0), 0.0);
     c.damage = 2;
-    assert!((combat::disengage_chance(&c) - 0.25).abs() < 1e-12);
+    assert!((combat::disengage_chance(&c, 2.0) - 0.25).abs() < 1e-12);
     c.damage = 3;
-    assert!((combat::disengage_chance(&c) - 0.375).abs() < 1e-12);
+    assert!((combat::disengage_chance(&c, 2.0) - 0.375).abs() < 1e-12);
     c.evade = true;
     c.damage = 0;
-    assert_eq!(combat::disengage_chance(&c), 0.5);
+    assert_eq!(combat::disengage_chance(&c, 2.0), 0.5);
 }
 
 #[test]
@@ -290,7 +291,7 @@ fn pursuit_catches_on_a_d6_at_or_under_pursuit_and_not_above() {
         let mut d = vec![Combatant::new(UnitRef::Ship(ShipId(2)), "Colony Ship 2", 0, 3, 0, 0, true)];
         // Evade roll true at the start; pursuit hit-roll true if caught.
         let mut dice = Script { chances: VecDeque::from(vec![true, true]), d6s: VecDeque::from(vec![roll]), picks: VecDeque::new() };
-        let stats = combat::fight(&mut a, &mut d, &mut dice);
+        let stats = combat::fight(&mut a, &mut d, &mut dice, 2.0);
         assert_eq!(stats.rounds, 0, "nobody was left engaged to fight a round");
         assert_eq!(d[0].damage, if caught { 1 } else { 0 }, "d6 {roll}");
         assert!(d[0].escaped);
@@ -1641,7 +1642,7 @@ fn a_partys_chance_to_land_a_hit_is_its_share_of_the_total_strength_present() {
         let mut a = party(1, "A Frigate", 6, 10_000, 0);
         let mut b = party(2, "B Frigate", 3, 10_000, 0);
         let mut c = party(3, "C Frigate", 1, 10_000, 0);
-        let stats = combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice);
+        let stats = combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice, 2.0);
         for (i, l) in landed.iter_mut().enumerate() {
             *l += stats.hits_of(i);
         }
@@ -1671,7 +1672,7 @@ fn a_partys_hits_are_spread_across_the_enemy_parties_in_proportion_to_their_stre
         let mut a = party(1, "A Frigate", 6, 10_000, 0);
         let mut b = party(2, "B Frigate", 3, 10_000, 0);
         let mut c = party(3, "C Frigate", 1, 10_000, 0);
-        combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice);
+        combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice, 2.0);
         b_damage += b[0].damage;
         c_damage += c[0].damage;
     }
@@ -7427,7 +7428,8 @@ fn a_threatened_neutral_raises_a_levy_and_stands_it_down_and_holding_arms_it_for
     let levy = g.levy_at(egypt).expect("a Levy raised at Income");
     let l = g.armies.iter().find(|a| a.id == levy).unwrap().clone();
     assert!(l.standing && l.levy && l.at == ArmyAt::Place(Place::State(egypt)));
-    assert_eq!(g.army_strength(&l), (g.state(egypt).industry_level + 2) as i64, "Industry + 2");
+    // Ticket #296 (version 0.08.6): plus the calm point, since the fixture is calm and unpoliced.
+    assert_eq!(g.army_strength(&l), (g.state(egypt).industry_level + 2 + g.tables.standing_army.calm) as i64, "Industry + 2, plus the people's calm");
     assert!(g.army_name(&l).contains("Egyptian"), "named from its home: {}", g.army_name(&l));
     assert_eq!(g.armies.iter().filter(|a| a.standing && !a.levy && a.home == ArmyHome::State(egypt)).count(), 1, "the Standing Army is still one");
     assert!(g.report.lines.iter().any(|l| l.text.contains("Egypt arms")), "the Report says so: {:?}", g.report.lines);
@@ -7456,7 +7458,8 @@ fn a_threatened_neutral_raises_a_levy_and_stands_it_down_and_holding_arms_it_for
     for _ in 0..5 {
         g.neutral_held(egypt);
     }
-    assert_eq!(g.standing_army_cap(egypt), g.state(egypt).industry_level + 4, "never past Industry + 4");
+    // Ticket #296 (version 0.08.6): the ceiling is on the earned steps; the people's points sit on top.
+    assert_eq!(g.standing_army_cap(egypt), g.state(egypt).industry_level + 4 + g.people_bonus(egypt), "never past Industry + 4 in earned steps");
     assert_eq!(g.neutral_holds, 6, "every hold is counted for the sweep");
 
     // The respawn: a destroyed Standing Army returns two Incomes later, not the next.
@@ -10513,6 +10516,69 @@ fn a_starting_station_opens_with_two_aboard_and_the_arkwrights_with_two_pioneers
             assert_eq!(st.emigrants, 0, "nobody else starts with a Pioneer waiting");
         }
     }
+}
+
+/// Ticket #295 (version 0.08.6): the disengage roll's divisor is the table's, and the table says
+/// three: a unit at half its hit points leaves one time in six, where the First Playable's two made
+/// it one in four. Evade's flat half is untouched.
+#[test]
+fn the_disengage_roll_is_a_third_of_the_damage_fraction_from_the_table() {
+    let g = fresh();
+    let d = g.tables.disengage.divisor;
+    assert_eq!(d, 3.0, "the designer's word: a third");
+    let mut c = frigate(1);
+    c.damage = 2;
+    assert!((combat::disengage_chance(&c, d) - 1.0 / 6.0).abs() < 1e-12, "half its hit points: one in six");
+    c.evade = true;
+    c.damage = 0;
+    assert_eq!(combat::disengage_chance(&c, d), 0.5, "Evade is still a flat half");
+}
+
+/// Ticket #296 (version 0.08.6): a Region's defence is its people. Its Standing Army reads
+/// Industry + 1, plus one while a working Constabulary stands there, plus one while Unrest is
+/// under the Standing Army's threshold; a Levy the same two on top of Industry + 2; hit points
+/// equal that live strength; and an Army whose damage reaches its strength is destroyed at Income
+/// rather than sitting at strength nought. A built Army is untouched: 4 and 5.
+#[test]
+fn a_standing_army_reads_its_industry_its_constabulary_and_its_calm_and_dies_at_its_strength() {
+    let mut g = fresh();
+    calm(&mut g);
+    let sid = StateId::EastAsia;
+    let industry = g.state(sid).industry_level;
+    assert_eq!(industry, 3, "the fixture: China at Industry 3");
+    let id = g.armies.iter().find(|a| a.standing && !a.levy && a.home == ArmyHome::State(sid)).map(|a| a.id).unwrap();
+    let army = |g: &Game| g.armies.iter().find(|a| a.id == id).unwrap().clone();
+    // Calm, no Constabulary: Industry + 1 + calm.
+    assert_eq!(g.army_strength(&army(&g)), (industry + 2) as i64, "Industry + 1, plus one for calm");
+    assert_eq!(g.army_hit_points(&army(&g)), industry + 2, "hit points equal the strength");
+    // A working Constabulary: one more.
+    g.state_mut(sid).facilities.push(Facility { online: true, ..Facility::new(FacilityKind::Constabulary) });
+    assert!(g.constabulary_online(sid));
+    assert_eq!(g.army_strength(&army(&g)), (industry + 3) as i64, "and one for the police");
+    assert_eq!(g.army_hit_points(&army(&g)), industry + 3);
+    // Restive: the calm point goes, live.
+    g.state_mut(sid).unrest = g.tables.unrest.army_threshold;
+    assert_eq!(g.army_strength(&army(&g)), (industry + 2) as i64, "Unrest at the threshold takes the calm point");
+    // Mothballed police: the Constabulary point goes too.
+    g.state_mut(sid).facilities.iter_mut().find(|f| f.kind == FacilityKind::Constabulary).unwrap().mothballed = true;
+    assert_eq!(g.army_strength(&army(&g)), (industry + 1) as i64, "back to Industry + 1");
+    // Damage reaching the strength destroys it at Income and starts the two-Income return.
+    g.army_mut(id).unwrap().damage = industry + 1;
+    assert_eq!(g.army_strength(&army(&g)), 0);
+    g.income_phase();
+    assert!(!g.armies.iter().any(|a| a.id == id), "at its strength in damage it is destroyed, not left at nought");
+    assert_eq!(g.state(sid).respawn_wait, 1, "and returns two Incomes later, as a destroyed one does");
+    // A Levy reads the same two terms on top of Industry + 2; a built Army reads neither.
+    let mut g = fresh();
+    calm(&mut g);
+    let egypt = StateId::NorthAfrica;
+    let levy = g.raise_levy(egypt);
+    let l = g.armies.iter().find(|a| a.id == levy).unwrap().clone();
+    assert_eq!(g.army_strength(&l), (g.state(egypt).industry_level + 3) as i64, "Industry + 2, plus one for calm");
+    assert_eq!(g.army_hit_points(&l), g.state(egypt).industry_level + 3);
+    let built = g.raise_army(Place::State(sid), false);
+    let b = g.armies.iter().find(|a| a.id == built).unwrap().clone();
+    assert_eq!((g.army_strength(&b), g.army_hit_points(&b)), (4, 5), "a built Army is the card's 4 and 5 wherever it stands");
 }
 
 /// Ticket #290 (version 0.08.6): the computer's opening. While its starting station has a slot free

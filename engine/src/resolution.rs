@@ -401,7 +401,9 @@ impl Game {
         // Ticket #281 (version 0.08.5): by name -- the 1st Chinese Army -- as every other surface has
         // it since 0.08.4; a neutral Region's own Army is named the same way.
         let name = self.army_name(a);
-        Combatant::new(UnitRef::Army(id), name, self.army_strength(a), card.hit_points, a.damage, card.pursuit, a.stance == Stance::Evade)
+        // Ticket #296 (version 0.08.6): hit points are the Army's own, not the card's, for a
+        // Region's Standing Army and Levy.
+        Combatant::new(UnitRef::Army(id), name, self.army_strength(a), self.army_hit_points(a), a.damage, card.pursuit, a.stance == Stance::Evade)
     }
 
     /// One melee of Ship stacks at a Body (ticket #50).
@@ -476,7 +478,7 @@ impl Game {
         let stats = {
             let mut slices: Vec<&mut [Combatant]> = parties.iter_mut().map(|(_, _, c)| c.as_mut_slice()).collect();
             let mut rng = self.rng.clone();
-            let stats = combat::melee(&mut slices, &mut rng as &mut dyn Dice);
+            let stats = combat::melee(&mut slices, &mut rng as &mut dyn Dice, self.tables.disengage.divisor);
             self.rng = rng;
             stats
         };
@@ -512,6 +514,23 @@ impl Game {
                 odds: if *agg { Some(combat::first_round_odds(strengths[i], total - strengths[i])) } else { None },
             })
             .collect();
+        // Ticket #295 (version 0.08.6): escapes counted at the event, by the seat the unit fought
+        // for, so the sweep can say what the disengage figure does.
+        let mut any_escape = false;
+        for (i, (seat, _, _)) in parties.iter().enumerate() {
+            let n = stats.escaped.get(i).map(|e| e.len() as u32).unwrap_or(0);
+            if n == 0 {
+                continue;
+            }
+            any_escape = true;
+            match seat {
+                Some(s) => self.war.escapes[s.index()] += n,
+                None => self.war.escapes_neutral += n,
+            }
+        }
+        if any_escape {
+            self.war.battles_with_escape += 1;
+        }
         let line = BattleLine { place: place.to_string(), parties: listed, result: format!("{} round(s).", stats.rounds), at };
         // The Battle's own line goes in BEFORE the losses are applied, so among the rank-4 lines a
         // turn holds it is the earliest and headlines over "PMV Magellan destroyed (battle)".

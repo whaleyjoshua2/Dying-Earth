@@ -928,6 +928,15 @@ pub struct WarCounters {
     pub marches_neutral: [u32; SEAT_COUNT],
     pub marches_held: [u32; SEAT_COUNT],
     pub orbit_attacks: [u32; SEAT_COUNT],
+    /// Ticket #295 (version 0.08.6): units that escaped a Battle, by the seat they fought for, and
+    /// a neutral Region's own; and Battles in which any unit escaped. The disengage figure was
+    /// never measured before it was nudged.
+    #[serde(default)]
+    pub escapes: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub escapes_neutral: u32,
+    #[serde(default)]
+    pub battles_with_escape: u32,
 }
 
 impl WarCounters {
@@ -945,9 +954,12 @@ impl WarCounters {
             self.marches_neutral[i] += o.marches_neutral[i];
             self.marches_held[i] += o.marches_held[i];
             self.orbit_attacks[i] += o.orbit_attacks[i];
+            self.escapes[i] += o.escapes[i];
         }
         self.battles_vs_neutral += o.battles_vs_neutral;
         self.standing_armies_lost += o.standing_armies_lost;
+        self.escapes_neutral += o.escapes_neutral;
+        self.battles_with_escape += o.battles_with_escape;
     }
 }
 
@@ -2111,14 +2123,27 @@ impl Game {
     }
 
     /// Industry Level + 1, plus every step the Region has earned holding against an attack
-    /// (ticket #282, version 0.08.5; neutral Regions only earn them).
+    /// (ticket #282, version 0.08.5; neutral Regions only earn them), plus what its people add
+    /// (ticket #296, version 0.08.6): a working Constabulary and calm.
     pub fn standing_army_cap(&self, s: StateId) -> u32 {
-        self.state(s).industry_level + 1 + self.state(s).armed
+        self.state(s).industry_level + 1 + self.state(s).armed + self.people_bonus(s)
     }
 
-    /// Ticket #282: a Levy's strength, Industry + 2, at the designer's word.
+    /// Ticket #282: a Levy's strength, Industry + 2, at the designer's word; ticket #296: plus
+    /// what its people add, on top, at the designer's word ("on top").
     pub fn levy_cap(&self, s: StateId) -> u32 {
-        self.state(s).industry_level + 2
+        self.state(s).industry_level + 2 + self.people_bonus(s)
+    }
+
+    /// Ticket #296 (version 0.08.6): **a Region's defence is its people.** What a Region's own
+    /// Armies -- its Standing Army and its Levy, never a built one -- add to their strength: the
+    /// table's `constabulary` while a working Constabulary stands there (the same test its Unrest
+    /// effect uses) and `calm` while Unrest is under the Standing Army's threshold (the same test
+    /// that lets it heal). Read live, so a Constabulary going offline or Unrest crossing the
+    /// threshold takes the point away that turn, and hit points with it.
+    pub fn people_bonus(&self, s: StateId) -> u32 {
+        let t = &self.tables.standing_army;
+        (if self.constabulary_online(s) { t.constabulary } else { 0 }) + (if self.army_replenishes(s) { t.calm } else { 0 })
     }
 
     /// Ticket #282: the most steps a neutral Region may earn, so its Standing Army never passes
@@ -2148,6 +2173,19 @@ impl Game {
         }
         self.levies_raised += 1;
         id
+    }
+
+    /// An Army's hit points. Ticket #296 (version 0.08.6): a Region's own Army -- its Standing Army
+    /// or its Levy -- has as many as its live strength before damage, so a calm, policed Region is
+    /// a wall and a restive one soft, and an Army whose damage reaches its strength is destroyed
+    /// rather than sitting at strength nought (the limbo the reviews found). A built Army, and a
+    /// Colony's, keep the card's.
+    pub fn army_hit_points(&self, a: &Army) -> u32 {
+        match a.home {
+            ArmyHome::State(s) if a.standing && a.levy => self.levy_cap(s).max(1),
+            ArmyHome::State(s) if a.standing => self.standing_army_cap(s).max(1),
+            _ => self.tables.unit(UnitKind::Army).hit_points,
+        }
     }
 
     pub fn army_strength(&self, a: &Army) -> i64 {
