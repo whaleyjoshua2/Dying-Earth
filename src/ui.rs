@@ -2005,18 +2005,30 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 if lines.is_empty() { "No income from buildings last turn.".to_string() } else { format!("Last Income:\n{}", lines.join("\n")) }
             };
             bar_resource(ui, icons, "materials", "Materials", format!("{} ({})", left.materials, signed(inc.materials)), sources(dying_earth_engine::Resource::Materials));
-            // Ticket #72: the Prospectors' Fund beside their Materials.
-            if game.kind(Seat(0)) == FactionKind::Prospectors {
-                let s = game.seat(Seat(0));
-                ui.label(RichText::new(format!("Fund {} ({}%)", s.venture_fund, (s.venture_share * 100.0).round() as u32)).strong())
-                    .on_hover_text(format!("The Venture Capital Fund: Ducats banked toward the {} your Victory Condition asks for, and the share of your Ducat income going in each turn. Set it on the Victory panel.", game.tables.faction(FactionKind::Prospectors).victory_first.bar));
-            }
             ui.separator();
             bar_resource(ui, icons, "fuel", "Fuel", format!("{} ({})", left.fuel, signed(inc.fuel)), sources(dying_earth_engine::Resource::Fuel));
             ui.separator();
             bar_resource(ui, icons, "energy", "Energy", format!("{} ({})", left.energy, signed(inc.energy)), sources(dying_earth_engine::Resource::Energy));
             ui.separator();
             bar_resource(ui, icons, "ducats", "Ducats", format!("{} ({})", left.ducats, signed(inc.ducats)), sources(dying_earth_engine::Resource::Ducats));
+            // Ticket #72: the Prospectors' Fund, beside their Materials when the Fund held Materials.
+            // Ticket #308 (version 0.08.7): beside their Ducats, which the Fund has held since ticket
+            // #240, and a PROGRESS BAR rather than a figure, at the designer's word -- *"move
+            // besides duckets ... bar only details on hover"* -- drawn as the Research race bar is,
+            // in the Prospectors' colour, filled to the Fund's share of its bar; the balance, the
+            // bar and the share are on the hover.
+            if game.kind(Seat(0)) == FactionKind::Prospectors {
+                let s = game.seat(Seat(0));
+                let bar = game.tables.faction(FactionKind::Prospectors).victory_first.bar;
+                let (rect, resp) = ui.allocate_exact_size(egui::vec2(80.0, 14.0), egui::Sense::hover());
+                let painter = ui.painter_at(rect);
+                painter.rect_filled(rect, 3.0, Color32::from_gray(45));
+                let w = rect.width() * ((s.venture_fund.max(0) as f32) / (bar.max(1.0) as f32)).min(1.0);
+                if w > 0.0 {
+                    painter.rect_filled(egui::Rect::from_min_size(rect.min, egui::vec2(w, rect.height())), 3.0, seat_colour(session, Seat(0)));
+                }
+                rule_tip(resp, format!("Venture Capital Fund: {} of {bar} Ducats, banking {}% of Ducat income. Set it on the Victory panel.", s.venture_fund, (s.venture_share * 100.0).round() as u32));
+            }
             ui.separator();
             // Ticket #128 (version 0.07.2): Influence stands before Research, at the designer's
             // word; the race bar and the Pick a Tech button are Research's and travel with it.
