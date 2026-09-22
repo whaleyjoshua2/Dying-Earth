@@ -50,7 +50,9 @@ pub const SAVE_VERSION: u32 = 1;
 /// it banked (#299); the war's counters gained escapes, Dig Ins and landings (#295, #297, #300);
 /// and the tables gained figures a save does not carry but a board from before would disagree
 /// with. A refusal naming both versions is the right answer.
-pub const GAME_VERSION: &str = "0.08.6";
+/// Ticket #314 (version 0.08.7): the presentation version added nothing to the save, so
+/// `SAVE_VERSION` stands and a 0.08.6 save loads; only the name a save carries moves.
+pub const GAME_VERSION: &str = "0.08.7";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;
