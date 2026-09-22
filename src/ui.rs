@@ -2899,6 +2899,13 @@ fn battle_summary(game: &Game, i: usize) -> String {
 /// the command cluster 10% larger"* -- so 1.15 times 1.1.
 const CLUSTER_SCALE: f32 = 1.265;
 
+/// Ticket #312 (version 0.08.7): what a card's Armies block -- heading, stance row, rows and the
+/// orders under them -- is multiplied by, at the designer's word: *"enlarge by 10%"*, *"whole
+/// block"*. Nothing in the block had a size to multiply (egui's defaults throughout), so a
+/// constant is named, as `TUTORIAL_TICK` and `CLUSTER_SCALE` were, and applied to the block's text
+/// styles the way the cluster applies its own.
+const ARMY_LIST_SCALE: f32 = 1.1;
+
 /// Ticket #114 (version 0.07.1): **the command cluster**, a strip along the foot of the side panel
 /// that never scrolls away. The designer asked for a corner like the one CK3 and other 4X games put
 /// their standing controls in: *"add influence spend button to bottom right ... with a second button
@@ -4961,51 +4968,90 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // Ticket #146 (version 0.07.3): the slots as boxes, with the clicked box's line beneath them.
     slot_boxes(ui, session, game, view, sid, mine, director, actions);
     no_slot_section(ui, session, game, sid, mine, director, actions);
-    ui.label(RichText::new("Armies").strong());
+    // Ticket #312 (version 0.08.7): the Armies block holds the Army orders too, at the designer's
+    // word -- *"Move the Army orders block up the card and into the Armies list"*: the stance row
+    // under the heading (it is per place, so it belongs to the list and not to any row), and under
+    // each of the player's raised Armies its march buttons and repairs, indented. The block that
+    // stood at the foot of the card, below the fold at 1080 in the presentation review's picture,
+    // is gone. The whole block is a tenth larger, at `ARMY_LIST_SCALE`.
     let armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid))).collect();
-    for a in &armies {
-        let who = match game.army_seat(a) {
-            Some(s) => game.seat_name(s),
-            None => "neutral".to_string(),
-        };
-        // Ticket #270 (version 0.08.4): named, the Standing Army included.
-        // Ticket #282 (version 0.08.5): a Levy says so, and a standing row's hover names the rule.
-        // Ticket #297 (version 0.08.6): a dug-in Army says so. Ticket #302: and every Army says
-        // what it defends at -- its strength, its Region's people, Dig In -- beside its strength.
-        let defended = game.army_defended_strength(a);
-        let defends = if defended != game.army_strength(a) { format!(", defends at {defended}") } else { String::new() };
-        let dug = if game.army_dug_in(a) { ", dug in" } else { "" };
-        let row = ui.label(format!(
-            "  {} ({}{}): strength {}, damage {}/{}{defends}{dug}",
-            game.army_name(a),
-            who,
-            if a.standing { ", standing" } else { "" },
-            game.army_strength(a),
-            a.damage,
-            game.army_hit_points(a)
-        ));
-        // Ticket #302 (version 0.08.6): the hover names every term of the one Army system.
-        let t = &game.tables.standing_army;
-        let tip = if a.standing {
-            let armed = game.state(sid).armed;
-            let police = if game.constabulary_online(sid) { format!(" +{} for the working Constabulary", t.constabulary) } else { format!(" +{} if a Constabulary were working here", t.constabulary) };
-            let calm = if game.army_replenishes(sid) { format!(", +{} while Unrest is under {:.0}", t.calm, game.tables.unrest.army_threshold) } else { format!(", +{} lost to Unrest at {:.0} or more", t.calm, game.tables.unrest.army_threshold) };
-            format!(
-                "A Region's own Army. Its strength and hit points are Industry Level + 1{}; it stays at home. Defending, it fights at that{police}{calm}{}. It heals 1 a turn while Unrest is under {:.0}; at its strength in damage it is destroyed, and returns at strength 1 two Incomes later. A neutral Region arms for good, +{} when a threat appears next door and +{} for every attack it holds against, with no ceiling.",
-                if armed > 0 { format!(" and +{armed} armed") } else { String::new() },
-                if game.army_dug_in(a) { format!(", +{} dug in", game.tables.dig_in.defence) } else { String::new() },
-                game.tables.unrest.army_threshold,
-                t.threat_steps,
-                t.held_step
-            )
-        } else {
-            format!(
-                "A raised Army: its strength and hit points were its home's Industry Level + 1 when it was raised, fixed since. It belongs to its home Region and changes hands with it; it marches, and it may Dig In for +{} while defending.",
-                game.tables.dig_in.defence
-            )
-        };
-        row.on_hover_text(tip);
-    }
+    ui.scope(|ui| {
+        for font in ui.style_mut().text_styles.values_mut() {
+            font.size *= ARMY_LIST_SCALE;
+        }
+        ui.label(RichText::new("Armies").strong());
+        let my_armies: Vec<&Army> = armies.iter().copied().filter(|a| mine && game.army_seat(a) == Some(Seat(0)) && !game.army_stands_down(a)).collect();
+        if !my_armies.is_empty() {
+            stance_row(ui, game, &session.pending, my_armies[0].stance, |s| Order::ArmyStance { place: Place::State(sid), stance: s }, false, actions);
+        }
+        for a in &armies {
+            let who = match game.army_seat(a) {
+                Some(s) => game.seat_name(s),
+                None => "neutral".to_string(),
+            };
+            // Ticket #270 (version 0.08.4): named, the Standing Army included.
+            // Ticket #282 (version 0.08.5): a Levy says so, and a standing row's hover names the rule.
+            // Ticket #297 (version 0.08.6): a dug-in Army says so. Ticket #302: and every Army says
+            // what it defends at -- its strength, its Region's people, Dig In -- beside its strength.
+            let defended = game.army_defended_strength(a);
+            let defends = if defended != game.army_strength(a) { format!(", defends at {defended}") } else { String::new() };
+            let dug = if game.army_dug_in(a) { ", dug in" } else { "" };
+            let row = ui.label(format!(
+                "  {} ({}{}): strength {}, damage {}/{}{defends}{dug}",
+                game.army_name(a),
+                who,
+                if a.standing { ", standing" } else { "" },
+                game.army_strength(a),
+                a.damage,
+                game.army_hit_points(a)
+            ));
+            // Ticket #302 (version 0.08.6): the hover names every term of the one Army system.
+            let t = &game.tables.standing_army;
+            let tip = if a.standing {
+                let armed = game.state(sid).armed;
+                let police = if game.constabulary_online(sid) { format!(" +{} for the working Constabulary", t.constabulary) } else { format!(" +{} if a Constabulary were working here", t.constabulary) };
+                let calm = if game.army_replenishes(sid) { format!(", +{} while Unrest is under {:.0}", t.calm, game.tables.unrest.army_threshold) } else { format!(", +{} lost to Unrest at {:.0} or more", t.calm, game.tables.unrest.army_threshold) };
+                format!(
+                    "A Region's own Army. Its strength and hit points are Industry Level + 1{}; it stays at home. Defending, it fights at that{police}{calm}{}. It heals 1 a turn while Unrest is under {:.0}; at its strength in damage it is destroyed, and returns at strength 1 two Incomes later. A neutral Region arms for good, +{} when a threat appears next door and +{} for every attack it holds against, with no ceiling.",
+                    if armed > 0 { format!(" and +{armed} armed") } else { String::new() },
+                    if game.army_dug_in(a) { format!(", +{} dug in", game.tables.dig_in.defence) } else { String::new() },
+                    game.tables.unrest.army_threshold,
+                    t.threat_steps,
+                    t.held_step
+                )
+            } else {
+                format!(
+                    "A raised Army: its strength and hit points were its home's Industry Level + 1 when it was raised, fixed since. It belongs to its home Region and changes hands with it; it marches, and it may Dig In for +{} while defending.",
+                    game.tables.dig_in.defence
+                )
+            };
+            row.on_hover_text(tip);
+            // Ticket #302 (version 0.08.6): a Region's own Army stays at home, so only a raised Army
+            // has march buttons. Ticket #309 (version 0.08.7): the odds are on a hover that names the
+            // defender, not on the button face. Ticket #312: under the Army's own row.
+            if my_armies.iter().any(|m| m.id == a.id) && !a.standing {
+                ui.horizontal_wrapped(|ui| {
+                    ui.add_space(16.0);
+                    for n in &card.neighbours {
+                        let ctrl = game.state(*n).control;
+                        let own = ctrl == Control::Controlled(Seat(0));
+                        let name = &game.tables.state(*n).name;
+                        let label = format!("{} {name}", if own { "move to" } else { "attack" });
+                        let hover = if own {
+                            format!("{name}: held by you. Moving costs nothing; the Army keeps its stance.")
+                        } else {
+                            attack_hover(game, Place::State(*n), name, game.army_strength(a), false)
+                        };
+                        cost_button_with_hover(ui, game, &session.pending, Order::MoveArmy { army: a.id, to: *n }, &label, Some(hover), actions);
+                    }
+                    if a.damage > 0 {
+                        cost_button(ui, game, &session.pending, Order::Repair { unit: UnitRef::Army(a.id), points: a.damage }, "Repair fully", actions);
+                        cost_button(ui, game, &session.pending, Order::RepairWithDucats { unit: UnitRef::Army(a.id), points: a.damage }, "Repair fully with Ducats", actions);
+                    }
+                });
+            }
+        }
+    });
     ui.separator();
     if mine {
         // Ticket #154 (version 0.07.4): the per-kind build list is gone from here -- a Facility is
@@ -5172,36 +5218,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             })
             .weak(),
         );
-        let my_armies: Vec<&Army> = armies.iter().copied().filter(|a| game.army_seat(a) == Some(Seat(0)) && !game.army_stands_down(a)).collect();
-        if !my_armies.is_empty() {
-            ui.label(RichText::new("Army orders").strong());
-            stance_row(ui, game, &session.pending, my_armies[0].stance, |s| Order::ArmyStance { place: Place::State(sid), stance: s }, false, actions);
-            // Ticket #302 (version 0.08.6): a Region's own Army stays at home, so only a raised
-            // Army has march buttons, and the odds read what the defenders FIGHT at.
-            for a in my_armies.iter().filter(|a| !a.standing) {
-                ui.label(format!("{} (strength {}):", game.army_name(a), game.army_strength(a)));
-                ui.horizontal_wrapped(|ui| {
-                    // Ticket #309 (version 0.08.7): the odds leave the button face for a hover
-                    // that names the defender, at the designer's word.
-                    for n in &card.neighbours {
-                        let ctrl = game.state(*n).control;
-                        let own = ctrl == Control::Controlled(Seat(0));
-                        let name = &game.tables.state(*n).name;
-                        let label = format!("{} {name}", if own { "move to" } else { "attack" });
-                        let hover = if own {
-                            format!("{name}: held by you. Moving costs nothing; the Army keeps its stance.")
-                        } else {
-                            attack_hover(game, Place::State(*n), name, game.army_strength(a), false)
-                        };
-                        cost_button_with_hover(ui, game, &session.pending, Order::MoveArmy { army: a.id, to: *n }, &label, Some(hover), actions);
-                    }
-                });
-                if a.damage > 0 {
-                    cost_button(ui, game, &session.pending, Order::Repair { unit: UnitRef::Army(a.id), points: a.damage }, "Repair fully", actions);
-                    cost_button(ui, game, &session.pending, Order::RepairWithDucats { unit: UnitRef::Army(a.id), points: a.damage }, "Repair fully with Ducats", actions);
-                }
-            }
-        }
+        // Ticket #312 (version 0.08.7): the Army orders that stood here are in the Armies block.
     }
 }
 
@@ -5395,10 +5412,31 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     for b in col.queue.iter().filter(|b| !matches!(b.item, BuildItem::Module(_))) {
         ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
     }
+    // Ticket #312 (version 0.08.7): the Colony's Armies block, as the Region card's: a heading, the
+    // stance row under it, the rows, and the repairs under the player's own; a tenth larger.
     let armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(cid))).collect();
-    for a in &armies {
-        let who = game.army_seat(a).map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".into());
-        ui.label(format!("  {} ({}): strength {}, damage {}", game.army_name(a), who, game.army_strength(a), a.damage));
+    if !armies.is_empty() {
+        ui.scope(|ui| {
+            for font in ui.style_mut().text_styles.values_mut() {
+                font.size *= ARMY_LIST_SCALE;
+            }
+            ui.label(RichText::new("Armies").strong());
+            let my_armies: Vec<&Army> = armies.iter().copied().filter(|a| !session.spectator && game.army_seat(a) == Some(Seat(0))).collect();
+            if !my_armies.is_empty() {
+                stance_row(ui, game, &session.pending, my_armies[0].stance, |s| Order::ArmyStance { place: Place::Colony(cid), stance: s }, false, actions);
+            }
+            for a in &armies {
+                let who = game.army_seat(a).map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".into());
+                ui.label(format!("  {} ({}): strength {}, damage {}", game.army_name(a), who, game.army_strength(a), a.damage));
+                if my_armies.iter().any(|m| m.id == a.id) && a.damage > 0 {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.add_space(16.0);
+                        cost_button(ui, game, &session.pending, Order::Repair { unit: UnitRef::Army(a.id), points: a.damage }, "Repair fully", actions);
+                        cost_button(ui, game, &session.pending, Order::RepairWithDucats { unit: UnitRef::Army(a.id), points: a.damage }, "Repair fully with Ducats", actions);
+                    });
+                }
+            }
+        });
     }
     ui.separator();
     let mine = !session.spectator && col.control.director() == Some(Seat(0));
@@ -5490,16 +5528,8 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             }
         }
     }
-    let my_armies: Vec<&Army> = armies.iter().copied().filter(|a| !session.spectator && game.army_seat(a) == Some(Seat(0))).collect();
-    if !my_armies.is_empty() {
-        stance_row(ui, game, &session.pending, my_armies[0].stance, |s| Order::ArmyStance { place: Place::Colony(cid), stance: s }, false, actions);
-        for a in &my_armies {
-            if a.damage > 0 {
-                cost_button(ui, game, &session.pending, Order::Repair { unit: UnitRef::Army(a.id), points: a.damage }, "Repair Army fully", actions);
-                cost_button(ui, game, &session.pending, Order::RepairWithDucats { unit: UnitRef::Army(a.id), points: a.damage }, "Repair Army fully with Ducats", actions);
-            }
-        }
-    }
+    // Ticket #312 (version 0.08.7): the stance row and the repairs that stood here are in the
+    // Armies block above.
     influence_row(ui, game, session, view, Place::Colony(cid), true, actions);
 }
 

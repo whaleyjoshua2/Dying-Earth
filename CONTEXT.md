@@ -279,6 +279,7 @@ _Avoid_: capital ship, dreadnought, cruiser
 
 **Army**:
 A ground fighting unit, of one system since version 0.08.6. A Region's Armies belong to the state and are directed by the Faction that controls it, following the state if control changes -- its **Standing Army**, which stays at home, and the Armies **raised** there, which march. A raised Army's strength and hit points are its home's Industry Level plus one when it is raised, fixed for its life. A Colony's Army belongs to the Colony, exists only where it has a Barracks, only defends, and is worth the rounded average Industry Level of the Regions its raising Faction held, plus one, fixed at the raise. Any Army fights at its strength plus what it defends with: a Region's own Army its people (a working Constabulary, and calm), and any Army dug in two more. Since version 0.08.4 every Army has a name given as it is raised, from its home rather than from any Faction: an ordinal and the Region's demonym -- *the 1st Chinese Army*, *the 2nd* -- or for a Colony's, its Garrison -- *the Tycho Garrison*, *the 2nd Tycho Garrison*. The Standing Army is the first raised and so the 1st; a re-raised one takes the next number; the name survives every change of hands, since the Army is its Region's.
+Since version 0.08.7 an Army's orders -- the stance row, and under a raised Army's own row its march buttons and repairs -- are given in the Armies block of its place's card, a tenth larger than the card's other text, not in a block at the card's foot.
 _Avoid_: troops, soldiers, garrison, marines
 
 **Standing Army**:
