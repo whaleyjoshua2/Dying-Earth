@@ -2872,114 +2872,136 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
         font.size *= CLUSTER_SCALE;
     }
     ui.add_space(4.0);
-    // The Allotment, at the size the designer asked for: "much higher and more prominent".
+    // Ticket #305 (version 0.08.7): two columns, at the designer's word -- *"next turn icon has
+    // its own column on the right side of the command cluster - button sits at the bottom"*. The
+    // left column holds the four rows as they were (the Allotment, the rail, Spend, Max and the
+    // every-turn tick) at a width fixed BEFORE the rail is drawn, since the rail takes all the
+    // width it is given; the right column is the sun's own width and nothing more, with the sun
+    // pushed to the bottom by measured space so its lower edge sits level with the Max row. The
+    // space is measured from the left column's rect rather than laid out bottom-up, because a
+    // bottom-up layout in a panel that sizes itself from its content has no bottom to sit on.
+    let sun_d = 46.2 * CLUSTER_SCALE;
+    let sun_w = sun_d + 8.0;
+    let sun_h = sun_d + 16.0 * CLUSTER_SCALE + 4.0;
     ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 5.0;
-        if let Some(image) = Icons::from_ctx(ui.ctx(), "influence", 20.0 * CLUSTER_SCALE) {
-            ui.add(image);
-        }
-        ui.label(RichText::new(format!("{influence_left}")).size(22.0 * CLUSTER_SCALE).strong())
-            .on_hover_text("Influence still unspent this turn. It is lost at End Turn: the Allotment does not carry over.");
-        ui.label(RichText::new(format!("of {} left", s.allotment)).size(15.0 * CLUSTER_SCALE));
-    });
+        let left_w = ui.available_width() - sun_w - ui.spacing().item_spacing.x;
+        let column = ui.vertical(|ui| {
+            ui.set_width(left_w);
+            // Text wraps inside the column: at the panel's default width the "Click a Region or a
+            // Colony" line is wider than the column and would otherwise push the sun off the edge
+            // (seen in the first picture).
+            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+            // The Allotment, at the size the designer asked for: "much higher and more prominent".
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 5.0;
+                if let Some(image) = Icons::from_ctx(ui.ctx(), "influence", 20.0 * CLUSTER_SCALE) {
+                    ui.add(image);
+                }
+                ui.label(RichText::new(format!("{influence_left}")).size(22.0 * CLUSTER_SCALE).strong())
+                    .on_hover_text("Influence still unspent this turn. It is lost at End Turn: the Allotment does not carry over.");
+                ui.label(RichText::new(format!("of {} left", s.allotment)).size(15.0 * CLUSTER_SCALE));
+            });
 
-    // Spend, on whatever is selected.
-    let target = match view.selection {
-        Selection::State(sid) => Some((Place::State(sid), game.tables.state(sid).name.clone())),
-        Selection::Colony(cid) => Some((Place::Colony(cid), game.place_name(Place::Colony(cid)))),
-        _ => None,
-    };
-    // Ticket #294 (version 0.08.6): the amount is set on the rail the Smear and the Greenwash use
-    // (`influence_rail`, ticket #293), at the designer's word -- *"spending influence on the
-    // command cluster is now a slider"* -- so the three Influence spends read alike: single points
-    // from nought to the turn's whole Influence, what is already ordered greyed from the right.
-    // The rail is drawn whether or not a place is selected, so the strip never changes shape; the
-    // Spend button below it is what needs the place.
-    let (whole, left) = influence_this_turn(game, session);
-    let amount = influence_rail(ui, &mut view.influence_amount, whole, left, None);
-    ui.horizontal(|ui| {
-        match &target {
-            Some((place, name)) => {
-                let order = Order::Influence { target: *place, amount };
-                let check = game.check_order(Seat(0), &session.pending, &order);
-                let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Spend {amount} on {name}")));
-                if let Err(e) = &check {
-                    resp.clone().on_disabled_hover_text(&e.0);
+            // Spend, on whatever is selected.
+            let target = match view.selection {
+                Selection::State(sid) => Some((Place::State(sid), game.tables.state(sid).name.clone())),
+                Selection::Colony(cid) => Some((Place::Colony(cid), game.place_name(Place::Colony(cid)))),
+                _ => None,
+            };
+            // Ticket #294 (version 0.08.6): the amount is set on the rail the Smear and the Greenwash use
+            // (`influence_rail`, ticket #293), at the designer's word -- *"spending influence on the
+            // command cluster is now a slider"* -- so the three Influence spends read alike: single points
+            // from nought to the turn's whole Influence, what is already ordered greyed from the right.
+            // The rail is drawn whether or not a place is selected, so the strip never changes shape; the
+            // Spend button below it is what needs the place.
+            let (whole, left) = influence_this_turn(game, session);
+            let amount = influence_rail(ui, &mut view.influence_amount, whole, left, None);
+            ui.horizontal(|ui| {
+                match &target {
+                    Some((place, name)) => {
+                        let order = Order::Influence { target: *place, amount };
+                        let check = game.check_order(Seat(0), &session.pending, &order);
+                        let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Spend {amount} on {name}")));
+                        if let Err(e) = &check {
+                            resp.clone().on_disabled_hover_text(&e.0);
+                        }
+                        if resp.on_hover_text(format!("Raise your Standing on {name}. Its card shows what it would take to hold or take it.")).clicked() {
+                            actions.push(Action::Place(order));
+                        }
+                    }
+                    None => {
+                        ui.label(RichText::new("Click a Region or a Colony to spend on it").weak());
+                    }
                 }
-                if resp.on_hover_text(format!("Raise your Standing on {name}. Its card shows what it would take to hold or take it.")).clicked() {
-                    actions.push(Action::Place(order));
-                }
-            }
-            None => {
-                ui.label(RichText::new("Click a Region or a Colony to spend on it").weak());
-            }
-        }
-    });
+            });
 
-    // Ticket #134 (version 0.07.3): Max, exactly where Defence stood. The designer: *"Get rid of
-    // defense button replace with a max spend button that just say Max."* One press places one
-    // order spending everything left this turn on the selected place; greyed with a hint when
-    // nothing is selected. Ticket #294 (version 0.08.6): and the rail follows it to the bound --
-    // *"it also moves the slider to max"* -- and End Turn shares this row, at its right.
-    ui.horizontal(|ui| {
-        let button = egui::Button::new(RichText::new("Max").strong());
-        match &target {
-            Some((place, name)) if influence_left > 0 => {
-                let order = Order::Influence { target: *place, amount: influence_left };
-                let check = game.check_order(Seat(0), &session.pending, &order);
-                let resp = ui.add_enabled(check.is_ok(), button);
-                if let Err(e) = &check {
-                    resp.clone().on_disabled_hover_text(&e.0);
+            // Ticket #134 (version 0.07.3): Max, exactly where Defence stood. The designer: *"Get rid of
+            // defense button replace with a max spend button that just say Max."* One press places one
+            // order spending everything left this turn on the selected place; greyed with a hint when
+            // nothing is selected. Ticket #294 (version 0.08.6): and the rail follows it to the bound --
+            // *"it also moves the slider to max"* -- and, until ticket #305, End Turn shared this row.
+            ui.horizontal(|ui| {
+                let button = egui::Button::new(RichText::new("Max").strong());
+                match &target {
+                    Some((place, name)) if influence_left > 0 => {
+                        let order = Order::Influence { target: *place, amount: influence_left };
+                        let check = game.check_order(Seat(0), &session.pending, &order);
+                        let resp = ui.add_enabled(check.is_ok(), button);
+                        if let Err(e) = &check {
+                            resp.clone().on_disabled_hover_text(&e.0);
+                        }
+                        if resp.on_hover_text(format!("Spend all {influence_left} left this turn on {name}.")).clicked() {
+                            view.influence_amount = influence_left;
+                            actions.push(Action::Place(order));
+                        }
+                    }
+                    Some(_) => {
+                        ui.add_enabled(false, button).on_disabled_hover_text("Nothing left to spend this turn.");
+                    }
+                    None => {
+                        ui.add_enabled(false, button).on_disabled_hover_text("Click a Region or a Colony to spend on it");
+                    }
                 }
-                if resp.on_hover_text(format!("Spend all {influence_left} left this turn on {name}.")).clicked() {
-                    view.influence_amount = influence_left;
-                    actions.push(Action::Place(order));
+                // The standing order, on the shape the Archive's funding already uses: a pending order that
+                // sets a seat field, so it survives a save and shows in the turn's order list like anything
+                // else. It never spends by itself -- next turn it places the whole Allotment on the place
+                // as a pending order, which the player can read and cancel; cancelling it ends the standing
+                // order too (the designer's addition), as does the place ceasing to be theirs.
+                let pending_flip = session.pending.iter().find_map(|o| match o {
+                    Order::SetMaxStanding { target } => Some(*target),
+                    _ => None,
+                });
+                let standing = pending_flip.unwrap_or(s.max_standing);
+                let mut on = standing.is_some();
+                let label = match standing {
+                    Some(place) => format!("every turn on {}", game.place_name(place)),
+                    None => "every turn".to_string(),
+                };
+                let can_tick = on || target.is_some();
+                let resp = ui.add_enabled(can_tick, egui::Checkbox::new(&mut on, label));
+                let resp = resp
+                    .on_hover_text("Spend your whole Allotment on this place at the start of every turn from now on. It is placed as an ordinary order you can read and cancel before ending the turn, never spent behind your back; cancelling it, or losing the place, ends it.")
+                    .on_disabled_hover_text("Click a Region or a Colony first.");
+                if resp.changed() {
+                    if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetMaxStanding { .. })) {
+                        actions.push(Action::Cancel(i));
+                    } else {
+                        let target = if on { target.as_ref().map(|(p, _)| *p) } else { None };
+                        actions.push(Action::Place(Order::SetMaxStanding { target }));
+                    }
                 }
-            }
-            Some(_) => {
-                ui.add_enabled(false, button).on_disabled_hover_text("Nothing left to spend this turn.");
-            }
-            None => {
-                ui.add_enabled(false, button).on_disabled_hover_text("Click a Region or a Colony to spend on it");
-            }
-        }
-        // The standing order, on the shape the Archive's funding already uses: a pending order that
-        // sets a seat field, so it survives a save and shows in the turn's order list like anything
-        // else. It never spends by itself -- next turn it places the whole Allotment on the place
-        // as a pending order, which the player can read and cancel; cancelling it ends the standing
-        // order too (the designer's addition), as does the place ceasing to be theirs.
-        let pending_flip = session.pending.iter().find_map(|o| match o {
-            Order::SetMaxStanding { target } => Some(*target),
-            _ => None,
+            });
         });
-        let standing = pending_flip.unwrap_or(s.max_standing);
-        let mut on = standing.is_some();
-        let label = match standing {
-            Some(place) => format!("every turn on {}", game.place_name(place)),
-            None => "every turn".to_string(),
-        };
-        let can_tick = on || target.is_some();
-        let resp = ui.add_enabled(can_tick, egui::Checkbox::new(&mut on, label));
-        let resp = resp
-            .on_hover_text("Spend your whole Allotment on this place at the start of every turn from now on. It is placed as an ordinary order you can read and cancel before ending the turn, never spent behind your back; cancelling it, or losing the place, ends it.")
-            .on_disabled_hover_text("Click a Region or a Colony first.");
-        if resp.changed() {
-            if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetMaxStanding { .. })) {
-                actions.push(Action::Cancel(i));
-            } else {
-                let target = if on { target.as_ref().map(|(p, _)| *p) } else { None };
-                actions.push(Action::Place(Order::SetMaxStanding { target }));
-            }
-        }
         // End Turn, where a hand already is. Ticket #128 (version 0.07.2): named for its key.
-        // Ticket #294 (version 0.08.6): a sun at the right edge of this row, the words beneath it
-        // and the key on the hover, at the designer's word. Right-to-left inside the horizontal,
-        // which takes one row; on its own it would take the whole remaining height (the Faction
-        // window's dropdown learned that first).
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            // A tenth larger again at the designer's word, on seeing the first picture: "make it
-            // 10% larger".
-            let resp = sun_button(ui, can_end_turn(game, view), 46.2 * CLUSTER_SCALE, "End Turn");
+        // Ticket #294 (version 0.08.6): a sun, the words beneath it and the key on the hover, at the
+        // designer's word; a tenth larger again on seeing the first picture: "make it 10% larger".
+        // Ticket #305 (version 0.08.7): in its own column at the right, at the bottom, nothing above it.
+        let left_h = column.response.rect.height();
+        ui.vertical(|ui| {
+            if left_h > sun_h {
+                ui.add_space(left_h - sun_h);
+            }
+            let resp = sun_button(ui, can_end_turn(game, view), sun_d, "End Turn");
             if resp.on_hover_text("End the turn (Enter).").on_disabled_hover_text("Pick a Tech first").clicked() {
                 press_end_turn(session, game, view, actions);
             }

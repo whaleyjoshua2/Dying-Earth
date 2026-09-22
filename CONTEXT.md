@@ -159,7 +159,7 @@ The strip across the head of the game screen: a row of the world's and the playe
 _Avoid_: HUD, header, status bar, ribbon
 
 **Command Cluster**:
-The strip along the foot of the side panel, since version 0.07.1, holding the controls a player reaches for every turn: the Influence still unspent, Spend on whatever place is selected, Max (Defence until version 0.07.3), and End Turn. It does not scroll: the card or the Roster scrolls above it. It is the only place End Turn stands. Since version 0.08.6 the spend is set on the same slider the Smear and the Greenwash use, Max moves that slider to the bound as well as placing the order, the whole strip is a tenth larger again, and End Turn is the sun at the right of its last row with Max and the every-turn tick on its left.
+The strip along the foot of the side panel, since version 0.07.1, holding the controls a player reaches for every turn: the Influence still unspent, Spend on whatever place is selected, Max (Defence until version 0.07.3), and End Turn. It does not scroll: the card or the Roster scrolls above it. It is the only place End Turn stands. Since version 0.08.6 the spend is set on the same slider the Smear and the Greenwash use, Max moves that slider to the bound as well as placing the order, the whole strip is a tenth larger again, and End Turn is the sun. Since version 0.08.7 the strip is two columns: the four rows (the Allotment, the slider, Spend, then Max and the every-turn tick) on the left, and the sun alone in its own column at the right, at the bottom, level with the Max row.
 _Avoid_: action bar, toolbar, HUD, control panel
 
 **Max**:
@@ -541,7 +541,7 @@ The phase in which a Faction commits everything it will do that turn: building, 
 _Avoid_: commands, moves, actions, player phase
 
 **End Turn**:
-The commitment. Pressing it closes the Orders phase, after which the Event card is drawn and nothing can be taken back. Since version 0.08.6 it is a **sun** at the right of the Command Cluster's last row -- a shaded disc with sunspots, the words beneath it, the Enter key on its hover -- that dims to embers while a Tech pick is owed.
+The commitment. Pressing it closes the Orders phase, after which the Event card is drawn and nothing can be taken back. Since version 0.08.6 it is a **sun** -- a shaded disc with sunspots, the words beneath it, the Enter key on its hover -- that dims to embers while a Tech pick is owed; since version 0.08.7 it stands alone in its own column at the right of the Command Cluster, at the bottom.
 _Avoid_: submit, confirm, next turn
 
 **Resolution**:
