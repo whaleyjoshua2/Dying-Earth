@@ -844,6 +844,16 @@ fn build_board(session: &mut Session) {
     {
         g.raise_army(Place::State(sid), false);
     }
+    // `threat:1` (a building aid, ticket #310): seat 1 takes the first neighbour of seat 0's start
+    // state and raises an Army there, so the threat line on seat 0's card can be photographed.
+    if std::env::args().any(|a| a == "threat:1")
+        && let Some(g) = session.game.as_mut()
+        && let Some(sid) = g.directed_states(Seat(0)).first().copied()
+        && let Some(n) = g.tables.state(sid).neighbours.first().copied()
+    {
+        g.take_control(n, Seat(1));
+        g.raise_army(Place::State(n), false);
+    }
     // `offline:1` (a building aid, ticket #307): the first Facility of seat 0's start state and the
     // first Module beyond the Core on seat 0's first station over Earth are put offline as an
     // Energy shortfall would put them, so the offline tile can be photographed. After `commit:1`,

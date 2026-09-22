@@ -4226,6 +4226,36 @@ Spending here raises the bar; doing nothing lowers it, yours decaying {} a turn 
                     ui.label(RichText::new("No rival has a Standing here.").weak());
                 }
             }
+            // Ticket #310 (version 0.08.7): **the threat line**, the military counterpart of the
+            // challenger line, on a Region the player holds: the rival raised Army next door with
+            // the best first-exchange odds against this Region's defenders. Presence and strength,
+            // never its stance, at the designer's word (as a Region arms stance-blind, #282); no
+            // line at all when nobody stands next door; amber when their odds reach the bar the
+            // computer attacks at, which is measured behaviour read from `ai.toml`, not a rule.
+            if let Place::State(sid) = target
+                && let Some((id, from, odds)) = game.nearest_army_threat(sid)
+                && let Some(a) = game.army(id)
+                && let Some(who) = game.army_seat(a)
+            {
+                let strength = game.army_strength(a);
+                let defence: i64 = game.defenders_at(Place::State(sid), who).iter().filter_map(|d| game.army(*d)).map(|d| game.army_defended_strength(d)).sum();
+                let bar = game.tables.ai.thresholds.attack_odds;
+                let pressing = odds >= bar;
+                let line = format!(
+                    "The {}' {}, strength {strength}, stands next door in {}.{}",
+                    game.seat_name(who),
+                    game.army_name(a).trim_start_matches("the "),
+                    game.tables.state(from).name,
+                    if pressing { " Dig In here to hold it." } else { "" }
+                );
+                let tip = format!(
+                    "Their {strength} against the {defence} that defends here: {:.0}% is their chance to win the first exchange.\nThe computer seats attack at {:.0}% or better, so the line turns amber there.\nRaised Armies next door only, whatever their stance; a Region's own Army never marches.",
+                    odds * 100.0,
+                    bar * 100.0
+                );
+                let colour = if pressing { Color32::from_rgb(255, 160, 60) } else { rgb(game.tables.faction(game.kind(who)).colour) };
+                rule_tip(ui.label(RichText::new(line).color(colour)), tip);
+            }
         }
     }
 

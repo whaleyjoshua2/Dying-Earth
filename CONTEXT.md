@@ -492,6 +492,14 @@ _Avoid_: accumulation, influence points, loyalty
 The Standing a Faction must reach to take a place. A Region's is a base plus a figure for each step of the state's size; a Colony's is a figure for each of its Colonists, and a Space Station's has a base of its own besides. Green Consensus lowers every threshold by a quarter, and since version 0.05 each Faction reads its own, since its Blame raises it on every place it does not hold. A place already held wants the holder's Standing plus the challenge margin as well, so the threshold is the floor and never the whole price. Since version 0.08.2 that margin is a little dearer for a challenger the holder thinks badly of, so the same Region costs more to take from somebody you have crossed than from somebody you have not. Schooling does NOT move the threshold: Resistance taxes the spending instead. The word has a second, unrelated sense in the climate rules, where a Break or a Sea Level threshold is a Temperature; this entry is the Influence one.
 _Avoid_: cost, price, target (for the Influence sense); the climate sense, which is a Break or a Sea Level threshold
 
+**Challenger line**:
+The line in a held place's Standings block, since version 0.08.4, naming the rival nearest to taking it by Influence -- nearest its own price, not the highest Standing -- and how far off it stands: *The Prospectors stand at 47; they take this at 70.* Amber, with *Spend here to stay ahead.*, when they press within two steps; the arithmetic on its hover; *No rival has a Standing here.* when nobody does.
+_Avoid_: rival line, warning line, contest indicator
+
+**Threat line**:
+The challenger line's military counterpart on a held Region, since version 0.08.7: the rival raised Army standing in a neighbouring Region with the best first-exchange odds against the Region's defenders, named with its strength and the Region it stands in -- *The Prospectors' 2nd Russian Army, strength 3, stands next door in Russia.* -- and never with its stance, as a Region arms stance-blind. Amber, with *Dig In here to hold it.*, when their odds reach the bar the computer seats attack at, which is the computer's habit and not a rule; the arithmetic on its hover; no line at all when nobody stands next door. Regions only: a Colony has no neighbours.
+_Avoid_: danger line, enemy line, alert
+
 **Resistance**:
 How hard a place is to sway, from how well it is schooled, from version 0.08.0. The Influence an OUTSIDER spends there is divided by it before it becomes Standing, rounded down; the controller converts in full. A place at the neutral pivot has no effect; below it an outsider's spending goes further, above it less, to a band either side. It touches neither the threshold nor the challenge margin -- it taxes the spending, not the gate -- which is why a well-schooled Region is harder to buy without being harder to reach.
 _Avoid_: defence, loyalty, resilience, stubbornness

@@ -2750,6 +2750,37 @@ impl Game {
             .min_by_key(|(_, standing, price)| *price - *standing)
     }
 
+    /// Ticket #310 (version 0.08.7): **the military threat to a held Region**, the counterpart of
+    /// `nearest_challenger`: the rival raised Army standing in a neighbouring Region with the best
+    /// first-exchange odds against this Region's defenders, ties to the strongest, with the Region
+    /// it stands in and those odds. A Region's own Army never marches (#302), so only raised
+    /// Armies count; a neutral Region's own is nobody's and never counts. Stance-blind at the
+    /// designer's word, as `neutral_threatened` is: the line this feeds says presence and
+    /// strength, never orders. None on a Region nobody holds, or with no rival Army next door.
+    pub fn nearest_army_threat(&self, sid: StateId) -> Option<(ArmyId, StateId, f64)> {
+        let holder = self.state(sid).control.controller()?;
+        let mut best: Option<(ArmyId, StateId, f64, i64)> = None;
+        for n in &self.tables.state(sid).neighbours {
+            for a in self.armies.iter().filter(|a| !a.standing && a.at == ArmyAt::Place(Place::State(*n)) && !self.army_stands_down(a)) {
+                let Some(seat) = self.army_seat(a) else { continue };
+                if seat == holder {
+                    continue;
+                }
+                let strength = self.army_strength(a);
+                let defence: i64 = self.defenders_at(Place::State(sid), seat).iter().filter_map(|id| self.army(*id)).map(|d| self.army_defended_strength(d)).sum();
+                let odds = crate::combat::first_round_odds(strength, defence);
+                let better = match best {
+                    None => true,
+                    Some((_, _, o, s)) => odds > o || (odds == o && strength > s),
+                };
+                if better {
+                    best = Some((a.id, *n, odds, strength));
+                }
+            }
+        }
+        best.map(|(id, n, odds, _)| (id, n, odds))
+    }
+
     /// Ticket #257 (version 0.08.4): does a Sea Wall stand and work in this state? The Climate
     /// phase, the Storm Surge card and the card all ask the same question.
     pub fn sea_wall_working(&self, sid: StateId) -> bool {
