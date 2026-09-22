@@ -4563,8 +4563,8 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         match kind {
             SlotBoxKind::Standing(i) => {
                 let f = &st.facilities[*i];
-                let state = if f.mothballed { TileState::Mothballed } else { TileState::Standing };
-                let heading = format!("{} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), if f.online || f.mothballed { "" } else { OFFLINE_SUFFIX });
+                let state = if f.mothballed { TileState::Mothballed } else if !f.online { TileState::Offline } else { TileState::Standing };
+                let heading = format!("{} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), facility_offline_words(f));
                 let tip = facility_rules(&heading, f.coastal);
                 if hab_tile(ui, rect, id, Some(crate::icons::facility_icon(f.kind)), f.kind.name(), state, view.slot_box == Some(SlotBox::Facility(*i)), edge, tip).clicked() {
                     view.slot_box = Some(SlotBox::Facility(*i));
@@ -6059,6 +6059,12 @@ const HAB_LABEL: f32 = 18.0;
 enum TileState {
     Standing,
     Mothballed,
+    /// Ticket #307 (version 0.08.7): a building that stands and is not mothballed but is not
+    /// online -- short of Energy, struck by a card, in a grid-failed Colony, or an Occupied
+    /// Colony's Archive. Drawn with the mothballed tile's dimming and the word *offline* in a
+    /// warmer colour than mothballed's grey, at the designer's word; the cause is on the hover.
+    /// Until this ticket such a building was drawn exactly like a working one.
+    Offline,
     /// Ticket #291 (version 0.08.6): a building ordered this turn (`ordered`, before End Turn) or
     /// under way (after it), with the turns until it stands. Both are drawn hatched AND dimmed,
     /// with the count on the face, at the designer's word: *"hatch stays but greyed out with turns
@@ -6121,8 +6127,8 @@ Build", Color32::from_gray(165)) } else { ("free", Color32::from_gray(130)) };
         _ => {
             // Ticket #291 (version 0.08.6): a building ordered or under way takes the mothballed
             // tile's darker fill and dimmed picture as well as its hatch.
-            let dim = matches!(state, TileState::Mothballed | TileState::Flooded | TileState::Building { .. });
-            let fill = if matches!(state, TileState::Mothballed | TileState::Building { .. }) { Color32::from_rgb(36, 36, 42) } else { Color32::from_rgb(48, 48, 58) };
+            let dim = matches!(state, TileState::Mothballed | TileState::Offline | TileState::Flooded | TileState::Building { .. });
+            let fill = if matches!(state, TileState::Mothballed | TileState::Offline | TileState::Building { .. }) { Color32::from_rgb(36, 36, 42) } else { Color32::from_rgb(48, 48, 58) };
             painter.rect(rect, 6.0, fill, egui::Stroke::new(if edge.is_some() { 2.0 } else { 1.0 }, outline), egui::StrokeKind::Inside);
             if let Some(image) = key.and_then(|k| Icons::from_ctx(ui.ctx(), k, 48.0)) {
                 let tint = if dim { crate::icons::kind_fill().gamma_multiply(0.4) } else { crate::icons::kind_fill() };
@@ -6146,6 +6152,9 @@ Build", Color32::from_gray(165)) } else { ("free", Color32::from_gray(130)) };
             }
             if state == TileState::Mothballed {
                 ui.painter().text(rect.left_bottom() + egui::vec2(4.0, -4.0), egui::Align2::LEFT_BOTTOM, "mothballed", FontId::proportional(11.0), Color32::from_rgb(170, 170, 190));
+            }
+            if state == TileState::Offline {
+                ui.painter().text(rect.left_bottom() + egui::vec2(4.0, -4.0), egui::Align2::LEFT_BOTTOM, "offline", FontId::proportional(11.0), Color32::from_rgb(225, 165, 115));
             }
             if state == TileState::Flooded {
                 // Ticket #146 (version 0.07.3): the sea. The designer: *"flooded tiles to filled 3/4th
@@ -6207,13 +6216,39 @@ fn module_line(game: &Game, col: &Colony, cid: ColonyId, mi: usize, director: Op
             None => "idle".to_string(),
         }
     };
-    format!("{}: {}{}", m.kind.name(), figures, if m.online || m.mothballed { "" } else { OFFLINE_SUFFIX })
+    format!("{}: {}", m.kind.name(), figures)
 }
 
-/// The words a box's hover adds to an offline building's line. Ticket #306 (version 0.08.7): the
-/// hover's alone; the row under the grid strips them, since the row and the hover are about the
-/// same building.
-const OFFLINE_SUFFIX: &str = " (offline, making nothing)";
+/// The words a box's hover adds to an offline building's line, and nothing for a working or a
+/// mothballed one. Ticket #306 (version 0.08.7): the hover's alone; the row under the grid does
+/// not carry them, since the row and the hover are about the same building. Ticket #307: they
+/// name the cause. A Facility goes offline two ways: struck by a card until the next Resolution,
+/// or shut at Income for want of Energy.
+fn facility_offline_words(f: &Facility) -> &'static str {
+    if f.online || f.mothballed {
+        ""
+    } else if f.offline_until_resolution {
+        " (offline until the next Resolution, struck by a card; making nothing)"
+    } else {
+        " (offline, short of Energy; making nothing)"
+    }
+}
+
+/// A Module's offline words, the counterpart of `facility_offline_words`: a card, the Colony's
+/// grid down, an Occupied Colony's Archive, or want of Energy.
+fn module_offline_words(col: &Colony, m: &Module) -> &'static str {
+    if m.online || m.mothballed {
+        ""
+    } else if m.offline_until_resolution {
+        " (offline until the next Resolution, struck by a card; making nothing)"
+    } else if col.grid_failed {
+        " (offline, the grid is down; making nothing)"
+    } else if m.kind == ModuleKind::Archive && col.control.is_occupied() {
+        " (offline while the Colony is Occupied)"
+    } else {
+        " (offline, short of Energy; making nothing)"
+    }
+}
 
 /// Ticket #150 (version 0.07.4): the Module rules under a tile, the counterpart of `facility_rules`.
 fn module_rules(heading: &str) -> String {
@@ -6263,11 +6298,11 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     let mut i = 0usize;
     for mi in standing {
         let m = &col.modules[mi];
-        let state = if m.mothballed { TileState::Mothballed } else { TileState::Standing };
+        let state = if m.mothballed { TileState::Mothballed } else if !m.online { TileState::Offline } else { TileState::Standing };
         let selected = view.hab_tile == Some(HabTile::Module(mi));
         // Ticket #150 (version 0.07.4): the tile's hover -- the figures its strip line carries and
         // the Module rules, which the old rows never had.
-        let tip = module_rules(&module_line(game, col, cid, mi, director));
+        let tip = module_rules(&format!("{}{}", module_line(game, col, cid, mi, director), module_offline_words(col, m)));
         if hab_tile(ui, tile_rect(i), ui.id().with(("hab", mi)), Some(crate::icons::module_icon(m.kind)), m.kind.name(), state, selected, None, tip).clicked() {
             view.hab_tile = Some(HabTile::Module(mi));
         }
@@ -6300,8 +6335,8 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     if let Some(ai) = archive {
         // The Archive stands apart: a row of its own, outside the count.
         let rect = egui::Rect::from_min_size(grid.min + egui::vec2(0.0, rows as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP)), egui::vec2(HAB_TILE, HAB_TILE));
-        let state = if col.modules[ai].mothballed { TileState::Mothballed } else { TileState::Standing };
-        let tip = format!("{}\nOutside the Module count. Its Research is paid into the Archive fund at any pace; complete, it takes a great deal of Energy to keep running. Destroyed outright if this Colony changes hands; the fund is kept.", module_line(game, col, cid, ai, director));
+        let state = if col.modules[ai].mothballed { TileState::Mothballed } else if !col.modules[ai].online { TileState::Offline } else { TileState::Standing };
+        let tip = format!("{}{}\nOutside the Module count. Its Research is paid into the Archive fund at any pace; complete, it takes a great deal of Energy to keep running. Destroyed outright if this Colony changes hands; the fund is kept.", module_line(game, col, cid, ai, director), module_offline_words(col, &col.modules[ai]));
         if hab_tile(ui, rect, ui.id().with("hab-archive"), Some(crate::icons::module_icon(ModuleKind::Archive)), "The Archive", state, view.hab_tile == Some(HabTile::Module(ai)), None, tip).clicked() {
             view.hab_tile = Some(HabTile::Module(ai));
         }
@@ -6312,7 +6347,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         Some(HabTile::Module(mi)) if mi < col.modules.len() => {
             let m = &col.modules[mi];
             let colour = if m.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
-            figures_with_icons(ui, module_line(game, col, cid, mi, director).trim_end_matches(OFFLINE_SUFFIX), 14.0, colour, &[]);
+            figures_with_icons(ui, &module_line(game, col, cid, mi, director), 14.0, colour, &[]);
             if mine && m.kind != ModuleKind::Archive {
                 change_row(ui, game, &session.pending, BuildingRef::Module(cid, mi), m.mothballed, m.change, actions);
             }

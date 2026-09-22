@@ -835,6 +835,24 @@ fn build_board(session: &mut Session) {
     if std::env::args().any(|a| a == "commit:1") {
         session.end_turn();
     }
+    // `offline:1` (a building aid, ticket #307): the first Facility of seat 0's start state and the
+    // first Module beyond the Core on seat 0's first station over Earth are put offline as an
+    // Energy shortfall would put them, so the offline tile can be photographed. After `commit:1`,
+    // so a Module built by `morder:` is standing to be switched off.
+    if std::env::args().any(|a| a == "offline:1")
+        && let Some(g) = session.game.as_mut()
+    {
+        if let Some(sid) = g.directed_states(Seat(0)).first().copied()
+            && let Some(f) = g.state_mut(sid).facilities.first_mut()
+        {
+            f.online = false;
+        }
+        if let Some(c) = g.colonies.iter_mut().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0)))
+            && let Some(m) = c.modules.iter_mut().find(|m| m.kind != ModuleKind::Core)
+        {
+            m.online = false;
+        }
+    }
     session.earth_dirty = true;
 }
 

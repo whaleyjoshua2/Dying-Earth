@@ -368,6 +368,10 @@ _Avoid_: cooldown, lockout, occupation, tenure, grace period
 The Orders-phase order that stands a Facility or a Module down. A mothballed building produces nothing, pays no Energy upkeep, emits nothing, is online for no rule, and keeps its slot. It is free, it takes effect at the Resolution, it raises the Unrest of a Region it happens in, and only a Restart brings the building back, for Materials and a turn.
 _Avoid_: pause, disable, switch off, idle, shut down (that is the Energy shortfall rule)
 
+**Offline**:
+A standing building that is not mothballed and is not running. Four things put one offline: the Energy shortfall rule at Income (buildings shut one at a time, dearest upkeep first, Module before Facility, the Core never, until the bill is met); an Event card (Wildfire, Labour Dispute, Launch Pad Fire, Reactor Leak) until the next Resolution; a grid failure, which shuts every Module in the Colony; and Occupation, which shuts the Colony's Archive whoever directs it. An offline building makes nothing, keeps its slot, and pays no upkeep. Two things look like it and are not: a blockaded station's Modules make nothing and still pay, and a Facility in a Region nobody directs is idle. Since version 0.08.7 an offline building's box is dimmed with the word *offline* in its corner, and its hover names the cause.
+_Avoid_: broken, damaged, disabled, unpowered, dark
+
 **Production Moved**:
 The Custodians' third signature rule, since version 0.06.0. While a Factory, Power Plant, Refinery or Research Lab of theirs on Earth is mothballed, one Mine, Generator, Refinery or Observatory of theirs off Earth makes double, one Facility for one Module, the most productive undoubled Module first, on its final figure. A Restart ends it; with no idle Facility of the pair there is no bonus.
 _Avoid_: offshoring, relocation bonus, the mothball bonus
