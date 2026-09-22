@@ -3867,6 +3867,45 @@ fn cost_button(ui: &mut Ui, game: &Game, pending: &[Order], order: Order, label:
     cost_button_with_hover(ui, game, pending, order, label, None, actions);
 }
 
+/// Ticket #309 (version 0.08.7): the hover on a button that attacks a place -- a march on a
+/// Region, a landing at a Colony -- naming who defends it and what the odds figure is a chance
+/// OF, at the designer's word: the place and its holder; a line per defender with its name, its
+/// strength, what it defends at (dug in noted) and its damage; the first-exchange chance with the
+/// two strengths it was made from; and the cost-and-stance line. Six lines at most: three
+/// defenders are named, and past three, two are named and the rest counted. The presentation
+/// review's finding was that a player saw "61%" with no way to learn what defended or at what.
+fn attack_hover(game: &Game, place: Place, name: &str, attacker: i64, landing: bool) -> String {
+    let control = match place {
+        Place::State(sid) => game.state(sid).control,
+        Place::Colony(cid) => game.colonies.iter().find(|c| c.id == cid).map(|c| c.control).unwrap_or(Control::Neutral),
+    };
+    let holder = match control {
+        Control::Neutral => if matches!(place, Place::State(_)) { "neutral".to_string() } else { "nobody's".to_string() },
+        Control::Controlled(Seat(0)) => "held by you".to_string(),
+        Control::Controlled(s) => format!("held by the {}", game.seat_name(s)),
+        Control::Occupied { occupier, .. } => format!("occupied by the {}", game.seat_name(occupier)),
+    };
+    let defenders: Vec<&Army> = game.defenders_at(place, Seat(0)).iter().filter_map(|id| game.army(*id)).collect();
+    let arrives = if landing { "The Army attacks as it lands" } else { "The Army arrives on Attack" };
+    if defenders.is_empty() {
+        return format!("{name}: {holder}, undefended. {arrives} and the Occupation begins.");
+    }
+    let total: i64 = defenders.iter().map(|a| game.army_defended_strength(a)).sum();
+    let named = if defenders.len() > 3 { 2 } else { defenders.len() };
+    let mut lines = vec![format!("{name}: {holder}.")];
+    for a in &defenders[..named] {
+        let dug = if game.army_dug_in(a) { " (dug in)" } else { "" };
+        lines.push(format!("defended by {}: strength {}, defends at {}{dug}, damage {}/{}", game.army_name(a), game.army_strength(a), game.army_defended_strength(a), a.damage, game.army_hit_points(a)));
+    }
+    if named < defenders.len() {
+        let rest: i64 = defenders[named..].iter().map(|a| game.army_defended_strength(a)).sum();
+        lines.push(format!("and {} more, defending at {rest} in all", defenders.len() - named));
+    }
+    lines.push(format!("{:.0}% is the chance to win the first exchange: your {attacker} against their {total}.", first_round_odds(attacker, total) * 100.0));
+    lines.push(format!("{} costs nothing; {}.", if landing { "Landing" } else { "Moving" }, if landing { "the Army attacks as it lands" } else { "the Army arrives on Attack" }));
+    lines.join("\n")
+}
+
 /// Ticket #121 (version 0.07.2): a button whose price is **figures and glyphs**, not words in
 /// parentheses -- `Factory  25 [cart]` where it read `Factory (25 Materials)` -- and whose price is
 /// simply absent when there is none, so a Mothball is a plain verb and not `Mothball (free)`. The
@@ -5046,13 +5085,19 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             for a in my_armies.iter().filter(|a| !a.standing) {
                 ui.label(format!("{} (strength {}):", game.army_name(a), game.army_strength(a)));
                 ui.horizontal_wrapped(|ui| {
+                    // Ticket #309 (version 0.08.7): the odds leave the button face for a hover
+                    // that names the defender, at the designer's word.
                     for n in &card.neighbours {
                         let ctrl = game.state(*n).control;
-                        let verb = if ctrl == Control::Controlled(Seat(0)) { "move to" } else { "attack" };
-                        let def: i64 = game.defenders_at(Place::State(*n), Seat(0)).iter().filter_map(|id| game.army(*id)).map(|x| game.army_defended_strength(x)).sum();
-                        let odds = first_round_odds(game.army_strength(a), def);
-                        let label = if verb == "attack" { format!("{} {} ({:.0}%)", verb, game.tables.state(*n).name, odds * 100.0) } else { format!("{} {}", verb, game.tables.state(*n).name) };
-                        cost_button(ui, game, &session.pending, Order::MoveArmy { army: a.id, to: *n }, &label, actions);
+                        let own = ctrl == Control::Controlled(Seat(0));
+                        let name = &game.tables.state(*n).name;
+                        let label = format!("{} {name}", if own { "move to" } else { "attack" });
+                        let hover = if own {
+                            format!("{name}: held by you. Moving costs nothing; the Army keeps its stance.")
+                        } else {
+                            attack_hover(game, Place::State(*n), name, game.army_strength(a), false)
+                        };
+                        cost_button_with_hover(ui, game, &session.pending, Order::MoveArmy { army: a.id, to: *n }, &label, Some(hover), actions);
                     }
                 });
                 if a.damage > 0 {
@@ -5587,16 +5632,16 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 }
                 if let Some(aid) = s.army {
                     // Ticket #300 (version 0.08.6): the attack happens the turn it lands, so the
-                    // button quotes the first-round odds as the march buttons do.
+                    // button carries the first-round odds as the march buttons do. Ticket #309
+                    // (version 0.08.7): on a hover that names the defender, not on the face.
                     let slot_name = &game.tables.body(c.body).slots[c.slot as usize].name;
-                    let label = if own {
-                        format!("Land the Army at {slot_name}")
+                    let (label, hover) = if own {
+                        (format!("Land the Army at {slot_name}"), format!("{slot_name}: held by you. Landing costs nothing; the Army lands on Hold."))
                     } else {
-                        let defence: i64 = game.defenders_at(Place::Colony(c.id), Seat(0)).iter().filter_map(|id| game.army(*id)).map(|a| game.army_defended_strength(a)).sum();
                         let mine = game.army(aid).map(|a| game.army_strength(a)).unwrap_or(0);
-                        format!("Land the Army to attack {slot_name} ({:.0}%)", first_round_odds(mine, defence) * 100.0)
+                        (format!("Land the Army to attack {slot_name}"), attack_hover(game, Place::Colony(c.id), slot_name, mine, true))
                     };
-                    cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: 0, army: true, into: UnloadTarget::Colony(c.id) }, &label, actions);
+                    cost_button_with_hover(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: 0, army: true, into: UnloadTarget::Colony(c.id) }, &label, Some(hover), actions);
                 }
             }
             if s.kind == UnitKind::ColonyShip && s.colonists > 0 && body != BodyId::Earth {

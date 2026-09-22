@@ -835,6 +835,15 @@ fn build_board(session: &mut Session) {
     if std::env::args().any(|a| a == "commit:1") {
         session.end_turn();
     }
+    // `army:1` (a building aid, ticket #309): a raised Army of seat 0's stands in its start state,
+    // so the march buttons and their hovers can be photographed; since ticket #302 a Region's own
+    // Army never marches, so a fresh board has no march buttons at all.
+    if std::env::args().any(|a| a == "army:1")
+        && let Some(g) = session.game.as_mut()
+        && let Some(sid) = g.directed_states(Seat(0)).first().copied()
+    {
+        g.raise_army(Place::State(sid), false);
+    }
     // `offline:1` (a building aid, ticket #307): the first Facility of seat 0's start state and the
     // first Module beyond the Core on seat 0's first station over Earth are put offline as an
     // Energy shortfall would put them, so the offline tile can be photographed. After `commit:1`,

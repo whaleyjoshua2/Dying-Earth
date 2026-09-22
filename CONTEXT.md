@@ -603,7 +603,7 @@ A damaged unit's attempt to leave a Battle, more likely the more damage it carri
 _Avoid_: retreat, rout, flee, break
 
 **Battle Report**:
-The account of every Battle from the last end-of-turn processing, read at the start of the next turn. Since version 0.08.5 every Battle is also a line of the Report at its place, ranked with a Ship destroyed when a unit died and unranked when nobody lost one, so a skirmish never reads over a Break; its parties name every unit and what it took, and an attacker's first-round odds as the button quoted them; and an Army destroyed is a line by name, as a Ship has been.
+The account of every Battle from the last end-of-turn processing, read at the start of the next turn. Since version 0.08.5 every Battle is also a line of the Report at its place, ranked with a Ship destroyed when a unit died and unranked when nobody lost one, so a skirmish never reads over a Break; its parties name every unit and what it took, and an attacker's first-round odds as the attack button's hover quoted them (on the button's face until version 0.08.7); and an Army destroyed is a line by name, as a Ship has been.
 _Avoid_: combat log, after-action report
 
 **Orbital Control**:
