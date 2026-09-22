@@ -16,7 +16,12 @@ box (§3), and the Prospectors' Fund figure taken off the top bar (§4). No figu
 seat's reasoning changed, and nothing was added to the save.
 
 **What it did to the win column**, 20 seeds across four seatings at the shipped climate cell
-(sink 6, step 300), against the 0.08.6 baseline: see *What the closing sweep says* at the foot.
+(sink 6, step 300), against the 0.08.6 baseline: nothing, line for line; see *What the closing
+sweep says* at the foot.
+
+The designer, shown the unchanged column and the pictures: **ship**, and the version ships as the
+**Windows kit alone**, built on this machine (`dist/dying-earth-0.08.7-windows.zip`); the
+designer's word on the closing ticket was *"ship and windows only"*. No Linux kit was built.
 
 ---
 
