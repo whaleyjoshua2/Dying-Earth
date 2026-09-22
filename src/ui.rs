@@ -2930,7 +2930,10 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
                         }
                     }
                     None => {
-                        ui.label(RichText::new("Click a Region or a Colony to spend on it").weak());
+                        // Ticket #306 (version 0.08.7): the sentence that stood here is cut as a
+                        // duplicate of the Max button's hover, at the designer's word; a greyed
+                        // Spend keeps the strip's shape, since the rail is drawn either way.
+                        ui.add_enabled(false, egui::Button::new(format!("Spend {amount}")));
                     }
                 }
             });
@@ -4338,7 +4341,8 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
         let side = if !game.takes_slot(f.kind) { "" } else if f.coastal { " (coastal)" } else { " (inland)" };
         let resp = figures_with_icons(
             ui,
-            &format!("{}{}: {}{}", f.kind.name(), side, figures, if f.online || f.mothballed { "" } else { " (offline, making nothing)" }),
+            // Ticket #306 (version 0.08.7): the offline suffix is the box's hover's alone now.
+            &format!("{}{}: {}", f.kind.name(), side, figures),
             14.0,
             colour,
             &[],
@@ -4560,7 +4564,7 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             SlotBoxKind::Standing(i) => {
                 let f = &st.facilities[*i];
                 let state = if f.mothballed { TileState::Mothballed } else { TileState::Standing };
-                let heading = format!("{} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), if f.online || f.mothballed { "" } else { " (offline, making nothing)" });
+                let heading = format!("{} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), if f.online || f.mothballed { "" } else { OFFLINE_SUFFIX });
                 let tip = facility_rules(&heading, f.coastal);
                 if hab_tile(ui, rect, id, Some(crate::icons::facility_icon(f.kind)), f.kind.name(), state, view.slot_box == Some(SlotBox::Facility(*i)), edge, tip).clicked() {
                     view.slot_box = Some(SlotBox::Facility(*i));
@@ -4604,7 +4608,7 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             facility_row(ui, session, game, sid, i, &st.facilities[i], mine, director, actions);
         }
         Some(SlotBox::Free) if mine => {
-            ui.label(RichText::new("Build here (hover a button for what it makes)").strong());
+            ui.label(RichText::new("Build here").strong());
             facility_build_buttons(ui, session, game, sid, actions);
         }
         _ => {
@@ -4752,8 +4756,8 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     Order::Agitate { state: sid },
                     "Agitate: Unrest +1",
                     Some(format!(
-                        "Turn its people against the {}: Unrest rises by {} at End Turn, halved by a working Constabulary. Once a turn here. They will know who paid: it is an offence.\nAt {} the Standing Army stops replenishing, at {} every Facility runs at half, at {} the state throws its controller off.",
-                        game.seat_name(holder), Game::unrest_figure(ag.agitate_points), ag.army_threshold, ag.facility_threshold, ag.max
+                        "Turn its people against the {}: Unrest rises by {} at End Turn, halved by a working Constabulary. Once a turn here. They will know who paid: it is an offence.",
+                        game.seat_name(holder), Game::unrest_figure(ag.agitate_points)
                     )),
                     actions,
                 );
@@ -4874,7 +4878,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         // built by clicking a free box -- and the Scrubber and Sea Wall buttons stand under the
         // boxes; what is left is orders, and the header says so. The designer: *"remove redundant
         // build list from the region cards."*
-        ui.label(RichText::new("Orders (hover a button for what it does)").strong());
+        ui.label(RichText::new("Orders").strong());
         // Ticket #54: the Custodians' Leapfrog, and the Prospectors' Strip Permit.
         if game.kind(Seat(0)) == FactionKind::Custodians {
             ui.horizontal(|ui| {
@@ -5246,7 +5250,9 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     {
         ui.label(format!("  The Archive: building, {} turn(s) left", (b.due_turn + 1).saturating_sub(game.turn)));
     }
-    for b in col.queue.iter().filter(|b| b.item != BuildItem::Module(ModuleKind::Archive)) {
+    // Ticket #306 (version 0.08.7): a queued Module is on its hatched tile, so only what has no
+    // tile is listed here, as the Region card's loop already does.
+    for b in col.queue.iter().filter(|b| !matches!(b.item, BuildItem::Module(_))) {
         ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
     }
     let armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(cid))).collect();
@@ -5333,7 +5339,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         // Ticket #162 (version 0.07.5): the header matches the Nation card's, which ticket #154
         // renamed when its own build list folded into the boxes. A Module is ordered from a free
         // tile; what is left here is orders.
-        ui.label(RichText::new("Orders (hover a button for what it does)").strong());
+        ui.label(RichText::new("Orders").strong());
         if !col.in_orbit {
             cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::Colony(cid) }, "Build Army (Barracks)", actions);
         }
@@ -5982,7 +5988,6 @@ fn tech_legend(ui: &mut Ui) {
             ui.painter().rect_filled(sw, 3.0, colour);
             ui.label(label);
         }
-        ui.label("Hover a box for its effect.");
     });
 }
 
@@ -6202,8 +6207,13 @@ fn module_line(game: &Game, col: &Colony, cid: ColonyId, mi: usize, director: Op
             None => "idle".to_string(),
         }
     };
-    format!("{}: {}{}", m.kind.name(), figures, if m.online || m.mothballed { "" } else { " (offline, making nothing)" })
+    format!("{}: {}{}", m.kind.name(), figures, if m.online || m.mothballed { "" } else { OFFLINE_SUFFIX })
 }
+
+/// The words a box's hover adds to an offline building's line. Ticket #306 (version 0.08.7): the
+/// hover's alone; the row under the grid strips them, since the row and the hover are about the
+/// same building.
+const OFFLINE_SUFFIX: &str = " (offline, making nothing)";
 
 /// Ticket #150 (version 0.07.4): the Module rules under a tile, the counterpart of `facility_rules`.
 fn module_rules(heading: &str) -> String {
@@ -6302,13 +6312,13 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         Some(HabTile::Module(mi)) if mi < col.modules.len() => {
             let m = &col.modules[mi];
             let colour = if m.mothballed { Color32::from_rgb(170, 170, 190) } else { ui.visuals().text_color() };
-            figures_with_icons(ui, &module_line(game, col, cid, mi, director), 14.0, colour, &[]);
+            figures_with_icons(ui, module_line(game, col, cid, mi, director).trim_end_matches(OFFLINE_SUFFIX), 14.0, colour, &[]);
             if mine && m.kind != ModuleKind::Archive {
                 change_row(ui, game, &session.pending, BuildingRef::Module(cid, mi), m.mothballed, m.change, actions);
             }
         }
         Some(HabTile::Free) if mine => {
-            ui.label(RichText::new("Build here (hover a button for what it makes)").strong());
+            ui.label(RichText::new("Build here").strong());
             module_build_buttons(ui, session, game, cid, actions);
         }
         Some(HabTile::Free) => {
@@ -6930,19 +6940,10 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         faction_heading(ui, session, kind, 64.0);
         ui.separator();
 
-        // 1. Victory progress -- the percentage and both parts, the figures the Victory window's
-        // four blocks carry, for the one Faction this page is about.
-        let p = game.progress(seat);
-        ui.label(RichText::new(format!("Victory progress - {:.0}% of the way there", p.score() * 100.0)).strong());
-        ui.label(match &p.first_held_back {
-            Some(why) => format!("{}: {:.0} of {:.0} - {}", p.first_name, p.first_value, p.first_bar, why),
-            None => format!("{}: {:.0} of {:.0}", p.first_name, p.first_value, p.first_bar),
-        });
-        ui.add(egui::ProgressBar::new(p.first_fraction() as f32));
-        ui.label(format!("{}: {}", p.second_name, p.second_text));
-        ui.add(egui::ProgressBar::new(p.second_fraction() as f32));
-        // Ticket #264 (version 0.08.4): the Victory history under the progress bars, on every
-        // Faction's page, the player's own included, at the population chart's size.
+        // 1. Victory history. Ticket #264 (version 0.08.4): on every Faction's page, the player's
+        // own included, at the population chart's size. Ticket #306 (version 0.08.7): the progress
+        // lines and bars that stood above it are cut, at the designer's word, as a copy of the
+        // Victory window's four blocks; the Victory window is the victory's home.
         ui.add_space(4.0);
         victory_history(ui, game, seat, egui::vec2(ui.available_width(), 90.0));
         ui.add_space(6.0);
@@ -6978,14 +6979,12 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
             ],
             15.0,
         );
-        // Ticket #203: a spectator has no side to keep secrets from, so they get no line at all --
-        // neither the withholding one nor the one that says where the breakdown is.
-        if !session.spectator {
-            if breakdown {
-                ui.label(RichText::new("Hover a figure for the building-by-building breakdown.").weak());
-            } else {
-                ui.label(RichText::new("A rival's income is shown as totals only; the building-by-building breakdown is yours alone.").weak());
-            }
+        // Ticket #203: a spectator has no side to keep secrets from, so they get no line at all.
+        // Ticket #306 (version 0.08.7): the line that said where the breakdown is ("Hover a
+        // figure...") is cut as a signpost, at the designer's word; the withholding line stays,
+        // since it states a rule.
+        if !session.spectator && !breakdown {
+            ui.label(RichText::new("A rival's income is shown as totals only; the building-by-building breakdown is yours alone.").weak());
         }
         ui.add_space(6.0);
 
@@ -7411,7 +7410,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // keep their words.
                 figures_with_icons(ui, &line, 14.0, seat_colour(session, seat), &[("ppm", "emissions")]);
             }
-            ui.label(RichText::new("A share above a fair quarter raises that Faction's Influence thresholds on every Region it does not hold, up to half again.").weak());
+            // Ticket #306 (version 0.08.7): the sentence that stood here, a clause of the heading's
+            // hover word for word, is cut at the designer's word.
         });
         view.show_climate = open;
     }
@@ -7430,7 +7430,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // `Held by the Archivists` and the roster are deliberately left alone: there a Faction's
                 // name describes a PLACE, and a click there must go on selecting the place.
                 faction_link(ui, view, seat, RichText::new(format!("{} - {:.0}% of the way there", game.seat_name(seat), p.score() * 100.0)).strong().color(seat_colour(session, seat)));
-                ui.label(RichText::new(&game.tables.faction(game.kind(seat)).victory).weak());
+                // Ticket #306 (version 0.08.7): the Victory Condition sentence that stood here is
+                // cut, at the designer's word, as a restatement of the two labelled bars beneath
+                // it; the Rulebook keeps its copy.
                 ui.label(match &p.first_held_back {
                     Some(why) => format!("{}: {:.0} of {:.0} - {}", p.first_name, p.first_value, p.first_bar, why),
                     None => format!("{}: {:.0} of {:.0}", p.first_name, p.first_value, p.first_bar),

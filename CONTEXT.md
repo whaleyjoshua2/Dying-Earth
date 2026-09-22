@@ -151,7 +151,7 @@ The three Techs the Research Lead chooses between, drawn when a Tech completes, 
 _Avoid_: options, candidates, draft, offer
 
 **Faction window**:
-The window, since version 0.08.1, that says everything about one Faction: opened by `Factions (F)` and picked from a dropdown in its own top right, defaulting to the player's own. It wears the Faction's symbol at its head and holds the live figures -- Victory progress, the income of its last turn, Blame, its **Relations** as two rows, and what it holds -- above a collapsing section carrying the Faction card itself, which the setup screen shows before a game and which had been unreachable once one began. A rival's income is shown as totals only; the building-by-building breakdown is the player's alone, and a spectator sees every seat in full.
+The window, since version 0.08.1, that says everything about one Faction: opened by `Factions (F)` and picked from a dropdown in its own top right, defaulting to the player's own. It wears the Faction's symbol at its head and holds the live figures -- the Victory history chart (the progress lines and bars above it were cut in version 0.08.7 as a copy of the Victory window's), the income of its last turn, Blame, its **Relations** as two rows, and what it holds -- above a collapsing section carrying the Faction card itself, which the setup screen shows before a game and which had been unreachable once one began. A rival's income is shown as totals only; the building-by-building breakdown is the player's alone, and a spectator sees every seat in full.
 _Avoid_: faction panel, player info, empire screen, diplomacy screen
 
 **Top bar**:
@@ -665,7 +665,7 @@ Since version 0.07.4, the record the engine keeps of every Climate phase -- the 
 _Avoid_: emissions total, emissions log, graph, chart (as names)
 
 **Victory history**:
-Since version 0.08.4, the record each Faction keeps of every Climate phase -- how far along its Victory Condition it stands, the lower of its two parts' fractions, and its share of the four Factions' Blame -- saved with the game, and the chart drawn from it on the Faction window under the Victory progress: the progress in the Faction's colour, the Blame share on a scale of its own with the fair quarter marked, the in-game date along the foot, and ticked there a Break in red, Antarctica's opening in blue, and in white the turn the Faction's gate Tech was done and, for the Archivists, the Archive completed. Every Faction's page carries its own, the player's included. The first history the game keeps per Faction rather than for the world.
+Since version 0.08.4, the record each Faction keeps of every Climate phase -- how far along its Victory Condition it stands, the lower of its two parts' fractions, and its share of the four Factions' Blame -- saved with the game, and the chart drawn from it at the head of the Faction window's page (under the Victory progress block until version 0.08.7 cut that block): the progress in the Faction's colour, the Blame share on a scale of its own with the fair quarter marked, the in-game date along the foot, and ticked there a Break in red, Antarctica's opening in blue, and in white the turn the Faction's gate Tech was done and, for the Archivists, the Archive completed. Every Faction's page carries its own, the player's included. The first history the game keeps per Faction rather than for the world.
 _Avoid_: progress graph, score chart, victory log
 
 **Natural Sink**:
