@@ -2750,6 +2750,14 @@ impl Game {
             .min_by_key(|(_, standing, price)| *price - *standing)
     }
 
+    /// Ticket #311 (version 0.08.7): the Battle of the last Resolution fought at this place, as an
+    /// index into the Report, for the map's ring and the shields' outline. The Report is wiped at
+    /// End Turn and filled by the Resolution, so this is last turn's Battle for exactly the one
+    /// Orders phase that follows it, with nothing added to the save.
+    pub fn battle_last_turn_at(&self, at: crate::report::ReportPlace) -> Option<usize> {
+        self.report.battles.iter().position(|b| b.at == Some(at))
+    }
+
     /// Ticket #310 (version 0.08.7): **the military threat to a held Region**, the counterpart of
     /// `nearest_challenger`: the rival raised Army standing in a neighbouring Region with the best
     /// first-exchange odds against this Region's defenders, ties to the strongest, with the Region

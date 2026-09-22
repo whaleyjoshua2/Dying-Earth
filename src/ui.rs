@@ -430,6 +430,9 @@ struct Hotspot {
 enum Hit {
     Select(Selection),
     Enter(BodyId),
+    /// Ticket #311 (version 0.08.7): the ring that marks last turn's Battle, by its index in the
+    /// Report; a hover reads the record and a click opens the Report.
+    Battle(usize),
 }
 
 pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mut session: ResMut<Session>, contexts: Option<Res<bevy_egui::input::EguiWantsInput>>) {
@@ -762,7 +765,11 @@ fn shield_glyph(painter: &egui::Painter, rect: egui::Rect) {
 }
 
 /// A shield with a number on it: the Army icon of the Earth Map.
-fn shield(painter: &egui::Painter, centre: Pos2, fill: Color32, text: &str) {
+/// Ticket #311 (version 0.08.7): `outline` is the aggressor's colour when a Battle was fought here
+/// last turn (every stack present fought, a Battle being a melee of every party), black otherwise;
+/// `hurt` puts a red pip at the shield's top-right corner when the stack carries damage. Both at
+/// the designer's word: *"damage pip and outline for fought"*.
+fn shield(painter: &egui::Painter, centre: Pos2, fill: Color32, text: &str, outline: Option<Color32>, hurt: bool) {
     let (w, h) = (20.0, 24.0);
     let pts = vec![
         centre + egui::vec2(-w / 2.0, -h / 2.0),
@@ -771,8 +778,16 @@ fn shield(painter: &egui::Painter, centre: Pos2, fill: Color32, text: &str) {
         centre + egui::vec2(0.0, h / 2.0),
         centre + egui::vec2(-w / 2.0, 0.0),
     ];
-    painter.add(egui::Shape::convex_polygon(pts, fill, egui::Stroke::new(1.5, Color32::BLACK)));
+    let stroke = match outline {
+        Some(c) => egui::Stroke::new(2.5, c),
+        None => egui::Stroke::new(1.5, Color32::BLACK),
+    };
+    painter.add(egui::Shape::convex_polygon(pts, fill, stroke));
     painter.text(centre + egui::vec2(0.0, -2.0), egui::Align2::CENTER_CENTER, text, FontId::proportional(12.0), Color32::BLACK);
+    if hurt {
+        let pip = centre + egui::vec2(w / 2.0 - 1.0, -h / 2.0 + 1.0);
+        painter.circle(pip, 4.0, Color32::from_rgb(230, 50, 40), egui::Stroke::new(1.0, Color32::BLACK));
+    }
 }
 
 /// Ticket #112 (version 0.07.1): a map label is lightened before it is drawn. A Faction's colour
@@ -1907,6 +1922,19 @@ fn game_screen(
                         resp.show_tooltip_text(lines.join("\n"));
                     }
                 }
+                // Ticket #311 (version 0.08.7): the Battle ring's hover, read from the record.
+                let mut ring: Option<(f32, usize)> = None;
+                for h in &hotspots {
+                    if let Hit::Battle(i) = h.hit {
+                        let d = h.pos.distance(p);
+                        if d <= h.radius && ring.map(|(bd, _)| d < bd).unwrap_or(true) {
+                            ring = Some((d, i));
+                        }
+                    }
+                }
+                if let Some((_, i)) = ring {
+                    resp.show_tooltip_text(battle_summary(game, i));
+                }
             }
             if resp.hovered() {
                 let scroll = ui.input(|i| i.smooth_scroll_delta.y);
@@ -2453,27 +2481,39 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             label_at(painter, p - egui::vec2(0.0, 38.0), &format!("Unrest {}", game.unrest_text(sid)), tint, 13.0);
                         }
                         hotspots.push(Hotspot { pos: p, radius: 30.0, hit: Hit::Select(Selection::State(sid)) });
+                        // Ticket #311 (version 0.08.7): last turn's Battle here as a ring round the
+                        // label in the aggressor's colour, for the one Orders phase the Report
+                        // lives; its hover reads the record and a click on the ring's crown opens
+                        // the Report. The crown, not the ring's centre, so the label's own click
+                        // still selects the Region.
+                        let fought = game.battle_last_turn_at(ReportPlace::State(sid));
+                        let fought_colour = fought.and_then(|i| game.report.battles[i].aggressor()).map(|s| seat_colour(session, s)).or(fought.map(|_| Color32::from_gray(150)));
+                        if let (Some(i), Some(colour)) = (fought, fought_colour) {
+                            painter.circle_stroke(p, 26.0, egui::Stroke::new(2.0, colour));
+                            hotspots.push(Hotspot { pos: p - egui::vec2(0.0, 26.0), radius: 10.0, hit: Hit::Battle(i) });
+                        }
                         // Army shields (ticket #31): one per Faction present, grey for a neutral Standing Army.
                         // Ticket #297 (version 0.08.6): a shield whose Army is dug in carries a
                         // trench line beneath it, in its own colour.
-                        let mut shields: Vec<(Option<Seat>, i64, bool)> = Vec::new();
+                        let mut shields: Vec<(Option<Seat>, i64, bool, bool)> = Vec::new();
                         for seat in Seat::ALL {
                             let s = game.army_stack_strength(seat, Place::State(sid));
                             let ids = game.armies_of_seat_at(seat, Place::State(sid));
                             if s > 0 || !ids.is_empty() {
                                 let dug = ids.iter().filter_map(|id| game.army(*id)).any(|a| game.army_dug_in(a));
-                                shields.push((Some(seat), s, dug));
+                                let hurt = ids.iter().filter_map(|id| game.army(*id)).any(|a| a.damage > 0);
+                                shields.push((Some(seat), s, dug, hurt));
                             }
                         }
                         let neutral_armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid)) && game.army_seat(a).is_none() && !game.army_stands_down(a)).collect();
                         let neutral: i64 = neutral_armies.iter().map(|a| game.army_strength(a)).sum();
                         if neutral > 0 {
-                            shields.push((None, neutral, neutral_armies.iter().any(|a| game.army_dug_in(a))));
+                            shields.push((None, neutral, neutral_armies.iter().any(|a| game.army_dug_in(a)), neutral_armies.iter().any(|a| a.damage > 0)));
                         }
-                        for (i, (seat, strength, dug)) in shields.iter().enumerate() {
+                        for (i, (seat, strength, dug, hurt)) in shields.iter().enumerate() {
                             let centre = p + egui::vec2(-38.0 + 26.0 * i as f32, 36.0);
                             let fill = seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
-                            shield(painter, centre, fill, &strength.to_string());
+                            shield(painter, centre, fill, &strength.to_string(), fought_colour, *hurt);
                             if *dug {
                                 painter.line_segment([centre + egui::vec2(-10.0, 15.0), centre + egui::vec2(10.0, 15.0)], egui::Stroke::new(3.0, fill));
                             }
@@ -2634,6 +2674,15 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                     None => (format!("{name}: empty"), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot)), None),
                 };
                 label_kind_at(painter, p + egui::vec2(0.0, 24.0), kind, &text, colour, 12.0);
+                // Ticket #311 (version 0.08.7): last turn's Battle at this Colony as a ring round
+                // its label, in the aggressor's colour, the hover on its crown; as a Region's.
+                if let Some(c) = game.colony_at(body, slot)
+                    && let Some(i) = game.battle_last_turn_at(ReportPlace::Colony(c.id))
+                {
+                    let ring = game.report.battles[i].aggressor().map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
+                    painter.circle_stroke(p + egui::vec2(0.0, 24.0), 26.0, egui::Stroke::new(2.0, ring));
+                    hotspots.push(Hotspot { pos: p + egui::vec2(0.0, -2.0), radius: 10.0, hit: Hit::Battle(i) });
+                }
                 // Ticket #57: every slot carries its own four yields under its name, filled or free;
                 // a free slot's figures are what a Colony founded there would get. TO BE REVISITED
                 // WHEN BOARD LENSES ARRIVE: this is on the map always, and once the player can turn
@@ -2822,7 +2871,24 @@ fn apply_hit(hit: Hit, view: &mut ViewState) {
             view.attack_preview = false;
         }
         Hit::Enter(b) => view.enter_surface(b),
+        Hit::Battle(_) => view.popup = Popup::Report,
     }
+}
+
+/// Ticket #311 (version 0.08.7): what the Battle ring's hover says, read from the record: who
+/// attacked, how long it ran, and each party's line, within the six-line rule.
+fn battle_summary(game: &Game, i: usize) -> String {
+    let Some(b) = game.report.battles.get(i) else { return String::new() };
+    let who = |s: Option<Seat>| s.map(|s| game.seat_name(s)).unwrap_or_else(|| "Neutral".to_string());
+    let mut lines = vec![match b.aggressor() {
+        Some(s) => format!("A Battle here last turn: the {} attacked; {}", game.seat_name(s), b.result),
+        None => format!("A Battle here last turn; {}", b.result),
+    }];
+    for party in b.parties.iter().take(4) {
+        lines.push(format!("{}: {} ({} hit(s) landed)", who(party.seat), party.units, party.hits));
+    }
+    lines.push("Click the ring for the Report.".to_string());
+    lines.join("\n")
 }
 
 // ------------------------------------------------------------------ the command cluster
