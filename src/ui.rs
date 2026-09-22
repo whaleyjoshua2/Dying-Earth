@@ -2011,24 +2011,11 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             bar_resource(ui, icons, "energy", "Energy", format!("{} ({})", left.energy, signed(inc.energy)), sources(dying_earth_engine::Resource::Energy));
             ui.separator();
             bar_resource(ui, icons, "ducats", "Ducats", format!("{} ({})", left.ducats, signed(inc.ducats)), sources(dying_earth_engine::Resource::Ducats));
-            // Ticket #72: the Prospectors' Fund, beside their Materials when the Fund held Materials.
-            // Ticket #308 (version 0.08.7): beside their Ducats, which the Fund has held since ticket
-            // #240, and a PROGRESS BAR rather than a figure, at the designer's word -- *"move
-            // besides duckets ... bar only details on hover"* -- drawn as the Research race bar is,
-            // in the Prospectors' colour, filled to the Fund's share of its bar; the balance, the
-            // bar and the share are on the hover.
-            if game.kind(Seat(0)) == FactionKind::Prospectors {
-                let s = game.seat(Seat(0));
-                let bar = game.tables.faction(FactionKind::Prospectors).victory_first.bar;
-                let (rect, resp) = ui.allocate_exact_size(egui::vec2(80.0, 14.0), egui::Sense::hover());
-                let painter = ui.painter_at(rect);
-                painter.rect_filled(rect, 3.0, Color32::from_gray(45));
-                let w = rect.width() * ((s.venture_fund.max(0) as f32) / (bar.max(1.0) as f32)).min(1.0);
-                if w > 0.0 {
-                    painter.rect_filled(egui::Rect::from_min_size(rect.min, egui::vec2(w, rect.height())), 3.0, seat_colour(session, Seat(0)));
-                }
-                rule_tip(resp, format!("Venture Capital Fund: {} of {bar} Ducats, banking {}% of Ducat income. Set it on the Victory panel.", s.venture_fund, (s.venture_share * 100.0).round() as u32));
-            }
+            // Ticket #72: the Prospectors' Fund stood beside their Materials from version 0.05.5,
+            // when the Fund held Materials. Ticket #308 (version 0.08.7): moved beside Ducats as a
+            // progress bar, then CUT on the designer's seeing it -- *"let's just cut it, the
+            // archivist bank is not shown on the bar"* -- so the top bar carries no Faction's fund;
+            // the Victory window carries the Prospectors'.
             ui.separator();
             // Ticket #128 (version 0.07.2): Influence stands before Research, at the designer's
             // word; the race bar and the Pick a Tech button are Research's and travel with it.

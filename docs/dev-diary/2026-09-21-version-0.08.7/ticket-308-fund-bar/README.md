@@ -5,29 +5,26 @@ Ticket [#308](https://github.com/whaleyjoshua2/Dying-Earth/issues/308) on
 
 | picture | what it shows |
 |---|---|
-| [`prospectors-top-bar.png`](prospectors-top-bar.png) | `shot: player:prospectors venture:900 panel:0`. The top bar as the Prospectors: after **Ducats 12 (+12)** a small bar in the Prospectors' orange, filled to 900 of 2500, with no figure of its own; the Materials group carries Materials alone. |
-| [`fund-bar-hover.png`](fund-bar-hover.png) | `shot: player:prospectors venture:900 panel:0 tip:Venture Capital Fund:`. The bar's hover: *Venture Capital Fund: 900 of 2500 Ducats, banking 50% of Ducat income. Set it on the Victory panel.* |
+| [`prospectors-top-bar-cut.png`](prospectors-top-bar-cut.png) | `shot: player:prospectors venture:900 panel:0`. The top bar as the Prospectors with the Fund gone from it: Materials, Fuel, Energy, Ducats and Influence in their groups and nothing of the Fund's, which is 900 of 2500 in this picture and is read on the Victory window. |
 
 No batch was run: an interface change; the engine is untouched.
 
 ## What was decided, in the designer's words
 
-*"q1 move besides duckets q2 inverse bar only details on hover q3 yes"*, and on which bar,
-*"progress bar as recommended"*: the Fund leaves the Materials group for the Ducats group, becomes a
-progress bar with no figures of its own, and carries the balance, the 2500 and the share on its
-hover; no separator of its own.
+First, on the ticket: *"q1 move besides duckets q2 inverse bar only details on hover q3 yes"* and
+*"progress bar as recommended"*. That was built as a small progress bar beside Ducats in the
+Prospectors' colour, its figures on the hover, and shown to the designer in two pictures. Then, on
+seeing it: *"yeah let's just cut it, the archivist bank is not shown on the bar"*. **The Fund is not
+on the top bar at all**, as no other Faction's fund is; its figures are the Victory window's (the
+progress line, the slider's heading, the Fund line) and the Faction window's chart.
 
 ## Settled by the builder, to be corrected if wrong
 
-- **The bar is 80 pixels wide and 14 tall**, drawn as the Research race bar is (a grey trough, the
-  fill in the seat's colour), so the two bars on the row read as one family. The Research race bar
-  is 150 wide; the Fund's is narrower because it carries one seat's figure, not four.
-- **The hover goes through `rule_tip`**, so the `tip:` aid can photograph it.
-- At 1280 pixels the Prospectors' figures row runs to the window's edge, as it did with the figure
-  it replaces, which was about the same width.
+- Nothing of the bar remains in the code; the comment at its old place records the two moves.
+- The **Top bar** and **Venture Capital Fund** glossary entries say the Fund is not on the bar and
+  why.
 
 ## Looked at, not tested
 
-The two pictures above, each opened and read before this was committed. A first pair was taken from
-a binary that had not rebuilt (a float compared to an integer stopped the build) and was thrown
-away before being looked at.
+The picture above, opened and read before this was committed. The two pictures of the progress
+bar it replaced were looked at, shown to the designer, and removed with it.
