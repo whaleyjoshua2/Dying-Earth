@@ -430,6 +430,9 @@ struct Hotspot {
 enum Hit {
     Select(Selection),
     Enter(BodyId),
+    /// Ticket #311 (version 0.08.7): the ring that marks last turn's Battle, by its index in the
+    /// Report; a hover reads the record and a click opens the Report.
+    Battle(usize),
 }
 
 pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mut session: ResMut<Session>, contexts: Option<Res<bevy_egui::input::EguiWantsInput>>) {
@@ -762,7 +765,11 @@ fn shield_glyph(painter: &egui::Painter, rect: egui::Rect) {
 }
 
 /// A shield with a number on it: the Army icon of the Earth Map.
-fn shield(painter: &egui::Painter, centre: Pos2, fill: Color32, text: &str) {
+/// Ticket #311 (version 0.08.7): `outline` is the aggressor's colour when a Battle was fought here
+/// last turn (every stack present fought, a Battle being a melee of every party), black otherwise;
+/// `hurt` puts a red pip at the shield's top-right corner when the stack carries damage. Both at
+/// the designer's word: *"damage pip and outline for fought"*.
+fn shield(painter: &egui::Painter, centre: Pos2, fill: Color32, text: &str, outline: Option<Color32>, hurt: bool) {
     let (w, h) = (20.0, 24.0);
     let pts = vec![
         centre + egui::vec2(-w / 2.0, -h / 2.0),
@@ -771,8 +778,16 @@ fn shield(painter: &egui::Painter, centre: Pos2, fill: Color32, text: &str) {
         centre + egui::vec2(0.0, h / 2.0),
         centre + egui::vec2(-w / 2.0, 0.0),
     ];
-    painter.add(egui::Shape::convex_polygon(pts, fill, egui::Stroke::new(1.5, Color32::BLACK)));
+    let stroke = match outline {
+        Some(c) => egui::Stroke::new(2.5, c),
+        None => egui::Stroke::new(1.5, Color32::BLACK),
+    };
+    painter.add(egui::Shape::convex_polygon(pts, fill, stroke));
     painter.text(centre + egui::vec2(0.0, -2.0), egui::Align2::CENTER_CENTER, text, FontId::proportional(12.0), Color32::BLACK);
+    if hurt {
+        let pip = centre + egui::vec2(w / 2.0 - 1.0, -h / 2.0 + 1.0);
+        painter.circle(pip, 4.0, Color32::from_rgb(230, 50, 40), egui::Stroke::new(1.0, Color32::BLACK));
+    }
 }
 
 /// Ticket #112 (version 0.07.1): a map label is lightened before it is drawn. A Faction's colour
@@ -1907,6 +1922,19 @@ fn game_screen(
                         resp.show_tooltip_text(lines.join("\n"));
                     }
                 }
+                // Ticket #311 (version 0.08.7): the Battle ring's hover, read from the record.
+                let mut ring: Option<(f32, usize)> = None;
+                for h in &hotspots {
+                    if let Hit::Battle(i) = h.hit {
+                        let d = h.pos.distance(p);
+                        if d <= h.radius && ring.map(|(bd, _)| d < bd).unwrap_or(true) {
+                            ring = Some((d, i));
+                        }
+                    }
+                }
+                if let Some((_, i)) = ring {
+                    resp.show_tooltip_text(battle_summary(game, i));
+                }
             }
             if resp.hovered() {
                 let scroll = ui.input(|i| i.smooth_scroll_delta.y);
@@ -2005,18 +2033,17 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
                 if lines.is_empty() { "No income from buildings last turn.".to_string() } else { format!("Last Income:\n{}", lines.join("\n")) }
             };
             bar_resource(ui, icons, "materials", "Materials", format!("{} ({})", left.materials, signed(inc.materials)), sources(dying_earth_engine::Resource::Materials));
-            // Ticket #72: the Prospectors' Fund beside their Materials.
-            if game.kind(Seat(0)) == FactionKind::Prospectors {
-                let s = game.seat(Seat(0));
-                ui.label(RichText::new(format!("Fund {} ({}%)", s.venture_fund, (s.venture_share * 100.0).round() as u32)).strong())
-                    .on_hover_text(format!("The Venture Capital Fund: Ducats banked toward the {} your Victory Condition asks for, and the share of your Ducat income going in each turn. Set it on the Victory panel.", game.tables.faction(FactionKind::Prospectors).victory_first.bar));
-            }
             ui.separator();
             bar_resource(ui, icons, "fuel", "Fuel", format!("{} ({})", left.fuel, signed(inc.fuel)), sources(dying_earth_engine::Resource::Fuel));
             ui.separator();
             bar_resource(ui, icons, "energy", "Energy", format!("{} ({})", left.energy, signed(inc.energy)), sources(dying_earth_engine::Resource::Energy));
             ui.separator();
             bar_resource(ui, icons, "ducats", "Ducats", format!("{} ({})", left.ducats, signed(inc.ducats)), sources(dying_earth_engine::Resource::Ducats));
+            // Ticket #72: the Prospectors' Fund stood beside their Materials from version 0.05.5,
+            // when the Fund held Materials. Ticket #308 (version 0.08.7): moved beside Ducats as a
+            // progress bar, then CUT on the designer's seeing it -- *"let's just cut it, the
+            // archivist bank is not shown on the bar"* -- so the top bar carries no Faction's fund;
+            // the Victory window carries the Prospectors'.
             ui.separator();
             // Ticket #128 (version 0.07.2): Influence stands before Research, at the designer's
             // word; the race bar and the Pick a Tech button are Research's and travel with it.
@@ -2454,27 +2481,39 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             label_at(painter, p - egui::vec2(0.0, 38.0), &format!("Unrest {}", game.unrest_text(sid)), tint, 13.0);
                         }
                         hotspots.push(Hotspot { pos: p, radius: 30.0, hit: Hit::Select(Selection::State(sid)) });
+                        // Ticket #311 (version 0.08.7): last turn's Battle here as a ring round the
+                        // label in the aggressor's colour, for the one Orders phase the Report
+                        // lives; its hover reads the record and a click on the ring's crown opens
+                        // the Report. The crown, not the ring's centre, so the label's own click
+                        // still selects the Region.
+                        let fought = game.battle_last_turn_at(ReportPlace::State(sid));
+                        let fought_colour = fought.and_then(|i| game.report.battles[i].aggressor()).map(|s| seat_colour(session, s)).or(fought.map(|_| Color32::from_gray(150)));
+                        if let (Some(i), Some(colour)) = (fought, fought_colour) {
+                            painter.circle_stroke(p, 26.0, egui::Stroke::new(2.0, colour));
+                            hotspots.push(Hotspot { pos: p - egui::vec2(0.0, 26.0), radius: 10.0, hit: Hit::Battle(i) });
+                        }
                         // Army shields (ticket #31): one per Faction present, grey for a neutral Standing Army.
                         // Ticket #297 (version 0.08.6): a shield whose Army is dug in carries a
                         // trench line beneath it, in its own colour.
-                        let mut shields: Vec<(Option<Seat>, i64, bool)> = Vec::new();
+                        let mut shields: Vec<(Option<Seat>, i64, bool, bool)> = Vec::new();
                         for seat in Seat::ALL {
                             let s = game.army_stack_strength(seat, Place::State(sid));
                             let ids = game.armies_of_seat_at(seat, Place::State(sid));
                             if s > 0 || !ids.is_empty() {
                                 let dug = ids.iter().filter_map(|id| game.army(*id)).any(|a| game.army_dug_in(a));
-                                shields.push((Some(seat), s, dug));
+                                let hurt = ids.iter().filter_map(|id| game.army(*id)).any(|a| a.damage > 0);
+                                shields.push((Some(seat), s, dug, hurt));
                             }
                         }
                         let neutral_armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid)) && game.army_seat(a).is_none() && !game.army_stands_down(a)).collect();
                         let neutral: i64 = neutral_armies.iter().map(|a| game.army_strength(a)).sum();
                         if neutral > 0 {
-                            shields.push((None, neutral, neutral_armies.iter().any(|a| game.army_dug_in(a))));
+                            shields.push((None, neutral, neutral_armies.iter().any(|a| game.army_dug_in(a)), neutral_armies.iter().any(|a| a.damage > 0)));
                         }
-                        for (i, (seat, strength, dug)) in shields.iter().enumerate() {
+                        for (i, (seat, strength, dug, hurt)) in shields.iter().enumerate() {
                             let centre = p + egui::vec2(-38.0 + 26.0 * i as f32, 36.0);
                             let fill = seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
-                            shield(painter, centre, fill, &strength.to_string());
+                            shield(painter, centre, fill, &strength.to_string(), fought_colour, *hurt);
                             if *dug {
                                 painter.line_segment([centre + egui::vec2(-10.0, 15.0), centre + egui::vec2(10.0, 15.0)], egui::Stroke::new(3.0, fill));
                             }
@@ -2635,6 +2674,15 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                     None => (format!("{name}: empty"), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot)), None),
                 };
                 label_kind_at(painter, p + egui::vec2(0.0, 24.0), kind, &text, colour, 12.0);
+                // Ticket #311 (version 0.08.7): last turn's Battle at this Colony as a ring round
+                // its label, in the aggressor's colour, the hover on its crown; as a Region's.
+                if let Some(c) = game.colony_at(body, slot)
+                    && let Some(i) = game.battle_last_turn_at(ReportPlace::Colony(c.id))
+                {
+                    let ring = game.report.battles[i].aggressor().map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
+                    painter.circle_stroke(p + egui::vec2(0.0, 24.0), 26.0, egui::Stroke::new(2.0, ring));
+                    hotspots.push(Hotspot { pos: p + egui::vec2(0.0, -2.0), radius: 10.0, hit: Hit::Battle(i) });
+                }
                 // Ticket #57: every slot carries its own four yields under its name, filled or free;
                 // a free slot's figures are what a Colony founded there would get. TO BE REVISITED
                 // WHEN BOARD LENSES ARRIVE: this is on the map always, and once the player can turn
@@ -2823,7 +2871,24 @@ fn apply_hit(hit: Hit, view: &mut ViewState) {
             view.attack_preview = false;
         }
         Hit::Enter(b) => view.enter_surface(b),
+        Hit::Battle(_) => view.popup = Popup::Report,
     }
+}
+
+/// Ticket #311 (version 0.08.7): what the Battle ring's hover says, read from the record: who
+/// attacked, how long it ran, and each party's line, within the six-line rule.
+fn battle_summary(game: &Game, i: usize) -> String {
+    let Some(b) = game.report.battles.get(i) else { return String::new() };
+    let who = |s: Option<Seat>| s.map(|s| game.seat_name(s)).unwrap_or_else(|| "Neutral".to_string());
+    let mut lines = vec![match b.aggressor() {
+        Some(s) => format!("A Battle here last turn: the {} attacked; {}", game.seat_name(s), b.result),
+        None => format!("A Battle here last turn; {}", b.result),
+    }];
+    for party in b.parties.iter().take(4) {
+        lines.push(format!("{}: {} ({} hit(s) landed)", who(party.seat), party.units, party.hits));
+    }
+    lines.push("Click the ring for the Report.".to_string());
+    lines.join("\n")
 }
 
 // ------------------------------------------------------------------ the command cluster
@@ -2833,6 +2898,13 @@ fn apply_hit(hit: Hit, view: &mut ViewState) {
 /// Ticket #294 (version 0.08.6): a tenth larger again, at the designer's word -- *"everything on
 /// the command cluster 10% larger"* -- so 1.15 times 1.1.
 const CLUSTER_SCALE: f32 = 1.265;
+
+/// Ticket #312 (version 0.08.7): what a card's Armies block -- heading, stance row, rows and the
+/// orders under them -- is multiplied by, at the designer's word: *"enlarge by 10%"*, *"whole
+/// block"*. Nothing in the block had a size to multiply (egui's defaults throughout), so a
+/// constant is named, as `TUTORIAL_TICK` and `CLUSTER_SCALE` were, and applied to the block's text
+/// styles the way the cluster applies its own.
+const ARMY_LIST_SCALE: f32 = 1.1;
 
 /// Ticket #114 (version 0.07.1): **the command cluster**, a strip along the foot of the side panel
 /// that never scrolls away. The designer asked for a corner like the one CK3 and other 4X games put
@@ -2872,114 +2944,139 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
         font.size *= CLUSTER_SCALE;
     }
     ui.add_space(4.0);
-    // The Allotment, at the size the designer asked for: "much higher and more prominent".
+    // Ticket #305 (version 0.08.7): two columns, at the designer's word -- *"next turn icon has
+    // its own column on the right side of the command cluster - button sits at the bottom"*. The
+    // left column holds the four rows as they were (the Allotment, the rail, Spend, Max and the
+    // every-turn tick) at a width fixed BEFORE the rail is drawn, since the rail takes all the
+    // width it is given; the right column is the sun's own width and nothing more, with the sun
+    // pushed to the bottom by measured space so its lower edge sits level with the Max row. The
+    // space is measured from the left column's rect rather than laid out bottom-up, because a
+    // bottom-up layout in a panel that sizes itself from its content has no bottom to sit on.
+    let sun_d = 46.2 * CLUSTER_SCALE;
+    let sun_w = sun_d + 8.0;
+    let sun_h = sun_d + 16.0 * CLUSTER_SCALE + 4.0;
     ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 5.0;
-        if let Some(image) = Icons::from_ctx(ui.ctx(), "influence", 20.0 * CLUSTER_SCALE) {
-            ui.add(image);
-        }
-        ui.label(RichText::new(format!("{influence_left}")).size(22.0 * CLUSTER_SCALE).strong())
-            .on_hover_text("Influence still unspent this turn. It is lost at End Turn: the Allotment does not carry over.");
-        ui.label(RichText::new(format!("of {} left", s.allotment)).size(15.0 * CLUSTER_SCALE));
-    });
+        let left_w = ui.available_width() - sun_w - ui.spacing().item_spacing.x;
+        let column = ui.vertical(|ui| {
+            ui.set_width(left_w);
+            // Text wraps inside the column: at the panel's default width the "Click a Region or a
+            // Colony" line is wider than the column and would otherwise push the sun off the edge
+            // (seen in the first picture).
+            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+            // The Allotment, at the size the designer asked for: "much higher and more prominent".
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 5.0;
+                if let Some(image) = Icons::from_ctx(ui.ctx(), "influence", 20.0 * CLUSTER_SCALE) {
+                    ui.add(image);
+                }
+                ui.label(RichText::new(format!("{influence_left}")).size(22.0 * CLUSTER_SCALE).strong())
+                    .on_hover_text("Influence still unspent this turn. It is lost at End Turn: the Allotment does not carry over.");
+                ui.label(RichText::new(format!("of {} left", s.allotment)).size(15.0 * CLUSTER_SCALE));
+            });
 
-    // Spend, on whatever is selected.
-    let target = match view.selection {
-        Selection::State(sid) => Some((Place::State(sid), game.tables.state(sid).name.clone())),
-        Selection::Colony(cid) => Some((Place::Colony(cid), game.place_name(Place::Colony(cid)))),
-        _ => None,
-    };
-    // Ticket #294 (version 0.08.6): the amount is set on the rail the Smear and the Greenwash use
-    // (`influence_rail`, ticket #293), at the designer's word -- *"spending influence on the
-    // command cluster is now a slider"* -- so the three Influence spends read alike: single points
-    // from nought to the turn's whole Influence, what is already ordered greyed from the right.
-    // The rail is drawn whether or not a place is selected, so the strip never changes shape; the
-    // Spend button below it is what needs the place.
-    let (whole, left) = influence_this_turn(game, session);
-    let amount = influence_rail(ui, &mut view.influence_amount, whole, left, None);
-    ui.horizontal(|ui| {
-        match &target {
-            Some((place, name)) => {
-                let order = Order::Influence { target: *place, amount };
-                let check = game.check_order(Seat(0), &session.pending, &order);
-                let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Spend {amount} on {name}")));
-                if let Err(e) = &check {
-                    resp.clone().on_disabled_hover_text(&e.0);
+            // Spend, on whatever is selected.
+            let target = match view.selection {
+                Selection::State(sid) => Some((Place::State(sid), game.tables.state(sid).name.clone())),
+                Selection::Colony(cid) => Some((Place::Colony(cid), game.place_name(Place::Colony(cid)))),
+                _ => None,
+            };
+            // Ticket #294 (version 0.08.6): the amount is set on the rail the Smear and the Greenwash use
+            // (`influence_rail`, ticket #293), at the designer's word -- *"spending influence on the
+            // command cluster is now a slider"* -- so the three Influence spends read alike: single points
+            // from nought to the turn's whole Influence, what is already ordered greyed from the right.
+            // The rail is drawn whether or not a place is selected, so the strip never changes shape; the
+            // Spend button below it is what needs the place.
+            let (whole, left) = influence_this_turn(game, session);
+            let amount = influence_rail(ui, &mut view.influence_amount, whole, left, None);
+            ui.horizontal(|ui| {
+                match &target {
+                    Some((place, name)) => {
+                        let order = Order::Influence { target: *place, amount };
+                        let check = game.check_order(Seat(0), &session.pending, &order);
+                        let resp = ui.add_enabled(check.is_ok(), egui::Button::new(format!("Spend {amount} on {name}")));
+                        if let Err(e) = &check {
+                            resp.clone().on_disabled_hover_text(&e.0);
+                        }
+                        if resp.on_hover_text(format!("Raise your Standing on {name}. Its card shows what it would take to hold or take it.")).clicked() {
+                            actions.push(Action::Place(order));
+                        }
+                    }
+                    None => {
+                        // Ticket #306 (version 0.08.7): the sentence that stood here is cut as a
+                        // duplicate of the Max button's hover, at the designer's word; a greyed
+                        // Spend keeps the strip's shape, since the rail is drawn either way.
+                        ui.add_enabled(false, egui::Button::new(format!("Spend {amount}")));
+                    }
                 }
-                if resp.on_hover_text(format!("Raise your Standing on {name}. Its card shows what it would take to hold or take it.")).clicked() {
-                    actions.push(Action::Place(order));
-                }
-            }
-            None => {
-                ui.label(RichText::new("Click a Region or a Colony to spend on it").weak());
-            }
-        }
-    });
+            });
 
-    // Ticket #134 (version 0.07.3): Max, exactly where Defence stood. The designer: *"Get rid of
-    // defense button replace with a max spend button that just say Max."* One press places one
-    // order spending everything left this turn on the selected place; greyed with a hint when
-    // nothing is selected. Ticket #294 (version 0.08.6): and the rail follows it to the bound --
-    // *"it also moves the slider to max"* -- and End Turn shares this row, at its right.
-    ui.horizontal(|ui| {
-        let button = egui::Button::new(RichText::new("Max").strong());
-        match &target {
-            Some((place, name)) if influence_left > 0 => {
-                let order = Order::Influence { target: *place, amount: influence_left };
-                let check = game.check_order(Seat(0), &session.pending, &order);
-                let resp = ui.add_enabled(check.is_ok(), button);
-                if let Err(e) = &check {
-                    resp.clone().on_disabled_hover_text(&e.0);
+            // Ticket #134 (version 0.07.3): Max, exactly where Defence stood. The designer: *"Get rid of
+            // defense button replace with a max spend button that just say Max."* One press places one
+            // order spending everything left this turn on the selected place; greyed with a hint when
+            // nothing is selected. Ticket #294 (version 0.08.6): and the rail follows it to the bound --
+            // *"it also moves the slider to max"* -- and, until ticket #305, End Turn shared this row.
+            ui.horizontal(|ui| {
+                let button = egui::Button::new(RichText::new("Max").strong());
+                match &target {
+                    Some((place, name)) if influence_left > 0 => {
+                        let order = Order::Influence { target: *place, amount: influence_left };
+                        let check = game.check_order(Seat(0), &session.pending, &order);
+                        let resp = ui.add_enabled(check.is_ok(), button);
+                        if let Err(e) = &check {
+                            resp.clone().on_disabled_hover_text(&e.0);
+                        }
+                        if resp.on_hover_text(format!("Spend all {influence_left} left this turn on {name}.")).clicked() {
+                            view.influence_amount = influence_left;
+                            actions.push(Action::Place(order));
+                        }
+                    }
+                    Some(_) => {
+                        ui.add_enabled(false, button).on_disabled_hover_text("Nothing left to spend this turn.");
+                    }
+                    None => {
+                        ui.add_enabled(false, button).on_disabled_hover_text("Click a Region or a Colony to spend on it");
+                    }
                 }
-                if resp.on_hover_text(format!("Spend all {influence_left} left this turn on {name}.")).clicked() {
-                    view.influence_amount = influence_left;
-                    actions.push(Action::Place(order));
+                // The standing order, on the shape the Archive's funding already uses: a pending order that
+                // sets a seat field, so it survives a save and shows in the turn's order list like anything
+                // else. It never spends by itself -- next turn it places the whole Allotment on the place
+                // as a pending order, which the player can read and cancel; cancelling it ends the standing
+                // order too (the designer's addition), as does the place ceasing to be theirs.
+                let pending_flip = session.pending.iter().find_map(|o| match o {
+                    Order::SetMaxStanding { target } => Some(*target),
+                    _ => None,
+                });
+                let standing = pending_flip.unwrap_or(s.max_standing);
+                let mut on = standing.is_some();
+                let label = match standing {
+                    Some(place) => format!("every turn on {}", game.place_name(place)),
+                    None => "every turn".to_string(),
+                };
+                let can_tick = on || target.is_some();
+                let resp = ui.add_enabled(can_tick, egui::Checkbox::new(&mut on, label));
+                let resp = resp
+                    .on_hover_text("Spend your whole Allotment on this place at the start of every turn from now on. It is placed as an ordinary order you can read and cancel before ending the turn, never spent behind your back; cancelling it, or losing the place, ends it.")
+                    .on_disabled_hover_text("Click a Region or a Colony first.");
+                if resp.changed() {
+                    if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetMaxStanding { .. })) {
+                        actions.push(Action::Cancel(i));
+                    } else {
+                        let target = if on { target.as_ref().map(|(p, _)| *p) } else { None };
+                        actions.push(Action::Place(Order::SetMaxStanding { target }));
+                    }
                 }
-            }
-            Some(_) => {
-                ui.add_enabled(false, button).on_disabled_hover_text("Nothing left to spend this turn.");
-            }
-            None => {
-                ui.add_enabled(false, button).on_disabled_hover_text("Click a Region or a Colony to spend on it");
-            }
-        }
-        // The standing order, on the shape the Archive's funding already uses: a pending order that
-        // sets a seat field, so it survives a save and shows in the turn's order list like anything
-        // else. It never spends by itself -- next turn it places the whole Allotment on the place
-        // as a pending order, which the player can read and cancel; cancelling it ends the standing
-        // order too (the designer's addition), as does the place ceasing to be theirs.
-        let pending_flip = session.pending.iter().find_map(|o| match o {
-            Order::SetMaxStanding { target } => Some(*target),
-            _ => None,
+            });
         });
-        let standing = pending_flip.unwrap_or(s.max_standing);
-        let mut on = standing.is_some();
-        let label = match standing {
-            Some(place) => format!("every turn on {}", game.place_name(place)),
-            None => "every turn".to_string(),
-        };
-        let can_tick = on || target.is_some();
-        let resp = ui.add_enabled(can_tick, egui::Checkbox::new(&mut on, label));
-        let resp = resp
-            .on_hover_text("Spend your whole Allotment on this place at the start of every turn from now on. It is placed as an ordinary order you can read and cancel before ending the turn, never spent behind your back; cancelling it, or losing the place, ends it.")
-            .on_disabled_hover_text("Click a Region or a Colony first.");
-        if resp.changed() {
-            if let Some(i) = session.pending.iter().position(|o| matches!(o, Order::SetMaxStanding { .. })) {
-                actions.push(Action::Cancel(i));
-            } else {
-                let target = if on { target.as_ref().map(|(p, _)| *p) } else { None };
-                actions.push(Action::Place(Order::SetMaxStanding { target }));
-            }
-        }
         // End Turn, where a hand already is. Ticket #128 (version 0.07.2): named for its key.
-        // Ticket #294 (version 0.08.6): a sun at the right edge of this row, the words beneath it
-        // and the key on the hover, at the designer's word. Right-to-left inside the horizontal,
-        // which takes one row; on its own it would take the whole remaining height (the Faction
-        // window's dropdown learned that first).
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            // A tenth larger again at the designer's word, on seeing the first picture: "make it
-            // 10% larger".
-            let resp = sun_button(ui, can_end_turn(game, view), 46.2 * CLUSTER_SCALE, "End Turn");
+        // Ticket #294 (version 0.08.6): a sun, the words beneath it and the key on the hover, at the
+        // designer's word; a tenth larger again on seeing the first picture: "make it 10% larger".
+        // Ticket #305 (version 0.08.7): in its own column at the right, at the bottom, nothing above it.
+        let left_h = column.response.rect.height();
+        ui.vertical(|ui| {
+            if left_h > sun_h {
+                ui.add_space(left_h - sun_h);
+            }
+            let resp = sun_button(ui, can_end_turn(game, view), sun_d, "End Turn");
             if resp.on_hover_text("End the turn (Enter).").on_disabled_hover_text("Pick a Tech first").clicked() {
                 press_end_turn(session, game, view, actions);
             }
@@ -3345,6 +3442,10 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             }
             // Stranded is now per-SHIP rather than the old all-or-nothing warning on the stack,
             // which is strictly more accurate: one hull can be dry while another beside it is full.
+            // Ticket #313 (version 0.08.7): the stance word in brackets, as an Army's row has it,
+            // and the stance's sentence on the hover; a Ship on Intercept was the case nobody could
+            // read anywhere.
+            text.push_str(&format!("  ({})", s.stance.name()));
             if game.stranded(s.id) {
                 text.push_str(" - STRANDED: no leg affordable and no station of yours here");
             }
@@ -3352,8 +3453,12 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             // with no leg it can afford and no station of its own is the one piece in the game that can
             // become permanently useless, and the roster said so in four words and explained none of it.
             let tip = format!(
-                "Tank {} of {}. Fuel goes on transits, and a leg costs least at a launch window.\nRefuelling needs a station or Colony of yours where the Ship sits, so a Ship is STRANDED with no leg it can afford and nowhere to fill up.",
-                s.fuel, tank
+                "{}: {} {}\nTank {} of {}. Fuel goes on transits, and a leg costs least at a launch window.\nRefuelling needs a station or Colony of yours where the Ship sits, so a Ship is STRANDED with no leg it can afford and nowhere to fill up.",
+                s.stance.name(),
+                s.stance.one_liner(true),
+                Stance::PERSISTS,
+                s.fuel,
+                tank
             );
             ships_rows.push(RosterRow { kind: Kind::of_unit(s.kind), text, tip: Some(tip), mark: marks.then_some(!ordered), jump: Some((View::Solar, Selection::ShipStack(body, seat))) });
         }
@@ -3403,16 +3508,12 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
         if !matches!(a.at, ArmyAt::Aboard(_)) {
             text.push_str(&format!("  ({})", a.stance.name()));
         }
+        // Ticket #313 (version 0.08.7): the stance's sentence is the engine's, the same one the
+        // stance row's label shows, so it lives once.
         let tip = format!(
-            "An Army keeps the stance it was last given until it is moved or given another; it is never reset at a Resolution.\n{} A Standing Army replenishes where it stands, unless its state's Unrest has passed {:.0}.",
-            match a.stance {
-                Stance::Hold => "Holding, it stands and fights where it is.",
-                Stance::Attack => "On Attack, it strikes at the place it was sent to.",
-                Stance::Intercept => "On Intercept, it meets what arrives.",
-                Stance::Evade => "Evading, it avoids battle where it can.",
-                Stance::Blockade => "An Army cannot blockade; it holds.",
-                Stance::DigIn => "Dug in, it fights two stronger in defence and never disengages, and it cannot march or board a Carrier until its stance is changed and the turn has passed.",
-            },
+            "An Army keeps the stance it was last given until it is moved or given another; it is never reset at a Resolution.\n{}: {} A Standing Army replenishes where it stands, unless its state's Unrest has passed {:.0}.",
+            a.stance.name(),
+            a.stance.one_liner(false),
             game.tables.unrest.army_threshold
         );
         army_rows.push((where_, RosterRow { kind: Kind::Army, text, tip: Some(tip), mark: None, jump: target }));
@@ -3843,6 +3944,45 @@ fn cost_button(ui: &mut Ui, game: &Game, pending: &[Order], order: Order, label:
     cost_button_with_hover(ui, game, pending, order, label, None, actions);
 }
 
+/// Ticket #309 (version 0.08.7): the hover on a button that attacks a place -- a march on a
+/// Region, a landing at a Colony -- naming who defends it and what the odds figure is a chance
+/// OF, at the designer's word: the place and its holder; a line per defender with its name, its
+/// strength, what it defends at (dug in noted) and its damage; the first-exchange chance with the
+/// two strengths it was made from; and the cost-and-stance line. Six lines at most: three
+/// defenders are named, and past three, two are named and the rest counted. The presentation
+/// review's finding was that a player saw "61%" with no way to learn what defended or at what.
+fn attack_hover(game: &Game, place: Place, name: &str, attacker: i64, landing: bool) -> String {
+    let control = match place {
+        Place::State(sid) => game.state(sid).control,
+        Place::Colony(cid) => game.colonies.iter().find(|c| c.id == cid).map(|c| c.control).unwrap_or(Control::Neutral),
+    };
+    let holder = match control {
+        Control::Neutral => if matches!(place, Place::State(_)) { "neutral".to_string() } else { "nobody's".to_string() },
+        Control::Controlled(Seat(0)) => "held by you".to_string(),
+        Control::Controlled(s) => format!("held by the {}", game.seat_name(s)),
+        Control::Occupied { occupier, .. } => format!("occupied by the {}", game.seat_name(occupier)),
+    };
+    let defenders: Vec<&Army> = game.defenders_at(place, Seat(0)).iter().filter_map(|id| game.army(*id)).collect();
+    let arrives = if landing { "The Army attacks as it lands" } else { "The Army arrives on Attack" };
+    if defenders.is_empty() {
+        return format!("{name}: {holder}, undefended. {arrives} and the Occupation begins.");
+    }
+    let total: i64 = defenders.iter().map(|a| game.army_defended_strength(a)).sum();
+    let named = if defenders.len() > 3 { 2 } else { defenders.len() };
+    let mut lines = vec![format!("{name}: {holder}.")];
+    for a in &defenders[..named] {
+        let dug = if game.army_dug_in(a) { " (dug in)" } else { "" };
+        lines.push(format!("defended by {}: strength {}, defends at {}{dug}, damage {}/{}", game.army_name(a), game.army_strength(a), game.army_defended_strength(a), a.damage, game.army_hit_points(a)));
+    }
+    if named < defenders.len() {
+        let rest: i64 = defenders[named..].iter().map(|a| game.army_defended_strength(a)).sum();
+        lines.push(format!("and {} more, defending at {rest} in all", defenders.len() - named));
+    }
+    lines.push(format!("{:.0}% is the chance to win the first exchange: your {attacker} against their {total}.", first_round_odds(attacker, total) * 100.0));
+    lines.push(format!("{} costs nothing; {}.", if landing { "Landing" } else { "Moving" }, if landing { "the Army attacks as it lands" } else { "the Army arrives on Attack" }));
+    lines.join("\n")
+}
+
 /// Ticket #121 (version 0.07.2): a button whose price is **figures and glyphs**, not words in
 /// parentheses -- `Factory  25 [cart]` where it read `Factory (25 Materials)` -- and whose price is
 /// simply absent when there is none, so a Mothball is a plain verb and not `Mothball (free)`. The
@@ -3957,7 +4097,10 @@ fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make
                 _ => None,
             });
             let shown = pending_stance.unwrap_or(current);
-            if ui.selectable_label(shown == st, st.name()).clicked() && shown != st {
+            // Ticket #313 (version 0.08.7): each label says what it does on hover, in the one
+            // sentence the engine keeps for it, and the rule every stance shares; no marker (#233).
+            let resp = rule_tip(ui.selectable_label(shown == st, st.name()), format!("{}: {}\n{}", st.name(), st.one_liner(ships), Stance::PERSISTS));
+            if resp.clicked() && shown != st {
                 let order = make(st);
                 if game.check_order(Seat(0), pending, &order).is_ok() {
                     actions.push(Action::Place(order));
@@ -4163,6 +4306,36 @@ Spending here raises the bar; doing nothing lowers it, yours decaying {} a turn 
                     ui.label(RichText::new("No rival has a Standing here.").weak());
                 }
             }
+            // Ticket #310 (version 0.08.7): **the threat line**, the military counterpart of the
+            // challenger line, on a Region the player holds: the rival raised Army next door with
+            // the best first-exchange odds against this Region's defenders. Presence and strength,
+            // never its stance, at the designer's word (as a Region arms stance-blind, #282); no
+            // line at all when nobody stands next door; amber when their odds reach the bar the
+            // computer attacks at, which is measured behaviour read from `ai.toml`, not a rule.
+            if let Place::State(sid) = target
+                && let Some((id, from, odds)) = game.nearest_army_threat(sid)
+                && let Some(a) = game.army(id)
+                && let Some(who) = game.army_seat(a)
+            {
+                let strength = game.army_strength(a);
+                let defence: i64 = game.defenders_at(Place::State(sid), who).iter().filter_map(|d| game.army(*d)).map(|d| game.army_defended_strength(d)).sum();
+                let bar = game.tables.ai.thresholds.attack_odds;
+                let pressing = odds >= bar;
+                let line = format!(
+                    "The {}' {}, strength {strength}, stands next door in {}.{}",
+                    game.seat_name(who),
+                    game.army_name(a).trim_start_matches("the "),
+                    game.tables.state(from).name,
+                    if pressing { " Dig In here to hold it." } else { "" }
+                );
+                let tip = format!(
+                    "Their {strength} against the {defence} that defends here: {:.0}% is their chance to win the first exchange.\nThe computer seats attack at {:.0}% or better, so the line turns amber there.\nRaised Armies next door only, whatever their stance; a Region's own Army never marches.",
+                    odds * 100.0,
+                    bar * 100.0
+                );
+                let colour = if pressing { Color32::from_rgb(255, 160, 60) } else { rgb(game.tables.faction(game.kind(who)).colour) };
+                rule_tip(ui.label(RichText::new(line).color(colour)), tip);
+            }
         }
     }
 
@@ -4316,7 +4489,8 @@ fn facility_row(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, i: us
         let side = if !game.takes_slot(f.kind) { "" } else if f.coastal { " (coastal)" } else { " (inland)" };
         let resp = figures_with_icons(
             ui,
-            &format!("{}{}: {}{}", f.kind.name(), side, figures, if f.online || f.mothballed { "" } else { " (offline, making nothing)" }),
+            // Ticket #306 (version 0.08.7): the offline suffix is the box's hover's alone now.
+            &format!("{}{}: {}", f.kind.name(), side, figures),
             14.0,
             colour,
             &[],
@@ -4537,8 +4711,8 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
         match kind {
             SlotBoxKind::Standing(i) => {
                 let f = &st.facilities[*i];
-                let state = if f.mothballed { TileState::Mothballed } else { TileState::Standing };
-                let heading = format!("{} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), if f.online || f.mothballed { "" } else { " (offline, making nothing)" });
+                let state = if f.mothballed { TileState::Mothballed } else if !f.online { TileState::Offline } else { TileState::Standing };
+                let heading = format!("{} ({side}): {}{}", f.kind.name(), facility_figures(game, sid, f, director), facility_offline_words(f));
                 let tip = facility_rules(&heading, f.coastal);
                 if hab_tile(ui, rect, id, Some(crate::icons::facility_icon(f.kind)), f.kind.name(), state, view.slot_box == Some(SlotBox::Facility(*i)), edge, tip).clicked() {
                     view.slot_box = Some(SlotBox::Facility(*i));
@@ -4582,7 +4756,7 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
             facility_row(ui, session, game, sid, i, &st.facilities[i], mine, director, actions);
         }
         Some(SlotBox::Free) if mine => {
-            ui.label(RichText::new("Build here (hover a button for what it makes)").strong());
+            ui.label(RichText::new("Build here").strong());
             facility_build_buttons(ui, session, game, sid, actions);
         }
         _ => {
@@ -4730,8 +4904,8 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     Order::Agitate { state: sid },
                     "Agitate: Unrest +1",
                     Some(format!(
-                        "Turn its people against the {}: Unrest rises by {} at End Turn, halved by a working Constabulary. Once a turn here. They will know who paid: it is an offence.\nAt {} the Standing Army stops replenishing, at {} every Facility runs at half, at {} the state throws its controller off.",
-                        game.seat_name(holder), Game::unrest_figure(ag.agitate_points), ag.army_threshold, ag.facility_threshold, ag.max
+                        "Turn its people against the {}: Unrest rises by {} at End Turn, halved by a working Constabulary. Once a turn here. They will know who paid: it is an offence.",
+                        game.seat_name(holder), Game::unrest_figure(ag.agitate_points)
                     )),
                     actions,
                 );
@@ -4801,58 +4975,97 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // Ticket #146 (version 0.07.3): the slots as boxes, with the clicked box's line beneath them.
     slot_boxes(ui, session, game, view, sid, mine, director, actions);
     no_slot_section(ui, session, game, sid, mine, director, actions);
-    ui.label(RichText::new("Armies").strong());
+    // Ticket #312 (version 0.08.7): the Armies block holds the Army orders too, at the designer's
+    // word -- *"Move the Army orders block up the card and into the Armies list"*: the stance row
+    // under the heading (it is per place, so it belongs to the list and not to any row), and under
+    // each of the player's raised Armies its march buttons and repairs, indented. The block that
+    // stood at the foot of the card, below the fold at 1080 in the presentation review's picture,
+    // is gone. The whole block is a tenth larger, at `ARMY_LIST_SCALE`.
     let armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::State(sid))).collect();
-    for a in &armies {
-        let who = match game.army_seat(a) {
-            Some(s) => game.seat_name(s),
-            None => "neutral".to_string(),
-        };
-        // Ticket #270 (version 0.08.4): named, the Standing Army included.
-        // Ticket #282 (version 0.08.5): a Levy says so, and a standing row's hover names the rule.
-        // Ticket #297 (version 0.08.6): a dug-in Army says so. Ticket #302: and every Army says
-        // what it defends at -- its strength, its Region's people, Dig In -- beside its strength.
-        let defended = game.army_defended_strength(a);
-        let defends = if defended != game.army_strength(a) { format!(", defends at {defended}") } else { String::new() };
-        let dug = if game.army_dug_in(a) { ", dug in" } else { "" };
-        let row = ui.label(format!(
-            "  {} ({}{}): strength {}, damage {}/{}{defends}{dug}",
-            game.army_name(a),
-            who,
-            if a.standing { ", standing" } else { "" },
-            game.army_strength(a),
-            a.damage,
-            game.army_hit_points(a)
-        ));
-        // Ticket #302 (version 0.08.6): the hover names every term of the one Army system.
-        let t = &game.tables.standing_army;
-        let tip = if a.standing {
-            let armed = game.state(sid).armed;
-            let police = if game.constabulary_online(sid) { format!(" +{} for the working Constabulary", t.constabulary) } else { format!(" +{} if a Constabulary were working here", t.constabulary) };
-            let calm = if game.army_replenishes(sid) { format!(", +{} while Unrest is under {:.0}", t.calm, game.tables.unrest.army_threshold) } else { format!(", +{} lost to Unrest at {:.0} or more", t.calm, game.tables.unrest.army_threshold) };
-            format!(
-                "A Region's own Army. Its strength and hit points are Industry Level + 1{}; it stays at home. Defending, it fights at that{police}{calm}{}. It heals 1 a turn while Unrest is under {:.0}; at its strength in damage it is destroyed, and returns at strength 1 two Incomes later. A neutral Region arms for good, +{} when a threat appears next door and +{} for every attack it holds against, with no ceiling.",
-                if armed > 0 { format!(" and +{armed} armed") } else { String::new() },
-                if game.army_dug_in(a) { format!(", +{} dug in", game.tables.dig_in.defence) } else { String::new() },
-                game.tables.unrest.army_threshold,
-                t.threat_steps,
-                t.held_step
-            )
-        } else {
-            format!(
-                "A raised Army: its strength and hit points were its home's Industry Level + 1 when it was raised, fixed since. It belongs to its home Region and changes hands with it; it marches, and it may Dig In for +{} while defending.",
-                game.tables.dig_in.defence
-            )
-        };
-        row.on_hover_text(tip);
-    }
+    ui.scope(|ui| {
+        for font in ui.style_mut().text_styles.values_mut() {
+            font.size *= ARMY_LIST_SCALE;
+        }
+        ui.label(RichText::new("Armies").strong());
+        let my_armies: Vec<&Army> = armies.iter().copied().filter(|a| mine && game.army_seat(a) == Some(Seat(0)) && !game.army_stands_down(a)).collect();
+        if !my_armies.is_empty() {
+            stance_row(ui, game, &session.pending, my_armies[0].stance, |s| Order::ArmyStance { place: Place::State(sid), stance: s }, false, actions);
+        }
+        for a in &armies {
+            let who = match game.army_seat(a) {
+                Some(s) => game.seat_name(s),
+                None => "neutral".to_string(),
+            };
+            // Ticket #270 (version 0.08.4): named, the Standing Army included.
+            // Ticket #282 (version 0.08.5): a Levy says so, and a standing row's hover names the rule.
+            // Ticket #297 (version 0.08.6): a dug-in Army says so. Ticket #302: and every Army says
+            // what it defends at -- its strength, its Region's people, Dig In -- beside its strength.
+            let defended = game.army_defended_strength(a);
+            let defends = if defended != game.army_strength(a) { format!(", defends at {defended}") } else { String::new() };
+            let dug = if game.army_dug_in(a) { ", dug in" } else { "" };
+            let row = ui.label(format!(
+                "  {} ({}{}): strength {}, damage {}/{}{defends}{dug}",
+                game.army_name(a),
+                who,
+                if a.standing { ", standing" } else { "" },
+                game.army_strength(a),
+                a.damage,
+                game.army_hit_points(a)
+            ));
+            // Ticket #302 (version 0.08.6): the hover names every term of the one Army system.
+            let t = &game.tables.standing_army;
+            let tip = if a.standing {
+                let armed = game.state(sid).armed;
+                let police = if game.constabulary_online(sid) { format!(" +{} for the working Constabulary", t.constabulary) } else { format!(" +{} if a Constabulary were working here", t.constabulary) };
+                let calm = if game.army_replenishes(sid) { format!(", +{} while Unrest is under {:.0}", t.calm, game.tables.unrest.army_threshold) } else { format!(", +{} lost to Unrest at {:.0} or more", t.calm, game.tables.unrest.army_threshold) };
+                format!(
+                    "A Region's own Army. Its strength and hit points are Industry Level + 1{}; it stays at home. Defending, it fights at that{police}{calm}{}. It heals 1 a turn while Unrest is under {:.0}; at its strength in damage it is destroyed, and returns at strength 1 two Incomes later. A neutral Region arms for good, +{} when a threat appears next door and +{} for every attack it holds against, with no ceiling.",
+                    if armed > 0 { format!(" and +{armed} armed") } else { String::new() },
+                    if game.army_dug_in(a) { format!(", +{} dug in", game.tables.dig_in.defence) } else { String::new() },
+                    game.tables.unrest.army_threshold,
+                    t.threat_steps,
+                    t.held_step
+                )
+            } else {
+                format!(
+                    "A raised Army: its strength and hit points were its home's Industry Level + 1 when it was raised, fixed since. It belongs to its home Region and changes hands with it; it marches, and it may Dig In for +{} while defending.",
+                    game.tables.dig_in.defence
+                )
+            };
+            row.on_hover_text(tip);
+            // Ticket #302 (version 0.08.6): a Region's own Army stays at home, so only a raised Army
+            // has march buttons. Ticket #309 (version 0.08.7): the odds are on a hover that names the
+            // defender, not on the button face. Ticket #312: under the Army's own row.
+            if my_armies.iter().any(|m| m.id == a.id) && !a.standing {
+                ui.horizontal_wrapped(|ui| {
+                    ui.add_space(16.0);
+                    for n in &card.neighbours {
+                        let ctrl = game.state(*n).control;
+                        let own = ctrl == Control::Controlled(Seat(0));
+                        let name = &game.tables.state(*n).name;
+                        let label = format!("{} {name}", if own { "move to" } else { "attack" });
+                        let hover = if own {
+                            format!("{name}: held by you. Moving costs nothing; the Army keeps its stance.")
+                        } else {
+                            attack_hover(game, Place::State(*n), name, game.army_strength(a), false)
+                        };
+                        cost_button_with_hover(ui, game, &session.pending, Order::MoveArmy { army: a.id, to: *n }, &label, Some(hover), actions);
+                    }
+                    if a.damage > 0 {
+                        cost_button(ui, game, &session.pending, Order::Repair { unit: UnitRef::Army(a.id), points: a.damage }, "Repair fully", actions);
+                        cost_button(ui, game, &session.pending, Order::RepairWithDucats { unit: UnitRef::Army(a.id), points: a.damage }, "Repair fully with Ducats", actions);
+                    }
+                });
+            }
+        }
+    });
     ui.separator();
     if mine {
         // Ticket #154 (version 0.07.4): the per-kind build list is gone from here -- a Facility is
         // built by clicking a free box -- and the Scrubber and Sea Wall buttons stand under the
         // boxes; what is left is orders, and the header says so. The designer: *"remove redundant
         // build list from the region cards."*
-        ui.label(RichText::new("Orders (hover a button for what it does)").strong());
+        ui.label(RichText::new("Orders").strong());
         // Ticket #54: the Custodians' Leapfrog, and the Prospectors' Strip Permit.
         if game.kind(Seat(0)) == FactionKind::Custodians {
             ui.horizontal(|ui| {
@@ -5012,30 +5225,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             })
             .weak(),
         );
-        let my_armies: Vec<&Army> = armies.iter().copied().filter(|a| game.army_seat(a) == Some(Seat(0)) && !game.army_stands_down(a)).collect();
-        if !my_armies.is_empty() {
-            ui.label(RichText::new("Army orders").strong());
-            stance_row(ui, game, &session.pending, my_armies[0].stance, |s| Order::ArmyStance { place: Place::State(sid), stance: s }, false, actions);
-            // Ticket #302 (version 0.08.6): a Region's own Army stays at home, so only a raised
-            // Army has march buttons, and the odds read what the defenders FIGHT at.
-            for a in my_armies.iter().filter(|a| !a.standing) {
-                ui.label(format!("{} (strength {}):", game.army_name(a), game.army_strength(a)));
-                ui.horizontal_wrapped(|ui| {
-                    for n in &card.neighbours {
-                        let ctrl = game.state(*n).control;
-                        let verb = if ctrl == Control::Controlled(Seat(0)) { "move to" } else { "attack" };
-                        let def: i64 = game.defenders_at(Place::State(*n), Seat(0)).iter().filter_map(|id| game.army(*id)).map(|x| game.army_defended_strength(x)).sum();
-                        let odds = first_round_odds(game.army_strength(a), def);
-                        let label = if verb == "attack" { format!("{} {} ({:.0}%)", verb, game.tables.state(*n).name, odds * 100.0) } else { format!("{} {}", verb, game.tables.state(*n).name) };
-                        cost_button(ui, game, &session.pending, Order::MoveArmy { army: a.id, to: *n }, &label, actions);
-                    }
-                });
-                if a.damage > 0 {
-                    cost_button(ui, game, &session.pending, Order::Repair { unit: UnitRef::Army(a.id), points: a.damage }, "Repair fully", actions);
-                    cost_button(ui, game, &session.pending, Order::RepairWithDucats { unit: UnitRef::Army(a.id), points: a.damage }, "Repair fully with Ducats", actions);
-                }
-            }
-        }
+        // Ticket #312 (version 0.08.7): the Army orders that stood here are in the Armies block.
     }
 }
 
@@ -5224,13 +5414,36 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     {
         ui.label(format!("  The Archive: building, {} turn(s) left", (b.due_turn + 1).saturating_sub(game.turn)));
     }
-    for b in col.queue.iter().filter(|b| b.item != BuildItem::Module(ModuleKind::Archive)) {
+    // Ticket #306 (version 0.08.7): a queued Module is on its hatched tile, so only what has no
+    // tile is listed here, as the Region card's loop already does.
+    for b in col.queue.iter().filter(|b| !matches!(b.item, BuildItem::Module(_))) {
         ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
     }
+    // Ticket #312 (version 0.08.7): the Colony's Armies block, as the Region card's: a heading, the
+    // stance row under it, the rows, and the repairs under the player's own; a tenth larger.
     let armies: Vec<&Army> = game.armies.iter().filter(|a| a.at == ArmyAt::Place(Place::Colony(cid))).collect();
-    for a in &armies {
-        let who = game.army_seat(a).map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".into());
-        ui.label(format!("  {} ({}): strength {}, damage {}", game.army_name(a), who, game.army_strength(a), a.damage));
+    if !armies.is_empty() {
+        ui.scope(|ui| {
+            for font in ui.style_mut().text_styles.values_mut() {
+                font.size *= ARMY_LIST_SCALE;
+            }
+            ui.label(RichText::new("Armies").strong());
+            let my_armies: Vec<&Army> = armies.iter().copied().filter(|a| !session.spectator && game.army_seat(a) == Some(Seat(0))).collect();
+            if !my_armies.is_empty() {
+                stance_row(ui, game, &session.pending, my_armies[0].stance, |s| Order::ArmyStance { place: Place::Colony(cid), stance: s }, false, actions);
+            }
+            for a in &armies {
+                let who = game.army_seat(a).map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".into());
+                ui.label(format!("  {} ({}): strength {}, damage {}", game.army_name(a), who, game.army_strength(a), a.damage));
+                if my_armies.iter().any(|m| m.id == a.id) && a.damage > 0 {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.add_space(16.0);
+                        cost_button(ui, game, &session.pending, Order::Repair { unit: UnitRef::Army(a.id), points: a.damage }, "Repair fully", actions);
+                        cost_button(ui, game, &session.pending, Order::RepairWithDucats { unit: UnitRef::Army(a.id), points: a.damage }, "Repair fully with Ducats", actions);
+                    });
+                }
+            }
+        });
     }
     ui.separator();
     let mine = !session.spectator && col.control.director() == Some(Seat(0));
@@ -5311,7 +5524,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         // Ticket #162 (version 0.07.5): the header matches the Nation card's, which ticket #154
         // renamed when its own build list folded into the boxes. A Module is ordered from a free
         // tile; what is left here is orders.
-        ui.label(RichText::new("Orders (hover a button for what it does)").strong());
+        ui.label(RichText::new("Orders").strong());
         if !col.in_orbit {
             cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::Colony(cid) }, "Build Army (Barracks)", actions);
         }
@@ -5322,16 +5535,8 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             }
         }
     }
-    let my_armies: Vec<&Army> = armies.iter().copied().filter(|a| !session.spectator && game.army_seat(a) == Some(Seat(0))).collect();
-    if !my_armies.is_empty() {
-        stance_row(ui, game, &session.pending, my_armies[0].stance, |s| Order::ArmyStance { place: Place::Colony(cid), stance: s }, false, actions);
-        for a in &my_armies {
-            if a.damage > 0 {
-                cost_button(ui, game, &session.pending, Order::Repair { unit: UnitRef::Army(a.id), points: a.damage }, "Repair Army fully", actions);
-                cost_button(ui, game, &session.pending, Order::RepairWithDucats { unit: UnitRef::Army(a.id), points: a.damage }, "Repair Army fully with Ducats", actions);
-            }
-        }
-    }
+    // Ticket #312 (version 0.08.7): the stance row and the repairs that stood here are in the
+    // Armies block above.
     influence_row(ui, game, session, view, Place::Colony(cid), true, actions);
 }
 
@@ -5560,16 +5765,16 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 }
                 if let Some(aid) = s.army {
                     // Ticket #300 (version 0.08.6): the attack happens the turn it lands, so the
-                    // button quotes the first-round odds as the march buttons do.
+                    // button carries the first-round odds as the march buttons do. Ticket #309
+                    // (version 0.08.7): on a hover that names the defender, not on the face.
                     let slot_name = &game.tables.body(c.body).slots[c.slot as usize].name;
-                    let label = if own {
-                        format!("Land the Army at {slot_name}")
+                    let (label, hover) = if own {
+                        (format!("Land the Army at {slot_name}"), format!("{slot_name}: held by you. Landing costs nothing; the Army lands on Hold."))
                     } else {
-                        let defence: i64 = game.defenders_at(Place::Colony(c.id), Seat(0)).iter().filter_map(|id| game.army(*id)).map(|a| game.army_defended_strength(a)).sum();
                         let mine = game.army(aid).map(|a| game.army_strength(a)).unwrap_or(0);
-                        format!("Land the Army to attack {slot_name} ({:.0}%)", first_round_odds(mine, defence) * 100.0)
+                        (format!("Land the Army to attack {slot_name}"), attack_hover(game, Place::Colony(c.id), slot_name, mine, true))
                     };
-                    cost_button(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: 0, army: true, into: UnloadTarget::Colony(c.id) }, &label, actions);
+                    cost_button_with_hover(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: 0, army: true, into: UnloadTarget::Colony(c.id) }, &label, Some(hover), actions);
                 }
             }
             if s.kind == UnitKind::ColonyShip && s.colonists > 0 && body != BodyId::Earth {
@@ -5960,7 +6165,6 @@ fn tech_legend(ui: &mut Ui) {
             ui.painter().rect_filled(sw, 3.0, colour);
             ui.label(label);
         }
-        ui.label("Hover a box for its effect.");
     });
 }
 
@@ -6032,6 +6236,12 @@ const HAB_LABEL: f32 = 18.0;
 enum TileState {
     Standing,
     Mothballed,
+    /// Ticket #307 (version 0.08.7): a building that stands and is not mothballed but is not
+    /// online -- short of Energy, struck by a card, in a grid-failed Colony, or an Occupied
+    /// Colony's Archive. Drawn with the mothballed tile's dimming and the word *offline* in a
+    /// warmer colour than mothballed's grey, at the designer's word; the cause is on the hover.
+    /// Until this ticket such a building was drawn exactly like a working one.
+    Offline,
     /// Ticket #291 (version 0.08.6): a building ordered this turn (`ordered`, before End Turn) or
     /// under way (after it), with the turns until it stands. Both are drawn hatched AND dimmed,
     /// with the count on the face, at the designer's word: *"hatch stays but greyed out with turns
@@ -6094,8 +6304,8 @@ Build", Color32::from_gray(165)) } else { ("free", Color32::from_gray(130)) };
         _ => {
             // Ticket #291 (version 0.08.6): a building ordered or under way takes the mothballed
             // tile's darker fill and dimmed picture as well as its hatch.
-            let dim = matches!(state, TileState::Mothballed | TileState::Flooded | TileState::Building { .. });
-            let fill = if matches!(state, TileState::Mothballed | TileState::Building { .. }) { Color32::from_rgb(36, 36, 42) } else { Color32::from_rgb(48, 48, 58) };
+            let dim = matches!(state, TileState::Mothballed | TileState::Offline | TileState::Flooded | TileState::Building { .. });
+            let fill = if matches!(state, TileState::Mothballed | TileState::Offline | TileState::Building { .. }) { Color32::from_rgb(36, 36, 42) } else { Color32::from_rgb(48, 48, 58) };
             painter.rect(rect, 6.0, fill, egui::Stroke::new(if edge.is_some() { 2.0 } else { 1.0 }, outline), egui::StrokeKind::Inside);
             if let Some(image) = key.and_then(|k| Icons::from_ctx(ui.ctx(), k, 48.0)) {
                 let tint = if dim { crate::icons::kind_fill().gamma_multiply(0.4) } else { crate::icons::kind_fill() };
@@ -6119,6 +6329,9 @@ Build", Color32::from_gray(165)) } else { ("free", Color32::from_gray(130)) };
             }
             if state == TileState::Mothballed {
                 ui.painter().text(rect.left_bottom() + egui::vec2(4.0, -4.0), egui::Align2::LEFT_BOTTOM, "mothballed", FontId::proportional(11.0), Color32::from_rgb(170, 170, 190));
+            }
+            if state == TileState::Offline {
+                ui.painter().text(rect.left_bottom() + egui::vec2(4.0, -4.0), egui::Align2::LEFT_BOTTOM, "offline", FontId::proportional(11.0), Color32::from_rgb(225, 165, 115));
             }
             if state == TileState::Flooded {
                 // Ticket #146 (version 0.07.3): the sea. The designer: *"flooded tiles to filled 3/4th
@@ -6180,7 +6393,38 @@ fn module_line(game: &Game, col: &Colony, cid: ColonyId, mi: usize, director: Op
             None => "idle".to_string(),
         }
     };
-    format!("{}: {}{}", m.kind.name(), figures, if m.online || m.mothballed { "" } else { " (offline, making nothing)" })
+    format!("{}: {}", m.kind.name(), figures)
+}
+
+/// The words a box's hover adds to an offline building's line, and nothing for a working or a
+/// mothballed one. Ticket #306 (version 0.08.7): the hover's alone; the row under the grid does
+/// not carry them, since the row and the hover are about the same building. Ticket #307: they
+/// name the cause. A Facility goes offline two ways: struck by a card until the next Resolution,
+/// or shut at Income for want of Energy.
+fn facility_offline_words(f: &Facility) -> &'static str {
+    if f.online || f.mothballed {
+        ""
+    } else if f.offline_until_resolution {
+        " (offline until the next Resolution, struck by a card; making nothing)"
+    } else {
+        " (offline, short of Energy; making nothing)"
+    }
+}
+
+/// A Module's offline words, the counterpart of `facility_offline_words`: a card, the Colony's
+/// grid down, an Occupied Colony's Archive, or want of Energy.
+fn module_offline_words(col: &Colony, m: &Module) -> &'static str {
+    if m.online || m.mothballed {
+        ""
+    } else if m.offline_until_resolution {
+        " (offline until the next Resolution, struck by a card; making nothing)"
+    } else if col.grid_failed {
+        " (offline, the grid is down; making nothing)"
+    } else if m.kind == ModuleKind::Archive && col.control.is_occupied() {
+        " (offline while the Colony is Occupied)"
+    } else {
+        " (offline, short of Energy; making nothing)"
+    }
 }
 
 /// Ticket #150 (version 0.07.4): the Module rules under a tile, the counterpart of `facility_rules`.
@@ -6231,11 +6475,11 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     let mut i = 0usize;
     for mi in standing {
         let m = &col.modules[mi];
-        let state = if m.mothballed { TileState::Mothballed } else { TileState::Standing };
+        let state = if m.mothballed { TileState::Mothballed } else if !m.online { TileState::Offline } else { TileState::Standing };
         let selected = view.hab_tile == Some(HabTile::Module(mi));
         // Ticket #150 (version 0.07.4): the tile's hover -- the figures its strip line carries and
         // the Module rules, which the old rows never had.
-        let tip = module_rules(&module_line(game, col, cid, mi, director));
+        let tip = module_rules(&format!("{}{}", module_line(game, col, cid, mi, director), module_offline_words(col, m)));
         if hab_tile(ui, tile_rect(i), ui.id().with(("hab", mi)), Some(crate::icons::module_icon(m.kind)), m.kind.name(), state, selected, None, tip).clicked() {
             view.hab_tile = Some(HabTile::Module(mi));
         }
@@ -6268,8 +6512,8 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     if let Some(ai) = archive {
         // The Archive stands apart: a row of its own, outside the count.
         let rect = egui::Rect::from_min_size(grid.min + egui::vec2(0.0, rows as f32 * (HAB_TILE + HAB_LABEL + HAB_GAP)), egui::vec2(HAB_TILE, HAB_TILE));
-        let state = if col.modules[ai].mothballed { TileState::Mothballed } else { TileState::Standing };
-        let tip = format!("{}\nOutside the Module count. Its Research is paid into the Archive fund at any pace; complete, it takes a great deal of Energy to keep running. Destroyed outright if this Colony changes hands; the fund is kept.", module_line(game, col, cid, ai, director));
+        let state = if col.modules[ai].mothballed { TileState::Mothballed } else if !col.modules[ai].online { TileState::Offline } else { TileState::Standing };
+        let tip = format!("{}{}\nOutside the Module count. Its Research is paid into the Archive fund at any pace; complete, it takes a great deal of Energy to keep running. Destroyed outright if this Colony changes hands; the fund is kept.", module_line(game, col, cid, ai, director), module_offline_words(col, &col.modules[ai]));
         if hab_tile(ui, rect, ui.id().with("hab-archive"), Some(crate::icons::module_icon(ModuleKind::Archive)), "The Archive", state, view.hab_tile == Some(HabTile::Module(ai)), None, tip).clicked() {
             view.hab_tile = Some(HabTile::Module(ai));
         }
@@ -6286,7 +6530,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             }
         }
         Some(HabTile::Free) if mine => {
-            ui.label(RichText::new("Build here (hover a button for what it makes)").strong());
+            ui.label(RichText::new("Build here").strong());
             module_build_buttons(ui, session, game, cid, actions);
         }
         Some(HabTile::Free) => {
@@ -6908,19 +7152,10 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
         faction_heading(ui, session, kind, 64.0);
         ui.separator();
 
-        // 1. Victory progress -- the percentage and both parts, the figures the Victory window's
-        // four blocks carry, for the one Faction this page is about.
-        let p = game.progress(seat);
-        ui.label(RichText::new(format!("Victory progress - {:.0}% of the way there", p.score() * 100.0)).strong());
-        ui.label(match &p.first_held_back {
-            Some(why) => format!("{}: {:.0} of {:.0} - {}", p.first_name, p.first_value, p.first_bar, why),
-            None => format!("{}: {:.0} of {:.0}", p.first_name, p.first_value, p.first_bar),
-        });
-        ui.add(egui::ProgressBar::new(p.first_fraction() as f32));
-        ui.label(format!("{}: {}", p.second_name, p.second_text));
-        ui.add(egui::ProgressBar::new(p.second_fraction() as f32));
-        // Ticket #264 (version 0.08.4): the Victory history under the progress bars, on every
-        // Faction's page, the player's own included, at the population chart's size.
+        // 1. Victory history. Ticket #264 (version 0.08.4): on every Faction's page, the player's
+        // own included, at the population chart's size. Ticket #306 (version 0.08.7): the progress
+        // lines and bars that stood above it are cut, at the designer's word, as a copy of the
+        // Victory window's four blocks; the Victory window is the victory's home.
         ui.add_space(4.0);
         victory_history(ui, game, seat, egui::vec2(ui.available_width(), 90.0));
         ui.add_space(6.0);
@@ -6956,14 +7191,12 @@ fn faction_window(ctx: &egui::Context, session: &Session, game: &Game, view: &mu
             ],
             15.0,
         );
-        // Ticket #203: a spectator has no side to keep secrets from, so they get no line at all --
-        // neither the withholding one nor the one that says where the breakdown is.
-        if !session.spectator {
-            if breakdown {
-                ui.label(RichText::new("Hover a figure for the building-by-building breakdown.").weak());
-            } else {
-                ui.label(RichText::new("A rival's income is shown as totals only; the building-by-building breakdown is yours alone.").weak());
-            }
+        // Ticket #203: a spectator has no side to keep secrets from, so they get no line at all.
+        // Ticket #306 (version 0.08.7): the line that said where the breakdown is ("Hover a
+        // figure...") is cut as a signpost, at the designer's word; the withholding line stays,
+        // since it states a rule.
+        if !session.spectator && !breakdown {
+            ui.label(RichText::new("A rival's income is shown as totals only; the building-by-building breakdown is yours alone.").weak());
         }
         ui.add_space(6.0);
 
@@ -7389,7 +7622,8 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // keep their words.
                 figures_with_icons(ui, &line, 14.0, seat_colour(session, seat), &[("ppm", "emissions")]);
             }
-            ui.label(RichText::new("A share above a fair quarter raises that Faction's Influence thresholds on every Region it does not hold, up to half again.").weak());
+            // Ticket #306 (version 0.08.7): the sentence that stood here, a clause of the heading's
+            // hover word for word, is cut at the designer's word.
         });
         view.show_climate = open;
     }
@@ -7408,7 +7642,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // `Held by the Archivists` and the roster are deliberately left alone: there a Faction's
                 // name describes a PLACE, and a click there must go on selecting the place.
                 faction_link(ui, view, seat, RichText::new(format!("{} - {:.0}% of the way there", game.seat_name(seat), p.score() * 100.0)).strong().color(seat_colour(session, seat)));
-                ui.label(RichText::new(&game.tables.faction(game.kind(seat)).victory).weak());
+                // Ticket #306 (version 0.08.7): the Victory Condition sentence that stood here is
+                // cut, at the designer's word, as a restatement of the two labelled bars beneath
+                // it; the Rulebook keeps its copy.
                 ui.label(match &p.first_held_back {
                     Some(why) => format!("{}: {:.0} of {:.0} - {}", p.first_name, p.first_value, p.first_bar, why),
                     None => format!("{}: {:.0} of {:.0}", p.first_name, p.first_value, p.first_bar),

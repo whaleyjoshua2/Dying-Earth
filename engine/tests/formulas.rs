@@ -10786,3 +10786,33 @@ fn the_computer_opens_with_a_habitat_on_its_starting_station() {
 }
 
 
+
+// -------------------------------------------- 0.08.7 ticket #310: the threat line
+
+/// Ticket #310 (version 0.08.7): the military threat to a held Region is the rival RAISED Army
+/// next door with the best first-exchange odds against the Region's defenders. None with nobody
+/// next door; a neutral neighbour's own Army is nobody's; a rival's Standing Army never marches and
+/// so never counts; and a Region nobody holds has no threat line.
+#[test]
+fn the_nearest_army_threat_is_the_rival_raised_army_next_door_with_the_best_odds() {
+    let mut g = game();
+    let china = StateId::EastAsia;
+    assert_eq!(g.state(china).control, Control::Controlled(Seat(0)));
+    assert!(g.nearest_army_threat(china).is_none(), "nobody stands next door on a fresh board");
+    let next_door = g.tables.state(china).neighbours.iter().copied().find(|n| g.state(*n).control == Control::Neutral).expect("a neutral neighbour");
+    g.take_control(next_door, Seat(1));
+    assert!(g.nearest_army_threat(china).is_none(), "a rival's Standing Army next door never marches, so it is no threat");
+    let raised = g.raise_army(Place::State(next_door), false);
+    let (id, from, odds) = g.nearest_army_threat(china).expect("a raised rival Army next door is the threat");
+    assert_eq!((id, from), (raised, next_door));
+    let a = g.armies.iter().find(|a| a.id == raised).unwrap();
+    let defence: i64 = g.defenders_at(Place::State(china), Seat(1)).iter().filter_map(|d| g.army(*d)).map(|d| g.army_defended_strength(d)).sum();
+    assert!((odds - combat::first_round_odds(g.army_strength(a), defence)).abs() < 1e-9, "the odds are the first-exchange odds against what defends here");
+    // A stronger raised Army next door with better odds takes the line.
+    let second = g.raise_army(Place::State(next_door), false);
+    g.armies.iter_mut().find(|x| x.id == second).unwrap().raised_strength = 9;
+    assert_eq!(g.nearest_army_threat(china).map(|(id, _, _)| id), Some(second), "the best odds win the line");
+    // A Region nobody holds has no threat line.
+    let nobody = StateId::ALL.into_iter().find(|s| g.state(*s).control == Control::Neutral).expect("a neutral Region");
+    assert!(g.nearest_army_threat(nobody).is_none());
+}

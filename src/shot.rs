@@ -835,6 +835,66 @@ fn build_board(session: &mut Session) {
     if std::env::args().any(|a| a == "commit:1") {
         session.end_turn();
     }
+    // `army:1` (a building aid, ticket #309): a raised Army of seat 0's stands in its start state,
+    // so the march buttons and their hovers can be photographed; since ticket #302 a Region's own
+    // Army never marches, so a fresh board has no march buttons at all.
+    if std::env::args().any(|a| a == "army:1")
+        && let Some(g) = session.game.as_mut()
+        && let Some(sid) = g.directed_states(Seat(0)).first().copied()
+    {
+        g.raise_army(Place::State(sid), false);
+    }
+    // `battle:region` (a building aid, ticket #311): seat 1 takes the first neighbour of seat 0's
+    // start state and raises an Army there; seat 0 raises one at home and marches on it; the turn
+    // runs, so the Orders phase that follows carries a ground Battle in the Report, a ring on the
+    // map, and outlined shields with damage. The rivals sit still for the one turn, as `battle:1`
+    // has them do.
+    if std::env::args().any(|a| a == "battle:region")
+        && let Some(g) = session.game.as_mut()
+        && let Some(sid) = g.directed_states(Seat(0)).first().copied()
+        && let Some(n) = g.tables.state(sid).neighbours.first().copied()
+    {
+        g.take_control(n, Seat(1));
+        g.raise_army(Place::State(n), false);
+        let mine = g.raise_army(Place::State(sid), false);
+        for seat in Seat::ALL.into_iter().skip(1) {
+            g.seats[seat.index()].ai = false;
+        }
+        let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+        orders[0] = vec![Order::MoveArmy { army: mine, to: n }];
+        g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
+        for seat in Seat::ALL.into_iter().skip(1) {
+            g.seats[seat.index()].ai = true;
+        }
+    }
+    // `threat:1` (a building aid, ticket #310): seat 1 takes the first neighbour of seat 0's start
+    // state and raises an Army there, so the threat line on seat 0's card can be photographed.
+    if std::env::args().any(|a| a == "threat:1")
+        && let Some(g) = session.game.as_mut()
+        && let Some(sid) = g.directed_states(Seat(0)).first().copied()
+        && let Some(n) = g.tables.state(sid).neighbours.first().copied()
+    {
+        g.take_control(n, Seat(1));
+        g.raise_army(Place::State(n), false);
+    }
+    // `offline:1` (a building aid, ticket #307): the first Facility of seat 0's start state and the
+    // first Module beyond the Core on seat 0's first station over Earth are put offline as an
+    // Energy shortfall would put them, so the offline tile can be photographed. After `commit:1`,
+    // so a Module built by `morder:` is standing to be switched off.
+    if std::env::args().any(|a| a == "offline:1")
+        && let Some(g) = session.game.as_mut()
+    {
+        if let Some(sid) = g.directed_states(Seat(0)).first().copied()
+            && let Some(f) = g.state_mut(sid).facilities.first_mut()
+        {
+            f.online = false;
+        }
+        if let Some(c) = g.colonies.iter_mut().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0)))
+            && let Some(m) = c.modules.iter_mut().find(|m| m.kind != ModuleKind::Core)
+        {
+            m.online = false;
+        }
+    }
     session.earth_dirty = true;
 }
 

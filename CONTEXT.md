@@ -151,7 +151,7 @@ The three Techs the Research Lead chooses between, drawn when a Tech completes, 
 _Avoid_: options, candidates, draft, offer
 
 **Faction window**:
-The window, since version 0.08.1, that says everything about one Faction: opened by `Factions (F)` and picked from a dropdown in its own top right, defaulting to the player's own. It wears the Faction's symbol at its head and holds the live figures -- Victory progress, the income of its last turn, Blame, its **Relations** as two rows, and what it holds -- above a collapsing section carrying the Faction card itself, which the setup screen shows before a game and which had been unreachable once one began. A rival's income is shown as totals only; the building-by-building breakdown is the player's alone, and a spectator sees every seat in full.
+The window, since version 0.08.1, that says everything about one Faction: opened by `Factions (F)` and picked from a dropdown in its own top right, defaulting to the player's own. It wears the Faction's symbol at its head and holds the live figures -- the Victory history chart (the progress lines and bars above it were cut in version 0.08.7 as a copy of the Victory window's), the income of its last turn, Blame, its **Relations** as two rows, and what it holds -- above a collapsing section carrying the Faction card itself, which the setup screen shows before a game and which had been unreachable once one began. A rival's income is shown as totals only; the building-by-building breakdown is the player's alone, and a spectator sees every seat in full.
 _Avoid_: faction panel, player info, empire screen, diplomacy screen
 
 **Top bar**:
@@ -159,7 +159,7 @@ The strip across the head of the game screen: a row of the world's and the playe
 _Avoid_: HUD, header, status bar, ribbon
 
 **Command Cluster**:
-The strip along the foot of the side panel, since version 0.07.1, holding the controls a player reaches for every turn: the Influence still unspent, Spend on whatever place is selected, Max (Defence until version 0.07.3), and End Turn. It does not scroll: the card or the Roster scrolls above it. It is the only place End Turn stands. Since version 0.08.6 the spend is set on the same slider the Smear and the Greenwash use, Max moves that slider to the bound as well as placing the order, the whole strip is a tenth larger again, and End Turn is the sun at the right of its last row with Max and the every-turn tick on its left.
+The strip along the foot of the side panel, since version 0.07.1, holding the controls a player reaches for every turn: the Influence still unspent, Spend on whatever place is selected, Max (Defence until version 0.07.3), and End Turn. It does not scroll: the card or the Roster scrolls above it. It is the only place End Turn stands. Since version 0.08.6 the spend is set on the same slider the Smear and the Greenwash use, Max moves that slider to the bound as well as placing the order, the whole strip is a tenth larger again, and End Turn is the sun. Since version 0.08.7 the strip is two columns: the four rows (the Allotment, the slider, Spend, then Max and the every-turn tick) on the left, and the sun alone in its own column at the right, at the bottom, level with the Max row.
 _Avoid_: action bar, toolbar, HUD, control panel
 
 **Max**:
@@ -279,6 +279,7 @@ _Avoid_: capital ship, dreadnought, cruiser
 
 **Army**:
 A ground fighting unit, of one system since version 0.08.6. A Region's Armies belong to the state and are directed by the Faction that controls it, following the state if control changes -- its **Standing Army**, which stays at home, and the Armies **raised** there, which march. A raised Army's strength and hit points are its home's Industry Level plus one when it is raised, fixed for its life. A Colony's Army belongs to the Colony, exists only where it has a Barracks, only defends, and is worth the rounded average Industry Level of the Regions its raising Faction held, plus one, fixed at the raise. Any Army fights at its strength plus what it defends with: a Region's own Army its people (a working Constabulary, and calm), and any Army dug in two more. Since version 0.08.4 every Army has a name given as it is raised, from its home rather than from any Faction: an ordinal and the Region's demonym -- *the 1st Chinese Army*, *the 2nd* -- or for a Colony's, its Garrison -- *the Tycho Garrison*, *the 2nd Tycho Garrison*. The Standing Army is the first raised and so the 1st; a re-raised one takes the next number; the name survives every change of hands, since the Army is its Region's.
+Since version 0.08.7 an Army's orders -- the stance row, and under a raised Army's own row its march buttons and repairs -- are given in the Armies block of its place's card, a tenth larger than the card's other text, not in a block at the card's foot.
 _Avoid_: troops, soldiers, garrison, marines
 
 **Standing Army**:
@@ -367,6 +368,10 @@ _Avoid_: cooldown, lockout, occupation, tenure, grace period
 **Mothball**:
 The Orders-phase order that stands a Facility or a Module down. A mothballed building produces nothing, pays no Energy upkeep, emits nothing, is online for no rule, and keeps its slot. It is free, it takes effect at the Resolution, it raises the Unrest of a Region it happens in, and only a Restart brings the building back, for Materials and a turn.
 _Avoid_: pause, disable, switch off, idle, shut down (that is the Energy shortfall rule)
+
+**Offline**:
+A standing building that is not mothballed and is not running. Four things put one offline: the Energy shortfall rule at Income (buildings shut one at a time, dearest upkeep first, Module before Facility, the Core never, until the bill is met); an Event card (Wildfire, Labour Dispute, Launch Pad Fire, Reactor Leak) until the next Resolution; a grid failure, which shuts every Module in the Colony; and Occupation, which shuts the Colony's Archive whoever directs it. An offline building makes nothing, keeps its slot, and pays no upkeep. Two things look like it and are not: a blockaded station's Modules make nothing and still pay, and a Facility in a Region nobody directs is idle. Since version 0.08.7 an offline building's box is dimmed with the word *offline* in its corner, and its hover names the cause.
+_Avoid_: broken, damaged, disabled, unpowered, dark
 
 **Production Moved**:
 The Custodians' third signature rule, since version 0.06.0. While a Factory, Power Plant, Refinery or Research Lab of theirs on Earth is mothballed, one Mine, Generator, Refinery or Observatory of theirs off Earth makes double, one Facility for one Module, the most productive undoubled Module first, on its final figure. A Restart ends it; with no idle Facility of the pair there is no bonus.
@@ -488,6 +493,14 @@ _Avoid_: accumulation, influence points, loyalty
 The Standing a Faction must reach to take a place. A Region's is a base plus a figure for each step of the state's size; a Colony's is a figure for each of its Colonists, and a Space Station's has a base of its own besides. Green Consensus lowers every threshold by a quarter, and since version 0.05 each Faction reads its own, since its Blame raises it on every place it does not hold. A place already held wants the holder's Standing plus the challenge margin as well, so the threshold is the floor and never the whole price. Since version 0.08.2 that margin is a little dearer for a challenger the holder thinks badly of, so the same Region costs more to take from somebody you have crossed than from somebody you have not. Schooling does NOT move the threshold: Resistance taxes the spending instead. The word has a second, unrelated sense in the climate rules, where a Break or a Sea Level threshold is a Temperature; this entry is the Influence one.
 _Avoid_: cost, price, target (for the Influence sense); the climate sense, which is a Break or a Sea Level threshold
 
+**Challenger line**:
+The line in a held place's Standings block, since version 0.08.4, naming the rival nearest to taking it by Influence -- nearest its own price, not the highest Standing -- and how far off it stands: *The Prospectors stand at 47; they take this at 70.* Amber, with *Spend here to stay ahead.*, when they press within two steps; the arithmetic on its hover; *No rival has a Standing here.* when nobody does.
+_Avoid_: rival line, warning line, contest indicator
+
+**Threat line**:
+The challenger line's military counterpart on a held Region, since version 0.08.7: the rival raised Army standing in a neighbouring Region with the best first-exchange odds against the Region's defenders, named with its strength and the Region it stands in -- *The Prospectors' 2nd Russian Army, strength 3, stands next door in Russia.* -- and never with its stance, as a Region arms stance-blind. Amber, with *Dig In here to hold it.*, when their odds reach the bar the computer seats attack at, which is the computer's habit and not a rule; the arithmetic on its hover; no line at all when nobody stands next door. Regions only: a Colony has no neighbours.
+_Avoid_: danger line, enemy line, alert
+
 **Resistance**:
 How hard a place is to sway, from how well it is schooled, from version 0.08.0. The Influence an OUTSIDER spends there is divided by it before it becomes Standing, rounded down; the controller converts in full. A place at the neutral pivot has no effect; below it an outsider's spending goes further, above it less, to a band either side. It touches neither the threshold nor the challenge margin -- it taxes the spending, not the gate -- which is why a well-schooled Region is harder to buy without being harder to reach.
 _Avoid_: defence, loyalty, resilience, stubbornness
@@ -541,7 +554,7 @@ The phase in which a Faction commits everything it will do that turn: building, 
 _Avoid_: commands, moves, actions, player phase
 
 **End Turn**:
-The commitment. Pressing it closes the Orders phase, after which the Event card is drawn and nothing can be taken back. Since version 0.08.6 it is a **sun** at the right of the Command Cluster's last row -- a shaded disc with sunspots, the words beneath it, the Enter key on its hover -- that dims to embers while a Tech pick is owed.
+The commitment. Pressing it closes the Orders phase, after which the Event card is drawn and nothing can be taken back. Since version 0.08.6 it is a **sun** -- a shaded disc with sunspots, the words beneath it, the Enter key on its hover -- that dims to embers while a Tech pick is owed; since version 0.08.7 it stands alone in its own column at the right of the Command Cluster, at the bottom.
 _Avoid_: submit, confirm, next turn
 
 **Resolution**:
@@ -575,7 +588,7 @@ A melee at one Body, Region or Colony in which every Faction present is hostile 
 _Avoid_: fight, engagement, skirmish, encounter
 
 **Stance**:
-The one order a stack carries into end-of-turn processing: Attack, Hold, Intercept (Ships only, engaging arrivals before they unload), Blockade (Ships only, since version 0.08.5), Evade, or, for Armies since version 0.08.6, **Dig In**. A stance persists until it is changed; Hold does nothing of its own.
+The one order a stack carries into end-of-turn processing: Attack, Hold, Intercept (Ships only, engaging arrivals before they unload), Blockade (Ships only, since version 0.08.5), Evade, or, for Armies since version 0.08.6, **Dig In**. A stance persists until it is changed; Hold does nothing of its own. Since version 0.08.7 each stance has one sentence, kept in one place and read by the stance row's label hovers and the roster rows: Attack strikes at the place it is sent to, or fights where it stands; Hold stands and fights where it is; Evade avoids battle where it can, an even chance to slip away before the first exchange; Intercept fights what arrives this turn, before it can land; Blockade shuts the orbital slot to every other Faction; Dig In fights two stronger in defence and never disengages. A Ship's roster row carries its stance word as an Army's has.
 _Avoid_: order, mode, posture, aggression setting
 
 **Dig In**:
@@ -599,7 +612,7 @@ A damaged unit's attempt to leave a Battle, more likely the more damage it carri
 _Avoid_: retreat, rout, flee, break
 
 **Battle Report**:
-The account of every Battle from the last end-of-turn processing, read at the start of the next turn. Since version 0.08.5 every Battle is also a line of the Report at its place, ranked with a Ship destroyed when a unit died and unranked when nobody lost one, so a skirmish never reads over a Break; its parties name every unit and what it took, and an attacker's first-round odds as the button quoted them; and an Army destroyed is a line by name, as a Ship has been.
+The account of every Battle from the last end-of-turn processing, read at the start of the next turn. Since version 0.08.5 every Battle is also a line of the Report at its place, ranked with a Ship destroyed when a unit died and unranked when nobody lost one, so a skirmish never reads over a Break; its parties name every unit and what it took, and an attacker's first-round odds as the attack button's hover quoted them (on the button's face until version 0.08.7); and since version 0.08.7 the map draws it for the one turn the record lives: a ring in the aggressor's colour round the Region's or the Colony's label, the shields at the place outlined in that colour (every stack present fought), a red pip on any shield whose stack carries damage, and nothing for a Battle in orbit; and an Army destroyed is a line by name, as a Ship has been.
 _Avoid_: combat log, after-action report
 
 **Orbital Control**:
@@ -634,7 +647,7 @@ _Avoid_: extraction total, production score, output total, wealth
 
 **Venture Capital Fund**:
 The Prospectors' own pool beside the Stockpile, and their measure since version 0.05.5. **Since version 0.08.3 it holds Ducats, and since version 0.08.4 2500 of them is the first part of their Victory Condition** (2000 in 0.08.3); it held Materials before that, with a bar of 750 and then 1000.
-On any turn they set the share of their **Ducat income** that goes into it at Income, from nothing to four fifths in whole percents on a slider (since version 0.08.4; in tenths before), taken before they can spend a coin of it; Ducats got by selling are not income and never reach it. A **withdrawal** takes Ducats back out at a tenth's loss.
+On any turn they set the share of their **Ducat income** that goes into it at Income, from nothing to four fifths in whole percents on a slider (since version 0.08.4; in tenths before), taken before they can spend a coin of it; Ducats got by selling are not income and never reach it. A **withdrawal** takes Ducats back out at a tenth's loss. It is not on the top bar (a figure stood there beside Materials from version 0.05.5 to 0.08.6; version 0.08.7 cut it, since no other Faction's fund is on the bar): its figures are the Victory window's.
 The change is more than a change of units. A share of Materials output skimmed a resource they stockpile anyway, so the hoard cost them little; Ducats are what everybody spends on Influence, Relief, Resettle and repairs, so the Fund now competes with the Faction's whole economy and the share is a **decision taken every turn** — bank it or spend it — which is what a venture fund is. The bar of 2000 was set by measurement rather than by converting the old one at the market rate, leaving the median long game just across the line, exactly as 1000 Materials did; 2500 is a deliberate stretch past it, taken in version 0.08.4 with other changes expected to raise their income.
 _Avoid_: the pool, savings, treasury, war chest, bank
 
@@ -665,7 +678,7 @@ Since version 0.07.4, the record the engine keeps of every Climate phase -- the 
 _Avoid_: emissions total, emissions log, graph, chart (as names)
 
 **Victory history**:
-Since version 0.08.4, the record each Faction keeps of every Climate phase -- how far along its Victory Condition it stands, the lower of its two parts' fractions, and its share of the four Factions' Blame -- saved with the game, and the chart drawn from it on the Faction window under the Victory progress: the progress in the Faction's colour, the Blame share on a scale of its own with the fair quarter marked, the in-game date along the foot, and ticked there a Break in red, Antarctica's opening in blue, and in white the turn the Faction's gate Tech was done and, for the Archivists, the Archive completed. Every Faction's page carries its own, the player's included. The first history the game keeps per Faction rather than for the world.
+Since version 0.08.4, the record each Faction keeps of every Climate phase -- how far along its Victory Condition it stands, the lower of its two parts' fractions, and its share of the four Factions' Blame -- saved with the game, and the chart drawn from it at the head of the Faction window's page (under the Victory progress block until version 0.08.7 cut that block): the progress in the Faction's colour, the Blame share on a scale of its own with the fair quarter marked, the in-game date along the foot, and ticked there a Break in red, Antarctica's opening in blue, and in white the turn the Faction's gate Tech was done and, for the Archivists, the Archive completed. Every Faction's page carries its own, the player's included. The first history the game keeps per Faction rather than for the world.
 _Avoid_: progress graph, score chart, victory log
 
 **Natural Sink**:
