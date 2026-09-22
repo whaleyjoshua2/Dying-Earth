@@ -682,6 +682,28 @@ impl Stance {
             Stance::DigIn => "Dig In",
         }
     }
+
+    /// Ticket #313 (version 0.08.7): what the stance does, in one sentence, for the stance row's
+    /// label hovers and the roster rows, so the sentence lives once. `ships` picks the wording
+    /// where a Ship's and an Army's differ: Intercept and Blockade are Ships' stances, Dig In an
+    /// Army's, and an Army handed the other's says what it does instead. The designer's words for
+    /// Intercept: *"fights what arrives this turn, before it can land"*, the one nobody could find.
+    pub fn one_liner(self, ships: bool) -> &'static str {
+        match (self, ships) {
+            (Stance::Attack, _) => "Strikes at the place it is sent to, or fights where it stands.",
+            (Stance::Hold, _) => "Stands and fights where it is; does nothing of its own.",
+            (Stance::Evade, _) => "Avoids battle where it can: an even chance to slip away before the first exchange.",
+            (Stance::DigIn, false) => "Dug in, it fights two stronger in defence and never disengages, and it cannot march or board a Carrier until its stance is changed and the turn has passed.",
+            (Stance::DigIn, true) => "A Ship cannot dig in; it holds.",
+            (Stance::Intercept, true) => "Fights what arrives this turn, before it can land.",
+            (Stance::Intercept, false) => "An Army cannot intercept; it holds.",
+            (Stance::Blockade, true) => "Shuts this orbital slot to every other Faction: no landing, no refuel, no building in it.",
+            (Stance::Blockade, false) => "An Army cannot blockade; it holds.",
+        }
+    }
+
+    /// Ticket #313 (version 0.08.7): the rule every stance shares, the second line of every hover.
+    pub const PERSISTS: &'static str = "A stance persists until it is changed.";
 }
 
 impl fmt::Display for ShipId {

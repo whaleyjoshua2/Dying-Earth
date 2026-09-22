@@ -588,7 +588,7 @@ A melee at one Body, Region or Colony in which every Faction present is hostile 
 _Avoid_: fight, engagement, skirmish, encounter
 
 **Stance**:
-The one order a stack carries into end-of-turn processing: Attack, Hold, Intercept (Ships only, engaging arrivals before they unload), Blockade (Ships only, since version 0.08.5), Evade, or, for Armies since version 0.08.6, **Dig In**. A stance persists until it is changed; Hold does nothing of its own.
+The one order a stack carries into end-of-turn processing: Attack, Hold, Intercept (Ships only, engaging arrivals before they unload), Blockade (Ships only, since version 0.08.5), Evade, or, for Armies since version 0.08.6, **Dig In**. A stance persists until it is changed; Hold does nothing of its own. Since version 0.08.7 each stance has one sentence, kept in one place and read by the stance row's label hovers and the roster rows: Attack strikes at the place it is sent to, or fights where it stands; Hold stands and fights where it is; Evade avoids battle where it can, an even chance to slip away before the first exchange; Intercept fights what arrives this turn, before it can land; Blockade shuts the orbital slot to every other Faction; Dig In fights two stronger in defence and never disengages. A Ship's roster row carries its stance word as an Army's has.
 _Avoid_: order, mode, posture, aggression setting
 
 **Dig In**:

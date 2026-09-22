@@ -3442,6 +3442,10 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             }
             // Stranded is now per-SHIP rather than the old all-or-nothing warning on the stack,
             // which is strictly more accurate: one hull can be dry while another beside it is full.
+            // Ticket #313 (version 0.08.7): the stance word in brackets, as an Army's row has it,
+            // and the stance's sentence on the hover; a Ship on Intercept was the case nobody could
+            // read anywhere.
+            text.push_str(&format!("  ({})", s.stance.name()));
             if game.stranded(s.id) {
                 text.push_str(" - STRANDED: no leg affordable and no station of yours here");
             }
@@ -3449,8 +3453,12 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             // with no leg it can afford and no station of its own is the one piece in the game that can
             // become permanently useless, and the roster said so in four words and explained none of it.
             let tip = format!(
-                "Tank {} of {}. Fuel goes on transits, and a leg costs least at a launch window.\nRefuelling needs a station or Colony of yours where the Ship sits, so a Ship is STRANDED with no leg it can afford and nowhere to fill up.",
-                s.fuel, tank
+                "{}: {} {}\nTank {} of {}. Fuel goes on transits, and a leg costs least at a launch window.\nRefuelling needs a station or Colony of yours where the Ship sits, so a Ship is STRANDED with no leg it can afford and nowhere to fill up.",
+                s.stance.name(),
+                s.stance.one_liner(true),
+                Stance::PERSISTS,
+                s.fuel,
+                tank
             );
             ships_rows.push(RosterRow { kind: Kind::of_unit(s.kind), text, tip: Some(tip), mark: marks.then_some(!ordered), jump: Some((View::Solar, Selection::ShipStack(body, seat))) });
         }
@@ -3500,16 +3508,12 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
         if !matches!(a.at, ArmyAt::Aboard(_)) {
             text.push_str(&format!("  ({})", a.stance.name()));
         }
+        // Ticket #313 (version 0.08.7): the stance's sentence is the engine's, the same one the
+        // stance row's label shows, so it lives once.
         let tip = format!(
-            "An Army keeps the stance it was last given until it is moved or given another; it is never reset at a Resolution.\n{} A Standing Army replenishes where it stands, unless its state's Unrest has passed {:.0}.",
-            match a.stance {
-                Stance::Hold => "Holding, it stands and fights where it is.",
-                Stance::Attack => "On Attack, it strikes at the place it was sent to.",
-                Stance::Intercept => "On Intercept, it meets what arrives.",
-                Stance::Evade => "Evading, it avoids battle where it can.",
-                Stance::Blockade => "An Army cannot blockade; it holds.",
-                Stance::DigIn => "Dug in, it fights two stronger in defence and never disengages, and it cannot march or board a Carrier until its stance is changed and the turn has passed.",
-            },
+            "An Army keeps the stance it was last given until it is moved or given another; it is never reset at a Resolution.\n{}: {} A Standing Army replenishes where it stands, unless its state's Unrest has passed {:.0}.",
+            a.stance.name(),
+            a.stance.one_liner(false),
             game.tables.unrest.army_threshold
         );
         army_rows.push((where_, RosterRow { kind: Kind::Army, text, tip: Some(tip), mark: None, jump: target }));
@@ -4093,7 +4097,10 @@ fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make
                 _ => None,
             });
             let shown = pending_stance.unwrap_or(current);
-            if ui.selectable_label(shown == st, st.name()).clicked() && shown != st {
+            // Ticket #313 (version 0.08.7): each label says what it does on hover, in the one
+            // sentence the engine keeps for it, and the rule every stance shares; no marker (#233).
+            let resp = rule_tip(ui.selectable_label(shown == st, st.name()), format!("{}: {}\n{}", st.name(), st.one_liner(ships), Stance::PERSISTS));
+            if resp.clicked() && shown != st {
                 let order = make(st);
                 if game.check_order(Seat(0), pending, &order).is_ok() {
                     actions.push(Action::Place(order));
