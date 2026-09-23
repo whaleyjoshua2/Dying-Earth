@@ -631,6 +631,9 @@ enum Kind {
     Colony,
     Region,
     Army,
+    /// Ticket #317 (version 0.08.8): a Battle fought last turn, crossed blades; the mark on the
+    /// map and the glyph on the Battles list.
+    Battle,
 }
 
 /// The side of a kind glyph in a row of text at the panel's ordinary size.
@@ -646,6 +649,7 @@ impl Kind {
             Kind::Colony => Some("colony"),
             Kind::Region => Some("region"),
             Kind::Army => None,
+            Kind::Battle => Some("battle"),
         }
     }
 
@@ -765,11 +769,11 @@ fn shield_glyph(painter: &egui::Painter, rect: egui::Rect) {
 }
 
 /// A shield with a number on it: the Army icon of the Earth Map.
-/// Ticket #311 (version 0.08.7): `outline` is the aggressor's colour when a Battle was fought here
-/// last turn (every stack present fought, a Battle being a melee of every party), black otherwise;
-/// `hurt` puts a red pip at the shield's top-right corner when the stack carries damage. Both at
-/// the designer's word: *"damage pip and outline for fought"*.
-fn shield(painter: &egui::Painter, centre: Pos2, fill: Color32, text: &str, outline: Option<Color32>, hurt: bool) {
+/// Ticket #311 (version 0.08.7): `hurt` puts a red pip at the shield's top-right corner when the
+/// stack carries damage, at the designer's word. The outline in the aggressor's colour that came
+/// with it was dropped by ticket #317 (version 0.08.8), at the designer's word; the Battle mark
+/// beside the label says a Battle was fought here.
+fn shield(painter: &egui::Painter, centre: Pos2, fill: Color32, text: &str, hurt: bool) {
     let (w, h) = (20.0, 24.0);
     let pts = vec![
         centre + egui::vec2(-w / 2.0, -h / 2.0),
@@ -778,11 +782,7 @@ fn shield(painter: &egui::Painter, centre: Pos2, fill: Color32, text: &str, outl
         centre + egui::vec2(0.0, h / 2.0),
         centre + egui::vec2(-w / 2.0, 0.0),
     ];
-    let stroke = match outline {
-        Some(c) => egui::Stroke::new(2.5, c),
-        None => egui::Stroke::new(1.5, Color32::BLACK),
-    };
-    painter.add(egui::Shape::convex_polygon(pts, fill, stroke));
+    painter.add(egui::Shape::convex_polygon(pts, fill, egui::Stroke::new(1.5, Color32::BLACK)));
     painter.text(centre + egui::vec2(0.0, -2.0), egui::Align2::CENTER_CENTER, text, FontId::proportional(12.0), Color32::BLACK);
     if hurt {
         let pip = centre + egui::vec2(w / 2.0 - 1.0, -h / 2.0 + 1.0);
@@ -854,6 +854,26 @@ fn glyph_at(painter: &egui::Painter, kind: Kind, centre: Pos2, size: f32, tint: 
         let rect = egui::Rect::from_center_size(centre, egui::vec2(size, size));
         painter.image(texture, rect, egui::Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), tint);
     }
+}
+
+/// Ticket #317 (version 0.08.8): **the Battle mark**, at the designer's word: the crossed-blades
+/// glyph, off-white as every kind glyph is, on a disc in the aggressor's colour (grey when the
+/// record names none), beside the label of the place where a Battle was fought last turn -- a
+/// Region, a Colony, or a Body in orbit -- for the one Orders phase the record lives. It replaces
+/// 0.08.7's ring, which marked nothing in orbit, where most Battles are. The caller pushes its
+/// hotspot: the hover reads the record, the click opens the Report.
+fn battle_mark(painter: &egui::Painter, centre: Pos2, colour: Color32) {
+    let size = 18.0;
+    painter.circle(centre, size * 0.78, colour, egui::Stroke::new(1.0, Color32::BLACK));
+    if let Some(texture) = Kind::Battle.icon().and_then(|name| Icons::texture_from_ctx(painter.ctx(), name)) {
+        let rect = egui::Rect::from_center_size(centre, egui::vec2(size, size));
+        painter.image(texture, rect, egui::Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), crate::icons::kind_fill());
+    }
+}
+
+/// The colour a Battle's mark wears: its aggressor's, or nobody's grey.
+fn battle_colour(session: &Session, game: &Game, i: usize) -> Color32 {
+    game.report.battles.get(i).and_then(|b| b.aggressor()).map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150))
 }
 
 /// The warship sitting in an Orbital Slot, if one is: a Frigate or Battleship at the Body that chose
@@ -2393,6 +2413,16 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         }
                     }
                     hotspots.push(Hotspot { pos: p, radius: 40.0, hit: Hit::Enter(body) });
+                    // Ticket #317 (version 0.08.8): a Battle in orbit last turn, marked beside the
+                    // Body's label, to its left, at the label's own height: below the disc the
+                    // moons' labels hang, and above it the Orbital Control and stack labels stack.
+                    if let Some(i) = game.battle_last_turn_at(ReportPlace::Body(body)) {
+                        let label_centre = p - egui::vec2(0.0, side * (22.0 + 7.5 * lines as f32));
+                        let width = painter.layout_no_wrap(text.clone(), FontId::proportional(13.0), Color32::WHITE).size().x;
+                        let at = label_centre - egui::vec2(width / 2.0 + 18.0, 0.0);
+                        battle_mark(painter, at, battle_colour(session, game, i));
+                        hotspots.push(Hotspot { pos: at, radius: 12.0, hit: Hit::Battle(i) });
+                    }
                     // Ticket #57: hovering a Body across the gulf says when its launch window is and
                     // what the flight costs now against what it costs then. TO BE REVISITED: these
                     // are transits FROM EARTH. Once a Faction can launch from the Moon, or home from
@@ -2481,16 +2511,16 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             label_at(painter, p - egui::vec2(0.0, 38.0), &format!("Unrest {}", game.unrest_text(sid)), tint, 13.0);
                         }
                         hotspots.push(Hotspot { pos: p, radius: 30.0, hit: Hit::Select(Selection::State(sid)) });
-                        // Ticket #311 (version 0.08.7): last turn's Battle here as a ring round the
-                        // label in the aggressor's colour, for the one Orders phase the Report
-                        // lives; its hover reads the record and a click on the ring's crown opens
-                        // the Report. The crown, not the ring's centre, so the label's own click
-                        // still selects the Region.
-                        let fought = game.battle_last_turn_at(ReportPlace::State(sid));
-                        let fought_colour = fought.and_then(|i| game.report.battles[i].aggressor()).map(|s| seat_colour(session, s)).or(fought.map(|_| Color32::from_gray(150)));
-                        if let (Some(i), Some(colour)) = (fought, fought_colour) {
-                            painter.circle_stroke(p, 26.0, egui::Stroke::new(2.0, colour));
-                            hotspots.push(Hotspot { pos: p - egui::vec2(0.0, 26.0), radius: 10.0, hit: Hit::Battle(i) });
+                        // Ticket #311 (version 0.08.7): last turn's Battle here, for the one Orders
+                        // phase the Report lives; its hover reads the record and a click opens the
+                        // Report. Ticket #317 (version 0.08.8): the ring became the Battle mark,
+                        // above the label in the Unrest label's row, and a row higher when that
+                        // label is showing.
+                        if let Some(i) = game.battle_last_turn_at(ReportPlace::State(sid)) {
+                            let lift = if st.unrest >= game.tables.unrest.army_threshold { 56.0 } else { 38.0 };
+                            let at = p - egui::vec2(0.0, lift);
+                            battle_mark(painter, at, battle_colour(session, game, i));
+                            hotspots.push(Hotspot { pos: at, radius: 12.0, hit: Hit::Battle(i) });
                         }
                         // Army shields (ticket #31): one per Faction present, grey for a neutral Standing Army.
                         // Ticket #297 (version 0.08.6): a shield whose Army is dug in carries a
@@ -2513,7 +2543,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         for (i, (seat, strength, dug, hurt)) in shields.iter().enumerate() {
                             let centre = p + egui::vec2(-38.0 + 26.0 * i as f32, 36.0);
                             let fill = seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
-                            shield(painter, centre, fill, &strength.to_string(), fought_colour, *hurt);
+                            shield(painter, centre, fill, &strength.to_string(), *hurt);
                             if *dug {
                                 painter.line_segment([centre + egui::vec2(-10.0, 15.0), centre + egui::vec2(10.0, 15.0)], egui::Stroke::new(3.0, fill));
                             }
@@ -2547,12 +2577,23 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         Some(s) => (format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s), None, None),
                         None => ("Orbital Control: nobody".to_string(), Color32::LIGHT_GRAY, None, None),
                     });
+                    // Ticket #317 (version 0.08.8): a Battle in orbit last turn is a row of the
+                    // band, with the Battle mark's glyph, in the aggressor's colour; its hotspot
+                    // reads the record and opens the Report as the mark's does.
+                    let fought = game.battle_last_turn_at(ReportPlace::Body(body));
+                    if let Some(i) = fought {
+                        let who = game.report.battles[i].aggressor().map(|s| format!("the {} attacked", game.seat_name(s))).unwrap_or_else(|| "nobody attacked".to_string());
+                        band.push((format!("A Battle here last turn: {who}"), battle_colour(session, game, i), Some(Kind::Battle), None));
+                    }
                     let rect = painter.clip_rect();
                     let x = rect.center().x - 120.0;
                     label_at(painter, Pos2::new(x, rect.min.y + 50.0), &format!("In orbit around {}", game.tables.body(body).name), Color32::WHITE, 13.0);
                     for (i, (text, colour, kind, seat)) in band.iter().enumerate() {
                         let at = Pos2::new(x, rect.min.y + 70.0 + 18.0 * i as f32);
                         label_kind_at(painter, at, *kind, text, *colour, 12.0);
+                        if *kind == Some(Kind::Battle) && let Some(b) = fought {
+                            hotspots.push(Hotspot { pos: at, radius: 14.0, hit: Hit::Battle(b) });
+                        }
                         // Ticket #216: a Faction's line gets a hit target, so hovering it can name
                         // that Faction's hulls. The Solar System Map's block already had one for the
                         // click; this block had none at all, being painted at fixed positions.
@@ -2674,14 +2715,14 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                     None => (format!("{name}: empty"), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot)), None),
                 };
                 label_kind_at(painter, p + egui::vec2(0.0, 24.0), kind, &text, colour, 12.0);
-                // Ticket #311 (version 0.08.7): last turn's Battle at this Colony as a ring round
-                // its label, in the aggressor's colour, the hover on its crown; as a Region's.
+                // Ticket #311 (version 0.08.7): last turn's Battle at this Colony, as a Region's.
+                // Ticket #317 (version 0.08.8): the Battle mark above the slot's point.
                 if let Some(c) = game.colony_at(body, slot)
                     && let Some(i) = game.battle_last_turn_at(ReportPlace::Colony(c.id))
                 {
-                    let ring = game.report.battles[i].aggressor().map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
-                    painter.circle_stroke(p + egui::vec2(0.0, 24.0), 26.0, egui::Stroke::new(2.0, ring));
-                    hotspots.push(Hotspot { pos: p + egui::vec2(0.0, -2.0), radius: 10.0, hit: Hit::Battle(i) });
+                    let at = p - egui::vec2(0.0, 18.0);
+                    battle_mark(painter, at, battle_colour(session, game, i));
+                    hotspots.push(Hotspot { pos: at, radius: 12.0, hit: Hit::Battle(i) });
                 }
                 // Ticket #57: every slot carries its own four yields under its name, filled or free;
                 // a free slot's figures are what a Colony founded there would get. TO BE REVISITED
@@ -3257,6 +3298,34 @@ fn selection_card(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             // Colonies stand here: Antarctica's shut sites are the ice's business.
             if let View::Surface(b) = view.view {
                 colonies_block(ui, game, view, b);
+            }
+            // Ticket #317 (version 0.08.8): last turn's Battles, listed on the Solar System Map's
+            // page, one row per Battle in the aggressor's colour, each a way there; the Report is
+            // reachable by no button once it has closed, and this is where a player who missed a
+            // mark finds the fight.
+            if view.view == View::Solar && !game.report.battles.is_empty() {
+                ui.label(RichText::new("Battles last turn").strong());
+                for (i, b) in game.report.battles.iter().enumerate() {
+                    let who = b.aggressor().map(|s| format!("the {} attacked", game.seat_name(s))).unwrap_or_else(|| "nobody attacked".to_string());
+                    let text = format!("{}: {who}; {}", b.place, b.result);
+                    let colour = battle_colour(session, game, i);
+                    let button = match Kind::Battle.image(ui.ctx(), 14.0) {
+                        Some(image) => egui::Button::image_and_text(image, RichText::new(&text).color(colour)),
+                        None => egui::Button::new(RichText::new(&text).color(colour)),
+                    };
+                    let resp = ui.add(button.frame(false));
+                    match b.at {
+                        Some(place) => {
+                            if resp.on_hover_text("Go there").clicked() {
+                                actions.push(Action::GoTo(place));
+                            }
+                        }
+                        None => {
+                            resp.on_hover_text("An older record with no place to go to.");
+                        }
+                    }
+                }
+                ui.separator();
             }
             stations_panel(ui, session, game, view, actions);
             ui.separator();
