@@ -25,6 +25,12 @@ moved as the map expected it to, and by a great deal: Battles opened 62 to **225
 held Region 5 to **347**, places taken by force 2 to **169**, Standing Armies lost 2 to **161**.
 See *What the closing sweep says* at the foot, which says which ticket did it.
 
+The designer, shown the column, the military block and the pictures: **ship**, and the version
+ships as the **Windows kit alone**, built on this machine (`dist/dying-earth-0.08.8-windows.zip`);
+the designer's word on the closing ticket was *"q1 ship q2 carry q3 windows only"*. What the sweep
+exposed, a computer that never lands an Army from a Carrier and never strikes Passage, is carried
+to the balance version, since both wait on the fog the map already names. No Linux kit was built.
+
 ---
 
 ## 1. A new way to signify Battles on the map, orbit included
