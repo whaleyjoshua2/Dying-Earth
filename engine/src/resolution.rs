@@ -494,7 +494,9 @@ impl Game {
         let s = self.ship(id).unwrap();
         let card = self.tables.unit(s.kind);
         // Ticket #281 (version 0.08.5): by name, as every other surface has it since 0.08.1.
-        Combatant::new(UnitRef::Ship(id), self.ship_name(s), self.ship_strength(s), card.hit_points, s.damage, card.pursuit, s.stance == Stance::Evade)
+        // Ticket #326 (version 0.08.8): a Colony Ship or a Carrier is unarmed, and its escorts take
+        // the fire while any stands engaged.
+        Combatant::new(UnitRef::Ship(id), self.ship_name(s), self.ship_strength(s), card.hit_points, s.damage, card.pursuit, s.stance == Stance::Evade).armed(s.kind.is_warship())
     }
 
     /// `defending`: the Army is not on the aggressor's side of this melee. Ticket #302 (version

@@ -51,11 +51,16 @@ pub struct Combatant {
     /// Ticket #297 (version 0.08.6): dug in, it never rolls to disengage. Its defence bonus is
     /// already in `strength`; the caller adds it.
     pub dug_in: bool,
+    /// Ticket #326 (version 0.08.8): a warship, a Battery or an Army; a Colony Ship and a Carrier
+    /// are not. While a party has an engaged armed unit, hits on the party land on its armed units
+    /// and its unarmed ones are neither struck nor pursued: the escort takes the fire. Set by the
+    /// caller from the hull, since the melee does not know kinds; true unless it says otherwise.
+    pub armed: bool,
 }
 
 impl Combatant {
     pub fn new(unit: UnitRef, name: impl Into<String>, strength: i64, hit_points: u32, damage: u32, pursuit: u32, evade: bool) -> Combatant {
-        Combatant { unit, name: name.into(), strength, hit_points, damage, pursuit, evade, engaged: true, escaped: false, pursued: false, dug_in: false }
+        Combatant { unit, name: name.into(), strength, hit_points, damage, pursuit, evade, engaged: true, escaped: false, pursued: false, dug_in: false, armed: true }
     }
 
     /// Ticket #297: the same unit, dug in.
@@ -63,6 +68,18 @@ impl Combatant {
         self.dug_in = dug_in;
         self
     }
+
+    /// Ticket #326: the same unit, armed or not.
+    pub fn armed(mut self, armed: bool) -> Combatant {
+        self.armed = armed;
+        self
+    }
+}
+
+/// Ticket #326: whether the party still has an armed unit engaged, which is what covers its
+/// unarmed ones.
+fn escorted(side: &[Combatant]) -> bool {
+    side.iter().any(|c| c.engaged && !c.destroyed() && c.armed)
 }
 
 impl Combatant {
@@ -105,8 +122,11 @@ fn any_engaged(side: &[Combatant]) -> bool {
     side.iter().any(|c| c.engaged && !c.destroyed())
 }
 
+/// Ticket #326 (version 0.08.8): drawn uniformly among the party's engaged ARMED units while it
+/// has any; its unarmed hulls are struck only when no armed unit of its remains engaged.
 fn random_engaged(side: &[Combatant], dice: &mut dyn Dice) -> Option<usize> {
-    let idx: Vec<usize> = side.iter().enumerate().filter(|(_, c)| c.engaged && !c.destroyed()).map(|(i, _)| i).collect();
+    let covered = escorted(side);
+    let idx: Vec<usize> = side.iter().enumerate().filter(|(_, c)| c.engaged && !c.destroyed() && (c.armed || !covered)).map(|(i, _)| i).collect();
     if idx.is_empty() {
         None
     } else {
@@ -277,6 +297,12 @@ fn pursue(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, stats: &mut Bat
             .map(|(j, _)| j)
             .collect();
         for li in leaver_idx {
+            // Ticket #326 (version 0.08.8): an unarmed hull that runs while an armed unit of its
+            // party still stands engaged is covered, and not pursued.
+            if !parties[i][li].armed && escorted(parties[i]) {
+                parties[i][li].pursued = true;
+                continue;
+            }
             let leaver_strength = parties[i][li].strength;
             // The best pursuer among every other party's engaged units.
             let mut best: Option<(u32, i64, usize)> = None;

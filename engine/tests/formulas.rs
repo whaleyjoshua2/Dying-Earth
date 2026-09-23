@@ -229,7 +229,8 @@ fn frigate(id: u32) -> Combatant {
     Combatant::new(UnitRef::Ship(ShipId(id)), format!("Frigate {id}"), 3, 4, 0, 4, false)
 }
 fn colony_ship(id: u32) -> Combatant {
-    Combatant::new(UnitRef::Ship(ShipId(id)), format!("Colony Ship {id}"), 0, 3, 0, 0, false)
+    // Ticket #326 (version 0.08.8): unarmed, as the resolution builds it.
+    Combatant::new(UnitRef::Ship(ShipId(id)), format!("Colony Ship {id}"), 0, 3, 0, 0, false).armed(false)
 }
 
 #[test]
@@ -11087,4 +11088,36 @@ fn a_refuel_accord_opens_a_partners_station() {
     let name = g.next_ship_name(UnitKind::Frigate);
     g.ships.push(Ship { id: blockader, name, kind: UnitKind::Frigate, seat: Seat(2), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(0) });
     assert!(g.check_order(Seat(0), &[], &refuel).is_err(), "blockaded against its holder, it fuels nobody");
+}
+
+// -------------------------------------------- 0.08.8 ticket #326: escorts take the fire
+
+/// Ticket #326 (version 0.08.8): while a party has a warship engaged, hits on the party land on
+/// its warships; the unarmed hull is struck only once the last warship is down. And the retreat
+/// is covered: an unarmed hull that runs while its escort stands is not pursued.
+#[test]
+fn escorts_take_the_fire_and_cover_the_retreat() {
+    // A Frigate attacks a Colony Ship escorted by a Frigate; the Colony Ship stands FIRST in its
+    // party, so a uniform draw with the scripted pick of 0 would strike it first. Every hitter
+    // roll goes to the attacker; the escort never disengages. Round 1: three hits on the escort.
+    // Round 2: the fourth destroys it, the next two land on the Colony Ship. Round 3: the third
+    // hit destroys the Colony Ship.
+    let mut a = vec![frigate(1)];
+    let mut d = vec![colony_ship(3), frigate(2)];
+    let chances = vec![true, true, true, false, true, true, true, false, true, true, true];
+    let mut dice = Script { chances: VecDeque::from(chances), d6s: VecDeque::new(), picks: VecDeque::new() };
+    let stats = combat::fight(&mut a, &mut d, &mut dice, 2.0);
+    assert!(d[1].destroyed(), "the escort fell first, at {} hits", d[1].damage);
+    assert_eq!(d[1].damage, 4, "every hit while it stood landed on it");
+    assert_eq!(d[0].damage, 3, "the Colony Ship was struck only after, and died: {stats:?}");
+    assert_eq!(stats.hits[0], 7);
+    // The retreat: the Colony Ship on Evade escapes at the start; its escort stands engaged, so no
+    // pursuit is rolled for it (an empty d6 script would panic if one were), and it takes no hit.
+    let mut a = vec![frigate(1)];
+    let mut d = vec![Combatant::new(UnitRef::Ship(ShipId(3)), "Colony Ship 3", 0, 3, 0, 0, true).armed(false), frigate(2)];
+    let chances = vec![true, true, true, true, false, true, true, true];
+    let mut dice = Script { chances: VecDeque::from(chances), d6s: VecDeque::new(), picks: VecDeque::new() };
+    combat::fight(&mut a, &mut d, &mut dice, 2.0);
+    assert!(d[0].escaped && d[0].damage == 0, "the Colony Ship ran under cover and was not caught");
+    assert!(d[1].destroyed(), "its escort took the fight");
 }

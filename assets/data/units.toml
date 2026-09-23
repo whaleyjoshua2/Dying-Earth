@@ -44,7 +44,9 @@ carries_army = false
 tank = 30
 
 # Version 0.04 (ticket #43): the transport for one Army and nothing else. Unarmed, so it needs an
-# escort, and a target for Intercept like a Colony Ship.
+# escort, and a target for Intercept like a Colony Ship. Ticket #326 (version 0.08.8): the escort
+# is real now -- while a warship of its party stands engaged, hits land on the warships and an
+# unarmed hull is neither struck nor pursued.
 [[unit]]
 id = "carrier"
 name = "Carrier"
