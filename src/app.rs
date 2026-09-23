@@ -357,6 +357,11 @@ pub struct ViewState {
     pub credits_amount: i64,
     pub credits_offer: i64,
     pub attack_preview: bool,
+    /// Ticket #323 (version 0.08.8): the Region whose stack of the player's Armies is ARMED for a
+    /// right-click march, set by a click on its shield; cleared by any other click, Escape, End
+    /// Turn or a change of view. `armed_scroll` asks the card to scroll to its Armies block once.
+    pub armed_stack: Option<StateId>,
+    pub armed_scroll: bool,
     /// Ticket #58: which Moment kinds are switched on, remembered for the session. `None` until the
     /// player touches a checkbox, when it is filled from the defaults in `report.toml`.
     pub moments_on: Option<[bool; dying_earth_engine::MomentKind::ALL.len()]>,
@@ -413,7 +418,7 @@ impl Default for ViewState {
             greenwash_amount: 5,
             credits_amount: 10,
             credits_offer: 0,
-            attack_preview: false,
+            attack_preview: false, armed_stack: None, armed_scroll: false,
             moments_on: None,
             force_hover: None,
             max_placed: None,
@@ -456,6 +461,7 @@ impl ViewState {
         self.view = View::Surface(body);
         self.last_surface = body;
         self.selection = Selection::None;
+        self.armed_stack = None;
         self.yaw = crate::geo::yaw_facing(0.0, 0.0);
         self.pitch = 0.0;
         self.zoom = 1.0;
@@ -466,6 +472,7 @@ impl ViewState {
             View::Surface(_) => View::Solar,
         };
         self.selection = Selection::None;
+        self.armed_stack = None;
     }
 }
 

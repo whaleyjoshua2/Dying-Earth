@@ -392,6 +392,8 @@ fn temperature_bar(ui: &mut Ui, game: &Game) {
 enum Action {
     Place(Order),
     Cancel(usize),
+    /// Ticket #323 (version 0.08.8): a sentence for the panel's notice line, where a refusal shows.
+    Notice(String),
     EndTurn,
     PickTech(TechId),
     /// Ticket #58: a Report line was clicked; go where it points.
@@ -433,6 +435,9 @@ enum Hit {
     /// Ticket #311 (version 0.08.7): the ring that marks last turn's Battle, by its index in the
     /// Report; a hover reads the record and a click opens the Report.
     Battle(usize),
+    /// Ticket #323 (version 0.08.8): the player's own shield at a Region: a click selects the
+    /// Region AND arms its stack for a right-click march.
+    Shield(StateId),
 }
 
 pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mut session: ResMut<Session>, contexts: Option<Res<bevy_egui::input::EguiWantsInput>>) {
@@ -504,6 +509,9 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mu
             // Event, since it never carried the flag the note's own button checked for.
             let has_event = session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some();
             advance_popup(&mut view, moments, has_event);
+        } else if view.armed_stack.is_some() {
+            // Ticket #323 (version 0.08.8): Esc disarms the stack before anything else.
+            view.armed_stack = None;
         } else if view.hab_tile.is_some() {
             // Ticket #162 (version 0.07.5): Esc clears a clicked Module tile before it leaves a
             // Surface Map, as it closed the Hab View before the window retired.
@@ -1063,6 +1071,7 @@ pub fn draw(
             Action::Place(o) => {
                 session.place(o);
             }
+            Action::Notice(text) => session.last_error = Some(text),
             Action::Cancel(i) => {
                 if i < session.pending.len() {
                     // Ticket #134 (version 0.07.3): cancelling the Influence order the standing Max
@@ -1968,6 +1977,12 @@ fn game_screen(
             if let (Some(pos), Some((camera, cam_gt))) = (click, cam) {
                 pick(pos, session, game, view, camera, cam_gt, globes, textures, &hotspots);
             }
+            // Ticket #323 (version 0.08.8): a right-click moves the armed stack, or the selected
+            // Ship stack; it never selects.
+            let right = if resp.secondary_clicked() { resp.interact_pointer_pos().filter(|p| rect.contains(*p)) } else { None };
+            if let (Some(pos), Some((camera, cam_gt))) = (right, cam) {
+                right_click(pos, session, game, view, camera, cam_gt, globes, textures, actions);
+            }
         }
     });
     popups(ctx, session, game, view, actions);
@@ -2511,6 +2526,13 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             label_at(painter, p - egui::vec2(0.0, 38.0), &format!("Unrest {}", game.unrest_text(sid)), tint, 13.0);
                         }
                         hotspots.push(Hotspot { pos: p, radius: 30.0, hit: Hit::Select(Selection::State(sid)) });
+                        // Ticket #323 (version 0.08.8): the Regions an armed stack may reach are
+                        // outlined, in the roster's ring colour, so a right-click knows its targets.
+                        if let Some(from) = view.armed_stack
+                            && game.tables.state(from).neighbours.contains(&sid)
+                        {
+                            painter.circle_stroke(p, 30.0, egui::Stroke::new(2.0, RING_WANTS));
+                        }
                         // Ticket #311 (version 0.08.7): last turn's Battle here, for the one Orders
                         // phase the Report lives; its hover reads the record and a click opens the
                         // Report. Ticket #317 (version 0.08.8): the ring became the Battle mark,
@@ -2547,7 +2569,13 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             if *dug {
                                 painter.line_segment([centre + egui::vec2(-10.0, 15.0), centre + egui::vec2(10.0, 15.0)], egui::Stroke::new(3.0, fill));
                             }
-                            hotspots.push(Hotspot { pos: centre, radius: 12.0, hit: Hit::Select(Selection::State(sid)) });
+                            // Ticket #323 (version 0.08.8): the player's own shield arms its stack
+                            // on a click and wears a ring while it is armed.
+                            let own = *seat == Some(Seat(0));
+                            if own && view.armed_stack == Some(sid) {
+                                painter.circle_stroke(centre, 16.0, egui::Stroke::new(2.0, RING_WANTS));
+                            }
+                            hotspots.push(Hotspot { pos: centre, radius: 12.0, hit: if own { Hit::Shield(sid) } else { Hit::Select(Selection::State(sid)) } });
                         }
                     }
                     // Ticket #44: Antarctica's Colony Slots.
@@ -2840,6 +2868,8 @@ fn nearest_slot(game: &Game, body: BodyId, lon: f32, lat: f32) -> Option<u32> {
 #[allow(clippy::too_many_arguments)]
 fn pick(pos: Pos2, session: &Session, game: &Game, view: &mut ViewState, camera: &Camera, cam_gt: &GlobalTransform, globes: &Query<(&Globe, &GlobalTransform)>, textures: &Textures, hotspots: &[Hotspot]) {
     let _ = session;
+    // Ticket #323 (version 0.08.8): any left-click disarms the stack; a shield's click re-arms it.
+    view.armed_stack = None;
     // Labels and markers first.
     let mut best: Option<(f32, Hit)> = None;
     for h in hotspots {
@@ -2913,6 +2943,92 @@ fn apply_hit(hit: Hit, view: &mut ViewState) {
         }
         Hit::Enter(b) => view.enter_surface(b),
         Hit::Battle(_) => view.popup = Popup::Report,
+        Hit::Shield(sid) => {
+            view.selection = Selection::State(sid);
+            view.attack_preview = false;
+            view.armed_stack = Some(sid);
+            view.armed_scroll = true;
+        }
+    }
+}
+
+/// Ticket #323 (version 0.08.8): **a right-click on the map moves the armed stack.** On Earth, with
+/// a Region's stack armed by a click on its shield, a right-click on a neighbouring Region places
+/// the stack's march there, the same orders the card's *attack X* button places; a second
+/// right-click on the same Region takes them back. On the Solar System Map, with the player's Ship
+/// stack selected, a right-click on another Body sends every Ship of it that can pay the leg, as
+/// the card's *All that can* does, and a second right-click takes that back. A right-click never
+/// selects; on anything else it does nothing, and a Region out of reach says so in a notice.
+#[allow(clippy::too_many_arguments)]
+fn right_click(pos: Pos2, session: &Session, game: &Game, view: &ViewState, camera: &Camera, cam_gt: &GlobalTransform, globes: &Query<(&Globe, &GlobalTransform)>, textures: &Textures, actions: &mut Vec<Action>) {
+    let Ok(ray) = camera.viewport_to_world(cam_gt, Vec2::new(pos.x, pos.y)) else { return };
+    let (origin, dir) = (ray.origin, Vec3::from(ray.direction));
+    // The orders the target would take, and whether every one of them is already pending.
+    let place_or_cancel = |orders: Vec<Order>, actions: &mut Vec<Action>| {
+        if orders.is_empty() {
+            return;
+        }
+        let pending: Vec<usize> = orders.iter().filter_map(|o| session.pending.iter().position(|p| p == o)).collect();
+        if pending.len() == orders.len() {
+            let mut idx = pending;
+            idx.sort_unstable_by(|a, b| b.cmp(a));
+            for i in idx {
+                actions.push(Action::Cancel(i));
+            }
+        } else {
+            for o in orders {
+                if game.check_order(Seat(0), &session.pending, &o).is_ok() {
+                    actions.push(Action::Place(o));
+                }
+            }
+        }
+    };
+    match view.view {
+        View::Solar => {
+            let Selection::ShipStack(from, Seat(0)) = view.selection else { return };
+            let mut nearest: Option<(f32, BodyId)> = None;
+            for body in BodyId::ALL {
+                let hit = geo::ray_sphere(origin, dir, geo::solar_place(game, body), geo::solar_radius(body) * 1.5);
+                if let Some(t) = hit.filter(|t| nearest.map(|(n, _)| *t < n).unwrap_or(true)) {
+                    nearest = Some((t, body));
+                }
+            }
+            let Some((_, to)) = nearest else { return };
+            if to == from {
+                return;
+            }
+            let orders: Vec<Order> = game.ships_at(Seat(0), from).into_iter().map(|id| Order::Transit { ship: id, to, slot: None }).filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok() || session.pending.contains(o)).collect();
+            if orders.is_empty() {
+                actions.push(Action::Notice(format!("No Ship of the stack can pay the leg to {}.", game.tables.body(to).name)));
+            }
+            place_or_cancel(orders, actions);
+        }
+        View::Surface(BodyId::Earth) => {
+            let Some(from) = view.armed_stack else { return };
+            let Some((_, globe_gt)) = globes.iter().find(|(g, _)| g.0 == BodyId::Earth) else { return };
+            let center = globe_gt.translation();
+            let Some(t) = geo::ray_sphere(origin, dir, center, GLOBE_RADIUS) else { return };
+            let world = origin + dir * t;
+            let local = globe_gt.affine().inverse().transform_point3(world);
+            let (lon, lat) = geo::lonlat_from_local(local);
+            let (x, y) = geo::pixel_for(lon, lat, textures.earth.w, textures.earth.h);
+            let Some(to) = textures.state_at(x, y) else { return };
+            if !game.tables.state(from).neighbours.contains(&to) {
+                actions.push(Action::Notice(format!("{} is not next to {}: the stack can reach only the outlined Regions.", game.tables.state(to).name, game.tables.state(from).name)));
+                return;
+            }
+            let orders: Vec<Order> = game
+                .armies_of_seat_at(Seat(0), Place::State(from))
+                .into_iter()
+                .map(|id| Order::MoveArmy { army: id, to })
+                .filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok() || session.pending.contains(o))
+                .collect();
+            if orders.is_empty() {
+                actions.push(Action::Notice("No Army of the stack may march this turn.".to_string()));
+            }
+            place_or_cancel(orders, actions);
+        }
+        View::Surface(_) => {}
     }
 }
 
@@ -3190,6 +3306,8 @@ fn can_end_turn(game: &Game, view: &ViewState) -> bool {
 /// than ending the turn; on that confirmation, pressing again confirms. A spectator has no
 /// Influence to lose and no confirmation.
 fn press_end_turn(session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    // Ticket #323 (version 0.08.8): End Turn disarms the stack.
+    view.armed_stack = None;
     if view.popup == Popup::ConfirmEndTurn {
         view.popup = Popup::None;
         actions.push(Action::EndTurn);
@@ -5091,7 +5209,12 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         for font in ui.style_mut().text_styles.values_mut() {
             font.size *= ARMY_LIST_SCALE;
         }
-        ui.label(RichText::new("Armies").strong());
+        let heading = ui.label(RichText::new("Armies").strong());
+        // Ticket #323 (version 0.08.8): a click on the shield brings the card to its Armies block.
+        if view.armed_stack == Some(sid) && view.armed_scroll {
+            heading.scroll_to_me(Some(egui::Align::Min));
+            view.armed_scroll = false;
+        }
         let my_armies: Vec<&Army> = armies.iter().copied().filter(|a| mine && game.army_seat(a) == Some(Seat(0)) && !game.army_stands_down(a)).collect();
         if !my_armies.is_empty() {
             stance_row(ui, game, &session.pending, my_armies[0].stance, |s| Order::ArmyStance { place: Place::State(sid), stance: s }, false, actions);

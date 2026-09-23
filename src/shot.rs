@@ -21,6 +21,8 @@ pub struct ShotPlan {
     pub menus: bool,
     pub menu_step: usize,
     pub select: Option<String>,
+    /// Ticket #323 (version 0.08.8): `arm:1`, the Region whose stack is armed for the picture.
+    pub arm: Option<StateId>,
     /// `hab:1` (a building aid, ticket #145; ticket #162 in version 0.07.5): seat 0's first station
     /// or Colony is SELECTED, so its card -- which carries the Module tiles since the Hab View
     /// window retired -- is in every picture.
@@ -117,6 +119,13 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     // own now, as `slotbox:` does on a selected Region.
     if let Some(v) = std::env::args().find_map(|a| a.strip_prefix("habtile:").map(str::to_owned)) {
         view.hab_tile = if v == "free" { Some(HabTile::Free) } else { v.parse::<usize>().ok().map(HabTile::Module) };
+    }
+    // `arm:1` (a building aid, ticket #323): seat 0's start state has its stack armed, as a click on
+    // its shield would, so the shield's ring and the outlined neighbours can be photographed; the
+    // right-click itself cannot be, headless.
+    if let Some(sid) = plan.arm {
+        view.armed_stack = Some(sid);
+        view.armed_scroll = true;
     }
     // `slotbox:<n>` or `slotbox:free` (a building aid, ticket #146): that slot box on the selected
     // Region's card is clicked, so the strip beneath the boxes can be photographed.
@@ -1170,6 +1179,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         show_view(&mut view, VIEWS[0].1);
         // `select:<state id>` (a building aid) opens that Region's card in the Earth picture.
         plan.select = std::env::args().find_map(|a| a.strip_prefix("select:").map(str::to_owned));
+        plan.arm = std::env::args().any(|a| a == "arm:1").then(|| session.game.as_ref().and_then(|g| g.directed_states(Seat(0)).first().copied())).flatten();
         plan.tech = std::env::args().any(|a| a == "tech:1");
         plan.hab = std::env::args().any(|a| a == "hab:1");
         // Ticket #204 (version 0.08.1): `hab:ground` picks seat 0's first Colony ON a surface
