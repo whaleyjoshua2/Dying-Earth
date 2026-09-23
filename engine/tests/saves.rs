@@ -117,7 +117,7 @@ fn a_save_from_another_version_and_a_damaged_file_are_both_refused_with_a_messag
 
     // The same save, stamped by the version before this one (ticket #68: read from the constant, so
     // the test follows the stamp when a version bumps it).
-    let older = text.replacen("save_version:1", "save_version:0", 1).replacen(&format!("game_version:\"{}\"", save::GAME_VERSION), "game_version:\"0.05\"", 1);
+    let older = text.replacen(&format!("save_version:{}", save::SAVE_VERSION), "save_version:0", 1).replacen(&format!("game_version:\"{}\"", save::GAME_VERSION), "game_version:\"0.05\"", 1);
     assert_ne!(older, text, "the stamp was actually changed");
     let stamped = dir.path().join("save-5-turn-4-from-0.05.ron");
     std::fs::write(&stamped, &older).unwrap();
