@@ -50,8 +50,18 @@ the non-aggression offer when the pair is Friendly and adjacent: **`passage 0` a
 lines and the column unchanged (5/13/0/0, 6/14/0/0, 2/5/1/0, 0/20/0/0). A seed simulated headlessly
 says why: **no pair of computer seats is Friendly at any point in thirty-six turns** (median
 Relations over the batch are -3 to -7), so the offer's bar, which the designer set at Friendly, is
-never reached. The rule reaches the computer seats; today's table is too cold for them to use it.
-Lowering the bar to Cordial is a one-word change and a designer's call, not made here.
+never reached. Shown this, the designer: *"make it based on the level below friendly"*. **The
+third batch**, at **Cordial** or better (`batch-after.txt` now): **`passage 0` a third time**, the
+column and the war lines unchanged. A probe printed from the offer predicate itself over one
+simulated seed says exactly why: offers are weighed on turn one, when every pair is Neutral at a
+score of 0, and again only after an Accord breaks, from turn twenty on, when the pairs are Wary,
+Cold or Hostile; **the highest score any pair had at any of the 140 moments an offer was weighed
+was 1**, two short of Cordial. Relations recover to Neutral and never past it on their own; only a
+kept Accord or the Research Directive's reward lifts a pair above it, and neither had by the time
+an offer came round. The rule reaches the computer seats at the bar the designer set; the table
+gives them no Cordial neighbour to offer it to. What would: offering Passage at Neutral (every
+non-aggression offer to an adjacent seat would carry it), or an offer made mid-Accord rather than
+only where none stands. Both are the designer's, not made here.
 
 ## Settled by the builder, to be corrected if wrong
 

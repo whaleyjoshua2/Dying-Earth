@@ -283,10 +283,12 @@ impl Game {
     }
 
     /// Ticket #320 (version 0.08.8): whether Passage with `other` is worth this seat's offering:
-    /// it is Friendly toward them and holds a Region next door to one they hold, so an Army of
-    /// either could use it. Accepted at Neutral or better, as non-aggression is.
+    /// it is Cordial or better toward them (a score of 3 or more; Friendly at first, and no pair
+    /// of computer seats was ever Friendly in eighty games, so the designer set the band below)
+    /// and holds a Region next door to one they hold, so an Army of either could use it.
+    /// Accepted at Neutral or better, as non-aggression is.
     pub fn passage_worth_offering(&self, seat: Seat, other: Seat) -> bool {
-        self.relations_level(seat, other) == "Friendly"
+        matches!(self.relations_level(seat, other), "Cordial" | "Friendly")
             && StateId::ALL.into_iter().any(|s| {
                 self.state(s).control == Control::Controlled(seat) && self.tables.state(s).neighbours.iter().any(|n| self.state(*n).control == Control::Controlled(other))
             })
@@ -1476,7 +1478,7 @@ impl Game {
             }
             let mut terms = vec![Term::NonAggression];
             // Ticket #320 (version 0.08.8): and Passage in the same offer, to a Faction this seat
-            // is Friendly with when it holds a Region next door to one that Faction holds, so the
+            // is Cordial or better with when it holds a Region next door to one that Faction holds, so the
             // term has somewhere to matter. In the same offer, because one Accord stands per pair
             // and a non-aggression Accord struck first would shut Passage out for good: offered on
             // its own it was struck in no seating of eighty games.
