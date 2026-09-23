@@ -392,6 +392,8 @@ fn temperature_bar(ui: &mut Ui, game: &Game) {
 enum Action {
     Place(Order),
     Cancel(usize),
+    /// Ticket #323 (version 0.08.8): a sentence for the panel's notice line, where a refusal shows.
+    Notice(String),
     EndTurn,
     PickTech(TechId),
     /// Ticket #58: a Report line was clicked; go where it points.
@@ -433,6 +435,9 @@ enum Hit {
     /// Ticket #311 (version 0.08.7): the ring that marks last turn's Battle, by its index in the
     /// Report; a hover reads the record and a click opens the Report.
     Battle(usize),
+    /// Ticket #323 (version 0.08.8): the player's own shield at a Region: a click selects the
+    /// Region AND arms its stack for a right-click march.
+    Shield(StateId),
 }
 
 pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mut session: ResMut<Session>, contexts: Option<Res<bevy_egui::input::EguiWantsInput>>) {
@@ -504,6 +509,9 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mu
             // Event, since it never carried the flag the note's own button checked for.
             let has_event = session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some();
             advance_popup(&mut view, moments, has_event);
+        } else if view.armed_stack.is_some() {
+            // Ticket #323 (version 0.08.8): Esc disarms the stack before anything else.
+            view.armed_stack = None;
         } else if view.hab_tile.is_some() {
             // Ticket #162 (version 0.07.5): Esc clears a clicked Module tile before it leaves a
             // Surface Map, as it closed the Hab View before the window retired.
@@ -631,6 +639,9 @@ enum Kind {
     Colony,
     Region,
     Army,
+    /// Ticket #317 (version 0.08.8): a Battle fought last turn, crossed blades; the mark on the
+    /// map and the glyph on the Battles list.
+    Battle,
 }
 
 /// The side of a kind glyph in a row of text at the panel's ordinary size.
@@ -646,6 +657,7 @@ impl Kind {
             Kind::Colony => Some("colony"),
             Kind::Region => Some("region"),
             Kind::Army => None,
+            Kind::Battle => Some("battle"),
         }
     }
 
@@ -765,11 +777,11 @@ fn shield_glyph(painter: &egui::Painter, rect: egui::Rect) {
 }
 
 /// A shield with a number on it: the Army icon of the Earth Map.
-/// Ticket #311 (version 0.08.7): `outline` is the aggressor's colour when a Battle was fought here
-/// last turn (every stack present fought, a Battle being a melee of every party), black otherwise;
-/// `hurt` puts a red pip at the shield's top-right corner when the stack carries damage. Both at
-/// the designer's word: *"damage pip and outline for fought"*.
-fn shield(painter: &egui::Painter, centre: Pos2, fill: Color32, text: &str, outline: Option<Color32>, hurt: bool) {
+/// Ticket #311 (version 0.08.7): `hurt` puts a red pip at the shield's top-right corner when the
+/// stack carries damage, at the designer's word. The outline in the aggressor's colour that came
+/// with it was dropped by ticket #317 (version 0.08.8), at the designer's word; the Battle mark
+/// beside the label says a Battle was fought here.
+fn shield(painter: &egui::Painter, centre: Pos2, fill: Color32, text: &str, hurt: bool) {
     let (w, h) = (20.0, 24.0);
     let pts = vec![
         centre + egui::vec2(-w / 2.0, -h / 2.0),
@@ -778,11 +790,7 @@ fn shield(painter: &egui::Painter, centre: Pos2, fill: Color32, text: &str, outl
         centre + egui::vec2(0.0, h / 2.0),
         centre + egui::vec2(-w / 2.0, 0.0),
     ];
-    let stroke = match outline {
-        Some(c) => egui::Stroke::new(2.5, c),
-        None => egui::Stroke::new(1.5, Color32::BLACK),
-    };
-    painter.add(egui::Shape::convex_polygon(pts, fill, stroke));
+    painter.add(egui::Shape::convex_polygon(pts, fill, egui::Stroke::new(1.5, Color32::BLACK)));
     painter.text(centre + egui::vec2(0.0, -2.0), egui::Align2::CENTER_CENTER, text, FontId::proportional(12.0), Color32::BLACK);
     if hurt {
         let pip = centre + egui::vec2(w / 2.0 - 1.0, -h / 2.0 + 1.0);
@@ -854,6 +862,26 @@ fn glyph_at(painter: &egui::Painter, kind: Kind, centre: Pos2, size: f32, tint: 
         let rect = egui::Rect::from_center_size(centre, egui::vec2(size, size));
         painter.image(texture, rect, egui::Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), tint);
     }
+}
+
+/// Ticket #317 (version 0.08.8): **the Battle mark**, at the designer's word: the crossed-blades
+/// glyph, off-white as every kind glyph is, on a disc in the aggressor's colour (grey when the
+/// record names none), beside the label of the place where a Battle was fought last turn -- a
+/// Region, a Colony, or a Body in orbit -- for the one Orders phase the record lives. It replaces
+/// 0.08.7's ring, which marked nothing in orbit, where most Battles are. The caller pushes its
+/// hotspot: the hover reads the record, the click opens the Report.
+fn battle_mark(painter: &egui::Painter, centre: Pos2, colour: Color32) {
+    let size = 18.0;
+    painter.circle(centre, size * 0.78, colour, egui::Stroke::new(1.0, Color32::BLACK));
+    if let Some(texture) = Kind::Battle.icon().and_then(|name| Icons::texture_from_ctx(painter.ctx(), name)) {
+        let rect = egui::Rect::from_center_size(centre, egui::vec2(size, size));
+        painter.image(texture, rect, egui::Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), crate::icons::kind_fill());
+    }
+}
+
+/// The colour a Battle's mark wears: its aggressor's, or nobody's grey.
+fn battle_colour(session: &Session, game: &Game, i: usize) -> Color32 {
+    game.report.battles.get(i).and_then(|b| b.aggressor()).map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150))
 }
 
 /// The warship sitting in an Orbital Slot, if one is: a Frigate or Battleship at the Body that chose
@@ -1043,6 +1071,7 @@ pub fn draw(
             Action::Place(o) => {
                 session.place(o);
             }
+            Action::Notice(text) => session.last_error = Some(text),
             Action::Cancel(i) => {
                 if i < session.pending.len() {
                     // Ticket #134 (version 0.07.3): cancelling the Influence order the standing Max
@@ -1948,6 +1977,12 @@ fn game_screen(
             if let (Some(pos), Some((camera, cam_gt))) = (click, cam) {
                 pick(pos, session, game, view, camera, cam_gt, globes, textures, &hotspots);
             }
+            // Ticket #323 (version 0.08.8): a right-click moves the armed stack, or the selected
+            // Ship stack; it never selects.
+            let right = if resp.secondary_clicked() { resp.interact_pointer_pos().filter(|p| rect.contains(*p)) } else { None };
+            if let (Some(pos), Some((camera, cam_gt))) = (right, cam) {
+                right_click(pos, session, game, view, camera, cam_gt, globes, textures, actions);
+            }
         }
     });
     popups(ctx, session, game, view, actions);
@@ -2393,6 +2428,16 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         }
                     }
                     hotspots.push(Hotspot { pos: p, radius: 40.0, hit: Hit::Enter(body) });
+                    // Ticket #317 (version 0.08.8): a Battle in orbit last turn, marked beside the
+                    // Body's label, to its left, at the label's own height: below the disc the
+                    // moons' labels hang, and above it the Orbital Control and stack labels stack.
+                    if let Some(i) = game.battle_last_turn_at(ReportPlace::Body(body)) {
+                        let label_centre = p - egui::vec2(0.0, side * (22.0 + 7.5 * lines as f32));
+                        let width = painter.layout_no_wrap(text.clone(), FontId::proportional(13.0), Color32::WHITE).size().x;
+                        let at = label_centre - egui::vec2(width / 2.0 + 18.0, 0.0);
+                        battle_mark(painter, at, battle_colour(session, game, i));
+                        hotspots.push(Hotspot { pos: at, radius: 12.0, hit: Hit::Battle(i) });
+                    }
                     // Ticket #57: hovering a Body across the gulf says when its launch window is and
                     // what the flight costs now against what it costs then. TO BE REVISITED: these
                     // are transits FROM EARTH. Once a Faction can launch from the Moon, or home from
@@ -2481,16 +2526,23 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             label_at(painter, p - egui::vec2(0.0, 38.0), &format!("Unrest {}", game.unrest_text(sid)), tint, 13.0);
                         }
                         hotspots.push(Hotspot { pos: p, radius: 30.0, hit: Hit::Select(Selection::State(sid)) });
-                        // Ticket #311 (version 0.08.7): last turn's Battle here as a ring round the
-                        // label in the aggressor's colour, for the one Orders phase the Report
-                        // lives; its hover reads the record and a click on the ring's crown opens
-                        // the Report. The crown, not the ring's centre, so the label's own click
-                        // still selects the Region.
-                        let fought = game.battle_last_turn_at(ReportPlace::State(sid));
-                        let fought_colour = fought.and_then(|i| game.report.battles[i].aggressor()).map(|s| seat_colour(session, s)).or(fought.map(|_| Color32::from_gray(150)));
-                        if let (Some(i), Some(colour)) = (fought, fought_colour) {
-                            painter.circle_stroke(p, 26.0, egui::Stroke::new(2.0, colour));
-                            hotspots.push(Hotspot { pos: p - egui::vec2(0.0, 26.0), radius: 10.0, hit: Hit::Battle(i) });
+                        // Ticket #323 (version 0.08.8): the Regions an armed stack may reach are
+                        // outlined, in the roster's ring colour, so a right-click knows its targets.
+                        if let Some(from) = view.armed_stack
+                            && game.tables.state(from).neighbours.contains(&sid)
+                        {
+                            painter.circle_stroke(p, 30.0, egui::Stroke::new(2.0, RING_WANTS));
+                        }
+                        // Ticket #311 (version 0.08.7): last turn's Battle here, for the one Orders
+                        // phase the Report lives; its hover reads the record and a click opens the
+                        // Report. Ticket #317 (version 0.08.8): the ring became the Battle mark,
+                        // above the label in the Unrest label's row, and a row higher when that
+                        // label is showing.
+                        if let Some(i) = game.battle_last_turn_at(ReportPlace::State(sid)) {
+                            let lift = if st.unrest >= game.tables.unrest.army_threshold { 56.0 } else { 38.0 };
+                            let at = p - egui::vec2(0.0, lift);
+                            battle_mark(painter, at, battle_colour(session, game, i));
+                            hotspots.push(Hotspot { pos: at, radius: 12.0, hit: Hit::Battle(i) });
                         }
                         // Army shields (ticket #31): one per Faction present, grey for a neutral Standing Army.
                         // Ticket #297 (version 0.08.6): a shield whose Army is dug in carries a
@@ -2513,11 +2565,17 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         for (i, (seat, strength, dug, hurt)) in shields.iter().enumerate() {
                             let centre = p + egui::vec2(-38.0 + 26.0 * i as f32, 36.0);
                             let fill = seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
-                            shield(painter, centre, fill, &strength.to_string(), fought_colour, *hurt);
+                            shield(painter, centre, fill, &strength.to_string(), *hurt);
                             if *dug {
                                 painter.line_segment([centre + egui::vec2(-10.0, 15.0), centre + egui::vec2(10.0, 15.0)], egui::Stroke::new(3.0, fill));
                             }
-                            hotspots.push(Hotspot { pos: centre, radius: 12.0, hit: Hit::Select(Selection::State(sid)) });
+                            // Ticket #323 (version 0.08.8): the player's own shield arms its stack
+                            // on a click and wears a ring while it is armed.
+                            let own = *seat == Some(Seat(0));
+                            if own && view.armed_stack == Some(sid) {
+                                painter.circle_stroke(centre, 16.0, egui::Stroke::new(2.0, RING_WANTS));
+                            }
+                            hotspots.push(Hotspot { pos: centre, radius: 12.0, hit: if own { Hit::Shield(sid) } else { Hit::Select(Selection::State(sid)) } });
                         }
                     }
                     // Ticket #44: Antarctica's Colony Slots.
@@ -2543,16 +2601,37 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         let name = who.map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".into());
                         band.push((format!("{} ({})", game.station_name(body, c.slot), name), who.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY), Some(Kind::Station), None));
                     }
+                    // Ticket #324 (version 0.08.8): a seat's working Batteries at the Body are a row
+                    // of the band, and the Control line says when they are why nobody holds it.
+                    for seat in Seat::ALL {
+                        let n = game.batteries_at(seat, body).len();
+                        if n > 0 {
+                            band.push((format!("{}: {} Batter{}, strength {}", game.seat_name(seat), n, if n == 1 { "y" } else { "ies" }, game.battery_strength(seat, body)), seat_colour(session, seat), None, None));
+                        }
+                    }
+                    let any_battery = Seat::ALL.iter().any(|s| !game.batteries_at(*s, body).is_empty());
                     band.push(match game.orbital_control(body) {
                         Some(s) => (format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s), None, None),
+                        None if any_battery => ("Orbital Control: nobody, a Battery stands".to_string(), Color32::LIGHT_GRAY, None, None),
                         None => ("Orbital Control: nobody".to_string(), Color32::LIGHT_GRAY, None, None),
                     });
+                    // Ticket #317 (version 0.08.8): a Battle in orbit last turn is a row of the
+                    // band, with the Battle mark's glyph, in the aggressor's colour; its hotspot
+                    // reads the record and opens the Report as the mark's does.
+                    let fought = game.battle_last_turn_at(ReportPlace::Body(body));
+                    if let Some(i) = fought {
+                        let who = game.report.battles[i].aggressor().map(|s| format!("the {} attacked", game.seat_name(s))).unwrap_or_else(|| "nobody attacked".to_string());
+                        band.push((format!("A Battle here last turn: {who}"), battle_colour(session, game, i), Some(Kind::Battle), None));
+                    }
                     let rect = painter.clip_rect();
                     let x = rect.center().x - 120.0;
                     label_at(painter, Pos2::new(x, rect.min.y + 50.0), &format!("In orbit around {}", game.tables.body(body).name), Color32::WHITE, 13.0);
                     for (i, (text, colour, kind, seat)) in band.iter().enumerate() {
                         let at = Pos2::new(x, rect.min.y + 70.0 + 18.0 * i as f32);
                         label_kind_at(painter, at, *kind, text, *colour, 12.0);
+                        if *kind == Some(Kind::Battle) && let Some(b) = fought {
+                            hotspots.push(Hotspot { pos: at, radius: 14.0, hit: Hit::Battle(b) });
+                        }
                         // Ticket #216: a Faction's line gets a hit target, so hovering it can name
                         // that Faction's hulls. The Solar System Map's block already had one for the
                         // click; this block had none at all, being painted at fixed positions.
@@ -2674,14 +2753,14 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                     None => (format!("{name}: empty"), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot)), None),
                 };
                 label_kind_at(painter, p + egui::vec2(0.0, 24.0), kind, &text, colour, 12.0);
-                // Ticket #311 (version 0.08.7): last turn's Battle at this Colony as a ring round
-                // its label, in the aggressor's colour, the hover on its crown; as a Region's.
+                // Ticket #311 (version 0.08.7): last turn's Battle at this Colony, as a Region's.
+                // Ticket #317 (version 0.08.8): the Battle mark above the slot's point.
                 if let Some(c) = game.colony_at(body, slot)
                     && let Some(i) = game.battle_last_turn_at(ReportPlace::Colony(c.id))
                 {
-                    let ring = game.report.battles[i].aggressor().map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
-                    painter.circle_stroke(p + egui::vec2(0.0, 24.0), 26.0, egui::Stroke::new(2.0, ring));
-                    hotspots.push(Hotspot { pos: p + egui::vec2(0.0, -2.0), radius: 10.0, hit: Hit::Battle(i) });
+                    let at = p - egui::vec2(0.0, 18.0);
+                    battle_mark(painter, at, battle_colour(session, game, i));
+                    hotspots.push(Hotspot { pos: at, radius: 12.0, hit: Hit::Battle(i) });
                 }
                 // Ticket #57: every slot carries its own four yields under its name, filled or free;
                 // a free slot's figures are what a Colony founded there would get. TO BE REVISITED
@@ -2799,6 +2878,8 @@ fn nearest_slot(game: &Game, body: BodyId, lon: f32, lat: f32) -> Option<u32> {
 #[allow(clippy::too_many_arguments)]
 fn pick(pos: Pos2, session: &Session, game: &Game, view: &mut ViewState, camera: &Camera, cam_gt: &GlobalTransform, globes: &Query<(&Globe, &GlobalTransform)>, textures: &Textures, hotspots: &[Hotspot]) {
     let _ = session;
+    // Ticket #323 (version 0.08.8): any left-click disarms the stack; a shield's click re-arms it.
+    view.armed_stack = None;
     // Labels and markers first.
     let mut best: Option<(f32, Hit)> = None;
     for h in hotspots {
@@ -2872,6 +2953,92 @@ fn apply_hit(hit: Hit, view: &mut ViewState) {
         }
         Hit::Enter(b) => view.enter_surface(b),
         Hit::Battle(_) => view.popup = Popup::Report,
+        Hit::Shield(sid) => {
+            view.selection = Selection::State(sid);
+            view.attack_preview = false;
+            view.armed_stack = Some(sid);
+            view.armed_scroll = true;
+        }
+    }
+}
+
+/// Ticket #323 (version 0.08.8): **a right-click on the map moves the armed stack.** On Earth, with
+/// a Region's stack armed by a click on its shield, a right-click on a neighbouring Region places
+/// the stack's march there, the same orders the card's *attack X* button places; a second
+/// right-click on the same Region takes them back. On the Solar System Map, with the player's Ship
+/// stack selected, a right-click on another Body sends every Ship of it that can pay the leg, as
+/// the card's *All that can* does, and a second right-click takes that back. A right-click never
+/// selects; on anything else it does nothing, and a Region out of reach says so in a notice.
+#[allow(clippy::too_many_arguments)]
+fn right_click(pos: Pos2, session: &Session, game: &Game, view: &ViewState, camera: &Camera, cam_gt: &GlobalTransform, globes: &Query<(&Globe, &GlobalTransform)>, textures: &Textures, actions: &mut Vec<Action>) {
+    let Ok(ray) = camera.viewport_to_world(cam_gt, Vec2::new(pos.x, pos.y)) else { return };
+    let (origin, dir) = (ray.origin, Vec3::from(ray.direction));
+    // The orders the target would take, and whether every one of them is already pending.
+    let place_or_cancel = |orders: Vec<Order>, actions: &mut Vec<Action>| {
+        if orders.is_empty() {
+            return;
+        }
+        let pending: Vec<usize> = orders.iter().filter_map(|o| session.pending.iter().position(|p| p == o)).collect();
+        if pending.len() == orders.len() {
+            let mut idx = pending;
+            idx.sort_unstable_by(|a, b| b.cmp(a));
+            for i in idx {
+                actions.push(Action::Cancel(i));
+            }
+        } else {
+            for o in orders {
+                if game.check_order(Seat(0), &session.pending, &o).is_ok() {
+                    actions.push(Action::Place(o));
+                }
+            }
+        }
+    };
+    match view.view {
+        View::Solar => {
+            let Selection::ShipStack(from, Seat(0)) = view.selection else { return };
+            let mut nearest: Option<(f32, BodyId)> = None;
+            for body in BodyId::ALL {
+                let hit = geo::ray_sphere(origin, dir, geo::solar_place(game, body), geo::solar_radius(body) * 1.5);
+                if let Some(t) = hit.filter(|t| nearest.map(|(n, _)| *t < n).unwrap_or(true)) {
+                    nearest = Some((t, body));
+                }
+            }
+            let Some((_, to)) = nearest else { return };
+            if to == from {
+                return;
+            }
+            let orders: Vec<Order> = game.ships_at(Seat(0), from).into_iter().map(|id| Order::Transit { ship: id, to, slot: None }).filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok() || session.pending.contains(o)).collect();
+            if orders.is_empty() {
+                actions.push(Action::Notice(format!("No Ship of the stack can pay the leg to {}.", game.tables.body(to).name)));
+            }
+            place_or_cancel(orders, actions);
+        }
+        View::Surface(BodyId::Earth) => {
+            let Some(from) = view.armed_stack else { return };
+            let Some((_, globe_gt)) = globes.iter().find(|(g, _)| g.0 == BodyId::Earth) else { return };
+            let center = globe_gt.translation();
+            let Some(t) = geo::ray_sphere(origin, dir, center, GLOBE_RADIUS) else { return };
+            let world = origin + dir * t;
+            let local = globe_gt.affine().inverse().transform_point3(world);
+            let (lon, lat) = geo::lonlat_from_local(local);
+            let (x, y) = geo::pixel_for(lon, lat, textures.earth.w, textures.earth.h);
+            let Some(to) = textures.state_at(x, y) else { return };
+            if !game.tables.state(from).neighbours.contains(&to) {
+                actions.push(Action::Notice(format!("{} is not next to {}: the stack can reach only the outlined Regions.", game.tables.state(to).name, game.tables.state(from).name)));
+                return;
+            }
+            let orders: Vec<Order> = game
+                .armies_of_seat_at(Seat(0), Place::State(from))
+                .into_iter()
+                .map(|id| Order::MoveArmy { army: id, to })
+                .filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok() || session.pending.contains(o))
+                .collect();
+            if orders.is_empty() {
+                actions.push(Action::Notice("No Army of the stack may march this turn.".to_string()));
+            }
+            place_or_cancel(orders, actions);
+        }
+        View::Surface(_) => {}
     }
 }
 
@@ -3149,6 +3316,8 @@ fn can_end_turn(game: &Game, view: &ViewState) -> bool {
 /// than ending the turn; on that confirmation, pressing again confirms. A spectator has no
 /// Influence to lose and no confirmation.
 fn press_end_turn(session: &Session, game: &Game, view: &mut ViewState, actions: &mut Vec<Action>) {
+    // Ticket #323 (version 0.08.8): End Turn disarms the stack.
+    view.armed_stack = None;
     if view.popup == Popup::ConfirmEndTurn {
         view.popup = Popup::None;
         actions.push(Action::EndTurn);
@@ -3257,6 +3426,34 @@ fn selection_card(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             // Colonies stand here: Antarctica's shut sites are the ice's business.
             if let View::Surface(b) = view.view {
                 colonies_block(ui, game, view, b);
+            }
+            // Ticket #317 (version 0.08.8): last turn's Battles, listed on the Solar System Map's
+            // page, one row per Battle in the aggressor's colour, each a way there; the Report is
+            // reachable by no button once it has closed, and this is where a player who missed a
+            // mark finds the fight.
+            if view.view == View::Solar && !game.report.battles.is_empty() {
+                ui.label(RichText::new("Battles last turn").strong());
+                for (i, b) in game.report.battles.iter().enumerate() {
+                    let who = b.aggressor().map(|s| format!("the {} attacked", game.seat_name(s))).unwrap_or_else(|| "nobody attacked".to_string());
+                    let text = format!("{}: {who}; {}", b.place, b.result);
+                    let colour = battle_colour(session, game, i);
+                    let button = match Kind::Battle.image(ui.ctx(), 14.0) {
+                        Some(image) => egui::Button::image_and_text(image, RichText::new(&text).color(colour)),
+                        None => egui::Button::new(RichText::new(&text).color(colour)),
+                    };
+                    let resp = ui.add(button.frame(false));
+                    match b.at {
+                        Some(place) => {
+                            if resp.on_hover_text("Go there").clicked() {
+                                actions.push(Action::GoTo(place));
+                            }
+                        }
+                        None => {
+                            resp.on_hover_text("An older record with no place to go to.");
+                        }
+                    }
+                }
+                ui.separator();
             }
             stations_panel(ui, session, game, view, actions);
             ui.separator();
@@ -3606,13 +3803,14 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildModule { colony, kind } => format!("Build {} at {}", kind.name(), game.place_name(Place::Colony(*colony))),
         Order::BuildShip { site, kind } => format!("Build {} at {}", kind.name(), game.place_name(*site)),
         Order::BuildArmy { place } => format!("Build Army at {}", game.place_name(*place)),
-        Order::Repair { unit, points } => format!("Repair {} point(s) on {}", points, match unit { UnitRef::Ship(s) => s.to_string(), UnitRef::Army(a) => a.to_string() }),
+        Order::Repair { unit, points } => format!("Repair {} point(s) on {}", points, unit_name(game, unit)),
         Order::Transit { ship, to, slot } => match slot {
             Some(n) => format!("Send {} to {}, into Orbital Slot {}", ship, game.tables.body(*to).name, n),
             None => format!("Send {} to {}", ship, game.tables.body(*to).name),
         },
         Order::Refuel { ship } => format!("Refuel {} ({} Fuel from the Stockpile)", ship, game.refuel_amount(Seat(0), *ship)),
         Order::ShipStance { body, stance } => format!("Ships at {}: {}", game.tables.body(*body).name, stance.name()),
+        Order::Bombard { ship, colony } => format!("Bombard {} from {}", game.place_name(Place::Colony(*colony)), ship),
         Order::ArmyStance { place, stance } => format!("Armies at {}: {}", game.place_name(*place), stance.name()),
         Order::MoveArmy { army, to } => format!("{} to {}", army, game.tables.state(*to).name),
         Order::Load { ship, colonists, army, .. } => format!("Load {} onto {}", if *colonists > 0 { format!("{colonists} Colonists") } else { format!("{}", army.unwrap_or(ArmyId(0))) }, ship),
@@ -3622,7 +3820,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         },
         Order::Influence { target, amount } => format!("{} Influence on {}", amount, game.place_name(*target)),
         Order::BuyInfluence { amount } => format!("Buy {} Influence with Ducats", amount),
-        Order::RepairWithDucats { unit, points } => format!("Repair {} point(s) on {} with Ducats", points, match unit { UnitRef::Ship(s) => s.to_string(), UnitRef::Army(a) => a.to_string() }),
+        Order::RepairWithDucats { unit, points } => format!("Repair {} point(s) on {} with Ducats", points, unit_name(game, unit)),
         Order::Buy { resource, amount } => format!("Buy {} {} for {} Ducats", amount, resource.name(), game.order_cost(Seat(0), o).ducats),
         Order::Sell { resource, amount } => format!("Sell {} {} for {} Ducats", amount, resource.name(), -game.order_cost(Seat(0), o).ducats),
         Order::BuildFacilityWithDucats { state, kind } => format!("Build {} in {} for Ducats", kind.name(), game.tables.state(*state).name),
@@ -4051,6 +4249,39 @@ fn build_turns_for(game: &Game, order: &Order) -> Option<u32> {
 /// make each turn (#22). Ticket #121 (version 0.07.2): the hover no longer repeats the price --
 /// *"that's already stated"* -- and *"Once it stands"* became the turn count: `Ready next turn:` or
 /// `Ready in 2 turns:`, from the building's own card. Eight of the ten Facilities take one turn.
+/// Ticket #322 (version 0.08.8): a button that places SEVERAL orders at once -- a stack's march,
+/// a stack's transit, a Repair all -- at the designer's word that Armies stack for orders. It is
+/// enabled when every order it holds is legal on its own, priced at their sum, and its refusal is
+/// the first order's, since a stack is refused for one reason at a time.
+fn orders_button(ui: &mut Ui, game: &Game, pending: &[Order], orders: Vec<Order>, label: &str, hover: Option<String>, actions: &mut Vec<Action>) {
+    let mut cost = dying_earth_engine::Cost::default();
+    let mut refusal: Option<String> = None;
+    for o in &orders {
+        let c = game.order_cost(Seat(0), o);
+        cost.materials += c.materials;
+        cost.fuel += c.fuel;
+        cost.energy += c.energy;
+        cost.ducats += c.ducats;
+        cost.influence += c.influence;
+        if refusal.is_none() && let Err(e) = game.check_order(Seat(0), pending, o) {
+            refusal = Some(e.0);
+        }
+    }
+    let ok = refusal.is_none() && !orders.is_empty();
+    let mut resp = priced_button(ui, ok, label, &cost);
+    if let Some(h) = &hover {
+        resp = rule_tip(resp, h.clone()).on_disabled_hover_ui(|ui| hover_with_icons(ui, h));
+    }
+    if let Some(e) = &refusal {
+        resp = rule_tip(resp, e.clone());
+    }
+    if resp.clicked() && ok {
+        for o in orders {
+            actions.push(Action::Place(o));
+        }
+    }
+}
+
 fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Order, label: &str, hover: Option<String>, actions: &mut Vec<Action>) {
     let cost = game.order_cost(Seat(0), &order);
     let check = game.check_order(Seat(0), pending, &order);
@@ -4099,7 +4330,10 @@ fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make
             let shown = pending_stance.unwrap_or(current);
             // Ticket #313 (version 0.08.7): each label says what it does on hover, in the one
             // sentence the engine keeps for it, and the rule every stance shares; no marker (#233).
-            let resp = rule_tip(ui.selectable_label(shown == st, st.name()), format!("{}: {}\n{}", st.name(), st.one_liner(ships), Stance::PERSISTS));
+            // Ticket #319 (version 0.08.8): the Intercept label says when the computer seats use
+            // it, which is measured behaviour and not a rule, at the designer's word.
+            let measured = if ships && st == Stance::Intercept { "\nThe computer seats intercept with warships when an unarmed rival hull is inbound: a Colony Ship or a Carrier." } else { "" };
+            let resp = rule_tip(ui.selectable_label(shown == st, st.name()), format!("{}: {}\n{}{measured}", st.name(), st.one_liner(ships), Stance::PERSISTS));
             if resp.clicked() && shown != st {
                 let order = make(st);
                 if game.check_order(Seat(0), pending, &order).is_ok() {
@@ -4329,7 +4563,7 @@ Spending here raises the bar; doing nothing lowers it, yours decaying {} a turn 
                     if pressing { " Dig In here to hold it." } else { "" }
                 );
                 let tip = format!(
-                    "Their {strength} against the {defence} that defends here: {:.0}% is their chance to win the first exchange.\nThe computer seats attack at {:.0}% or better, so the line turns amber there.\nRaised Armies next door only, whatever their stance; a Region's own Army never marches.",
+                    "Their {strength} against the {defence} that defends here: {:.0}% is their chance to win the first exchange.\nThe computer seats attack at {:.0}% or better, so the line turns amber there.\nArmies next door whatever their stance; a Region's own Army standing at home is no threat, marched out it is.",
                     odds * 100.0,
                     bar * 100.0
                 );
@@ -4986,10 +5220,52 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         for font in ui.style_mut().text_styles.values_mut() {
             font.size *= ARMY_LIST_SCALE;
         }
-        ui.label(RichText::new("Armies").strong());
+        let heading = ui.label(RichText::new("Armies").strong());
+        // Ticket #323 (version 0.08.8): a click on the shield brings the card to its Armies block.
+        if view.armed_stack == Some(sid) && view.armed_scroll {
+            heading.scroll_to_me(Some(egui::Align::Min));
+            view.armed_scroll = false;
+        }
         let my_armies: Vec<&Army> = armies.iter().copied().filter(|a| mine && game.army_seat(a) == Some(Seat(0)) && !game.army_stands_down(a)).collect();
         if !my_armies.is_empty() {
             stance_row(ui, game, &session.pending, my_armies[0].stance, |s| Order::ArmyStance { place: Place::State(sid), stance: s }, false, actions);
+        }
+        // Ticket #322 (version 0.08.8): **the stack**: every Army of the player's at the place. With
+        // more than one, a row of neighbour buttons moves them all, priced at nothing, the odds
+        // read from the stack's summed strength; the per-Army rows keep their buttons for a split.
+        // With one, the Army's own row is the stack and no second row is drawn.
+        let stack: Vec<&Army> = my_armies.iter().copied().filter(|a| a.stance != Stance::DigIn).collect();
+        let stacked = stack.len() > 1;
+        if stacked {
+            let strength: i64 = stack.iter().map(|a| game.army_strength(a)).sum();
+            ui.horizontal_wrapped(|ui| {
+                ui.label(format!("All {} ({}):", stack.len(), strength));
+                for n in &card.neighbours {
+                    let ctrl = game.state(*n).control;
+                    let own = ctrl == Control::Controlled(Seat(0));
+                    let passage = matches!(ctrl, Control::Controlled(h) if h != Seat(0) && game.accord_has(Seat(0), h, Term::Passage));
+                    let name = &game.tables.state(*n).name;
+                    let label = format!("{} {name}", if own || passage { "move to" } else { "attack" });
+                    let hover = if own {
+                        format!("{name}: held by you. Moving costs nothing; the stack keeps its stance.")
+                    } else if let (true, Control::Controlled(h)) = (passage, ctrl) {
+                        format!("{name}: held by the {}, a partner under Passage. Moving costs nothing; the stack arrives on Hold.", game.seat_name(h))
+                    } else {
+                        attack_hover(game, Place::State(*n), name, strength, false)
+                    };
+                    let orders: Vec<Order> = stack.iter().map(|a| Order::MoveArmy { army: a.id, to: *n }).collect();
+                    orders_button(ui, game, &session.pending, orders, &label, Some(hover), actions);
+                }
+            });
+            let hurt: Vec<&Army> = stack.iter().copied().filter(|a| a.damage > 0).collect();
+            if hurt.len() > 1 {
+                ui.horizontal_wrapped(|ui| {
+                    let repairs: Vec<Order> = hurt.iter().map(|a| Order::Repair { unit: UnitRef::Army(a.id), points: a.damage }).collect();
+                    orders_button(ui, game, &session.pending, repairs, "Repair all", Some("Every damaged Army of the stack repaired fully, for Materials.".to_string()), actions);
+                    let repairs: Vec<Order> = hurt.iter().map(|a| Order::RepairWithDucats { unit: UnitRef::Army(a.id), points: a.damage }).collect();
+                    orders_button(ui, game, &session.pending, repairs, "Repair all with Ducats", Some("Every damaged Army of the stack repaired fully, for Ducats.".to_string()), actions);
+                });
+            }
         }
         for a in &armies {
             let who = match game.army_seat(a) {
@@ -5019,7 +5295,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 let police = if game.constabulary_online(sid) { format!(" +{} for the working Constabulary", t.constabulary) } else { format!(" +{} if a Constabulary were working here", t.constabulary) };
                 let calm = if game.army_replenishes(sid) { format!(", +{} while Unrest is under {:.0}", t.calm, game.tables.unrest.army_threshold) } else { format!(", +{} lost to Unrest at {:.0} or more", t.calm, game.tables.unrest.army_threshold) };
                 format!(
-                    "A Region's own Army. Its strength and hit points are Industry Level + 1{}; it stays at home. Defending, it fights at that{police}{calm}{}. It heals 1 a turn while Unrest is under {:.0}; at its strength in damage it is destroyed, and returns at strength 1 two Incomes later. A neutral Region arms for good, +{} when a threat appears next door and +{} for every attack it holds against, with no ceiling.",
+                    "A Region's own Army. Its strength and hit points are Industry Level + 1{}; it may march, and away from home it is an Army like any other. Defending at home, it fights at that{police}{calm}{}. It heals 1 a turn while Unrest is under {:.0}; at its strength in damage it is destroyed, and returns at strength 1 two Incomes later. A neutral Region arms for good, +{} when a threat appears next door and +{} for every attack it holds against, with no ceiling.",
                     if armed > 0 { format!(" and +{armed} armed") } else { String::new() },
                     if game.army_dug_in(a) { format!(", +{} dug in", game.tables.dig_in.defence) } else { String::new() },
                     game.tables.unrest.army_threshold,
@@ -5036,16 +5312,23 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             // Ticket #302 (version 0.08.6): a Region's own Army stays at home, so only a raised Army
             // has march buttons. Ticket #309 (version 0.08.7): the odds are on a hover that names the
             // defender, not on the button face. Ticket #312: under the Army's own row.
-            if my_armies.iter().any(|m| m.id == a.id) && !a.standing {
+            // Ticket #321 (version 0.08.8): a Region's own Army marches too, so every Army of the
+        // player's has march buttons.
+        if my_armies.iter().any(|m| m.id == a.id) {
                 ui.horizontal_wrapped(|ui| {
                     ui.add_space(16.0);
                     for n in &card.neighbours {
                         let ctrl = game.state(*n).control;
                         let own = ctrl == Control::Controlled(Seat(0));
+                        // Ticket #320 (version 0.08.8): a partner's Region under Passage is moved
+                        // into, not attacked; the Army arrives on Hold.
+                        let passage = matches!(ctrl, Control::Controlled(h) if h != Seat(0) && game.accord_has(Seat(0), h, Term::Passage));
                         let name = &game.tables.state(*n).name;
-                        let label = format!("{} {name}", if own { "move to" } else { "attack" });
+                        let label = format!("{} {name}", if own || passage { "move to" } else { "attack" });
                         let hover = if own {
                             format!("{name}: held by you. Moving costs nothing; the Army keeps its stance.")
+                        } else if let (true, Control::Controlled(h)) = (passage, ctrl) {
+                            format!("{name}: held by the {}, a partner under Passage. Moving costs nothing; the Army arrives on Hold and fights nobody while the Accord stands.", game.seat_name(h))
                         } else {
                             attack_hover(game, Place::State(*n), name, game.army_strength(a), false)
                         };
@@ -5643,6 +5926,26 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             }
         }
     }
+    // Ticket #328 (version 0.08.8): Bombard, one button per Battleship per rival Colony at the
+    // Body, never over Earth; the hover carries the odds and the offence, and the button greys
+    // with the reason when the orbit is not held outright.
+    if body != BodyId::Earth {
+        let targets: Vec<&Colony> = game.colonies.iter().filter(|c| c.body == body && c.control.director().is_some_and(|d| d != Seat(0))).collect();
+        let battleships: Vec<&Ship> = ships.iter().copied().filter(|s| s.kind == UnitKind::Battleship).collect();
+        if !targets.is_empty() && !battleships.is_empty() {
+            ui.label(RichText::new("Bombard").strong());
+            let p = game.tables.influence.destruction_chance * 100.0;
+            for s in battleships {
+                for c in targets.iter() {
+                    let n = c.modules.iter().filter(|m| !matches!(m.kind, ModuleKind::Core | ModuleKind::Archive)).count();
+                    let place = game.place_name(Place::Colony(c.id));
+                    let holder = c.control.director().map(|d| game.seat_name(d)).unwrap_or_default();
+                    let hover = format!("One Module of {n} at {place}, drawn at random, rolls a {p:.0}% chance to burn; when a Habitat burns, the Colonists beyond the room left die with it. A rung 3 offence against the {holder}, breaking a non-aggression Accord if one stands. Needs Orbital Control here held outright; never over Earth.");
+                    cost_button_with_hover(ui, game, &session.pending, Order::Bombard { ship: s.id, colony: c.id }, &format!("Bombard {} from {}", place, game.ship_name(s)), Some(hover), actions);
+                }
+            }
+        }
+    }
     ui.label(RichText::new("Transits (whole stack)").strong());
     for to in BodyId::ALL {
         if to == body {
@@ -5653,6 +5956,17 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         let (turns, fuel) = game.transit_cost_for(Seat(0), body, to);
         ui.horizontal_wrapped(|ui| {
             ui.label(format!("To {}: {} turn(s), {} Fuel each from the tank", game.tables.body(to).name, turns, fuel));
+            // Ticket #322 (version 0.08.8): the heading's promise kept: one button moves every
+            // Ship of the stack that can pay the leg, the per-Ship buttons staying for a split.
+            if ships.len() > 1 {
+                let able: Vec<Order> = ships
+                    .iter()
+                    .map(|s| Order::Transit { ship: s.id, to, slot: None })
+                    .filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok())
+                    .collect();
+                let n = able.len();
+                orders_button(ui, game, &session.pending, able, &format!("All {n} that can"), Some(format!("Every Ship of the stack whose tank pays the leg, {n} of {}, sent together.", ships.len())), actions);
+            }
             for s in &ships {
                 // Ticket #87: the button reads the tank against the leg.
                 cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: None }, &format!("{} ({}/{} in the tank)", game.ship_name(s), s.fuel, game.tables.unit(s.kind).tank), actions);
@@ -5670,12 +5984,19 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             faction_glyph(ui, session, game, Some(s.seat), 16.0);
             ui.label(format!("{}: {}/{} Fuel", game.ship_name(s), s.fuel, tank))
                 .on_hover_text(format!("{} {}", s.kind.name(), s.id.0));
-            if game.own_station_at(Seat(0), body) {
-                cost_button(ui, game, &session.pending, Order::Refuel { ship: s.id }, "Refuel from the Stockpile", actions);
+            // Ticket #325 (version 0.08.8): or a partner's station under a Refuel Accord, named on
+            // the hover; the Fuel is still the player's own Stockpile's.
+            if game.refuel_station_at(Seat(0), body) {
+                let partner = if game.own_station_at(Seat(0), body) {
+                    None
+                } else {
+                    game.colonies.iter().filter(|c| c.body == body && game.fuels_for(c, Seat(0))).find_map(|c| c.control.director()).map(|d| format!("At the station of the {}, under your Refuel Accord: the Fuel is your own Stockpile's, drawn there.", game.seat_name(d)))
+                };
+                cost_button_with_hover(ui, game, &session.pending, Order::Refuel { ship: s.id }, "Refuel from the Stockpile", partner, actions);
             } else if game.stranded(s.id) {
-                ui.colored_label(Color32::from_rgb(230, 120, 90), "stranded: no leg it can pay, and no station of yours here to refuel at; a station built in orbit here rescues it");
+                ui.colored_label(Color32::from_rgb(230, 120, 90), "stranded: no leg it can pay, and no station of yours or of a Refuel partner's here to refuel at; a station built in orbit here, or a Refuel Accord with one who holds a station here, rescues it");
             } else {
-                ui.label("no station of yours here to refuel at");
+                ui.label("no station of yours, or of a Refuel partner's, here to refuel at");
             }
         });
     }
@@ -6387,6 +6708,10 @@ fn module_line(game: &Game, col: &Colony, cid: ColonyId, mi: usize, director: Op
         }
     } else if m.mothballed {
         "mothballed: making nothing and paying no upkeep".to_string()
+    } else if m.kind == ModuleKind::Battery {
+        // Ticket #324 (version 0.08.8): a Battery's figures are a unit's, not a yield.
+        let card = game.tables.module(ModuleKind::Battery);
+        format!("strength {}, {} of {} hit points, {} Energy upkeep", card.strength, card.hit_points.saturating_sub(m.damage), card.hit_points, card.energy_upkeep)
     } else {
         match director {
             Some(d) => game.module_yield_at(d, cid, mi).text(),
@@ -6394,6 +6719,21 @@ fn module_line(game: &Game, col: &Colony, cid: ColonyId, mi: usize, director: Op
         }
     };
     format!("{}: {}", m.kind.name(), figures)
+}
+
+/// Ticket #324 (version 0.08.8): what a Repair order's line calls the thing it repairs.
+fn unit_name(game: &Game, unit: &UnitRef) -> String {
+    match unit {
+        UnitRef::Ship(s) => s.to_string(),
+        UnitRef::Army(a) => a.to_string(),
+        UnitRef::Battery { colony, .. } => format!("the Battery at {}", game.place_name(Place::Colony(*colony))),
+    }
+}
+
+/// Ticket #324 (version 0.08.8): the Battery's rules, under its tile's figures on the hover.
+fn battery_rules(game: &Game) -> String {
+    let card = game.tables.module(ModuleKind::Battery);
+    format!("\nA Battery stands in the line of any Battle fought in this orbit, on Hold, and never disengages. While it stands and works, no rival holds Orbital Control here: none may land, and no Blockade shuts its owner's station; its owner gains no Control by it. Repaired with Materials here, as a Ship is; at {} hits it is destroyed.", card.hit_points)
 }
 
 /// The words a box's hover adds to an offline building's line, and nothing for a working or a
@@ -6479,8 +6819,18 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         let selected = view.hab_tile == Some(HabTile::Module(mi));
         // Ticket #150 (version 0.07.4): the tile's hover -- the figures its strip line carries and
         // the Module rules, which the old rows never had.
-        let tip = module_rules(&format!("{}{}", module_line(game, col, cid, mi, director), module_offline_words(col, m)));
-        if hab_tile(ui, tile_rect(i), ui.id().with(("hab", mi)), Some(crate::icons::module_icon(m.kind)), m.kind.name(), state, selected, None, tip).clicked() {
+        let mut tip = module_rules(&format!("{}{}", module_line(game, col, cid, mi, director), module_offline_words(col, m)));
+        // Ticket #324 (version 0.08.8): a Battery's hover carries its rules; a damaged one wears its
+        // hit points on its label, as a shield wears an Army's.
+        let mut label = m.kind.name().to_string();
+        if m.kind == ModuleKind::Battery {
+            tip.push_str(&battery_rules(game));
+            if m.damage > 0 {
+                let hp = game.tables.module(ModuleKind::Battery).hit_points;
+                label = format!("Battery {}/{}", hp.saturating_sub(m.damage), hp);
+            }
+        }
+        if hab_tile(ui, tile_rect(i), ui.id().with(("hab", mi)), Some(crate::icons::module_icon(m.kind)), &label, state, selected, None, tip).clicked() {
             view.hab_tile = Some(HabTile::Module(mi));
         }
         i += 1;
@@ -6527,6 +6877,13 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             figures_with_icons(ui, &module_line(game, col, cid, mi, director), 14.0, colour, &[]);
             if mine && m.kind != ModuleKind::Archive {
                 change_row(ui, game, &session.pending, BuildingRef::Module(cid, mi), m.mothballed, m.change, actions);
+            }
+            // Ticket #324 (version 0.08.8): a damaged Battery repairs here, as a Ship does at a yard.
+            if mine && m.kind == ModuleKind::Battery && m.damage > 0 {
+                ui.horizontal(|ui| {
+                    cost_button(ui, game, &session.pending, Order::Repair { unit: UnitRef::Battery { colony: cid, index: mi }, points: m.damage }, "Repair fully", actions);
+                    cost_button(ui, game, &session.pending, Order::RepairWithDucats { unit: UnitRef::Battery { colony: cid, index: mi }, points: m.damage }, "Repair fully with Ducats", actions);
+                });
             }
         }
         Some(HabTile::Free) if mine => {
@@ -7052,7 +7409,7 @@ fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actio
         let friendly = game.relations_score(me, other) >= 7 && game.relations_score(other, me) >= 7;
         for (term, label, tip) in [
             (Term::NonAggression, "Non-aggression", "Neither spends Influence on a place the other holds, nor opens a Battle against them."),
-            (Term::Passage, "Passage", "Neither treats the other's Ships as a target, and a Blockade does not shut them out of the slot."),
+            (Term::Passage, "Passage", "Either's Armies may march into the other's Regions without attacking, arriving on Hold; neither intercepts the other's Ships, and a Blockade does not shut them out of the slot."),
             (Term::Refuel, "Refuel", "Either may Refuel at the other's Space Stations."),
             (Term::ResearchAgreement, "Research agreement", "Both parties' Research rises a tenth while it stands. Wants Friendly on both sides to strike, and once struck it stands whatever the scores later do."),
         ] {

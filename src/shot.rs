@@ -21,6 +21,8 @@ pub struct ShotPlan {
     pub menus: bool,
     pub menu_step: usize,
     pub select: Option<String>,
+    /// Ticket #323 (version 0.08.8): `arm:1`, the Region whose stack is armed for the picture.
+    pub arm: Option<StateId>,
     /// `hab:1` (a building aid, ticket #145; ticket #162 in version 0.07.5): seat 0's first station
     /// or Colony is SELECTED, so its card -- which carries the Module tiles since the Hab View
     /// window retired -- is in every picture.
@@ -117,6 +119,13 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     // own now, as `slotbox:` does on a selected Region.
     if let Some(v) = std::env::args().find_map(|a| a.strip_prefix("habtile:").map(str::to_owned)) {
         view.hab_tile = if v == "free" { Some(HabTile::Free) } else { v.parse::<usize>().ok().map(HabTile::Module) };
+    }
+    // `arm:1` (a building aid, ticket #323): seat 0's start state has its stack armed, as a click on
+    // its shield would, so the shield's ring and the outlined neighbours can be photographed; the
+    // right-click itself cannot be, headless.
+    if let Some(sid) = plan.arm {
+        view.armed_stack = Some(sid);
+        view.armed_scroll = true;
     }
     // `slotbox:<n>` or `slotbox:free` (a building aid, ticket #146): that slot box on the selected
     // Region's card is clicked, so the strip beneath the boxes can be photographed.
@@ -285,6 +294,54 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.materials = 120;
             g.seats[0].stockpile.energy = 60;
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
+        }
+        // `battery:1` (a building aid, ticket #324, version 0.08.8): seat 0 gets a Colony on Mars
+        // with a Battery standing, two hits on it, and seat 1 a Frigate in Mars orbit on Hold; so
+        // the Mars band reads the Battery's row and why nobody holds Orbital Control, and the
+        // Colony's card (`hab:ground`) shows the tile, its hover and the Repair buttons.
+        if std::env::args().any(|a| a == "battery:1") {
+            let slot = g.free_slots_on(BodyId::Mars).first().copied().unwrap_or(0);
+            let id = ColonyId(g.fresh_id());
+            let mut battery = Module::new(ModuleKind::Battery);
+            battery.damage = 2;
+            let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Mine), battery];
+            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            let sid = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::Frigate);
+            let built_turn = g.turn;
+            g.ships.push(Ship { id: sid, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
+            g.seats[0].stockpile.materials = 120;
+            g.seats[0].stockpile.energy = 60;
+        }
+        // `refuel:1` (a building aid, ticket #325, version 0.08.8): seat 1 holds a station over
+        // Mars, seat 0 a Frigate in Mars orbit with an empty tank and no station of its own there,
+        // and a Refuel Accord stands between them; so the Ship card (`stack:1`) shows the Refuel
+        // button at a partner's station and its hover.
+        if std::env::args().any(|a| a == "refuel:1") {
+            let id = ColonyId(g.fresh_id());
+            let modules = vec![Module::new(ModuleKind::Habitat)];
+            g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules, colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+            let sid = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::Frigate);
+            let built_turn = g.turn;
+            g.ships.push(Ship { id: sid, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 0, slot: None });
+            let _ = g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression, Term::Refuel]);
+            g.seats[0].stockpile.fuel = 40;
+        }
+        // `bombard:1` (a building aid, ticket #328, version 0.08.8): seat 1 holds a Colony on the
+        // ground of Mars and seat 0 a Battleship in Mars orbit, holding the orbit; so the Ship card
+        // (`stack:1`) shows the Bombard button and its hover. With `bombard:order` the Bombard is
+        // placed as well, for `commit:1` to resolve.
+        if std::env::args().any(|a| a == "bombard:1") {
+            let slot = g.free_slots_on(BodyId::Mars).first().copied().unwrap_or(0);
+            let id = ColonyId(g.fresh_id());
+            let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Mine), Module::new(ModuleKind::Generator)];
+            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(1)), modules, colonists: 8, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.ships.retain(|s| !(s.at == ShipAt::Body(BodyId::Mars) && s.kind.is_warship() && s.seat != Seat(0)));
+            let sid = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::Battleship);
+            let built_turn = g.turn;
+            g.ships.push(Ship { id: sid, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
         }
         // `rival:1` (a building aid, ticket #261, version 0.08.4): seat 1 stands three quarters of
         // the way to its Victory Condition -- nine Colonists on the Moon of twelve, and, for the
@@ -828,6 +885,19 @@ fn build_board(session: &mut Session) {
         eprintln!("morder:{name} was refused");
         std::process::exit(3);
     }
+    // `bombard:order` (ticket #328): the Bombard of `bombard:1`'s Battleship at the rival Colony
+    // is placed, for `commit:1` to resolve.
+    if std::env::args().any(|a| a == "bombard:order")
+        && let Some((ship, colony)) = session.game.as_ref().and_then(|g| {
+            let ship = g.ships.iter().find(|s| s.seat == Seat(0) && s.kind == UnitKind::Battleship && s.at == ShipAt::Body(BodyId::Mars))?.id;
+            let colony = g.colonies.iter().find(|c| c.body == BodyId::Mars && c.control.director() == Some(Seat(1)))?.id;
+            Some((ship, colony))
+        })
+        && !session.place(Order::Bombard { ship, colony })
+    {
+        eprintln!("bombard:order was refused");
+        std::process::exit(3);
+    }
     // `commit:1` (a building aid, ticket #291): the turn is ended WITH the orders the aids above
     // placed, the way the End Turn button ends it, so a building under way -- the turn after the
     // order, with its turns to go -- can be photographed. `turns:<n>` cannot do this: it hands
@@ -837,12 +907,19 @@ fn build_board(session: &mut Session) {
     }
     // `army:1` (a building aid, ticket #309): a raised Army of seat 0's stands in its start state,
     // so the march buttons and their hovers can be photographed; since ticket #302 a Region's own
-    // Army never marches, so a fresh board has no march buttons at all.
+    // Army did not march until ticket #321, so a fresh board had no march buttons at all.
     if std::env::args().any(|a| a == "army:1")
         && let Some(g) = session.game.as_mut()
         && let Some(sid) = g.directed_states(Seat(0)).first().copied()
     {
         g.raise_army(Place::State(sid), false);
+    }
+    // `passage:1` (a building aid, ticket #320): a Passage Accord stands between seat 0 and seat 1,
+    // so a partner's Region reads "move to" on seat 0's card and its hover says why.
+    if std::env::args().any(|a| a == "passage:1")
+        && let Some(g) = session.game.as_mut()
+    {
+        let _ = g.strike_accord(Seat(0), Seat(1), vec![Term::Passage]);
     }
     // `battle:region` (a building aid, ticket #311): seat 1 takes the first neighbour of seat 0's
     // start state and raises an Army there; seat 0 raises one at home and marches on it; the turn
@@ -1163,6 +1240,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         show_view(&mut view, VIEWS[0].1);
         // `select:<state id>` (a building aid) opens that Region's card in the Earth picture.
         plan.select = std::env::args().find_map(|a| a.strip_prefix("select:").map(str::to_owned));
+        plan.arm = std::env::args().any(|a| a == "arm:1").then(|| session.game.as_ref().and_then(|g| g.directed_states(Seat(0)).first().copied())).flatten();
         plan.tech = std::env::args().any(|a| a == "tech:1");
         plan.hab = std::env::args().any(|a| a == "hab:1");
         // Ticket #204 (version 0.08.1): `hab:ground` picks seat 0's first Colony ON a surface

@@ -147,7 +147,7 @@ fn main() {
                         let mut lost_in_transit = [0i64; 4];
                         // Ticket #87: stranded Ships at the end, Refuel orders and stations off Earth.
                         let mut stranded = [0u32; 4];
-                        let (mut refuels, mut stations_off_earth) = (0u32, 0u32);
+                        let (mut refuels, mut partner_refuels, mut stations_off_earth) = (0u32, 0u32, 0u32);
                         // Ticket #290 (version 0.08.6): Modules beyond the Core on a starting
                         // station at the end of turn three, per seat, summed over the batch.
                         let mut opening_modules = [0u32; 4];
@@ -160,6 +160,8 @@ fn main() {
                         let mut d_below = [0u32; 4];
                         let (mut ex_calls, mut ex_pioneers, mut acc_struck) = (0u32, 0u32, 0u32);
                         let mut uniq = [0u32; 4];
+                        // Ticket #324 (version 0.08.8): Batteries standing at the end over the batch, by seat.
+                        let mut batteries = [0u32; 4];
                         // Ticket #89: Solar Arrays standing at the end over the batch.
                         let mut solar_arrays = 0u32;
                         // Ticket #90: Trade Posts standing at the end over the batch.
@@ -226,6 +228,7 @@ fn main() {
                                 stranded[s] += r.stranded_at_end[s];
                             }
                             refuels += r.refuels;
+                            partner_refuels += r.partner_refuels;
                             stations_off_earth += r.stations_off_earth;
                             for (i, n) in opening_modules.iter_mut().enumerate() {
                                 *n += r.opening_modules[i];
@@ -243,6 +246,7 @@ fn main() {
                             for i in 0..4 {
                                 d_below[i] += r.directive_turns_below[i];
                                 uniq[i] += r.uniques[i];
+                                batteries[i] += r.batteries[i];
                             }
                             trade_posts += r.trade_posts;
                             mass_drivers += r.mass_drivers;
@@ -349,7 +353,7 @@ fn main() {
                                 gate_turns.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
                             );
                             println!("      Crowded ships: Colonists lost in transit over the batch, by seat {lost_in_transit:?}");
-                            println!("      Tanks: Ships stranded at the end over the batch, by seat {stranded:?}; {refuels} Refuel orders; {stations_off_earth} stations standing off Earth at the end");
+                            println!("      Tanks: Ships stranded at the end over the batch, by seat {stranded:?}; {refuels} Refuel orders ({partner_refuels} at a partner's station); {stations_off_earth} stations standing off Earth at the end");
                             println!("      The opening: Modules beyond the Core on a starting station at the end of turn 3 over the batch, by seat {opening_modules:?}");
                             println!(
                                 "      Build it where you dig: {deep_colonies} ground Colonies with two or more working Mines at the end over the batch; {:.1} Modules per ground Colony",
@@ -367,6 +371,7 @@ fn main() {
                             println!("      Accords STRUCK over the batch: {acc_struck} (against {accords} standing at the end)");
                             println!("      Exodus Calls sounded over the batch: {ex_calls}, worth {ex_pioneers} Pioneers");
                             println!("      Unique Modules standing at the end over the batch: Academy {}, Heliostat {}, Exchange {}, Chorus {}", uniq[0], uniq[1], uniq[2], uniq[3]);
+                            println!("      Batteries standing at the end over the batch, by seat {batteries:?}");
                             println!("      Venus: {venus_stations} stations at the end over the batch, {venus_colonists} Colonists living there");
                             println!(
                                 "      Mars system: a Colony founded in {}/{seeds} seeds, median first turn {}; Antarctic Colonies founded {antarctic}",
@@ -475,6 +480,12 @@ fn main() {
                             println!("      Dig In orders over the batch, by seat {:?}", warc.dig_ins);
                             // Ticket #300 (version 0.08.6): Armies landed from a Carrier, by seat.
                             println!("      Armies landed at a Colony over the batch, by seat {:?}", warc.armies_landed);
+                            // Ticket #319 (version 0.08.8): interceptions fought, by the intercepting seat.
+                            println!("      Interceptions over the batch, by seat {:?}", warc.interceptions);
+                            // Ticket #324 (version 0.08.8): Batteries lost in a Battle, by the seat that held them.
+                            println!("      Batteries lost over the batch, by seat {:?}", warc.batteries_lost);
+                            // Ticket #328 (version 0.08.8): Bombards and what they burned, by the bombarder.
+                            println!("      Bombards over the batch, by seat {:?}; Modules burned {:?}", warc.bombards, warc.modules_burned);
                             println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
                             println!("      Breaks fired: {}", fired.join(", "));
                         }

@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 /// The stamp at the head of every save. A file whose stamp is not this one is refused with a plain
 /// message; a save is never migrated between versions.
-pub const SAVE_VERSION: u32 = 1;
+pub const SAVE_VERSION: u32 = 2;
 
 /// The rules version this executable plays, named beside the file's own in a refusal.
 ///
@@ -52,7 +52,14 @@ pub const SAVE_VERSION: u32 = 1;
 /// with. A refusal naming both versions is the right answer.
 /// Ticket #314 (version 0.08.7): the presentation version added nothing to the save, so
 /// `SAVE_VERSION` stands and a 0.08.6 save loads; only the name a save carries moves.
-pub const GAME_VERSION: &str = "0.08.7";
+/// Ticket #329 (version 0.08.8): moved to 2. A Module carries damage and `ModuleKind` gained the
+/// Battery, appended last (#324); the pending orders carry Bombards (#328); the war's counters
+/// gained interceptions, Batteries lost, Bombards and Modules burned (#319, #324, #328); the
+/// tables gained a respawn delay, combat figures on a Module card and the melee's shape (#318,
+/// #324, #327). Every new field has a default, so a 0.08.7 file would parse; but it would then
+/// be played under rules it was not written for, with Armies that march where they could not and
+/// a melee that rolls differently, and a refusal naming both versions is the honest answer.
+pub const GAME_VERSION: &str = "0.08.8";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;

@@ -229,7 +229,8 @@ fn frigate(id: u32) -> Combatant {
     Combatant::new(UnitRef::Ship(ShipId(id)), format!("Frigate {id}"), 3, 4, 0, 4, false)
 }
 fn colony_ship(id: u32) -> Combatant {
-    Combatant::new(UnitRef::Ship(ShipId(id)), format!("Colony Ship {id}"), 0, 3, 0, 0, false)
+    // Ticket #326 (version 0.08.8): unarmed, as the resolution builds it.
+    Combatant::new(UnitRef::Ship(ShipId(id)), format!("Colony Ship {id}"), 0, 3, 0, 0, false).armed(false)
 }
 
 #[test]
@@ -1645,7 +1646,7 @@ fn a_partys_chance_to_land_a_hit_is_its_share_of_the_total_strength_present() {
         let mut a = party(1, "A Frigate", 6, 10_000, 0);
         let mut b = party(2, "B Frigate", 3, 10_000, 0);
         let mut c = party(3, "C Frigate", 1, 10_000, 0);
-        let stats = combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice, 2.0);
+        let stats = combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice, 2.0, 3, 3);
         for (i, l) in landed.iter_mut().enumerate() {
             *l += stats.hits_of(i);
         }
@@ -1675,7 +1676,7 @@ fn a_partys_hits_are_spread_across_the_enemy_parties_in_proportion_to_their_stre
         let mut a = party(1, "A Frigate", 6, 10_000, 0);
         let mut b = party(2, "B Frigate", 3, 10_000, 0);
         let mut c = party(3, "C Frigate", 1, 10_000, 0);
-        combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice, 2.0);
+        combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice, 2.0, 3, 3);
         b_damage += b[0].damage;
         c_damage += c[0].damage;
     }
@@ -10815,4 +10816,400 @@ fn the_nearest_army_threat_is_the_rival_raised_army_next_door_with_the_best_odds
     // A Region nobody holds has no threat line.
     let nobody = StateId::ALL.into_iter().find(|s| g.state(*s).control == Control::Neutral).expect("a neutral Region");
     assert!(g.nearest_army_threat(nobody).is_none());
+}
+
+// -------------------------------------------- 0.08.8 ticket #319: Carriers off Earth for every seat
+
+/// Ticket #319 (version 0.08.8): a seat other than the Prospectors wants a Carrier only with cause:
+/// a rival's Colony off Earth whose holder it is Wary or worse toward. A station over Earth is no
+/// target, and a rival it is Neutral toward gives no cause.
+#[test]
+fn a_carrier_has_somewhere_to_go_only_with_cause_against_a_colony_off_earth() {
+    let mut g = game();
+    assert_eq!(g.kind(Seat(0)), FactionKind::Custodians, "seat 0 is not the Prospectors here");
+    assert!(!g.carrier_target_exists(Seat(0)), "a fresh board: no rival Colony off Earth");
+    // A rival's station over Earth is not off Earth.
+    let over_earth = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: over_earth, body: BodyId::Earth, slot: 3, control: Control::Controlled(Seat(2)), modules: Vec::new(), colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.relations.score[0][2] = -8;
+    assert!(!g.carrier_target_exists(Seat(0)), "a station over Earth is no Carrier's target");
+    // A rival's Colony on Mars, the rival Neutral: no cause.
+    let mars = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: mars, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules: Vec::new(), colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+    assert!(!g.carrier_target_exists(Seat(0)), "Neutral toward its holder: no cause, no target");
+    // Cold toward its holder: cause.
+    g.relations.score[0][1] = -8;
+    assert!(g.relations_score(Seat(0), Seat(1)) <= g.tables.ai.thresholds.war_cause);
+    assert!(g.carrier_target_exists(Seat(0)), "Cold toward the Colony's holder: a target");
+}
+
+// -------------------------------------------- 0.08.8 ticket #318: an escaped Army holds no Occupation
+
+/// Ticket #318 (version 0.08.8): an Occupation is held by the presence that begins one -- an Army
+/// of the occupier at the place that did not escape -- so an Army that ran keeps no Occupation
+/// alive. Until this ticket the holding check read every Army of the seat there, escaped or not.
+#[test]
+fn an_army_that_escaped_holds_no_occupation() {
+    let mut g = game();
+    g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
+    let id = occupier_in(&mut g, StateId::EastAsia, StateId::Europe);
+    g.resolution_phase();
+    assert!(matches!(g.state(StateId::Europe).control, Control::Occupied { occupier: Seat(0), turns: 1, .. }), "the Occupation begins");
+    assert!(g.present_at(Place::State(StateId::Europe), Seat(0)));
+    g.armies.iter_mut().find(|a| a.id == id).unwrap().escaped = true;
+    assert!(!g.present_at(Place::State(StateId::Europe), Seat(0)), "escaped, the Army is not present for an Occupation");
+    g.resolution_phase();
+    assert!(!matches!(g.state(StateId::Europe).control, Control::Occupied { .. }), "the Occupation broke: an Army that ran holds nothing");
+}
+
+// -------------------------------------------- 0.08.8 ticket #320: Passage as a rule for Armies
+
+/// Ticket #320 (version 0.08.8): under a Passage Accord an Army marches into a partner's held
+/// Region without attacking: it arrives on Hold, no march on a held Region is counted, no Battle
+/// is fought and no offence is charged. Without Passage the same march arrives on Attack, as it
+/// always did. And a Blockade does not shut out a partner under Passage.
+#[test]
+fn passage_lets_an_army_march_into_a_partners_region_on_hold() {
+    let march = |passage: bool| {
+        let mut g = game();
+        let (home, target) = (StateId::EastAsia, StateId::Russia);
+        assert!(g.tables.state(home).neighbours.contains(&target));
+        g.take_control(target, Seat(1));
+        if passage {
+            g.strike_accord(Seat(0), Seat(1), vec![Term::Passage]).expect("Passage struck");
+            assert!(g.accord_has(Seat(0), Seat(1), Term::Passage));
+        }
+        let army = g.raise_army(Place::State(home), false);
+        g.armies.iter_mut().find(|a| a.id == army).unwrap().move_to = Some(target);
+        let before = g.relations_score(Seat(1), Seat(0));
+        g.resolution_phase();
+        let a = g.armies.iter().find(|a| a.id == army).expect("the Army lives");
+        assert_eq!(a.at, ArmyAt::Place(Place::State(target)), "it marched");
+        (a.stance, g.war.marches_held[0], g.war.battles[0], g.relations_score(Seat(1), Seat(0)) - before)
+    };
+    assert_eq!(march(true), (Stance::Hold, 0, 0, 0), "under Passage: on Hold, no march on a held Region, no Battle, no offence");
+    let (stance, marches, _, _) = march(false);
+    assert_eq!((stance, marches), (Stance::Attack, 1), "without Passage: an attack, counted");
+}
+
+#[test]
+fn a_blockade_does_not_shut_out_a_partner_under_passage() {
+    let mut g = game();
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).expect("seat 0's station").clone();
+    let id = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Frigate);
+    g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(station.slot) });
+    assert!(g.slot_blockaded_against(Seat(0), BodyId::Earth, station.slot), "a rival's warship on Blockade shuts the slot");
+    g.strike_accord(Seat(0), Seat(1), vec![Term::Passage]).expect("Passage struck");
+    assert!(!g.slot_blockaded_against(Seat(0), BodyId::Earth, station.slot), "not against a partner under Passage");
+}
+
+// -------------------------------------------- 0.08.8 ticket #321: a Region's own Army marches again
+
+/// Ticket #321 (version 0.08.8): the holder may march a Region's own Army, which 0.08.6 kept at
+/// home. At home it defends with its people (the Constabulary and the calm); marched out it is an
+/// Army like any other, with no such bonus, and a threat next door like any other.
+#[test]
+fn a_regions_own_army_marches_again_and_defends_only_at_home() {
+    let mut g = game();
+    let (home, target) = (StateId::EastAsia, StateId::Russia);
+    g.take_control(target, Seat(1));
+    let standing = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(home)).map(|a| a.id).expect("China's own Army");
+    let a = g.army(standing).unwrap().clone();
+    assert!(g.army_at_home(&a));
+    let bonus_at_home = g.army_defence(&a);
+    assert!(g.check_order(Seat(0), &[], &Order::MoveArmy { army: standing, to: target }).is_ok(), "its holder may march it");
+    g.armies.iter_mut().find(|a| a.id == standing).unwrap().move_to = Some(target);
+    g.resolution_phase();
+    let a = g.army(standing).expect("it lives").clone();
+    assert_eq!(a.at, ArmyAt::Place(Place::State(target)), "it marched");
+    assert!(!g.army_at_home(&a), "and is not at home");
+    assert_eq!(g.army_defence(&a), 0, "away from home, no people's defence (at home it was {bonus_at_home})");
+    // Marched out next to a third Region the Prospectors hold, it is a threat to it like any other.
+    let third = g.tables.state(target).neighbours.iter().copied().find(|n| *n != home && g.state(*n).control == Control::Neutral).expect("a neutral neighbour of Russia");
+    g.take_control(third, Seat(1));
+    let (id, from, _) = g.nearest_army_threat(third).expect("China's own Army, marched out, threatens the Region next door");
+    assert_eq!((id, from), (standing, target));
+}
+
+// -------------------------------------------- 0.08.8 ticket #322: Armies that stack for orders
+
+/// Ticket #322 (version 0.08.8): where two Armies of a seat may march and neither alone clears the
+/// computer's attack bar against a neighbour, the stack does, and the computer marches them both
+/// in one candidate. Before this ticket each Army was weighed alone and the seat never massed.
+#[test]
+fn the_computer_marches_a_stack_where_one_army_alone_would_not_clear_the_bar() {
+    let mut g = game();
+    calm(&mut g);
+    let (home, target) = (StateId::EastAsia, StateId::Russia);
+    g.take_control(target, Seat(1));
+    g.relations.score[0][1] = -8;
+    assert!(g.relations_score(Seat(0), Seat(1)) <= g.tables.ai.thresholds.war_cause, "cause");
+    // Russia's own Army fights at 5 defended; one raised Army of 4 is under the bar, two of 4 are over it.
+    let def: i64 = g.defenders_at(Place::State(target), Seat(0)).iter().filter_map(|id| g.army(*id)).map(|a| g.army_defended_strength(a)).sum();
+    let bar = g.tables.ai.thresholds.attack_odds;
+    assert!(combat::first_round_odds(4, def) < bar, "one Army of 4 against {def}: under the bar");
+    assert!(combat::first_round_odds(8, def) >= bar, "two of 4 against {def}: over it");
+    // China's own Army is kept out of it, so the stack is the two raised.
+    for a in g.armies.iter_mut().filter(|a| a.standing && a.home == ArmyHome::State(home)) {
+        a.stance = Stance::DigIn;
+    }
+    let first = g.raise_army(Place::State(home), false);
+    g.armies.iter_mut().find(|a| a.id == first).unwrap().raised_strength = 4;
+    let alone: Vec<Order> = g.ai_orders(Seat(0));
+    assert!(!alone.iter().any(|o| matches!(o, Order::MoveArmy { to, .. } if *to == target)), "one Army alone does not march on Russia: {alone:?}");
+    let second = g.raise_army(Place::State(home), false);
+    g.armies.iter_mut().find(|a| a.id == second).unwrap().raised_strength = 4;
+    let together: Vec<Order> = g.ai_orders(Seat(0));
+    let marched: Vec<ArmyId> = together.iter().filter_map(|o| match o { Order::MoveArmy { army, to } if *to == target => Some(*army), _ => None }).collect();
+    assert!(marched.contains(&first) && marched.contains(&second), "the stack of two marches on Russia together: {together:?}");
+}
+
+// -------------------------------------------- 0.08.8 ticket #324: the Battery
+
+/// Ticket #324 (version 0.08.8): a working Battery denies a rival Orbital Control at its Body and
+/// the Blockade with it, grants its owner none, is the owner's to repair at its Colony, and stands
+/// in the line of a Battle there, where a rival stack on Attack fights it with no Ship of the
+/// owner's present; shot to its hit points it is gone. Mothballed, it neither fires nor denies.
+#[test]
+fn a_battery_denies_orbital_control_and_the_blockade_and_falls_in_a_battle() {
+    let mut g = game();
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("seat 0's station");
+    let slot = g.colony(station).unwrap().slot;
+    g.ships.retain(|s| s.at != ShipAt::Body(BodyId::Earth));
+    let id = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Frigate);
+    g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(slot) });
+    assert_eq!(g.orbital_control(BodyId::Earth), Some(Seat(1)), "a lone rival warship holds Orbital Control");
+    assert!(g.slot_blockaded_against(Seat(0), BodyId::Earth, slot));
+    assert!(!g.may_land(Seat(0), BodyId::Earth));
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Battery));
+    let index = g.colony(station).unwrap().modules.len() - 1;
+    let card = g.tables.module(ModuleKind::Battery).clone();
+    assert_eq!(g.orbital_control(BodyId::Earth), None, "a Battery denies it");
+    assert!(g.may_land(Seat(0), BodyId::Earth), "so its owner lands");
+    assert!(!g.slot_blockaded_against(Seat(0), BodyId::Earth, slot), "and the Blockade shuts nothing");
+    assert_eq!(g.starved_by(station), None, "nor starves");
+    assert_eq!(g.battery_strength(Seat(0), BodyId::Earth), card.strength);
+    g.colony_mut(station).unwrap().modules[index].mothballed = true;
+    assert_eq!(g.orbital_control(BodyId::Earth), Some(Seat(1)), "mothballed, it denies nothing");
+    g.colony_mut(station).unwrap().modules[index].mothballed = false;
+    // The Repair order: the owner's, at its Colony, for no more than its damage.
+    g.colony_mut(station).unwrap().modules[index].damage = 2;
+    let repair = |points: u32| Order::Repair { unit: UnitRef::Battery { colony: station, index }, points };
+    assert!(g.check_order(Seat(0), &[], &repair(2)).is_ok(), "the owner repairs it");
+    assert!(g.check_order(Seat(1), &[], &repair(2)).is_err(), "a rival does not");
+    assert!(g.check_order(Seat(0), &[], &repair(3)).is_err(), "no more than its damage");
+    // The Battle: the rival's stack on Attack, no Ship of the owner's present, and the Battery one
+    // hit from gone.
+    g.colony_mut(station).unwrap().modules[index].damage = card.hit_points - 1;
+    for _ in 0..2 {
+        let id = ShipId(g.fresh_id());
+        let name = g.next_ship_name(UnitKind::Frigate);
+        g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    }
+    for s in g.ships.iter_mut().filter(|s| s.seat == Seat(1) && s.at == ShipAt::Body(BodyId::Earth)) {
+        s.stance = Stance::Attack;
+    }
+    g.resolution_phase();
+    let line = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::Body(BodyId::Earth))).expect("a Battle in Earth orbit").clone();
+    let mine = line.parties.iter().find(|p| p.seat == Some(Seat(0))).expect("the Battery's side");
+    assert!(mine.units.contains("the Battery at"), "the Battery is named in the line: {}", mine.units);
+    assert_eq!(mine.strength, card.strength, "at its card's strength");
+    assert!(!g.colony(station).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Battery), "shot to nothing, it is gone: {}", mine.units);
+    assert_eq!(g.war.batteries_lost[0], 1, "and counted");
+    assert!(line.result.contains("Orbital Control"), "{}", line.result);
+    assert_eq!(g.orbital_control(BodyId::Earth), Some(Seat(1)), "Control is the rival's again: {}", line.result);
+}
+
+/// Ticket #324: the computer wants a Battery at a Colony where a rival's warship stands, and not
+/// where none does; and a rival reads the Battery's strength in its odds in that orbit.
+#[test]
+fn the_computer_wants_a_battery_where_a_rival_warship_stands() {
+    let mut g = game();
+    calm(&mut g);
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("seat 0's station");
+    g.seats[0].stockpile.materials = 500;
+    g.seats[0].stockpile.energy = 500;
+    // Room on the station, with its opening Habitat and its Trade Post already standing: on a fresh
+    // station with two free places those two outrank a Battery at the Barracks' weight (measured).
+    {
+        let col = g.colony_mut(station).unwrap();
+        col.modules.push(Module::new(ModuleKind::Habitat));
+        col.modules.push(Module::new(ModuleKind::TradePost));
+        col.colonists = 8;
+    }
+    let before: Vec<Order> = g.ai_orders(Seat(0));
+    assert!(!before.iter().any(|o| matches!(o, Order::BuildModule { kind: ModuleKind::Battery, .. })), "no rival warship here, no Battery: {before:?}");
+    let id = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Frigate);
+    g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    let after: Vec<Order> = g.ai_orders(Seat(0));
+    assert!(after.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: ModuleKind::Battery } if *colony == station)), "a rival warship at the Body: {after:?}");
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Battery));
+    assert_eq!(g.enemy_ship_strength(Seat(1), BodyId::Earth), g.ship_stack_strength(Seat(0), BodyId::Earth) + g.tables.module(ModuleKind::Battery).strength, "the rival's odds read it");
+}
+
+// -------------------------------------------- 0.08.8 ticket #325: Refuelling at a partner's station
+
+/// Ticket #325 (version 0.08.8): under a Refuel Accord a Ship refuels at the partner's station as
+/// at its own, from its own Stockpile; without one it is stranded there; a station blockaded
+/// against its holder fuels the partner no more than its holder; and the computer offers Refuel
+/// where the other holds a station at a Body it has Ships at and no station of its own.
+#[test]
+fn a_refuel_accord_opens_a_partners_station() {
+    let mut g = game();
+    calm(&mut g);
+    let station = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: station, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules: Vec::new(), colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    let id = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Frigate);
+    g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 0, slot: None });
+    g.seats[0].stockpile.fuel = 40;
+    let refuel = Order::Refuel { ship: id };
+    assert!(!g.own_station_at(Seat(0), BodyId::Mars));
+    assert!(g.check_order(Seat(0), &[], &refuel).is_err(), "no station of its own, no Accord: no Refuel");
+    assert!(g.stranded(id), "and stranded on an empty tank");
+    // The computer offers Refuel here, in its non-aggression offer.
+    let offers: Vec<Order> = g.ai_orders(Seat(0)).into_iter().filter(|o| matches!(o, Order::ProposeAccord { to: Seat(1), .. })).collect();
+    assert!(offers.iter().any(|o| matches!(o, Order::ProposeAccord { terms, .. } if terms.contains(&Term::Refuel))), "the Prospectors hold the only station at Mars: {offers:?}");
+    g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression, Term::Refuel]).expect("struck");
+    assert!(g.check_order(Seat(0), &[], &refuel).is_ok(), "under the Accord it refuels at the partner's station");
+    assert!(!g.stranded(id), "and is not stranded");
+    let fuel_before = g.seats[0].stockpile.fuel;
+    g.commit_orders(Seat(0), std::slice::from_ref(&refuel));
+    g.resolution_phase();
+    assert_eq!(g.ship(id).unwrap().fuel, g.tables.unit(UnitKind::Frigate).tank, "the tank is full");
+    assert_eq!(g.seats[0].stockpile.fuel, fuel_before - g.tables.unit(UnitKind::Frigate).tank, "paid from the refueller's own Stockpile");
+    assert!(g.log.iter().any(|l| l.contains("at a partner's station")), "said in the log");
+    // A rival blockading the partner's slot shuts it to the partner as to its holder.
+    g.ships.iter_mut().find(|s| s.id == id).unwrap().fuel = 0;
+    let blockader = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Frigate);
+    g.ships.push(Ship { id: blockader, name, kind: UnitKind::Frigate, seat: Seat(2), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(0) });
+    assert!(g.check_order(Seat(0), &[], &refuel).is_err(), "blockaded against its holder, it fuels nobody");
+}
+
+// -------------------------------------------- 0.08.8 ticket #326: escorts take the fire
+
+/// Ticket #326 (version 0.08.8): while a party has a warship engaged, hits on the party land on
+/// its warships; the unarmed hull is struck only once the last warship is down. And the retreat
+/// is covered: an unarmed hull that runs while its escort stands is not pursued.
+#[test]
+fn escorts_take_the_fire_and_cover_the_retreat() {
+    // A Frigate attacks a Colony Ship escorted by a Frigate; the Colony Ship stands FIRST in its
+    // party, so a uniform draw with the scripted pick of 0 would strike it first. Every hitter
+    // roll goes to the attacker; the escort never disengages. Round 1: three hits on the escort.
+    // Round 2: the fourth destroys it, the next two land on the Colony Ship. Round 3: the third
+    // hit destroys the Colony Ship.
+    let mut a = vec![frigate(1)];
+    let mut d = vec![colony_ship(3), frigate(2)];
+    let chances = vec![true, true, true, false, true, true, true, false, true, true, true];
+    let mut dice = Script { chances: VecDeque::from(chances), d6s: VecDeque::new(), picks: VecDeque::new() };
+    let stats = combat::fight(&mut a, &mut d, &mut dice, 2.0);
+    assert!(d[1].destroyed(), "the escort fell first, at {} hits", d[1].damage);
+    assert_eq!(d[1].damage, 4, "every hit while it stood landed on it");
+    assert_eq!(d[0].damage, 3, "the Colony Ship was struck only after, and died: {stats:?}");
+    assert_eq!(stats.hits[0], 7);
+    // The retreat: the Colony Ship on Evade escapes at the start; its escort stands engaged, so no
+    // pursuit is rolled for it (an empty d6 script would panic if one were), and it takes no hit.
+    let mut a = vec![frigate(1)];
+    let mut d = vec![Combatant::new(UnitRef::Ship(ShipId(3)), "Colony Ship 3", 0, 3, 0, 0, true).armed(false), frigate(2)];
+    let chances = vec![true, true, true, true, false, true, true, true];
+    let mut dice = Script { chances: VecDeque::from(chances), d6s: VecDeque::new(), picks: VecDeque::new() };
+    combat::fight(&mut a, &mut d, &mut dice, 2.0);
+    assert!(d[0].escaped && d[0].damage == 0, "the Colony Ship ran under cover and was not caught");
+    assert!(d[1].destroyed(), "its escort took the fight");
+}
+
+// -------------------------------------------- 0.08.8 ticket #327: rolls per engaged warship
+
+/// Ticket #327 (version 0.08.8): a Ship melee rolls once a round for every engaged armed unit
+/// present. Two Frigates and a Battery against a Battleship roll four a round, so the Battleship
+/// (8 hit points) dies in two rounds where a flat three needed three.
+#[test]
+fn a_ship_melee_rolls_once_a_round_for_every_engaged_armed_unit() {
+    let mut a = vec![frigate(1), frigate(2), Combatant::new(UnitRef::Battery { colony: ColonyId(9), index: 0 }, "the Battery", 4, 6, 0, 0, false)];
+    let mut d = vec![Combatant::new(UnitRef::Ship(ShipId(3)), "Battleship 3", 7, 8, 0, 0, false)];
+    let rolls = (a.len() + d.len()) as u32;
+    assert_eq!(rolls, 4);
+    // Every hitter roll to the attackers; the Battleship never disengages.
+    let chances = vec![true, true, true, true, false, true, true, true, true];
+    let mut dice = Script { chances: VecDeque::from(chances), d6s: VecDeque::new(), picks: VecDeque::new() };
+    let stats = combat::melee(&mut [&mut a, &mut d], &mut dice, 3.0, 3, rolls);
+    assert!(d[0].destroyed(), "eight hits in two rounds of four: {stats:?}");
+    assert_eq!(stats.rounds, 2, "two rounds, not three: {stats:?}");
+    assert_eq!(stats.hits[0], 8);
+    // The table carries the figures, and a fresh game reads them.
+    let g = game();
+    assert_eq!((g.tables.melee.rounds, g.tables.melee.rolls), (3, 3));
+}
+
+// -------------------------------------------- 0.08.8 ticket #328: Bombard
+
+/// Ticket #328 (version 0.08.8): a Battleship holding the orbit outright bombards a rival's Colony
+/// at the Body: one Module burns at the destruction chance (forced to certain here), a burned
+/// Habitat takes the people beyond the room left, the offence is rung 3, the Report and the Battle
+/// record carry it. Refused over Earth, without the orbit held outright, and from a Frigate.
+#[test]
+fn a_battleship_bombards_a_rival_colony_from_an_orbit_it_holds() {
+    let mut g = game();
+    calm(&mut g);
+    let colony = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: colony, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules: vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Core)], colonists: 12, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+    g.ships.retain(|s| s.at != ShipAt::Body(BodyId::Mars));
+    let ship = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Battleship);
+    g.ships.push(Ship { id: ship, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    let bombard = Order::Bombard { ship, colony };
+    assert_eq!(g.orbital_control(BodyId::Mars), Some(Seat(0)));
+    assert!(g.check_order(Seat(0), &[], &bombard).is_ok(), "held outright, a rival's Colony at the Body");
+    // Not with the orbit contested.
+    let rival = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Frigate);
+    g.ships.push(Ship { id: rival, name, kind: UnitKind::Frigate, seat: Seat(2), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    assert!(g.check_order(Seat(0), &[], &bombard).is_err(), "the orbit is contested");
+    g.ships.retain(|s| s.id != rival);
+    // Never over Earth, from any hull.
+    let over_earth = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(1))).map(|c| c.id).expect("seat 1's station");
+    let earth_ship = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Battleship);
+    g.ships.push(Ship { id: earth_ship, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    assert!(g.check_order(Seat(0), &[], &Order::Bombard { ship: earth_ship, colony: over_earth }).is_err(), "no Bombard over Earth");
+    g.ships.retain(|s| s.id != earth_ship);
+    // The strike, at a certain chance: one Module burns, never the Core, and the people beyond the room left die.
+    std::sync::Arc::make_mut(&mut g.tables).influence.destruction_chance = 1.0;
+    let owed_before = g.relations.owed[1][0];
+    g.commit_orders(Seat(0), std::slice::from_ref(&bombard));
+    g.resolution_phase();
+    let c = g.colony(colony).unwrap().clone();
+    assert_eq!(c.modules.len(), 2, "one Module burned: {:?}", c.modules.iter().map(|m| m.kind).collect::<Vec<_>>());
+    assert!(c.modules.iter().any(|m| m.kind == ModuleKind::Core), "never the Core Module");
+    assert_eq!(c.modules.iter().filter(|m| m.kind == ModuleKind::Habitat).count(), 1, "a Habitat burned");
+    assert_eq!(c.colonists, g.habitat_room(&c), "the people beyond the room left died: {} of 12 live", c.colonists);
+    assert_eq!(g.relations.owed[1][0] - owed_before, 3, "rung 3 against the holder");
+    assert_eq!((g.war.bombards[0], g.war.modules_burned[0]), (1, 1));
+    assert!(g.log.iter().any(|l| l.contains("bombarded") && l.contains("Habitat destroyed") && l.contains("Colonists dead")), "{:?}", g.log.iter().filter(|l| l.contains("bombard")).collect::<Vec<_>>());
+    let line = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::Body(BodyId::Mars))).expect("a Battle record at Mars for the mark");
+    assert_eq!(line.aggressor(), Some(Seat(0)));
+}
+
+/// Ticket #328: the computer bombards a Colony whose holder it has cause against, from a
+/// Battleship holding the orbit outright, and not without cause.
+#[test]
+fn the_computer_bombards_with_cause_and_the_orbit_held() {
+    let mut g = game();
+    calm(&mut g);
+    let colony = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: colony, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules: vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Mine)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+    g.ships.retain(|s| s.at != ShipAt::Body(BodyId::Mars));
+    let ship = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Battleship);
+    g.ships.push(Ship { id: ship, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    let calm_orders: Vec<Order> = g.ai_orders(Seat(0));
+    assert!(!calm_orders.iter().any(|o| matches!(o, Order::Bombard { .. })), "no cause, no Bombard: {calm_orders:?}");
+    g.relations.score[0][1] = -8;
+    assert!(g.relations_score(Seat(0), Seat(1)) <= g.tables.ai.thresholds.war_cause);
+    let orders: Vec<Order> = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::Bombard { ship: s, colony: c } if *s == ship && *c == colony)), "with cause and the orbit held: {orders:?}");
 }

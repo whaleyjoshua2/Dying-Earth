@@ -1,4 +1,4 @@
-DYING EARTH - playtest build, version 0.08.7
+DYING EARTH - playtest build, version 0.08.8
 ============================================
 
 Thanks for playing. This is an early build of a turn-based strategy game about colonizing
@@ -16,46 +16,58 @@ HOW TO RUN
 4. The very first launch shows a blank dark window for up to ten seconds while it
    compiles graphics. Later launches are quick.
 5. Needs Windows 10 or 11, 64-bit, and any graphics card from the last ten years.
-6. Saves from 0.08.6 load in this version: no rule changed. Saves from 0.08.5 and before
-   will not; the Load screen says so. This version ships for Windows only.
+6. Saves from 0.08.7 and before will not load in this version: the rules of war changed
+   under them; the Load screen says so. This version ships for Windows only.
 
-WHAT CHANGED SINCE 0.08.6
+WHAT CHANGED SINCE 0.08.7
 -------------------------
-Nothing in the rules. This version is about what you can SEE. Last version rewrote the
-army; this one lets you read the war.
+The war. Last version let you read it; this one lets you fight it, on the ground and in
+orbit. Every rule below the computer plays too.
 
-- THE ATTACK BUTTON TELLS YOU WHO YOU ARE ATTACKING. It used to read "attack Russia
-  (61%)" and nothing else. Now it reads "attack Russia", and hovering it says who
-  defends, at what strength, what they defend at (dug in or not), how hurt they are,
-  and what the percentage is a chance OF: winning the first exchange, your strength
-  against theirs. Landing an army at a rival's colony gets the same hover.
-- A THREAT LINE ON YOUR COUNTRIES. Under the line that names the rival closest to
-  taking a country by influence, a second line names the rival army next door most
-  likely to take it by force: "The Prospectors' 2nd Russian Army, strength 3, stands
-  next door in Russia." It turns amber when their odds reach the point where the
-  computer would attack. It never tells you their orders - only that they are there.
-- LAST TURN'S BATTLE IS ON THE MAP. The turn after a battle, a ring in the attacker's
-  colour circles the country (or colony) where it was fought; hover it for who attacked
-  and what happened, click its top edge for the Report. Every army shield there is
-  outlined in that colour, and any shield whose army is hurt wears a red dot. Battles
-  in orbit are not marked.
-- ARMY ORDERS ARE WHERE THE ARMIES ARE. The stance row and the march buttons now sit in
-  the Armies list on the country card, under each army, instead of at the very bottom of
-  the card where you had to scroll for them. The whole block is a little larger.
-- STANCES EXPLAIN THEMSELVES. Hover Attack, Hold, Dig In, Evade, Intercept or Blockade
-  on the stance row and it says what it does. Intercept, for warships, "fights what
-  arrives this turn, before it can land" - nobody could find that out before. Ships in
-  the roster now show their stance in brackets, as armies do.
-- OFFLINE BUILDINGS LOOK OFFLINE. A building shut for lack of energy, knocked out by an
-  event, in a colony whose grid is down, or an Archive under occupation is dimmed with
-  the word "offline" in its corner; hovering says why. Before, it looked exactly like a
-  working one.
-- END TURN HAS ITS OWN COLUMN, at the right of the command cluster, at the bottom.
-- LESS SAYING THINGS TWICE: eight places where the screen repeated itself are gone. The
-  "(hover a button...)" hints on headings, the sentence under the climate panel's blame
-  block, the victory text repeated over its own bars, and so on.
-- THE PROSPECTORS' FUND IS OFF THE TOP BAR. It is on the Victory panel, where its slider
-  is. No other side's fund was ever on the bar.
+- YOUR COUNTRY'S OWN ARMY CAN MARCH. Last version kept a country's standing army at home
+  for good. Now you may march it like any other; at home it defends with its people, away
+  from home it is an ordinary army and a threat to whoever it stands next to. The computer
+  marches its own last and its raised armies first.
+- ARMIES MOVE AS A STACK. Under the stance row on a country card, one row of buttons moves
+  every army there at once ("All 2 (8): attack Russia"), with the odds for the whole stack
+  on hover; the per-army rows stay if you want to split. "Repair all" too. Ships get the
+  same: "All 2 that can" per destination. THE COMPUTER MASSES NOW: two armies together
+  clear odds one alone would not, and it knows it.
+- CLICK A SHIELD, THEN RIGHT-CLICK THE MAP. Clicking your own army shield arms the stack:
+  a ring on the shield, the countries it can reach outlined. Right-click one of them to
+  march the whole stack there; right-click it again to take the order back. Escape, End
+  Turn or a click elsewhere disarms. Works for ships on the Solar System Map too.
+- PASSAGE IS A REAL RULE. Under a Passage bargain your armies may march into the other
+  side's countries without attacking; they sit on Hold, fight nobody and defend nothing
+  until the bargain ends, then they are attacking. The computer offers it with
+  non-aggression when it is Cordial with you and shares a border.
+- THE BATTERY: a new building for a colony or a station (25 Materials, 3 Energy a turn).
+  It fights in orbit with strength 4 and 6 hit points, never runs, and while it stands
+  NOBODY ELSE HOLDS ORBITAL CONTROL there: no landing against you, no blockade of your
+  station. It does not give you control either; a fleet that wants your ground has to
+  shoot it down first. Repair it with Materials on its tile. The computer builds one when a
+  rival warship parks over its colony.
+- BOMBARD: a battleship holding an orbit outright (nobody else's warships, no enemy
+  Battery) can bombard a rival colony there from the Ship card. One building, drawn at
+  random, has a 25% chance to burn; if it is a Habitat the people beyond the room left
+  die with it. It is a rung-3 offence like starting a battle, and it is never allowed over
+  Earth. The computer does it when it has cause against you.
+- ESCORTS WORK. While you have a warship in a battle, hits land on the warships; a colony
+  ship or carrier beside them is not hit and not chased. Before, a colony ship next to a
+  frigate took half the hits.
+- BIG FIGHTS ARE DEADLIER. A battle in orbit rolls for a hit once a round per warship or
+  Battery present (never fewer than three), instead of a flat three however many hulls
+  were there. A battleship can now die in a turn if enough guns are on it.
+- REFUEL AT A FRIEND'S STATION. Under a Refuel bargain you can fill your tanks at the
+  other side's station, from your own stockpile. A ship at a body with only a partner's
+  station is no longer stranded. The computer offers it where it has ships and no station
+  of its own.
+- CARRIERS AND INTERCEPT FOR EVERYONE. Any side with a grudge against a colony off Earth
+  may build a carrier and lift an army to it, not only the Prospectors; and Intercept
+  fires now against unarmed ships arriving, without needing orbital control.
+- BATTLES IN ORBIT ARE MARKED ON THE MAP. The ring is gone; one crossed-swords mark in the
+  attacker's colour sits beside every place a battle was fought last turn, on Earth, on a
+  body and in orbit on the Solar System Map, with a "Battles last turn" list there.
 
 HOW TO PLAY, IN SHORT
 ---------------------
@@ -68,7 +80,8 @@ HOW TO PLAY, IN SHORT
   and press Spend, or Max.
 - ARMIES are raised from a region's card and march to a neighbouring region from the
   Armies list on that card. Arriving in a region you do not hold is an attack; hover the
-  button first. A region's own standing army never marches. Warships are built at a
+  button first. A region's own standing army can march too, but away from home it
+  loses its people's defence. Warships are built at a
   shipyard and fight in orbit; a warship in a rival station's slot can be ordered to
   Blockade.
 - The FACTION WINDOW (F) has a page for each side: what they have, what they think of you,
@@ -110,32 +123,30 @@ Screenshots help. Print Screen, then paste into a message.
 KNOWN ROUGH EDGES
 -----------------
 All the numbers below come from eighty computer-only games, twenty with each side going
-first. They are the same eighty games as last version, move for move, because no rule
-changed.
+first.
 
-- THE WIN COLUMN IS WHERE 0.08.6 LEFT IT. Out of eighty games: Custodians 43, Prospectors
-  21, Arkwrights 2, Archivists 0. Last version's rules hardened the defender and the
-  Prospectors were the side that attacked; this version changed nothing about that.
-  Expect the next version to be about balance.
-- THE COMPUTER NO LONGER WINS ON THE GROUND. It marches one army at a time and only at
-  60% odds, and a single raised army clears that against almost nobody. Two armies
-  together would; it never masses. This is measured behaviour, not a rule: YOU can mass.
-- THE WORLD COLLAPSES IN 14 GAMES OF 80. When the Arkwrights go first it collapses 12
-  times in 20, and that seating ends at +3.0 C. The other three end cooler.
-- THREE RULES NEVER FIRE IN EIGHTY COMPUTER GAMES: no occupation is abandoned, no army is
-  landed at a colony, and no neutral country is ever threatened (every country is taken
-  by influence before the first army exists). They will matter to YOU if you play that
-  way.
-- BATTLES IN ORBIT ARE NOT MARKED ON THE MAP, and in computer games that is most of them
-  (57 of 62). The Report still lists every one.
-- THE BLOCKADE IS STILL MOSTLY THE PROSPECTORS' (107 colony-turns starved where they go
-  second).
+- THE WIN COLUMN BARELY MOVED: Custodians 43, Prospectors 22, Arkwrights 1, Archivists 0
+  (last version 43 / 21 / 2 / 0). The ground war is wide open now - 347 marches on held
+  countries where there were 5, 169 countries taken by force where there were 2, 161
+  standing armies lost where there were 2 - and it did not change who wins. Expect the
+  next version to be about balance.
+- THE WORLD COLLAPSES IN 14 GAMES OF 80. When the Arkwrights go first it collapses 13
+  times in 20, and that seating carries most of the war.
+- THE ORBITAL RULES FIRE RARELY IN COMPUTER GAMES. 39 Batteries stood at the end and 8
+  were shot down; 6 bombards were fired and all six missed; 2 refuels were drawn at a
+  partner's station; 1 interception was fought; NO ARMY WAS LANDED FROM A CARRIER in
+  eighty games, and no colony ship was ever caught beside an escort. The computer's
+  orbital fights are one or two hulls a side. These rules are there for YOU.
+- PASSAGE IS NEVER STRUCK between computer sides: they never get warm enough with each
+  other at the moment they offer. You can strike it with them.
+- THE BLOCKADE IS STILL MOSTLY THE PROSPECTORS' (85 colony-turns starved where they go
+  second), a little less than before now that Batteries stand.
 - THE REPORT STILL SAYS "ARMY" in its march lines.
 - SPACE EVENTS CAN STILL FIND NOTHING TO HIT: about three cards a game.
 - TWO OF THE FOUR SPECIAL SPACE BUILDINGS ARE STILL NEVER BUILT BY THE COMPUTER (the
   Archivists' Heliostat and the Custodians' Academy). You can build either by hand.
-- ONLY NON-AGGRESSION EVER GETS STRUCK between computer sides, and most bargains are
-  later broken. As last version.
+- ONLY NON-AGGRESSION AND REFUEL EVER GET STRUCK between computer sides, and most bargains
+  are later broken.
 - FUEL AND ENERGY PRICES BARELY MOVE, because the computer sides never sell goods. As last
   version.
 - WHERE EACH SIDE STARTS IS NOT RANDOM. The computer sides always take the richest free

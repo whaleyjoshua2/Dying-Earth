@@ -233,6 +233,12 @@ pub struct ModuleCard {
     pub does: Option<String>,
     #[serde(default)]
     pub holds_colonists: u32,
+    /// Ticket #324 (version 0.08.8): the Battery's figures in the orbital Battle, nought for every
+    /// other Module. Hardened Hulls does not reach them; a Module is not a hull.
+    #[serde(default)]
+    pub strength: i64,
+    #[serde(default)]
+    pub hit_points: u32,
     #[serde(default)]
     pub influence_allotment: i64,
     #[serde(default)]
@@ -1181,6 +1187,9 @@ pub struct StandingArmyCard {
     pub calm: u32,
     pub threat_steps: u32,
     pub held_step: u32,
+    /// Ticket #318 (version 0.08.8): the Incomes after a Standing Army's death before it is raised
+    /// again, at strength one; 2 since ticket #282, where it was a literal in code.
+    pub respawn_incomes: u32,
 }
 
 /// Ticket #297 (version 0.08.6): what an Army dug in adds to its strength while it defends. Hit
@@ -1190,12 +1199,22 @@ pub struct DigInCard {
     pub defence: i64,
 }
 
+/// Ticket #327 (version 0.08.8): the melee's shape, in data: its rounds, and the hit rolls a
+/// round on the ground and the floor for a Ship melee, which rolls once for every engaged armed
+/// unit present when that is more.
+#[derive(Debug, Clone, Deserialize)]
+pub struct MeleeCard {
+    pub rounds: u32,
+    pub rolls: u32,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct UnitsFile {
     unit: Vec<UnitCard>,
     repair: RepairCard,
     crowding: CrowdingCard,
     disengage: DisengageCard,
+    melee: MeleeCard,
     standing_army: StandingArmyCard,
     dig_in: DigInCard,
 }
@@ -1449,6 +1468,8 @@ pub struct Tables {
     pub crowding: CrowdingCard,
     /// Ticket #295 (version 0.08.6): the disengage roll's divisor.
     pub disengage: DisengageCard,
+    /// Ticket #327 (version 0.08.8): the melee's rounds and rolls.
+    pub melee: MeleeCard,
     /// Ticket #296 (version 0.08.6): what a Region's people add to its own Armies.
     pub standing_army: StandingArmyCard,
     /// Ticket #297 (version 0.08.6): what digging in adds to a defending Army.
@@ -1566,6 +1587,7 @@ impl Tables {
             repair: units.repair,
             crowding: units.crowding,
             disengage: units.disengage,
+            melee: units.melee,
             standing_army: units.standing_army,
             dig_in: units.dig_in,
             techs: techs.tech,
@@ -1743,6 +1765,10 @@ impl Tables {
         if self.disengage.divisor <= 0.0 {
             return Err(err("units.toml", "[disengage] divisor must be positive"));
         }
+        // Ticket #327: a melee of no rounds or no rolls is no melee.
+        if self.melee.rounds == 0 || self.melee.rolls == 0 {
+            return Err(err("units.toml", "[melee] rounds and rolls must both be at least 1"));
+        }
         for s in &self.states {
             if s.unrest < 0.0 || s.unrest > u.max {
                 return Err(err("nation_states.toml", format!("row {}: unrest {} is outside 0..={}", s.name, s.unrest, u.max)));
@@ -1760,6 +1786,10 @@ impl Tables {
         }
         if self.slots.per_colonist == 0 {
             return Err(err("modules.toml", "[slots] per_colonist must be at least 1: a Colonist has to buy something"));
+        }
+        // Ticket #324: a Module that fights needs hit points to lose, or the first hit is its last.
+        if let Some(m) = self.modules.iter().find(|m| m.strength > 0 && m.hit_points == 0) {
+            return Err(err("modules.toml", format!("[[module]] {} has strength and no hit_points", m.name)));
         }
         if self.archive.research <= 0 || !(0.0..=1.0).contains(&self.archive.banked_before_built) {
             return Err(err("modules.toml", "[archive] needs research above zero and banked_before_built from 0 to 1"));

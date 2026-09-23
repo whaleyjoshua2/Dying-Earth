@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
 pub enum UnitRef {
     Ship(ShipId),
     Army(ArmyId),
+    /// Ticket #324 (version 0.08.8): a Battery, by its Colony and its index among that Colony's
+    /// Modules; the reference a Battle writes damage back through and a Repair order names.
+    Battery { colony: ColonyId, index: usize },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -58,6 +61,10 @@ pub enum Order {
     /// Faction holds a Space Station, as far as the Stockpile can pay.
     Refuel { ship: ShipId },
     ShipStance { body: BodyId, stance: Stance },
+    /// Ticket #328 (version 0.08.8): a Battleship at a Body whose Faction holds Orbital Control
+    /// there outright bombards a rival's Colony at that Body: one Module drawn at random rolls the
+    /// destruction chance. Never over Earth.
+    Bombard { ship: ShipId, colony: ColonyId },
     ArmyStance { place: Place, stance: Stance },
     MoveArmy { army: ArmyId, to: StateId },
     Load { ship: ShipId, colonists: u32, from: LoadSource, army: Option<ArmyId> },
@@ -252,6 +259,10 @@ fn fail<T>(msg: impl Into<String>) -> Result<T, OrderError> {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Pending {
     pub repairs: Vec<(Seat, UnitRef, u32)>,
+    /// Ticket #328 (version 0.08.8): Bombards ordered this turn -- who, from which Battleship, at
+    /// which Colony -- resolved after the orbital Battles.
+    #[serde(default)]
+    pub bombards: Vec<(Seat, ShipId, ColonyId)>,
     pub cargo: Vec<(Seat, Order)>,
     /// Ticket #46: stations ordered this turn.
     pub stations: Vec<(Seat, BodyId, u32)>,
@@ -302,6 +313,8 @@ impl Game {
             // Ticket #87: a transit spends the Ship's tank, not the Stockpile; a Refuel takes from
             // the Stockpile what the tank wants and the Stockpile can pay.
             Order::Transit { .. } => Cost::default(),
+            // Ticket #328 (version 0.08.8): a Bombard costs nothing but the offence.
+            Order::Bombard { .. } => Cost::default(),
             Order::Refuel { ship } => Cost { fuel: self.refuel_amount(seat, *ship), ..Default::default() },
             Order::Influence { amount, .. } => Cost { influence: *amount, ..Default::default() },
             Order::Smear { amount, .. } => Cost { influence: *amount, ..Default::default() },
@@ -847,10 +860,11 @@ impl Game {
                 // Ticket #90: and a Trade Post.
                 // Ticket #185 (version 0.08.0): and an Institute, since a station carries Observatories
                 // and the Institute is what multiplies them.
+                // Ticket #324 (version 0.08.8): and Batteries.
                 if col.in_orbit
-                    && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Academy)
+                    && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Academy | ModuleKind::Battery)
                 {
-                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays, a Trade Post and an Institute");
+                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays, a Trade Post, an Institute and Batteries");
                 }
                 // Ticket #186 (version 0.08.0): nobody but the Custodians builds an Academy off
                 // Earth either, captured ones included.
@@ -1008,6 +1022,18 @@ impl Game {
                             return fail("an Army cannot repair and move in one turn");
                         }
                     }
+                    // Ticket #324 (version 0.08.8): a Battery repairs at its own Colony, which its
+                    // director must direct; no yard is needed, since the Colony is the yard.
+                    UnitRef::Battery { colony, index } => {
+                        let Some(col) = self.colony(*colony) else { return fail("no such Colony") };
+                        if col.control.director() != Some(seat) {
+                            return fail("not your Battery");
+                        }
+                        let Some(m) = col.modules.get(*index).filter(|m| m.kind == ModuleKind::Battery) else { return fail("no Battery there") };
+                        if *points > m.damage {
+                            return fail("more repair than damage");
+                        }
+                    }
                 }
                 Ok(cost)
             }
@@ -1050,12 +1076,13 @@ impl Game {
                     return fail("not your Ship");
                 }
                 let ShipAt::Body(body) = s.at else { return fail("in transit") };
-                if !self.own_station_at(seat, body) {
-                    return fail(format!("no station of yours over {} to refuel at", self.tables.body(body).name));
+                // Ticket #325 (version 0.08.8): or a partner's station under a Refuel Accord.
+                if !self.refuel_station_at(seat, body) {
+                    return fail(format!("no station of yours, or of a Refuel partner's, over {} to refuel at", self.tables.body(body).name));
                 }
                 // Ticket #99 (version 0.07.0): a blockaded station fuels nothing.
                 if !self.refuelling_station(seat, body) {
-                    return fail(format!("every station of yours over {} is blockaded", self.tables.body(body).name));
+                    return fail(format!("every station over {} you could refuel at is blockaded", self.tables.body(body).name));
                 }
                 if s.fuel >= self.tables.unit(s.kind).tank {
                     return fail("the tank is full");
@@ -1064,6 +1091,35 @@ impl Game {
                     return fail("no Fuel in the Stockpile to fill it with");
                 }
                 if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Refuel { ship: x } if x == ship)) {
+                    return fail("this Ship already has an order");
+                }
+                Ok(cost)
+            }
+            // Ticket #328 (version 0.08.8): Bombard, from a Battleship holding the orbit outright.
+            Order::Bombard { ship, colony } => {
+                let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
+                if s.seat != seat {
+                    return fail("not your Ship");
+                }
+                if s.kind != UnitKind::Battleship {
+                    return fail("only a Battleship can Bombard");
+                }
+                let ShipAt::Body(body) = s.at else { return fail("in transit") };
+                if body == BodyId::Earth {
+                    return fail("no Bombard over Earth");
+                }
+                let Some(col) = self.colony(*colony) else { return fail("no such Colony") };
+                if col.body != body {
+                    return fail("that Colony is not at this Body");
+                }
+                match col.control.director() {
+                    Some(d) if d != seat => {}
+                    _ => return fail("not a rival's Colony"),
+                }
+                if self.orbital_control(body) != Some(seat) {
+                    return fail(format!("you do not hold Orbital Control of {} outright", self.tables.body(body).name));
+                }
+                if pending.iter().any(|o| matches!(o, Order::Bombard { ship: x, .. } | Order::Transit { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 Ok(cost)
@@ -1105,11 +1161,9 @@ impl Game {
                 if self.army_stands_down(a) {
                     return fail("this Army stands down");
                 }
-                // Ticket #302 (version 0.08.6): a Region's own Army stays at home; only a raised
-                // Army marches. The holder could march the Standing Army before this version.
-                if a.standing {
-                    return fail("a Region's own Army stays at home; raise one to march");
-                }
+                // Ticket #302 (version 0.08.6) kept a Region's own Army at home. Ticket #321
+                // (version 0.08.8): it marches again, at the designer's word -- "no they can
+                // march" -- the playtest having found a board on which nothing could be moved.
                 // Ticket #297 (version 0.08.6): dug in, it goes nowhere until its stance has been
                 // changed and the turn has passed; a stance order this turn takes effect at the
                 // Resolution, after the march would have gone, so it does not lift this.
@@ -1641,6 +1695,8 @@ impl Game {
                     }
                 }
                 Order::Repair { unit, points } => self.pending.repairs.push((seat, *unit, *points)),
+                // Ticket #328 (version 0.08.8): resolved after the orbital Battles.
+                Order::Bombard { ship, colony } => self.pending.bombards.push((seat, *ship, *colony)),
                 Order::Transit { ship, to, slot } => {
                     let from = match self.ship(*ship).map(|s| s.at) {
                         Some(ShipAt::Body(b)) => b,
@@ -1662,10 +1718,17 @@ impl Game {
                 Order::Refuel { ship } => {
                     let amount = cost.fuel;
                     let tank = self.ship(*ship).map(|s| self.tables.unit(s.kind).tank).unwrap_or(0);
+                    let body = self.ship(*ship).and_then(|s| match s.at {
+                        ShipAt::Body(b) => Some(b),
+                        _ => None,
+                    });
                     if let Some(s) = self.ship_mut(*ship) {
                         s.fuel = (s.fuel + amount).min(tank);
                     }
-                    self.log(format!("{} refuels {} with {} Fuel.", self.seat_name(seat), ship, amount));
+                    // Ticket #325 (version 0.08.8): said when it is a partner's station, so the
+                    // sweep can count it apart from a refuel at one's own.
+                    let at_partner = body.is_some_and(|b| !self.own_station_at(seat, b));
+                    self.log(format!("{} refuels {} with {} Fuel{}.", self.seat_name(seat), ship, amount, if at_partner { " at a partner's station" } else { "" }));
                 }
                 Order::ShipStance { body, stance } => {
                     for s in self.ships.iter_mut().filter(|s| s.seat == seat && s.at == ShipAt::Body(*body)) {
@@ -2035,6 +2098,7 @@ impl Game {
             match u {
                 UnitRef::Ship(id) => self.ship(id).map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into()),
                 UnitRef::Army(_) => "an Army".to_string(),
+                UnitRef::Battery { .. } => "a Battery".to_string(),
             }
         };
         match order {
@@ -2079,6 +2143,8 @@ impl Game {
             // the computer announcing that it did nothing. Five of the nine clauses in one sampled
             // paragraph were exactly that.
             Order::ShipStance { stance: Stance::Hold, .. } | Order::ArmyStance { stance: Stance::Hold, .. } => None,
+            // Ticket #328 (version 0.08.8).
+            Order::Bombard { colony, .. } => r("bombard", &[("colony", place(Place::Colony(*colony)))]),
             Order::ShipStance { body, stance } => {
                 r("ship_stance", &[("body", self.tables.body(*body).name.clone()), ("stance", stance.name().to_string())])
             }

@@ -51,11 +51,16 @@ pub struct Combatant {
     /// Ticket #297 (version 0.08.6): dug in, it never rolls to disengage. Its defence bonus is
     /// already in `strength`; the caller adds it.
     pub dug_in: bool,
+    /// Ticket #326 (version 0.08.8): a warship, a Battery or an Army; a Colony Ship and a Carrier
+    /// are not. While a party has an engaged armed unit, hits on the party land on its armed units
+    /// and its unarmed ones are neither struck nor pursued: the escort takes the fire. Set by the
+    /// caller from the hull, since the melee does not know kinds; true unless it says otherwise.
+    pub armed: bool,
 }
 
 impl Combatant {
     pub fn new(unit: UnitRef, name: impl Into<String>, strength: i64, hit_points: u32, damage: u32, pursuit: u32, evade: bool) -> Combatant {
-        Combatant { unit, name: name.into(), strength, hit_points, damage, pursuit, evade, engaged: true, escaped: false, pursued: false, dug_in: false }
+        Combatant { unit, name: name.into(), strength, hit_points, damage, pursuit, evade, engaged: true, escaped: false, pursued: false, dug_in: false, armed: true }
     }
 
     /// Ticket #297: the same unit, dug in.
@@ -63,6 +68,18 @@ impl Combatant {
         self.dug_in = dug_in;
         self
     }
+
+    /// Ticket #326: the same unit, armed or not.
+    pub fn armed(mut self, armed: bool) -> Combatant {
+        self.armed = armed;
+        self
+    }
+}
+
+/// Ticket #326: whether the party still has an armed unit engaged, which is what covers its
+/// unarmed ones.
+fn escorted(side: &[Combatant]) -> bool {
+    side.iter().any(|c| c.engaged && !c.destroyed() && c.armed)
 }
 
 impl Combatant {
@@ -94,6 +111,8 @@ impl BattleStats {
     }
 }
 
+/// The First Playable's figures, kept for the two-sided callers and the tests; the game reads
+/// its own from `units.toml [melee]` since ticket #327 (version 0.08.8).
 pub const MAX_ROUNDS: u32 = 3;
 pub const HIT_ROLLS: u32 = 3;
 
@@ -105,8 +124,11 @@ fn any_engaged(side: &[Combatant]) -> bool {
     side.iter().any(|c| c.engaged && !c.destroyed())
 }
 
+/// Ticket #326 (version 0.08.8): drawn uniformly among the party's engaged ARMED units while it
+/// has any; its unarmed hulls are struck only when no armed unit of its remains engaged.
 fn random_engaged(side: &[Combatant], dice: &mut dyn Dice) -> Option<usize> {
-    let idx: Vec<usize> = side.iter().enumerate().filter(|(_, c)| c.engaged && !c.destroyed()).map(|(i, _)| i).collect();
+    let covered = escorted(side);
+    let idx: Vec<usize> = side.iter().enumerate().filter(|(_, c)| c.engaged && !c.destroyed() && (c.armed || !covered)).map(|(i, _)| i).collect();
     if idx.is_empty() {
         None
     } else {
@@ -167,12 +189,15 @@ pub fn disengage_chance(c: &Combatant, divisor: f64) -> f64 {
 /// Run one battle between two parties to its end. Kept for the two-sided callers and the tests;
 /// it is `melee` with two parties.
 pub fn fight(attackers: &mut [Combatant], defenders: &mut [Combatant], dice: &mut dyn Dice, divisor: f64) -> BattleStats {
-    melee(&mut [attackers, defenders], dice, divisor)
+    melee(&mut [attackers, defenders], dice, divisor, MAX_ROUNDS, HIT_ROLLS)
 }
 
 /// Run one melee to its end: every party is hostile to every other. Units are mutated in place;
-/// escaped units are marked. `divisor` is the disengage roll's (ticket #295).
-pub fn melee(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, divisor: f64) -> BattleStats {
+/// escaped units are marked. `divisor` is the disengage roll's (ticket #295). Ticket #327
+/// (version 0.08.8): `rounds` and `rolls` are the caller's -- a Ship melee rolls once a round for
+/// every engaged armed unit across every party, never fewer than the table's figure; a ground
+/// melee rolls the table's figure.
+pub fn melee(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, divisor: f64, rounds: u32, rolls: u32) -> BattleStats {
     let n = parties.len();
     let mut stats = BattleStats { rounds: 0, hits: vec![0; n], destroyed: vec![Vec::new(); n], escaped: vec![Vec::new(); n] };
     // Evade rolls at the start of the battle, at current damage (spec 9.2).
@@ -185,7 +210,7 @@ pub fn melee(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, divisor: f64
         }
     }
     pursue(parties, dice, &mut stats);
-    for _round in 0..MAX_ROUNDS {
+    for _round in 0..rounds {
         if parties.iter().filter(|p| any_engaged(p)).count() < 2 {
             break;
         }
@@ -195,7 +220,7 @@ pub fn melee(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, divisor: f64
         let strengths: Vec<i64> = parties.iter().map(|p| total_strength(p)).collect();
         let live: Vec<usize> = (0..n).filter(|i| any_engaged(parties[*i])).collect();
         let total: i64 = strengths.iter().sum();
-        for _ in 0..HIT_ROLLS {
+        for _ in 0..rolls {
             if total <= 0 {
                 break;
             }
@@ -277,6 +302,12 @@ fn pursue(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, stats: &mut Bat
             .map(|(j, _)| j)
             .collect();
         for li in leaver_idx {
+            // Ticket #326 (version 0.08.8): an unarmed hull that runs while an armed unit of its
+            // party still stands engaged is covered, and not pursued.
+            if !parties[i][li].armed && escorted(parties[i]) {
+                parties[i][li].pursued = true;
+                continue;
+            }
             let leaver_strength = parties[i][li].strength;
             // The best pursuer among every other party's engaged units.
             let mut best: Option<(u32, i64, usize)> = None;

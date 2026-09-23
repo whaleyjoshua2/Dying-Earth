@@ -156,11 +156,15 @@ pub struct Module {
     /// Ticket #54: mothballed, exactly as a Facility is.
     pub mothballed: bool,
     pub change: Option<PendingChange>,
+    /// Ticket #324 (version 0.08.8): hits taken in a Battle, nought for every Module but a Battery;
+    /// repaired with Materials as a Ship's are. At the card's hit points the Battery is gone.
+    #[serde(default)]
+    pub damage: u32,
 }
 
 impl Module {
     pub fn new(kind: ModuleKind) -> Module {
-        Module { kind, online: true, offline_until_resolution: false, mothballed: false, change: None }
+        Module { kind, online: true, offline_until_resolution: false, mothballed: false, change: None, damage: 0 }
     }
     /// Ticket #54: standing, running and not mothballed.
     pub fn working(&self) -> bool {
@@ -961,6 +965,18 @@ pub struct WarCounters {
     /// counted before; the reviews measured no Army carried by anybody in eighty games.
     #[serde(default)]
     pub armies_landed: [u32; SEAT_COUNT],
+    /// Ticket #319 (version 0.08.8): interceptions fought, by the intercepting seat. An
+    /// interception is also counted among the orbit attacks, as it always was.
+    #[serde(default)]
+    pub interceptions: [u32; SEAT_COUNT],
+    /// Ticket #324 (version 0.08.8): Batteries destroyed in a Battle, by the seat that held them.
+    #[serde(default)]
+    pub batteries_lost: [u32; SEAT_COUNT],
+    /// Ticket #328 (version 0.08.8): Bombards resolved and Modules they burned, by the bombarder.
+    #[serde(default)]
+    pub bombards: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub modules_burned: [u32; SEAT_COUNT],
 }
 
 impl WarCounters {
@@ -981,6 +997,10 @@ impl WarCounters {
             self.escapes[i] += o.escapes[i];
             self.dig_ins[i] += o.dig_ins[i];
             self.armies_landed[i] += o.armies_landed[i];
+            self.interceptions[i] += o.interceptions[i];
+            self.batteries_lost[i] += o.batteries_lost[i];
+            self.bombards[i] += o.bombards[i];
+            self.modules_burned[i] += o.modules_burned[i];
         }
         self.battles_vs_neutral += o.battles_vs_neutral;
         self.standing_armies_lost += o.standing_armies_lost;
@@ -1840,6 +1860,20 @@ impl Game {
         self.colonies.iter().any(|c| c.in_orbit && c.body == body && c.control.director() == Some(seat))
     }
 
+    /// Ticket #325 (version 0.08.8): whether a station fuels this seat's Ships: its own, or a
+    /// partner's under a Refuel Accord. The Fuel is the refueller's own Stockpile's either way;
+    /// the partner's station is only where it is drawn.
+    pub fn fuels_for(&self, c: &Colony, seat: Seat) -> bool {
+        c.in_orbit && c.control.director().is_some_and(|d| d == seat || self.accord_has(seat, d, Term::Refuel))
+    }
+
+    /// Ticket #325: a station at the Body the seat may Refuel at, its own or a partner's, blockaded
+    /// or not -- the test that says whether a Ship is stranded and whether the card offers a
+    /// Refuel at all; `refuelling_station` says whether one is open this turn.
+    pub fn refuel_station_at(&self, seat: Seat, body: BodyId) -> bool {
+        self.colonies.iter().any(|c| c.body == body && self.fuels_for(c, seat))
+    }
+
     /// Ticket #87: what a Refuel order takes from the Stockpile: what the tank wants, as far as
     /// the Stockpile can pay.
     pub fn refuel_amount(&self, seat: Seat, ship: ShipId) -> i64 {
@@ -1858,7 +1892,8 @@ impl Game {
     pub fn stranded(&self, ship: ShipId) -> bool {
         let Some(s) = self.ship(ship) else { return false };
         let ShipAt::Body(body) = s.at else { return false };
-        if self.own_station_at(s.seat, body) {
+        // Ticket #325 (version 0.08.8): a partner's station under a Refuel Accord rescues it too.
+        if self.refuel_station_at(s.seat, body) {
             return false;
         }
         match self.cheapest_leg_from(s.seat, body) {
@@ -2205,10 +2240,19 @@ impl Game {
     /// Region's own Army reads its Region's people (`defence_bonus`); a raised Army and a
     /// Colony's read nothing; Dig In's own term is added by the Battle for any Army dug in.
     pub fn army_defence(&self, a: &Army) -> i64 {
+        // Ticket #321 (version 0.08.8): a Region's own Army marches again, and its people's
+        // defence (the Constabulary, the calm) is theirs only while it stands at home.
         match a.home {
-            ArmyHome::State(s) if a.standing => self.defence_bonus(s) as i64,
+            ArmyHome::State(s) if self.army_at_home(a) => self.defence_bonus(s) as i64,
             _ => 0,
         }
+    }
+
+    /// Ticket #321 (version 0.08.8): a Region's own Army standing in its own Region. Since this
+    /// version it may march (ticket #302 had kept it home); at home it defends with its people,
+    /// away it is an Army like any other, and a threat next door like any other.
+    pub fn army_at_home(&self, a: &Army) -> bool {
+        a.standing && matches!((a.home, a.at), (ArmyHome::State(h), ArmyAt::Place(Place::State(s))) if h == s)
     }
 
     /// Ticket #302: what an Army fights at when attacked -- its strength, its defence, and Dig In
@@ -2761,7 +2805,8 @@ impl Game {
     /// Ticket #310 (version 0.08.7): **the military threat to a held Region**, the counterpart of
     /// `nearest_challenger`: the rival raised Army standing in a neighbouring Region with the best
     /// first-exchange odds against this Region's defenders, ties to the strongest, with the Region
-    /// it stands in and those odds. A Region's own Army never marches (#302), so only raised
+    /// it stands in and those odds. A Region's own Army standing at home is no threat (ticket
+    /// #321: it marches again, and marched out it counts like any other); so only Armies not at home
     /// Armies count; a neutral Region's own is nobody's and never counts. Stance-blind at the
     /// designer's word, as `neutral_threatened` is: the line this feeds says presence and
     /// strength, never orders. None on a Region nobody holds, or with no rival Army next door.
@@ -2769,7 +2814,7 @@ impl Game {
         let holder = self.state(sid).control.controller()?;
         let mut best: Option<(ArmyId, StateId, f64, i64)> = None;
         for n in &self.tables.state(sid).neighbours {
-            for a in self.armies.iter().filter(|a| !a.standing && a.at == ArmyAt::Place(Place::State(*n)) && !self.army_stands_down(a)) {
+            for a in self.armies.iter().filter(|a| !self.army_at_home(a) && a.at == ArmyAt::Place(Place::State(*n)) && !self.army_stands_down(a)) {
                 let Some(seat) = self.army_seat(a) else { continue };
                 if seat == holder {
                     continue;
@@ -3089,9 +3134,33 @@ impl Game {
             .into_iter()
             .filter(|seat| self.ships.iter().any(|s| s.seat == *seat && s.at == ShipAt::Body(body) && s.kind.is_warship() && !s.escaped));
         match (holders.next(), holders.next()) {
-            (Some(one), None) => Some(one),
+            // Ticket #324 (version 0.08.8): a rival's Battery standing at the Body denies it.
+            (Some(one), None) if !self.battery_stands_against(one, body) => Some(one),
             _ => None,
         }
+    }
+
+    /// Ticket #324 (version 0.08.8): the working Batteries a seat directs at a Body, each as its
+    /// Colony and its index among that Colony's Modules -- the reference a Battle and a Repair
+    /// order carry. Mothballed or offline, a Battery neither fires nor denies, as every Module
+    /// that is not working does nothing.
+    pub fn batteries_at(&self, seat: Seat, body: BodyId) -> Vec<(ColonyId, usize)> {
+        self.colonies
+            .iter()
+            .filter(|c| c.body == body && c.control.director() == Some(seat))
+            .flat_map(|c| c.modules.iter().enumerate().filter(|(_, m)| m.kind == ModuleKind::Battery && m.working()).map(move |(i, _)| (c.id, i)))
+            .collect()
+    }
+
+    /// Ticket #324: the strength a seat's Batteries at a Body bring to a Battle there.
+    pub fn battery_strength(&self, seat: Seat, body: BodyId) -> i64 {
+        self.batteries_at(seat, body).len() as i64 * self.tables.module(ModuleKind::Battery).strength
+    }
+
+    /// Ticket #324: whether a Battery of some OTHER seat's stands and works at the Body, which is
+    /// what denies this seat Orbital Control there and the Blockade with it.
+    pub fn battery_stands_against(&self, seat: Seat, body: BodyId) -> bool {
+        seat.others().iter().any(|s| !self.batteries_at(*s, body).is_empty())
     }
 
     /// Whether a seat may land Armies and Colonists on the GROUND of a Body (spec 9.3).
@@ -3115,7 +3184,12 @@ impl Game {
     /// needs to be positively chosen, not just the presence of a ship" -- and a blockaded station
     /// makes nothing (`starved_by`).
     pub fn slot_blockaded_against(&self, seat: Seat, body: BodyId, slot: u32) -> bool {
-        self.ships.iter().any(|s| s.seat != seat && self.blockading(s) && s.at == ShipAt::Body(body) && s.slot == Some(slot))
+        // Ticket #324 (version 0.08.8): nor a seat with a Battery standing at the Body.
+        if !self.batteries_at(seat, body).is_empty() {
+            return false;
+        }
+        // Ticket #320 (version 0.08.8): a Blockade does not shut out a partner under Passage.
+        self.ships.iter().any(|s| s.seat != seat && !self.accord_has(seat, s.seat, Term::Passage) && self.blockading(s) && s.at == ShipAt::Body(body) && s.slot == Some(slot))
     }
 
     /// Ticket #278: a warship on Blockade, still engaged. The one test every blockade reads.
@@ -3144,6 +3218,11 @@ impl Game {
     pub fn starved_by(&self, cid: ColonyId) -> Option<Seat> {
         let col = self.colony(cid)?;
         let holder = col.control.director()?;
+        // Ticket #324 (version 0.08.8): a Battery of the holder's at the Body denies every rival
+        // Orbital Control there and the Blockade with it; nothing starves behind one.
+        if !self.batteries_at(holder, col.body).is_empty() {
+            return None;
+        }
         if col.in_orbit {
             self.slot_blockaders(col.body, col.slot).into_iter().find(|s| *s != holder)
         } else {
@@ -3153,9 +3232,12 @@ impl Game {
 
     /// Ticket #99: a station of this seat's at this Body that a rival warship is not blockading, so
     /// a Refuel has somewhere to draw from.
+    ///
+    /// Ticket #325 (version 0.08.8): or a partner's under a Refuel Accord; a station blockaded
+    /// against its holder fuels the partner no more than its holder.
     pub fn refuelling_station(&self, seat: Seat, body: BodyId) -> bool {
         self.colonies.iter().any(|c| {
-            c.in_orbit && c.body == body && c.control.controller() == Some(seat) && !self.slot_blockaded_against(seat, body, c.slot)
+            c.body == body && self.fuels_for(c, seat) && c.control.director().is_some_and(|d| !self.slot_blockaded_against(d, body, c.slot))
         })
     }
 
@@ -3875,10 +3957,12 @@ impl Game {
         let view = self.relations_score(seat, from);
         // Non-aggression from somebody it holds nothing against is easy; from somebody it loathes it
         // is not. A research agreement is its own gate and needs no opinion beyond Friendly.
+        // Ticket #320 (version 0.08.8): Passage, now a rule for Armies as well as Ships, is accepted
+        // at Neutral or better, as non-aggression is.
         terms.iter().all(|t| match t {
             Term::ResearchAgreement => true,
-            Term::NonAggression => view >= -2,
-            Term::Passage | Term::Refuel => view >= -5,
+            Term::NonAggression | Term::Passage => view >= -2,
+            Term::Refuel => view >= -5,
         })
     }
 
