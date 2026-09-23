@@ -328,6 +328,21 @@ fn build_board(session: &mut Session) {
             let _ = g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression, Term::Refuel]);
             g.seats[0].stockpile.fuel = 40;
         }
+        // `bombard:1` (a building aid, ticket #328, version 0.08.8): seat 1 holds a Colony on the
+        // ground of Mars and seat 0 a Battleship in Mars orbit, holding the orbit; so the Ship card
+        // (`stack:1`) shows the Bombard button and its hover. With `bombard:order` the Bombard is
+        // placed as well, for `commit:1` to resolve.
+        if std::env::args().any(|a| a == "bombard:1") {
+            let slot = g.free_slots_on(BodyId::Mars).first().copied().unwrap_or(0);
+            let id = ColonyId(g.fresh_id());
+            let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Mine), Module::new(ModuleKind::Generator)];
+            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(1)), modules, colonists: 8, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.ships.retain(|s| !(s.at == ShipAt::Body(BodyId::Mars) && s.kind.is_warship() && s.seat != Seat(0)));
+            let sid = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::Battleship);
+            let built_turn = g.turn;
+            g.ships.push(Ship { id: sid, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
+        }
         // `rival:1` (a building aid, ticket #261, version 0.08.4): seat 1 stands three quarters of
         // the way to its Victory Condition -- nine Colonists on the Moon of twelve, and, for the
         // Prospectors it usually is, the Fund at 2000 of 2500 -- and a quiet turn runs so the
@@ -868,6 +883,19 @@ fn build_board(session: &mut Session) {
         && !session.place(Order::BuildModule { colony: cid, kind })
     {
         eprintln!("morder:{name} was refused");
+        std::process::exit(3);
+    }
+    // `bombard:order` (ticket #328): the Bombard of `bombard:1`'s Battleship at the rival Colony
+    // is placed, for `commit:1` to resolve.
+    if std::env::args().any(|a| a == "bombard:order")
+        && let Some((ship, colony)) = session.game.as_ref().and_then(|g| {
+            let ship = g.ships.iter().find(|s| s.seat == Seat(0) && s.kind == UnitKind::Battleship && s.at == ShipAt::Body(BodyId::Mars))?.id;
+            let colony = g.colonies.iter().find(|c| c.body == BodyId::Mars && c.control.director() == Some(Seat(1)))?.id;
+            Some((ship, colony))
+        })
+        && !session.place(Order::Bombard { ship, colony })
+    {
+        eprintln!("bombard:order was refused");
         std::process::exit(3);
     }
     // `commit:1` (a building aid, ticket #291): the turn is ended WITH the orders the aids above

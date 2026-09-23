@@ -417,6 +417,9 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #297 (version 0.08.6): the turn an Army digs in.
     ("army_dug_in", &["faction", "place"]),
     ("units_destroyed", &["place", "why", "lost"]),
+    // Ticket #328 (version 0.08.8): a Bombard, hit or miss.
+    ("bombard_hit", &["faction", "ship", "place", "module", "dead"]),
+    ("bombard_miss", &["faction", "ship", "place", "module"]),
     ("occupation_begun", &["faction", "place"]),
     ("occupation_ended", &["place", "faction"]),
     // Ticket #299 (version 0.08.6): a broken Occupation, at a cost.
@@ -513,6 +516,8 @@ pub fn ordinal(n: usize) -> String {
 pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     ("attacks", &[]),
     ("cargo_aboard", &["n"]),
+    // Ticket #328 (version 0.08.8): the Colonists a burned Habitat took with it.
+    ("bombard_dead", &["n"]),
     ("sea_unrest", &["rose", "unrest"]),
     ("sea_inland", &[]),
     ("sea_inland_flipped", &["what"]),
@@ -559,6 +564,7 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("repair", &["unit"]),
     ("transit", &["unit", "body"]),
     ("refuel", &["unit", "body"]),
+    ("bombard", &["colony"]),
     ("ship_stance", &["body", "stance"]),
     ("army_stance", &["place", "stance"]),
     ("move_army", &["state"]),

@@ -972,6 +972,11 @@ pub struct WarCounters {
     /// Ticket #324 (version 0.08.8): Batteries destroyed in a Battle, by the seat that held them.
     #[serde(default)]
     pub batteries_lost: [u32; SEAT_COUNT],
+    /// Ticket #328 (version 0.08.8): Bombards resolved and Modules they burned, by the bombarder.
+    #[serde(default)]
+    pub bombards: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub modules_burned: [u32; SEAT_COUNT],
 }
 
 impl WarCounters {
@@ -994,6 +999,8 @@ impl WarCounters {
             self.armies_landed[i] += o.armies_landed[i];
             self.interceptions[i] += o.interceptions[i];
             self.batteries_lost[i] += o.batteries_lost[i];
+            self.bombards[i] += o.bombards[i];
+            self.modules_burned[i] += o.modules_burned[i];
         }
         self.battles_vs_neutral += o.battles_vs_neutral;
         self.standing_armies_lost += o.standing_armies_lost;

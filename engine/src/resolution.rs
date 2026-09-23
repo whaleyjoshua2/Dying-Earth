@@ -32,6 +32,7 @@ impl Game {
         self.blackout_stances();
         self.resolve_transits(); // (a)
         self.resolve_battles(); // (b)
+        self.resolve_bombards(); // (b'), ticket #328: after the orbit is fought for
         self.resolve_occupation(); // (c)
         self.resolve_influence(); // (d)
         self.resolve_changes(); // (e), ticket #54: a decommission frees its slot before a build wants it
@@ -857,6 +858,85 @@ impl Game {
             self.report_line(LineKind::DecisiveBattle, Some(place.into()), text);
         }
         lost
+    }
+
+    /// Ticket #328 (version 0.08.8): Bombard. A Battleship at a Body off Earth whose seat holds
+    /// Orbital Control there outright -- checked again here, since the Battles just fought may have
+    /// sunk it or taken the orbit -- strikes a rival's Colony at the Body: one Module drawn at
+    /// random (the Core Module and the Archive left out) rolls the destruction chance; a burned
+    /// Habitat takes the Colonists beyond the room left with it. Rung 3 against the holder, a
+    /// non-aggression Accord broken with it, the war ppm of a burned building charged to the
+    /// bombarder; a Report line hit or miss, a Moment and the Battle mark when anything burned.
+    fn resolve_bombards(&mut self) {
+        let bombards = std::mem::take(&mut self.pending.bombards);
+        for (seat, ship, colony) in bombards {
+            let Some(s) = self.ship(ship) else { continue };
+            let ShipAt::Body(body) = s.at else { continue };
+            if s.seat != seat || s.escaped || s.kind != UnitKind::Battleship || body == BodyId::Earth || self.orbital_control(body) != Some(seat) {
+                continue;
+            }
+            let ship_name = self.ship_name(s);
+            let ship_strength = self.ship_strength(s);
+            let Some(col) = self.colony(colony) else { continue };
+            let Some(holder) = col.control.director().filter(|h| *h != seat) else { continue };
+            if col.body != body {
+                continue;
+            }
+            let targets: Vec<usize> = col.modules.iter().enumerate().filter(|(_, m)| !matches!(m.kind, ModuleKind::Core | ModuleKind::Archive)).map(|(i, _)| i).collect();
+            let place = self.place_name(Place::Colony(colony));
+            self.war.bombards[seat.index()] += 1;
+            self.offend_by(seat, holder, 3);
+            let p = self.tables.influence.destruction_chance;
+            let mut hit = false;
+            let mut dead = 0u32;
+            let module = if targets.is_empty() {
+                None
+            } else {
+                let i = targets[self.rng.pick(targets.len())];
+                let name = self.colony(colony).map(|c| c.modules[i].kind.name().to_string()).unwrap_or_default();
+                if self.rng.chance(p) {
+                    hit = true;
+                    let before = self.colony(colony).map(|c| c.colonists).unwrap_or(0);
+                    if let Some(c) = self.colony_mut(colony) {
+                        c.modules.remove(i);
+                    }
+                    let room = self.colony(colony).map(|c| self.habitat_room(c)).unwrap_or(0);
+                    if let Some(c) = self.colony_mut(colony) {
+                        c.colonists = c.colonists.min(room);
+                        dead = before.saturating_sub(c.colonists);
+                    }
+                }
+                Some(name)
+            };
+            let module_name = module.clone().unwrap_or_else(|| "walls".to_string());
+            let text = if hit {
+                self.war.modules_burned[seat.index()] += 1;
+                let ppm = self.tables.climate.war_ppm_per_building;
+                self.charge_war(false, Some(seat), ppm);
+                let dead_words = if dead > 0 { self.phrase("bombard_dead", &[("n", dead.to_string())]) } else { String::new() };
+                self.say("bombard_hit", &[("faction", self.seat_name(seat)), ("ship", ship_name.clone()), ("place", place.clone()), ("module", module_name.clone()), ("dead", dead_words)])
+            } else {
+                self.say("bombard_miss", &[("faction", self.seat_name(seat)), ("ship", ship_name.clone()), ("place", place.clone()), ("module", module_name.clone())])
+            };
+            self.log(text.clone());
+            let at = Some(ReportPlace::Body(body));
+            self.report_line(if hit { LineKind::DecisiveBattle } else { LineKind::Battle }, at, text.clone());
+            if hit {
+                let result = format!("bombarded by the {}: the {} destroyed{}", self.seat_name(seat), module_name, if dead > 0 { format!(", {dead} Colonists dead") } else { String::new() });
+                self.moment(MomentKind::DecisiveBattle, &[("place", place.clone()), ("result", result), ("figure", "1 lost".to_string())], at);
+            }
+            // The Battle mark and the band's row read the Battle record, so a Bombard is one.
+            let outcome = if hit { format!("the {module_name} destroyed") } else { format!("the {module_name} struck, standing") };
+            self.report.battles.push(BattleLine {
+                place: format!("{} orbit (bombardment)", self.tables.body(body).name),
+                parties: vec![
+                    BattleParty { seat: Some(seat), aggressor: true, units: format!("{ship_name} bombarded {place}"), strength: ship_strength, hits: u32::from(hit), destroyed: Vec::new(), escaped: Vec::new(), odds: Some(p) },
+                    BattleParty { seat: Some(holder), aggressor: false, units: format!("{place}: {outcome}"), strength: 0, hits: 0, destroyed: if hit { vec![module_name] } else { Vec::new() }, escaped: Vec::new(), odds: None },
+                ],
+                result: text,
+                at,
+            });
+        }
     }
 
     // ------------------------------------------------------------------ (c)

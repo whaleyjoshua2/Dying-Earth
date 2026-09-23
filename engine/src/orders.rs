@@ -61,6 +61,10 @@ pub enum Order {
     /// Faction holds a Space Station, as far as the Stockpile can pay.
     Refuel { ship: ShipId },
     ShipStance { body: BodyId, stance: Stance },
+    /// Ticket #328 (version 0.08.8): a Battleship at a Body whose Faction holds Orbital Control
+    /// there outright bombards a rival's Colony at that Body: one Module drawn at random rolls the
+    /// destruction chance. Never over Earth.
+    Bombard { ship: ShipId, colony: ColonyId },
     ArmyStance { place: Place, stance: Stance },
     MoveArmy { army: ArmyId, to: StateId },
     Load { ship: ShipId, colonists: u32, from: LoadSource, army: Option<ArmyId> },
@@ -255,6 +259,10 @@ fn fail<T>(msg: impl Into<String>) -> Result<T, OrderError> {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Pending {
     pub repairs: Vec<(Seat, UnitRef, u32)>,
+    /// Ticket #328 (version 0.08.8): Bombards ordered this turn -- who, from which Battleship, at
+    /// which Colony -- resolved after the orbital Battles.
+    #[serde(default)]
+    pub bombards: Vec<(Seat, ShipId, ColonyId)>,
     pub cargo: Vec<(Seat, Order)>,
     /// Ticket #46: stations ordered this turn.
     pub stations: Vec<(Seat, BodyId, u32)>,
@@ -305,6 +313,8 @@ impl Game {
             // Ticket #87: a transit spends the Ship's tank, not the Stockpile; a Refuel takes from
             // the Stockpile what the tank wants and the Stockpile can pay.
             Order::Transit { .. } => Cost::default(),
+            // Ticket #328 (version 0.08.8): a Bombard costs nothing but the offence.
+            Order::Bombard { .. } => Cost::default(),
             Order::Refuel { ship } => Cost { fuel: self.refuel_amount(seat, *ship), ..Default::default() },
             Order::Influence { amount, .. } => Cost { influence: *amount, ..Default::default() },
             Order::Smear { amount, .. } => Cost { influence: *amount, ..Default::default() },
@@ -1085,6 +1095,35 @@ impl Game {
                 }
                 Ok(cost)
             }
+            // Ticket #328 (version 0.08.8): Bombard, from a Battleship holding the orbit outright.
+            Order::Bombard { ship, colony } => {
+                let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
+                if s.seat != seat {
+                    return fail("not your Ship");
+                }
+                if s.kind != UnitKind::Battleship {
+                    return fail("only a Battleship can Bombard");
+                }
+                let ShipAt::Body(body) = s.at else { return fail("in transit") };
+                if body == BodyId::Earth {
+                    return fail("no Bombard over Earth");
+                }
+                let Some(col) = self.colony(*colony) else { return fail("no such Colony") };
+                if col.body != body {
+                    return fail("that Colony is not at this Body");
+                }
+                match col.control.director() {
+                    Some(d) if d != seat => {}
+                    _ => return fail("not a rival's Colony"),
+                }
+                if self.orbital_control(body) != Some(seat) {
+                    return fail(format!("you do not hold Orbital Control of {} outright", self.tables.body(body).name));
+                }
+                if pending.iter().any(|o| matches!(o, Order::Bombard { ship: x, .. } | Order::Transit { ship: x, .. } if x == ship)) {
+                    return fail("this Ship already has an order");
+                }
+                Ok(cost)
+            }
             Order::ShipStance { body, stance } => {
                 if self.ships_at(seat, *body).is_empty() {
                     return fail("no Ships of yours there");
@@ -1656,6 +1695,8 @@ impl Game {
                     }
                 }
                 Order::Repair { unit, points } => self.pending.repairs.push((seat, *unit, *points)),
+                // Ticket #328 (version 0.08.8): resolved after the orbital Battles.
+                Order::Bombard { ship, colony } => self.pending.bombards.push((seat, *ship, *colony)),
                 Order::Transit { ship, to, slot } => {
                     let from = match self.ship(*ship).map(|s| s.at) {
                         Some(ShipAt::Body(b)) => b,
@@ -2102,6 +2143,8 @@ impl Game {
             // the computer announcing that it did nothing. Five of the nine clauses in one sampled
             // paragraph were exactly that.
             Order::ShipStance { stance: Stance::Hold, .. } | Order::ArmyStance { stance: Stance::Hold, .. } => None,
+            // Ticket #328 (version 0.08.8).
+            Order::Bombard { colony, .. } => r("bombard", &[("colony", place(Place::Colony(*colony)))]),
             Order::ShipStance { body, stance } => {
                 r("ship_stance", &[("body", self.tables.body(*body).name.clone()), ("stance", stance.name().to_string())])
             }

@@ -484,6 +484,8 @@ fn main() {
                             println!("      Interceptions over the batch, by seat {:?}", warc.interceptions);
                             // Ticket #324 (version 0.08.8): Batteries lost in a Battle, by the seat that held them.
                             println!("      Batteries lost over the batch, by seat {:?}", warc.batteries_lost);
+                            // Ticket #328 (version 0.08.8): Bombards and what they burned, by the bombarder.
+                            println!("      Bombards over the batch, by seat {:?}; Modules burned {:?}", warc.bombards, warc.modules_burned);
                             println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
                             println!("      Breaks fired: {}", fired.join(", "));
                         }

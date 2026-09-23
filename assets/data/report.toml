@@ -65,6 +65,9 @@ army_moved = "{faction} Army moved from {from} to {to}{attacks}."
 army_dug_in = "{faction} Armies dig in at {place}."
 army_landed = "{faction} landed an Army at {colony}."
 units_destroyed = "{place} was {why}: {lost} destroyed."
+# Ticket #328 (version 0.08.8): a Bombard from orbit, hit or miss; {dead} is `bombard_dead` or nothing.
+bombard_hit = "The {faction} bombarded {place} from {ship}: the {module} destroyed{dead}."
+bombard_miss = "The {faction} bombarded {place} from {ship}: the {module} was struck and stands."
 occupation_begun = "The {faction} occupy {place}."
 occupation_ended = "Occupation of {place} by the {faction} ended."
 # Ticket #299 (version 0.08.6): a break costs. {holder} is the previous holder, or nobody.
@@ -159,6 +162,7 @@ energy_zero = "{faction}: Energy fell to zero even with every producer off."
 [phrase]
 attacks = " and attacks"
 cargo_aboard = " with {n} Colonists aboard"
+bombard_dead = ", {n} Colonists dead with it"
 sea_unrest = " Unrest there rose by {rose} to {unrest}."
 # Ticket #276 (version 0.08.5): every rise turns one inland slot coastal, wall or no wall; an empty
 # slot first, else the oldest inland Facility with its slot.
@@ -212,6 +216,7 @@ repair = "repaired {unit}"
 transit = "sent a {unit} to {body}"
 # Ticket #87 (version 0.06.0): the Refuel order.
 refuel = "refuelled {unit} at {body}"
+bombard = "bombarded {colony}"
 ship_stance = "set its Ships at {body} to {stance}"
 army_stance = "set its Armies at {place} to {stance}"
 move_army = "moved an Army into {state}"

@@ -11144,3 +11144,72 @@ fn a_ship_melee_rolls_once_a_round_for_every_engaged_armed_unit() {
     let g = game();
     assert_eq!((g.tables.melee.rounds, g.tables.melee.rolls), (3, 3));
 }
+
+// -------------------------------------------- 0.08.8 ticket #328: Bombard
+
+/// Ticket #328 (version 0.08.8): a Battleship holding the orbit outright bombards a rival's Colony
+/// at the Body: one Module burns at the destruction chance (forced to certain here), a burned
+/// Habitat takes the people beyond the room left, the offence is rung 3, the Report and the Battle
+/// record carry it. Refused over Earth, without the orbit held outright, and from a Frigate.
+#[test]
+fn a_battleship_bombards_a_rival_colony_from_an_orbit_it_holds() {
+    let mut g = game();
+    calm(&mut g);
+    let colony = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: colony, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules: vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Core)], colonists: 12, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+    g.ships.retain(|s| s.at != ShipAt::Body(BodyId::Mars));
+    let ship = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Battleship);
+    g.ships.push(Ship { id: ship, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    let bombard = Order::Bombard { ship, colony };
+    assert_eq!(g.orbital_control(BodyId::Mars), Some(Seat(0)));
+    assert!(g.check_order(Seat(0), &[], &bombard).is_ok(), "held outright, a rival's Colony at the Body");
+    // Not with the orbit contested.
+    let rival = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Frigate);
+    g.ships.push(Ship { id: rival, name, kind: UnitKind::Frigate, seat: Seat(2), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    assert!(g.check_order(Seat(0), &[], &bombard).is_err(), "the orbit is contested");
+    g.ships.retain(|s| s.id != rival);
+    // Never over Earth, from any hull.
+    let over_earth = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(1))).map(|c| c.id).expect("seat 1's station");
+    let earth_ship = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Battleship);
+    g.ships.push(Ship { id: earth_ship, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    assert!(g.check_order(Seat(0), &[], &Order::Bombard { ship: earth_ship, colony: over_earth }).is_err(), "no Bombard over Earth");
+    g.ships.retain(|s| s.id != earth_ship);
+    // The strike, at a certain chance: one Module burns, never the Core, and the people beyond the room left die.
+    std::sync::Arc::make_mut(&mut g.tables).influence.destruction_chance = 1.0;
+    let owed_before = g.relations.owed[1][0];
+    g.commit_orders(Seat(0), std::slice::from_ref(&bombard));
+    g.resolution_phase();
+    let c = g.colony(colony).unwrap().clone();
+    assert_eq!(c.modules.len(), 2, "one Module burned: {:?}", c.modules.iter().map(|m| m.kind).collect::<Vec<_>>());
+    assert!(c.modules.iter().any(|m| m.kind == ModuleKind::Core), "never the Core Module");
+    assert_eq!(c.modules.iter().filter(|m| m.kind == ModuleKind::Habitat).count(), 1, "a Habitat burned");
+    assert_eq!(c.colonists, g.habitat_room(&c), "the people beyond the room left died: {} of 12 live", c.colonists);
+    assert_eq!(g.relations.owed[1][0] - owed_before, 3, "rung 3 against the holder");
+    assert_eq!((g.war.bombards[0], g.war.modules_burned[0]), (1, 1));
+    assert!(g.log.iter().any(|l| l.contains("bombarded") && l.contains("Habitat destroyed") && l.contains("Colonists dead")), "{:?}", g.log.iter().filter(|l| l.contains("bombard")).collect::<Vec<_>>());
+    let line = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::Body(BodyId::Mars))).expect("a Battle record at Mars for the mark");
+    assert_eq!(line.aggressor(), Some(Seat(0)));
+}
+
+/// Ticket #328: the computer bombards a Colony whose holder it has cause against, from a
+/// Battleship holding the orbit outright, and not without cause.
+#[test]
+fn the_computer_bombards_with_cause_and_the_orbit_held() {
+    let mut g = game();
+    calm(&mut g);
+    let colony = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: colony, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules: vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Mine)], colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+    g.ships.retain(|s| s.at != ShipAt::Body(BodyId::Mars));
+    let ship = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Battleship);
+    g.ships.push(Ship { id: ship, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    let calm_orders: Vec<Order> = g.ai_orders(Seat(0));
+    assert!(!calm_orders.iter().any(|o| matches!(o, Order::Bombard { .. })), "no cause, no Bombard: {calm_orders:?}");
+    g.relations.score[0][1] = -8;
+    assert!(g.relations_score(Seat(0), Seat(1)) <= g.tables.ai.thresholds.war_cause);
+    let orders: Vec<Order> = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::Bombard { ship: s, colony: c } if *s == ship && *c == colony)), "with cause and the orbit held: {orders:?}");
+}

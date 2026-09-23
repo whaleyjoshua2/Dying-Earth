@@ -3810,6 +3810,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         },
         Order::Refuel { ship } => format!("Refuel {} ({} Fuel from the Stockpile)", ship, game.refuel_amount(Seat(0), *ship)),
         Order::ShipStance { body, stance } => format!("Ships at {}: {}", game.tables.body(*body).name, stance.name()),
+        Order::Bombard { ship, colony } => format!("Bombard {} from {}", game.place_name(Place::Colony(*colony)), ship),
         Order::ArmyStance { place, stance } => format!("Armies at {}: {}", game.place_name(*place), stance.name()),
         Order::MoveArmy { army, to } => format!("{} to {}", army, game.tables.state(*to).name),
         Order::Load { ship, colonists, army, .. } => format!("Load {} onto {}", if *colonists > 0 { format!("{colonists} Colonists") } else { format!("{}", army.unwrap_or(ArmyId(0))) }, ship),
@@ -5922,6 +5923,26 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             if ui.button("Confirm Attack").clicked() {
                 actions.push(Action::Place(Order::ShipStance { body, stance: Stance::Attack }));
                 view.attack_preview = false;
+            }
+        }
+    }
+    // Ticket #328 (version 0.08.8): Bombard, one button per Battleship per rival Colony at the
+    // Body, never over Earth; the hover carries the odds and the offence, and the button greys
+    // with the reason when the orbit is not held outright.
+    if body != BodyId::Earth {
+        let targets: Vec<&Colony> = game.colonies.iter().filter(|c| c.body == body && c.control.director().is_some_and(|d| d != Seat(0))).collect();
+        let battleships: Vec<&Ship> = ships.iter().copied().filter(|s| s.kind == UnitKind::Battleship).collect();
+        if !targets.is_empty() && !battleships.is_empty() {
+            ui.label(RichText::new("Bombard").strong());
+            let p = game.tables.influence.destruction_chance * 100.0;
+            for s in battleships {
+                for c in targets.iter() {
+                    let n = c.modules.iter().filter(|m| !matches!(m.kind, ModuleKind::Core | ModuleKind::Archive)).count();
+                    let place = game.place_name(Place::Colony(c.id));
+                    let holder = c.control.director().map(|d| game.seat_name(d)).unwrap_or_default();
+                    let hover = format!("One Module of {n} at {place}, drawn at random, rolls a {p:.0}% chance to burn; when a Habitat burns, the Colonists beyond the room left die with it. A rung 3 offence against the {holder}, breaking a non-aggression Accord if one stands. Needs Orbital Control here held outright; never over Earth.");
+                    cost_button_with_hover(ui, game, &session.pending, Order::Bombard { ship: s.id, colony: c.id }, &format!("Bombard {} from {}", place, game.ship_name(s)), Some(hover), actions);
+                }
             }
         }
     }

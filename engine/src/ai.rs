@@ -2016,6 +2016,21 @@ impl Game {
                 Some(odds) => push(vec![Order::ShipStance { body, stance: Stance::Attack }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack), 1.0, 1.0, 1.0, format!("Attack at {} (odds {:.0}%)", self.tables.body(body).name, odds * 100.0), Some(key.clone())),
                 None => push(vec![Order::ShipStance { body, stance: Stance::Hold }], Cat::StanceHold, self.base_weight(seat, Cat::StanceHold), 1.0, threat, 1.0, format!("Hold at {}", self.tables.body(body).name), Some(key.clone())),
             }
+            // Ticket #328 (version 0.08.8): a Battleship holding the orbit outright, off Earth, with
+            // cause against a Colony's holder there, bombards it, at the orbital Attack's weight.
+            // Its own key, since the stance is the stack's and a Bombard is the Ship's; a second
+            // Bombard for the same Ship is dropped at the check.
+            if body != BodyId::Earth && self.orbital_control(body) == Some(seat) {
+                for s in stack.iter().filter(|s| s.kind == UnitKind::Battleship && !s.escaped) {
+                    for c in self.colonies.iter().filter(|c| c.body == body) {
+                        let Some(h) = c.control.director().filter(|h| *h != seat) else { continue };
+                        if self.relations_score(seat, h) > th.war_cause {
+                            continue;
+                        }
+                        push(vec![Order::Bombard { ship: s.id, colony: c.id }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack), 1.0, 1.0, 1.0, format!("Bombard {} from {}", self.place_name(Place::Colony(c.id)), self.ship_name(s)), None);
+                    }
+                }
+            }
             // Ticket #319 (version 0.08.8): Intercept FIRES. Until this ticket it was offered only
             // to the seat holding Orbital Control outright, and at the Hold weight, so Attack's
             // weight won the Body's one key every time; over eighty games no interception was
