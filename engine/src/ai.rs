@@ -282,6 +282,16 @@ impl Game {
         c.control.director().map(|d| d != seat).unwrap_or(false)
     }
 
+    /// Ticket #319 (version 0.08.8): whether a Carrier has somewhere to go: a rival's Colony off
+    /// Earth whose holder this seat has cause against (`war_cause_at`, Wary or worse). The
+    /// Prospectors' Carrier appetite never asked for cause and still does not; every other seat's
+    /// begins here. Taking such a Colony moves its Colonists from the holder's off-world count to
+    /// the taker's, which is the Arkwrights' Victory denied, the review's "Diaspora denial".
+    pub fn carrier_target_exists(&self, seat: Seat) -> bool {
+        let cause = self.tables.ai.thresholds.war_cause;
+        self.colonies.iter().any(|c| c.body != BodyId::Earth && self.rival_holds(seat, c) && self.war_cause_at(seat, Place::Colony(c.id), cause))
+    }
+
     /// Ticket #57: what one Colony Slot's own yields are worth to the part the AI is furthest
     /// behind on. Every slot has its own four figures now, so the AI reads the slot, not the Body.
     fn slot_worth(&self, seat: Seat, y: SlotYields, behind: Behind) -> f64 {
@@ -460,12 +470,14 @@ impl Game {
 
     /// Ticket #43: a Carrier is worth building when the seat has a free Army on Earth, a rival Colony
     /// to land on, and no empty Carrier (or one on the way) already.
+    /// Ticket #319 (version 0.08.8): any seat with CAUSE against the holder of a rival Colony off
+    /// Earth wants one, by the same predicate the marches read (`war_cause_at`, Wary or worse),
+    /// at the designer's word; the Prospectors want one as before, cause or none. Until this
+    /// ticket the other three seats never carried an Army anywhere, and no Army was landed at a
+    /// Colony in eighty games.
     fn wants_carrier(&self, seat: Seat) -> bool {
-        if self.kind(seat) != FactionKind::Prospectors {
-            return false;
-        }
         let free_army = self.armies.iter().any(|a| !a.standing && self.army_seat(a) == Some(seat) && matches!(a.at, ArmyAt::Place(Place::State(_))));
-        let enemy_colony = self.colonies.iter().any(|c| self.rival_holds(seat, c));
+        let enemy_colony = self.carrier_target_exists(seat);
         let empty_carrier = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::Carrier && s.army.is_none());
         let queued = self.states.iter().flat_map(|s| s.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Unit(UnitKind::Carrier));
         free_army && enemy_colony && !empty_carrier && !queued
@@ -1862,7 +1874,8 @@ impl Game {
                     push(vec![Order::Transit { ship: s.id, to: d, slot: self.ai_blockade_slot(seat, d, s.kind) }], Cat::Transit, base, 1.0, threat, 1.0, format!("send {} to {}", ship_name, self.tables.body(d).name), None);
                 }
                 // Load an Army aboard a Carrier at Earth for an attack on a rival Colony (ticket #43).
-                if card.carries_army && s.army.is_none() && body == BodyId::Earth && kind == FactionKind::Prospectors {
+                // Ticket #319 (version 0.08.8): any seat that wants a Carrier loads one.
+                if card.carries_army && s.army.is_none() && body == BodyId::Earth && (kind == FactionKind::Prospectors || self.carrier_target_exists(seat)) {
                     // Ticket #46: the Army lifts from its own state, which needs a working Launch Site.
                     let army = self.armies.iter().find_map(|a| match a.at {
                         ArmyAt::Place(Place::State(st))
@@ -1875,7 +1888,7 @@ impl Game {
                         }
                         _ => None,
                     });
-                    let enemy_colony = self.colonies.iter().any(|c| self.rival_holds(seat, c));
+                    let enemy_colony = kind == FactionKind::Prospectors || self.carrier_target_exists(seat);
                     if let (Some((aid, st)), true) = (army, enemy_colony) {
                         push(vec![Order::Load { ship: s.id, colonists: 0, from: LoadSource::State(st), army: Some(aid) }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload) * 0.8, 1.0, 1.0, 1.0, format!("load an Army onto {}", ship_name), None);
                     }
@@ -1943,8 +1956,14 @@ impl Game {
                 Some(odds) => push(vec![Order::ShipStance { body, stance: Stance::Attack }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack), 1.0, 1.0, 1.0, format!("Attack at {} (odds {:.0}%)", self.tables.body(body).name, odds * 100.0), Some(key.clone())),
                 None => push(vec![Order::ShipStance { body, stance: Stance::Hold }], Cat::StanceHold, self.base_weight(seat, Cat::StanceHold), 1.0, threat, 1.0, format!("Hold at {}", self.tables.body(body).name), Some(key.clone())),
             }
-            if warships && self.orbital_control(body) == Some(seat) && inbound_target {
-                push(vec![Order::ShipStance { body, stance: Stance::Intercept }], Cat::StanceIntercept, self.base_weight(seat, Cat::StanceIntercept), 1.0, threat, 1.0, format!("Intercept at {}", self.tables.body(body).name), Some(key.clone()));
+            // Ticket #319 (version 0.08.8): Intercept FIRES. Until this ticket it was offered only
+            // to the seat holding Orbital Control outright, and at the Hold weight, so Attack's
+            // weight won the Body's one key every time; over eighty games no interception was
+            // fought. Now any seat with warships at the Body may intercept an unarmed enemy hull
+            // inbound, and the candidate scores above Hold, at the designer's word. An armed
+            // inbound stack is not intercepted: that would open a Battle against whoever arrives.
+            if warships && inbound_target {
+                push(vec![Order::ShipStance { body, stance: Stance::Intercept }], Cat::StanceIntercept, self.base_weight(seat, Cat::StanceIntercept).max(self.base_weight(seat, Cat::StanceHold) + 1.0), 1.0, threat, 1.0, format!("Intercept at {}", self.tables.body(body).name), Some(key.clone()));
             }
             if total_hp > 0 && (total_dmg as f64) / (total_hp as f64) >= th.evade_damage_fraction {
                 push(vec![Order::ShipStance { body, stance: Stance::Evade }], Cat::StanceEvade, self.base_weight(seat, Cat::StanceEvade) * 10.0, 1.0, 1.0, 1.0, format!("Evade at {}", self.tables.body(body).name), Some(key.clone()));

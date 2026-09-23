@@ -4168,7 +4168,10 @@ fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make
             let shown = pending_stance.unwrap_or(current);
             // Ticket #313 (version 0.08.7): each label says what it does on hover, in the one
             // sentence the engine keeps for it, and the rule every stance shares; no marker (#233).
-            let resp = rule_tip(ui.selectable_label(shown == st, st.name()), format!("{}: {}\n{}", st.name(), st.one_liner(ships), Stance::PERSISTS));
+            // Ticket #319 (version 0.08.8): the Intercept label says when the computer seats use
+            // it, which is measured behaviour and not a rule, at the designer's word.
+            let measured = if ships && st == Stance::Intercept { "\nThe computer seats intercept with warships when an unarmed rival hull is inbound: a Colony Ship or a Carrier." } else { "" };
+            let resp = rule_tip(ui.selectable_label(shown == st, st.name()), format!("{}: {}\n{}{measured}", st.name(), st.one_liner(ships), Stance::PERSISTS));
             if resp.clicked() && shown != st {
                 let order = make(st);
                 if game.check_order(Seat(0), pending, &order).is_ok() {

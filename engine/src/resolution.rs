@@ -185,6 +185,8 @@ impl Game {
                 }
                 let name = format!("{} orbit (interception)", self.tables.body(body).name);
                 self.ship_melee(&name, body, &parties);
+                // Ticket #319 (version 0.08.8): counted, so the sweep can say whether Intercept fires.
+                self.war.interceptions[seat.index()] += 1;
             }
         }
     }

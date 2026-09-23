@@ -10816,3 +10816,28 @@ fn the_nearest_army_threat_is_the_rival_raised_army_next_door_with_the_best_odds
     let nobody = StateId::ALL.into_iter().find(|s| g.state(*s).control == Control::Neutral).expect("a neutral Region");
     assert!(g.nearest_army_threat(nobody).is_none());
 }
+
+// -------------------------------------------- 0.08.8 ticket #319: Carriers off Earth for every seat
+
+/// Ticket #319 (version 0.08.8): a seat other than the Prospectors wants a Carrier only with cause:
+/// a rival's Colony off Earth whose holder it is Wary or worse toward. A station over Earth is no
+/// target, and a rival it is Neutral toward gives no cause.
+#[test]
+fn a_carrier_has_somewhere_to_go_only_with_cause_against_a_colony_off_earth() {
+    let mut g = game();
+    assert_eq!(g.kind(Seat(0)), FactionKind::Custodians, "seat 0 is not the Prospectors here");
+    assert!(!g.carrier_target_exists(Seat(0)), "a fresh board: no rival Colony off Earth");
+    // A rival's station over Earth is not off Earth.
+    let over_earth = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: over_earth, body: BodyId::Earth, slot: 3, control: Control::Controlled(Seat(2)), modules: Vec::new(), colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    g.relations.score[0][2] = -8;
+    assert!(!g.carrier_target_exists(Seat(0)), "a station over Earth is no Carrier's target");
+    // A rival's Colony on Mars, the rival Neutral: no cause.
+    let mars = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: mars, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules: Vec::new(), colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+    assert!(!g.carrier_target_exists(Seat(0)), "Neutral toward its holder: no cause, no target");
+    // Cold toward its holder: cause.
+    g.relations.score[0][1] = -8;
+    assert!(g.relations_score(Seat(0), Seat(1)) <= g.tables.ai.thresholds.war_cause);
+    assert!(g.carrier_target_exists(Seat(0)), "Cold toward the Colony's holder: a target");
+}

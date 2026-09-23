@@ -266,7 +266,7 @@ The extra Colonists a warming Earth puts aboard a Colony Ship lifting at Earth, 
 _Avoid_: overloading, coach class (that is the Arkwrights' rule), refugees aboard
 
 **Carrier**:
-The Ship type that carries one Army and nothing else, since version 0.04. Unarmed, it needs an escort and is a target for Intercept like a Colony Ship. Every landing needs one. Since version 0.08.6 an Army landed at a Colony its Faction does not direct lands on Attack and fights the turn it lands, after the orbit has been fought, and a landing that meets nobody occupies the Colony the same turn; landed at its own, it lands on Hold. An Army lands only at a Colony, never in a Region.
+The Ship type that carries one Army and nothing else, since version 0.04. Unarmed, it needs an escort and is a target for Intercept like a Colony Ship. Every landing needs one. Since version 0.08.6 an Army landed at a Colony its Faction does not direct lands on Attack and fights the turn it lands, after the orbit has been fought, and a landing that meets nobody occupies the Colony the same turn; landed at its own, it lands on Hold. An Army lands only at a Colony, never in a Region. Since version 0.08.8 every computer seat wants one where it has cause against the holder of a rival Colony off Earth, not the Prospectors alone; measured, none was built in eighty games, the appetite's terms never coinciding.
 _Avoid_: troopship, transport, landing ship
 
 **Frigate**:

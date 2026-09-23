@@ -961,6 +961,10 @@ pub struct WarCounters {
     /// counted before; the reviews measured no Army carried by anybody in eighty games.
     #[serde(default)]
     pub armies_landed: [u32; SEAT_COUNT],
+    /// Ticket #319 (version 0.08.8): interceptions fought, by the intercepting seat. An
+    /// interception is also counted among the orbit attacks, as it always was.
+    #[serde(default)]
+    pub interceptions: [u32; SEAT_COUNT],
 }
 
 impl WarCounters {
@@ -981,6 +985,7 @@ impl WarCounters {
             self.escapes[i] += o.escapes[i];
             self.dig_ins[i] += o.dig_ins[i];
             self.armies_landed[i] += o.armies_landed[i];
+            self.interceptions[i] += o.interceptions[i];
         }
         self.battles_vs_neutral += o.battles_vs_neutral;
         self.standing_armies_lost += o.standing_armies_lost;

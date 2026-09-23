@@ -475,6 +475,8 @@ fn main() {
                             println!("      Dig In orders over the batch, by seat {:?}", warc.dig_ins);
                             // Ticket #300 (version 0.08.6): Armies landed from a Carrier, by seat.
                             println!("      Armies landed at a Colony over the batch, by seat {:?}", warc.armies_landed);
+                            // Ticket #319 (version 0.08.8): interceptions fought, by the intercepting seat.
+                            println!("      Interceptions over the batch, by seat {:?}", warc.interceptions);
                             println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
                             println!("      Breaks fired: {}", fired.join(", "));
                         }
