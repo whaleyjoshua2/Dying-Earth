@@ -5963,12 +5963,19 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             faction_glyph(ui, session, game, Some(s.seat), 16.0);
             ui.label(format!("{}: {}/{} Fuel", game.ship_name(s), s.fuel, tank))
                 .on_hover_text(format!("{} {}", s.kind.name(), s.id.0));
-            if game.own_station_at(Seat(0), body) {
-                cost_button(ui, game, &session.pending, Order::Refuel { ship: s.id }, "Refuel from the Stockpile", actions);
+            // Ticket #325 (version 0.08.8): or a partner's station under a Refuel Accord, named on
+            // the hover; the Fuel is still the player's own Stockpile's.
+            if game.refuel_station_at(Seat(0), body) {
+                let partner = if game.own_station_at(Seat(0), body) {
+                    None
+                } else {
+                    game.colonies.iter().filter(|c| c.body == body && game.fuels_for(c, Seat(0))).find_map(|c| c.control.director()).map(|d| format!("At the station of the {}, under your Refuel Accord: the Fuel is your own Stockpile's, drawn there.", game.seat_name(d)))
+                };
+                cost_button_with_hover(ui, game, &session.pending, Order::Refuel { ship: s.id }, "Refuel from the Stockpile", partner, actions);
             } else if game.stranded(s.id) {
-                ui.colored_label(Color32::from_rgb(230, 120, 90), "stranded: no leg it can pay, and no station of yours here to refuel at; a station built in orbit here rescues it");
+                ui.colored_label(Color32::from_rgb(230, 120, 90), "stranded: no leg it can pay, and no station of yours or of a Refuel partner's here to refuel at; a station built in orbit here, or a Refuel Accord with one who holds a station here, rescues it");
             } else {
-                ui.label("no station of yours here to refuel at");
+                ui.label("no station of yours, or of a Refuel partner's, here to refuel at");
             }
         });
     }

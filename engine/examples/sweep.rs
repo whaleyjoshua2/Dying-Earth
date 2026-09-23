@@ -147,7 +147,7 @@ fn main() {
                         let mut lost_in_transit = [0i64; 4];
                         // Ticket #87: stranded Ships at the end, Refuel orders and stations off Earth.
                         let mut stranded = [0u32; 4];
-                        let (mut refuels, mut stations_off_earth) = (0u32, 0u32);
+                        let (mut refuels, mut partner_refuels, mut stations_off_earth) = (0u32, 0u32, 0u32);
                         // Ticket #290 (version 0.08.6): Modules beyond the Core on a starting
                         // station at the end of turn three, per seat, summed over the batch.
                         let mut opening_modules = [0u32; 4];
@@ -228,6 +228,7 @@ fn main() {
                                 stranded[s] += r.stranded_at_end[s];
                             }
                             refuels += r.refuels;
+                            partner_refuels += r.partner_refuels;
                             stations_off_earth += r.stations_off_earth;
                             for (i, n) in opening_modules.iter_mut().enumerate() {
                                 *n += r.opening_modules[i];
@@ -352,7 +353,7 @@ fn main() {
                                 gate_turns.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
                             );
                             println!("      Crowded ships: Colonists lost in transit over the batch, by seat {lost_in_transit:?}");
-                            println!("      Tanks: Ships stranded at the end over the batch, by seat {stranded:?}; {refuels} Refuel orders; {stations_off_earth} stations standing off Earth at the end");
+                            println!("      Tanks: Ships stranded at the end over the batch, by seat {stranded:?}; {refuels} Refuel orders ({partner_refuels} at a partner's station); {stations_off_earth} stations standing off Earth at the end");
                             println!("      The opening: Modules beyond the Core on a starting station at the end of turn 3 over the batch, by seat {opening_modules:?}");
                             println!(
                                 "      Build it where you dig: {deep_colonies} ground Colonies with two or more working Mines at the end over the batch; {:.1} Modules per ground Colony",

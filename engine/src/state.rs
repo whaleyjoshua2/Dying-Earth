@@ -1853,6 +1853,20 @@ impl Game {
         self.colonies.iter().any(|c| c.in_orbit && c.body == body && c.control.director() == Some(seat))
     }
 
+    /// Ticket #325 (version 0.08.8): whether a station fuels this seat's Ships: its own, or a
+    /// partner's under a Refuel Accord. The Fuel is the refueller's own Stockpile's either way;
+    /// the partner's station is only where it is drawn.
+    pub fn fuels_for(&self, c: &Colony, seat: Seat) -> bool {
+        c.in_orbit && c.control.director().is_some_and(|d| d == seat || self.accord_has(seat, d, Term::Refuel))
+    }
+
+    /// Ticket #325: a station at the Body the seat may Refuel at, its own or a partner's, blockaded
+    /// or not -- the test that says whether a Ship is stranded and whether the card offers a
+    /// Refuel at all; `refuelling_station` says whether one is open this turn.
+    pub fn refuel_station_at(&self, seat: Seat, body: BodyId) -> bool {
+        self.colonies.iter().any(|c| c.body == body && self.fuels_for(c, seat))
+    }
+
     /// Ticket #87: what a Refuel order takes from the Stockpile: what the tank wants, as far as
     /// the Stockpile can pay.
     pub fn refuel_amount(&self, seat: Seat, ship: ShipId) -> i64 {
@@ -1871,7 +1885,8 @@ impl Game {
     pub fn stranded(&self, ship: ShipId) -> bool {
         let Some(s) = self.ship(ship) else { return false };
         let ShipAt::Body(body) = s.at else { return false };
-        if self.own_station_at(s.seat, body) {
+        // Ticket #325 (version 0.08.8): a partner's station under a Refuel Accord rescues it too.
+        if self.refuel_station_at(s.seat, body) {
             return false;
         }
         match self.cheapest_leg_from(s.seat, body) {
@@ -3210,9 +3225,12 @@ impl Game {
 
     /// Ticket #99: a station of this seat's at this Body that a rival warship is not blockading, so
     /// a Refuel has somewhere to draw from.
+    ///
+    /// Ticket #325 (version 0.08.8): or a partner's under a Refuel Accord; a station blockaded
+    /// against its holder fuels the partner no more than its holder.
     pub fn refuelling_station(&self, seat: Seat, body: BodyId) -> bool {
         self.colonies.iter().any(|c| {
-            c.in_orbit && c.body == body && c.control.controller() == Some(seat) && !self.slot_blockaded_against(seat, body, c.slot)
+            c.body == body && self.fuels_for(c, seat) && c.control.director().is_some_and(|d| !self.slot_blockaded_against(d, body, c.slot))
         })
     }
 

@@ -11048,3 +11048,43 @@ fn the_computer_wants_a_battery_where_a_rival_warship_stands() {
     g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Battery));
     assert_eq!(g.enemy_ship_strength(Seat(1), BodyId::Earth), g.ship_stack_strength(Seat(0), BodyId::Earth) + g.tables.module(ModuleKind::Battery).strength, "the rival's odds read it");
 }
+
+// -------------------------------------------- 0.08.8 ticket #325: Refuelling at a partner's station
+
+/// Ticket #325 (version 0.08.8): under a Refuel Accord a Ship refuels at the partner's station as
+/// at its own, from its own Stockpile; without one it is stranded there; a station blockaded
+/// against its holder fuels the partner no more than its holder; and the computer offers Refuel
+/// where the other holds a station at a Body it has Ships at and no station of its own.
+#[test]
+fn a_refuel_accord_opens_a_partners_station() {
+    let mut g = game();
+    calm(&mut g);
+    let station = ColonyId(g.fresh_id());
+    g.colonies.push(Colony { id: station, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules: Vec::new(), colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    let id = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Frigate);
+    g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 0, slot: None });
+    g.seats[0].stockpile.fuel = 40;
+    let refuel = Order::Refuel { ship: id };
+    assert!(!g.own_station_at(Seat(0), BodyId::Mars));
+    assert!(g.check_order(Seat(0), &[], &refuel).is_err(), "no station of its own, no Accord: no Refuel");
+    assert!(g.stranded(id), "and stranded on an empty tank");
+    // The computer offers Refuel here, in its non-aggression offer.
+    let offers: Vec<Order> = g.ai_orders(Seat(0)).into_iter().filter(|o| matches!(o, Order::ProposeAccord { to: Seat(1), .. })).collect();
+    assert!(offers.iter().any(|o| matches!(o, Order::ProposeAccord { terms, .. } if terms.contains(&Term::Refuel))), "the Prospectors hold the only station at Mars: {offers:?}");
+    g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression, Term::Refuel]).expect("struck");
+    assert!(g.check_order(Seat(0), &[], &refuel).is_ok(), "under the Accord it refuels at the partner's station");
+    assert!(!g.stranded(id), "and is not stranded");
+    let fuel_before = g.seats[0].stockpile.fuel;
+    g.commit_orders(Seat(0), std::slice::from_ref(&refuel));
+    g.resolution_phase();
+    assert_eq!(g.ship(id).unwrap().fuel, g.tables.unit(UnitKind::Frigate).tank, "the tank is full");
+    assert_eq!(g.seats[0].stockpile.fuel, fuel_before - g.tables.unit(UnitKind::Frigate).tank, "paid from the refueller's own Stockpile");
+    assert!(g.log.iter().any(|l| l.contains("at a partner's station")), "said in the log");
+    // A rival blockading the partner's slot shuts it to the partner as to its holder.
+    g.ships.iter_mut().find(|s| s.id == id).unwrap().fuel = 0;
+    let blockader = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Frigate);
+    g.ships.push(Ship { id: blockader, name, kind: UnitKind::Frigate, seat: Seat(2), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(0) });
+    assert!(g.check_order(Seat(0), &[], &refuel).is_err(), "blockaded against its holder, it fuels nobody");
+}

@@ -94,7 +94,7 @@ The rule, since version 0.06.0, that a Module built at a Colony with a working M
 _Avoid_: in-situ discount, local build bonus, mining discount
 
 **Refuel**:
-The Orders-phase order that fills a Ship's Tank from the Stockpile, as far as the Stockpile can pay, at a Body where the Ship's Faction holds a Space Station.
+The Orders-phase order that fills a Ship's Tank from the Stockpile, as far as the Stockpile can pay, at a Body where the Ship's Faction holds a Space Station or, since version 0.08.8, where a partner under a Refuel Accord holds one: the Fuel is always the refueller's own Stockpile's, and a partner's station is only where it is drawn. A station blockaded against its holder fuels nobody. A Ship with no such station and no leg its tank can pay is stranded.
 _Avoid_: resupply, top up, tanker
 _Avoid_: base, platform, orbital, outpost
 
@@ -518,7 +518,7 @@ A bargain between two Factions, from version 0.08.2, holding one or more **Terms
 _Avoid_: diplomacy, treaty, alliance, pact, deal
 
 **Terms**:
-What is inside an Accord. **Non-aggression**: neither spends Influence on a place the other holds, nor opens a Battle against them -- not forbidden by the rules, but paid for and fatal to the Accord. **Passage**: since version 0.08.8 a rule for Armies as well as Ships: either's Armies may march into the other's held Regions without attacking, arriving on Hold, fighting nobody and defending nothing while the Accord stands, and on Attack at the next Resolution once it ends, as any rival Army would be; neither intercepts the other's Ships, and a Blockade does not shut the other out of the slot. Without it a march into a held Region is an attack, charged as one when the Battle is fought. **Refuel**: either may Refuel at the other's Space Stations. **Tribute**: a fixed gift, one a turn to a Faction, which raises their view of you by one; it is a single turn's act rather than a standing term. **A research agreement**: both parties' Research rises a tenth while it stands, and it wants Friendly on both sides to strike -- checked at that moment and never again.
+What is inside an Accord. **Non-aggression**: neither spends Influence on a place the other holds, nor opens a Battle against them -- not forbidden by the rules, but paid for and fatal to the Accord. **Passage**: since version 0.08.8 a rule for Armies as well as Ships: either's Armies may march into the other's held Regions without attacking, arriving on Hold, fighting nobody and defending nothing while the Accord stands, and on Attack at the next Resolution once it ends, as any rival Army would be; neither intercepts the other's Ships, and a Blockade does not shut the other out of the slot. Without it a march into a held Region is an attack, charged as one when the Battle is fought. **Refuel**: either may Refuel at the other's Space Stations, from their own Stockpile, since version 0.08.8 in the rules and not only in the text; it costs the granting side nothing, so the computer accepts it at Wary or better and offers it, in its non-aggression offer, where the other holds a station at a Body it has Ships or a Colony at and no station of its own. **Tribute**: a fixed gift, one a turn to a Faction, which raises their view of you by one; it is a single turn's act rather than a standing term. **A research agreement**: both parties' Research rises a tenth while it stands, and it wants Friendly on both sides to strike -- checked at that moment and never again.
 _Avoid_: clause, article, condition (that is close to Victory Condition), provision
 
 **Allotment**:

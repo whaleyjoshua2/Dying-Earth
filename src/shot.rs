@@ -313,6 +313,21 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.materials = 120;
             g.seats[0].stockpile.energy = 60;
         }
+        // `refuel:1` (a building aid, ticket #325, version 0.08.8): seat 1 holds a station over
+        // Mars, seat 0 a Frigate in Mars orbit with an empty tank and no station of its own there,
+        // and a Refuel Accord stands between them; so the Ship card (`stack:1`) shows the Refuel
+        // button at a partner's station and its hover.
+        if std::env::args().any(|a| a == "refuel:1") {
+            let id = ColonyId(g.fresh_id());
+            let modules = vec![Module::new(ModuleKind::Habitat)];
+            g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules, colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+            let sid = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::Frigate);
+            let built_turn = g.turn;
+            g.ships.push(Ship { id: sid, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 0, slot: None });
+            let _ = g.strike_accord(Seat(0), Seat(1), vec![Term::NonAggression, Term::Refuel]);
+            g.seats[0].stockpile.fuel = 40;
+        }
         // `rival:1` (a building aid, ticket #261, version 0.08.4): seat 1 stands three quarters of
         // the way to its Victory Condition -- nine Colonists on the Moon of twelve, and, for the
         // Prospectors it usually is, the Fund at 2000 of 2500 -- and a quiet turn runs so the

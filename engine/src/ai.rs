@@ -290,6 +290,17 @@ impl Game {
     /// of computer seats was ever Friendly in eighty games, so the designer set the band below)
     /// and holds a Region next door to one they hold, so an Army of either could use it.
     /// Accepted at Neutral or better, as non-aggression is.
+    /// Ticket #325 (version 0.08.8): Refuel is worth offering where the other seat holds a station
+    /// at a Body this seat has Ships or a Colony at and no station of its own: the one place the
+    /// term would change what its Ships can do.
+    pub fn refuel_worth_offering(&self, seat: Seat, other: Seat) -> bool {
+        BodyId::ALL.into_iter().any(|body| {
+            self.own_station_at(other, body)
+                && !self.own_station_at(seat, body)
+                && (self.ships.iter().any(|s| s.seat == seat && s.at == ShipAt::Body(body)) || self.colonies.iter().any(|c| c.body == body && c.control.director() == Some(seat)))
+        })
+    }
+
     pub fn passage_worth_offering(&self, seat: Seat, other: Seat) -> bool {
         matches!(self.relations_level(seat, other), "Cordial" | "Friendly")
             && StateId::ALL.into_iter().any(|s| {
@@ -1503,6 +1514,12 @@ impl Game {
             if self.passage_worth_offering(seat, other) {
                 terms.push(Term::Passage);
             }
+            // Ticket #325 (version 0.08.8): and Refuel in the same offer, where the other holds a
+            // station at a Body this seat has Ships or a Colony at and no station of its own, so
+            // the term has somewhere to matter.
+            if self.refuel_worth_offering(seat, other) {
+                terms.push(Term::Refuel);
+            }
             if !self.accord_acceptable(seat, other, &terms) {
                 continue;
             }
@@ -1798,7 +1815,8 @@ impl Game {
             // Ticket #87: refuel at a station of its own whenever the tank is short and the
             // Stockpile has Fuel; a leg the tank cannot pay is refused at the check, so the AI
             // never flies on an empty tank.
-            if s.fuel < card.tank && self.own_station_at(seat, body) && self.seat(seat).stockpile.fuel > 0 {
+            // Ticket #325 (version 0.08.8): or at a partner's station under a Refuel Accord.
+            if s.fuel < card.tank && self.refuel_station_at(seat, body) && self.seat(seat).stockpile.fuel > 0 {
                 push(
                     vec![Order::Refuel { ship: s.id }],
                     Cat::Transit,

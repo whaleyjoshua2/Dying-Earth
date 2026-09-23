@@ -1066,12 +1066,13 @@ impl Game {
                     return fail("not your Ship");
                 }
                 let ShipAt::Body(body) = s.at else { return fail("in transit") };
-                if !self.own_station_at(seat, body) {
-                    return fail(format!("no station of yours over {} to refuel at", self.tables.body(body).name));
+                // Ticket #325 (version 0.08.8): or a partner's station under a Refuel Accord.
+                if !self.refuel_station_at(seat, body) {
+                    return fail(format!("no station of yours, or of a Refuel partner's, over {} to refuel at", self.tables.body(body).name));
                 }
                 // Ticket #99 (version 0.07.0): a blockaded station fuels nothing.
                 if !self.refuelling_station(seat, body) {
-                    return fail(format!("every station of yours over {} is blockaded", self.tables.body(body).name));
+                    return fail(format!("every station over {} you could refuel at is blockaded", self.tables.body(body).name));
                 }
                 if s.fuel >= self.tables.unit(s.kind).tank {
                     return fail("the tank is full");
@@ -1676,10 +1677,17 @@ impl Game {
                 Order::Refuel { ship } => {
                     let amount = cost.fuel;
                     let tank = self.ship(*ship).map(|s| self.tables.unit(s.kind).tank).unwrap_or(0);
+                    let body = self.ship(*ship).and_then(|s| match s.at {
+                        ShipAt::Body(b) => Some(b),
+                        _ => None,
+                    });
                     if let Some(s) = self.ship_mut(*ship) {
                         s.fuel = (s.fuel + amount).min(tank);
                     }
-                    self.log(format!("{} refuels {} with {} Fuel.", self.seat_name(seat), ship, amount));
+                    // Ticket #325 (version 0.08.8): said when it is a partner's station, so the
+                    // sweep can count it apart from a refuel at one's own.
+                    let at_partner = body.is_some_and(|b| !self.own_station_at(seat, b));
+                    self.log(format!("{} refuels {} with {} Fuel{}.", self.seat_name(seat), ship, amount, if at_partner { " at a partner's station" } else { "" }));
                 }
                 Order::ShipStance { body, stance } => {
                     for s in self.ships.iter_mut().filter(|s| s.seat == seat && s.at == ShipAt::Body(*body)) {
