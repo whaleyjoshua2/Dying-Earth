@@ -156,11 +156,15 @@ pub struct Module {
     /// Ticket #54: mothballed, exactly as a Facility is.
     pub mothballed: bool,
     pub change: Option<PendingChange>,
+    /// Ticket #324 (version 0.08.8): hits taken in a Battle, nought for every Module but a Battery;
+    /// repaired with Materials as a Ship's are. At the card's hit points the Battery is gone.
+    #[serde(default)]
+    pub damage: u32,
 }
 
 impl Module {
     pub fn new(kind: ModuleKind) -> Module {
-        Module { kind, online: true, offline_until_resolution: false, mothballed: false, change: None }
+        Module { kind, online: true, offline_until_resolution: false, mothballed: false, change: None, damage: 0 }
     }
     /// Ticket #54: standing, running and not mothballed.
     pub fn working(&self) -> bool {
@@ -965,6 +969,9 @@ pub struct WarCounters {
     /// interception is also counted among the orbit attacks, as it always was.
     #[serde(default)]
     pub interceptions: [u32; SEAT_COUNT],
+    /// Ticket #324 (version 0.08.8): Batteries destroyed in a Battle, by the seat that held them.
+    #[serde(default)]
+    pub batteries_lost: [u32; SEAT_COUNT],
 }
 
 impl WarCounters {
@@ -986,6 +993,7 @@ impl WarCounters {
             self.dig_ins[i] += o.dig_ins[i];
             self.armies_landed[i] += o.armies_landed[i];
             self.interceptions[i] += o.interceptions[i];
+            self.batteries_lost[i] += o.batteries_lost[i];
         }
         self.battles_vs_neutral += o.battles_vs_neutral;
         self.standing_armies_lost += o.standing_armies_lost;
@@ -3104,9 +3112,33 @@ impl Game {
             .into_iter()
             .filter(|seat| self.ships.iter().any(|s| s.seat == *seat && s.at == ShipAt::Body(body) && s.kind.is_warship() && !s.escaped));
         match (holders.next(), holders.next()) {
-            (Some(one), None) => Some(one),
+            // Ticket #324 (version 0.08.8): a rival's Battery standing at the Body denies it.
+            (Some(one), None) if !self.battery_stands_against(one, body) => Some(one),
             _ => None,
         }
+    }
+
+    /// Ticket #324 (version 0.08.8): the working Batteries a seat directs at a Body, each as its
+    /// Colony and its index among that Colony's Modules -- the reference a Battle and a Repair
+    /// order carry. Mothballed or offline, a Battery neither fires nor denies, as every Module
+    /// that is not working does nothing.
+    pub fn batteries_at(&self, seat: Seat, body: BodyId) -> Vec<(ColonyId, usize)> {
+        self.colonies
+            .iter()
+            .filter(|c| c.body == body && c.control.director() == Some(seat))
+            .flat_map(|c| c.modules.iter().enumerate().filter(|(_, m)| m.kind == ModuleKind::Battery && m.working()).map(move |(i, _)| (c.id, i)))
+            .collect()
+    }
+
+    /// Ticket #324: the strength a seat's Batteries at a Body bring to a Battle there.
+    pub fn battery_strength(&self, seat: Seat, body: BodyId) -> i64 {
+        self.batteries_at(seat, body).len() as i64 * self.tables.module(ModuleKind::Battery).strength
+    }
+
+    /// Ticket #324: whether a Battery of some OTHER seat's stands and works at the Body, which is
+    /// what denies this seat Orbital Control there and the Blockade with it.
+    pub fn battery_stands_against(&self, seat: Seat, body: BodyId) -> bool {
+        seat.others().iter().any(|s| !self.batteries_at(*s, body).is_empty())
     }
 
     /// Whether a seat may land Armies and Colonists on the GROUND of a Body (spec 9.3).
@@ -3130,6 +3162,10 @@ impl Game {
     /// needs to be positively chosen, not just the presence of a ship" -- and a blockaded station
     /// makes nothing (`starved_by`).
     pub fn slot_blockaded_against(&self, seat: Seat, body: BodyId, slot: u32) -> bool {
+        // Ticket #324 (version 0.08.8): nor a seat with a Battery standing at the Body.
+        if !self.batteries_at(seat, body).is_empty() {
+            return false;
+        }
         // Ticket #320 (version 0.08.8): a Blockade does not shut out a partner under Passage.
         self.ships.iter().any(|s| s.seat != seat && !self.accord_has(seat, s.seat, Term::Passage) && self.blockading(s) && s.at == ShipAt::Body(body) && s.slot == Some(slot))
     }
@@ -3160,6 +3196,11 @@ impl Game {
     pub fn starved_by(&self, cid: ColonyId) -> Option<Seat> {
         let col = self.colony(cid)?;
         let holder = col.control.director()?;
+        // Ticket #324 (version 0.08.8): a Battery of the holder's at the Body denies every rival
+        // Orbital Control there and the Blockade with it; nothing starves behind one.
+        if !self.batteries_at(holder, col.body).is_empty() {
+            return None;
+        }
         if col.in_orbit {
             self.slot_blockaders(col.body, col.slot).into_iter().find(|s| *s != holder)
         } else {

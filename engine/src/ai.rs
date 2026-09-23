@@ -274,8 +274,10 @@ impl Game {
 
     /// The total strength of every other seat's Ships at a Body (ticket #50): a Battle there is a
     /// melee, so the odds preview counts all of them.
+    /// Ticket #324 (version 0.08.8): a rival's Batteries at the Body count, since they stand in
+    /// the line of any Battle there.
     pub fn enemy_ship_strength(&self, seat: Seat, body: BodyId) -> i64 {
-        seat.others().iter().map(|s| self.ship_stack_strength(*s, body)).sum()
+        seat.others().iter().map(|s| self.ship_stack_strength(*s, body) + self.battery_strength(*s, body)).sum()
     }
 
     /// Whether any other seat directs this Colony.
@@ -1012,6 +1014,21 @@ impl Game {
                     }
                     ModuleKind::Barracks => {
                         if col.modules.iter().any(|m| m.kind == ModuleKind::Barracks) {
+                            continue;
+                        }
+                        (Cat::ArmyOrBarracks, self.base_weight(seat, Cat::ArmyOrBarracks))
+                    }
+                    // Ticket #324 (version 0.08.8): a Battery where a rival's warship stands at the
+                    // Body or a rival's Carrier is inbound to it, one per Colony, at the Barracks'
+                    // weight and the threat term; nowhere else, since it makes nothing and draws
+                    // three Energy a turn.
+                    ModuleKind::Battery => {
+                        let pressed = self.ships.iter().any(|s| {
+                            s.seat != seat
+                                && ((s.at == ShipAt::Body(col.body) && s.kind.is_warship() && !s.escaped)
+                                    || (s.kind == UnitKind::Carrier && matches!(s.at, ShipAt::Transit { to, .. } if to == col.body)))
+                        });
+                        if !pressed || col.modules.iter().any(|m| m.kind == ModuleKind::Battery) || col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Battery)) {
                             continue;
                         }
                         (Cat::ArmyOrBarracks, self.base_weight(seat, Cat::ArmyOrBarracks))
@@ -1946,7 +1963,9 @@ impl Game {
             let key = format!("ships@{body:?}");
             let my_str = self.ship_stack_strength(seat, body);
             let enemy_str = self.enemy_ship_strength(seat, body);
-            let enemy_here = self.ships.iter().any(|s| s.seat != seat && s.at == ShipAt::Body(body));
+            // Ticket #324 (version 0.08.8): a rival's Battery is an enemy in orbit too -- the one
+            // way to clear it, and the odds above read its strength.
+            let enemy_here = self.ships.iter().any(|s| s.seat != seat && s.at == ShipAt::Body(body)) || self.battery_stands_against(seat, body);
             let inbound_target = self.ships.iter().any(|s| s.seat != seat && matches!(s.kind, UnitKind::ColonyShip | UnitKind::Carrier) && matches!(s.at, ShipAt::Transit { to, .. } if to == body));
             let threat = if self.enemy_present_or_inbound(seat, body) { m.threat } else { 1.0 };
             let total_hp: u32 = stack.iter().map(|s| self.tables.unit(s.kind).hit_points).sum();
@@ -1965,7 +1984,10 @@ impl Game {
                 let held_against_me = self.orbital_control(body).map(|o| o != seat).unwrap_or(false);
                 let cause = match self.orbital_control(body).filter(|o| *o != seat) {
                     Some(o) => self.relations_score(seat, o) <= th.war_cause,
-                    None => self.ships.iter().any(|s| s.seat != seat && s.at == ShipAt::Body(body) && self.relations_score(seat, s.seat) <= th.war_cause),
+                    None => {
+                        self.ships.iter().any(|s| s.seat != seat && s.at == ShipAt::Body(body) && self.relations_score(seat, s.seat) <= th.war_cause)
+                            || seat.others().iter().any(|o| !self.batteries_at(*o, body).is_empty() && self.relations_score(seat, *o) <= th.war_cause)
+                    }
                 };
                 if odds >= th.attack_odds && (cause || (my_colony_here && held_against_me)) && wars_opened < 1 {
                     attack = Some(odds);
@@ -1991,7 +2013,9 @@ impl Game {
             // Ticket #278 (version 0.08.5): a Blockade must be chosen, so the stack that landed in a
             // rival station's slot (ai_blockade_slot) is offered the stance that makes it one. The
             // richest rival station is already the slot it took.
-            if let Some(target) = stack.iter().filter(|s| s.kind.is_warship()).find_map(|s| self.station_at(body, s.slot?).filter(|c| self.rival_holds(seat, c))) {
+            // Ticket #324 (version 0.08.8): not against a station whose holder has a Battery at the
+            // Body; the Blockade would shut nothing.
+            if let Some(target) = stack.iter().filter(|s| s.kind.is_warship()).find_map(|s| self.station_at(body, s.slot?).filter(|c| self.rival_holds(seat, c) && c.control.director().is_some_and(|h| self.batteries_at(h, body).is_empty()))) {
                 push(
                     vec![Order::ShipStance { body, stance: Stance::Blockade }],
                     Cat::StanceBlockade,

@@ -276,6 +276,22 @@ energy_upkeep = 2
 influence_allotment = 1
 standing_per_turn = 2
 
+# Ticket #324 (version 0.08.8): the Battery, the one Module that fights. On a Colony or a station.
+# It is a party in the orbital Battle at its Body whenever one is fought there, on Hold, at these
+# figures; it never disengages and Hardened Hulls does not reach it. While one stands and works, no
+# rival holds Orbital Control at its Body -- no landing, no Blockade against its owner -- and the
+# owner gains no Control by it. Damage is repaired with Materials as a Ship's is, at the Colony
+# itself; destroyed, it is gone. Appended last, as the Core Module was.
+[[module]]
+id = "battery"
+name = "Battery"
+materials = 25
+build_turns = 1
+energy_upkeep = 3
+strength = 4
+hit_points = 6
+does = "fires at rival Ship stacks in orbit here; while it stands no rival holds Orbital Control"
+
 # Ticket #88 (version 0.06.0): build it where you dig. A Module (the Archive included) built at a
 # Colony with one working Mine costs `one_mine` of its price, with two or more `two_mines`,
 # multiplicative with the Faction's own discount, rounded down, never below `floor` of the row.

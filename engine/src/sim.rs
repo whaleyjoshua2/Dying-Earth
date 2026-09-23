@@ -203,6 +203,8 @@ pub struct SimResult {
     /// Ticket #241: the four **Unique Modules** standing at the end -- Academy, Heliostat, Exchange,
     /// Chorus -- so that ticket #239's three can be read beside the Custodians' original.
     pub uniques: [u32; 4],
+    /// Ticket #324 (version 0.08.8): Batteries standing at the end, by the seat directing them.
+    pub batteries: [u32; SEAT_COUNT],
     /// The turn the whole Tech Tree completed, if it did. A research agreement pays two seats a
     /// tenth more, and the tree already finished with the game half run.
     pub tree_done_turn: Option<u32>,
@@ -502,6 +504,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     // Ticket #241: the four Unique Modules standing at the end, in card order.
     let uniques: [u32; 4] = [ModuleKind::Academy, ModuleKind::Heliostat, ModuleKind::Exchange, ModuleKind::Chorus]
         .map(|k| game.colonies.iter().map(|c| c.modules.iter().filter(|m| m.kind == k).count() as u32).sum());
+    let batteries: [u32; SEAT_COUNT] =
+        std::array::from_fn(|i| game.colonies.iter().filter(|c| c.control.director() == Some(Seat(i as u8))).map(|c| c.modules.iter().filter(|m| m.kind == ModuleKind::Battery).count() as u32).sum());
     let directive_mean: [f64; SEAT_COUNT] = std::array::from_fn(|i| if directive_samples == 0 { 0.0 } else { directive_sum[i] / directive_samples as f64 });
     let tree_done_turn = if game.research.done.len() == game.tables.techs.len() { Some(game.turn) } else { None };
     let highest_rung = game.research.done.iter().map(|t| tables.tech(*t).rung).max().unwrap_or(0);
@@ -627,6 +631,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         exodus_pioneers,
         accords_struck,
         uniques,
+        batteries,
         tree_done_turn,
         highest_rung,
         victory_met,

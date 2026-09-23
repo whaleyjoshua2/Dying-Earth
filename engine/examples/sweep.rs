@@ -160,6 +160,8 @@ fn main() {
                         let mut d_below = [0u32; 4];
                         let (mut ex_calls, mut ex_pioneers, mut acc_struck) = (0u32, 0u32, 0u32);
                         let mut uniq = [0u32; 4];
+                        // Ticket #324 (version 0.08.8): Batteries standing at the end over the batch, by seat.
+                        let mut batteries = [0u32; 4];
                         // Ticket #89: Solar Arrays standing at the end over the batch.
                         let mut solar_arrays = 0u32;
                         // Ticket #90: Trade Posts standing at the end over the batch.
@@ -243,6 +245,7 @@ fn main() {
                             for i in 0..4 {
                                 d_below[i] += r.directive_turns_below[i];
                                 uniq[i] += r.uniques[i];
+                                batteries[i] += r.batteries[i];
                             }
                             trade_posts += r.trade_posts;
                             mass_drivers += r.mass_drivers;
@@ -367,6 +370,7 @@ fn main() {
                             println!("      Accords STRUCK over the batch: {acc_struck} (against {accords} standing at the end)");
                             println!("      Exodus Calls sounded over the batch: {ex_calls}, worth {ex_pioneers} Pioneers");
                             println!("      Unique Modules standing at the end over the batch: Academy {}, Heliostat {}, Exchange {}, Chorus {}", uniq[0], uniq[1], uniq[2], uniq[3]);
+                            println!("      Batteries standing at the end over the batch, by seat {batteries:?}");
                             println!("      Venus: {venus_stations} stations at the end over the batch, {venus_colonists} Colonists living there");
                             println!(
                                 "      Mars system: a Colony founded in {}/{seeds} seeds, median first turn {}; Antarctic Colonies founded {antarctic}",
@@ -477,6 +481,8 @@ fn main() {
                             println!("      Armies landed at a Colony over the batch, by seat {:?}", warc.armies_landed);
                             // Ticket #319 (version 0.08.8): interceptions fought, by the intercepting seat.
                             println!("      Interceptions over the batch, by seat {:?}", warc.interceptions);
+                            // Ticket #324 (version 0.08.8): Batteries lost in a Battle, by the seat that held them.
+                            println!("      Batteries lost over the batch, by seat {:?}", warc.batteries_lost);
                             println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
                             println!("      Breaks fired: {}", fired.join(", "));
                         }

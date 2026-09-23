@@ -265,10 +265,15 @@ pub enum ModuleKind {
     /// `chorus_colonists` living at its own Colony, rounded down. The more people stand here, the
     /// further the voice carries -- which is the Faction whose whole game is moving people.
     Chorus,
+    /// Version 0.08.8 (ticket #324): the Battery, the one Module that fights. It is a party in the
+    /// orbital Battle at its Body, on Hold, at its card's strength and hit points, and while one
+    /// stands and works no rival holds Orbital Control there; its owner gains none by it. Appended
+    /// last, as the Core Module was, for `Tables::module`.
+    Battery,
 }
 
 impl ModuleKind {
-    pub const ALL: [ModuleKind; 18] = [
+    pub const ALL: [ModuleKind; 19] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -287,9 +292,10 @@ impl ModuleKind {
         ModuleKind::Heliostat,
         ModuleKind::Exchange,
         ModuleKind::Chorus,
+        ModuleKind::Battery,
     ];
     /// The Modules an ordinary build order may place (ticket #51: the Archive is not one of them).
-    pub const BUILDABLE: [ModuleKind; 16] = [
+    pub const BUILDABLE: [ModuleKind; 17] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -306,6 +312,7 @@ impl ModuleKind {
         ModuleKind::Heliostat,
         ModuleKind::Exchange,
         ModuleKind::Chorus,
+        ModuleKind::Battery,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -327,6 +334,7 @@ impl ModuleKind {
             ModuleKind::Observatory => "Observatory",
             ModuleKind::SolarArray => "Solar Array",
             ModuleKind::MassDriver => "Mass Driver",
+            ModuleKind::Battery => "Battery",
         }
     }
 
@@ -386,7 +394,7 @@ impl ModuleKind {
     pub fn stands_on_a_station(self) -> bool {
         matches!(
             self.common().unwrap_or(self),
-            ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute
+            ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Battery
         )
     }
 }

@@ -166,6 +166,8 @@ pub fn module_icon(kind: dying_earth_engine::ModuleKind) -> &'static str {
         Exchange => "module_exchange",
         Chorus => "module_chorus",
         Archive => "module_archive",
+        // Ticket #324 (version 0.08.8): the Battery's glyph is the game's own drawing, in DRAWN.
+        Battery => "module_battery",
         // Ticket #164 (version 0.07.5): the Core Module wears the station glyph the game drew for
         // itself on ticket #135 -- two solar panels on a bar with a module between them, which is
         // what a core module is. It owes no credit. A ground Colony's Core Module wears it too,
@@ -205,7 +207,9 @@ pub fn faction_symbol(kind: dying_earth_engine::FactionKind) -> &'static str {
 /// Ticket #317 (version 0.08.8): the Battle mark, two crossed blades, drawn by hand as the station
 /// was, so it owes no credit. The board had no glyph for a fight; the mark is off-white like every
 /// kind glyph and sits on a disc in the aggressor's colour, since on this board a colour says whose.
-pub const DRAWN: [&str; 3] = ["station", "facility_school", "battle"];
+/// Ticket #324 (version 0.08.8): the Battery's glyph, a turret on a mount with its barrel raised,
+/// drawn by hand as the Battle mark was, so it owes no credit.
+pub const DRAWN: [&str; 4] = ["station", "facility_school", "battle", "module_battery"];
 
 impl Credit {
     /// The file stem in `assets/icons/` this credit is for: the name, lower-cased, spaces to

@@ -10963,3 +10963,88 @@ fn the_computer_marches_a_stack_where_one_army_alone_would_not_clear_the_bar() {
     let marched: Vec<ArmyId> = together.iter().filter_map(|o| match o { Order::MoveArmy { army, to } if *to == target => Some(*army), _ => None }).collect();
     assert!(marched.contains(&first) && marched.contains(&second), "the stack of two marches on Russia together: {together:?}");
 }
+
+// -------------------------------------------- 0.08.8 ticket #324: the Battery
+
+/// Ticket #324 (version 0.08.8): a working Battery denies a rival Orbital Control at its Body and
+/// the Blockade with it, grants its owner none, is the owner's to repair at its Colony, and stands
+/// in the line of a Battle there, where a rival stack on Attack fights it with no Ship of the
+/// owner's present; shot to its hit points it is gone. Mothballed, it neither fires nor denies.
+#[test]
+fn a_battery_denies_orbital_control_and_the_blockade_and_falls_in_a_battle() {
+    let mut g = game();
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("seat 0's station");
+    let slot = g.colony(station).unwrap().slot;
+    g.ships.retain(|s| s.at != ShipAt::Body(BodyId::Earth));
+    let id = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Frigate);
+    g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(slot) });
+    assert_eq!(g.orbital_control(BodyId::Earth), Some(Seat(1)), "a lone rival warship holds Orbital Control");
+    assert!(g.slot_blockaded_against(Seat(0), BodyId::Earth, slot));
+    assert!(!g.may_land(Seat(0), BodyId::Earth));
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Battery));
+    let index = g.colony(station).unwrap().modules.len() - 1;
+    let card = g.tables.module(ModuleKind::Battery).clone();
+    assert_eq!(g.orbital_control(BodyId::Earth), None, "a Battery denies it");
+    assert!(g.may_land(Seat(0), BodyId::Earth), "so its owner lands");
+    assert!(!g.slot_blockaded_against(Seat(0), BodyId::Earth, slot), "and the Blockade shuts nothing");
+    assert_eq!(g.starved_by(station), None, "nor starves");
+    assert_eq!(g.battery_strength(Seat(0), BodyId::Earth), card.strength);
+    g.colony_mut(station).unwrap().modules[index].mothballed = true;
+    assert_eq!(g.orbital_control(BodyId::Earth), Some(Seat(1)), "mothballed, it denies nothing");
+    g.colony_mut(station).unwrap().modules[index].mothballed = false;
+    // The Repair order: the owner's, at its Colony, for no more than its damage.
+    g.colony_mut(station).unwrap().modules[index].damage = 2;
+    let repair = |points: u32| Order::Repair { unit: UnitRef::Battery { colony: station, index }, points };
+    assert!(g.check_order(Seat(0), &[], &repair(2)).is_ok(), "the owner repairs it");
+    assert!(g.check_order(Seat(1), &[], &repair(2)).is_err(), "a rival does not");
+    assert!(g.check_order(Seat(0), &[], &repair(3)).is_err(), "no more than its damage");
+    // The Battle: the rival's stack on Attack, no Ship of the owner's present, and the Battery one
+    // hit from gone.
+    g.colony_mut(station).unwrap().modules[index].damage = card.hit_points - 1;
+    for _ in 0..2 {
+        let id = ShipId(g.fresh_id());
+        let name = g.next_ship_name(UnitKind::Frigate);
+        g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    }
+    for s in g.ships.iter_mut().filter(|s| s.seat == Seat(1) && s.at == ShipAt::Body(BodyId::Earth)) {
+        s.stance = Stance::Attack;
+    }
+    g.resolution_phase();
+    let line = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::Body(BodyId::Earth))).expect("a Battle in Earth orbit").clone();
+    let mine = line.parties.iter().find(|p| p.seat == Some(Seat(0))).expect("the Battery's side");
+    assert!(mine.units.contains("the Battery at"), "the Battery is named in the line: {}", mine.units);
+    assert_eq!(mine.strength, card.strength, "at its card's strength");
+    assert!(!g.colony(station).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Battery), "shot to nothing, it is gone: {}", mine.units);
+    assert_eq!(g.war.batteries_lost[0], 1, "and counted");
+    assert!(line.result.contains("Orbital Control"), "{}", line.result);
+    assert_eq!(g.orbital_control(BodyId::Earth), Some(Seat(1)), "Control is the rival's again: {}", line.result);
+}
+
+/// Ticket #324: the computer wants a Battery at a Colony where a rival's warship stands, and not
+/// where none does; and a rival reads the Battery's strength in its odds in that orbit.
+#[test]
+fn the_computer_wants_a_battery_where_a_rival_warship_stands() {
+    let mut g = game();
+    calm(&mut g);
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.id).expect("seat 0's station");
+    g.seats[0].stockpile.materials = 500;
+    g.seats[0].stockpile.energy = 500;
+    // Room on the station, with its opening Habitat and its Trade Post already standing: on a fresh
+    // station with two free places those two outrank a Battery at the Barracks' weight (measured).
+    {
+        let col = g.colony_mut(station).unwrap();
+        col.modules.push(Module::new(ModuleKind::Habitat));
+        col.modules.push(Module::new(ModuleKind::TradePost));
+        col.colonists = 8;
+    }
+    let before: Vec<Order> = g.ai_orders(Seat(0));
+    assert!(!before.iter().any(|o| matches!(o, Order::BuildModule { kind: ModuleKind::Battery, .. })), "no rival warship here, no Battery: {before:?}");
+    let id = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Frigate);
+    g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    let after: Vec<Order> = g.ai_orders(Seat(0));
+    assert!(after.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: ModuleKind::Battery } if *colony == station)), "a rival warship at the Body: {after:?}");
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Battery));
+    assert_eq!(g.enemy_ship_strength(Seat(1), BodyId::Earth), g.ship_stack_strength(Seat(0), BodyId::Earth) + g.tables.module(ModuleKind::Battery).strength, "the rival's odds read it");
+}

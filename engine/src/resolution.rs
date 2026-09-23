@@ -169,16 +169,16 @@ impl Game {
                 if interceptors.is_empty() {
                     continue;
                 }
-                let mut parties: Vec<(Seat, bool, Vec<ShipId>)> = vec![(seat, true, interceptors)];
+                let mut parties: Vec<(Seat, bool, Vec<UnitRef>)> = vec![(seat, true, interceptors.into_iter().map(UnitRef::Ship).collect())];
                 for other in seat.others() {
                     // Ticket #320 (version 0.08.8): a partner under Passage is no target for Intercept.
                     if self.accord_has(seat, other, Term::Passage) {
                         continue;
                     }
-                    let arriving: Vec<ShipId> = arrivals
+                    let arriving: Vec<UnitRef> = arrivals
                         .iter()
                         .filter(|(s, b, id)| *s == other && *b == body && self.ship(*id).map(|x| !x.escaped).unwrap_or(false))
-                        .map(|(_, _, id)| *id)
+                        .map(|(_, _, id)| UnitRef::Ship(*id))
                         .collect();
                     if !arriving.is_empty() {
                         parties.push((other, false, arriving));
@@ -208,15 +208,23 @@ impl Game {
             if aggressors.is_empty() {
                 continue;
             }
-            let parties: Vec<(Seat, bool, Vec<ShipId>)> = Seat::ALL
+            // Ticket #324 (version 0.08.8): a seat's working Batteries at the Body stand in its line
+            // after its Ships, so a stack on Attack at a Body with nothing but a Battery in it fights
+            // the Battery, and a Battery beside its owner's stack fights with it.
+            let parties: Vec<(Seat, bool, Vec<UnitRef>)> = Seat::ALL
                 .into_iter()
                 .filter_map(|seat| {
-                    let ships: Vec<ShipId> =
-                        self.ships.iter().filter(|s| s.seat == seat && s.at == ShipAt::Body(body) && !s.escaped).map(|s| s.id).collect();
-                    if ships.is_empty() {
+                    let units: Vec<UnitRef> = self
+                        .ships
+                        .iter()
+                        .filter(|s| s.seat == seat && s.at == ShipAt::Body(body) && !s.escaped)
+                        .map(|s| UnitRef::Ship(s.id))
+                        .chain(self.batteries_at(seat, body).into_iter().map(|(colony, index)| UnitRef::Battery { colony, index }))
+                        .collect();
+                    if units.is_empty() {
                         None
                     } else {
-                        Some((seat, aggressors.contains(&seat), ships))
+                        Some((seat, aggressors.contains(&seat), units))
                     }
                 })
                 .collect();
@@ -463,6 +471,25 @@ impl Game {
             && matches!(a.at, ArmyAt::Place(Place::State(s)) if matches!(self.state(s).control, Control::Controlled(h) if self.army_seat(a).is_some_and(|seat| seat != h && self.accord_has(seat, h, Term::Passage))))
     }
 
+    /// Ticket #324 (version 0.08.8): a unit of an orbital line, Ship or Battery, as a combatant.
+    fn unit_combatant(&self, u: UnitRef) -> Combatant {
+        match u {
+            UnitRef::Ship(id) => self.ship_combatant(id),
+            UnitRef::Army(id) => self.army_combatant(id, false),
+            UnitRef::Battery { colony, index } => self.battery_combatant(colony, index),
+        }
+    }
+
+    /// Ticket #324 (version 0.08.8): a Battery in the line: its card's strength and hit points, its
+    /// own damage, no pursuit, and never a roll to disengage, since it cannot leave -- the flag Dig
+    /// In sets on an Army (#297) says exactly that. Hardened Hulls does not reach it.
+    fn battery_combatant(&self, colony: ColonyId, index: usize) -> Combatant {
+        let card = self.tables.module(ModuleKind::Battery);
+        let damage = self.colony(colony).and_then(|c| c.modules.get(index)).map(|m| m.damage).unwrap_or(0);
+        let name = format!("the Battery at {}", self.place_name(Place::Colony(colony)));
+        Combatant::new(UnitRef::Battery { colony, index }, name, card.strength, card.hit_points, damage, 0, false).dug_in(true)
+    }
+
     fn ship_combatant(&self, id: ShipId) -> Combatant {
         let s = self.ship(id).unwrap();
         let card = self.tables.unit(s.kind);
@@ -487,7 +514,7 @@ impl Game {
     }
 
     /// One melee of Ship stacks at a Body (ticket #50).
-    fn ship_melee(&mut self, place: &str, body: BodyId, parties: &[(Seat, bool, Vec<ShipId>)]) {
+    fn ship_melee(&mut self, place: &str, body: BodyId, parties: &[(Seat, bool, Vec<UnitRef>)]) {
         // Ticket #191 (version 0.08.0): opening a Battle offends everyone on the other side of it.
         for (aggressor, _, _) in parties.iter().filter(|(_, agg, _)| *agg) {
             for (other, _, _) in parties {
@@ -496,7 +523,7 @@ impl Game {
             }
         }
         let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
-            parties.iter().map(|(seat, agg, ids)| (Some(*seat), *agg, ids.iter().map(|id| self.ship_combatant(*id)).collect())).collect();
+            parties.iter().map(|(seat, agg, ids)| (Some(*seat), *agg, ids.iter().map(|u| self.unit_combatant(*u)).collect())).collect();
         let mut line = self.run_melee(place, Some(ReportPlace::Body(body)), units);
         // Ticket #286 (version 0.08.5): counted by the seat that opened it.
         for (seat, _, _) in parties.iter().filter(|(_, agg, _)| *agg) {
@@ -508,6 +535,8 @@ impl Game {
                 line.result.push_str(&format!(" The {} hold Orbital Control.", self.seat_name(s)))
             }
             Some(s) => line.result.push_str(&format!(" The {} keep Orbital Control.", self.seat_name(s))),
+            // Ticket #324: and why not, when a Battery is the reason.
+            None if Seat::ALL.iter().any(|s| !self.batteries_at(*s, body).is_empty()) => line.result.push_str(" Nobody holds Orbital Control: a Battery stands."),
             None => line.result.push_str(" Nobody holds Orbital Control."),
         }
         self.charge_war_hits(body == BodyId::Earth, &line);
@@ -642,6 +671,9 @@ impl Game {
     }
 
     fn apply_combatants(&mut self, side: &[Combatant], at: Option<ReportPlace>) {
+        // Ticket #324 (version 0.08.8): Batteries shot to nothing, removed after the loop from the
+        // highest index down, so an earlier removal does not shift a later one's index.
+        let mut fallen: Vec<(ColonyId, usize)> = Vec::new();
         for c in side {
             match c.unit {
                 UnitRef::Ship(id) => {
@@ -660,8 +692,36 @@ impl Game {
                         a.escaped = c.escaped;
                     }
                 }
+                UnitRef::Battery { colony, index } => {
+                    if let Some(m) = self.colony_mut(colony).and_then(|col| col.modules.get_mut(index)) {
+                        m.damage = c.damage;
+                    }
+                    if c.destroyed() {
+                        fallen.push((colony, index));
+                    }
+                }
             }
         }
+        fallen.sort_by(|a, b| b.cmp(a));
+        for (colony, index) in fallen {
+            self.destroy_battery(colony, index);
+        }
+    }
+
+    /// Ticket #324 (version 0.08.8): a Battery destroyed in a Battle is gone from its Colony,
+    /// counted against the seat that held it, and said in the log.
+    pub fn destroy_battery(&mut self, colony: ColonyId, index: usize) {
+        let Some(col) = self.colony_mut(colony) else { return };
+        if col.modules.get(index).map(|m| m.kind) != Some(ModuleKind::Battery) {
+            return;
+        }
+        let holder = col.control.director();
+        col.modules.remove(index);
+        if let Some(h) = holder {
+            self.war.batteries_lost[h.index()] += 1;
+        }
+        let whose = holder.map(|h| self.seat_name(h)).unwrap_or_else(|| "Nobody's".to_string());
+        self.log(format!("{whose} Battery at {} destroyed (battle).", self.place_name(Place::Colony(colony))));
     }
 
     pub fn destroy_ship(&mut self, id: ShipId, why: &str) {
@@ -1554,6 +1614,12 @@ impl Game {
                 UnitRef::Army(id) => {
                     if let Some(a) = self.army_mut(id) {
                         a.damage = a.damage.saturating_sub(points);
+                    }
+                }
+                // Ticket #324 (version 0.08.8): a Battery, at its own Colony.
+                UnitRef::Battery { colony, index } => {
+                    if let Some(m) = self.colony_mut(colony).and_then(|c| c.modules.get_mut(index)).filter(|m| m.kind == ModuleKind::Battery) {
+                        m.damage = m.damage.saturating_sub(points);
                     }
                 }
             }

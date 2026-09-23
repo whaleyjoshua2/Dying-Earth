@@ -2601,8 +2601,18 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         let name = who.map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".into());
                         band.push((format!("{} ({})", game.station_name(body, c.slot), name), who.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY), Some(Kind::Station), None));
                     }
+                    // Ticket #324 (version 0.08.8): a seat's working Batteries at the Body are a row
+                    // of the band, and the Control line says when they are why nobody holds it.
+                    for seat in Seat::ALL {
+                        let n = game.batteries_at(seat, body).len();
+                        if n > 0 {
+                            band.push((format!("{}: {} Batter{}, strength {}", game.seat_name(seat), n, if n == 1 { "y" } else { "ies" }, game.battery_strength(seat, body)), seat_colour(session, seat), None, None));
+                        }
+                    }
+                    let any_battery = Seat::ALL.iter().any(|s| !game.batteries_at(*s, body).is_empty());
                     band.push(match game.orbital_control(body) {
                         Some(s) => (format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s), None, None),
+                        None if any_battery => ("Orbital Control: nobody, a Battery stands".to_string(), Color32::LIGHT_GRAY, None, None),
                         None => ("Orbital Control: nobody".to_string(), Color32::LIGHT_GRAY, None, None),
                     });
                     // Ticket #317 (version 0.08.8): a Battle in orbit last turn is a row of the
@@ -3793,7 +3803,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildModule { colony, kind } => format!("Build {} at {}", kind.name(), game.place_name(Place::Colony(*colony))),
         Order::BuildShip { site, kind } => format!("Build {} at {}", kind.name(), game.place_name(*site)),
         Order::BuildArmy { place } => format!("Build Army at {}", game.place_name(*place)),
-        Order::Repair { unit, points } => format!("Repair {} point(s) on {}", points, match unit { UnitRef::Ship(s) => s.to_string(), UnitRef::Army(a) => a.to_string() }),
+        Order::Repair { unit, points } => format!("Repair {} point(s) on {}", points, unit_name(game, unit)),
         Order::Transit { ship, to, slot } => match slot {
             Some(n) => format!("Send {} to {}, into Orbital Slot {}", ship, game.tables.body(*to).name, n),
             None => format!("Send {} to {}", ship, game.tables.body(*to).name),
@@ -3809,7 +3819,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         },
         Order::Influence { target, amount } => format!("{} Influence on {}", amount, game.place_name(*target)),
         Order::BuyInfluence { amount } => format!("Buy {} Influence with Ducats", amount),
-        Order::RepairWithDucats { unit, points } => format!("Repair {} point(s) on {} with Ducats", points, match unit { UnitRef::Ship(s) => s.to_string(), UnitRef::Army(a) => a.to_string() }),
+        Order::RepairWithDucats { unit, points } => format!("Repair {} point(s) on {} with Ducats", points, unit_name(game, unit)),
         Order::Buy { resource, amount } => format!("Buy {} {} for {} Ducats", amount, resource.name(), game.order_cost(Seat(0), o).ducats),
         Order::Sell { resource, amount } => format!("Sell {} {} for {} Ducats", amount, resource.name(), -game.order_cost(Seat(0), o).ducats),
         Order::BuildFacilityWithDucats { state, kind } => format!("Build {} in {} for Ducats", kind.name(), game.tables.state(*state).name),
@@ -6670,6 +6680,10 @@ fn module_line(game: &Game, col: &Colony, cid: ColonyId, mi: usize, director: Op
         }
     } else if m.mothballed {
         "mothballed: making nothing and paying no upkeep".to_string()
+    } else if m.kind == ModuleKind::Battery {
+        // Ticket #324 (version 0.08.8): a Battery's figures are a unit's, not a yield.
+        let card = game.tables.module(ModuleKind::Battery);
+        format!("strength {}, {} of {} hit points, {} Energy upkeep", card.strength, card.hit_points.saturating_sub(m.damage), card.hit_points, card.energy_upkeep)
     } else {
         match director {
             Some(d) => game.module_yield_at(d, cid, mi).text(),
@@ -6677,6 +6691,21 @@ fn module_line(game: &Game, col: &Colony, cid: ColonyId, mi: usize, director: Op
         }
     };
     format!("{}: {}", m.kind.name(), figures)
+}
+
+/// Ticket #324 (version 0.08.8): what a Repair order's line calls the thing it repairs.
+fn unit_name(game: &Game, unit: &UnitRef) -> String {
+    match unit {
+        UnitRef::Ship(s) => s.to_string(),
+        UnitRef::Army(a) => a.to_string(),
+        UnitRef::Battery { colony, .. } => format!("the Battery at {}", game.place_name(Place::Colony(*colony))),
+    }
+}
+
+/// Ticket #324 (version 0.08.8): the Battery's rules, under its tile's figures on the hover.
+fn battery_rules(game: &Game) -> String {
+    let card = game.tables.module(ModuleKind::Battery);
+    format!("\nA Battery stands in the line of any Battle fought in this orbit, on Hold, and never disengages. While it stands and works, no rival holds Orbital Control here: none may land, and no Blockade shuts its owner's station; its owner gains no Control by it. Repaired with Materials here, as a Ship is; at {} hits it is destroyed.", card.hit_points)
 }
 
 /// The words a box's hover adds to an offline building's line, and nothing for a working or a
@@ -6762,8 +6791,18 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         let selected = view.hab_tile == Some(HabTile::Module(mi));
         // Ticket #150 (version 0.07.4): the tile's hover -- the figures its strip line carries and
         // the Module rules, which the old rows never had.
-        let tip = module_rules(&format!("{}{}", module_line(game, col, cid, mi, director), module_offline_words(col, m)));
-        if hab_tile(ui, tile_rect(i), ui.id().with(("hab", mi)), Some(crate::icons::module_icon(m.kind)), m.kind.name(), state, selected, None, tip).clicked() {
+        let mut tip = module_rules(&format!("{}{}", module_line(game, col, cid, mi, director), module_offline_words(col, m)));
+        // Ticket #324 (version 0.08.8): a Battery's hover carries its rules; a damaged one wears its
+        // hit points on its label, as a shield wears an Army's.
+        let mut label = m.kind.name().to_string();
+        if m.kind == ModuleKind::Battery {
+            tip.push_str(&battery_rules(game));
+            if m.damage > 0 {
+                let hp = game.tables.module(ModuleKind::Battery).hit_points;
+                label = format!("Battery {}/{}", hp.saturating_sub(m.damage), hp);
+            }
+        }
+        if hab_tile(ui, tile_rect(i), ui.id().with(("hab", mi)), Some(crate::icons::module_icon(m.kind)), &label, state, selected, None, tip).clicked() {
             view.hab_tile = Some(HabTile::Module(mi));
         }
         i += 1;
@@ -6810,6 +6849,13 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
             figures_with_icons(ui, &module_line(game, col, cid, mi, director), 14.0, colour, &[]);
             if mine && m.kind != ModuleKind::Archive {
                 change_row(ui, game, &session.pending, BuildingRef::Module(cid, mi), m.mothballed, m.change, actions);
+            }
+            // Ticket #324 (version 0.08.8): a damaged Battery repairs here, as a Ship does at a yard.
+            if mine && m.kind == ModuleKind::Battery && m.damage > 0 {
+                ui.horizontal(|ui| {
+                    cost_button(ui, game, &session.pending, Order::Repair { unit: UnitRef::Battery { colony: cid, index: mi }, points: m.damage }, "Repair fully", actions);
+                    cost_button(ui, game, &session.pending, Order::RepairWithDucats { unit: UnitRef::Battery { colony: cid, index: mi }, points: m.damage }, "Repair fully with Ducats", actions);
+                });
             }
         }
         Some(HabTile::Free) if mine => {

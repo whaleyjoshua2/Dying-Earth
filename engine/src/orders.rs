@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
 pub enum UnitRef {
     Ship(ShipId),
     Army(ArmyId),
+    /// Ticket #324 (version 0.08.8): a Battery, by its Colony and its index among that Colony's
+    /// Modules; the reference a Battle writes damage back through and a Repair order names.
+    Battery { colony: ColonyId, index: usize },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -847,10 +850,11 @@ impl Game {
                 // Ticket #90: and a Trade Post.
                 // Ticket #185 (version 0.08.0): and an Institute, since a station carries Observatories
                 // and the Institute is what multiplies them.
+                // Ticket #324 (version 0.08.8): and Batteries.
                 if col.in_orbit
-                    && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Academy)
+                    && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Academy | ModuleKind::Battery)
                 {
-                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays, a Trade Post and an Institute");
+                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays, a Trade Post, an Institute and Batteries");
                 }
                 // Ticket #186 (version 0.08.0): nobody but the Custodians builds an Academy off
                 // Earth either, captured ones included.
@@ -1006,6 +1010,18 @@ impl Game {
                         }
                         if pending.iter().any(|o| matches!(o, Order::MoveArmy { army: a, .. } if a == id)) {
                             return fail("an Army cannot repair and move in one turn");
+                        }
+                    }
+                    // Ticket #324 (version 0.08.8): a Battery repairs at its own Colony, which its
+                    // director must direct; no yard is needed, since the Colony is the yard.
+                    UnitRef::Battery { colony, index } => {
+                        let Some(col) = self.colony(*colony) else { return fail("no such Colony") };
+                        if col.control.director() != Some(seat) {
+                            return fail("not your Battery");
+                        }
+                        let Some(m) = col.modules.get(*index).filter(|m| m.kind == ModuleKind::Battery) else { return fail("no Battery there") };
+                        if *points > m.damage {
+                            return fail("more repair than damage");
                         }
                     }
                 }
@@ -2033,6 +2049,7 @@ impl Game {
             match u {
                 UnitRef::Ship(id) => self.ship(id).map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into()),
                 UnitRef::Army(_) => "an Army".to_string(),
+                UnitRef::Battery { .. } => "a Battery".to_string(),
             }
         };
         match order {

@@ -295,6 +295,24 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.energy = 60;
             ARCHIVE_COLONY.with(|c| c.set(Some(id)));
         }
+        // `battery:1` (a building aid, ticket #324, version 0.08.8): seat 0 gets a Colony on Mars
+        // with a Battery standing, two hits on it, and seat 1 a Frigate in Mars orbit on Hold; so
+        // the Mars band reads the Battery's row and why nobody holds Orbital Control, and the
+        // Colony's card (`hab:ground`) shows the tile, its hover and the Repair buttons.
+        if std::env::args().any(|a| a == "battery:1") {
+            let slot = g.free_slots_on(BodyId::Mars).first().copied().unwrap_or(0);
+            let id = ColonyId(g.fresh_id());
+            let mut battery = Module::new(ModuleKind::Battery);
+            battery.damage = 2;
+            let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Mine), battery];
+            g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            let sid = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::Frigate);
+            let built_turn = g.turn;
+            g.ships.push(Ship { id: sid, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
+            g.seats[0].stockpile.materials = 120;
+            g.seats[0].stockpile.energy = 60;
+        }
         // `rival:1` (a building aid, ticket #261, version 0.08.4): seat 1 stands three quarters of
         // the way to its Victory Condition -- nine Colonists on the Moon of twelve, and, for the
         // Prospectors it usually is, the Fund at 2000 of 2500 -- and a quiet turn runs so the

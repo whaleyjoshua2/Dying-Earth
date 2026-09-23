@@ -233,6 +233,12 @@ pub struct ModuleCard {
     pub does: Option<String>,
     #[serde(default)]
     pub holds_colonists: u32,
+    /// Ticket #324 (version 0.08.8): the Battery's figures in the orbital Battle, nought for every
+    /// other Module. Hardened Hulls does not reach them; a Module is not a hull.
+    #[serde(default)]
+    pub strength: i64,
+    #[serde(default)]
+    pub hit_points: u32,
     #[serde(default)]
     pub influence_allotment: i64,
     #[serde(default)]
@@ -1763,6 +1769,10 @@ impl Tables {
         }
         if self.slots.per_colonist == 0 {
             return Err(err("modules.toml", "[slots] per_colonist must be at least 1: a Colonist has to buy something"));
+        }
+        // Ticket #324: a Module that fights needs hit points to lose, or the first hit is its last.
+        if let Some(m) = self.modules.iter().find(|m| m.strength > 0 && m.hit_points == 0) {
+            return Err(err("modules.toml", format!("[[module]] {} has strength and no hit_points", m.name)));
         }
         if self.archive.research <= 0 || !(0.0..=1.0).contains(&self.archive.banked_before_built) {
             return Err(err("modules.toml", "[archive] needs research above zero and banked_before_built from 0 to 1"));
