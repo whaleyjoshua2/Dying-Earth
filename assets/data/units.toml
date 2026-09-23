@@ -84,6 +84,17 @@ materials_per_point = 5
 [disengage]
 divisor = 3.0
 
+# Ticket #327 (version 0.08.8): the melee's shape, which the First Playable wrote into the code as
+# three rounds of three hit rolls for the whole fight, however many hulls stood in it -- so nine
+# hits was every Battle's ceiling and a Battleship (8 hit points) could not die in a turn. Now a
+# Ship melee rolls once a round for every engaged armed unit across every party (warships and
+# Batteries), never fewer than `rolls`; a ground melee rolls `rolls`, where one or two Armies a
+# side make three about one a unit already. `rounds` is both. Measured before: 226 Battles over
+# eighty games, two warships lost.
+[melee]
+rounds = 3
+rolls = 3
+
 # Ticket #296 (version 0.08.6): a Region's defence is its people. Its Standing Army adds
 # `constabulary` while a working Constabulary stands there and `calm` while Unrest is under the
 # Standing Army's threshold. Ticket #302 (version 0.08.6): as DEFENCE -- while it defends, and never

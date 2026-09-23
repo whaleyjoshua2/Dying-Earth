@@ -1199,12 +1199,22 @@ pub struct DigInCard {
     pub defence: i64,
 }
 
+/// Ticket #327 (version 0.08.8): the melee's shape, in data: its rounds, and the hit rolls a
+/// round on the ground and the floor for a Ship melee, which rolls once for every engaged armed
+/// unit present when that is more.
+#[derive(Debug, Clone, Deserialize)]
+pub struct MeleeCard {
+    pub rounds: u32,
+    pub rolls: u32,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 struct UnitsFile {
     unit: Vec<UnitCard>,
     repair: RepairCard,
     crowding: CrowdingCard,
     disengage: DisengageCard,
+    melee: MeleeCard,
     standing_army: StandingArmyCard,
     dig_in: DigInCard,
 }
@@ -1458,6 +1468,8 @@ pub struct Tables {
     pub crowding: CrowdingCard,
     /// Ticket #295 (version 0.08.6): the disengage roll's divisor.
     pub disengage: DisengageCard,
+    /// Ticket #327 (version 0.08.8): the melee's rounds and rolls.
+    pub melee: MeleeCard,
     /// Ticket #296 (version 0.08.6): what a Region's people add to its own Armies.
     pub standing_army: StandingArmyCard,
     /// Ticket #297 (version 0.08.6): what digging in adds to a defending Army.
@@ -1575,6 +1587,7 @@ impl Tables {
             repair: units.repair,
             crowding: units.crowding,
             disengage: units.disengage,
+            melee: units.melee,
             standing_army: units.standing_army,
             dig_in: units.dig_in,
             techs: techs.tech,
@@ -1751,6 +1764,10 @@ impl Tables {
         // Ticket #295 (version 0.08.6): a divisor of nought would be a certain escape at any damage.
         if self.disengage.divisor <= 0.0 {
             return Err(err("units.toml", "[disengage] divisor must be positive"));
+        }
+        // Ticket #327: a melee of no rounds or no rolls is no melee.
+        if self.melee.rounds == 0 || self.melee.rolls == 0 {
+            return Err(err("units.toml", "[melee] rounds and rolls must both be at least 1"));
         }
         for s in &self.states {
             if s.unrest < 0.0 || s.unrest > u.max {

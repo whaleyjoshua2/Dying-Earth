@@ -111,6 +111,8 @@ impl BattleStats {
     }
 }
 
+/// The First Playable's figures, kept for the two-sided callers and the tests; the game reads
+/// its own from `units.toml [melee]` since ticket #327 (version 0.08.8).
 pub const MAX_ROUNDS: u32 = 3;
 pub const HIT_ROLLS: u32 = 3;
 
@@ -187,12 +189,15 @@ pub fn disengage_chance(c: &Combatant, divisor: f64) -> f64 {
 /// Run one battle between two parties to its end. Kept for the two-sided callers and the tests;
 /// it is `melee` with two parties.
 pub fn fight(attackers: &mut [Combatant], defenders: &mut [Combatant], dice: &mut dyn Dice, divisor: f64) -> BattleStats {
-    melee(&mut [attackers, defenders], dice, divisor)
+    melee(&mut [attackers, defenders], dice, divisor, MAX_ROUNDS, HIT_ROLLS)
 }
 
 /// Run one melee to its end: every party is hostile to every other. Units are mutated in place;
-/// escaped units are marked. `divisor` is the disengage roll's (ticket #295).
-pub fn melee(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, divisor: f64) -> BattleStats {
+/// escaped units are marked. `divisor` is the disengage roll's (ticket #295). Ticket #327
+/// (version 0.08.8): `rounds` and `rolls` are the caller's -- a Ship melee rolls once a round for
+/// every engaged armed unit across every party, never fewer than the table's figure; a ground
+/// melee rolls the table's figure.
+pub fn melee(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, divisor: f64, rounds: u32, rolls: u32) -> BattleStats {
     let n = parties.len();
     let mut stats = BattleStats { rounds: 0, hits: vec![0; n], destroyed: vec![Vec::new(); n], escaped: vec![Vec::new(); n] };
     // Evade rolls at the start of the battle, at current damage (spec 9.2).
@@ -205,7 +210,7 @@ pub fn melee(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, divisor: f64
         }
     }
     pursue(parties, dice, &mut stats);
-    for _round in 0..MAX_ROUNDS {
+    for _round in 0..rounds {
         if parties.iter().filter(|p| any_engaged(p)).count() < 2 {
             break;
         }
@@ -215,7 +220,7 @@ pub fn melee(parties: &mut [&mut [Combatant]], dice: &mut dyn Dice, divisor: f64
         let strengths: Vec<i64> = parties.iter().map(|p| total_strength(p)).collect();
         let live: Vec<usize> = (0..n).filter(|i| any_engaged(parties[*i])).collect();
         let total: i64 = strengths.iter().sum();
-        for _ in 0..HIT_ROLLS {
+        for _ in 0..rolls {
             if total <= 0 {
                 break;
             }

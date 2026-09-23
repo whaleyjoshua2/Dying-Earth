@@ -526,7 +526,11 @@ impl Game {
         }
         let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
             parties.iter().map(|(seat, agg, ids)| (Some(*seat), *agg, ids.iter().map(|u| self.unit_combatant(*u)).collect())).collect();
-        let mut line = self.run_melee(place, Some(ReportPlace::Body(body)), units);
+        // Ticket #327 (version 0.08.8): one hit roll a round for every engaged armed unit present,
+        // never fewer than the table's figure.
+        let armed = units.iter().flat_map(|(_, _, c)| c.iter()).filter(|c| c.armed && c.engaged && !c.destroyed()).count() as u32;
+        let rolls = armed.max(self.tables.melee.rolls);
+        let mut line = self.run_melee(place, Some(ReportPlace::Body(body)), units, rolls);
         // Ticket #286 (version 0.08.5): counted by the seat that opened it.
         for (seat, _, _) in parties.iter().filter(|(_, agg, _)| *agg) {
             self.war.battles[seat.index()] += 1;
@@ -558,7 +562,8 @@ impl Game {
         }
         let units: Vec<(Option<Seat>, bool, Vec<Combatant>)> =
             parties.iter().map(|(seat, agg, ids)| (*seat, *agg, ids.iter().map(|id| self.army_combatant(*id, !*agg)).collect())).collect();
-        let mut line = self.run_melee(place_name, Some(place.into()), units);
+        let rolls = self.tables.melee.rolls;
+        let mut line = self.run_melee(place_name, Some(place.into()), units, rolls);
         // Ticket #286 (version 0.08.5): counted by the seat that opened it, and against a neutral.
         for seat in aggressors {
             self.war.battles[seat.index()] += 1;
@@ -581,7 +586,7 @@ impl Game {
     /// Ticket #281 (version 0.08.5): `at` is the real place, for the Report's line to jump to; the
     /// party text names every unit and what it took; an aggressor carries the first-round odds it
     /// faced, as the attack button quoted them.
-    fn run_melee(&mut self, place: &str, at: Option<ReportPlace>, parties: Vec<(Option<Seat>, bool, Vec<Combatant>)>) -> BattleLine {
+    fn run_melee(&mut self, place: &str, at: Option<ReportPlace>, parties: Vec<(Option<Seat>, bool, Vec<Combatant>)>, rolls: u32) -> BattleLine {
         let mut parties = parties;
         let before: Vec<Vec<u32>> = parties.iter().map(|(_, _, c)| c.iter().map(|x| x.damage).collect()).collect();
         let strengths: Vec<i64> = parties.iter().map(|(_, _, c)| c.iter().map(|x| x.strength).sum()).collect();
@@ -589,7 +594,7 @@ impl Game {
         let stats = {
             let mut slices: Vec<&mut [Combatant]> = parties.iter_mut().map(|(_, _, c)| c.as_mut_slice()).collect();
             let mut rng = self.rng.clone();
-            let stats = combat::melee(&mut slices, &mut rng as &mut dyn Dice, self.tables.disengage.divisor);
+            let stats = combat::melee(&mut slices, &mut rng as &mut dyn Dice, self.tables.disengage.divisor, self.tables.melee.rounds, rolls);
             self.rng = rng;
             stats
         };

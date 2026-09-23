@@ -1646,7 +1646,7 @@ fn a_partys_chance_to_land_a_hit_is_its_share_of_the_total_strength_present() {
         let mut a = party(1, "A Frigate", 6, 10_000, 0);
         let mut b = party(2, "B Frigate", 3, 10_000, 0);
         let mut c = party(3, "C Frigate", 1, 10_000, 0);
-        let stats = combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice, 2.0);
+        let stats = combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice, 2.0, 3, 3);
         for (i, l) in landed.iter_mut().enumerate() {
             *l += stats.hits_of(i);
         }
@@ -1676,7 +1676,7 @@ fn a_partys_hits_are_spread_across_the_enemy_parties_in_proportion_to_their_stre
         let mut a = party(1, "A Frigate", 6, 10_000, 0);
         let mut b = party(2, "B Frigate", 3, 10_000, 0);
         let mut c = party(3, "C Frigate", 1, 10_000, 0);
-        combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice, 2.0);
+        combat::melee(&mut [&mut a, &mut b, &mut c], &mut rng as &mut dyn Dice, 2.0, 3, 3);
         b_damage += b[0].damage;
         c_damage += c[0].damage;
     }
@@ -11120,4 +11120,27 @@ fn escorts_take_the_fire_and_cover_the_retreat() {
     combat::fight(&mut a, &mut d, &mut dice, 2.0);
     assert!(d[0].escaped && d[0].damage == 0, "the Colony Ship ran under cover and was not caught");
     assert!(d[1].destroyed(), "its escort took the fight");
+}
+
+// -------------------------------------------- 0.08.8 ticket #327: rolls per engaged warship
+
+/// Ticket #327 (version 0.08.8): a Ship melee rolls once a round for every engaged armed unit
+/// present. Two Frigates and a Battery against a Battleship roll four a round, so the Battleship
+/// (8 hit points) dies in two rounds where a flat three needed three.
+#[test]
+fn a_ship_melee_rolls_once_a_round_for_every_engaged_armed_unit() {
+    let mut a = vec![frigate(1), frigate(2), Combatant::new(UnitRef::Battery { colony: ColonyId(9), index: 0 }, "the Battery", 4, 6, 0, 0, false)];
+    let mut d = vec![Combatant::new(UnitRef::Ship(ShipId(3)), "Battleship 3", 7, 8, 0, 0, false)];
+    let rolls = (a.len() + d.len()) as u32;
+    assert_eq!(rolls, 4);
+    // Every hitter roll to the attackers; the Battleship never disengages.
+    let chances = vec![true, true, true, true, false, true, true, true, true];
+    let mut dice = Script { chances: VecDeque::from(chances), d6s: VecDeque::new(), picks: VecDeque::new() };
+    let stats = combat::melee(&mut [&mut a, &mut d], &mut dice, 3.0, 3, rolls);
+    assert!(d[0].destroyed(), "eight hits in two rounds of four: {stats:?}");
+    assert_eq!(stats.rounds, 2, "two rounds, not three: {stats:?}");
+    assert_eq!(stats.hits[0], 8);
+    // The table carries the figures, and a fresh game reads them.
+    let g = game();
+    assert_eq!((g.tables.melee.rounds, g.tables.melee.rolls), (3, 3));
 }
