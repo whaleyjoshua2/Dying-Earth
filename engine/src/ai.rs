@@ -261,7 +261,8 @@ impl Game {
             Place::State(s) => {
                 let mut near = vec![s];
                 near.extend(self.tables.state(s).neighbours.iter().copied());
-                self.armies.iter().any(|a| !a.standing && theirs(a) && matches!(a.at, ArmyAt::Place(Place::State(x)) if near.contains(&x)))
+                // Ticket #321 (version 0.08.8): a Region's own Army marched out is a threat like any other.
+                self.armies.iter().any(|a| !self.army_at_home(a) && theirs(a) && matches!(a.at, ArmyAt::Place(Place::State(x)) if near.contains(&x)))
             }
             Place::Colony(c) => {
                 let body = self.colony(c).map(|c| c.body);
@@ -2056,13 +2057,20 @@ impl Game {
             if let Place::State(sid) = place
                 && !occupying
             {
-                for aid in &mine {
+                // Ticket #321 (version 0.08.8): a Region's own Army marches too, but last: the
+                // raised Armies are offered first, since one new war a turn is the cap and the
+                // first candidate pushed takes it, and its march is weighed at half, so the
+                // computer empties a Region of its own defence only when nothing else will serve.
+                let mut ordered: Vec<ArmyId> = mine.clone();
+                ordered.sort_by_key(|aid| self.army(*aid).map(|a| a.standing).unwrap_or(true));
+                for aid in &ordered {
                     let a = self.army(*aid).unwrap();
                     // Ticket #297 (version 0.08.6): a dug-in Army is refused a march until its stance
                     // has changed and a turn has passed, so no march is offered for it.
-                    if a.standing || a.damage > 2 || a.stance == Stance::DigIn {
+                    if a.damage > 2 || a.stance == Stance::DigIn {
                         continue;
                     }
+                    let own_army = if a.standing { 0.5 } else { 1.0 };
                     for n in &self.tables.state(sid).neighbours {
                         let ctrl = self.state(*n).control;
                         if ctrl == Control::Controlled(seat) {
@@ -2082,7 +2090,7 @@ impl Game {
                                 wars_opened += 1;
                             }
                             let value = (self.tables.state(*n).industry_level + self.tables.state(*n).size) as f64 / 7.0;
-                            push(vec![Order::MoveArmy { army: *aid, to: *n }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * (1.0 + value), 1.0, 1.0, 1.0, format!("march on {} (odds {:.0}%)", self.tables.state(*n).name, odds * 100.0), None);
+                            push(vec![Order::MoveArmy { army: *aid, to: *n }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * (1.0 + value) * own_army, 1.0, 1.0, 1.0, format!("march on {} (odds {:.0}%)", self.tables.state(*n).name, odds * 100.0), None);
                         }
                     }
                 }

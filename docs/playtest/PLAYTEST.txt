@@ -68,7 +68,8 @@ HOW TO PLAY, IN SHORT
   and press Spend, or Max.
 - ARMIES are raised from a region's card and march to a neighbouring region from the
   Armies list on that card. Arriving in a region you do not hold is an attack; hover the
-  button first. A region's own standing army never marches. Warships are built at a
+  button first. A region's own standing army can march too, but away from home it
+  loses its people's defence. Warships are built at a
   shipyard and fight in orbit; a warship in a rival station's slot can be ordered to
   Blockade.
 - The FACTION WINDOW (F) has a page for each side: what they have, what they think of you,

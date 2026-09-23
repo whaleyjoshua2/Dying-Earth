@@ -1105,11 +1105,9 @@ impl Game {
                 if self.army_stands_down(a) {
                     return fail("this Army stands down");
                 }
-                // Ticket #302 (version 0.08.6): a Region's own Army stays at home; only a raised
-                // Army marches. The holder could march the Standing Army before this version.
-                if a.standing {
-                    return fail("a Region's own Army stays at home; raise one to march");
-                }
+                // Ticket #302 (version 0.08.6) kept a Region's own Army at home. Ticket #321
+                // (version 0.08.8): it marches again, at the designer's word -- "no they can
+                // march" -- the playtest having found a board on which nothing could be moved.
                 // Ticket #297 (version 0.08.6): dug in, it goes nowhere until its stance has been
                 // changed and the turn has passed; a stance order this turn takes effect at the
                 // Resolution, after the march would have gone, so it does not lift this.

@@ -4401,7 +4401,7 @@ Spending here raises the bar; doing nothing lowers it, yours decaying {} a turn 
                     if pressing { " Dig In here to hold it." } else { "" }
                 );
                 let tip = format!(
-                    "Their {strength} against the {defence} that defends here: {:.0}% is their chance to win the first exchange.\nThe computer seats attack at {:.0}% or better, so the line turns amber there.\nRaised Armies next door only, whatever their stance; a Region's own Army never marches.",
+                    "Their {strength} against the {defence} that defends here: {:.0}% is their chance to win the first exchange.\nThe computer seats attack at {:.0}% or better, so the line turns amber there.\nArmies next door whatever their stance; a Region's own Army standing at home is no threat, marched out it is.",
                     odds * 100.0,
                     bar * 100.0
                 );
@@ -5091,7 +5091,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 let police = if game.constabulary_online(sid) { format!(" +{} for the working Constabulary", t.constabulary) } else { format!(" +{} if a Constabulary were working here", t.constabulary) };
                 let calm = if game.army_replenishes(sid) { format!(", +{} while Unrest is under {:.0}", t.calm, game.tables.unrest.army_threshold) } else { format!(", +{} lost to Unrest at {:.0} or more", t.calm, game.tables.unrest.army_threshold) };
                 format!(
-                    "A Region's own Army. Its strength and hit points are Industry Level + 1{}; it stays at home. Defending, it fights at that{police}{calm}{}. It heals 1 a turn while Unrest is under {:.0}; at its strength in damage it is destroyed, and returns at strength 1 two Incomes later. A neutral Region arms for good, +{} when a threat appears next door and +{} for every attack it holds against, with no ceiling.",
+                    "A Region's own Army. Its strength and hit points are Industry Level + 1{}; it may march, and away from home it is an Army like any other. Defending at home, it fights at that{police}{calm}{}. It heals 1 a turn while Unrest is under {:.0}; at its strength in damage it is destroyed, and returns at strength 1 two Incomes later. A neutral Region arms for good, +{} when a threat appears next door and +{} for every attack it holds against, with no ceiling.",
                     if armed > 0 { format!(" and +{armed} armed") } else { String::new() },
                     if game.army_dug_in(a) { format!(", +{} dug in", game.tables.dig_in.defence) } else { String::new() },
                     game.tables.unrest.army_threshold,
@@ -5108,7 +5108,9 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             // Ticket #302 (version 0.08.6): a Region's own Army stays at home, so only a raised Army
             // has march buttons. Ticket #309 (version 0.08.7): the odds are on a hover that names the
             // defender, not on the button face. Ticket #312: under the Army's own row.
-            if my_armies.iter().any(|m| m.id == a.id) && !a.standing {
+            // Ticket #321 (version 0.08.8): a Region's own Army marches too, so every Army of the
+        // player's has march buttons.
+        if my_armies.iter().any(|m| m.id == a.id) {
                 ui.horizontal_wrapped(|ui| {
                     ui.add_space(16.0);
                     for n in &card.neighbours {

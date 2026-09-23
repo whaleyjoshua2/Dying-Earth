@@ -2210,10 +2210,19 @@ impl Game {
     /// Region's own Army reads its Region's people (`defence_bonus`); a raised Army and a
     /// Colony's read nothing; Dig In's own term is added by the Battle for any Army dug in.
     pub fn army_defence(&self, a: &Army) -> i64 {
+        // Ticket #321 (version 0.08.8): a Region's own Army marches again, and its people's
+        // defence (the Constabulary, the calm) is theirs only while it stands at home.
         match a.home {
-            ArmyHome::State(s) if a.standing => self.defence_bonus(s) as i64,
+            ArmyHome::State(s) if self.army_at_home(a) => self.defence_bonus(s) as i64,
             _ => 0,
         }
+    }
+
+    /// Ticket #321 (version 0.08.8): a Region's own Army standing in its own Region. Since this
+    /// version it may march (ticket #302 had kept it home); at home it defends with its people,
+    /// away it is an Army like any other, and a threat next door like any other.
+    pub fn army_at_home(&self, a: &Army) -> bool {
+        a.standing && matches!((a.home, a.at), (ArmyHome::State(h), ArmyAt::Place(Place::State(s))) if h == s)
     }
 
     /// Ticket #302: what an Army fights at when attacked -- its strength, its defence, and Dig In
@@ -2766,7 +2775,8 @@ impl Game {
     /// Ticket #310 (version 0.08.7): **the military threat to a held Region**, the counterpart of
     /// `nearest_challenger`: the rival raised Army standing in a neighbouring Region with the best
     /// first-exchange odds against this Region's defenders, ties to the strongest, with the Region
-    /// it stands in and those odds. A Region's own Army never marches (#302), so only raised
+    /// it stands in and those odds. A Region's own Army standing at home is no threat (ticket
+    /// #321: it marches again, and marched out it counts like any other); so only Armies not at home
     /// Armies count; a neutral Region's own is nobody's and never counts. Stance-blind at the
     /// designer's word, as `neutral_threatened` is: the line this feeds says presence and
     /// strength, never orders. None on a Region nobody holds, or with no rival Army next door.
@@ -2774,7 +2784,7 @@ impl Game {
         let holder = self.state(sid).control.controller()?;
         let mut best: Option<(ArmyId, StateId, f64, i64)> = None;
         for n in &self.tables.state(sid).neighbours {
-            for a in self.armies.iter().filter(|a| !a.standing && a.at == ArmyAt::Place(Place::State(*n)) && !self.army_stands_down(a)) {
+            for a in self.armies.iter().filter(|a| !self.army_at_home(a) && a.at == ArmyAt::Place(Place::State(*n)) && !self.army_stands_down(a)) {
                 let Some(seat) = self.army_seat(a) else { continue };
                 if seat == holder {
                     continue;

@@ -837,7 +837,7 @@ fn build_board(session: &mut Session) {
     }
     // `army:1` (a building aid, ticket #309): a raised Army of seat 0's stands in its start state,
     // so the march buttons and their hovers can be photographed; since ticket #302 a Region's own
-    // Army never marches, so a fresh board has no march buttons at all.
+    // Army did not march until ticket #321, so a fresh board had no march buttons at all.
     if std::env::args().any(|a| a == "army:1")
         && let Some(g) = session.game.as_mut()
         && let Some(sid) = g.directed_states(Seat(0)).first().copied()

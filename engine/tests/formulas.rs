@@ -10902,3 +10902,31 @@ fn a_blockade_does_not_shut_out_a_partner_under_passage() {
     g.strike_accord(Seat(0), Seat(1), vec![Term::Passage]).expect("Passage struck");
     assert!(!g.slot_blockaded_against(Seat(0), BodyId::Earth, station.slot), "not against a partner under Passage");
 }
+
+// -------------------------------------------- 0.08.8 ticket #321: a Region's own Army marches again
+
+/// Ticket #321 (version 0.08.8): the holder may march a Region's own Army, which 0.08.6 kept at
+/// home. At home it defends with its people (the Constabulary and the calm); marched out it is an
+/// Army like any other, with no such bonus, and a threat next door like any other.
+#[test]
+fn a_regions_own_army_marches_again_and_defends_only_at_home() {
+    let mut g = game();
+    let (home, target) = (StateId::EastAsia, StateId::Russia);
+    g.take_control(target, Seat(1));
+    let standing = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(home)).map(|a| a.id).expect("China's own Army");
+    let a = g.army(standing).unwrap().clone();
+    assert!(g.army_at_home(&a));
+    let bonus_at_home = g.army_defence(&a);
+    assert!(g.check_order(Seat(0), &[], &Order::MoveArmy { army: standing, to: target }).is_ok(), "its holder may march it");
+    g.armies.iter_mut().find(|a| a.id == standing).unwrap().move_to = Some(target);
+    g.resolution_phase();
+    let a = g.army(standing).expect("it lives").clone();
+    assert_eq!(a.at, ArmyAt::Place(Place::State(target)), "it marched");
+    assert!(!g.army_at_home(&a), "and is not at home");
+    assert_eq!(g.army_defence(&a), 0, "away from home, no people's defence (at home it was {bonus_at_home})");
+    // Marched out next to a third Region the Prospectors hold, it is a threat to it like any other.
+    let third = g.tables.state(target).neighbours.iter().copied().find(|n| *n != home && g.state(*n).control == Control::Neutral).expect("a neutral neighbour of Russia");
+    g.take_control(third, Seat(1));
+    let (id, from, _) = g.nearest_army_threat(third).expect("China's own Army, marched out, threatens the Region next door");
+    assert_eq!((id, from), (standing, target));
+}
