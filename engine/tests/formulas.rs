@@ -10860,3 +10860,45 @@ fn an_army_that_escaped_holds_no_occupation() {
     g.resolution_phase();
     assert!(!matches!(g.state(StateId::Europe).control, Control::Occupied { .. }), "the Occupation broke: an Army that ran holds nothing");
 }
+
+// -------------------------------------------- 0.08.8 ticket #320: Passage as a rule for Armies
+
+/// Ticket #320 (version 0.08.8): under a Passage Accord an Army marches into a partner's held
+/// Region without attacking: it arrives on Hold, no march on a held Region is counted, no Battle
+/// is fought and no offence is charged. Without Passage the same march arrives on Attack, as it
+/// always did. And a Blockade does not shut out a partner under Passage.
+#[test]
+fn passage_lets_an_army_march_into_a_partners_region_on_hold() {
+    let march = |passage: bool| {
+        let mut g = game();
+        let (home, target) = (StateId::EastAsia, StateId::Russia);
+        assert!(g.tables.state(home).neighbours.contains(&target));
+        g.take_control(target, Seat(1));
+        if passage {
+            g.strike_accord(Seat(0), Seat(1), vec![Term::Passage]).expect("Passage struck");
+            assert!(g.accord_has(Seat(0), Seat(1), Term::Passage));
+        }
+        let army = g.raise_army(Place::State(home), false);
+        g.armies.iter_mut().find(|a| a.id == army).unwrap().move_to = Some(target);
+        let before = g.relations_score(Seat(1), Seat(0));
+        g.resolution_phase();
+        let a = g.armies.iter().find(|a| a.id == army).expect("the Army lives");
+        assert_eq!(a.at, ArmyAt::Place(Place::State(target)), "it marched");
+        (a.stance, g.war.marches_held[0], g.war.battles[0], g.relations_score(Seat(1), Seat(0)) - before)
+    };
+    assert_eq!(march(true), (Stance::Hold, 0, 0, 0), "under Passage: on Hold, no march on a held Region, no Battle, no offence");
+    let (stance, marches, _, _) = march(false);
+    assert_eq!((stance, marches), (Stance::Attack, 1), "without Passage: an attack, counted");
+}
+
+#[test]
+fn a_blockade_does_not_shut_out_a_partner_under_passage() {
+    let mut g = game();
+    let station = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).expect("seat 0's station").clone();
+    let id = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Frigate);
+    g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(station.slot) });
+    assert!(g.slot_blockaded_against(Seat(0), BodyId::Earth, station.slot), "a rival's warship on Blockade shuts the slot");
+    g.strike_accord(Seat(0), Seat(1), vec![Term::Passage]).expect("Passage struck");
+    assert!(!g.slot_blockaded_against(Seat(0), BodyId::Earth, station.slot), "not against a partner under Passage");
+}

@@ -5114,10 +5114,15 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     for n in &card.neighbours {
                         let ctrl = game.state(*n).control;
                         let own = ctrl == Control::Controlled(Seat(0));
+                        // Ticket #320 (version 0.08.8): a partner's Region under Passage is moved
+                        // into, not attacked; the Army arrives on Hold.
+                        let passage = matches!(ctrl, Control::Controlled(h) if h != Seat(0) && game.accord_has(Seat(0), h, Term::Passage));
                         let name = &game.tables.state(*n).name;
-                        let label = format!("{} {name}", if own { "move to" } else { "attack" });
+                        let label = format!("{} {name}", if own || passage { "move to" } else { "attack" });
                         let hover = if own {
                             format!("{name}: held by you. Moving costs nothing; the Army keeps its stance.")
+                        } else if let (true, Control::Controlled(h)) = (passage, ctrl) {
+                            format!("{name}: held by the {}, a partner under Passage. Moving costs nothing; the Army arrives on Hold and fights nobody while the Accord stands.", game.seat_name(h))
                         } else {
                             attack_hover(game, Place::State(*n), name, game.army_strength(a), false)
                         };
@@ -7124,7 +7129,7 @@ fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actio
         let friendly = game.relations_score(me, other) >= 7 && game.relations_score(other, me) >= 7;
         for (term, label, tip) in [
             (Term::NonAggression, "Non-aggression", "Neither spends Influence on a place the other holds, nor opens a Battle against them."),
-            (Term::Passage, "Passage", "Neither treats the other's Ships as a target, and a Blockade does not shut them out of the slot."),
+            (Term::Passage, "Passage", "Either's Armies may march into the other's Regions without attacking, arriving on Hold; neither intercepts the other's Ships, and a Blockade does not shut them out of the slot."),
             (Term::Refuel, "Refuel", "Either may Refuel at the other's Space Stations."),
             (Term::ResearchAgreement, "Research agreement", "Both parties' Research rises a tenth while it stands. Wants Friendly on both sides to strike, and once struck it stands whatever the scores later do."),
         ] {

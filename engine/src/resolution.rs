@@ -171,6 +171,10 @@ impl Game {
                 }
                 let mut parties: Vec<(Seat, bool, Vec<ShipId>)> = vec![(seat, true, interceptors)];
                 for other in seat.others() {
+                    // Ticket #320 (version 0.08.8): a partner under Passage is no target for Intercept.
+                    if self.accord_has(seat, other, Term::Passage) {
+                        continue;
+                    }
                     let arriving: Vec<ShipId> = arrivals
                         .iter()
                         .filter(|(s, b, id)| *s == other && *b == body && self.ship(*id).map(|x| !x.escaped).unwrap_or(false))
@@ -235,16 +239,23 @@ impl Game {
                 ArmyAt::Place(Place::State(s)) => s,
                 _ => continue,
             };
+            // Ticket #320 (version 0.08.8): PASSAGE. A march into a Region held by a partner under
+            // a Passage Accord is not an attack: the Army arrives on Hold, fights nobody and is
+            // counted as no march on a held Region, at the designer's word. Without Passage a
+            // march into a held Region is what it always was.
+            let passage = matches!(self.state(to).control, Control::Controlled(h) if h != seat && self.accord_has(seat, h, Term::Passage));
             let a = self.army_mut(id).unwrap();
             a.at = ArmyAt::Place(Place::State(to));
             a.move_to = None;
-            if !entering_own {
+            if passage {
+                a.stance = Stance::Hold;
+            } else if !entering_own {
                 a.stance = Stance::Attack;
             }
             // Ticket #286 (version 0.08.5): a march on a neutral, or on a Region a rival holds.
             match self.state(to).control {
                 Control::Neutral => self.war.marches_neutral[seat.index()] += 1,
-                Control::Controlled(r) if r != seat => self.war.marches_held[seat.index()] += 1,
+                Control::Controlled(r) if r != seat && !passage => self.war.marches_held[seat.index()] += 1,
                 _ => {}
             }
             let line = format!(
@@ -279,6 +290,25 @@ impl Game {
     /// reached by whoever won it. Only a place where one of those Armies stands on Attack fights
     /// in the second pass, so nothing already fought at (b) is fought twice.
     fn ground_battles(&mut self, places: Vec<Place>, only_landed: Option<&[ArmyId]>) {
+        // Ticket #320 (version 0.08.8): a rival Army standing in a held Region with no Passage
+        // behind it is on Attack, as any rival Army in a Region not its seat's would be -- the
+        // guest whose Accord ended, at the designer's word. A guest under Passage stands as it is.
+        if only_landed.is_none() {
+            let turned: Vec<ArmyId> = self
+                .armies
+                .iter()
+                .filter(|a| {
+                    matches!(a.stance, Stance::Hold | Stance::DigIn)
+                        && matches!(a.at, ArmyAt::Place(Place::State(s)) if matches!(self.state(s).control, Control::Controlled(h) if self.army_seat(a).is_some_and(|seat| seat != h && !self.accord_has(seat, h, Term::Passage))))
+                })
+                .map(|a| a.id)
+                .collect();
+            for id in turned {
+                if let Some(a) = self.army_mut(id) {
+                    a.stance = Stance::Attack;
+                }
+            }
+        }
         for place in places {
             if let Some(landed) = only_landed
                 && !self.armies.iter().any(|a| landed.contains(&a.id) && a.at == ArmyAt::Place(place) && a.stance == Stance::Attack && !a.escaped)
@@ -419,8 +449,18 @@ impl Game {
             .iter()
             .filter(|a| a.at == ArmyAt::Place(place) && self.army_seat(a) != Some(attacker) && !self.army_stands_down(a) && !a.escaped)
             .filter(|a| self.army_strength(a) > 0 || !a.standing)
+            // Ticket #320 (version 0.08.8): a guest under Passage defends nothing.
+            .filter(|a| !self.guest_at(a))
             .map(|a| a.id)
             .collect()
+    }
+
+    /// Ticket #320 (version 0.08.8): a guest is an Army standing in a Region held by another seat
+    /// under a Passage Accord between them, not on Attack. It fights nobody and defends nothing
+    /// while the Accord stands: it is no party to a Battle at the place and no defender of it.
+    pub fn guest_at(&self, a: &Army) -> bool {
+        a.stance != Stance::Attack
+            && matches!(a.at, ArmyAt::Place(Place::State(s)) if matches!(self.state(s).control, Control::Controlled(h) if self.army_seat(a).is_some_and(|seat| seat != h && self.accord_has(seat, h, Term::Passage))))
     }
 
     fn ship_combatant(&self, id: ShipId) -> Combatant {

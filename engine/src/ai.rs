@@ -282,6 +282,16 @@ impl Game {
         c.control.director().map(|d| d != seat).unwrap_or(false)
     }
 
+    /// Ticket #320 (version 0.08.8): whether Passage with `other` is worth this seat's offering:
+    /// it is Friendly toward them and holds a Region next door to one they hold, so an Army of
+    /// either could use it. Accepted at Neutral or better, as non-aggression is.
+    pub fn passage_worth_offering(&self, seat: Seat, other: Seat) -> bool {
+        self.relations_level(seat, other) == "Friendly"
+            && StateId::ALL.into_iter().any(|s| {
+                self.state(s).control == Control::Controlled(seat) && self.tables.state(s).neighbours.iter().any(|n| self.state(*n).control == Control::Controlled(other))
+            })
+    }
+
     /// Ticket #319 (version 0.08.8): whether a Carrier has somewhere to go: a rival's Colony off
     /// Earth whose holder this seat has cause against (`war_cause_at`, Wary or worse). The
     /// Prospectors' Carrier appetite never asked for cause and still does not; every other seat's
@@ -1464,7 +1474,15 @@ impl Game {
             if other == seat || self.accords.iter().any(|a| a.holds(seat, other)) {
                 continue;
             }
-            let terms = vec![Term::NonAggression];
+            let mut terms = vec![Term::NonAggression];
+            // Ticket #320 (version 0.08.8): and Passage in the same offer, to a Faction this seat
+            // is Friendly with when it holds a Region next door to one that Faction holds, so the
+            // term has somewhere to matter. In the same offer, because one Accord stands per pair
+            // and a non-aggression Accord struck first would shut Passage out for good: offered on
+            // its own it was struck in no seating of eighty games.
+            if self.passage_worth_offering(seat, other) {
+                terms.push(Term::Passage);
+            }
             if !self.accord_acceptable(seat, other, &terms) {
                 continue;
             }
@@ -1479,7 +1497,6 @@ impl Game {
                 None,
             );
         }
-
         // --- Ticket #54: Mothball, Restart and Decommission.
         // A mothball answers an Energy shortfall a turn ahead: the highest-upkeep building that
         // produces nothing is the one to shut. A Custodian behind on Stabilization with Scrubbers
@@ -2052,6 +2069,11 @@ impl Game {
                         let def: i64 = self.defenders_at(Place::State(*n), seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_defended_strength(a)).sum();
                         let odds = first_round_odds(self.army_strength(a), def);
                         let held_by_rival = matches!(ctrl, Control::Controlled(r) if r != seat);
+                        // Ticket #320 (version 0.08.8): a partner's Region under Passage is never a
+                        // target; it is a place to move through, which the computer does not plan.
+                        if matches!(ctrl, Control::Controlled(h) if h != seat && self.accord_has(seat, h, Term::Passage)) {
+                            continue;
+                        }
                         let allowed = odds >= th.attack_odds && self.war_cause_at(seat, Place::State(*n), th.war_cause) && (!held_by_rival || wars_opened < 1);
                         if allowed {
                             if held_by_rival {

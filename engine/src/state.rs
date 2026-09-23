@@ -3120,7 +3120,8 @@ impl Game {
     /// needs to be positively chosen, not just the presence of a ship" -- and a blockaded station
     /// makes nothing (`starved_by`).
     pub fn slot_blockaded_against(&self, seat: Seat, body: BodyId, slot: u32) -> bool {
-        self.ships.iter().any(|s| s.seat != seat && self.blockading(s) && s.at == ShipAt::Body(body) && s.slot == Some(slot))
+        // Ticket #320 (version 0.08.8): a Blockade does not shut out a partner under Passage.
+        self.ships.iter().any(|s| s.seat != seat && !self.accord_has(seat, s.seat, Term::Passage) && self.blockading(s) && s.at == ShipAt::Body(body) && s.slot == Some(slot))
     }
 
     /// Ticket #278: a warship on Blockade, still engaged. The one test every blockade reads.
@@ -3880,10 +3881,12 @@ impl Game {
         let view = self.relations_score(seat, from);
         // Non-aggression from somebody it holds nothing against is easy; from somebody it loathes it
         // is not. A research agreement is its own gate and needs no opinion beyond Friendly.
+        // Ticket #320 (version 0.08.8): Passage, now a rule for Armies as well as Ships, is accepted
+        // at Neutral or better, as non-aggression is.
         terms.iter().all(|t| match t {
             Term::ResearchAgreement => true,
-            Term::NonAggression => view >= -2,
-            Term::Passage | Term::Refuel => view >= -5,
+            Term::NonAggression | Term::Passage => view >= -2,
+            Term::Refuel => view >= -5,
         })
     }
 

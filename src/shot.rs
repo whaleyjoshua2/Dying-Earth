@@ -844,6 +844,13 @@ fn build_board(session: &mut Session) {
     {
         g.raise_army(Place::State(sid), false);
     }
+    // `passage:1` (a building aid, ticket #320): a Passage Accord stands between seat 0 and seat 1,
+    // so a partner's Region reads "move to" on seat 0's card and its hover says why.
+    if std::env::args().any(|a| a == "passage:1")
+        && let Some(g) = session.game.as_mut()
+    {
+        let _ = g.strike_accord(Seat(0), Seat(1), vec![Term::Passage]);
+    }
     // `battle:region` (a building aid, ticket #311): seat 1 takes the first neighbour of seat 0's
     // start state and raises an Army there; seat 0 raises one at home and marches on it; the turn
     // runs, so the Orders phase that follows carries a ground Battle in the Report, a ring on the
