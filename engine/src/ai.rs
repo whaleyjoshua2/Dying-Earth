@@ -2063,6 +2063,36 @@ impl Game {
                 // computer empties a Region of its own defence only when nothing else will serve.
                 let mut ordered: Vec<ArmyId> = mine.clone();
                 ordered.sort_by_key(|aid| self.army(*aid).map(|a| a.standing).unwrap_or(true));
+                // Ticket #322 (version 0.08.8): THE STACK MARCHES. Where two or more Armies of the
+                // seat may march, one candidate moves them all, its odds read from their summed
+                // strength, so two together clear the bar where one alone does not -- the
+                // playtest note's "it never masses" made false. Offered before the single marches,
+                // since one new war a turn is the cap and the first candidate pushed takes it;
+                // weighed as a raised Army's march when any of the stack is raised.
+                let marchable: Vec<ArmyId> = ordered.iter().copied().filter(|aid| self.army(*aid).is_some_and(|a| a.damage <= 2 && a.stance != Stance::DigIn)).collect();
+                if marchable.len() > 1 {
+                    let strength: i64 = marchable.iter().filter_map(|aid| self.army(*aid)).map(|a| self.army_strength(a)).sum();
+                    let any_raised = marchable.iter().filter_map(|aid| self.army(*aid)).any(|a| !a.standing);
+                    let own_army = if any_raised { 1.0 } else { 0.5 };
+                    for n in &self.tables.state(sid).neighbours {
+                        let ctrl = self.state(*n).control;
+                        if ctrl == Control::Controlled(seat) || matches!(ctrl, Control::Controlled(h) if h != seat && self.accord_has(seat, h, Term::Passage)) {
+                            continue;
+                        }
+                        let def: i64 = self.defenders_at(Place::State(*n), seat).iter().filter_map(|id| self.army(*id)).map(|a| self.army_defended_strength(a)).sum();
+                        let odds = first_round_odds(strength, def);
+                        let held_by_rival = matches!(ctrl, Control::Controlled(r) if r != seat);
+                        let allowed = odds >= th.attack_odds && self.war_cause_at(seat, Place::State(*n), th.war_cause) && (!held_by_rival || wars_opened < 1);
+                        if allowed {
+                            if held_by_rival {
+                                wars_opened += 1;
+                            }
+                            let value = (self.tables.state(*n).industry_level + self.tables.state(*n).size) as f64 / 7.0;
+                            let orders: Vec<Order> = marchable.iter().map(|aid| Order::MoveArmy { army: *aid, to: *n }).collect();
+                            push(orders, Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack) * (1.0 + value) * own_army, 1.0, 1.0, 1.0, format!("march the stack of {} on {} (odds {:.0}%)", marchable.len(), self.tables.state(*n).name, odds * 100.0), None);
+                        }
+                    }
+                }
                 for aid in &ordered {
                     let a = self.army(*aid).unwrap();
                     // Ticket #297 (version 0.08.6): a dug-in Army is refused a march until its stance

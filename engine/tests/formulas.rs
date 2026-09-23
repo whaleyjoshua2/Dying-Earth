@@ -10930,3 +10930,36 @@ fn a_regions_own_army_marches_again_and_defends_only_at_home() {
     let (id, from, _) = g.nearest_army_threat(third).expect("China's own Army, marched out, threatens the Region next door");
     assert_eq!((id, from), (standing, target));
 }
+
+// -------------------------------------------- 0.08.8 ticket #322: Armies that stack for orders
+
+/// Ticket #322 (version 0.08.8): where two Armies of a seat may march and neither alone clears the
+/// computer's attack bar against a neighbour, the stack does, and the computer marches them both
+/// in one candidate. Before this ticket each Army was weighed alone and the seat never massed.
+#[test]
+fn the_computer_marches_a_stack_where_one_army_alone_would_not_clear_the_bar() {
+    let mut g = game();
+    calm(&mut g);
+    let (home, target) = (StateId::EastAsia, StateId::Russia);
+    g.take_control(target, Seat(1));
+    g.relations.score[0][1] = -8;
+    assert!(g.relations_score(Seat(0), Seat(1)) <= g.tables.ai.thresholds.war_cause, "cause");
+    // Russia's own Army fights at 5 defended; one raised Army of 4 is under the bar, two of 4 are over it.
+    let def: i64 = g.defenders_at(Place::State(target), Seat(0)).iter().filter_map(|id| g.army(*id)).map(|a| g.army_defended_strength(a)).sum();
+    let bar = g.tables.ai.thresholds.attack_odds;
+    assert!(combat::first_round_odds(4, def) < bar, "one Army of 4 against {def}: under the bar");
+    assert!(combat::first_round_odds(8, def) >= bar, "two of 4 against {def}: over it");
+    // China's own Army is kept out of it, so the stack is the two raised.
+    for a in g.armies.iter_mut().filter(|a| a.standing && a.home == ArmyHome::State(home)) {
+        a.stance = Stance::DigIn;
+    }
+    let first = g.raise_army(Place::State(home), false);
+    g.armies.iter_mut().find(|a| a.id == first).unwrap().raised_strength = 4;
+    let alone: Vec<Order> = g.ai_orders(Seat(0));
+    assert!(!alone.iter().any(|o| matches!(o, Order::MoveArmy { to, .. } if *to == target)), "one Army alone does not march on Russia: {alone:?}");
+    let second = g.raise_army(Place::State(home), false);
+    g.armies.iter_mut().find(|a| a.id == second).unwrap().raised_strength = 4;
+    let together: Vec<Order> = g.ai_orders(Seat(0));
+    let marched: Vec<ArmyId> = together.iter().filter_map(|o| match o { Order::MoveArmy { army, to } if *to == target => Some(*army), _ => None }).collect();
+    assert!(marched.contains(&first) && marched.contains(&second), "the stack of two marches on Russia together: {together:?}");
+}

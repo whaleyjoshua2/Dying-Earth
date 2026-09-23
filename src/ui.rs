@@ -4120,6 +4120,39 @@ fn build_turns_for(game: &Game, order: &Order) -> Option<u32> {
 /// make each turn (#22). Ticket #121 (version 0.07.2): the hover no longer repeats the price --
 /// *"that's already stated"* -- and *"Once it stands"* became the turn count: `Ready next turn:` or
 /// `Ready in 2 turns:`, from the building's own card. Eight of the ten Facilities take one turn.
+/// Ticket #322 (version 0.08.8): a button that places SEVERAL orders at once -- a stack's march,
+/// a stack's transit, a Repair all -- at the designer's word that Armies stack for orders. It is
+/// enabled when every order it holds is legal on its own, priced at their sum, and its refusal is
+/// the first order's, since a stack is refused for one reason at a time.
+fn orders_button(ui: &mut Ui, game: &Game, pending: &[Order], orders: Vec<Order>, label: &str, hover: Option<String>, actions: &mut Vec<Action>) {
+    let mut cost = dying_earth_engine::Cost::default();
+    let mut refusal: Option<String> = None;
+    for o in &orders {
+        let c = game.order_cost(Seat(0), o);
+        cost.materials += c.materials;
+        cost.fuel += c.fuel;
+        cost.energy += c.energy;
+        cost.ducats += c.ducats;
+        cost.influence += c.influence;
+        if refusal.is_none() && let Err(e) = game.check_order(Seat(0), pending, o) {
+            refusal = Some(e.0);
+        }
+    }
+    let ok = refusal.is_none() && !orders.is_empty();
+    let mut resp = priced_button(ui, ok, label, &cost);
+    if let Some(h) = &hover {
+        resp = rule_tip(resp, h.clone()).on_disabled_hover_ui(|ui| hover_with_icons(ui, h));
+    }
+    if let Some(e) = &refusal {
+        resp = rule_tip(resp, e.clone());
+    }
+    if resp.clicked() && ok {
+        for o in orders {
+            actions.push(Action::Place(o));
+        }
+    }
+}
+
 fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Order, label: &str, hover: Option<String>, actions: &mut Vec<Action>) {
     let cost = game.order_cost(Seat(0), &order);
     let check = game.check_order(Seat(0), pending, &order);
@@ -5063,6 +5096,43 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         if !my_armies.is_empty() {
             stance_row(ui, game, &session.pending, my_armies[0].stance, |s| Order::ArmyStance { place: Place::State(sid), stance: s }, false, actions);
         }
+        // Ticket #322 (version 0.08.8): **the stack**: every Army of the player's at the place. With
+        // more than one, a row of neighbour buttons moves them all, priced at nothing, the odds
+        // read from the stack's summed strength; the per-Army rows keep their buttons for a split.
+        // With one, the Army's own row is the stack and no second row is drawn.
+        let stack: Vec<&Army> = my_armies.iter().copied().filter(|a| a.stance != Stance::DigIn).collect();
+        let stacked = stack.len() > 1;
+        if stacked {
+            let strength: i64 = stack.iter().map(|a| game.army_strength(a)).sum();
+            ui.horizontal_wrapped(|ui| {
+                ui.label(format!("All {} ({}):", stack.len(), strength));
+                for n in &card.neighbours {
+                    let ctrl = game.state(*n).control;
+                    let own = ctrl == Control::Controlled(Seat(0));
+                    let passage = matches!(ctrl, Control::Controlled(h) if h != Seat(0) && game.accord_has(Seat(0), h, Term::Passage));
+                    let name = &game.tables.state(*n).name;
+                    let label = format!("{} {name}", if own || passage { "move to" } else { "attack" });
+                    let hover = if own {
+                        format!("{name}: held by you. Moving costs nothing; the stack keeps its stance.")
+                    } else if let (true, Control::Controlled(h)) = (passage, ctrl) {
+                        format!("{name}: held by the {}, a partner under Passage. Moving costs nothing; the stack arrives on Hold.", game.seat_name(h))
+                    } else {
+                        attack_hover(game, Place::State(*n), name, strength, false)
+                    };
+                    let orders: Vec<Order> = stack.iter().map(|a| Order::MoveArmy { army: a.id, to: *n }).collect();
+                    orders_button(ui, game, &session.pending, orders, &label, Some(hover), actions);
+                }
+            });
+            let hurt: Vec<&Army> = stack.iter().copied().filter(|a| a.damage > 0).collect();
+            if hurt.len() > 1 {
+                ui.horizontal_wrapped(|ui| {
+                    let repairs: Vec<Order> = hurt.iter().map(|a| Order::Repair { unit: UnitRef::Army(a.id), points: a.damage }).collect();
+                    orders_button(ui, game, &session.pending, repairs, "Repair all", Some("Every damaged Army of the stack repaired fully, for Materials.".to_string()), actions);
+                    let repairs: Vec<Order> = hurt.iter().map(|a| Order::RepairWithDucats { unit: UnitRef::Army(a.id), points: a.damage }).collect();
+                    orders_button(ui, game, &session.pending, repairs, "Repair all with Ducats", Some("Every damaged Army of the stack repaired fully, for Ducats.".to_string()), actions);
+                });
+            }
+        }
         for a in &armies {
             let who = match game.army_seat(a) {
                 Some(s) => game.seat_name(s),
@@ -5732,6 +5802,17 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         let (turns, fuel) = game.transit_cost_for(Seat(0), body, to);
         ui.horizontal_wrapped(|ui| {
             ui.label(format!("To {}: {} turn(s), {} Fuel each from the tank", game.tables.body(to).name, turns, fuel));
+            // Ticket #322 (version 0.08.8): the heading's promise kept: one button moves every
+            // Ship of the stack that can pay the leg, the per-Ship buttons staying for a split.
+            if ships.len() > 1 {
+                let able: Vec<Order> = ships
+                    .iter()
+                    .map(|s| Order::Transit { ship: s.id, to, slot: None })
+                    .filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok())
+                    .collect();
+                let n = able.len();
+                orders_button(ui, game, &session.pending, able, &format!("All {n} that can"), Some(format!("Every Ship of the stack whose tank pays the leg, {n} of {}, sent together.", ships.len())), actions);
+            }
             for s in &ships {
                 // Ticket #87: the button reads the tank against the leg.
                 cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: None }, &format!("{} ({}/{} in the tank)", game.ship_name(s), s.fuel, game.tables.unit(s.kind).tank), actions);
