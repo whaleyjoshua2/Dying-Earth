@@ -397,6 +397,14 @@ impl Game {
         }
     }
 
+    /// Ticket #318 (version 0.08.8): the presence an Occupation needs, to begin and to hold alike:
+    /// an Army of the seat at the place that did not escape and does not stand down. Until this
+    /// ticket the holding check read every Army of the seat there, escaped or not, so an Army that
+    /// ran kept an Occupation it could not have begun until the next Resolution cleared the flag.
+    pub fn present_at(&self, place: Place, seat: Seat) -> bool {
+        self.armies.iter().any(|a| a.at == ArmyAt::Place(place) && self.army_seat(a) == Some(seat) && !a.escaped && !self.army_stands_down(a))
+    }
+
     /// Ticket #284 (version 0.08.5): a seat is alone at a place when it has an Army there on Attack
     /// that did not escape, and no defender is left engaged. Read by the Battle line and by the
     /// Occupation alike, so the two can never disagree about `escaped` again.
@@ -661,8 +669,10 @@ impl Game {
             _ => {}
         }
         // Ticket #282 (version 0.08.5): THE Standing Army returns two Incomes later, not the next.
+        // Ticket #318 (version 0.08.8): the two is the table's `respawn_incomes`, where a 1 was
+        // written here; the wait is the Incomes that raise nothing before the one that does.
         if army.standing && !army.levy && let ArmyHome::State(sid) = army.home {
-            self.state_mut(sid).respawn_wait = 1;
+            self.state_mut(sid).respawn_wait = self.tables.standing_army.respawn_incomes.saturating_sub(1);
         }
         for s in &mut self.ships {
             if s.army == Some(id) {
@@ -758,7 +768,8 @@ impl Game {
             let control = self.place_control(place);
             match control {
                 Control::Occupied { occupier, previous, turns, banked } => {
-                    if self.armies_of_seat_at(occupier, place).is_empty() {
+                    // Ticket #318 (version 0.08.8): held by the presence that begins one.
+                    if !self.present_at(place, occupier) {
                         // Occupation broken. Ticket #299 (version 0.08.6): at a cost, whether the
                         // last Army marched off, was lifted or was destroyed -- the place hands back
                         // at +2 Unrest, the occupier takes a rung-2 offence from the previous holder

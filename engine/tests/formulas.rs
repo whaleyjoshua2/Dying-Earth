@@ -10841,3 +10841,22 @@ fn a_carrier_has_somewhere_to_go_only_with_cause_against_a_colony_off_earth() {
     assert!(g.relations_score(Seat(0), Seat(1)) <= g.tables.ai.thresholds.war_cause);
     assert!(g.carrier_target_exists(Seat(0)), "Cold toward the Colony's holder: a target");
 }
+
+// -------------------------------------------- 0.08.8 ticket #318: an escaped Army holds no Occupation
+
+/// Ticket #318 (version 0.08.8): an Occupation is held by the presence that begins one -- an Army
+/// of the occupier at the place that did not escape -- so an Army that ran keeps no Occupation
+/// alive. Until this ticket the holding check read every Army of the seat there, escaped or not.
+#[test]
+fn an_army_that_escaped_holds_no_occupation() {
+    let mut g = game();
+    g.armies.retain(|a| a.home != ArmyHome::State(StateId::Europe));
+    let id = occupier_in(&mut g, StateId::EastAsia, StateId::Europe);
+    g.resolution_phase();
+    assert!(matches!(g.state(StateId::Europe).control, Control::Occupied { occupier: Seat(0), turns: 1, .. }), "the Occupation begins");
+    assert!(g.present_at(Place::State(StateId::Europe), Seat(0)));
+    g.armies.iter_mut().find(|a| a.id == id).unwrap().escaped = true;
+    assert!(!g.present_at(Place::State(StateId::Europe), Seat(0)), "escaped, the Army is not present for an Occupation");
+    g.resolution_phase();
+    assert!(!matches!(g.state(StateId::Europe).control, Control::Occupied { .. }), "the Occupation broke: an Army that ran holds nothing");
+}

@@ -91,11 +91,15 @@ divisor = 3.0
 # per threat episode, where a Levy used to be raised and stood down; `held_step` for every attack a
 # neutral holds against. No ceiling. A raised Army is worth its home's Industry + 1, fixed at the
 # raise; a Colony's the rounded average Industry of its Faction's Regions + 1.
+# Ticket #318 (version 0.08.8): `respawn_incomes` is how many Incomes after a Standing Army's
+# death it is raised again, at strength one -- two since ticket #282, so a won Battle opens a
+# window; a code literal until this version.
 [standing_army]
 constabulary = 1
 calm = 1
 threat_steps = 2
 held_step = 1
+respawn_incomes = 2
 
 # Ticket #297 (version 0.08.6): Dig In, the third live stance an Army has. Dug in, an Army adds
 # `defence` to its strength while it defends and never rolls to disengage; its hit points do not

@@ -1181,6 +1181,9 @@ pub struct StandingArmyCard {
     pub calm: u32,
     pub threat_steps: u32,
     pub held_step: u32,
+    /// Ticket #318 (version 0.08.8): the Incomes after a Standing Army's death before it is raised
+    /// again, at strength one; 2 since ticket #282, where it was a literal in code.
+    pub respawn_incomes: u32,
 }
 
 /// Ticket #297 (version 0.08.6): what an Army dug in adds to its strength while it defends. Hit
