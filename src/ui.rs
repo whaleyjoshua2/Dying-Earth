@@ -6941,29 +6941,35 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     (n, if n == 1 { "Facility" } else { "Facilities" })
                 }
             };
-            let target_orbit = touching(chosen);
-            let holds = if target_orbit.is_low() {
-                format!("The Missile Carrier must be in low orbit, with Orbital Control of {} held outright.", game.tables.body(body).name)
-            } else {
-                format!("The Missile Carrier must be {}, with no rival warship and no rival working Battery in that orbit.", orbit_phrase(game, body, target_orbit))
-            };
             // What a strike does at this kind of place, in the words rule R4 is written in.
             let and_then = match chosen {
-                Place::Colony(_) => "The Core Module and the Archive are spared, so a place is gutted and never erased.".to_string(),
-                Place::State(_) => format!("Its Standing Army dies with them, and its Industry Level falls by {}, never below the level it began on.", n.industry_lost),
+                Place::Colony(_) => "The Core Module and the Archive are spared.".to_string(),
+                Place::State(_) => format!("Its Standing Army dies too, and its Industry Level falls by {}.", n.industry_lost),
             };
             // Ticket #279's rule, which this inherits: the war bucket and the Sink are Earth's
             // alone, so a strike off Earth poisons nothing and the hover must not say it does.
             let air = if body == BodyId::Earth {
-                format!(" Over Earth: {:.0} ppm into your war bucket, and the Natural Sink rises {:.2}, for good.", n.war_ppm, n.sink_rise)
+                format!(" Over Earth: {:.0} ppm of war Emissions and +{:.2} to the Sink, for good.", n.war_ppm, n.sink_rise)
             } else {
                 String::new()
             };
             // One hover for every hull: nothing in it turns on which hull fires, and the rows at
-            // the head of this card already say where each one is sitting. `rule_tip` holds the
-            // whole thing under the pointer, so it is kept near the ceiling the tooltip rule sets.
+            // the head of this card already say where each one is sitting.
+            //
+            // CUT TO THE SIX-LINE CEILING at the designer's word -- "you gotta cut some the wording
+            // on mouse over on lauching nukes" -- where the first draft ran to eight and the first
+            // cut still measured seven. What went was justification, never a figure: "each on its
+            // own", "never below the level it began on", "breaking a NON-AGGRESSION Accord IF ONE
+            // STANDS", "so a place is gutted and never erased".
+            //
+            // The last sentence to go was the ORBIT RULE ("must be in low orbit, with Orbital
+            // Control held outright"), which the Bombard's hover does carry. It is the one line
+            // here that is not about what firing DOES: this hover is only ever read on a button
+            // that is already live, so the rule has already been met, and a hull that has not met
+            // it reads the engine's own refusal on the greyed button instead -- which says the same
+            // thing, at the moment it matters. Five lines now, where the ceiling is six.
             let hover = format!(
-                "Every building at {} ({buildings} {what}) rolls a {:.0}% chance to burn, each on its own, and between {:.0}% and {:.0}% of its people die. {and_then} A rung {} offence against the {holder}, breaking a non-aggression Accord if one stands, and the Warhead is spent either way.{air} {holds}",
+                "Every building at {} ({buildings} {what}) rolls {:.0}% to burn; {:.0}-{:.0}% of its people die. {and_then} Rung {} against the {holder}, and any Accord breaks. The Warhead is spent either way.{air}",
                 game.place_name(chosen),
                 n.destruction_chance * 100.0,
                 n.people_min * 100.0,
