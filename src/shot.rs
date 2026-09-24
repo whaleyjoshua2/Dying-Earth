@@ -312,6 +312,18 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.materials = 120;
             g.seats[0].stockpile.energy = 60;
         }
+        // `barracks:1` (a building aid, ticket #334, version 0.09.0): seat 0 gets a Colony on the
+        // Moon with a Barracks standing and four Colonists, and the Materials for a raise; so the
+        // Colony's card (`hab:ground`) shows the Build Army button and its hover, which names the
+        // Colonist a raise takes.
+        if std::env::args().any(|a| a == "barracks:1") {
+            let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
+            let id = ColonyId(g.fresh_id());
+            let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Mine), Module::new(ModuleKind::Barracks), Module::new(ModuleKind::Core)];
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.seats[0].stockpile.materials = 120;
+            g.seats[0].stockpile.energy = 60;
+        }
         // `refuel:1` (a building aid, ticket #325, version 0.08.8): seat 1 holds a station over
         // Mars, seat 0 a Frigate in Mars orbit with an empty tank and no station of its own there,
         // and a Refuel Accord stands between them; so the Ship card (`stack:1`) shows the Refuel

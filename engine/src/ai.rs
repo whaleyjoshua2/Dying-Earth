@@ -2405,6 +2405,14 @@ impl Game {
                     Ok(_) => trial.push(o.clone()),
                     Err(e) => {
                         lines.push(format!("  skip  {:6.1}  {} ({})", c.score(), c.note, e));
+                        // Ticket #334 (version 0.09.0): a raise refused for want of people is
+                        // counted for the sweep. The gate is `check_order`'s, as for every other
+                        // candidate; the computer weighs nothing new against it.
+                        if let Order::BuildArmy { place } = o
+                            && self.army_people_refusal(&trial, *place).as_deref() == Some(e.0.as_str())
+                        {
+                            self.war.army_raises_refused_people[seat.index()] += 1;
+                        }
                         ok = false;
                         break;
                     }

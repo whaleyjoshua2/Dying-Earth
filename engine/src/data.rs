@@ -1244,6 +1244,16 @@ pub struct DigInCard {
     pub defence: i64,
 }
 
+/// Ticket #334 (version 0.09.0): the people a raised Army takes, at the order. In a Region
+/// `population_each` units of its population (one unit, one million people since ticket #333); at
+/// a Colony `colonists_each` Colonists, refused where fewer than one more live there so the Core is
+/// never emptied. The Standing Army takes nobody, and nobody returns.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ArmyCard {
+    pub population_each: f64,
+    pub colonists_each: u32,
+}
+
 /// Ticket #327 (version 0.08.8): the melee's shape, in data: its rounds, and the hit rolls a
 /// round on the ground and the floor for a Ship melee, which rolls once for every engaged armed
 /// unit present when that is more.
@@ -1262,6 +1272,7 @@ struct UnitsFile {
     melee: MeleeCard,
     standing_army: StandingArmyCard,
     dig_in: DigInCard,
+    army: ArmyCard,
 }
 
 /// Ticket #86 (version 0.06.0): a warming Earth fills the Colony Ships. `per_step` Colonists
@@ -1523,6 +1534,8 @@ pub struct Tables {
     pub standing_army: StandingArmyCard,
     /// Ticket #297 (version 0.08.6): what digging in adds to a defending Army.
     pub dig_in: DigInCard,
+    /// Ticket #334 (version 0.09.0): the people a raised Army takes.
+    pub army: ArmyCard,
     pub techs: Vec<TechCard>,
     pub events: EventsTable,
     pub factions: Vec<FactionCard>,
@@ -1641,6 +1654,7 @@ impl Tables {
             melee: units.melee,
             standing_army: units.standing_army,
             dig_in: units.dig_in,
+            army: units.army,
             techs: techs.tech,
             shortlist: techs.shortlist,
             events,
@@ -1779,6 +1793,11 @@ impl Tables {
         }
         if self.industry_level.widgets == 0 || self.widgets.region_base + self.widgets.per_industry_level == 0 {
             return Err(err("facilities.toml", "[industry_level] widgets must be at least 1, and [widgets] region_base or per_industry_level must be"));
+        }
+        // Ticket #334 (version 0.09.0): an Army is raised from people, so a raise that took nobody
+        // is not a rule anybody wrote; and a Colony's take must leave the Core its one Colonist.
+        if self.army.population_each <= 0.0 || !self.army.population_each.is_finite() || self.army.colonists_each == 0 {
+            return Err(err("units.toml", "[army] population_each must be positive and colonists_each at least 1"));
         }
         for t in &self.techs {
             for n in &t.needs {

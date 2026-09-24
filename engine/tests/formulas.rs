@@ -11840,3 +11840,108 @@ fn one_unit_of_population_is_one_million_people_and_a_pioneer_takes_exactly_one(
     assert_eq!(g.tables.population_text(380.0), "380.0 (380M)");
     assert_eq!(g.tables.units_per_hundred_million(), 100.0, "a hundred units to the hundred million the cards quote by");
 }
+
+// ---------------------------------------------- 0.09.0 ticket #334: Armies raised from people
+
+/// Ticket #334 (version 0.09.0): a raised Army takes people. In a Region, `[army]
+/// population_each` units of its population -- one, one million people -- at the order, on top of
+/// its Materials and Widgets, whatever the Army's strength; refused where the Region has not got
+/// it, with a refusal that names the rule. The designer: *"armies from people too"*.
+#[test]
+fn a_raised_army_takes_one_unit_of_its_regions_population_and_is_refused_below_it() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 2000;
+    let each = g.tables.army.population_each;
+    assert_eq!(each, 1.0, "one unit of population an Army, one million people");
+    let raise = Order::BuildArmy { place: Place::State(StateId::EastAsia) };
+    let before = g.state(StateId::EastAsia).population;
+    assert!(g.check_order(Seat(0), &[], &raise).is_ok());
+    g.commit_orders(Seat(0), &[raise.clone()]);
+    let taken = before - g.state(StateId::EastAsia).population;
+    assert!((taken - each).abs() < 1e-9, "the raise took {taken} units of population, not {each}");
+    assert!((taken * g.tables.climate.people_per_unit - 1_000_000.0).abs() < 1e-3, "one million people");
+    assert_eq!(g.state(StateId::EastAsia).queue.len(), 1, "and the Army is in the queue, its Materials and Widgets as before");
+    assert!(g.log.to_vec().iter().any(|l| l.contains("under arms")), "the Report names the people taken: {:?}", g.log.to_vec());
+    // Below the figure the raise is refused, and the refusal names the rule.
+    g.state_mut(StateId::EastAsia).population = each - 0.5;
+    let err = g.check_order(Seat(0), &[], &raise).expect_err("a Region under one unit cannot raise an Army");
+    assert!(err.0.contains("not the people for an Army"), "the refusal names the rule: {}", err.0);
+    // At exactly the figure it may; two in one turn want two.
+    g.state_mut(StateId::EastAsia).population = each;
+    assert!(g.check_order(Seat(0), &[], &raise).is_ok(), "at exactly one unit the Region has the people");
+    assert!(g.check_order(Seat(0), std::slice::from_ref(&raise), &raise).is_err(), "a second raise this turn wants a second unit");
+    g.commit_orders(Seat(0), &[raise]);
+    assert_eq!(g.state(StateId::EastAsia).population, 0.0, "the last unit went under arms");
+}
+
+/// Ticket #334 (b): a Colony's Army takes one Colonist at the raise, and its Module slot with them;
+/// refused at fewer than two so the Core Module is never emptied. A Colony whose Colonists fall
+/// below its Modules keeps them all -- ticket #97's rule -- and simply has no room until they are back.
+#[test]
+fn a_colonys_army_takes_one_colonist_and_is_refused_at_one() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 2000;
+    assert_eq!(g.tables.army.colonists_each, 1, "one Colonist a raise");
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Barracks, ModuleKind::Mine, ModuleKind::Mine], 3);
+    let raise = Order::BuildArmy { place: Place::Colony(c) };
+    let pop = g.state(StateId::EastAsia).population;
+    assert!(g.check_order(Seat(0), &[], &raise).is_ok());
+    g.commit_orders(Seat(0), &[raise.clone()]);
+    assert_eq!(g.colony(c).unwrap().colonists, 2, "one Colonist went under arms");
+    assert_eq!(g.state(StateId::EastAsia).population, pop, "and no Region paid for a Colony's Army");
+    assert!(g.log.to_vec().iter().any(|l| l.contains("one Colonist under arms")), "the Report names the Colonist: {:?}", g.log.to_vec());
+    // The slot went with them: three Modules on a cap of two stand, and nothing more fits.
+    let col = g.colony(c).unwrap();
+    assert_eq!(g.module_slots(col), 2);
+    assert_eq!(g.module_slots_used(col), 3, "the Barracks and both Mines stand: nothing is destroyed or mothballed");
+    assert_eq!(g.free_module_slots(col), 0, "and there is no room until a Colonist arrives");
+    // At one Colonist the raise is refused, and the refusal names the rule.
+    let mut g = game();
+    g.seats[0].stockpile.materials = 2000;
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Barracks], 1);
+    let raise = Order::BuildArmy { place: Place::Colony(c) };
+    let err = g.check_order(Seat(0), &[], &raise).expect_err("a Colony of one Colonist cannot raise an Army");
+    assert!(err.0.contains("keeps at least one Colonist"), "the refusal names the rule: {}", err.0);
+    g.colony_mut(c).unwrap().colonists = 2;
+    assert!(g.check_order(Seat(0), &[], &raise).is_ok(), "at two it may: one stays with the Core");
+}
+
+/// Ticket #334 (c): the Standing Army is the state's, and takes nobody -- neither when the game
+/// begins nor when it is raised again two Incomes after it dies.
+#[test]
+fn the_standing_armys_respawn_takes_no_people() {
+    let mut g = game();
+    calm(&mut g);
+    let sid = StateId::EastAsia;
+    let standing = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(sid)).map(|a| a.id).unwrap();
+    g.destroy_army(standing, "battle", None);
+    assert_eq!(g.state(sid).respawn_wait, 1, "two Incomes later");
+    let before = g.state(sid).population;
+    g.income_phase();
+    assert!(!g.armies.iter().any(|a| a.standing && a.home == ArmyHome::State(sid)), "the first Income raises nothing");
+    g.income_phase();
+    assert!(g.armies.iter().any(|a| a.standing && a.home == ArmyHome::State(sid)), "the second raises it again");
+    let after = g.state(sid).population;
+    assert!(after >= before, "the Standing Army's return took {} units of population; it takes nobody", before - after);
+}
+
+/// Ticket #334 (d): the people are gone. A destroyed raised Army returns nobody to its Region, and a
+/// Colony's returns no Colonist.
+#[test]
+fn a_destroyed_raised_army_returns_nobody() {
+    let mut g = game();
+    g.seats[0].stockpile.materials = 2000;
+    let raise = Order::BuildArmy { place: Place::State(StateId::EastAsia) };
+    g.commit_orders(Seat(0), &[raise]);
+    let after_raise = g.state(StateId::EastAsia).population;
+    let id = g.raise_army(Place::State(StateId::EastAsia), false);
+    g.destroy_army(id, "battle", Some(ReportPlace::State(StateId::EastAsia)));
+    assert!(!g.armies.iter().any(|a| a.id == id));
+    assert_eq!(g.state(StateId::EastAsia).population, after_raise, "nobody came home");
+    let c = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Barracks], 3);
+    g.commit_orders(Seat(0), &[Order::BuildArmy { place: Place::Colony(c) }]);
+    assert_eq!(g.colony(c).unwrap().colonists, 2);
+    let id = g.raise_army(Place::Colony(c), false);
+    g.destroy_army(id, "battle", Some(ReportPlace::Colony(c)));
+    assert_eq!(g.colony(c).unwrap().colonists, 2, "no Colonist came back");
+}

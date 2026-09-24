@@ -77,6 +77,17 @@ pursuit = 2
 carries_colonists = 0
 carries_army = false
 
+# Ticket #334 (version 0.09.0): an Army is raised from people. In a Region a raise takes
+# `population_each` units of the Region's population -- one unit, one million people since ticket
+# #333 -- at the order, on top of its Materials and Widgets, whatever the Army's strength, and is
+# refused where the Region has not got it. At a Colony it takes `colonists_each` Colonists, refused
+# where fewer than one more than that live there, so the Core Module is never emptied; the Module
+# slot the Colonist bought goes with them. The Standing Army takes nobody. The people are gone: a
+# destroyed Army returns nobody. The designer: "armies from people too".
+[army]
+population_each = 1.0
+colonists_each = 1
+
 [repair]
 materials_per_point = 5
 

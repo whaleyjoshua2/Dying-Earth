@@ -398,6 +398,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("archive_begun", &["faction", "colony"]),
     ("neutral_research", &["states", "n"]),
     ("emigrants_mustered", &["n", "state", "fell", "unrest"]),
+    // Ticket #334 (version 0.09.0).
+    ("army_ordered", &["place", "people"]),
     ("emigrants_arrived", &["n", "state", "colony"]),
     ("emigrants_returned", &["n", "state"]),
     ("emigrants_lifted", &["n", "state", "station"]),
@@ -550,7 +552,7 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("build_module", &["building", "colony"]),
     ("build_module_ducats", &["building", "colony"]),
     ("build_ship", &["unit", "place"]),
-    ("build_army", &["place"]),
+    ("build_army", &["place", "people"]),
     // Ticket #332 (version 0.09.0).
     ("cancel_build", &["building", "place"]),
     ("build_station", &["body"]),

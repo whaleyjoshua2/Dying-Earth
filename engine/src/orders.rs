@@ -477,6 +477,38 @@ impl Game {
         self.check_order_inner(seat, pending, order, false)
     }
 
+    /// Ticket #334 (version 0.09.0): why a raise at this place is refused for want of people, or
+    /// `None` where it has them. A Region wants `[army] population_each` units of population for
+    /// this raise and for every raise already pending there this turn; a Colony wants
+    /// `colonists_each` Colonists and one more, so the Core Module is never emptied. One door, so
+    /// the gate, the computer's count of refusals and the card's refusal all say the same thing.
+    pub fn army_people_refusal(&self, pending: &[Order], place: Place) -> Option<String> {
+        let ordered = pending.iter().filter(|o| matches!(o, Order::BuildArmy { place: p } if *p == place)).count() as f64;
+        match place {
+            Place::State(s) => {
+                let wants = self.tables.army.population_each * (ordered + 1.0);
+                (self.state(s).population < wants).then(|| format!("{} has not the people for an Army: it takes {}", self.tables.state(s).name, self.army_people_text(place)))
+            }
+            Place::Colony(c) => {
+                let col = self.colony(c)?;
+                let each = self.tables.army.colonists_each;
+                (col.colonists < each + 1).then(|| format!("a Colony keeps at least one Colonist; an Army takes {}", self.army_people_text(place)))
+            }
+        }
+    }
+
+    /// Ticket #334: the people a raise at this place takes, in words for the card and the Report:
+    /// `1M people` in a Region, `one Colonist` at a Colony.
+    pub fn army_people_text(&self, place: Place) -> String {
+        match place {
+            Place::State(_) => format!("{} people", self.tables.people_text(self.tables.army.population_each)),
+            Place::Colony(_) => match self.tables.army.colonists_each {
+                1 => "one Colonist".to_string(),
+                n => format!("{n} Colonists"),
+            },
+        }
+    }
+
     fn check_order_inner(&self, seat: Seat, pending: &[Order], order: &Order, enforce_cost: bool) -> Result<Cost, OrderError> {
         let cost = self.order_cost(seat, order);
         let (left, influence_left) = self.remaining(seat, pending);
@@ -998,6 +1030,11 @@ impl Game {
                             return fail("this Barracks already holds an Army");
                         }
                     }
+                }
+                // Ticket #334 (version 0.09.0): an Army is raised from people, and the people are
+                // checked after everything else so the refusal a player reads is the one that binds.
+                if let Some(why) = self.army_people_refusal(pending, *place) {
+                    return fail(why);
                 }
                 Ok(cost)
             }
@@ -1727,14 +1764,28 @@ impl Game {
                 Order::BuildArmy { place } => {
                     let widgets = self.build_widgets(seat, BuildItem::Unit(UnitKind::Army));
                     let b = Build { item: BuildItem::Unit(UnitKind::Army), seat, widgets, done: 0, coastal: false };
+                    // Ticket #334 (version 0.09.0): the people go under arms at the order, as a
+                    // Pioneer's population is paid at the recruit: a Region's unit of population, a
+                    // Colony's Colonist. Nobody returns when the Army dies or marches.
+                    let people = self.army_people_text(*place);
                     match place {
-                        Place::State(s) => self.state_mut(*s).queue.push(b),
+                        Place::State(s) => {
+                            let each = self.tables.army.population_each;
+                            self.state_mut(*s).population = (self.state(*s).population - each).max(0.0);
+                            self.state_mut(*s).queue.push(b)
+                        }
                         Place::Colony(c) => {
+                            let each = self.tables.army.colonists_each;
                             if let Some(c) = self.colony_mut(*c) {
+                                c.colonists = c.colonists.saturating_sub(each);
                                 c.queue.push(b)
                             }
                         }
                     }
+                    let line = format!("An Army began at {} for the {}: {} under arms.", self.place_name(*place), self.seat_name(seat), people);
+                    self.log(line);
+                    let text = self.say("army_ordered", &[("place", self.place_name(*place)), ("people", people)]);
+                    self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some((*place).into()), text);
                 }
                 // Ticket #332 (version 0.09.0): the build goes, its Widgets done with it; the refund
                 // was credited above as this order's (negative) cost, and the Report names it.
@@ -2178,7 +2229,8 @@ impl Game {
                 r("build_module_ducats", &[("building", kind.name().to_string()), ("colony", place(Place::Colony(*colony)))])
             }
             Order::BuildShip { site, kind } => r("build_ship", &[("unit", kind.name().to_string()), ("place", place(*site))]),
-            Order::BuildArmy { place: p } => r("build_army", &[("place", place(*p))]),
+            // Ticket #334 (version 0.09.0): and the people it took.
+            Order::BuildArmy { place: p } => r("build_army", &[("place", place(*p)), ("people", self.army_people_text(*p))]),
             // Ticket #332 (version 0.09.0): told before the order commits, so the index still names
             // the build.
             Order::CancelBuild { place: p, index } => {

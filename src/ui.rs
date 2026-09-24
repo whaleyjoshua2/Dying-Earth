@@ -4312,7 +4312,13 @@ fn build_words(game: &Game, order: &Order) -> Option<String> {
         1 => "ready next turn here".to_string(),
         n => format!("about {n} turns here"),
     };
-    Some(format!("{} Materials, {widgets} Widgets, {when}", cost.materials))
+    // Ticket #334 (version 0.09.0): a raise names the people it takes beside the Materials and
+    // the Widgets -- a Region's unit of population, a Colony's Colonist.
+    let people = match order {
+        Order::BuildArmy { place } => format!(", and {}", game.army_people_text(*place)),
+        _ => String::new(),
+    };
+    Some(format!("{} Materials, {widgets} Widgets{people}, {when}", cost.materials))
 }
 
 /// Ticket #332: an estimate in words, for a queue line, a hatched tile and the Under way block

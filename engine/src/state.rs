@@ -986,6 +986,10 @@ pub struct WarCounters {
     pub bombards: [u32; SEAT_COUNT],
     #[serde(default)]
     pub modules_burned: [u32; SEAT_COUNT],
+    /// Ticket #334 (version 0.09.0): raises the computer wanted and was refused for want of people
+    /// -- a Region under its unit of population, a Colony down to its last Colonist -- by seat.
+    #[serde(default)]
+    pub army_raises_refused_people: [u32; SEAT_COUNT],
 }
 
 /// Ticket #332 (version 0.09.0): Widgets, counted where they are made and spent, so the sweep can
@@ -1028,6 +1032,7 @@ impl WarCounters {
             self.batteries_lost[i] += o.batteries_lost[i];
             self.bombards[i] += o.bombards[i];
             self.modules_burned[i] += o.modules_burned[i];
+            self.army_raises_refused_people[i] += o.army_raises_refused_people[i];
         }
         self.battles_vs_neutral += o.battles_vs_neutral;
         self.standing_armies_lost += o.standing_armies_lost;

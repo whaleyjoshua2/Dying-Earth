@@ -284,6 +284,7 @@ _Avoid_: capital ship, dreadnought, cruiser
 **Army**:
 A ground fighting unit, of one system since version 0.08.6. A Region's Armies belong to the state and are directed by the Faction that controls it, following the state if control changes -- its **Standing Army**, and the Armies **raised** there; all march (since version 0.08.8; from 0.08.6 the Standing Army stayed at home). A raised Army's strength and hit points are its home's Industry Level plus one when it is raised, fixed for its life. A Colony's Army belongs to the Colony, exists only where it has a Barracks, only defends, and is worth the rounded average Industry Level of the Regions its raising Faction held, plus one, fixed at the raise. Any Army fights at its strength plus what it defends with: a Region's own Army its people (a working Constabulary, and calm), and any Army dug in two more. Since version 0.08.4 every Army has a name given as it is raised, from its home rather than from any Faction: an ordinal and the Region's demonym -- *the 1st Chinese Army*, *the 2nd* -- or for a Colony's, its Garrison -- *the Tycho Garrison*, *the 2nd Tycho Garrison*. The Standing Army is the first raised and so the 1st; a re-raised one takes the next number; the name survives every change of hands, since the Army is its Region's.
 Since version 0.08.7 an Army's orders -- the stance row, and under a raised Army's own row its march buttons and repairs -- are given in the Armies block of its place's card, a tenth larger than the card's other text, not in a block at the card's foot.
+Since version 0.09.0 **a raised Army is raised from people** (the designer: *"armies from people too"*): in a Region it takes one unit of the Region's population, one million people, at the order, on top of its Materials and Widgets and whatever its strength (`population_each` in `units.toml`), and is refused where the Region has not got it; at a Colony it takes one Colonist, and their Module slot with them, refused where fewer than two live there so the Core Module is never emptied. The Standing Army takes nobody. The people are gone: a destroyed Army returns nobody, a marching one carries nobody home, and there is no disbanding.
 _Avoid_: troops, soldiers, garrison, marines
 
 **Stack**:
@@ -303,7 +304,7 @@ Retired in version 0.08.6. From version 0.08.5 it was the second Army a neutral 
 _Avoid_: militia, reserves, conscripts, second Standing Army
 
 **Barracks**:
-The Module that lets a Colony hold and build a defensive Army. A Colony without one has no defenders. Since version 0.08.6 the Army it raises is worth the rounded average Industry Level of the Regions its Faction holds, plus one, fixed at the raise; the Barracks is not a police force, so that Army defends with Dig In alone.
+The Module that lets a Colony hold and build a defensive Army. A Colony without one has no defenders. Since version 0.08.6 the Army it raises is worth the rounded average Industry Level of the Regions its Faction holds, plus one, fixed at the raise; the Barracks is not a police force, so that Army defends with Dig In alone. Since version 0.09.0 the raise takes one Colonist from the Colony (`colonists_each` in `units.toml`), refused at fewer than two, and the Colonist does not come back.
 _Avoid_: fort, garrison, base
 
 **Battery**:

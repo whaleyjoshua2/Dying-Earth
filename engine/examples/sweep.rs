@@ -494,6 +494,9 @@ fn main() {
                                 "      Armies built {:?}, lost {:?}, Standing Armies lost {}; warships built {:?}, lost {:?}; Occupations begun {:?}, broken {:?}; places taken by force {:?}",
                                 warc.armies_built, warc.armies_lost, warc.standing_armies_lost, warc.warships_built, warc.warships_lost, warc.occupations_begun, warc.occupations_broken, warc.takes_by_force
                             );
+                            // Ticket #334 (version 0.09.0): Armies are raised from people, and the
+                            // computer's raises refused for want of them are counted.
+                            println!("      Army raises refused for want of people, by seat {:?}", warc.army_raises_refused_people);
                             // Ticket #295 (version 0.08.6): the escapes, never counted before the
                             // disengage figure was nudged.
                             println!(
