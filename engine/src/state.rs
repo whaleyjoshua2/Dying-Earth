@@ -1000,6 +1000,10 @@ pub struct WidgetCounters {
     pub lost: [i64; SEAT_COUNT],
     /// The depth of every directed place's queue at every Resolution, for the median.
     pub queue_depths: Vec<u32>,
+    /// Widgets applied at the LAST Resolution alone, by seat: the top bar's second figure. Zeroed
+    /// at the start of every Resolution, so it never accumulates.
+    #[serde(default)]
+    pub applied_last: [i64; SEAT_COUNT],
 }
 
 impl WarCounters {

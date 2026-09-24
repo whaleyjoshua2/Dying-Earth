@@ -887,10 +887,13 @@ impl Game {
                 // Ticket #185 (version 0.08.0): and an Institute, since a station carries Observatories
                 // and the Institute is what multiplies them.
                 // Ticket #324 (version 0.08.8): and Batteries.
+                // Ticket #332 (version 0.09.0): and the Factory Module, since the designer's word was
+                // that a station has a Widget maker of its own; without it a station's Core made
+                // one Widget a turn for the whole game and a Shipyard there took eight turns.
                 if col.in_orbit
-                    && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Academy | ModuleKind::Battery)
+                    && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Academy | ModuleKind::Battery | ModuleKind::Factory)
                 {
-                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays, a Trade Post, an Institute and Batteries");
+                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays, a Trade Post, an Institute, Batteries and Factories");
                 }
                 // Ticket #186 (version 0.08.0): nobody but the Custodians builds an Academy off
                 // Earth either, captured ones included.

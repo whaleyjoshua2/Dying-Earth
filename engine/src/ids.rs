@@ -408,10 +408,11 @@ impl ModuleKind {
     /// without gaining the Heliostat, because `built_by` swaps the common kind out and the list
     /// then threw the Unique away. Answering by the JOB makes every future Unique follow its
     /// sibling with nothing to remember.
+    /// Ticket #332 (version 0.09.0): and the Factory Module, a station's Widget maker.
     pub fn stands_on_a_station(self) -> bool {
         matches!(
             self.common().unwrap_or(self),
-            ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Battery
+            ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Battery | ModuleKind::Factory
         )
     }
 }

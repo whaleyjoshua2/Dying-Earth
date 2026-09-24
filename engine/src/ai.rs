@@ -81,11 +81,15 @@ struct Candidate {
     note: String,
     /// The stack a Stance candidate belongs to; one Stance per stack.
     stack: Option<String>,
+    /// Ticket #332 (version 0.09.0): the pace of a build at its place -- 1.0 for everything that
+    /// is not a build, and for a build at the seat's place whose Widgets would finish it soonest
+    /// behind its queue; less, down to `build_pace_floor`, at a place that would take longer.
+    pace: f64,
 }
 
 impl Candidate {
     fn score(&self) -> f64 {
-        self.base * self.gap * self.threat * self.opportunity
+        self.base * self.gap * self.threat * self.opportunity * self.pace
     }
 }
 
@@ -528,6 +532,19 @@ impl Game {
         self.seat(seat).stockpile.energy - drain <= self.total_upkeep(seat)
     }
 
+    /// Ticket #332 (version 0.09.0): the place and item a build order would queue, for the pace
+    /// every build candidate is weighed by; nothing for an order that is not a build.
+    fn build_target(o: &Order) -> Option<(Place, BuildItem)> {
+        match o {
+            Order::BuildFacility { state, kind } => Some((Place::State(*state), BuildItem::Facility(*kind))),
+            Order::RaiseIndustry { state } => Some((Place::State(*state), BuildItem::IndustryLevel)),
+            Order::BuildModule { colony, kind } => Some((Place::Colony(*colony), BuildItem::Module(*kind))),
+            Order::BuildShip { site, kind } => Some((*site, BuildItem::Unit(*kind))),
+            Order::BuildArmy { place } => Some((*place, BuildItem::Unit(UnitKind::Army))),
+            _ => None,
+        }
+    }
+
     pub fn ai_orders(&mut self, seat: Seat) -> Vec<Order> {
         let (gap, behind) = self.victory_gap(seat);
         let kind = self.kind(seat);
@@ -602,7 +619,7 @@ impl Game {
             } else {
                 base
             };
-            cands.push(Candidate { orders, cat, base, gap, threat, opportunity, note, stack });
+            cands.push(Candidate { orders, cat, base, gap, threat, opportunity, note, stack, pace: 1.0 });
         };
 
         // What advances the Faction's own first Victory part (ticket #50).
@@ -659,6 +676,26 @@ impl Game {
                 Behind::Presence if advances_presence(cat) => gap,
                 _ => 1.0,
             }
+        };
+        // Ticket #332 (version 0.09.0): every seat wants a Mine early in its most Materials-lean
+        // Region at the Factory's weight -- the designer's words. Through `early_mine_turn`, while
+        // the seat directs fewer Mines on Earth (standing or on order) than `early_mines`, the
+        // Region with a slot free where a Mine would make the most (`facility_yield`: the lean, Deep
+        // Mining, a Strip Permit, Unrest 7 all read) is the one; the first on the list among equals.
+        // The Mine there takes the gap and the opportunity below, as the opening Habitat of ticket
+        // #290 does, so it comes before the Labs and Scrubbers it used to lose to at a plain
+        // Producer's weight. The probe that opened this lane found the Arkwrights, who start with
+        // no Mine, holding fifteen Materials and earning none from turn 2 to turn 7.
+        let earth_mines: u32 = self
+            .directed_states(seat)
+            .iter()
+            .map(|s| self.state(*s).facilities.iter().filter(|f| f.kind == FacilityKind::Mine).count() + self.state(*s).queue.iter().filter(|b| b.seat == seat && b.item == BuildItem::Facility(FacilityKind::Mine)).count())
+            .sum::<usize>() as u32;
+        let early_mine_region: Option<StateId> = if self.turn <= th.early_mine_turn && earth_mines < th.early_mines {
+            // `max_by_key` keeps the LAST of equals, so the list is walked backwards to keep the first.
+            self.directed_states(seat).into_iter().filter(|s| self.free_slots(*s) > 0).rev().max_by_key(|s| self.facility_yield(seat, *s, FacilityKind::Mine).amount)
+        } else {
+            None
         };
         // --- Earth builds
         for sid in self.directed_states(seat) {
@@ -757,7 +794,9 @@ impl Game {
                     // Ticket #60: and a Constabulary doubles at Unrest 9, where one more turn would
                     // throw the seat off the state, exactly as Relief doubles at the same figure.
                     let sea_close = fk == FacilityKind::SeaWall && self.sea_is_close(sid);
-                    let seizes_the_moment = sea_close || (fk == FacilityKind::Constabulary && self.state(sid).unrest >= 9.0);
+                    // Ticket #332 (version 0.09.0): and the early Mine, in the one Region chosen above.
+                    let early_mine = job == FacilityKind::Mine && early_mine_region == Some(sid);
+                    let seizes_the_moment = sea_close || early_mine || (fk == FacilityKind::Constabulary && self.state(sid).unrest >= 9.0);
                     let opportunity = if seizes_the_moment { m.opportunity } else { 1.0 };
                     // Ticket #70 (version 0.05.5): the rising sea is a threat to the state, so a Sea
                     // Wall with the sea close takes the threat multiplier as well.
@@ -772,8 +811,9 @@ impl Game {
                     // 5, so it competes with the Scrubber on even terms. The Research ticket of
                     // 0.05.5 found Coastal Engineering done by turn 16 to 18 in every seed and no
                     // Sea Wall ever built: the Custodian AI held its Materials for a Scrubber every time.
-                    let pull = if fk == FacilityKind::Constabulary || sea_close { gap } else { gap_for(cat, Some(name)) };
-                    push(vec![Order::BuildFacility { state: sid, kind: fk }], cat, base, pull, sway, opportunity, format!("build {} in {}", name, self.tables.state(sid).name), None);
+                    let pull = if fk == FacilityKind::Constabulary || sea_close || early_mine { gap } else { gap_for(cat, Some(name)) };
+                    let note = if early_mine { format!("build {} in {} (the early Mine)", name, self.tables.state(sid).name) } else { format!("build {} in {}", name, self.tables.state(sid).name) };
+                    push(vec![Order::BuildFacility { state: sid, kind: fk }], cat, base, pull, sway, opportunity, note, None);
                 }
             }
             // Ticket #54: a Scrubber takes no build slot, so it is offered whether or not one is
@@ -903,10 +943,25 @@ impl Game {
                     continue;
                 }
                 let module_job = mk.common().unwrap_or(mk);
+                // Ticket #332 (version 0.09.0): a Factory Module speeds the Colony's whole queue.
+                let mut speeds_the_queue = false;
                 let (cat, mut base) = match module_job {
-                    // Ticket #332 (version 0.09.0): the Factory Module is a producer at the base
-                    // weight until the AI lane gives the computer seats their wants for it.
-                    ModuleKind::Factory => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
+                    // Ticket #332 (version 0.09.0): a Factory Module is wanted at any Colony whose
+                    // queue is `factory_module_queue_depth` deep or where a Ship is wanted (a
+                    // Shipyard standing or on order) -- the designer's words -- and nowhere else,
+                    // since four Widgets a turn at a Colony with nothing under way are simply lost.
+                    // Where it is wanted it takes the gap and the opportunity below: the queue is the
+                    // moment, and the Module speeds whatever the seat is behind on there. At a plain
+                    // Producer's weight it lost to the Mine beside it whenever Materials were scarce
+                    // (6 against 9, measured), which is every turn of every game.
+                    ModuleKind::Factory => {
+                        let ship_wanted = col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) || col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Shipyard));
+                        if col.queue.len() < th.factory_module_queue_depth && !ship_wanted {
+                            continue;
+                        }
+                        speeds_the_queue = true;
+                        (Cat::Producer, self.base_weight(seat, Cat::Producer) * self.production_moved_boost(seat, &col, mk))
+                    }
                     // Ticket #89: a Solar Array is an Energy producer; the Energy-shortage bonus below
                     // is what makes the AI raise one when the Stockpile is within a turn of nothing.
                     ModuleKind::SolarArray => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
@@ -1116,21 +1171,40 @@ impl Game {
                 } else {
                     1.0
                 };
-                let (pull, opp) = if opening { (gap, m.opportunity) } else { (gap_for(cat, Some(mk.name())), 1.0) };
+                let (pull, opp) = if opening || speeds_the_queue { (gap, m.opportunity) } else { (gap_for(cat, Some(mk.name())), 1.0) };
                 push(vec![Order::BuildModule { colony: cid, kind: mk }], cat, base, pull, t, opp, format!("build {} at {}", mk.name(), self.place_name(Place::Colony(cid))), None);
             }
             if col.modules.iter().any(|m| m.kind == ModuleKind::Barracks) && !self.armies.iter().any(|a| a.home == ArmyHome::Colony(cid)) {
                 push(vec![Order::BuildArmy { place: Place::Colony(cid) }], Cat::ArmyOrBarracks, self.base_weight(seat, Cat::ArmyOrBarracks), 1.0, threat, 1.0, format!("build Army at {}", self.place_name(Place::Colony(cid))), None);
             }
-            if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
-                for uk in UnitKind::SHIPS {
-                    let cat = if uk == UnitKind::ColonyShip { Cat::ColonyShip } else { Cat::Warship };
-                    // Ticket #43: a Carrier is built over Earth, where Armies board, and only when one wants carrying.
-                    if uk == UnitKind::Carrier && (col.body != BodyId::Earth || !self.wants_carrier(seat)) {
+        }
+
+        // --- Ships. Ticket #332 (version 0.09.0): built at the yard with the most Widgets -- the
+        // designer's words -- so a seat with two Shipyards offers each Ship at one of them, the
+        // one whose Widgets finish it soonest, the first on the list among equals. A Carrier is
+        // still built over Earth, where Armies board (ticket #43), so it goes to the Earth yard
+        // with the most Widgets. Until this ticket the Ships were enumerated inside the Colony loop
+        // above, after ticket #97's `continue` on a Colony with no Module slot free, so a full yard
+        // offered no Ships at all; a yard's Ships take no Module slot, and they are enumerated here
+        // whatever the yard's slots.
+        let yards: Vec<ColonyId> = self.directed_colonies(seat).into_iter().filter(|c| self.colony(*c).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Shipyard && m.working())).collect();
+        let most_widgets = |list: &[ColonyId]| list.iter().copied().rev().max_by_key(|c| self.widgets_at(Place::Colony(*c)));
+        let best_yard = most_widgets(&yards);
+        let best_earth_yard = most_widgets(&yards.iter().copied().filter(|c| self.colony(*c).unwrap().body == BodyId::Earth).collect::<Vec<_>>());
+        for cid in yards {
+            let col = self.colony(cid).unwrap();
+            let threat = if self.enemy_present_or_inbound(seat, col.body) || self.enemy_army_near(seat, Place::Colony(cid)) || self.starved_by(cid).is_some() { m.threat } else { 1.0 };
+            for uk in UnitKind::SHIPS {
+                let cat = if uk == UnitKind::ColonyShip { Cat::ColonyShip } else { Cat::Warship };
+                // Ticket #43: a Carrier is built over Earth, where Armies board, and only when one wants carrying.
+                if uk == UnitKind::Carrier {
+                    if best_earth_yard != Some(cid) || !self.wants_carrier(seat) {
                         continue;
                     }
-                    push(vec![Order::BuildShip { site: Place::Colony(cid), kind: uk }], cat, self.base_weight(seat, cat), gap_for(cat, None), if cat == Cat::Warship { threat } else { 1.0 }, 1.0, format!("build {} at {}", uk.name(), self.place_name(Place::Colony(cid))), None);
+                } else if best_yard != Some(cid) {
+                    continue;
                 }
+                push(vec![Order::BuildShip { site: Place::Colony(cid), kind: uk }], cat, self.base_weight(seat, cat), gap_for(cat, None), if cat == Cat::Warship { threat } else { 1.0 }, 1.0, format!("build {} at {}", uk.name(), self.place_name(Place::Colony(cid))), None);
             }
         }
 
@@ -2188,6 +2262,47 @@ impl Game {
                         }
                     }
                 }
+            }
+        }
+
+        // --- Ticket #332 (version 0.09.0): a build is ordered where the place's Widgets finish it
+        // soonest, the queue's depth as the gap -- the designer's words. Every build candidate is
+        // weighed against the SAME build at the seat's other places by the Resolutions until this
+        // place's Widgets would complete it behind everything already in its queue
+        // (`turns_to_build`: the queue's Widgets still owed, plus the build's own, at the place's
+        // rate): the soonest place at full weight, every other at soonest / turns, never below
+        // `build_pace_floor`. So a Research Lab goes to the Region with the Factory and an empty
+        // queue rather than the one two builds deep, and a build with one place to stand is at
+        // full weight there. It never weighs one build against another: a first cut that
+        // discounted every build by its turns outright halved the opening Habitat and quartered
+        // the Solar Array on a starting station, whose Core makes one Widget a turn (ticket #290's
+        // and #89's tests red, measured). A discount and never a lift, on ticket #232's lesson.
+        // The two Widget makers are exempt: a slow place is exactly where a Factory or a Factory
+        // Module is wanted, and its pace would say the opposite. So is the early Mine, whose Region
+        // the designer chose by its Materials lean and not by its Widgets: paced, a Materials-lean
+        // Region making one Widget a turn tied with an Energy-lean one making two (9 and 9,
+        // measured), and the Mine went to the wrong one.
+        let mut paced: Vec<(usize, BuildItem, u32)> = Vec::new();
+        for (i, c) in cands.iter().enumerate() {
+            let [o] = c.orders.as_slice() else { continue };
+            let Some((place, item)) = Self::build_target(o) else { continue };
+            if matches!(item, BuildItem::Facility(FacilityKind::Factory) | BuildItem::Module(ModuleKind::Factory)) {
+                continue;
+            }
+            if item == BuildItem::Facility(FacilityKind::Mine) && matches!(place, Place::State(s) if early_mine_region == Some(s)) {
+                continue;
+            }
+            paced.push((i, item, self.turns_to_build(seat, place, item)));
+        }
+        for (i, item, turns) in &paced {
+            let soonest = paced.iter().filter(|(_, it, _)| it == item).map(|(_, _, t)| *t).min().unwrap_or(*turns);
+            let c = &mut cands[*i];
+            if *turns == u32::MAX {
+                c.pace = m.build_pace_floor;
+                c.note.push_str(" (no Widgets here)");
+            } else {
+                c.pace = (soonest as f64 / *turns as f64).clamp(m.build_pace_floor, 1.0);
+                c.note.push_str(&format!(" ({turns} turn{} here)", if *turns == 1 { "" } else { "s" }));
             }
         }
 

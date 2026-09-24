@@ -10830,6 +10830,24 @@ fn the_computer_opens_with_a_habitat_on_its_starting_station() {
 
 
 
+// -------------------------------------------- 0.09.0 ticket #332: the Factory Module on a station
+
+/// Ticket #332 (version 0.09.0): the designer's word was that Colonies AND stations have a Widget
+/// maker of their own -- *"for colonies and stations to have a counterpart"* -- so the Factory
+/// Module stands on a station as it stands on a Colony. Measured before this was true: a
+/// station's Core made one Widget a turn for the whole game, a Shipyard there took eight turns,
+/// no warship was built in eighty games and no station stood off Earth at the end.
+#[test]
+fn a_factory_module_may_stand_on_a_station() {
+    let mut g = fresh();
+    let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the Custodians start with a station over Earth");
+    g.seat_mut(Seat(0)).stockpile.materials = 200;
+    let order = Order::BuildModule { colony: iss, kind: ModuleKind::Factory };
+    assert!(g.check_order(Seat(0), &[], &order).is_ok(), "a Factory Module is legal on a station: {:?}", g.check_order(Seat(0), &[], &order));
+    assert!(ModuleKind::Factory.stands_on_a_station(), "the computer's list agrees");
+}
+
+
 // -------------------------------------------- 0.08.7 ticket #310: the threat line
 
 /// Ticket #310 (version 0.08.7): the military threat to a held Region is the rival RAISED Army
@@ -11624,4 +11642,121 @@ fn turns_to_build_estimates_at_the_places_rate_behind_its_queue() {
     // The Under way block reads the same estimate.
     let u = g.under_way(Seat(0));
     assert_eq!(u.builds, vec![("Power Plant".to_string(), place, 1)]);
+}
+
+// -------------------------------------------- 0.09.0 ticket #332: the computer seats under Widgets
+
+/// The score the AI's log gave the first candidate whose note contains `needle`, from the
+/// `  take    12.0  build Mine in Mexico` lines `ai_orders` writes; a candidate it never scored is
+/// nought. The three tests below read the RANKING, since what a seat can afford in one turn is
+/// decided by its reserve and its whole list, and the rules under test are about where a build
+/// goes, not how many it buys.
+fn scored(g: &Game, needle: &str) -> f64 {
+    g.log
+        .iter()
+        .filter(|l| l.starts_with("  ") && l.contains(needle))
+        .filter_map(|l| l.split_whitespace().nth(1).and_then(|n| n.parse::<f64>().ok()))
+        .next()
+        .unwrap_or(0.0)
+}
+
+/// Ticket #332 (version 0.09.0): every seat wants a Mine early in its most Materials-lean Region,
+/// at the Factory's weight. The seat holds an Energy-lean Region (Australia) and a Materials-lean
+/// one (Central America), a Mine standing in the wrong one already so no bootstrap fires: the
+/// Mine in Central America, whose lean makes it six a turn, outscores the one in Australia, which
+/// stands first on the list and would make four, and is bought.
+#[test]
+fn the_ai_wants_an_early_mine_in_its_most_materials_lean_region() {
+    let mut g = game();
+    calm(&mut g);
+    let cust = Seat(0);
+    g.state_mut(StateId::EastAsia).control = Control::Neutral;
+    g.take_control(StateId::Australia, cust);
+    g.take_control(StateId::CentralAmerica, cust);
+    g.state_mut(StateId::Australia).facilities.push(facility(FacilityKind::Mine));
+    assert_eq!(g.tables.state(StateId::CentralAmerica).resource_lean, Resource::Materials);
+    assert_eq!(g.tables.state(StateId::Australia).resource_lean, Resource::Energy);
+    g.turn = 2;
+    g.seats[0].stockpile.materials = 50;
+    g.seats[0].stockpile.energy = 200;
+    g.seats[0].income_last_turn.materials = 4;
+    g.seats[0].income_last_turn.energy = 20;
+    let orders = g.ai_orders(cust);
+    let (mexico, australia) = (scored(&g, "build Mine in Mexico"), scored(&g, "build Mine in Australia"));
+    assert!(mexico > australia, "the Materials-lean Region's Mine outscores the other's: Mexico {mexico}, Australia {australia}");
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::BuildFacility { state: StateId::CentralAmerica, kind: FacilityKind::Mine })),
+        "and it is bought: {orders:?}"
+    );
+    assert!(!orders.iter().any(|o| matches!(o, Order::BuildFacility { state: StateId::Australia, kind: FacilityKind::Mine })), "and the other is not: {orders:?}");
+}
+
+/// Ticket #332: a Factory Module is wanted at a Colony whose queue is two deep, ahead of the Mine
+/// that outscores it while Materials are scarce; and not at a Colony with nothing under way and
+/// no Shipyard, where its Widgets would be lost.
+#[test]
+fn the_ai_wants_a_factory_module_where_a_colonys_queue_is_two_deep() {
+    let mut g = game();
+    calm(&mut g);
+    let cust = Seat(0);
+    g.turn = 5;
+    // Materials for the early Mine and the Scrubber the Custodians open with, the Trade Post that
+    // scores the same 12 as the Factory Module and stands earlier on the list, and the Module.
+    g.seats[0].stockpile.materials = 95;
+    g.seats[0].stockpile.energy = 500;
+    g.seats[0].income_last_turn.materials = 6;
+    g.seats[0].income_last_turn.energy = 20;
+    // The ISS emptied: with nobody aboard it has no Module slot, so it offers nothing that would
+    // hold the Materials (its Trade Post scored the same 12 and stood earlier on the list).
+    let iss = station_of(&g, cust, BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().colonists = 0;
+    let moon = colony(&mut g, cust, BodyId::Moon, &[], 4);
+    for _ in 0..2 {
+        g.colony_mut(moon).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Habitat), seat: cust, widgets: 4, done: 0, coastal: false });
+    }
+    let orders = g.ai_orders(cust);
+    let (factory, mine) = (scored(&g, "build Factory at Mare"), scored(&g, "build Mine at Mare"));
+    assert!(factory > mine, "the Factory Module outscores the Mine where the queue is two deep: Factory {factory}, Mine {mine}");
+    let lines: Vec<String> = g.log.iter().filter(|l| l.starts_with("  take") || l.starts_with("  wait") || l.starts_with("  save")).take(12).cloned().collect();
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::BuildModule { colony, kind: ModuleKind::Factory } if *colony == moon)),
+        "and it is bought: {orders:?}\nscored: {lines:#?}"
+    );
+    // The same Colony idle: no Factory Module is offered at all.
+    g.colony_mut(moon).unwrap().queue.clear();
+    g.seats[0].stockpile.materials = 95;
+    g.log.clear();
+    g.ai_orders(cust);
+    assert_eq!(scored(&g, "build Factory at Mare"), 0.0, "none where nothing is under way");
+}
+
+/// Ticket #332: Ships are built at the yard with the most Widgets. Two Shipyards: the ISS, whose
+/// Core Module makes one Widget a turn, and a Moon Colony with a Factory Module beside its Core,
+/// five. The Moon Colony was founded later, so it stands later on the list and would have lost a
+/// tie; with Materials for everything the seat wants, every Ship ordered goes to the Moon.
+#[test]
+fn the_ai_builds_its_ships_at_the_yard_with_the_most_widgets() {
+    let mut g = game();
+    calm(&mut g);
+    let cust = Seat(0);
+    let iss = station_of(&g, cust, BodyId::Earth).unwrap();
+    g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    g.colony_mut(iss).unwrap().colonists = 4;
+    let moon = colony(&mut g, cust, BodyId::Moon, &[ModuleKind::Shipyard, ModuleKind::Factory], 4);
+    assert_eq!(g.widgets_at(Place::Colony(iss)), 1);
+    assert_eq!(g.widgets_at(Place::Colony(moon)), 5);
+    g.turn = 6;
+    g.seats[0].stockpile.materials = 400;
+    g.seats[0].stockpile.energy = 500;
+    g.seats[0].stockpile.fuel = 100;
+    g.seats[0].income_last_turn.materials = 6;
+    g.seats[0].income_last_turn.energy = 20;
+    let orders = g.ai_orders(cust);
+    let scored_ships: Vec<String> = g.log.iter().filter(|l| l.contains("Ship at")).cloned().collect();
+    let ships: Vec<&Order> = orders.iter().filter(|o| matches!(o, Order::BuildShip { .. })).collect();
+    assert!(!ships.is_empty(), "a Ship is ordered somewhere: {orders:?}\nscored: {scored_ships:#?}");
+    assert!(
+        ships.iter().all(|o| matches!(o, Order::BuildShip { site, .. } if *site == Place::Colony(moon))),
+        "every Ship at the Moon yard, five Widgets against the ISS's one: {ships:?}\nscored: {scored_ships:#?}"
+    );
 }

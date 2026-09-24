@@ -991,6 +991,11 @@ pub struct AiMultipliers {
     /// while they have nowhere the Archive may stand. It applies to no other Faction and stops the
     /// moment they hold such a place.
     pub archive_needs_a_place: f64,
+    /// Ticket #332 (version 0.09.0): the pace of a build. A build candidate is weighed against
+    /// the same build at the seat's other places by the Resolutions until this place's Widgets
+    /// would finish it behind its queue: the soonest place at full weight, every other at
+    /// soonest / turns, never below this floor. A place that makes no Widgets is at the floor.
+    pub build_pace_floor: f64,
 }
 
 /// Ticket #50: one pace schedule per Faction. `first` is the schedule for the Faction's first
@@ -1028,6 +1033,15 @@ pub struct AiThresholds {
     /// which made any contribution threshold unreachable and the shared-pot rule a flat tax.
     pub directive_when_wanted: u8,
     pub directive_when_indifferent: u8,
+    /// Ticket #332 (version 0.09.0): the early Mine. Through this turn, while the seat directs
+    /// fewer Mines on Earth (standing or on order) than `early_mines`, the Mine in its most
+    /// Materials-lean Region -- the one where a Mine would make the most -- is wanted at the
+    /// Factory's weight with the victory-gap and opportunity multipliers.
+    pub early_mine_turn: u32,
+    pub early_mines: u32,
+    /// Ticket #332: a Factory Module is wanted at a Colony whose queue is this many builds deep,
+    /// or where a Ship is wanted (a Shipyard standing or on order).
+    pub factory_module_queue_depth: usize,
 }
 
 /// Ticket #50: one pick list per Faction. `order` is tried first, then the cheapest available

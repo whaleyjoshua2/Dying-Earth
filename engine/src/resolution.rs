@@ -1329,6 +1329,7 @@ impl Game {
         }
         let places: Vec<Place> = StateId::ALL.iter().map(|s| Place::State(*s)).chain(self.colonies.iter().map(|c| Place::Colony(c.id))).collect();
         let mut completed: Vec<(Place, Build)> = Vec::new();
+        self.widgets.applied_last = [0; SEAT_COUNT];
         for place in places {
             let director = self.place_director(place);
             let made = self.widgets_at(place);
@@ -1369,6 +1370,7 @@ impl Game {
                 let w = &mut self.widgets;
                 w.made[d.index()] += made;
                 w.applied[d.index()] += applied;
+                w.applied_last[d.index()] += applied;
                 w.lost[d.index()] += made - applied;
             }
         }

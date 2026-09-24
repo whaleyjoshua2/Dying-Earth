@@ -608,6 +608,33 @@ fn build_board(session: &mut Session) {
                 fuel: g.tables.unit(UnitKind::Frigate).tank,
             });
         }
+        // `queue:1` (a building aid, ticket #332, version 0.09.0): seat 0's start Region has three
+        // builds under way -- a Power Plant 3 of 8, a Research Lab 0 of 4, and a Bank 2 of 8 that
+        // seat 1 began, as if the Region had lately changed hands -- and seat 0 holds a Colony on
+        // the Moon with a Factory Module standing and three builds in its queue, a Habitat 2 of 4,
+        // a Mine 0 of 4 and seat 1's Refinery 1 of 8, with room for one Module more; so the
+        // Widgets line, the queue, the `3 of 8` tiles, the rival's cancel hover and the build
+        // buttons' estimates can all be photographed. Nothing the computer plays in six turns
+        // composes a queue this deep, and nothing composes a rival's build at a place of one's own.
+        if std::env::args().any(|a| a == "queue:1") {
+            if let Some(sid) = g.directed_states(Seat(0)).first().copied() {
+                for (kind, seat, widgets, done) in [(FacilityKind::PowerPlant, Seat(0), 8, 3), (FacilityKind::ResearchLab, Seat(0), 4, 0), (FacilityKind::Bank, Seat(1), 8, 2)] {
+                    let coastal = g.next_slot_is_coastal(sid, kind, 0, 0).unwrap_or(false);
+                    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(kind), seat, widgets, done, coastal });
+                }
+            }
+            let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
+            let id = ColonyId(g.fresh_id());
+            let modules = vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Factory)];
+            let queue = vec![
+                Build { item: BuildItem::Module(ModuleKind::Habitat), seat: Seat(0), widgets: 4, done: 2, coastal: false },
+                Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 0, coastal: false },
+                Build { item: BuildItem::Module(ModuleKind::Refinery), seat: Seat(1), widgets: 8, done: 1, coastal: false },
+            ];
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 8, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.seats[0].stockpile.materials = 200;
+            g.seats[0].stockpile.energy = 80;
+        }
         // `challenger:1` (a building aid, ticket #262, version 0.08.4): a rival stands on seat 0's
         // start state, well short of its price, so the challenger line on the held card has a name
         // and two figures to show. `threat:1` puts a rival OVER the price; this one keeps it under.

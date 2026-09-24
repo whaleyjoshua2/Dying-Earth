@@ -257,6 +257,22 @@ investment_bank_per_fund = 0.002
 # That cap was set when the Archive was ordered on turn 1 in Earth orbit, where there was no journey
 # to fund through, so its premise is gone even though the figure has not moved.
 archive_needs_a_place = 5.0
+# Ticket #332 (version 0.09.0): a build is ordered where the place's Widgets finish it soonest, the
+# queue's depth as the gap. Every build candidate is weighed against the SAME build at the seat's
+# other places by the Resolutions until this place's Widgets would complete it behind everything
+# already in its queue (`turns_to_build`): the soonest place at full weight and every other at
+# soonest / turns, so a Power Plant goes to the Region with the Factory and the empty queue rather
+# than to the one making a Widget a turn or the one two builds deep. It never weighs one build
+# against another: a Shipyard that can only stand on the seat's one station is at full weight
+# there. A first cut discounted every build by its turns outright, and on a starting station, one
+# Widget a turn from its Core, that halved the opening Habitat of ticket #290 and quartered the
+# Solar Array of ticket #89 (two tests red, measured). Never below `build_pace_floor`, so a slow
+# place still builds when the fast one is full, and a place that makes nothing (a starved Colony)
+# sits at the floor. A discount and never a lift, on the lesson of ticket #232: a factor that can
+# only shrink a weight cannot put 329 of anything on the board. The two Widget makers -- the
+# Factory on Earth and the Factory Module -- are exempt, since a slow place is exactly where one is
+# wanted; so is the early Mine, whose Region is chosen by its lean.
+build_pace_floor = 0.25
 
 # Pace (spec 16.3), stretched to twenty-four turns on ticket #27 and keyed per Faction on #50.
 # `first` is the Faction's first Victory part by turn, as [turn, value]; a Faction whose first part
@@ -319,6 +335,24 @@ gate_pick_fraction = 0.5
 directive_when_wanted = 0
 directive_when_indifferent = 10
 gate_pick_turn = 24
+# Ticket #332 (version 0.09.0): every seat wants a Mine early in its most Materials-lean Region at
+# the Factory's weight. Through `early_mine_turn`, while the seat directs fewer Mines on Earth
+# (standing or on order) than `early_mines`, the Mine in the Region where one would make the most
+# -- a Materials-lean Region makes six a turn where any other makes four -- takes the Producer
+# weight the Factory has always had, the victory-gap multiplier as the Materials bootstrap does,
+# and the opportunity multiplier as the opening Habitat does (ticket #290): an opening is played
+# once. Two, because every seat whose start Region holds a Factory holds a Mine beside it from
+# turn 1 (the starting board of ticket #332), so the early Mine is the second; a seat that starts
+# without one (the Arkwrights in Saudi Arabia, income nought until turn 8 in the probe that opened
+# this lane) wants both. Eight turns is the window before the first Colony is founded (median 10).
+early_mine_turn = 8
+early_mines = 2
+# Ticket #332: a Factory Module is wanted at a Colony whose queue is this many builds deep, or where
+# a Ship is wanted (a Shipyard standing or on order); nowhere else, since its four Widgets a turn
+# are lost at a Colony with nothing under way. Where wanted it takes the victory-gap and
+# opportunity multipliers: a queue two deep is the moment, and it speeds whatever the seat is
+# behind on there.
+factory_module_queue_depth = 2
 
 # Tech picks as Research Lead (spec 16.4): `order` first, then the cheapest available that is not
 # `never`, and `last` only when nothing else is left.
