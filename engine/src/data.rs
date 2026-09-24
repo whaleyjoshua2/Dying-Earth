@@ -65,6 +65,11 @@ pub struct BodyCard {
     /// Ticket #140 (version 0.07.3): the fourth yield is Research, multiplying an Observatory; it
     /// was the Habitat yield, which multiplied a Habitat's room, until the designer traded it.
     pub research_yield: f64,
+    /// Ticket #345 (version 0.09.1): the Influence the Faction that founds this Body's FIRST ground
+    /// Colony is paid, once, in the Income after the landing. No `#[serde(default)]` on purpose: a
+    /// Body row that has not been given a figure is a rule this build cannot price, and the load
+    /// refuses the whole table rather than pay nothing quietly. See `bodies.toml`.
+    pub first_windfall: i64,
 }
 
 impl BodyCard {
@@ -911,6 +916,10 @@ pub struct InfluenceTable {
     /// ticket #336 (version 0.09.0) rather than on top of it.
     #[serde(default)]
     pub station_threshold_base: i64,
+    /// Ticket #345 (version 0.09.1): what the Core of a Colony that was first to its Body adds to
+    /// its founder's Allotment, after the Faction multiplier and at face value, every turn the
+    /// founder still directs it. See `influence.toml`.
+    pub first_settled_allotment: i64,
     pub occupation_turns: u32,
     pub destruction_chance: f64,
     /// Ticket #187 (version 0.08.0): how far a place's schooling bends what an outsider's Influence
@@ -1236,6 +1245,13 @@ pub struct AiThresholds {
     /// Ticket #335 (version 0.09.0): how many warships a seat wants holding LOW ORBIT at a Body
     /// whose ground it wants, before the next hull's leg names a rival station's ring instead.
     pub low_orbit_warships: u32,
+    /// Ticket #345 (version 0.09.1): what ONE Influence of an unclaimed Body's `first_windfall` is
+    /// worth to the AI when it picks where to send a loaded Colony Ship, in the units a Colony
+    /// Slot's yields are weighed in. Nought here and the computer seats never read the new rule.
+    pub first_windfall_worth: f64,
+    /// Ticket #345: what the founding appetite is multiplied by at a Body whose first is still
+    /// unclaimed -- the landing that takes a world is worth more than the landing that joins one.
+    pub first_found_weight: f64,
 }
 
 /// Ticket #50: one pick list per Faction. `order` is tried first, then the cheapest available

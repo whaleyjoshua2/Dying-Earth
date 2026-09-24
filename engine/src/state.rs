@@ -437,6 +437,19 @@ pub struct Colony {
     pub in_orbit: bool,
 }
 
+/// Ticket #345 (version 0.09.1): who was FIRST to a Body, and where. One row per Body at most,
+/// written at the founding of the first ground Colony that Body ever carried and never rewritten
+/// afterwards: a first is claimed once and for good, whatever becomes of the Colony. The Colony id
+/// is kept beside the seat because the Core's standing +1 is keyed to that one place -- it sleeps
+/// while a rival holds it, wakes when the founder takes it back, and never hops to a second Colony
+/// of the founder's on the same Body.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BodyFirst {
+    pub body: BodyId,
+    pub seat: Seat,
+    pub colony: ColonyId,
+}
+
 /// Ticket #263 (version 0.08.4): a seat's builds begun and Ships in transit, soonest first --
 /// `(what, where, turns until it lands)` and `(name, from, to, turns left)`.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -921,6 +934,14 @@ pub struct SeatState {
     /// Earth this turn, waiting to be paid into NEXT turn's Allotment. Read and cleared at Income.
     #[serde(default)]
     pub spaceport_influence: i64,
+    /// Ticket #345 (version 0.09.1): Influence this seat's first landings on a Body have earned this
+    /// turn, waiting to be paid into NEXT turn's Allotment. Read and cleared at Income, exactly as
+    /// `spaceport_influence` above is, and for exactly its reason: the Income ASSIGNS the Allotment,
+    /// so a windfall written straight into `allotment` during the Resolution is wiped by the very
+    /// next Income and pays nothing at all. Held here, it is spendable in the turn after the
+    /// landing, which is the first turn anything can be spent.
+    #[serde(default)]
+    pub first_windfall: i64,
     /// Ticket #192 (version 0.08.0): Colonists uploaded into the Archive, all told. The Archivists'
     /// second Victory part counts this rather than who happens to be living beside the Module, and
     /// it only ever climbs: an uploaded Colonist cannot be lost to a raid, a crowding death or a
@@ -1431,6 +1452,9 @@ pub struct Game {
     pub market: Market,
     /// Ticket #226 (version 0.08.2): the Accords standing between pairs of Factions.
     pub accords: Vec<Accord>,
+    /// Ticket #345 (version 0.09.1): who was first to each Body, one row per Body at most,
+    /// appended when a first is claimed and never rewritten. In the save.
+    pub body_firsts: Vec<BodyFirst>,
 }
 
 /// Ticket #50: every game seats all four Factions. The player picks one Faction and a start
@@ -1470,6 +1494,7 @@ impl Game {
             bought_units: 0,
             sold_units: 0,
             spaceport_influence: 0,
+            first_windfall: 0,
             uploaded: 0,
             stabilization_run: 0,
             influence: BTreeMap::new(),
@@ -1645,6 +1670,7 @@ impl Game {
             relations: Relations::default(),
             market: Market::default(),
             accords: Vec::new(),
+            body_firsts: Vec::new(),
             tables,
         };
         // Ticket #57: every Colony Slot on every Body draws its own four yields, in Body order then
@@ -3249,7 +3275,72 @@ impl Game {
         // they are bad at diplomacy, and this clause says they are good at moving people, which is a
         // different kind of Influence. Applying their designed weakness to the rule written to mend
         // it would be the rule arguing with itself.
-        (base as f64 * m).floor() as i64 + self.seat(seat).spaceport_influence
+        // Ticket #345 (version 0.09.1): and beside it the two halves of the first-to-a-Body clause,
+        // both after the multiplier at face value and for the same argument. Reaching a world before
+        // anybody else is not diplomacy, so the Arkwrights' x0.8 has no business shaving it.
+        //
+        // `first_windfall` is the accumulator the seat's landings have filled since the last Income,
+        // built in the Spaceport's shape because the Income ASSIGNS this figure to `allotment`: a
+        // windfall written straight into the Allotment at the Resolution would be wiped by the next
+        // Income before a single point of it could be spent.
+        //
+        // The Core's standing +1 is counted here rather than in `building_allotment` on purpose. That
+        // function sits INSIDE the multiplier and skips a starved Colony's Modules, and this clause
+        // must do neither: the Arkwrights get their whole 1, and a Colony with its lights out is
+        // still the one that got there first.
+        let firsts: i64 = self.body_firsts.iter().filter(|f| f.seat == seat && self.directs(seat, Place::Colony(f.colony))).count() as i64;
+        (base as f64 * m).floor() as i64 + self.seat(seat).spaceport_influence + self.seat(seat).first_windfall + firsts * t.first_settled_allotment
+    }
+
+    /// Ticket #345 (version 0.09.1): which seat was first to a Body, and at which Colony.
+    pub fn first_at(&self, body: BodyId) -> Option<(Seat, ColonyId)> {
+        self.body_firsts.iter().find(|f| f.body == body).map(|f| (f.seat, f.colony))
+    }
+
+    /// Ticket #345: every Body this seat was first to, in the order it claimed them.
+    pub fn firsts_of(&self, seat: Seat) -> Vec<BodyFirst> {
+        self.body_firsts.iter().copied().filter(|f| f.seat == seat).collect()
+    }
+
+    /// Ticket #345 (version 0.09.1): R2. A founding claims its Body's first, if there is one left to
+    /// claim. Called at BOTH ground-founding sites -- the sea to Antarctica and the Colony Ship's
+    /// unload -- though only the second can ever succeed: the first is on Earth, and Earth is
+    /// excluded because Antarctica is on Earth and reaching it is not reaching a new world.
+    ///
+    /// A Space Station claims nothing and closes nothing: a station standing over Mars leaves the
+    /// ground of Mars unclaimed. Venus can never be claimed, having no ground slots at all; no code
+    /// says so, and the day Venus is given a slot the rule turns on by itself.
+    ///
+    /// Returns whether the first was claimed, and pays the windfall into the seat's accumulator when
+    /// it was. It is paid once: losing the Colony and taking it back never pays it again.
+    pub fn claim_first(&mut self, seat: Seat, body: BodyId, colony: ColonyId) -> bool {
+        if body == BodyId::Earth {
+            return false;
+        }
+        // A station is no settling; a Colony id that names nothing is no settling either.
+        if self.colony(colony).map(|c| c.in_orbit || c.body != body).unwrap_or(true) {
+            return false;
+        }
+        if self.first_at(body).is_some() {
+            return false;
+        }
+        // A Colony is never removed from the board, so a ground Colony raised on an earlier turn is
+        // proof a ground Colony has stood here. The ones raised THIS turn are the contenders, and
+        // which of them claims it has already been settled by the caller.
+        if self.colonies.iter().any(|c| c.body == body && !c.in_orbit && c.id != colony && c.founded_turn < self.turn) {
+            return false;
+        }
+        self.body_firsts.push(BodyFirst { body, seat, colony });
+        let windfall = self.tables.body(body).first_windfall;
+        self.seats[seat.index()].first_windfall += windfall;
+        let (faction, place, body_name) = (self.seat_name(seat), self.place_name(Place::Colony(colony)), self.tables.body(body).name.clone());
+        let line = format!("{} is the first Faction to settle {}: {} Influence.", faction, body_name, windfall);
+        self.log(line);
+        let args = [("faction", faction), ("body", body_name), ("colony", place), ("n", windfall.to_string())];
+        let text = self.say("first_to_body", &args);
+        self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(colony)), text);
+        self.moment(MomentKind::FirstToABody, &args, Some(ReportPlace::Colony(colony)));
+        true
     }
 
     /// Ticket #183 (version 0.08.0): the Spaceport's clause. +1 Influence for every Emigrant it lifts

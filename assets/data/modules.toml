@@ -202,8 +202,12 @@ low_gravity_only = true
 # the Module cap. It holds `holds_colonists` people flat -- Expanded Habitats and the Arkwrights'
 # capacity multiplier reach a Habitat and not this -- so a place can take its first arrivals before
 # it has built anything, and `materials` and `widgets` are zero because nobody buys it.
-# Ticket #332 (version 0.09.0): and it makes ONE Widget a turn, the base every Colony and station
-# builds on with no Factory Module; `widgets` is nought as `materials` is, since nobody orders it.
+# Ticket #332 (version 0.09.0): and it makes FOUR Widgets a turn, the base every Colony and station
+# builds on with no Factory Module, so a bare place still finishes a Module a turn as it did before
+# Widgets existed; `widgets` is nought as `materials` is, since nobody orders it.
+# (This comment read ONE Widget from #332 until ticket #345 corrected it. The row below has said
+# four since the day it was written, and `CONTEXT.md` has said four as well, so the comment was the
+# only thing wrong -- but it was the thing a reader would have believed.)
 [[module]]
 id = "core"
 name = "Core Module"

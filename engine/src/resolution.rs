@@ -2136,6 +2136,11 @@ impl Game {
             &[("faction", self.seat_name(seat)), ("slot", (slot + 1).to_string()), ("body", self.tables.body(BodyId::Earth).name.clone()), ("n", moved.to_string())],
         );
         self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(id)), text);
+        // Ticket #345 (version 0.09.1): the sea to Antarctica is a ground founding and so asks for
+        // the Body's first, exactly as the Colony Ship's unload does. It is always refused: this is
+        // Earth, and Earth is excluded. The call stands so the two founding sites do the same thing,
+        // and so that a test can watch the refusal happen rather than infer it from an absence.
+        self.claim_first(seat, BodyId::Earth, id);
         let antarctic = self.colonies.iter().filter(|c| c.control.director() == Some(seat) && c.body == BodyId::Earth && !c.in_orbit).count();
         // Ticket #85: Antarctica is on Earth, so its founding has phrases of its own, the count an ordinal.
         let note = if antarctic <= 1 {
@@ -2237,6 +2242,11 @@ impl Game {
                 }
             }
         }
+        // Ticket #345 (version 0.09.1): every ground Colony this Resolution founds, in the order it
+        // landed. Which of them claims its Body's first is settled after the loop, not inside it:
+        // two seats founding at one Body in one Resolution are simultaneous, and loop order is not
+        // a rule.
+        let mut ground_founded: Vec<(Seat, BodyId, ColonyId)> = Vec::new();
         for (seat, order) in cargo {
             match order {
                 Order::Load { ship, colonists, from, army } => {
@@ -2382,6 +2392,8 @@ impl Game {
                                 Some(ReportPlace::Colony(id)),
                             );
                             self.ai_deed(seat, "founded", &[("colony", self.place_name(Place::Colony(id)))]);
+                            // Ticket #345 (version 0.09.1): a candidate for its Body's first.
+                            ground_founded.push((seat, b, id));
                         }
                         UnloadTarget::Colony(cid) => {
                             let Some(col) = self.colony(cid) else { continue };
@@ -2417,6 +2429,36 @@ impl Game {
                 }
                 _ => {}
             }
+        }
+        self.claim_firsts(&ground_founded);
+    }
+
+    /// Ticket #345 (version 0.09.1): R2 and R5. Every ground Colony founded in this Resolution asks
+    /// its Body for the first, once per Body. A Body reached by one seat goes to that seat. A Body
+    /// reached by two or more in the SAME Resolution, in DIFFERENT slots, so that every one of them
+    /// lands, is settled by `tiebreak_at_body` -- the very function that settles two seats reaching
+    /// for the same slot, so the greater Ship stack in orbit takes it and a random draw parts only
+    /// seats level on strength. The designer, told that a pure draw and the contested-slot rule were
+    /// not the same thing: *"let's keep the current system for ties."*
+    ///
+    /// A same-slot contest never reaches here: it is settled before the unloads run and the loser
+    /// never founds at all.
+    fn claim_firsts(&mut self, founded: &[(Seat, BodyId, ColonyId)]) {
+        let mut done: Vec<BodyId> = Vec::new();
+        for (_, body, _) in founded {
+            if done.contains(body) {
+                continue;
+            }
+            done.push(*body);
+            let mut contenders: Vec<Seat> = Vec::new();
+            for (s, b, _) in founded {
+                if b == body && !contenders.contains(s) {
+                    contenders.push(*s);
+                }
+            }
+            let winner = if contenders.len() > 1 { self.tiebreak_at_body(*body, &contenders) } else { contenders[0] };
+            let Some((_, _, colony)) = founded.iter().find(|(s, b, _)| *s == winner && b == body).copied() else { continue };
+            self.claim_first(winner, *body, colony);
         }
     }
 

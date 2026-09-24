@@ -173,6 +173,10 @@ impl Game {
             // Ticket #183 (version 0.08.0): last turn's Spaceport Influence has now been paid into
             // this Allotment, so the tally is cleared and begins again.
             s.spaceport_influence = 0;
+            // Ticket #345 (version 0.09.1): and so has the first-to-a-Body windfall, on the same
+            // line and for the same reason. It is paid once; the accumulator begins again at nought
+            // and stays there until the seat is first to another Body.
+            s.first_windfall = 0;
         }
     }
 

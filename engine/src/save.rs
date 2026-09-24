@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 /// The stamp at the head of every save. A file whose stamp is not this one is refused with a plain
 /// message; a save is never migrated between versions.
-pub const SAVE_VERSION: u32 = 4;
+pub const SAVE_VERSION: u32 = 5;
 
 /// The rules version this executable plays, named beside the file's own in a refusal.
 ///
@@ -88,6 +88,12 @@ pub const SAVE_VERSION: u32 = 4;
 /// under a Sink rule this version does not have. A refusal naming both versions is the right
 /// answer, and a silent partial load is not. `GAME_VERSION` is NOT moved here: the version's
 /// closing ticket moves it for the whole version, as ticket #340 did for 0.09.0.
+/// Ticket #345 (version 0.09.1): moved to **5**. The game carries the record of who was FIRST to
+/// each Body, and a seat carries the `first_windfall` accumulator that record pays into; neither
+/// has a field in an older file, so a 0.09.1 board loaded from one would have forgotten every
+/// first already claimed and would hand the next founder a windfall the game had already paid.
+/// Every Body row carries a `first_windfall` besides, so a board from before was played under a
+/// rule this version does not have. A refusal naming both versions is the right answer.
 pub const GAME_VERSION: &str = "0.09.0";
 
 /// The game autosaves at the start of the Report phase of every third turn.
@@ -212,6 +218,9 @@ pub struct SavedGame {
     pub choice_refused: [u32; SEAT_COUNT],
     #[serde(default)]
     pub choice_not_asked: [u32; SEAT_COUNT],
+    /// Ticket #345 (version 0.09.1): who was first to each Body.
+    #[serde(default)]
+    pub body_firsts: Vec<BodyFirst>,
 }
 
 impl SavedGame {
@@ -256,6 +265,7 @@ impl SavedGame {
             market,
             accords,
             events_no_target,
+            body_firsts,
         } = g;
         SavedGame {
             seed: *seed,
@@ -294,6 +304,7 @@ impl SavedGame {
             neutral_holds: *neutral_holds,
             war: war.clone(),
             widgets: widgets.clone(),
+            body_firsts: body_firsts.clone(),
         }
     }
 
@@ -336,6 +347,7 @@ impl SavedGame {
             market: self.market,
             accords: self.accords,
             events_no_target: self.events_no_target,
+            body_firsts: self.body_firsts,
             log: self.log,
         }
     }

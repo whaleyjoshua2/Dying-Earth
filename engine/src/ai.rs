@@ -530,7 +530,20 @@ impl Game {
                 .map(|s| self.slot_worth(seat, self.slot_yields(*b, s), behind))
                 .unwrap_or(if *b == BodyId::Venus { self.slot_worth(seat, SlotYields::of_body(self.tables.body(*b)), behind) } else { 0.0 });
             let fresh = if spreading && self.colonists_at_body(seat, *b) == 0 { 10.0 } else { 0.0 };
-            (yields + fresh) * (1.0 - flight(*b) / turns_left)
+            // Ticket #345 (version 0.09.1): and what being FIRST to the Body would pay. A world
+            // nobody has settled carries a windfall for whoever lands on it first, and reading it
+            // here is what makes a distant Body worth the voyage: without this the destination
+            // list is yields against flight time, the Moon wins it from turn one, and no computer
+            // seat founded a Colony in the Mars system in eighty measured games. It falls to
+            // nought the moment the Body is claimed, so the second Colony Ship looks further out
+            // than the first did. Venus is excluded by its own board: no ground slot, no landing,
+            // and its figure is nought besides.
+            let first = if self.first_at(*b).is_none() && !self.free_slots_on(*b).is_empty() {
+                t.body(*b).first_windfall as f64 * t.ai.thresholds.first_windfall_worth
+            } else {
+                0.0
+            };
+            (yields + fresh + first) * (1.0 - flight(*b) / turns_left)
         };
         bodies.sort_by(|a, b| key(b).partial_cmp(&key(a)).unwrap());
         bodies[0]
@@ -2221,7 +2234,14 @@ impl Game {
                     // whose figures best serve the part it is furthest behind on, not the first one.
                     if let Some(slot) = self.best_slot_for(seat, body, behind) {
                         let opp = if free.len() == 1 || presence_needed <= s.colonists { m.opportunity } else { 1.0 };
-                        push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony), gap_for(Cat::FoundColony, None), 1.0, opp, format!("found a Colony at {} on {}", self.tables.body(body).slots[slot as usize].name, self.tables.body(body).name), None);
+                        // Ticket #345 (version 0.09.1): the landing that TAKES a world is worth
+                        // more than the landing that joins one, because the first Faction down is
+                        // paid a windfall and keeps a standing +1 while it holds the place. The
+                        // appetite is lifted while the Body's first is unclaimed and falls back to
+                        // the plain weight the moment somebody has it.
+                        let unclaimed = self.first_at(body).is_none() && self.tables.body(body).first_windfall > 0;
+                        let lift = if unclaimed { self.tables.ai.thresholds.first_found_weight } else { 1.0 };
+                        push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * lift, gap_for(Cat::FoundColony, None), 1.0, opp, format!("found a Colony at {} on {}", self.tables.body(body).slots[slot as usize].name, self.tables.body(body).name), None);
                     }
                 }
                 // Ticket #44: Antarctica, Earth's slots. A foothold, not Presence: half weight and no gap,

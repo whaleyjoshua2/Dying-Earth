@@ -22,9 +22,25 @@ station_materials = 40
 # Body's figures times a factor from a triangular distribution centred on 1.0 with these limits.
 slot_yield_spread = 0.25
 
+# Ticket #345 (version 0.09.1): FIRST TO A BODY. The Faction that founds the first ground Colony a
+# Body has ever carried is paid `first_windfall` Influence, once, into the turn after the landing --
+# a prize for reaching a new world before anybody else, never paid twice and never paid again if the
+# Colony is lost and retaken. Every Body carries the figure, and a row without it refuses the table:
+# a Body whose prize this build cannot price is a rule half-written, and paying nothing quietly is
+# the one answer that would never be noticed.
+#
+# The figures rise with the voyage, since the prize is for the distance and the risk: the Moon is one
+# turn and 6 Fuel away and pays 5; Mars is four turns and 20 Fuel and pays 15; Phobos and Deimos are
+# five turns and 24 Fuel, at the end of the longest leg on the board, and pay 20. Earth pays 0 --
+# Antarctica is on Earth and claims nothing -- and Venus pays 0 because Venus has no ground slots at
+# all, so nothing can ever land there to claim it. Venus keeps a figure rather than none so that the
+# day a Colony Slot is given to Venus the rule turns on with a number already in its row.
+
 [[body]]
 id = "earth"
 name = "Earth"
+# Ticket #345: Antarctica is on Earth, so an Antarctic founding claims no first and pays nothing.
+first_windfall = 0
 # Version 0.04 (ticket #44): Antarctica is Earth's three Colony Slots, founded by a Colony Ship at
 # Earth with no transit. Cold and Fuel-leaning: good for Refineries, poor for Habitats and Generators.
 # Its Colonists live on Earth (no Off-world Presence) and its Modules emit like Facilities.
@@ -46,6 +62,7 @@ slots = [
 
 [[body]]
 id = "moon"
+first_windfall = 5
 # Ticket #92 (version 0.06.0): a small world, where a Mass Driver may stand.
 low_gravity = true
 name = "the Moon"
@@ -71,6 +88,7 @@ slots = [
 [[body]]
 id = "mars"
 name = "Mars"
+first_windfall = 15
 transit_turns = 4
 transit_fuel = 20
 mine_yield = 1.25
@@ -93,6 +111,7 @@ slots = [
 # 1 Fuel between them.
 [[body]]
 id = "phobos"
+first_windfall = 20
 low_gravity = true
 name = "Phobos"
 parent = "mars"
@@ -113,6 +132,7 @@ slots = [
 
 [[body]]
 id = "deimos"
+first_windfall = 20
 low_gravity = true
 name = "Deimos"
 parent = "mars"
@@ -138,6 +158,9 @@ slots = [
 [[body]]
 id = "venus"
 name = "Venus"
+# Ticket #345: no Colony Slots, so nothing ever lands to claim Venus. The figure waits for the day
+# Venus is given ground.
+first_windfall = 0
 transit_turns = 3
 transit_fuel = 16
 mine_yield = 1.0

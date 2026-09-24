@@ -4873,7 +4873,15 @@ fn the_ai_banks_fuel_when_the_mars_window_is_within_two_turns() {
     // A full tank at the window, and the crossing is ordered as before.
     let mut at = board(window);
     let orders = at.ai_orders(Seat(0));
-    assert!(orders.iter().any(|o| matches!(o, Order::Transit { to: BodyId::Mars, .. })), "a full tank on the window crosses: {orders:?}");
+    // Ticket #345 (version 0.09.1): the crossing is into the MARS SYSTEM rather than Mars itself.
+    // Phobos and Deimos pay the largest first-to-a-Body windfall on the board (20 against Mars's
+    // 15), so a seat with a full tank on the window now reaches past Mars for one of its moons.
+    // This test is about the FUEL BANK letting the crossing happen at all, not about which of the
+    // three it picks.
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::Transit { to: BodyId::Mars | BodyId::Phobos | BodyId::Deimos, .. })),
+        "a full tank on the window crosses: {orders:?}"
+    );
 }
 
 /// Ticket #57: a loaded Colony Ship weighs a Body by what its slot is worth less the share of the
@@ -10292,7 +10300,7 @@ fn a_rival_closing_on_its_victory_condition_interrupts_the_player_once_a_step() 
     g.end_phase();
     assert_eq!(fired(&g), 2, "rivals only: {:?}", g.report.moments);
     assert_eq!(MomentKind::RivalProgress.rank(), 5, "between a Battle (4) and a Tech (6)");
-    assert_eq!(MomentKind::ALL.len(), 10, "ticket #281 (version 0.08.5) added a place taken by force");
+    assert_eq!(MomentKind::ALL.len(), 11, "ticket #281 (version 0.08.5) added a place taken by force, and #345 (0.09.1) a Body settled first");
     assert!(g.tables.report.moment_on(MomentKind::RivalProgress), "on by default");
 }
 
@@ -13413,4 +13421,376 @@ fn the_computer_builds_a_missile_carrier_and_launches_with_cause() {
     g.resolution_phase();
     assert_eq!(g.war.launches[0], 1, "counted for the sweep");
     assert_eq!(g.war.missile_carriers_built, [0, 0, 0, 0], "and a hull placed by a test was never built");
+}
+
+// ---------------------------------------------------------------- Ticket #345: first to a Body
+
+/// A loaded Colony Ship of one seat in LOW ORBIT at a Body, and the Unload that founds a ground
+/// Colony in a named free slot of it. The slot is named so two seats can reach for one Body in one
+/// Resolution without contesting a slot, which is the board R5 is about. The slot's yields are
+/// pinned to its Body's card figures, as the `colony` helper pins them, so nothing here reads a
+/// random draw.
+fn lander(g: &mut Game, seat: Seat, body: BodyId, slot: u32) -> (ShipId, Order) {
+    let id = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::ColonyShip);
+    g.ships.push(Ship {
+        id, name, kind: UnitKind::ColonyShip, seat, damage: 0, at: ShipAt::Body(body), colonists: 4, warhead: false, colonists_education: 1.0,
+        army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
+    });
+    g.slot_yields.insert((body, slot), SlotYields::of_body(g.tables.body(body)));
+    (id, Order::Unload { ship: id, colonists: 4, army: false, into: UnloadTarget::Slot(body, slot) })
+}
+
+/// The Colony standing in a Body's slot, once a Resolution has put one there.
+fn colony_in_slot(g: &Game, body: BodyId, slot: u32) -> ColonyId {
+    g.colonies.iter().find(|c| c.body == body && c.slot == slot && !c.in_orbit).map(|c| c.id).expect("a ground Colony stands in that slot")
+}
+
+/// R1. The record names the seat that was first to a Body and the Colony it was first with, and a
+/// Body's first is claimed once and for good: a second founding on the same Body, by anybody, never
+/// grows a second row and never rewrites the row that is there.
+#[test]
+fn ticket_345_a_bodys_first_is_recorded_once_and_never_rewritten() {
+    let mut g = game();
+    calm(&mut g);
+    assert!(g.first_at(BodyId::Moon).is_none(), "nobody has settled the Moon at the opening");
+    assert!(g.body_firsts.is_empty(), "and the record is empty");
+    let (_, down) = lander(&mut g, Seat(0), BodyId::Moon, 0);
+    g.commit_orders(Seat(0), &[down]);
+    g.resolution_phase();
+    let first = colony_in_slot(&g, BodyId::Moon, 0);
+    assert_eq!(g.first_at(BodyId::Moon), Some((Seat(0), first)), "the record names the seat and the Colony");
+    assert_eq!(g.firsts_of(Seat(0)).len(), 1, "one Body claimed, one row");
+    assert_eq!(g.firsts_of(Seat(1)).len(), 0, "and nothing for a seat that claimed nothing");
+    // A rival lands on the same Body, in another slot, a turn later. The other slots stay open to
+    // everybody: only the bonus was spent.
+    g.turn += 1;
+    let (_, late) = lander(&mut g, Seat(1), BodyId::Moon, 1);
+    g.commit_orders(Seat(1), &[late]);
+    g.resolution_phase();
+    assert!(g.colonies.iter().any(|c| c.body == BodyId::Moon && c.slot == 1), "the rival's Colony stands");
+    assert_eq!(g.body_firsts.len(), 1, "the record never grows a second row for one Body");
+    assert_eq!(g.first_at(BodyId::Moon), Some((Seat(0), first)), "and never rewrites the row it has");
+}
+
+/// R2. What claims a first and what does not. Antarctica is on Earth and claims nothing, by either
+/// of the two roads to its ice; a Space Station claims nothing and closes nothing, so the ground of
+/// a Body a station orbits is still there to be taken; and the row a claim writes never names a
+/// station. Venus can never be claimed at all, having no ground to land on -- no code says so, and
+/// the day Venus is given a Colony Slot the rule turns on by itself.
+#[test]
+fn ticket_345_antarctica_and_a_station_claim_nothing_and_venus_has_no_ground_to_claim() {
+    let mut g = game();
+    calm(&mut g);
+    g.antarctica_open = true;
+    // (a) A Colony Ship's landing in Antarctica founds a ground Colony, and claims nothing.
+    let (_, ice) = lander(&mut g, Seat(0), BodyId::Earth, 0);
+    g.commit_orders(Seat(0), &[ice]);
+    g.resolution_phase();
+    assert!(g.colonies.iter().any(|c| c.body == BodyId::Earth && !c.in_orbit && c.slot == 0), "a Colony stands on the ice");
+    assert!(g.first_at(BodyId::Earth).is_none(), "Antarctica is on Earth, and Earth is nobody's first");
+    // (b) And neither does the other road to the same ice, the sea.
+    g.antarctic_sends.push(AntarcticSend { seat: Seat(1), from: StateId::Europe, n: 4, education: 1.0, into: UnloadTarget::Slot(BodyId::Earth, 1), due_turn: g.turn });
+    g.resolution_phase();
+    assert!(g.colonies.iter().any(|c| c.body == BodyId::Earth && !c.in_orbit && c.slot == 1), "the Pioneers landed by sea");
+    assert!(g.first_at(BodyId::Earth).is_none(), "the sea claims no first either");
+    assert!(g.body_firsts.is_empty(), "and the record is still empty");
+    // (c) A Space Station over Mars claims nothing and leaves the ground of Mars open.
+    g.seats[0].stockpile.materials = 1_000;
+    g.commit_orders(Seat(0), &[Order::BuildStation { body: BodyId::Mars, slot: 0 }]);
+    g.resolution_phase();
+    assert!(g.colonies.iter().any(|c| c.body == BodyId::Mars && c.in_orbit), "the station stands over Mars");
+    assert!(g.first_at(BodyId::Mars).is_none(), "a station claims no Body");
+    // The ground below it is still unclaimed, and the rival that lands takes the first.
+    g.turn += 1;
+    let (_, down) = lander(&mut g, Seat(1), BodyId::Mars, 0);
+    g.commit_orders(Seat(1), &[down]);
+    g.resolution_phase();
+    let (who, what) = g.first_at(BodyId::Mars).expect("the ground of Mars was there to be taken");
+    assert_eq!(who, Seat(1), "the seat that LANDED took it, not the seat in orbit above");
+    assert!(!g.colony(what).unwrap().in_orbit, "the record never names a station");
+    // (d) Venus has no ground at all, so nothing can ever land there to claim it.
+    assert!(g.free_slots_on(BodyId::Venus).is_empty(), "Venus has no Colony Slot");
+    assert_eq!(g.tables.body(BodyId::Venus).colony_slots(), 0, "and its card gives it none");
+    assert!(g.first_at(BodyId::Venus).is_none(), "so Venus is unclaimable");
+}
+
+/// R3. The windfall. It is paid into an accumulator at the founding and into the Allotment at the
+/// NEXT Income, which is the first moment anything can be spent -- the Income ASSIGNS the Allotment,
+/// so a windfall written straight into `allotment` at the Resolution would be wiped before a point
+/// of it could be spent and would pay exactly nothing. It is paid once: the accumulator is cleared
+/// by the Income that paid it, and losing and retaking the Colony never pays it again.
+#[test]
+fn ticket_345_the_windfall_is_paid_into_the_allotment_of_the_turn_after_the_landing_and_paid_once() {
+    let mut g = game();
+    calm(&mut g);
+    let plain = g.influence_allotment(Seat(0));
+    let (_, down) = lander(&mut g, Seat(0), BodyId::Mars, 0);
+    g.commit_orders(Seat(0), &[down]);
+    g.resolution_phase();
+    let windfall = g.tables.body(BodyId::Mars).first_windfall;
+    assert_eq!(windfall, 15, "Mars pays 15, out of bodies.toml");
+    assert_eq!(g.seat(Seat(0)).first_windfall, windfall, "the founding filled the accumulator");
+    // The Allotment the next Income will ASSIGN carries it, and the Core's standing +1 beside it.
+    let standing = g.tables.influence.first_settled_allotment;
+    assert_eq!(g.influence_allotment(Seat(0)), plain + windfall + standing, "the windfall and the +1 are both in the figure the Income assigns");
+    g.turn += 1;
+    g.income_phase();
+    assert_eq!(g.seat(Seat(0)).allotment, plain + windfall + standing, "and the Income paid them both into the Allotment, where they can be spent");
+    assert_eq!(g.seat(Seat(0)).first_windfall, 0, "the accumulator is cleared by the Income that paid it");
+    // A second Income pays the standing +1 again and the windfall never again.
+    g.turn += 1;
+    g.income_phase();
+    assert_eq!(g.seat(Seat(0)).allotment, plain + standing, "the windfall is paid once");
+    // Losing the Colony and taking it back never pays it again.
+    let cid = colony_in_slot(&g, BodyId::Mars, 0);
+    g.colony_mut(cid).unwrap().control = Control::Controlled(Seat(1));
+    g.colony_mut(cid).unwrap().control = Control::Controlled(Seat(0));
+    g.turn += 1;
+    g.income_phase();
+    assert_eq!(g.seat(Seat(0)).first_windfall, 0, "retaking the place pays no second windfall");
+    assert_eq!(g.seat(Seat(0)).allotment, plain + standing, "and the Allotment carries the standing +1 alone");
+}
+
+/// R4. The Core's standing +1. It sleeps while a rival holds the Colony and never pays that rival;
+/// it wakes when the founder takes the place back; it never hops to a second Colony of the
+/// founder's on the same Body; and it keeps paying while the Colony is starved of Energy, where a
+/// Relay or a Chorus goes quiet. That last is why it does not go through `building_allotment`.
+#[test]
+fn ticket_345_the_cores_standing_plus_one_sleeps_under_a_rival_never_hops_and_outlasts_a_starving() {
+    let mut g = game();
+    calm(&mut g);
+    let standing = g.tables.influence.first_settled_allotment;
+    assert_eq!(standing, 1, "one, out of influence.toml");
+    let base_founder = g.influence_allotment(Seat(0));
+    let base_rival = g.influence_allotment(Seat(1));
+    let (_, down) = lander(&mut g, Seat(0), BodyId::Moon, 0);
+    g.commit_orders(Seat(0), &[down]);
+    g.resolution_phase();
+    let cid = colony_in_slot(&g, BodyId::Moon, 0);
+    // Clear the windfall so what is left in the figure is the standing +1 alone.
+    g.seats[0].first_windfall = 0;
+    assert_eq!(g.influence_allotment(Seat(0)) - base_founder, standing, "the founder is paid the +1 while it directs the place");
+    // It sleeps under a rival, and never pays the rival.
+    g.colony_mut(cid).unwrap().control = Control::Controlled(Seat(1));
+    assert_eq!(g.influence_allotment(Seat(0)), base_founder, "it pays the founder nothing while a rival holds the place");
+    assert_eq!(g.influence_allotment(Seat(1)), base_rival, "and it never pays the rival who took it");
+    // And wakes when the founder takes it back.
+    g.colony_mut(cid).unwrap().control = Control::Controlled(Seat(0));
+    assert_eq!(g.influence_allotment(Seat(0)) - base_founder, standing, "and wakes when the founder takes it back");
+    // It never hops: a second Colony of the founder's on the same Body pays nothing.
+    g.turn += 1;
+    let (_, again) = lander(&mut g, Seat(0), BodyId::Moon, 1);
+    g.commit_orders(Seat(0), &[again]);
+    g.resolution_phase();
+    g.seats[0].first_windfall = 0;
+    assert_eq!(g.influence_allotment(Seat(0)) - base_founder, standing, "a second Colony on the same Body pays no second +1");
+    // A starved Colony keeps paying it, where a Relay goes quiet. `building_allotment` is what skips
+    // a starved Colony, and this clause deliberately does not go through it.
+    g.colony_mut(cid).unwrap().modules.push(Module::new(ModuleKind::Relay));
+    let with_relay = g.influence_allotment(Seat(0));
+    assert!(with_relay > base_founder + standing, "the Relay pays while the place is fed");
+    // Ticket #278's starving: one rival holding Orbital Control of the Body outright with a stack
+    // on Blockade in low orbit.
+    ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Moon, None, Stance::Blockade);
+    assert_eq!(g.starved_by(cid), Some(Seat(1)), "the Colony is starved");
+    assert!(g.influence_allotment(Seat(0)) < with_relay, "the Relay at a starved Colony goes quiet");
+    assert_eq!(g.influence_allotment(Seat(0)) - base_founder, standing, "and the +1 does not: being there first is not undone by a Blockade");
+}
+
+/// R4, the half of it the Faction multiplier decides. The Arkwrights convert Influence at x0.8, and
+/// a clause INSIDE the multiplier gives them four fifths of it. Both halves of this rule sit outside
+/// it, so an Arkwright first is worth exactly what any other Faction's is: the whole windfall and
+/// the whole +1, as the Spaceport's clause already is.
+#[test]
+fn ticket_345_neither_half_is_shaved_by_the_arkwrights_multiplier() {
+    let mut g = game();
+    calm(&mut g);
+    let ark = Seat::ALL.into_iter().find(|s| g.kind(*s) == FactionKind::Arkwrights).expect("an Arkwright sits at this table");
+    assert!(g.tables.faction(FactionKind::Arkwrights).influence_multiplier < 1.0, "the Arkwrights convert at less than face value");
+    let before = g.influence_allotment(ark);
+    let (_, down) = lander(&mut g, ark, BodyId::Phobos, 0);
+    g.commit_orders(ark, &[down]);
+    g.resolution_phase();
+    let windfall = g.tables.body(BodyId::Phobos).first_windfall;
+    let standing = g.tables.influence.first_settled_allotment;
+    assert_eq!(windfall, 20, "Phobos pays 20, out of bodies.toml");
+    assert_eq!(g.influence_allotment(ark) - before, windfall + standing, "an Arkwright is paid the whole figure, not four fifths of it");
+}
+
+/// R5. Two seats founding a ground Colony at one Body in one Resolution, in different slots, both
+/// land, and the first goes to the seat with the greater Ship stack strength at the Body --
+/// `tiebreak_at_body`, the very function that settles two seats reaching for the SAME slot. The
+/// designer, told that a pure random draw and the contested-slot rule are not the same thing:
+/// *"let's keep the current system for ties."* A random draw parts only seats level on strength.
+#[test]
+fn ticket_345_a_body_reached_by_two_seats_at_once_goes_to_the_greater_fleet() {
+    // The stronger fleet takes it, whichever seat the loop reaches first.
+    let mut g = game();
+    calm(&mut g);
+    let (_, a) = lander(&mut g, Seat(0), BodyId::Mars, 0);
+    let (_, b) = lander(&mut g, Seat(1), BodyId::Mars, 1);
+    // A Frigate of seat 1's in an ORBITAL SLOT, not low orbit: it is stack strength at the Body and
+    // not Orbital Control, so seat 0's landing is never barred and both Colonies are founded.
+    ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Mars, Some(0), Stance::Hold);
+    assert!(g.ship_stack_strength(Seat(1), BodyId::Mars) > g.ship_stack_strength(Seat(0), BodyId::Mars), "seat 1 has the stronger stack");
+    g.commit_orders(Seat(0), &[a]);
+    g.commit_orders(Seat(1), &[b]);
+    g.resolution_phase();
+    assert!(g.colonies.iter().any(|c| c.body == BodyId::Mars && c.slot == 0), "seat 0 landed too: different slots, both land");
+    assert!(g.colonies.iter().any(|c| c.body == BodyId::Mars && c.slot == 1), "and so did seat 1");
+    assert_eq!(g.body_firsts.len(), 1, "one Body, one row");
+    assert_eq!(g.first_at(BodyId::Mars).map(|(s, _)| s), Some(Seat(1)), "the greater fleet at the Body took the first");
+    assert_eq!(g.seat(Seat(0)).first_windfall, 0, "and the seat that lost it was paid nothing");
+    assert_eq!(g.seat(Seat(1)).first_windfall, g.tables.body(BodyId::Mars).first_windfall, "while the winner was paid the windfall");
+    // Level on strength, the draw parts them -- one of the two, never both, never neither.
+    let mut drawn: Vec<Seat> = Vec::new();
+    for seed in 1..14u64 {
+        let mut g = with_seed(seed);
+        calm(&mut g);
+        let (_, a) = lander(&mut g, Seat(0), BodyId::Mars, 0);
+        let (_, b) = lander(&mut g, Seat(1), BodyId::Mars, 1);
+        assert_eq!(g.ship_stack_strength(Seat(0), BodyId::Mars), g.ship_stack_strength(Seat(1), BodyId::Mars), "two Colony Ships are level: neither has any strength");
+        g.commit_orders(Seat(0), &[a]);
+        g.commit_orders(Seat(1), &[b]);
+        g.resolution_phase();
+        assert_eq!(g.body_firsts.len(), 1, "exactly one of them claims it");
+        let (who, _) = g.first_at(BodyId::Mars).expect("somebody claimed Mars");
+        assert!(who == Seat(0) || who == Seat(1), "and it is one of the two that landed");
+        if !drawn.contains(&who) {
+            drawn.push(who);
+        }
+    }
+    assert_eq!(drawn.len(), 2, "level on strength it is a draw, and over thirteen seeds it fell both ways: {drawn:?}");
+}
+
+/// R6. The computer, at Earth: the destination a loaded Colony Ship is sent to reads what an
+/// unclaimed Body would pay, so a distant world nobody has settled becomes worth the voyage. It is
+/// the change that makes the rule exist in play -- no computer seat founded a Colony anywhere in the
+/// Mars system in eighty measured games before it.
+///
+/// Measured rather than asserted on one board, because the destination list weighs a slot's own
+/// drawn yields against the flight, and on some boards the Mars system already wins without any
+/// prize. The witness is the FIGURE: the same twelve boards are put to the computer twice, once
+/// with `first_windfall_worth` as `ai.toml` has it and once with it at nought, and nothing else
+/// differs.
+#[test]
+fn ticket_345_the_computer_sends_its_colony_ship_to_a_world_nobody_has_settled() {
+    let mars_system_picks = |worth: f64, claimed: bool| -> usize {
+        let mut picked = 0;
+        for seed in 1..13u64 {
+            let mut t = Tables::load(&default_data_dir()).expect("tables load");
+            t.ai.thresholds.first_windfall_worth = worth;
+            let mut g = Game::new(Arc::new(t), NewGame { seed, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+            calm(&mut g);
+            g.turn = g.next_window_turn(1);
+            if claimed {
+                // The record alone, with no Colony planted: nothing else about the board moves.
+                for (i, b) in [BodyId::Moon, BodyId::Mars, BodyId::Phobos, BodyId::Deimos].into_iter().enumerate() {
+                    g.body_firsts.push(BodyFirst { body: b, seat: Seat(2), colony: ColonyId(9_000 + i as u32) });
+                }
+            }
+            let id = ShipId(g.fresh_id());
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            g.ships.push(Ship {
+                id, name, kind: UnitKind::ColonyShip, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 4, warhead: false,
+                colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
+            });
+            g.seats[1].stockpile.fuel = 200;
+            g.seats[1].stockpile.energy = 400;
+            let dest = g.ai_orders(Seat(1)).iter().find_map(|o| match o {
+                Order::Transit { ship: s, to, .. } if *s == id => Some(*to),
+                _ => None,
+            });
+            if matches!(dest, Some(BodyId::Mars) | Some(BodyId::Phobos) | Some(BodyId::Deimos)) {
+                picked += 1;
+            }
+        }
+        picked
+    };
+    let figure = Tables::load(&default_data_dir()).expect("tables load").ai.thresholds.first_windfall_worth;
+    assert!(figure > 0.0, "the figure is in ai.toml and is not nought");
+    let (with_prize, without) = (mars_system_picks(figure, false), mars_system_picks(0.0, false));
+    assert!(with_prize > without, "the windfall pulls the voyage out to the Mars system: {with_prize} boards of twelve against {without}");
+    // And what it reads is the RECORD: with every first already claimed the figure buys nothing.
+    let spent = mars_system_picks(figure, true);
+    assert_eq!(spent, without, "a Body already claimed pays nothing, so the old ranking stands: {spent} against {without}");
+}
+
+/// R6, the half of it that lives at the Body rather than at Earth: the founding appetite itself is
+/// lifted at a world still unclaimed, so a Ship that has arrived commits to the ground rather than
+/// parking its load somewhere easier.
+#[test]
+fn ticket_345_the_founding_appetite_is_lifted_at_a_world_still_unclaimed() {
+    let scored = |claimed: bool| -> f64 {
+        let mut g = with_seed(7);
+        calm(&mut g);
+        let (ship, _) = lander(&mut g, Seat(1), BodyId::Mars, 0);
+        let _ = ship;
+        if claimed {
+            let cid = colony(&mut g, Seat(2), BodyId::Mars, &[], 1);
+            g.body_firsts.push(BodyFirst { body: BodyId::Mars, seat: Seat(2), colony: cid });
+        }
+        g.log.clear();
+        let _ = g.ai_orders(Seat(1));
+        // The scored list the computer wrote down, which is the only record of what it wanted and
+        // by how much. "found a Colony at ... on Mars" is the candidate this rule lifts.
+        g.log
+            .iter()
+            .filter(|l| l.contains("found a Colony at") && l.contains("on Mars"))
+            .filter_map(|l| l.split_whitespace().nth(1).and_then(|n| n.parse::<f64>().ok()))
+            .fold(0.0, f64::max)
+    };
+    let (unclaimed, taken) = (scored(false), scored(true));
+    assert!(taken > 0.0, "the appetite is there either way: {taken}");
+    assert!(unclaimed > taken, "and a world nobody has settled is wanted more: {unclaimed} against {taken}");
+}
+
+/// R7. What the game says when a Body's first is claimed: a Report line and a Moment, each naming
+/// the Faction, the Body and the Colony.
+#[test]
+fn ticket_345_the_report_and_the_moment_name_the_faction_the_body_and_the_colony() {
+    let mut g = game();
+    calm(&mut g);
+    g.report = Report::default();
+    let (_, down) = lander(&mut g, Seat(0), BodyId::Deimos, 0);
+    g.commit_orders(Seat(0), &[down]);
+    g.resolution_phase();
+    let cid = colony_in_slot(&g, BodyId::Deimos, 0);
+    let (faction, body, place) = (g.seat_name(Seat(0)), g.tables.body(BodyId::Deimos).name.clone(), g.place_name(Place::Colony(cid)));
+    let texts: Vec<String> = g.report.lines.iter().map(|l| l.text.clone()).collect();
+    let line = texts.iter().find(|t| t.contains(&body) && t.contains("first")).unwrap_or_else(|| panic!("a Report line says who was first: {texts:?}"));
+    assert!(line.contains(&faction), "the line names the Faction: {line}");
+    assert!(line.contains(&place), "and the Colony: {line}");
+    assert!(line.contains(&g.tables.body(BodyId::Deimos).first_windfall.to_string()), "and what it pays: {line}");
+    let moment = g.report.moments.iter().find(|m| m.kind == MomentKind::FirstToABody).expect("a Moment stops the turn for it");
+    assert!(moment.text.contains(&faction), "the Moment names the Faction: {}", moment.text);
+    assert!(moment.text.contains(&body), "and the Body: {}", moment.text);
+    assert!(moment.text.contains(&place), "and the Colony: {}", moment.text);
+    assert_eq!(moment.place, Some(ReportPlace::Colony(cid)), "and points at the Colony");
+    assert!(g.tables.report.moment(MomentKind::FirstToABody).is_some(), "and report.toml carries its card");
+}
+
+/// The error case the load check owns: a Body row with no `first_windfall` is a rule this build
+/// cannot price, and the whole table is refused rather than quietly paying nothing.
+#[test]
+fn ticket_345_a_body_row_without_a_windfall_refuses_the_table() {
+    let src = default_data_dir();
+    let dir = std::env::temp_dir().join(format!("dying-earth-345-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("a temporary data folder");
+    for entry in std::fs::read_dir(&src).expect("the data folder") {
+        let entry = entry.expect("a data file");
+        if entry.path().is_file() {
+            std::fs::copy(entry.path(), dir.join(entry.file_name())).expect("copy");
+        }
+    }
+    assert!(Tables::load(&dir).is_ok(), "the copy loads before anything is taken out of it");
+    let bodies = std::fs::read_to_string(dir.join("bodies.toml")).expect("bodies.toml");
+    assert!(bodies.contains("first_windfall = 15"), "Mars carries its figure");
+    let stripped: String = bodies.lines().filter(|l| l.trim() != "first_windfall = 15").collect::<Vec<_>>().join("\n");
+    std::fs::write(dir.join("bodies.toml"), stripped).expect("write");
+    let err = Tables::load(&dir).expect_err("a Body with no windfall is refused");
+    assert!(format!("{err:?}").contains("first_windfall"), "and the refusal names the missing figure: {err:?}");
+    let _ = std::fs::remove_dir_all(&dir);
 }

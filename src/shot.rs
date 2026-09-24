@@ -102,6 +102,8 @@ fn moment_from_id(name: &str) -> Option<MomentKind> {
         "archive" => Some(MomentKind::ArchiveComplete),
         "lost" => Some(MomentKind::LostInTransit),
         "rival" => Some(MomentKind::RivalProgress),
+        // Ticket #345 (version 0.09.1): a Body settled for the first time.
+        "first" => Some(MomentKind::FirstToABody),
         _ => None,
     }
 }
@@ -463,6 +465,51 @@ fn build_board(session: &mut Session) {
             g.seats[0].stockpile.materials = 220;
             g.seats[0].stockpile.energy = 80;
             g.seats[0].stockpile.fuel = 120;
+        }
+        // `first:1` and `first:lost` (building aids, ticket #345, version 0.09.1): **the board the
+        // first-to-a-Body rule is photographed on.** Seat 0 lands on the MOON and takes its first,
+        // and Mars, Phobos and Deimos are left with theirs unclaimed -- so one picture of the Solar
+        // System Map carries a world that has been taken beside three that are still worth the
+        // crossing, which is the whole argument of the rule in one frame.
+        //
+        // The landing is driven through `end_turn` with a real Unload order rather than by pushing a
+        // Colony onto the board, because everything worth photographing here is made by the engine
+        // at the founding: the record, the windfall, the Report line and the Moment. A planted
+        // Colony would have none of them, and `moment:first` would open on nothing. The rivals sit
+        // still for the one turn, as `battle:1` has them do, so the board the aids built stays put.
+        //
+        // `first:lost` then hands the Colony to seat 1. The +1 is the FOUNDER'S and sleeps while
+        // somebody else directs the place, and that second reading is a picture of its own: no game
+        // gives both boards at once, since a Colony has one holder.
+        if let Some(mode) = std::env::args().find_map(|a| a.strip_prefix("first:").map(str::to_owned)) {
+            let body = BodyId::Moon;
+            let slot = g.free_slots_on(body).first().copied().unwrap_or(0);
+            let id = ShipId(g.fresh_id());
+            let built_turn = g.turn;
+            let name = g.next_ship_name(UnitKind::ColonyShip);
+            g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 8, warhead: false, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
+            for seat in Seat::ALL.into_iter().skip(1) {
+                g.seats[seat.index()].ai = false;
+            }
+            let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+            orders[0] = vec![Order::Unload { ship: id, colonists: 8, army: false, into: UnloadTarget::Slot(body, slot) }];
+            refuse_any_card(g);
+            g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
+            for seat in Seat::ALL.into_iter().skip(1) {
+                g.seats[seat.index()].ai = true;
+            }
+            if g.first_at(body).is_none() {
+                eprintln!("first:{mode} founded nothing on {body:?}, so no first was claimed");
+                std::process::exit(3);
+            }
+            if mode == "lost"
+                && let Some((_, cid)) = g.first_at(body)
+                && let Some(col) = g.colony_mut(cid)
+            {
+                col.control = Control::Controlled(Seat(1));
+            }
+            g.seats[0].stockpile.materials = 120;
+            g.seats[0].stockpile.energy = 60;
         }
         // `eye:1` and `eye:0` (building aids, ticket #339, version 0.09.0): **the pair of boards the
         // eye is photographed on.** Seat 1 takes the first neighbour of seat 0's start Region and

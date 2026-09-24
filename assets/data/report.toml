@@ -42,6 +42,8 @@ loaded = "{faction} loaded {cargo} at {body}."
 slot_taken = "{faction}: another Faction took that Colony Slot first."
 landing_contested = "{faction} could not land at {body}: the orbit is contested."
 colony_founded = "The {faction} founded a Colony in slot {slot} on {body} with {n} Colonists."
+# Ticket #345 (version 0.09.1): the first Colony a world has ever carried, and what it pays.
+first_to_body = "The {faction} are the first Faction ever to settle {body}. {colony} claims a windfall of {n} Influence, and its Core will pay while they hold it."
 disembarked = "{n} Colonists disembarked into {colony}."
 station_built = "{faction} built {station}."
 antarctica_opens = "The Antarctic ice opens: {n} Colony Slots on Earth."
@@ -283,6 +285,12 @@ founded = "founded {colony}"
 on = true
 text = "The {faction} founded {colony}, {note}."
 figure = "{n} Colonists"
+
+# Ticket #345 (version 0.09.1): the first Faction to put a Colony on the ground of a world.
+[moments.first_to_body]
+on = true
+text = "The {faction} are the first to settle {body}. {colony} is theirs."
+figure = "{n} Influence"
 
 [moments.control_changed]
 on = true

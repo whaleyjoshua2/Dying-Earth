@@ -178,10 +178,13 @@ pub enum MomentKind {
     /// Ticket #281 (version 0.08.5): buildings burned in the rolls after a taking. It wore the
     /// Battle's name from ticket #50 to here, and fired for a Pacified transfer that fought nobody.
     PlaceTakenByForce,
+    /// Ticket #345 (version 0.09.1): a Body settled for the first time, by anybody. It fires once
+    /// per Body in a whole game, which is the rarest Moment on the list.
+    FirstToABody,
 }
 
 impl MomentKind {
-    pub const ALL: [MomentKind; 10] = [
+    pub const ALL: [MomentKind; 11] = [
         MomentKind::ColonyFounded,
         MomentKind::ControlChanged,
         MomentKind::ClimateThreshold,
@@ -192,6 +195,7 @@ impl MomentKind {
         MomentKind::LostInTransit,
         MomentKind::RivalProgress,
         MomentKind::PlaceTakenByForce,
+        MomentKind::FirstToABody,
     ];
 
     /// The key its table carries in `report.toml`.
@@ -207,6 +211,7 @@ impl MomentKind {
             MomentKind::LostInTransit => "lost_in_transit",
             MomentKind::RivalProgress => "rival_progress",
             MomentKind::PlaceTakenByForce => "taken_by_force",
+            MomentKind::FirstToABody => "first_to_body",
         }
     }
 
@@ -223,6 +228,7 @@ impl MomentKind {
             MomentKind::LostInTransit => "Colonists lost in transit",
             MomentKind::RivalProgress => "A rival closing on its Victory Condition",
             MomentKind::PlaceTakenByForce => "A place taken by force",
+            MomentKind::FirstToABody => "A Body settled for the first time",
         }
     }
 
@@ -230,6 +236,9 @@ impl MomentKind {
     /// crossed; the Archive completed is a build completed.
     pub fn rank(self) -> u8 {
         match self {
+            // Ticket #345 (version 0.09.1): the first landing on a world reads with the founding
+            // it came out of, and before it, since it is the rarer half of the same news.
+            MomentKind::FirstToABody => 0,
             MomentKind::ColonyFounded => 1,
             // Ticket #86: lives lost read before a place changing hands.
             MomentKind::LostInTransit => 2,
@@ -398,6 +407,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("slot_taken", &["faction"]),
     ("landing_contested", &["faction", "body"]),
     ("colony_founded", &["faction", "slot", "body", "n"]),
+    // Ticket #345 (version 0.09.1): a Body settled for the first time.
+    ("first_to_body", &["faction", "body", "colony", "n"]),
     ("disembarked", &["n", "colony"]),
     ("station_built", &["faction", "station"]),
     ("antarctica_opens", &["n"]),
@@ -633,6 +644,8 @@ pub const MOMENT_ARGS: &[(&str, &[&str])] = &[
     ("archive_complete", &["faction", "place", "research"]),
     // Ticket #261 (version 0.08.4): the sentence is a line card, as the climate threshold's is.
     ("rival_progress", &["text", "figure"]),
+    // Ticket #345 (version 0.09.1): a Body settled for the first time.
+    ("first_to_body", &["faction", "body", "colony", "n"]),
 ];
 
 impl ReportTable {

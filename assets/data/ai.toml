@@ -336,6 +336,20 @@ first = [[10, 20], [18, 40], [26, 60], [32, 80]]
 colonists = [[12, 4], [22, 12]]
 
 [thresholds]
+# Ticket #345 (version 0.09.1): FIRST TO A BODY, on the computer's side. `first_windfall_worth`
+# is what one Influence of an unclaimed Body's windfall counts for when a seat picks where to
+# send a loaded Colony Ship, in the units a Colony Slot's yields are weighed in -- a slot is worth
+# 0.5 to 1.75 on that scale, so this figure times 15 (Mars) or 20 (the Mars moons) is what has to
+# outweigh the Moon's better ground and its one-turn leg. `first_found_weight` multiplies the
+# founding appetite itself at a Body still unclaimed, so a Ship that has arrived commits to the
+# ground rather than parking its load in a Colony of its own.
+#
+# Without these two the rule would not exist in play: the destination list was yields against
+# flight time, the Moon won it from turn one, and no computer seat founded a Colony anywhere in
+# the Mars system in eighty measured games. Both fall away the moment a Body is claimed, so the
+# pull is toward whatever world is still unsettled and never toward one that is.
+first_windfall_worth = 0.12
+first_found_weight = 1.5
 attack_odds = 0.6
 # Ticket #284 (version 0.08.5): every seat may attack a place it did not lose, on the odds, given a
 # cause: a neutral place needs none, and a place a rival holds wants Relations toward that rival at

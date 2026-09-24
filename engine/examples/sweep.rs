@@ -19,7 +19,7 @@
 
 use dying_earth_engine::data::BreakEffect;
 use dying_earth_engine::data::{default_data_dir, Tables};
-use dying_earth_engine::ids::{FactionKind, Seat, StateId};
+use dying_earth_engine::ids::{BodyId, FactionKind, Seat, StateId};
 use dying_earth_engine::state::Outcome;
 use std::sync::Arc;
 
@@ -101,6 +101,9 @@ fn main() {
                         // Ticket #67 (version 0.05.5): whether the Mars system is reached now that the
                         // game holds three windows, and how many Antarctic Colonies are founded.
                         let (mut mars_turns, mut antarctic) = (Vec::new(), 0u32);
+                        // Ticket #345 (version 0.09.1): every Body settled first over the batch --
+                        // which Body, which FACTION took it, and on what turn.
+                        let mut firsts: Vec<(BodyId, FactionKind, u32)> = Vec::new();
                         // Ticket #68: how far the Archivists' Archive gets.
                         let (mut archive_built, mut archive_complete, mut archive_funds) = (Vec::new(), Vec::new(), Vec::new());
                         // Ticket #69: the neutral Labs' Research and the Sea Wall's Tech.
@@ -280,6 +283,7 @@ fn main() {
                                 mars_turns.push(t);
                             }
                             antarctic += r.antarctic_colonies;
+                            firsts.extend(r.firsts.iter().copied());
                             if let Some(t) = r.archive_built_turn {
                                 archive_built.push(t);
                             }
@@ -440,6 +444,33 @@ fn main() {
                             println!("      The Prospectors' Venture Capital Fund at the end: median {} Ducats of the {} their Victory Condition asks", median_u(&mut venture), base.faction(FactionKind::Prospectors).victory_first.bar);
                             println!("      The deck: median {} cards drawn a game, empty at the end in {deck_empty}/{seeds} seeds", median_u(&mut cards_drawn));
                             println!("      Pioneers: {emigrant_batches} batches recruited, {by_sea} Antarctic Colonies founded by sea");
+                            // Ticket #345 (version 0.09.1): who was first to each world, and when.
+                            // By Body, then by Faction, because seat 0 rotates across seatings and
+                            // a per-seat count would say nothing.
+                            let claimed: Vec<String> = BodyId::ALL
+                                .into_iter()
+                                .filter(|b| *b != BodyId::Earth)
+                                .filter_map(|b| {
+                                    let mut rows: Vec<(FactionKind, u32)> = firsts.iter().filter(|(fb, _, _)| *fb == b).map(|(_, k, t)| (*k, *t)).collect();
+                                    if rows.is_empty() {
+                                        return None;
+                                    }
+                                    let mut turns: Vec<u32> = rows.iter().map(|(_, t)| *t).collect();
+                                    rows.sort_by_key(|(k, _)| format!("{k:?}"));
+                                    let mut by: Vec<String> = Vec::new();
+                                    for k in FactionKind::ALL {
+                                        let n = rows.iter().filter(|(fk, _)| *fk == k).count();
+                                        if n > 0 {
+                                            by.push(format!("{k:?} {n}"));
+                                        }
+                                    }
+                                    Some(format!("{} in {}/{seeds} (median turn {}; {})", base.body(b).name, turns.len(), median_u(&mut turns), by.join(", ")))
+                                })
+                                .collect();
+                            println!(
+                                "      First to a Body: {}",
+                                if claimed.is_empty() { "no Body settled first in any seed".to_string() } else { claimed.join("; ") }
+                            );
                             println!("      Seat 0 lost its start state in {}/{seeds} seeds (median turn {})", home_lost.len(), median_u(&mut home_lost));
                             println!(
                                 "      Victory Conditions met outright: {}",

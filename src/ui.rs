@@ -2699,6 +2699,14 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
     let cam_pos = cam_gt.translation();
     match view.view {
         View::Solar => {
+            // Ticket #345 (version 0.09.1): the blocks the Body labels have already taken, so a
+            // label that hangs BELOW its disc can be dropped clear of one drawn before it. Phobos
+            // and Deimos stand about ten pixels apart on this map and both hang below; this
+            // ticket's second line made their two boxes overlap, and Deimos's background painted
+            // over Phobos's first line. The two moons also MOVE round Mars as the ephemeris turns,
+            // so which of them sits higher is not fixed and no constant stagger can answer it.
+            // `label_at` has handed back the block it filled since ticket #335 for exactly this.
+            let mut placed: Vec<egui::Rect> = Vec::new();
             for body in BodyId::ALL {
                 let pos = geo::solar_place(game, body);
                 // Ticket #155 (version 0.07.4): a label by Body -- Venus's and the satellites' hang
@@ -2716,6 +2724,28 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     let hovering = view.force_hover == Some(body)
                         || painter.ctx().pointer_latest_pos().map(|q| (q - p).length() < 40.0).unwrap_or(false);
                     let mut text = format!("{name}  {filled}/{slots} slots, {stations}/{orbital} stations");
+                    // Ticket #345 (version 0.09.1): **what a world still pays the Faction that
+                    // reaches it first, or who took that prize.** It is on this map and not only on
+                    // the planet card because this is the map a voyage is chosen from: the whole
+                    // point of the rule is that an unsettled world should be visibly worth the
+                    // crossing, and a player who has to enter a surface to find that out has already
+                    // decided where to sail. Always open, not folded into the hover as the orbital
+                    // list is, for the same reason -- a prize nobody can see is no prize.
+                    //
+                    // Earth carries nothing (Antarctica is on Earth, and claims nothing) and neither
+                    // does Venus, which has no Colony Slots for anybody to land in.
+                    //
+                    // It does NOT count into `lines` below, which spaces the label away from the
+                    // disc: Earth's Antarctic line has stood in this label unspaced since ticket #56
+                    // and a second line clears both the disc and the Orbital Control flag above it,
+                    // where a third would not. Spacing it measurably pushed Mars's label into that
+                    // flag, which is why this note is here rather than the increment.
+                    if body != BodyId::Earth && slots > 0 {
+                        match game.first_at(body) {
+                            Some((seat, _)) => text.push_str(&format!("\nfirst settled by the {}", game.seat_name(seat))),
+                            None => text.push_str(&format!("\nfirst to land: {} Influence", game.tables.body(body).first_windfall)),
+                        }
+                    }
                     // Ticket #136 (version 0.07.3): every Orbital Slot by name and holder. The
                     // designer: *"List orbital slots in the body card."* The list unfolds while the
                     // Body is under the pointer: always open, Earth's six lines lay over the Moon
@@ -2737,7 +2767,21 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     if body == BodyId::Earth && !game.antarctica_open {
                         text.push_str(&format!("\nAntarctica: opens at {:+.1} C", game.tables.climate.antarctica_opens_at));
                     }
-                    label_at(painter, p - egui::vec2(0.0, side * (22.0 + 7.5 * lines as f32)), &text, Color32::WHITE, 13.0);
+                    // Ticket #345 (version 0.09.1): a label that hangs below its disc is dropped,
+                    // whole, below any Body label already drawn that it would otherwise lie over --
+                    // the rule the orbit band's site labels already follow. Only the ones that hang
+                    // BELOW are moved: a planet's label stands above its disc, under the Orbital
+                    // Control flag and the stack labels, and nudging those downward would walk them
+                    // into the disc. Bounded, so a pathological board cannot spin here.
+                    let mut anchor = p - egui::vec2(0.0, side * (22.0 + 7.5 * lines as f32));
+                    if below {
+                        for _ in 0..BodyId::ALL.len() {
+                            let block = label_block(painter, anchor, None, &text, 13.0);
+                            let Some(hit) = placed.iter().find(|r| r.intersects(block)) else { break };
+                            anchor.y = hit.max.y + block.height() / 2.0 + 3.0;
+                        }
+                    }
+                    placed.push(label_at(painter, anchor, &text, Color32::WHITE, 13.0));
                     // Ticket #136: one orbit per Body, the stations on it at spaced positions, dashed
                     // while nothing is in orbit. Five rings will not fit round an eighteen-pixel Earth
                     // without swallowing the Moon, so on this map the slots share one ring; each has
@@ -3158,19 +3202,54 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
             }
 }
 
+/// Ticket #345 (version 0.09.1): **who was first to this Body's ground, or what the Body still pays
+/// the Faction that gets there first.** It stands at the head of the planet card, under the Body's
+/// own four figures and above the sites, because it is a figure of the whole Body and not of any one
+/// slot -- the prize is for reaching the world, and the slot that takes it is incidental.
+///
+/// Only a Body with ground to settle carries the line. Earth is excluded by the rule (Antarctica is
+/// on Earth, and reaching it is not reaching a new world) and Venus has no Colony Slots at all, so
+/// on those two the line would be a rule about nothing.
+fn first_to_body_line(ui: &mut Ui, session: &Session, game: &Game, body: BodyId) {
+    let card = game.tables.body(body);
+    if body == BodyId::Earth || card.colony_slots() == 0 {
+        return;
+    }
+    let standing = game.tables.influence.first_settled_allotment;
+    let resp = match game.first_at(body) {
+        Some((seat, cid)) => {
+            let text = format!("First to settle {}: the {}, at {}.", card.name, game.seat_name(seat), game.place_name(Place::Colony(cid)));
+            ui.label(RichText::new(text).color(seat_colour(session, seat)).strong())
+        }
+        // Ticket #258's lesson, and #283's: a figure on this card is drawn with its glyph, so the
+        // prize goes through `icon_word` rather than being written out in the word Influence.
+        None => icon_word(ui, "influence", format!("First to settle {}: nobody yet. {} Influence to the Faction that lands first.", card.name, card.first_windfall)),
+    };
+    rule_tip(
+        resp,
+        format!(
+            // Measured on the capture: the first draft of this hover ran to seven rendered lines
+            // against a ceiling of six, so it lost the words that said where the windfall lands and
+            // whose Allotment the trickle joins. Both are on the Colony's own card.
+            "Paid once, after the landing, to the first Faction ever to settle this world's ground; that Colony's Core then adds +{standing} Influence a turn while they direct it.\nA station claims nothing, the other slots stay open, and retaking a lost Colony never pays again."
+        ),
+    );
+}
+
 /// Ticket #46: the stations over the Body on screen, and the orbital slots still free.
 /// Ticket #283 (version 0.08.5): the planet card's Colonies block. The Body's own four figures
 /// first, weak, then one row per Colony on the ground and per open site, in slot order, with the
 /// slot's glyph row beneath as the map label draws it; clicking a row selects it. Every row goes
 /// through `slot_yield_row`, since the one glyph rule only swaps a word that follows a figure and
 /// a line written "Materials x1.37" would silently come out in words (ticket #258's lesson).
-fn colonies_block(ui: &mut Ui, game: &Game, view: &mut ViewState, body: BodyId) {
+fn colonies_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, body: BodyId) {
     let card = game.tables.body(body);
     let (ink, weak) = (ui.visuals().text_color(), ui.visuals().weak_text_color());
     ui.horizontal(|ui| {
         ui.label(RichText::new(format!("{} as a whole:", card.name)).weak());
         slot_yield_row(ui, [("materials", card.mine_yield), ("energy", card.generator_yield), ("fuel", card.refinery_yield), ("research", card.research_yield)], 14.0, weak);
     });
+    first_to_body_line(ui, session, game, body);
     let rows: Vec<u32> = (0..card.colony_slots()).filter(|s| body != BodyId::Earth || game.colony_at(body, *s).is_some()).collect();
     if rows.is_empty() {
         return;
@@ -3898,7 +3977,7 @@ fn selection_card(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
             // reads the Body's figures, so the In orbit rows beneath carry none. On Earth only the
             // Colonies stand here: Antarctica's shut sites are the ice's business.
             if let View::Surface(b) = view.view {
-                colonies_block(ui, game, view, b);
+                colonies_block(ui, session, game, view, b);
             }
             // Ticket #317 (version 0.08.8): last turn's Battles, listed on the Solar System Map's
             // page, one row per Battle in the aggressor's colour, each a way there; the Report is
@@ -5927,11 +6006,22 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // read off the tables, the same shape: `Region population 1454.5 (1.45B)`.
     icon_word(ui, "population", format!("Region population {}, Industry Level {}, leans {:?}", game.tables.population_text(st.population), st.industry_level, card.resource_lean));
     // Ticket #161 (version 0.07.5): what an Allotment is, which this line names and never explains.
+    // Ticket #345 (version 0.09.1): and what ELSE an Allotment is. This hover named the base and the
+    // Regions and stopped there, so it had been wrong since ticket #36 built the Embassy -- it left
+    // out the Embassy, the Relay, the Chorus and (from ticket #183) the Spaceport's lift clause, and
+    // this ticket would have added two more sources to a list it does not keep. There is no page in
+    // the game that breaks an Allotment down line by line, so pointing at one was not open; and a
+    // signpost line is the thing the designer cut from the Faction window in ticket #306. So the
+    // hover NAMES EVERY SOURCE, briefly, and pays for the room by dropping the words that told the
+    // player where the Trading window is -- the Trading button's own hover says that.
+    // The ceiling is six rendered lines and this sits at it; a seventh source wants a shorter list,
+    // not a seventh line.
     rule_tip(
         icon_word(ui, "influence", format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid))),
         format!(
-            "The Allotment is what you receive each turn: {}, plus the Influence value of every Region you hold.\nIt does not carry over; what is unspent at End Turn is lost. Ducats buy more, two a point, in the Trading window.",
-            game.tables.influence.allotment_base
+            "The Allotment is what you receive each turn: {}, your Regions, your Embassies, Relays and Choruses, your Spaceports' lifts, a first landing's windfall, and +{} for every Body you were first to and still hold.\nIt does not carry over: what is unspent at End Turn is lost. Ducats buy more, two a point.",
+            game.tables.influence.allotment_base,
+            game.tables.influence.first_settled_allotment
         ),
     );
     ui.label(format!("GDP {}: its economy pays its controller {} Ducats a turn (GDP x Industry Level / 5, never below 1); a Bank here would add {}", card.gdp, game.state_ducats(sid), (game.tables.facility(FacilityKind::Bank).produces.as_ref().map(|p| p.amount).unwrap_or(0) * card.gdp) / 10));
@@ -6542,6 +6632,34 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         Control::Occupied { occupier, turns, .. } => format!("Occupied by the {} (turn {})", game.seat_name(occupier), turns),
     };
     ui.label(owner);
+    // Ticket #345 (version 0.09.1): **this Colony was the first ever raised on the ground of its
+    // Body**, under the line that says who holds it, because the two are read together: the +1 is
+    // the FOUNDER'S and pays only while the founder directs the place. So a Colony its founder still
+    // holds reads as a trickle being paid, in the founder's colour, and one a rival has taken reads
+    // as a trickle asleep, in weak grey -- the shape ticket #343 gave `Warhead aboard` against
+    // `Warhead spent`. It never says a rival is paid, because a rival never is.
+    if let Some((founder, first)) = game.first_at(col.body)
+        && first == cid
+    {
+        let standing = game.tables.influence.first_settled_allotment;
+        let (body_name, faction) = (game.tables.body(col.body).name.clone(), game.seat_name(founder));
+        let resp = if col.control.director() == Some(founder) {
+            figures_with_icons(ui, &format!("First to settle {body_name}: +{standing} Influence a turn to the {faction}, while they direct it."), 14.0, seat_colour(session, founder), &[])
+        } else {
+            figures_with_icons(ui, &format!("First to settle {body_name}: the {faction}' +{standing} Influence a turn sleeps while another Faction directs it."), 14.0, ui.visuals().weak_text_color(), &[])
+        };
+        rule_tip(
+            resp,
+            format!(
+                // Measured on the capture: with a closing clause saying the trickle never moves to a
+                // second Colony of the founder's on this Body, this hover ran to seven rendered
+                // lines against a ceiling of six. That clause went, being the one rule here a player
+                // must hold two Colonies on one world to meet; the starved rule stayed, being the
+                // surprising one and the one a blockade brings round.
+                "The {faction} raised the first Colony ever to stand on the ground of {body_name}, and took that world's windfall once.\nThe +{standing} a turn is theirs alone: it stops while somebody else directs this place, wakes if they take it back, and keeps paying while the Colony is starved of Energy."
+            ),
+        );
+    }
     // Ticket #278 (version 0.08.5): a starved Colony says so, in the designer's words, and how.
     if let Some(by) = game.starved_by(cid) {
         let how = if col.in_orbit { format!("Blockaded by the {}", game.seat_name(by)) } else { format!("Under the {}' Orbital Control", game.seat_name(by)) };
@@ -7888,7 +8006,35 @@ fn module_line(game: &Game, col: &Colony, cid: ColonyId, mi: usize, director: Op
             None => "idle".to_string(),
         }
     };
-    format!("{}: {}", m.kind.name(), figures)
+    // Ticket #345 (version 0.09.1): the Core's line, and only the Core's, carries the Body's first.
+    let first = if m.kind == ModuleKind::Core { core_first_words(game, col, cid) } else { String::new() };
+    format!("{}: {}{}", m.kind.name(), figures, first)
+}
+
+/// Ticket #345 (version 0.09.1): what a **Core Module** adds to its tile's line and to its tile's
+/// hover when the Colony under it was the first ever settled on its Body. The clause is one short
+/// sentence and no more: the Core's hover already carries the Module rules, a tooltip stops at six
+/// rendered lines, and the Colony card above the tiles says the rule in full.
+///
+/// Two readings, and the difference between them is the whole of R4. The +1 is the FOUNDER'S, so a
+/// Colony a rival has taken says the trickle is asleep rather than saying nothing, and never says
+/// the rival is paid. Nothing at all for the Core of a second Colony of the founder's on the same
+/// Body: the record is keyed to one Colony and the trickle never hops.
+fn core_first_words(game: &Game, col: &Colony, cid: ColonyId) -> String {
+    let Some((founder, first)) = game.first_at(col.body) else { return String::new() };
+    if first != cid {
+        return String::new();
+    }
+    let standing = game.tables.influence.first_settled_allotment;
+    let body = &game.tables.body(col.body).name;
+    // Both readings are kept to about sixty characters, which is what the Core's hover has room for
+    // at six rendered lines. The dormant one is therefore one word -- *sleeps* -- where the Colony
+    // card above says the whole of it; the tile is a reminder and the card is the explanation.
+    if col.control.director() == Some(founder) {
+        format!(". First to settle {body}: +{standing} Influence a turn to the {}", game.seat_name(founder))
+    } else {
+        format!(". First to settle {body}: the {}' +{standing} Influence sleeps", game.seat_name(founder))
+    }
 }
 
 /// Ticket #324 (version 0.08.8): what a Repair order's line calls the thing it repairs.
@@ -7950,8 +8096,16 @@ fn module_offline_words(col: &Colony, m: &Module) -> &'static str {
 }
 
 /// Ticket #150 (version 0.07.4): the Module rules under a tile, the counterpart of `facility_rules`.
-fn module_rules(heading: &str) -> String {
-    format!("{heading}\nEnergy upkeep is paid at Income first; short of Energy, Modules go offline in order until the bill is met, and an offline one makes nothing and keeps its place.\nMothballed, it makes nothing and pays nothing until it is restarted.")
+///
+/// Ticket #345 (version 0.09.1): the Mothball sentence is left off the **Core Module**, which the
+/// engine refuses to mothball or decommission at all -- *"the Core Module is the place itself; it is
+/// never mothballed or decommissioned"* (`orders.rs:1925`) -- so on that one tile the sentence has
+/// always described something that cannot happen. Cutting it is a correction, and it is also what
+/// buys the room for this ticket's own clause: measured on the capture, the Core's hover ran to
+/// EIGHT rendered lines with both, against a ceiling of six, and sits at six with the lie gone.
+fn module_rules(kind: ModuleKind, heading: &str) -> String {
+    let mothball = if kind == ModuleKind::Core { "" } else { "\nMothballed, it makes nothing and pays nothing until it is restarted." };
+    format!("{heading}\nEnergy upkeep is paid at Income first; short of Energy, Modules go offline in order until the bill is met, and an offline one makes nothing and keeps its place.{mothball}")
 }
 
 /// Ticket #162 (version 0.07.5): a Colony's Module tiles are laid out in the SAME grid as a
@@ -8004,7 +8158,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         let selected = view.hab_tile == Some(HabTile::Module(mi));
         // Ticket #150 (version 0.07.4): the tile's hover -- the figures its strip line carries and
         // the Module rules, which the old rows never had.
-        let mut tip = module_rules(&format!("{}{}", module_line(game, col, cid, mi, director), module_offline_words(col, m)));
+        let mut tip = module_rules(m.kind, &format!("{}{}", module_line(game, col, cid, mi, director), module_offline_words(col, m)));
         // Ticket #324 (version 0.08.8): a Battery's hover carries its rules; a damaged one wears its
         // hit points on its label, as a shield wears an Army's.
         let mut label = m.kind.name().to_string();
@@ -8014,6 +8168,18 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                 let hp = game.tables.module(ModuleKind::Battery).hit_points;
                 label = format!("Battery {}/{}", hp.saturating_sub(m.damage), hp);
             }
+        }
+        // Ticket #345 (version 0.09.1): the Core of the Colony that was first to this Body wears
+        // what it pays on its label, as a damaged Battery wears its hit points: the label carries
+        // the LIVE figure and the hover carries the rule. It is worn only while the figure is
+        // actually being paid -- the founder directing the place -- so the plain label is itself the
+        // reading for a first whose trickle is asleep, and the hover below says which it is.
+        if m.kind == ModuleKind::Core
+            && let Some((founder, first)) = game.first_at(col.body)
+            && first == cid
+            && director == Some(founder)
+        {
+            label = format!("Core Module +{}", game.tables.influence.first_settled_allotment);
         }
         if hab_tile(ui, tile_rect(i), ui.id().with(("hab", mi)), Some(crate::icons::module_icon(m.kind)), &label, state, selected, None, tip).clicked() {
             view.hab_tile = Some(HabTile::Module(mi));

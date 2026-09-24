@@ -118,6 +118,10 @@ pub struct SimResult {
     /// Ticket #57: the turn the first Colony in the Mars system was founded, and the turn the Mars
     /// launch window falls on, which the ephemeris fixes and no seed moves.
     pub first_mars_colony_turn: Option<u32>,
+    /// Ticket #345 (version 0.09.1): every Body settled first in this game -- the Body, the
+    /// FACTION that took it (never the seat: seat 0 rotates between Factions across seatings) and
+    /// the turn its Colony was founded.
+    pub firsts: Vec<(BodyId, FactionKind, u32)>,
     pub window_turn: u32,
     /// Ticket #68: the turn the Archive Module first stood, the turn the Archive was complete, and
     /// the Archivists' fund at the end.
@@ -635,6 +639,11 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         antarctica_turn,
         antarctic_colonies,
         first_mars_colony_turn,
+        firsts: game
+            .body_firsts
+            .iter()
+            .map(|f| (f.body, game.kind(f.seat), game.colony(f.colony).map(|c| c.founded_turn).unwrap_or(0)))
+            .collect(),
         window_turn,
         archive_built_turn,
         archive_complete_turn,
