@@ -11916,7 +11916,7 @@ fn a_raised_army_takes_one_unit_of_its_regions_population_and_is_refused_below_i
     let raise = Order::BuildArmy { place: Place::State(StateId::EastAsia) };
     let before = g.state(StateId::EastAsia).population;
     assert!(g.check_order(Seat(0), &[], &raise).is_ok());
-    g.commit_orders(Seat(0), &[raise.clone()]);
+    g.commit_orders(Seat(0), std::slice::from_ref(&raise));
     let taken = before - g.state(StateId::EastAsia).population;
     assert!((taken - each).abs() < 1e-9, "the raise took {taken} units of population, not {each}");
     assert!((taken * g.tables.climate.people_per_unit - 1_000_000.0).abs() < 1e-3, "one million people");
@@ -11946,7 +11946,7 @@ fn a_colonys_army_takes_one_colonist_and_is_refused_at_one() {
     let raise = Order::BuildArmy { place: Place::Colony(c) };
     let pop = g.state(StateId::EastAsia).population;
     assert!(g.check_order(Seat(0), &[], &raise).is_ok());
-    g.commit_orders(Seat(0), &[raise.clone()]);
+    g.commit_orders(Seat(0), std::slice::from_ref(&raise));
     assert_eq!(g.colony(c).unwrap().colonists, 2, "one Colonist went under arms");
     assert_eq!(g.state(StateId::EastAsia).population, pop, "and no Region paid for a Colony's Army");
     assert!(g.log.to_vec().iter().any(|l| l.contains("one Colonist under arms")), "the Report names the Colonist: {:?}", g.log.to_vec());
@@ -12096,7 +12096,7 @@ fn an_orbit_change_costs_one_fuel_from_the_tank_and_lands_before_the_battles() {
     let cost = g.order_cost(Seat(0), &order);
     assert_eq!((cost.fuel, cost.materials), (0, 0), "an orbit change spends the tank, not the Stockpile");
     assert!(g.check_order(Seat(0), &[], &order).is_ok());
-    let err = g.check_order(Seat(0), &[order.clone()], &Order::Transit { ship, to: BodyId::Moon, slot: None }).unwrap_err().0;
+    let err = g.check_order(Seat(0), std::slice::from_ref(&order), &Order::Transit { ship, to: BodyId::Moon, slot: None }).unwrap_err().0;
     assert!(err.contains("already has an order"), "one order a turn: {err}");
     // A rival on Attack is waiting at the ring it is moving to: the move lands first, so the Ship
     // fights in its new orbit.
@@ -12331,4 +12331,108 @@ fn a_bombard_holds_the_orbit_it_is_given_from() {
     assert_eq!(g.colony(station).unwrap().modules.len(), before - 1, "one Module burned");
     let at = Some(ReportPlace::Orbit(BodyId::Mars, Orbit::Slot(slot)));
     assert!(g.report.battles.iter().any(|b| b.at == at), "the record is the ring's: {:?}", g.report.battles.iter().map(|b| b.place.clone()).collect::<Vec<_>>());
+}
+
+// ------------------------------------------- 0.09.0 ticket #335 (R7): the computer seats want orbits
+
+/// Ticket #335 (R7): **a transit names low orbit by default, and a rival station's ring where the
+/// seat means to blockade or attack that station.** Until this ticket every warship leg anywhere
+/// named the richest rival station's slot whatever the seat thought of its holder, which is why no
+/// computer warship ever held low orbit -- the lane to the ground, and the one orbit Orbital
+/// Control is held in. Meaning it is now Cold or worse toward the holder (`war_cause`), with no
+/// working Battery of the holder's standing in that ring to lift the Blockade.
+#[test]
+fn a_warship_sent_to_blockade_a_rival_station_names_that_stations_ring() {
+    let board = |score: i64| -> Game {
+        let mut g = game();
+        calm(&mut g);
+        at_window(&mut g);
+        let station = station_at(&mut g, Seat(1), BodyId::Mars);
+        g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Core));
+        g.relations.score[0][1] = score;
+        // A Colony of seat 0's on Earth's own surface, so the ground at EARTH is what the seat
+        // wants at home and the Frigate standing in Earth's low orbit is the garrison holding it.
+        // Without this the reading under test is drowned by the right answer at the wrong Body:
+        // every Faction opens with a station over Earth, so the hull would move up to a rival's
+        // ring here rather than take the leg to Mars, which is what this test is about.
+        colony(&mut g, Seat(0), BodyId::Earth, &[ModuleKind::Habitat], 4);
+        ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
+        g
+    };
+    let cause = game().tables.ai.thresholds.war_cause;
+    // Cold or worse toward the holder: the leg names the ring the Blockade will be given in.
+    let mut g = board(-8);
+    assert!(g.relations_score(Seat(0), Seat(1)) <= cause, "the seat means it: {}", g.relations_score(Seat(0), Seat(1)));
+    let ring = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Mars).unwrap().slot;
+    let orders = g.ai_orders(Seat(0));
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::Transit { to: BodyId::Mars, slot: Some(n), .. } if *n == ring)),
+        "the leg names the rival station's ring: {orders:?}"
+    );
+    // Warm toward the holder, and it means nothing by being there: low orbit, the default.
+    let mut g = board(0);
+    assert!(g.relations_score(Seat(0), Seat(1)) > cause, "no cause: {}", g.relations_score(Seat(0), Seat(1)));
+    let orders = g.ai_orders(Seat(0));
+    let mars: Vec<&Order> = orders.iter().filter(|o| matches!(o, Order::Transit { to: BodyId::Mars, .. })).collect();
+    assert!(!mars.is_empty(), "it still flies to Mars: {orders:?}");
+    assert!(mars.iter().all(|o| matches!(o, Order::Transit { slot: None, .. })), "with no cause the leg names low orbit: {mars:?}");
+}
+
+/// Ticket #335 (R7): **a seat that wants the ground wants Orbital Control of low orbit**, so its
+/// warship's leg names low orbit even where a rival keeps a station it has every cause against.
+/// Orbital Control is low orbit's since this ticket, and the ground waits on Control; a hull parked
+/// at a ring three orbits up shuts nothing on the surface.
+#[test]
+fn a_seat_that_wants_the_ground_sends_its_warship_to_low_orbit() {
+    let mut g = game();
+    calm(&mut g);
+    at_window(&mut g);
+    let station = station_at(&mut g, Seat(1), BodyId::Mars);
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Core));
+    g.relations.score[0][1] = -8;
+    // As in the test above: a Colony of its own on Earth's surface, so the Frigate in Earth's low
+    // orbit is the garrison of the Body it is standing at and the leg to Mars is what it weighs.
+    colony(&mut g, Seat(0), BodyId::Earth, &[ModuleKind::Habitat], 4);
+    ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
+    let ring = g.colony(station).unwrap().slot;
+    // With nothing of its own on the Martian surface, the ring is what the leg names.
+    assert!(!g.ai_wants_the_ground(Seat(0), BodyId::Mars), "nothing on the ground yet");
+    let orders = g.ai_orders(Seat(0));
+    assert!(orders.iter().any(|o| matches!(o, Order::Transit { to: BodyId::Mars, slot: Some(n), .. } if *n == ring)), "{orders:?}");
+    // A Colony of its own on the ground there, and the surface is the thing: low orbit.
+    colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    assert!(g.ai_wants_the_ground(Seat(0), BodyId::Mars), "a Colony of its own on the surface to keep");
+    let orders = g.ai_orders(Seat(0));
+    let mars: Vec<&Order> = orders.iter().filter(|o| matches!(o, Order::Transit { to: BodyId::Mars, .. })).collect();
+    assert!(!mars.is_empty(), "it still flies to Mars: {orders:?}");
+    assert!(mars.iter().all(|o| matches!(o, Order::Transit { slot: None, .. })), "the ground wants Control of low orbit: {mars:?}");
+}
+
+/// Ticket #335 (R7): **it changes orbit rather than flying away when what it wants is at the same
+/// Body.** A warship already at a Body, sitting in low orbit with a rival station above it that
+/// its seat means to shut, moves up to that ring -- where the Blockade it is for shuts something --
+/// instead of taking the leg home. The engine lane built this for a Ship's own errands (a tank, a
+/// load, the ground); the blockade appetite is the want added here, and the measured 0.08.8 board
+/// had no candidate of the kind at all.
+#[test]
+fn a_warship_changes_orbit_to_the_ring_it_means_to_shut_rather_than_flying_away() {
+    let mut g = game();
+    calm(&mut g);
+    let station = station_at(&mut g, Seat(1), BodyId::Mars);
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Core));
+    let ring = g.colony(station).unwrap().slot;
+    g.relations.score[0][1] = -8;
+    let ship = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    assert!(!g.ai_wants_the_ground(Seat(0), BodyId::Mars), "nothing of its own on the surface");
+    let orders = g.ai_orders(Seat(0));
+    assert!(
+        orders.iter().any(|o| matches!(o, Order::ChangeOrbit { ship: id, slot: Some(n) } if *id == ship && *n == ring)),
+        "it moves up to the ring it means to shut: {orders:?}"
+    );
+    assert!(!orders.iter().any(|o| matches!(o, Order::Transit { ship: id, .. } if *id == ship)), "and does not fly away instead: {orders:?}");
+    // With its own Colony on the ground below, the hull that holds low orbit stays in it: Orbital
+    // Control is low orbit's, and the garrison is what the ground waits on.
+    colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    let orders = g.ai_orders(Seat(0));
+    assert!(!orders.iter().any(|o| matches!(o, Order::ChangeOrbit { ship: id, .. } if *id == ship)), "it holds the lane: {orders:?}");
 }

@@ -1058,6 +1058,9 @@ pub struct AiThresholds {
     /// Ticket #332: a Factory Module is wanted at a Colony whose queue is this many builds deep,
     /// or where a Ship is wanted (a Shipyard standing or on order).
     pub factory_module_queue_depth: usize,
+    /// Ticket #335 (version 0.09.0): how many warships a seat wants holding LOW ORBIT at a Body
+    /// whose ground it wants, before the next hull's leg names a rival station's ring instead.
+    pub low_orbit_warships: u32,
 }
 
 /// Ticket #50: one pick list per Faction. `order` is tried first, then the cheapest available

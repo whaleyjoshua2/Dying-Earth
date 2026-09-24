@@ -70,6 +70,9 @@ pub struct ShotPlan {
     pub notice: Option<String>,
     /// Ticket #59, a building aid (`load:1`): 0 nothing yet, 1 the Load screen is up, 2 captured.
     pub load_step: u8,
+    /// Ticket #335 (version 0.09.0), a building aid (`scroll:transits`, `scroll:orbits`): the Ship
+    /// stack card scrolls to that block, which a headless capture cannot do with a scrollbar.
+    pub stack_scroll: Option<StackBlock>,
 }
 
 /// Ticket #58: the Moment a `moment:` aid names.
@@ -108,6 +111,7 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     if plan.stack {
         view.selection = Selection::ShipStack(BodyId::Mars, Seat(0));
     }
+    view.stack_scroll = plan.stack_scroll;
     // Ticket #162 (version 0.07.5): `hab:1` SELECTS seat 0's first station or Colony (the ISS on a
     // fresh board), so its card and its Module tiles are in the picture; the window it used to open
     // is gone.
@@ -226,6 +230,42 @@ fn build_board(session: &mut Session) {
         if std::env::args().any(|a| a == "levy:1") {
             g.raise_army(Place::State(StateId::EastAsia), false);
             run_one_quiet_turn(g);
+        }
+        // `orbits:1` (a building aid, ticket #335, version 0.09.0): **three of Mars's four orbits
+        // are occupied at once.** Seat 0 holds the station in slot 0 (Mars Base Camp) and seat 1 the
+        // station in slot 1 (Ares); seat 0 keeps its Frigate in LOW ORBIT and gains a Colony Ship at
+        // its own station's ring, seat 1 gains a Frigate at seat 0's station's ring on Blockade, and
+        // seat 2's Carrier stays in low orbit. So one Surface Map picture carries low orbit's ring
+        // with stacks on it, two station rings with stacks on them, and an orbit band with a row per
+        // stack per orbit; and the stack card's Change orbit door has three other orbits to offer.
+        // It runs BEFORE `battle:1`, so that aid's Attack stances make a Battle in each orbit that
+        // has two parties in it, which is the only way to photograph two Battle marks at one Body.
+        if std::env::args().any(|a| a == "orbits:1") {
+            for (slot, seat) in [(0u32, Seat(0)), (1, Seat(1))] {
+                if g.station_at(BodyId::Mars, slot).is_none() {
+                    let id = ColonyId(g.fresh_id());
+                    let modules = vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)];
+                    g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(seat), modules, colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+                }
+            }
+            for (seat, kind, slot, stance) in [(Seat(0), UnitKind::ColonyShip, Some(0u32), Stance::Hold), (Seat(1), UnitKind::Frigate, Some(0), Stance::Blockade)] {
+                let id = ShipId(g.fresh_id());
+                let built_turn = g.turn;
+                let name = g.next_ship_name(kind);
+                g.ships.push(Ship { id, name, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot });
+            }
+            // And, over EARTH, a Colony Ship of seat 0's at the ISS's own ring rather than in low
+            // orbit, so the Region card's lift door is shut on it and says why: a lift from a Launch
+            // Site arrives in low orbit and nowhere else.
+            if let Some(slot) = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot) {
+                let id = ShipId(g.fresh_id());
+                let built_turn = g.turn;
+                let name = g.next_ship_name(UnitKind::ColonyShip);
+                g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: Some(slot) });
+            }
+            g.seats[0].stockpile.materials = 200;
+            g.seats[0].stockpile.energy = 80;
+            g.seats[0].stockpile.fuel = 60;
         }
         // `blockade:1` (a building aid, ticket #278, version 0.08.5): a Prospector Frigate sits in
         // the slot of seat 0's station over Earth on Blockade, so the station's button and card say
@@ -1303,6 +1343,13 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             }
         }
         plan.stack = std::env::args().any(|a| a == "stack:1");
+        // Ticket #335 (version 0.09.0): `scroll:transits` or `scroll:orbits`, the block of the Ship
+        // stack's card the picture is of.
+        plan.stack_scroll = std::env::args().find_map(|a| match a.strip_prefix("scroll:") {
+            Some("transits") => Some(StackBlock::Transits),
+            Some("orbits") => Some(StackBlock::ChangeOrbit),
+            _ => None,
+        });
         plan.hover = std::env::args().find_map(|a| a.strip_prefix("hover:").and_then(body_from_id));
         plan.look = std::env::args().find_map(|a| {
             let (lon, lat) = a.strip_prefix("look:")?.split_once(',')?;

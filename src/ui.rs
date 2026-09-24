@@ -812,47 +812,67 @@ fn on_map(colour: Color32) -> Color32 {
     Color32::from_rgb(lift(colour.r()), lift(colour.g()), lift(colour.b()))
 }
 
-fn label_at(painter: &egui::Painter, pos: Pos2, text: &str, colour: Color32, size: f32) {
+/// Ticket #335 (version 0.09.0): the block a map label fills, by the arithmetic the two painters
+/// below paint with, so a caller can see where a label would land before it is drawn. The orbit
+/// band measures itself with it and a Colony Slot label asks whether it would land in the band.
+fn label_block(painter: &egui::Painter, pos: Pos2, kind: Option<Kind>, text: &str, size: f32) -> egui::Rect {
+    let galley = painter.layout_no_wrap(text.to_string(), FontId::proportional(size), Color32::WHITE);
+    let wears_glyph = kind.and_then(Kind::icon).and_then(|name| Icons::texture_from_ctx(painter.ctx(), name)).is_some();
+    let glyph = if wears_glyph { size + 2.0 + 4.0 } else { 0.0 };
+    egui::Rect::from_center_size(pos, galley.size() + egui::vec2(8.0 + glyph, 4.0))
+}
+
+/// Both painters hand back the block they filled, so a caller that must stay clear of a label can
+/// know where it went (ticket #335).
+fn label_at(painter: &egui::Painter, pos: Pos2, text: &str, colour: Color32, size: f32) -> egui::Rect {
     let colour = on_map(colour);
     let galley = painter.layout_no_wrap(text.to_string(), FontId::proportional(size), colour);
-    let rect = egui::Rect::from_center_size(pos, galley.size() + egui::vec2(8.0, 4.0));
+    let rect = label_block(painter, pos, None, text, size);
     painter.rect_filled(rect, 3.0, Color32::from_black_alpha(170));
     painter.galley(rect.min + egui::vec2(4.0, 2.0), galley, colour);
+    rect
 }
 
 /// Ticket #127 (version 0.07.2): a map label wearing its kind glyph at the left, in the kind fill and
 /// sized to a line of the text. Where there is no art for it the bare label is drawn, so the map
 /// never goes mute; the whole of glyph and text is centred on `pos`, as the bare label is.
-fn label_kind_at(painter: &egui::Painter, pos: Pos2, kind: Option<Kind>, text: &str, colour: Color32, size: f32) {
+fn label_kind_at(painter: &egui::Painter, pos: Pos2, kind: Option<Kind>, text: &str, colour: Color32, size: f32) -> egui::Rect {
     let texture = kind.and_then(Kind::icon).and_then(|name| Icons::texture_from_ctx(painter.ctx(), name));
     let Some(texture) = texture else {
-        label_at(painter, pos, text, colour, size);
-        return;
+        return label_at(painter, pos, text, colour, size);
     };
     let colour = on_map(colour);
     let galley = painter.layout_no_wrap(text.to_string(), FontId::proportional(size), colour);
     let glyph = size + 2.0;
     let gap = 4.0;
-    let rect = egui::Rect::from_center_size(pos, galley.size() + egui::vec2(8.0 + glyph + gap, 4.0));
+    let rect = label_block(painter, pos, kind, text, size);
     painter.rect_filled(rect, 3.0, Color32::from_black_alpha(170));
     let glyph_rect = egui::Rect::from_min_size(rect.min + egui::vec2(4.0, 2.0), egui::vec2(glyph, glyph));
     painter.image(texture, glyph_rect, egui::Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), crate::icons::kind_fill());
     painter.galley(rect.min + egui::vec2(4.0 + glyph + gap, 2.0), galley, colour);
+    rect
 }
 
 /// Ticket #136 (version 0.07.3): an orbit as a projected polyline. `points` are the ring's samples
 /// in order, `None` where a sample is hidden behind the globe or off screen; a **dashed** ring is
 /// an empty orbit, drawn three samples on and three off, so room to build is visible without a card.
-fn orbit_polyline(painter: &egui::Painter, points: &[Option<Pos2>], dashed: bool, colour: Color32) {
+/// Ticket #335 (version 0.09.0): `width` came with low orbit's ring, which is drawn heavier than an
+/// Orbital Slot's so the innermost ring is never read as a sixth slot.
+fn orbit_polyline(painter: &egui::Painter, points: &[Option<Pos2>], dashed: bool, colour: Color32, width: f32) {
     let n = points.len();
     for i in 0..n {
         let (Some(a), Some(b)) = (points[i], points[(i + 1) % n]) else { continue };
         if dashed && (i / 3) % 2 == 1 {
             continue;
         }
-        painter.line_segment([a, b], egui::Stroke::new(1.2, colour));
+        painter.line_segment([a, b], egui::Stroke::new(width, colour));
     }
 }
+
+/// Ticket #335 (version 0.09.0): **low orbit's own colour**, a pale blue-white that belongs to no
+/// Faction and to no Orbital Slot. A slot's ring wears its holder's colour, or the empty grey; low
+/// orbit is held by nobody, so it wears neither.
+const LOW_ORBIT: Color32 = Color32::from_rgb(180, 210, 245);
 
 /// Ticket #136: a kind glyph painted at a point in a colour, on a dark disc so it reads over a
 /// photograph. On the orbit rings the colour is the holder's, since on a map a colour says whose.
@@ -890,6 +910,39 @@ fn warship_in_slot(game: &Game, body: BodyId, slot: u32) -> Option<&Ship> {
     game.ships.iter().find(|s| s.at == ShipAt::Body(body) && s.slot == Some(slot) && matches!(s.kind, UnitKind::Frigate | UnitKind::Battleship))
 }
 
+/// Ticket #335 (version 0.09.0): an orbit named for a line that already says which Body -- "in low
+/// orbit", "at Tiangong-2". `Game::orbit_name` carries the Body's name with it, for a line that
+/// does not; these two are the only words the interface says an orbit in.
+fn orbit_phrase(game: &Game, body: BodyId, orbit: Orbit) -> String {
+    match orbit {
+        Orbit::Low => "in low orbit".to_string(),
+        Orbit::Slot(n) => format!("at {}", game.station_name(body, n)),
+    }
+}
+
+/// Ticket #335: the Ships of one Faction sitting in ONE orbit of a Body -- the stack a ring draws,
+/// a band row names, and a Battle in that orbit is fought by.
+fn ships_in_orbit(game: &Game, seat: Seat, body: BodyId, orbit: Orbit) -> Vec<&Ship> {
+    game.ships.iter().filter(|s| s.seat == seat && game.ship_in_orbit(s, body, orbit)).collect()
+}
+
+/// Ticket #335: the orbits of a Body a Faction has Ships in, low orbit first. One, and a label can
+/// name it; more, and the stack is spread and the label says over how many.
+fn orbits_of_stack(game: &Game, seat: Seat, body: BodyId) -> Vec<Orbit> {
+    game.orbits_of(body).into_iter().filter(|o| !ships_in_orbit(game, seat, body, *o).is_empty()).collect()
+}
+
+/// Ticket #335: where a Faction's stack at a Body sits, for a label with room for one clause. A
+/// stack is no longer one thing in one place: `Selection::ShipStack` still gathers a Faction's
+/// Ships at a whole Body, and those Ships may sit in different orbits and fight different Battles.
+fn stack_orbit_phrase(game: &Game, seat: Seat, body: BodyId) -> String {
+    match orbits_of_stack(game, seat, body).as_slice() {
+        [] => String::new(),
+        [one] => orbit_phrase(game, body, *one),
+        many => format!("across {} orbits", many.len()),
+    }
+}
+
 /// Ticket #136 (version 0.07.3): **one ring per Orbital Slot round the globe** on a Body Surface
 /// Map. The designer: *"Want to see icons representative of orbitals orbiting their parent bodies
 /// each slot a separate orbit."* Ticket #151 (version 0.07.4) redrew them: *"each should be on
@@ -900,9 +953,13 @@ fn warship_in_slot(game: &Game, body: BodyId, slot: u32) -> Option<&Ship> {
 /// of the globe; the part behind the globe is not drawn. A built station's glyph **travels slowly
 /// round its ring** (one revolution in about a minute and a half, each slot's period its own),
 /// in its holder's colour with its name beneath, clickable as it goes; in `shot:` mode the clock
-/// is stopped so the pictures are reproducible. An empty slot is a solid grey ring; a warship
-/// blockading the slot is drawn beside the station in its Faction's colour, which is the first
-/// time Blockade has been visible on a map.
+/// is stopped so the pictures are reproducible. An empty slot is a solid grey ring.
+///
+/// Ticket #335 (version 0.09.0): **low orbit is a ring too**, the innermost, and every stack in any
+/// orbit is drawn on that orbit's ring with a mark for the Battle fought in it. A Body's orbits are
+/// low orbit plus one per Orbital Slot; before this the map drew the slots alone, so a Ship in low
+/// orbit -- which is most of the Ships in the game -- appeared on no ring at all, and one warship
+/// blockading a slot was the only hull a ring ever showed.
 #[allow(clippy::too_many_arguments)]
 fn orbit_rings_on_globe(
     painter: &egui::Painter,
@@ -915,10 +972,6 @@ fn orbit_rings_on_globe(
     project: &dyn Fn(Vec3) -> Option<Pos2>,
     hotspots: &mut Vec<Hotspot>,
 ) {
-    let n = game.tables.body(body).orbital_slots;
-    if n == 0 {
-        return;
-    }
     let center = globe_gt.translation();
     let Some(c2) = project(center) else { return };
     let rim = project(center + cam_right * GLOBE_RADIUS).map(|r| (r - c2).length()).unwrap_or(0.0);
@@ -932,46 +985,115 @@ fn orbit_rings_on_globe(
     let rot = globe_gt.rotation() * geo::upright().inverse();
     // The clock the stations travel by. Stopped in `shot:` mode, so a picture is the same twice.
     let clock = if session.shot_prefix.is_empty() { painter.ctx().input(|i| i.time) as f32 } else { 0.0 };
-    for slot in 0..n {
+    // Ticket #335 (version 0.09.0): one ring per ORBIT, which is low orbit and then one per Orbital
+    // Slot. Low orbit is drawn innermost, hugging the globe it is the lane to, on a plane of its own
+    // and in a colour and a weight no slot wears, so it is never read as a sixth slot; the slots
+    // keep the radii, planes and periods ticket #151 gave them, to the pixel.
+    for orbit in game.orbits_of(body) {
+        let slot = orbit.slot();
         // A step tighter to the globe than the first try, at the designer's word ("just slightly
         // tighter"), so the outer rings stay nearer the window at the default zoom.
-        let radius = GLOBE_RADIUS * (1.08 + 0.04 * slot as f32);
+        let radius = GLOBE_RADIUS
+            * match slot {
+                Some(n) => 1.08 + 0.04 * n as f32,
+                None => 1.035,
+            };
         // Each slot's own plane: a lean from the equator of 32 to 61 degrees, and a heading for
         // the line of nodes a good step round from the last slot's.
-        let incline = 0.55 + 0.13 * slot as f32;
-        let node = 1.3 * slot as f32;
+        // Low orbit's plane leans less than any slot's and is turned a little off slot 0's, so the
+        // two cross rather than stack; the first try at 0.95 and 2.35 stood nearly edge-on from
+        // where this camera sits and the picture showed it as two thin arcs, which is the very
+        // fault ticket #151 redrew the slots to cure.
+        let incline = match slot {
+            Some(n) => 0.55 + 0.13 * n as f32,
+            None => 0.40,
+        };
+        let node = match slot {
+            Some(n) => 1.3 * n as f32,
+            None => 0.6,
+        };
         let u = Vec3::new(node.cos(), 0.0, node.sin());
         let v = Vec3::new(-node.sin() * incline.cos(), incline.sin(), node.cos() * incline.cos());
         let world_at = |a: f32| center + rot * (radius * (a.cos() * u + a.sin() * v));
+        // One angle of the ring, or None where the globe is in front of it or it is off screen.
+        let seen = |a: f32| {
+            let w = world_at(a);
+            project(w).filter(|p| !hidden(w, *p))
+        };
         let samples = 128;
-        let points: Vec<Option<Pos2>> = (0..samples)
-            .map(|i| {
-                let a = i as f32 / samples as f32 * std::f32::consts::TAU;
-                let w = world_at(a);
-                project(w).filter(|p| !hidden(w, *p))
-            })
-            .collect();
-        let station = game.colonies.iter().find(|c| c.in_orbit && c.body == body && c.slot == slot);
-        let colour = station.and_then(|c| c.control.director()).map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150));
+        let points: Vec<Option<Pos2>> = (0..samples).map(|i| seen(i as f32 / samples as f32 * std::f32::consts::TAU)).collect();
+        let station = slot.and_then(|n| game.colonies.iter().find(|c| c.in_orbit && c.body == body && c.slot == n));
+        let colour = match slot {
+            None => LOW_ORBIT,
+            Some(_) => station.and_then(|c| c.control.director()).map(|s| seat_colour(session, s)).unwrap_or(Color32::from_gray(150)),
+        };
         // Ticket #151: an empty slot's ring is a solid line in the empty grey, no longer dashed --
         // the designer: *"lets make them solid lines, same color."*
-        orbit_polyline(painter, &points, false, colour.gamma_multiply(0.8));
+        orbit_polyline(painter, &points, false, colour.gamma_multiply(0.8), if slot.is_none() { 2.2 } else { 1.2 });
         // The glyph starts a step further round its ring than the last slot's, so five glyphs fan
         // out rather than line up, and travels on from there: one revolution in ninety seconds
         // for the first slot and eight seconds longer for each after it, so they drift apart.
-        let period = 90.0 + 8.0 * slot as f32;
-        let a = std::f32::consts::PI * (1.18 + 0.14 * slot as f32) + clock * std::f32::consts::TAU / period;
-        let w = world_at(a);
-        let Some(p) = project(w).filter(|p| !hidden(w, *p)) else { continue };
-        if let Some(c) = station {
+        // Low orbit is lower, so it goes round faster: seventy seconds.
+        let period = match slot {
+            Some(n) => 90.0 + 8.0 * n as f32,
+            None => 70.0,
+        };
+        let start = std::f32::consts::PI
+            * match slot {
+                Some(n) => 1.18 + 0.14 * n as f32,
+                None => 1.06,
+            };
+        let a = start + clock * std::f32::consts::TAU / period;
+        if let (Some(c), Some(p)) = (station, seen(a)) {
             glyph_at(painter, Kind::Station, p, 18.0, colour);
-            label_at(painter, p + egui::vec2(0.0, 17.0), &game.station_name(body, slot), colour, 11.0);
+            label_at(painter, p + egui::vec2(0.0, 17.0), &game.station_name(body, c.slot), colour, 11.0);
             // A moving target: the circle is wider than a fixed glyph's, and the click is taken
             // where the mouse was pressed, so a station cannot slip out from under its own click.
             hotspots.push(Hotspot { pos: p, radius: 16.0, hit: Hit::Select(Selection::Colony(c.id)) });
         }
-        if let Some(s) = warship_in_slot(game, body, slot) {
-            glyph_at(painter, Kind::Warship, p + egui::vec2(20.0, 0.0), 16.0, seat_colour(session, s.seat));
+        // Ticket #335: **every stack sitting in this orbit is drawn on it**, one glyph a Faction in
+        // that Faction's colour, trailing the station's own glyph round the ring. Until now a ring
+        // showed one blockading warship and nothing else, and a Ship in low orbit was on no ring at
+        // all, which is most of the Ships in the game.
+        // A stack trails the station's glyph by half a radian a Faction; where the globe stands in
+        // front of that spot it is carried on round the ring until it is in sight, since a stack
+        // that is HERE and drawn nowhere is the fault this ring was redrawn to cure. Looking caught
+        // it: four stacks sat in Mars's low orbit and the first picture showed one.
+        let mut step = if station.is_some() { 1.0 } else { 0.0 };
+        for seat in Seat::ALL {
+            let here = ships_in_orbit(game, seat, body, orbit);
+            if here.is_empty() {
+                continue;
+            }
+            let from = a + 0.5 * step;
+            let Some(p) = (0..18).find_map(|k| seen(from + 0.35 * k as f32)) else {
+                step += 1.0;
+                continue;
+            };
+            glyph_at(painter, Kind::of_ships(here.iter().copied()), p, 16.0, seat_colour(session, seat));
+            label_at(painter, p + egui::vec2(0.0, 15.0), &format!("{} x{}", game.seat_name(seat), here.len()), seat_colour(session, seat), 10.0);
+            hotspots.push(Hotspot { pos: p, radius: 14.0, hit: Hit::Select(Selection::ShipStack(body, seat)) });
+            step += 1.0;
+        }
+        // A slot's ring is named by its station's label; low orbit has no station to name it, so it
+        // says its own name on the ring, high on the ring's RIGHT-HAND side. The orbit band fills
+        // the top left of the window and the slots' own glyphs gather low and to the left, and the
+        // first two tries -- a fixed angle, then the ring's lowest point -- landed under each.
+        if orbit.is_low() {
+            let right: Vec<Pos2> = points.iter().flatten().copied().filter(|p| p.x >= c2.x).collect();
+            let anchor = right.iter().copied().min_by(|a, b| a.y.total_cmp(&b.y)).or_else(|| points.iter().flatten().copied().min_by(|a, b| a.y.total_cmp(&b.y)));
+            if let Some(p) = anchor {
+                label_at(painter, p, "low orbit", LOW_ORBIT, 11.0);
+            }
+        }
+        // Ticket #317 (version 0.08.8) gave the Body one Battle mark. Ticket #335: a Battle is
+        // fought and recorded in ONE ORBIT, so the mark belongs beside the orbit that fought, and
+        // two fights at one Body -- one in low orbit, one at a station's ring -- put two marks up.
+        if let Some(i) = game.battle_last_turn_at(ReportPlace::Orbit(body, orbit))
+            && let Some(p) = seen(a - 0.78)
+        {
+            battle_mark(painter, p, battle_colour(session, game, i));
+            hotspots.push(Hotspot { pos: p, radius: 12.0, hit: Hit::Battle(i) });
         }
     }
 }
@@ -1995,7 +2117,7 @@ fn game_screen(
             // Ship stack; it never selects.
             let right = if resp.secondary_clicked() { resp.interact_pointer_pos().filter(|p| rect.contains(*p)) } else { None };
             if let (Some(pos), Some((camera, cam_gt))) = (right, cam) {
-                right_click(pos, session, game, view, camera, cam_gt, globes, textures, actions);
+                right_click(pos, session, game, view, camera, cam_gt, globes, textures, &hotspots, actions);
             }
         }
     });
@@ -2404,6 +2526,21 @@ Click to open the Tech Tree.".to_string() };
 
 // ------------------------------------------------------------------ overlays and picking
 
+/// Ticket #335 (version 0.09.0): **one row of the Body Surface Map's orbit band**. It was a tuple
+/// until this ticket; a Battle row now has to carry the record it reads, because there is a row per
+/// ORBIT that fought rather than one for the whole Body, and a fifth field in a tuple of five is a
+/// line nobody can read.
+struct BandRow {
+    text: String,
+    colour: Color32,
+    /// The glyph at the left of the row, where the row is about a kind of thing.
+    kind: Option<Kind>,
+    /// The Faction whose stack this row is, for the hotspot that selects it.
+    seat: Option<Seat>,
+    /// The Battle this row reads, as an index into the Report, for the hotspot that opens it.
+    battle: Option<usize>,
+}
+
 #[allow(clippy::too_many_arguments)]
 fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &ViewState, camera: &Camera, cam_gt: &GlobalTransform, globes: &Query<(&Globe, &GlobalTransform)>, hotspots: &mut Vec<Hotspot>) {
     let project = |p: Vec3| -> Option<Pos2> { camera.world_to_viewport(cam_gt, p).ok().map(|v| Pos2::new(v.x, v.y)) };
@@ -2458,7 +2595,7 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         let at = |a: f32| pos + Vec3::new(a.cos() * r, 0.0, a.sin() * r);
                         let samples = 64;
                         let points: Vec<Option<Pos2>> = (0..samples).map(|i| project(at(i as f32 / samples as f32 * std::f32::consts::TAU))).collect();
-                        orbit_polyline(painter, &points, stations == 0, Color32::from_gray(140));
+                        orbit_polyline(painter, &points, stations == 0, Color32::from_gray(140), 1.2);
                         for slot in 0..orbital {
                             let Some(q) = project(at(slot as f32 / orbital as f32 * std::f32::consts::TAU + 0.3)) else { continue };
                             if let Some(c) = game.colonies.iter().find(|c| c.in_orbit && c.body == body && c.slot == slot) {
@@ -2493,9 +2630,11 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     if far && hovering {
                         label_on_screen(painter, p + egui::vec2(0.0, 96.0), &game.window_text(body), Color32::from_rgb(255, 220, 140), 13.0);
                     }
-                    // The Orbital Control flag in the holder's Faction colour.
+                    // The Orbital Control flag in the holder's Faction colour. Ticket #335 (version
+                    // 0.09.0): Control is of LOW ORBIT, and the flag says so, since a warship at a
+                    // station's ring holds nothing by sitting there.
                     if let Some(s) = game.orbital_control(body) {
-                        label_at(painter, p - egui::vec2(0.0, side * 40.0), &format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s), 12.0);
+                        label_at(painter, p - egui::vec2(0.0, side * 40.0), &format!("Orbital Control of low orbit: {}", game.seat_name(s)), seat_colour(session, s), 12.0);
                     }
                 }
                 // Ticket #50: up to four stacks at one Body. The markers sit at four fixed angles
@@ -2508,7 +2647,11 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                         continue;
                     }
                     let Some(p) = head else { continue };
-                    let text = format!("{} x{}  str {}", game.seat_name(seat), ships.len(), game.ship_stack_strength(seat, body));
+                    // Ticket #335 (version 0.09.0): and WHICH ORBIT it sits in, since a stack at a
+                    // Body is in low orbit or at one of the stations, and what it can reach from
+                    // there -- the ground, a station, a Battle -- follows from that alone. A stack
+                    // spread over several orbits says how many; the Surface Map's band names each.
+                    let text = format!("{} x{}  str {}, {}", game.seat_name(seat), ships.len(), game.ship_stack_strength(seat, body), stack_orbit_phrase(game, seat, body));
                     let at = p - egui::vec2(0.0, 58.0 + row * 16.0);
                     label_kind_at(painter, at, Some(Kind::of_ships(ships.iter().filter_map(|id| game.ship(*id)))), &text, seat_colour(session, seat), 12.0);
                     hotspots.push(Hotspot { pos: at, radius: 14.0, hit: Hit::Select(Selection::ShipStack(body, seat)) });
@@ -2624,71 +2767,96 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                             hotspots.push(Hotspot { pos: centre, radius: 12.0, hit: if own { Hit::Shield(sid) } else { Hit::Select(Selection::State(sid)) } });
                         }
                     }
-                    // Ticket #44: Antarctica's Colony Slots.
-                    slot_labels(painter, session, game, body, &visible, hotspots);
+                    // Ticket #44: Antarctica's Colony Slots. Earth's globe carries no orbit band,
+                    // so nothing here has a rectangle to keep clear of (ticket #335).
+                    slot_labels(painter, session, game, body, &visible, hotspots, None);
                 }
                 _ => {
-                    slot_labels(painter, session, game, body, &visible, hotspots);
                     // The band along the top: Ship stacks in orbit and Orbital Control. Ticket #50:
                     // four seats will not fit on one line, so each takes its own in its own colour.
                     // Ticket #216 (version 0.08.2): a line that belongs to a Faction's stack carries
                     // its seat, so the block can grow hotspots and a hover naming the hulls. A
                     // station's line and the Orbital Control line belong to nobody and carry None.
-                    let mut band: Vec<(String, Color32, Option<Kind>, Option<Seat>)> = Vec::new();
+                    //
+                    // Ticket #335 (version 0.09.0): **every row that speaks of a place says which
+                    // ORBIT**. A Faction's Ships at a Body are no longer one row: they are a row per
+                    // orbit they sit in, because what a stack can reach follows from its orbit and
+                    // from nothing else. A Battery's row says the orbit it covers, and there is a
+                    // Battle row per orbit that fought.
+                    let mut band: Vec<BandRow> = Vec::new();
                     for seat in Seat::ALL {
-                        let ids = game.ships_at(seat, body);
-                        if !ids.is_empty() {
-                            let kind = Kind::of_ships(ids.iter().filter_map(|id| game.ship(*id)));
-                            band.push((format!("{}: {} Ship(s), strength {}", game.seat_name(seat), ids.len(), game.ship_stack_strength(seat, body)), seat_colour(session, seat), Some(kind), Some(seat)));
+                        for orbit in game.orbits_of(body) {
+                            let here = ships_in_orbit(game, seat, body, orbit);
+                            if here.is_empty() {
+                                continue;
+                            }
+                            let strength: i64 = here.iter().map(|s| game.ship_strength(s)).sum();
+                            let text = format!("{}: {} Ship(s), strength {}, {}", game.seat_name(seat), here.len(), strength, orbit_phrase(game, body, orbit));
+                            band.push(BandRow { text, colour: seat_colour(session, seat), kind: Some(Kind::of_ships(here.iter().copied())), seat: Some(seat), battle: None });
                         }
                     }
                     for c in game.colonies.iter().filter(|c| c.in_orbit && c.body == body) {
                         let who = c.control.director();
                         let name = who.map(|s| game.seat_name(s)).unwrap_or_else(|| "nobody's".into());
-                        band.push((format!("{} ({})", game.station_name(body, c.slot), name), who.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY), Some(Kind::Station), None));
+                        let colour = who.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY);
+                        band.push(BandRow { text: format!("{} ({})", game.station_name(body, c.slot), name), colour, kind: Some(Kind::Station), seat: None, battle: None });
                     }
                     // Ticket #324 (version 0.08.8): a seat's working Batteries at the Body are a row
                     // of the band, and the Control line says when they are why nobody holds it.
+                    // Ticket #335: a Battery covers its OWN orbit alone -- a station's its station's
+                    // ring, a ground Colony's low orbit -- so the row names the orbit it denies.
                     for seat in Seat::ALL {
-                        // Ticket #335 (version 0.09.0): the row speaks of the whole Body, so it
-                        // counts every orbit's Batteries; which orbit each covers is the interface
-                        // lane's to draw.
-                        let n = game.batteries_at_body(seat, body).len();
-                        if n > 0 {
-                            band.push((format!("{}: {} Batter{}, strength {}", game.seat_name(seat), n, if n == 1 { "y" } else { "ies" }, game.battery_strength_at_body(seat, body)), seat_colour(session, seat), None, None));
+                        for orbit in game.orbits_of(body) {
+                            let n = game.batteries_at(seat, body, orbit).len();
+                            if n == 0 {
+                                continue;
+                            }
+                            let text = format!("{}: {} Batter{}, strength {}, covering {}", game.seat_name(seat), n, if n == 1 { "y" } else { "ies" }, game.battery_strength(seat, body, orbit), game.orbit_name(body, orbit));
+                            band.push(BandRow { text, colour: seat_colour(session, seat), kind: None, seat: None, battle: None });
                         }
                     }
-                    let any_battery = Seat::ALL.iter().any(|s| !game.batteries_at_body(*s, body).is_empty());
+                    // Ticket #335: Orbital Control is of LOW ORBIT, and the line says so, since a
+                    // warship at a station's ring holds nothing by sitting there.
+                    let any_battery = Seat::ALL.iter().any(|s| !game.batteries_at(*s, body, Orbit::Low).is_empty());
                     band.push(match game.orbital_control(body) {
-                        Some(s) => (format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s), None, None),
-                        None if any_battery => ("Orbital Control: nobody, a Battery stands".to_string(), Color32::LIGHT_GRAY, None, None),
-                        None => ("Orbital Control: nobody".to_string(), Color32::LIGHT_GRAY, None, None),
+                        Some(s) => BandRow { text: format!("Orbital Control of low orbit: {}", game.seat_name(s)), colour: seat_colour(session, s), kind: None, seat: None, battle: None },
+                        None if any_battery => BandRow { text: "Orbital Control of low orbit: nobody, a Battery stands".to_string(), colour: Color32::LIGHT_GRAY, kind: None, seat: None, battle: None },
+                        None => BandRow { text: "Orbital Control of low orbit: nobody".to_string(), colour: Color32::LIGHT_GRAY, kind: None, seat: None, battle: None },
                     });
                     // Ticket #317 (version 0.08.8): a Battle in orbit last turn is a row of the
                     // band, with the Battle mark's glyph, in the aggressor's colour; its hotspot
                     // reads the record and opens the Report as the mark's does.
-                    // Ticket #335 (version 0.09.0): any orbit of this Body.
-                    let fought = game.battle_last_turn_in_orbit(body);
-                    if let Some(i) = fought {
+                    // Ticket #335 (version 0.09.0): one row per ORBIT that fought, since two fights
+                    // at one Body are two records and the map now marks each on its own ring.
+                    for orbit in game.orbits_of(body) {
+                        let Some(i) = game.battle_last_turn_at(ReportPlace::Orbit(body, orbit)) else { continue };
                         let who = game.report.battles[i].aggressor().map(|s| format!("the {} attacked", game.seat_name(s))).unwrap_or_else(|| "nobody attacked".to_string());
-                        band.push((format!("A Battle here last turn: {who}"), battle_colour(session, game, i), Some(Kind::Battle), None));
+                        let text = format!("A Battle {} last turn: {who}", orbit_phrase(game, body, orbit));
+                        band.push(BandRow { text, colour: battle_colour(session, game, i), kind: Some(Kind::Battle), seat: None, battle: Some(i) });
                     }
                     let rect = painter.clip_rect();
                     let x = rect.center().x - 120.0;
-                    label_at(painter, Pos2::new(x, rect.min.y + 50.0), &format!("In orbit around {}", game.tables.body(body).name), Color32::WHITE, 13.0);
-                    for (i, (text, colour, kind, seat)) in band.iter().enumerate() {
+                    // Ticket #335 (version 0.09.0): the band keeps the rectangle it painted in --
+                    // the union of its title and every row -- and hands it to the Colony Slot
+                    // labels below, which are drawn after it and step clear of it. The band grew on
+                    // this ticket from one row per Faction to one per Faction per orbit plus a
+                    // Battle row per orbit, and a site projecting near the top centre had its name
+                    // painted through those rows.
+                    let mut band_rect = label_at(painter, Pos2::new(x, rect.min.y + 50.0), &format!("In orbit around {}", game.tables.body(body).name), Color32::WHITE, 13.0);
+                    for (i, row) in band.iter().enumerate() {
                         let at = Pos2::new(x, rect.min.y + 70.0 + 18.0 * i as f32);
-                        label_kind_at(painter, at, *kind, text, *colour, 12.0);
-                        if *kind == Some(Kind::Battle) && let Some(b) = fought {
+                        band_rect = band_rect.union(label_kind_at(painter, at, row.kind, &row.text, row.colour, 12.0));
+                        if let Some(b) = row.battle {
                             hotspots.push(Hotspot { pos: at, radius: 14.0, hit: Hit::Battle(b) });
                         }
                         // Ticket #216: a Faction's line gets a hit target, so hovering it can name
                         // that Faction's hulls. The Solar System Map's block already had one for the
                         // click; this block had none at all, being painted at fixed positions.
-                        if let Some(s) = seat {
-                            hotspots.push(Hotspot { pos: at, radius: 14.0, hit: Hit::Select(Selection::ShipStack(body, *s)) });
+                        if let Some(s) = row.seat {
+                            hotspots.push(Hotspot { pos: at, radius: 14.0, hit: Hit::Select(Selection::ShipStack(body, s)) });
                         }
                     }
+                    slot_labels(painter, session, game, body, &visible, hotspots, Some(band_rect));
                 }
             }
         }
@@ -2776,7 +2944,9 @@ fn slot_yield_label(painter: &egui::Painter, pos: Pos2, yields: &dying_earth_eng
     }
 }
 
-fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: BodyId, visible: &dyn Fn(Vec3) -> Option<Pos2>, hotspots: &mut Vec<Hotspot>) {
+/// `band` is the orbit band's rectangle where the Body has one, so a label can step clear of it
+/// (ticket #335).
+fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: BodyId, visible: &dyn Fn(Vec3) -> Option<Pos2>, hotspots: &mut Vec<Hotspot>, band: Option<egui::Rect>) {
     // Ticket #103 (version 0.07.0): Earth's three slots are Antarctica's, and nothing of them is
     // drawn until the ice opens -- no marker, no name, no yields. A player is told the ice EXISTS
     // and at what warmth it goes, on the Solar System Map and the Climate Panel, so an Antarctic
@@ -2802,6 +2972,18 @@ fn slot_labels(painter: &egui::Painter, session: &Session, game: &Game, body: Bo
                     }
                     None => (format!("{name}: empty"), Color32::LIGHT_GRAY, Hit::Select(Selection::Slot(body, slot)), None),
                 };
+                // Ticket #335 (version 0.09.0): a site that projects near the top centre of the
+                // globe had its name and its four yields painted through the orbit band's rows, a
+                // collision this ticket's extra rows made common. Where the label's block would
+                // land inside the band, the whole of the site's annotation -- name, yields, Battle
+                // mark and hotspot -- drops together to just below the band, keeping the mark above
+                // the name and the click where the text is. Nothing is hidden and nothing shrinks.
+                let block = label_block(painter, p + egui::vec2(0.0, 24.0), kind, &text, 12.0);
+                let dodge = match band {
+                    Some(b) if b.intersects(block) => b.max.y + 8.0 - block.min.y,
+                    _ => 0.0,
+                };
+                let p = p + egui::vec2(0.0, dodge);
                 label_kind_at(painter, p + egui::vec2(0.0, 24.0), kind, &text, colour, 12.0);
                 // Ticket #311 (version 0.08.7): last turn's Battle at this Colony, as a Region's.
                 // Ticket #317 (version 0.08.8): the Battle mark above the slot's point.
@@ -2880,7 +3062,8 @@ fn stations_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewSt
         ui.label(RichText::new(format!("In orbit: {} of {} station slots", count, card.orbital_slots)).strong()),
         format!(
             "{} has room for {} stations in orbit, and a station taken is a station gone: nobody else builds there.
-A station is where Ships refuel and where a Shipyard can stand, and a Warship holding a slot blockades that slot alone, not the whole world.",
+A station is touched -- unloaded into, refuelled at, blockaded, attacked -- only from its own orbit, and this Body's orbits are low orbit and one per slot.
+A Warship on Blockade shuts the one orbit it sits in and no other: a station's ring starves that station, and low orbit starves the ground under a rival's Orbital Control.",
             card.name, card.orbital_slots
         ),
     );
@@ -3019,8 +3202,16 @@ fn apply_hit(hit: Hit, view: &mut ViewState) {
 /// stack selected, a right-click on another Body sends every Ship of it that can pay the leg, as
 /// the card's *All that can* does, and a second right-click takes that back. A right-click never
 /// selects; on anything else it does nothing, and a Region out of reach says so in a notice.
+///
+/// Ticket #335 (version 0.09.0): **and on a Body Surface Map it chooses the orbit.** With the
+/// player's Ship stack at that Body selected -- from its line in the orbit band, or from its glyph
+/// on a ring -- a right-click on a station's glyph moves every Ship of the stack that can pay it
+/// into that station's orbit, and a right-click on the globe itself moves them into low orbit; a
+/// second right-click on the same target takes the orders back, as everywhere else. On the Solar
+/// System Map a right-click on a Body still sends the stack to that Body's LOW ORBIT, which is what
+/// `slot: None` has always meant and is now named and drawn.
 #[allow(clippy::too_many_arguments)]
-fn right_click(pos: Pos2, session: &Session, game: &Game, view: &ViewState, camera: &Camera, cam_gt: &GlobalTransform, globes: &Query<(&Globe, &GlobalTransform)>, textures: &Textures, actions: &mut Vec<Action>) {
+fn right_click(pos: Pos2, session: &Session, game: &Game, view: &ViewState, camera: &Camera, cam_gt: &GlobalTransform, globes: &Query<(&Globe, &GlobalTransform)>, textures: &Textures, hotspots: &[Hotspot], actions: &mut Vec<Action>) {
     let Ok(ray) = camera.viewport_to_world(cam_gt, Vec2::new(pos.x, pos.y)) else { return };
     let (origin, dir) = (ray.origin, Vec3::from(ray.direction));
     // The orders the target would take, and whether every one of them is already pending.
@@ -3057,13 +3248,39 @@ fn right_click(pos: Pos2, session: &Session, game: &Game, view: &ViewState, came
             if to == from {
                 return;
             }
+            // Ticket #335 (version 0.09.0): a right-click on a Body sends the stack to that Body's
+            // LOW ORBIT -- `slot: None` -- which is the orbit the ground is reached from and the
+            // one a player almost always means from this map. A station's own orbit is chosen from
+            // the stack card's Transits row, or by a right-click on its glyph once there.
             let orders: Vec<Order> = game.ships_at(Seat(0), from).into_iter().map(|id| Order::Transit { ship: id, to, slot: None }).filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok() || session.pending.contains(o)).collect();
             if orders.is_empty() {
-                actions.push(Action::Notice(format!("No Ship of the stack can pay the leg to {}.", game.tables.body(to).name)));
+                actions.push(Action::Notice(format!("No Ship of the stack can pay the leg to {}.", game.orbit_name(to, Orbit::Low))));
             }
             place_or_cancel(orders, actions);
         }
-        View::Surface(BodyId::Earth) => {
+        View::Surface(body) => {
+            // Ticket #335 (version 0.09.0): the orbit right-click is tried first. It only fires
+            // with the player's own Ship stack AT THIS BODY selected, which an armed Region's stack
+            // never is, so the Earth march below cannot be shadowed by it.
+            if let Some((orbit, ids)) = orbit_right_click(pos, game, view, origin, dir, globes, hotspots, body) {
+                let orders: Vec<Order> = ids
+                    .into_iter()
+                    .map(|id| Order::ChangeOrbit { ship: id, slot: orbit.slot() })
+                    .filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok() || session.pending.contains(o))
+                    .collect();
+                if orders.is_empty() {
+                    actions.push(Action::Notice(format!(
+                        "No Ship of the stack moves to {}: each is there already, has another order, or holds fewer than {} Fuel.",
+                        game.orbit_name(body, orbit),
+                        game.tables.orbit_change_fuel
+                    )));
+                }
+                place_or_cancel(orders, actions);
+                return;
+            }
+            if body != BodyId::Earth {
+                return;
+            }
             let Some(from) = view.armed_stack else { return };
             let Some((_, globe_gt)) = globes.iter().find(|(g, _)| g.0 == BodyId::Earth) else { return };
             let center = globe_gt.translation();
@@ -3088,8 +3305,41 @@ fn right_click(pos: Pos2, session: &Session, game: &Game, view: &ViewState, came
             }
             place_or_cancel(orders, actions);
         }
-        View::Surface(_) => {}
     }
+}
+
+/// Ticket #335 (version 0.09.0): **the orbit a right-click on a Body Surface Map names**, and the
+/// player's Ships at that Body to move into it. A station's glyph travels round its ring carrying a
+/// hotspot with it, so the nearest station hotspot under the pointer is that station's orbit; the
+/// globe itself, with no glyph over it, is low orbit, the lane to the ground. None where no stack of
+/// the player's at this Body is selected, or where the click landed on neither.
+#[allow(clippy::too_many_arguments)]
+fn orbit_right_click(pos: Pos2, game: &Game, view: &ViewState, origin: Vec3, dir: Vec3, globes: &Query<(&Globe, &GlobalTransform)>, hotspots: &[Hotspot], body: BodyId) -> Option<(Orbit, Vec<ShipId>)> {
+    let Selection::ShipStack(at, Seat(0)) = view.selection else { return None };
+    if at != body {
+        return None;
+    }
+    let mut best: Option<(f32, Orbit)> = None;
+    for h in hotspots {
+        let d = h.pos.distance(pos);
+        if d > h.radius {
+            continue;
+        }
+        let Hit::Select(Selection::Colony(cid)) = h.hit else { continue };
+        let Some(c) = game.colony(cid).filter(|c| c.in_orbit && c.body == body) else { continue };
+        if best.map(|(bd, _)| d < bd).unwrap_or(true) {
+            best = Some((d, Orbit::Slot(c.slot)));
+        }
+    }
+    let orbit = match best {
+        Some((_, o)) => o,
+        None => {
+            let (_, globe_gt) = globes.iter().find(|(g, _)| g.0 == body)?;
+            geo::ray_sphere(origin, dir, globe_gt.translation(), GLOBE_RADIUS)?;
+            Orbit::Low
+        }
+    };
+    Some((orbit, game.ships_at(Seat(0), body)))
 }
 
 /// Ticket #311 (version 0.08.7): what the Battle ring's hover says, read from the record: who
@@ -4569,7 +4819,16 @@ fn stance_row(ui: &mut Ui, game: &Game, pending: &[Order], current: Stance, make
             // Ticket #319 (version 0.08.8): the Intercept label says when the computer seats use
             // it, which is measured behaviour and not a rule, at the designer's word.
             let measured = if ships && st == Stance::Intercept { "\nThe computer seats intercept with warships when an unarmed rival hull is inbound: a Colony Ship or a Carrier." } else { "" };
-            let resp = rule_tip(ui.selectable_label(shown == st, st.name()), format!("{}: {}\n{}{measured}", st.name(), st.one_liner(ships), Stance::PERSISTS));
+            // Ticket #335 (version 0.09.0): a Ship's Blockade and Intercept now reach ONE ORBIT --
+            // the one the stack sits in -- and the engine's one-liners were written in 0.08.5, when
+            // a Blockade was a slot's business and there was no low orbit to say. The orbit rule is
+            // said here, where the stance is chosen, rather than left to be found out by a refusal.
+            let orbit_rule = match (ships, st) {
+                (true, Stance::Blockade) => "\nIt shuts the orbit the stack sits in and no other: a station's own orbit starves that station, and low orbit starves the ground while you hold Orbital Control of it outright.",
+                (true, Stance::Intercept) => "\nIt catches only what arrives into the orbit the stack sits in.",
+                _ => "",
+            };
+            let resp = rule_tip(ui.selectable_label(shown == st, st.name()), format!("{}: {}\n{}{measured}{orbit_rule}", st.name(), st.one_liner(ships), Stance::PERSISTS));
             if resp.clicked() && shown != st {
                 let order = make(st);
                 if game.check_order(Seat(0), pending, &order).is_ok() {
@@ -5727,13 +5986,24 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 if n == 0 {
                     continue;
                 }
+                // Ticket #335 (version 0.09.0): the hover says WHICH ORBIT the Ship is in, and,
+                // where that is not low orbit, why the door is shut: a lift from a Launch Site
+                // arrives in low orbit and nowhere else, so a Ship at a station's ring is out of
+                // its reach until it changes orbit. The engine's own refusal is on the greyed
+                // button; this says it before the player has to hover a dead button to find out.
+                let where_it_is = orbit_phrase(game, BodyId::Earth, game.ship_orbit(s));
+                let reach = if game.ship_orbit(s).is_low() {
+                    String::new()
+                } else {
+                    format!(" This Ship is {where_it_is}; a lift from a Launch Site arrives in low orbit, so it must change orbit first.")
+                };
                 cost_button_with_hover(
                     ui,
                     game,
                     &session.pending,
                     Order::Load { ship: s.id, colonists: n, from: LoadSource::State(sid), army: None },
-                    &format!("Send {n} to {} in orbit", game.ship_name(s)),
-                    Some(format!("A launch, aboard at this turn's Resolution. This Ship carries {capacity} and has {} aboard. To crowd it past its capacity, load it from its own card.", s.colonists)),
+                    &format!("Send {n} to {} ({})", game.ship_name(s), where_it_is),
+                    Some(format!("A launch, aboard at this turn's Resolution. This Ship carries {capacity} and has {} aboard. To crowd it past its capacity, load it from its own card.{reach}", s.colonists)),
                     actions,
                 );
             }
@@ -5891,7 +6161,10 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     if let Some(by) = game.starved_by(cid) {
         let how = if col.in_orbit { format!("Blockaded by the {}", game.seat_name(by)) } else { format!("Under the {}' Orbital Control", game.seat_name(by)) };
         ui.label(RichText::new(format!("{how}: producing nothing, upkeep still paid.")).color(Color32::from_rgb(230, 110, 90))).on_hover_text(
-            "A warship stack ordered to Blockade the slot of a station starves it; a Colony on the ground starves while one rival holds Orbital Control outright and has a stack there on Blockade. Every Module makes nothing and pays its upkeep; nobody dies and nothing is destroyed. Each turn of it is an offence against you.",
+            // Ticket #335 (version 0.09.0): a Blockade shuts the ORBIT it is given in, so a station
+            // starves under a Blockade of its own ring and the ground starves under one in low
+            // orbit; a stack blockading elsewhere at the Body starves nothing.
+            "A warship stack ordered to Blockade a station's own orbit starves that station; a Colony on the ground starves while one rival holds Orbital Control of low orbit outright and has a stack on Blockade in low orbit. Every Module makes nothing and pays its upkeep; nobody dies and nothing is destroyed. Each turn of it is an offence against you.",
         );
     }
     // Ticket #164 (version 0.07.5): the room is the Core Module's four and the Habitats' eight
@@ -6122,8 +6395,19 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         }
         ui.horizontal(|ui| {
             faction_glyph(ui, session, game, Some(s.seat), 16.0);
-            ui.label(format!("{}: strength {}, damage {}/{}{}", game.ship_name(s), game.ship_strength(s), s.damage, card.hit_points, if extra.is_empty() { String::new() } else { format!(", carrying {}", extra.join(" and ")) }))
-                .on_hover_text(format!("{} {}", s.kind.name(), s.id.0));
+            // Ticket #335 (version 0.09.0): a Ship's line says the ORBIT it sits in. Two Ships of one
+            // stack may sit in two orbits, fight two Battles and reach two different things, so the
+            // card can no longer speak of the stack as though it were all in one place.
+            ui.label(format!(
+                "{}: strength {}, damage {}/{}{}, {}",
+                game.ship_name(s),
+                game.ship_strength(s),
+                s.damage,
+                card.hit_points,
+                if extra.is_empty() { String::new() } else { format!(", carrying {}", extra.join(" and ")) },
+                orbit_phrase(game, body, game.ship_orbit(s))
+            ))
+            .on_hover_text(format!("{} {}", s.kind.name(), s.id.0));
         });
     }
     if session.spectator {
@@ -6185,13 +6469,36 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     let n = c.modules.iter().filter(|m| !matches!(m.kind, ModuleKind::Core | ModuleKind::Archive)).count();
                     let place = game.place_name(Place::Colony(c.id));
                     let holder = c.control.director().map(|d| game.seat_name(d)).unwrap_or_default();
-                    let hover = format!("One Module of {n} at {place}, drawn at random, rolls a {p:.0}% chance to burn; when a Habitat burns, the Colonists beyond the room left die with it. A rung 3 offence against the {holder}, breaking a non-aggression Accord if one stands. Needs Orbital Control here held outright; never over Earth.");
+                    // Ticket #335 (version 0.09.0): **the orbit you are in is the orbit you must
+                    // hold.** A ground Colony is broken from low orbit by a Faction holding Orbital
+                    // Control of it outright; a station from that station's own ring, with no rival
+                    // warship and no rival working Battery in it. The hover says which, and where
+                    // this Battleship is sitting now, so a greyed button is never a mystery.
+                    let holds = if c.in_orbit {
+                        format!("The Battleship must be {}, with no rival warship and no rival working Battery in that orbit.", orbit_phrase(game, body, game.colony_orbit(c)))
+                    } else {
+                        "The Battleship must be in low orbit, with Orbital Control of low orbit held outright; never over Earth's ground.".to_string()
+                    };
+                    let hover = format!(
+                        "One Module of {n} at {place}, drawn at random, rolls a {p:.0}% chance to burn; when a Habitat burns, the Colonists beyond the room left die with it. A rung 3 offence against the {holder}, breaking a non-aggression Accord if one stands. {holds} {} is {} now.",
+                        game.ship_name(s),
+                        orbit_phrase(game, body, game.ship_orbit(s))
+                    );
                     cost_button_with_hover(ui, game, &session.pending, Order::Bombard { ship: s.id, colony: c.id }, &format!("Bombard {} from {}", place, game.ship_name(s)), Some(hover), actions);
                 }
             }
         }
     }
-    ui.label(RichText::new("Transits (whole stack)").strong());
+    // Ticket #335 (version 0.09.0): **a transit names the orbit it ends in before it leaves**, so
+    // every destination Body unfolds into its orbits -- low orbit, then one line per station -- and
+    // each line has the buttons the Body's one line used to carry. The leg costs the same whichever
+    // orbit it ends in; the orbit decides what the Ship can do when it gets there, and until this
+    // ticket every transit the interface sent passed `slot: None`, so no human player could
+    // blockade, refuel at a rival's station, or arrive anywhere but low orbit.
+    let transits = ui.label(RichText::new("Transits (whole stack)").strong());
+    if view.stack_scroll == Some(StackBlock::Transits) {
+        transits.scroll_to_me(Some(egui::Align::Min));
+    }
     for to in BodyId::ALL {
         if to == body {
             continue;
@@ -6199,22 +6506,65 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         // Ticket #92: the player's own figure, with the Faction's and the Tech's multipliers and a
         // Mass Driver's cut on it.
         let (turns, fuel) = game.transit_cost_for(Seat(0), body, to);
+        ui.label(format!("To {}: {} turn(s), {} Fuel each from the tank, whichever orbit it ends in", game.tables.body(to).name, turns, fuel));
+        for orbit in game.orbits_of(to) {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(format!("   {}", game.orbit_name(to, orbit)));
+                // Ticket #322 (version 0.08.8): the heading's promise kept: one button moves every
+                // Ship of the stack that can pay the leg, the per-Ship buttons staying for a split.
+                if ships.len() > 1 {
+                    let able: Vec<Order> = ships
+                        .iter()
+                        .map(|s| Order::Transit { ship: s.id, to, slot: orbit.slot() })
+                        .filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok())
+                        .collect();
+                    let n = able.len();
+                    orders_button(ui, game, &session.pending, able, &format!("All {n} that can"), Some(format!("Every Ship of the stack whose tank pays the leg, {n} of {}, sent together into {}.", ships.len(), game.orbit_name(to, orbit))), actions);
+                }
+                for s in &ships {
+                    // Ticket #87: the button reads the tank against the leg.
+                    cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: orbit.slot() }, &format!("{} ({}/{} in the tank)", game.ship_name(s), s.fuel, game.tables.unit(s.kind).tank), actions);
+                }
+            });
+        }
+    }
+    // Ticket #335 (version 0.09.0): **the door for `Order::ChangeOrbit`**: one line per other orbit
+    // at this Body, with the Fuel it costs on the line and a button per Ship not already in it. A
+    // Ship that wants a station's refuelling, a Blockade of a station's ring, or the low orbit a
+    // landing is made from no longer has to fly away and come back to get there.
+    let orbit_fuel = game.tables.orbit_change_fuel;
+    let door = ui.label(RichText::new("Change orbit").strong());
+    if view.stack_scroll == Some(StackBlock::ChangeOrbit) {
+        door.scroll_to_me(Some(egui::Align::Min));
+    }
+    ui.label(format!("Moving between two orbits of {} costs {} Fuel from the Ship's own tank, and lands with the transits, before the Battles.", game.tables.body(body).name, orbit_fuel));
+    for orbit in game.orbits_of(body) {
+        // Every Ship already sitting there is no candidate; a line nobody can take is not drawn.
+        let movers: Vec<&&Ship> = ships.iter().filter(|s| game.ship_orbit(s) != orbit).collect();
+        if movers.is_empty() {
+            continue;
+        }
         ui.horizontal_wrapped(|ui| {
-            ui.label(format!("To {}: {} turn(s), {} Fuel each from the tank", game.tables.body(to).name, turns, fuel));
-            // Ticket #322 (version 0.08.8): the heading's promise kept: one button moves every
-            // Ship of the stack that can pay the leg, the per-Ship buttons staying for a split.
-            if ships.len() > 1 {
-                let able: Vec<Order> = ships
+            ui.label(format!("   To {} ({} Fuel)", game.orbit_name(body, orbit), orbit_fuel));
+            if movers.len() > 1 {
+                let able: Vec<Order> = movers
                     .iter()
-                    .map(|s| Order::Transit { ship: s.id, to, slot: None })
+                    .map(|s| Order::ChangeOrbit { ship: s.id, slot: orbit.slot() })
                     .filter(|o| game.check_order(Seat(0), &session.pending, o).is_ok())
                     .collect();
                 let n = able.len();
-                orders_button(ui, game, &session.pending, able, &format!("All {n} that can"), Some(format!("Every Ship of the stack whose tank pays the leg, {n} of {}, sent together.", ships.len())), actions);
+                orders_button(ui, game, &session.pending, able, &format!("All {n} that can"), Some(format!("Every Ship of the stack with {orbit_fuel} Fuel in the tank and no other order, {n} of {}, moved together.", movers.len())), actions);
             }
-            for s in &ships {
-                // Ticket #87: the button reads the tank against the leg.
-                cost_button(ui, game, &session.pending, Order::Transit { ship: s.id, to, slot: None }, &format!("{} ({}/{} in the tank)", game.ship_name(s), s.fuel, game.tables.unit(s.kind).tank), actions);
+            for s in &movers {
+                cost_button_with_hover(
+                    ui,
+                    game,
+                    &session.pending,
+                    Order::ChangeOrbit { ship: s.id, slot: orbit.slot() },
+                    &format!("{} ({}/{} in the tank)", game.ship_name(s), s.fuel, game.tables.unit(s.kind).tank),
+                    Some(format!("{} is {} now. {orbit_fuel} Fuel from its own tank, and it fights this turn's Battle in its new orbit.", game.ship_name(s), orbit_phrase(game, body, game.ship_orbit(s)))),
+                    actions,
+                );
             }
         });
     }
@@ -6227,7 +6577,11 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             // Ticket #210 (version 0.08.1): the name, with the Faction's symbol in front of it and
             // the kind and id kept on the hover -- a save, a log line and a Report all speak in ids.
             faction_glyph(ui, session, game, Some(s.seat), 16.0);
-            ui.label(format!("{}: {}/{} Fuel", game.ship_name(s), s.fuel, tank))
+            // Ticket #335 (version 0.09.0): and the orbit it is in, because a station fuels only a
+            // Ship in its OWN orbit -- so a Ship in low orbit under a station of its own refuels at
+            // nothing until it has changed orbit, and the line has to say where it is for the greyed
+            // button to make sense.
+            ui.label(format!("{}: {}/{} Fuel, {}", game.ship_name(s), s.fuel, tank, orbit_phrase(game, body, game.ship_orbit(s))))
                 .on_hover_text(format!("{} {}", s.kind.name(), s.id.0));
             // Ticket #325 (version 0.08.8): or a partner's station under a Refuel Accord, named on
             // the hover; the Fuel is still the player's own Stockpile's.
@@ -6295,7 +6649,12 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 _ => {
                     for c in game.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(Seat(0)) && c.colonists > 0) {
                         let k = n.min(c.colonists);
-                        cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: k, from: LoadSource::Colony(c.id), army: None }, &format!("Load {} Colonists from {}", k, game.tables.body(c.body).slots[c.slot as usize].name), actions);
+                        // Ticket #335 (version 0.09.0): by the place's OWN name. This read the
+                        // Body's ground-slot table with the Colony's slot number, so a station in
+                        // Orbital Slot 0 was labelled with the name of the ground site numbered 0 --
+                        // "Load 2 Colonists from Olympus Mons" for a station called Mars Base Camp.
+                        // A picture of the Change orbit door caught it. `place_name` names both.
+                        cost_button(ui, game, &session.pending, Order::Load { ship: s.id, colonists: k, from: LoadSource::Colony(c.id), army: None }, &format!("Load {} Colonists from {}", k, game.place_name(Place::Colony(c.id))), actions);
                     }
                 }
             }
@@ -6979,9 +7338,21 @@ fn unit_name(game: &Game, unit: &UnitRef) -> String {
 }
 
 /// Ticket #324 (version 0.08.8): the Battery's rules, under its tile's figures on the hover.
-fn battery_rules(game: &Game) -> String {
+fn battery_rules(game: &Game, col: &Colony) -> String {
     let card = game.tables.module(ModuleKind::Battery);
-    format!("\nA Battery stands in the line of any Battle fought in this orbit, on Hold, and never disengages. While it stands and works, no rival holds Orbital Control here: none may land, and no Blockade shuts its owner's station; its owner gains no Control by it. Repaired with Materials here, as a Ship is; at {} hits it is destroyed.", card.hit_points)
+    // Ticket #335 (version 0.09.0): a Battery covers its OWN orbit and no other -- a station's its
+    // station's ring, a ground Colony's low orbit -- which narrows what ticket #324 gave it, at the
+    // designer's word. The hover names the orbit, and says what denying that one orbit is worth.
+    let orbit = game.orbit_name(col.body, game.colony_orbit(col));
+    let worth = if col.in_orbit {
+        "no rival's Blockade shuts this station"
+    } else {
+        "no rival holds Orbital Control, which is of low orbit, so none may land on the ground"
+    };
+    format!(
+        "\nA Battery covers ONE orbit, its own: {orbit}. It stands in the line of any Battle fought there, on Hold, and never disengages, and it denies nothing in any other orbit of this Body. While it stands and works, {worth}; its owner gains no Control by it. Repaired with Materials here, as a Ship is; at {} hits it is destroyed.",
+        card.hit_points
+    )
 }
 
 /// The words a box's hover adds to an offline building's line, and nothing for a working or a
@@ -7075,7 +7446,7 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         // hit points on its label, as a shield wears an Army's.
         let mut label = m.kind.name().to_string();
         if m.kind == ModuleKind::Battery {
-            tip.push_str(&battery_rules(game));
+            tip.push_str(&battery_rules(game, col));
             if m.damage > 0 {
                 let hp = game.tables.module(ModuleKind::Battery).hit_points;
                 label = format!("Battery {}/{}", hp.saturating_sub(m.damage), hp);
@@ -7671,7 +8042,7 @@ fn accords_block(ui: &mut Ui, session: &Session, game: &Game, other: Seat, actio
         let friendly = game.relations_score(me, other) >= 7 && game.relations_score(other, me) >= 7;
         for (term, label, tip) in [
             (Term::NonAggression, "Non-aggression", "Neither spends Influence on a place the other holds, nor opens a Battle against them."),
-            (Term::Passage, "Passage", "Either's Armies may march into the other's Regions without attacking, arriving on Hold; neither intercepts the other's Ships, and a Blockade does not shut them out of the slot."),
+            (Term::Passage, "Passage", "Either's Armies may march into the other's Regions without attacking, arriving on Hold; neither intercepts the other's Ships, and a Blockade does not shut them out of the orbit it shuts."),
             (Term::Refuel, "Refuel", "Either may Refuel at the other's Space Stations."),
             (Term::ResearchAgreement, "Research agreement", "Both parties' Research rises a tenth while it stands. Wants Friendly on both sides to strike, and once struck it stands whatever the scores later do."),
         ] {

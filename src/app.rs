@@ -281,6 +281,16 @@ pub enum HabTile {
     Free,
 }
 
+/// Ticket #335 (version 0.09.0), a building aid: a block of the Ship stack's card that a headless
+/// picture asks to be scrolled to, since a capture cannot drag a scrollbar.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum StackBlock {
+    /// The Transits row, one line per destination ORBIT since this ticket.
+    Transits,
+    /// The Change orbit door, one line per other orbit at this Body.
+    ChangeOrbit,
+}
+
 /// Ticket #146 (version 0.07.3): what is clicked among a Region card's slot boxes -- a standing
 /// Facility by its index, or a free box, whose strip offers the build buttons.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -362,6 +372,10 @@ pub struct ViewState {
     /// Turn or a change of view. `armed_scroll` asks the card to scroll to its Armies block once.
     pub armed_stack: Option<StateId>,
     pub armed_scroll: bool,
+    /// Ticket #335 (version 0.09.0), a building aid (`scroll:transits`, `scroll:orbits`): the Ship
+    /// stack card scrolls to that block and stays there. A headless picture cannot scroll a panel,
+    /// and on a card with four Ships on it both blocks sit well below the fold.
+    pub stack_scroll: Option<StackBlock>,
     /// Ticket #58: which Moment kinds are switched on, remembered for the session. `None` until the
     /// player touches a checkbox, when it is filled from the defaults in `report.toml`.
     pub moments_on: Option<[bool; dying_earth_engine::MomentKind::ALL.len()]>,
@@ -418,7 +432,7 @@ impl Default for ViewState {
             greenwash_amount: 5,
             credits_amount: 10,
             credits_offer: 0,
-            attack_preview: false, armed_stack: None, armed_scroll: false,
+            attack_preview: false, armed_stack: None, armed_scroll: false, stack_scroll: None,
             moments_on: None,
             force_hover: None,
             max_placed: None,

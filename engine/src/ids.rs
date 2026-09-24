@@ -763,9 +763,11 @@ impl Stance {
             (Stance::Evade, _) => "Avoids battle where it can: an even chance to slip away before the first exchange.",
             (Stance::DigIn, false) => "Dug in, it fights two stronger in defence and never disengages, and it cannot march or board a Carrier until its stance is changed and the turn has passed.",
             (Stance::DigIn, true) => "A Ship cannot dig in; it holds.",
-            (Stance::Intercept, true) => "Fights what arrives this turn, before it can land.",
+            // Ticket #335 (version 0.09.0): an Intercept catches only what arrives into the orbit
+            // the stack itself sits in, and a Blockade shuts that one orbit, not the Body.
+            (Stance::Intercept, true) => "Fights what arrives this turn into its own orbit, before it can land.",
             (Stance::Intercept, false) => "An Army cannot intercept; it holds.",
-            (Stance::Blockade, true) => "Shuts this orbital slot to every other Faction: no landing, no refuel, no building in it.",
+            (Stance::Blockade, true) => "Shuts the orbit it sits in to every other Faction: no unloading, no refuel, no building in it.",
             (Stance::Blockade, false) => "An Army cannot blockade; it holds.",
         }
     }

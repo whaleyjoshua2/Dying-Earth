@@ -353,6 +353,16 @@ early_mines = 2
 # opportunity multipliers: a queue two deep is the moment, and it speeds whatever the seat is
 # behind on there.
 factory_module_queue_depth = 2
+# Ticket #335 (version 0.09.0): a leg names its destination orbit before it leaves, and low orbit is
+# the default -- the lane to the ground, and the one orbit Orbital Control is held in. A warship
+# flies to a rival station's ring instead only where the seat means to shut that station AND this
+# many of its warships are already holding low orbit at that Body (counting the ones on the way that
+# named no ring), so the ground the seat wants is never given up for a Blockade above it. One,
+# because Orbital Control is one seat alone with a warship in low orbit: one hull holds the lane,
+# and the hull after it is the one with nothing to lose by going up. Measured at 0.08.8 every
+# warship leg named the richest rival station whatever the seat thought of its holder, so low orbit
+# stood empty and the ground was never shut by anybody.
+low_orbit_warships = 1
 
 # Tech picks as Research Lead (spec 16.4): `order` first, then the cheapest available that is not
 # `never`, and `last` only when nothing else is left.
