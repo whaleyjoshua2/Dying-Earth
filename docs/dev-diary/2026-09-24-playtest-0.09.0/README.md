@@ -327,8 +327,11 @@ Ranked by how much they break the game.
 8. **Cheap Ore Offer pays you twice.** Its refuse side sets the **global** Materials price to 1 for
    two turns, so take the ore and let a rival's refusal crash the price for you as well.
 9. **The Directive has one right answer.** Overflow above the fund's cap still reaches the shared
-   Tech, so `directive 100` costs nothing, ever. The slider the Archivists are built around has one
-   correct setting from turn one.
+   Tech, so `directive 100` loses no Research. **Partly corrected on review**: it is not free. The
+   declared figure, not the figure actually taken, is what the rest of the game reads, so at 100 the
+   Archivists lose **Provisional Findings**, their own signature rule, which wants a contribution of
+   at least 75, and take **-1 Relations with every rival** for contributing under 85. The slider is
+   still close to one-sided, but it has a price the playtester did not see.
 10. **Coach Class's drawback is not one.** A large Region grows faster than eight Pioneers a turn cost
     it, so the Arkwrights' double population cost never bites.
 11. **Materials to Ducats to Fuel.** Materials sell at 1.5, Fuel buys at 4, and the prices never move
