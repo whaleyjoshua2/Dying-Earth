@@ -251,7 +251,7 @@ fn temperature_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
     const BREAK: Color32 = Color32::from_rgb(236, 88, 76);
     let h = &game.climate.history;
     let c = &game.tables.climate;
-    ui.label(RichText::new("Temperature by turn; red is a Break").weak().small());
+    ui.label(RichText::new("The Temperature as the years ran; red is a Break").weak().small());
     let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
     let painter = ui.painter();
     painter.rect_filled(rect, 3.0, Color32::from_rgb(38, 38, 44));
@@ -758,6 +758,12 @@ fn kind_glyph(ui: &mut Ui, kind: Kind, size: f32) {
 ///
 /// Built as `glyph_button` is, a clickable frame of its own, because a plain egui button's face is
 /// text and cannot carry the glyphs.
+/// Ticket #339 (version 0.09.0): the width a `slot_yield_row` at 13 points takes on a founding
+/// button -- four glyphs, four `x1.29` figures and the air between them. Measured off the first
+/// capture at 216 pixels and rounded up, since it is used to reserve room for the row and a figure
+/// a little short of the truth costs the words a word.
+const YIELD_ROW_W: f32 = 220.0;
+
 fn found_button(ui: &mut Ui, yields: &dying_earth_engine::SlotYields, label: &str) -> egui::Response {
     ui.scope_builder(egui::UiBuilder::new().sense(egui::Sense::click()), |ui| {
         let resp = ui.response();
@@ -768,8 +774,25 @@ fn found_button(ui: &mut Ui, yields: &dying_earth_engine::SlotYields, label: &st
             .fill(visuals.weak_bg_fill)
             .stroke(visuals.bg_stroke)
             .show(ui, |ui| {
-                ui.vertical(|ui| {
-                    ui.label(RichText::new(label).color(visuals.text_color()));
+                // Ticket #339 (version 0.09.0): the four yields sit BESIDE the words, at the
+                // designer's word -- *"the yields on the found colony buttons should be next to
+                // rather than below the button"*. They were under them, which made the button two
+                // storeys tall and put the price of the site a line away from the site's name.
+                //
+                // The words WRAP, and the picture is why. The longest of the three doors reads
+                // "Found a Colony here with the 8 Colonists aboard TSV Endeavour", and laid beside
+                // the yields on one line it came to about 610 pixels -- the first capture shows it
+                // widening the side panel by ninety pixels and eating that much of the map, since
+                // the panel sizes itself to its content. So the words are given the room left after
+                // the yields and wrap inside it; a short door still puts the glyphs right beside
+                // its last word, because the words claim only the width they use.
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 8.0;
+                    let room = (ui.available_width() - YIELD_ROW_W).max(140.0);
+                    ui.allocate_ui(egui::vec2(room, 0.0), |ui| {
+                        ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+                        ui.label(RichText::new(label).color(visuals.text_color()));
+                    });
                     // Ticket #258 (version 0.08.4): drawn glyph-first; see `slot_yield_row`.
                     slot_yield_row(ui, slot_yield_figures(yields), 13.0, visuals.text_color());
                 });
@@ -2309,7 +2332,12 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             {
                 // Ticket #42: the turn's Allotment and what the trading window added, shown apart.
                 let bought: i64 = session.pending.iter().map(|o| if let Order::BuyInfluence { amount } = o { *amount } else { 0 }).sum();
-                let influence = if bought > 0 { format!("{} of {} ({} free + {} bought)", influence_left, s.allotment + bought, s.allotment, bought) } else { format!("{} of {}", influence_left, s.allotment) };
+                // Ticket #339 (version 0.09.0): a SLASH, at the designer's word -- *"replace of in
+                // the header influence section"*. Every other paired figure on this bar is written
+                // that way (Widgets `made / applied`, Research `progress / cost`, `Turn 13 / 36`),
+                // so Influence was the one figure on the bar in words. The command cluster's own
+                // `of 24 left` is untouched: the designer named the header.
+                let influence = if bought > 0 { format!("{} / {} ({} free + {} bought)", influence_left, s.allotment + bought, s.allotment, bought) } else { format!("{} / {}", influence_left, s.allotment) };
                 // Ticket #112 (version 0.07.1): Influence now has a glyph, so on the bar it follows the
                 // same rule the five resources do -- the picture stands in place of the word.
                 bar_resource(ui, icons, "influence", "Influence", influence, INFLUENCE_HOVER.to_string());
@@ -2381,11 +2409,18 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             ui.label(RichText::new(format!("Turn {} / {}, {}", game.turn, game.tables.victory.turns, game.date_text())).strong());
             ui.separator();
             // Ticket #158 (version 0.07.4): the Temperature figure's hover draws its history.
-            let temp = ui.label(format!("{:+.1} C, heading to {:+.1}", game.climate.temperature, game.target_temperature()));
-            rule_tip_ui(temp, "Temperature history", |ui| {
+            // Ticket #339 (version 0.09.0): the bar carries the TEMPERATURE and nothing else, at the
+            // designer's word -- *"get rid of 'heading to' portion of temperature section of header
+            // bar"*. The figure it dropped is not lost: it is the second sentence of this hover, in
+            // words and to the same tenth, and the hover's chart has always drawn it as the line the
+            // curve is climbing toward. The Climate Panel's own line keeps both figures, the
+            // designer having named the header bar.
+            let temp = ui.label(format!("{:+.1} C", game.climate.temperature));
+            let target = game.target_temperature();
+            rule_tip_ui(temp, "Temperature history", move |ui| {
                 ui.set_max_width(300.0);
                 ui.label(RichText::new("Temperature history").strong());
-                ui.label("Where the heat stands, and where the CO2 Stock already in the air is taking it. The Climate Panel's bar shows what it has crossed and what is next.");
+                ui.label(format!("Where the heat stands. The CO2 Stock already in the air is heading to {target:+.1} C on its own, with nothing else emitted. The Climate Panel's bar shows what it has crossed and what is next."));
                 temperature_history(ui, game, egui::vec2(280.0, 96.0));
             });
             ui.separator();
@@ -3481,7 +3516,14 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
     // space is measured from the left column's rect rather than laid out bottom-up, because a
     // bottom-up layout in a panel that sizes itself from its content has no bottom to sit on.
     let sun_d = 46.2 * CLUSTER_SCALE;
-    let sun_w = sun_d + 8.0;
+    // Ticket #339 (version 0.09.0): a little air on End Turn's left, at the designer's word --
+    // *"give the end turn button a little more padding on the left"*. The sun sat one item spacing
+    // (4 pixels) from the every-turn tick and the Spend button beside it, close enough that a hand
+    // reaching for the tick was reaching past the sun. The pad is taken OFF the left column's width
+    // rather than added to the strip, so the cluster is the same width it was and only the sun
+    // moves right; it is scaled with everything else in the cluster (ticket #211).
+    let sun_pad = 10.0 * CLUSTER_SCALE;
+    let sun_w = sun_d + 8.0 + sun_pad;
     let sun_h = sun_d + 16.0 * CLUSTER_SCALE + 4.0;
     ui.horizontal(|ui| {
         let left_w = ui.available_width() - sun_w - ui.spacing().item_spacing.x;
@@ -3600,6 +3642,7 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
         // designer's word; a tenth larger again on seeing the first picture: "make it 10% larger".
         // Ticket #305 (version 0.08.7): in its own column at the right, at the bottom, nothing above it.
         let left_h = column.response.rect.height();
+        ui.add_space(sun_pad);
         ui.vertical(|ui| {
             if left_h > sun_h {
                 ui.add_space(left_h - sun_h);
@@ -6980,6 +7023,72 @@ fn credits_request_block(ui: &mut Ui, session: &Session, game: &Game, view: &mut
     }
 }
 
+/// Ticket #339 (version 0.09.0): **an edge routed around the boxes in its way**, rather than
+/// straight through them. The complaint is old -- raised on issue #243 and declined, then made
+/// worse by #245 and #246, which between them deleted one line that ran under two boxes and drew a
+/// longer one of the same shape. A line that crosses a box reads as if it JOINS that box, so a
+/// player learns a prerequisite the game does not have.
+///
+/// The elbow itself is unchanged where nothing is in the way: out of the needed box, along the
+/// lane in the gap to the left of the needing box's column, and in at that box's left edge. What is
+/// new is that the horizontal RUN -- the only leg long enough to cross a column -- is tried at a
+/// series of heights and the first CLEAR one is taken:
+///
+/// 1. the needed box's own middle, which is the straight elbow and what is drawn today;
+/// 2. the air between two box rows, below the box and then above it, stepping a whole `row` at a
+///    time out to three rows either side. A run at one of these leaves the box by its bottom or
+///    its top and drops into the lane first.
+///
+/// With nothing clear it falls back to the straight elbow, because a line that is drawn wrongly can
+/// still be read and a line that is not drawn at all cannot. Three rows either side is the bound:
+/// this is a detour, not a graph-layout engine, and the tree is five bands tall.
+///
+/// The air between rows is `row - from_box.height()`, so the function needs no copy of the tree's
+/// box height; the lane sits a quarter of a row-gap clear of the box edge, as the old detour did.
+fn tech_edge_path(from_box: egui::Rect, to_box: egui::Rect, gap_x: f32, row: f32, obstacles: &[egui::Rect]) -> Vec<Pos2> {
+    let to = to_box.left_center();
+    let clear = (row - from_box.height()).max(8.0) / 4.0;
+    // A run at `y`: out of the box (by a side if `y` is level with it, otherwise by the nearer of
+    // top and bottom and down the column into the lane), along to the gap, up or down the gap, in.
+    let path_at = |y: f32| -> Vec<Pos2> {
+        let mut pts: Vec<Pos2> = Vec::new();
+        if y > from_box.min.y && y < from_box.max.y {
+            pts.push(Pos2::new(if from_box.max.x < gap_x { from_box.max.x } else { from_box.min.x }, y));
+        } else {
+            let edge = if y > from_box.center().y { from_box.max.y } else { from_box.min.y };
+            pts.push(Pos2::new(from_box.center().x, edge));
+            pts.push(Pos2::new(from_box.center().x, y));
+        }
+        pts.push(Pos2::new(gap_x, y));
+        pts.push(Pos2::new(gap_x, to.y));
+        pts.push(to);
+        pts
+    };
+    // Below first when the needing box is below, so a detour bends toward where the line is going.
+    let (near, far) = if to.y > from_box.center().y { (1.0, -1.0) } else { (-1.0, 1.0) };
+    let mut heights = vec![from_box.center().y];
+    for k in 0..3 {
+        let step = clear + from_box.height() / 2.0 + k as f32 * row;
+        heights.push(from_box.center().y + near * step);
+        heights.push(from_box.center().y + far * step);
+    }
+    for y in heights {
+        let path = path_at(y);
+        if !path.windows(2).any(|leg| obstacles.iter().any(|r| segment_meets(leg[0], leg[1], *r))) {
+            return path;
+        }
+    }
+    path_at(from_box.center().y)
+}
+
+/// Does an axis-aligned segment pass through a box? Written as a rectangle overlap, since a
+/// horizontal or vertical segment is a rectangle of no thickness, so one test covers both
+/// directions. Touching an edge exactly does not count: a line that leaves a box's own side must
+/// not read as crossing it.
+fn segment_meets(a: Pos2, b: Pos2, r: egui::Rect) -> bool {
+    a.x.max(b.x) > r.min.x && a.x.min(b.x) < r.max.x && a.y.max(b.y) > r.min.y && a.y.min(b.y) < r.max.y
+}
+
 /// Ticket #41: the Tech Tree drawn as a tree, a line from every Tech to each Tech that needs it,
 /// each box coloured by its state. Ticket #133 (version 0.07.3) transposed it: **one row per
 /// branch, one column per rung**, so time runs left to right the way a tree is read, the branch
@@ -7085,43 +7194,30 @@ fn tech_tree(ui: &mut Ui, game: &Game, available: &[TechId], must_pick: bool, ac
     }
     // Lines first, so the boxes sit on top of them. A line is green once the Tech it comes from is done.
     // Ticket #133: a line is ELBOWED -- it leaves the needed box, runs along the gap to the left of
-    // the needing box's column, and enters the needing box's left edge -- so it never crosses a
-    // box. A Tech that needs one on its own rung (Closed-Loop Colonies needs Clean Power) is
-    // reached the same way: out of the needed box's LEFT edge, down that same gap, and in.
+    // the needing box's column, and enters the needing box's left edge. A Tech that needs one on
+    // its own rung (Closed-Loop Colonies needs Clean Power) is reached the same way: out of the
+    // needed box's LEFT edge, down that same gap, and in.
+    //
+    // Ticket #339 (version 0.09.0): where that elbow would run THROUGH a box, it is routed around
+    // it instead (`tech_edge_path`). Every box in the tree is an obstacle to every line but the two
+    // the line joins.
+    let boxes: Vec<(TechId, egui::Rect)> = TechId::ALL.into_iter().map(|t| (t, box_of(t))).collect();
     for t in TechId::ALL {
         for n in &game.tables.tech(t).needs {
             let to_box = box_of(t);
             let from_box = box_of(*n);
-            let to = to_box.left_center();
             // Each source row takes its own lane in the gap, or every line into a column merges
             // into one trunk and nobody can tell which Tech feeds which (the first picture).
             let lane = branches.iter().position(|x| *x == game.tables.tech(*n).branch).unwrap_or(0) as f32;
             let gap_x = to_box.min.x - 4.0 - lane * 3.5;
             let colour = if game.research.done.contains(n) { Color32::from_rgb(120, 200, 120) } else { Color32::from_gray(150) };
             let stroke = egui::Stroke::new(2.0, colour);
-            // A box standing between the needed box and the lane (Coastal Engineering beside
-            // Efficient Grids) would have the line run behind it and seem to feed the target
-            // itself; so the line leaves that box's bottom instead, runs along the row gap, and
-            // only then climbs the lane.
-            let between = TechId::ALL.iter().any(|o| {
-                let ob = box_of(*o);
-                *o != *n && ob.min.x >= from_box.max.x && ob.max.x <= gap_x && (ob.center().y - from_box.center().y).abs() < 1.0
-            });
-            let from = if between {
-                let start = from_box.center_bottom();
-                let row_gap_y = from_box.max.y + (ROW - BOX_H) / 4.0;
-                painter.line_segment([start, Pos2::new(start.x, row_gap_y)], stroke);
-                painter.line_segment([Pos2::new(start.x, row_gap_y), Pos2::new(gap_x, row_gap_y)], stroke);
-                Pos2::new(gap_x, row_gap_y)
-            } else if from_box.max.x < gap_x {
-                from_box.right_center()
-            } else {
-                from_box.left_center()
-            };
-            painter.line_segment([from, Pos2::new(gap_x, from.y)], stroke);
-            painter.line_segment([Pos2::new(gap_x, from.y), Pos2::new(gap_x, to.y)], stroke);
-            painter.line_segment([Pos2::new(gap_x, to.y), to], stroke);
-            painter.circle_filled(to, 3.5, colour);
+            let obstacles: Vec<egui::Rect> = boxes.iter().filter(|(o, _)| *o != t && *o != *n).map(|(_, r)| *r).collect();
+            let path = tech_edge_path(from_box, to_box, gap_x, ROW, &obstacles);
+            for leg in path.windows(2) {
+                painter.line_segment([leg[0], leg[1]], stroke);
+            }
+            painter.circle_filled(to_box.left_center(), 3.5, colour);
         }
     }
     for t in TechId::ALL {
@@ -9443,5 +9539,48 @@ mod tests {
         assert_eq!(next(Popup::Card, 0, false, false), Popup::Report, "answered, with no Moments: the Report");
         // The card comes before the Event, and a turn that draws a question draws nothing else.
         assert_eq!(next(Popup::Tutorial, 2, true, true), Popup::Card, "a tutorial note hands on to the question first of all");
+    }
+
+    /// Ticket #339 (version 0.09.0): **no Tech Tree edge crosses a box.** The complaint is old --
+    /// #243 declined it, #245 removed one such line and #246 drew a longer one -- and it kept
+    /// coming back because the routing had no idea what a box was: its one detour fired only for a
+    /// box whose middle sat within a pixel of the needed box's middle.
+    ///
+    /// The fixture is the tree's own grid, three columns 144 apart and rows 86 apart with 122x58
+    /// boxes in them, so the figures a reader checks are the figures `tech_tree` uses. The
+    /// obstacle is put squarely on the straight elbow's path, which is the shape both #245 and #246
+    /// drew: a line from rung 1 to rung 3 running through whatever stands on rung 2.
+    #[test]
+    fn a_tech_tree_edge_is_routed_around_the_boxes_in_its_way() {
+        const COL: f32 = 144.0;
+        const ROW: f32 = 86.0;
+        let at = |col: f32, row: f32| egui::Rect::from_min_size(Pos2::new(col * COL + 11.0, row * ROW + 14.0), egui::vec2(122.0, 58.0));
+        let crosses = |path: &[Pos2], r: egui::Rect| path.windows(2).any(|leg| segment_meets(leg[0], leg[1], r));
+
+        // Rung 1 to rung 3 on one row, with rung 2 on that row empty: the straight elbow, three
+        // legs, leaving the needed box by its right edge at its own middle.
+        let (from, to) = (at(0.0, 0.0), at(2.0, 0.0));
+        let gap_x = to.min.x - 4.0;
+        let clear = tech_edge_path(from, to, gap_x, ROW, &[at(1.0, 1.0), at(1.0, 2.0)]);
+        assert_eq!(clear.first(), Some(&from.right_center()), "nothing in the way: out of the right edge, as it always was");
+        assert_eq!(clear.last(), Some(&to.left_center()), "and in at the needing box's left edge");
+        assert_eq!(clear.len(), 4, "three legs");
+
+        // The same edge with a box standing on rung 2 of that row, which the straight elbow would
+        // run through. The detour must clear it, and must still arrive at the same place.
+        let blocker = at(1.0, 0.0);
+        let routed = tech_edge_path(from, to, gap_x, ROW, &[blocker, at(1.0, 2.0)]);
+        assert!(crosses(&clear, blocker), "the control: the straight elbow really does cross that box");
+        assert!(!crosses(&routed, blocker), "the routed edge clears it");
+        assert_eq!(routed.last(), Some(&to.left_center()), "and still arrives at the needing box's left edge");
+        assert!(routed.len() > clear.len(), "it costs a leg: down into the row gap and along");
+
+        // A second box on the row below, so the nearest detour is blocked too and the next one out
+        // has to be taken. Both are cleared, which is what "around the boxes" means when there is
+        // more than one.
+        let below = at(1.0, 1.0);
+        let further = tech_edge_path(from, to, gap_x, ROW, &[blocker, below]);
+        assert!(!crosses(&further, blocker) && !crosses(&further, below), "both boxes cleared");
+        assert_eq!(further.last(), Some(&to.left_center()));
     }
 }

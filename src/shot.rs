@@ -1502,14 +1502,18 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         // `site:<body id>,<slot>` (a building aid, ticket #258): that Body's picture opens the empty
         // Colony Slot's panel, the one place the yields were still in words. `settler:<body id>`
         // (the same ticket): that Body's picture selects seat 0's Ship stack there.
+        // Ticket #339 (version 0.09.0): `site:` is applied AFTER `settler:`, so the two can be given
+        // together -- the Colony Ship `settler:` plants is what puts a founding button on the SLOT
+        // panel `site:` opens, and before this the stack selection won and the slot panel could
+        // never be photographed with a founding door on it. The more specific aid wins.
         if let View::Surface(body) = v {
+            if std::env::args().any(|a| a.strip_prefix("settler:").and_then(body_from_id) == Some(body)) {
+                view.selection = Selection::ShipStack(body, Seat(0));
+            }
             if let Some((b, slot)) = std::env::args().find_map(|a| a.strip_prefix("site:").and_then(|v| v.split_once(',')).and_then(|(b, n)| Some((body_from_id(b)?, n.parse::<u32>().ok()?))))
                 && b == body
             {
                 view.selection = Selection::Slot(body, slot);
-            }
-            if std::env::args().any(|a| a.strip_prefix("settler:").and_then(body_from_id) == Some(body)) {
-                view.selection = Selection::ShipStack(body, Seat(0));
             }
         }
         plan.next_at = t + 2.5;
