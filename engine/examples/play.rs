@@ -10,8 +10,12 @@
 //! `turn` reads a plain-text order list, refuses the whole list if any line is illegal (unless
 //! `--force`), commits what is left, ends the turn with the three AI seats ordering for
 //! themselves, and prints the new Report and the board.
+//!
+//! Ticket #337 (version 0.09.0): a Choice Card is drawn at the HEAD of the turn, before orders, and
+//! the turn cannot end while this seat owes it an answer. `show` prints the question; an
+//! `answer take` or `answer refuse` line in the order list answers it.
 
-use dying_earth_engine::data::{default_data_dir, Tables};
+use dying_earth_engine::data::{default_data_dir, CardEffect, CardThing, Tables};
 use dying_earth_engine::ids::*;
 use dying_earth_engine::orders::{BuildingRef, LoadSource, Order, UnitRef, UnloadTarget};
 use dying_earth_engine::save::{self, SaveKind};
@@ -48,7 +52,10 @@ fn pick<T: Copy + std::fmt::Debug>(list: &[T], word: &str) -> Result<T, String> 
 }
 
 const RESOURCES: [Resource; 5] = [Resource::Materials, Resource::Fuel, Resource::Energy, Resource::Research, Resource::Ducats];
-const STANCES: [Stance; 4] = [Stance::Attack, Stance::Hold, Stance::Intercept, Stance::Evade];
+// Ticket #278 (version 0.08.5) and ticket #297 (version 0.08.6): a Blockade is a STANCE a Ship
+// stack is given, and Dig In is an Army's. The driver offered neither, so seat 0 could not give a
+// Blockade at all -- the very move ticket #335 handed the player an orbit to give it from.
+const STANCES: [Stance; 6] = [Stance::Attack, Stance::Hold, Stance::Intercept, Stance::Evade, Stance::Blockade, Stance::DigIn];
 const CHANGES: [BuildingChange; 3] = [BuildingChange::Mothball, BuildingChange::Restart, BuildingChange::Decommission];
 
 fn number(word: &str) -> Result<i64, String> {
@@ -100,6 +107,16 @@ fn colony_id(word: &str) -> Result<ColonyId, String> {
     Ok(ColonyId(count(w)?))
 }
 
+/// Ticket #335 (version 0.09.0): an ORBIT as an order names it -- `low` (or nothing at all) for low
+/// orbit, a number for that Orbital Slot's ring. The shape `Transit` and `ChangeOrbit` both carry.
+fn orbit_slot(word: &str) -> Result<Option<u32>, String> {
+    let w = word.to_ascii_lowercase();
+    if w == "low" || w == "-" {
+        return Ok(None);
+    }
+    Ok(Some(count(&w)?))
+}
+
 /// `slot <body> <n>` or `colony <n>`, as an unload or an Antarctic landing wants it.
 fn unload_target(words: &[&str]) -> Result<UnloadTarget, String> {
     match words.first().map(|w| w.to_ascii_lowercase()).as_deref() {
@@ -115,29 +132,72 @@ fn unload_target(words: &[&str]) -> Result<UnloadTarget, String> {
 
 const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank lines are skipped)
 
+  answer take                          answer THIS TURN'S CHOICE CARD: take the offer,
+  answer refuse                        or refuse it.
+                                       Ticket #337 (version 0.09.0): a card is drawn at the HEAD of
+                                       the turn, before orders, and the turn CANNOT END while this
+                                       seat owes it an answer. `show` prints the card, its question
+                                       and what each side does; a seat that cannot pay the offer may
+                                       only refuse.
+
   tech <tech>                          pick the next shared Tech (when the board says one is awaited)
 
   build facility <state> <facility>    e.g. build facility europe factory
   build facility-ducats <state> <facility>
   build module <colony> <module>       e.g. build module 1 habitat
   build module-ducats <colony> <module>
-  build ship <place> <ship>            place is a state (needs a Launch Site) or colony:<n>
-  build army <place>
-  build station <body> <slot>          e.g. build station moon 0
+  build ship <colony> <ship>           at a Colony or station of yours with a WORKING SHIPYARD
+                                       (ticket #46): never in a Nation State, whatever its Launch
+                                       Site. The new Ship starts in the orbit of the yard that built
+                                       it -- a station's own orbit, or low orbit for a ground Colony.
+  build army <place>                   a Nation State you control, or a Colony with a Barracks.
+                                       Materials and Widgets AND PEOPLE (ticket #334, version
+                                       0.09.0): a Region loses population for it, a Colony a
+                                       Colonist, and a place without the people to spare is refused.
+  build station <body> <slot>          e.g. build station moon 0; Materials alone, no Widgets
   build archive <colony>               the Archivists only
   industry <state>                     raise the Industry Level
+  cancel-build <place> <index>         cancel a build ANOTHER seat began at a place you now direct,
+                                       which is what a conquest leaves behind: its Materials come
+                                       back at your own price and the Widgets done are lost. One a
+                                       turn at a place, and never a build of your own -- take that
+                                       back out of this turn's order list instead. The index is the
+                                       number `show` prints beside the item in that place's
+                                       `building:` list.
 
-  transit <ship> <body> [slot]         fly; spends the ship's own tank. A warship arriving into an
-                                       Orbital Slot blockades that slot and nothing else.
-  refuel <ship>                        fill the tank where you hold a station
+  A BUILD HAS NO TURN COUNT (ticket #332, version 0.09.0). Materials are paid in full at the order,
+  and a build needs a figure in WIDGETS, which the place makes at its own rate every turn and spends
+  on its queue in the order the builds were given. `show` prints each place's Widgets a turn, what
+  its queue owes, and every build as `done/needed w`. The `-ducats` forms buy a building outright
+  at twice its Materials and complete at the next Resolution whatever their Widget figure.
+
+  transit <ship> <body> [slot|low]     fly, spending the Ship's own tank. The leg names the ORBIT it
+                                       ends in: a slot number for that Orbital Slot's ring, or `low`
+                                       (or nothing at all) for low orbit.
+  change-orbit <ship> <slot|low>       move a Ship between the orbits of the Body it ALREADY stands
+                                       at, for {fuel} Fuel out of its own tank. Resolved with the
+                                       transits, before the Battles, so a Ship that changes orbit
+                                       fights in its new orbit.
+  refuel <ship>                        fill the tank at a station of yours (or of a Refuel partner's)
+                                       AT THAT STATION'S OWN ORBIT: a Ship in low orbit, or at
+                                       another station's ring, refuels at nothing until it moves.
   load <ship> <n> from <place> [army <army>]
   unload <ship> <n> [army] into slot <body> <slot>
   unload <ship> <n> [army] into colony <n>
   move-army <army> <state>
-  ship-stance <body> <stance>          stance = attack|hold|intercept|evade
-  army-stance <place> <stance>
+  ship-stance <body> <stance>          stance = attack|hold|intercept|evade|blockade
+  army-stance <place> <stance>         stance = attack|evade|digin (hold does nothing to an Army)
   repair <ship:n|army:n> <points>
   repair-ducats <ship:n|army:n> <points>
+
+  A BODY'S ORBITS (ticket #335, version 0.09.0) are LOW ORBIT and one per Orbital Slot, and every
+  Ship at a Body sits in exactly one of them; there is no Body at large. LOW ORBIT is what touches
+  the ground: landing an Army at a ground Colony, unloading Colonists into one, founding one,
+  Bombarding one, and receiving a lift from a Launch Site. A STATION'S OWN ORBIT is what touches
+  that station: unloading into it, refuelling at it, blockading it, attacking it. Orbital Control is
+  of LOW orbit and gates the ground. A BLOCKADE IS A STANCE, chosen (`ship-stance <body> blockade`)
+  and shutting the orbit the stack sits in -- never a side effect of arriving anywhere. `show` names
+  the orbit every Ship sits in, and lists each Body's orbits under FREE SLOTS.
 
   influence <place> <amount>
   buy-influence <amount>
@@ -152,7 +212,7 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   change module <colony> <index> <mothball|restart|decommission>
   fund-archive                         the Archivists only: pay the Labs into the Archive fund
   unfund-archive                       the Archivists only: pay them back into the shared Tech
-  venture-share <percent>              the Prospectors only, a step of 10, 0 to 80
+  venture-share <percent>              the Prospectors only, any whole percent from 0 to 80
   draw-venture <amount>                the Prospectors only
   leapfrog <state>                     the Custodians only
   strip-permit <state>                 the Prospectors only
@@ -160,10 +220,18 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
 Names may be shortened as long as they stay unique: `eur` is Europe, `colonys` is a Colony Ship.
 Colonies, ships and armies are named by the numbers the board prints beside them."#;
 
-/// One line is an order, or the `tech` line, which is not one.
+/// The grammar with this game's own figures written into it, so a table that moves a figure moves
+/// the help with it.
+fn grammar(fuel: i64) -> String {
+    GRAMMAR.replace("{fuel}", &fuel.to_string())
+}
+
+/// One line is an order, or the `tech` line or an `answer` line, neither of which is one.
 enum Line {
     Order(Box<Order>),
     Tech(TechId),
+    /// Ticket #337: this seat's answer to the turn's Choice Card -- taken, or refused.
+    Answer(bool),
 }
 
 fn parse_line(line: &str) -> Result<Line, String> {
@@ -172,6 +240,16 @@ fn parse_line(line: &str) -> Result<Line, String> {
     let verb = w[0].to_ascii_lowercase();
     let o = match verb.as_str() {
         "tech" => return Ok(Line::Tech(pick(&TechId::ALL, at(1)?)?)),
+        // Ticket #337 (version 0.09.0): the only door the driver has onto the turn's question. It
+        // is not an Order -- it is answered the moment the line is read, as a `tech` pick is.
+        "answer" => {
+            let side = at(1)?.to_ascii_lowercase();
+            return match side.as_str() {
+                "take" => Ok(Line::Answer(true)),
+                "refuse" => Ok(Line::Answer(false)),
+                _ => Err(format!("`answer` wants `take` or `refuse`, not {side:?}")),
+            };
+        }
         "build" => {
             let what = at(1)?.to_ascii_lowercase();
             match what.as_str() {
@@ -187,15 +265,21 @@ fn parse_line(line: &str) -> Result<Line, String> {
             }
         }
         "industry" => Order::RaiseIndustry { state: pick(&StateId::ALL, at(1)?)? },
+        // Ticket #332 (version 0.09.0): a build another seat began at a place that has changed hands.
+        "cancel-build" => Order::CancelBuild { place: place(at(1)?)?, index: count(at(2)?)? as usize },
         "transit" => Order::Transit {
             ship: ship_id(at(1)?)?,
             to: pick(&BodyId::ALL, at(2)?)?,
-            // Ticket #99: an optional Orbital Slot to arrive into; a warship there blockades it.
+            // Ticket #99: the Orbital Slot to arrive into. Ticket #335 (version 0.09.0): the leg
+            // names the ORBIT it ends in, and a leg naming none ends in low orbit, which is an
+            // orbit like any other and not "the Body at large".
             slot: match w.get(3) {
                 None => None,
-                Some(v) => Some(count(v)?),
+                Some(v) => orbit_slot(v)?,
             },
         },
+        // Ticket #335 (version 0.09.0): between the orbits of the Body the Ship already stands at.
+        "change-orbit" => Order::ChangeOrbit { ship: ship_id(at(1)?)?, slot: orbit_slot(at(2)?)? },
         "refuel" => Order::Refuel { ship: ship_id(at(1)?)? },
         "load" => {
             let ship = ship_id(at(1)?)?;
@@ -265,11 +349,121 @@ fn control_text(g: &Game, c: Control) -> String {
     }
 }
 
-fn ship_at_text(at: ShipAt) -> String {
-    match at {
-        ShipAt::Body(b) => b.name().to_string(),
-        ShipAt::Transit { from, to, turns_left } => format!("{} -> {} ({turns_left} left)", from.name(), to.name()),
+/// Where a Ship is. Ticket #335 (version 0.09.0): a Ship sits in an ORBIT of a Body, and which
+/// orbit decides what it can touch, refuel at, blockade or fight, so the orbit is what is printed:
+/// a Ship at a station's ring reads differently from one in low orbit. A Ship in transit names the
+/// orbit its leg ends in, which was chosen when it launched.
+fn ship_at_text(g: &Game, s: &Ship) -> String {
+    match s.at {
+        ShipAt::Body(b) => g.orbit_name(b, g.ship_orbit(s)),
+        ShipAt::Transit { from, to, turns_left } => format!("{} -> {} ({turns_left} left)", from.name(), g.orbit_name(to, Orbit::of(s.slot))),
     }
+}
+
+/// Ticket #337 (version 0.09.0): one effect of one side of a Choice Card, in words. The eighteen
+/// cards are not eighteen pieces of written code: each side is a list of effects composed in
+/// `events.toml` from one vocabulary, so a card given new figures in the table says the new figures
+/// here without this being touched.
+fn card_effect_text(e: &CardEffect) -> String {
+    match e {
+        CardEffect::Resources { materials, fuel, energy, ducats, research } => {
+            let parts: Vec<String> = [(*materials, Resource::Materials), (*fuel, Resource::Fuel), (*energy, Resource::Energy), (*ducats, Resource::Ducats), (*research, Resource::Research)]
+                .into_iter()
+                .filter(|(n, _)| *n != 0)
+                .map(|(n, r)| format!("{n:+} {}", r.name()))
+                .collect();
+            parts.join(", ")
+        }
+        CardEffect::PerUnitCost { per, resource, amount } => {
+            let thing = match per {
+                CardThing::Facility(k) => k.name().to_string(),
+                CardThing::ShipInOrbit => "Ship of yours in orbit".to_string(),
+            };
+            format!("{amount} {} for every {thing}", resource.name())
+        }
+        CardEffect::PopulationToMostPopulous { population } => format!("{population:+.1} population in your most populous Region"),
+        CardEffect::EmissionsNext { ppm } => format!("{ppm:+.1} ppm of Emissions next turn"),
+        CardEffect::StandingAllHeld { standing } => format!("{standing:+} Standing in every Region you hold"),
+        CardEffect::StandingAtMostPopulous { standing } => format!("{standing:+} Standing in your most populous Region"),
+        CardEffect::UnrestAllHeld { unrest } => format!("{unrest:+.1} Unrest in every Region you hold"),
+        CardEffect::UnrestAtMostPopulous { unrest } => format!("{unrest:+.1} Unrest in your most populous Region"),
+        CardEffect::UnrestAtBusiest { unrest } => format!("{unrest:+.1} Unrest in your busiest Region"),
+        CardEffect::HoldShips => "every Ship of yours holds this turn: no transit of yours resolves".to_string(),
+        CardEffect::HoldOneShip => "one Ship of yours holds this turn".to_string(),
+        CardEffect::DamageShips { damage, in_orbit } => format!("{damage} damage to each of your Ships{}", if *in_orbit { " in orbit" } else { "" }),
+        CardEffect::TradePrice { resource, to, by, turns } => match to {
+            Some(to) => format!("the {} price stands at {to} for {turns} turn(s)", resource.name()),
+            None => format!("the {} price moves {by:+} for {turns} turn(s)", resource.name()),
+        },
+        CardEffect::RelationsAllRivals { relations } => format!("{relations:+} Relations with every rival"),
+        CardEffect::BlamePpm { ppm } => {
+            if *ppm < 0.0 {
+                format!("{:.1} ppm off your Blame", -ppm)
+            } else {
+                format!("{ppm:.1} ppm onto your Blame")
+            }
+        }
+        CardEffect::WidgetsNow { widgets } => format!("{widgets:+} Widgets this turn in your busiest Region"),
+        CardEffect::FacilityOutputMultiplier { facility, multiplier } => {
+            format!("every {} of yours makes {:.0}% of its output at the next Income", facility.name(), multiplier * 100.0)
+        }
+        CardEffect::DiscoveryAtColony { module, multiplier, turns } => {
+            format!("a Discovery at one of your Colonies: its {} at x{multiplier:.1} for {turns} turn(s)", module.name())
+        }
+        CardEffect::PioneersFree { pioneers } => format!("{pioneers} Pioneers waiting, costing their Region no people"),
+        CardEffect::FreeBuilding { module, army } => match (module, army) {
+            (Some(m), _) => format!("a {} standing free at your smallest Colony", m.name()),
+            (None, true) => "an Army raised free in your most populous Region, costing it no people".to_string(),
+            (None, false) => String::new(),
+        },
+    }
+}
+
+fn card_side_text(side: &[CardEffect]) -> String {
+    let parts: Vec<String> = side.iter().map(card_effect_text).filter(|s| !s.is_empty()).collect();
+    parts.join("; ")
+}
+
+/// Ticket #337 (version 0.09.0): **the turn's question**, which a player who cannot see cannot
+/// answer -- and the turn cannot end until they have. The card, what it asks, what each side does,
+/// and whether the offer is one this seat can pay.
+fn print_question(g: &Game) {
+    let me = Seat(0);
+    let Some(q) = g.pending_question() else { return };
+    let card = g.tables.event(q.card);
+    let Some(c) = card.choice.as_ref() else { return };
+    println!("\n=== THE TURN'S QUESTION: {} ===", card.name);
+    println!("{}", c.question);
+    println!("  `answer take`    {}: {}", c.take, card_side_text(&c.take_does));
+    println!("  `answer refuse`  {}: {}", c.refuse, card_side_text(&c.refuse_does));
+    match q.answer_of(me) {
+        Some(a) => println!("  Your answer is given: you {a_word}.", a_word = a.word()),
+        None if !g.may_take_card(me) => {
+            println!("  *** THE OFFER IS CLOSED TO YOU: you cannot pay what it asks, so `answer refuse` is your only move. ***")
+        }
+        None => println!("  *** UNANSWERED. Both sides are open to you. The turn cannot end until an `answer` line is given. ***"),
+    }
+}
+
+/// Ticket #337: what this seat still owes the turn's card, in the driver's own words -- naming the
+/// card and the line that answers it, since a line is the only door the driver has. `Game::end_turn`
+/// refuses in its own words; a player reading only those would not know what to write.
+fn owed_answer(g: &Game) -> Option<String> {
+    let q = g.pending_question()?;
+    if q.answer_of(Seat(0)).is_some() {
+        return None;
+    }
+    let card = g.tables.event(q.card);
+    let question = card.choice.as_ref().map(|c| c.question.as_str()).unwrap_or_default();
+    Some(format!(
+        "{} is asking you: {question}\n  Put `answer take` or `answer refuse` in the order list. {}",
+        card.name,
+        if g.may_take_card(Seat(0)) {
+            "Either side is open to you."
+        } else {
+            "You cannot pay what it asks, so `answer refuse` is your only move."
+        }
+    ))
 }
 
 /// What it would take this seat to take `target` as it stands, which on a held place is the
@@ -287,6 +481,31 @@ fn standing_note(g: &Game, seat: Seat, target: Target) -> String {
         Some(c) => format!("{} needed to take it from the {}", need, g.seat_name(c)),
         None => format!("{need} needed to take it"),
     }
+}
+
+/// Ticket #332 (version 0.09.0): a place's queue, each build as its INDEX (what `cancel-build`
+/// names), its item, and the Widgets done of the Widgets it wants. A build begun by another seat --
+/// what a conquest leaves behind -- is the only kind that may be cancelled, so it says whose it is.
+fn queue_text(g: &Game, place: Place) -> Vec<String> {
+    g.queue_at(place)
+        .iter()
+        .enumerate()
+        .map(|(i, b)| {
+            let whose = if b.seat == Seat(0) { String::new() } else { format!(" (the {}'s, cancellable)", g.seat_name(b.seat)) };
+            format!("{i}:{} {}/{}w{whose}", b.item.name(), b.done, b.widgets)
+        })
+        .collect()
+}
+
+/// Ticket #332: what a place MAKES and what it OWES, which is the whole of planning a build now
+/// that the flat turn count is gone: the queue is served in order at this rate.
+fn widgets_text(g: &Game, place: Place, queue: &[String]) -> String {
+    format!(
+        "Widgets {} a turn, {} owed | building: {}",
+        g.widgets_at(place),
+        g.widgets_owed(place),
+        if queue.is_empty() { "nothing".to_string() } else { queue.join(", ") }
+    )
 }
 
 fn slot_name(g: &Game, body: BodyId, slot: u32) -> String {
@@ -359,6 +578,9 @@ fn print_report(g: &Game) {
 fn print_board(g: &Game) {
     let me = Seat(0);
     let t = &g.tables;
+    // Ticket #337: at the head of the board, because it is asked at the head of the turn and holds
+    // End Turn until it is answered.
+    print_question(g);
     println!("\n=== TURN {} of {} ({}) ===", g.turn, t.victory.turns, g.date_text());
     println!("{}", g.outcome_text());
     println!(
@@ -498,7 +720,7 @@ fn print_board(g: &Game) {
                 format!("{i}:{}{mark}", f.kind.name())
             })
             .collect();
-        let q: Vec<String> = st.queue.iter().map(|b| format!("{} {}/{}w", b.item.name(), b.done, b.widgets)).collect();
+        let q = queue_text(g, Place::State(st.id));
         let inf = g.seat(me).influence.get(&Place::State(st.id)).copied().unwrap_or(0);
         println!(
             "{:<16} {:<30} pop {:.1} ind {} unrest {} | free slots {}/{} (coastal {}) | your Standing {}, {} | emigrants {}",
@@ -521,9 +743,7 @@ fn print_board(g: &Game) {
             card.gdp,
             if facs.is_empty() { "none".into() } else { facs.join(", ") }
         );
-        if !q.is_empty() {
-            println!("    building: {}", q.join(", "));
-        }
+        println!("    {}", widgets_text(g, Place::State(st.id), &q));
         let note = g.unrest_note(st.id);
         if !note.is_empty() {
             println!("    {note}");
@@ -544,7 +764,7 @@ fn print_board(g: &Game) {
                 format!("{i}:{}{mark}", m.kind.name())
             })
             .collect();
-        let q: Vec<String> = c.queue.iter().map(|b| format!("{} {}/{}w", b.item.name(), b.done, b.widgets)).collect();
+        let q = queue_text(g, Place::Colony(c.id));
         let name = if c.in_orbit { g.station_name(c.body, c.slot) } else { slot_name(g, c.body, c.slot) };
         println!(
             "colony {:<3} {:<22} {:<7} {:<30} colonists {} (room {}) | Modules {}/{} | yields {}",
@@ -570,23 +790,37 @@ fn print_board(g: &Game) {
             g.seat(me).influence.get(&Place::Colony(c.id)).copied().unwrap_or(0),
             standing_note(g, me, Place::Colony(c.id))
         );
-        println!(
-            "    at {} | modules: {}{}",
-            c.body.name(),
-            if mods.is_empty() { "none".into() } else { mods.join(", ") },
-            if q.is_empty() { String::new() } else { format!(" | building: {}", q.join(", ")) }
-        );
+        // Ticket #335: the ORBIT a Ship must sit in to touch this place -- its own for a station,
+        // low orbit for a Colony on the ground, since low orbit is what touches the ground.
+        let reached = if c.in_orbit {
+            g.orbit_name(c.body, g.colony_orbit(c))
+        } else {
+            format!("on the ground at {}, reached from {}", c.body.name(), g.orbit_name(c.body, Orbit::Low))
+        };
+        println!("    at {reached} | modules: {}", if mods.is_empty() { "none".into() } else { mods.join(", ") });
+        println!("    {}", widgets_text(g, Place::Colony(c.id), &q));
     }
 
     println!("\n--- FREE SLOTS ---");
     for b in BodyId::ALL {
         let ground: Vec<String> = g.free_slots_on(b).iter().map(|n| format!("{n} {} [{}]", slot_name(g, b, *n), g.slot_yields(b, *n).text())).collect();
         let orbit: Vec<String> = g.free_orbital_slots(b).iter().map(|n| format!("{n} {}", g.station_name(b, *n))).collect();
+        // Ticket #335 (version 0.09.0): every orbit of the Body, free or not -- the numbers a
+        // `transit` or a `change-orbit` line names.
+        let orbits: Vec<String> = g
+            .orbits_of(b)
+            .iter()
+            .map(|o| match o {
+                Orbit::Low => "low".to_string(),
+                Orbit::Slot(n) => format!("{n} {}", g.station_name(b, *n)),
+            })
+            .collect();
         println!(
-            "{:<7} ground: {}\n        orbital: {}",
+            "{:<7} ground: {}\n        orbital: {}\n        orbits to fly to: {}",
             b.name(),
             if ground.is_empty() { "none".into() } else { ground.join("; ") },
-            if orbit.is_empty() { "none".into() } else { orbit.join("; ") }
+            if orbit.is_empty() { "none".into() } else { orbit.join("; ") },
+            orbits.join(" | ")
         );
     }
 
@@ -595,13 +829,14 @@ fn print_board(g: &Game) {
         println!("none anywhere");
     }
     for sh in &g.ships {
+        // Ticket #335 (version 0.09.0): the ORBIT, not the bare Body and a slot number, so a Ship at
+        // a station's ring can be told from one in low orbit without doing the arithmetic.
         println!(
-            "ship {:<3} {:<12} seat {} at {:<26} slot {:<4} tank {}/{} | colonists {} | army {:?} | hp {} | {}{}",
+            "ship {:<3} {:<12} seat {} at {:<34} tank {}/{} | colonists {} | army {:?} | hp {} | {}{}",
             sh.id.0,
             sh.kind.name(),
             sh.seat.0,
-            ship_at_text(sh.at),
-            sh.slot.map(|n| n.to_string()).unwrap_or_else(|| "-".into()),
+            ship_at_text(g, sh),
             sh.fuel,
             t.unit(sh.kind).tank,
             sh.colonists,
@@ -690,7 +925,12 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let command = args.first().cloned().unwrap_or_else(|| "help".into());
     if command == "help" {
-        println!("{GRAMMAR}");
+        // The figures in the help are the table's, not literals in this file, so a table that moves
+        // one moves the help with it. Where the data cannot be found, the grammar still prints.
+        match Tables::load(&default_data_dir()) {
+            Ok(t) => println!("{}", grammar(t.orbit_change_fuel)),
+            Err(_) => println!("{}", GRAMMAR.replace("{fuel}", "the orbit-change")),
+        }
         return;
     }
     let tables = Arc::new(Tables::load(&default_data_dir()).expect("tables"));
@@ -761,6 +1001,15 @@ fn main() {
                         println!("line {}: REFUSED `{line}`: {e}", n + 1);
                         bad += 1;
                     }
+                    // Ticket #337 (version 0.09.0): answered the moment the line is read, as a
+                    // `tech` pick is, so it is given before the turn it holds can end.
+                    Ok(Line::Answer(taken)) => match game.answer_card(Seat(0), taken) {
+                        Ok(()) => println!("line {}: answered: you {}", n + 1, if taken { "take the offer" } else { "refuse it" }),
+                        Err(e) => {
+                            println!("line {}: REFUSED `{line}`: {e}", n + 1);
+                            bad += 1;
+                        }
+                    },
                     Ok(Line::Tech(t)) => match game.pick_tech(Seat(0), t) {
                         Ok(()) => println!("line {}: picked {}", n + 1, game.tables.tech(t).name),
                         Err(e) => {
@@ -790,11 +1039,22 @@ fn main() {
                 left.ducats,
                 influence
             );
+            // Ticket #337 (version 0.09.0): the turn's question holds End Turn. The engine refuses
+            // in its own words; this says which card is asking and what line answers it, because a
+            // line is the only door the driver has and a raw refusal names none.
+            let owed = owed_answer(&game);
+            if let Some(why) = &owed {
+                println!("\nSTILL OWED: {why}");
+            }
             if command == "check" {
                 return;
             }
             if bad > 0 && !args.iter().any(|a| a == "--force") {
                 eprintln!("\nThe turn was NOT ended: {bad} line(s) were refused. Fix them, or pass --force to end the turn with the rest.");
+                std::process::exit(1);
+            }
+            if let Some(why) = owed {
+                eprintln!("\nThe turn was NOT ended: {why}");
                 std::process::exit(1);
             }
             let mut all: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
