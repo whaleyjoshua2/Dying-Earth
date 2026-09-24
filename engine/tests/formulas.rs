@@ -12905,3 +12905,141 @@ fn an_ordinary_card_is_held_in_silence_and_lands_where_it_always_did() {
     g.apply_event_now();
     assert_eq!(g.state(sid).unrest, quiet + g.tables.events.unrest_card_unrest, "the card's own figure, unchanged");
 }
+
+
+/// Ticket #339 (version 0.09.0): **a refusal names the rule, not the price.** `check_order_inner`
+/// tested affordability before it tested anything else, so an order that was both forbidden and
+/// unaffordable was told what it cost and never told it was forbidden -- the fog carried on four
+/// wayfinder maps since #230. The legality runs first now and the price last, so the sentence a
+/// player reads is the one that still binds when the Materials are found.
+#[test]
+fn a_refusal_names_the_rule_before_the_price() {
+    let mut g = game();
+    g.seats[0].stockpile = Stockpile { materials: 0, fuel: 0, energy: 0, ducats: 0 };
+    // Sub-Saharan Africa is nobody's, so a Factory there is forbidden -- and unaffordable as well.
+    let forbidden = Order::BuildFacility { state: StateId::SubSaharanAfrica, kind: FacilityKind::Factory };
+    assert!(g.order_cost(Seat(0), &forbidden).materials > 0, "the order has a price it could be told instead");
+    let why = g.check_order(Seat(0), &[], &forbidden).expect_err("forbidden and unaffordable at once");
+    assert!(why.0.contains("do not direct"), "the refusal names the rule, not the price: {}", why.0);
+    // And an order that is only unaffordable is still told its price, which is the useful sentence there.
+    let priced = Order::BuildFacility { state: StateId::EastAsia, kind: FacilityKind::Factory };
+    let why = g.check_order(Seat(0), &[], &priced).expect_err("legal but unaffordable");
+    assert!(why.0.contains("Materials"), "a legal order short of the money is told its price: {}", why.0);
+}
+
+
+/// Ticket #339 (version 0.09.0): **the march lines name the Army.** Armies have carried names since
+/// 0.08.4 and the Report still said "Custodians Army moved from China to Russia" (#270, declared to
+/// the playtesters as a rough edge). The march, the landing, the rival's march clause and the
+/// rival's loading clause all read the name now, through `report.toml`'s own templates.
+#[test]
+fn the_reports_march_lines_name_the_army() {
+    let mut g = game();
+    let (home, target) = (StateId::EastAsia, StateId::Russia);
+    let id = g.armies.iter().find(|a| a.standing && a.home == ArmyHome::State(home)).map(|a| a.id).expect("China's own Army");
+    let name = g.army_name(g.army(id).expect("it stands")).clone();
+    assert!(name.contains("Army") && name != "the Army", "it has a name of its own: {name}");
+    // The rival's paragraph names it for a march and for a loading.
+    let deed = g.rival_deed(Seat(0), &Order::MoveArmy { army: id, to: target }).expect("a march is a visible deed");
+    assert!(deed.contains(&name), "the rival's march clause names the Army: {deed}");
+    // And the Report's own march line names it.
+    g.armies.iter_mut().find(|a| a.id == id).unwrap().move_to = Some(target);
+    g.resolution_phase();
+    let march: Vec<String> = g.report.lines.iter().filter(|l| l.text.contains("Russia") && l.text.contains("China")).map(|l| l.text.clone()).collect();
+    assert!(!march.is_empty(), "the march is in the Report at all");
+    assert!(march.iter().any(|t| t.contains(&name)), "the march line names the Army ({name}): {march:?}");
+}
+
+
+/// Ticket #339 (version 0.09.0): **the odds are the whole Battle's.** The attack button and the
+/// Battle Report carried `first_round_odds` -- the aggressor's share of the strength in the first
+/// exchange -- and `PLAYTEST.txt` asked the testers by name whether they knew what it meant. The
+/// honest figure is the chance of holding the field when the Battle is over, and it is measured:
+/// a thousand copies of the fight from the FIGURE's own seed, so it is the same every time it is
+/// asked and asking it never spends one of the game's dice.
+#[test]
+fn the_attack_odds_are_the_whole_battles_and_never_touch_the_games_dice() {
+    let (home, target) = (StateId::EastAsia, StateId::Russia);
+    let place = Place::State(target);
+    // Russia held by the Prospectors, with two Armies raised there beside its own, so an attacker
+    // must destroy THREE before it holds the field. This is where the first exchange's share lies
+    // hardest: it reads one pooled strength and says nothing about how many units have to die.
+    let board = || {
+        let mut g = game();
+        g.take_control(target, Seat(1));
+        g.raise_army(place, false);
+        g.raise_army(place, false);
+        g
+    };
+    let (mut a, b, mut untouched) = (board(), board(), board());
+    let id = a.armies.iter().find(|x| x.standing && x.home == ArmyHome::State(home)).map(|x| x.id).expect("China's own Army");
+    let odds = a.ground_battle_odds(place, Seat(0), &[id]);
+    assert!(odds > 0.0 && odds < 1.0, "a defended Region is neither a certainty nor hopeless: {odds}");
+    // The same board asked twice is the same figure: a seeded game is unchanged by looking at it.
+    assert_eq!(odds, b.ground_battle_odds(place, Seat(0), &[id]), "two identical games read the same odds");
+    assert_eq!(odds, a.ground_battle_odds(place, Seat(0), &[id]), "and asking twice does not move it");
+    // And the game's own dice are where they were: the figure has a seed of its own.
+    let (spent, fresh) = {
+        use rand::Rng;
+        (a.rng.random::<u64>(), untouched.rng.random::<u64>())
+    };
+    assert_eq!(spent, fresh, "reading the odds spent none of the game's dice");
+    // It is a different number from the first exchange's share, which is what made it dishonest.
+    let attacker = a.army_strength(a.army(id).expect("it stands"));
+    let defence: i64 = a.defenders_at(place, Seat(0)).iter().filter_map(|d| a.army(*d)).map(|d| a.army_defended_strength(d)).sum();
+    let first = combat::first_round_odds(attacker, defence);
+    assert!(
+        (odds - first).abs() > 0.15,
+        "the whole Battle is not its first round: whole {odds:.3} against first-round {first:.3} (strength {attacker} against {defence}, {} defenders)",
+        a.defenders_at(place, Seat(0)).len()
+    );
+    // The orbit has the same door, and it too is the same figure every time it is asked.
+    let orbit = Orbit::Low;
+    assert_eq!(a.orbit_battle_odds(BodyId::Moon, orbit, Seat(0)), 0.0, "no Ships of yours there, no odds");
+    let mine = a_colony_ship(&mut a, Seat(0), BodyId::Moon);
+    a.ships.iter_mut().find(|s| s.id == mine).unwrap().kind = UnitKind::Frigate;
+    assert_eq!(a.orbit_battle_odds(BodyId::Moon, orbit, Seat(0)), 1.0, "an empty orbit is held by arriving in it");
+    let theirs = a_colony_ship(&mut a, Seat(1), BodyId::Moon);
+    a.ships.iter_mut().find(|s| s.id == theirs).unwrap().kind = UnitKind::Battleship;
+    let in_orbit = a.orbit_battle_odds(BodyId::Moon, orbit, Seat(0));
+    assert!(in_orbit > 0.0 && in_orbit < 1.0, "a Frigate against a Battleship is neither: {in_orbit}");
+    assert_eq!(in_orbit, a.orbit_battle_odds(BodyId::Moon, orbit, Seat(0)), "asked twice, the same figure");
+}
+
+
+/// Ticket #339 (version 0.09.0): **the Relay and the Embassy are eyes.** The designer: *"its holder
+/// reads a rival's building-by-building income at that Body"*, which the Faction window withholds.
+/// One eye a Body -- a working Relay off Earth, a working Embassy on it -- and what it reads is the
+/// Income phase's own figures, read for the RIVAL, so the Faction multipliers in them are theirs.
+/// A seat without one reads nothing, which is the point of paying for one.
+#[test]
+fn a_relay_or_an_embassy_reads_a_rivals_income_where_a_seat_without_one_reads_nothing() {
+    let mut g = game();
+    // On Earth: the Prospectors hold Russia and run a Factory there.
+    let theirs = StateId::Russia;
+    g.take_control(theirs, Seat(1));
+    g.state_mut(theirs).facilities.push(facility(FacilityKind::Factory));
+    let place = Place::State(theirs);
+    assert!(!g.has_eye(Seat(0), BodyId::Earth), "no Embassy, no eye");
+    assert!(g.eye_income(Seat(0), place).is_none(), "and nothing is read without one");
+    g.state_mut(StateId::EastAsia).facilities.push(facility(FacilityKind::Embassy));
+    assert!(g.has_eye(Seat(0), BodyId::Earth), "an Embassy in a Region it directs is an eye on Earth");
+    let read = g.eye_income(Seat(0), place).expect("the eye reads Russia");
+    assert!(read.iter().any(|(name, _)| name == "Factory"), "building by building: {:?}", read.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>());
+    let factory = read.iter().find(|(n, _)| n == "Factory").map(|(_, y)| y.clone()).unwrap();
+    assert_eq!(factory, g.facility_yield(Seat(1), theirs, FacilityKind::Factory), "and reads the RIVAL's figures, not the watcher's");
+    // The Arkwrights have no Embassy anywhere, so they read nothing of the same Region.
+    assert!(!g.has_eye(Seat(2), BodyId::Earth), "the Arkwrights built none");
+    assert!(g.eye_income(Seat(2), place).is_none(), "a seat with no eye reads nothing a seat with one reads");
+    // A seat never needs an eye on its own place.
+    assert!(g.eye_income(Seat(0), Place::State(StateId::EastAsia)).is_none(), "its own income is on its own card");
+    // Off Earth: a Relay at a Colony of the seat's at the same Body.
+    let rival = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Mine], 4);
+    assert!(g.eye_income(Seat(0), Place::Colony(rival)).is_none(), "an Embassy on Earth is no eye at the Moon");
+    let mine = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Relay], 4);
+    let _ = mine;
+    assert!(g.has_eye(Seat(0), BodyId::Moon), "a working Relay at the Body is the eye there");
+    let read = g.eye_income(Seat(0), Place::Colony(rival)).expect("the eye reads their Colony");
+    assert!(read.iter().any(|(name, _)| name == "Mine"), "Module by Module: {:?}", read.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>());
+    assert!(g.eye_income(Seat(2), Place::Colony(rival)).is_none(), "and a seat with no Relay there still reads nothing");
+}

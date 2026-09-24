@@ -544,26 +544,44 @@ impl Game {
         }
     }
 
+    /// Ticket #339 (version 0.09.0): **the rule first, the price last.** This tested affordability
+    /// before it tested anything else, so an order that was forbidden AND unaffordable was told
+    /// what it cost and never told it was forbidden: a player saved for a Factory they were never
+    /// going to be allowed to build. The fog was carried on four wayfinder maps from #230, and this
+    /// version added three refusals of its own to get wrong.
+    ///
+    /// The legality of the order is the most specific thing that can be said about it, so it is
+    /// asked first; the price is asked only of an order that is legal. Nothing about WHICH orders
+    /// pass changes -- both questions are still asked of every order -- so the computer seats are
+    /// filtered exactly as they were; only the sentence a refusal carries moves.
     fn check_order_inner(&self, seat: Seat, pending: &[Order], order: &Order, enforce_cost: bool) -> Result<Cost, OrderError> {
-        let cost = self.order_cost(seat, order);
-        let (left, influence_left) = self.remaining(seat, pending);
-        if enforce_cost {
-            if cost.materials > left.materials {
-                return fail(format!("needs {} Materials, {} left", cost.materials, left.materials));
-            }
-            if cost.fuel > left.fuel {
-                return fail(format!("needs {} Fuel, {} left", cost.fuel, left.fuel));
-            }
-            if cost.energy > left.energy {
-                return fail(format!("needs {} Energy, {} left", cost.energy, left.energy));
-            }
-            if cost.influence > influence_left {
-                return fail(format!("needs {} Influence, {} left", cost.influence, influence_left));
-            }
-            if cost.ducats > left.ducats {
-                return fail(format!("needs {} Ducats, {} left", cost.ducats, left.ducats));
-            }
+        let cost = self.check_order_rules(seat, pending, order)?;
+        if !enforce_cost {
+            return Ok(cost);
         }
+        let (left, influence_left) = self.remaining(seat, pending);
+        if cost.materials > left.materials {
+            return fail(format!("needs {} Materials, {} left", cost.materials, left.materials));
+        }
+        if cost.fuel > left.fuel {
+            return fail(format!("needs {} Fuel, {} left", cost.fuel, left.fuel));
+        }
+        if cost.energy > left.energy {
+            return fail(format!("needs {} Energy, {} left", cost.energy, left.energy));
+        }
+        if cost.influence > influence_left {
+            return fail(format!("needs {} Influence, {} left", cost.influence, influence_left));
+        }
+        if cost.ducats > left.ducats {
+            return fail(format!("needs {} Ducats, {} left", cost.ducats, left.ducats));
+        }
+        Ok(cost)
+    }
+
+    /// Ticket #339 (version 0.09.0): is the order legal at all, price aside? The half of the check
+    /// that names a RULE. Every arm returns the order's cost so the caller above can price it.
+    fn check_order_rules(&self, seat: Seat, pending: &[Order], order: &Order) -> Result<Cost, OrderError> {
+        let cost = self.order_cost(seat, order);
         match order {
             Order::BuyInfluence { amount } => {
                 if *amount <= 0 {
@@ -635,7 +653,9 @@ impl Game {
                 if !matches!(resource, Resource::Materials | Resource::Fuel) {
                     return fail("the window buys only Materials and Fuel");
                 }
-                // The affordability check above already refused a lot larger than what is left.
+                // Ticket #339 (version 0.09.0): a lot larger than what is left is refused by the
+                // affordability check, which runs AFTER this one now and says "needs N Materials,
+                // M left" -- the same sentence it said when it ran first.
                 Ok(cost)
             }
             Order::BuildFacilityWithDucats { state, kind } => {
@@ -2323,6 +2343,69 @@ pub fn merged_for_report(list: &[Order]) -> Vec<Order> {
 }
 
 impl Game {
+    // ------------------------------------------------------------------ ticket #339: the eye
+
+    /// Ticket #339 (version 0.09.0): **a Relay or an Embassy is an EYE.** The designer's words:
+    /// *"its holder reads a rival's building-by-building income at that Body"*, which the Faction
+    /// window withholds today. One eye a Body: off Earth a working Relay at a Colony or a station
+    /// the seat directs, on Earth a working Embassy in a Region it directs -- the two Influence
+    /// buildings, each in the half of the board it belongs to, so a Faction that has paid to be
+    /// heard at a place also gets to listen there.
+    ///
+    /// A Unique that does a Relay's or an Embassy's job counts, as it does for every other rule
+    /// that reads a job rather than a kind; a mothballed or dark one is not watching.
+    pub fn has_eye(&self, seat: Seat, body: BodyId) -> bool {
+        match body {
+            BodyId::Earth => StateId::ALL.into_iter().any(|s| {
+                self.state(s).control.director() == Some(seat)
+                    && self.state(s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::Embassy) && f.working())
+            }),
+            b => self.colonies.iter().any(|c| {
+                c.body == b
+                    && c.control.director() == Some(seat)
+                    && c.modules.iter().any(|m| m.kind.does_the_job_of(ModuleKind::Relay) && m.working())
+            }),
+        }
+    }
+
+    /// Ticket #339: has this seat an eye on the Body this place belongs to? The question the
+    /// interface asks of one card before it draws the rival's figures on it.
+    pub fn has_eye_at(&self, seat: Seat, place: Place) -> bool {
+        self.body_of(place).is_some_and(|b| self.has_eye(seat, b))
+    }
+
+    /// Ticket #339: which Body a place belongs to -- a Region is Earth's.
+    pub fn body_of(&self, place: Place) -> Option<BodyId> {
+        match place {
+            Place::State(_) => Some(BodyId::Earth),
+            Place::Colony(c) => self.colony(c).map(|c| c.body),
+        }
+    }
+
+    /// Ticket #339: what the eye reads at one place -- the rival director's buildings there, in the
+    /// order they stand, each with the figures that director draws from it this turn. `None` where
+    /// the seat has no eye on that Body, where the place is nobody's, or where it is the seat's
+    /// own, since a seat reads its own income on the card already.
+    ///
+    /// The yields are the Income phase's own (`facility_yield`, `module_yield_at`), read for the
+    /// DIRECTOR and not for the watcher, so the Faction multipliers, the Techs and the Custodians'
+    /// doubling are the rival's and the figure is the one the rival is actually paid.
+    pub fn eye_income(&self, seat: Seat, place: Place) -> Option<Vec<(String, crate::economy::Yield)>> {
+        let director = self.place_control(place).director()?;
+        if director == seat || !self.has_eye_at(seat, place) {
+            return None;
+        }
+        Some(match place {
+            Place::State(s) => {
+                self.state(s).facilities.iter().map(|f| (f.kind.name().to_string(), self.facility_yield(director, s, f.kind))).collect()
+            }
+            Place::Colony(c) => {
+                let col = self.colony(c)?;
+                col.modules.iter().enumerate().map(|(i, m)| (m.kind.name().to_string(), self.module_yield_at(director, c, i))).collect()
+            }
+        })
+    }
+
     /// Ticket #58: one clause saying what a rival Faction did with one order it committed. Only
     /// what the board or its cards would show: nothing the AI scored, waited for or skipped. `None`
     /// for an order that leaves no visible mark.
@@ -2339,10 +2422,12 @@ impl Game {
                 }
             }
         };
+        // Ticket #339 (version 0.09.0): an Army in a rival's paragraph is named, as a Ship is.
+        let army_of = |id: ArmyId| -> String { self.army(id).map(|a| self.army_name(a)).unwrap_or_else(|| "an Army".to_string()) };
         let unit_of = |u: UnitRef| -> String {
             match u {
                 UnitRef::Ship(id) => self.ship(id).map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into()),
-                UnitRef::Army(_) => "an Army".to_string(),
+                UnitRef::Army(id) => army_of(id),
                 UnitRef::Battery { .. } => "a Battery".to_string(),
             }
         };
@@ -2411,8 +2496,9 @@ impl Game {
                 r("ship_stance", &[("body", self.tables.body(*body).name.clone()), ("stance", stance.name().to_string())])
             }
             Order::ArmyStance { place: p, stance } => r("army_stance", &[("place", place(*p)), ("stance", stance.name().to_string())]),
-            Order::MoveArmy { to, .. } => r("move_army", &[("state", self.tables.state(*to).name.clone())]),
-            Order::Load { colonists, from, .. } => {
+            // Ticket #339 (version 0.09.0): the march and the loading name the Army.
+            Order::MoveArmy { army, to } => r("move_army", &[("army", army_of(*army)), ("state", self.tables.state(*to).name.clone())]),
+            Order::Load { colonists, from, army, .. } => {
                 let where_ = match from {
                     LoadSource::State(s) => self.tables.state(*s).name.clone(),
                     LoadSource::Colony(c) => place(Place::Colony(*c)),
@@ -2420,7 +2506,7 @@ impl Game {
                 if *colonists > 0 {
                     r("load_colonists", &[("n", colonists.to_string()), ("place", where_)])
                 } else {
-                    r("load_army", &[("place", where_)])
+                    r("load_army", &[("army", army.map(army_of).unwrap_or_else(|| "an Army".to_string())), ("place", where_)])
                 }
             }
             Order::Unload { into, .. } => {

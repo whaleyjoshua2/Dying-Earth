@@ -420,8 +420,9 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("exodus_call_order", &["state"]),
     ("directive_ducats", &["faction", "research", "n"]),
     ("directive_fuel", &["faction", "research", "n"]),
-    ("army_moved", &["faction", "from", "to", "attacks"]),
-    ("army_landed", &["faction", "colony"]),
+    // Ticket #339 (version 0.09.0): the march lines name the Army.
+    ("army_moved", &["army", "faction", "from", "to", "attacks"]),
+    ("army_landed", &["army", "faction", "colony"]),
     // Ticket #297 (version 0.08.6): the turn an Army digs in.
     ("army_dug_in", &["faction", "place"]),
     ("units_destroyed", &["place", "why", "lost"]),
@@ -585,9 +586,10 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("bombard", &["colony"]),
     ("ship_stance", &["body", "stance"]),
     ("army_stance", &["place", "stance"]),
-    ("move_army", &["state"]),
+    // Ticket #339 (version 0.09.0): the march and the loading name the Army.
+    ("move_army", &["army", "state"]),
     ("load_colonists", &["n", "place"]),
-    ("load_army", &["place"]),
+    ("load_army", &["army", "place"]),
     ("unload", &["place"]),
     ("influence", &["n", "place"]),
     ("buy_influence", &["n"]),

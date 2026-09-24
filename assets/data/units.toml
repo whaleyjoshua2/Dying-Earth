@@ -110,6 +110,13 @@ divisor = 3.0
 [melee]
 rounds = 3
 rolls = 3
+# Ticket #339 (version 0.09.0): the whole-battle odds are MEASURED, not derived. `odds_trials`
+# runs of the melee are fought on a copy of the board, from `odds_seed` -- the figure's own seed
+# and never the game's, so asking what the odds are cannot move a seeded game by one roll.
+# A thousand trials read a percentage to about a point and a half either way, and cost a
+# millisecond or two; raise it for a steadier figure, lower it for a cheaper one.
+odds_trials = 1000
+odds_seed = 339
 
 # Ticket #296 (version 0.08.6): a Region's defence is its people. Its Standing Army adds
 # `constabulary` while a working Constabulary stands there and `calm` while Unrest is under the

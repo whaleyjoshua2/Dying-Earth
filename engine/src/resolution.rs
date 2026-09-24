@@ -302,8 +302,12 @@ impl Game {
                 Control::Controlled(r) if r != seat && !passage => self.war.marches_held[seat.index()] += 1,
                 _ => {}
             }
+            // Ticket #339 (version 0.09.0): the march line names the Army, as the destruction line
+            // has since #281 -- read AFTER the move, since the Army is the same Army either way.
+            let name = self.army(id).map(|a| self.army_name(a)).unwrap_or_else(|| "the Army".to_string());
             let line = format!(
-                "{} Army moved from {} to {}{}.",
+                "{} ({}) moved from {} to {}{}.",
+                name,
                 self.seat_name(seat),
                 self.tables.state(from).name,
                 self.tables.state(to).name,
@@ -313,6 +317,7 @@ impl Game {
             let text = self.say(
                 "army_moved",
                 &[
+                    ("army", name),
                     ("faction", self.seat_name(seat)),
                     ("from", self.tables.state(from).name.clone()),
                     ("to", self.tables.state(to).name.clone()),
@@ -549,6 +554,83 @@ impl Game {
         let dug_in = self.army_dug_in(a);
         let strength = if defending { self.army_defended_strength(a) } else { self.army_strength(a) };
         Combatant::new(UnitRef::Army(id), name, strength, self.army_hit_points(a), a.damage, card.pursuit, a.stance == Stance::Evade).dug_in(dug_in)
+    }
+
+    // ------------------------------------------------------------------ ticket #339: the odds
+
+    /// Ticket #339 (version 0.09.0): **the chance of winning the whole Battle** if `attackers`
+    /// attack `place` -- the figure the attack button and the Battle Report should carry, where
+    /// both carried the first exchange's share of strength before. Measured over
+    /// `[melee] odds_trials` copies of the fight from the figure's own seed, so it is the same
+    /// every time it is asked and asking it never touches the game's dice. 1.0 where nobody
+    /// defends: the field is taken by walking on to it.
+    ///
+    /// The defenders are grouped by whose they are, exactly as `ground_battles` groups them, since
+    /// a melee spreads its hits across the parties and two parties of one Army each are not one
+    /// party of two.
+    pub fn ground_battle_odds(&self, place: Place, seat: Seat, attackers: &[ArmyId]) -> f64 {
+        let mine: Vec<Combatant> = attackers.iter().filter(|id| self.army(**id).is_some()).map(|id| self.army_combatant(*id, false)).collect();
+        if mine.is_empty() {
+            return 0.0;
+        }
+        let defenders = self.defenders_at(place, seat);
+        let mut parties = vec![mine];
+        for owner in Seat::ALL.into_iter().map(Some).chain(std::iter::once(None)) {
+            if owner == Some(seat) {
+                continue;
+            }
+            let theirs: Vec<Combatant> = defenders
+                .iter()
+                .filter(|id| self.army(**id).map(|a| self.army_seat(a) == owner).unwrap_or(false))
+                .map(|id| self.army_combatant(*id, true))
+                .collect();
+            if !theirs.is_empty() {
+                parties.push(theirs);
+            }
+        }
+        if parties.len() < 2 {
+            return 1.0;
+        }
+        self.whole_battle_odds(&parties, self.tables.melee.rolls)
+    }
+
+    /// Ticket #339 (version 0.09.0): the same figure for one ORBIT of a Body -- the Ships of the
+    /// seat and its working Batteries there against every other Faction's, one party each, and the
+    /// hit rolls a Ship melee's: one a round for every engaged armed unit, never fewer than the
+    /// table's figure (ticket #327).
+    pub fn orbit_battle_odds(&self, body: BodyId, orbit: Orbit, seat: Seat) -> f64 {
+        let line = |s: Seat| -> Vec<Combatant> {
+            self.ships
+                .iter()
+                .filter(|x| x.seat == s && self.ship_in_orbit(x, body, orbit) && !x.escaped)
+                .map(|x| UnitRef::Ship(x.id))
+                .chain(self.batteries_at(s, body, orbit).into_iter().map(|(colony, index)| UnitRef::Battery { colony, index }))
+                .map(|u| self.unit_combatant(u))
+                .collect()
+        };
+        let mine = line(seat);
+        if mine.is_empty() {
+            return 0.0;
+        }
+        let mut parties = vec![mine];
+        for other in seat.others() {
+            let theirs = line(other);
+            if !theirs.is_empty() {
+                parties.push(theirs);
+            }
+        }
+        if parties.len() < 2 {
+            return 1.0;
+        }
+        let armed = parties.iter().flatten().filter(|c| c.armed && c.engaged && !c.destroyed()).count() as u32;
+        self.whole_battle_odds(&parties, armed.max(self.tables.melee.rolls))
+    }
+
+    /// Ticket #339: the trials, the rounds, the disengage divisor and the seed, all from the data,
+    /// so the two doors above cannot drift apart. Party 0 is always the one asking.
+    fn whole_battle_odds(&self, parties: &[Vec<Combatant>], rolls: u32) -> f64 {
+        let m = &self.tables.melee;
+        combat::whole_battle_odds(parties, 0, self.tables.disengage.divisor, m.rounds, rolls, m.odds_trials, m.odds_seed)
     }
 
     /// One melee of Ship stacks in one ORBIT of a Body (ticket #50; ticket #335, version 0.09.0,
@@ -2150,9 +2232,11 @@ impl Game {
                             if let Some(aid) = aboard_army.filter(|_| army) {
                                 self.war.armies_landed[seat.index()] += 1;
                                 self.land_army(aid, ship, Place::Colony(cid));
-                                let line = format!("{} landed an Army at {}.", self.seat_name(seat), self.place_name(Place::Colony(cid)));
+                                // Ticket #339 (version 0.09.0): the Army that came down, by name.
+                                let name = self.army(aid).map(|a| self.army_name(a)).unwrap_or_else(|| "the Army".to_string());
+                                let line = format!("{} ({}) landed at {}.", name, self.seat_name(seat), self.place_name(Place::Colony(cid)));
                                 self.log(line);
-                                let text = self.say("army_landed", &[("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(cid)))]);
+                                let text = self.say("army_landed", &[("army", name), ("faction", self.seat_name(seat)), ("colony", self.place_name(Place::Colony(cid)))]);
                                 self.report_line(LineKind::Army, Some(ReportPlace::Colony(cid)), text);
                             }
                         }

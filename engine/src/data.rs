@@ -1429,6 +1429,10 @@ pub struct ArmyCard {
 pub struct MeleeCard {
     pub rounds: u32,
     pub rolls: u32,
+    /// Ticket #339 (version 0.09.0): the whole-battle odds' own trial count and seed. The seed is
+    /// the FIGURE's, never the game's, so reading the odds cannot move a seeded game.
+    pub odds_trials: u32,
+    pub odds_seed: u64,
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -64,10 +64,12 @@ directive_ducats = "The {faction} directed {research} Research into their coffer
 directive_fuel = "The {faction} directed {research} Research into propellant: {n} Fuel."
 
 # On Earth
-army_moved = "{faction} Army moved from {from} to {to}{attacks}."
+# Ticket #339 (version 0.09.0): the march lines name the Army, as the destruction line has
+# since #281. An Army has carried a name of its own since 0.08.4.
+army_moved = "{army} ({faction}) moved from {from} to {to}{attacks}."
 # Ticket #297 (version 0.08.6): the turn an Army digs in.
 army_dug_in = "{faction} Armies dig in at {place}."
-army_landed = "{faction} landed an Army at {colony}."
+army_landed = "{army} ({faction}) landed at {colony}."
 units_destroyed = "{place} was {why}: {lost} destroyed."
 # Ticket #328 (version 0.08.8): a Bombard from orbit, hit or miss; {dead} is `bombard_dead` or nothing.
 bombard_hit = "The {faction} bombarded {place} from {ship}: the {module} destroyed{dead}."
@@ -239,9 +241,9 @@ refuel = "refuelled {unit} at {body}"
 bombard = "bombarded {colony}"
 ship_stance = "set its Ships at {body} to {stance}"
 army_stance = "set its Armies at {place} to {stance}"
-move_army = "moved an Army into {state}"
+move_army = "moved {army} into {state}"
 load_colonists = "lifted {n} Colonists at {place}"
-load_army = "loaded an Army at {place}"
+load_army = "loaded {army} at {place}"
 unload = "unloaded at {place}"
 influence = "spent {n} Influence on {place}"
 buy_influence = "bought {n} Influence"
