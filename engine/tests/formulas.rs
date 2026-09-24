@@ -4809,8 +4809,12 @@ fn the_ai_banks_fuel_when_the_mars_window_is_within_two_turns() {
     // nothing to hold against; what the AI does two turns out is fill a short tank at its station,
     // the one Fuel spend the bank never blocks, and fly no leg the tank cannot pay.
     let mut near = board(window - 2);
+    // Ticket #335 (version 0.09.0): a station fuels only a Ship in its own orbit, so the short
+    // tanks stand at the ISS's ring; from low orbit the computer would ask for the orbit change.
+    let iss_slot = near.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot).expect("the ISS");
     for s in near.ships.iter_mut().filter(|s| s.kind == UnitKind::ColonyShip) {
         s.fuel = 5;
+        s.slot = Some(iss_slot);
     }
     let orders = near.ai_orders(Seat(0));
     let refuels = orders.iter().filter(|o| matches!(o, Order::Refuel { .. })).count();
@@ -6578,6 +6582,11 @@ fn refuel_is_an_order_at_a_station_of_your_own_and_a_station_rescues_a_stranded_
     g.ship_mut(ship).unwrap().fuel = 4;
     g.seats[0].stockpile.fuel = 10;
     let refuel = Order::Refuel { ship };
+    // Ticket #335 (version 0.09.0): a station fuels only a Ship in its OWN orbit, so a Ship in low
+    // orbit is refused until it has changed orbit to the ring the ISS stands on.
+    let iss_slot = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot).expect("the ISS");
+    assert!(g.check_order(Seat(0), &[], &refuel).unwrap_err().0.contains("no station fuels a Ship in Earth, low orbit"), "in low orbit nothing fuels it");
+    g.ship_mut(ship).unwrap().slot = Some(iss_slot);
     assert!(g.check_order(Seat(0), &[], &refuel).is_ok(), "the ISS stands over Earth");
     assert_eq!(g.order_cost(Seat(0), &refuel).fuel, 10, "26 wanted, 10 held: what the Stockpile can pay");
     g.commit_orders(Seat(0), std::slice::from_ref(&refuel));
@@ -6592,10 +6601,17 @@ fn refuel_is_an_order_at_a_station_of_your_own_and_a_station_rescues_a_stranded_
     assert!(!g.stranded(ship), "14 in the tank at Earth flies to the Moon");
     let id = ColonyId(g.fresh_id());
     g.colonies.push(Colony { id, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(0)), modules: Vec::new(), colonists: 0, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+    // Ticket #335 (version 0.09.0): the station rescues it because the 1 in the tank still pays the
+    // orbit change that reaches the ring it stands on; a dry tank in the wrong orbit does not.
     assert!(!g.stranded(far), "a station of ours in orbit rescues it");
+    g.ship_mut(far).unwrap().fuel = 0;
+    assert!(g.stranded(far), "with nothing in the tank it cannot even change orbit to the station");
+    g.ship_mut(far).unwrap().fuel = 1;
+    g.ship_mut(far).unwrap().slot = Some(0);
     assert!(g.check_order(Seat(0), &[], &Order::Refuel { ship: far }).is_ok());
     let (full, _) = colony_ship_ready(&mut g, BodyId::Earth);
     g.ship_mut(full).unwrap().fuel = 30;
+    g.ship_mut(full).unwrap().slot = Some(iss_slot);
     assert!(g.check_order(Seat(0), &[], &Order::Refuel { ship: full }).unwrap_err().0.contains("full"));
 }
 
@@ -6607,6 +6623,10 @@ fn the_ai_refuels_at_its_station_and_orders_no_leg_its_tank_cannot_pay() {
     at_window(&mut g);
     let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
     g.ship_mut(ship).unwrap().fuel = 3;
+    // Ticket #335 (version 0.09.0): the Ship stands at the ISS's own ring, which is the orbit a
+    // station fuels from; in low orbit the computer asks for the orbit change first.
+    let iss_slot = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot).expect("the ISS");
+    g.ship_mut(ship).unwrap().slot = Some(iss_slot);
     g.seats[0].stockpile.fuel = 100;
     g.seats[0].stockpile.energy = 200;
     let orders = g.ai_orders(Seat(0));
@@ -6917,6 +6937,14 @@ fn a_venus_station_is_built_from_a_ship_in_orbit_and_its_colonists_are_off_earth
     let station = g.colonies.iter().find(|c| c.body == BodyId::Venus && c.in_orbit).expect("Ishtar stands").id;
     g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     let land = Order::Unload { ship, colonists: 4, army: false, into: UnloadTarget::Colony(station) };
+    // Ticket #335 (version 0.09.0): a station is unloaded into from its own orbit; the Ship that
+    // built it from low orbit changes orbit to its ring first.
+    assert!(g.check_order(Seat(0), &[], &land).unwrap_err().0.contains("reached from"), "not from low orbit");
+    let change = Order::ChangeOrbit { ship, slot: Some(0) };
+    assert!(g.check_order(Seat(0), &[], &change).is_ok());
+    g.commit_orders(Seat(0), std::slice::from_ref(&change));
+    g.resolution_phase();
+    assert_eq!(g.ship(ship).unwrap().slot, Some(0), "it rode up to Ishtar's ring");
     assert!(g.check_order(Seat(0), &[], &land).is_ok());
     g.commit_orders(Seat(0), std::slice::from_ref(&land));
     g.resolution_phase();
@@ -6953,6 +6981,10 @@ fn the_ai_disembarks_into_its_own_station_with_room_at_venus_and_over_earth() {
     let venus = station_at(&mut g, Seat(0), BodyId::Venus);
     g.colony_mut(venus).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     let (ship, _) = colony_ship_ready(&mut g, BodyId::Venus);
+    // Ticket #335 (version 0.09.0): the Ship stands at the station's own ring, which is the orbit
+    // a station is unloaded into; from low orbit the computer asks for the orbit change first.
+    let slot = g.colony(venus).unwrap().slot;
+    g.ship_mut(ship).unwrap().slot = Some(slot);
     let orders = g.ai_orders(Seat(0));
     assert!(orders.iter().any(|o| matches!(o, Order::Unload { ship: s, into: UnloadTarget::Colony(c), .. } if *s == ship && *c == venus)), "no landing into the Venus station: {orders:?}");
     let mut g = game();
@@ -6962,6 +6994,9 @@ fn the_ai_disembarks_into_its_own_station_with_room_at_venus_and_over_earth() {
     let iss = station_of(&g, Seat(0), BodyId::Earth).unwrap();
     g.colony_mut(iss).unwrap().modules.push(Module::new(ModuleKind::Habitat));
     let (ship, _) = colony_ship_ready(&mut g, BodyId::Earth);
+    // Ticket #335 (version 0.09.0): at the ISS's own ring, the orbit it is unloaded into from.
+    let slot = g.colony(iss).unwrap().slot;
+    g.ship_mut(ship).unwrap().slot = Some(slot);
     g.ai_orders(Seat(0));
     let score = |needle: &str| -> f64 {
         let l = g.log.iter().find(|l| l.contains(needle)).unwrap_or_else(|| panic!("no scored line {needle:?}: {:#?}", g.log.iter().filter(|l| l.starts_with("  ")).collect::<Vec<_>>()));
@@ -7689,9 +7724,14 @@ fn a_blockade_is_ordered_and_starves_the_station_in_its_slot_upkeep_still_paid()
         name: String::new(), id: rival, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None,
         stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
     });
-    // The order wants a warship in a slot: at the Body at large it is refused.
+    // Ticket #335 (version 0.09.0): there is no Body at large. A Blockade may be given in LOW
+    // ORBIT, which is where the ground is starved from; what is still refused is a stack sitting in
+    // nothing but its own station's orbit, which would shut its holder out of nowhere.
+    assert!(g.check_order(Seat(1), &[], &Order::ShipStance { body, stance: Stance::Blockade }).is_ok(), "low orbit is an orbit to blockade");
+    let own = g.colonies.iter().find(|c| c.in_orbit && c.body == body && c.control.director() == Some(Seat(1))).map(|c| c.slot).expect("seat 1's own station");
+    g.ship_mut(rival).unwrap().slot = Some(own);
     let err = g.check_order(Seat(1), &[], &Order::ShipStance { body, stance: Stance::Blockade }).unwrap_err().0;
-    assert!(err.contains("no warship of yours sits in a slot"), "{err}");
+    assert!(err.contains("no warship of yours sits in an orbit"), "{err}");
     g.ship_mut(rival).unwrap().slot = Some(slot);
     assert!(g.check_order(Seat(1), &[], &Order::ShipStance { body, stance: Stance::Blockade }).is_ok(), "in the station's slot it may be ordered");
     assert_eq!(g.starved_by(station), None, "on Hold it starves nothing");
@@ -7773,8 +7813,9 @@ fn a_blockade_stops_refuelling_and_holds_an_empty_slot_against_a_builder() {
     let mine = ShipId(g.fresh_id());
     g.ships.push(Ship {
         name: String::new(), id: mine, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None,
-        stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 5, slot: None,
+        stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 5, slot: Some(slot),
     });
+    // Ticket #335 (version 0.09.0): at the station's own ring, which is the orbit it fuels from.
     assert!(g.check_order(Seat(0), &[], &Order::Refuel { ship: mine }).is_ok(), "an unblockaded station fuels it");
     let rival = ShipId(g.fresh_id());
     g.ships.push(Ship {
@@ -11086,20 +11127,30 @@ fn a_battery_denies_orbital_control_and_the_blockade_and_falls_in_a_battle() {
     let id = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::Frigate);
     g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Blockade, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(slot) });
-    assert_eq!(g.orbital_control(BodyId::Earth), Some(Seat(1)), "a lone rival warship holds Orbital Control");
+    // Ticket #335 (version 0.09.0): the frigate sits in the STATION'S orbit, so it blockades that
+    // station and holds nothing of low orbit, which is what Orbital Control is of now.
+    assert_eq!(g.orbital_control(BodyId::Earth), None, "a warship at a station's ring holds no Control of low orbit");
     assert!(g.slot_blockaded_against(Seat(0), BodyId::Earth, slot));
-    assert!(!g.may_land(Seat(0), BodyId::Earth));
+    assert_eq!(g.starved_by(station), Some(Seat(1)), "and the station starves under it");
     g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Battery));
     let index = g.colony(station).unwrap().modules.len() - 1;
     let card = g.tables.module(ModuleKind::Battery).clone();
-    assert_eq!(g.orbital_control(BodyId::Earth), None, "a Battery denies it");
-    assert!(g.may_land(Seat(0), BodyId::Earth), "so its owner lands");
-    assert!(!g.slot_blockaded_against(Seat(0), BodyId::Earth, slot), "and the Blockade shuts nothing");
+    assert!(!g.slot_blockaded_against(Seat(0), BodyId::Earth, slot), "a Battery lifts the Blockade of its own orbit");
     assert_eq!(g.starved_by(station), None, "nor starves");
-    assert_eq!(g.battery_strength(Seat(0), BodyId::Earth), card.strength);
+    assert_eq!(g.battery_strength(Seat(0), BodyId::Earth, Orbit::Slot(slot)), card.strength);
+    assert_eq!(g.battery_strength(Seat(0), BodyId::Earth, Orbit::Low), 0, "ticket #335: a Battery covers its own orbit alone");
     g.colony_mut(station).unwrap().modules[index].mothballed = true;
-    assert_eq!(g.orbital_control(BodyId::Earth), Some(Seat(1)), "mothballed, it denies nothing");
+    assert!(g.slot_blockaded_against(Seat(0), BodyId::Earth, slot), "mothballed, it denies nothing");
     g.colony_mut(station).unwrap().modules[index].mothballed = false;
+    // Ticket #324's Orbital Control clause, read where Control now lives: a rival warship in LOW
+    // ORBIT holds it, and the station's Battery high above does not deny it -- ticket #335 narrowed
+    // a Battery to the orbit it covers, at the designer's word.
+    let low = ShipId(g.fresh_id());
+    let name = g.next_ship_name(UnitKind::Frigate);
+    g.ships.push(Ship { id: low, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+    assert_eq!(g.orbital_control(BodyId::Earth), Some(Seat(1)), "a lone rival warship in low orbit holds Orbital Control");
+    assert!(!g.may_land(Seat(0), BodyId::Earth), "so the ground is shut");
+    g.ships.retain(|s| s.id != low);
     // The Repair order: the owner's, at its Colony, for no more than its damage.
     g.colony_mut(station).unwrap().modules[index].damage = 2;
     let repair = |points: u32| Order::Repair { unit: UnitRef::Battery { colony: station, index }, points };
@@ -11109,23 +11160,28 @@ fn a_battery_denies_orbital_control_and_the_blockade_and_falls_in_a_battle() {
     // The Battle: the rival's stack on Attack, no Ship of the owner's present, and the Battery one
     // hit from gone.
     g.colony_mut(station).unwrap().modules[index].damage = card.hit_points - 1;
+    // Ticket #335 (version 0.09.0): the attackers sit in the station's own orbit, since that is
+    // where the Battery stands and a Battle is fought within one orbit.
     for _ in 0..2 {
         let id = ShipId(g.fresh_id());
         let name = g.next_ship_name(UnitKind::Frigate);
-        g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None });
+        g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Attack, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot: Some(slot) });
     }
     for s in g.ships.iter_mut().filter(|s| s.seat == Seat(1) && s.at == ShipAt::Body(BodyId::Earth)) {
         s.stance = Stance::Attack;
     }
     g.resolution_phase();
-    let line = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::Body(BodyId::Earth))).expect("a Battle in Earth orbit").clone();
+    // Ticket #335 (version 0.09.0): the Battle was fought in the STATION'S orbit, and the record
+    // is that orbit's, not the Body's.
+    let line = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::Orbit(BodyId::Earth, Orbit::Slot(slot)))).expect("a Battle at the station's orbit").clone();
     let mine = line.parties.iter().find(|p| p.seat == Some(Seat(0))).expect("the Battery's side");
     assert!(mine.units.contains("the Battery at"), "the Battery is named in the line: {}", mine.units);
     assert_eq!(mine.strength, card.strength, "at its card's strength");
     assert!(!g.colony(station).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Battery), "shot to nothing, it is gone: {}", mine.units);
     assert_eq!(g.war.batteries_lost[0], 1, "and counted");
-    assert!(line.result.contains("Orbital Control"), "{}", line.result);
-    assert_eq!(g.orbital_control(BodyId::Earth), Some(Seat(1)), "Control is the rival's again: {}", line.result);
+    // Ticket #335: Orbital Control is low orbit's, so a fight at a station's ring says nothing
+    // about it, where before every orbital Battle line ended with the state of Control.
+    assert!(!line.result.contains("Orbital Control"), "{}", line.result);
 }
 
 /// Ticket #324: the computer wants a Battery at a Colony where a rival's warship stands, and not
@@ -11170,7 +11226,9 @@ fn a_refuel_accord_opens_a_partners_station() {
     g.colonies.push(Colony { id: station, body: BodyId::Mars, slot: 0, control: Control::Controlled(Seat(1)), modules: Vec::new(), colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
     let id = ShipId(g.fresh_id());
     let name = g.next_ship_name(UnitKind::Frigate);
-    g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 0, slot: None });
+    // Ticket #335 (version 0.09.0): the Frigate stands at the partner station's own ring, which is
+    // the orbit a station fuels from.
+    g.ships.push(Ship { id, name, kind: UnitKind::Frigate, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 0, slot: Some(0) });
     g.seats[0].stockpile.fuel = 40;
     let refuel = Order::Refuel { ship: id };
     assert!(!g.own_station_at(Seat(0), BodyId::Mars));
@@ -11296,7 +11354,9 @@ fn a_battleship_bombards_a_rival_colony_from_an_orbit_it_holds() {
     assert_eq!(g.relations.owed[1][0] - owed_before, 3, "rung 3 against the holder");
     assert_eq!((g.war.bombards[0], g.war.modules_burned[0]), (1, 1));
     assert!(g.log.iter().any(|l| l.contains("bombarded") && l.contains("Habitat destroyed") && l.contains("Colonists dead")), "{:?}", g.log.iter().filter(|l| l.contains("bombard")).collect::<Vec<_>>());
-    let line = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::Body(BodyId::Mars))).expect("a Battle record at Mars for the mark");
+    // Ticket #335 (version 0.09.0): the record is the ORBIT's -- low orbit, which is where a
+    // ground Colony is broken from.
+    let line = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::Orbit(BodyId::Mars, Orbit::Low))).expect("a Battle record in Mars low orbit for the mark");
     assert_eq!(line.aggressor(), Some(Seat(0)));
 }
 
@@ -11944,4 +12004,331 @@ fn a_destroyed_raised_army_returns_nobody() {
     let id = g.raise_army(Place::Colony(c), false);
     g.destroy_army(id, "battle", Some(ReportPlace::Colony(c)));
     assert_eq!(g.colony(c).unwrap().colonists, 2, "no Colonist came back");
+}
+
+// ---------------------------------------------------------------- 0.09.0 ticket #335: orbits
+
+/// A Ship of a seat's standing in one orbit of a Body: `None` is low orbit, `Some(n)` the ring of
+/// Orbital Slot n. Ticket #335 (version 0.09.0) made that the one thing a Ship's position is.
+fn ship_in(g: &mut Game, seat: Seat, kind: UnitKind, body: BodyId, slot: Option<u32>, stance: Stance) -> ShipId {
+    let id = ShipId(g.fresh_id());
+    let name = g.next_ship_name(kind);
+    g.ships.push(Ship {
+        id, name, kind, seat, damage: 0, at: ShipAt::Body(body), colonists: 0, colonists_education: 1.0, army: None,
+        stance, escaped: false, arrived_this_turn: false, built_turn: 1, fuel: 30, slot,
+    });
+    id
+}
+
+/// A build that completes at the next Resolution: a queue row with no Widgets left to do. The
+/// Shipyard's queue is the one door a Ship comes into a real game through, and ticket #335 makes
+/// the orbit it comes into the yard's own.
+fn build_now(g: &mut Game, place: Place, item: BuildItem, seat: Seat) {
+    let b = Build { item, seat, widgets: 0, done: 0, coastal: false };
+    match place {
+        Place::State(s) => g.state_mut(s).queue.push(b),
+        Place::Colony(c) => g.colony_mut(c).unwrap().queue.push(b),
+    }
+}
+
+/// Ticket #335 (R1): where a Ship is. A Body's orbits are LOW ORBIT plus one per Orbital Slot --
+/// twenty-one on the board -- and a new Ship starts in the orbit of the Shipyard that built it: a
+/// station's yard at that station's ring, a ground Colony's yard in low orbit. A leg that names no
+/// orbit arrives in low orbit, and the helper names an orbit for a player to read.
+#[test]
+fn a_new_ship_starts_in_the_orbit_of_the_yard_that_built_it() {
+    let mut g = game();
+    let total: usize = BodyId::ALL.iter().map(|b| g.orbits_of(*b).len()).sum();
+    assert_eq!(total, 21, "low orbit plus one per Orbital Slot, over six Bodies");
+    assert_eq!(g.orbits_of(BodyId::Mars)[0], Orbit::Low, "low orbit is the first of them");
+    assert_eq!(g.orbit_name(BodyId::Mars, Orbit::Low), "Mars, low orbit");
+    let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the ISS");
+    let iss_slot = g.colony(iss).unwrap().slot;
+    assert_eq!(g.orbit_name(BodyId::Earth, Orbit::Slot(iss_slot)), "Earth, at ISS");
+    assert!(!g.orbit_exists(BodyId::Phobos, Orbit::Slot(1)), "Phobos has one Orbital Slot");
+    // A station's Shipyard puts its Ship at that station's own ring.
+    build_now(&mut g, Place::Colony(iss), BuildItem::Unit(UnitKind::Frigate), Seat(0));
+    g.resolution_phase();
+    let built = g.ships.iter().find(|s| s.kind == UnitKind::Frigate).expect("the Frigate was built").clone();
+    assert_eq!((built.at, g.ship_orbit(&built)), (ShipAt::Body(BodyId::Earth), Orbit::Slot(iss_slot)), "the orbit of the yard that built it");
+    // A ground Colony's yard puts it in low orbit.
+    let ground = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Shipyard], 4);
+    build_now(&mut g, Place::Colony(ground), BuildItem::Unit(UnitKind::Battleship), Seat(0));
+    g.resolution_phase();
+    let built = g.ships.iter().find(|s| s.kind == UnitKind::Battleship).expect("the Battleship was built").clone();
+    assert_eq!((built.at, g.ship_orbit(&built)), (ShipAt::Body(BodyId::Moon), Orbit::Low), "a ground yard builds into low orbit");
+    // A leg that names no orbit arrives in low orbit, whatever orbit it left.
+    let id = built.id;
+    g.ship_mut(id).unwrap().slot = Some(0);
+    let leg = Order::Transit { ship: id, to: BodyId::Earth, slot: None };
+    g.commit_orders(Seat(0), std::slice::from_ref(&leg));
+    for _ in 0..6 {
+        if matches!(g.ship(id).unwrap().at, ShipAt::Body(_)) {
+            break;
+        }
+        g.resolution_phase();
+    }
+    assert_eq!(g.ship(id).unwrap().at, ShipAt::Body(BodyId::Earth), "it arrived");
+    assert_eq!(g.ship_orbit(g.ship(id).unwrap()), Orbit::Low, "a leg that named no orbit arrives in low orbit");
+}
+
+/// Ticket #335 (R2): changing orbit. An order for a Ship at a Body, to an orbit of that Body that
+/// exists and is not the one it is in, costing `orbit_change_fuel` out of the Ship's own tank and
+/// refused below it; one order a turn like any other; resolved WITH the transits, before the
+/// Battles, so a Ship that changes orbit fights in its new one.
+#[test]
+fn an_orbit_change_costs_one_fuel_from_the_tank_and_lands_before_the_battles() {
+    let mut g = game();
+    let fuel = g.tables.orbit_change_fuel;
+    assert_eq!(fuel, 1, "bodies.toml: the sibling hop's figure");
+    let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the ISS");
+    let slot = g.colony(iss).unwrap().slot;
+    let ship = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(ship).unwrap().fuel = 4;
+    // Refused to the orbit it is already in, and to an orbit the Body has not got.
+    let err = g.check_order(Seat(0), &[], &Order::ChangeOrbit { ship, slot: None }).unwrap_err().0;
+    assert!(err.contains("already in"), "{err}");
+    let slots = g.tables.body(BodyId::Earth).orbital_slots;
+    let err = g.check_order(Seat(0), &[], &Order::ChangeOrbit { ship, slot: Some(slots) }).unwrap_err().0;
+    assert!(err.contains("Orbital Slots"), "{err}");
+    // The Stockpile pays nothing: the tank does.
+    let order = Order::ChangeOrbit { ship, slot: Some(slot) };
+    let cost = g.order_cost(Seat(0), &order);
+    assert_eq!((cost.fuel, cost.materials), (0, 0), "an orbit change spends the tank, not the Stockpile");
+    assert!(g.check_order(Seat(0), &[], &order).is_ok());
+    let err = g.check_order(Seat(0), &[order.clone()], &Order::Transit { ship, to: BodyId::Moon, slot: None }).unwrap_err().0;
+    assert!(err.contains("already has an order"), "one order a turn: {err}");
+    // A rival on Attack is waiting at the ring it is moving to: the move lands first, so the Ship
+    // fights in its new orbit.
+    ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Earth, Some(slot), Stance::Attack);
+    g.commit_orders(Seat(0), std::slice::from_ref(&order));
+    assert_eq!(g.ship(ship).unwrap().fuel, 4 - fuel, "the Fuel left the tank at the order");
+    assert_eq!(g.ship_orbit(g.ship(ship).unwrap()), Orbit::Low, "and it has not moved yet");
+    g.resolution_phase();
+    assert_eq!(g.ship_orbit(g.ship(ship).unwrap()), Orbit::Slot(slot), "it moved with the transits");
+    let at = Some(ReportPlace::Orbit(BodyId::Earth, Orbit::Slot(slot)));
+    let line = g.report.battles.iter().find(|b| b.at == at).expect("a Battle at the ring it moved to");
+    assert!(
+        line.parties.iter().any(|p| p.seat == Some(Seat(0))),
+        "it fought in its new orbit: {:?}",
+        line.parties.iter().map(|p| p.seat).collect::<Vec<_>>()
+    );
+    // Refused below the figure, naming it.
+    g.ship_mut(ship).unwrap().fuel = 0;
+    let err = g.check_order(Seat(0), &[], &Order::ChangeOrbit { ship, slot: None }).unwrap_err().0;
+    assert!(err.contains(&format!("needs {fuel}")), "{err}");
+}
+
+/// Ticket #335 (R3): what each orbit is for. LOW ORBIT touches the ground -- founding a Colony and
+/// taking a lift from a Launch Site -- and a STATION'S OWN ORBIT touches that station: unloading
+/// into it and refuelling at it. Neither reaches the other.
+#[test]
+fn low_orbit_touches_the_ground_and_a_stations_own_orbit_touches_the_station() {
+    let mut g = game();
+    bare_stations(&mut g);
+    let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the ISS");
+    let slot = g.colony(iss).unwrap().slot;
+    g.seats[0].stockpile.fuel = 100;
+    // Refuelling: the station's own ring, never low orbit.
+    let tanker = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(tanker).unwrap().fuel = 2;
+    let err = g.check_order(Seat(0), &[], &Order::Refuel { ship: tanker }).unwrap_err().0;
+    assert!(err.contains("no station fuels a Ship in Earth, low orbit"), "a Ship in low orbit fuels at nothing: {err}");
+    g.ship_mut(tanker).unwrap().slot = Some(slot);
+    assert!(g.check_order(Seat(0), &[], &Order::Refuel { ship: tanker }).is_ok(), "at the ISS's ring it refuels");
+    // Unloading into the station: its own ring, never low orbit.
+    let hauler = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(hauler).unwrap().colonists = 2;
+    let aboard = Order::Unload { ship: hauler, colonists: 2, army: false, into: UnloadTarget::Colony(iss) };
+    let err = g.check_order(Seat(0), &[], &aboard).unwrap_err().0;
+    assert!(err.contains("reached from"), "a station is not unloaded into from low orbit: {err}");
+    g.ship_mut(hauler).unwrap().slot = Some(slot);
+    assert!(g.check_order(Seat(0), &[], &aboard).is_ok(), "from its ring it is");
+    // A lift from a Launch Site reaches low orbit alone.
+    g.state_mut(StateId::EastAsia).emigrants = 4;
+    let lift = Order::Load { ship: hauler, colonists: 2, from: LoadSource::State(StateId::EastAsia), army: None };
+    let err = g.check_order(Seat(0), &[], &lift).unwrap_err().0;
+    assert!(err.contains("low orbit"), "a Launch Site does not reach a station's ring: {err}");
+    g.ship_mut(hauler).unwrap().slot = None;
+    assert!(g.check_order(Seat(0), &[], &lift).is_ok(), "in low orbit it takes the lift");
+    // Founding a Colony on the ground: low orbit alone.
+    let settler = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Moon, Some(0), Stance::Hold);
+    g.ship_mut(settler).unwrap().colonists = 4;
+    let ground = g.free_slots_on(BodyId::Moon)[0];
+    let found = Order::Unload { ship: settler, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Moon, ground) };
+    let err = g.check_order(Seat(0), &[], &found).unwrap_err().0;
+    assert!(err.contains("low orbit"), "a Colony is not founded from a station's ring: {err}");
+    g.ship_mut(settler).unwrap().slot = None;
+    assert!(g.check_order(Seat(0), &[], &found).is_ok(), "from low orbit it is");
+}
+
+/// Ticket #335 (R4): Orbital Control is LOW ORBIT's, and a Battery covers its OWN orbit. A warship
+/// at a station's ring holds no Control; a station's Battery denies no Control of low orbit; a
+/// ground Colony's Battery does.
+#[test]
+fn orbital_control_is_low_orbits_and_a_battery_covers_its_own_orbit() {
+    let mut g = game();
+    let station = station_at(&mut g, Seat(1), BodyId::Mars);
+    let station_slot = g.colony(station).unwrap().slot;
+    let ground = colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    let ship = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, Some(station_slot), Stance::Hold);
+    assert_eq!(g.orbital_control(BodyId::Mars), None, "a warship at a station's ring holds no Control of low orbit");
+    g.ship_mut(ship).unwrap().slot = None;
+    assert_eq!(g.orbital_control(BodyId::Mars), Some(Seat(0)), "in low orbit it holds it");
+    assert!(!g.may_land(Seat(1), BodyId::Mars), "and the ground is shut to the rival");
+    // A rival's Battery on the STATION covers its own ring and nothing else.
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Battery));
+    assert!(g.battery_stands_against(Seat(0), BodyId::Mars, Orbit::Slot(station_slot)), "it covers the station's ring");
+    assert!(!g.battery_stands_against(Seat(0), BodyId::Mars, Orbit::Low), "and not low orbit");
+    assert_eq!(g.orbital_control(BodyId::Mars), Some(Seat(0)), "so Control of low orbit stands");
+    // A rival's Battery on the GROUND stands in low orbit's line, and denies it.
+    g.colony_mut(ground).unwrap().modules.push(Module::new(ModuleKind::Battery));
+    assert!(g.battery_stands_against(Seat(0), BodyId::Mars, Orbit::Low), "a ground Colony's Battery covers low orbit");
+    assert_eq!(g.orbital_control(BodyId::Mars), None, "and denies Control there");
+    assert!(g.may_land(Seat(1), BodyId::Mars), "so its owner lands again");
+}
+
+/// Ticket #335 (R5a): battle parties form per ORBIT. Two Attacks at one Body in two orbits are two
+/// Battles and two records, and a station's Battery stands in its own ring's fight alone -- the
+/// specification's second refutation, that a stack on Attack in low orbit must not fight a
+/// station's Battery in a high orbit.
+#[test]
+fn battle_parties_form_per_orbit_and_a_station_battery_fights_only_its_own_ring() {
+    let mut g = game();
+    calm(&mut g);
+    let station = station_at(&mut g, Seat(1), BodyId::Mars);
+    let slot = g.colony(station).unwrap().slot;
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Battery));
+    // Low orbit: seat 0 on Attack, seat 1 holding. The station's ring: seat 2 on Attack.
+    ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Attack);
+    ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    ship_in(&mut g, Seat(2), UnitKind::Frigate, BodyId::Mars, Some(slot), Stance::Attack);
+    g.resolution_phase();
+    let low = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::Orbit(BodyId::Mars, Orbit::Low))).expect("a Battle in Mars low orbit").clone();
+    let ring = g.report.battles.iter().find(|b| b.at == Some(ReportPlace::Orbit(BodyId::Mars, Orbit::Slot(slot)))).expect("a Battle at the station's ring").clone();
+    assert_ne!(low.place, ring.place, "two Battles at one Body are two records: {} and {}", low.place, ring.place);
+    assert!(low.place.contains("Mars orbit"), "low orbit keeps the wording every Battle record has had: {}", low.place);
+    assert!(ring.place.contains(&g.station_name(BodyId::Mars, slot)), "and a station's ring names the station: {}", ring.place);
+    let defenders = low.parties.iter().find(|p| p.seat == Some(Seat(1))).expect("seat 1 in low orbit");
+    assert!(!defenders.units.contains("Battery"), "the station's Battery is not in low orbit's line: {}", defenders.units);
+    let held = ring.parties.iter().find(|p| p.seat == Some(Seat(1))).expect("seat 1 at its own ring");
+    assert!(held.units.contains("Battery"), "it stands in its own ring's line: {}", held.units);
+}
+
+/// Ticket #335 (R5b): an Intercept catches only arrivals into its OWN orbit. A picket in low orbit
+/// never touches a Ship that flew straight to a station's ring.
+#[test]
+fn an_intercept_catches_only_arrivals_into_its_own_orbit() {
+    let mut g = game();
+    calm(&mut g);
+    let picket = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Intercept);
+    let inbound = ship_in(&mut g, Seat(1), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(inbound).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 1 };
+    g.ship_mut(inbound).unwrap().slot = Some(0);
+    g.resolution_phase();
+    assert_eq!(g.war.interceptions[0], 0, "the arrival went to a ring the picket does not watch");
+    // The same arrival into low orbit is caught.
+    g.ship_mut(inbound).unwrap().at = ShipAt::Transit { from: BodyId::Earth, to: BodyId::Mars, turns_left: 1 };
+    g.ship_mut(inbound).unwrap().slot = None;
+    g.ship_mut(picket).unwrap().stance = Stance::Intercept;
+    g.ship_mut(picket).unwrap().arrived_this_turn = false;
+    g.resolution_phase();
+    assert_eq!(g.war.interceptions[0], 1, "into low orbit it is caught");
+}
+
+/// Ticket #335 (R5c): a Blockade shuts the ORBIT it is given in. A station starves under a Blockade
+/// of its own ring and not under one in low orbit; a Colony on the ground starves under a Blockade
+/// in low orbit by a rival holding Orbital Control outright, and not under one at a station's ring.
+#[test]
+fn a_blockade_shuts_the_orbit_it_is_given_in() {
+    let mut g = game();
+    calm(&mut g);
+    let station = station_at(&mut g, Seat(1), BodyId::Mars);
+    let slot = g.colony(station).unwrap().slot;
+    let ground = colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    // A warship of the same seat holds low orbit throughout, so Orbital Control never moves and the
+    // only thing that changes below is the orbit the Blockade is given in.
+    ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
+    let blockader = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Mars, None, Stance::Blockade);
+    assert_eq!(g.orbital_control(BodyId::Mars), Some(Seat(0)), "in low orbit it holds Control outright");
+    assert_eq!(g.starved_by(ground), Some(Seat(0)), "so the ground starves under a Blockade in low orbit");
+    assert_eq!(g.starved_by(station), None, "the station above does not");
+    assert!(!g.slot_blockaded_against(Seat(1), BodyId::Mars, slot), "and its ring is not shut");
+    g.ship_mut(blockader).unwrap().slot = Some(slot);
+    assert_eq!(g.orbital_control(BodyId::Mars), Some(Seat(0)), "Control stands: a warship still holds low orbit");
+    assert_eq!(g.starved_by(station), Some(Seat(0)), "at the ring the station starves");
+    assert!(g.slot_blockaded_against(Seat(1), BodyId::Mars, slot), "and the ring is shut");
+    assert_eq!(g.starved_by(ground), None, "and the ground is free: the Blockade is not in its orbit, Control or no Control");
+}
+
+/// Ticket #335 (R5d): the specification's fourth refutation. A human can now give a Blockade: the
+/// transit names the rival station's orbit, the Ship arrives there, and the stance is ordered. At
+/// version 0.08.8 every transit the interface sent named no slot, so this path did not exist.
+#[test]
+fn a_human_flies_to_a_rival_station_and_blockades_it() {
+    let mut g = game();
+    calm(&mut g);
+    at_window(&mut g);
+    let station = station_at(&mut g, Seat(1), BodyId::Mars);
+    let slot = g.colony(station).unwrap().slot;
+    let ship = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
+    let leg = Order::Transit { ship, to: BodyId::Mars, slot: Some(slot) };
+    assert!(g.check_order(Seat(0), &[], &leg).is_ok(), "the leg names the station's ring");
+    g.commit_orders(Seat(0), std::slice::from_ref(&leg));
+    for _ in 0..12 {
+        if matches!(g.ship(ship).unwrap().at, ShipAt::Body(BodyId::Mars)) {
+            break;
+        }
+        g.resolution_phase();
+    }
+    assert_eq!(g.ship_orbit(g.ship(ship).unwrap()), Orbit::Slot(slot), "it arrived at the ring it named");
+    let order = Order::ShipStance { body: BodyId::Mars, stance: Stance::Blockade };
+    assert!(g.check_order(Seat(0), &[], &order).is_ok(), "and the Blockade is given");
+    g.commit_orders(Seat(0), std::slice::from_ref(&order));
+    assert_eq!(g.war.blockades_ordered[0], 1, "counted for the sweep");
+    assert_eq!(g.starved_by(station), Some(Seat(0)), "the station is starved by a path a human walked");
+}
+
+/// Ticket #335 (R6): the orbit you are in is the orbit you must hold. A ground Colony is bombarded
+/// from LOW ORBIT by a Faction holding Orbital Control there outright; a station from that
+/// station's own ring, with no rival warship and no rival working Battery standing in it.
+#[test]
+fn a_bombard_holds_the_orbit_it_is_given_from() {
+    let mut g = game();
+    calm(&mut g);
+    let station = station_at(&mut g, Seat(1), BodyId::Mars);
+    let slot = g.colony(station).unwrap().slot;
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    let ground = colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    let ship = ship_in(&mut g, Seat(0), UnitKind::Battleship, BodyId::Mars, None, Stance::Hold);
+    let at_ground = Order::Bombard { ship, colony: ground };
+    let at_station = Order::Bombard { ship, colony: station };
+    // From low orbit: the ground under an outright Orbital Control, and not the station above.
+    assert_eq!(g.orbital_control(BodyId::Mars), Some(Seat(0)));
+    assert!(g.check_order(Seat(0), &[], &at_ground).is_ok(), "the ground from low orbit");
+    let err = g.check_order(Seat(0), &[], &at_station).unwrap_err().0;
+    assert!(err.contains("given from"), "the station is not reached from low orbit: {err}");
+    // From the station's ring: the station, and not the ground below.
+    g.ship_mut(ship).unwrap().slot = Some(slot);
+    assert!(g.check_order(Seat(0), &[], &at_station).is_ok(), "the station from its own ring");
+    let err = g.check_order(Seat(0), &[], &at_ground).unwrap_err().0;
+    assert!(err.contains("given from"), "the ground is not reached from a ring: {err}");
+    // A rival warship in that ring, or a rival working Battery covering it, refuses it.
+    let rival = ship_in(&mut g, Seat(2), UnitKind::Frigate, BodyId::Mars, Some(slot), Stance::Hold);
+    let err = g.check_order(Seat(0), &[], &at_station).unwrap_err().0;
+    assert!(err.contains("a rival still stands"), "{err}");
+    g.ships.retain(|s| s.id != rival);
+    g.colony_mut(station).unwrap().modules.push(Module::new(ModuleKind::Battery));
+    let err = g.check_order(Seat(0), &[], &at_station).unwrap_err().0;
+    assert!(err.contains("a rival still stands"), "a working Battery in the ring is the shield: {err}");
+    g.colony_mut(station).unwrap().modules.last_mut().unwrap().mothballed = true;
+    assert!(g.check_order(Seat(0), &[], &at_station).is_ok(), "mothballed, it shields nothing");
+    // And the strike lands, its record at the orbit it was given from.
+    std::sync::Arc::make_mut(&mut g.tables).influence.destruction_chance = 1.0;
+    let before = g.colony(station).unwrap().modules.len();
+    g.commit_orders(Seat(0), std::slice::from_ref(&at_station));
+    g.resolution_phase();
+    assert_eq!(g.colony(station).unwrap().modules.len(), before - 1, "one Module burned");
+    let at = Some(ReportPlace::Orbit(BodyId::Mars, Orbit::Slot(slot)));
+    assert!(g.report.battles.iter().any(|b| b.at == at), "the record is the ring's: {:?}", g.report.battles.iter().map(|b| b.place.clone()).collect::<Vec<_>>());
 }

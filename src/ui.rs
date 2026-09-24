@@ -1146,6 +1146,16 @@ pub fn draw(
                         view.view = View::Solar;
                         view.selection = Selection::None;
                     }
+                    // Ticket #335 (version 0.09.0): a line that points at ONE ORBIT of a Body takes
+                    // the player to that Body, as a line pointing at the Body does; the orbit's own
+                    // ring on the Surface Map is the interface lane's.
+                    ReportPlace::Orbit(BodyId::Earth, _) => {
+                        view.enter_surface(BodyId::Earth);
+                    }
+                    ReportPlace::Orbit(_, _) => {
+                        view.view = View::Solar;
+                        view.selection = Selection::None;
+                    }
                 }
                 view.attack_preview = false;
             }
@@ -2464,7 +2474,10 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // Ticket #317 (version 0.08.8): a Battle in orbit last turn, marked beside the
                     // Body's label, to its left, at the label's own height: below the disc the
                     // moons' labels hang, and above it the Orbital Control and stack labels stack.
-                    if let Some(i) = game.battle_last_turn_at(ReportPlace::Body(body)) {
+                    // Ticket #335 (version 0.09.0): a Battle is fought and recorded in one ORBIT,
+                    // so the mark beside the Body's label reads the first of the Body's orbits to
+                    // have one; a mark per orbit is the interface lane's.
+                    if let Some(i) = game.battle_last_turn_in_orbit(body) {
                         let label_centre = p - egui::vec2(0.0, side * (22.0 + 7.5 * lines as f32));
                         let width = painter.layout_no_wrap(text.clone(), FontId::proportional(13.0), Color32::WHITE).size().x;
                         let at = label_centre - egui::vec2(width / 2.0 + 18.0, 0.0);
@@ -2637,12 +2650,15 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // Ticket #324 (version 0.08.8): a seat's working Batteries at the Body are a row
                     // of the band, and the Control line says when they are why nobody holds it.
                     for seat in Seat::ALL {
-                        let n = game.batteries_at(seat, body).len();
+                        // Ticket #335 (version 0.09.0): the row speaks of the whole Body, so it
+                        // counts every orbit's Batteries; which orbit each covers is the interface
+                        // lane's to draw.
+                        let n = game.batteries_at_body(seat, body).len();
                         if n > 0 {
-                            band.push((format!("{}: {} Batter{}, strength {}", game.seat_name(seat), n, if n == 1 { "y" } else { "ies" }, game.battery_strength(seat, body)), seat_colour(session, seat), None, None));
+                            band.push((format!("{}: {} Batter{}, strength {}", game.seat_name(seat), n, if n == 1 { "y" } else { "ies" }, game.battery_strength_at_body(seat, body)), seat_colour(session, seat), None, None));
                         }
                     }
-                    let any_battery = Seat::ALL.iter().any(|s| !game.batteries_at(*s, body).is_empty());
+                    let any_battery = Seat::ALL.iter().any(|s| !game.batteries_at_body(*s, body).is_empty());
                     band.push(match game.orbital_control(body) {
                         Some(s) => (format!("Orbital Control: {}", game.seat_name(s)), seat_colour(session, s), None, None),
                         None if any_battery => ("Orbital Control: nobody, a Battery stands".to_string(), Color32::LIGHT_GRAY, None, None),
@@ -2651,7 +2667,8 @@ fn overlays(painter: &egui::Painter, session: &Session, game: &Game, view: &View
                     // Ticket #317 (version 0.08.8): a Battle in orbit last turn is a row of the
                     // band, with the Battle mark's glyph, in the aggressor's colour; its hotspot
                     // reads the record and opens the Report as the mark's does.
-                    let fought = game.battle_last_turn_at(ReportPlace::Body(body));
+                    // Ticket #335 (version 0.09.0): any orbit of this Body.
+                    let fought = game.battle_last_turn_in_orbit(body);
                     if let Some(i) = fought {
                         let who = game.report.battles[i].aggressor().map(|s| format!("the {} attacked", game.seat_name(s))).unwrap_or_else(|| "nobody attacked".to_string());
                         band.push((format!("A Battle here last turn: {who}"), battle_colour(session, game, i), Some(Kind::Battle), None));
@@ -3842,10 +3859,18 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::BuildShip { site, kind } => format!("Build {} at {}", kind.name(), game.place_name(*site)),
         Order::BuildArmy { place } => format!("Build Army at {}", game.place_name(*place)),
         Order::Repair { unit, points } => format!("Repair {} point(s) on {}", points, unit_name(game, unit)),
-        Order::Transit { ship, to, slot } => match slot {
-            Some(n) => format!("Send {} to {}, into Orbital Slot {}", ship, game.tables.body(*to).name, n),
-            None => format!("Send {} to {}", ship, game.tables.body(*to).name),
-        },
+        // Ticket #335 (version 0.09.0): a leg names the ORBIT it ends in, low orbit included.
+        Order::Transit { ship, to, slot } => format!("Send {} to {}", ship, game.orbit_name(*to, Orbit::of(*slot))),
+        Order::ChangeOrbit { ship, slot } => {
+            let body = game.ship(*ship).and_then(|s| match s.at {
+                ShipAt::Body(b) => Some(b),
+                _ => None,
+            });
+            match body {
+                Some(b) => format!("Move {} to {}", ship, game.orbit_name(b, Orbit::of(*slot))),
+                None => format!("Move {ship} to another orbit"),
+            }
+        }
         Order::Refuel { ship } => format!("Refuel {} ({} Fuel from the Stockpile)", ship, game.refuel_amount(Seat(0), *ship)),
         Order::ShipStance { body, stance } => format!("Ships at {}: {}", game.tables.body(*body).name, stance.name()),
         Order::Bombard { ship, colony } => format!("Bombard {} from {}", game.place_name(Place::Colony(*colony)), ship),
@@ -5684,10 +5709,10 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             }
         }
         // Ticket #193 (version 0.08.0): and straight onto a Colony Ship of yours at Earth with room
-        // left, whether it sits in an Orbital Slot or at the Body at large -- that distinction is
-        // about blockades and has nothing to do with loading people, so a button for one and not the
-        // other would read as a defect. A Carrier takes an Army and no Colonists, so it never
-        // appears. The rule already worked; only the door was missing, exactly as ticket #141
+        // left. Ticket #335 (version 0.09.0): a Launch Site reaches LOW ORBIT alone, so the door
+        // greys out for a Ship at a station's ring, as every other door does when its order is
+        // refused; while the orbit a Ship sat in was about blockades alone the distinction did not
+        // touch loading people. A Carrier takes an Army and no Colonists, so it never appears. The rule already worked; only the door was missing, exactly as ticket #141
         // answered for stations. Both doors write the same Load order, so either cancels the other.
         //
         // It never offers the CROWDED places: above +1.8 a Ship lifting at Earth may take Colonists
@@ -8375,6 +8400,9 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                                         dying_earth_engine::report::ReportPlace::State(_) => Some(Kind::Region),
                                         dying_earth_engine::report::ReportPlace::Colony(c) => game.colony(c).map(Kind::of_colony),
                                         dying_earth_engine::report::ReportPlace::Body(_) => None,
+                                        // Ticket #335 (version 0.09.0): an orbit is no one kind of
+                                        // thing either.
+                                        dying_earth_engine::report::ReportPlace::Orbit(_, _) => None,
                                     };
                                     let button = match kind.and_then(|k| k.image(ui.ctx(), 14.0)) {
                                         Some(image) => egui::Button::image_and_text(image, &l.text),

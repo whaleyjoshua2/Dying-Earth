@@ -4,7 +4,7 @@
 //! a line can have, the severity order the headline and the Moments read, the four headings the
 //! rest is grouped under, and the template renderer with its validation.
 
-use crate::ids::{BodyId, ColonyId, Place, Seat, StateId, TechId};
+use crate::ids::{BodyId, ColonyId, Orbit, Place, Seat, StateId, TechId};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -17,6 +17,10 @@ pub enum ReportPlace {
     State(StateId),
     Colony(ColonyId),
     Body(BodyId),
+    /// Ticket #335 (version 0.09.0): **one orbit of a Body**. Battle parties form per orbit, so two
+    /// Battles at one Body are two records and want two places; `Body` still names the whole Body,
+    /// which is where an arrival, a Bombard's Report line and the Antarctic still point.
+    Orbit(BodyId, Orbit),
 }
 
 impl From<Place> for ReportPlace {
@@ -380,6 +384,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("start_rivals", &["rivals", "collapse"]),
     ("solar_storm", &[]),
     ("ship_arrived", &["faction", "ship", "body"]),
+    // Ticket #335 (version 0.09.0): a Ship that changed orbit at the Body it stands at.
+    ("orbit_changed", &["faction", "ship", "orbit"]),
     ("ship_destroyed", &["faction", "ship", "why", "cargo"]),
     // Ticket #281 (version 0.08.5): an Army destroyed, by name; and every Battle, as a line.
     ("army_destroyed", &["faction", "army", "why"]),
@@ -570,6 +576,8 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("draw_venture", &["n"]),
     ("repair", &["unit"]),
     ("transit", &["unit", "body"]),
+    // Ticket #335 (version 0.09.0).
+    ("change_orbit", &["unit", "orbit"]),
     ("refuel", &["unit", "body"]),
     ("bombard", &["colony"]),
     ("ship_stance", &["body", "stance"]),

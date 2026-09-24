@@ -1087,6 +1087,9 @@ struct BodiesFile {
     sibling_turns: u32,
     #[serde(default = "one_i64")]
     sibling_fuel: i64,
+    /// Ticket #335 (version 0.09.0): what an orbit change costs from the Ship's own tank.
+    #[serde(default = "one_i64")]
+    orbit_change_fuel: i64,
     #[serde(default = "forty")]
     station_materials: i64,
     /// Ticket #57: how far a Colony Slot's own yields may fall either side of its Body's.
@@ -1474,6 +1477,8 @@ pub struct Tables {
     pub bodies: Vec<BodyCard>,
     /// Ticket #45: the hop between two satellites of the same Body.
     pub sibling_transit: (u32, i64),
+    /// Ticket #335 (version 0.09.0): the Fuel an orbit change takes from a Ship's own tank.
+    pub orbit_change_fuel: i64,
     /// Ticket #46: what a station costs.
     pub station_materials: i64,
     /// Ticket #57: how far a Colony Slot's own four yields may fall either side of its Body's.
@@ -1620,6 +1625,7 @@ impl Tables {
         let tables = Tables {
             ship_names,
             sibling_transit: (bodies.sibling_turns, bodies.sibling_fuel),
+            orbit_change_fuel: bodies.orbit_change_fuel,
             station_materials: bodies.station_materials,
             slot_yield_spread: bodies.slot_yield_spread,
             planets: ephemeris.planet,

@@ -35,6 +35,41 @@ impl BodyId {
     }
 }
 
+/// Ticket #335 (version 0.09.0): **one orbit of a Body**. A Body's orbits are LOW ORBIT plus one
+/// per Orbital Slot -- twenty-one on the board -- and every Ship at a Body sits in exactly one of
+/// them; there is no longer a Body at large. `Ship.slot: Option<u32>` keeps its shape, `None`
+/// being low orbit, so no save changes shape; this is the word every rule that used to say "at
+/// the Body" is now written in, and the one a player reads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Orbit {
+    Low,
+    Slot(u32),
+}
+
+impl Orbit {
+    /// The orbit a Ship's `slot` names: low orbit where it names none.
+    pub fn of(slot: Option<u32>) -> Orbit {
+        match slot {
+            Some(n) => Orbit::Slot(n),
+            None => Orbit::Low,
+        }
+    }
+
+    /// The Orbital Slot this orbit is that of, or None for low orbit -- the shape `Ship.slot` and
+    /// `Order::Transit` carry.
+    pub fn slot(self) -> Option<u32> {
+        match self {
+            Orbit::Low => None,
+            Orbit::Slot(n) => Some(n),
+        }
+    }
+
+    pub fn is_low(self) -> bool {
+        self == Orbit::Low
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StateId {

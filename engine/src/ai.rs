@@ -281,7 +281,7 @@ impl Game {
     /// Ticket #324 (version 0.08.8): a rival's Batteries at the Body count, since they stand in
     /// the line of any Battle there.
     pub fn enemy_ship_strength(&self, seat: Seat, body: BodyId) -> i64 {
-        seat.others().iter().map(|s| self.ship_stack_strength(*s, body) + self.battery_strength(*s, body)).sum()
+        seat.others().iter().map(|s| self.ship_stack_strength(*s, body) + self.battery_strength_at_body(*s, body)).sum()
     }
 
     /// Whether any other seat directs this Colony.
@@ -1907,7 +1907,11 @@ impl Game {
             // Stockpile has Fuel; a leg the tank cannot pay is refused at the check, so the AI
             // never flies on an empty tank.
             // Ticket #325 (version 0.08.8): or at a partner's station under a Refuel Accord.
-            if s.fuel < card.tank && self.refuel_station_at(seat, body) && self.seat(seat).stockpile.fuel > 0 {
+            // Ticket #335 (version 0.09.0): a station fuels only a Ship in its own orbit, so the
+            // Refuel is offered where the Ship already sits at one; the orbit change that reaches
+            // it is the candidate below.
+            let orbit = self.ship_orbit(s);
+            if s.fuel < card.tank && self.refuelling_station(seat, body, orbit) && self.seat(seat).stockpile.fuel > 0 {
                 push(
                     vec![Order::Refuel { ship: s.id }],
                     Cat::Transit,
@@ -1915,15 +1919,54 @@ impl Game {
                     gap_for(Cat::Transit, None),
                     1.0,
                     1.0,
-                    format!("refuel {} at {} ({} of {} in the tank)", ship_name, self.tables.body(body).name, s.fuel, card.tank),
+                    format!("refuel {} at {} ({} of {} in the tank)", ship_name, self.orbit_name(body, orbit), s.fuel, card.tank),
                     None,
                 );
+            }
+            // Ticket #335 (version 0.09.0): **it changes orbit rather than flying away when what it
+            // wants is at the same Body** -- a station of its own to fill the tank at, a Colony with
+            // room for the people aboard, or low orbit, which is what touches the ground: founding
+            // a Colony, taking a lift from a Launch Site and landing an Army all want it. Offered
+            // at the transit's weight, since it is the same sort of move and the cheaper one.
+            // Each want carries the weight of the order it is a step toward, so an orbit change
+            // never outranks the thing it enables: the 0.06.0 sweep found that a loaded Colony Ship
+            // offered its own station over Earth at full weight parked every load there and left
+            // Mars unfounded, and a move toward that station must not reopen it.
+            if s.fuel >= self.tables.orbit_change_fuel {
+                let mut wants: Vec<(Orbit, String, Cat, f64)> = Vec::new();
+                if s.fuel < card.tank && self.seat(seat).stockpile.fuel > 0 && !self.refuelling_station(seat, body, orbit) {
+                    for c in self.colonies.iter().filter(|c| c.body == body && self.fuels_for(c, seat)) {
+                        wants.push((Orbit::Slot(c.slot), format!("to refuel at {}", self.place_name(Place::Colony(c.id))), Cat::Transit, self.base_weight(seat, Cat::Transit)));
+                    }
+                }
+                if s.colonists > 0 {
+                    for c in self.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(seat) && self.habitat_room(c) > c.colonists) {
+                        let weight = if body == BodyId::Earth { self.base_weight(seat, Cat::LoadUnload) * 0.5 } else { self.base_weight(seat, Cat::LoadUnload) };
+                        wants.push((self.colony_orbit(c), format!("to disembark into {}", self.place_name(Place::Colony(c.id))), Cat::LoadUnload, weight));
+                    }
+                }
+                let wants_the_ground = (s.colonists > 0 && !self.free_slots_on(body).is_empty())
+                    || s.army.is_some()
+                    || (body == BodyId::Earth && s.kind == UnitKind::ColonyShip && s.colonists == 0);
+                if wants_the_ground {
+                    wants.push((Orbit::Low, "to reach the ground".to_string(), Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload)));
+                }
+                let mut offered: Vec<Orbit> = Vec::new();
+                for (want, why, cat, weight) in wants {
+                    if want == orbit || offered.contains(&want) || !self.orbit_exists(body, want) {
+                        continue;
+                    }
+                    offered.push(want);
+                    let what = format!("move {} to {} {}", ship_name, self.orbit_name(body, want), why);
+                    push(vec![Order::ChangeOrbit { ship: s.id, slot: want.slot() }], cat, weight, 1.0, 1.0, 1.0, what, None);
+                }
             }
             if s.kind == UnitKind::ColonyShip {
                 // Ticket #86: behind on Off-world Presence, the AI lifts the crowded load at Earth;
                 // otherwise the safe one.
                 let capacity = if body == BodyId::Earth && presence_needed > 0 { self.colony_ship_crowded_capacity(seat) } else { self.colony_ship_capacity(seat) };
-                if body == BodyId::Earth && s.colonists < capacity {
+                // Ticket #335 (version 0.09.0): a lift from a Launch Site reaches low orbit alone.
+                if body == BodyId::Earth && s.colonists < capacity && orbit.is_low() {
                     // Load from the directed state with the most Emigrants waiting (ticket #73).
                     // Ticket #46: only a state with a working Launch Site lifts them.
                     let from = self
@@ -1937,7 +1980,9 @@ impl Game {
                         push(vec![Order::Load { ship: s.id, colonists: n, from: LoadSource::State(st), army: None }], Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload), gap_for(Cat::LoadUnload, None), 1.0, opp, format!("load {} Colonists onto {}", n, ship_name), None);
                     }
                 }
-                if s.colonists > 0 && body != BodyId::Earth {
+                // Ticket #335 (version 0.09.0): a Colony is founded from low orbit, which is what
+                // touches the ground; from a station's ring the order is refused.
+                if s.colonists > 0 && body != BodyId::Earth && orbit.is_low() {
                     let free = self.free_slots_on(body);
                     // Ticket #57: every slot has its own four yields, so the AI picks the free slot
                     // whose figures best serve the part it is furthest behind on, not the first one.
@@ -1948,7 +1993,7 @@ impl Game {
                 }
                 // Ticket #44: Antarctica, Earth's slots. A foothold, not Presence: half weight and no gap,
                 // so it is taken when the Ship cannot go anywhere better.
-                if s.colonists > 0 && body == BodyId::Earth {
+                if s.colonists > 0 && body == BodyId::Earth && orbit.is_low() {
                     // Ticket #56: Antarctica is shut until the ice opens; a loaded Ship goes elsewhere.
                     if let Some(slot) = self.best_slot_for(seat, BodyId::Earth, behind).filter(|_| self.antarctica_open) {
                         push(vec![Order::Unload { ship: s.id, colonists: s.colonists, army: false, into: UnloadTarget::Slot(body, slot) }], Cat::FoundColony, self.base_weight(seat, Cat::FoundColony) * 0.5, 1.0, 1.0, 1.0, format!("found a Colony at {}", self.tables.body(BodyId::Earth).slots[slot as usize].name), None);
@@ -1965,7 +2010,8 @@ impl Game {
                 // Earth the landing is a foothold like Antarctica's: half weight, no gap, taken when
                 // the Ship cannot go anywhere better.
                 if s.colonists > 0 {
-                    for c in self.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(seat) && (c.in_orbit || c.body != BodyId::Earth)) {
+                    // Ticket #335 (version 0.09.0): and only into a place this Ship's orbit touches.
+                    for c in self.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(seat) && (c.in_orbit || c.body != BodyId::Earth) && self.ship_may_touch(s, c)) {
                         let room = self.habitat_room(c).saturating_sub(c.colonists);
                         if room > 0 {
                             let n = room.min(s.colonists);
@@ -2041,7 +2087,9 @@ impl Game {
                 }
                 if let Some(aid) = s.army.filter(|_| body != BodyId::Earth) {
                     {
-                        for c in self.colonies.iter().filter(|c| c.body == body) {
+                        // Ticket #335 (version 0.09.0): a landing is given from the orbit that
+                        // touches the place -- low orbit for the ground, the station's own ring.
+                        for c in self.colonies.iter().filter(|c| c.body == body && self.ship_may_touch(s, c)) {
                             let enemy = self.rival_holds(seat, c);
                             let mine = c.control.director() == Some(seat);
                             if enemy || mine {
@@ -2074,7 +2122,7 @@ impl Game {
             let enemy_str = self.enemy_ship_strength(seat, body);
             // Ticket #324 (version 0.08.8): a rival's Battery is an enemy in orbit too -- the one
             // way to clear it, and the odds above read its strength.
-            let enemy_here = self.ships.iter().any(|s| s.seat != seat && s.at == ShipAt::Body(body)) || self.battery_stands_against(seat, body);
+            let enemy_here = self.ships.iter().any(|s| s.seat != seat && s.at == ShipAt::Body(body)) || self.battery_stands_against_at_body(seat, body);
             let inbound_target = self.ships.iter().any(|s| s.seat != seat && matches!(s.kind, UnitKind::ColonyShip | UnitKind::Carrier) && matches!(s.at, ShipAt::Transit { to, .. } if to == body));
             let threat = if self.enemy_present_or_inbound(seat, body) { m.threat } else { 1.0 };
             let total_hp: u32 = stack.iter().map(|s| self.tables.unit(s.kind).hit_points).sum();
@@ -2095,7 +2143,7 @@ impl Game {
                     Some(o) => self.relations_score(seat, o) <= th.war_cause,
                     None => {
                         self.ships.iter().any(|s| s.seat != seat && s.at == ShipAt::Body(body) && self.relations_score(seat, s.seat) <= th.war_cause)
-                            || seat.others().iter().any(|o| !self.batteries_at(*o, body).is_empty() && self.relations_score(seat, *o) <= th.war_cause)
+                            || seat.others().iter().any(|o| !self.batteries_at_body(*o, body).is_empty() && self.relations_score(seat, *o) <= th.war_cause)
                     }
                 };
                 if odds >= th.attack_odds && (cause || (my_colony_here && held_against_me)) && wars_opened < 1 {
@@ -2111,11 +2159,23 @@ impl Game {
             // cause against a Colony's holder there, bombards it, at the orbital Attack's weight.
             // Its own key, since the stance is the stack's and a Bombard is the Ship's; a second
             // Bombard for the same Ship is dropped at the check.
-            if body != BodyId::Earth && self.orbital_control(body) == Some(seat) {
+            // Ticket #335 (version 0.09.0): the orbit the Battleship is in is the orbit it must
+            // hold, so the candidate is offered per Colony: a ground Colony from low orbit under an
+            // outright Orbital Control, a station from that station's own ring with no rival
+            // warship and no rival working Battery in it. Offering it any other way would be
+            // proposing an order the gate refuses.
+            if body != BodyId::Earth {
                 for s in stack.iter().filter(|s| s.kind == UnitKind::Battleship && !s.escaped) {
-                    for c in self.colonies.iter().filter(|c| c.body == body) {
+                    for c in self.colonies.iter().filter(|c| c.body == body && self.ship_may_touch(s, c)) {
                         let Some(h) = c.control.director().filter(|h| *h != seat) else { continue };
                         if self.relations_score(seat, h) > th.war_cause {
+                            continue;
+                        }
+                        let holds = match self.colony_orbit(c) {
+                            Orbit::Low => self.orbital_control(body) == Some(seat),
+                            o => self.orbit_uncontested(seat, body, o),
+                        };
+                        if !holds {
                             continue;
                         }
                         push(vec![Order::Bombard { ship: s.id, colony: c.id }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack), 1.0, 1.0, 1.0, format!("Bombard {} from {}", self.place_name(Place::Colony(c.id)), self.ship_name(s)), None);
@@ -2137,9 +2197,14 @@ impl Game {
             // Ticket #278 (version 0.08.5): a Blockade must be chosen, so the stack that landed in a
             // rival station's slot (ai_blockade_slot) is offered the stance that makes it one. The
             // richest rival station is already the slot it took.
-            // Ticket #324 (version 0.08.8): not against a station whose holder has a Battery at the
-            // Body; the Blockade would shut nothing.
-            if let Some(target) = stack.iter().filter(|s| s.kind.is_warship()).find_map(|s| self.station_at(body, s.slot?).filter(|c| self.rival_holds(seat, c) && c.control.director().is_some_and(|h| self.batteries_at(h, body).is_empty()))) {
+            // Ticket #324 (version 0.08.8): not against a station whose holder has a Battery in
+            // that station's own orbit (ticket #335, version 0.09.0, which narrowed a Battery to
+            // the orbit it covers); the Blockade would shut nothing.
+            if let Some(target) = stack
+                .iter()
+                .filter(|s| s.kind.is_warship())
+                .find_map(|s| self.station_at(body, s.slot?).filter(|c| self.rival_holds(seat, c) && c.control.director().is_some_and(|h| self.batteries_at(h, body, Orbit::Slot(c.slot)).is_empty())))
+            {
                 push(
                     vec![Order::ShipStance { body, stance: Stance::Blockade }],
                     Cat::StanceBlockade,

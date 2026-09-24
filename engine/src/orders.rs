@@ -53,10 +53,17 @@ pub enum Order {
     BuildArmy { place: Place },
     Repair { unit: UnitRef, points: u32 },
     /// Ticket #99 (version 0.07.0): a Ship may name the Orbital Slot it arrives into. A warship
-    /// sitting in a slot blockades that slot and nothing else; `None` arrives at the Body at large,
-    /// blockading nothing. The slot is chosen with the leg, so it is chosen before the Ship can see
-    /// who will be there when it lands.
+    /// sitting in a slot blockades that slot and nothing else. Ticket #335 (version 0.09.0): the
+    /// leg names the ORBIT it ends in, and `None` is low orbit, which is an orbit like any other
+    /// and no longer "the Body at large". The orbit is chosen with the leg, so it is chosen before
+    /// the Ship can see who will be there when it lands.
     Transit { ship: ShipId, to: BodyId, slot: Option<u32> },
+    /// Ticket #335 (version 0.09.0): move a Ship between the orbits of the Body it stands at --
+    /// low orbit and the Orbital Slots -- for `orbit_change_fuel` (`bodies.toml`, 1) out of its own
+    /// tank. `slot: None` is low orbit, the same shape a Transit's destination orbit has. One order
+    /// a turn like any other, and resolved WITH the transits, before the Battles, so a Ship that
+    /// changes orbit fights in its new one.
+    ChangeOrbit { ship: ShipId, slot: Option<u32> },
     /// Version 0.06.0 (ticket #87): fill a Ship's tank from the Stockpile at a Body where its
     /// Faction holds a Space Station, as far as the Stockpile can pay.
     Refuel { ship: ShipId },
@@ -270,6 +277,11 @@ pub struct Pending {
     /// which Colony -- resolved after the orbital Battles.
     #[serde(default)]
     pub bombards: Vec<(Seat, ShipId, ColonyId)>,
+    /// Ticket #335 (version 0.09.0): orbit changes ordered this turn -- who, which Ship, the orbit
+    /// it moves to (`None` is low orbit) -- resolved with the transits, before the Battles. The
+    /// Fuel left the tank at the order.
+    #[serde(default)]
+    pub orbit_changes: Vec<(Seat, ShipId, Option<u32>)>,
     pub cargo: Vec<(Seat, Order)>,
     /// Ticket #46: stations ordered this turn.
     pub stations: Vec<(Seat, BodyId, u32)>,
@@ -320,6 +332,9 @@ impl Game {
             // Ticket #87: a transit spends the Ship's tank, not the Stockpile; a Refuel takes from
             // the Stockpile what the tank wants and the Stockpile can pay.
             Order::Transit { .. } => Cost::default(),
+            // Ticket #335 (version 0.09.0): an orbit change spends the tank too, as a transit does,
+            // so the Stockpile pays nothing for it.
+            Order::ChangeOrbit { .. } => Cost::default(),
             // Ticket #328 (version 0.08.8): a Bombard costs nothing but the offence.
             Order::Bombard { .. } => Cost::default(),
             Order::Refuel { ship } => Cost { fuel: self.refuel_amount(seat, *ship), ..Default::default() },
@@ -1055,7 +1070,7 @@ impl Game {
                         if !self.has_repair_yard(seat, body) {
                             return fail("needs a Launch Site or Shipyard at this Body");
                         }
-                        if pending.iter().any(|o| matches!(o, Order::Transit { ship: s, .. } if s == id)) {
+                        if pending.iter().any(|o| matches!(o, Order::Transit { ship: s, .. } | Order::ChangeOrbit { ship: s, .. } if s == id)) {
                             return fail("a Ship cannot repair and move in one turn");
                         }
                     }
@@ -1119,7 +1134,7 @@ impl Game {
                 if s.arrived_this_turn {
                     return fail("arrived this turn; it may act next turn");
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } if x == ship)) {
+                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 // Ticket #99 (version 0.07.0): the Orbital Slot it arrives into, chosen with the leg.
@@ -1136,6 +1151,36 @@ impl Game {
                 }
                 Ok(cost)
             }
+            // Ticket #335 (version 0.09.0): an orbit change, at a Body, to an orbit of that Body
+            // that exists and is not the one the Ship is in, for the tank's `orbit_change_fuel`.
+            Order::ChangeOrbit { ship, slot } => {
+                let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
+                if s.seat != seat {
+                    return fail("not your Ship");
+                }
+                let ShipAt::Body(body) = s.at else { return fail("a Ship in transit is between orbits") };
+                let want = Orbit::of(*slot);
+                if !self.orbit_exists(body, want) {
+                    let slots = self.tables.body(body).orbital_slots;
+                    return fail(format!("{} has low orbit and {} Orbital Slots, numbered 0 to {}", self.tables.body(body).name, slots, slots.saturating_sub(1)));
+                }
+                if self.ship_orbit(s) == want {
+                    return fail(format!("already in {}", self.orbit_name(body, want)));
+                }
+                if s.arrived_this_turn {
+                    return fail("arrived this turn; it may act next turn");
+                }
+                let fuel = self.tables.orbit_change_fuel;
+                if s.fuel < fuel {
+                    return fail(format!("the tank holds {} Fuel; an orbit change needs {fuel}", s.fuel));
+                }
+                if pending.iter().any(|o| {
+                    matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } | Order::Bombard { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)
+                }) {
+                    return fail("this Ship already has an order");
+                }
+                Ok(cost)
+            }
             Order::Refuel { ship } => {
                 let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
                 if s.seat != seat {
@@ -1146,9 +1191,13 @@ impl Game {
                 if !self.refuel_station_at(seat, body) {
                     return fail(format!("no station of yours, or of a Refuel partner's, over {} to refuel at", self.tables.body(body).name));
                 }
-                // Ticket #99 (version 0.07.0): a blockaded station fuels nothing.
-                if !self.refuelling_station(seat, body) {
-                    return fail(format!("every station over {} you could refuel at is blockaded", self.tables.body(body).name));
+                // Ticket #99 (version 0.07.0): a blockaded station fuels nothing. Ticket #335
+                // (version 0.09.0): nor does one in another orbit -- a station's own orbit is what
+                // touches that station, refuelling included, so a Ship in low orbit or at another
+                // station's ring fuels at nothing until it has changed orbit. One rule, one refusal.
+                let orbit = self.ship_orbit(s);
+                if !self.refuelling_station(seat, body, orbit) {
+                    return fail(format!("no station fuels a Ship in {}: it is in another orbit, or blockaded", self.orbit_name(body, orbit)));
                 }
                 if s.fuel >= self.tables.unit(s.kind).tank {
                     return fail("the tank is full");
@@ -1156,7 +1205,7 @@ impl Game {
                 if cost.fuel <= 0 {
                     return fail("no Fuel in the Stockpile to fill it with");
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Refuel { ship: x } if x == ship)) {
+                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Refuel { ship: x } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 Ok(cost)
@@ -1182,10 +1231,22 @@ impl Game {
                     Some(d) if d != seat => {}
                     _ => return fail("not a rival's Colony"),
                 }
-                if self.orbital_control(body) != Some(seat) {
-                    return fail(format!("you do not hold Orbital Control of {} outright", self.tables.body(body).name));
+                // Ticket #335 (version 0.09.0): **the orbit you are in is the orbit you must hold.**
+                // A Colony on the ground is broken from low orbit by a Faction holding Orbital
+                // Control there outright; a station from the station's own orbit, with no rival
+                // warship and no rival working Battery standing in it.
+                let orbit = self.colony_orbit(col);
+                if !self.ship_in_orbit(s, body, orbit) {
+                    return fail(format!("a Bombard is given from {}", self.orbit_name(body, orbit)));
                 }
-                if pending.iter().any(|o| matches!(o, Order::Bombard { ship: x, .. } | Order::Transit { ship: x, .. } if x == ship)) {
+                if orbit.is_low() {
+                    if self.orbital_control(body) != Some(seat) {
+                        return fail(format!("you do not hold Orbital Control of {} outright", self.tables.body(body).name));
+                    }
+                } else if !self.orbit_uncontested(seat, body, orbit) {
+                    return fail(format!("a rival still stands in {}", self.orbit_name(body, orbit)));
+                }
+                if pending.iter().any(|o| matches!(o, Order::Bombard { ship: x, .. } | Order::Transit { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 Ok(cost)
@@ -1198,18 +1259,20 @@ impl Game {
                 if *stance == Stance::DigIn {
                     return fail("a Ship cannot dig in");
                 }
-                // Ticket #278 (version 0.08.5): a Blockade is chosen against a slot, so it wants a
-                // warship of the seat's sitting in an Orbital Slot that is not its own station's --
-                // a rival's, or an empty one held against a builder.
+                // Ticket #278 (version 0.08.5): a Blockade is chosen against a place, so it wants a
+                // warship of the seat's sitting in an orbit it may shut. Ticket #335 (version
+                // 0.09.0): **the orbit it is given in** -- LOW ORBIT, which starves the ground
+                // under an outright Orbital Control, or an Orbital Slot that is not its own
+                // station's: a rival's, or an empty one held against a builder.
                 if *stance == Stance::Blockade
                     && !self.ships.iter().any(|s| {
                         s.seat == seat
                             && s.at == ShipAt::Body(*body)
                             && s.kind.is_warship()
-                            && s.slot.is_some_and(|sl| self.station_at(*body, sl).is_none_or(|c| c.control.director() != Some(seat)))
+                            && s.slot.is_none_or(|sl| self.station_at(*body, sl).is_none_or(|c| c.control.director() != Some(seat)))
                     })
                 {
-                    return fail("no warship of yours sits in a slot to blockade here");
+                    return fail("no warship of yours sits in an orbit to blockade here");
                 }
                 Ok(cost)
             }
@@ -1269,7 +1332,7 @@ impl Game {
                 if s.colonists + *colonists > capacity {
                     return fail(format!("this Ship carries at most {capacity} Colonists"));
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } if x == ship)) {
+                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 if *colonists > 0 {
@@ -1290,11 +1353,22 @@ impl Game {
                             if self.state(*st).emigrants < *colonists {
                                 return fail(format!("only {} Pioneers are waiting there", self.state(*st).emigrants));
                             }
+                            // Ticket #335 (version 0.09.0): low orbit is what touches the ground, a
+                            // lift from a Launch Site included; a Ship at a station's ring is out
+                            // of the Launch Site's reach.
+                            if !self.ship_in_orbit(s, body, Orbit::Low) {
+                                return fail(format!("a lift from a Launch Site reaches {} alone", self.orbit_name(body, Orbit::Low)));
+                            }
                         }
                         LoadSource::Colony(c) => {
                             let Some(col) = self.colony(*c) else { return fail("no such Colony") };
                             if col.body != body || col.control.director() != Some(seat) {
                                 return fail("that Colony is not yours at this Body");
+                            }
+                            // Ticket #335 (version 0.09.0): a place is touched from its own orbit,
+                            // taking people off it as much as putting them on.
+                            if !self.ship_may_touch(s, col) {
+                                return fail(format!("{} is reached from {}", self.place_name(Place::Colony(*c)), self.orbit_name(body, self.colony_orbit(col))));
                             }
                             if col.colonists < *colonists {
                                 return fail("not enough Colonists there");
@@ -1327,13 +1401,16 @@ impl Game {
                     if matches!(a.home, ArmyHome::Colony(_)) {
                         return fail("a Colony's Army never leaves");
                     }
+                    // Ticket #335 (version 0.09.0): and the Ship is in the orbit that touches the
+                    // Army's place -- low orbit for a Region or a Colony on the ground, a station's
+                    // own orbit for an Army aboard that station.
                     let here = match a.at {
-                        ArmyAt::Place(Place::State(_)) => body == BodyId::Earth,
-                        ArmyAt::Place(Place::Colony(c)) => self.colony(c).map(|c| c.body == body).unwrap_or(false),
+                        ArmyAt::Place(Place::State(_)) => body == BodyId::Earth && self.ship_in_orbit(s, body, Orbit::Low),
+                        ArmyAt::Place(Place::Colony(c)) => self.colony(c).map(|c| c.body == body && self.ship_may_touch(s, c)).unwrap_or(false),
                         ArmyAt::Aboard(_) => false,
                     };
                     if !here {
-                        return fail("that Army is not at this Body");
+                        return fail("that Army is not at this Body, or not in this Ship's orbit");
                     }
                 }
                 Ok(cost)
@@ -1353,13 +1430,18 @@ impl Game {
                 if *colonists == 0 && !*army {
                     return fail("nothing to unload");
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } if x == ship)) {
+                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 match into {
                     UnloadTarget::Slot(b, slot) => {
                         if *b != body {
                             return fail("that slot is not at this Body");
+                        }
+                        // Ticket #335 (version 0.09.0): founding a Colony is touching the ground,
+                        // and low orbit is what touches the ground.
+                        if !self.ship_in_orbit(s, body, Orbit::Low) {
+                            return fail(format!("a Colony is founded from {}", self.orbit_name(body, Orbit::Low)));
                         }
                         if s.kind != UnitKind::ColonyShip || *colonists == 0 {
                             return fail("only a Colony Ship with Colonists founds a Colony");
@@ -1376,6 +1458,11 @@ impl Game {
                         let Some(col) = self.colony(*c) else { return fail("no such Colony") };
                         if col.body != body {
                             return fail("that Colony is not at this Body");
+                        }
+                        // Ticket #335 (version 0.09.0): a station is unloaded into from its own
+                        // orbit, a Colony on the ground from low orbit.
+                        if !self.ship_may_touch(s, col) {
+                            return fail(format!("{} is reached from {}", self.place_name(Place::Colony(*c)), self.orbit_name(body, self.colony_orbit(col))));
                         }
                         if *colonists > 0 {
                             if col.control.director() != Some(seat) {
@@ -1820,10 +1907,30 @@ impl Game {
                     if let Some(s) = self.ship_mut(*ship) {
                         s.at = ShipAt::Transit { from, to: *to, turns_left: turns };
                         s.fuel = (s.fuel - fuel).max(0);
-                        // Ticket #99: it arrives into the slot the leg named, or the Body at large.
+                        // Ticket #99: it arrives into the orbit the leg named. Ticket #335
+                        // (version 0.09.0): a leg that names none arrives in LOW ORBIT, which is
+                        // what `None` has always meant and is now drawn and named.
                         s.slot = *slot;
                     }
                     self.log(format!("{} launches {} toward {} ({} turns, {} Fuel from the tank).", self.seat_name(seat), ship, name, turns, fuel));
+                }
+                // Ticket #335 (version 0.09.0): the Fuel leaves the tank now, as a transit's does,
+                // and the Ship moves at the Resolution WITH the transits, before the Battles, so a
+                // Ship that changes orbit fights in its new one.
+                Order::ChangeOrbit { ship, slot } => {
+                    let fuel = self.tables.orbit_change_fuel;
+                    let body = self.ship(*ship).and_then(|s| match s.at {
+                        ShipAt::Body(b) => Some(b),
+                        _ => None,
+                    });
+                    if let Some(s) = self.ship_mut(*ship) {
+                        s.fuel = (s.fuel - fuel).max(0);
+                    }
+                    self.pending.orbit_changes.push((seat, *ship, *slot));
+                    if let Some(b) = body {
+                        let to = self.orbit_name(b, Orbit::of(*slot));
+                        self.log(format!("{} moves {} to {} ({} Fuel from the tank).", self.seat_name(seat), ship, to, fuel));
+                    }
                 }
                 // Ticket #87: the Fuel came out of the Stockpile with the order's cost; it goes into the tank.
                 Order::Refuel { ship } => {
@@ -1849,6 +1956,11 @@ impl Game {
                     }
                     if *stance == Stance::Attack {
                         self.pending.attack_sequence += 1;
+                    }
+                    // Ticket #335 (version 0.09.0): counted, so the sweep can say how often a
+                    // Blockade is given now that a human can give one at all.
+                    if *stance == Stance::Blockade {
+                        self.war.blockades_ordered[seat.index()] += 1;
                     }
                 }
                 Order::ArmyStance { place, stance } => {
@@ -2257,6 +2369,16 @@ impl Game {
             Order::Transit { ship, to, .. } => {
                 let unit = self.ship(*ship).map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into());
                 r("transit", &[("unit", unit), ("body", self.tables.body(*to).name.clone())])
+            }
+            // Ticket #335 (version 0.09.0): the orbit change reads as the orbit it ends in.
+            Order::ChangeOrbit { ship, slot } => {
+                let s = self.ship(*ship);
+                let unit = s.map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into());
+                let orbit = match s.map(|s| s.at) {
+                    Some(ShipAt::Body(b)) => self.orbit_name(b, Orbit::of(*slot)),
+                    _ => "another orbit".to_string(),
+                };
+                r("change_orbit", &[("unit", unit), ("orbit", orbit)])
             }
             // Ticket #106 (version 0.07.0): a rival's paragraph does not report defaults. Hold is
             // what a stack does when nobody tells it otherwise, so "set its Armies at X to Hold" is

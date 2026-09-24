@@ -513,6 +513,10 @@ fn main() {
                             println!("      Batteries lost over the batch, by seat {:?}", warc.batteries_lost);
                             // Ticket #328 (version 0.08.8): Bombards and what they burned, by the bombarder.
                             println!("      Bombards over the batch, by seat {:?}; Modules burned {:?}", warc.bombards, warc.modules_burned);
+                            // Ticket #335 (version 0.09.0): orbit changes, and Blockades -- every
+                            // one of which a human could now give by the same path, where before
+                            // this ticket no human player could give one at all.
+                            println!("      Orbit changes over the batch, by seat {:?}; Blockades ordered {:?}", warc.orbit_changes, warc.blockades_ordered);
                             println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
                             println!("      Breaks fired: {}", fired.join(", "));
                         }

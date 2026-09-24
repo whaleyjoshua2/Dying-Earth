@@ -474,8 +474,10 @@ pub struct Ship {
     #[serde(default)]
     pub fuel: i64,
     /// Ticket #99 (version 0.07.0): the Orbital Slot this Ship sits in, chosen with the leg that
-    /// brought it. A warship in a slot blockades that slot; `None` is the Body at large, which
-    /// blockades nothing. A Ship built at a Shipyard starts at the Body at large.
+    /// brought it. Ticket #335 (version 0.09.0): `None` is **low orbit**, one of the Body's orbits
+    /// like any other and no longer "the Body at large"; read it through `Game::ship_orbit`, which
+    /// gives the `Orbit` every rule is written in. The shape is unchanged so no save changes. A
+    /// Ship built at a Shipyard starts in the orbit of the yard that built it.
     #[serde(default)]
     pub slot: Option<u32>,
 }
@@ -986,6 +988,15 @@ pub struct WarCounters {
     pub bombards: [u32; SEAT_COUNT],
     #[serde(default)]
     pub modules_burned: [u32; SEAT_COUNT],
+    /// Ticket #335 (version 0.09.0): orbit changes resolved, by seat -- a Ship moving between the
+    /// orbits of one Body rather than flying away; and Blockade orders committed, by seat. Every
+    /// Blockade counted here is one a HUMAN could have given by the same path, a transit naming the
+    /// orbit and then the stance, which was impossible before this ticket: until now every transit
+    /// the interface sent named no slot, so no human player ever blockaded anything.
+    #[serde(default)]
+    pub orbit_changes: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub blockades_ordered: [u32; SEAT_COUNT],
     /// Ticket #334 (version 0.09.0): raises the computer wanted and was refused for want of people
     /// -- a Region under its unit of population, a Colony down to its last Colonist -- by seat.
     #[serde(default)]
@@ -1033,6 +1044,9 @@ impl WarCounters {
             self.bombards[i] += o.bombards[i];
             self.modules_burned[i] += o.modules_burned[i];
             self.army_raises_refused_people[i] += o.army_raises_refused_people[i];
+            // Ticket #335 (version 0.09.0).
+            self.orbit_changes[i] += o.orbit_changes[i];
+            self.blockades_ordered[i] += o.blockades_ordered[i];
         }
         self.battles_vs_neutral += o.battles_vs_neutral;
         self.standing_armies_lost += o.standing_armies_lost;
@@ -1928,7 +1942,12 @@ impl Game {
         let Some(s) = self.ship(ship) else { return false };
         let ShipAt::Body(body) = s.at else { return false };
         // Ticket #325 (version 0.08.8): a partner's station under a Refuel Accord rescues it too.
-        if self.refuel_station_at(s.seat, body) {
+        // Ticket #335 (version 0.09.0): a station fuels only a Ship in its own orbit, so a station
+        // in another orbit rescues this Ship only while the tank can still pay the orbit change
+        // that would reach it. A dry tank in the wrong orbit is stranded with a station in sight.
+        if self.refuel_station_at(s.seat, body)
+            && (self.ship_orbit(s).slot().is_some_and(|sl| self.station_at(body, sl).is_some_and(|c| self.fuels_for(c, s.seat))) || s.fuel >= self.tables.orbit_change_fuel)
+        {
             return false;
         }
         match self.cheapest_leg_from(s.seat, body) {
@@ -2826,6 +2845,13 @@ impl Game {
         self.report.battles.iter().position(|b| b.at == Some(at))
     }
 
+    /// Ticket #335 (version 0.09.0): a Battle of the last Resolution fought in ANY orbit of this
+    /// Body, since parties form per orbit and two fights at one Body are two records. The first is
+    /// the one a mark on the Body reads; a mark per orbit is the interface's, on its own ring.
+    pub fn battle_last_turn_in_orbit(&self, body: BodyId) -> Option<usize> {
+        self.report.battles.iter().position(|b| matches!(b.at, Some(ReportPlace::Orbit(b2, _)) if b2 == body))
+    }
+
     /// Ticket #310 (version 0.08.7): **the military threat to a held Region**, the counterpart of
     /// `nearest_challenger`: the rival raised Army standing in a neighbouring Region with the best
     /// first-exchange odds against this Region's defenders, ties to the strongest, with the Region
@@ -3151,40 +3177,129 @@ impl Game {
         self.tables.body(body).stations.get(slot as usize).cloned().unwrap_or_else(|| format!("Station {}", slot + 1))
     }
 
+    // ------------------------------------------- Ticket #335 (version 0.09.0): a Body's orbits
+
+    /// Ticket #335: the orbits of a Body -- LOW ORBIT, then one per Orbital Slot. Every Ship at the
+    /// Body sits in exactly one of them, and a Battle is fought within one of them.
+    pub fn orbits_of(&self, body: BodyId) -> Vec<Orbit> {
+        std::iter::once(Orbit::Low).chain((0..self.tables.body(body).orbital_slots).map(Orbit::Slot)).collect()
+    }
+
+    /// Ticket #335: whether this orbit exists at this Body. Low orbit always does; a slot's does
+    /// where the Body has that many Orbital Slots.
+    pub fn orbit_exists(&self, body: BodyId, orbit: Orbit) -> bool {
+        match orbit {
+            Orbit::Low => true,
+            Orbit::Slot(n) => n < self.tables.body(body).orbital_slots,
+        }
+    }
+
+    /// Ticket #335: the orbit a Ship sits in. `slot: None` is low orbit, which the tree called "the
+    /// Body at large" until this ticket.
+    pub fn ship_orbit(&self, s: &Ship) -> Orbit {
+        Orbit::of(s.slot)
+    }
+
+    /// Ticket #335: whether this Ship sits in this orbit of this Body -- the test every rule that
+    /// used to say "at the Body" is now written in.
+    pub fn ship_in_orbit(&self, s: &Ship, body: BodyId, orbit: Orbit) -> bool {
+        s.at == ShipAt::Body(body) && self.ship_orbit(s) == orbit
+    }
+
+    /// Ticket #335: the orbit a Colony is touched from -- its own for a station, low orbit for a
+    /// Colony on the ground, since low orbit is what touches the ground.
+    pub fn colony_orbit(&self, c: &Colony) -> Orbit {
+        if c.in_orbit { Orbit::Slot(c.slot) } else { Orbit::Low }
+    }
+
+    /// Ticket #335: an orbit named for a player to read -- "Mars, low orbit", "Mars, at Tiangong".
+    /// An Orbital Slot carries its station's name whether or not a station stands in it yet, which
+    /// is the name the Surface Map has drawn on its ring since version 0.07.3.
+    pub fn orbit_name(&self, body: BodyId, orbit: Orbit) -> String {
+        match orbit {
+            Orbit::Low => format!("{}, low orbit", self.tables.body(body).name),
+            Orbit::Slot(n) => format!("{}, at {}", self.tables.body(body).name, self.station_name(body, n)),
+        }
+    }
+
+    /// Ticket #335: the same orbit as a Battle's place. Low orbit keeps the wording every Battle
+    /// record has had -- "Mars orbit" -- and a station's orbit names the station.
+    pub fn orbit_battle_name(&self, body: BodyId, orbit: Orbit) -> String {
+        match orbit {
+            Orbit::Low => format!("{} orbit", self.tables.body(body).name),
+            Orbit::Slot(n) => format!("{} orbit at {}", self.tables.body(body).name, self.station_name(body, n)),
+        }
+    }
+
     /// Orbital Control at a Body (spec 9.3, ticket #50): held by the one seat with a Frigate or
     /// Battleship there and no other seat's warship still engaged. Two or more, and nobody holds it.
+    ///
+    /// Ticket #335 (version 0.09.0): **Orbital Control is of LOW ORBIT**, since low orbit is what
+    /// touches the ground and the ground is all Control governs. A warship in a station's orbit
+    /// holds nothing by sitting there; it must come down to low orbit to shut the surface.
     pub fn orbital_control(&self, body: BodyId) -> Option<Seat> {
         let mut holders = Seat::ALL
             .into_iter()
-            .filter(|seat| self.ships.iter().any(|s| s.seat == *seat && s.at == ShipAt::Body(body) && s.kind.is_warship() && !s.escaped));
+            .filter(|seat| self.ships.iter().any(|s| s.seat == *seat && self.ship_in_orbit(s, body, Orbit::Low) && s.kind.is_warship() && !s.escaped));
         match (holders.next(), holders.next()) {
-            // Ticket #324 (version 0.08.8): a rival's Battery standing at the Body denies it.
-            (Some(one), None) if !self.battery_stands_against(one, body) => Some(one),
+            // Ticket #324 (version 0.08.8): a rival's Battery denies it. Ticket #335: a Battery
+            // covers its own orbit alone, so it is low orbit's Batteries -- the ground Colonies' --
+            // that deny Control, and a station's Battery high above denies nothing down here.
+            (Some(one), None) if !self.battery_stands_against(one, body, Orbit::Low) => Some(one),
             _ => None,
         }
     }
 
-    /// Ticket #324 (version 0.08.8): the working Batteries a seat directs at a Body, each as its
-    /// Colony and its index among that Colony's Modules -- the reference a Battle and a Repair
-    /// order carry. Mothballed or offline, a Battery neither fires nor denies, as every Module
-    /// that is not working does nothing.
-    pub fn batteries_at(&self, seat: Seat, body: BodyId) -> Vec<(ColonyId, usize)> {
+    /// Ticket #335 (version 0.09.0): whether a seat stands alone in one orbit -- no rival warship
+    /// still engaged in it and no rival working Battery covering it. Orbital Control is low
+    /// orbit's and gates the ground; THIS is what a station's own orbit asks of the Ship that
+    /// would Bombard the station standing there.
+    pub fn orbit_uncontested(&self, seat: Seat, body: BodyId, orbit: Orbit) -> bool {
+        let rival_warship = self.ships.iter().any(|s| s.seat != seat && s.kind.is_warship() && !s.escaped && self.ship_in_orbit(s, body, orbit));
+        !rival_warship && !self.battery_stands_against(seat, body, orbit)
+    }
+
+    /// Ticket #324 (version 0.08.8): the working Batteries a seat directs in one ORBIT of a Body
+    /// (ticket #335), each as its Colony and its index among that Colony's Modules -- the reference
+    /// a Battle and a Repair order carry. Mothballed or offline, a Battery neither fires nor denies,
+    /// as every Module that is not working does nothing.
+    ///
+    /// Ticket #335 (version 0.09.0): **a Battery covers its own orbit**: a station's Battery its
+    /// station's orbit, a ground Colony's low orbit. This narrows ticket #324, which had every
+    /// Battery at a Body standing in every Battle there, at the designer's word.
+    pub fn batteries_at(&self, seat: Seat, body: BodyId, orbit: Orbit) -> Vec<(ColonyId, usize)> {
         self.colonies
             .iter()
-            .filter(|c| c.body == body && c.control.director() == Some(seat))
+            .filter(|c| c.body == body && c.control.director() == Some(seat) && self.colony_orbit(c) == orbit)
             .flat_map(|c| c.modules.iter().enumerate().filter(|(_, m)| m.kind == ModuleKind::Battery && m.working()).map(move |(i, _)| (c.id, i)))
             .collect()
     }
 
-    /// Ticket #324: the strength a seat's Batteries at a Body bring to a Battle there.
-    pub fn battery_strength(&self, seat: Seat, body: BodyId) -> i64 {
-        self.batteries_at(seat, body).len() as i64 * self.tables.module(ModuleKind::Battery).strength
+    /// Ticket #335: every working Battery a seat directs at a Body, in every orbit -- what the
+    /// Body's card and the computer's reading of a whole Body want, where a Battle wants one orbit's.
+    pub fn batteries_at_body(&self, seat: Seat, body: BodyId) -> Vec<(ColonyId, usize)> {
+        self.orbits_of(body).into_iter().flat_map(|o| self.batteries_at(seat, body, o)).collect()
     }
 
-    /// Ticket #324: whether a Battery of some OTHER seat's stands and works at the Body, which is
-    /// what denies this seat Orbital Control there and the Blockade with it.
-    pub fn battery_stands_against(&self, seat: Seat, body: BodyId) -> bool {
-        seat.others().iter().any(|s| !self.batteries_at(*s, body).is_empty())
+    /// Ticket #324: the strength a seat's Batteries bring to a Battle in this orbit.
+    pub fn battery_strength(&self, seat: Seat, body: BodyId, orbit: Orbit) -> i64 {
+        self.batteries_at(seat, body, orbit).len() as i64 * self.tables.module(ModuleKind::Battery).strength
+    }
+
+    /// Ticket #335: the same across every orbit of a Body, for a reading of the whole Body.
+    pub fn battery_strength_at_body(&self, seat: Seat, body: BodyId) -> i64 {
+        self.batteries_at_body(seat, body).len() as i64 * self.tables.module(ModuleKind::Battery).strength
+    }
+
+    /// Ticket #324: whether a Battery of some OTHER seat's stands and works in this orbit, which is
+    /// what denies this seat Orbital Control (low orbit's) and the Blockade of that orbit with it.
+    pub fn battery_stands_against(&self, seat: Seat, body: BodyId, orbit: Orbit) -> bool {
+        seat.others().iter().any(|s| !self.batteries_at(*s, body, orbit).is_empty())
+    }
+
+    /// Ticket #335: the same across every orbit of a Body.
+    pub fn battery_stands_against_at_body(&self, seat: Seat, body: BodyId) -> bool {
+        seat.others().iter().any(|s| !self.batteries_at_body(*s, body).is_empty())
     }
 
     /// Whether a seat may land Armies and Colonists on the GROUND of a Body (spec 9.3).
@@ -3208,12 +3323,17 @@ impl Game {
     /// needs to be positively chosen, not just the presence of a ship" -- and a blockaded station
     /// makes nothing (`starved_by`).
     pub fn slot_blockaded_against(&self, seat: Seat, body: BodyId, slot: u32) -> bool {
-        // Ticket #324 (version 0.08.8): nor a seat with a Battery standing at the Body.
-        if !self.batteries_at(seat, body).is_empty() {
+        // Ticket #324 (version 0.08.8): nor a seat with a Battery standing in that orbit; ticket
+        // #335: its own orbit is the one a Battery covers, so it is the station's own Battery that
+        // lifts the Blockade of the station's own slot.
+        if !self.batteries_at(seat, body, Orbit::Slot(slot)).is_empty() {
             return false;
         }
         // Ticket #320 (version 0.08.8): a Blockade does not shut out a partner under Passage.
-        self.ships.iter().any(|s| s.seat != seat && !self.accord_has(seat, s.seat, Term::Passage) && self.blockading(s) && s.at == ShipAt::Body(body) && s.slot == Some(slot))
+        // Ticket #335: the blockading stack sits in the orbit it shuts, as it always had to.
+        self.ships
+            .iter()
+            .any(|s| s.seat != seat && !self.accord_has(seat, s.seat, Term::Passage) && self.blockading(s) && self.ship_in_orbit(s, body, Orbit::Slot(slot)))
     }
 
     /// Ticket #278: a warship on Blockade, still engaged. The one test every blockade reads.
@@ -3223,16 +3343,20 @@ impl Game {
 
     /// Ticket #99: the seats blockading this slot, for the card and the Report.
     pub fn slot_blockaders(&self, body: BodyId, slot: u32) -> Vec<Seat> {
-        let mut v: Vec<Seat> = self.ships.iter().filter(|s| self.blockading(s) && s.at == ShipAt::Body(body) && s.slot == Some(slot)).map(|s| s.seat).collect();
+        let mut v: Vec<Seat> = self.ships.iter().filter(|s| self.blockading(s) && self.ship_in_orbit(s, body, Orbit::Slot(slot))).map(|s| s.seat).collect();
         v.sort();
         v.dedup();
         v
     }
 
-    /// Ticket #278 (version 0.08.5): whether this seat has a blockading warship at the Body at all,
-    /// in any slot -- what starves a Colony on the GROUND under its outright Orbital Control.
-    pub fn blockading_at(&self, seat: Seat, body: BodyId) -> bool {
-        self.ships.iter().any(|s| s.seat == seat && self.blockading(s) && s.at == ShipAt::Body(body))
+    /// Ticket #278 (version 0.08.5): whether this seat has a blockading warship at the Body -- what
+    /// starves a Colony on the GROUND under its outright Orbital Control.
+    ///
+    /// Ticket #335 (version 0.09.0): **in LOW ORBIT**. A Blockade shuts the orbit it is given in,
+    /// and the ground's orbit is low orbit; a stack blockading a station high above starves nobody
+    /// on the surface, where before any slot at the Body would do.
+    pub fn blockading_in(&self, seat: Seat, body: BodyId, orbit: Orbit) -> bool {
+        self.ships.iter().any(|s| s.seat == seat && self.blockading(s) && self.ship_in_orbit(s, body, orbit))
     }
 
     /// Ticket #278 (version 0.08.5): the seat starving this Colony, if any. A station starves under
@@ -3242,15 +3366,20 @@ impl Game {
     pub fn starved_by(&self, cid: ColonyId) -> Option<Seat> {
         let col = self.colony(cid)?;
         let holder = col.control.director()?;
-        // Ticket #324 (version 0.08.8): a Battery of the holder's at the Body denies every rival
-        // Orbital Control there and the Blockade with it; nothing starves behind one.
-        if !self.batteries_at(holder, col.body).is_empty() {
+        // Ticket #324 (version 0.08.8): a Battery of the holder's denies every rival Orbital
+        // Control and the Blockade with it; nothing starves behind one. Ticket #335 (version
+        // 0.09.0): the Battery that shields a place is the one in the place's OWN orbit -- a
+        // station's own, a ground Colony's own, standing in low orbit's line.
+        let orbit = self.colony_orbit(col);
+        if !self.batteries_at(holder, col.body, orbit).is_empty() {
             return None;
         }
         if col.in_orbit {
             self.slot_blockaders(col.body, col.slot).into_iter().find(|s| *s != holder)
         } else {
-            self.orbital_control(col.body).filter(|o| *o != holder && self.blockading_at(*o, col.body))
+            // Ticket #335: Orbital Control is low orbit's, and the stack that starves the ground
+            // blockades in low orbit.
+            self.orbital_control(col.body).filter(|o| *o != holder && self.blockading_in(*o, col.body, Orbit::Low))
         }
     }
 
@@ -3259,10 +3388,21 @@ impl Game {
     ///
     /// Ticket #325 (version 0.08.8): or a partner's under a Refuel Accord; a station blockaded
     /// against its holder fuels the partner no more than its holder.
-    pub fn refuelling_station(&self, seat: Seat, body: BodyId) -> bool {
-        self.colonies.iter().any(|c| {
-            c.body == body && self.fuels_for(c, seat) && c.control.director().is_some_and(|d| !self.slot_blockaded_against(d, body, c.slot))
-        })
+    ///
+    /// Ticket #335 (version 0.09.0): **in the orbit the Ship sits in**. A station's own orbit is
+    /// what touches that station, refuelling included, so a Ship in low orbit fuels at nothing and
+    /// a Ship at one station's ring cannot draw from another's.
+    pub fn refuelling_station(&self, seat: Seat, body: BodyId, orbit: Orbit) -> bool {
+        let Some(slot) = orbit.slot() else { return false };
+        self.station_at(body, slot)
+            .is_some_and(|c| self.fuels_for(c, seat) && c.control.director().is_some_and(|d| !self.slot_blockaded_against(d, body, slot)))
+    }
+
+    /// Ticket #335 (version 0.09.0): whether a Ship sits in the orbit that touches this Colony --
+    /// the station's own orbit for a station, low orbit for a Colony on the ground. Unloading into
+    /// a place, founding one, landing an Army and lifting from it all ask this first.
+    pub fn ship_may_touch(&self, s: &Ship, c: &Colony) -> bool {
+        self.ship_in_orbit(s, c.body, self.colony_orbit(c))
     }
 
     /// Ticket #99: whether a Colony of this seat's can be reached at all -- a station in a

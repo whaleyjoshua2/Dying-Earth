@@ -79,6 +79,23 @@ impl Game {
     // ------------------------------------------------------------------ (a)
 
     fn resolve_transits(&mut self) {
+        // Ticket #335 (version 0.09.0): the orbit changes ordered this turn land WITH the transits,
+        // before the Battles, so a Ship that changed orbit fights in its new one and an Intercept
+        // below watches the orbit it moved to. The Fuel left the tank when the order was given.
+        for (seat, ship, slot) in std::mem::take(&mut self.pending.orbit_changes) {
+            let Some(s) = self.ship(ship).filter(|s| s.seat == seat) else { continue };
+            let ShipAt::Body(body) = s.at else { continue };
+            let name = self.ship_name(s);
+            if let Some(s) = self.ship_mut(ship) {
+                s.slot = slot;
+            }
+            self.war.orbit_changes[seat.index()] += 1;
+            let orbit = Orbit::of(slot);
+            let where_ = self.orbit_name(body, orbit);
+            self.log(format!("{} moved {} to {}.", self.seat_name(seat), name, where_));
+            let text = self.say("orbit_changed", &[("faction", self.seat_name(seat)), ("ship", name), ("orbit", where_)]);
+            self.report_line(LineKind::Ship, Some(ReportPlace::Orbit(body, orbit)), text);
+        }
         let storm = self.event_is(EventId::SolarStorm) && !self.has_tech(TechId::EfficientTransit);
         let mut arrivals: Vec<(Seat, BodyId, ShipId)> = Vec::new();
         for s in &mut self.ships {
@@ -158,40 +175,44 @@ impl Game {
             self.log(line);
         }
         // Intercept battles (ticket #50): one melee per intercepting stack, against every arriving
-        // enemy stack that turn.
+        // enemy stack that turn. Ticket #335 (version 0.09.0): **an Intercept catches only arrivals
+        // into its own orbit**, so a picket in low orbit never touches a Ship that flew straight to
+        // a station's ring, and one at a station's ring never touches a landing.
         for body in BodyId::ALL {
-            for seat in Seat::ALL {
-                let interceptors: Vec<ShipId> = self
-                    .ships
-                    .iter()
-                    .filter(|s| s.seat == seat && s.at == ShipAt::Body(body) && s.stance == Stance::Intercept && !s.escaped)
-                    .map(|s| s.id)
-                    .collect();
-                if interceptors.is_empty() {
-                    continue;
-                }
-                let mut parties: Vec<(Seat, bool, Vec<UnitRef>)> = vec![(seat, true, interceptors.into_iter().map(UnitRef::Ship).collect())];
-                for other in seat.others() {
-                    // Ticket #320 (version 0.08.8): a partner under Passage is no target for Intercept.
-                    if self.accord_has(seat, other, Term::Passage) {
+            for orbit in self.orbits_of(body) {
+                for seat in Seat::ALL {
+                    let interceptors: Vec<ShipId> = self
+                        .ships
+                        .iter()
+                        .filter(|s| s.seat == seat && self.ship_in_orbit(s, body, orbit) && s.stance == Stance::Intercept && !s.escaped)
+                        .map(|s| s.id)
+                        .collect();
+                    if interceptors.is_empty() {
                         continue;
                     }
-                    let arriving: Vec<UnitRef> = arrivals
-                        .iter()
-                        .filter(|(s, b, id)| *s == other && *b == body && self.ship(*id).map(|x| !x.escaped).unwrap_or(false))
-                        .map(|(_, _, id)| UnitRef::Ship(*id))
-                        .collect();
-                    if !arriving.is_empty() {
-                        parties.push((other, false, arriving));
+                    let mut parties: Vec<(Seat, bool, Vec<UnitRef>)> = vec![(seat, true, interceptors.into_iter().map(UnitRef::Ship).collect())];
+                    for other in seat.others() {
+                        // Ticket #320 (version 0.08.8): a partner under Passage is no target for Intercept.
+                        if self.accord_has(seat, other, Term::Passage) {
+                            continue;
+                        }
+                        let arriving: Vec<UnitRef> = arrivals
+                            .iter()
+                            .filter(|(s, b, id)| *s == other && *b == body && self.ship(*id).map(|x| !x.escaped && self.ship_orbit(x) == orbit).unwrap_or(false))
+                            .map(|(_, _, id)| UnitRef::Ship(*id))
+                            .collect();
+                        if !arriving.is_empty() {
+                            parties.push((other, false, arriving));
+                        }
                     }
+                    if parties.len() < 2 {
+                        continue;
+                    }
+                    let name = format!("{} (interception)", self.orbit_battle_name(body, orbit));
+                    self.ship_melee(&name, body, orbit, &parties);
+                    // Ticket #319 (version 0.08.8): counted, so the sweep can say whether Intercept fires.
+                    self.war.interceptions[seat.index()] += 1;
                 }
-                if parties.len() < 2 {
-                    continue;
-                }
-                let name = format!("{} orbit (interception)", self.tables.body(body).name);
-                self.ship_melee(&name, body, &parties);
-                // Ticket #319 (version 0.08.8): counted, so the sweep can say whether Intercept fires.
-                self.war.interceptions[seat.index()] += 1;
             }
         }
     }
@@ -201,39 +222,46 @@ impl Game {
     fn resolve_battles(&mut self) {
         // Ship battles (ticket #50): any stack ordered Attack pulls every other Faction's Ships at
         // that Body into one melee. Evade stacks still try to disengage; Hold stacks fight.
+        // Ticket #335 (version 0.09.0): **battle parties form per ORBIT.** An Attack fights the
+        // orbit the stack sits in, so two Battles at one Body are two melees and two records, and a
+        // station's Battery never fires on a fight in low orbit.
         for body in BodyId::ALL {
-            let aggressors: Vec<Seat> = Seat::ALL
-                .into_iter()
-                .filter(|seat| self.ships.iter().any(|s| s.seat == *seat && s.at == ShipAt::Body(body) && s.stance == Stance::Attack && !s.escaped))
-                .collect();
-            if aggressors.is_empty() {
-                continue;
+            for orbit in self.orbits_of(body) {
+                let aggressors: Vec<Seat> = Seat::ALL
+                    .into_iter()
+                    .filter(|seat| self.ships.iter().any(|s| s.seat == *seat && self.ship_in_orbit(s, body, orbit) && s.stance == Stance::Attack && !s.escaped))
+                    .collect();
+                if aggressors.is_empty() {
+                    continue;
+                }
+                // Ticket #324 (version 0.08.8): a seat's working Batteries stand in its line after
+                // its Ships, so a stack on Attack in an orbit with nothing but a Battery in it
+                // fights the Battery, and a Battery beside its owner's stack fights with it.
+                // Ticket #335: the Batteries of THIS orbit -- a station's its own ring, a ground
+                // Colony's low orbit.
+                let parties: Vec<(Seat, bool, Vec<UnitRef>)> = Seat::ALL
+                    .into_iter()
+                    .filter_map(|seat| {
+                        let units: Vec<UnitRef> = self
+                            .ships
+                            .iter()
+                            .filter(|s| s.seat == seat && self.ship_in_orbit(s, body, orbit) && !s.escaped)
+                            .map(|s| UnitRef::Ship(s.id))
+                            .chain(self.batteries_at(seat, body, orbit).into_iter().map(|(colony, index)| UnitRef::Battery { colony, index }))
+                            .collect();
+                        if units.is_empty() {
+                            None
+                        } else {
+                            Some((seat, aggressors.contains(&seat), units))
+                        }
+                    })
+                    .collect();
+                if parties.len() < 2 {
+                    continue;
+                }
+                let name = self.orbit_battle_name(body, orbit);
+                self.ship_melee(&name, body, orbit, &parties);
             }
-            // Ticket #324 (version 0.08.8): a seat's working Batteries at the Body stand in its line
-            // after its Ships, so a stack on Attack at a Body with nothing but a Battery in it fights
-            // the Battery, and a Battery beside its owner's stack fights with it.
-            let parties: Vec<(Seat, bool, Vec<UnitRef>)> = Seat::ALL
-                .into_iter()
-                .filter_map(|seat| {
-                    let units: Vec<UnitRef> = self
-                        .ships
-                        .iter()
-                        .filter(|s| s.seat == seat && s.at == ShipAt::Body(body) && !s.escaped)
-                        .map(|s| UnitRef::Ship(s.id))
-                        .chain(self.batteries_at(seat, body).into_iter().map(|(colony, index)| UnitRef::Battery { colony, index }))
-                        .collect();
-                    if units.is_empty() {
-                        None
-                    } else {
-                        Some((seat, aggressors.contains(&seat), units))
-                    }
-                })
-                .collect();
-            if parties.len() < 2 {
-                continue;
-            }
-            let name = format!("{} orbit", self.tables.body(body).name);
-            self.ship_melee(&name, body, &parties);
         }
         // Army moves and attacks on Earth.
         let moving: Vec<(ArmyId, StateId)> = self.armies.iter().filter_map(|a| a.move_to.map(|t| (a.id, t))).collect();
@@ -516,8 +544,9 @@ impl Game {
         Combatant::new(UnitRef::Army(id), name, strength, self.army_hit_points(a), a.damage, card.pursuit, a.stance == Stance::Evade).dug_in(dug_in)
     }
 
-    /// One melee of Ship stacks at a Body (ticket #50).
-    fn ship_melee(&mut self, place: &str, body: BodyId, parties: &[(Seat, bool, Vec<UnitRef>)]) {
+    /// One melee of Ship stacks in one ORBIT of a Body (ticket #50; ticket #335, version 0.09.0,
+    /// which made the orbit the place a Battle is fought and recorded in).
+    fn ship_melee(&mut self, place: &str, body: BodyId, orbit: Orbit, parties: &[(Seat, bool, Vec<UnitRef>)]) {
         // Ticket #191 (version 0.08.0): opening a Battle offends everyone on the other side of it.
         for (aggressor, _, _) in parties.iter().filter(|(_, agg, _)| *agg) {
             for (other, _, _) in parties {
@@ -531,20 +560,26 @@ impl Game {
         // never fewer than the table's figure.
         let armed = units.iter().flat_map(|(_, _, c)| c.iter()).filter(|c| c.armed && c.engaged && !c.destroyed()).count() as u32;
         let rolls = armed.max(self.tables.melee.rolls);
-        let mut line = self.run_melee(place, Some(ReportPlace::Body(body)), units, rolls);
+        let mut line = self.run_melee(place, Some(ReportPlace::Orbit(body, orbit)), units, rolls);
         // Ticket #286 (version 0.08.5): counted by the seat that opened it.
         for (seat, _, _) in parties.iter().filter(|(_, agg, _)| *agg) {
             self.war.battles[seat.index()] += 1;
             self.war.orbit_attacks[seat.index()] += 1;
         }
-        match self.orbital_control(body) {
-            Some(s) if parties.iter().any(|(seat, agg, _)| *agg && *seat == s) => {
-                line.result.push_str(&format!(" The {} hold Orbital Control.", self.seat_name(s)))
+        // Ticket #335 (version 0.09.0): Orbital Control is LOW ORBIT's, so only a Battle fought
+        // there can have moved it; a fight at a station's ring says nothing about the ground.
+        if orbit.is_low() {
+            match self.orbital_control(body) {
+                Some(s) if parties.iter().any(|(seat, agg, _)| *agg && *seat == s) => {
+                    line.result.push_str(&format!(" The {} hold Orbital Control.", self.seat_name(s)))
+                }
+                Some(s) => line.result.push_str(&format!(" The {} keep Orbital Control.", self.seat_name(s))),
+                // Ticket #324: and why not, when a Battery is the reason.
+                None if Seat::ALL.iter().any(|s| !self.batteries_at(*s, body, Orbit::Low).is_empty()) => {
+                    line.result.push_str(" Nobody holds Orbital Control: a Battery stands.")
+                }
+                None => line.result.push_str(" Nobody holds Orbital Control."),
             }
-            Some(s) => line.result.push_str(&format!(" The {} keep Orbital Control.", self.seat_name(s))),
-            // Ticket #324: and why not, when a Battery is the reason.
-            None if Seat::ALL.iter().any(|s| !self.batteries_at(*s, body).is_empty()) => line.result.push_str(" Nobody holds Orbital Control: a Battery stands."),
-            None => line.result.push_str(" Nobody holds Orbital Control."),
         }
         self.charge_war_hits(body == BodyId::Earth, &line);
         self.log(line.text(&|s| self.seat_name(s), "neutral"));
@@ -872,14 +907,27 @@ impl Game {
         for (seat, ship, colony) in bombards {
             let Some(s) = self.ship(ship) else { continue };
             let ShipAt::Body(body) = s.at else { continue };
-            if s.seat != seat || s.escaped || s.kind != UnitKind::Battleship || body == BodyId::Earth || self.orbital_control(body) != Some(seat) {
+            if s.seat != seat || s.escaped || s.kind != UnitKind::Battleship || body == BodyId::Earth {
                 continue;
             }
+            let orbit = self.ship_orbit(s);
             let ship_name = self.ship_name(s);
             let ship_strength = self.ship_strength(s);
             let Some(col) = self.colony(colony) else { continue };
             let Some(holder) = col.control.director().filter(|h| *h != seat) else { continue };
             if col.body != body {
+                continue;
+            }
+            // Ticket #335 (version 0.09.0): **the orbit you are in is the orbit you must hold**,
+            // read again here as the Control always was, since the Battles just fought may have
+            // sunk the Battleship's escort or put a rival back in the ring: a ground Colony from
+            // low orbit under an outright Orbital Control, a station from its own orbit with no
+            // rival warship and no rival working Battery left in it.
+            if self.colony_orbit(col) != orbit {
+                continue;
+            }
+            let holds = if orbit.is_low() { self.orbital_control(body) == Some(seat) } else { self.orbit_uncontested(seat, body, orbit) };
+            if !holds {
                 continue;
             }
             let targets: Vec<usize> = col.modules.iter().enumerate().filter(|(_, m)| !matches!(m.kind, ModuleKind::Core | ModuleKind::Archive)).map(|(i, _)| i).collect();
@@ -919,7 +967,8 @@ impl Game {
                 self.say("bombard_miss", &[("faction", self.seat_name(seat)), ("ship", ship_name.clone()), ("place", place.clone()), ("module", module_name.clone())])
             };
             self.log(text.clone());
-            let at = Some(ReportPlace::Body(body));
+            // Ticket #335 (version 0.09.0): the record lives at the orbit the strike was given from.
+            let at = Some(ReportPlace::Orbit(body, orbit));
             self.report_line(if hit { LineKind::DecisiveBattle } else { LineKind::Battle }, at, text.clone());
             if hit {
                 let result = format!("bombarded by the {}: the {} destroyed{}", self.seat_name(seat), module_name, if dead > 0 { format!(", {dead} Colonists dead") } else { String::new() });
@@ -928,7 +977,7 @@ impl Game {
             // The Battle mark and the band's row read the Battle record, so a Bombard is one.
             let outcome = if hit { format!("the {module_name} destroyed") } else { format!("the {module_name} struck, standing") };
             self.report.battles.push(BattleLine {
-                place: format!("{} orbit (bombardment)", self.tables.body(body).name),
+                place: format!("{} (bombardment)", self.orbit_battle_name(body, orbit)),
                 parties: vec![
                     BattleParty { seat: Some(seat), aggressor: true, units: format!("{ship_name} bombarded {place}"), strength: ship_strength, hits: u32::from(hit), destroyed: Vec::new(), escaped: Vec::new(), odds: Some(p) },
                     BattleParty { seat: Some(holder), aggressor: false, units: format!("{place}: {outcome}"), strength: 0, hits: 0, destroyed: if hit { vec![module_name] } else { Vec::new() }, escaped: Vec::new(), odds: None },
@@ -1653,6 +1702,13 @@ impl Game {
                     Place::State(_) => BodyId::Earth,
                     Place::Colony(c) => self.colony(c).map(|c| c.body).unwrap_or(BodyId::Earth),
                 };
+                // Ticket #335 (version 0.09.0): **a new Ship starts in the orbit of the Shipyard
+                // that built it** -- a station's yard puts it at that station's ring, a ground
+                // Colony's yard and a Launch Site on Earth in low orbit.
+                let slot = match place {
+                    Place::State(_) => None,
+                    Place::Colony(c) => self.colony(c).map(|c| self.colony_orbit(c)).unwrap_or(Orbit::Low).slot(),
+                };
                 let id = ShipId(self.fresh_id());
                 // Ticket #210 (version 0.08.1): named at the build, from the list its kind draws
                 // from, taking the first name no Ship on the board is using. This is the ONE place a
@@ -1664,8 +1720,8 @@ impl Game {
                 self.ships.push(Ship {
                     id,
                     name,
-                    // Ticket #99: a Ship built at a Shipyard starts at the Body at large.
-                    slot: None,
+                    // Ticket #335 (version 0.09.0): the orbit of the yard that built it.
+                    slot,
                     kind,
                     seat: b.seat,
                     damage: 0,
@@ -1967,9 +2023,13 @@ impl Game {
                     // Ticket #99 (version 0.07.0): the ground answers to Orbital Control, a station
                     // only to a warship sitting in its own Orbital Slot. A Faction is never shut out
                     // of a place it holds by a ship that never touched it.
+                    // Ticket #335 (version 0.09.0): and the Ship is in the orbit that touches the
+                    // place -- low orbit for the ground, a station's own ring for the station. The
+                    // gate said so when the order was given; it is read again here because the
+                    // orbit changes and the Battles have run since.
                     let barred = match into {
-                        UnloadTarget::Colony(cid) => !self.may_unload_into(seat, cid),
-                        UnloadTarget::Slot(_, _) => !self.may_land(seat, body),
+                        UnloadTarget::Colony(cid) => !self.may_unload_into(seat, cid) || !self.colony(cid).map(|c| self.ship_may_touch(s, c)).unwrap_or(false),
+                        UnloadTarget::Slot(_, _) => !self.may_land(seat, body) || !self.ship_in_orbit(s, body, Orbit::Low),
                     };
                     if barred {
                         let line = format!("{} could not land at {}: the orbit is contested.", self.seat_name(seat), self.tables.body(body).name);
