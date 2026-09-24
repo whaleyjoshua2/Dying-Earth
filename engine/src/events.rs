@@ -1,7 +1,7 @@
 //! The Event Deck (spec 13, amended by ticket #25): no Calm Cards, a draw chance that rises with the
 //! Temperature, and twenty-two Events over forty cards since ticket #76 (version 0.05.5).
 
-use crate::data::Tables;
+use crate::data::{CardEffect, CardRule, CardThing, Tables};
 use crate::ids::*;
 use crate::state::*;
 use rand::seq::SliceRandom;
@@ -61,25 +61,521 @@ impl Game {
         self.report_line(LineKind::Event, None, text);
     }
 
-    /// Phase 5: maybe draw one card and choose its target. The effect applies in Resolution.
-    pub fn event_phase(&mut self) {
+    /// Ticket #337 (version 0.09.0): **the Question, at the head of the turn and before orders.**
+    ///
+    /// The DRAW moved here from the Event phase, because a card that says *hold every Ship in orbit
+    /// this turn* can only mean something if it is answered before the orders it binds are given,
+    /// and orders are committed in phase 4. The roll, the chance it is rolled against, the
+    /// never-reshuffled deck and the off-Earth join are all exactly as they were; only the moment
+    /// the top card leaves the deck has moved.
+    ///
+    /// An ordinary card is **held in silence** -- nothing is logged, nothing is reported, no target
+    /// is chosen -- and the Event phase takes it up and announces and applies it precisely where it
+    /// always did, so none of the 22 behaves differently. A choice card becomes the turn's pending
+    /// question: every seat is asked it, except the seats neither of whose sides it can reach.
+    pub fn question_phase(&mut self) {
+        self.question = None;
+        self.draw = CardDraw::NoCard;
         self.join_off_earth_cards();
-        let chance = self.draw_chance();
         if !self.rolls_a_card() {
-            self.last_event = None;
-            let text = format!("No Event this turn (a card comes {:.0}% of turns at this Temperature).", chance * 100.0);
-            self.log(format!("Event: {text}"));
-            self.report.event = Some(text);
             return;
         }
         let Some(card) = self.deck.cards.pop() else {
-            self.last_event = None;
-            self.log("Event: the deck is empty.");
-            self.report.event = Some("The Event Deck is empty.".to_string());
+            self.draw = CardDraw::DeckEmpty;
             return;
         };
         self.deck.drawn.push(card);
         let Card::Event(id) = card;
+        if !self.tables.event(id).asks() {
+            // One of the 22: held, unannounced, for the Event phase.
+            self.draw = CardDraw::Ordinary(id);
+            return;
+        }
+        self.draw = CardDraw::Choice(id);
+        let mut q = Question { card: id, answers: [None; SEAT_COUNT] };
+        for seat in Seat::ALL {
+            // A seat the card cannot touch is NOT asked: its answer is recorded as nothing to
+            // decide, it never holds the turn, and the Report says so for it.
+            if !self.card_reaches(id, seat) {
+                q.answers[seat.index()] = Some(CardAnswer::NothingToDecide);
+                self.choice_not_asked[seat.index()] += 1;
+            }
+        }
+        let (name, question) = {
+            let c = self.tables.event(id);
+            (c.name.clone(), c.choice.as_ref().map(|c| c.question.clone()).unwrap_or_default())
+        };
+        self.log(format!("Question: {name}: {question}"));
+        let text = self.say("card_asked", &[("card", name), ("question", question)]);
+        self.report_line(LineKind::Event, None, text);
+        self.question = Some(q);
+    }
+
+    /// Ticket #337: the card asking this turn, and what each seat has answered.
+    pub fn pending_question(&self) -> Option<&Question> {
+        self.question.as_ref()
+    }
+
+    /// Ticket #337: record one seat's answer. Refused where no card is asking, where the seat has
+    /// already answered, and where the card was never the seat's to answer.
+    pub fn answer_card(&mut self, seat: Seat, taken: bool) -> Result<(), String> {
+        let Some(q) = self.question.as_ref() else {
+            return Err("No card is asking anything this turn.".to_string());
+        };
+        let name = self.tables.event(q.card).name.clone();
+        match q.answers[seat.index()] {
+            Some(CardAnswer::NothingToDecide) => {
+                return Err(format!("{name} has nothing in it for the {}: they were not asked.", self.seat_name(seat)));
+            }
+            Some(_) => return Err(format!("The {} have already answered {name} this turn.", self.seat_name(seat))),
+            None => {}
+        }
+        let answer = if taken { CardAnswer::Taken } else { CardAnswer::Refused };
+        if let Some(q) = self.question.as_mut() {
+            q.answers[seat.index()] = Some(answer);
+        }
+        if taken {
+            self.choice_taken[seat.index()] += 1;
+        } else {
+            self.choice_refused[seat.index()] += 1;
+        }
+        self.log(format!("{name}: the {} {}.", self.seat_name(seat), answer.word()));
+        Ok(())
+    }
+
+    /// Ticket #337 R4: a computer seat answers by the rule on its card, read off its own board,
+    /// when its orders are computed -- so it never holds the turn and never sees a human's answer.
+    pub fn ai_answer_card(&mut self, seat: Seat) {
+        let Some(q) = self.question.as_ref() else { return };
+        if q.answers[seat.index()].is_some() {
+            return;
+        }
+        let Some(rule) = self.tables.event(q.card).choice.as_ref().map(|c| c.take_when.clone()) else { return };
+        let take = self.card_rule_holds(seat, &rule);
+        self.answer_card(seat, take).ok();
+    }
+
+    /// Ticket #337 R4: whether the card's rule holds on this seat's board. The predicates are the
+    /// ones the ticket names -- Unrest, Ducats, Blame, and whether a landing is under way -- and
+    /// every figure comes off the card in `events.toml`.
+    pub fn card_rule_holds(&self, seat: Seat, rule: &CardRule) -> bool {
+        match rule {
+            CardRule::Always => true,
+            CardRule::Never => false,
+            CardRule::DucatsAtLeast { ducats } => self.seat(seat).stockpile.ducats >= *ducats,
+            CardRule::UnrestAtLeast { unrest } => self.controlled_states(seat).iter().any(|s| self.state(*s).unrest >= *unrest),
+            CardRule::UnrestBelow { unrest } => self.controlled_states(seat).iter().all(|s| self.state(*s).unrest < *unrest),
+            CardRule::BlameAtLeast { blame } => self.blame(seat) >= *blame,
+            CardRule::LandingUnderWay => self.ships.iter().any(|s| s.seat == seat && matches!(s.at, ShipAt::Transit { .. })),
+            CardRule::NoLandingUnderWay => !self.ships.iter().any(|s| s.seat == seat && matches!(s.at, ShipAt::Transit { .. })),
+        }
+    }
+
+    // ---------------------------------------------------------------- the effect vocabulary
+
+    /// Ticket #337: the effects of the side this seat answered with, or nothing.
+    pub fn card_effects(&self, seat: Seat) -> &[CardEffect] {
+        let Some(q) = self.question.as_ref() else { return &[] };
+        let taken = match q.answers[seat.index()] {
+            Some(CardAnswer::Taken) => true,
+            Some(CardAnswer::Refused) => false,
+            _ => return &[],
+        };
+        self.tables.event(q.card).choice.as_ref().map(|c| c.side(taken)).unwrap_or(&[])
+    }
+
+    /// Ticket #337: **whether this card has a question for this seat at all.** Each side reaches a
+    /// seat when every effect on it can land; a card asks a seat only when both sides reach it.
+    ///
+    /// This is where "a seat that cannot be touched is not asked" falls out of the vocabulary
+    /// rather than being written per card: a Faction holding no Region is never asked the Hard
+    /// Winter, because the refusing side raises Unrest in every Region it holds and there are
+    /// none; and a Faction with no Ship is never asked the Grounded Fleet. It also means no seat is
+    /// ever offered a side it cannot pay for, since a price it cannot meet is an effect that
+    /// cannot land.
+    pub fn card_reaches(&self, id: EventId, seat: Seat) -> bool {
+        let Some(c) = self.tables.event(id).choice.as_ref() else { return false };
+        self.side_reaches(&c.take_does, seat) && self.side_reaches(&c.refuse_does, seat)
+    }
+
+    fn side_reaches(&self, side: &[CardEffect], seat: Seat) -> bool {
+        !side.is_empty() && side.iter().all(|e| self.card_effect_can_land(e, seat))
+    }
+
+    /// Ticket #337: can this one effect do anything to this seat? An effect whose target is not on
+    /// the board, and a price the seat cannot pay, both answer no.
+    fn card_effect_can_land(&self, e: &CardEffect, seat: Seat) -> bool {
+        let s = self.seat(seat);
+        match e {
+            CardEffect::Resources { materials, fuel, energy, ducats, research: _ } => {
+                s.stockpile.materials + materials >= 0 && s.stockpile.fuel + fuel >= 0 && s.stockpile.energy + energy >= 0 && s.stockpile.ducats + ducats >= 0
+            }
+            CardEffect::PerUnitCost { per, resource, amount } => {
+                let n = self.card_things(seat, *per);
+                n > 0 && self.stock_of(seat, *resource) >= n as i64 * amount
+            }
+            CardEffect::PopulationToMostPopulous { .. } | CardEffect::StandingAtMostPopulous { .. } | CardEffect::UnrestAtMostPopulous { .. } | CardEffect::PioneersFree { .. } => {
+                self.card_most_populous(seat).is_some()
+            }
+            CardEffect::StandingAllHeld { .. } | CardEffect::UnrestAllHeld { .. } => !self.controlled_states(seat).is_empty(),
+            CardEffect::UnrestAtBusiest { .. } | CardEffect::WidgetsNow { .. } => self.card_busiest(seat).is_some(),
+            CardEffect::EmissionsNext { .. } | CardEffect::TradePrice { .. } | CardEffect::RelationsAllRivals { .. } | CardEffect::BlamePpm { .. } => true,
+            CardEffect::HoldShips | CardEffect::HoldOneShip => self.ships.iter().any(|s| s.seat == seat),
+            CardEffect::DamageShips { in_orbit, .. } => self.ships.iter().any(|s| s.seat == seat && (!in_orbit || matches!(s.at, ShipAt::Body(_)))),
+            CardEffect::FacilityOutputMultiplier { facility, .. } => self
+                .directed_states(seat)
+                .iter()
+                .any(|sid| self.state(*sid).facilities.iter().any(|f| f.kind.does_the_job_of(*facility))),
+            CardEffect::DiscoveryAtColony { module, .. } => self.card_discovery_body(seat, *module).is_some(),
+            CardEffect::FreeBuilding { module, army } => {
+                if *army {
+                    self.card_most_populous(seat).is_some()
+                } else if let Some(k) = module {
+                    self.card_smallest_colony(seat, *k).is_some()
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
+    /// Ticket #337: how many things of a kind a `per_unit_cost` counts for this seat.
+    fn card_things(&self, seat: Seat, per: CardThing) -> usize {
+        match per {
+            CardThing::Facility(kind) => self
+                .directed_states(seat)
+                .iter()
+                .map(|s| self.state(*s).facilities.iter().filter(|f| f.kind.does_the_job_of(kind)).count())
+                .sum(),
+            CardThing::ShipInOrbit => self.ships.iter().filter(|s| s.seat == seat && matches!(s.at, ShipAt::Body(_))).count(),
+        }
+    }
+
+    fn stock_of(&self, seat: Seat, r: Resource) -> i64 {
+        let s = &self.seat(seat).stockpile;
+        match r {
+            Resource::Materials => s.materials,
+            Resource::Fuel => s.fuel,
+            Resource::Energy => s.energy,
+            Resource::Ducats => s.ducats,
+            // Research is the table's pool and never a seat's stock, so nothing is ever held in it.
+            Resource::Research | Resource::Widgets => 0,
+        }
+    }
+
+    /// Ticket #337: the seat's most populous HELD Region -- what the cards mean by "your most
+    /// populous state". Ties go to the lower id, so a seeded game is never moved by this.
+    pub fn card_most_populous(&self, seat: Seat) -> Option<StateId> {
+        self.controlled_states(seat)
+            .into_iter()
+            .filter(|s| self.state(*s).population > 0.0)
+            .max_by(|a, b| {
+                let (pa, pb) = (self.state(*a).population, self.state(*b).population);
+                pa.partial_cmp(&pb).unwrap_or(std::cmp::Ordering::Equal).then(b.index().cmp(&a.index()))
+            })
+    }
+
+    /// Ticket #337: the seat's BUSIEST Region -- the one it directs that makes the most Widgets,
+    /// which is what the Overtime card means by "your busiest Region" and by "there". Ties go to
+    /// the lower id.
+    pub fn card_busiest(&self, seat: Seat) -> Option<StateId> {
+        self.directed_states(seat)
+            .into_iter()
+            .max_by_key(|s| (self.widgets_at(Place::State(*s)), std::cmp::Reverse(s.index())))
+    }
+
+    /// Ticket #337: the seat's smallest Colony with room for another Module -- where a free one
+    /// would stand. Fewest Colonists first, then the lower id.
+    pub fn card_smallest_colony(&self, seat: Seat, _kind: ModuleKind) -> Option<ColonyId> {
+        self.directed_colonies(seat)
+            .into_iter()
+            .filter(|c| self.colony(*c).map(|col| self.free_module_slots(col) > 0).unwrap_or(false))
+            .min_by_key(|c| (self.colony(*c).map(|col| col.colonists).unwrap_or(0), c.0))
+    }
+
+    /// Ticket #337: the Body a `discovery_at_colony` would land over -- the Body of the seat's
+    /// Colony holding the most Modules of the kind the Discovery lifts, ties to the lower id.
+    ///
+    /// **An implementation choice, not the designer's, named here for correction**: a Discovery in
+    /// this game is a Body-wide effect on a Module kind (`Discovery { body, kind, .. }`, which is
+    /// what a Rich Seam pushes), and the card says "a Discovery at one Colony". Rather than build a
+    /// second, Colony-scoped kind of Discovery, the card picks one of the seat's Colonies and the
+    /// Discovery stands over its Body, which also reaches a rival's Mines there.
+    pub fn card_discovery_body(&self, seat: Seat, kind: ModuleKind) -> Option<BodyId> {
+        self.directed_colonies(seat)
+            .into_iter()
+            .filter_map(|c| self.colony(c))
+            .filter(|col| col.modules.iter().any(|m| m.kind == kind))
+            .max_by_key(|col| (col.modules.iter().filter(|m| m.kind == kind).count(), std::cmp::Reverse(col.id.0)))
+            .map(|col| col.body)
+    }
+
+    // ------------------------------------------------- the effects read BEFORE the Resolution
+
+    /// Ticket #337: this seat grounded its fleet, so no transit of its own resolves this turn --
+    /// the Solar Storm's shape (`resolve_transits`), for one seat.
+    pub fn card_holds_ships(&self, seat: Seat) -> bool {
+        self.card_effects(seat).iter().any(|e| matches!(e, CardEffect::HoldShips))
+    }
+
+    /// Ticket #337: the one Ship this seat turned aside to answer a call, and so holds this turn.
+    ///
+    /// **An implementation choice, not the designer's, named here for correction**: it is the
+    /// seat's Ship with the most Fuel in its tank, ties to the lower id, so the pick is
+    /// deterministic and a seeded game is not moved by it.
+    pub fn card_holds_one_ship(&self, seat: Seat) -> Option<ShipId> {
+        if !self.card_effects(seat).iter().any(|e| matches!(e, CardEffect::HoldOneShip)) {
+            return None;
+        }
+        self.ships
+            .iter()
+            .filter(|s| s.seat == seat)
+            .max_by_key(|s| (s.fuel, std::cmp::Reverse(s.id.0)))
+            .map(|s| s.id)
+    }
+
+    /// Ticket #337: the Widgets the Overtime card adds this turn, by place -- read in
+    /// `resolve_builds` beside what the place makes of its own, and counted to its director as made
+    /// and applied like any other.
+    pub fn card_widgets_now(&self) -> Vec<(Place, i64)> {
+        let mut out = Vec::new();
+        for seat in Seat::ALL {
+            for e in self.card_effects(seat) {
+                if let CardEffect::WidgetsNow { widgets } = e
+                    && let Some(s) = self.card_busiest(seat)
+                {
+                    out.push((Place::State(s), *widgets));
+                }
+            }
+        }
+        out
+    }
+
+    /// Ticket #337: the share a Facility of this kind makes for this seat at THIS Income, set by a
+    /// card answered last turn. One, where no card touched it.
+    pub fn card_facility_multiplier(&self, seat: Seat, kind: FacilityKind) -> f64 {
+        match self.seat(seat).card_facility {
+            Some((k, m)) if kind.does_the_job_of(k) => m,
+            _ => 1.0,
+        }
+    }
+
+    // ------------------------------------------------------ the effects applied at Resolution
+
+    /// Ticket #337: Resolution (h), beside `apply_event_now`: every seat's answer, effect by
+    /// effect. The two that are read earlier in the Resolution -- the held fleet before the
+    /// transits, the Widgets before the builds -- do nothing here, and say so.
+    pub fn apply_card_answers(&mut self) {
+        let Some(q) = self.question.clone() else { return };
+        let Some(choice) = self.tables.event(q.card).choice.clone() else { return };
+        let name = self.tables.event(q.card).name.clone();
+        for seat in Seat::ALL {
+            let taken = match q.answers[seat.index()] {
+                Some(CardAnswer::Taken) => true,
+                Some(CardAnswer::Refused) => false,
+                _ => continue,
+            };
+            for e in choice.side(taken) {
+                self.apply_card_effect(seat, e);
+            }
+            let word = if taken { CardAnswer::Taken } else { CardAnswer::Refused }.word();
+            let text = self.say("card_answered", &[("card", name.clone()), ("faction", self.seat_name(seat)), ("answer", word.to_string())]);
+            self.report_line_of(seat, LineKind::YourWorks, LineKind::Event, None, text);
+        }
+        // A seat that was never asked is named too, so the Report does not simply pass it over.
+        for seat in Seat::ALL {
+            if q.answers[seat.index()] == Some(CardAnswer::NothingToDecide) {
+                let text = self.say(
+                    "card_answered",
+                    &[("card", name.clone()), ("faction", self.seat_name(seat)), ("answer", CardAnswer::NothingToDecide.word().to_string())],
+                );
+                self.report_line_of(seat, LineKind::YourWorks, LineKind::Event, None, text);
+            }
+        }
+    }
+
+    fn apply_card_effect(&mut self, seat: Seat, e: &CardEffect) {
+        match e {
+            CardEffect::Resources { materials, fuel, energy, ducats, research } => {
+                let s = &mut self.seat_mut(seat).stockpile;
+                s.materials = (s.materials + materials).max(0);
+                s.fuel = (s.fuel + fuel).max(0);
+                s.energy = (s.energy + energy).max(0);
+                s.ducats = (s.ducats + ducats).max(0);
+                if *research != 0 {
+                    self.add_research_unattributed(*research);
+                }
+            }
+            CardEffect::PerUnitCost { per, resource, amount } => {
+                let bill = self.card_things(seat, *per) as i64 * amount;
+                let s = &mut self.seat_mut(seat).stockpile;
+                match resource {
+                    Resource::Materials => s.materials = (s.materials - bill).max(0),
+                    Resource::Fuel => s.fuel = (s.fuel - bill).max(0),
+                    Resource::Energy => s.energy = (s.energy - bill).max(0),
+                    Resource::Ducats => s.ducats = (s.ducats - bill).max(0),
+                    Resource::Research | Resource::Widgets => {}
+                }
+            }
+            CardEffect::PopulationToMostPopulous { population } => {
+                if let Some(sid) = self.card_most_populous(seat) {
+                    self.state_mut(sid).population += population;
+                }
+            }
+            // The Methane Burst's own field: ppm charged at the next Climate phase, worldwide.
+            CardEffect::EmissionsNext { ppm } => {
+                self.climate.card_emissions_next += ppm;
+            }
+            CardEffect::StandingAllHeld { standing } => {
+                for sid in self.controlled_states(seat) {
+                    let e = self.seat_mut(seat).influence.entry(Place::State(sid)).or_insert(0);
+                    *e = (*e + standing).max(0);
+                }
+            }
+            CardEffect::StandingAtMostPopulous { standing } => {
+                if let Some(sid) = self.card_most_populous(seat) {
+                    let e = self.seat_mut(seat).influence.entry(Place::State(sid)).or_insert(0);
+                    *e = (*e + standing).max(0);
+                }
+            }
+            CardEffect::UnrestAllHeld { unrest } => {
+                for sid in self.controlled_states(seat) {
+                    self.card_unrest(sid, *unrest);
+                }
+            }
+            CardEffect::UnrestAtMostPopulous { unrest } => {
+                if let Some(sid) = self.card_most_populous(seat) {
+                    self.card_unrest(sid, *unrest);
+                }
+            }
+            CardEffect::UnrestAtBusiest { unrest } => {
+                if let Some(sid) = self.card_busiest(seat) {
+                    self.card_unrest(sid, *unrest);
+                }
+            }
+            // Read before the transits (`resolve_transits`) and before the builds
+            // (`resolve_builds`); by the time the Resolution reaches here they have already bitten.
+            CardEffect::HoldShips | CardEffect::HoldOneShip | CardEffect::WidgetsNow { .. } => {}
+            CardEffect::DamageShips { damage, in_orbit } => {
+                let mut hit = 0;
+                for s in self.ships.iter_mut().filter(|s| s.seat == seat && (!in_orbit || matches!(s.at, ShipAt::Body(_)))) {
+                    s.damage += damage;
+                    hit += 1;
+                }
+                let t = self.tables.clone();
+                let destroyed: Vec<ShipId> = self.ships.iter().filter(|s| s.seat == seat && s.damage >= t.unit(s.kind).hit_points).map(|s| s.id).collect();
+                for sid in destroyed {
+                    self.destroy_ship(sid, "a card");
+                }
+                if hit > 0 {
+                    self.log(format!("{}: {hit} Ship(s) damaged by this turn's card.", self.seat_name(seat)));
+                }
+            }
+            CardEffect::TradePrice { resource, to, by, turns } => {
+                let Some(row) = Game::market_row(*resource) else { return };
+                // A card that MOVES a price moves the banded one, so two cards in three turns do
+                // not compound one override onto another.
+                let price = match to {
+                    Some(p) => *p,
+                    None => self.banded_price_at(row) + by,
+                };
+                self.market.card_price[row] = price.max(1);
+                // The effect lands at this turn's Resolution, after this turn's trading, so the
+                // turns it names are the ones that follow it.
+                self.market.card_price_until[row] = self.turn + turns;
+            }
+            CardEffect::RelationsAllRivals { relations } => {
+                let c = self.tables.relations.clone();
+                for rival in Seat::ALL {
+                    if rival == seat {
+                        continue;
+                    }
+                    let (v, o) = (rival.index(), seat.index());
+                    self.relations.score[v][o] = (self.relations.score[v][o] + relations).clamp(c.worst, c.deeds_ceiling);
+                }
+            }
+            // The Smear and the Greenwash ledgers: ppm laid on, or taken off, for good.
+            CardEffect::BlamePpm { ppm } => {
+                if *ppm >= 0.0 {
+                    self.seat_mut(seat).blame_smeared += ppm;
+                } else {
+                    self.seat_mut(seat).blame_cleaned += -ppm;
+                }
+            }
+            CardEffect::FacilityOutputMultiplier { facility, multiplier } => {
+                self.seat_mut(seat).card_facility = Some((*facility, *multiplier));
+            }
+            CardEffect::DiscoveryAtColony { module, multiplier, turns } => {
+                if let Some(body) = self.card_discovery_body(seat, *module) {
+                    self.discoveries.push(Discovery { body, kind: *module, multiplier: *multiplier, turns_left: *turns });
+                }
+            }
+            CardEffect::PioneersFree { pioneers } => {
+                if let Some(sid) = self.card_most_populous(seat) {
+                    // Ticket #334's rule is deliberately not charged here: the card says the state
+                    // pays no people for them, which is the whole of what it offers.
+                    self.muster_emigrants(sid, *pioneers);
+                }
+            }
+            CardEffect::FreeBuilding { module, army } => {
+                if *army {
+                    if let Some(sid) = self.card_most_populous(seat) {
+                        let place = Place::State(sid);
+                        self.raise_army(place, false);
+                        self.war.armies_built[seat.index()] += 1;
+                        self.log(format!("{}: an Army was raised free in {} by this turn's card.", self.seat_name(seat), self.tables.state(sid).name));
+                    }
+                } else if let Some(k) = module
+                    && let Some(cid) = self.card_smallest_colony(seat, *k)
+                {
+                    if let Some(col) = self.colony_mut(cid) {
+                        col.modules.push(Module::new(*k));
+                    }
+                    self.log(format!("{}: a free {} stands at {}.", self.seat_name(seat), k.name(), self.place_name(Place::Colony(cid))));
+                }
+            }
+        }
+    }
+
+    /// Ticket #337: a card's move on a Region's Unrest, up through the damping or down flat.
+    fn card_unrest(&mut self, sid: StateId, amount: f64) {
+        if amount >= 0.0 {
+            self.raise_unrest(sid, amount, UnrestSource::Plain);
+        } else {
+            self.lower_unrest(sid, -amount);
+        }
+    }
+
+    /// Phase 5: take up the card the Question phase drew and apply it, exactly as before. The only
+    /// change ticket #337 makes here is where the card came from: the deck was touched at the head
+    /// of the turn rather than now, and a choice card was asked there and is answered by then.
+    pub fn event_phase(&mut self) {
+        let chance = self.draw_chance();
+        let id = match self.draw {
+            CardDraw::NoCard => {
+                self.last_event = None;
+                let text = format!("No Event this turn (a card comes {:.0}% of turns at this Temperature).", chance * 100.0);
+                self.log(format!("Event: {text}"));
+                self.report.event = Some(text);
+                return;
+            }
+            CardDraw::DeckEmpty => {
+                self.last_event = None;
+                self.log("Event: the deck is empty.");
+                self.report.event = Some("The Event Deck is empty.".to_string());
+                return;
+            }
+            CardDraw::Choice(id) => {
+                // Ticket #337: the question was asked at the head of the turn and the answers are
+                // applied at Resolution (h). `last_event` stays empty, because nothing landed on
+                // the table: what happened, happened to each seat by its own answer.
+                self.last_event = None;
+                let card = self.tables.event(id);
+                self.report.event = Some(format!("{}: {}", card.name, card.choice.as_ref().map(|c| c.question.clone()).unwrap_or_default()));
+                return;
+            }
+            CardDraw::Ordinary(id) => id,
+        };
         let drawn = self.target_event(id);
         if matches!(drawn.target, EventTarget::None) {
             self.events_no_target += 1;
@@ -242,6 +738,28 @@ impl Game {
                     None => (EventTarget::None, format!("{}: no exposed coast has a threshold ahead, so nothing happens.", card.name)),
                 }
             }
+            // Ticket #337 (version 0.09.0): a choice card never reaches here. The Question phase
+            // takes it at the head of the turn and the Event phase returns before targeting. The
+            // eighteen are written out rather than caught by a wildcard, so a card added to the
+            // deck without an arm of its own is still a compile error, as it has always been.
+            EventId::RefugeeConvoy
+            | EventId::GroundedFleet
+            | EventId::CheapOreOffer
+            | EventId::OvertimeAtTheYards
+            | EventId::TheAuditors
+            | EventId::SalvageRights
+            | EventId::FuelContract
+            | EventId::TheHardWinter
+            | EventId::DistressCall
+            | EventId::StrikeAtTheRefineries
+            | EventId::DeepSurvey
+            | EventId::EmergencyShutdown
+            | EventId::TheRecruiters
+            | EventId::CarbonOffsetScheme
+            | EventId::OrbitalDebris
+            | EventId::TheWhistleblower
+            | EventId::SurplusHabitats
+            | EventId::ConscriptionNotice => (EventTarget::None, format!("{}: {}.", card.name, card.effect)),
         };
         DrawnEvent { card: Card::Event(id), target, scale, text }
     }

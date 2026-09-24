@@ -9,6 +9,9 @@ pub enum Phase {
     Income,
     Climate,
     Report,
+    /// Ticket #337 (version 0.09.0): the Question, between the Report and the Orders. It draws the
+    /// turn's card so a card that asks something can be asked BEFORE the orders it binds.
+    Question,
     Orders,
     Event,
     Resolution,
@@ -21,6 +24,7 @@ impl Phase {
             Phase::Income => "Income",
             Phase::Climate => "Climate",
             Phase::Report => "Report",
+            Phase::Question => "the Question",
             Phase::Orders => "Orders",
             Phase::Event => "Event",
             Phase::Resolution => "Resolution",
@@ -80,6 +84,12 @@ impl Game {
         self.climate_phase();
         self.log("Phase 3: Report");
         self.report_phase();
+        // Ticket #337 (version 0.09.0): the turn's card is drawn HERE, at the head of the turn and
+        // before orders, because *hold every Ship in orbit this turn* can only mean something if it
+        // is answered before the orders it binds are given. An ordinary card is held in silence for
+        // the Event phase, so none of the 22 moves.
+        self.log("The Question");
+        self.question_phase();
     }
 
     fn report_phase(&mut self) {
@@ -101,7 +111,22 @@ impl Game {
     /// same version did not know about it: twelve playtest games were played in which declining to
     /// pick froze the tech tree for good, and that was reported as "the strongest strategy in the
     /// game". It was the harness, not the game. A rule only one caller enforces is a habit.
+    ///
+    /// Ticket #337 (version 0.09.0): and while a human seat owes this turn's choice card an answer,
+    /// in the same shape and through the same door, so the interface needs no new mechanism for it.
+    /// A computer seat never appears here: it answers when its orders are computed.
     pub fn end_turn_refusal(&self) -> Option<String> {
+        if let Some(q) = self.pending_question() {
+            for seat in Seat::ALL {
+                if !self.seat(seat).ai && q.answer_of(seat).is_none() {
+                    return Some(format!(
+                        "{} is asking the {} a question, and it has not been answered. Take the offer or refuse it; the turn cannot end until you do.",
+                        self.tables.event(q.card).name,
+                        self.seat_name(seat)
+                    ));
+                }
+            }
+        }
         let owed = self.research.awaiting_pick?;
         if self.seat(owed).ai || self.available_techs().is_empty() {
             return None;
@@ -204,6 +229,9 @@ impl Game {
         self.climate_phase();
         self.log("Phase 3: Report");
         self.report_phase();
+        // Ticket #337 (version 0.09.0): the next turn's card, drawn before its orders are given.
+        self.log("The Question");
+        self.question_phase();
         Ok(())
     }
 }

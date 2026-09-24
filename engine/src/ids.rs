@@ -607,10 +607,32 @@ pub enum EventId {
     VolcanicEruption,
     Moonquake,
     HeliumVein,
+    // Ticket #337 (version 0.09.0): the eighteen CHOICE cards, appended last so every id before
+    // them keeps its index -- `Tables::event` indexes `events.toml` by this enum. Each asks the
+    // table a question at the start of the turn, every seat answers it, and what the two answers
+    // do is composed in data from the effect vocabulary, so none of the eighteen is code.
+    RefugeeConvoy,
+    GroundedFleet,
+    CheapOreOffer,
+    OvertimeAtTheYards,
+    TheAuditors,
+    SalvageRights,
+    FuelContract,
+    TheHardWinter,
+    DistressCall,
+    StrikeAtTheRefineries,
+    DeepSurvey,
+    EmergencyShutdown,
+    TheRecruiters,
+    CarbonOffsetScheme,
+    OrbitalDebris,
+    TheWhistleblower,
+    SurplusHabitats,
+    ConscriptionNotice,
 }
 
 impl EventId {
-    pub const ALL: [EventId; 22] = [
+    pub const ALL: [EventId; 40] = [
         EventId::SolarStorm,
         EventId::RadiationSurge,
         EventId::CommsBlackout,
@@ -633,6 +655,25 @@ impl EventId {
         EventId::VolcanicEruption,
         EventId::Moonquake,
         EventId::HeliumVein,
+        // Ticket #337 (version 0.09.0): the eighteen choice cards, in the order `events.toml` lists them.
+        EventId::RefugeeConvoy,
+        EventId::GroundedFleet,
+        EventId::CheapOreOffer,
+        EventId::OvertimeAtTheYards,
+        EventId::TheAuditors,
+        EventId::SalvageRights,
+        EventId::FuelContract,
+        EventId::TheHardWinter,
+        EventId::DistressCall,
+        EventId::StrikeAtTheRefineries,
+        EventId::DeepSurvey,
+        EventId::EmergencyShutdown,
+        EventId::TheRecruiters,
+        EventId::CarbonOffsetScheme,
+        EventId::OrbitalDebris,
+        EventId::TheWhistleblower,
+        EventId::SurplusHabitats,
+        EventId::ConscriptionNotice,
     ];
     pub const CLIMATE: [EventId; 6] = [EventId::Heatwave, EventId::Wildfire, EventId::StormSurge, EventId::MethaneBurst, EventId::Drought, EventId::VolcanicEruption];
 }
@@ -644,6 +685,10 @@ pub enum EventKind {
     Failure,
     Discovery,
     Climate,
+    /// Ticket #337 (version 0.09.0): a card that asks the table a question. The Temperature scales
+    /// a Climate card and nothing else, so a choice card's own kind keeps it out of that scaling
+    /// even where the weather is what it is about.
+    Choice,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]

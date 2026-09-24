@@ -467,6 +467,9 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("game_over_draw", &["turn", "note"]),
     ("game_over_collapse", &["turn", "temperature"]),
     ("event_drawn", &["text"]),
+    // Ticket #337 (version 0.09.0): the card that asks a question, and what each seat answered.
+    ("card_asked", &["card", "question"]),
+    ("card_answered", &["card", "faction", "answer"]),
     ("break_fired", &["temperature", "name", "happened", "text"]),
     ("break_coastal", &["states", "exposure", "percent", "unrest"]),
     ("break_baseline", &["state", "rise"]),

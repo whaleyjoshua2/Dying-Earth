@@ -1,7 +1,7 @@
 //! The formula tests spec 19.4 asks for, one per pinned rule.
 
 use dying_earth_engine::combat::{self, Combatant, Dice};
-use dying_earth_engine::data::{default_data_dir, Tables};
+use dying_earth_engine::data::{default_data_dir, CardEffect, CardRule, Tables};
 use dying_earth_engine::*;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -42,8 +42,36 @@ fn pick_a_tech(g: &mut Game) {
     }
 }
 
+/// Ticket #337 (version 0.09.0): `end_turn` refuses while a human seat owes this turn's choice card
+/// an answer, exactly as it refuses while a human Lead owes a Tech, so a test that drives turns has
+/// to answer it as a player does. It REFUSES the offer, which is the answer that buys nothing.
+fn answer_the_card(g: &mut Game) {
+    for seat in Seat::ALL {
+        let owed = g.pending_question().map(|q| q.answer_of(seat).is_none()).unwrap_or(false);
+        if owed && !g.seat(seat).ai {
+            g.answer_card(seat, false).ok();
+        }
+    }
+}
+
 fn facility(kind: FacilityKind) -> Facility {
     Facility::new(kind)
+}
+
+/// Ticket #337 (version 0.09.0): put one named card on top of the deck and run the Question phase
+/// until the draw chance lets it through, so a test about a card is not a test about the roll. The
+/// Temperature is left where the game put it, because forcing the chance to one would need a
+/// Temperature past the Collapse line and every turn after it would be a finished game.
+fn ask_the_card(g: &mut Game, id: EventId) {
+    for _ in 0..200 {
+        g.deck.cards = vec![Card::Event(id)];
+        g.deck.drawn.clear();
+        g.question_phase();
+        if g.draw != CardDraw::NoCard {
+            return;
+        }
+    }
+    panic!("{id:?} did not come in two hundred rolls at a draw chance of {:.2}", g.draw_chance());
 }
 
 /// Ticket #57: stand the game on the turn the Mars launch window falls on, where a crossing costs
@@ -991,12 +1019,13 @@ fn a_card_comes_on_about_half_the_turns_at_the_start_and_more_when_warm() {
 #[test]
 fn the_deck_is_twenty_six_cards_as_the_table_deals_them_and_no_calm() {
     let mut g = game();
-    // Ticket #76 (version 0.05.5): forty cards for thirty-six turns. The 28 of #25 and #32, a third
-    // copy of Heatwave, Wildfire, Rich Seam and Solar Storm, a second of Unrest, Methane Burst,
-    // Labour Dispute and Dust Storm, and four new Events once each.
-    // Ticket #259 (version 0.08.4): the twelve cards that can only land off Earth are not dealt at
-    // the start; they join on turn 12. So the deck begins at 28 and is 40 only once they are in.
-    assert_eq!(g.deck.cards.len(), 28, "twenty-eight at the start: the twelve off-Earth cards join on turn 12 (#259)");
+    // Ticket #76 (version 0.05.5): forty cards for thirty-six turns.
+    // Ticket #259 (version 0.08.4): the cards that can only land off Earth are not dealt at the
+    // start; they join on turn 12, so the deck begins short and is 40 only once they are in.
+    // Ticket #337 (version 0.09.0): every duplicate copy is cut and eighteen choice cards take
+    // their places, so the deck is 40 DISTINCT cards and exactly SEVEN of them are off-Earth.
+    // The two figures below moved with that: 28 became 33, and twelve copies became seven cards.
+    assert_eq!(g.deck.cards.len(), 33, "thirty-three at the start: the seven off-Earth cards join on turn 12 (#259)");
     assert!(!g.deck.off_earth_joined);
     for id in [EventId::GridFailure, EventId::ReactorLeak, EventId::DustStorm, EventId::Moonquake, EventId::HeliumVein, EventId::RichSeam, EventId::IceDeposit] {
         assert!(g.tables.events.event.iter().find(|e| e.id == id).unwrap().off_earth, "{id:?} is flagged off Earth");
@@ -1005,38 +1034,40 @@ fn the_deck_is_twenty_six_cards_as_the_table_deals_them_and_no_calm() {
     assert_eq!(g.tables.events.off_earth_join_turn, 12);
     // A card may or may not be drawn on any turn (the chance is never nought), so the deck and its
     // drawn pile are counted together.
+    // Ticket #337 (version 0.09.0): the DRAW is the Question phase's now, not the Event phase's.
     let dealt = |g: &Game| g.deck.cards.len() + g.deck.drawn.len();
     g.turn = 11;
-    g.event_phase();
-    assert_eq!(dealt(&g), 28, "turn 11: not yet");
+    g.question_phase();
+    assert_eq!(dealt(&g), 33, "turn 11: not yet");
     g.turn = 12;
-    g.event_phase();
+    g.question_phase();
     assert!(g.deck.off_earth_joined);
-    assert_eq!(dealt(&g), 40, "turn 12: the twelve join, and the deck is the forty of #76");
+    assert_eq!(dealt(&g), 40, "turn 12: the seven join, and the deck is forty");
     assert!(g.report.lines.iter().any(|l| l.text.contains("join the deck")), "the Report says so: {:?}", g.report.lines);
-    g.event_phase();
+    g.question_phase();
     assert_eq!(dealt(&g), 40, "and they join once");
     // The rest of this test reads the deck as dealt, so a fresh one -- with the off-Earth cards
     // in -- is what the copy counts below are checked against.
     let mut g = game();
     g.turn = 12;
     g.deck.cards.append(&mut g.deck.drawn);
-    g.event_phase();
+    g.question_phase();
     g.deck.cards.append(&mut g.deck.drawn);
     let copies = |id: EventId| g.deck.cards.iter().filter(|c| **c == Card::Event(id)).count();
+    // Ticket #337: what used to be dealt twice and three times is dealt ONCE, every kind of it.
     for id in [EventId::Heatwave, EventId::Wildfire, EventId::RichSeam, EventId::SolarStorm] {
-        assert_eq!(copies(id), 3, "{id:?} three times");
+        assert_eq!(copies(id), 1, "{id:?} once now, where it was three times");
     }
     for id in [EventId::Unrest, EventId::MethaneBurst, EventId::LabourDispute, EventId::DustStorm] {
-        assert_eq!(copies(id), 2, "{id:?} twice");
+        assert_eq!(copies(id), 1, "{id:?} once now, where it was twice");
     }
     for id in [EventId::RadiationSurge, EventId::CommsBlackout, EventId::GridFailure, EventId::IceDeposit, EventId::Breakthrough, EventId::StormSurge] {
-        assert_eq!(copies(id), 2, "{id:?} still twice");
+        assert_eq!(copies(id), 1, "{id:?} once now, where it was twice");
     }
     for id in [EventId::LaunchPadFire, EventId::SolarMaximum, EventId::MeteorShower, EventId::ReactorLeak] {
         assert_eq!(copies(id), 1, "{id:?} still once");
     }
-    assert_eq!(EventId::ALL.len(), 22, "eighteen Events and the four of #76");
+    assert_eq!(EventId::ALL.len(), 40, "the 22 ordinary kinds and the eighteen that ask a question (#337)");
     for e in &g.tables.events.event {
         assert_eq!(g.deck.count(e.id), e.copies as usize, "{}", e.name);
     }
@@ -1450,6 +1481,7 @@ fn colony_attack_turns(seed: u64) -> Option<u32> {
             orders.push(Order::ArmyStance { place: Place::Colony(cid), stance: Stance::Attack });
         }
         pick_a_tech(&mut g);
+        answer_the_card(&mut g);
         g.end_turn([orders, Vec::new(), Vec::new(), Vec::new()]).expect("the turn should end");
         if g.colony(cid).map(|c| c.control == Control::Controlled(Seat(0))).unwrap_or(false) {
             return Some(turn);
@@ -1584,6 +1616,9 @@ fn only_climate_cards_scale_with_the_temperature() {
         for _ in 0..50 {
             g.deck.cards = vec![Card::Event(id)];
             g.last_event = None;
+            // Ticket #337 (version 0.09.0): the draw is the Question phase's; the Event phase takes
+            // up what it held. Both are run, so the card still arrives where it always did.
+            g.question_phase();
             g.event_phase();
             if let Some(e) = &g.last_event {
                 drawn = Some(e.clone());
@@ -4013,7 +4048,10 @@ fn c_start_facilities_are_coastal_first_and_a_new_build_is_inland_first() {
     directed(&mut g, sid);
     let orders = vec![Order::BuildFacility { state: sid, kind: FacilityKind::Bank }];
     pick_a_tech(&mut g);
+    answer_the_card(&mut g);
     g.end_turn([orders, Vec::new(), Vec::new(), Vec::new()]).expect("the turn should end");
+    pick_a_tech(&mut g);
+    answer_the_card(&mut g);
     g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
     assert!(standing(&g, sid, false).contains(&FacilityKind::Bank), "the Bank went inland: {:?}", standing(&g, sid, false));
 }
@@ -4901,6 +4939,7 @@ fn the_headline_takes_the_most_severe_line_whatever_order_it_came_in() {
     let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
     orders[0] = vec![found];
     pick_a_tech(&mut g);
+    answer_the_card(&mut g);
     g.end_turn(orders).expect("the turn should end");
     let founded = g.report.lines.iter().position(|l| l.kind == LineKind::ColonyFounded).expect("a Colony was founded");
     // The Tech completes after the founding, so only the severity order can put the Colony first.
@@ -4950,6 +4989,7 @@ fn every_report_line_carries_its_kind_and_place_and_falls_under_the_right_headin
     let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
     orders[0] = vec![found];
     pick_a_tech(&mut g);
+    answer_the_card(&mut g);
     g.end_turn(orders).expect("the turn should end");
 
     let founded = g.report.lines.iter().find(|l| l.kind == LineKind::ColonyFounded).expect("a Colony was founded");
@@ -5056,6 +5096,7 @@ fn a_rivals_paragraph_names_its_visible_orders_and_none_of_its_scores() {
     // And a real AI turn's paragraph says what it did, with none of the scored list in it.
     let mut g = game();
     pick_a_tech(&mut g);
+    answer_the_card(&mut g);
     g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
     let entry = g.report.ai_lines.iter().find(|e| e.seat == Seat(1)).expect("the Prospectors ordered");
     assert!(!entry.deeds.is_empty(), "and the Report keeps what they did");
@@ -5259,6 +5300,7 @@ fn the_spectators_dispatch_carries_every_factions_works_and_all_four_paragraphs(
     let mut found: Option<(Seat, String)> = None;
     for _ in 0..12 {
         pick_a_tech(&mut g);
+        answer_the_card(&mut g);
         g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
         let works: Vec<&ReportLine> = g.report.sections().into_iter().find(|(s, _)| *s == Section::YourWorks).map(|(_, l)| l).unwrap_or_default();
         for seat in Seat::ALL.into_iter().skip(1) {
@@ -5285,6 +5327,7 @@ fn the_spectators_dispatch_carries_every_factions_works_and_all_four_paragraphs(
     let mut p = with_seed(7);
     p.start();
     pick_a_tech(&mut p);
+    answer_the_card(&mut p);
     p.end_turn(std::array::from_fn(|_| Vec::new())).expect("the turn should end");
     assert!(p.faction_paragraphs().iter().all(|(s, _)| *s != Seat(0)), "a player's Report keeps seat 0 out of the rivals");
 }
@@ -7871,6 +7914,7 @@ fn the_turn_will_not_end_while_a_human_lead_owes_a_tech() {
     assert_eq!(g.turn, before, "and nothing advanced");
     // Picking clears it.
     pick_a_tech(&mut g);
+    answer_the_card(&mut g);
     assert!(g.end_turn_refusal().is_none());
     assert!(g.end_turn(std::array::from_fn(|_| Vec::new())).is_ok());
     assert_eq!(g.turn, before + 1);
@@ -9066,7 +9110,9 @@ fn relations_do_nothing_mechanical_in_this_version() {
     // divergence, comes a turn later; measured at seven on this seed when the ticket was built.
     for _ in 0..7 {
         pick_a_tech(&mut a);
+        answer_the_card(&mut a);
         pick_a_tech(&mut b);
+        answer_the_card(&mut b);
         a.end_turn(std::array::from_fn(|_| Vec::new())).unwrap();
         b.end_turn(std::array::from_fn(|_| Vec::new())).unwrap();
     }
@@ -10935,6 +10981,7 @@ fn the_computer_builds_no_factory_where_nothing_is_queued() {
             "turn {turn}: no Region of the Custodians has a two-deep queue, so no Factory is ordered: {orders:?}"
         );
         pick_a_tech(&mut g);
+        answer_the_card(&mut g);
         g.end_turn(std::array::from_fn(|s| if s == 0 { orders.clone() } else { Vec::new() })).unwrap();
     }
 }
@@ -12562,4 +12609,268 @@ fn the_computer_wants_the_cheaper_rival_colony_not_the_emptier() {
     let spent: Vec<Place> = orders.iter().filter_map(|o| match o { Order::Influence { target, .. } => Some(*target), _ => None }).collect();
     assert!(spent.iter().all(|t| *t == Place::Colony(fuller)), "every step on the cheaper place, where the old rule put them all on the emptier: {spent:?}");
     assert!(!spent.is_empty(), "it spends its Allotment somewhere: {orders:?}");
+}
+
+
+// ---------------------------------------------------------------- Ticket #337: cards that ask
+
+/// Ticket #337 (version 0.09.0) R1: **the deck is forty cards and every one of them is distinct.**
+/// Fourteen kinds carried eighteen extra copies between them; every extra copy is cut and eighteen
+/// choice cards take their places. Before this the same Solar Storm could be drawn three times in a
+/// game; now no card is ever seen twice, and eighteen of the forty ask the table a question.
+#[test]
+fn the_deck_is_forty_distinct_cards_and_eighteen_of_them_ask_a_question() {
+    let g = game();
+    let t = &g.tables.events;
+    assert_eq!(t.event.len(), 40, "forty kinds");
+    let duplicated: Vec<String> = t.event.iter().filter(|e| e.copies != 1).map(|e| format!("{} x{}", e.name, e.copies)).collect();
+    assert!(duplicated.is_empty(), "no kind is dealt twice: {duplicated:?}");
+    assert_eq!(t.event.iter().map(|e| e.copies).sum::<u32>(), 40, "forty cards in all");
+    assert_eq!(t.event.iter().filter(|e| e.asks()).count(), 18, "eighteen of them ask a question");
+    // And the deck as dealt, once the off-Earth cards have joined, holds each of them once.
+    let mut g = game();
+    g.turn = t.off_earth_join_turn;
+    g.question_phase();
+    g.deck.cards.append(&mut g.deck.drawn);
+    let mut ids: Vec<EventId> = g.deck.cards.iter().map(|c| { let Card::Event(e) = *c; e }).collect();
+    assert_eq!(ids.len(), 40, "forty cards dealt");
+    ids.sort();
+    ids.dedup();
+    assert_eq!(ids.len(), 40, "and no card appears twice in the deck");
+}
+
+/// Ticket #337 R2: **the card is drawn and asked at the head of the turn, before orders**, and a
+/// seat neither side of it can reach is NOT asked. The Hard Winter offers relief or raises Unrest
+/// in every Region the seat holds; a Faction holding no Region has nothing to decide, and the spec
+/// is wrong if such a seat is asked it.
+#[test]
+fn a_card_is_asked_before_orders_and_a_seat_it_cannot_reach_is_not_asked() {
+    let mut g = game();
+    // Seat 2 holds nothing at all, so the refusing side has nowhere to land on it.
+    for sid in g.controlled_states(Seat(2)) {
+        g.state_mut(sid).control = Control::Neutral;
+    }
+    assert!(g.controlled_states(Seat(2)).is_empty(), "seat 2 holds no Region");
+    // The Question phase runs at the head of the turn, BEFORE any order is given.
+    ask_the_card(&mut g, EventId::TheHardWinter);
+    let q = g.pending_question().expect("the Hard Winter is asking");
+    assert_eq!(q.card, EventId::TheHardWinter);
+    assert_eq!(q.answer_of(Seat(0)), None, "a seat holding Regions is asked, and owes an answer");
+    assert_eq!(q.answer_of(Seat(2)), Some(CardAnswer::NothingToDecide), "a seat with no Region held is NOT asked the Hard Winter");
+    assert_eq!(q.unanswered(), Some(Seat(0)), "seat 0 is the first that still owes one");
+    // And the Event phase has no Event to announce: nothing landed on the table, because what
+    // happened happened to each seat by its own answer.
+    g.event_phase();
+    assert!(g.last_event.is_none(), "a choice card is not an Event that befell the table");
+}
+
+/// Ticket #337 R2: **End Turn is refused while a human seat owes this turn's card an answer**, in
+/// the same shape and through the same door as the Tech pick of #105, naming the card. The spec is
+/// wrong if End Turn can be pressed with a question pending and unanswered.
+#[test]
+fn the_turn_will_not_end_while_a_human_seat_owes_this_turns_card_an_answer() {
+    let mut g = game();
+    pick_a_tech(&mut g); // so the only refusal left is the card's
+    ask_the_card(&mut g, EventId::SalvageRights);
+    let before = g.turn;
+    let why = g.end_turn_refusal().expect("a card is asking, so the turn is refused");
+    assert!(why.contains("Salvage Rights"), "and the refusal names the card: {why}");
+    assert_eq!(g.end_turn(std::array::from_fn(|_| Vec::new())), Err(why), "the turn refuses with the same words");
+    assert_eq!(g.turn, before, "and nothing advanced");
+    // Answering clears it, and a seat answers once.
+    g.answer_card(Seat(0), true).expect("the offer can be taken");
+    assert!(g.answer_card(Seat(0), false).is_err(), "a seat that has answered cannot answer again");
+    assert!(g.end_turn_refusal().is_none(), "answered, the turn may end");
+    assert!(g.end_turn(std::array::from_fn(|_| Vec::new())).is_ok());
+    assert_eq!(g.turn, before + 1);
+    // A computer seat never holds the turn: it answers when its orders are computed.
+    let mut s = Game::spectate(tables(), 7);
+    s.start();
+    assert!(s.end_turn_refusal().is_none(), "every seat is an AI here");
+}
+
+/// Ticket #337 R3: **the two sides are lists of effects composed in data, and every figure is a
+/// field of `events.toml`.** The Hard Winter is read out of the table and both answers are played
+/// on identical boards: the spec is wrong if two seats answering the same card differently produce
+/// the same board.
+#[test]
+fn the_two_sides_of_a_card_are_composed_in_data_and_make_different_boards() {
+    let mut taken = game();
+    let mut refused = game();
+    let card = taken.tables.event(EventId::TheHardWinter).choice.clone().expect("the Hard Winter asks a question");
+    // Both sides are lists of effects, each carrying its own figures. Nothing below is a literal:
+    // the relief and the Unrest are read out of the table and the board is checked against them.
+    let relief = match card.take_does.first().expect("the take side is a list of effects") {
+        CardEffect::Resources { ducats, .. } => *ducats,
+        e => panic!("the take side of the Hard Winter is relief in Ducats: {e:?}"),
+    };
+    let rise = match card.refuse_does.first().expect("the refuse side is a list of effects") {
+        CardEffect::UnrestAllHeld { unrest } => *unrest,
+        e => panic!("the refuse side of the Hard Winter is Unrest in every held Region: {e:?}"),
+    };
+    assert!(relief > 0 && rise > 0.0, "the card carries its own figures: {relief} Ducats, {rise} Unrest");
+    let purse = taken.seat(Seat(0)).stockpile.ducats;
+    let held = taken.controlled_states(Seat(0));
+    let quiet: Vec<f64> = held.iter().map(|s| taken.state(*s).unrest).collect();
+    for g in [&mut taken, &mut refused] {
+        ask_the_card(g, EventId::TheHardWinter);
+    }
+    taken.answer_card(Seat(0), true).unwrap();
+    refused.answer_card(Seat(0), false).unwrap();
+    taken.apply_card_answers();
+    refused.apply_card_answers();
+    assert_eq!(taken.seat(Seat(0)).stockpile.ducats, purse + relief, "taking it pays the relief the card names");
+    assert_eq!(refused.seat(Seat(0)).stockpile.ducats, purse, "refusing it pays nothing");
+    for (i, sid) in held.iter().enumerate() {
+        assert_eq!(taken.state(*sid).unrest, quiet[i], "{:?}: taking it moves no Unrest", sid);
+        assert_eq!(refused.state(*sid).unrest, quiet[i] + rise, "{:?}: refusing it raises Unrest by the card's figure", sid);
+    }
+}
+
+/// Ticket #337 R4: **a computer seat answers by the rule the card carries**, read off its own
+/// board, with the rule's figure in `events.toml` beside the card rather than in `ai.toml`. The
+/// Emergency Shutdown is shut by a Faction already answerable for a lot of ppm and run hot by a
+/// clean one, so a rival's answer tells the player something true about it.
+#[test]
+fn a_computer_seat_answers_its_card_by_the_rule_the_card_carries() {
+    let mut g = game();
+    let bar = match g.tables.event(EventId::EmergencyShutdown).choice.as_ref().expect("it asks").take_when {
+        CardRule::BlameAtLeast { blame } => blame,
+        ref r => panic!("the Emergency Shutdown answers to a Blame bar: {r:?}"),
+    };
+    // Both seats have a Power Plant, so the card reaches both of them.
+    for seat in [Seat(1), Seat(2)] {
+        let sid = g.controlled_states(seat)[0];
+        g.state_mut(sid).facilities.push(facility(FacilityKind::PowerPlant));
+    }
+    g.seats[1].blame_emitted = bar + 1.0;
+    g.seats[2].blame_emitted = 0.0;
+    ask_the_card(&mut g, EventId::EmergencyShutdown);
+    g.ai_answer_card(Seat(1));
+    g.ai_answer_card(Seat(2));
+    let q = g.pending_question().expect("the card is asking");
+    assert_eq!(q.answer_of(Seat(1)), Some(CardAnswer::Taken), "over the bar at {} ppm, it shuts the plants", bar + 1.0);
+    assert_eq!(q.answer_of(Seat(2)), Some(CardAnswer::Refused), "under the bar, it runs them hot");
+    // And the answer is the seat's own: the two boards differ, so the rule read the board.
+    assert_ne!(q.answer_of(Seat(1)), q.answer_of(Seat(2)), "the rule is a predicate over the seat's board, not a constant");
+}
+
+/// Ticket #337 R5: **the Report names each seat's answer, and says *nothing to decide* for a seat
+/// that was not asked**; and the game counts answers by seat for the sweep.
+#[test]
+fn the_report_names_every_seats_answer_and_the_game_counts_them() {
+    let mut g = game();
+    for sid in g.controlled_states(Seat(3)) {
+        g.state_mut(sid).control = Control::Neutral;
+    }
+    ask_the_card(&mut g, EventId::TheHardWinter);
+    g.answer_card(Seat(0), true).unwrap();
+    g.answer_card(Seat(1), false).unwrap();
+    g.answer_card(Seat(2), false).unwrap();
+    assert!(g.answer_card(Seat(3), true).is_err(), "a seat that was not asked cannot answer");
+    g.report = Report::default();
+    g.apply_card_answers();
+    let lines: Vec<String> = g.report.lines.iter().map(|l| l.text.clone()).collect();
+    let said = |who: &str, what: &str| lines.iter().any(|l| l.contains("Hard Winter") && l.contains(who) && l.contains(what));
+    assert!(said(&g.seat_name(Seat(0)), "took it"), "the Report names the seat that took it: {lines:?}");
+    assert!(said(&g.seat_name(Seat(1)), "refused it"), "and the seat that refused: {lines:?}");
+    assert!(said(&g.seat_name(Seat(3)), "nothing to decide"), "and says so for the seat that was not asked: {lines:?}");
+    assert_eq!(g.choice_taken[0], 1, "one taken by seat 0");
+    assert_eq!(g.choice_refused[1], 1, "one refused by seat 1");
+    assert_eq!(g.choice_not_asked[3], 1, "one never asked of seat 3");
+    assert_eq!(g.choice_taken[3], 0, "and nothing counted as an answer for it");
+}
+
+/// Ticket #337 R3, the effect the whole phase order exists for: **a seat that grounds its fleet
+/// holds every transit of its own this turn** -- the Solar Storm's shape, for one seat. The card is
+/// answered before orders are given, so the answer binds orders the player gives knowing it.
+#[test]
+fn grounding_the_fleet_holds_that_seats_transits_and_nobody_elses() {
+    let mut g = game();
+    let mk = |g: &mut Game, seat: Seat| {
+        let id = ShipId(g.fresh_id());
+        g.ships.push(Ship {
+            name: String::new(), id, kind: UnitKind::Frigate, seat, damage: 0,
+            at: ShipAt::Transit { from: BodyId::Earth, to: BodyId::Moon, turns_left: 1 },
+            colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false,
+            arrived_this_turn: false, built_turn: 1, fuel: 30, slot: None,
+        });
+        id
+    };
+    let mine = mk(&mut g, Seat(0));
+    let theirs = mk(&mut g, Seat(1));
+    ask_the_card(&mut g, EventId::GroundedFleet);
+    g.answer_card(Seat(0), true).expect("seat 0 grounds its fleet");
+    g.answer_card(Seat(1), false).expect("seat 1 flies on");
+    assert!(g.card_holds_ships(Seat(0)), "seat 0 answered with the holding side");
+    assert!(!g.card_holds_ships(Seat(1)), "seat 1 did not");
+    g.resolution_phase();
+    assert!(matches!(g.ship(mine).unwrap().at, ShipAt::Transit { .. }), "the grounded seat's Ship did not arrive");
+    assert!(matches!(g.ship(theirs).unwrap().at, ShipAt::Body(BodyId::Moon)), "the seat that flew on arrived");
+    assert_eq!(g.ship(theirs).unwrap().damage, 1, "and took the damage the refusing side carries");
+    assert_eq!(g.ship(mine).unwrap().damage, 0, "while the grounded fleet took none");
+}
+
+
+/// Ticket #337 R3, and the error case the spec names: **a `trade_price` effect overrides the band
+/// for the turns the card names, and the band resumes after.** The Cheap Ore Offer refused puts
+/// Materials at 1, which is outside the band on purpose -- that is the point of the card -- and the
+/// override is recorded rather than written into the price, so nothing of the band is lost.
+///
+/// The turns it names are the turns of ORDERS that follow it: the answer lands at the Resolution of
+/// the turn it was given in, by which time that turn's trading is done, so a countdown spent at the
+/// settle would burn one of its turns before a single order had been priced at it.
+#[test]
+fn a_card_that_moves_a_price_overrides_the_band_for_the_turns_it_names() {
+    let mut g = game();
+    let refuse = g.tables.event(EventId::CheapOreOffer).choice.clone().expect("it asks").refuse_does;
+    let (to, turns) = match refuse.first().expect("the refusing side is a list of effects") {
+        CardEffect::TradePrice { to, turns, .. } => (to.expect("the Cheap Ore Offer SETS the price"), *turns),
+        e => panic!("the refusing side of the Cheap Ore Offer is a price: {e:?}"),
+    };
+    let row = Game::market_row(Resource::Materials).expect("Materials are traded");
+    let band = g.market_price_at(row);
+    assert_ne!(band, to, "the card's price is outside the band the market opens at");
+    // The offer is 30 Materials for 20 Ducats, and a seat that cannot pay the 20 is not asked at
+    // all -- a price it cannot meet is an effect that cannot land. So it is given the money first.
+    g.seats[0].stockpile.ducats = 100;
+    ask_the_card(&mut g, EventId::CheapOreOffer);
+    let answered_on = g.turn;
+    g.answer_card(Seat(0), false).expect("the offer can be refused");
+    g.apply_card_answers();
+    g.settle_market(); // the end of the turn it was answered in
+    for t in answered_on + 1..answered_on + 1 + turns {
+        g.turn = t;
+        assert_eq!(g.market_price_at(row), to, "turn {t}: the price the card named stands");
+        g.settle_market();
+    }
+    g.turn = answered_on + 1 + turns;
+    assert_eq!(g.market_price_at(row), band, "and the band is the price again once the card is spent");
+}
+
+
+/// Ticket #337: **an ordinary card is held in silence and behaves exactly as it always did.** The
+/// DRAW moved to the head of the turn so a choice card could be asked before orders; the
+/// announcement, the target and the effect did not move an inch. The spec is wrong if an ordinary
+/// card's behaviour changes, so this pins the whole path for one of the 22.
+#[test]
+fn an_ordinary_card_is_held_in_silence_and_lands_where_it_always_did() {
+    let mut g = game();
+    let before_lines = g.report.lines.len();
+    ask_the_card(&mut g, EventId::Unrest);
+    assert!(g.pending_question().is_none(), "an ordinary card asks nobody anything");
+    let refusal = g.end_turn_refusal().unwrap_or_default();
+    assert!(!refusal.contains("Unrest"), "and it never holds the turn: {refusal}");
+    assert_eq!(g.report.lines.len(), before_lines, "nothing is said at the head of the turn: the card is HELD");
+    assert!(g.last_event.is_none(), "and nothing has landed yet");
+    // The Event phase takes it up: the target is chosen and the card announced, where it always was.
+    g.event_phase();
+    let e = g.last_event.clone().expect("the Event phase announces the card the Question phase held");
+    assert_eq!(e.card, Card::Event(EventId::Unrest));
+    let EventTarget::State(sid) = e.target else { panic!("the Unrest card lands on a Region: {:?}", e.target) };
+    assert!(g.report.lines.len() > before_lines, "and the Report carries it, as it always did");
+    // And Resolution (h) applies it by the card's own figure in `events.toml`, unchanged.
+    let quiet = g.state(sid).unrest;
+    g.apply_event_now();
+    assert_eq!(g.state(sid).unrest, quiet + g.tables.events.unrest_card_unrest, "the card's own figure, unchanged");
 }

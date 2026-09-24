@@ -99,6 +99,11 @@ pub struct SimResult {
     pub widgets_lost: [i64; SEAT_COUNT],
     pub queue_depth_median: u32,
     pub events_no_target: u32,
+    /// Ticket #337 (version 0.09.0): choice cards this seat took, refused, and was never asked --
+    /// the third being the cards neither of whose sides reached its board.
+    pub choice_taken: [u32; SEAT_COUNT],
+    pub choice_refused: [u32; SEAT_COUNT],
+    pub choice_not_asked: [u32; SEAT_COUNT],
     pub coastal_slots_lost: u32,
     pub facilities_drowned: u32,
     /// Ticket #276 (version 0.08.5): inland slots the sea turned coastal over the game. Read off the
@@ -546,6 +551,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let blockade_suffered = Seat::ALL.map(|s| game.seat(s).blockade_turns_suffered);
     let blockade_imposed = Seat::ALL.map(|s| game.seat(s).blockade_turns_imposed);
     let events_no_target = game.events_no_target;
+    let (choice_taken, choice_refused, choice_not_asked) = (game.choice_taken, game.choice_refused, game.choice_not_asked);
     // Ticket #276 (version 0.08.5): the three sea figures are counters on the state, not scraped
     // from the log's sentences as the first two were from #56 to 0.08.4.
     let coastal_slots_lost: u32 = game.states.iter().map(|s| s.lost_slots).sum();
@@ -613,6 +619,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
             depths.get(depths.len() / 2).copied().unwrap_or(0)
         },
         events_no_target,
+        choice_taken,
+        choice_refused,
+        choice_not_asked,
         sea_walls_spent,
         coastal_slots_lost,
         facilities_drowned,

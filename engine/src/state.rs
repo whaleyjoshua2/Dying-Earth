@@ -735,6 +735,63 @@ impl Deck {
     }
 }
 
+/// Ticket #337 (version 0.09.0): what the turn drew, settled in the Question phase at the head of
+/// the turn and read again in the Event phase. The DRAW moves to the head of the turn so a choice
+/// card can be asked before orders are given; an ordinary card is HELD here, silently, and
+/// announced and applied in the Event phase exactly where it always was, so none of the 22 changes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CardDraw {
+    /// The roll did not bring a card.
+    #[default]
+    NoCard,
+    /// The deck is spent.
+    DeckEmpty,
+    /// One of the 22, held for the Event phase.
+    Ordinary(EventId),
+    /// One of the eighteen: the turn's question.
+    Choice(EventId),
+}
+
+/// Ticket #337 (version 0.09.0): what one seat answered this turn's choice card.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CardAnswer {
+    Taken,
+    Refused,
+    /// Neither side of the card reaches this seat, so it was never asked: it does not hold the turn
+    /// and the Report says so for it, rather than a small Faction being made to refuse.
+    NothingToDecide,
+}
+
+impl CardAnswer {
+    /// The word the Report and the log use.
+    pub fn word(self) -> &'static str {
+        match self {
+            CardAnswer::Taken => "took it",
+            CardAnswer::Refused => "refused it",
+            CardAnswer::NothingToDecide => "had nothing to decide",
+        }
+    }
+}
+
+/// Ticket #337 (version 0.09.0): **the turn's pending question** -- the choice card and what each
+/// seat has answered. A seat whose answer is still `None` owes one; a human seat that owes one
+/// refuses End Turn, and a computer seat answers when its orders are computed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Question {
+    pub card: EventId,
+    pub answers: [Option<CardAnswer>; SEAT_COUNT],
+}
+
+impl Question {
+    pub fn answer_of(&self, seat: Seat) -> Option<CardAnswer> {
+        self.answers[seat.index()]
+    }
+    /// The first seat that still owes an answer, if any.
+    pub fn unanswered(&self) -> Option<Seat> {
+        Seat::ALL.into_iter().find(|s| self.answers[s.index()].is_none())
+    }
+}
+
 /// A drawn card with its target and size, for the popup and the log.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DrawnEvent {
@@ -928,6 +985,12 @@ pub struct SeatState {
     pub blame_emitted: f64,
     /// Ticket #53: every ppm this Faction has removed, over the whole game.
     pub blame_removed: f64,
+    /// Ticket #337 (version 0.09.0): a Facility kind of this seat's makes this share of its output
+    /// at the NEXT Income, because of a choice card answered this turn -- the Drought's shape, per
+    /// seat and per kind. Cleared at the Income that reads it, beside `drought` and
+    /// `solar_maximum_next`.
+    #[serde(default)]
+    pub card_facility: Option<(FacilityKind, f64)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1203,6 +1266,19 @@ pub struct Market {
     pub price: [i64; 3],
     /// Net units of each bought less sold this turn, across the whole table.
     pub net: [i64; 3],
+    /// Ticket #337 (version 0.09.0): a price a choice card has OVERRIDDEN, and the LAST TURN it
+    /// stands on. Nought is no override. The override is outside the band on purpose -- a Materials
+    /// price of 1 is the whole point of the Cheap Ore Offer -- and it is recorded here rather than
+    /// written into `price`, so the band goes on moving underneath it with what the table trades
+    /// and resumes of itself the moment the override runs out.
+    ///
+    /// The last turn rather than a countdown, because the answer lands at the Resolution of the
+    /// turn it was given in, AFTER that turn's trading: a countdown decremented at the settle would
+    /// spend one of its turns before any order had been priced at it.
+    #[serde(default)]
+    pub card_price: [i64; 3],
+    #[serde(default)]
+    pub card_price_until: [u32; 3],
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -1260,6 +1336,17 @@ pub struct Game {
     pub climate: Climate,
     pub research: Research,
     pub deck: Deck,
+    /// Ticket #337 (version 0.09.0): what the Question phase drew at the head of this turn, and the
+    /// question it is asking if it drew a choice card. The draw is held here between the head of
+    /// the turn and the Event phase, so an ordinary card is announced and applied where it always
+    /// was while a choice card is asked before orders.
+    pub draw: CardDraw,
+    pub question: Option<Question>,
+    /// Ticket #337: choice cards taken, refused, and never asked, by seat, over the game, for the
+    /// sweep. A seat neither of whose sides the card reaches is counted in the third.
+    pub choice_taken: [u32; SEAT_COUNT],
+    pub choice_refused: [u32; SEAT_COUNT],
+    pub choice_not_asked: [u32; SEAT_COUNT],
     /// Ticket #272 (version 0.08.4): cards drawn with nowhere to land over the game, for the sweep.
     pub events_no_target: u32,
     pub discoveries: Vec<Discovery>,
@@ -1356,6 +1443,7 @@ impl Game {
             resettle_to: None,
             blame_emitted: 0.0,
             blame_removed: 0.0,
+            card_facility: None,
         };
         // Seat 0 is the player's Faction; the other three follow in enum order (ticket #50).
         let mut kinds: Vec<FactionKind> = vec![setup.player];
@@ -1485,6 +1573,13 @@ impl Game {
                 findings_tech: None,
             },
             deck,
+            // Ticket #337 (version 0.09.0): nothing drawn and nothing asked until the first
+            // Question phase, which `start` runs after the first Report.
+            draw: CardDraw::NoCard,
+            question: None,
+            choice_taken: [0; SEAT_COUNT],
+            choice_refused: [0; SEAT_COUNT],
+            choice_not_asked: [0; SEAT_COUNT],
             events_no_target: 0,
             discoveries: Vec::new(),
             antarctic_sends: Vec::new(),

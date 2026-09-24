@@ -176,6 +176,19 @@ pub struct SavedGame {
     /// Ticket #332 (version 0.09.0): the Widgets counters.
     #[serde(default)]
     pub widgets: WidgetCounters,
+    /// Ticket #337 (version 0.09.0): the turn's draw, the pending question with what each seat has
+    /// answered, and the game's tally of answers. A save captures a turn START, which is exactly
+    /// where a question is pending and unanswered, so it has to travel or the card would be lost.
+    #[serde(default)]
+    pub draw: CardDraw,
+    #[serde(default)]
+    pub question: Option<Question>,
+    #[serde(default)]
+    pub choice_taken: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub choice_refused: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub choice_not_asked: [u32; SEAT_COUNT],
 }
 
 impl SavedGame {
@@ -199,6 +212,11 @@ impl SavedGame {
             climate,
             research,
             deck,
+            draw,
+            question,
+            choice_taken,
+            choice_refused,
+            choice_not_asked,
             discoveries,
             antarctic_sends,
             solar_maximum_next,
@@ -228,6 +246,11 @@ impl SavedGame {
             climate: climate.clone(),
             research: research.clone(),
             deck: deck.clone(),
+            draw: *draw,
+            question: question.clone(),
+            choice_taken: *choice_taken,
+            choice_refused: *choice_refused,
+            choice_not_asked: *choice_not_asked,
             discoveries: discoveries.clone(),
             antarctic_sends: antarctic_sends.clone(),
             solar_maximum_next: *solar_maximum_next,
@@ -270,6 +293,11 @@ impl SavedGame {
             climate: self.climate,
             research: self.research,
             deck: self.deck,
+            draw: self.draw,
+            question: self.question,
+            choice_taken: self.choice_taken,
+            choice_refused: self.choice_refused,
+            choice_not_asked: self.choice_not_asked,
             discoveries: self.discoveries,
             antarctic_sends: self.antarctic_sends,
             solar_maximum_next: self.solar_maximum_next,

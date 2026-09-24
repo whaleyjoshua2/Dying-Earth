@@ -158,6 +158,10 @@ impl Game {
             s.drought = false;
             s.storm_surge = false;
         }
+        // Ticket #337 (version 0.09.0): and so does a choice card's cut to a Facility kind.
+        for s in &mut self.seats {
+            s.card_facility = None;
+        }
         for d in &mut self.discoveries {
             d.turns_left = d.turns_left.saturating_sub(1);
         }
@@ -577,7 +581,11 @@ impl Game {
                 // what its COASTAL Facilities make at this Income; an inland one is untouched.
                 let dry = if st.drought { self.tables.events.drought_output_multiplier } else { 1.0 };
                 let surge = if st.storm_surge && f.coastal { self.tables.events.storm_surge_coastal_multiplier } else { 1.0 };
-                let scale = dry * surge;
+                // Ticket #337 (version 0.09.0): a choice card answered last turn may cut one kind of
+                // this seat's Facilities at this Income -- the Drought's shape, per seat and per
+                // kind, which is what the Strike and the Emergency Shutdown both want.
+                let card = self.card_facility_multiplier(seat, f.kind);
+                let scale = dry * surge * card;
                 let halve = |v: i64| if scale < 1.0 { (v as f64 * scale).floor() as i64 } else { v };
                 out.push(Producer {
                     place: ProducerPlace::Facility(sid, i),

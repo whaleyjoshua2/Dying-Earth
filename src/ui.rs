@@ -396,6 +396,9 @@ enum Action {
     Notice(String),
     EndTurn,
     PickTech(TechId),
+    /// Ticket #337 (version 0.09.0): seat 0 answered this turn's choice card. A PLACEHOLDER, so
+    /// the card can be answered at all while the interface for it is built in its own lane.
+    AnswerCard(bool),
     /// Ticket #58: a Report line was clicked; go where it points.
     GoTo(ReportPlace),
     ChooseFaction(FactionKind),
@@ -507,7 +510,7 @@ pub fn keyboard(keys: Res<ButtonInput<KeyCode>>, mut view: ResMut<ViewState>, mu
             let moments = session.game.as_ref().map(|g| view.moments_of(&session.tables, &g.report).len()).unwrap_or(0);
             // Ticket #205 (version 0.08.1): Escape is the path that used to lose a tutorial turn's
             // Event, since it never carried the flag the note's own button checked for.
-            let has_event = session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some();
+            let has_event = session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some() || card_owed(session.game.as_ref());
             advance_popup(&mut view, moments, has_event);
         } else if view.armed_stack.is_some() {
             // Ticket #323 (version 0.08.8): Esc disarms the stack before anything else.
@@ -535,6 +538,13 @@ pub fn toggle_climate(view: &mut ViewState) {
 /// the game says, and the turn they open is a field on the note rather than their order in the file.
 fn tutorial_note(tables: &Tables, turn: u32) -> Option<&dying_earth_engine::TutorialNote> {
     tables.tutorial.note.iter().find(|n| n.turn == turn)
+}
+
+/// Ticket #337 (version 0.09.0): whether seat 0 still owes this turn's choice card an answer. The
+/// turn will not end while it does (`Game::end_turn_refusal`), so the modal that asks it is raised
+/// wherever the turn's Event would have been, and again if the turn is tried without it.
+fn card_owed(game: Option<&Game>) -> bool {
+    game.and_then(|g| g.pending_question()).map(|q| q.answer_of(Seat(0)).is_none()).unwrap_or(false)
 }
 
 /// Ticket #58: Event, then the turn's Moments one after another, then the Report.
@@ -1219,7 +1229,10 @@ pub fn draw(
                 // Ticket #105: a refusal raises its own popup, every time, so the button never just
                 // does nothing.
                 if session.refusal.is_some() {
-                    view.popup = Popup::Refused;
+                    // Ticket #337 (version 0.09.0): a turn refused because a card is still asking
+                    // raises the CARD, not the refusal, so a player who dismissed it can always
+                    // answer it. Every other refusal speaks for itself, as it has since #105.
+                    view.popup = if card_owed(session.game.as_ref()) { Popup::Event } else { Popup::Refused };
                 }
                 view.selection = Selection::None;
                 let moments = session.game.as_ref().map(|g| view.moments_of(&session.tables, &g.report).len()).unwrap_or(0);
@@ -1228,7 +1241,7 @@ pub fn draw(
                 let has_note = session.tutorial && session.game.as_ref().map(|g| tutorial_note(&session.tables, g.turn).is_some()).unwrap_or(false);
                 view.popup = if has_note {
                     Popup::Tutorial
-                } else if session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some() {
+                } else if session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some() || card_owed(session.game.as_ref()) {
                     Popup::Event
                 } else if moments > 0 {
                     Popup::Moment(0)
@@ -1239,6 +1252,14 @@ pub fn draw(
             }
             Action::PickTech(t) => {
                 let result = session.game.as_mut().map(|g| g.pick_tech(Seat(0), t));
+                if let Some(Err(e)) = result {
+                    session.last_error = Some(e);
+                }
+            }
+            // Ticket #337 (version 0.09.0): the answer goes to the engine, which records it and
+            // stops refusing End Turn. See the note on `Popup::Event` for what is still owed here.
+            Action::AnswerCard(taken) => {
+                let result = session.game.as_mut().map(|g| g.answer_card(Seat(0), taken));
                 if let Some(Err(e)) = result {
                     session.last_error = Some(e);
                 }
@@ -1320,7 +1341,7 @@ pub fn draw(
                     session.tutorial = false;
                 }
                 let moments = session.game.as_ref().map(|g| view.moments_of(&session.tables, &g.report).len()).unwrap_or(0);
-                let has_event = session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some();
+                let has_event = session.game.as_ref().and_then(|g| g.last_event.as_ref()).is_some() || card_owed(session.game.as_ref());
                 advance_popup(&mut view, moments, has_event);
             }
             Action::Save => {
@@ -8702,6 +8723,36 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 });
             });
         }
+        // Ticket #337 (version 0.09.0): a CHOICE card is asked here, before orders, and this modal
+        // is the ENGINE LANE's placeholder for it -- the card, the question and the two buttons,
+        // and nothing else. What is still owed, and belongs to the interface lane: the End Turn
+        // button greyed with the refusal as its reason while the answer is owed, a modal of the
+        // card's own rather than the Event's, and the Report's answer lines drawn as answers.
+        // Nothing here lies: the ordinary-card body below is untouched and never sees a question,
+        // because a choice card leaves `last_event` empty.
+        Popup::Event if game.pending_question().map(|q| q.answer_of(Seat(0)).is_none()).unwrap_or(false) => {
+            let q = game.pending_question().expect("the arm's guard read it");
+            let card = game.tables.event(q.card);
+            let (name, question, take, refuse) = match &card.choice {
+                Some(c) => (card.name.clone(), c.question.clone(), c.take.clone(), c.refuse.clone()),
+                None => return,
+            };
+            egui::Modal::new("event".into()).show(ctx, |ui| {
+                ui.set_width(460.0);
+                ui.label(RichText::new(name).size(20.0).strong());
+                ui.label(question);
+                ui.horizontal(|ui| {
+                    if ui.button(take).clicked() {
+                        actions.push(Action::AnswerCard(true));
+                        view.popup = Popup::None;
+                    }
+                    if ui.button(refuse).clicked() {
+                        actions.push(Action::AnswerCard(false));
+                        view.popup = Popup::None;
+                    }
+                });
+            });
+        }
         Popup::Event => {
             let text = game.last_event.as_ref().map(|e| e.text.clone()).unwrap_or_default();
             egui::Modal::new("event".into()).show(ctx, |ui| {
@@ -8847,7 +8898,7 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             // drawn, because it is the same thing to the player: the turn stops for one short
             // thought. Nothing is forced and nothing is checked -- the note says where to look.
             let Some(note) = tutorial_note(&session.tables, game.turn).cloned() else {
-                advance_popup(view, view.moments_of(&session.tables, &game.report).len(), game.last_event.is_some());
+                advance_popup(view, view.moments_of(&session.tables, &game.report).len(), game.last_event.is_some() || card_owed(Some(game)));
                 return;
             };
             let last = session.tables.tutorial.note.iter().map(|n| n.turn).max() == Some(game.turn);

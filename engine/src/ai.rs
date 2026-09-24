@@ -664,6 +664,10 @@ impl Game {
     }
 
     pub fn ai_orders(&mut self, seat: Seat) -> Vec<Order> {
+        // Ticket #337 (version 0.09.0): the seat answers this turn's choice card HERE, before it
+        // reads its own board for anything else, so a held fleet or a paid bill is already true of
+        // the board the orders are chosen against -- and so the computer never holds the turn.
+        self.ai_answer_card(seat);
         let (gap, behind) = self.victory_gap(seat);
         let kind = self.kind(seat);
         let m = self.tables.ai.multipliers.clone();

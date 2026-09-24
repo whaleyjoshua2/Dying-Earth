@@ -55,6 +55,7 @@ impl Game {
         self.resolve_repairs(); // (f)
         self.resolve_antarctic(); // (g), ticket #73: Emigrants by sea land a turn after they left
         self.apply_event_now(); // (h)
+        self.apply_card_answers(); // (h), ticket #337: what each seat's answer to this turn's card does
         self.resolve_strip_permits(); // (h), ticket #54: a permit that ran out charges its price
         self.resolve_unrest(); // (i), ticket #52
         self.resolve_credits(); // (j), ticket #268: carbon credits change hands
@@ -97,10 +98,16 @@ impl Game {
             self.report_line(LineKind::Ship, Some(ReportPlace::Orbit(body, orbit)), text);
         }
         let storm = self.event_is(EventId::SolarStorm) && !self.has_tech(TechId::EfficientTransit);
+        // Ticket #337 (version 0.09.0): a seat that grounded its fleet to answer this turn's card
+        // holds every transit of its own -- the Solar Storm's shape, for one seat -- and a seat
+        // that turned a hull aside to answer a distress call holds that one. Both are read here,
+        // before the transits, which is the whole reason the card is asked before orders.
+        let grounded: [bool; SEAT_COUNT] = Seat::ALL.map(|s| self.card_holds_ships(s));
+        let turned_aside: Vec<ShipId> = Seat::ALL.into_iter().filter_map(|s| self.card_holds_one_ship(s)).collect();
         let mut arrivals: Vec<(Seat, BodyId, ShipId)> = Vec::new();
         for s in &mut self.ships {
             if let ShipAt::Transit { from, to, turns_left } = s.at {
-                if storm {
+                if storm || grounded[s.seat.index()] || turned_aside.contains(&s.id) {
                     continue;
                 }
                 let left = turns_left.saturating_sub(1);
@@ -1392,9 +1399,13 @@ impl Game {
         let places: Vec<Place> = StateId::ALL.iter().map(|s| Place::State(*s)).chain(self.colonies.iter().map(|c| Place::Colony(c.id))).collect();
         let mut completed: Vec<(Place, Build)> = Vec::new();
         self.widgets.applied_last = [0; SEAT_COUNT];
+        // Ticket #337 (version 0.09.0): the Overtime card's extra shift, at the busiest Region of
+        // every seat that worked it. They are Widgets like any other: applied to the queue in
+        // order, counted to the director as made and applied, and lost where nothing wants them.
+        let overtime = self.card_widgets_now();
         for place in places {
             let director = self.place_director(place);
-            let made = self.widgets_at(place);
+            let made = self.widgets_at(place) + overtime.iter().filter(|(p, _)| *p == place).map(|(_, n)| n).sum::<i64>();
             if director.is_some() {
                 let depth = self.queue_at(place).len() as u32;
                 self.widgets.queue_depths.push(depth);

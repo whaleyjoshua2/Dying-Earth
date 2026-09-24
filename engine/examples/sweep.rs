@@ -123,6 +123,8 @@ fn main() {
                         let mut walls_standing = 0u32;
                         let mut walls_held = 0u32;
                         let mut no_target = 0u32;
+                        // Ticket #337 (version 0.09.0): the choice cards, by seat.
+                        let (mut took, mut refused, mut not_asked) = ([0u32; 4], [0u32; 4], [0u32; 4]);
                         let mut fund_met = 0u32;
                         let mut rel_end: Vec<i64> = Vec::new();
                         let mut rel_floored = 0u32;
@@ -290,6 +292,11 @@ fn main() {
                             walls_standing += r.sea_walls_standing;
                             walls_held += r.sea_walls_spent;
                             no_target += r.events_no_target;
+                            for i in 0..4 {
+                                took[i] += r.choice_taken[i];
+                                refused[i] += r.choice_refused[i];
+                                not_asked[i] += r.choice_not_asked[i];
+                            }
                             cards_drawn.push(r.cards_drawn);
                             war_nobody.push(r.war_ppm_nobody);
                             levies += r.levies_raised;
@@ -468,6 +475,9 @@ fn main() {
                             println!("      Neutral states: {levies} threat episodes armed for over the batch, {neutral_holds} attacks held against");
                             println!("      Sea Walls: {sea_walls} built over the batch, {walls_standing} standing at the end, {walls_held} thresholds held");
                             println!("      Events drawn with nowhere to land over the batch: {no_target}; the Fund at or past its bar in {fund_met}/{seeds} seeds");
+                            // Ticket #337 (version 0.09.0): what the eighteen cards that ask a
+                            // question were answered, by seat, over the batch.
+                            println!("      Choice cards over the batch, by seat: taken {took:?}, refused {refused:?}, not asked {not_asked:?}");
                             let floored_pct = if rel_end.is_empty() { 0.0 } else { rel_floored as f64 * 100.0 / rel_end.len() as f64 };
                             let mut sorted = rel_end.clone();
                             sorted.sort_unstable();

@@ -355,6 +355,160 @@ pub struct EventCard {
     /// start, joining it on `off_earth_join_turn`.
     #[serde(default)]
     pub off_earth: bool,
+    /// Ticket #337 (version 0.09.0): the question this card asks and the two sides it offers. A row
+    /// carrying this table is a CHOICE card; a row without it is one of the 22 ordinary cards and
+    /// behaves exactly as it always has.
+    #[serde(default)]
+    pub choice: Option<ChoiceCard>,
+}
+
+impl EventCard {
+    /// Ticket #337: whether this card asks the table a question.
+    pub fn asks(&self) -> bool {
+        self.choice.is_some()
+    }
+}
+
+/// Ticket #337 (version 0.09.0): **a choice card's two sides**, composed in data.
+///
+/// The designer's eighteen cards would have been thirty-six one-off effects written in code, each
+/// with its own figures in this table. They are rows instead: a side is a LIST of effects, an
+/// effect is a tagged entry carrying its own figures, and the engine holds one mechanism rather
+/// than eighteen. Nothing here is a code literal -- every figure the cards move is a field below.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ChoiceCard {
+    /// What the modal asks.
+    pub question: String,
+    /// What the two buttons say.
+    pub take: String,
+    pub refuse: String,
+    /// Ticket #337 R4: the rule a COMPUTER seat answers by, read off its own board. It lives here
+    /// beside the card rather than in `ai.toml` because the figures are the card's, not the
+    /// Faction's: the rule holds, the seat takes the offer; it does not, the seat refuses.
+    pub take_when: CardRule,
+    #[serde(default)]
+    pub take_does: Vec<CardEffect>,
+    #[serde(default)]
+    pub refuse_does: Vec<CardEffect>,
+}
+
+impl ChoiceCard {
+    pub fn side(&self, taken: bool) -> &[CardEffect] {
+        if taken { &self.take_does } else { &self.refuse_does }
+    }
+}
+
+/// Ticket #337 (version 0.09.0): what a computer seat asks of its own board before answering. A
+/// predicate over the seat's Unrest, its Ducats, its Blame, and whether a landing is under way,
+/// which is the list the ticket names.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "rule", rename_all = "snake_case")]
+pub enum CardRule {
+    /// The offer is always worth taking.
+    Always,
+    /// It never is.
+    Never,
+    /// The seat holds at least this many Ducats.
+    DucatsAtLeast { ducats: i64 },
+    /// Some Region it holds stands at or above this Unrest.
+    UnrestAtLeast { unrest: f64 },
+    /// Every Region it holds stands below this Unrest: the calm half of the same question.
+    UnrestBelow { unrest: f64 },
+    /// Its Blame stands at or above this many ppm.
+    BlameAtLeast { blame: f64 },
+    /// A Ship of the seat is in transit: a landing, a crossing or a supply run is under way, and
+    /// holding the fleet this turn would cost it.
+    LandingUnderWay,
+    /// No landing is under way, which is the other half of the same question.
+    NoLandingUnderWay,
+}
+
+/// Ticket #337 (version 0.09.0): **the effect vocabulary**. One side of one card is a list of
+/// these. Each carries its own figures, and an effect whose target is not on the board does
+/// nothing -- which is also how a card works out that it has no question for a seat at all.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "effect", rename_all = "snake_case")]
+pub enum CardEffect {
+    /// Signed Materials, Fuel, Energy, Ducats and Research. A negative figure is a price, and a
+    /// seat that cannot pay it is a seat this side cannot reach.
+    Resources {
+        #[serde(default)]
+        materials: i64,
+        #[serde(default)]
+        fuel: i64,
+        #[serde(default)]
+        energy: i64,
+        #[serde(default)]
+        ducats: i64,
+        #[serde(default)]
+        research: i64,
+    },
+    /// A price in one resource for every thing of a kind the seat has: a Refinery it directs, a
+    /// Ship of its own in orbit.
+    PerUnitCost { per: CardThing, resource: Resource, amount: i64 },
+    /// Units of population into the seat's most populous held Region.
+    PopulationToMostPopulous { population: f64 },
+    /// ppm added at the next Climate phase, through the same field the Methane Burst uses.
+    EmissionsNext { ppm: f64 },
+    /// A change to the seat's Standing in every Region it holds, or in its most populous one.
+    StandingAllHeld { standing: i64 },
+    StandingAtMostPopulous { standing: i64 },
+    /// A change to Unrest, the same two ways -- and at the busiest Region, which is where the
+    /// Overtime card's "there instead" points: the Region that made the Widgets.
+    UnrestAllHeld { unrest: f64 },
+    UnrestAtMostPopulous { unrest: f64 },
+    UnrestAtBusiest { unrest: f64 },
+    /// No transit of this seat's resolves this turn: the Solar Storm's shape, for one seat.
+    HoldShips,
+    /// One Ship of the seat holds this turn.
+    HoldOneShip,
+    /// So much damage to each of the seat's Ships -- every one of them, or only those in orbit
+    /// around a Body, which is what the Orbital Debris card says and the Grounded Fleet does not.
+    DamageShips {
+        damage: u32,
+        #[serde(default)]
+        in_orbit: bool,
+    },
+    /// A good's price set (`to`) or moved (`by`) for so many turns, over the band.
+    TradePrice {
+        resource: Resource,
+        #[serde(default)]
+        to: Option<i64>,
+        #[serde(default)]
+        by: i64,
+        turns: u32,
+    },
+    /// A change to what every other seat thinks of this one.
+    RelationsAllRivals { relations: i64 },
+    /// ppm onto the seat's own Blame, or off it where the figure is negative.
+    BlamePpm { ppm: f64 },
+    /// Widgets added this turn at the seat's busiest Region -- the one that makes the most.
+    WidgetsNow { widgets: i64 },
+    /// A Facility kind of the seat's makes this share of its output at the next Income, the shape
+    /// the Drought already has.
+    FacilityOutputMultiplier { facility: FacilityKind, multiplier: f64 },
+    /// A Discovery over the Body one of the seat's Colonies stands at, for so many turns.
+    DiscoveryAtColony { module: ModuleKind, multiplier: f64, turns: u32 },
+    /// Pioneers waiting in the seat's most populous held Region, at no cost to its population.
+    PioneersFree { pioneers: u32 },
+    /// A Module at the seat's smallest Colony, or an Army in its most populous held Region, free
+    /// and costing nobody.
+    FreeBuilding {
+        #[serde(default)]
+        module: Option<ModuleKind>,
+        #[serde(default)]
+        army: bool,
+    },
+}
+
+/// Ticket #337: what a `per_unit_cost` counts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CardThing {
+    /// Every Facility of this kind in a Region the seat directs.
+    Facility(FacilityKind),
+    /// Every Ship of the seat's in orbit around a Body.
+    ShipInOrbit,
 }
 
 fn one() -> u32 {
@@ -1938,6 +2092,23 @@ impl Tables {
         }
         if !(0.0..=1.0).contains(&self.events.draw_chance_base) || self.events.draw_chance_step_degrees <= 0.0 {
             return Err(err("events.toml", "draw_chance_base must be between 0 and 1 and draw_chance_step_degrees positive"));
+        }
+        // Ticket #337 (version 0.09.0): a choice card with nothing on either side would be drawn,
+        // asked and answered to no purpose, and nobody reading the table would see it. The load
+        // refuses it rather than dealing it.
+        for e in &self.events.event {
+            match (&e.choice, e.kind) {
+                (Some(c), _) if c.take_does.is_empty() && c.refuse_does.is_empty() => {
+                    return Err(err("events.toml", format!("{}: a card that asks a question needs an effect on one of its sides; both are empty", e.name)));
+                }
+                (Some(_), k) if k != EventKind::Choice => {
+                    return Err(err("events.toml", format!("{}: a card with a [choice] table must have kind = \"choice\"", e.name)));
+                }
+                (None, EventKind::Choice) => {
+                    return Err(err("events.toml", format!("{}: kind = \"choice\" wants a [choice] table saying what it asks", e.name)));
+                }
+                _ => {}
+            }
         }
         Ok(())
     }

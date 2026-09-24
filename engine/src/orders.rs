@@ -413,6 +413,18 @@ impl Game {
     /// The live price. A zero in `market.price` means the market has not opened yet -- a fresh game,
     /// or a save written before this version -- and reads as the card figure.
     pub fn market_price_at(&self, row: usize) -> i64 {
+        // Ticket #337 (version 0.09.0): a choice card may OVERRIDE the price, outside the band,
+        // through the last turn it named -- a Materials price of 1 is the whole point of the Cheap
+        // Ore Offer. The banded price goes on underneath and resumes when the override runs out.
+        if self.market.card_price[row] > 0 && self.turn <= self.market.card_price_until[row] {
+            return self.market.card_price[row];
+        }
+        self.banded_price_at(row)
+    }
+
+    /// Ticket #337: the price the band alone says, with no card over it. The settle reads this, so
+    /// an override is never banked into the band it is standing over.
+    pub fn banded_price_at(&self, row: usize) -> i64 {
         let p = self.market.price[row];
         if p <= 0 { self.market_base(row) } else { p }
     }
@@ -430,9 +442,17 @@ impl Game {
     pub fn settle_market(&mut self) {
         let step = self.tables.ducats.price_step_units.max(1);
         let band = self.tables.ducats.price_band.max(0);
+        // Ticket #337 (version 0.09.0): an override whose last turn has been played is forgotten
+        // here, and the band -- which never stopped moving -- is the price again from the next turn.
+        for row in 0..3 {
+            if self.market.card_price[row] > 0 && self.turn >= self.market.card_price_until[row] {
+                self.market.card_price[row] = 0;
+                self.market.card_price_until[row] = 0;
+            }
+        }
         for row in 0..3 {
             let base = self.market_base(row);
-            let mut price = self.market_price_at(row);
+            let mut price = self.banded_price_at(row);
             let net = self.market.net[row];
             if net >= step {
                 price += 1;
