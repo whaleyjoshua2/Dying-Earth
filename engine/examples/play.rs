@@ -57,6 +57,10 @@ const RESOURCES: [Resource; 5] = [Resource::Materials, Resource::Fuel, Resource:
 // Blockade at all -- the very move ticket #335 handed the player an orbit to give it from.
 const STANCES: [Stance; 6] = [Stance::Attack, Stance::Hold, Stance::Intercept, Stance::Evade, Stance::Blockade, Stance::DigIn];
 const CHANGES: [BuildingChange; 3] = [BuildingChange::Mothball, BuildingChange::Restart, BuildingChange::Decommission];
+// Ticket #226 (version 0.08.2): the four Terms an Accord may hold. The driver could name none of
+// them, so the whole of the diplomacy -- the one system a seat cannot reach alone -- was invisible
+// from here and would have been reported as absent from the game.
+const TERMS: [Term; 4] = [Term::NonAggression, Term::Passage, Term::Refuel, Term::ResearchAgreement];
 
 fn number(word: &str) -> Result<i64, String> {
     word.parse::<i64>().map_err(|_| format!("{word:?} is not a whole number"))
@@ -64,6 +68,34 @@ fn number(word: &str) -> Result<i64, String> {
 
 fn count(word: &str) -> Result<u32, String> {
     word.parse::<u32>().map_err(|_| format!("{word:?} is not a whole number"))
+}
+
+/// A whole percent, written plainly or with its sign: `25` or `25%`. Ticket #235 (version 0.08.3):
+/// the Research Directive has been a per-percent figure since, and the driver offered only nought
+/// and a hundred -- the two positions the order had BEFORE that ticket.
+fn percent(word: &str) -> Result<u8, String> {
+    let n = number(word.trim_end_matches('%'))?;
+    if !(0..=100).contains(&n) {
+        return Err(format!("{word:?} is not a whole percent from 0 to 100"));
+    }
+    Ok(n as u8)
+}
+
+/// A Faction at the table: a seat number (`2`, `seat:2`), or the Faction's own name shortened as far
+/// as it stays unique (`ark` is the Arkwrights). Which seat holds which Faction is a thing of THIS
+/// game, so the word is matched against the game's own table rather than a fixed list.
+fn seat_of(g: &Game, word: &str) -> Result<Seat, String> {
+    let lower = word.to_ascii_lowercase();
+    let w = lower.trim_start_matches("seat").trim_start_matches(':');
+    if let Ok(n) = w.parse::<u8>() {
+        if (n as usize) < SEAT_COUNT {
+            return Ok(Seat(n));
+        }
+        return Err(format!("{word:?} is not a seat: there are {SEAT_COUNT} at the table"));
+    }
+    let kinds: Vec<FactionKind> = Seat::ALL.iter().map(|s| g.kind(*s)).collect();
+    let kind = pick(&kinds, w)?;
+    Ok(Seat::ALL[kinds.iter().position(|k| *k == kind).unwrap_or(0)])
 }
 
 /// `europe`, `state:europe`, `colony:3`, `c:3` or a bare colony number.
@@ -81,16 +113,24 @@ fn place(word: &str) -> Result<Place, String> {
     Ok(Place::State(pick(&StateId::ALL, &w)?))
 }
 
-/// `ship:4`, `army:2`, `ship4`, `army2`.
+/// `ship:4`, `army:2`, `ship4`, `army2`, or -- ticket #324 (version 0.08.8) -- `battery:<colony>:<n>`
+/// for a Colony's Battery, which a Battle damages and a Repair may name, and which the driver could
+/// not write at all.
 fn unit_ref(word: &str) -> Result<UnitRef, String> {
     let w = word.to_ascii_lowercase();
+    if let Some(rest) = w.strip_prefix("battery") {
+        let mut parts = rest.trim_start_matches(':').split(':');
+        let colony = colony_id(parts.next().unwrap_or(""))?;
+        let index = count(parts.next().ok_or("a Battery is battery:<colony>:<index>")?)? as usize;
+        return Ok(UnitRef::Battery { colony, index });
+    }
     if let Some(rest) = w.strip_prefix("ship") {
         return Ok(UnitRef::Ship(ShipId(count(rest.trim_start_matches(':'))?)));
     }
     if let Some(rest) = w.strip_prefix("army") {
         return Ok(UnitRef::Army(ArmyId(count(rest.trim_start_matches(':'))?)));
     }
-    Err(format!("{word:?} should be ship:<n> or army:<n>"))
+    Err(format!("{word:?} should be ship:<n>, army:<n> or battery:<colony>:<index>"))
 }
 
 fn ship_id(word: &str) -> Result<ShipId, String> {
@@ -187,8 +227,8 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   move-army <army> <state>
   ship-stance <body> <stance>          stance = attack|hold|intercept|evade|blockade
   army-stance <place> <stance>         stance = attack|evade|digin (hold does nothing to an Army)
-  repair <ship:n|army:n> <points>
-  repair-ducats <ship:n|army:n> <points>
+  repair <unit> <points>               unit = ship:<n>, army:<n> or battery:<colony>:<index>
+  repair-ducats <unit> <points>
 
   A BODY'S ORBITS (ticket #335, version 0.09.0) are LOW ORBIT and one per Orbital Slot, and every
   Ship at a Body sits in exactly one of them; there is no Body at large. LOW ORBIT is what touches
@@ -199,31 +239,137 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
   and shutting the orbit the stack sits in -- never a side effect of arriving anywhere. `show` names
   the orbit every Ship sits in, and lists each Body's orbits under FREE SLOTS.
 
+  bombard <ship> <colony>              a Battleship of yours breaks one Module of a RIVAL'S Colony,
+                                       never over Earth. Ticket #335 (version 0.09.0): IT ACTS IN
+                                       THE ORBIT IT SITS IN. A Colony on the ground is bombarded
+                                       from LOW ORBIT and wants Orbital Control of that Body
+                                       outright; a station from that station's own orbit, which must
+                                       hold no rival warship and no rival working Battery. Move the
+                                       Battleship there first with `change-orbit`, and in an EARLIER
+                                       turn: a Ship takes one order a turn, and a Bombard is one.
+
   influence <place> <amount>
   buy-influence <amount>
+  max <place>                          repeat next turn's WHOLE Allotment on one place you hold,
+  max off                              turn after turn until it is switched off. Free, and it
+                                       spends nothing by itself.
   buy <resource> <amount>              materials|fuel|energy
   sell <resource> <amount>             materials|fuel
-  relief <state>
+
+CAMPAIGNS AND CARBON CREDITS -- the Blame ledger the Influence thresholds read (`show` prints it)
+
+  smear <faction> <amount>             Influence spent on a RIVAL'S name, laying {smear} ppm on their
+                                       ledger for good per point spent. One a turn per target; an
+                                       offence, and the Report names who paid.
+  greenwash <amount>                   Influence spent on your own name, with {gwducats} Ducat(s) beside
+                                       every point, taking {greenwash} ppm off your own ledger for good
+                                       per point. One a turn, and no offence.
+  offer-credits <ppm>                  the Custodians only: the ppm of carbon credit they sell a
+                                       turn, standing until it is set again; nought refuses
+                                       everybody.
+  buy-credits <ppm>                    buy carbon credit from the Custodians at {creditprice} Ducat(s) a ppm
+                                       before their view of you multiplies it, at most {creditcap} ppm a
+                                       turn, one purchase a turn, and only while they are offering.
+                                       It comes off your ledger at the Resolution. `show` prints
+                                       what stands offered and what a ppm would cost you.
+
+DIPLOMACY (ticket #226; `show` prints Relations both ways and every Accord standing)
+
+  accord offer <faction> <term>...     offer an Accord holding one or more Terms:
+                                         non-aggression  neither spends Influence on a place the
+                                                         other holds, nor opens a Battle on them
+                                         passage         neither treats the other's Ships as a
+                                                         target, a Blockade does not shut the other
+                                                         out of a slot, and an Army may cross
+                                         refuel          either may Refuel at the other's stations
+                                         research        both parties' Research rises a tenth; it
+                                                         wants Friendly on BOTH sides to strike
+                                       One offer a turn to a Faction, and none where an Accord
+                                       already stands. THE ANSWER IS NOBODY'S TO WRITE: every seat,
+                                       this one included, answers an offer made to it at the
+                                       Resolution by its own weights, so there is no order to accept
+                                       or decline one. A refusal is not an offence. An Accord kept
+                                       {kept} turns pays both sides.
+  accord end <faction>                 declare a standing Accord over: free, and it lapses at the
+                                       next turn's start -- which gives the board a turn's warning
+                                       that something is coming.
+  tribute <faction> ducats             a fixed gift, one per Faction per turn, paying Relations:
+  tribute <faction> materials          {tributeducats} Ducats, or {tributematerials} Materials.
+
+REGIONS AND PEOPLE
+
+  relief <state>                       Ducats lower by one the Unrest of a Region you direct
+  agitate <state>                      Relief's mirror: {agitateducats} Ducats and {agitateinf} Influence raise
+                                       by one the Unrest of a Region a RIVAL holds, once a turn per
+                                       Region. An offence.
   resettle <state>
   emigrants <state> <n>                recruit Pioneers
   send-antarctica <state> <n> slot earth <slot>
   send-antarctica <state> <n> colony <n>
+  lift <state> <n> <colony>            lift waiting Pioneers from a Region of yours with a working
+                                       Launch Site straight onto a station of yours over Earth, as
+                                       far as its Habitat room goes. A launch: it emits, and what it
+                                       emits goes on your Blame.
   change facility <state> <index> <mothball|restart|decommission>
   change module <colony> <index> <mothball|restart|decommission>
-  fund-archive                         the Archivists only: pay the Labs into the Archive fund
-  unfund-archive                       the Archivists only: pay them back into the shared Tech
-  venture-share <percent>              the Prospectors only, any whole percent from 0 to 80
+
+RESEARCH, THE ARCHIVE AND THE FACTION ORDERS
+
+  directive <percent>                  the RESEARCH DIRECTIVE: the share of your Labs' Research that
+                                       goes somewhere other than the shared Tech, at ANY whole
+                                       percent. The Archivists may go to {dirarchivists}%, which fills the
+                                       Archive fund; every other Faction to {dirmax}%, and what that
+                                       share turns into is its own -- the Custodians' into the
+                                       Natural Sink, the Prospectors' into Ducats, the Arkwrights'
+                                       into Fuel. `show` names yours and its rate. Read at the next
+                                       Income, and it holds until it is set again.
+  fund-archive                         the same order at your Faction's cap,
+  unfund-archive                       and the same order at nought.
+  upload <colony> <n>                  the Archivists only, and only once the Archive is COMPLETE:
+                                       Colonists at the Archive's own place are read into it and
+                                       leave the living population. Free, and irreversible.
+  venture-share <percent>              the Prospectors only, in steps of {venturestep}% from 0% to {venturemax}%
   draw-venture <amount>                the Prospectors only
   leapfrog <state>                     the Custodians only
   strip-permit <state>                 the Prospectors only
+  exodus-call <state>                  the Arkwrights only, on a Region they control, once per Region
+                                       EVER, for {exodus} Ducats: while it runs it doubles what they may
+                                       recruit there and suspends Coach Class's double population
+                                       charge.
+
+A FACTION is named by its own name, shortened as far as it stays unique (`ark` is the Arkwrights),
+or by its seat number. `show` prints both beside every Faction.
 
 Names may be shortened as long as they stay unique: `eur` is Europe, `colonys` is a Colony Ship.
 Colonies, ships and armies are named by the numbers the board prints beside them."#;
 
 /// The grammar with this game's own figures written into it, so a table that moves a figure moves
-/// the help with it.
-fn grammar(fuel: i64) -> String {
-    GRAMMAR.replace("{fuel}", &fuel.to_string())
+/// the help with it. Where the data directory cannot be found at all, every figure reads `?` and
+/// the grammar still prints: a player with no tables can still be told the shape of a line.
+fn grammar(t: Option<&Tables>) -> String {
+    let n = |get: fn(&Tables) -> String| -> String { t.map(get).unwrap_or_else(|| "?".to_string()) };
+    let mut s = GRAMMAR.to_string();
+    for (key, value) in [
+        ("{fuel}", n(|t| t.orbit_change_fuel.to_string())),
+        ("{smear}", n(|t| format!("{:.2}", t.influence.smear.ppm_per_influence))),
+        ("{greenwash}", n(|t| format!("{:.2}", t.influence.greenwash.ppm_per_influence))),
+        ("{gwducats}", n(|t| t.influence.greenwash.ducats_per_influence.to_string())),
+        ("{creditprice}", n(|t| t.carbon_credits.price_per_ppm.to_string())),
+        ("{creditcap}", n(|t| t.carbon_credits.cap_per_turn.to_string())),
+        ("{kept}", n(|t| t.relations.accord_kept_turns.to_string())),
+        ("{tributeducats}", n(|t| t.relations.tribute_ducats.to_string())),
+        ("{tributematerials}", n(|t| t.relations.tribute_materials.to_string())),
+        ("{agitateducats}", n(|t| t.unrest.agitate_ducats.to_string())),
+        ("{agitateinf}", n(|t| t.unrest.agitate_influence.to_string())),
+        ("{dirarchivists}", n(|t| t.research_directive.archivists_max.to_string())),
+        ("{dirmax}", n(|t| t.research_directive.max.to_string())),
+        ("{venturestep}", n(|t| format!("{:.0}", t.venture.share_step * 100.0))),
+        ("{venturemax}", n(|t| format!("{:.0}", t.venture.max_share * 100.0))),
+        ("{exodus}", n(|t| t.ducats.per_exodus_call.to_string())),
+    ] {
+        s = s.replace(key, &value);
+    }
+    s
 }
 
 /// One line is an order, or the `tech` line or an `answer` line, neither of which is one.
@@ -234,7 +380,9 @@ enum Line {
     Answer(bool),
 }
 
-fn parse_line(line: &str) -> Result<Line, String> {
+/// The game is read here as well as written: a Faction is named by its own name, and which seat
+/// holds which Faction is a thing of the board, not of the grammar. Nothing is changed through it.
+fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
     let w: Vec<&str> = line.split_whitespace().collect();
     let at = |i: usize| -> Result<&str, String> { w.get(i).copied().ok_or_else(|| format!("`{}` wants more words", w[0])) };
     let verb = w[0].to_ascii_lowercase();
@@ -281,6 +429,9 @@ fn parse_line(line: &str) -> Result<Line, String> {
         // Ticket #335 (version 0.09.0): between the orbits of the Body the Ship already stands at.
         "change-orbit" => Order::ChangeOrbit { ship: ship_id(at(1)?)?, slot: orbit_slot(at(2)?)? },
         "refuel" => Order::Refuel { ship: ship_id(at(1)?)? },
+        // Ticket #328 (version 0.08.8), and ticket #335 (version 0.09.0) for the orbit: the
+        // Battleship acts in the orbit it sits in, so the line names no orbit of its own.
+        "bombard" => Order::Bombard { ship: ship_id(at(1)?)?, colony: colony_id(at(2)?)? },
         "load" => {
             let ship = ship_id(at(1)?)?;
             let colonists = count(at(2)?)?;
@@ -311,12 +462,69 @@ fn parse_line(line: &str) -> Result<Line, String> {
         "repair-ducats" => Order::RepairWithDucats { unit: unit_ref(at(1)?)?, points: count(at(2)?)? },
         "influence" => Order::Influence { target: place(at(1)?)?, amount: number(at(2)?)? },
         "buy-influence" => Order::BuyInfluence { amount: number(at(1)?)? },
+        // Version 0.07.3 (ticket #134): Max, the standing order. `max off` switches it off.
+        "max" => {
+            let word = at(1)?.to_ascii_lowercase();
+            let target = if word == "off" || word == "none" { None } else { Some(place(&word)?) };
+            Order::SetMaxStanding { target }
+        }
+        // Ticket #267 (version 0.08.4) and ticket #275/#277 (version 0.08.5): the two campaigns
+        // that spend Influence on a NAME rather than a place -- a rival's, and the seat's own.
+        "smear" => Order::Smear { target: seat_of(g, at(1)?)?, amount: number(at(2)?)? },
+        "greenwash" => Order::Greenwash { amount: number(at(1)?)? },
+        // Ticket #268 (version 0.08.4): the Custodians' standing offer, and everybody else's buy.
+        "offer-credits" => Order::OfferCredits { ppm: number(at(1)?)? },
+        "buy-credits" => Order::BuyCredits { ppm: number(at(1)?)? },
+        // Ticket #226 (version 0.08.2): the diplomacy. `accord accept` and `accord decline` are
+        // named here on purpose: a player who looks for them should be told the rule rather than
+        // that the word is not an order.
+        "accord" => {
+            let what = at(1)?.to_ascii_lowercase();
+            match what.as_str() {
+                "offer" | "propose" => {
+                    let to = seat_of(g, at(2)?)?;
+                    if w.len() < 4 {
+                        return Err("an Accord wants at least one Term: non-aggression, passage, refuel or research".into());
+                    }
+                    let mut terms: Vec<Term> = Vec::new();
+                    for word in &w[3..] {
+                        let term = pick(&TERMS, word)?;
+                        if !terms.contains(&term) {
+                            terms.push(term);
+                        }
+                    }
+                    Order::ProposeAccord { to, terms }
+                }
+                "end" => Order::EndAccord { with: seat_of(g, at(2)?)? },
+                "accept" | "decline" | "refuse" => {
+                    return Err(
+                        "an offer made to you is answered at the Resolution by your own seat's weights: no order accepts or declines one. `accord end <faction>` ends an Accord that stands."
+                            .into(),
+                    );
+                }
+                _ => return Err(format!("`accord {what}` is not one of offer, end")),
+            }
+        }
+        "tribute" => {
+            let to = seat_of(g, at(1)?)?;
+            let what = at(2)?.to_ascii_lowercase();
+            let materials = match what.as_str() {
+                "materials" => true,
+                "ducats" => false,
+                _ => return Err(format!("a tribute is paid in `ducats` or `materials`, not {what:?}")),
+            };
+            Order::Tribute { to, materials }
+        }
         "buy" => Order::Buy { resource: pick(&RESOURCES, at(1)?)?, amount: number(at(2)?)? },
         "sell" => Order::Sell { resource: pick(&RESOURCES, at(1)?)?, amount: number(at(2)?)? },
         "relief" => Order::Relief { state: pick(&StateId::ALL, at(1)?)? },
+        // Ticket #269 (version 0.08.4): Relief's mirror, on a Region a rival holds.
+        "agitate" => Order::Agitate { state: pick(&StateId::ALL, at(1)?)? },
         "resettle" => Order::Resettle { state: pick(&StateId::ALL, at(1)?)? },
         "emigrants" => Order::BuildEmigrants { state: pick(&StateId::ALL, at(1)?)?, n: count(at(2)?)? },
         "send-antarctica" => Order::SendToAntarctica { state: pick(&StateId::ALL, at(1)?)?, n: count(at(2)?)?, into: unload_target(&w[3..])? },
+        // Version 0.07.3 (ticket #141): Pioneers lifted from a Launch Site onto a station over Earth.
+        "lift" => Order::LiftToStation { state: pick(&StateId::ALL, at(1)?)?, n: count(at(2)?)?, colony: colony_id(at(3)?)? },
         "change" => {
             let what = at(1)?.to_ascii_lowercase();
             let index = count(at(3)?)? as usize;
@@ -328,12 +536,20 @@ fn parse_line(line: &str) -> Result<Line, String> {
             };
             Order::Change { building, what: change }
         }
-        "fund-archive" => Order::SetResearchDirective { percent: 100 },
+        // Ticket #235 (version 0.08.3): the Research Directive is a per-percent figure. The two
+        // words are what the order used to be, kept as shorthands and now reading the Faction's own
+        // cap rather than a flat hundred, which no Faction but the Archivists may even set.
+        "directive" => Order::SetResearchDirective { percent: percent(at(1)?)? },
+        "fund-archive" => Order::SetResearchDirective { percent: g.research_directive_cap(Seat(0)) },
         "unfund-archive" => Order::SetResearchDirective { percent: 0 },
+        // Ticket #192 (version 0.08.0): the Upload, which is what the Archive is for.
+        "upload" => Order::Upload { colony: colony_id(at(1)?)?, n: count(at(2)?)? },
         "venture-share" => Order::SetVentureShare { share: count(at(1)?)? },
         "draw-venture" => Order::DrawVenture { amount: number(at(1)?)? },
         "leapfrog" => Order::Leapfrog { state: pick(&StateId::ALL, at(1)?)? },
         "strip-permit" => Order::StripPermit { state: pick(&StateId::ALL, at(1)?)? },
+        // Ticket #237 (version 0.08.3): the Arkwrights' remaking of a country.
+        "exodus-call" => Order::ExodusCall { state: pick(&StateId::ALL, at(1)?)? },
         _ => return Err(format!("`{verb}` is not an order; run `help` for the list")),
     };
     Ok(Line::Order(Box::new(o)))
@@ -508,6 +724,114 @@ fn widgets_text(g: &Game, place: Place, queue: &[String]) -> String {
     )
 }
 
+/// Ticket #226 (version 0.08.2): one Term of an Accord in the words the order line takes.
+fn term_text(t: Term) -> &'static str {
+    match t {
+        Term::NonAggression => "non-aggression",
+        Term::Passage => "passage",
+        Term::Refuel => "refuel",
+        Term::ResearchAgreement => "research",
+    }
+}
+
+/// Ticket #235 (version 0.08.3): where a Faction's Research Directive sends its Research, which is
+/// a different place for each of the four, at the rate its own table row sets.
+fn directive_destination(g: &Game, seat: Seat) -> String {
+    let t = &g.tables.research_directive;
+    match g.kind(seat) {
+        FactionKind::Archivists => "into the Archive fund".to_string(),
+        FactionKind::Custodians => format!("into the Natural Sink, {:.3} ppm a point, for good", t.custodians_ppm_per_point),
+        FactionKind::Prospectors => format!("into Ducats, {:.2} a point", t.prospectors_ducats_per_point),
+        FactionKind::Arkwrights => format!("into Fuel, {:.2} a point", t.arkwrights_fuel_per_point),
+    }
+}
+
+/// **What the campaigns, the credits and the diplomacy act on.** An Accord cannot be offered by a
+/// player who cannot see Relations, a Smear laid by one who cannot see Blame, a credit bought by
+/// one who cannot see what is offered, a Directive set by one who cannot see where it goes. One
+/// line a Faction and one line a system: the board is long already.
+fn print_standing(g: &Game) {
+    let me = Seat(0);
+    println!("\n--- RELATIONS, ACCORDS, BLAME AND CREDITS ---");
+    for seat in Seat::ALL {
+        let s = g.seat(seat);
+        let blame = format!(
+            "Blame {:.2} ppm ({:.0}% of the table, thresholds x{:.2}; {:.2} smeared on, {:.2} washed off)",
+            g.blame(seat),
+            g.blame_share(seat) * 100.0,
+            g.blame_threshold_multiplier(seat),
+            s.blame_smeared,
+            s.blame_cleaned
+        );
+        if seat == me {
+            println!("seat {} the {:<12} (YOU){:<41} | {blame}", seat.0, g.seat_name(seat), "");
+            continue;
+        }
+        println!(
+            "seat {} the {:<12} you see them {:<8} ({:+}), they see you {:<8} ({:+}) | {blame}",
+            seat.0,
+            g.seat_name(seat),
+            g.relations_level(me, seat),
+            g.relations_score(me, seat),
+            g.relations_level(seat, me),
+            g.relations_score(seat, me)
+        );
+    }
+    // Every Accord at the table, not only this seat's: an Accord between two rivals is as much a
+    // thing to plan around as one of your own.
+    let accords: Vec<String> = g
+        .accords
+        .iter()
+        .map(|a| {
+            format!(
+                "the {} & the {} [{}] struck turn {}{}",
+                g.seat_name(a.a),
+                g.seat_name(a.b),
+                a.terms.iter().map(|t| term_text(*t)).collect::<Vec<_>>().join(", "),
+                a.struck,
+                if a.ending { ", ENDING at the next turn's start" } else { "" }
+            )
+        })
+        .collect();
+    println!("Accords standing: {}", if accords.is_empty() { "none anywhere at all".to_string() } else { accords.join(" | ") });
+    match g.credit_seller() {
+        None => println!("Carbon credits: nobody at this table sells them"),
+        Some(seller) if seller == me => println!(
+            "Carbon credits: you offer {} ppm a turn, at most {} to one buyer (`offer-credits <ppm>`); you have sold {:.1} ppm.",
+            g.seat(me).credits_offered,
+            g.tables.carbon_credits.cap_per_turn,
+            g.seat(me).credits_sold
+        ),
+        Some(seller) => println!(
+            "Carbon credits: the {} offer {} ppm a turn, at most {} to one buyer; {}. You have bought {:.1} ppm, they have sold {:.1}.",
+            g.seat_name(seller),
+            g.seat(seller).credits_offered,
+            g.tables.carbon_credits.cap_per_turn,
+            match g.credit_cost(me, 1) {
+                Some(d) => format!("a ppm would cost you {d} Ducat(s)"),
+                None => "they will not sell to you: they are Hostile".to_string(),
+            },
+            g.seat(me).credits_bought,
+            g.seat(seller).credits_sold
+        ),
+    }
+    let s = g.seat(me);
+    println!(
+        "Research Directive: {}% of your Labs' Research goes {} (any whole percent to a cap of {}%); {}% was in force at the last Income.",
+        s.research_directive,
+        directive_destination(g, me),
+        g.research_directive_cap(me),
+        s.directive_last_income
+    );
+    println!(
+        "Max repeats: {}",
+        match s.max_standing {
+            Some(p) => format!("next turn's whole Allotment goes on {} until `max off`", g.place_name(p)),
+            None => "off -- no place takes next turn's Allotment by itself".to_string(),
+        }
+    );
+}
+
 fn slot_name(g: &Game, body: BodyId, slot: u32) -> String {
     g.tables.body(body).slots.get(slot as usize).map(|s| s.name.clone()).unwrap_or_else(|| format!("slot {slot}"))
 }
@@ -678,13 +1002,21 @@ fn print_board(g: &Game) {
         );
     }
     if s.kind == FactionKind::Archivists {
-        println!(
-            "Archive fund: {} of a cap of {}; the Archive {}",
-            s.archive_fund,
-            g.archive_fund_cap(me),
-            if g.archive_complete(me) { "is complete" } else if g.archive_built(me) { "stands" } else { "is not built" }
-        );
+        // Ticket #192 (version 0.08.0): what an `upload` line needs to know -- where the Archive
+        // stands, whether it is complete (nothing may be uploaded until it is), and how many
+        // Colonists are at that place to read in.
+        let stands = match g.archive_colony(me) {
+            Some(c) => format!(
+                "{} at {}, where {} Colonists stand to be uploaded",
+                if g.archive_complete(me) { "is complete" } else { "stands unfinished" },
+                g.place_name(Place::Colony(c)),
+                g.uploadable_at(c, 0)
+            ),
+            None => "is not built at any Colony of yours".to_string(),
+        };
+        println!("Archive fund: {} of a cap of {}; the Archive {stands}; {} uploaded so far", s.archive_fund, g.archive_fund_cap(me), s.uploaded);
     }
+    print_standing(g);
 
     println!("\n--- VICTORY ---");
     for seat in Seat::ALL {
@@ -927,10 +1259,7 @@ fn main() {
     if command == "help" {
         // The figures in the help are the table's, not literals in this file, so a table that moves
         // one moves the help with it. Where the data cannot be found, the grammar still prints.
-        match Tables::load(&default_data_dir()) {
-            Ok(t) => println!("{}", grammar(t.orbit_change_fuel)),
-            Err(_) => println!("{}", GRAMMAR.replace("{fuel}", "the orbit-change")),
-        }
+        println!("{}", grammar(Tables::load(&default_data_dir()).ok().as_ref()));
         return;
     }
     let tables = Arc::new(Tables::load(&default_data_dir()).expect("tables"));
@@ -996,7 +1325,7 @@ fn main() {
                 if line.is_empty() {
                     continue;
                 }
-                match parse_line(line) {
+                match parse_line(&game, line) {
                     Err(e) => {
                         println!("line {}: REFUSED `{line}`: {e}", n + 1);
                         bad += 1;
