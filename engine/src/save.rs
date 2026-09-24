@@ -65,7 +65,21 @@ pub const SAVE_VERSION: u32 = 3;
 /// appended last; the game carries the Widgets counters; and every table row carries `widgets`
 /// where it carried `build_turns`, so a board from before would be priced in a unit this version
 /// does not have. A refusal naming both versions is the right answer.
-pub const GAME_VERSION: &str = "0.08.8";
+/// Ticket #340 (version 0.09.0, the closing ticket): `SAVE_VERSION` stays at **3**, where #332 put
+/// it, and does not move again; `GAME_VERSION` moves to 0.09.0 for the whole version. Taken
+/// together, this is what a 0.08.8 save would not understand. Every Build carries the **Widgets**
+/// put into it and the figure it needs, where it carried a turn to be due on, so an older queue
+/// names a turn this version has no use for (#332). `FacilityKind` gained the **Mine** and
+/// `ModuleKind` the **Factory**, both appended last, so an older file's two lists are indexed
+/// differently here (#332). A Ship carries the **orbit** it sits in, low orbit or a Slot, and a
+/// transit the orbit it is bound for, where an older file has a Ship at the Body at large and a
+/// Battle keyed on the Body rather than on one orbit (#335). The deck carries **eighteen new Event
+/// ids**, a question pending at the head of the turn and the answer each seat gave, none of which
+/// an older file has a field for, and whose ids are not in the deck it was dealt (#337). And a unit
+/// of population is **one million people** where it was five, so every Region figure in an older
+/// file is five times too small read under these rules (#333). A refusal naming both versions is
+/// the right answer, and a silent partial load is not.
+pub const GAME_VERSION: &str = "0.09.0";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;

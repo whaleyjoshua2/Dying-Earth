@@ -204,10 +204,11 @@ bespoke rules, reusing the Solar Storm's transit hold, the Drought's output mult
 Burst's next-turn ppm, the Smear's ledgers and a Rich Seam's Discovery. Only the Trading price
 override needed new state. Every figure is a field of the card in `events.toml`.
 
-**Measured**: this moved the column further than anything else on the map. The Prospectors fell from
-32 wins in eighty to 10 and the Arkwrights rose from none to 17; collapses 42 of 80. Cards drawn
-with nowhere to land roughly halved, because with no duplicate copies a spent off-Earth card cannot
-come round again. Which Faction the cards favour is the balance version's question.
+**Measured**: the column barely moved, 5 / 31 / 1 / 0 against 4 / 32 / 0 / 1 before the ticket;
+collapses 42 of 80. Cards drawn with nowhere to land roughly halved, because with no duplicate
+copies a spent off-Earth card cannot come round again. The computer refuses 28% of what it is asked
+where the first build refused 7%, because a seat that cannot pay must now refuse rather than being
+skipped, and a quarter of seat-card pairs are still never asked at all.
 
 ---
 
@@ -237,3 +238,112 @@ screen and Quit. While the page stands, neither the board nor the box is drawn. 
 The page has a `shot:` name of its own, which the game-over box never had.
 
 ---
+
+## 8. Five interface improvements and four adjustments
+
+The authority is [ticket #339](https://github.com/whaleyjoshua2/Dying-Earth/issues/339).
+
+The ticket offered the designer nineteen candidates from the written record and asked for two. They
+chose **five**, dropped one as already built (Relations as a band, which ticket #221 built two
+versions ago), and one more was taken by §7, which now ranks the Factions at the end.
+
+**The odds a player reads are the whole Battle's.** This is the version's largest single finding.
+Since Battles existed the figure on an attack button, on a Ship stack's card and in the Battle
+Report has been the **first round's share of strength**, honestly labelled but not what a player
+wants to know. It has been wrong in both directions: on one board the honest figure is **1%** where
+the button said 19.8%, on another **86%** where it said 61%, and a Battle Report line **9%** where
+it said 30%. There is no closed form for a melee carrying hit points, disengage rolls, pursuit and
+the escort rule, so the figure is **a thousand trials from its own seed**, never touching the game's
+dice, so a seeded game is unchanged and the same board always reads the same. A win is **holding the
+field**: a unit of yours neither destroyed nor escaped and nobody else's standing, the same test the
+Occupation makes. The words moved with the figure everywhere, and since a Battle is fought per orbit
+(§4) a Ship stack's card gives a line per orbit rather than one figure for the Body. The record in
+the Battle Report moved too, because it was described as what the button quoted.
+
+**A refusal names the rule, not the price.** Every order was tested for affordability before
+legality, so ordering something forbidden answered with what it would have cost. Legality is asked
+first now and only a legal order is priced. Which orders pass is unchanged, so the computer's
+candidates did not move; only the sentence a player reads.
+
+**The Report's march lines name the Army.** Armies have carried names since version 0.08.4 and the
+march, landing and rival-deed lines never used them.
+
+**A Relay or an Embassy is an eye.** A working Relay at a Colony or station off Earth, or a working
+Embassy in a Region on Earth, lets its holder read a **rival's building-by-building income** at that
+place, on the rival's own card, headed by the thing that grants it. No eye, no block.
+
+**The Tech Tree's edges are routed around the boxes they cross** — and measurement showed there are
+none to route. With today's twenty Techs and seventeen edges not one crosses a box: the defect
+photographed on issue #246 was killed incidentally by #250's every-rung-stacks. The tree is
+pixel-identical. What changed is that the property is now held by code, with a test watched red and
+a negative control that adds a crossing edge on purpose.
+
+**The four adjustments**, in the designer's own words: the top bar's Influence reads `20 / 20` where
+it read `20 of 20`; its temperature reads `+1.7 C` with the heading-to figure moved onto its hover;
+the End Turn button gains padding on its left, taken from the column beside it so the cluster keeps
+its width; and the four yields on a Found a Colony door sit **beside** the words rather than under
+them. That door is recorded in `docs/HANDOFF.md` as built and never looked at by anybody: the first
+horizontal version widened the side panel by ninety pixels and ate that much of the map, which a
+picture caught.
+
+**Three things the ticket left to the designer**, none of them oversights: the threat line on a held
+Region still quotes the first exchange, because that figure is what the computer's attack bar
+compares against and moving one without the other makes the amber warning a lie; the stack card's
+founding doors are ragged down their right edge now the yields sit beside the words; and an armed
+Frigate against three unarmed hulls reads 24%, because holding an orbit means clearing every hull,
+which is not the same as taking Orbital Control.
+
+---
+
+## What the closing sweep says
+
+20 seeds across four seatings at the shipped climate cell (sink 6, step 300), filed as
+[`docs/dev-diary/2026-09-23-version-0.09.0/sweeps/final-0.09.0.txt`](../dev-diary/2026-09-23-version-0.09.0/sweeps/final-0.09.0.txt),
+against the 0.08.8 baseline. **Read the per-Faction totals at the foot of a sweep file, never the
+four-figure arrays on each seating's line**: a sweep rotates which Faction sits in seat 0, so those
+arrays are by seat. Two figures were first published from that mistake and corrected on tickets
+[#332](https://github.com/whaleyjoshua2/Dying-Earth/issues/332) and
+[#337](https://github.com/whaleyjoshua2/Dying-Earth/issues/337).
+
+| | 0.08.8 | 0.09.0 |
+|---|---|---|
+| Custodians | 43 | **5** |
+| Prospectors | 22 | **31** |
+| Arkwrights | 1 | **1** |
+| Archivists | 0 | **0** |
+| collapses, of 80 | 14 | **42** |
+
+**Which ticket did it.** Measured after each rule ticket in turn:
+
+| after | Custodians / Prospectors / Arkwrights / Archivists | collapses |
+|---|---|---|
+| 0.08.8, the baseline | 43 / 22 / 1 / 0 | 14 |
+| §1 Widgets | **9 / 35 / 1 / 0** | 35 |
+| §4 orbits | 6 / 27 / 4 / 0 | 43 |
+| §5 Influence | 4 / 32 / 0 / 1 | 43 |
+| §6 choice cards, and the version | 5 / 31 / 1 / 0 | 42 |
+
+**Widgets did all of it.** The Custodians fell from 43 wins in eighty to 9 and the collapse rate
+went from 14 to 35 in that one ticket; the three rule tickets after it move the column by a few wins
+either way, which is noise at twenty seeds. The cause of the Widgets move was measured rather than
+guessed, and it is not the pace of building: it is **Earth's emissions**. Two buildings pollute
+where one did, because the new Mine took the old Factory's place and the Factory kept its own, and
+the 0.08.8 games ended a hair under the collapse line. The emissions probe that found it is
+[`sweeps/breakdown-probe.md`](../dev-diary/2026-09-23-version-0.09.0/ticket-332-widgets/sweeps/breakdown-probe.md)
+in that ticket's folder, and eight sweeps beside it show what each figure does. The designer set the
+two makers at 0.75 each knowing the rest of the column would go to the balance version.
+
+**The rest of the board**, over the eighty games: 306 Battles opened, 269 Armies built, 92 warships
+built, 635 orbit changes and **2 Blockades ordered**; 1,404 places taken by Influence, of which
+**1,379 are Regions, 17 ground Colonies and 8 stations**, so a take off Earth is under two per cent
+of all takes; and of the choice cards, **1,551 taken, 612 refused and 733 not asked**.
+
+**Two findings carried to the balance version**, both measured here and neither an alarm:
+
+1. **The war in space is quiet.** Two Blockades and no orbital Battles in eighty games. A seat keeps
+   about one warship and §4's ground rule rightly stations it in low orbit, where no station sits,
+   so it is never beside anything to shut. The dials are the Blockade appetite and how many warships
+   a seat wants holding low orbit.
+2. **The column belongs to Earth's emissions**, not to any rule of war or trade. Until the two Earth
+   makers' emissions are set deliberately, every other balance lever will be read through a collapse
+   rate that one figure governs.

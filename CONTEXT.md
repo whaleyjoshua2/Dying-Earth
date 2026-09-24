@@ -127,7 +127,7 @@ An unplanned occurrence drawn from the Event Deck and taking effect during Resol
 _Avoid_: incident, crisis, card
 
 **Choice Card**:
-An Event that asks a question rather than simply happening, since version 0.09.0: it carries two sides, one for taking what it offers and one for refusing, and each side costs something different. It is drawn **at the start of the turn, before orders**, so that a card which binds this turn's orders (*hold every Ship in orbit this turn*) can be answered by a player who then gives orders knowing it; an ordinary Event is still drawn after orders are committed. **Every seat is asked the same card in the same turn**, the computer seats answering by a rule of the card's own, so a rival's answer says something true about their board. **The turn cannot end until a human answers**, exactly as it cannot end while a Research Lead owes the table a Tech. A seat the card cannot touch (no state held, no Ship in orbit, no Refinery standing) is not asked at all, and the Report says so rather than forcing a refusal on a Faction for being small. Eighteen of them replaced the eighteen duplicate copies the deck used to carry.
+An Event that asks a question rather than simply happening, since version 0.09.0: it carries two sides, one for taking what it offers and one for refusing, and each side costs something different. It is drawn **at the start of the turn, before orders**, so that a card which binds this turn's orders (*hold every Ship in orbit this turn*) can be answered by a player who then gives orders knowing it; an ordinary Event is still drawn after orders are committed. **Every seat is asked the same card in the same turn**, the computer seats answering by a rule of the card's own, so a rival's answer says something true about their board. **The turn cannot end until a human answers**, exactly as it cannot end while a Research Lead owes the table a Tech. A seat the card cannot touch (no state held, no Ship in orbit, no Refinery standing) is not asked at all, and the Report says so rather than forcing a refusal on a Faction for being small. A seat that simply **cannot pay** the offer is a different case and is asked all the same, at the designer's word during the build: the take side is shut to it and refusing is its only move, so a struggling Faction still feels the card. Eighteen of them replaced the eighteen duplicate copies the deck used to carry.
 _Avoid_: dilemma, decision card, prompt, event choice
 
 **Event Deck**:
@@ -205,7 +205,7 @@ Work, since version 0.09.0: the second cost of everything built. A Widget is one
 _Avoid_: production, production points, shields, hammers, work units, industry
 
 **Fuel**:
-What is burned to move between Bodies. Since version 0.06.0 a transit spends it from the Ship's own Tank, which is filled at the Shipyard and refilled only by a Refuel order at a Body with a Space Station of the Ship's Faction; the Stockpile holds what Refineries make and the Trading window sells, and only a Refuel or a build moves it into a Tank. A lift from Earth spends none.
+What is burned to move between Bodies. Since version 0.06.0 a transit spends it from the Ship's own Tank, which is filled at the Shipyard and refilled only by a Refuel order at a Space Station of the Ship's Faction or, since version 0.08.8, a partner's under a Refuel Accord -- since version 0.09.0 with the Ship sitting in that station's own orbit, where before any orbit at the Body would do; the Stockpile holds what Refineries make and the Trading window sells, and only a Refuel or a build moves it into a Tank. A lift from Earth spends none.
 _Avoid_: propellant, rocket fuel
 
 **Energy**:
@@ -579,7 +579,7 @@ The phase in which a Faction commits everything it will do that turn: building, 
 _Avoid_: commands, moves, actions, player phase
 
 **End Turn**:
-The commitment. Pressing it closes the Orders phase, after which the Event card is drawn and nothing can be taken back. Since version 0.08.6 it is a **sun** -- a shaded disc with sunspots, the words beneath it, the Enter key on its hover -- that dims to embers while a Tech pick is owed; since version 0.08.7 it stands alone in its own column at the right of the Command Cluster, at the bottom.
+The commitment. Pressing it closes the Orders phase, after which the Event card is drawn and nothing can be taken back. Since version 0.08.6 it is a **sun** -- a shaded disc with sunspots, the words beneath it, the Enter key on its hover -- that dims to embers while a Tech pick is owed and, since version 0.09.0, while a **Choice Card** drawn at the head of the turn is still unanswered -- which is the one thing that blocks End Turn before any order is given, the Tech pick and the card being the only two that block it at all; since version 0.08.7 it stands alone in its own column at the right of the Command Cluster, at the bottom.
 _Avoid_: submit, confirm, next turn
 
 **Resolution**:
@@ -687,6 +687,10 @@ _Avoid_: carbon neutral, balance, equilibrium
 **Off-world Presence**:
 The number of Colonists living away from Earth, required by the Custodians' and the Prospectors' Victory Conditions. No Faction can win on Earth alone. Colonists in Antarctica are still on Earth; since version 0.06.0 those on a station over Earth are off it, as is everything else that asks "off Earth": the Archive's place and the Archivists' Research.
 _Avoid_: population off Earth, colony size, settlers
+
+**Chronicle**:
+The page the game ends on, since version 0.09.0, reached by a **Chronicle** button on the game-over box, which keeps its Title screen and Quit. While it stands neither the board nor the box is drawn. It is a summary and not a narrative: the designer was offered three dated records of the game with the lift stated and named this instead. It carries the four Factions **ranked as the End phase ranks them** -- by score, then Colonists off Earth, then Colonies held -- where the box had listed them in seat order since the First Playable, with the tiebreak named on every row one decided and a sentence each on how that Faction ended and what held it back; a table of nine figures a Faction, every one already kept by the game (Materials, Fuel, Energy and Ducats at the end, Colonists off Earth, Regions held, Colonies and stations held together, Research made over the game, and Blame in ppm with its share); and the population and the temperature charts, the top bar's own, side by side with the in-game date on their axes. Nothing in it is new state: the game keeps no dated history of control or of cards, and the Chronicle does not invent one.
+_Avoid_: history, timeline, narrative, log, after-action report, epilogue
 
 ### Climate
 
