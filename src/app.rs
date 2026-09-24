@@ -26,6 +26,12 @@ pub enum Screen {
     ChooseStart { faction: FactionKind },
     Playing,
     GameOver,
+    /// Ticket #338 (version 0.09.0): **the chronicle**, the page the game-over box opens: the four
+    /// Factions ranked as the End phase ranked them, a table of what each ended the game holding,
+    /// and the population and Temperature charts. A page of its own and not a box over the board,
+    /// at the designer's word, since two charts and a table of nine columns do not sit in 520
+    /// pixels. It is reached only from the game-over box and goes back to it.
+    Chronicle,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

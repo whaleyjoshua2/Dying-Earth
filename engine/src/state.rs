@@ -1000,6 +1000,20 @@ pub enum Outcome {
     Collapse,
 }
 
+/// Ticket #338 (version 0.09.0): what separated one seat from the seat above it in `Game::ranking`.
+/// The three keys are the End phase's own, in its order, and the fourth says none of them told.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tiebreak {
+    /// The score alone: the seat above stood further along its Victory Condition.
+    Score,
+    /// Level on the score; the seat above had more Colonists off Earth.
+    ColonistsOffEarth,
+    /// Level on the score and on Colonists off Earth; the seat above held more Colonies.
+    ColoniesHeld,
+    /// Level on all three: nothing the End phase reads separated the two.
+    Nothing,
+}
+
 /// One party in a Battle (ticket #50): a Battle is a melee of every Faction present, so the
 /// Battle Report lists each of them rather than an attacker and a defender.
 /// Ticket #286 (version 0.08.5): the war, counted where it happens. Until this version the sweep
@@ -2587,6 +2601,31 @@ impl Game {
 
     pub fn directed_colonies(&self, seat: Seat) -> Vec<ColonyId> {
         self.colonies.iter().filter(|c| c.control.director() == Some(seat)).map(|c| c.id).collect()
+    }
+
+    /// Ticket #338 (version 0.09.0): **the four seats in the order the End phase ranks them**, each
+    /// with what separated it from the seat above it. The keys are `end_phase`'s own three, read in
+    /// its order: the score (the lower of the two parts' fractions), then Colonists off Earth, then
+    /// Colonies held. The chronicle page reads this rather than ranking for itself, so the page
+    /// cannot order a table differently from the rule that decided the game. Read-only.
+    pub fn ranking(&self) -> Vec<(Seat, Tiebreak)> {
+        let key = |s: Seat| (self.progress(s).score(), self.off_world_colonists(s), self.owned_colonies(s).len());
+        let mut seats: Vec<Seat> = Seat::ALL.to_vec();
+        seats.sort_by(|a, b| key(*b).partial_cmp(&key(*a)).unwrap_or(std::cmp::Ordering::Equal));
+        seats
+            .iter()
+            .enumerate()
+            .map(|(i, seat)| {
+                let separated = match i.checked_sub(1).map(|j| (key(seats[j]), key(*seat))) {
+                    None => Tiebreak::Score,
+                    Some((above, here)) if above.0 > here.0 => Tiebreak::Score,
+                    Some((above, here)) if above.1 > here.1 => Tiebreak::ColonistsOffEarth,
+                    Some((above, here)) if above.2 > here.2 => Tiebreak::ColoniesHeld,
+                    Some(_) => Tiebreak::Nothing,
+                };
+                (*seat, separated)
+            })
+            .collect()
     }
 
     /// Build slots a Nation State has now (spec 4.2, 11.4, ticket #56): Size + Industry Level +

@@ -427,6 +427,9 @@ enum Action {
     AskDelete(Option<std::path::PathBuf>),
     OpenSavesFolder,
     ToTitle,
+    /// Ticket #338 (version 0.09.0): the chronicle page opened from the game-over box, or shut
+    /// again. It travels as an action because the box is drawn from a read-only Session.
+    ShowChronicle(bool),
     Quit,
 }
 
@@ -1220,6 +1223,9 @@ pub fn draw(
             let cam = camera.single().ok();
             game_screen(&mut root, ctx, &session, &mut view, cam, &globes, &textures, icons, &mut actions);
         }
+        // Ticket #338 (version 0.09.0): the chronicle, which takes the whole window: the board and
+        // the game-over box behind it are not drawn at all while it stands.
+        Screen::Chronicle => chronicle_screen(&mut root, &session, &mut actions),
     }
     for a in actions {
         match a {
@@ -1419,6 +1425,11 @@ pub fn draw(
                 session.screen = Screen::Title;
                 session.earth_dirty = true;
                 *view = ViewState::default();
+            }
+            // Ticket #338 (version 0.09.0): in and out of the chronicle. Going back puts the
+            // game-over box up again, since that is the screen the page was opened from.
+            Action::ShowChronicle(on) => {
+                session.screen = if on { Screen::Chronicle } else { Screen::GameOver };
             }
             Action::Quit => {
                 exit.write(AppExit::Success);
@@ -9207,6 +9218,12 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 );
             }
             ui.horizontal(|ui| {
+                // Ticket #338 (version 0.09.0): the chronicle, on a page of its own. The box keeps
+                // its two buttons and gains this one; the page carries the ranking, the table of
+                // what each Faction ended holding and the two charts, none of which fits here.
+                if ui.button(RichText::new("Chronicle").strong()).clicked() {
+                    actions.push(Action::ShowChronicle(true));
+                }
                 if ui.button("Title screen").clicked() {
                     actions.push(Action::ToTitle);
                 }
@@ -9216,6 +9233,172 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
             });
         });
     }
+}
+
+/// Ticket #338 (version 0.09.0): **one sentence on how a Faction ended** -- won on its Victory
+/// Condition, fell short on the bar it missed, or ended in the Collapse. Every figure in it is the
+/// engine's own, off `Progress`: the part still short is `short_part`, the one figure a Faction
+/// could still have acted on, and a first part held back says so in the engine's words. The
+/// sentences are composed here rather than in `report.toml` because ticket #339's lane held that
+/// file while this was built.
+fn chronicle_sentence(game: &Game, seat: Seat) -> String {
+    let name = game.seat_name(seat);
+    let p = game.progress(seat);
+    let met_line = format!("{} {:.0} of {:.0}, and {}", p.first_name, p.first_value, p.first_bar, p.second_text);
+    let (part, value, bar) = p.short_part();
+    let short = format!("{part} at {value:.0} of {bar:.0}");
+    // The two sentences the engine writes here take different shapes -- `needs X, not yet
+    // researched` and `the Archive is complete but not running` -- so the joiner is one that fits
+    // both and puts neither in the wrong grammatical person.
+    let held = match &p.first_held_back {
+        Some(why) => format!(", held back: {why}"),
+        None => String::new(),
+    };
+    if let Some(Outcome::Win { seat: winner, margin_note }) = &game.outcome
+        && *winner == seat
+    {
+        // A game is won two ways, and the second picture caught the sentence saying the wrong one:
+        // a seat that took the game at the LAST TURN on the higher score never met its Condition,
+        // so it cannot be said to have won on it. The margin note is the engine's own either way,
+        // and it is left off where it would only repeat the clause before it.
+        return if p.met() {
+            let note = if margin_note == "met its Victory Condition" { String::new() } else { format!(" -- {margin_note}") };
+            format!("The {name} won on their Victory Condition: {met_line}{note}.")
+        } else {
+            format!("The {name} won when the turns ran out ({margin_note}), short on {short}{held}.")
+        };
+    }
+    // A seat can meet its Victory Condition and still not take the game, when two met it on the
+    // same turn and the other had the larger margin.
+    if p.met() {
+        return format!("The {name} met their Victory Condition too -- {met_line} -- but the game went elsewhere.");
+    }
+    // Ticket #338: **both bars reached and the Condition still not met**, which the first picture
+    // caught: a seat whose gate Tech is unresearched stands at 100% -- the score is a fraction of
+    // its bars and clamped -- so "short on" a part that is OVER its bar is a contradiction. The
+    // sentence says what actually held it back instead, in the engine's own words.
+    if p.first_value >= p.first_bar && p.second_value >= p.second_bar && let Some(why) = &p.first_held_back {
+        return format!("The {name} reached both bars -- {met_line} -- but {why}, so the Condition was never met.");
+    }
+    // The percentage is NOT repeated here: the row's own heading carries it a line above.
+    match &game.outcome {
+        Some(Outcome::Collapse) => format!("The {name} ended in the Collapse at {:+.1} C, short on {short}{held}.", game.climate.temperature),
+        Some(Outcome::Draw { note }) => format!("The {name} ended in a draw ({note}), short on {short}{held}."),
+        Some(Outcome::Win { .. }) => format!("The {name} lost on the bar they missed: {short}{held}."),
+        None => format!("The {name} stand short on {short}{held}."),
+    }
+}
+
+/// Ticket #338 (version 0.09.0): **the chronicle**, a page of its own reached from the game-over
+/// box. The designer took none of the three narratives that were put to them and named what they
+/// wanted instead: *"the final resource tallies of each Faction in a table, with the population and
+/// temperature graphs"*, with the four Factions ranked as the engine ranks them and a sentence each
+/// on how they ended. So: no dated record, nothing new kept per turn, and both charts reused where
+/// they were -- `population_history` and `temperature_history`, the top bar's own, at the size this
+/// page allots them, with the in-game date along the foot as every chart in this game carries it.
+///
+/// The ranking is `Game::ranking`, the End phase's own three keys in its own order, so the page
+/// cannot order the table differently from the rule that decided it; where the score alone did not
+/// separate two seats, the row says which key did.
+fn chronicle_screen(root: &mut Ui, session: &Session, actions: &mut Vec<Action>) {
+    let Some(game) = session.game.as_ref() else {
+        actions.push(Action::ShowChronicle(false));
+        return;
+    };
+    egui::CentralPanel::default().show(root, |ui| {
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("The Chronicle").size(30.0).strong());
+                ui.add_space(16.0);
+                // Back at the head rather than the foot: the page is taller than a small window and
+                // a button below the charts could sit off the bottom of it.
+                if ui.add(egui::Button::new(RichText::new("Back").size(16.0)).min_size(egui::vec2(110.0, 28.0))).clicked() {
+                    actions.push(Action::ShowChronicle(false));
+                }
+            });
+            ui.label(RichText::new(game.outcome_text()).size(18.0));
+            ui.label(RichText::new(format!("Turn {}, {}. Seed {}.", game.turn, game.date(game.turn).text(), game.seed)).weak());
+            ui.add_space(10.0);
+
+            // 1. The four Factions ranked, each with its sentence, and the tiebreak named on the
+            // row it decided.
+            ui.label(RichText::new("How the table finished").size(20.0).strong());
+            let ranking = game.ranking();
+            for (place, (seat, separated)) in ranking.iter().enumerate() {
+                let colour = seat_colour(session, *seat);
+                ui.add_space(4.0);
+                ui.label(RichText::new(format!("{}. The {} -- {:.0}% of the way to their Victory Condition", place + 1, game.seat_name(*seat), game.progress(*seat).score() * 100.0)).size(17.0).strong().color(colour));
+                ui.label(RichText::new(chronicle_sentence(game, *seat)).size(15.0));
+                // The tiebreak NAMED, where one decided the order rather than the score. Two seats
+                // level on all three keys are told so too, since the order between them then means
+                // nothing and a page that stayed silent would imply it did.
+                if *separated != Tiebreak::Score {
+                    let above = game.seat_name(ranking[place - 1].0);
+                    let line = match separated {
+                        Tiebreak::ColonistsOffEarth => format!("Level with the {above} on the score; placed below them on the first tiebreak, Colonists off Earth."),
+                        Tiebreak::ColoniesHeld => format!("Level with the {above} on the score and on Colonists off Earth; placed below them on the second tiebreak, Colonies held."),
+                        _ => format!("Level with the {above} on the score and on both tiebreaks: nothing the End phase reads separated them."),
+                    };
+                    ui.label(RichText::new(line).size(14.0).weak());
+                }
+            }
+            ui.add_space(12.0);
+
+            // 2. The table: nine figures a row, every one of them the engine's. The Stockpile alone
+            // says least about a Faction that spent well, which is why the other five are here.
+            ui.label(RichText::new("What each Faction ended the game holding").size(20.0).strong());
+            ui.add_space(4.0);
+            egui::Grid::new("chronicle_table").num_columns(10).spacing((18.0, 6.0)).striped(true).show(ui, |ui| {
+                let head = |ui: &mut Ui, text: &str, hover: &str| {
+                    ui.label(RichText::new(text).strong()).on_hover_text(hover);
+                };
+                ui.label(RichText::new("Faction").strong());
+                head(ui, "Materials", "The Materials in the Faction's Stockpile at the end.");
+                head(ui, "Fuel", "The Fuel in the Faction's Stockpile at the end.");
+                head(ui, "Energy", "The Energy in the Faction's Stockpile at the end.");
+                head(ui, "Ducats", "The Ducats in the Faction's Stockpile at the end.");
+                head(ui, "Off Earth", "Colonists living off Earth: in Colonies away from Earth and on stations over it. Antarctica is on Earth.");
+                head(ui, "Regions", "Nation States the Faction directed at the end: those it controlled, and those it occupied.");
+                head(ui, "Colonies", "Colonies and stations the Faction directed at the end, the two counted together.");
+                head(ui, "Research", "Research the Faction produced over the whole game, not what it holds now.");
+                head(ui, "Blame", "The ppm of CO2 the Faction is answerable for at the end -- its ledger, and its share of the table's Blame.");
+                ui.end_row();
+                for (seat, _) in &ranking {
+                    let s = game.seat(*seat);
+                    ui.label(RichText::new(game.seat_name(*seat)).strong().color(seat_colour(session, *seat)));
+                    ui.label(format!("{}", s.stockpile.materials));
+                    ui.label(format!("{}", s.stockpile.fuel));
+                    ui.label(format!("{}", s.stockpile.energy));
+                    ui.label(format!("{}", s.stockpile.ducats));
+                    ui.label(format!("{}", game.off_world_colonists(*seat)));
+                    ui.label(format!("{}", game.directed_states(*seat).len()));
+                    ui.label(format!("{}", game.directed_colonies(*seat).len()));
+                    ui.label(format!("{}", s.research_total));
+                    ui.label(format!("{:.0} ppm ({:.0}%)", game.blame(*seat), game.blame_share(*seat) * 100.0));
+                    ui.end_row();
+                }
+            });
+            ui.add_space(14.0);
+
+            // 3. The two charts, side by side, each already built and drawn on the top bar's hovers.
+            // Neither is rewritten here: the page only says how big to draw them.
+            ui.label(RichText::new("The world the game left behind").size(20.0).strong());
+            ui.add_space(4.0);
+            ui.horizontal_top(|ui| {
+                let half = ((ui.available_width() - 24.0) / 2.0).max(320.0);
+                ui.vertical(|ui| {
+                    ui.set_width(half);
+                    ui.label(RichText::new("The people, on Earth and off it").strong());
+                    population_history(ui, game, egui::vec2(half - 16.0, 220.0));
+                });
+                ui.vertical(|ui| {
+                    ui.set_width(half);
+                    ui.label(RichText::new("The Temperature").strong());
+                    temperature_history(ui, game, egui::vec2(half - 16.0, 220.0));
+                });
+            });
+        });
+    });
 }
 
 #[cfg(test)]

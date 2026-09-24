@@ -80,6 +80,11 @@ pub struct ShotPlan {
     /// it can be photographed with End Turn greyed; the `tip:` aid forces that button hover.
     pub card: bool,
     pub card_shut: bool,
+    /// Ticket #338 (version 0.09.0), a building aid (`chronicle:1`): **the chronicle page**, the
+    /// page the game-over box opens, which the game-over screen had never had a name for. It fills
+    /// the window, so the run takes ONE picture of it rather than seven copies of the same page.
+    /// Wants `turns:<n>` enough to play the board out, or the page reports a game still on.
+    pub chronicle: bool,
 }
 
 /// Ticket #58: the Moment a `moment:` aid names.
@@ -180,6 +185,11 @@ const VIEWS: [(&str, View); 7] = [
 // Ticket #109: the credits picture sits between the Faction cards and the start screen, so the
 // attribution the icons' licence requires is photographed with every other menu.
 const MENUS: [&str; 5] = ["title", "faction", "credits", "start", "report"];
+
+// Ticket #338 (version 0.09.0): `chronicle:1` photographs a PAGE and not a map, so the run takes
+// one picture and stops. The View beside it is never seen -- the page covers the window -- and is
+// only there so the capture loop needs no second shape.
+const CHRONICLE: [(&str, View); 1] = [("chronicle", View::Surface(BodyId::Earth))];
 
 /// Ticket #57: the Body a `hover:` aid names, by the id its data row carries.
 fn body_from_id(name: &str) -> Option<BodyId> {
@@ -1247,6 +1257,10 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         return;
     }
     let t = time.elapsed_secs();
+    // Ticket #338 (version 0.09.0): which pictures this run takes -- the four maps and the three
+    // moons, or the one chronicle page, which fills the window and would otherwise be photographed
+    // seven times over.
+    let views: &[(&str, View)] = if plan.chronicle { &CHRONICLE } else { &VIEWS };
     // `saved:1` (a building aid, ticket #59): the Save notice is held up for the whole run, so the
     // picture cannot be taken in the second after it has faded.
     if let Some(text) = &plan.notice {
@@ -1353,7 +1367,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
                 // Fall through to the four views with the game already made.
                 view.popup = Popup::None;
                 view.tech_prompted = true;
-                show_view(&mut view, VIEWS[0].1);
+                show_view(&mut view, views[0].1);
                 plan.next_at = t + 2.5;
                 return;
             }
@@ -1389,7 +1403,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         plan.archive_colony = ARCHIVE_COLONY.with(|c| c.get());
         view.popup = Popup::None;
         view.tech_prompted = true;
-        show_view(&mut view, VIEWS[0].1);
+        show_view(&mut view, views[0].1);
         // `select:<state id>` (a building aid) opens that Region's card in the Earth picture.
         plan.select = std::env::args().find_map(|a| a.strip_prefix("select:").map(str::to_owned));
         plan.arm = std::env::args().any(|a| a == "arm:1").then(|| session.game.as_ref().and_then(|g| g.directed_states(Seat(0)).first().copied())).flatten();
@@ -1408,6 +1422,13 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             .and_then(|g| g.colonies.iter().find(|c| c.control.director() == Some(Seat(0)) && (!ground || !c.in_orbit)).map(|c| c.id));
         plan.trade = std::env::args().any(|a| a == "trade:1");
         plan.victory = std::env::args().any(|a| a == "victory:1");
+        // Ticket #338 (version 0.09.0): `chronicle:1` opens the chronicle page, which in play is
+        // reached by the Chronicle button on the game-over box -- a click a headless run cannot
+        // make. The board is built above; `turns:<n>` is what plays it out to an ending.
+        plan.chronicle = std::env::args().any(|a| a == "chronicle:1");
+        if plan.chronicle {
+            session.screen = Screen::Chronicle;
+        }
         // Ticket #203: `factions:1` for seat 0's page, `factions:archivists` for that Faction's.
         if let Some(v) = std::env::args().find_map(|a| a.strip_prefix("factions:").map(str::to_owned)) {
             plan.faction_window = true;
@@ -1457,7 +1478,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             plan.next_at = t + 1.0;
             return;
         }
-        let (name, _) = VIEWS[plan.step];
+        let (name, _) = views[plan.step];
         let path = format!("{}-{}.png", session.shot_prefix, name);
         commands.spawn(Screenshot::primary_window()).observe(save_to_disk(path));
         plan.captured = true;
@@ -1467,10 +1488,10 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
     }
     plan.step += 1;
     plan.captured = false;
-    if plan.step >= VIEWS.len() {
+    if plan.step >= views.len() {
         plan.done_at = Some(t + 1.5);
     } else {
-        let (_, v) = VIEWS[plan.step];
+        let (_, v) = views[plan.step];
         show_view(&mut view, v);
         apply_aids(&mut plan, &mut view);
         let wanted = plan.select.as_ref().filter(|_| v == View::Surface(BodyId::Earth)).and_then(|name| StateId::ALL.into_iter().find(|s| format!("{s:?}").eq_ignore_ascii_case(name)));
