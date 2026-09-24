@@ -629,8 +629,14 @@ impl Game {
     /// Ticket #339: the trials, the rounds, the disengage divisor and the seed, all from the data,
     /// so the two doors above cannot drift apart. Party 0 is always the one asking.
     fn whole_battle_odds(&self, parties: &[Vec<Combatant>], rolls: u32) -> f64 {
+        self.whole_battle_odds_for(parties, 0, rolls)
+    }
+
+    /// Ticket #339: the same figure for a party that is not the first -- what the Battle Report's
+    /// record wants, since the aggressor is wherever the melee put it.
+    fn whole_battle_odds_for(&self, parties: &[Vec<Combatant>], party: usize, rolls: u32) -> f64 {
         let m = &self.tables.melee;
-        combat::whole_battle_odds(parties, 0, self.tables.disengage.divisor, m.rounds, rolls, m.odds_trials, m.odds_seed)
+        combat::whole_battle_odds(parties, party, self.tables.disengage.divisor, m.rounds, rolls, m.odds_trials, m.odds_seed)
     }
 
     /// One melee of Ship stacks in one ORBIT of a Body (ticket #50; ticket #335, version 0.09.0,
@@ -709,13 +715,22 @@ impl Game {
     }
 
     /// Ticket #281 (version 0.08.5): `at` is the real place, for the Report's line to jump to; the
-    /// party text names every unit and what it took; an aggressor carries the first-round odds it
-    /// faced, as the attack button quoted them.
+    /// party text names every unit and what it took; an aggressor carries the odds it faced, as the
+    /// attack button quoted them.
+    ///
+    /// Ticket #339 (version 0.09.0): those odds are **the whole Battle's** now, as the button's are
+    /// -- the chance of holding the field when it is over -- where they were the first exchange's
+    /// share of the strength. The record would otherwise describe itself as what the button quoted
+    /// and carry a different number: on the board the engine lane measured, 1% against 19.8%. It is
+    /// measured from the line as it stands BEFORE the first round, which is the board the attacker
+    /// decided on, and from the figure's own seed, so this record costs the game's dice nothing.
     fn run_melee(&mut self, place: &str, at: Option<ReportPlace>, parties: Vec<(Option<Seat>, bool, Vec<Combatant>)>, rolls: u32) -> BattleLine {
         let mut parties = parties;
         let before: Vec<Vec<u32>> = parties.iter().map(|(_, _, c)| c.iter().map(|x| x.damage).collect()).collect();
         let strengths: Vec<i64> = parties.iter().map(|(_, _, c)| c.iter().map(|x| x.strength).sum()).collect();
-        let total: i64 = strengths.iter().sum();
+        // The line as it stands before a blow is struck, kept for the odds below: `melee` fights the
+        // parties in place, so after it there is nothing left to measure the chance of.
+        let pristine: Vec<Vec<Combatant>> = if parties.iter().any(|(_, agg, _)| *agg) { parties.iter().map(|(_, _, c)| c.clone()).collect() } else { Vec::new() };
         let stats = {
             let mut slices: Vec<&mut [Combatant]> = parties.iter_mut().map(|(_, _, c)| c.as_mut_slice()).collect();
             let mut rng = self.rng.clone();
@@ -752,7 +767,7 @@ impl Game {
                 hits: stats.hits_of(i),
                 destroyed: stats.destroyed.get(i).cloned().unwrap_or_default(),
                 escaped: stats.escaped.get(i).cloned().unwrap_or_default(),
-                odds: if *agg { Some(combat::first_round_odds(strengths[i], total - strengths[i])) } else { None },
+                odds: if *agg { Some(self.whole_battle_odds_for(&pristine, i, rolls)) } else { None },
             })
             .collect();
         // Ticket #295 (version 0.08.6): escapes counted at the event, by the seat the unit fought

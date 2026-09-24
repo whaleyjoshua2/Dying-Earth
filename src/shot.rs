@@ -325,6 +325,7 @@ fn build_board(session: &mut Session) {
             }
             let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
             orders[0] = vec![Order::ShipStance { body, stance: Stance::Attack }];
+            refuse_any_card(g);
             g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
             if earth_battle {
                 run_one_quiet_turn(g);
@@ -417,6 +418,42 @@ fn build_board(session: &mut Session) {
             let name = g.next_ship_name(UnitKind::Battleship);
             let built_turn = g.turn;
             g.ships.push(Ship { id: sid, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
+        }
+        // `eye:1` and `eye:0` (building aids, ticket #339, version 0.09.0): **the pair of boards the
+        // eye is photographed on.** Seat 1 takes the first neighbour of seat 0's start Region and
+        // runs two Facilities in it, and holds a Colony on the Moon with three Modules; with
+        // `eye:1` seat 0 also has a working Embassy at home and a Colony of its own at the Moon
+        // with a working Relay, which are the two eyes. `eye:0` builds neither, so the same two
+        // rival cards can be photographed with nothing watching them and the difference is the
+        // block and nothing else. An AI game gives no board where one Faction has an Embassy and a
+        // rival a built-up Region next door on a turn anybody can choose.
+        if let Some(watching) = std::env::args().find_map(|a| match a.strip_prefix("eye:") {
+            Some("1") => Some(true),
+            Some("0") => Some(false),
+            _ => None,
+        }) {
+            if let Some(home) = g.directed_states(Seat(0)).first().copied()
+                && let Some(theirs) = g.tables.state(home).neighbours.first().copied()
+            {
+                g.take_control(theirs, Seat(1));
+                for kind in [FacilityKind::Factory, FacilityKind::ResearchLab] {
+                    g.state_mut(theirs).facilities.push(Facility::new(kind));
+                }
+                if watching {
+                    g.state_mut(home).facilities.push(Facility::new(FacilityKind::Embassy));
+                }
+            }
+            let mut slots = g.free_slots_on(BodyId::Moon).into_iter();
+            if let Some(slot) = slots.next() {
+                let id = ColonyId(g.fresh_id());
+                let modules = vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Mine), Module::new(ModuleKind::Generator)];
+                g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(1)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            }
+            if watching && let Some(slot) = slots.next() {
+                let id = ColonyId(g.fresh_id());
+                let modules = vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Relay)];
+                g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            }
         }
         // `rival:1` (a building aid, ticket #261, version 0.08.4): seat 1 stands three quarters of
         // the way to its Victory Condition -- nine Colonists on the Moon of twelve, and, for the
@@ -789,6 +826,7 @@ fn build_board(session: &mut Session) {
             g.seats[0].ai = false;
             let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
             orders[0] = vec![Order::StripPermit { state: sid }];
+            refuse_any_card(g);
             g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
             g.seats[0].ai = true;
         }
@@ -879,6 +917,7 @@ fn build_board(session: &mut Session) {
                 let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
                 orders[0] = vec![Order::Unload { ship: id, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Moon, slot) }];
                 g.seats[0].ai = false;
+                refuse_any_card(g);
                 g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
                 g.seats[0].ai = true;
             }
@@ -1041,6 +1080,7 @@ fn build_board(session: &mut Session) {
         }
         let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
         orders[0] = vec![Order::MoveArmy { army: mine, to: n }];
+        refuse_any_card(g);
         g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
         for seat in Seat::ALL.into_iter().skip(1) {
             g.seats[seat.index()].ai = true;
@@ -1196,8 +1236,23 @@ fn fill_with_scrubbers(g: &mut Game, sid: StateId) {
 /// the board the aid just built.
 fn run_one_quiet_turn(g: &mut Game) {
     g.seats[0].ai = false;
+    refuse_any_card(g);
     g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
     g.seats[0].ai = true;
+}
+
+/// Ticket #339 (version 0.09.0), a building aid: **refuse this turn's Choice Card for every human
+/// seat**, since ticket #337 made `end_turn` refuse while one is unanswered and an aid that drives
+/// a turn by hand has no player to answer it. It REFUSES, which is the answer that buys nothing and
+/// leaves the board the aid built where the aid put it. Without this, an aid that drives a turn
+/// panicked on any seed whose first turn happened to draw a card: `battle:region seed:7` did, which
+/// is how it was found.
+fn refuse_any_card(g: &mut Game) {
+    for seat in Seat::ALL {
+        if !g.seat(seat).ai && g.pending_question().map(|q| q.answer_of(seat).is_none()).unwrap_or(false) {
+            g.answer_card(seat, false).ok();
+        }
+    }
 }
 
 /// `tutorialtick:1` (a building aid, ticket #174, not part of the spec): the `Play Tutorial` tick at
@@ -1416,10 +1471,25 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         if ground {
             plan.hab = true;
         }
-        plan.hab_colony = session
-            .game
-            .as_ref()
-            .and_then(|g| g.colonies.iter().find(|c| c.control.director() == Some(Seat(0)) && (!ground || !c.in_orbit)).map(|c| c.id));
+        // Ticket #339 (version 0.09.0): `hab:rival` picks the first Colony a RIVAL directs instead,
+        // since the eye's whole point is what it reads on somebody else's card and no aid could
+        // open one before.
+        let rival = std::env::args().any(|a| a == "hab:rival");
+        if rival {
+            plan.hab = true;
+        }
+        plan.hab_colony = session.game.as_ref().and_then(|g| {
+            g.colonies
+                .iter()
+                .find(|c| match c.control.director() {
+                    // `hab:ground` narrows either to a Colony on a surface, which is how the Moon's
+                    // picture is kept off the station standing over Earth.
+                    Some(d) if rival => d != Seat(0) && (!ground || !c.in_orbit),
+                    Some(d) => d == Seat(0) && (!ground || !c.in_orbit),
+                    None => false,
+                })
+                .map(|c| c.id)
+        });
         plan.trade = std::env::args().any(|a| a == "trade:1");
         plan.victory = std::env::args().any(|a| a == "victory:1");
         // Ticket #338 (version 0.09.0): `chronicle:1` opens the chronicle page, which in play is

@@ -1159,8 +1159,11 @@ pub struct BattleParty {
     pub hits: u32,
     pub destroyed: Vec<String>,
     pub escaped: Vec<String>,
-    /// Ticket #281: an aggressor's first-round odds against everyone else present, as the attack
-    /// button quoted them; None for a party that did not open the Battle.
+    /// Ticket #281: an aggressor's odds against everyone else present, as the attack button quoted
+    /// them; None for a party that did not open the Battle.
+    /// Ticket #339 (version 0.09.0): **the whole Battle's** odds -- the chance of holding the field
+    /// when it is over -- since that is what the button quotes now. A Battle record lives one turn
+    /// and is wiped at the next, so no save carries a first-round figure under this name for long.
     #[serde(default)]
     pub odds: Option<f64>,
 }

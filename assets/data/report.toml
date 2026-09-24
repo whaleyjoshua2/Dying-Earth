@@ -33,7 +33,10 @@ army_destroyed = "{army} ({faction}) destroyed ({why})."
 # Ticket #302 (version 0.08.6): the Levy is retired; a threatened neutral arms for good instead.
 neutral_armed = "{state} arms while a foreign Army stands next door: its Standing Army will stand at {n} from now on."
 neutral_held = "{state} held against the attack, and arms: its Standing Army will stand at {n} from now on."
-battle = "Battle at {place}: the {faction} attacked at {odds}% first-round odds; {outcome}."
+# Ticket #339 (version 0.09.0): the odds are the WHOLE Battle's -- the chance of holding the
+# field when it is over -- as the attack button's hover quotes them, where both said the first
+# exchange's share of the strength.
+battle = "Battle at {place}: the {faction} attacked at {odds}% odds of holding the field; {outcome}."
 event_damaged_ships = "{event} damaged {n} Ship(s)."
 loaded = "{faction} loaded {cargo} at {body}."
 slot_taken = "{faction}: another Faction took that Colony Slot first."

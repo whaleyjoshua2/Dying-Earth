@@ -7616,7 +7616,7 @@ fn a_threatened_neutral_raises_a_levy_and_stands_it_down_and_holding_arms_it_for
 }
 
 /// Ticket #281 (version 0.08.5): a Battle is a line of the Report at its real place, its parties
-/// name every unit and what it took, an aggressor carries its first-round odds; when a unit died
+/// name every unit and what it took, an aggressor carries its odds; when a unit died
 /// the line ranks with a Ship destroyed and a Moment names the loss, and when nobody lost one the
 /// line is unranked and no Moment fires; an Army destroyed is a line by name.
 #[test]
@@ -7633,7 +7633,9 @@ fn a_battle_is_a_report_line_at_its_place_by_name_with_odds_and_a_moment_when_a_
     let agg = line.parties.iter().find(|p| p.aggressor).expect("an aggressor");
     assert_eq!(agg.seat, Some(Seat(0)));
     let odds = agg.odds.expect("the odds the aggressor faced");
-    assert!(odds > 0.0 && odds < 1.0, "first-round odds: {odds}");
+    // Ticket #339 (version 0.09.0): the whole Battle's odds, in the words the attack button quotes
+    // them in. The record said "first-round odds" until the button stopped quoting them.
+    assert!(odds > 0.0 && odds < 1.0, "the whole Battle's odds: {odds}");
     let neutral = line.parties.iter().find(|p| p.seat.is_none()).expect("the neutral party");
     assert!(neutral.odds.is_none(), "a defender carries no odds");
     assert!(neutral.units.starts_with(&defender_name), "the party text names the unit: {}", neutral.units);
@@ -7641,7 +7643,7 @@ fn a_battle_is_a_report_line_at_its_place_by_name_with_odds_and_a_moment_when_a_
     let lost: Vec<&String> = line.parties.iter().flat_map(|p| p.destroyed.iter()).collect();
     let report = g.report.lines.iter().find(|l| l.text.starts_with("Battle at Egypt")).expect("a Report line for the Battle");
     assert_eq!(report.place, Some(ReportPlace::State(target)), "the line jumps to the place");
-    assert!(report.text.contains(&format!("{:.0}% first-round odds", odds * 100.0)), "and says the odds, labelled: {}", report.text);
+    assert!(report.text.contains(&format!("{:.0}% odds of holding the field", odds * 100.0)), "and says the odds, labelled: {}", report.text);
     let moments = g.report.moments.iter().filter(|m| m.kind == MomentKind::DecisiveBattle).count();
     if lost.is_empty() {
         assert_eq!(report.kind, LineKind::Battle, "a bloodless Battle is unranked");

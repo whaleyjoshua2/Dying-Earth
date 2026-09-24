@@ -7,7 +7,6 @@ use crate::scene::{Globe, MainCamera, SceneHandles, GLOBE_RADIUS};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_egui::{egui, EguiContexts};
-use dying_earth_engine::combat::first_round_odds;
 // Ticket #337 (version 0.09.0): a Choice Card's two sides are lists of effects composed in the
 // table, and the modal that asks the card says what each side does, so the interface reads them.
 use dying_earth_engine::data::{CardEffect, CardThing};
@@ -4582,14 +4581,105 @@ fn cost_button(ui: &mut Ui, game: &Game, pending: &[Order], order: Order, label:
     cost_button_with_hover(ui, game, pending, order, label, None, actions);
 }
 
+/// Ticket #339 (version 0.09.0): the whole-Battle odds are **measured**, a thousand melees a call
+/// and about 1.3 milliseconds of them, and a button's hover is built every frame whether or not
+/// anything is under the pointer. A Region card with three Armies of its own and four hostile
+/// neighbours asks for sixteen figures a frame, which is twenty milliseconds and a third of the
+/// frame rate. So each answer is kept against a **fingerprint of the fight it was measured from**:
+/// the place, the attackers, and every combatant's strength, damage, hit points and stance. Nothing
+/// that could move the figure can move without moving the key, so a stale answer cannot be drawn;
+/// and within one turn the board does not move at all, which is where every hit lands.
+fn memo_odds(ctx: &egui::Context, id: egui::Id, measure: impl FnOnce() -> f64) -> f64 {
+    if let Some(v) = ctx.data(|d| d.get_temp::<f64>(id)) {
+        return v;
+    }
+    let v = measure();
+    ctx.data_mut(|d| d.insert_temp(id, v));
+    v
+}
+
+/// Ticket #339: the chance seat 0 holds `place` if `attackers` attack it, memoised as above.
+fn ground_odds(ctx: &egui::Context, game: &Game, place: Place, attackers: &[ArmyId]) -> f64 {
+    let print = |id: &ArmyId| {
+        game.army(*id).map(|a| (a.id, game.army_strength(a), game.army_defended_strength(a), a.damage, game.army_hit_points(a), game.army_dug_in(a), a.stance == Stance::Evade))
+    };
+    let mut key: Vec<_> = attackers.iter().filter_map(print).collect();
+    key.extend(game.defenders_at(place, Seat(0)).iter().filter_map(print));
+    memo_odds(ctx, egui::Id::new(("ground-battle-odds", place, key)), || game.ground_battle_odds(place, Seat(0), attackers))
+}
+
+/// Ticket #339: the chance a seat holds ONE orbit of a Body if it attacks there, memoised as above.
+/// Its fingerprint is every hull in that orbit and every Battery covering it, whosever they are.
+fn orbit_odds(ctx: &egui::Context, game: &Game, body: BodyId, orbit: Orbit, seat: Seat) -> f64 {
+    let hulls: Vec<_> = game
+        .ships
+        .iter()
+        .filter(|s| game.ship_in_orbit(s, body, orbit))
+        .map(|s| (s.id, s.seat, s.kind, s.damage, s.escaped, s.stance == Stance::Evade))
+        .collect();
+    let batteries: Vec<_> = Seat::ALL
+        .into_iter()
+        .flat_map(|s| game.batteries_at(s, body, orbit).into_iter().map(move |(c, i)| (s, c, i)))
+        .map(|(s, c, i)| (s, c, i, game.colony(c).map(|col| col.modules[i].damage).unwrap_or(0)))
+        .collect();
+    memo_odds(ctx, egui::Id::new(("orbit-battle-odds", body, orbit, seat, hulls, batteries)), || game.orbit_battle_odds(body, orbit, seat))
+}
+
+/// Ticket #339: the strength one Faction brings to a Battle in ONE orbit -- its Ships sitting there
+/// and its working Batteries covering it, which is exactly the line `orbit_battle_odds` fights
+/// with, so the strengths beside the figure are the strengths the figure was made from.
+fn orbit_strength(game: &Game, seat: Seat, body: BodyId, orbit: Orbit) -> i64 {
+    ships_in_orbit(game, seat, body, orbit).iter().filter(|s| !s.escaped).map(|s| game.ship_strength(s)).sum::<i64>() + game.battery_strength(seat, body, orbit)
+}
+
+/// Ticket #339 (version 0.09.0): **the odds line of every Battle an Attack at this Body would
+/// start** -- one per orbit seat 0 has Ships in where a rival has something too, since ticket #335
+/// made a Battle a thing of one orbit and a stack may be spread over several. Each line says what
+/// its figure is a chance OF: holding that orbit when the Battle is over, where the single line
+/// this replaced said "odds of winning the first round" and quoted a share of the strength.
+///
+/// Nothing at all where no rival shares an orbit with you, which is the honest answer: an Attack
+/// ordered at the Body fights nobody, however many rival hulls are in the sky.
+fn orbit_odds_lines(ui: &mut Ui, game: &Game, body: BodyId) {
+    let mut any = false;
+    for orbit in orbits_of_stack(game, Seat(0), body) {
+        // Whether a rival is THERE, not whether it is armed: three unarmed hulls in your orbit are
+        // three things a Battle would destroy, and a strength of nought made the line say nobody
+        // was there at all. Caught in `orbit-odds.png`'s first capture, which is a board of exactly
+        // that shape -- a Frigate of yours and three rival Colony Ships and Carriers in low orbit.
+        let present = |orbit: Orbit, s: Seat| ships_in_orbit(game, s, body, orbit).iter().any(|x| !x.escaped) || !game.batteries_at(s, body, orbit).is_empty();
+        if !Seat(0).others().iter().any(|s| present(orbit, *s)) {
+            continue;
+        }
+        any = true;
+        let theirs: i64 = Seat(0).others().iter().map(|s| orbit_strength(game, *s, body, orbit)).sum();
+        let mine = orbit_strength(game, Seat(0), body, orbit);
+        let odds = orbit_odds(ui.ctx(), game, body, orbit, Seat(0));
+        rule_tip(
+            ui.label(format!("Attacking {}: {:.0}% is your chance of holding the orbit when the Battle is over (your strength {mine} against {theirs}).", orbit_phrase(game, body, orbit), odds * 100.0)),
+            "The chance that nothing of any rival's is left standing in this orbit when the Battle ends and something of yours is -- the test an Occupation makes, not the first exchange's share of the strength.\nIt is measured: the Battle is fought a thousand times over on a copy of the board, from a seed of its own, so the figure never moves and asking for it never moves the game.".to_string(),
+        );
+    }
+    if !any {
+        ui.label(RichText::new("No rival stands in an orbit of yours here, so an Attack ordered here fights nobody.").weak());
+    }
+}
+
 /// Ticket #309 (version 0.08.7): the hover on a button that attacks a place -- a march on a
 /// Region, a landing at a Colony -- naming who defends it and what the odds figure is a chance
 /// OF, at the designer's word: the place and its holder; a line per defender with its name, its
-/// strength, what it defends at (dug in noted) and its damage; the first-exchange chance with the
-/// two strengths it was made from; and the cost-and-stance line. Six lines at most: three
-/// defenders are named, and past three, two are named and the rest counted. The presentation
-/// review's finding was that a player saw "61%" with no way to learn what defended or at what.
-fn attack_hover(game: &Game, place: Place, name: &str, attacker: i64, landing: bool) -> String {
+/// strength, what it defends at (dug in noted) and its damage; the chance with the two strengths it
+/// was made from; and the cost-and-stance line. Six lines at most: three defenders are named, and
+/// past three, two are named and the rest counted. The presentation review's finding was that a
+/// player saw "61%" with no way to learn what defended or at what.
+///
+/// Ticket #339 (version 0.09.0): the chance is **the whole Battle's** -- holding the field when it
+/// is over -- where it was the first exchange's share of the strength, and the words say so. The
+/// two are not near neighbours: on the board the engine lane measured, a first-round share of 19.8%
+/// was a 1% chance of actually holding the ground, because the share says nothing about how many
+/// units have to die before a place is yours. So the attackers arrive here as Armies and not as a
+/// strength: a measured Battle wants the units, not their sum.
+fn attack_hover(ctx: &egui::Context, game: &Game, place: Place, name: &str, attackers: &[ArmyId], landing: bool) -> String {
     let control = match place {
         Place::State(sid) => game.state(sid).control,
         Place::Colony(cid) => game.colonies.iter().find(|c| c.id == cid).map(|c| c.control).unwrap_or(Control::Neutral),
@@ -4601,6 +4691,7 @@ fn attack_hover(game: &Game, place: Place, name: &str, attacker: i64, landing: b
         Control::Occupied { occupier, .. } => format!("occupied by the {}", game.seat_name(occupier)),
     };
     let defenders: Vec<&Army> = game.defenders_at(place, Seat(0)).iter().filter_map(|id| game.army(*id)).collect();
+    let attacker: i64 = attackers.iter().filter_map(|id| game.army(*id)).map(|a| game.army_strength(a)).sum();
     let arrives = if landing { "The Army attacks as it lands" } else { "The Army arrives on Attack" };
     if defenders.is_empty() {
         return format!("{name}: {holder}, undefended. {arrives} and the Occupation begins.");
@@ -4616,7 +4707,11 @@ fn attack_hover(game: &Game, place: Place, name: &str, attacker: i64, landing: b
         let rest: i64 = defenders[named..].iter().map(|a| game.army_defended_strength(a)).sum();
         lines.push(format!("and {} more, defending at {rest} in all", defenders.len() - named));
     }
-    lines.push(format!("{:.0}% is the chance to win the first exchange: your {attacker} against their {total}.", first_round_odds(attacker, total) * 100.0));
+    // Ticket #339 (version 0.09.0): what the figure is a chance OF, in the sentence that carries it.
+    lines.push(format!(
+        "{:.0}% is the chance of holding the field when the Battle is over, not of winning its first exchange: your {attacker} against their {total}.",
+        ground_odds(ctx, game, place, attackers) * 100.0
+    ));
     lines.push(format!("{} costs nothing; {}.", if landing { "Landing" } else { "Moving" }, if landing { "the Army attacks as it lands" } else { "the Army arrives on Attack" }));
     lines.join("\n")
 }
@@ -4798,6 +4893,69 @@ fn widgets_block(ui: &mut Ui, game: &Game, place: Place) {
     rule_tip(icon_word(ui, "widgets", format!("Widgets {rate} a turn")), hover);
     for (b, turns) in game.queue_at(place).iter().zip(game.queue_estimates(place)) {
         ui.label(format!("  {}", queue_line(game, place, b, turns)));
+    }
+}
+
+/// Ticket #339 (version 0.09.0): **the eye**, improvement L of the designer's five. A working Relay
+/// at a Colony of yours off Earth, or a working Embassy in a Region of yours on Earth, reads a
+/// rival's income at every place on that Body **building by building** -- which the Faction window
+/// withholds, a rival's page there giving totals alone. The designer's own words: *"its holder
+/// reads a rival's building-by-building income at that Body"*.
+///
+/// It goes on the rival place's OWN CARD, which is where a player wondering what that place is
+/// worth to its holder is already looking, and it **names what is letting them see it**, so the
+/// rule is learnt from the thing itself and not from a rulebook. Without an eye the block is not
+/// drawn at all: `eye_income` answers `None`, and an empty block would read as a rival who makes
+/// nothing rather than as a reading nobody has paid for.
+///
+/// The figures are read for the RIVAL -- their Faction's multipliers, their Techs, the Custodians'
+/// doubling -- because what is wanted is what they are paid, not what the place would pay you.
+fn eye_block(ui: &mut Ui, session: &Session, game: &Game, place: Place) {
+    // Ticket #64: a spectated game has no "you", and every board on it is open already.
+    if session.spectator {
+        return;
+    }
+    let (Some(read), Some(body)) = (game.eye_income(Seat(0), place), game.body_of(place)) else { return };
+    let Some(holder) = game.place_control(place).director().map(|d| game.seat_name(d)) else { return };
+    rule_tip(
+        ui.label(RichText::new(format!("{} reads what the {holder} draw here, building by building:", eye_source(game, Seat(0), body))).strong()),
+        format!(
+            "A working Relay at a Colony of yours off Earth, or a working Embassy in a Region of yours on Earth, reads every rival's income at that Body building by building. The Faction window gives a rival's totals alone.\nOne is enough for the whole Body, and a Unique that does the job counts; mothballed or offline it reads nothing.\nThe figures are the {holder}' own, their Faction's multipliers and Techs in them."
+        ),
+    );
+    if read.is_empty() {
+        ui.label(RichText::new("  Nothing stands here yet, so there is nothing to read.").weak());
+    }
+    for (name, y) in &read {
+        ui.label(format!("  {name}: {}", y.text()));
+    }
+}
+
+/// Ticket #339: which building of yours is doing the watching, and where it stands -- by the same
+/// two rules `has_eye` tests, and named by the kind that is actually standing, so an Arkwright's
+/// Chorus says Chorus. The engine answers WHETHER there is an eye; the card wants to say which.
+fn eye_source(game: &Game, seat: Seat, body: BodyId) -> String {
+    match body {
+        BodyId::Earth => {
+            for sid in StateId::ALL {
+                let st = game.state(sid);
+                if st.control.director() != Some(seat) {
+                    continue;
+                }
+                if let Some(f) = st.facilities.iter().find(|f| f.kind.does_the_job_of(FacilityKind::Embassy) && f.working()) {
+                    return format!("Your {} in {}", f.kind.name(), game.tables.state(sid).name);
+                }
+            }
+            "Your Embassy".to_string()
+        }
+        b => {
+            for c in game.colonies.iter().filter(|c| c.body == b && c.control.director() == Some(seat)) {
+                if let Some(m) = c.modules.iter().find(|m| m.kind.does_the_job_of(ModuleKind::Relay) && m.working()) {
+                    return format!("Your {} at {}", m.kind.name(), game.place_name(Place::Colony(c.id)));
+                }
+            }
+            "Your Relay".to_string()
+        }
     }
 }
 
@@ -5172,6 +5330,12 @@ Spending here raises the bar; doing nothing lowers it, yours decaying {} a turn 
             // never its stance, at the designer's word (as a Region arms stance-blind, #282); no
             // line at all when nobody stands next door; amber when their odds reach the bar the
             // computer attacks at, which is measured behaviour read from `ai.toml`, not a rule.
+            // Ticket #339 (version 0.09.0) moved every odds figure a player is QUOTED FOR THEIR OWN
+            // ATTACK to the whole Battle's, and deliberately left this one where it was: the figure
+            // here is the computer's own bar, the same arithmetic `nearest_army_threat` ranks
+            // threats by and the same the amber compares against, so a whole-Battle figure here
+            // would be measured against a first-round bar and the amber rule would stop being true.
+            // The sentence still says "first exchange", so the line is honest about which it is.
             if let Place::State(sid) = target
                 && let Some((id, from, odds)) = game.nearest_army_threat(sid)
                 && let Some(a) = game.army(id)
@@ -5834,6 +5998,9 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     }
     // Ticket #332 (version 0.09.0): what this Region makes in Widgets a turn, and its queue.
     widgets_block(ui, game, Place::State(sid));
+    // Ticket #339 (version 0.09.0): and what an Embassy of yours on Earth reads of a rival's income
+    // here, above the slot boxes the Facilities it names are drawn in.
+    eye_block(ui, session, game, Place::State(sid));
     // Ticket #146 (version 0.07.3): the slots the sea took are drawn under water among the boxes
     // below, so the sea-blue count that stood here is gone.
     // Ticket #56: the two rows of slots, with what stands in each and what the sea has taken.
@@ -5886,6 +6053,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         let stacked = stack.len() > 1;
         if stacked {
             let strength: i64 = stack.iter().map(|a| game.army_strength(a)).sum();
+            let marching: Vec<ArmyId> = stack.iter().map(|a| a.id).collect();
             ui.horizontal_wrapped(|ui| {
                 ui.label(format!("All {} ({}):", stack.len(), strength));
                 for n in &card.neighbours {
@@ -5899,7 +6067,9 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     } else if let (true, Control::Controlled(h)) = (passage, ctrl) {
                         format!("{name}: held by the {}, a partner under Passage. Moving costs nothing; the stack arrives on Hold.", game.seat_name(h))
                     } else {
-                        attack_hover(game, Place::State(*n), name, strength, false)
+                        // Ticket #339 (version 0.09.0): the whole stack marches, so the whole stack
+                        // is what the Battle is measured with.
+                        attack_hover(ui.ctx(), game, Place::State(*n), name, &marching, false)
                     };
                     let orders: Vec<Order> = stack.iter().map(|a| Order::MoveArmy { army: a.id, to: *n }).collect();
                     orders_button(ui, game, &session.pending, orders, &label, Some(hover), actions);
@@ -5978,7 +6148,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                         } else if let (true, Control::Controlled(h)) = (passage, ctrl) {
                             format!("{name}: held by the {}, a partner under Passage. Moving costs nothing; the Army arrives on Hold and fights nobody while the Accord stands.", game.seat_name(h))
                         } else {
-                            attack_hover(game, Place::State(*n), name, game.army_strength(a), false)
+                            attack_hover(ui.ctx(), game, Place::State(*n), name, &[a.id], false)
                         };
                         cost_button_with_hover(ui, game, &session.pending, Order::MoveArmy { army: a.id, to: *n }, &label, Some(hover), actions);
                     }
@@ -6338,6 +6508,9 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     // Ticket #332 (version 0.09.0): what this place makes in Widgets a turn, and its queue in
     // order -- the Archive and a Ship on it too, which have no tile.
     widgets_block(ui, game, Place::Colony(cid));
+    // Ticket #339 (version 0.09.0): and what a Relay of yours at this Body reads of a rival's
+    // income here, above the tiles the Modules it names are drawn as.
+    eye_block(ui, session, game, Place::Colony(cid));
     let research = game.tables.archive.research;
     // Ticket #162 (version 0.07.5): the Modules are tiles on the card, where ticket #145 had put
     // them in a window. The summary line above says the cap; the tiles say the rest, so the
@@ -6557,17 +6730,13 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         return;
     }
     if seat != Seat(0) {
-        let mine = game.ship_stack_strength(Seat(0), body);
         // Ticket #50: a Battle at a Body is a melee, so the odds run against everyone else present.
-        let theirs = game.enemy_ship_strength(Seat(0), body);
+        // Ticket #339 (version 0.09.0): and since ticket #335 it is a melee in ONE ORBIT, so the
+        // one figure this line carried could not be either honest or single. It is a line per
+        // orbit now, and each says what its figure is a chance of.
         let rivals = rivals_at(game, Seat(0), body);
-        ui.label(format!(
-            "A Battle here is a melee against every Faction present. Odds of winning the first round if you attack: {:.0}% (your strength {} against {}{})",
-            first_round_odds(mine, theirs) * 100.0,
-            mine,
-            rivals_text(game, &rivals),
-            if rivals.len() > 1 { format!(", {theirs} in all") } else { String::new() }
-        ));
+        ui.label(format!("A Battle here is a melee against every Faction in the same orbit, and each orbit is a Battle of its own. Against {}.", rivals_text(game, &rivals)));
+        orbit_odds_lines(ui, game, body);
         return;
     }
     if ships.is_empty() {
@@ -6581,7 +6750,10 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         let mine = game.ship_stack_strength(Seat(0), body);
         // Ticket #50: name every Faction with Ships here; the attack is against all of them at once.
         let rivals = rivals_at(game, seat, body);
-        ui.label(format!("Against {} ({} in all). Attack odds (first round): {:.0}%", rivals_text(game, &rivals), enemy, first_round_odds(mine, enemy) * 100.0));
+        ui.label(format!("Against {} ({} in all). Your strength at the Body: {mine}.", rivals_text(game, &rivals), enemy));
+        // Ticket #339 (version 0.09.0): the odds of each Battle an Attack here would start, one
+        // per orbit, and the whole Battle's rather than its first round's.
+        orbit_odds_lines(ui, game, body);
         if ui.button("Attack this turn").clicked() {
             view.attack_preview = true;
         }
@@ -6828,14 +7000,14 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 }
                 if let Some(aid) = s.army {
                     // Ticket #300 (version 0.08.6): the attack happens the turn it lands, so the
-                    // button carries the first-round odds as the march buttons do. Ticket #309
-                    // (version 0.08.7): on a hover that names the defender, not on the face.
+                    // button carries the same odds the march buttons do. Ticket #309 (version
+                    // 0.08.7): on a hover that names the defender, not on the face. Ticket #339
+                    // (version 0.09.0): and those odds are the whole Battle's.
                     let slot_name = &game.tables.body(c.body).slots[c.slot as usize].name;
                     let (label, hover) = if own {
                         (format!("Land the Army at {slot_name}"), format!("{slot_name}: held by you. Landing costs nothing; the Army lands on Hold."))
                     } else {
-                        let mine = game.army(aid).map(|a| game.army_strength(a)).unwrap_or(0);
-                        (format!("Land the Army to attack {slot_name}"), attack_hover(game, Place::Colony(c.id), slot_name, mine, true))
+                        (format!("Land the Army to attack {slot_name}"), attack_hover(ui.ctx(), game, Place::Colony(c.id), slot_name, &[aid], true))
                     };
                     cost_button_with_hover(ui, game, &session.pending, Order::Unload { ship: s.id, colonists: 0, army: true, into: UnloadTarget::Colony(c.id) }, &label, Some(hover), actions);
                 }
@@ -9193,8 +9365,10 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                                 let colour = party.seat.map(|s| seat_colour(session, s)).unwrap_or(Color32::LIGHT_GRAY);
                                 // Ticket #281 (version 0.08.5): every unit by name and what it took,
                                 // and the odds the attacker faced, labelled for what they are.
+                                // Ticket #339 (version 0.09.0): the whole Battle's odds, in the
+                                // same words the attack button quoted them in.
                                 let attacking = match (party.aggressor, party.odds) {
-                                    (true, Some(o)) => format!(", attacking at {:.0}% first-round odds", o * 100.0),
+                                    (true, Some(o)) => format!(", attacking at {:.0}% odds of holding the field", o * 100.0),
                                     (true, None) => ", attacking".to_string(),
                                     _ => String::new(),
                                 };
