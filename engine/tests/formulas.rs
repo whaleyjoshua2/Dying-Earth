@@ -1980,13 +1980,13 @@ fn an_arkwright_muster_takes_twice_the_population_out_of_its_state() {
     g.state_mut(StateId::NorthAfrica).control = Control::Controlled(Seat(2));
     g.state_mut(StateId::NorthAfrica).facilities.retain(|f| f.kind != FacilityKind::LaunchSite);
     g.state_mut(StateId::NorthAfrica).facilities.push(facility(FacilityKind::LaunchSite));
-    assert!((g.lift_population(Seat(0), 4) - 4.0).abs() < 1e-9, "one unit of five million each since ticket #143 (version 0.07.3)");
+    assert!((g.lift_population(Seat(0), 4) - 4.0).abs() < 1e-9, "one unit each: one million people since ticket #333 (version 0.09.0), five million from ticket #143 (version 0.07.3)");
     assert!((g.lift_population(Seat(2), 4) - 8.0).abs() < 1e-9, "Coach Class costs the state twice");
     // Ticket #73: the population is paid when the Emigrants muster, and the lift takes none.
     let before = g.state(StateId::NorthAfrica).population;
     g.commit_orders(Seat(2), &[Order::BuildEmigrants { state: StateId::NorthAfrica, n: 4 }]);
     let taken = before - g.state(StateId::NorthAfrica).population;
-    assert!((taken - 8.0).abs() < 1e-9, "the recruit took {taken}, not 8.0 (two units of five million per Pioneer under Coach Class)");
+    assert!((taken - 8.0).abs() < 1e-9, "the recruit took {taken}, not 8.0 (two units of one million per Pioneer under Coach Class)");
     let after_muster = g.state(StateId::NorthAfrica).population;
     let ship = a_colony_ship(&mut g, Seat(2), BodyId::Earth);
     g.commit_orders(Seat(2), &[Order::Load { ship, colonists: 4, from: LoadSource::State(StateId::NorthAfrica), army: None }]);
@@ -2488,15 +2488,21 @@ fn b_a_sea_level_threshold_raises_two_a_slot_and_displaces_five_percent_an_expos
 }
 
 /// (c) Heat refugees: half of what a state lost arrives at its neighbours and raises their Unrest
-/// by one per half a person, at most three in a turn.
+/// by one per `refugees_per` of population -- two and a half million people: half a unit of five
+/// million until ticket #333 (version 0.09.0), two and a half units of one million since -- at most
+/// two in a turn.
 #[test]
-fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_half_a_person() {
+fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_two_and_a_half_million_people() {
     let mut g = game();
     calm(&mut g);
     for s in &mut g.states {
         s.population = 0.0;
     }
-    let before = 100.0;
+    // Ticket #333: 500 units of one million, the 100 units of five million of before -- the same
+    // five hundred million people -- so the flow below is still worth exactly one point.
+    let per = g.tables.unrest.refugees_per;
+    assert_eq!(per, 2.5, "two and a half million people a point, as 0.5 units of five million were (ticket #333)");
+    let before = 500.0;
     g.state_mut(StateId::EastAsia).population = before;
     // Russia is the only neighbour of East Asia's with any Industry Level, so it takes the whole flow.
     g.state_mut(StateId::Russia).industry_level = 2;
@@ -2509,7 +2515,7 @@ fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_half_a_person()
     g.climate_phase();
     let lost = before - g.state(StateId::EastAsia).population;
     let arrived = lost * 0.5;
-    assert!(arrived > 0.5 && arrived < 1.0, "the flow is worth exactly one point of Unrest: {arrived}");
+    assert!(arrived > per && arrived < 2.0 * per, "the flow is worth exactly one point of Unrest: {arrived}");
     assert!((g.state(StateId::Russia).population - arrived).abs() < 1e-6, "Russia took the flow: {}", g.state(StateId::Russia).population);
     // Ticket #176 (version 0.07.6): the Report no longer speaks per flow. The old line here read
     // "0.8 left China for Russia (the heat)" and was written the moment the people moved; a Region
@@ -2526,8 +2532,9 @@ fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_half_a_person()
     // Russia changed nothing and holds nobody, so the turn's fall of 1.5 nets against the rise.
     g.state_mut(StateId::Russia).changed_hands = true;
     g.resolve_unrest();
-    let want = (arrived / 0.5).floor();
-    assert_eq!(g.unrest(StateId::Russia), want.min(2.0), "one Unrest per half a person arriving");
+    let want = (arrived / per).floor();
+    assert_eq!(want, 1.0, "the flow of {arrived} is one point at {per} a point");
+    assert_eq!(g.unrest(StateId::Russia), want.min(2.0), "one Unrest per two and a half million people arriving");
     // And now the two net lines: China lost them, naming the cause that drove them out, and Russia
     // took them in, with the Unrest clause that is the one place the Report explains an Unrest rise.
     let said = |s: &str| g.report.lines.iter().any(|l| l.kind == LineKind::Refugees && l.text.contains(s));
@@ -2547,7 +2554,9 @@ fn c_heat_refugees_arrive_at_the_neighbours_and_raise_unrest_per_half_a_person()
 }
 
 /// Ticket #176 (version 0.07.6): the Report says **one net migration line per Region**, and only
-/// when the net is worth at least half a person. The designer: *"reduce report clutter by reporting
+/// when the net is worth at least `report_net_floor` -- two and a half million people: half a unit
+/// of five million when it was set, two and a half units of one million since ticket #333 (version
+/// 0.09.0). The designer: *"reduce report clutter by reporting
 /// only net migration from refugees and only when migration occurs."* Measured before the change,
 /// over ten computer-played games: the worst turn spent 39 of its 74 Report lines on refugees, the
 /// median turn 12, and refugees were 30% of the median Report -- because a Region spoke once per
@@ -2571,11 +2580,13 @@ fn the_report_says_one_net_migration_line_per_region_and_only_when_it_is_worth_s
     // that took six people absorbed six people's worth of grievance, whatever left afterwards.
     assert_eq!(g.unrest(StateId::Russia), 2.0, "charged on everyone who arrived, up to the cap");
 
-    // Under half a person, in either direction: silence.
+    // Under the floor, in either direction: silence. Ticket #333: 2.0 units of one million, the two
+    // million people that 0.4 units of five million were, under a floor of 2.5 that was 0.5.
     let mut g = game();
     calm(&mut g);
-    g.state_mut(StateId::Russia).refugees_in = 0.4;
-    g.state_mut(StateId::SouthAsia).refugees_out = vec![("the sea".to_string(), 0.4)];
+    assert_eq!(g.tables.unrest.report_net_floor, 2.5, "two and a half million people, as 0.5 units of five million were (ticket #333)");
+    g.state_mut(StateId::Russia).refugees_in = 2.0;
+    g.state_mut(StateId::SouthAsia).refugees_out = vec![("the sea".to_string(), 2.0)];
     g.resolve_unrest();
     assert!(refugee_lines(&g).is_empty(), "under the floor in both directions: {:?}", refugee_lines(&g));
 
@@ -2926,10 +2937,11 @@ fn twelve_nation_states_share_out_the_eight_they_came_from() {
     let america = [StateId::NorthAmerica, StateId::CentralAmerica];
     assert_eq!(america.iter().map(|s| card(*s).gdp).sum::<i64>(), 25);
     assert_eq!(america.iter().map(|s| card(*s).influence).sum::<i64>(), 8);
-    // The world still holds about 7.9 billion people, as the eight states did: 1,572 units of five
-    // million since ticket #143 (version 0.07.3), 78.6 hundred-million before.
+    // The world still holds about 7.9 billion people, as the eight states did: 7,860 units of one
+    // million since ticket #333 (version 0.09.0), 1,572 units of five million from ticket #143
+    // (version 0.07.3) until then, 78.6 hundred-million before.
     let people: f64 = StateId::ALL.iter().map(|s| card(*s).population).sum();
-    assert!((people - 1572.0).abs() < 0.1, "population {people}");
+    assert!((people - 7860.0).abs() < 0.1, "population {people}");
     // Every edge is listed on both states, and nothing neighbours itself.
     for s in StateId::ALL {
         assert!(!card(s).neighbours.contains(&s), "{s:?} neighbours itself");
@@ -2974,8 +2986,8 @@ fn quiet_world(g: &mut Game) {
 fn a_blame_follows_control_and_a_neutral_state_belongs_to_nobody() {
     let mut g = game();
     quiet_world(&mut g);
-    // North Africa is the Prospectors': baseline 0.4 at Industry Level 2, with 3.0 hundred million
-    // people. Sub-Saharan Africa stays neutral carrying exactly the same weight.
+    // North Africa is the Prospectors': baseline 0.4 at Industry Level 2, with 3.0 units of
+    // population. Sub-Saharan Africa stays neutral carrying exactly the same weight.
     g.take_control(StateId::NorthAfrica, Seat(1));
     g.state_mut(StateId::NorthAfrica).industry_level = 2;
     g.state_mut(StateId::NorthAfrica).population = 3.0;
@@ -3371,15 +3383,19 @@ fn c_population_emissions_follow_the_industry_level() {
     let g = game();
     let c = &g.tables.climate;
     // Ticket #143 (version 0.07.3): per unit of five million, a twentieth of the per-hundred-million 0.04 and 0.03.
-    assert_eq!(c.population_emissions_base, 0.002);
-    assert_eq!(c.population_emissions_per_level, 0.0015);
+    // Ticket #333 (version 0.09.0): per unit of one million, a hundredth of them; the quotation is unchanged.
+    assert_eq!(c.population_emissions_base, 0.0004);
+    assert_eq!(c.population_emissions_per_level, 0.0003);
     for sid in StateId::ALL {
         let want = c.population_emissions_base + c.population_emissions_per_level * g.state(sid).industry_level as f64;
         assert!((g.population_coefficient(sid) - want).abs() < 1e-9, "{sid:?}: {} where {want} was wanted", g.population_coefficient(sid));
     }
     // Sub-Saharan Africa at Industry Level 1 emits 0.07 per hundred million; East Asia at 3 emits
-    // 0.13. Ticket #143: the coefficient is per unit of five million, twenty to the hundred million.
-    let per_hundred_million = Game::UNITS_PER_HUNDRED_MILLION;
+    // 0.13. Ticket #143: the coefficient is per unit of five million, twenty to the hundred million;
+    // ticket #333: per unit of one million, a hundred to the hundred million, read off the tables.
+    assert_eq!(g.tables.climate.people_per_unit, 1_000_000.0, "one unit is one million people (ticket #333)");
+    let per_hundred_million = g.tables.units_per_hundred_million();
+    assert_eq!(per_hundred_million, 100.0);
     assert!((g.population_coefficient(StateId::SubSaharanAfrica) * per_hundred_million - 0.07).abs() < 1e-9);
     assert!((g.population_coefficient(StateId::EastAsia) * per_hundred_million - 0.13).abs() < 1e-9);
     let new: f64 = StateId::ALL.iter().map(|s| g.population_coefficient(*s) * g.state(*s).population).sum();
@@ -3393,8 +3409,9 @@ fn c_population_emissions_follow_the_industry_level() {
     g.state_mut(StateId::EastAsia).industry_level += 1;
     let rise = g.emissions_now().population - before;
     // Ticket #143: 288 units of five million, the 14.4 hundred-million of before; the same 0.432.
+    // Ticket #333: 1,440 units of one million, the same 0.432 again.
     let per_level = g.tables.climate.population_emissions_per_level;
-    assert!((rise - per_level * 288.0 * mult).abs() < 1e-9, "the population line rose {rise:.3}");
+    assert!((rise - per_level * 1440.0 * mult).abs() < 1e-9, "the population line rose {rise:.3}");
 }
 
 /// (d) Leapfrog is the Custodians' alone, costs 50 Ducats, takes one level's worth off the state's
@@ -3451,9 +3468,11 @@ fn e_a_scrubber_enlarges_the_sink_and_is_capped_destroyed_and_calming() {
     // Ticket #332 (version 0.09.0): 8 Widgets, four for each of its two turns.
     assert_eq!((card.materials, card.widgets, card.energy_upkeep, card.emissions), (30, 8, 3, 0.0));
     assert!(card.no_slot, "a Scrubber takes no build slot");
-    // The cap: half the population in hundreds of millions, between 2 and 10.
-    assert_eq!(g.scrubber_cap(StateId::Russia), 2, "Russia at 1.5 takes the floor");
-    assert_eq!(g.scrubber_cap(StateId::SouthAsia), 10, "South Asia at 19.4 takes the ceiling");
+    // The cap: one per two hundred million people (ticket #333, version 0.09.0: 200 units of one
+    // million; 40 units of five million before), between 2 and 10.
+    assert_eq!(g.tables.scrubber.per_population, 200.0, "two hundred million people a Scrubber");
+    assert_eq!(g.scrubber_cap(StateId::Russia), 2, "Russia at 150 takes the floor");
+    assert_eq!(g.scrubber_cap(StateId::SouthAsia), 10, "India at 1940 takes the ceiling");
     // Only the Custodians, and only on a state they control. Every seat that is not the Custodians
     // is refused, on its own state and on anyone else's, by BOTH build paths: the Materials one and
     // the Ducat one of ticket #42, which a Faction with money could otherwise walk in through.
@@ -5707,7 +5726,7 @@ fn emigrants_muster_four_a_turn_per_faction_in_one_state_at_one_unit_of_populati
     assert!(g.check_order(Seat(0), &[], &Order::Load { ship: ShipId(999), colonists: 1, from: LoadSource::State(StateId::EastAsia), army: None }).is_err(), "nothing waits yet");
     g.commit_orders(Seat(0), &[build]);
     assert_eq!(g.state(StateId::EastAsia).emigrants, 4, "on the card at End Turn");
-    assert!((pop - g.state(StateId::EastAsia).population - 4.0).abs() < 1e-9, "one unit of five million each (ticket #143)");
+    assert!((pop - g.state(StateId::EastAsia).population - 4.0).abs() < 1e-9, "one unit each: one million people since ticket #333, five million from ticket #143");
     assert_eq!(g.state(StateId::EastAsia).unrest, 2.5, "the batch took 0.5 off");
     assert!(g.log.to_vec().iter().any(|l| l.contains("Pioneers recruited in China")), "{:?}", g.log.to_vec());
     // Coach Class: eight a turn at twice the population.
@@ -8353,7 +8372,10 @@ fn schooling_moderates_the_population_bonus() {
     let sid = g.directed_states(Seat(0))[0];
     let card = g.tables.state(sid).education_level;
     let pop = g.state(sid).population;
-    let bonus = pop / 1000.0;
+    // Ticket #333 (version 0.09.0): 5,000 units of one million, the five billion that 1,000 units
+    // of five million were, read off facilities.toml.
+    assert_eq!(g.tables.population_factor.population_per_point, 5000.0);
+    let bonus = pop / 5000.0;
 
     assert!((g.population_factor(sid) - (1.0 + bonus * card)).abs() < 1e-9, "the card figure scales the bonus");
 
@@ -8387,7 +8409,7 @@ fn schooling_applies_twice_to_a_research_lab() {
     g.state_mut(sid).schooling = taught - card;
     let base = g.tables.facility(FacilityKind::ResearchLab).produces.as_ref().unwrap().amount as f64;
     let mult = g.tables.faction(g.kind(Seat(0))).research_multiplier;
-    let want = (base * (1.0 + pop / 1000.0 * taught) * taught * mult).floor() as i64;
+    let want = (base * (1.0 + pop / 5000.0 * taught) * taught * mult).floor() as i64;
     assert_eq!(g.facility_yield(Seat(0), sid, FacilityKind::ResearchLab).research, want, "the factor and the multiplier both carry the schooling");
 }
 
@@ -11787,4 +11809,34 @@ fn the_ai_builds_its_ships_at_the_yard_with_the_most_widgets() {
         ships.iter().all(|o| matches!(o, Order::BuildShip { site, .. } if *site == Place::Colony(moon))),
         "every Ship at the Moon yard, eight Widgets against the ISS's four: {ships:?}\nscored: {scored_ships:#?}"
     );
+}
+
+// ---------------------------------- 0.09.0 ticket #333: one unit of population per million people
+
+/// Ticket #333 (version 0.09.0): one unit of population is one million people, read off
+/// `climate.toml` rather than a code constant, and a Colonist is one unit -- so a Pioneer takes
+/// exactly one million people from its Region -- and the card keeps its shape, the unit figure to
+/// one decimal with the people in brackets. The designer: *"pop 1 per million"*.
+#[test]
+fn one_unit_of_population_is_one_million_people_and_a_pioneer_takes_exactly_one() {
+    let mut g = game();
+    calm(&mut g);
+    let people_per_unit = g.tables.climate.people_per_unit;
+    assert_eq!(people_per_unit, 1_000_000.0, "one unit is one million people");
+    // The world opens at 7,860 units, 7.86 billion people; China at 1,440, 1.44 billion.
+    let world: f64 = g.tables.states.iter().map(|s| s.population).sum();
+    assert_eq!(world, 7860.0);
+    assert_eq!(g.tables.people_text(world), "7.86B");
+    assert_eq!(g.tables.state(StateId::EastAsia).population, 1440.0);
+    // A Pioneer takes one unit, one million people, from its Region, at the recruit.
+    let before = g.state(StateId::EastAsia).population;
+    g.commit_orders(Seat(0), &[Order::BuildEmigrants { state: StateId::EastAsia, n: 1 }]);
+    let taken_people = (before - g.state(StateId::EastAsia).population) * people_per_unit;
+    assert!((taken_people - 1_000_000.0).abs() < 1e-3, "a Pioneer took {taken_people} people, not one million");
+    assert!((g.lift_population(Seat(0), 1) * people_per_unit - 1_000_000.0).abs() < 1e-3, "and the button's cost in people says one million");
+    assert_eq!(g.tables.people_text(1.0), "1M", "one Colonist, in the people form");
+    // The card's form: the unit figure to one decimal, the people in brackets.
+    assert_eq!(g.tables.population_text(1454.5), "1454.5 (1.45B)");
+    assert_eq!(g.tables.population_text(380.0), "380.0 (380M)");
+    assert_eq!(g.tables.units_per_hundred_million(), 100.0, "a hundred units to the hundred million the cards quote by");
 }

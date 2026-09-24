@@ -2560,29 +2560,11 @@ impl Game {
         self.build_slots(s).saturating_sub(self.slots_used(s))
     }
 
-    /// Ticket #143 (version 0.07.3): the population figure's unit, in people. A Region's figure, a
-    /// Colonist and an Emigrant are all counted in it, so `Region population 76.0` is 380 million
-    /// people and one Colonist is five million. (A hundred million, with a Colonist a tenth of one,
-    /// until this ticket.) The designer: *"I want country cards to use the actual population."*
-    pub const PEOPLE_PER_UNIT: f64 = 5_000_000.0;
-
-    /// Units in a hundred million people, since the cards quote per-person Emissions at that rate.
-    pub const UNITS_PER_HUNDRED_MILLION: f64 = 100_000_000.0 / Game::PEOPLE_PER_UNIT;
-
-    /// A population figure written as real people: `1.14B`, `380M`, `20M`.
-    pub fn people_text(units: f64) -> String {
-        let people = units * Game::PEOPLE_PER_UNIT;
-        if people >= 1_000_000_000.0 {
-            format!("{:.2}B", people / 1_000_000_000.0)
-        } else {
-            format!("{:.0}M", people / 1_000_000.0)
-        }
-    }
-
-    /// The card's form: the figure in units to one decimal, and the real number beside it.
-    pub fn population_text(units: f64) -> String {
-        format!("{units:.1} ({})", Game::people_text(units))
-    }
+    // Ticket #143 (version 0.07.3): the population figure's unit, in people, was `PEOPLE_PER_UNIT`
+    // here, five million, with `people_text` and `population_text` beside it. Ticket #333 (version
+    // 0.09.0) made it one million -- the designer: *"pop 1 per million"* -- and moved it into
+    // `climate.toml` as `people_per_unit`, read through `Tables::people_text`,
+    // `Tables::population_text` and `Tables::units_per_hundred_million`.
 
     /// Ticket #143: everyone on Earth -- the Regions' figures and the Colonists in Antarctica.
     pub fn earth_population(&self) -> f64 {
@@ -2600,7 +2582,9 @@ impl Game {
 
     pub fn population_factor(&self, s: StateId) -> f64 {
         // Ticket #143 (version 0.07.3): the unit is five million people, so 1,000 units is the five
-        // billion that 50 hundred-million was.
+        // billion that 50 hundred-million was. Ticket #333 (version 0.09.0): the unit is one
+        // million, the divisor is `[population_factor] population_per_point` in facilities.toml,
+        // 5,000 units, the same five billion.
         //
         // Ticket #188 (version 0.08.0): the BONUS -- the part above 1 -- is scaled by the state's
         // schooling, so a great many badly-schooled people are worth less to a Research Lab than a
@@ -2610,7 +2594,7 @@ impl Game {
         //
         // The Education Level therefore applies TWICE to a Lab -- here, and as the outright
         // multiplier it has always been. That compounding is the point.
-        1.0 + (self.state(s).population / 1000.0) * self.education_level(s)
+        1.0 + (self.state(s).population / self.tables.population_factor.population_per_point) * self.education_level(s)
     }
 
     /// Ticket #97 (version 0.07.0): the Modules this Colony or Space Station may hold: the table's

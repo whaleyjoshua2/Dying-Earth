@@ -872,7 +872,7 @@ impl Game {
                     gap_for(Cat::Leapfrog, None),
                     1.0,
                     1.0,
-                    format!("Leapfrog {} ({:.2} per hundred million now)", self.tables.state(sid).name, self.population_coefficient(sid) * Game::UNITS_PER_HUNDRED_MILLION),
+                    format!("Leapfrog {} ({:.2} per hundred million now)", self.tables.state(sid).name, self.population_coefficient(sid) * self.tables.units_per_hundred_million()),
                     None,
                 );
             }

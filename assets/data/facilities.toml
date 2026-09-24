@@ -211,12 +211,13 @@ energy_upkeep = 2
 produces = { resource = "materials", amount = 4 }
 emissions = 0.75
 
-# Ticket #54: the cap on Scrubbers in one Nation State, from its population -- in units of five
-# million since ticket #143 (version 0.07.3), so 40 units is the two hundred million each Scrubber wants:
-# clamp(round(population / per_population), min, max). Russia at 1.5 gets the floor of 2; South Asia
-# at 19.4 gets the ceiling of 10.
+# Ticket #54: the cap on Scrubbers in one Nation State, from its population -- in units of one
+# million since ticket #333 (version 0.09.0; five million from ticket #143, version 0.07.3, when this
+# was 40), so 200 units is the two hundred million each Scrubber wants:
+# clamp(round(population / per_population), min, max). Russia at 150 gets the floor of 2; India at
+# 1940 gets the ceiling of 10.
 [scrubber]
-per_population = 40.0
+per_population = 200.0
 min = 2
 max = 10
 
@@ -317,3 +318,11 @@ widgets = 4
 [widgets]
 region_base = 4
 per_industry_level = 1
+
+# Ticket #333 (version 0.09.0): what a Region's people are worth to a Research Lab there, the
+# population factor `1 + population / population_per_point x Education Level` (ticket #188, version
+# 0.08.0, scaled the bonus by the schooling). One point of bonus per this many units of population:
+# 5,000 units is five billion people, the same five billion that 1,000 units of five million were
+# when the divisor was a code literal in the engine, and 50 hundred-million before ticket #143.
+[population_factor]
+population_per_point = 5000.0

@@ -156,6 +156,14 @@ pub struct ScrubberCard {
     pub max: u32,
 }
 
+/// Ticket #333 (version 0.09.0): what a Region's people are worth to a Research Lab, one point of
+/// bonus per this many units of population (`facilities.toml`); a code literal of 1,000 units of
+/// five million from ticket #143 (version 0.07.3) until this ticket, the same five billion people.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PopulationFactorCard {
+    pub population_per_point: f64,
+}
+
 /// Ticket #257 (version 0.08.4): what each Sea Level rise a Sea Wall has held back adds to its
 /// keep, in Materials a turn (`facilities.toml`).
 #[derive(Debug, Clone, Deserialize)]
@@ -688,9 +696,15 @@ pub struct ClimateTable {
     pub collapse_line: f64,
     pub temperature_lag_fraction: f64,
     pub population_growth: f64,
+    /// Ticket #333 (version 0.09.0): the population figure's unit, in people. A Region's figure, a
+    /// Colonist and a Pioneer are all counted in it, so `Region population 380.0` is 380 million
+    /// people and one Colonist is one million. A code constant of five million from ticket #143
+    /// (version 0.07.3) until this ticket; every per-unit rate in the data is in this unit.
+    pub people_per_unit: f64,
     pub population_loss_per_tenth_degree: f64,
-    /// Ticket #54: Population Emissions per hundred million are `base + per_level x Industry Level`,
-    /// less the state's own Leapfrog adjustment, never below `base`.
+    /// Ticket #54: Population Emissions per unit are `base + per_level x Industry Level`,
+    /// less the state's own Leapfrog adjustment, never below `base`. Quoted to the player per
+    /// hundred million people (`Tables::units_per_hundred_million`).
     /// Ticket #108: what one Leapfrog takes off a Nation State's Baseline Emissions.
     pub leapfrog_baseline_cut: f64,
     pub population_emissions_base: f64,
@@ -1142,6 +1156,7 @@ struct FacilitiesFile {
     industry_level: IndustryLevelCard,
     widgets: WidgetsCard,
     scrubber: ScrubberCard,
+    population_factor: PopulationFactorCard,
     sea_wall: SeaWallCard,
     mothball: MothballCard,
     school: SchoolCard,
@@ -1472,6 +1487,8 @@ pub struct Tables {
     pub widgets: WidgetsCard,
     /// Ticket #54: the Scrubber cap and the Mothball prices (`facilities.toml`).
     pub scrubber: ScrubberCard,
+    /// Ticket #333 (version 0.09.0): the Research Lab's population factor divisor (`facilities.toml`).
+    pub population_factor: PopulationFactorCard,
     pub mothball: MothballCard,
     /// Ticket #257: the Sea Wall's keep per rise held.
     pub sea_wall: SeaWallCard,
@@ -1605,6 +1622,7 @@ impl Tables {
             industry_level: facilities.industry_level,
             widgets: facilities.widgets,
             scrubber: facilities.scrubber,
+            population_factor: facilities.population_factor,
             mothball: facilities.mothball,
             sea_wall: facilities.sea_wall,
             school: facilities.school,
@@ -1810,6 +1828,14 @@ impl Tables {
         if u.neutral_max > u.max || u.refugees_per <= 0.0 || u.report_net_floor <= 0.0 {
             return Err(err("unrest.toml", "neutral_max must not exceed max, and refugees_per and report_net_floor must be positive"));
         }
+        // Ticket #333 (version 0.09.0): the unit is a divisor in every people figure the interface
+        // prints, and the Research divisor is one in every Lab's yield.
+        if self.climate.people_per_unit <= 0.0 {
+            return Err(err("climate.toml", "people_per_unit must be positive"));
+        }
+        if self.population_factor.population_per_point <= 0.0 {
+            return Err(err("facilities.toml", "[population_factor] population_per_point must be positive"));
+        }
         // Ticket #295 (version 0.08.6): a divisor of nought would be a certain escape at any damage.
         if self.disengage.divisor <= 0.0 {
             return Err(err("units.toml", "[disengage] divisor must be positive"));
@@ -1991,6 +2017,30 @@ pub fn default_data_dir() -> PathBuf {
 /// Ducats formula lives HERE, in one place, so that `Game::state_ducats` and the panel can never
 /// disagree and the ticket that moves the formula moves one line.
 impl Tables {
+    /// Ticket #333 (version 0.09.0): units in a hundred million people, since the cards quote
+    /// per-person Emissions at that rate: a hundred at one million a unit, twenty at five.
+    pub fn units_per_hundred_million(&self) -> f64 {
+        100_000_000.0 / self.climate.people_per_unit
+    }
+
+    /// A population figure written as real people: `1.94B`, `380M`, `1M`. Ticket #143 (version
+    /// 0.07.3) on `Game` with the unit a code constant; ticket #333 (version 0.09.0) moved it here,
+    /// where the start screen, which has no game yet, can read it too.
+    pub fn people_text(&self, units: f64) -> String {
+        let people = units * self.climate.people_per_unit;
+        if people >= 1_000_000_000.0 {
+            format!("{:.2}B", people / 1_000_000_000.0)
+        } else {
+            format!("{:.0}M", people / 1_000_000.0)
+        }
+    }
+
+    /// The card's form: the figure in units to one decimal, and the real number beside it,
+    /// `1454.5 (1.45B)`.
+    pub fn population_text(&self, units: f64) -> String {
+        format!("{units:.1} ({})", self.people_text(units))
+    }
+
     /// The base Ducats a Region's economy pays a turn at an Industry Level. Ticket #35 set it at
     /// GDP x Industry Level / 10, rounded down, under which ten of the fourteen Regions paid nothing
     /// at the start; ticket #139 (version 0.07.3) made it **GDP x Industry Level / 5, rounded down,

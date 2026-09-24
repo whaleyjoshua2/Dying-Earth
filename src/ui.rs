@@ -145,10 +145,10 @@ fn population_history(ui: &mut Ui, game: &Game, size: egui::Vec2) {
     }
     // Each scale's ends at its own side, in its own colour, in people rather than units.
     let small = FontId::proportional(9.0);
-    painter.text(Pos2::new(plot.left() - 3.0, plot.top()), egui::Align2::RIGHT_TOP, Game::people_text(e_hi), small.clone(), EARTH);
-    painter.text(Pos2::new(plot.left() - 3.0, plot.bottom()), egui::Align2::RIGHT_BOTTOM, Game::people_text(e_lo.max(0.0)), small.clone(), EARTH);
-    painter.text(Pos2::new(plot.right() + 3.0, plot.top()), egui::Align2::LEFT_TOP, Game::people_text(s_hi), small.clone(), SPACE);
-    painter.text(Pos2::new(plot.right() + 3.0, plot.bottom()), egui::Align2::LEFT_BOTTOM, Game::people_text(s_lo.max(0.0)), small.clone(), SPACE);
+    painter.text(Pos2::new(plot.left() - 3.0, plot.top()), egui::Align2::RIGHT_TOP, game.tables.people_text(e_hi), small.clone(), EARTH);
+    painter.text(Pos2::new(plot.left() - 3.0, plot.bottom()), egui::Align2::RIGHT_BOTTOM, game.tables.people_text(e_lo.max(0.0)), small.clone(), EARTH);
+    painter.text(Pos2::new(plot.right() + 3.0, plot.top()), egui::Align2::LEFT_TOP, game.tables.people_text(s_hi), small.clone(), SPACE);
+    painter.text(Pos2::new(plot.right() + 3.0, plot.bottom()), egui::Align2::LEFT_BOTTOM, game.tables.people_text(s_lo.max(0.0)), small.clone(), SPACE);
     painter.text(Pos2::new(plot.left(), rect.bottom() - 2.0), egui::Align2::LEFT_BOTTOM, game.date(first).text(), small.clone(), Color32::from_gray(150));
     if last > first {
         painter.text(Pos2::new(plot.right(), rect.bottom() - 2.0), egui::Align2::RIGHT_BOTTOM, game.date(last).text(), small, Color32::from_gray(150));
@@ -1771,7 +1771,7 @@ fn start_screen(
                 glyph_row(
                     ui,
                     &[
-                        RowPart { before: String::new(), icon: Some("population"), after: format!("Region population {}", Game::population_text(c.population)), hover: Some("The whole Region's people, not its Nation's alone, in units of five million.".to_string()) },
+                        RowPart { before: String::new(), icon: Some("population"), after: format!("Region population {}", session.tables.population_text(c.population)), hover: Some("The whole Region's people, not its Nation's alone, in units of one million.".to_string()) },
                         RowPart { before: format!("Industry Level {}", c.industry_level), icon: None, after: String::new(), hover: None },
                         RowPart { before: "leans".to_string(), icon: Some(lean_key), after: String::new(), hover: Some(format!("Leans {:?}: the resource this Region is naturally good at producing.", c.resource_lean)) },
                     ],
@@ -2223,25 +2223,27 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             // were listed, which buried the chart the player hovered for under a list they could
             // read off the map.
             const NAMED: usize = 4;
-            let mut earth_lines: Vec<String> = regions.iter().take(NAMED).map(|(p, n)| format!("{n} {}", Game::people_text(*p))).collect();
+            let mut earth_lines: Vec<String> = regions.iter().take(NAMED).map(|(p, n)| format!("{n} {}", game.tables.people_text(*p))).collect();
             if regions.len() > NAMED {
                 let rest: f64 = regions.iter().skip(NAMED).map(|(p, _)| *p).sum();
-                earth_lines.push(format!("and {} more, {}", regions.len() - NAMED, Game::people_text(rest)));
+                earth_lines.push(format!("and {} more, {}", regions.len() - NAMED, game.tables.people_text(rest)));
             }
-            let space_lines: Vec<String> = if bodies.is_empty() { vec!["nobody yet".to_string()] } else { bodies.iter().map(|(n, b)| format!("{} {}", b, Game::people_text(*n as f64))).collect() };
+            let space_lines: Vec<String> = if bodies.is_empty() { vec!["nobody yet".to_string()] } else { bodies.iter().map(|(n, b)| format!("{} {}", b, game.tables.people_text(*n as f64))).collect() };
             // Ticket #166 (version 0.07.5): the figure's hover draws the population history under
             // its sentence, as the Emissions figure's does.
+            // Ticket #333 (version 0.09.0): one Colonist is one million people, read off the tables.
             let pop_sentence = format!(
-                "On Earth: {}.\nOff Earth: {}.\nOne Colonist is five million people; a station over Earth is off Earth and Antarctica is on it.\nPioneers waiting on a card and Colonists aboard a Ship are in neither line.",
+                "On Earth: {}.\nOff Earth: {}.\nOne Colonist is {} million people; a station over Earth is off Earth and Antarctica is on it.\nPioneers waiting on a card and Colonists aboard a Ship are in neither line.",
                 earth_lines.join(", "),
-                space_lines.join(", ")
+                space_lines.join(", "),
+                game.tables.climate.people_per_unit / 1_000_000.0
             );
             bar_resource_with(
                 ui,
                 icons,
                 "population",
                 "Population history",
-                format!("Earth {} · Space {}", Game::people_text(game.earth_population()), Game::people_text(game.space_population() as f64)),
+                format!("Earth {} · Space {}", game.tables.people_text(game.earth_population()), game.tables.people_text(game.space_population() as f64)),
                 |ui| {
                     ui.set_max_width(300.0);
                     ui.label(RichText::new("Population history").strong());
@@ -3891,7 +3893,7 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::Resettle { state } => format!("Resettle this turn's refugees in {}", game.tables.state(*state).name),
         // Ticket #54.
         Order::Change { building, what } => format!("{} the {} at {}", what.name(), building_name(game, *building), game.place_name(building.place())),
-        Order::Leapfrog { state } => format!("Leapfrog {}: its people emit {:.2} less per hundred million", game.tables.state(*state).name, game.tables.climate.population_emissions_per_level * Game::UNITS_PER_HUNDRED_MILLION),
+        Order::Leapfrog { state } => format!("Leapfrog {}: its people emit {:.2} less per hundred million", game.tables.state(*state).name, game.tables.climate.population_emissions_per_level * game.tables.units_per_hundred_million()),
         Order::StripPermit { state } => format!("Strip Permit in {}: three turns of double output", game.tables.state(*state).name),
         Order::ExodusCall { state } => format!("Exodus Call in {}: a doubled muster at the ordinary cost in people", game.tables.state(*state).name),
         // Ticket #192 (version 0.08.0): the Upload.
@@ -5252,8 +5254,9 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // Ticket #143 (version 0.07.3): the figure in units of five million with the real number beside
     // it, and the word Region, since the figure is the territory's and the Nation's name on the card
     // read it as the Nation's. The designer: *"Population 12.2 (hundreds of millions) should say
-    // something like Population 12.2 (339M)."*
-    icon_word(ui, "population", format!("Region population {}, Industry Level {}, leans {:?}", Game::population_text(st.population), st.industry_level, card.resource_lean));
+    // something like Population 12.2 (339M)."* Ticket #333 (version 0.09.0): units of one million,
+    // read off the tables, the same shape: `Region population 1454.5 (1.45B)`.
+    icon_word(ui, "population", format!("Region population {}, Industry Level {}, leans {:?}", game.tables.population_text(st.population), st.industry_level, card.resource_lean));
     // Ticket #161 (version 0.07.5): what an Allotment is, which this line names and never explains.
     rule_tip(
         icon_word(ui, "influence", format!("Influence value {}: what it adds to its controller's Allotment each turn (+1 per Industry Level raised)", game.state_influence_value(sid))),
@@ -5277,10 +5280,11 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         ui.label(
             RichText::new(format!(
                 "Its people emit {:.2} per hundred million ({:.2} base + {:.2} x Industry Level {}{})",
-                // Ticket #143: the rate is kept per hundred million, which is twenty units now.
-                game.population_coefficient(sid) * Game::UNITS_PER_HUNDRED_MILLION,
-                c.population_emissions_base * Game::UNITS_PER_HUNDRED_MILLION,
-                c.population_emissions_per_level * Game::UNITS_PER_HUNDRED_MILLION,
+                // Ticket #143: the rate is kept per hundred million, which is twenty units then and a
+                // hundred since ticket #333 (version 0.09.0).
+                game.population_coefficient(sid) * game.tables.units_per_hundred_million(),
+                c.population_emissions_base * game.tables.units_per_hundred_million(),
+                c.population_emissions_per_level * game.tables.units_per_hundred_million(),
                 st.industry_level,
                 leaps
             ))
@@ -5569,7 +5573,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         if game.kind(Seat(0)) == FactionKind::Custodians {
             ui.horizontal(|ui| {
                 cost_button(ui, game, &session.pending, Order::Leapfrog { state: sid }, "Leapfrog", actions);
-                ui.label(RichText::new(format!("lowers its people to {:.2} per hundred million, for good", (game.population_coefficient(sid) - game.tables.climate.population_emissions_per_level).max(game.tables.climate.population_emissions_base) * Game::UNITS_PER_HUNDRED_MILLION)).weak());
+                ui.label(RichText::new(format!("lowers its people to {:.2} per hundred million, for good", (game.population_coefficient(sid) - game.tables.climate.population_emissions_per_level).max(game.tables.climate.population_emissions_base) * game.tables.units_per_hundred_million())).weak());
             });
         }
         // Ticket #237 (version 0.08.3): the Arkwrights' own order, beside the Custodians' Leapfrog
@@ -5623,7 +5627,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             &format!("Recruit {per} Pioneers"),
             Some(format!(
                 "{} people, on the card at End Turn, and {} off this state's Unrest. A working Launch Site lifts them onto a Ship or straight to a station of yours over Earth; once the ice is open the sea takes them to Antarctica.",
-                Game::people_text(game.lift_population(Seat(0), per)),
+                game.tables.people_text(game.lift_population(Seat(0), per)),
                 Game::unrest_figure(game.tables.emigrants.unrest_fall)
             )),
             actions,
@@ -8121,10 +8125,10 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 let c = &game.tables.climate;
                 ui.label(format!("Population {:.1}", e.population)).on_hover_text(format!(
                     "Each state's people emit {:.2} + {:.2} x its Industry Level per hundred million, halved by Green Consensus, times its controller's Emissions multiplier. The Custodians' Leapfrog lowers a state's own figure by {:.2} for good, never below {:.2}.",
-                    c.population_emissions_base * Game::UNITS_PER_HUNDRED_MILLION,
-                    c.population_emissions_per_level * Game::UNITS_PER_HUNDRED_MILLION,
-                    c.population_emissions_per_level * Game::UNITS_PER_HUNDRED_MILLION,
-                    c.population_emissions_base * Game::UNITS_PER_HUNDRED_MILLION
+                    c.population_emissions_base * game.tables.units_per_hundred_million(),
+                    c.population_emissions_per_level * game.tables.units_per_hundred_million(),
+                    c.population_emissions_per_level * game.tables.units_per_hundred_million(),
+                    c.population_emissions_base * game.tables.units_per_hundred_million()
                 ));
             }
             if e.cards > 0.0 {

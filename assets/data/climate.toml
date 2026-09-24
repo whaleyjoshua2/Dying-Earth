@@ -65,15 +65,26 @@ natural_sink = 6.0
 collapse_line = 3.0
 temperature_lag_fraction = 0.5
 population_growth = 0.01
+# Ticket #333 (version 0.09.0): the population figure's unit, in people. A Region's figure, a
+# Colonist and a Pioneer are all counted in it, so `Region population 380.0` is 380 million people
+# and one Colonist is one million. The designer: "pop 1 per million". Five million from ticket #143
+# (version 0.07.3) until this ticket, as a code constant; a hundred million before that. Every
+# figure stated in units elsewhere in the data moves with it: a rate PER UNIT (the two emission
+# rates below) divides by the same factor the unit was divided by, and an AMOUNT in units
+# (`refugees_per` and `report_net_floor` in unrest.toml, the Scrubber's `per_population` and the
+# Research Lab's `[population_factor]` in facilities.toml) multiplies by it.
+people_per_unit = 1000000.0
 population_loss_per_tenth_degree = 0.0015
 # Ticket #54 (version 0.05): Population Emissions follow the Industry Level of the state the people
 # live in, in place of the flat 0.1 a hundred million every state paid: a state emits, PER UNIT OF
-# FIVE MILLION PEOPLE since ticket #143 (version 0.07.3; the cards and tooltips still quote the
-# rate per hundred million, which is twenty units),
+# POPULATION (`people_per_unit` above: one million people since ticket #333, version 0.09.0; five
+# million from ticket #143, version 0.07.3, until then; the cards and tooltips still quote the rate
+# per hundred million, which is a hundred units),
 # `population_emissions_base + population_emissions_per_level x Industry Level`.
-# At the opening board that is 0.07 in Sub-Saharan Africa and 0.13 in East Asia, and the world's
-# total is 8.03 against the old 7.86, within a fiftieth. Green Consensus halves the whole line as
-# before, the Faction Emissions multiplier applies as before, and the Custodians' Leapfrog lowers a
+# At the opening board that is 0.07 per hundred million in Sub-Saharan Africa and 0.13 in East Asia,
+# and the world's total is 8.03 against the old 7.86, within a fiftieth. Green Consensus halves the
+# whole line as before, the Faction Emissions multiplier applies as before, and the Custodians'
+# Leapfrog lowers a
 # state's own coefficient by one level's worth at a time, never below the base.
 # Ticket #108 (version 0.07.0): what one Leapfrog takes off the Nation State's Baseline Emissions,
 # as well as the 0.03 it takes off its people's coefficient. `baseline x Industry Level` was a floor
@@ -81,8 +92,8 @@ population_loss_per_tenth_degree = 0.0015
 # bought zero times in twelve playtested games; this answers both. A Baseline never falls below zero.
 leapfrog_baseline_cut = 0.1
 
-population_emissions_base = 0.002
-population_emissions_per_level = 0.0015
+population_emissions_base = 0.0004
+population_emissions_per_level = 0.0003
 launch_emissions = 2.0
 # Ticket #279 (version 0.08.5): Battles pollute. Every hit landed in a Battle on Earth or in Earth
 # orbit puts this many ppm in the air at the next Climate phase, worn as Blame by the seat that

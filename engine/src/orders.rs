@@ -1981,8 +1981,9 @@ impl Game {
                     let cut = self.tables.climate.leapfrog_baseline_cut;
                     self.state_mut(*state).leapfrog += per;
                     self.state_mut(*state).baseline_cut += cut;
-                    // Ticket #143 (version 0.07.3): the rate is quoted per hundred million, twenty units.
-                    let per_hundred_million = self.population_coefficient(*state) * Game::UNITS_PER_HUNDRED_MILLION;
+                    // Ticket #143 (version 0.07.3): the rate is quoted per hundred million, twenty units
+                    // then; a hundred since ticket #333 (version 0.09.0), the same figure printed.
+                    let per_hundred_million = self.population_coefficient(*state) * self.tables.units_per_hundred_million();
                     let line = format!("The {} Leapfrogged {}: its people now emit {:.2} per hundred million.", self.seat_name(seat), self.tables.state(*state).name, per_hundred_million);
                     self.log(line);
                     let text = self.say(
