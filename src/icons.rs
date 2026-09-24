@@ -218,7 +218,12 @@ pub fn faction_symbol(kind: dying_earth_engine::FactionKind) -> &'static str {
 /// Ticket #332 (version 0.09.0): the Widgets' glyph, a cog -- a ring with eight teeth and a bore
 /// -- drawn in-house at the designer's word, so it owes no credit. It is a FIGURE like the
 /// Materials' cart, and takes a fill of its own in `FIGURES` below.
-pub const DRAWN: [&str; 5] = ["station", "facility_school", "battle", "module_battery", "widgets"];
+/// Ticket #343 (version 0.09.1): the Missile Carrier's glyph, a finned missile on a diagonal with
+/// its exhaust behind it, drawn by hand as the station and the Battle mark were, so it owes no
+/// credit. game-icons.net's missiles were passed over for the reason the Academy's telescope was:
+/// the Colony Ship already wears Lorc's upright Rocket, and a second upright rocket at sixteen
+/// pixels is the same silhouette twice. The DIAGONAL is what tells the two apart across a roster.
+pub const DRAWN: [&str; 6] = ["station", "facility_school", "battle", "module_battery", "widgets", "missile_carrier"];
 
 impl Credit {
     /// The file stem in `assets/icons/` this credit is for: the name, lower-cased, spaces to
@@ -383,7 +388,9 @@ const FIGURES: [(&str, [u8; 3]); 10] = [
 /// station, a Colony, a Region -- as against the figures above, which say how much of something.
 /// On this board a colour means whose, so these carry the one off-white fill and never a colour
 /// of their own. The Army's shield is drawn, not loaded, and takes the same fill.
-pub const KINDS: [&str; 6] = ["warship", "colony_ship", "station", "colony", "region", "battle"];
+/// Ticket #343 (version 0.09.1): a seventh, the Missile Carrier's, named here rather than left to
+/// fall through to NEUTRAL, so it wears the same off-white every other kind glyph wears.
+pub const KINDS: [&str; 7] = ["warship", "colony_ship", "station", "colony", "region", "battle", "missile_carrier"];
 
 /// The fill every kind glyph wears, for the shapes that are drawn rather than loaded.
 pub fn kind_fill() -> egui::Color32 {

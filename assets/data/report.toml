@@ -77,6 +77,9 @@ units_destroyed = "{place} was {why}: {lost} destroyed."
 # Ticket #328 (version 0.08.8): a Bombard from orbit, hit or miss; {dead} is `bombard_dead` or nothing.
 bombard_hit = "The {faction} bombarded {place} from {ship}: the {module} destroyed{dead}."
 bombard_miss = "The {faction} bombarded {place} from {ship}: the {module} was struck and stands."
+# Ticket #343 (version 0.09.1): a Launch, hit or miss; {dead} is `launch_dead` or nothing.
+launch_hit = "The {faction} launched a Warhead from {ship} at {place}: {lost} destroyed{dead}."
+launch_miss = "The {faction} launched a Warhead from {ship} at {place}: nothing of it burned{dead}."
 occupation_begun = "The {faction} occupy {place}."
 occupation_ended = "Occupation of {place} by the {faction} ended."
 # Ticket #299 (version 0.08.6): a break costs. {holder} is the previous holder, or nobody.
@@ -185,6 +188,9 @@ energy_zero = "{faction}: Energy fell to zero even with every producer off."
 attacks = " and attacks"
 cargo_aboard = " with {n} Colonists aboard"
 bombard_dead = ", {n} Colonists dead with it"
+# Ticket #343 (version 0.09.1): the people a Launch killed, counted in units of population -- one
+# unit, one million people, since ticket #333.
+launch_dead = ", {n} million dead"
 sea_unrest = " Unrest there rose by {rose} to {unrest}."
 # Ticket #276 (version 0.08.5): every rise turns one inland slot coastal, wall or no wall; an empty
 # slot first, else the oldest inland Facility with its slot.
@@ -242,6 +248,8 @@ change_orbit = "moved a {unit} to {orbit}"
 # Ticket #87 (version 0.06.0): the Refuel order.
 refuel = "refuelled {unit} at {body}"
 bombard = "bombarded {colony}"
+launch = "launched a Warhead at {place}"
+rearm = "rearmed a Missile Carrier"
 ship_stance = "set its Ships at {body} to {stance}"
 army_stance = "set its Armies at {place} to {stance}"
 move_army = "moved {army} into {state}"

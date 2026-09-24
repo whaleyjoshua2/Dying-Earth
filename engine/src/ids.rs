@@ -461,10 +461,16 @@ pub enum UnitKind {
     /// Version 0.04 (ticket #43): the transport for one Army; a Colony Ship carries Colonists only.
     Carrier,
     Army,
+    /// Ticket #343 (version 0.09.1): the **Missile Carrier**, the hull that carries one Warhead and
+    /// fires it with `Order::Launch`. Appended LAST, since `units.toml` is indexed by discriminant.
+    /// It is a Ship (it is in `SHIPS`) but it is NOT a warship: it has no strength, it cannot hold
+    /// Orbital Control, it cannot blockade and it cannot intercept, and ticket #326's escort rule
+    /// treats it as the unarmed hull it is -- which is, by decision, the whole counter to it.
+    MissileCarrier,
 }
 
 impl UnitKind {
-    pub const SHIPS: [UnitKind; 4] = [UnitKind::ColonyShip, UnitKind::Carrier, UnitKind::Frigate, UnitKind::Battleship];
+    pub const SHIPS: [UnitKind; 5] = [UnitKind::ColonyShip, UnitKind::Carrier, UnitKind::Frigate, UnitKind::Battleship, UnitKind::MissileCarrier];
     pub fn name(self) -> &'static str {
         match self {
             UnitKind::ColonyShip => "Colony Ship",
@@ -472,8 +478,12 @@ impl UnitKind {
             UnitKind::Battleship => "Battleship",
             UnitKind::Carrier => "Carrier",
             UnitKind::Army => "Army",
+            UnitKind::MissileCarrier => "Missile Carrier",
         }
     }
+    /// Ticket #343 (version 0.09.1): still the Frigate and the Battleship alone. A Missile Carrier
+    /// is armed with a Warhead, not with guns, and every rule that reads this one -- Orbital
+    /// Control, the Blockade gate, Intercept, `armed` in the melee -- must go on reading it false.
     pub fn is_warship(self) -> bool {
         matches!(self, UnitKind::Frigate | UnitKind::Battleship)
     }
@@ -547,10 +557,14 @@ pub enum TechId {
     /// designer's word -- "I forgot about the relay - let's give the +1 influence to the relay
     /// instead" -- which also spares the Relay being made redundant by the Habitat.
     RelayNetworks,
+    /// Ticket #343 (version 0.09.1): the game's FIRST WEAPON TECH, and the only thing it does is
+    /// unlock the Missile Carrier. The tree is shared, so every seat sees it researched: opening
+    /// this door is a public act, which is the point.
+    MissileTechnology,
 }
 
 impl TechId {
-    pub const ALL: [TechId; 20] = [
+    pub const ALL: [TechId; 21] = [
         TechId::EfficientGrids,
         TechId::CleanPower,
         TechId::CleanManufacturing,
@@ -571,6 +585,7 @@ impl TechId {
         TechId::TheUpload,
         TechId::Beneficiation,
         TechId::RelayNetworks,
+        TechId::MissileTechnology,
     ];
     pub fn index(self) -> usize {
         self as usize

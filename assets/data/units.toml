@@ -77,6 +77,27 @@ pursuit = 2
 carries_colonists = 0
 carries_army = false
 
+# Ticket #343 (version 0.09.1): the Missile Carrier, the hull that carries one Warhead and fires it
+# with a Launch. Appended LAST because the tables are indexed by the enum's discriminant. Dearer
+# than a Battleship (50 / 8) because it ends games, and frailer than a Colony Ship: no strength, no
+# pursuit, three hit points. It is a Ship but NOT a warship -- it holds no Orbital Control, it
+# blockades nothing, and under ticket #326's escort rule it is struck only once its party has no
+# warship left engaged, which is by decision the whole counter to it. `needs_tech` is the first one
+# a unit row has ever carried.
+[[unit]]
+id = "missile_carrier"
+name = "Missile Carrier"
+materials = 60
+widgets = 16
+energy_upkeep = 2
+strength = 0
+hit_points = 3
+pursuit = 0
+carries_colonists = 0
+carries_army = false
+tank = 30
+needs_tech = "missile_technology"
+
 # Ticket #334 (version 0.09.0): an Army is raised from people. In a Region a raise takes
 # `population_each` units of the Region's population -- one unit, one million people since ticket
 # #333 -- at the order, on top of its Materials and Widgets, whatever the Army's strength, and is
@@ -155,3 +176,35 @@ step = 0.2
 per_step = 1
 cap = 4
 death_chance_per_extra = 0.05
+
+# Ticket #343 (version 0.09.1): everything a Launch reads. It lives here, beside the carrier's own
+# row, rather than in a file of its own: the weapon is a unit, so its figures are units figures --
+# what it destroys, whom it kills and what it costs to load again are one rule, not three. Nothing
+# here has a default in the code, so a missing figure refuses the whole table at load.
+[nuke]
+# Every building at the struck place rolls this, independently: a nuke is not gentler on a city
+# than the Occupation's three-turn siege, which rolls 0.25 (`influence.destruction_chance`, and
+# untouched by this ticket). The Core Module and the Archive are spared, so a place is gutted and
+# never erased from the board.
+destruction_chance = 0.60
+# The share of the place's people that dies, drawn once per strike from the game's own RNG: a
+# Region's population, a Colony's Colonists.
+people_min = 0.40
+people_max = 0.60
+# At a Region only: the Industry Levels it loses, floored at the state card's own figure, so a
+# Region never falls below the board it started on. It may be raised again by the ordinary order:
+# this is a setback, not ruin.
+industry_lost = 1
+# Rung 4, a rung above the three the game had. A weight, not an enum, so it is data: it breaks a
+# non-aggression Accord and leaves the permanent scar, both through `offend_by`.
+offence = 4
+# ON EARTH ONLY, which `charge_war` already enforces, at the designer's word: "I don't see how a
+# nuke on mars could possibly effect the climate on earth." Ten buildings' worth of war ppm at the
+# existing 2.0 a building, so one strike is felt in the air; and a permanent rise in the Natural
+# Sink, since the Sink is Earth's own forests and oceans and the soot dims them.
+war_ppm = 20.0
+sink_rise = 0.25
+# A Rearm at a Shipyard of the firing Faction: most of a second hull, so firing is a commitment and
+# a carrier that has fired is out of the war for the round trip home.
+rearm_materials = 40
+rearm_widgets = 8

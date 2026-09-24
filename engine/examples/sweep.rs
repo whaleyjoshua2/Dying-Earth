@@ -1,11 +1,12 @@
 //! Ticket #27: sweep the Climate knobs and report when a four-Faction game collapses (ticket #50).
 //! Ticket #60: the Breaks moved the clock as much as the knobs did, so the two figures that do the
 //! moving are overridable too -- the Permafrost Thaw's `emissions_per_turn` and the Sink Weakens'
-//! `sink_after` -- and a single cell can print the four-way balance block with `--balance`.
+//! `sink_cut` (ticket #343: what the Break TAKES OFF the Sink, where it used to be the figure the
+//! Sink was set to) -- and a single cell can print the four-way balance block with `--balance`.
 //!
 //! `cargo run -p dying-earth-engine --example sweep -- [seeds] [--player=<faction>]
 //!   [--start=<state>] [--sinks=6,8] [--steps=150,180] [--permafrost=4.0,2.5]
-//!   [--sink-after=4.0,5.0] [--balance]`
+//!   [--sink-cut=2.0,1.0] [--balance]`
 //!
 //! THE TARGET this sweep is read against, as ticket #60 restated it from #46 and #53: every seating
 //! stays hot to the end -- a median end Temperature of +2.5 to +2.9 C where it does not collapse --
@@ -51,7 +52,7 @@ fn main() {
     // Ticket #60: the Breaks' own two figures. Every other Break figure is left where `climate.toml`
     // has it -- the Coral Die-off, Ice Sheets and the Amazon pulse are not swept here.
     let permafrosts = list("--permafrost=", &[f64::NAN]);
-    let sink_afters = list("--sink-after=", &[f64::NAN]);
+    let sink_cuts = list("--sink-cut=", &[f64::NAN]);
     let balance = std::env::args().any(|a| a == "--balance");
     let base = Tables::load(&default_data_dir()).expect("tables");
     // Ticket #241 (version 0.08.3): `--seatings` runs all four Factions as seat 0 in one
@@ -63,6 +64,9 @@ fn main() {
     // Indexed by the Faction's place in `FactionKind::ALL`, never by seat: seat 0 is a
     // different Faction in every seating, which is the whole point of running four.
     let mut all_wins = [0u32; 4];
+    // Ticket #343 (version 0.09.1): the nuke's counters across every seating, so the closing
+    // review has ONE total to quote rather than four blocks to add up by hand.
+    let mut all_warc = dying_earth_engine::state::WarCounters::default();
     let (mut all_games, mut all_collapses) = (0u32, 0u32);
     for player in players {
         println!("seat 0: {} starting in {start:?}", player.name());
@@ -70,20 +74,20 @@ fn main() {
         for &sink in &sinks {
             for &step in &steps {
                 for &permafrost in &permafrosts {
-                    for &sink_after in &sink_afters {
+                    for &sink_cut in &sink_cuts {
                         let mut t = base.clone();
                         t.climate.natural_sink = sink;
                         t.climate.ppm_step = step;
                         for b in &mut t.climate.breaks {
                             match b.effect {
                                 BreakEffect::EmissionsPerTurn if permafrost.is_finite() => b.emissions = permafrost,
-                                BreakEffect::WeakenSink if sink_after.is_finite() => b.sink_after = sink_after,
+                                BreakEffect::WeakenSink if sink_cut.is_finite() => b.sink_cut = sink_cut,
                                 _ => {}
                             }
                         }
                         let shown = |v: f64, from: f64| if v.is_finite() { v } else { from };
                         let perm_shown = shown(permafrost, t.climate.breaks.iter().find(|b| b.effect == BreakEffect::EmissionsPerTurn).map(|b| b.emissions).unwrap_or(0.0));
-                        let after_shown = shown(sink_after, t.climate.breaks.iter().find(|b| b.effect == BreakEffect::WeakenSink).map(|b| b.sink_after).unwrap_or(0.0));
+                        let after_shown = shown(sink_cut, t.climate.breaks.iter().find(|b| b.effect == BreakEffect::WeakenSink).map(|b| b.sink_cut).unwrap_or(0.0));
                         let tables = Arc::new(t);
                         let mut turns = Vec::new();
                         let mut temps = Vec::new();
@@ -118,6 +122,8 @@ fn main() {
                         let (mut blockade_suffered, mut blockade_imposed) = ([0u32; 4], [0u32; 4]);
                         let (mut levies, mut neutral_holds) = (0u32, 0u32);
                         let mut warc = dying_earth_engine::state::WarCounters::default();
+                        // Ticket #343 (version 0.09.1): the Natural Sink at the end of each game.
+                        let mut sinks_end: Vec<f64> = Vec::new();
                         let mut war_ppm: [Vec<f64>; 4] = Default::default();
                         let mut war_nobody: Vec<f64> = Vec::new();
                         let mut walls_standing = 0u32;
@@ -302,6 +308,8 @@ fn main() {
                             levies += r.levies_raised;
                             neutral_holds += r.neutral_holds;
                             warc.add(&r.war);
+                            sinks_end.push(r.natural_sink_end);
+                            all_warc.add(&r.war);
                             if r.deck_empty {
                                 deck_empty += 1;
                             }
@@ -539,6 +547,22 @@ fn main() {
                             // one of which a human could now give by the same path, where before
                             // this ticket no human player could give one at all.
                             println!("      Orbit changes over the batch, by seat {:?}; Blockades ordered {:?}", warc.orbit_changes, warc.blockades_ordered);
+                            // Ticket #343 (version 0.09.1): the nuke, by seat, and where the Sink
+                            // finished. The seat index is a SEAT, not a Faction: with --seatings
+                            // seat 0 is a different Faction in each block, so these are read per
+                            // block or summed at the foot, never added up positionally.
+                            let mut sk = sinks_end.clone();
+                            sk.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                            let sink_med = if sk.is_empty() { 0.0 } else { sk[sk.len() / 2] };
+                            println!(
+                                "      The nuke over the batch, by seat: Missile Carriers built {:?}, Launches {:?}, buildings burned {:?}, people killed {:?}, Industry Levels lost {:?}",
+                                warc.missile_carriers_built,
+                                warc.launches,
+                                warc.launch_buildings_burned,
+                                warc.launch_people_killed.map(|v| v.round() as i64),
+                                warc.industry_levels_lost
+                            );
+                            println!("      Natural Sink at the end: median {sink_med:.2} over {} games", sinks_end.len());
                             println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
                             println!("      Breaks fired: {}", fired.join(", "));
                         }
@@ -554,5 +578,15 @@ fn main() {
             println!("  {:>12}: {:2} win(s) of {all_games}", k.name(), all_wins[i]);
         }
         println!("  collapses {all_collapses} of {all_games}");
+        // Ticket #343 (version 0.09.1): summed over every seat of every seating -- a TOTAL, never
+        // a per-Faction figure, since seat 0 is a different Faction in each seating.
+        println!(
+            "  the nuke, all seats and seatings: Missile Carriers built {}, Launches {}, buildings burned {}, people killed {:.0}, Industry Levels lost {}",
+            all_warc.missile_carriers_built.iter().sum::<u32>(),
+            all_warc.launches.iter().sum::<u32>(),
+            all_warc.launch_buildings_burned.iter().sum::<u32>(),
+            all_warc.launch_people_killed.iter().sum::<f64>(),
+            all_warc.industry_levels_lost.iter().sum::<u32>()
+        );
     }
 }

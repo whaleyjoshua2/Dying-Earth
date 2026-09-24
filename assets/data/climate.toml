@@ -146,7 +146,11 @@ id = "sink_weakens"
 name = "The Sink Weakens"
 temperature = 2.0
 effect = "weaken_sink"
-sink_after = 4.0
+# Ticket #343 (version 0.09.1): what the Break TAKES OFF the Natural Sink, where it used to be the
+# figure the Sink was SET TO (4.0). On an untouched game the two are the same, 6.0 - 2.0 = 4.0, so
+# no measurement moves; what changes is that a Sink somebody has raised -- the Custodians' Research
+# Directive, or the soot of a nuke on Earth -- keeps what it was given instead of having it erased.
+sink_cut = 2.0
 happened = "The Natural Sink weakens."
 text = "The forests and the oceans are full; the world stops taking back what we give it."
 

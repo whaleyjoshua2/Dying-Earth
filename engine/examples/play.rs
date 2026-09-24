@@ -248,6 +248,16 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
                                        Battleship there first with `change-orbit`, and in an EARLIER
                                        turn: a Ship takes one order a turn, and a Bombard is one.
 
+  launch <ship> <place>                a Missile Carrier of yours fires its one Warhead at a RIVAL'S
+                                       Region, ground Colony or Space Station. Ticket #343 (version
+                                       0.09.1): the same orbit rule a Bombard reads -- low orbit for
+                                       the ground (and Orbital Control of that Body outright), a
+                                       station's own orbit for a station -- but EARTH IS NOT
+                                       EXCEPTED, and a Region is a lawful target. Free.
+  rearm <ship>                         load another Warhead, at a Colony or station of yours with a
+                                       working Shipyard, in that place's own orbit. It is a build
+                                       in that yard's queue: Materials now, Widgets over the turns.
+
   influence <place> <amount>
   buy-influence <amount>
   max <place>                          repeat next turn's WHOLE Allotment on one place you hold,
@@ -432,6 +442,10 @@ fn parse_line(g: &Game, line: &str) -> Result<Line, String> {
         // Ticket #328 (version 0.08.8), and ticket #335 (version 0.09.0) for the orbit: the
         // Battleship acts in the orbit it sits in, so the line names no orbit of its own.
         "bombard" => Order::Bombard { ship: ship_id(at(1)?)?, colony: colony_id(at(2)?)? },
+        // Ticket #343 (version 0.09.1): the Missile Carrier fires its one Warhead, and loads
+        // another at a yard of its own. Both act in the orbit the hull sits in.
+        "launch" => Order::Launch { ship: ship_id(at(1)?)?, target: place(at(2)?)? },
+        "rearm" => Order::Rearm { ship: ship_id(at(1)?)? },
         "load" => {
             let ship = ship_id(at(1)?)?;
             let colonists = count(at(2)?)?;

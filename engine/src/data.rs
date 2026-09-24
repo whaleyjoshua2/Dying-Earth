@@ -308,6 +308,12 @@ pub struct UnitCard {
     pub tank: i64,
     pub carries_colonists: u32,
     pub carries_army: bool,
+    /// Ticket #343 (version 0.09.1): the Tech that must stand before this Ship can be ordered, if
+    /// any -- the Missile Carrier's Missile Technology, and nothing else's. The Facility card
+    /// (`needs_tech` above) and the Module card have carried one since tickets #56 and #92; a unit
+    /// card never did until this ticket, so every other row simply leaves it out.
+    #[serde(default)]
+    pub needs_tech: Option<TechId>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -799,8 +805,10 @@ pub enum BreakEffect {
     /// `emissions` ppm join the world's Emissions in this and every later Climate phase, on their
     /// own line: nobody's Blame, and never counted against a Stabilization run.
     EmissionsPerTurn,
-    /// The Natural Sink falls to `sink_after` for good. This one does bear on Stabilization: the
-    /// Sink is the bar the run is measured against.
+    /// `sink_cut` comes off the Natural Sink for good. This one does bear on Stabilization: the
+    /// Sink is the bar the run is measured against. Ticket #343 (version 0.09.1): a SUBTRACTION,
+    /// where until this version the Break assigned `sink_after` and so erased anything that had
+    /// raised the Sink. 6.0 - 2.0 = 4.0 on an untouched game, exactly where the assignment put it.
     WeakenSink,
     /// One Sea Level threshold's slot loss, displacement and Unrest lands at once on every state,
     /// out of sequence. The scheduled thresholds still fire on their own turns.
@@ -831,7 +839,7 @@ pub struct BreakCard {
     #[serde(default)]
     pub emissions: f64,
     #[serde(default)]
-    pub sink_after: f64,
+    pub sink_cut: f64,
     #[serde(default)]
     pub co2: f64,
     #[serde(default)]
@@ -1093,6 +1101,11 @@ pub struct AiWeights {
     pub build_launch_site_or_shipyard: f64,
     pub build_colony_ship: f64,
     pub build_warship: f64,
+    /// Ticket #343 (version 0.09.1): the Missile Carrier, weighted apart from a warship, since it
+    /// is not one: it never fights, it is dearer than a Battleship, and a seat wants at most one
+    /// at a time. And the Launch itself, which is what the hull was bought for.
+    pub build_missile_carrier: f64,
+    pub launch: f64,
     pub build_army_or_barracks: f64,
     /// Ticket #36: an Embassy or a Relay.
     pub build_influence: f64,
@@ -1445,6 +1458,33 @@ struct UnitsFile {
     standing_army: StandingArmyCard,
     dig_in: DigInCard,
     army: ArmyCard,
+    nuke: NukeCard,
+}
+
+/// Ticket #343 (version 0.09.1): every figure a Launch reads (`units.toml`). They live in
+/// `units.toml` rather than a file of their own because the carrier is a unit and its row is here:
+/// the destruction chance, the share of the people, the Industry Level, the offence, what a strike
+/// does to Earth's air and Earth's Sink, and what a rearm costs. NOTHING here has a serde default:
+/// a `nuke` figure missing from the table refuses the whole table at load, which is the error case
+/// the ticket asks for.
+#[derive(Debug, Clone, Deserialize)]
+pub struct NukeCard {
+    /// The chance each building at the struck place is destroyed, rolled independently. The
+    /// Occupation's own 0.25 stays in `influence.destruction_chance`; this is not it.
+    pub destruction_chance: f64,
+    /// The share of the place's people that dies, drawn once per strike between the two.
+    pub people_min: f64,
+    pub people_max: f64,
+    /// At a Region only: the Industry Levels the strike takes off, floored at the state card's own.
+    pub industry_lost: u32,
+    /// The offence weight against the holder: rung 4, a weight and not an enum.
+    pub offence: i64,
+    /// On Earth only: the ppm into the war bucket, and the permanent rise in the Natural Sink.
+    pub war_ppm: f64,
+    pub sink_rise: f64,
+    /// What a Rearm costs at a Shipyard of the firing Faction.
+    pub rearm_materials: i64,
+    pub rearm_widgets: u32,
 }
 
 /// Ticket #86 (version 0.06.0): a warming Earth fills the Colony Ships. `per_step` Colonists
@@ -1710,6 +1750,8 @@ pub struct Tables {
     pub dig_in: DigInCard,
     /// Ticket #334 (version 0.09.0): the people a raised Army takes.
     pub army: ArmyCard,
+    /// Ticket #343 (version 0.09.1): every figure a Launch reads.
+    pub nuke: NukeCard,
     pub techs: Vec<TechCard>,
     pub events: EventsTable,
     pub factions: Vec<FactionCard>,
@@ -1830,6 +1872,7 @@ impl Tables {
             standing_army: units.standing_army,
             dig_in: units.dig_in,
             army: units.army,
+            nuke: units.nuke,
             techs: techs.tech,
             shortlist: techs.shortlist,
             events,
@@ -1865,7 +1908,7 @@ impl Tables {
         check_rows("modules.toml", &ModuleKind::ALL, self.modules.iter().map(|m| m.id))?;
         check_rows(
             "units.toml",
-            &[UnitKind::ColonyShip, UnitKind::Frigate, UnitKind::Battleship, UnitKind::Carrier, UnitKind::Army],
+            &[UnitKind::ColonyShip, UnitKind::Frigate, UnitKind::Battleship, UnitKind::Carrier, UnitKind::Army, UnitKind::MissileCarrier],
             self.units.iter().map(|u| u.id),
         )?;
         check_rows("techs.toml", &TechId::ALL, self.techs.iter().map(|t| t.id))?;
@@ -1974,6 +2017,20 @@ impl Tables {
         if self.army.population_each <= 0.0 || !self.army.population_each.is_finite() || self.army.colonists_each == 0 {
             return Err(err("units.toml", "[army] population_each must be positive and colonists_each at least 1"));
         }
+        // Ticket #343 (version 0.09.1): a `nuke` figure that is absent refuses the table at the
+        // parse, since no field of `NukeCard` has a default; these are the figures that are present
+        // and out of range. A share of the people outside 0..1, or a band the wrong way round,
+        // would draw a share nobody wrote.
+        let n = &self.nuke;
+        if !(0.0..=1.0).contains(&n.destruction_chance) {
+            return Err(err("units.toml", "[nuke] destruction_chance must be between 0 and 1"));
+        }
+        if !(0.0..=1.0).contains(&n.people_min) || !(0.0..=1.0).contains(&n.people_max) || n.people_min > n.people_max {
+            return Err(err("units.toml", "[nuke] people_min and people_max must be between 0 and 1, and people_min no greater than people_max"));
+        }
+        if n.offence <= 0 || n.war_ppm < 0.0 || n.sink_rise < 0.0 || n.rearm_materials < 0 || n.rearm_widgets == 0 {
+            return Err(err("units.toml", "[nuke] offence and rearm_widgets must be positive, and war_ppm, sink_rise and rearm_materials not negative"));
+        }
         for t in &self.techs {
             for n in &t.needs {
                 if *n == t.id {
@@ -2006,7 +2063,7 @@ impl Tables {
             let figures = match b.effect {
                 BreakEffect::CoastalUnrest => b.unrest > 0.0 || b.population_loss > 0.0,
                 BreakEffect::EmissionsPerTurn => b.emissions > 0.0,
-                BreakEffect::WeakenSink => b.sink_after > 0.0,
+                BreakEffect::WeakenSink => b.sink_cut > 0.0,
                 BreakEffect::SeaLevelThreshold => true,
                 BreakEffect::CarbonPulse => b.co2 > 0.0 || (b.baseline_rise > 0.0 && b.state.is_some()),
             };

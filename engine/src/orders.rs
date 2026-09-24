@@ -72,6 +72,16 @@ pub enum Order {
     /// there outright bombards a rival's Colony at that Body: one Module drawn at random rolls the
     /// destruction chance. Never over Earth.
     Bombard { ship: ShipId, colony: ColonyId },
+    /// Ticket #343 (version 0.09.1): **Launch**. A Missile Carrier carrying its Warhead, in the
+    /// orbit that touches the target and holding that orbit outright, fires it at a Region, a
+    /// ground Colony or a Space Station a rival directs. Free to order -- the price was paid at
+    /// the build and is paid again at the Rearm -- and, unlike a Bombard, LAWFUL OVER EARTH: a
+    /// nuke on Earth is the point of the weapon.
+    Launch { ship: ShipId, target: Place },
+    /// Ticket #343 (version 0.09.1): **Rearm**. A Missile Carrier that has fired loads another
+    /// Warhead at a Colony or station of its Faction with a working Shipyard, in that place's own
+    /// orbit. It is a BUILD in that yard's queue, since it is paid in Widgets as well as Materials.
+    Rearm { ship: ShipId },
     ArmyStance { place: Place, stance: Stance },
     MoveArmy { army: ArmyId, to: StateId },
     Load { ship: ShipId, colonists: u32, from: LoadSource, army: Option<ArmyId> },
@@ -277,6 +287,11 @@ pub struct Pending {
     /// which Colony -- resolved after the orbital Battles.
     #[serde(default)]
     pub bombards: Vec<(Seat, ShipId, ColonyId)>,
+    /// Ticket #343 (version 0.09.1): Launches ordered this turn -- who, from which Missile
+    /// Carrier, at which place -- resolved after the orbital Battles beside the Bombards, and for
+    /// the same reason: the Battles just fought may have sunk the hull or taken the orbit.
+    #[serde(default)]
+    pub launches: Vec<(Seat, ShipId, Place)>,
     /// Ticket #335 (version 0.09.0): orbit changes ordered this turn -- who, which Ship, the orbit
     /// it moves to (`None` is low orbit) -- resolved with the transits, before the Battles. The
     /// Fuel left the tank at the order.
@@ -312,7 +327,34 @@ pub struct Pending {
     pub attack_sequence: u32,
 }
 
+/// Ticket #343 (version 0.09.1): where a Missile Carrier may load another Warhead, or why it may
+/// not. Two refusals rather than one, so the message names what is missing: there is no place of
+/// the seat's in this orbit at all, or there is one and it has no working Shipyard.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RearmSite {
+    Yard(ColonyId),
+    NoPlace,
+    NoShipyard,
+}
+
 impl Game {
+    /// Ticket #343 (version 0.09.1): the Colony or station a Rearm would be built at -- one this
+    /// seat directs, at the Body the Ship stands at, IN THE SHIP'S OWN ORBIT (a station's ring, or
+    /// low orbit for a Colony on the ground), with a working Shipyard standing in it.
+    pub fn rearm_site(&self, seat: Seat, ship: ShipId) -> RearmSite {
+        let Some(s) = self.ship(ship) else { return RearmSite::NoPlace };
+        let ShipAt::Body(body) = s.at else { return RearmSite::NoPlace };
+        let orbit = self.ship_orbit(s);
+        let here: Vec<&Colony> = self.colonies.iter().filter(|c| c.body == body && c.control.director() == Some(seat) && self.colony_orbit(c) == orbit).collect();
+        if here.is_empty() {
+            return RearmSite::NoPlace;
+        }
+        match here.iter().find(|c| c.modules.iter().any(|m| m.kind == ModuleKind::Shipyard && m.working())) {
+            Some(c) => RearmSite::Yard(c.id),
+            None => RearmSite::NoShipyard,
+        }
+    }
+
     /// The cost of one order for a seat, before legality.
     pub fn order_cost(&self, seat: Seat, order: &Order) -> Cost {
         let t = &self.tables;
@@ -337,6 +379,11 @@ impl Game {
             Order::ChangeOrbit { .. } => Cost::default(),
             // Ticket #328 (version 0.08.8): a Bombard costs nothing but the offence.
             Order::Bombard { .. } => Cost::default(),
+            // Ticket #343 (version 0.09.1): a Launch costs nothing but the offence; the Warhead was
+            // paid for at the build. A Rearm costs the table's Materials, and its Widgets are the
+            // build's, paid by the yard's place over the turns it takes.
+            Order::Launch { .. } => Cost::default(),
+            Order::Rearm { .. } => Cost { materials: t.nuke.rearm_materials, ..Default::default() },
             Order::Refuel { ship } => Cost { fuel: self.refuel_amount(seat, *ship), ..Default::default() },
             Order::Influence { amount, .. } => Cost { influence: *amount, ..Default::default() },
             Order::Smear { amount, .. } => Cost { influence: *amount, ..Default::default() },
@@ -1048,6 +1095,14 @@ impl Game {
                 if !UnitKind::SHIPS.contains(kind) {
                     return fail("not a Ship");
                 }
+                // Ticket #343 (version 0.09.1): a Ship whose card names a Tech waits for it, in the
+                // shape the Facility and the Module gates already use. The Missile Carrier is the
+                // first unit row that has ever named one; every other row leaves the field out.
+                if let Some(t) = self.tables.unit(*kind).needs_tech
+                    && !self.has_tech(t)
+                {
+                    return fail(format!("a {} needs {} first", kind.name(), self.tables.tech(t).name));
+                }
                 match site {
                     // Ticket #46: Ships are built only at Shipyards, on a station or a Colony.
                     Place::State(_) => return fail("Ships are built at a Shipyard, on a station or a Colony"),
@@ -1287,6 +1342,81 @@ impl Game {
                     return fail(format!("a rival still stands in {}", self.orbit_name(body, orbit)));
                 }
                 if pending.iter().any(|o| matches!(o, Order::Bombard { ship: x, .. } | Order::Transit { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
+                    return fail("this Ship already has an order");
+                }
+                Ok(cost)
+            }
+            // Ticket #343 (version 0.09.1): Launch, from a Missile Carrier carrying its Warhead and
+            // holding the orbit that touches the target outright. The gate is the Bombard's, with
+            // two differences that are the weapon's whole point: a REGION is a lawful target, and
+            // EARTH IS NOT EXCEPTED -- "no Bombard over Earth" is a Bombard's rule and does not
+            // carry over. Re-read at the Resolution, as the Bombard's is.
+            Order::Launch { ship, target } => {
+                let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
+                if s.seat != seat {
+                    return fail("not your Ship");
+                }
+                if s.kind != UnitKind::MissileCarrier {
+                    return fail("only a Missile Carrier can Launch");
+                }
+                if !s.warhead {
+                    return fail("this Missile Carrier has fired its Warhead; Rearm it at a Shipyard of yours");
+                }
+                let ShipAt::Body(body) = s.at else { return fail("in transit") };
+                // The orbit that touches the target: a Colony's own ring for a station and low
+                // orbit for a Colony on the ground, and low orbit for a Region, which is Earth's
+                // ground.
+                let (at_body, orbit) = match target {
+                    Place::State(_) => (BodyId::Earth, Orbit::Low),
+                    Place::Colony(c) => {
+                        let Some(col) = self.colony(*c) else { return fail("no such Colony") };
+                        (col.body, self.colony_orbit(col))
+                    }
+                };
+                if at_body != body {
+                    return fail("that place is not at this Body");
+                }
+                match self.place_director(*target) {
+                    Some(d) if d != seat => {}
+                    _ => return fail("not a rival's place"),
+                }
+                if !self.ship_in_orbit(s, body, orbit) {
+                    return fail(format!("a Launch is given from {}", self.orbit_name(body, orbit)));
+                }
+                if orbit.is_low() {
+                    if self.orbital_control(body) != Some(seat) {
+                        return fail(format!("you do not hold Orbital Control of {} outright", self.tables.body(body).name));
+                    }
+                } else if !self.orbit_uncontested(seat, body, orbit) {
+                    return fail(format!("a rival still stands in {}", self.orbit_name(body, orbit)));
+                }
+                if pending.iter().any(|o| matches!(o, Order::Launch { ship: x, .. } | Order::Rearm { ship: x } | Order::Transit { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
+                    return fail("this Ship already has an order");
+                }
+                Ok(cost)
+            }
+            // Ticket #343 (version 0.09.1): Rearm, at a Colony or station of the seat's Faction with
+            // a working Shipyard, in that place's own orbit. It is queued as a build there.
+            Order::Rearm { ship } => {
+                let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
+                if s.seat != seat {
+                    return fail("not your Ship");
+                }
+                if s.kind != UnitKind::MissileCarrier {
+                    return fail("only a Missile Carrier carries a Warhead");
+                }
+                if s.warhead {
+                    return fail("this Missile Carrier already carries its Warhead");
+                }
+                if !matches!(s.at, ShipAt::Body(_)) {
+                    return fail("in transit");
+                }
+                match self.rearm_site(seat, *ship) {
+                    RearmSite::Yard(_) => {}
+                    RearmSite::NoPlace => return fail("no place of yours in this orbit to rearm at"),
+                    RearmSite::NoShipyard => return fail("no working Shipyard here"),
+                }
+                if pending.iter().any(|o| matches!(o, Order::Launch { ship: x, .. } | Order::Rearm { ship: x } | Order::Transit { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 Ok(cost)
@@ -1935,6 +2065,18 @@ impl Game {
                 Order::Repair { unit, points } => self.pending.repairs.push((seat, *unit, *points)),
                 // Ticket #328 (version 0.08.8): resolved after the orbital Battles.
                 Order::Bombard { ship, colony } => self.pending.bombards.push((seat, *ship, *colony)),
+                // Ticket #343 (version 0.09.1): resolved after the orbital Battles, beside the Bombards.
+                Order::Launch { ship, target } => self.pending.launches.push((seat, *ship, *target)),
+                // Ticket #343: the Warhead is a build in the yard's queue, so it takes the yard's
+                // Widgets in queue order like anything else and lands at the Resolution they reach it.
+                Order::Rearm { ship } => {
+                    if let RearmSite::Yard(c) = self.rearm_site(seat, *ship) {
+                        let widgets = self.build_widgets(seat, BuildItem::Warhead(*ship));
+                        if let Some(col) = self.colony_mut(c) {
+                            col.queue.push(Build { item: BuildItem::Warhead(*ship), seat, widgets, done: 0, coastal: false });
+                        }
+                    }
+                }
                 Order::Transit { ship, to, slot } => {
                     let from = match self.ship(*ship).map(|s| s.at) {
                         Some(ShipAt::Body(b)) => b,
@@ -2492,6 +2634,9 @@ impl Game {
             Order::ShipStance { stance: Stance::Hold, .. } | Order::ArmyStance { stance: Stance::Hold, .. } => None,
             // Ticket #328 (version 0.08.8).
             Order::Bombard { colony, .. } => r("bombard", &[("colony", place(Place::Colony(*colony)))]),
+            // Ticket #343 (version 0.09.1).
+            Order::Launch { target, .. } => r("launch", &[("place", place(*target))]),
+            Order::Rearm { .. } => r("rearm", &[]),
             Order::ShipStance { body, stance } => {
                 r("ship_stance", &[("body", self.tables.body(*body).name.clone()), ("stance", stance.name().to_string())])
             }

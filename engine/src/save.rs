@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 /// The stamp at the head of every save. A file whose stamp is not this one is refused with a plain
 /// message; a save is never migrated between versions.
-pub const SAVE_VERSION: u32 = 3;
+pub const SAVE_VERSION: u32 = 4;
 
 /// The rules version this executable plays, named beside the file's own in a refusal.
 ///
@@ -79,6 +79,15 @@ pub const SAVE_VERSION: u32 = 3;
 /// of population is **one million people** where it was five, so every Region figure in an older
 /// file is five times too small read under these rules (#333). A refusal naming both versions is
 /// the right answer, and a silent partial load is not.
+/// Ticket #343 (version 0.09.1): moved to **4**. `UnitKind` gained the **Missile Carrier**,
+/// appended last, so an older file's unit list is indexed differently here; a Ship carries a
+/// **Warhead** and a queue may carry a Warhead build, neither of which an older file has a field
+/// for; `TechId` gained **Missile Technology**, so an older file's Tech flags are a list of a
+/// different length; the pending orders carry **Launches**; the war's counters gained the nuke's
+/// five; and the Sink Weakens **subtracts** where it assigned, so a board from before was played
+/// under a Sink rule this version does not have. A refusal naming both versions is the right
+/// answer, and a silent partial load is not. `GAME_VERSION` is NOT moved here: the version's
+/// closing ticket moves it for the whole version, as ticket #340 did for 0.09.0.
 pub const GAME_VERSION: &str = "0.09.0";
 
 /// The game autosaves at the start of the Report phase of every third turn.

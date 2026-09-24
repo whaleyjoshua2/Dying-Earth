@@ -55,6 +55,13 @@ build_habitat = 5
 build_launch_site_or_shipyard = 6
 build_colony_ship = 6
 build_warship = 5
+# Ticket #343 (version 0.09.1): the Missile Carrier, and the Launch it was bought for. A seat
+# builds one only with Missile Technology standing, a rival holding a place it wants and cannot
+# take, and no carrier of its own already armed or on the ways; it fires at the richest such
+# place it can reach and hold the orbit of. Both weights sit above a warship's, since a hull
+# that costs 60 and 16 is worth nothing until it is fired.
+build_missile_carrier = 6
+launch = 9
 build_army_or_barracks = 5
 build_influence = 6
 influence = 5
@@ -101,6 +108,13 @@ build_habitat = 7
 build_launch_site_or_shipyard = 6
 build_colony_ship = 8
 build_warship = 3
+# Ticket #343 (version 0.09.1): the Missile Carrier, and the Launch it was bought for. A seat
+# builds one only with Missile Technology standing, a rival holding a place it wants and cannot
+# take, and no carrier of its own already armed or on the ways; it fires at the richest such
+# place it can reach and hold the orbit of. Both weights sit above a warship's, since a hull
+# that costs 60 and 16 is worth nothing until it is fired.
+build_missile_carrier = 6
+launch = 9
 build_army_or_barracks = 4
 build_influence = 6
 influence = 8
@@ -148,6 +162,13 @@ build_habitat = 9
 build_launch_site_or_shipyard = 9
 build_colony_ship = 9
 build_warship = 3
+# Ticket #343 (version 0.09.1): the Missile Carrier, and the Launch it was bought for. A seat
+# builds one only with Missile Technology standing, a rival holding a place it wants and cannot
+# take, and no carrier of its own already armed or on the ways; it fires at the richest such
+# place it can reach and hold the orbit of. Both weights sit above a warship's, since a hull
+# that costs 60 and 16 is worth nothing until it is fired.
+build_missile_carrier = 6
+launch = 9
 build_army_or_barracks = 4
 build_influence = 6
 influence = 5
@@ -198,6 +219,13 @@ build_habitat = 7
 build_launch_site_or_shipyard = 6
 build_colony_ship = 8
 build_warship = 1
+# Ticket #343 (version 0.09.1): the Missile Carrier, and the Launch it was bought for. A seat
+# builds one only with Missile Technology standing, a rival holding a place it wants and cannot
+# take, and no carrier of its own already armed or on the ways; it fires at the richest such
+# place it can reach and hold the orbit of. Both weights sit above a warship's, since a hull
+# that costs 60 and 16 is worth nothing until it is fired.
+build_missile_carrier = 6
+launch = 9
 # Ticket #51: the Archivists spend on the Archive and Colony Ships, never a fleet.
 build_army_or_barracks = 4
 build_influence = 6

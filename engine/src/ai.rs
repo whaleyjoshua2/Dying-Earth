@@ -17,6 +17,9 @@ enum Cat {
     LaunchSiteOrShipyard,
     ColonyShip,
     Warship,
+    /// Ticket #343 (version 0.09.1): the Missile Carrier, and the Launch it was bought for.
+    MissileCarrier,
+    Launch,
     ArmyOrBarracks,
     /// Ticket #36: an Embassy or a Relay.
     BuildInfluence,
@@ -258,6 +261,8 @@ impl Game {
             Cat::LaunchSiteOrShipyard => w.build_launch_site_or_shipyard,
             Cat::ColonyShip => w.build_colony_ship,
             Cat::Warship => w.build_warship,
+            Cat::MissileCarrier => w.build_missile_carrier,
+            Cat::Launch => w.launch,
             Cat::ArmyOrBarracks => w.build_army_or_barracks,
             Cat::BuildInfluence => w.build_influence,
             Cat::Constabulary => w.build_constabulary,
@@ -629,6 +634,72 @@ impl Game {
         let empty_carrier = self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::Carrier && s.army.is_none());
         let queued = self.states.iter().flat_map(|s| s.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Unit(UnitKind::Carrier));
         free_army && enemy_colony && !empty_carrier && !queued
+    }
+
+    /// Ticket #343 (version 0.09.1): what a Missile Carrier of this seat's is for -- the place it
+    /// most wants and cannot take. A place qualifies when a RIVAL directs it, the seat has cause
+    /// against that rival (`war_cause_at`, the bar every other weapon reads), and the seat cannot
+    /// take it either way it knows how: no Army of its own stands there, so no Occupation is under
+    /// way or in reach, and its own Standing there is not within the challenge margin, so no short
+    /// push wins it. Ranked by what is standing on it, which is what a nuke is for: the buildings
+    /// first and the people after.
+    ///
+    /// THE READING OF "cannot take" IS THE BUILD'S CHOICE, not the designer's: the resolution says
+    /// "the holding it most wants and cannot take" and does not say by what test.
+    pub fn nuke_target(&self, seat: Seat) -> Option<Place> {
+        self.nuke_targets(seat).into_iter().next()
+    }
+
+    /// Ticket #343 (version 0.09.1): all of them, richest first, so a hull that cannot reach the
+    /// best one is offered the best one it CAN reach rather than nothing. Without this a carrier at
+    /// Mars would sit idle whenever a Region on Earth outranked the Colony above it, which -- a
+    /// Region being millions of people and a Colony a dozen -- is nearly always.
+    pub fn nuke_targets(&self, seat: Seat) -> Vec<Place> {
+        let cause = self.tables.ai.thresholds.war_cause;
+        let mut places: Vec<Place> = StateId::ALL.into_iter().map(Place::State).collect();
+        places.extend(self.colonies.iter().map(|c| Place::Colony(c.id)));
+        let mut out: Vec<Place> = places
+            .into_iter()
+            .filter(|p| matches!(self.place_director(*p), Some(h) if h != seat))
+            .filter(|p| self.war_cause_at(seat, *p, cause))
+            .filter(|p| !self.armies.iter().any(|a| self.army_seat(a) == Some(seat) && a.at == ArmyAt::Place(*p)))
+            .filter(|p| {
+                let holder = self.place_director(*p).unwrap_or(seat);
+                let mine = self.seat(seat).influence.get(p).copied().unwrap_or(0);
+                let theirs = self.seat(holder).influence.get(p).copied().unwrap_or(0);
+                mine < theirs + self.challenge_margin_at(*p)
+            })
+            .collect();
+        out.sort_by_key(|p| std::cmp::Reverse(self.nuke_worth(*p)));
+        out
+    }
+
+    /// Ticket #343 (version 0.09.1): what is standing at a place, for the ranking above -- its
+    /// buildings, weighted over its people, since buildings are what the roll takes.
+    fn nuke_worth(&self, place: Place) -> i64 {
+        match place {
+            Place::State(s) => self.state(s).facilities.len() as i64 * 2 + self.state(s).population as i64,
+            Place::Colony(c) => self.colony(c).map(|c| c.modules.len() as i64 * 2 + c.colonists as i64).unwrap_or(0),
+        }
+    }
+
+    /// Ticket #343 (version 0.09.1): a seat wants a Missile Carrier when Missile Technology stands,
+    /// there is a place it most wants and cannot take, and it has neither an armed carrier of its
+    /// own already nor one on the ways. One at a time: the hull is dearer than a Battleship.
+    fn wants_missile_carrier(&self, seat: Seat) -> bool {
+        self.has_tech(TechId::MissileTechnology)
+            && self.nuke_target(seat).is_some()
+            && !self.ships.iter().any(|s| s.seat == seat && s.kind == UnitKind::MissileCarrier && s.warhead)
+            && !self.queues_of(seat).any(|b| matches!(b.item, BuildItem::Unit(UnitKind::MissileCarrier) | BuildItem::Warhead(_)))
+    }
+
+    /// Ticket #343 (version 0.09.1): every build under way anywhere for this seat.
+    fn queues_of(&self, seat: Seat) -> impl Iterator<Item = &Build> {
+        self.states
+            .iter()
+            .flat_map(|s| s.queue.iter())
+            .chain(self.colonies.iter().flat_map(|c| c.queue.iter()))
+            .filter(move |b| b.seat == seat)
     }
 
     /// Ticket #41: the rival's standing on a place the seat holds is within the challenge margin of
@@ -1327,10 +1398,21 @@ impl Game {
             let col = self.colony(cid).unwrap();
             let threat = if self.enemy_present_or_inbound(seat, col.body) || self.enemy_army_near(seat, Place::Colony(cid)) || self.starved_by(cid).is_some() { m.threat } else { 1.0 };
             for uk in UnitKind::SHIPS {
-                let cat = if uk == UnitKind::ColonyShip { Cat::ColonyShip } else { Cat::Warship };
+                let cat = match uk {
+                    UnitKind::ColonyShip => Cat::ColonyShip,
+                    // Ticket #343 (version 0.09.1): weighted apart from a warship, which it is not.
+                    UnitKind::MissileCarrier => Cat::MissileCarrier,
+                    _ => Cat::Warship,
+                };
                 // Ticket #43: a Carrier is built over Earth, where Armies board, and only when one wants carrying.
                 if uk == UnitKind::Carrier {
                     if best_earth_yard != Some(cid) || !self.wants_carrier(seat) {
+                        continue;
+                    }
+                // Ticket #343 (version 0.09.1): a Missile Carrier only with the Tech standing and a
+                // place the seat wants and cannot take; one at a time, and at the busiest yard.
+                } else if uk == UnitKind::MissileCarrier {
+                    if best_yard != Some(cid) || !self.wants_missile_carrier(seat) {
                         continue;
                     }
                 } else if best_yard != Some(cid) {
@@ -2361,6 +2443,55 @@ impl Game {
                         }
                         push(vec![Order::Bombard { ship: s.id, colony: c.id }], Cat::StanceAttack, self.base_weight(seat, Cat::StanceAttack), 1.0, 1.0, 1.0, format!("Bombard {} from {}", self.place_name(Place::Colony(c.id)), self.ship_name(s)), None);
                     }
+                }
+            }
+            // Ticket #343 (version 0.09.1): a Missile Carrier carrying its Warhead, in an orbit it
+            // holds outright, fires at the place the seat most wants and cannot take -- if that
+            // place is one this orbit touches. EARTH IS NOT EXCEPTED, unlike the Bombard above: a
+            // Region is a lawful target and a nuke on Earth is the point of the weapon. A carrier
+            // that has fired is offered a Rearm instead, at a yard of its own in its own orbit,
+            // which puts it back in the war after the round trip home.
+            let wanted = self.nuke_targets(seat);
+            for s in stack.iter().filter(|s| s.kind == UnitKind::MissileCarrier && s.warhead && !s.escaped) {
+                let orbit = self.ship_orbit(s);
+                let holds = if orbit.is_low() { self.orbital_control(body) == Some(seat) } else { self.orbit_uncontested(seat, body, orbit) };
+                if !holds {
+                    continue;
+                }
+                let touched = wanted.iter().copied().find(|t| {
+                    let at = match t {
+                        Place::State(_) => (BodyId::Earth, Orbit::Low),
+                        Place::Colony(c) => match self.colony(*c) {
+                            Some(col) => (col.body, self.colony_orbit(col)),
+                            None => return false,
+                        },
+                    };
+                    at == (body, orbit)
+                });
+                if let Some(target) = touched {
+                    push(vec![Order::Launch { ship: s.id, target }], Cat::Launch, self.base_weight(seat, Cat::Launch), 1.0, 1.0, 1.0, format!("Launch at {} from {}", self.place_name(target), self.ship_name(s)), None);
+                }
+            }
+            // Ticket #343 (version 0.09.1): a carrier at the right Body in the wrong orbit moves to
+            // the orbit its target is touched from. Without this a hull built at a station's yard
+            // sits in that station's ring for the rest of the game, since the ring touches nothing
+            // but the station: measured, five hulls were built over eighty games and none fired.
+            for s in stack.iter().filter(|s| s.kind == UnitKind::MissileCarrier && s.warhead && !s.escaped) {
+                let orbit = self.ship_orbit(s);
+                let want = wanted.iter().copied().find_map(|t| {
+                    let at = match t {
+                        Place::State(_) => (BodyId::Earth, Orbit::Low),
+                        Place::Colony(c) => (self.colony(c)?.body, self.colony_orbit(self.colony(c)?)),
+                    };
+                    (at.0 == body && at.1 != orbit).then_some(at.1)
+                });
+                if let Some(to) = want {
+                    push(vec![Order::ChangeOrbit { ship: s.id, slot: to.slot() }], Cat::MissileCarrier, self.base_weight(seat, Cat::MissileCarrier), 1.0, 1.0, 1.0, format!("Move {} to {}", self.ship_name(s), self.orbit_name(body, to)), None);
+                }
+            }
+            for s in stack.iter().filter(|s| s.kind == UnitKind::MissileCarrier && !s.warhead && !s.escaped) {
+                if matches!(self.rearm_site(seat, s.id), RearmSite::Yard(_)) {
+                    push(vec![Order::Rearm { ship: s.id }], Cat::MissileCarrier, self.base_weight(seat, Cat::MissileCarrier), 1.0, 1.0, 1.0, format!("Rearm {}", self.ship_name(s)), None);
                 }
             }
             // Ticket #319 (version 0.08.8): Intercept FIRES. Until this ticket it was offered only

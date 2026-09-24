@@ -429,6 +429,9 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     // Ticket #328 (version 0.08.8): a Bombard, hit or miss.
     ("bombard_hit", &["faction", "ship", "place", "module", "dead"]),
     ("bombard_miss", &["faction", "ship", "place", "module"]),
+    // Ticket #343 (version 0.09.1): a Launch, hit or miss.
+    ("launch_hit", &["faction", "ship", "place", "lost", "dead"]),
+    ("launch_miss", &["faction", "ship", "place", "dead"]),
     ("occupation_begun", &["faction", "place"]),
     ("occupation_ended", &["place", "faction"]),
     // Ticket #299 (version 0.08.6): a broken Occupation, at a cost.
@@ -533,6 +536,8 @@ pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     ("cargo_aboard", &["n"]),
     // Ticket #328 (version 0.08.8): the Colonists a burned Habitat took with it.
     ("bombard_dead", &["n"]),
+    // Ticket #343 (version 0.09.1): the people a Launch killed.
+    ("launch_dead", &["n"]),
     ("sea_unrest", &["rose", "unrest"]),
     ("sea_inland", &[]),
     ("sea_inland_flipped", &["what"]),
@@ -584,6 +589,9 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("change_orbit", &["unit", "orbit"]),
     ("refuel", &["unit", "body"]),
     ("bombard", &["colony"]),
+    // Ticket #343 (version 0.09.1).
+    ("launch", &["place"]),
+    ("rearm", &[]),
     ("ship_stance", &["body", "stance"]),
     ("army_stance", &["place", "stance"]),
     // Ticket #339 (version 0.09.0): the march and the loading name the Army.

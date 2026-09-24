@@ -745,6 +745,9 @@ impl Game {
             BuildItem::Module(k) => (t.module(k).widgets, fac.module_materials_multiplier),
             BuildItem::Unit(UnitKind::Army) => (t.unit(UnitKind::Army).widgets, 1.0),
             BuildItem::Unit(k) => (t.unit(k).widgets, fac.ship_materials_multiplier),
+            // Ticket #343 (version 0.09.1): a Warhead is priced flat, the Faction's Ship discount
+            // left out. The discount is a shipwright's, and reloading is not shipbuilding.
+            BuildItem::Warhead(_) => (t.nuke.rearm_widgets, 1.0),
         };
         ((row as f64 * m).floor() as u32).max(1)
     }
@@ -805,6 +808,8 @@ impl Game {
             (BuildItem::Module(k), Place::State(_)) => self.module_materials(seat, k),
             (BuildItem::Unit(UnitKind::Army), _) => self.tables.unit(UnitKind::Army).materials,
             (BuildItem::Unit(k), _) => self.ship_materials(seat, k),
+            // Ticket #343 (version 0.09.1): the rearm's flat price, for the same reason.
+            (BuildItem::Warhead(_), _) => self.tables.nuke.rearm_materials,
         }
     }
 

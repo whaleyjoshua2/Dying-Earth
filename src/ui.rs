@@ -677,6 +677,12 @@ enum Kind {
     /// Ticket #317 (version 0.08.8): a Battle fought last turn, crossed blades; the mark on the
     /// map and the glyph on the Battles list.
     Battle,
+    /// Ticket #343 (version 0.09.1): the Missile Carrier. A sixth KIND of thing, against the
+    /// designer's five, because the hull is neither of the two Ships the five name: it is not a
+    /// warship (`is_warship()` is false, so it fell through to the Colony Ship's rocket and the one
+    /// hull in the game that can gut a Region wore the glyph of the one that founds them) and it
+    /// carries nobody. The glyph is drawn for the game, so it owes no credit; see `icons::DRAWN`.
+    MissileCarrier,
 }
 
 /// The side of a kind glyph in a row of text at the panel's ordinary size.
@@ -693,6 +699,7 @@ impl Kind {
             Kind::Region => Some("region"),
             Kind::Army => None,
             Kind::Battle => Some("battle"),
+            Kind::MissileCarrier => Some("missile_carrier"),
         }
     }
 
@@ -703,12 +710,28 @@ impl Kind {
     /// A stack with one warship in it is a warship stack; a stack of transports is not. A Carrier
     /// is a transport, so it wears the Colony Ship's glyph, the designer having named two kinds
     /// of Ship and not three.
+    /// Ticket #343 (version 0.09.1): and a stack with no warship but a Missile Carrier in it wears
+    /// the Missile Carrier's, since that is the most dangerous thing in it and a glyph on a ring or
+    /// a band has room to say one thing. The order is warship, then carrier, then transport --
+    /// escorts first, because the escort rule (#326) is what decides whether the carrier can be
+    /// reached at all.
     fn of_ships<'a>(ships: impl IntoIterator<Item = &'a Ship>) -> Kind {
-        if ships.into_iter().any(|s| s.kind.is_warship()) { Kind::Warship } else { Kind::ColonyShip }
+        let mut carrier = false;
+        for s in ships {
+            if s.kind.is_warship() {
+                return Kind::Warship;
+            }
+            carrier |= s.kind == UnitKind::MissileCarrier;
+        }
+        if carrier { Kind::MissileCarrier } else { Kind::ColonyShip }
     }
 
     fn of_unit(kind: UnitKind) -> Kind {
-        if kind.is_warship() { Kind::Warship } else { Kind::ColonyShip }
+        match kind {
+            UnitKind::MissileCarrier => Kind::MissileCarrier,
+            k if k.is_warship() => Kind::Warship,
+            _ => Kind::ColonyShip,
+        }
     }
 
     fn image(self, ctx: &egui::Context, size: f32) -> Option<egui::Image<'static>> {
@@ -975,6 +998,37 @@ fn orbit_phrase(game: &Game, body: BodyId, orbit: Orbit) -> String {
     match orbit {
         Orbit::Low => "in low orbit".to_string(),
         Orbit::Slot(n) => format!("at {}", game.station_name(body, n)),
+    }
+}
+
+/// Ticket #343 (version 0.09.1): **whether the hull still carries its Warhead**, in three words,
+/// for every list that says what a Ship is carrying. `None` for anything that is not a Missile
+/// Carrier: no other hull has a Warhead to carry and none can ever be given one, so a word about
+/// one would be noise on every other row in the game.
+///
+/// A Missile Carrier that has fired is the game's first spent piece -- it still flies, still eats
+/// Fuel, still takes a hit for the stack under the escort rule, and can do NOTHING until it is
+/// rearmed -- so the difference is said on the row rather than left to a hover.
+fn warhead_words(s: &Ship) -> Option<&'static str> {
+    if s.kind != UnitKind::MissileCarrier {
+        return None;
+    }
+    Some(if s.warhead { "Warhead aboard" } else { "Warhead spent" })
+}
+
+/// The colour the Warhead word wears: the amber this interface already warns in (the crowding line
+/// on a Colony Ship's loader) while the hull is armed, and the weak ink of a thing that is not
+/// there once it has fired.
+const WARHEAD_ARMED: Color32 = Color32::from_rgb(230, 170, 90);
+
+/// Ticket #343: the Warhead word as a coloured label on a Ship's row, beside the damage and the
+/// tank -- the shape the stranded warning already uses.
+fn warhead_label(ui: &mut Ui, s: &Ship) {
+    let Some(words) = warhead_words(s) else { return };
+    if s.warhead {
+        ui.colored_label(WARHEAD_ARMED, words);
+    } else {
+        ui.label(RichText::new(words).weak());
     }
 }
 
@@ -2161,7 +2215,10 @@ fn game_screen(
                         .iter()
                         .filter_map(|id| game.ship(*id))
                         .take(5)
-                        .map(|sh| format!("{} ({})", game.ship_name(sh), sh.kind.name().to_lowercase()))
+                        // Ticket #343 (version 0.09.1): a Missile Carrier says whether it still
+                        // carries its Warhead here too, since this hover is how a stack on the
+                        // Solar System Map is read without selecting it.
+                        .map(|sh| format!("{} ({}){}", game.ship_name(sh), sh.kind.name().to_lowercase(), warhead_words(sh).map(|w| format!(", {w}")).unwrap_or_default()))
                         .collect();
                     if ids.len() > 5 {
                         lines.push(format!("and {} more - click the stack", ids.len() - 5));
@@ -4053,6 +4110,12 @@ fn roster_of(ui: &mut Ui, session: &Session, game: &Game, seat: Seat, marks: boo
             if s.damage > 0 {
                 text.push_str(&format!(", damage {}/{}", s.damage, game.tables.unit(s.kind).hit_points));
             }
+            // Ticket #343 (version 0.09.1): and whether a Missile Carrier still has its Warhead,
+            // which is the whole of what the hull is for and the one figure on it that no other
+            // line on this row carries.
+            if let Some(words) = warhead_words(s) {
+                text.push_str(&format!(", {words}"));
+            }
             // Stranded is now per-SHIP rather than the old all-or-nothing warning on the stack,
             // which is strictly more accurate: one hull can be dry while another beside it is full.
             // Ticket #313 (version 0.08.7): the stance word in brackets, as an Army's row has it,
@@ -4240,6 +4303,10 @@ fn order_text(game: &Game, o: &Order) -> String {
         Order::Refuel { ship } => format!("Refuel {} ({} Fuel from the Stockpile)", ship, game.refuel_amount(Seat(0), *ship)),
         Order::ShipStance { body, stance } => format!("Ships at {}: {}", game.tables.body(*body).name, stance.name()),
         Order::Bombard { ship, colony } => format!("Bombard {} from {}", game.place_name(Place::Colony(*colony)), ship),
+        // Ticket #343 (version 0.09.1): the engine lane's two new orders, so the order list can
+        // name them. The buttons that give them are the interface lane's work.
+        Order::Launch { ship, target } => format!("Launch a Warhead at {} from {}", game.place_name(*target), ship),
+        Order::Rearm { ship } => format!("Rearm {}", ship),
         Order::ArmyStance { place, stance } => format!("Armies at {}: {}", game.place_name(*place), stance.name()),
         Order::MoveArmy { army, to } => format!("{} to {}", army, game.tables.state(*to).name),
         Order::Load { ship, colonists, army, .. } => format!("Load {} onto {}", if *colonists > 0 { format!("{colonists} Colonists") } else { format!("{}", army.unwrap_or(ArmyId(0))) }, ship),
@@ -4776,7 +4843,9 @@ fn priced_button(ui: &mut Ui, enabled: bool, label: &str, cost: &dying_earth_eng
 /// in Ducats. `None` for an order that builds nothing -- a Mothball, a Relief -- which then gets
 /// no cost line and no cog on its face. (Ticket #121 read a flat turn count off the row here;
 /// a build has none any more.)
-fn build_item_of(order: &Order) -> Option<(Place, BuildItem, bool)> {
+/// Ticket #343 (version 0.09.1): and a Rearm, whose place is not in the order -- the yard is
+/// wherever the hull is sitting -- so the game is read for it. That is why this takes a `Game`.
+fn build_item_of(game: &Game, order: &Order) -> Option<(Place, BuildItem, bool)> {
     match order {
         Order::BuildFacility { state, kind } => Some((Place::State(*state), BuildItem::Facility(*kind), false)),
         Order::BuildFacilityWithDucats { state, kind } => Some((Place::State(*state), BuildItem::Facility(*kind), true)),
@@ -4786,6 +4855,14 @@ fn build_item_of(order: &Order) -> Option<(Place, BuildItem, bool)> {
         Order::BuildArchive { colony } => Some((Place::Colony(*colony), BuildItem::Module(ModuleKind::Archive), false)),
         Order::BuildShip { site, kind } => Some((*site, BuildItem::Unit(*kind), false)),
         Order::BuildArmy { place } => Some((*place, BuildItem::Unit(UnitKind::Army), false)),
+        // Ticket #343 (version 0.09.1): a Warhead is a build in the Shipyard's own queue, so the
+        // button wears the cog and the hover says the Materials, the Widgets and the turns, exactly
+        // as a Module's does. Nowhere to build it is nothing to say: the button is refused anyway,
+        // and the refusal names what is missing.
+        Order::Rearm { ship } => match game.rearm_site(Seat(0), *ship) {
+            RearmSite::Yard(c) => Some((Place::Colony(c), BuildItem::Warhead(*ship), false)),
+            RearmSite::NoPlace | RearmSite::NoShipyard => None,
+        },
         _ => None,
     }
 }
@@ -4796,7 +4873,7 @@ fn build_item_of(order: &Order) -> Option<(Place, BuildItem, bool)> {
 /// everything already in its queue (`Game::turns_to_build`). An outright buy in Ducats completes
 /// at the next Resolution ahead of the queue whatever its figure, and says so instead.
 fn build_words(game: &Game, order: &Order) -> Option<String> {
-    let (place, item, ducats) = build_item_of(order)?;
+    let (place, item, ducats) = build_item_of(game, order)?;
     let cost = game.order_cost(Seat(0), order);
     if ducats {
         return Some(format!("{} Ducats, ready at the next Resolution ahead of the queue", cost.ducats));
@@ -5053,7 +5130,7 @@ fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Or
     let check = game.check_order(Seat(0), pending, &order);
     // Ticket #332 (version 0.09.0): the Widget figure on the face after the price, and the hover's
     // first line the Materials, the Widgets and the estimate at this place's rate behind its queue.
-    let widgets = build_item_of(&order).filter(|(_, _, ducats)| !ducats).map(|(_, item, _)| game.build_widgets(Seat(0), item)).unwrap_or(0);
+    let widgets = build_item_of(game, &order).filter(|(_, _, ducats)| !ducats).map(|(_, item, _)| game.build_widgets(Seat(0), item)).unwrap_or(0);
     let mut resp = priced_button(ui, check.is_ok(), label, &cost, widgets);
     let ready = build_words(game, &order);
     let whole = match (&ready, &hover) {
@@ -6719,6 +6796,11 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                 orbit_phrase(game, body, game.ship_orbit(s))
             ))
             .on_hover_text(format!("{} {}", s.kind.name(), s.id.0));
+            // Ticket #343 (version 0.09.1): and, for a Missile Carrier, the Warhead, in the
+            // coloured word the stranded tank is said in -- a carrier that has fired is a hull
+            // that can do nothing at all until a Shipyard reloads it, and the card must say so
+            // without being asked.
+            warhead_label(ui, s);
         });
     }
     if session.spectator {
@@ -6796,6 +6878,118 @@ fn stack_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
                     );
                     cost_button_with_hover(ui, game, &session.pending, Order::Bombard { ship: s.id, colony: c.id }, &format!("Bombard {} from {}", place, game.ship_name(s)), Some(hover), actions);
                 }
+            }
+        }
+    }
+    // Ticket #343 (version 0.09.1): **Launch**, built on the Bombard's door above and differing
+    // from it in the two ways the weapon exists for. It stands at EARTH TOO -- "never over Earth"
+    // is a Bombard's rule and does not carry over, a nuke on Earth being the point of the thing --
+    // and it reaches a REGION as well as a ground Colony and a station.
+    //
+    // Which is why the target is CHOSEN here rather than given a button apiece as a Bombard's is:
+    // over Earth a rival may direct a dozen Regions, and a dozen buttons times every carrier in the
+    // stack is a wall of them. One chooser, then one button per hull, each greying with the
+    // engine's own refusal -- no Warhead, not the orbit, the orbit not held -- so a shut door
+    // always says which door it is.
+    let carriers: Vec<&Ship> = ships.iter().copied().filter(|s| s.kind == UnitKind::MissileCarrier).collect();
+    if !carriers.is_empty() {
+        ui.label(RichText::new("Launch").strong());
+        let mut targets: Vec<Place> = game.colonies.iter().filter(|c| c.body == body && c.control.director().is_some_and(|d| d != Seat(0))).map(|c| Place::Colony(c.id)).collect();
+        if body == BodyId::Earth {
+            targets.extend(StateId::ALL.into_iter().filter(|sid| game.place_director(Place::State(*sid)).is_some_and(|d| d != Seat(0))).map(Place::State));
+        }
+        // The orbit that touches a place: a station's own ring, and low orbit for a Colony on the
+        // ground or for a Region, which is Earth's ground.
+        let touching = |p: Place| match p {
+            Place::Colony(c) => game.colony(c).map(|col| game.colony_orbit(col)).unwrap_or(Orbit::Low),
+            Place::State(_) => Orbit::Low,
+        };
+        // A target an armed hull of this stack can actually reach is offered FIRST, so the chooser
+        // opens on a Launch that could be given rather than on one the gate refuses. A stable sort,
+        // so within each half the order is the one the list was built in.
+        let armed: Vec<Orbit> = carriers.iter().filter(|s| s.warhead).map(|s| game.ship_orbit(s)).collect();
+        targets.sort_by_key(|t| !armed.contains(&touching(*t)));
+        if targets.is_empty() {
+            ui.label(RichText::new("Nothing at this Body is a rival's. A Warhead is fired at a Region, a Colony or a station a rival directs; never at a neutral place, and never at one of yours.").weak());
+        } else {
+            let chosen = view.launch_target.filter(|t| targets.contains(t)).unwrap_or(targets[0]);
+            let named = |p: Place| match game.place_director(p) {
+                Some(d) => format!("{} ({})", game.place_name(p), game.seat_name(d)),
+                None => game.place_name(p),
+            };
+            ui.horizontal(|ui| {
+                ui.label("Target:");
+                egui::ComboBox::from_id_salt(("launch", body)).selected_text(named(chosen)).show_ui(ui, |ui| {
+                    for t in &targets {
+                        if ui.selectable_label(*t == chosen, named(*t)).clicked() {
+                            view.launch_target = Some(*t);
+                        }
+                    }
+                });
+            });
+            let n = &game.tables.nuke;
+            let holder = game.place_director(chosen).map(|d| game.seat_name(d)).unwrap_or_default();
+            // What stands at the target and would roll: a Colony's Modules, the Core and the
+            // Archive left out because a strike spares them, and a Region's Facilities.
+            let (buildings, what) = match chosen {
+                Place::Colony(c) => {
+                    let n = game.colony(c).map(|col| col.modules.iter().filter(|m| !matches!(m.kind, ModuleKind::Core | ModuleKind::Archive)).count()).unwrap_or(0);
+                    (n, if n == 1 { "Module" } else { "Modules" })
+                }
+                Place::State(sid) => {
+                    let n = game.state(sid).facilities.len();
+                    (n, if n == 1 { "Facility" } else { "Facilities" })
+                }
+            };
+            let target_orbit = touching(chosen);
+            let holds = if target_orbit.is_low() {
+                format!("The Missile Carrier must be in low orbit, with Orbital Control of {} held outright.", game.tables.body(body).name)
+            } else {
+                format!("The Missile Carrier must be {}, with no rival warship and no rival working Battery in that orbit.", orbit_phrase(game, body, target_orbit))
+            };
+            // What a strike does at this kind of place, in the words rule R4 is written in.
+            let and_then = match chosen {
+                Place::Colony(_) => "The Core Module and the Archive are spared, so a place is gutted and never erased.".to_string(),
+                Place::State(_) => format!("Its Standing Army dies with them, and its Industry Level falls by {}, never below the level it began on.", n.industry_lost),
+            };
+            // Ticket #279's rule, which this inherits: the war bucket and the Sink are Earth's
+            // alone, so a strike off Earth poisons nothing and the hover must not say it does.
+            let air = if body == BodyId::Earth {
+                format!(" Over Earth: {:.0} ppm into your war bucket, and the Natural Sink rises {:.2}, for good.", n.war_ppm, n.sink_rise)
+            } else {
+                String::new()
+            };
+            // One hover for every hull: nothing in it turns on which hull fires, and the rows at
+            // the head of this card already say where each one is sitting. `rule_tip` holds the
+            // whole thing under the pointer, so it is kept near the ceiling the tooltip rule sets.
+            let hover = format!(
+                "Every building at {} ({buildings} {what}) rolls a {:.0}% chance to burn, each on its own, and between {:.0}% and {:.0}% of its people die. {and_then} A rung {} offence against the {holder}, breaking a non-aggression Accord if one stands, and the Warhead is spent either way.{air} {holds}",
+                game.place_name(chosen),
+                n.destruction_chance * 100.0,
+                n.people_min * 100.0,
+                n.people_max * 100.0,
+                n.offence,
+            );
+            for s in &carriers {
+                cost_button_with_hover(ui, game, &session.pending, Order::Launch { ship: s.id, target: chosen }, &format!("Launch at {} from {}", game.place_name(chosen), game.ship_name(s)), Some(hover.clone()), actions);
+            }
+        }
+        // Ticket #343: **Rearm**, under the Launch and only for the hulls that need it, because it
+        // is the answer to the refusal the button above gives a spent carrier. It is a BUILD in the
+        // yard's queue and not an instant act, so it wears the cog and its hover says the
+        // Materials, the Widgets and the turns, exactly as a Module's build button does -- see
+        // `build_item_of`, which reads the yard out of the board since the order does not carry it.
+        let spent: Vec<&Ship> = carriers.iter().copied().filter(|s| !s.warhead).collect();
+        if !spent.is_empty() {
+            ui.label(RichText::new("Rearm").strong());
+            ui.label("A Warhead is built where the carrier sits: it joins the Shipyard's queue like any other build and lands at the Resolution that yard's Widgets reach it.");
+            for s in spent {
+                let where_words = match game.rearm_site(Seat(0), s.id) {
+                    RearmSite::Yard(c) => format!("the hull carries another Warhead and may Launch again. It is built at {}, behind whatever already stands in that Shipyard's queue.", game.place_name(Place::Colony(c))),
+                    RearmSite::NoShipyard => "A place of yours is in this orbit, but nothing there is a working Shipyard.".to_string(),
+                    RearmSite::NoPlace => "A Warhead is loaded at a Colony or station of yours, in that place's own orbit; there is none of yours in this one.".to_string(),
+                };
+                cost_button_with_hover(ui, game, &session.pending, Order::Rearm { ship: s.id }, &format!("Rearm {}", game.ship_name(s)), Some(where_words), actions);
             }
         }
     }

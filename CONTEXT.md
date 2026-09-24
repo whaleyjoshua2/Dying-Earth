@@ -259,14 +259,14 @@ A building placed inside a Colony. **Twenty kinds** since version 0.09.0. Fourte
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:
-A persistent piece that travels between Bodies. It is one of four types since version 0.04: Colony Ship, Carrier, Frigate or Battleship. It is built only at a Shipyard, on a Space Station or a Colony. It is not consumed on arrival; damage it takes persists until repaired.
+A persistent piece that travels between Bodies. It is one of five types since version 0.09.1: Colony Ship, Carrier, Frigate, Battleship or Missile Carrier; there were four from version 0.04. It is built only at a Shipyard, on a Space Station or a Colony, and since version 0.09.1 a type may wait on a Tech, the Missile Carrier being the only one that does. It is not consumed on arrival; damage it takes persists until repaired.
 _Avoid_: vessel, rocket, fleet, expedition
 **Motto**:
 One line a Faction says of itself, under its name on the selection card and in the in-game rulebook, since version 0.08.4 -- the Custodians' *Leave it better than we found it*, the Prospectors' *Everything has a price. We find it*, the Arkwrights' *Nothing left behind but the Earth*, the Archivists' *Everyone remembered*. It is the Faction speaking, where the blurb beneath it is the rules describing the Faction; it appears nowhere else.
 _Avoid_: slogan, tagline, catchphrase
 
 **Ship name**:
-The name a Ship is given when it is built, since version 0.08.1, drawn from one of two lists -- the ships of exploration for a Colony Ship, the ships of the line for a Frigate, a Battleship and the Carrier. It is unique across the whole board and is taken as the first unused name in list order, which draws no randomness and so cannot shift a seeded game. The **prefix** in front of it belongs to whoever flies the ship and is its Faction's -- TSV, PMV, ARK, ACV -- where the name belongs to the hull. The Ship's id survives on every hover, since a save file, a log line and the Report all speak in ids.
+The name a Ship is given when it is built, since version 0.08.1, drawn from one of two lists -- the ships of exploration for a Colony Ship, the ships of the line for a Frigate, a Battleship, the Carrier and, since version 0.09.1, the Missile Carrier. It is unique across the whole board and is taken as the first unused name in list order, which draws no randomness and so cannot shift a seeded game. The **prefix** in front of it belongs to whoever flies the ship and is its Faction's -- TSV, PMV, ARK, ACV -- where the name belongs to the hull. The Ship's id survives on every hover, since a save file, a log line and the Report all speak in ids.
 _Avoid_: callsign, registry, hull number, designation
 
 **Colony Ship**:
@@ -288,6 +288,14 @@ _Avoid_: escort, corvette, destroyer
 **Battleship**:
 The heavy warship type: the most strength and hit points, low Pursuit, dear and slow to build. Since version 0.04 it carries no Army.
 _Avoid_: capital ship, dreadnought, cruiser
+
+**Missile Carrier**:
+The fifth Ship type, since version 0.09.1: the hull that carries one Warhead and fires it with a Launch. Dearer than a Battleship and frailer than a Colony Ship -- no strength, no Pursuit, three hit points -- it cannot fight at all, and it waits on Missile Technology, the first Tech that gates a Ship. It is a Ship but never a warship: it holds no Orbital Control, it blockades nothing, it intercepts nobody, and under the escort rule it is struck only once its party has no warship left standing. That frailty is the counter to it by decision, and the game has no anti-missile rule.
+_Avoid_: missile boat, nuke ship, ICBM, bomber
+
+**Warhead**:
+The one shot a Missile Carrier carries, since version 0.09.1, and the first thing in the game that is spent by using it. It comes with the hull at the build and is gone the moment it is fired, whether or not anything burned; a Rearm loads another, at a Colony or station of the hull's own Faction with a working Shipyard, in that place's own orbit, for Materials and Widgets -- so a carrier that has fired is out of the war for the round trip home.
+_Avoid_: missile, payload, ammunition, bomb, reload
 
 **Army**:
 A ground fighting unit, of one system since version 0.08.6. A Region's Armies belong to the state and are directed by the Faction that controls it, following the state if control changes -- its **Standing Army**, and the Armies **raised** there; all march (since version 0.08.8; from 0.08.6 the Standing Army stayed at home). A raised Army's strength and hit points are its home's Industry Level plus one when it is raised, fixed for its life. A Colony's Army belongs to the Colony, exists only where it has a Barracks, only defends, and is worth the rounded average Industry Level of the Regions its raising Faction held, plus one, fixed at the raise. Any Army fights at its strength plus what it defends with: a Region's own Army its people (a working Constabulary, and calm), and any Army dug in two more. Since version 0.08.4 every Army has a name given as it is raised, from its home rather than from any Faction: an ordinal and the Region's demonym -- *the 1st Chinese Army*, *the 2nd* -- or for a Colony's, its Garrison -- *the Tycho Garrison*, *the 2nd Tycho Garrison*. The Standing Army is the first raised and so the 1st; a re-raised one takes the next number; the name survives every change of hands, since the Army is its Region's.
@@ -652,12 +660,16 @@ _Avoid_: siege, embargo, interdiction, orbital control
 An Orders-phase order, since version 0.08.8, for a Battleship at a Body other than Earth: it strikes a rival's Colony there. Since version 0.09.0 **the orbit it is in is the orbit it must hold**: a Colony on the ground is struck from low orbit by a Faction holding Orbital Control there outright, and a Space Station from its own orbit, with no rival warship and no rival working Battery in it. It is also the second action against a station a fleet has beaten, since an Attack on a station that cannot fight back does nothing beyond the Battle. Resolved after the orbital Battles, one Module of the Colony drawn at random (the Core Module and the Archive never among them) rolls the destruction chance a taking uses; when a Habitat burns, the Colonists beyond the room left die with it, which is the one way a Bombard kills people. Each Bombard is an offence at rung 3 against the Colony's holder, as opening a Battle is, and breaks a non-aggression Accord if one stands; a burned building's war Emissions are the bombarder's. One Bombard per Battleship a turn, never over Earth, where the opening stations stand. It is a Battle's act: a Report line hit or miss, a Moment and the Battle mark when anything burned. A standing Battery, which denies every rival Orbital Control in the orbit it covers, is the shield against it.
 _Avoid_: orbital strike, shelling, siege, raid
 
+**Launch**:
+The Orders-phase order, since version 0.09.1, that fires a Missile Carrier's Warhead at a Region, a ground Colony or a Space Station a rival directs. It needs what a Bombard needs -- the hull in the orbit that touches the place and holding that orbit outright -- but unlike a Bombard it is lawful over **Earth**, and a Region is a lawful target: a nuke at home is the point of the weapon. Free to order, since the price was paid at the build and is paid again at the Rearm. Resolved after the orbital Battles, **every** building at the place rolls a destruction chance far above a taking's, the Core Module and the Archive spared, so a place is gutted and never removed from the board; between two fifths and three fifths of its people die; and at a Region the Standing Army is destroyed and the Industry Level falls by one, never below the board the Region started on and raisable again by the ordinary order. It is an Offence at rung 4 against the holder. On Earth alone it also fouls the air and raises the Natural Sink for good; a Launch off Earth does neither.
+_Avoid_: nuke (in the interface), missile strike, bombard, first strike
+
 **Occupation**:
 The state of a Region or Colony whose defenders were beaten by an Army. The occupier chooses build orders but does not direct its Armies; control transfers after the lesser of three turns or the population being Pacified. Since version 0.08.6 the two ends differ: a transfer by the three-turn clock rolls a quarter of the buildings to burn, a transfer by Pacified takes the place **whole**, and either fires the Moment for a place taken by force. An Occupation **breaks** the moment the occupier has no Army at the place, whether the last one marched off, was lifted or was destroyed, and since version 0.08.6 a break costs: the place hands back to its previous holder at +2 Unrest, the occupier takes a rung-2 Offence from that holder (a neutral charges nobody), and the Standing the Occupation had banked for the occupier is wiped. The march itself stays legal: an occupier may leave, and pays. Since version 0.08.8 it is held by the same presence that begins it: an Army of the occupier at the place that did not escape, so an Army that ran holds nothing.
 _Avoid_: conquest, annexation, capture
 
 **Offence**:
-An act against a rival that costs Relations, weighed on a ladder: **1** for Influence spent on a place the rival holds (once per place per turn), a Smear, an Agitate, or a turn of Blockade; **2**, since version 0.08.6, for an Occupation of the rival's place that broke; **3** for opening a Battle against them or breaking an Accord with them. A turn charges the sum of every offence in it, to a cap, and an offence against a non-aggression partner breaks the Accord as well. The rival's Report names who paid.
+An act against a rival that costs Relations, weighed on a ladder: **1** for Influence spent on a place the rival holds (once per place per turn), a Smear, an Agitate, or a turn of Blockade; **2**, since version 0.08.6, for an Occupation of the rival's place that broke; **3** for opening a Battle against them, bombarding them or breaking an Accord with them; and **4**, since version 0.09.1, for a Launch at a place they hold, the heaviest rung there is. A turn charges the sum of every offence in it, to a cap, and an offence against a non-aggression partner breaks the Accord as well. The rival's Report names who paid.
 _Avoid_: crime, aggression score, penalty, grievance
 
 **Pacified**:
@@ -715,7 +727,7 @@ Since version 0.08.4, the record each Faction keeps of every Climate phase -- ho
 _Avoid_: progress graph, score chart, victory log
 
 **Natural Sink**:
-The amount of CO2 the oceans and forests remove from the CO2 Stock every turn. Net emissions below it stabilize the stock. Every Scrubber standing and online enlarges it while it stands, and since version 0.05 a Break can weaken it for good.
+The amount of CO2 the oceans and forests remove from the CO2 Stock every turn. Net emissions below it stabilize the stock. Every Scrubber standing and online enlarges it while it stands; the Custodians' Research Directive can add to it for good; and since version 0.09.1 a Launch on Earth raises it for good as well, the soot of a nuke at home dimming the sky. Since version 0.05 a Break can weaken it for good, and since version 0.09.1 that Break **takes an amount off** it rather than setting it to a figure, so a Sink somebody has raised keeps what it was given.
 _Avoid_: absorption, offset, carbon capture
 
 **Sea Level**:
@@ -723,7 +735,7 @@ How far the oceans have risen with the Temperature. It is drawn on the globe as 
 _Avoid_: flooding, water line, ocean rise
 
 **Break**:
-A Temperature at which a permanent change to the world fires once, the first time the Temperature stands at or above it. Five since version 0.05: the reefs die, the permafrost thaws, the Natural Sink weakens, the ice sheets go and the Amazon dies back. Nothing undoes a Break, and the Report says it happened rather than that it is coming.
+A Temperature at which a permanent change to the world fires once, the first time the Temperature stands at or above it. Five since version 0.05: the reefs die, the permafrost thaws, the Natural Sink weakens, the ice sheets go and the Amazon dies back. Since version 0.09.1 the Sink Weakens **subtracts** from the Natural Sink instead of assigning it a figure; on an untouched world it lands where it always did, but it no longer erases whatever had raised the Sink first. Nothing undoes a Break, and the Report says it happened rather than that it is coming.
 _Avoid_: tipping point, threshold, trigger
 
 **Committed Warming**:

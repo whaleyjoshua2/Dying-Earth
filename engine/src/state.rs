@@ -178,6 +178,11 @@ pub enum BuildItem {
     IndustryLevel,
     Module(ModuleKind),
     Unit(UnitKind),
+    /// Ticket #343 (version 0.09.1): a **Warhead** for a Missile Carrier that has fired, loaded at
+    /// a Shipyard of its Faction. It is a build and not an instant order because it is paid in
+    /// Widgets as well as Materials, and Widgets are a place's rate: it sits in the yard's queue
+    /// like anything else and lands at the Resolution the yard has made it.
+    Warhead(ShipId),
 }
 
 impl BuildItem {
@@ -187,6 +192,7 @@ impl BuildItem {
             BuildItem::IndustryLevel => "Industry Level".to_string(),
             BuildItem::Module(k) => k.name().to_string(),
             BuildItem::Unit(k) => k.name().to_string(),
+            BuildItem::Warhead(_) => "Warhead".to_string(),
         }
     }
 }
@@ -480,6 +486,12 @@ pub struct Ship {
     /// Ship built at a Shipyard starts in the orbit of the yard that built it.
     #[serde(default)]
     pub slot: Option<u32>,
+    /// Ticket #343 (version 0.09.1): the **Warhead** aboard a Missile Carrier -- true at the build,
+    /// false once it is fired, and true again when a Rearm completes at a Shipyard of its Faction.
+    /// The first one-shot anything in this game carries. False on every other hull, which has no
+    /// Warhead to carry and can never be given one.
+    #[serde(default)]
+    pub warhead: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1088,6 +1100,20 @@ pub struct WarCounters {
     pub takes_by_influence_colonies: [u32; SEAT_COUNT],
     #[serde(default)]
     pub takes_by_influence_stations: [u32; SEAT_COUNT],
+    /// Ticket #343 (version 0.09.1): the nuke, by the seat that fired it -- Missile Carriers
+    /// completed, Launches resolved, buildings burned by them, and Industry Levels taken off a
+    /// Region. `people_killed` is in units of POPULATION, one unit being one million people since
+    /// ticket #333, so a Region's share and a Colony's Colonists are counted in the same coin.
+    #[serde(default)]
+    pub missile_carriers_built: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub launches: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub launch_buildings_burned: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub launch_people_killed: [f64; SEAT_COUNT],
+    #[serde(default)]
+    pub industry_levels_lost: [u32; SEAT_COUNT],
 }
 
 /// Ticket #332 (version 0.09.0): Widgets, counted where they are made and spent, so the sweep can
@@ -1138,6 +1164,12 @@ impl WarCounters {
             self.takes_by_influence_states[i] += o.takes_by_influence_states[i];
             self.takes_by_influence_colonies[i] += o.takes_by_influence_colonies[i];
             self.takes_by_influence_stations[i] += o.takes_by_influence_stations[i];
+            // Ticket #343 (version 0.09.1).
+            self.missile_carriers_built[i] += o.missile_carriers_built[i];
+            self.launches[i] += o.launches[i];
+            self.launch_buildings_burned[i] += o.launch_buildings_burned[i];
+            self.launch_people_killed[i] += o.launch_people_killed[i];
+            self.industry_levels_lost[i] += o.industry_levels_lost[i];
         }
         self.battles_vs_neutral += o.battles_vs_neutral;
         self.standing_armies_lost += o.standing_armies_lost;

@@ -338,3 +338,20 @@ cost = 32
 needs = ["expanded_habitats"]
 effect = "A Relay adds 2 Influence to the Allotment instead of 1"
 value = 1.0
+
+# Ticket #343 (version 0.09.1): the game's FIRST WEAPON TECH. It unlocks the Missile Carrier and
+# does nothing else, so it needs no effect handler -- a Tech's `effect` line is words for the
+# panel, and behaviour is keyed by `TechId` in code. The tree is SHARED, so every seat watches this
+# one come up the ladder and the Research Lead decides whether to open the door at all.
+# THE BRANCH AND THE PREREQUISITE ARE THE BUILD'S CHOICE, NOT THE DESIGNER'S -- the rung and the
+# cost are theirs. Propulsion is where the tree's only other combat Tech (Hardened Hulls) sits, and
+# Hardened Hulls is its rung-3 neighbour there, so the prerequisite keeps the branch in one line.
+[[tech]]
+id = "missile_technology"
+name = "Missile Technology"
+branch = "Propulsion"
+rung = 3
+cost = 48
+needs = ["hardened_hulls"]
+effect = "Unlocks the Missile Carrier: the first weapon Tech, and the whole table sees it"
+value = 0.0

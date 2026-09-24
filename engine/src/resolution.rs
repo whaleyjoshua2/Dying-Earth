@@ -4,6 +4,8 @@ use crate::combat::{self, Combatant, Dice};
 use crate::ids::*;
 use crate::orders::*;
 use crate::state::*;
+// Ticket #343 (version 0.09.1): the Launch draws one uniform share of the people it kills.
+use rand::Rng;
 
 impl Game {
     pub fn resolution_phase(&mut self) {
@@ -33,6 +35,7 @@ impl Game {
         self.resolve_transits(); // (a)
         self.resolve_battles(); // (b)
         self.resolve_bombards(); // (b'), ticket #328: after the orbit is fought for
+        self.resolve_launches(); // (b''), ticket #343: beside the Bombards, for the same reason
         self.resolve_occupation(); // (c)
         self.resolve_influence(); // (d)
         self.resolve_changes(); // (e), ticket #54: a decommission frees its slot before a build wants it
@@ -940,8 +943,11 @@ impl Game {
     /// clock; a Battle burns nothing and a Pacified transfer rolls nothing. A Unique Facility is
     /// rolled like any other building, at the designer's word. Returns what burned; the Moment for
     /// a place taken by force is the transfer's, fired whether or not anything burned.
-    fn destruction_rolls(&mut self, place: Place, why: &str, charged: &[Seat]) -> Vec<String> {
-        let p = self.tables.influence.destruction_chance;
+    /// Ticket #343 (version 0.09.1): the CHANCE and the EXEMPTION are parameters now, so that one
+    /// function does both the Occupation's roll and the Launch's. The Occupation passes exactly
+    /// what it read out of the tables before -- `influence.destruction_chance` and nothing exempt
+    /// -- so its behaviour is unchanged, and a test says so.
+    fn destruction_rolls(&mut self, place: Place, why: &str, charged: &[Seat], p: f64, exempt: &[ModuleKind]) -> Vec<String> {
         let mut lost = Vec::new();
         match place {
             Place::State(s) => {
@@ -960,8 +966,10 @@ impl Game {
             }
             Place::Colony(c) => {
                 if let Some(col) = self.colony(c) {
-                    let n = col.modules.len();
-                    let keep: Vec<bool> = (0..n).map(|_| !self.rng.chance(p)).collect();
+                    // Ticket #343: an exempt Module is not rolled at all, so the roll order of
+                    // everything else is the same whether or not the list is empty.
+                    let spared: Vec<bool> = col.modules.iter().map(|m| exempt.contains(&m.kind)).collect();
+                    let keep: Vec<bool> = spared.into_iter().map(|e| e || !self.rng.chance(p)).collect();
                     let col = self.colony_mut(c).unwrap();
                     let mut i = 0;
                     col.modules.retain(|m| {
@@ -1085,6 +1093,137 @@ impl Game {
                 parties: vec![
                     BattleParty { seat: Some(seat), aggressor: true, units: format!("{ship_name} bombarded {place}"), strength: ship_strength, hits: u32::from(hit), destroyed: Vec::new(), escaped: Vec::new(), odds: Some(p) },
                     BattleParty { seat: Some(holder), aggressor: false, units: format!("{place}: {outcome}"), strength: 0, hits: 0, destroyed: if hit { vec![module_name] } else { Vec::new() }, escaped: Vec::new(), odds: None },
+                ],
+                result: text,
+                at,
+            });
+        }
+    }
+
+    /// Ticket #343 (version 0.09.1): **Launch**. A Missile Carrier carrying its Warhead, in the
+    /// orbit that touches the target and holding it outright -- read AGAIN here, as the Bombard's
+    /// gate is, since the Battles just fought may have sunk the hull or taken the orbit -- fires at
+    /// a Region, a ground Colony or a Space Station a rival directs.
+    ///
+    /// Every building at the place rolls `nuke.destruction_chance`, the Core Module and the Archive
+    /// spared, so a place is gutted and never erased. A share of its people between
+    /// `nuke.people_min` and `nuke.people_max` dies, drawn once per strike. At a Region the
+    /// Standing Army is destroyed besides, and the Industry Level falls by `nuke.industry_lost`,
+    /// floored at the state card's own so the ground never falls below the board it started on --
+    /// a setback, and `Order::RaiseIndustry` may undo it.
+    ///
+    /// Rung 4 against the holder, which breaks a non-aggression Accord and leaves the permanent
+    /// scar. ON EARTH ONLY, which `charge_war` already enforces: `nuke.war_ppm` into the war bucket
+    /// and `nuke.sink_rise` onto the Natural Sink for good, the two written together under one
+    /// `on_earth` so they can never disagree. The Warhead is spent whether or not anything burned.
+    fn resolve_launches(&mut self) {
+        let launches = std::mem::take(&mut self.pending.launches);
+        for (seat, ship, target) in launches {
+            let Some(s) = self.ship(ship) else { continue };
+            let ShipAt::Body(body) = s.at else { continue };
+            if s.seat != seat || s.escaped || s.kind != UnitKind::MissileCarrier || !s.warhead {
+                continue;
+            }
+            let orbit = self.ship_orbit(s);
+            let ship_name = self.ship_name(s);
+            // The orbit that touches the target, read again on the board as it stands now.
+            let (at_body, touches) = match target {
+                Place::State(_) => (BodyId::Earth, Orbit::Low),
+                Place::Colony(c) => {
+                    let Some(col) = self.colony(c) else { continue };
+                    (col.body, self.colony_orbit(col))
+                }
+            };
+            if at_body != body || touches != orbit {
+                continue;
+            }
+            let Some(holder) = self.place_director(target).filter(|h| *h != seat) else { continue };
+            let holds = if orbit.is_low() { self.orbital_control(body) == Some(seat) } else { self.orbit_uncontested(seat, body, orbit) };
+            if !holds {
+                continue;
+            }
+            // It fires. The Warhead is spent whether or not anything burns.
+            if let Some(hull) = self.ship_mut(ship) {
+                hull.warhead = false;
+            }
+            self.war.launches[seat.index()] += 1;
+            let place = self.place_name(target);
+            let offence = self.tables.nuke.offence;
+            self.offend_by(seat, holder, offence);
+            // The buildings, at the nuke's own chance, the two monuments spared.
+            let chance = self.tables.nuke.destruction_chance;
+            let lost = self.destruction_rolls(target, "struck from orbit", &[], chance, &[ModuleKind::Core, ModuleKind::Archive]);
+            self.war.launch_buildings_burned[seat.index()] += lost.len() as u32;
+            // The people: one share drawn per strike from the game's own RNG.
+            let (lo, hi) = (self.tables.nuke.people_min, self.tables.nuke.people_max);
+            let share = if hi > lo { self.rng.random_range(lo..hi) } else { lo };
+            let dead: f64;
+            let mut industry_lost = 0u32;
+            match target {
+                Place::State(sid) => {
+                    let before = self.state(sid).population;
+                    let killed = (before * share).min(before);
+                    self.state_mut(sid).population = (before - killed).max(0.0);
+                    dead = killed;
+                    // The Standing Army with them. `destroy_army` counts it as any other loss is.
+                    let standing: Vec<ArmyId> = self.armies.iter().filter(|a| a.standing && a.home == ArmyHome::State(sid)).map(|a| a.id).collect();
+                    for id in standing {
+                        self.destroy_army(id, "destroyed from orbit", Some(ReportPlace::State(sid)));
+                    }
+                    // And the Industry Level, floored at the card's own: a setback, never ruin.
+                    let floor = self.tables.state(sid).industry_level;
+                    let fall = self.tables.nuke.industry_lost;
+                    let now = self.state(sid).industry_level;
+                    let after = now.saturating_sub(fall).max(floor);
+                    industry_lost = now.saturating_sub(after);
+                    self.state_mut(sid).industry_level = after;
+                }
+                Place::Colony(c) => {
+                    // `destruction_rolls` has already trimmed the Colonists to the Habitats left;
+                    // the share is taken off what the trimming left, and the trim is read again
+                    // after, since a Habitat that burned cannot house the survivors either.
+                    let before = self.colony(c).map(|col| col.colonists).unwrap_or(0);
+                    let killed = ((before as f64) * share).floor() as u32;
+                    if let Some(col) = self.colony_mut(c) {
+                        col.colonists = col.colonists.saturating_sub(killed);
+                    }
+                    let room = self.colony(c).map(|col| self.habitat_room(col)).unwrap_or(0);
+                    if let Some(col) = self.colony_mut(c) {
+                        col.colonists = col.colonists.min(room);
+                    }
+                    let after = self.colony(c).map(|col| col.colonists).unwrap_or(0);
+                    dead = before.saturating_sub(after) as f64;
+                }
+            }
+            self.war.launch_people_killed[seat.index()] += dead;
+            self.war.industry_levels_lost[seat.index()] += industry_lost;
+            // ON EARTH ONLY. `charge_war` returns at once off Earth, and the Sink rise takes the
+            // very same test on the very next line, so the two can never disagree.
+            let on_earth = self.on_earth_place(target);
+            let ppm = self.tables.nuke.war_ppm;
+            self.charge_war(on_earth, Some(seat), ppm);
+            if on_earth {
+                self.climate.natural_sink += self.tables.nuke.sink_rise;
+            }
+            // The Report line, the Moment and the Battle mark, as a Bombard leaves.
+            let hit = !lost.is_empty();
+            let dead_words = if dead >= 1.0 { self.phrase("launch_dead", &[("n", format!("{dead:.0}"))]) } else { String::new() };
+            let text = if hit {
+                self.say("launch_hit", &[("faction", self.seat_name(seat)), ("ship", ship_name.clone()), ("place", place.clone()), ("lost", lost.join(", ")), ("dead", dead_words)])
+            } else {
+                self.say("launch_miss", &[("faction", self.seat_name(seat)), ("ship", ship_name.clone()), ("place", place.clone()), ("dead", dead_words)])
+            };
+            self.log(text.clone());
+            let at = Some(ReportPlace::Orbit(body, orbit));
+            self.report_line(if hit { LineKind::DecisiveBattle } else { LineKind::Battle }, at, text.clone());
+            let result = format!("struck from orbit by the {}: {}", self.seat_name(seat), if hit { lost.join(", ") + " destroyed" } else { "the buildings stood".to_string() });
+            self.moment(MomentKind::DecisiveBattle, &[("place", place.clone()), ("result", result), ("figure", format!("{} lost", lost.len()))], at);
+            let outcome = if hit { format!("{} destroyed", lost.join(", ")) } else { "the buildings stood".to_string() };
+            self.report.battles.push(BattleLine {
+                place: format!("{} (Launch)", self.orbit_battle_name(body, orbit)),
+                parties: vec![
+                    BattleParty { seat: Some(seat), aggressor: true, units: format!("{ship_name} launched at {place}"), strength: 0, hits: u32::from(hit), destroyed: Vec::new(), escaped: Vec::new(), odds: Some(chance) },
+                    BattleParty { seat: Some(holder), aggressor: false, units: format!("{place}: {outcome}"), strength: 0, hits: 0, destroyed: lost.clone(), escaped: Vec::new(), odds: None },
                 ],
                 result: text,
                 at,
@@ -1328,7 +1467,11 @@ impl Game {
         // The Moment for a place taken by force fires on every take by force, burned or not: the
         // taking is the news, not the fire.
         if why != "Influence" {
-            let lost = if why == "Pacified" { Vec::new() } else { self.destruction_rolls(place, "taken", &[seat]) };
+            // Ticket #343 (version 0.09.1): the Occupation's own figures, named where it reads
+            // them, since the roll takes them as parameters now: the table's 0.25 and nothing
+            // exempt, exactly what the function read for itself until this ticket.
+            let p = self.tables.influence.destruction_chance;
+            let lost = if why == "Pacified" { Vec::new() } else { self.destruction_rolls(place, "taken", &[seat], p, &[]) };
             let result = if lost.is_empty() { format!("{} taken whole by the {} ({why}).", self.place_name(place), self.seat_name(seat)) } else { format!("{} was taken: {} destroyed.", self.place_name(place), lost.join(", ")) };
             let figure = if lost.is_empty() { "nothing lost".to_string() } else { format!("{} lost", lost.len()) };
             self.moment(MomentKind::PlaceTakenByForce, &[("place", self.place_name(place)), ("result", result), ("figure", figure)], Some(place.into()));
@@ -1811,6 +1954,14 @@ impl Game {
                     col.modules.push(Module::new(k));
                 }
             }
+            // Ticket #343 (version 0.09.1): a Warhead is loaded onto the hull it was ordered for,
+            // if that hull is still afloat. A carrier sunk while its Warhead was on the ways loses
+            // the build with itself, which is the same bargain every queued Ship makes.
+            (_, BuildItem::Warhead(id)) => {
+                if let Some(hull) = self.ship_mut(id) {
+                    hull.warhead = true;
+                }
+            }
             (_, BuildItem::Unit(UnitKind::Army)) => {
                 // Ticket #270 (version 0.08.4): raised through the one door, and named there.
                 self.raise_army(place, false);
@@ -1838,9 +1989,16 @@ impl Game {
                 if kind.is_warship() {
                     self.war.warships_built[b.seat.index()] += 1;
                 }
+                // Ticket #343 (version 0.09.1): a Missile Carrier is NOT a warship, so it is
+                // counted on its own line, and it comes off the ways WITH its Warhead: the one
+                // shot is included in the hull's price.
+                if kind == UnitKind::MissileCarrier {
+                    self.war.missile_carriers_built[b.seat.index()] += 1;
+                }
                 self.ships.push(Ship {
                     id,
                     name,
+                    warhead: kind == UnitKind::MissileCarrier,
                     // Ticket #335 (version 0.09.0): the orbit of the yard that built it.
                     slot,
                     kind,
