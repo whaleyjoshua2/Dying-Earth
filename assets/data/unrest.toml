@@ -28,15 +28,21 @@ climate_card = 1.5
 per_mothball = 1.0
 per_decommission = 2.0
 # Refugees arriving: one per this much population, at most `refugees_max` in a turn. #53 doubled
-# the population a point of Unrest costs and cut the cap from 3 to 2.
-refugees_per = 0.5
+# the population a point of Unrest costs and cut the cap from 3 to 2. Ticket #333 (version 0.09.0):
+# an AMOUNT in units, not a rate per unit, so it is five times the 0.5 it was now that the unit is
+# one million people where it was five: a point of Unrest still costs the same two and a half
+# million people arriving. (The ticket's resolution wrote "divide by five", 0.1, which would have
+# made a point cost a hundred thousand people, twenty-five times as sensitive; the probe sweep at
+# 0.1 is in the ticket's dev diary for the designer to read.)
+refugees_per = 2.5
 refugees_max = 2.0
 
 # Ticket #176 (version 0.07.6): the Report says one NET migration line per Region, and stays silent
-# under this much movement. Half a person, at the designer's word: it is the same figure Unrest
-# itself rounds by (`refugees_per`), so a Region the Report passes over in silence is one whose
-# movement changed nothing else either.
-report_net_floor = 0.5
+# under this much movement. Two and a half million people (half a unit of five million when it was
+# set, at the designer's word; two and a half units of one million since ticket #333, version
+# 0.09.0, the same people): it is the same figure Unrest itself rounds by (`refugees_per`), so a
+# Region the Report passes over in silence is one whose movement changed nothing else either.
+report_net_floor = 2.5
 # Occupation: when it begins, and each turn it lasts. Unchanged: Occupation should hurt.
 occupation_start = 3.0
 occupation_per_turn = 1.0

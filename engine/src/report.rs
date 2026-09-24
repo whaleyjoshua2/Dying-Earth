@@ -4,7 +4,7 @@
 //! a line can have, the severity order the headline and the Moments read, the four headings the
 //! rest is grouped under, and the template renderer with its validation.
 
-use crate::ids::{BodyId, ColonyId, Place, Seat, StateId, TechId};
+use crate::ids::{BodyId, ColonyId, Orbit, Place, Seat, StateId, TechId};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -17,6 +17,10 @@ pub enum ReportPlace {
     State(StateId),
     Colony(ColonyId),
     Body(BodyId),
+    /// Ticket #335 (version 0.09.0): **one orbit of a Body**. Battle parties form per orbit, so two
+    /// Battles at one Body are two records and want two places; `Body` still names the whole Body,
+    /// which is where an arrival, a Bombard's Report line and the Antarctic still point.
+    Orbit(BodyId, Orbit),
 }
 
 impl From<Place> for ReportPlace {
@@ -380,6 +384,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("start_rivals", &["rivals", "collapse"]),
     ("solar_storm", &[]),
     ("ship_arrived", &["faction", "ship", "body"]),
+    // Ticket #335 (version 0.09.0): a Ship that changed orbit at the Body it stands at.
+    ("orbit_changed", &["faction", "ship", "orbit"]),
     ("ship_destroyed", &["faction", "ship", "why", "cargo"]),
     // Ticket #281 (version 0.08.5): an Army destroyed, by name; and every Battle, as a line.
     ("army_destroyed", &["faction", "army", "why"]),
@@ -398,6 +404,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("archive_begun", &["faction", "colony"]),
     ("neutral_research", &["states", "n"]),
     ("emigrants_mustered", &["n", "state", "fell", "unrest"]),
+    // Ticket #334 (version 0.09.0).
+    ("army_ordered", &["place", "people"]),
     ("emigrants_arrived", &["n", "state", "colony"]),
     ("emigrants_returned", &["n", "state"]),
     ("emigrants_lifted", &["n", "state", "station"]),
@@ -412,8 +420,9 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("exodus_call_order", &["state"]),
     ("directive_ducats", &["faction", "research", "n"]),
     ("directive_fuel", &["faction", "research", "n"]),
-    ("army_moved", &["faction", "from", "to", "attacks"]),
-    ("army_landed", &["faction", "colony"]),
+    // Ticket #339 (version 0.09.0): the march lines name the Army.
+    ("army_moved", &["army", "faction", "from", "to", "attacks"]),
+    ("army_landed", &["army", "faction", "colony"]),
     // Ticket #297 (version 0.08.6): the turn an Army digs in.
     ("army_dug_in", &["faction", "place"]),
     ("units_destroyed", &["place", "why", "lost"]),
@@ -447,15 +456,21 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("building_changed_colony", &["faction", "done", "building", "colony"]),
     ("building_decommissioned_colony", &["faction", "building", "colony", "refund"]),
     ("build_lost", &["building", "place"]),
+    // Ticket #332 (version 0.09.0): a rival's build cancelled by the place's new holder.
+    ("build_cancelled", &["faction", "building", "place", "refund"]),
     ("colonists_no_room", &["n", "colony"]),
     // Ticket #191 (version 0.08.0): Relations, said in the offender's paragraph.
     ("relations_fell", &["victim", "offender"]),
     ("uploaded", &["n", "colony", "total"]),
-    ("launch_pad_fire", &["faction", "item", "place"]),
+    // Ticket #332 (version 0.09.0): the fire takes the Region's Widgets for the turn.
+    ("launch_pad_fire", &["place", "widgets"]),
     ("game_over_win", &["turn", "faction", "note"]),
     ("game_over_draw", &["turn", "note"]),
     ("game_over_collapse", &["turn", "temperature"]),
     ("event_drawn", &["text"]),
+    // Ticket #337 (version 0.09.0): the card that asks a question, and what each seat answered.
+    ("card_asked", &["card", "question"]),
+    ("card_answered", &["card", "faction", "answer"]),
     ("break_fired", &["temperature", "name", "happened", "text"]),
     ("break_coastal", &["states", "exposure", "percent", "unrest"]),
     ("break_baseline", &["state", "rise"]),
@@ -547,7 +562,9 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("build_module", &["building", "colony"]),
     ("build_module_ducats", &["building", "colony"]),
     ("build_ship", &["unit", "place"]),
-    ("build_army", &["place"]),
+    ("build_army", &["place", "people"]),
+    // Ticket #332 (version 0.09.0).
+    ("cancel_build", &["building", "place"]),
     ("build_station", &["body"]),
     ("build_archive", &["colony"]),
     // Ticket #192 (version 0.08.0): the Upload.
@@ -563,13 +580,16 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("draw_venture", &["n"]),
     ("repair", &["unit"]),
     ("transit", &["unit", "body"]),
+    // Ticket #335 (version 0.09.0).
+    ("change_orbit", &["unit", "orbit"]),
     ("refuel", &["unit", "body"]),
     ("bombard", &["colony"]),
     ("ship_stance", &["body", "stance"]),
     ("army_stance", &["place", "stance"]),
-    ("move_army", &["state"]),
+    // Ticket #339 (version 0.09.0): the march and the loading name the Army.
+    ("move_army", &["army", "state"]),
     ("load_colonists", &["n", "place"]),
-    ("load_army", &["place"]),
+    ("load_army", &["army", "place"]),
     ("unload", &["place"]),
     ("influence", &["n", "place"]),
     ("buy_influence", &["n"]),

@@ -191,11 +191,20 @@ impl BuildItem {
     }
 }
 
+/// One build under way at a place. Ticket #332 (version 0.09.0): it carries a Widget figure and a
+/// count in place of a due turn. The place's Widgets fill `done` each Resolution in queue order,
+/// and the build completes at the Resolution `done` reaches `widgets`; a build never completes
+/// short of its figure, and nothing here is a turn count.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Build {
     pub item: BuildItem,
     pub seat: Seat,
-    pub due_turn: u32,
+    /// The Widgets the build needs: the row's figure times the seat's Faction discount for the
+    /// kind, floored, never below 1. Fixed at the order, as the Materials are.
+    pub widgets: u32,
+    /// The Widgets applied so far. An outright buy in Ducats starts with `done == widgets`, so it
+    /// completes at the next Resolution ahead of the queue.
+    pub done: u32,
     /// Ticket #56: the slot a Facility build in a Nation State reserved, coastal or inland. False
     /// for everything else, which has no slot of this kind to reserve.
     pub coastal: bool,
@@ -465,8 +474,10 @@ pub struct Ship {
     #[serde(default)]
     pub fuel: i64,
     /// Ticket #99 (version 0.07.0): the Orbital Slot this Ship sits in, chosen with the leg that
-    /// brought it. A warship in a slot blockades that slot; `None` is the Body at large, which
-    /// blockades nothing. A Ship built at a Shipyard starts at the Body at large.
+    /// brought it. Ticket #335 (version 0.09.0): `None` is **low orbit**, one of the Body's orbits
+    /// like any other and no longer "the Body at large"; read it through `Game::ship_orbit`, which
+    /// gives the `Orbit` every rule is written in. The shape is unchanged so no save changes. A
+    /// Ship built at a Shipyard starts in the orbit of the yard that built it.
     #[serde(default)]
     pub slot: Option<u32>,
 }
@@ -724,6 +735,63 @@ impl Deck {
     }
 }
 
+/// Ticket #337 (version 0.09.0): what the turn drew, settled in the Question phase at the head of
+/// the turn and read again in the Event phase. The DRAW moves to the head of the turn so a choice
+/// card can be asked before orders are given; an ordinary card is HELD here, silently, and
+/// announced and applied in the Event phase exactly where it always was, so none of the 22 changes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CardDraw {
+    /// The roll did not bring a card.
+    #[default]
+    NoCard,
+    /// The deck is spent.
+    DeckEmpty,
+    /// One of the 22, held for the Event phase.
+    Ordinary(EventId),
+    /// One of the eighteen: the turn's question.
+    Choice(EventId),
+}
+
+/// Ticket #337 (version 0.09.0): what one seat answered this turn's choice card.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CardAnswer {
+    Taken,
+    Refused,
+    /// Neither side of the card reaches this seat, so it was never asked: it does not hold the turn
+    /// and the Report says so for it, rather than a small Faction being made to refuse.
+    NothingToDecide,
+}
+
+impl CardAnswer {
+    /// The word the Report and the log use.
+    pub fn word(self) -> &'static str {
+        match self {
+            CardAnswer::Taken => "took it",
+            CardAnswer::Refused => "refused it",
+            CardAnswer::NothingToDecide => "had nothing to decide",
+        }
+    }
+}
+
+/// Ticket #337 (version 0.09.0): **the turn's pending question** -- the choice card and what each
+/// seat has answered. A seat whose answer is still `None` owes one; a human seat that owes one
+/// refuses End Turn, and a computer seat answers when its orders are computed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Question {
+    pub card: EventId,
+    pub answers: [Option<CardAnswer>; SEAT_COUNT],
+}
+
+impl Question {
+    pub fn answer_of(&self, seat: Seat) -> Option<CardAnswer> {
+        self.answers[seat.index()]
+    }
+    /// The first seat that still owes an answer, if any.
+    pub fn unanswered(&self) -> Option<Seat> {
+        Seat::ALL.into_iter().find(|s| self.answers[s.index()].is_none())
+    }
+}
+
 /// A drawn card with its target and size, for the popup and the log.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DrawnEvent {
@@ -917,6 +985,12 @@ pub struct SeatState {
     pub blame_emitted: f64,
     /// Ticket #53: every ppm this Faction has removed, over the whole game.
     pub blame_removed: f64,
+    /// Ticket #337 (version 0.09.0): a Facility kind of this seat's makes this share of its output
+    /// at the NEXT Income, because of a choice card answered this turn -- the Drought's shape, per
+    /// seat and per kind. Cleared at the Income that reads it, beside `drought` and
+    /// `solar_maximum_next`.
+    #[serde(default)]
+    pub card_facility: Option<(FacilityKind, f64)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -924,6 +998,20 @@ pub enum Outcome {
     Win { seat: Seat, margin_note: String },
     Draw { note: String },
     Collapse,
+}
+
+/// Ticket #338 (version 0.09.0): what separated one seat from the seat above it in `Game::ranking`.
+/// The three keys are the End phase's own, in its order, and the fourth says none of them told.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tiebreak {
+    /// The score alone: the seat above stood further along its Victory Condition.
+    Score,
+    /// Level on the score; the seat above had more Colonists off Earth.
+    ColonistsOffEarth,
+    /// Level on the score and on Colonists off Earth; the seat above held more Colonies.
+    ColoniesHeld,
+    /// Level on all three: nothing the End phase reads separated the two.
+    Nothing,
 }
 
 /// One party in a Battle (ticket #50): a Battle is a melee of every Faction present, so the
@@ -977,6 +1065,47 @@ pub struct WarCounters {
     pub bombards: [u32; SEAT_COUNT],
     #[serde(default)]
     pub modules_burned: [u32; SEAT_COUNT],
+    /// Ticket #335 (version 0.09.0): orbit changes resolved, by seat -- a Ship moving between the
+    /// orbits of one Body rather than flying away; and Blockade orders committed, by seat. Every
+    /// Blockade counted here is one a HUMAN could have given by the same path, a transit naming the
+    /// orbit and then the stance, which was impossible before this ticket: until now every transit
+    /// the interface sent named no slot, so no human player ever blockaded anything.
+    #[serde(default)]
+    pub orbit_changes: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub blockades_ordered: [u32; SEAT_COUNT],
+    /// Ticket #334 (version 0.09.0): raises the computer wanted and was refused for want of people
+    /// -- a Region under its unit of population, a Colony down to its last Colonist -- by seat.
+    #[serde(default)]
+    pub army_raises_refused_people: [u32; SEAT_COUNT],
+    /// Ticket #336 (version 0.09.0): places taken by Influence, by the seat that took them and BY
+    /// KIND -- a Region, a Colony on the ground, a Space Station. One counter reported all three
+    /// together and it was read off the log, by the lines ending `(Influence).`; the doubling off
+    /// Earth is a rule about two of the three, so it is measured here instead, at the transfer.
+    #[serde(default)]
+    pub takes_by_influence_states: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub takes_by_influence_colonies: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub takes_by_influence_stations: [u32; SEAT_COUNT],
+}
+
+/// Ticket #332 (version 0.09.0): Widgets, counted where they are made and spent, so the sweep can
+/// say them. A place's Widgets are counted to its director; a Region nobody directs makes its base
+/// and is counted to nobody. Every figure is a counter incremented at the event.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WidgetCounters {
+    /// Widgets made a game, by the director of the place that made them.
+    pub made: [i64; SEAT_COUNT],
+    /// Of those, applied to a build under way; and lost, which is the rest.
+    pub applied: [i64; SEAT_COUNT],
+    pub lost: [i64; SEAT_COUNT],
+    /// The depth of every directed place's queue at every Resolution, for the median.
+    pub queue_depths: Vec<u32>,
+    /// Widgets applied at the LAST Resolution alone, by seat: the top bar's second figure. Zeroed
+    /// at the start of every Resolution, so it never accumulates.
+    #[serde(default)]
+    pub applied_last: [i64; SEAT_COUNT],
 }
 
 impl WarCounters {
@@ -1001,6 +1130,14 @@ impl WarCounters {
             self.batteries_lost[i] += o.batteries_lost[i];
             self.bombards[i] += o.bombards[i];
             self.modules_burned[i] += o.modules_burned[i];
+            self.army_raises_refused_people[i] += o.army_raises_refused_people[i];
+            // Ticket #335 (version 0.09.0).
+            self.orbit_changes[i] += o.orbit_changes[i];
+            self.blockades_ordered[i] += o.blockades_ordered[i];
+            // Ticket #336 (version 0.09.0).
+            self.takes_by_influence_states[i] += o.takes_by_influence_states[i];
+            self.takes_by_influence_colonies[i] += o.takes_by_influence_colonies[i];
+            self.takes_by_influence_stations[i] += o.takes_by_influence_stations[i];
         }
         self.battles_vs_neutral += o.battles_vs_neutral;
         self.standing_armies_lost += o.standing_armies_lost;
@@ -1022,8 +1159,11 @@ pub struct BattleParty {
     pub hits: u32,
     pub destroyed: Vec<String>,
     pub escaped: Vec<String>,
-    /// Ticket #281: an aggressor's first-round odds against everyone else present, as the attack
-    /// button quoted them; None for a party that did not open the Battle.
+    /// Ticket #281: an aggressor's odds against everyone else present, as the attack button quoted
+    /// them; None for a party that did not open the Battle.
+    /// Ticket #339 (version 0.09.0): **the whole Battle's** odds -- the chance of holding the field
+    /// when it is over -- since that is what the button quotes now. A Battle record lives one turn
+    /// and is wiped at the next, so no save carries a first-round figure under this name for long.
     #[serde(default)]
     pub odds: Option<f64>,
 }
@@ -1143,6 +1283,19 @@ pub struct Market {
     pub price: [i64; 3],
     /// Net units of each bought less sold this turn, across the whole table.
     pub net: [i64; 3],
+    /// Ticket #337 (version 0.09.0): a price a choice card has OVERRIDDEN, and the LAST TURN it
+    /// stands on. Nought is no override. The override is outside the band on purpose -- a Materials
+    /// price of 1 is the whole point of the Cheap Ore Offer -- and it is recorded here rather than
+    /// written into `price`, so the band goes on moving underneath it with what the table trades
+    /// and resumes of itself the moment the override runs out.
+    ///
+    /// The last turn rather than a countdown, because the answer lands at the Resolution of the
+    /// turn it was given in, AFTER that turn's trading: a countdown decremented at the settle would
+    /// spend one of its turns before any order had been priced at it.
+    #[serde(default)]
+    pub card_price: [i64; 3],
+    #[serde(default)]
+    pub card_price_until: [u32; 3],
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -1191,6 +1344,8 @@ pub struct Game {
     pub armies: Vec<Army>,
     /// Ticket #286 (version 0.08.5): the war, counted on the game so the sweep can say it.
     pub war: WarCounters,
+    /// Ticket #332 (version 0.09.0): Widgets made, applied and lost, and the queues' depths.
+    pub widgets: WidgetCounters,
     /// Ticket #282 (version 0.08.5): Levies raised and neutral Regions that held against an attack
     /// over the game, for the sweep.
     pub levies_raised: u32,
@@ -1198,6 +1353,17 @@ pub struct Game {
     pub climate: Climate,
     pub research: Research,
     pub deck: Deck,
+    /// Ticket #337 (version 0.09.0): what the Question phase drew at the head of this turn, and the
+    /// question it is asking if it drew a choice card. The draw is held here between the head of
+    /// the turn and the Event phase, so an ordinary card is announced and applied where it always
+    /// was while a choice card is asked before orders.
+    pub draw: CardDraw,
+    pub question: Option<Question>,
+    /// Ticket #337: choice cards taken, refused, and never asked, by seat, over the game, for the
+    /// sweep. A seat neither of whose sides the card reaches is counted in the third.
+    pub choice_taken: [u32; SEAT_COUNT],
+    pub choice_refused: [u32; SEAT_COUNT],
+    pub choice_not_asked: [u32; SEAT_COUNT],
     /// Ticket #272 (version 0.08.4): cards drawn with nowhere to land over the game, for the sweep.
     pub events_no_target: u32,
     pub discoveries: Vec<Discovery>,
@@ -1294,6 +1460,7 @@ impl Game {
             resettle_to: None,
             blame_emitted: 0.0,
             blame_removed: 0.0,
+            card_facility: None,
         };
         // Seat 0 is the player's Faction; the other three follow in enum order (ticket #50).
         let mut kinds: Vec<FactionKind> = vec![setup.player];
@@ -1386,6 +1553,7 @@ impl Game {
             ships: Vec::new(),
             armies: Vec::new(),
             war: WarCounters::default(),
+            widgets: WidgetCounters::default(),
             levies_raised: 0,
             neutral_holds: 0,
             climate: Climate {
@@ -1422,6 +1590,13 @@ impl Game {
                 findings_tech: None,
             },
             deck,
+            // Ticket #337 (version 0.09.0): nothing drawn and nothing asked until the first
+            // Question phase, which `start` runs after the first Report.
+            draw: CardDraw::NoCard,
+            question: None,
+            choice_taken: [0; SEAT_COUNT],
+            choice_refused: [0; SEAT_COUNT],
+            choice_not_asked: [0; SEAT_COUNT],
             events_no_target: 0,
             discoveries: Vec::new(),
             antarctic_sends: Vec::new(),
@@ -1893,7 +2068,12 @@ impl Game {
         let Some(s) = self.ship(ship) else { return false };
         let ShipAt::Body(body) = s.at else { return false };
         // Ticket #325 (version 0.08.8): a partner's station under a Refuel Accord rescues it too.
-        if self.refuel_station_at(s.seat, body) {
+        // Ticket #335 (version 0.09.0): a station fuels only a Ship in its own orbit, so a station
+        // in another orbit rescues this Ship only while the tank can still pay the orbit change
+        // that would reach it. A dry tank in the wrong orbit is stranded with a station in sight.
+        if self.refuel_station_at(s.seat, body)
+            && (self.ship_orbit(s).slot().is_some_and(|sl| self.station_at(body, sl).is_some_and(|c| self.fuels_for(c, s.seat))) || s.fuel >= self.tables.orbit_change_fuel)
+        {
             return false;
         }
         match self.cheapest_leg_from(s.seat, body) {
@@ -2426,6 +2606,31 @@ impl Game {
         self.colonies.iter().filter(|c| c.control.director() == Some(seat)).map(|c| c.id).collect()
     }
 
+    /// Ticket #338 (version 0.09.0): **the four seats in the order the End phase ranks them**, each
+    /// with what separated it from the seat above it. The keys are `end_phase`'s own three, read in
+    /// its order: the score (the lower of the two parts' fractions), then Colonists off Earth, then
+    /// Colonies held. The chronicle page reads this rather than ranking for itself, so the page
+    /// cannot order a table differently from the rule that decided the game. Read-only.
+    pub fn ranking(&self) -> Vec<(Seat, Tiebreak)> {
+        let key = |s: Seat| (self.progress(s).score(), self.off_world_colonists(s), self.owned_colonies(s).len());
+        let mut seats: Vec<Seat> = Seat::ALL.to_vec();
+        seats.sort_by(|a, b| key(*b).partial_cmp(&key(*a)).unwrap_or(std::cmp::Ordering::Equal));
+        seats
+            .iter()
+            .enumerate()
+            .map(|(i, seat)| {
+                let separated = match i.checked_sub(1).map(|j| (key(seats[j]), key(*seat))) {
+                    None => Tiebreak::Score,
+                    Some((above, here)) if above.0 > here.0 => Tiebreak::Score,
+                    Some((above, here)) if above.1 > here.1 => Tiebreak::ColonistsOffEarth,
+                    Some((above, here)) if above.2 > here.2 => Tiebreak::ColoniesHeld,
+                    Some(_) => Tiebreak::Nothing,
+                };
+                (*seat, separated)
+            })
+            .collect()
+    }
+
     /// Build slots a Nation State has now (spec 4.2, 11.4, ticket #56): Size + Industry Level +
     /// `base_slots`, less the coastal slots the sea has taken. They come in two rows, coastal and
     /// inland, and the sea takes only from the first.
@@ -2530,29 +2735,11 @@ impl Game {
         self.build_slots(s).saturating_sub(self.slots_used(s))
     }
 
-    /// Ticket #143 (version 0.07.3): the population figure's unit, in people. A Region's figure, a
-    /// Colonist and an Emigrant are all counted in it, so `Region population 76.0` is 380 million
-    /// people and one Colonist is five million. (A hundred million, with a Colonist a tenth of one,
-    /// until this ticket.) The designer: *"I want country cards to use the actual population."*
-    pub const PEOPLE_PER_UNIT: f64 = 5_000_000.0;
-
-    /// Units in a hundred million people, since the cards quote per-person Emissions at that rate.
-    pub const UNITS_PER_HUNDRED_MILLION: f64 = 100_000_000.0 / Game::PEOPLE_PER_UNIT;
-
-    /// A population figure written as real people: `1.14B`, `380M`, `20M`.
-    pub fn people_text(units: f64) -> String {
-        let people = units * Game::PEOPLE_PER_UNIT;
-        if people >= 1_000_000_000.0 {
-            format!("{:.2}B", people / 1_000_000_000.0)
-        } else {
-            format!("{:.0}M", people / 1_000_000.0)
-        }
-    }
-
-    /// The card's form: the figure in units to one decimal, and the real number beside it.
-    pub fn population_text(units: f64) -> String {
-        format!("{units:.1} ({})", Game::people_text(units))
-    }
+    // Ticket #143 (version 0.07.3): the population figure's unit, in people, was `PEOPLE_PER_UNIT`
+    // here, five million, with `people_text` and `population_text` beside it. Ticket #333 (version
+    // 0.09.0) made it one million -- the designer: *"pop 1 per million"* -- and moved it into
+    // `climate.toml` as `people_per_unit`, read through `Tables::people_text`,
+    // `Tables::population_text` and `Tables::units_per_hundred_million`.
 
     /// Ticket #143: everyone on Earth -- the Regions' figures and the Colonists in Antarctica.
     pub fn earth_population(&self) -> f64 {
@@ -2570,7 +2757,9 @@ impl Game {
 
     pub fn population_factor(&self, s: StateId) -> f64 {
         // Ticket #143 (version 0.07.3): the unit is five million people, so 1,000 units is the five
-        // billion that 50 hundred-million was.
+        // billion that 50 hundred-million was. Ticket #333 (version 0.09.0): the unit is one
+        // million, the divisor is `[population_factor] population_per_point` in facilities.toml,
+        // 5,000 units, the same five billion.
         //
         // Ticket #188 (version 0.08.0): the BONUS -- the part above 1 -- is scaled by the state's
         // schooling, so a great many badly-schooled people are worth less to a Research Lab than a
@@ -2580,7 +2769,7 @@ impl Game {
         //
         // The Education Level therefore applies TWICE to a Lab -- here, and as the outright
         // multiplier it has always been. That compounding is the point.
-        1.0 + (self.state(s).population / 1000.0) * self.education_level(s)
+        1.0 + (self.state(s).population / self.tables.population_factor.population_per_point) * self.education_level(s)
     }
 
     /// Ticket #97 (version 0.07.0): the Modules this Colony or Space Station may hold: the table's
@@ -2751,16 +2940,21 @@ impl Game {
     /// turns left. The Faction window's Under way block reads this; the Report or the AI could.
     /// Builds are counted by the seat that ORDERED them (`Build.seat`), so a build begun in a Region
     /// that has since changed hands stays with whoever paid for it.
+    /// Ticket #332 (version 0.09.0): the turns are an ESTIMATE at the place's Widgets a turn behind
+    /// everything ahead of the build in its queue (`queue_estimates`), since a build has no due turn
+    /// any more; a place that makes nothing reads `u32::MAX`.
     pub fn under_way(&self, seat: Seat) -> UnderWay {
         let mut builds: Vec<(String, Place, u32)> = Vec::new();
         for sid in StateId::ALL {
-            for b in self.state(sid).queue.iter().filter(|b| b.seat == seat) {
-                builds.push((b.item.name(), Place::State(sid), b.due_turn.saturating_sub(self.turn) + 1));
+            let turns = self.queue_estimates(Place::State(sid));
+            for (b, t) in self.state(sid).queue.iter().zip(turns).filter(|(b, _)| b.seat == seat) {
+                builds.push((b.item.name(), Place::State(sid), t));
             }
         }
         for c in &self.colonies {
-            for b in c.queue.iter().filter(|b| b.seat == seat) {
-                builds.push((b.item.name(), Place::Colony(c.id), b.due_turn.saturating_sub(self.turn) + 1));
+            let turns = self.queue_estimates(Place::Colony(c.id));
+            for (b, t) in c.queue.iter().zip(turns).filter(|(b, _)| b.seat == seat) {
+                builds.push((b.item.name(), Place::Colony(c.id), t));
             }
         }
         let mut transits: Vec<(String, String, String, u32)> = Vec::new();
@@ -2800,6 +2994,13 @@ impl Game {
     /// Orders phase that follows it, with nothing added to the save.
     pub fn battle_last_turn_at(&self, at: crate::report::ReportPlace) -> Option<usize> {
         self.report.battles.iter().position(|b| b.at == Some(at))
+    }
+
+    /// Ticket #335 (version 0.09.0): a Battle of the last Resolution fought in ANY orbit of this
+    /// Body, since parties form per orbit and two fights at one Body are two records. The first is
+    /// the one a mark on the Body reads; a mark per orbit is the interface's, on its own ring.
+    pub fn battle_last_turn_in_orbit(&self, body: BodyId) -> Option<usize> {
+        self.report.battles.iter().position(|b| matches!(b.at, Some(ReportPlace::Orbit(b2, _)) if b2 == body))
     }
 
     /// Ticket #310 (version 0.08.7): **the military threat to a held Region**, the counterpart of
@@ -2951,9 +3152,15 @@ impl Game {
         let t = &self.tables.influence;
         let raw = match target {
             Place::State(s) => t.state_threshold_base + t.state_threshold_per_size * self.tables.state(s).size as i64,
+            // Ticket #336 (version 0.09.0): a base plus the per-Colonist figure, both doubled. The
+            // base is the STATION'S on a station and the Colony's on the ground -- one replaces the
+            // other, it does not stack -- so a station and a ground Colony of the same crew are
+            // worth the same figure, where a station was dearer by its base since stations existed.
+            // The base is also what stops an empty place being free: a Colony nobody had moved into
+            // was worth nothing at all and a single point of Standing took it.
             Place::Colony(c) => self
                 .colony(c)
-                .map(|c| t.colony_threshold_per_colonist * c.colonists as i64 + if c.in_orbit { t.station_threshold_base } else { 0 })
+                .map(|c| t.colony_threshold_per_colonist * c.colonists as i64 + if c.in_orbit { t.station_threshold_base } else { t.colony_threshold_base })
                 .unwrap_or(i64::MAX / 4),
         };
         // Ticket #53: the multiplier now runs both ways (Green Consensus down, Blame up), so it is
@@ -3127,40 +3334,129 @@ impl Game {
         self.tables.body(body).stations.get(slot as usize).cloned().unwrap_or_else(|| format!("Station {}", slot + 1))
     }
 
+    // ------------------------------------------- Ticket #335 (version 0.09.0): a Body's orbits
+
+    /// Ticket #335: the orbits of a Body -- LOW ORBIT, then one per Orbital Slot. Every Ship at the
+    /// Body sits in exactly one of them, and a Battle is fought within one of them.
+    pub fn orbits_of(&self, body: BodyId) -> Vec<Orbit> {
+        std::iter::once(Orbit::Low).chain((0..self.tables.body(body).orbital_slots).map(Orbit::Slot)).collect()
+    }
+
+    /// Ticket #335: whether this orbit exists at this Body. Low orbit always does; a slot's does
+    /// where the Body has that many Orbital Slots.
+    pub fn orbit_exists(&self, body: BodyId, orbit: Orbit) -> bool {
+        match orbit {
+            Orbit::Low => true,
+            Orbit::Slot(n) => n < self.tables.body(body).orbital_slots,
+        }
+    }
+
+    /// Ticket #335: the orbit a Ship sits in. `slot: None` is low orbit, which the tree called "the
+    /// Body at large" until this ticket.
+    pub fn ship_orbit(&self, s: &Ship) -> Orbit {
+        Orbit::of(s.slot)
+    }
+
+    /// Ticket #335: whether this Ship sits in this orbit of this Body -- the test every rule that
+    /// used to say "at the Body" is now written in.
+    pub fn ship_in_orbit(&self, s: &Ship, body: BodyId, orbit: Orbit) -> bool {
+        s.at == ShipAt::Body(body) && self.ship_orbit(s) == orbit
+    }
+
+    /// Ticket #335: the orbit a Colony is touched from -- its own for a station, low orbit for a
+    /// Colony on the ground, since low orbit is what touches the ground.
+    pub fn colony_orbit(&self, c: &Colony) -> Orbit {
+        if c.in_orbit { Orbit::Slot(c.slot) } else { Orbit::Low }
+    }
+
+    /// Ticket #335: an orbit named for a player to read -- "Mars, low orbit", "Mars, at Tiangong".
+    /// An Orbital Slot carries its station's name whether or not a station stands in it yet, which
+    /// is the name the Surface Map has drawn on its ring since version 0.07.3.
+    pub fn orbit_name(&self, body: BodyId, orbit: Orbit) -> String {
+        match orbit {
+            Orbit::Low => format!("{}, low orbit", self.tables.body(body).name),
+            Orbit::Slot(n) => format!("{}, at {}", self.tables.body(body).name, self.station_name(body, n)),
+        }
+    }
+
+    /// Ticket #335: the same orbit as a Battle's place. Low orbit keeps the wording every Battle
+    /// record has had -- "Mars orbit" -- and a station's orbit names the station.
+    pub fn orbit_battle_name(&self, body: BodyId, orbit: Orbit) -> String {
+        match orbit {
+            Orbit::Low => format!("{} orbit", self.tables.body(body).name),
+            Orbit::Slot(n) => format!("{} orbit at {}", self.tables.body(body).name, self.station_name(body, n)),
+        }
+    }
+
     /// Orbital Control at a Body (spec 9.3, ticket #50): held by the one seat with a Frigate or
     /// Battleship there and no other seat's warship still engaged. Two or more, and nobody holds it.
+    ///
+    /// Ticket #335 (version 0.09.0): **Orbital Control is of LOW ORBIT**, since low orbit is what
+    /// touches the ground and the ground is all Control governs. A warship in a station's orbit
+    /// holds nothing by sitting there; it must come down to low orbit to shut the surface.
     pub fn orbital_control(&self, body: BodyId) -> Option<Seat> {
         let mut holders = Seat::ALL
             .into_iter()
-            .filter(|seat| self.ships.iter().any(|s| s.seat == *seat && s.at == ShipAt::Body(body) && s.kind.is_warship() && !s.escaped));
+            .filter(|seat| self.ships.iter().any(|s| s.seat == *seat && self.ship_in_orbit(s, body, Orbit::Low) && s.kind.is_warship() && !s.escaped));
         match (holders.next(), holders.next()) {
-            // Ticket #324 (version 0.08.8): a rival's Battery standing at the Body denies it.
-            (Some(one), None) if !self.battery_stands_against(one, body) => Some(one),
+            // Ticket #324 (version 0.08.8): a rival's Battery denies it. Ticket #335: a Battery
+            // covers its own orbit alone, so it is low orbit's Batteries -- the ground Colonies' --
+            // that deny Control, and a station's Battery high above denies nothing down here.
+            (Some(one), None) if !self.battery_stands_against(one, body, Orbit::Low) => Some(one),
             _ => None,
         }
     }
 
-    /// Ticket #324 (version 0.08.8): the working Batteries a seat directs at a Body, each as its
-    /// Colony and its index among that Colony's Modules -- the reference a Battle and a Repair
-    /// order carry. Mothballed or offline, a Battery neither fires nor denies, as every Module
-    /// that is not working does nothing.
-    pub fn batteries_at(&self, seat: Seat, body: BodyId) -> Vec<(ColonyId, usize)> {
+    /// Ticket #335 (version 0.09.0): whether a seat stands alone in one orbit -- no rival warship
+    /// still engaged in it and no rival working Battery covering it. Orbital Control is low
+    /// orbit's and gates the ground; THIS is what a station's own orbit asks of the Ship that
+    /// would Bombard the station standing there.
+    pub fn orbit_uncontested(&self, seat: Seat, body: BodyId, orbit: Orbit) -> bool {
+        let rival_warship = self.ships.iter().any(|s| s.seat != seat && s.kind.is_warship() && !s.escaped && self.ship_in_orbit(s, body, orbit));
+        !rival_warship && !self.battery_stands_against(seat, body, orbit)
+    }
+
+    /// Ticket #324 (version 0.08.8): the working Batteries a seat directs in one ORBIT of a Body
+    /// (ticket #335), each as its Colony and its index among that Colony's Modules -- the reference
+    /// a Battle and a Repair order carry. Mothballed or offline, a Battery neither fires nor denies,
+    /// as every Module that is not working does nothing.
+    ///
+    /// Ticket #335 (version 0.09.0): **a Battery covers its own orbit**: a station's Battery its
+    /// station's orbit, a ground Colony's low orbit. This narrows ticket #324, which had every
+    /// Battery at a Body standing in every Battle there, at the designer's word.
+    pub fn batteries_at(&self, seat: Seat, body: BodyId, orbit: Orbit) -> Vec<(ColonyId, usize)> {
         self.colonies
             .iter()
-            .filter(|c| c.body == body && c.control.director() == Some(seat))
+            .filter(|c| c.body == body && c.control.director() == Some(seat) && self.colony_orbit(c) == orbit)
             .flat_map(|c| c.modules.iter().enumerate().filter(|(_, m)| m.kind == ModuleKind::Battery && m.working()).map(move |(i, _)| (c.id, i)))
             .collect()
     }
 
-    /// Ticket #324: the strength a seat's Batteries at a Body bring to a Battle there.
-    pub fn battery_strength(&self, seat: Seat, body: BodyId) -> i64 {
-        self.batteries_at(seat, body).len() as i64 * self.tables.module(ModuleKind::Battery).strength
+    /// Ticket #335: every working Battery a seat directs at a Body, in every orbit -- what the
+    /// Body's card and the computer's reading of a whole Body want, where a Battle wants one orbit's.
+    pub fn batteries_at_body(&self, seat: Seat, body: BodyId) -> Vec<(ColonyId, usize)> {
+        self.orbits_of(body).into_iter().flat_map(|o| self.batteries_at(seat, body, o)).collect()
     }
 
-    /// Ticket #324: whether a Battery of some OTHER seat's stands and works at the Body, which is
-    /// what denies this seat Orbital Control there and the Blockade with it.
-    pub fn battery_stands_against(&self, seat: Seat, body: BodyId) -> bool {
-        seat.others().iter().any(|s| !self.batteries_at(*s, body).is_empty())
+    /// Ticket #324: the strength a seat's Batteries bring to a Battle in this orbit.
+    pub fn battery_strength(&self, seat: Seat, body: BodyId, orbit: Orbit) -> i64 {
+        self.batteries_at(seat, body, orbit).len() as i64 * self.tables.module(ModuleKind::Battery).strength
+    }
+
+    /// Ticket #335: the same across every orbit of a Body, for a reading of the whole Body.
+    pub fn battery_strength_at_body(&self, seat: Seat, body: BodyId) -> i64 {
+        self.batteries_at_body(seat, body).len() as i64 * self.tables.module(ModuleKind::Battery).strength
+    }
+
+    /// Ticket #324: whether a Battery of some OTHER seat's stands and works in this orbit, which is
+    /// what denies this seat Orbital Control (low orbit's) and the Blockade of that orbit with it.
+    pub fn battery_stands_against(&self, seat: Seat, body: BodyId, orbit: Orbit) -> bool {
+        seat.others().iter().any(|s| !self.batteries_at(*s, body, orbit).is_empty())
+    }
+
+    /// Ticket #335: the same across every orbit of a Body.
+    pub fn battery_stands_against_at_body(&self, seat: Seat, body: BodyId) -> bool {
+        seat.others().iter().any(|s| !self.batteries_at_body(*s, body).is_empty())
     }
 
     /// Whether a seat may land Armies and Colonists on the GROUND of a Body (spec 9.3).
@@ -3184,12 +3480,17 @@ impl Game {
     /// needs to be positively chosen, not just the presence of a ship" -- and a blockaded station
     /// makes nothing (`starved_by`).
     pub fn slot_blockaded_against(&self, seat: Seat, body: BodyId, slot: u32) -> bool {
-        // Ticket #324 (version 0.08.8): nor a seat with a Battery standing at the Body.
-        if !self.batteries_at(seat, body).is_empty() {
+        // Ticket #324 (version 0.08.8): nor a seat with a Battery standing in that orbit; ticket
+        // #335: its own orbit is the one a Battery covers, so it is the station's own Battery that
+        // lifts the Blockade of the station's own slot.
+        if !self.batteries_at(seat, body, Orbit::Slot(slot)).is_empty() {
             return false;
         }
         // Ticket #320 (version 0.08.8): a Blockade does not shut out a partner under Passage.
-        self.ships.iter().any(|s| s.seat != seat && !self.accord_has(seat, s.seat, Term::Passage) && self.blockading(s) && s.at == ShipAt::Body(body) && s.slot == Some(slot))
+        // Ticket #335: the blockading stack sits in the orbit it shuts, as it always had to.
+        self.ships
+            .iter()
+            .any(|s| s.seat != seat && !self.accord_has(seat, s.seat, Term::Passage) && self.blockading(s) && self.ship_in_orbit(s, body, Orbit::Slot(slot)))
     }
 
     /// Ticket #278: a warship on Blockade, still engaged. The one test every blockade reads.
@@ -3199,16 +3500,20 @@ impl Game {
 
     /// Ticket #99: the seats blockading this slot, for the card and the Report.
     pub fn slot_blockaders(&self, body: BodyId, slot: u32) -> Vec<Seat> {
-        let mut v: Vec<Seat> = self.ships.iter().filter(|s| self.blockading(s) && s.at == ShipAt::Body(body) && s.slot == Some(slot)).map(|s| s.seat).collect();
+        let mut v: Vec<Seat> = self.ships.iter().filter(|s| self.blockading(s) && self.ship_in_orbit(s, body, Orbit::Slot(slot))).map(|s| s.seat).collect();
         v.sort();
         v.dedup();
         v
     }
 
-    /// Ticket #278 (version 0.08.5): whether this seat has a blockading warship at the Body at all,
-    /// in any slot -- what starves a Colony on the GROUND under its outright Orbital Control.
-    pub fn blockading_at(&self, seat: Seat, body: BodyId) -> bool {
-        self.ships.iter().any(|s| s.seat == seat && self.blockading(s) && s.at == ShipAt::Body(body))
+    /// Ticket #278 (version 0.08.5): whether this seat has a blockading warship at the Body -- what
+    /// starves a Colony on the GROUND under its outright Orbital Control.
+    ///
+    /// Ticket #335 (version 0.09.0): **in LOW ORBIT**. A Blockade shuts the orbit it is given in,
+    /// and the ground's orbit is low orbit; a stack blockading a station high above starves nobody
+    /// on the surface, where before any slot at the Body would do.
+    pub fn blockading_in(&self, seat: Seat, body: BodyId, orbit: Orbit) -> bool {
+        self.ships.iter().any(|s| s.seat == seat && self.blockading(s) && self.ship_in_orbit(s, body, orbit))
     }
 
     /// Ticket #278 (version 0.08.5): the seat starving this Colony, if any. A station starves under
@@ -3218,15 +3523,20 @@ impl Game {
     pub fn starved_by(&self, cid: ColonyId) -> Option<Seat> {
         let col = self.colony(cid)?;
         let holder = col.control.director()?;
-        // Ticket #324 (version 0.08.8): a Battery of the holder's at the Body denies every rival
-        // Orbital Control there and the Blockade with it; nothing starves behind one.
-        if !self.batteries_at(holder, col.body).is_empty() {
+        // Ticket #324 (version 0.08.8): a Battery of the holder's denies every rival Orbital
+        // Control and the Blockade with it; nothing starves behind one. Ticket #335 (version
+        // 0.09.0): the Battery that shields a place is the one in the place's OWN orbit -- a
+        // station's own, a ground Colony's own, standing in low orbit's line.
+        let orbit = self.colony_orbit(col);
+        if !self.batteries_at(holder, col.body, orbit).is_empty() {
             return None;
         }
         if col.in_orbit {
             self.slot_blockaders(col.body, col.slot).into_iter().find(|s| *s != holder)
         } else {
-            self.orbital_control(col.body).filter(|o| *o != holder && self.blockading_at(*o, col.body))
+            // Ticket #335: Orbital Control is low orbit's, and the stack that starves the ground
+            // blockades in low orbit.
+            self.orbital_control(col.body).filter(|o| *o != holder && self.blockading_in(*o, col.body, Orbit::Low))
         }
     }
 
@@ -3235,10 +3545,21 @@ impl Game {
     ///
     /// Ticket #325 (version 0.08.8): or a partner's under a Refuel Accord; a station blockaded
     /// against its holder fuels the partner no more than its holder.
-    pub fn refuelling_station(&self, seat: Seat, body: BodyId) -> bool {
-        self.colonies.iter().any(|c| {
-            c.body == body && self.fuels_for(c, seat) && c.control.director().is_some_and(|d| !self.slot_blockaded_against(d, body, c.slot))
-        })
+    ///
+    /// Ticket #335 (version 0.09.0): **in the orbit the Ship sits in**. A station's own orbit is
+    /// what touches that station, refuelling included, so a Ship in low orbit fuels at nothing and
+    /// a Ship at one station's ring cannot draw from another's.
+    pub fn refuelling_station(&self, seat: Seat, body: BodyId, orbit: Orbit) -> bool {
+        let Some(slot) = orbit.slot() else { return false };
+        self.station_at(body, slot)
+            .is_some_and(|c| self.fuels_for(c, seat) && c.control.director().is_some_and(|d| !self.slot_blockaded_against(d, body, slot)))
+    }
+
+    /// Ticket #335 (version 0.09.0): whether a Ship sits in the orbit that touches this Colony --
+    /// the station's own orbit for a station, low orbit for a Colony on the ground. Unloading into
+    /// a place, founding one, landing an Army and lifting from it all ask this first.
+    pub fn ship_may_touch(&self, s: &Ship, c: &Colony) -> bool {
+        self.ship_in_orbit(s, c.body, self.colony_orbit(c))
     }
 
     /// Ticket #99: whether a Colony of this seat's can be reached at all -- a station in a

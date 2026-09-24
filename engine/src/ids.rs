@@ -35,6 +35,41 @@ impl BodyId {
     }
 }
 
+/// Ticket #335 (version 0.09.0): **one orbit of a Body**. A Body's orbits are LOW ORBIT plus one
+/// per Orbital Slot -- twenty-one on the board -- and every Ship at a Body sits in exactly one of
+/// them; there is no longer a Body at large. `Ship.slot: Option<u32>` keeps its shape, `None`
+/// being low orbit, so no save changes shape; this is the word every rule that used to say "at
+/// the Body" is now written in, and the one a player reads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Orbit {
+    Low,
+    Slot(u32),
+}
+
+impl Orbit {
+    /// The orbit a Ship's `slot` names: low orbit where it names none.
+    pub fn of(slot: Option<u32>) -> Orbit {
+        match slot {
+            Some(n) => Orbit::Slot(n),
+            None => Orbit::Low,
+        }
+    }
+
+    /// The Orbital Slot this orbit is that of, or None for low orbit -- the shape `Ship.slot` and
+    /// `Order::Transit` carry.
+    pub fn slot(self) -> Option<u32> {
+        match self {
+            Orbit::Low => None,
+            Orbit::Slot(n) => Some(n),
+        }
+    }
+
+    pub fn is_low(self) -> bool {
+        self == Orbit::Low
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StateId {
@@ -124,10 +159,15 @@ pub enum FacilityKind {
     /// the School and pays +1 Ducat a turn on top of the schooling. Off Earth it is a Unique
     /// Module of the same name, replacing the Institute.
     Academy,
+    /// Version 0.09.0 (ticket #332): the **Mine**, the Earth Facility that makes Materials now that
+    /// the Factory makes Widgets. The Region's Materials lean, Deep Mining and the Strip Permit
+    /// follow the Materials here; Clean Manufacturing stays with the Factory. Appended last:
+    /// `Tables::facility` indexes this enum by discriminant.
+    Mine,
 }
 
 impl FacilityKind {
-    pub const ALL: [FacilityKind; 15] = [
+    pub const ALL: [FacilityKind; 16] = [
         FacilityKind::Factory,
         FacilityKind::PowerPlant,
         FacilityKind::Refinery,
@@ -143,6 +183,7 @@ impl FacilityKind {
         FacilityKind::Spaceport,
         FacilityKind::Reactor,
         FacilityKind::Academy,
+        FacilityKind::Mine,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -161,6 +202,8 @@ impl FacilityKind {
             FacilityKind::Spaceport => "Spaceport",
             FacilityKind::Reactor => "Reactor",
             FacilityKind::Academy => "Academy",
+            // Ticket #332 (version 0.09.0): one name in both lists, by the Refinery precedent.
+            FacilityKind::Mine => "Mine",
         }
     }
 
@@ -270,10 +313,15 @@ pub enum ModuleKind {
     /// stands and works no rival holds Orbital Control there; its owner gains none by it. Appended
     /// last, as the Core Module was, for `Tables::module`.
     Battery,
+    /// Version 0.09.0 (ticket #332): the **Factory** Module, the one Module that makes Widgets off
+    /// Earth: four a turn, flat, reading no Body yield, so a Colony's queue moves at more than its
+    /// Core Module's one. Production Moved pairs the Earth Factory with it. Appended last, as the
+    /// Battery was, for `Tables::module`.
+    Factory,
 }
 
 impl ModuleKind {
-    pub const ALL: [ModuleKind; 19] = [
+    pub const ALL: [ModuleKind; 20] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -293,9 +341,10 @@ impl ModuleKind {
         ModuleKind::Exchange,
         ModuleKind::Chorus,
         ModuleKind::Battery,
+        ModuleKind::Factory,
     ];
     /// The Modules an ordinary build order may place (ticket #51: the Archive is not one of them).
-    pub const BUILDABLE: [ModuleKind; 17] = [
+    pub const BUILDABLE: [ModuleKind; 18] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -313,6 +362,7 @@ impl ModuleKind {
         ModuleKind::Exchange,
         ModuleKind::Chorus,
         ModuleKind::Battery,
+        ModuleKind::Factory,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -335,6 +385,8 @@ impl ModuleKind {
             ModuleKind::SolarArray => "Solar Array",
             ModuleKind::MassDriver => "Mass Driver",
             ModuleKind::Battery => "Battery",
+            // Ticket #332 (version 0.09.0): one name in both lists, by the Refinery precedent.
+            ModuleKind::Factory => "Factory",
         }
     }
 
@@ -391,10 +443,11 @@ impl ModuleKind {
     /// without gaining the Heliostat, because `built_by` swaps the common kind out and the list
     /// then threw the Unique away. Answering by the JOB makes every future Unique follow its
     /// sibling with nothing to remember.
+    /// Ticket #332 (version 0.09.0): and the Factory Module, a station's Widget maker.
     pub fn stands_on_a_station(self) -> bool {
         matches!(
             self.common().unwrap_or(self),
-            ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Battery
+            ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Battery | ModuleKind::Factory
         )
     }
 }
@@ -435,6 +488,12 @@ pub enum Resource {
     Research,
     /// Version 0.03 (ticket #35): money, which buys Influence, Restoration and repairs.
     Ducats,
+    /// Version 0.09.0 (ticket #332): **Widgets**, the work half of every build. A rate, never a
+    /// stock: made by a place's Factories, Industry Level or Core Module and applied that same
+    /// Resolution to what is under way there, in queue order; the rest is lost. Never in the
+    /// Stockpile, never traded. The variant exists so a `produces` row can name it and a `Yield`
+    /// can carry it through the same multipliers as any other output.
+    Widgets,
 }
 
 impl Resource {
@@ -445,6 +504,7 @@ impl Resource {
             Resource::Energy => "Energy",
             Resource::Research => "Research",
             Resource::Ducats => "Ducats",
+            Resource::Widgets => "Widgets",
         }
     }
 }
@@ -547,10 +607,32 @@ pub enum EventId {
     VolcanicEruption,
     Moonquake,
     HeliumVein,
+    // Ticket #337 (version 0.09.0): the eighteen CHOICE cards, appended last so every id before
+    // them keeps its index -- `Tables::event` indexes `events.toml` by this enum. Each asks the
+    // table a question at the start of the turn, every seat answers it, and what the two answers
+    // do is composed in data from the effect vocabulary, so none of the eighteen is code.
+    RefugeeConvoy,
+    GroundedFleet,
+    CheapOreOffer,
+    OvertimeAtTheYards,
+    TheAuditors,
+    SalvageRights,
+    FuelContract,
+    TheHardWinter,
+    DistressCall,
+    StrikeAtTheRefineries,
+    DeepSurvey,
+    EmergencyShutdown,
+    TheRecruiters,
+    CarbonOffsetScheme,
+    OrbitalDebris,
+    TheWhistleblower,
+    SurplusHabitats,
+    ConscriptionNotice,
 }
 
 impl EventId {
-    pub const ALL: [EventId; 22] = [
+    pub const ALL: [EventId; 40] = [
         EventId::SolarStorm,
         EventId::RadiationSurge,
         EventId::CommsBlackout,
@@ -573,6 +655,25 @@ impl EventId {
         EventId::VolcanicEruption,
         EventId::Moonquake,
         EventId::HeliumVein,
+        // Ticket #337 (version 0.09.0): the eighteen choice cards, in the order `events.toml` lists them.
+        EventId::RefugeeConvoy,
+        EventId::GroundedFleet,
+        EventId::CheapOreOffer,
+        EventId::OvertimeAtTheYards,
+        EventId::TheAuditors,
+        EventId::SalvageRights,
+        EventId::FuelContract,
+        EventId::TheHardWinter,
+        EventId::DistressCall,
+        EventId::StrikeAtTheRefineries,
+        EventId::DeepSurvey,
+        EventId::EmergencyShutdown,
+        EventId::TheRecruiters,
+        EventId::CarbonOffsetScheme,
+        EventId::OrbitalDebris,
+        EventId::TheWhistleblower,
+        EventId::SurplusHabitats,
+        EventId::ConscriptionNotice,
     ];
     pub const CLIMATE: [EventId; 6] = [EventId::Heatwave, EventId::Wildfire, EventId::StormSurge, EventId::MethaneBurst, EventId::Drought, EventId::VolcanicEruption];
 }
@@ -584,6 +685,10 @@ pub enum EventKind {
     Failure,
     Discovery,
     Climate,
+    /// Ticket #337 (version 0.09.0): a card that asks the table a question. The Temperature scales
+    /// a Climate card and nothing else, so a choice card's own kind keeps it out of that scaling
+    /// even where the weather is what it is about.
+    Choice,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -703,9 +808,11 @@ impl Stance {
             (Stance::Evade, _) => "Avoids battle where it can: an even chance to slip away before the first exchange.",
             (Stance::DigIn, false) => "Dug in, it fights two stronger in defence and never disengages, and it cannot march or board a Carrier until its stance is changed and the turn has passed.",
             (Stance::DigIn, true) => "A Ship cannot dig in; it holds.",
-            (Stance::Intercept, true) => "Fights what arrives this turn, before it can land.",
+            // Ticket #335 (version 0.09.0): an Intercept catches only what arrives into the orbit
+            // the stack itself sits in, and a Blockade shuts that one orbit, not the Body.
+            (Stance::Intercept, true) => "Fights what arrives this turn into its own orbit, before it can land.",
             (Stance::Intercept, false) => "An Army cannot intercept; it holds.",
-            (Stance::Blockade, true) => "Shuts this orbital slot to every other Faction: no landing, no refuel, no building in it.",
+            (Stance::Blockade, true) => "Shuts the orbit it sits in to every other Faction: no unloading, no refuel, no building in it.",
             (Stance::Blockade, false) => "An Army cannot blockade; it holds.",
         }
     }

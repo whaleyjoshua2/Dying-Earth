@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 /// The stamp at the head of every save. A file whose stamp is not this one is refused with a plain
 /// message; a save is never migrated between versions.
-pub const SAVE_VERSION: u32 = 2;
+pub const SAVE_VERSION: u32 = 3;
 
 /// The rules version this executable plays, named beside the file's own in a refusal.
 ///
@@ -59,7 +59,27 @@ pub const SAVE_VERSION: u32 = 2;
 /// #324, #327). Every new field has a default, so a 0.08.7 file would parse; but it would then
 /// be played under rules it was not written for, with Armies that march where they could not and
 /// a melee that rolls differently, and a refusal naming both versions is the honest answer.
-pub const GAME_VERSION: &str = "0.08.8";
+/// Ticket #332 (version 0.09.0): moved to 3. A Build carries a Widget figure and a count in place
+/// of a due turn, so a queue written by an older build has no field this one reads and nothing
+/// would ever complete; `FacilityKind` gained the Mine and `ModuleKind` the Factory, both
+/// appended last; the game carries the Widgets counters; and every table row carries `widgets`
+/// where it carried `build_turns`, so a board from before would be priced in a unit this version
+/// does not have. A refusal naming both versions is the right answer.
+/// Ticket #340 (version 0.09.0, the closing ticket): `SAVE_VERSION` stays at **3**, where #332 put
+/// it, and does not move again; `GAME_VERSION` moves to 0.09.0 for the whole version. Taken
+/// together, this is what a 0.08.8 save would not understand. Every Build carries the **Widgets**
+/// put into it and the figure it needs, where it carried a turn to be due on, so an older queue
+/// names a turn this version has no use for (#332). `FacilityKind` gained the **Mine** and
+/// `ModuleKind` the **Factory**, both appended last, so an older file's two lists are indexed
+/// differently here (#332). A Ship carries the **orbit** it sits in, low orbit or a Slot, and a
+/// transit the orbit it is bound for, where an older file has a Ship at the Body at large and a
+/// Battle keyed on the Body rather than on one orbit (#335). The deck carries **eighteen new Event
+/// ids**, a question pending at the head of the turn and the answer each seat gave, none of which
+/// an older file has a field for, and whose ids are not in the deck it was dealt (#337). And a unit
+/// of population is **one million people** where it was five, so every Region figure in an older
+/// file is five times too small read under these rules (#333). A refusal naming both versions is
+/// the right answer, and a silent partial load is not.
+pub const GAME_VERSION: &str = "0.09.0";
 
 /// The game autosaves at the start of the Report phase of every third turn.
 pub const AUTOSAVE_EVERY: u32 = 3;
@@ -167,6 +187,22 @@ pub struct SavedGame {
     /// Ticket #286 (version 0.08.5): the war's counters.
     #[serde(default)]
     pub war: WarCounters,
+    /// Ticket #332 (version 0.09.0): the Widgets counters.
+    #[serde(default)]
+    pub widgets: WidgetCounters,
+    /// Ticket #337 (version 0.09.0): the turn's draw, the pending question with what each seat has
+    /// answered, and the game's tally of answers. A save captures a turn START, which is exactly
+    /// where a question is pending and unanswered, so it has to travel or the card would be lost.
+    #[serde(default)]
+    pub draw: CardDraw,
+    #[serde(default)]
+    pub question: Option<Question>,
+    #[serde(default)]
+    pub choice_taken: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub choice_refused: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub choice_not_asked: [u32; SEAT_COUNT],
 }
 
 impl SavedGame {
@@ -184,11 +220,17 @@ impl SavedGame {
             ships,
             armies,
             war,
+            widgets,
             levies_raised,
             neutral_holds,
             climate,
             research,
             deck,
+            draw,
+            question,
+            choice_taken,
+            choice_refused,
+            choice_not_asked,
             discoveries,
             antarctic_sends,
             solar_maximum_next,
@@ -218,6 +260,11 @@ impl SavedGame {
             climate: climate.clone(),
             research: research.clone(),
             deck: deck.clone(),
+            draw: *draw,
+            question: question.clone(),
+            choice_taken: *choice_taken,
+            choice_refused: *choice_refused,
+            choice_not_asked: *choice_not_asked,
             discoveries: discoveries.clone(),
             antarctic_sends: antarctic_sends.clone(),
             solar_maximum_next: *solar_maximum_next,
@@ -237,6 +284,7 @@ impl SavedGame {
             levies_raised: *levies_raised,
             neutral_holds: *neutral_holds,
             war: war.clone(),
+            widgets: widgets.clone(),
         }
     }
 
@@ -253,11 +301,17 @@ impl SavedGame {
             ships: self.ships,
             armies: self.armies,
             war: self.war,
+            widgets: self.widgets,
             levies_raised: self.levies_raised,
             neutral_holds: self.neutral_holds,
             climate: self.climate,
             research: self.research,
             deck: self.deck,
+            draw: self.draw,
+            question: self.question,
+            choice_taken: self.choice_taken,
+            choice_refused: self.choice_refused,
+            choice_not_asked: self.choice_not_asked,
             discoveries: self.discoveries,
             antarctic_sends: self.antarctic_sends,
             solar_maximum_next: self.solar_maximum_next,

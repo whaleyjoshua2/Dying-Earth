@@ -20,8 +20,14 @@ pub struct SimResult {
     pub temperature: f64,
     pub collapse_projected_turn: Option<u32>,
     pub colony_changed_hands: Vec<(u32, u32)>,
-    /// Ticket #41: places that changed hands by Influence over the game.
+    /// Ticket #41: places that changed hands by Influence over the game. Ticket #336 (version
+    /// 0.09.0): read off the war counters rather than scraped out of the log, and split by the kind
+    /// of place taken -- Regions, Colonies on the ground, Space Stations -- which the doubling off
+    /// Earth is a rule about. The total is the three added together.
     pub influence_transfers: u32,
+    pub influence_takes_states: u32,
+    pub influence_takes_colonies: u32,
+    pub influence_takes_stations: u32,
     /// Ticket #41: Banks, Trade Posts, Embassies and Relays completed by any seat.
     pub new_buildings: [u32; 4],
     /// Ticket #52: states that threw off a controller, the highest Unrest any state reached, the
@@ -86,7 +92,18 @@ pub struct SimResult {
     pub neutral_holds: u32,
     /// Ticket #286 (version 0.08.5): the war's counters, whole.
     pub war: WarCounters,
+    /// Ticket #332 (version 0.09.0): Widgets made, applied and lost a game, by the director of the
+    /// place that made them; and the median depth of a directed place's queue at Resolution.
+    pub widgets_made: [i64; SEAT_COUNT],
+    pub widgets_applied: [i64; SEAT_COUNT],
+    pub widgets_lost: [i64; SEAT_COUNT],
+    pub queue_depth_median: u32,
     pub events_no_target: u32,
+    /// Ticket #337 (version 0.09.0): choice cards this seat took, refused, and was never asked --
+    /// the third being the cards neither of whose sides reached its board.
+    pub choice_taken: [u32; SEAT_COUNT],
+    pub choice_refused: [u32; SEAT_COUNT],
+    pub choice_not_asked: [u32; SEAT_COUNT],
     pub coastal_slots_lost: u32,
     pub facilities_drowned: u32,
     /// Ticket #276 (version 0.08.5): inland slots the sea turned coastal over the game. Read off the
@@ -188,6 +205,12 @@ pub struct SimResult {
     /// rise of 0.08.2 has never been shown to be what moved the collapse rate. Spending is measured
     /// rather than inferred -- held before the turn, plus the turn's income, less held after.
     pub ducats_made: [i64; SEAT_COUNT],
+    /// Ticket #332 (version 0.09.0): Materials income summed over the game, by seat, and the Mines
+    /// and Factories completed (Earth and off it together, by the log line), so a Materials-starved
+    /// column can be told from a Widgets-starved one.
+    pub materials_made: [i64; SEAT_COUNT],
+    pub mines_completed: u32,
+    pub factories_completed: u32,
     pub ducats_spent: [i64; SEAT_COUNT],
     /// Ticket #241: the **Research Directive** each seat actually ran, as the mean percentage kept
     /// back from the shared pot over the game, and the turns it sat below the 85% contribution the
@@ -273,6 +296,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let (mut moments_earned, mut moments_shown, mut turns_with_moment, mut most_moments_in_a_turn) = (0u32, 0u32, 0u32, 0u32);
     // Ticket #241 (version 0.08.3): the figures 0.08.2 named as missing, and this version's own.
     let (mut ducats_made, mut ducats_spent) = ([0i64; SEAT_COUNT], [0i64; SEAT_COUNT]);
+    let mut materials_made = [0i64; SEAT_COUNT];
     let (mut directive_sum, mut directive_turns_below, mut directive_samples) = ([0f64; SEAT_COUNT], [0u32; SEAT_COUNT], 0u32);
     // Ticket #290 (version 0.08.6): the opening, sampled once turn three has resolved.
     let mut opening_modules = [0u32; SEAT_COUNT];
@@ -295,6 +319,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
             let i = s_.index();
             let income = game.seat(s_).income_last_turn.ducats;
             ducats_made[i] += income;
+            materials_made[i] += game.seat(s_).income_last_turn.materials;
             ducats_spent[i] += (held_before[i] + income - game.seat(s_).stockpile.ducats).max(0);
             // The share KEPT BACK from the shared pot, sampled every turn, and the turns spent
             // under the 85% contribution the shared-pot rule asks for.
@@ -417,11 +442,18 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         observatories,
         research_off_earth
     ));
-    let influence_transfers = game.log.iter().filter(|l| !l.starts_with(' ') && l.ends_with("(Influence).")).count() as u32;
+    // Ticket #336 (version 0.09.0): counted at the transfer, by the kind of place (ticket #276's
+    // lesson about log scrapers: they break whenever a sentence moves).
+    let influence_takes_states: u32 = game.war.takes_by_influence_states.iter().sum();
+    let influence_takes_colonies: u32 = game.war.takes_by_influence_colonies.iter().sum();
+    let influence_takes_stations: u32 = game.war.takes_by_influence_stations.iter().sum();
+    let influence_transfers = influence_takes_states + influence_takes_colonies + influence_takes_stations;
     // Ticket #52, read off the log the same way: throw-offs, Constabularies, Relief orders and the
     // population the refugee flows carried (to the tenth the line prints).
     let throw_offs = game.log.iter().filter(|l| l.contains("threw off the")).count() as u32;
     let constabularies = game.log.iter().filter(|l| l.contains("completed Constabulary at")).count() as u32;
+    let mines_completed = game.log.iter().filter(|l| l.contains("completed Mine at")).count() as u32;
+    let factories_completed = game.log.iter().filter(|l| l.contains("completed Factory at")).count() as u32;
     let relief_orders = game.log.iter().filter(|l| l.trim_start().starts_with("take") && l.contains("pay Relief in")).count() as u32;
     let population_moved: f64 = game
         .log
@@ -519,6 +551,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let blockade_suffered = Seat::ALL.map(|s| game.seat(s).blockade_turns_suffered);
     let blockade_imposed = Seat::ALL.map(|s| game.seat(s).blockade_turns_imposed);
     let events_no_target = game.events_no_target;
+    let (choice_taken, choice_refused, choice_not_asked) = (game.choice_taken, game.choice_refused, game.choice_not_asked);
     // Ticket #276 (version 0.08.5): the three sea figures are counters on the state, not scraped
     // from the log's sentences as the first two were from #56 to 0.08.4.
     let coastal_slots_lost: u32 = game.states.iter().map(|s| s.lost_slots).sum();
@@ -536,6 +569,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         collapse_projected_turn: projected_collapse,
         colony_changed_hands: changed,
         influence_transfers,
+        influence_takes_states,
+        influence_takes_colonies,
+        influence_takes_stations,
         new_buildings,
         throw_offs,
         peak_unrest,
@@ -574,7 +610,18 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         levies_raised: game.levies_raised,
         neutral_holds: game.neutral_holds,
         war: game.war.clone(),
+        widgets_made: game.widgets.made,
+        widgets_applied: game.widgets.applied,
+        widgets_lost: game.widgets.lost,
+        queue_depth_median: {
+            let mut depths = game.widgets.queue_depths.clone();
+            depths.sort_unstable();
+            depths.get(depths.len() / 2).copied().unwrap_or(0)
+        },
         events_no_target,
+        choice_taken,
+        choice_refused,
+        choice_not_asked,
         sea_walls_spent,
         coastal_slots_lost,
         facilities_drowned,
@@ -627,6 +674,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         bought,
         sold,
         ducats_made,
+        materials_made,
+        mines_completed,
+        factories_completed,
         ducats_spent,
         directive_mean,
         directive_turns_below,

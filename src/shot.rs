@@ -70,6 +70,21 @@ pub struct ShotPlan {
     pub notice: Option<String>,
     /// Ticket #59, a building aid (`load:1`): 0 nothing yet, 1 the Load screen is up, 2 captured.
     pub load_step: u8,
+    /// Ticket #335 (version 0.09.0), a building aid (`scroll:transits`, `scroll:orbits`): the Ship
+    /// stack card scrolls to that block, which a headless capture cannot do with a scrollbar.
+    pub stack_scroll: Option<StackBlock>,
+    /// Ticket #337 (version 0.09.0), a building aid (`card:<event id>`): that Choice Card is the
+    /// turn's question, so its modal stands in every picture of the run. The deck is stacked with
+    /// the card and the real Question phase is run, so what is asked is asked the way a game asks
+    /// it. `cardshut:1` sets the modal aside -- which only a picture may do -- so the board behind
+    /// it can be photographed with End Turn greyed; the `tip:` aid forces that button hover.
+    pub card: bool,
+    pub card_shut: bool,
+    /// Ticket #338 (version 0.09.0), a building aid (`chronicle:1`): **the chronicle page**, the
+    /// page the game-over box opens, which the game-over screen had never had a name for. It fills
+    /// the window, so the run takes ONE picture of it rather than seven copies of the same page.
+    /// Wants `turns:<n>` enough to play the board out, or the page reports a game still on.
+    pub chronicle: bool,
 }
 
 /// Ticket #58: the Moment a `moment:` aid names.
@@ -108,6 +123,7 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     if plan.stack {
         view.selection = Selection::ShipStack(BodyId::Mars, Seat(0));
     }
+    view.stack_scroll = plan.stack_scroll;
     // Ticket #162 (version 0.07.5): `hab:1` SELECTS seat 0's first station or Colony (the ISS on a
     // fresh board), so its card and its Module tiles are in the picture; the window it used to open
     // is gone.
@@ -131,6 +147,13 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     // Region's card is clicked, so the strip beneath the boxes can be photographed.
     view.slot_box = std::env::args().find_map(|a| a.strip_prefix("slotbox:").map(str::to_owned)).and_then(|v| if v == "free" { Some(SlotBox::Free) } else { v.parse::<usize>().ok().map(SlotBox::Facility) });
     view.force_hover = plan.hover.filter(|_| view.view == View::Solar);
+    // Ticket #337 (version 0.09.0): the turn's Choice Card stands in the picture, unless the aid
+    // has set it aside for a picture of the board behind it. Applied at every view change, since
+    // the modal is raised again by the interface the moment nothing else is up.
+    view.card_aside = plan.card_shut;
+    if plan.card && !plan.card_shut {
+        view.popup = Popup::Card;
+    }
     // Ticket #51: `archive:<stage>` opens the Archive's Colony card in that Body's picture.
     if let (Some(cid), View::Surface(_)) = (plan.archive_colony, view.view) {
         view.selection = Selection::Colony(cid);
@@ -162,6 +185,11 @@ const VIEWS: [(&str, View); 7] = [
 // Ticket #109: the credits picture sits between the Faction cards and the start screen, so the
 // attribution the icons' licence requires is photographed with every other menu.
 const MENUS: [&str; 5] = ["title", "faction", "credits", "start", "report"];
+
+// Ticket #338 (version 0.09.0): `chronicle:1` photographs a PAGE and not a map, so the run takes
+// one picture and stops. The View beside it is never seen -- the page covers the window -- and is
+// only there so the capture loop needs no second shape.
+const CHRONICLE: [(&str, View); 1] = [("chronicle", View::Surface(BodyId::Earth))];
 
 /// Ticket #57: the Body a `hover:` aid names, by the id its data row carries.
 fn body_from_id(name: &str) -> Option<BodyId> {
@@ -227,6 +255,42 @@ fn build_board(session: &mut Session) {
             g.raise_army(Place::State(StateId::EastAsia), false);
             run_one_quiet_turn(g);
         }
+        // `orbits:1` (a building aid, ticket #335, version 0.09.0): **three of Mars's four orbits
+        // are occupied at once.** Seat 0 holds the station in slot 0 (Mars Base Camp) and seat 1 the
+        // station in slot 1 (Ares); seat 0 keeps its Frigate in LOW ORBIT and gains a Colony Ship at
+        // its own station's ring, seat 1 gains a Frigate at seat 0's station's ring on Blockade, and
+        // seat 2's Carrier stays in low orbit. So one Surface Map picture carries low orbit's ring
+        // with stacks on it, two station rings with stacks on them, and an orbit band with a row per
+        // stack per orbit; and the stack card's Change orbit door has three other orbits to offer.
+        // It runs BEFORE `battle:1`, so that aid's Attack stances make a Battle in each orbit that
+        // has two parties in it, which is the only way to photograph two Battle marks at one Body.
+        if std::env::args().any(|a| a == "orbits:1") {
+            for (slot, seat) in [(0u32, Seat(0)), (1, Seat(1))] {
+                if g.station_at(BodyId::Mars, slot).is_none() {
+                    let id = ColonyId(g.fresh_id());
+                    let modules = vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat)];
+                    g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(seat), modules, colonists: 2, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: true });
+                }
+            }
+            for (seat, kind, slot, stance) in [(Seat(0), UnitKind::ColonyShip, Some(0u32), Stance::Hold), (Seat(1), UnitKind::Frigate, Some(0), Stance::Blockade)] {
+                let id = ShipId(g.fresh_id());
+                let built_turn = g.turn;
+                let name = g.next_ship_name(kind);
+                g.ships.push(Ship { id, name, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot });
+            }
+            // And, over EARTH, a Colony Ship of seat 0's at the ISS's own ring rather than in low
+            // orbit, so the Region card's lift door is shut on it and says why: a lift from a Launch
+            // Site arrives in low orbit and nowhere else.
+            if let Some(slot) = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot) {
+                let id = ShipId(g.fresh_id());
+                let built_turn = g.turn;
+                let name = g.next_ship_name(UnitKind::ColonyShip);
+                g.ships.push(Ship { id, name, kind: UnitKind::ColonyShip, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Earth), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: Some(slot) });
+            }
+            g.seats[0].stockpile.materials = 200;
+            g.seats[0].stockpile.energy = 80;
+            g.seats[0].stockpile.fuel = 60;
+        }
         // `blockade:1` (a building aid, ticket #278, version 0.08.5): a Prospector Frigate sits in
         // the slot of seat 0's station over Earth on Blockade, so the station's button and card say
         // it is starved. With `hab:1` the station's card is open in the Earth picture.
@@ -261,6 +325,7 @@ fn build_board(session: &mut Session) {
             }
             let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
             orders[0] = vec![Order::ShipStance { body, stance: Stance::Attack }];
+            refuse_any_card(g);
             g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
             if earth_battle {
                 run_one_quiet_turn(g);
@@ -278,10 +343,9 @@ fn build_board(session: &mut Session) {
             let slot = g.free_slots_on(BodyId::Mars).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
             let mut modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Mine)];
-            let turn = g.turn;
             let mut queue = Vec::new();
             if point == 0 {
-                queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat: Seat(0), due_turn: turn + 1, coastal: false });
+                queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat: Seat(0), widgets: 12, done: 4, coastal: false });
             } else {
                 modules.push(Module::new(ModuleKind::Archive));
             }
@@ -310,6 +374,18 @@ fn build_board(session: &mut Session) {
             let name = g.next_ship_name(UnitKind::Frigate);
             let built_turn = g.turn;
             g.ships.push(Ship { id: sid, name, kind: UnitKind::Frigate, seat: Seat(1), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
+            g.seats[0].stockpile.materials = 120;
+            g.seats[0].stockpile.energy = 60;
+        }
+        // `barracks:1` (a building aid, ticket #334, version 0.09.0): seat 0 gets a Colony on the
+        // Moon with a Barracks standing and four Colonists, and the Materials for a raise; so the
+        // Colony's card (`hab:ground`) shows the Build Army button and its hover, which names the
+        // Colonist a raise takes.
+        if std::env::args().any(|a| a == "barracks:1") {
+            let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
+            let id = ColonyId(g.fresh_id());
+            let modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Mine), Module::new(ModuleKind::Barracks), Module::new(ModuleKind::Core)];
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
             g.seats[0].stockpile.materials = 120;
             g.seats[0].stockpile.energy = 60;
         }
@@ -342,6 +418,42 @@ fn build_board(session: &mut Session) {
             let name = g.next_ship_name(UnitKind::Battleship);
             let built_turn = g.turn;
             g.ships.push(Ship { id: sid, name, kind: UnitKind::Battleship, seat: Seat(0), damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, colonists_education: 1.0, army: None, stance: Stance::Hold, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot: None });
+        }
+        // `eye:1` and `eye:0` (building aids, ticket #339, version 0.09.0): **the pair of boards the
+        // eye is photographed on.** Seat 1 takes the first neighbour of seat 0's start Region and
+        // runs two Facilities in it, and holds a Colony on the Moon with three Modules; with
+        // `eye:1` seat 0 also has a working Embassy at home and a Colony of its own at the Moon
+        // with a working Relay, which are the two eyes. `eye:0` builds neither, so the same two
+        // rival cards can be photographed with nothing watching them and the difference is the
+        // block and nothing else. An AI game gives no board where one Faction has an Embassy and a
+        // rival a built-up Region next door on a turn anybody can choose.
+        if let Some(watching) = std::env::args().find_map(|a| match a.strip_prefix("eye:") {
+            Some("1") => Some(true),
+            Some("0") => Some(false),
+            _ => None,
+        }) {
+            if let Some(home) = g.directed_states(Seat(0)).first().copied()
+                && let Some(theirs) = g.tables.state(home).neighbours.first().copied()
+            {
+                g.take_control(theirs, Seat(1));
+                for kind in [FacilityKind::Factory, FacilityKind::ResearchLab] {
+                    g.state_mut(theirs).facilities.push(Facility::new(kind));
+                }
+                if watching {
+                    g.state_mut(home).facilities.push(Facility::new(FacilityKind::Embassy));
+                }
+            }
+            let mut slots = g.free_slots_on(BodyId::Moon).into_iter();
+            if let Some(slot) = slots.next() {
+                let id = ColonyId(g.fresh_id());
+                let modules = vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Mine), Module::new(ModuleKind::Generator)];
+                g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(1)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            }
+            if watching && let Some(slot) = slots.next() {
+                let id = ColonyId(g.fresh_id());
+                let modules = vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Relay)];
+                g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 4, education: 1.0, settler_education: 1.0, queue: Vec::new(), grid_failed: false, founded_turn: 1, in_orbit: false });
+            }
         }
         // `rival:1` (a building aid, ticket #261, version 0.08.4): seat 1 stands three quarters of
         // the way to its Victory Condition -- nine Colonists on the Moon of twelve, and, for the
@@ -583,11 +695,11 @@ fn build_board(session: &mut Session) {
         if std::env::args().any(|a| a == "underway:1") {
             let turn = g.turn;
             if let Some(sid) = g.directed_states(Seat(0)).first().copied() {
-                g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Factory), seat: Seat(0), due_turn: turn + 2, coastal: false });
+                g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Factory), seat: Seat(0), widgets: 4, done: 0, coastal: false });
             }
             let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
-            let queue = vec![Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), due_turn: turn, coastal: false }];
+            let queue = vec![Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 3, coastal: false }];
             g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Habitat)], colonists: 4, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
             let sid = ShipId(g.fresh_id());
             let name = g.next_ship_name(UnitKind::Frigate);
@@ -608,6 +720,33 @@ fn build_board(session: &mut Session) {
                 built_turn: turn,
                 fuel: g.tables.unit(UnitKind::Frigate).tank,
             });
+        }
+        // `queue:1` (a building aid, ticket #332, version 0.09.0): seat 0's start Region has three
+        // builds under way -- a Power Plant 3 of 8, a Research Lab 0 of 4, and a Bank 2 of 8 that
+        // seat 1 began, as if the Region had lately changed hands -- and seat 0 holds a Colony on
+        // the Moon with a Factory Module standing and three builds in its queue, a Habitat 2 of 4,
+        // a Mine 0 of 4 and seat 1's Refinery 1 of 8, with room for one Module more; so the
+        // Widgets line, the queue, the `3 of 8` tiles, the rival's cancel hover and the build
+        // buttons' estimates can all be photographed. Nothing the computer plays in six turns
+        // composes a queue this deep, and nothing composes a rival's build at a place of one's own.
+        if std::env::args().any(|a| a == "queue:1") {
+            if let Some(sid) = g.directed_states(Seat(0)).first().copied() {
+                for (kind, seat, widgets, done) in [(FacilityKind::PowerPlant, Seat(0), 8, 3), (FacilityKind::ResearchLab, Seat(0), 4, 0), (FacilityKind::Bank, Seat(1), 8, 2)] {
+                    let coastal = g.next_slot_is_coastal(sid, kind, 0, 0).unwrap_or(false);
+                    g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(kind), seat, widgets, done, coastal });
+                }
+            }
+            let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
+            let id = ColonyId(g.fresh_id());
+            let modules = vec![Module::new(ModuleKind::Core), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Factory)];
+            let queue = vec![
+                Build { item: BuildItem::Module(ModuleKind::Habitat), seat: Seat(0), widgets: 4, done: 2, coastal: false },
+                Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 0, coastal: false },
+                Build { item: BuildItem::Module(ModuleKind::Refinery), seat: Seat(1), widgets: 8, done: 1, coastal: false },
+            ];
+            g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules, colonists: 8, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
+            g.seats[0].stockpile.materials = 200;
+            g.seats[0].stockpile.energy = 80;
         }
         // `challenger:1` (a building aid, ticket #262, version 0.08.4): a rival stands on seat 0's
         // start state, well short of its price, so the challenger line on the held card has a name
@@ -687,6 +826,7 @@ fn build_board(session: &mut Session) {
             g.seats[0].ai = false;
             let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
             orders[0] = vec![Order::StripPermit { state: sid }];
+            refuse_any_card(g);
             g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
             g.seats[0].ai = true;
         }
@@ -777,6 +917,7 @@ fn build_board(session: &mut Session) {
                 let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
                 orders[0] = vec![Order::Unload { ship: id, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Moon, slot) }];
                 g.seats[0].ai = false;
+                refuse_any_card(g);
                 g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
                 g.seats[0].ai = true;
             }
@@ -939,6 +1080,7 @@ fn build_board(session: &mut Session) {
         }
         let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
         orders[0] = vec![Order::MoveArmy { army: mine, to: n }];
+        refuse_any_card(g);
         g.end_turn(orders).expect("the screenshot harness picks a Tech before it drives turns");
         for seat in Seat::ALL.into_iter().skip(1) {
             g.seats[seat.index()].ai = true;
@@ -972,7 +1114,67 @@ fn build_board(session: &mut Session) {
             m.online = false;
         }
     }
+    // Ticket #337 (version 0.09.0): `ducats:<n>` (a building aid): seat 0 holds exactly n Ducats.
+    // A card whose offer costs more than a seat holds greys its take button, and that is the state
+    // a third of the table is in when a card is drawn; a fresh board is never poor enough to show
+    // it.
+    if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("ducats:").and_then(|v| v.parse::<i64>().ok()))
+        && let Some(g) = session.game.as_mut()
+    {
+        g.seats[0].stockpile.ducats = n;
+    }
+    // `card:<event id>` (a building aid, ticket #337): that Choice Card is the turn's question, so
+    // the modal that asks it stands in the picture. `cardanswer:take` or `cardanswer:refuse` then
+    // answers it for seat 0 and runs the turn, so the Report that follows carries all four seats'
+    // answers -- the computer seats' among them, each answered by the card's own rule.
+    if let Some(id) = std::env::args().find_map(|a| a.strip_prefix("card:").and_then(card_from_id))
+        && let Some(g) = session.game.as_mut()
+    {
+        if !ask_the_card(g, id) {
+            eprintln!("card:{id:?} never came up in two hundred rolls");
+            std::process::exit(3);
+        }
+        if let Some(taken) = std::env::args().find_map(|a| match a.strip_prefix("cardanswer:") {
+            Some("take") => Some(true),
+            Some("refuse") => Some(false),
+            _ => None,
+        }) {
+            if let Err(e) = g.answer_card(Seat(0), taken) {
+                eprintln!("cardanswer: {e}");
+                std::process::exit(3);
+            }
+            run_one_quiet_turn(g);
+        }
+    }
     session.earth_dirty = true;
+}
+
+/// Ticket #337 (version 0.09.0): the Choice Card a `card:` aid names, by the id its data row
+/// carries (`the_hard_winter`) or by the name of its variant.
+fn card_from_id(name: &str) -> Option<EventId> {
+    let want = name.replace('_', "");
+    EventId::ALL.into_iter().find(|id| format!("{id:?}").eq_ignore_ascii_case(&want))
+}
+
+/// Ticket #337, a building aid: make that card the turn's question, by stacking the deck with it
+/// and running the game's OWN Question phase until a roll brings a card -- so the question is asked
+/// exactly as a game asks one, every seat included or passed over by the rule rather than by this
+/// aid. The deck is put back as it would stand with that card drawn, so the Climate Panel's count
+/// of what is left reads a real deck.
+fn ask_the_card(g: &mut Game, id: EventId) -> bool {
+    let deck = g.deck.clone();
+    for _ in 0..200 {
+        g.deck.cards = vec![Card::Event(id)];
+        g.deck.drawn.clear();
+        g.question_phase();
+        if g.pending_question().is_some() {
+            g.deck = deck;
+            g.deck.cards.retain(|c| *c != Card::Event(id));
+            g.deck.drawn.push(Card::Event(id));
+            return true;
+        }
+    }
+    false
 }
 
 /// Ticket #59, a building aid: write the board to the saves folder, read it back, and say whether
@@ -1034,8 +1236,23 @@ fn fill_with_scrubbers(g: &mut Game, sid: StateId) {
 /// the board the aid just built.
 fn run_one_quiet_turn(g: &mut Game) {
     g.seats[0].ai = false;
+    refuse_any_card(g);
     g.end_turn(std::array::from_fn(|_| Vec::new())).expect("the screenshot harness picks a Tech before it drives turns");
     g.seats[0].ai = true;
+}
+
+/// Ticket #339 (version 0.09.0), a building aid: **refuse this turn's Choice Card for every human
+/// seat**, since ticket #337 made `end_turn` refuse while one is unanswered and an aid that drives
+/// a turn by hand has no player to answer it. It REFUSES, which is the answer that buys nothing and
+/// leaves the board the aid built where the aid put it. Without this, an aid that drives a turn
+/// panicked on any seed whose first turn happened to draw a card: `battle:region seed:7` did, which
+/// is how it was found.
+fn refuse_any_card(g: &mut Game) {
+    for seat in Seat::ALL {
+        if !g.seat(seat).ai && g.pending_question().map(|q| q.answer_of(seat).is_none()).unwrap_or(false) {
+            g.answer_card(seat, false).ok();
+        }
+    }
 }
 
 /// `tutorialtick:1` (a building aid, ticket #174, not part of the spec): the `Play Tutorial` tick at
@@ -1095,6 +1312,10 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         return;
     }
     let t = time.elapsed_secs();
+    // Ticket #338 (version 0.09.0): which pictures this run takes -- the four maps and the three
+    // moons, or the one chronicle page, which fills the window and would otherwise be photographed
+    // seven times over.
+    let views: &[(&str, View)] = if plan.chronicle { &CHRONICLE } else { &VIEWS };
     // `saved:1` (a building aid, ticket #59): the Save notice is held up for the whole run, so the
     // picture cannot be taken in the second after it has faded.
     if let Some(text) = &plan.notice {
@@ -1201,7 +1422,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
                 // Fall through to the four views with the game already made.
                 view.popup = Popup::None;
                 view.tech_prompted = true;
-                show_view(&mut view, VIEWS[0].1);
+                show_view(&mut view, views[0].1);
                 plan.next_at = t + 2.5;
                 return;
             }
@@ -1237,7 +1458,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         plan.archive_colony = ARCHIVE_COLONY.with(|c| c.get());
         view.popup = Popup::None;
         view.tech_prompted = true;
-        show_view(&mut view, VIEWS[0].1);
+        show_view(&mut view, views[0].1);
         // `select:<state id>` (a building aid) opens that Region's card in the Earth picture.
         plan.select = std::env::args().find_map(|a| a.strip_prefix("select:").map(str::to_owned));
         plan.arm = std::env::args().any(|a| a == "arm:1").then(|| session.game.as_ref().and_then(|g| g.directed_states(Seat(0)).first().copied())).flatten();
@@ -1250,12 +1471,34 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         if ground {
             plan.hab = true;
         }
-        plan.hab_colony = session
-            .game
-            .as_ref()
-            .and_then(|g| g.colonies.iter().find(|c| c.control.director() == Some(Seat(0)) && (!ground || !c.in_orbit)).map(|c| c.id));
+        // Ticket #339 (version 0.09.0): `hab:rival` picks the first Colony a RIVAL directs instead,
+        // since the eye's whole point is what it reads on somebody else's card and no aid could
+        // open one before.
+        let rival = std::env::args().any(|a| a == "hab:rival");
+        if rival {
+            plan.hab = true;
+        }
+        plan.hab_colony = session.game.as_ref().and_then(|g| {
+            g.colonies
+                .iter()
+                .find(|c| match c.control.director() {
+                    // `hab:ground` narrows either to a Colony on a surface, which is how the Moon's
+                    // picture is kept off the station standing over Earth.
+                    Some(d) if rival => d != Seat(0) && (!ground || !c.in_orbit),
+                    Some(d) => d == Seat(0) && (!ground || !c.in_orbit),
+                    None => false,
+                })
+                .map(|c| c.id)
+        });
         plan.trade = std::env::args().any(|a| a == "trade:1");
         plan.victory = std::env::args().any(|a| a == "victory:1");
+        // Ticket #338 (version 0.09.0): `chronicle:1` opens the chronicle page, which in play is
+        // reached by the Chronicle button on the game-over box -- a click a headless run cannot
+        // make. The board is built above; `turns:<n>` is what plays it out to an ending.
+        plan.chronicle = std::env::args().any(|a| a == "chronicle:1");
+        if plan.chronicle {
+            session.screen = Screen::Chronicle;
+        }
         // Ticket #203: `factions:1` for seat 0's page, `factions:archivists` for that Faction's.
         if let Some(v) = std::env::args().find_map(|a| a.strip_prefix("factions:").map(str::to_owned)) {
             plan.faction_window = true;
@@ -1265,6 +1508,17 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             }
         }
         plan.stack = std::env::args().any(|a| a == "stack:1");
+        // Ticket #335 (version 0.09.0): `scroll:transits` or `scroll:orbits`, the block of the Ship
+        // stack's card the picture is of.
+        plan.stack_scroll = std::env::args().find_map(|a| match a.strip_prefix("scroll:") {
+            Some("transits") => Some(StackBlock::Transits),
+            Some("orbits") => Some(StackBlock::ChangeOrbit),
+            _ => None,
+        });
+        // Ticket #337 (version 0.09.0): the turn's Choice Card stands in every picture of the run,
+        // unless `cardshut:1` sets it aside for a picture of the board behind it.
+        plan.card = std::env::args().any(|a| a.starts_with("card:"));
+        plan.card_shut = std::env::args().any(|a| a == "cardshut:1");
         plan.hover = std::env::args().find_map(|a| a.strip_prefix("hover:").and_then(body_from_id));
         plan.look = std::env::args().find_map(|a| {
             let (lon, lat) = a.strip_prefix("look:")?.split_once(',')?;
@@ -1294,7 +1548,7 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             plan.next_at = t + 1.0;
             return;
         }
-        let (name, _) = VIEWS[plan.step];
+        let (name, _) = views[plan.step];
         let path = format!("{}-{}.png", session.shot_prefix, name);
         commands.spawn(Screenshot::primary_window()).observe(save_to_disk(path));
         plan.captured = true;
@@ -1304,10 +1558,10 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
     }
     plan.step += 1;
     plan.captured = false;
-    if plan.step >= VIEWS.len() {
+    if plan.step >= views.len() {
         plan.done_at = Some(t + 1.5);
     } else {
-        let (_, v) = VIEWS[plan.step];
+        let (_, v) = views[plan.step];
         show_view(&mut view, v);
         apply_aids(&mut plan, &mut view);
         let wanted = plan.select.as_ref().filter(|_| v == View::Surface(BodyId::Earth)).and_then(|name| StateId::ALL.into_iter().find(|s| format!("{s:?}").eq_ignore_ascii_case(name)));
@@ -1318,14 +1572,18 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
         // `site:<body id>,<slot>` (a building aid, ticket #258): that Body's picture opens the empty
         // Colony Slot's panel, the one place the yields were still in words. `settler:<body id>`
         // (the same ticket): that Body's picture selects seat 0's Ship stack there.
+        // Ticket #339 (version 0.09.0): `site:` is applied AFTER `settler:`, so the two can be given
+        // together -- the Colony Ship `settler:` plants is what puts a founding button on the SLOT
+        // panel `site:` opens, and before this the stack selection won and the slot panel could
+        // never be photographed with a founding door on it. The more specific aid wins.
         if let View::Surface(body) = v {
+            if std::env::args().any(|a| a.strip_prefix("settler:").and_then(body_from_id) == Some(body)) {
+                view.selection = Selection::ShipStack(body, Seat(0));
+            }
             if let Some((b, slot)) = std::env::args().find_map(|a| a.strip_prefix("site:").and_then(|v| v.split_once(',')).and_then(|(b, n)| Some((body_from_id(b)?, n.parse::<u32>().ok()?))))
                 && b == body
             {
                 view.selection = Selection::Slot(body, slot);
-            }
-            if std::env::args().any(|a| a.strip_prefix("settler:").and_then(body_from_id) == Some(body)) {
-                view.selection = Selection::ShipStack(body, Seat(0));
             }
         }
         plan.next_at = t + 2.5;

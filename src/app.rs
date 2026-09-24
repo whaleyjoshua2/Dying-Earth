@@ -26,6 +26,12 @@ pub enum Screen {
     ChooseStart { faction: FactionKind },
     Playing,
     GameOver,
+    /// Ticket #338 (version 0.09.0): **the chronicle**, the page the game-over box opens: the four
+    /// Factions ranked as the End phase ranked them, a table of what each ended the game holding,
+    /// and the population and Temperature charts. A page of its own and not a box over the board,
+    /// at the designer's word, since two charts and a table of nine columns do not sit in 520
+    /// pixels. It is reached only from the game-over box and goes back to it.
+    Chronicle,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,6 +53,13 @@ pub enum Selection {
 pub enum Popup {
     None,
     Event,
+    /// Ticket #337 (version 0.09.0): **the turn's Choice Card, asking its question.** Its own popup
+    /// rather than the Event's, because a card that asks something is not a notice: it carries two
+    /// buttons whose faces say what each side does, neither of them a default, and NOTHING dismisses
+    /// it but an answer -- not Escape, not a click outside, not the key that ends the turn. It is
+    /// raised at the head of the turn, where the Event would be, and hands on to the Moments and
+    /// the Report once it has been answered.
+    Card,
     /// Ticket #169 (version 0.07.5): a tutorial game's note for this turn, shown before everything
     /// else, since it says what the turn is for.
     Tutorial,
@@ -281,6 +294,16 @@ pub enum HabTile {
     Free,
 }
 
+/// Ticket #335 (version 0.09.0), a building aid: a block of the Ship stack's card that a headless
+/// picture asks to be scrolled to, since a capture cannot drag a scrollbar.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum StackBlock {
+    /// The Transits row, one line per destination ORBIT since this ticket.
+    Transits,
+    /// The Change orbit door, one line per other orbit at this Body.
+    ChangeOrbit,
+}
+
 /// Ticket #146 (version 0.07.3): what is clicked among a Region card's slot boxes -- a standing
 /// Facility by its index, or a free box, whose strip offers the build buttons.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -362,12 +385,21 @@ pub struct ViewState {
     /// Turn or a change of view. `armed_scroll` asks the card to scroll to its Armies block once.
     pub armed_stack: Option<StateId>,
     pub armed_scroll: bool,
+    /// Ticket #335 (version 0.09.0), a building aid (`scroll:transits`, `scroll:orbits`): the Ship
+    /// stack card scrolls to that block and stays there. A headless picture cannot scroll a panel,
+    /// and on a card with four Ships on it both blocks sit well below the fold.
+    pub stack_scroll: Option<StackBlock>,
     /// Ticket #58: which Moment kinds are switched on, remembered for the session. `None` until the
     /// player touches a checkbox, when it is filled from the defaults in `report.toml`.
     pub moments_on: Option<[bool; dying_earth_engine::MomentKind::ALL.len()]>,
     /// Ticket #57, a building aid (`hover:<body id>`): the Solar System Map draws that Body's launch
     /// window tooltip as though the pointer were on it, so a picture can be taken of it.
     pub force_hover: Option<BodyId>,
+    /// Ticket #337 (version 0.09.0), a building aid (`cardshut:1`): the turn's Choice Card is SET
+    /// ASIDE, so the board behind it -- the End Turn sun greyed, with the refusal on its hover --
+    /// can be photographed. Nothing in play sets it: in play the card cannot be set aside at all,
+    /// and the modal comes straight back whenever nothing else is up.
+    pub card_aside: bool,
     /// Ticket #114 (version 0.07.1), Max since ticket #134: the last turn the standing order was placed, so it is
     /// placed once a turn and not once a frame.
     pub max_placed: Option<u32>,
@@ -418,9 +450,10 @@ impl Default for ViewState {
             greenwash_amount: 5,
             credits_amount: 10,
             credits_offer: 0,
-            attack_preview: false, armed_stack: None, armed_scroll: false,
+            attack_preview: false, armed_stack: None, armed_scroll: false, stack_scroll: None,
             moments_on: None,
             force_hover: None,
+            card_aside: false,
             max_placed: None,
             hotkey: None,
             start_hover: None,

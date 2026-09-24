@@ -32,8 +32,10 @@ influence_multiplier = 1.2
 # Ticket #82: Production Moved. While a Facility of one of these kinds in a state they direct is
 # mothballed, one Module of the paired kind off Earth (a station over Earth included, Antarctica
 # not) makes double: one for one, the most productive undoubled Module first, on its final figure.
-mothball_pairs = { factory = "mine", power_plant = "generator", refinery = "refinery", research_lab = "observatory" }
-signature = "The Scrubber, Leapfrog and Production Moved. Only they build a Scrubber, in a Region they control, and it takes no build slot: 30 Materials, 2 turns, 4 Energy upkeep, no Emissions. Online it adds 3.0 ppm a turn to the Natural Sink and takes 1 off that Region's Unrest. A Region holds one per two hundred million people, between 2 and 10, and they are destroyed if it changes hands. A Leapfrog costs 50 Ducats in a Region they control and lowers its people's Emissions coefficient by 0.03 for good, never below 0.04. Production Moved: while a Factory, Power Plant, Refinery or Research Lab of theirs stands mothballed, one Mine, Generator, Refinery or Observatory of theirs off Earth makes double, one for one, the most productive first."
+# Ticket #332 (version 0.09.0): the Factory pairs with the Factory Module and the Mine with the
+# Mine, now that each list has both; before, the Factory paired with the Mine.
+mothball_pairs = { factory = "factory", mine = "mine", power_plant = "generator", refinery = "refinery", research_lab = "observatory" }
+signature = "The Scrubber, Leapfrog and Production Moved. Only they build a Scrubber, in a Region they control, and it takes no build slot: 30 Materials, 2 turns, 4 Energy upkeep, no Emissions. Online it adds 3.0 ppm a turn to the Natural Sink and takes 1 off that Region's Unrest. A Region holds one per two hundred million people, between 2 and 10, and they are destroyed if it changes hands. A Leapfrog costs 50 Ducats in a Region they control and lowers its people's Emissions coefficient by 0.03 for good, never below 0.04. Production Moved: while a Factory, Mine, Power Plant, Refinery or Research Lab of theirs stands mothballed, one Factory, Mine, Generator, Refinery or Observatory of theirs off Earth makes double, one for one, the most productive first."
 # Ticket #203 (version 0.08.1): the Unique Facility in one sentence, for the Faction card and the
 # Faction window. Ticket #186 built the Academy; nothing on any card named it until now.
 unique = "Academy -- replaces the School and the Institute, and pays +1 Ducat a turn while it is online."
@@ -101,8 +103,9 @@ id = "arkwrights"
 # Ticket #100 (version 0.07.0), renamed on ticket #195 (version 0.08.0): the Region the start
 # screen opens the globe on for this Faction. It changes nothing else -- no starting position, and
 # any of the fourteen may still be chosen -- which is what the old name `home` did not say.
-# Population 388, the largest on Earth -- 19.4 in the units used before ticket #143 (version
-# 0.07.3) put population in units of five million people -- and Coach Class recruits eight a turn at
+# Population 1940, the largest on Earth -- 388 in the units of five million used from ticket #143
+# (version 0.07.3) until ticket #333 (version 0.09.0) put population in units of one million people,
+# and 19.4 in the hundreds of millions before that -- and Coach Class recruits eight a turn at
 # twice the population cost.
 opens_on = "south_asia"
 name = "Arkwrights"

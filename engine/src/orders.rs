@@ -53,10 +53,17 @@ pub enum Order {
     BuildArmy { place: Place },
     Repair { unit: UnitRef, points: u32 },
     /// Ticket #99 (version 0.07.0): a Ship may name the Orbital Slot it arrives into. A warship
-    /// sitting in a slot blockades that slot and nothing else; `None` arrives at the Body at large,
-    /// blockading nothing. The slot is chosen with the leg, so it is chosen before the Ship can see
-    /// who will be there when it lands.
+    /// sitting in a slot blockades that slot and nothing else. Ticket #335 (version 0.09.0): the
+    /// leg names the ORBIT it ends in, and `None` is low orbit, which is an orbit like any other
+    /// and no longer "the Body at large". The orbit is chosen with the leg, so it is chosen before
+    /// the Ship can see who will be there when it lands.
     Transit { ship: ShipId, to: BodyId, slot: Option<u32> },
+    /// Ticket #335 (version 0.09.0): move a Ship between the orbits of the Body it stands at --
+    /// low orbit and the Orbital Slots -- for `orbit_change_fuel` (`bodies.toml`, 1) out of its own
+    /// tank. `slot: None` is low orbit, the same shape a Transit's destination orbit has. One order
+    /// a turn like any other, and resolved WITH the transits, before the Battles, so a Ship that
+    /// changes orbit fights in its new one.
+    ChangeOrbit { ship: ShipId, slot: Option<u32> },
     /// Version 0.06.0 (ticket #87): fill a Ship's tank from the Stockpile at a Body where its
     /// Faction holds a Space Station, as far as the Stockpile can pay.
     Refuel { ship: ShipId },
@@ -98,6 +105,13 @@ pub enum Order {
     Sell { resource: Resource, amount: i64 },
     BuildFacilityWithDucats { state: StateId, kind: FacilityKind },
     BuildModuleWithDucats { colony: ColonyId, kind: ModuleKind },
+    /// Ticket #332 (version 0.09.0): cancel a build under way at a place the ordering seat directs
+    /// that ANOTHER seat began -- the case of a place that changed hands, since a build keeps its
+    /// seat through a transfer. It is removed at End Turn, its Widgets done are lost, and its
+    /// item's Materials come back at the CANCELLER's own price: a conquest is a prize. A seat's
+    /// own order this turn is taken back from the pending list instead, and a build of its own
+    /// already under way is not cancelled at all. The computer seats never cancel.
+    CancelBuild { place: Place, index: usize },
     /// Version 0.04 (ticket #46): a Space Station in an orbital slot, built for Materials from a
     /// Nation State with a Launch Site (over Earth) or a Colony of the seat's (elsewhere).
     BuildStation { body: BodyId, slot: u32 },
@@ -263,6 +277,11 @@ pub struct Pending {
     /// which Colony -- resolved after the orbital Battles.
     #[serde(default)]
     pub bombards: Vec<(Seat, ShipId, ColonyId)>,
+    /// Ticket #335 (version 0.09.0): orbit changes ordered this turn -- who, which Ship, the orbit
+    /// it moves to (`None` is low orbit) -- resolved with the transits, before the Battles. The
+    /// Fuel left the tank at the order.
+    #[serde(default)]
+    pub orbit_changes: Vec<(Seat, ShipId, Option<u32>)>,
     pub cargo: Vec<(Seat, Order)>,
     /// Ticket #46: stations ordered this turn.
     pub stations: Vec<(Seat, BodyId, u32)>,
@@ -313,6 +332,9 @@ impl Game {
             // Ticket #87: a transit spends the Ship's tank, not the Stockpile; a Refuel takes from
             // the Stockpile what the tank wants and the Stockpile can pay.
             Order::Transit { .. } => Cost::default(),
+            // Ticket #335 (version 0.09.0): an orbit change spends the tank too, as a transit does,
+            // so the Stockpile pays nothing for it.
+            Order::ChangeOrbit { .. } => Cost::default(),
             // Ticket #328 (version 0.08.8): a Bombard costs nothing but the offence.
             Order::Bombard { .. } => Cost::default(),
             Order::Refuel { ship } => Cost { fuel: self.refuel_amount(seat, *ship), ..Default::default() },
@@ -347,6 +369,9 @@ impl Game {
                 }
             }
             Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: self.market_price(seat, self.facility_materials(seat, *kind) * t.ducats.per_building_material), ..Default::default() },
+            // Ticket #332 (version 0.09.0): the refund is a negative cost, as a purchase is, so
+            // `remaining` and `commit_orders` credit it without a special case.
+            Order::CancelBuild { place, index } => Cost { materials: -self.cancel_refund(seat, *place, *index), ..Default::default() },
             Order::BuildStation { .. } => Cost { materials: self.station_materials(seat), ..Default::default() },
             Order::BuildModuleWithDucats { colony, kind } => Cost { ducats: self.market_price(seat, self.module_materials_at(seat, *colony, *kind) * t.ducats.per_building_material), ..Default::default() },
             // Ticket #68: the Archive Module costs its row's Materials; the Research comes after.
@@ -388,6 +413,18 @@ impl Game {
     /// The live price. A zero in `market.price` means the market has not opened yet -- a fresh game,
     /// or a save written before this version -- and reads as the card figure.
     pub fn market_price_at(&self, row: usize) -> i64 {
+        // Ticket #337 (version 0.09.0): a choice card may OVERRIDE the price, outside the band,
+        // through the last turn it named -- a Materials price of 1 is the whole point of the Cheap
+        // Ore Offer. The banded price goes on underneath and resumes when the override runs out.
+        if self.market.card_price[row] > 0 && self.turn <= self.market.card_price_until[row] {
+            return self.market.card_price[row];
+        }
+        self.banded_price_at(row)
+    }
+
+    /// Ticket #337: the price the band alone says, with no card over it. The settle reads this, so
+    /// an override is never banked into the band it is standing over.
+    pub fn banded_price_at(&self, row: usize) -> i64 {
         let p = self.market.price[row];
         if p <= 0 { self.market_base(row) } else { p }
     }
@@ -405,9 +442,17 @@ impl Game {
     pub fn settle_market(&mut self) {
         let step = self.tables.ducats.price_step_units.max(1);
         let band = self.tables.ducats.price_band.max(0);
+        // Ticket #337 (version 0.09.0): an override whose last turn has been played is forgotten
+        // here, and the band -- which never stopped moving -- is the price again from the next turn.
+        for row in 0..3 {
+            if self.market.card_price[row] > 0 && self.turn >= self.market.card_price_until[row] {
+                self.market.card_price[row] = 0;
+                self.market.card_price_until[row] = 0;
+            }
+        }
         for row in 0..3 {
             let base = self.market_base(row);
-            let mut price = self.market_price_at(row);
+            let mut price = self.banded_price_at(row);
             let net = self.market.net[row];
             if net >= step {
                 price += 1;
@@ -467,26 +512,76 @@ impl Game {
         self.check_order_inner(seat, pending, order, false)
     }
 
-    fn check_order_inner(&self, seat: Seat, pending: &[Order], order: &Order, enforce_cost: bool) -> Result<Cost, OrderError> {
-        let cost = self.order_cost(seat, order);
-        let (left, influence_left) = self.remaining(seat, pending);
-        if enforce_cost {
-            if cost.materials > left.materials {
-                return fail(format!("needs {} Materials, {} left", cost.materials, left.materials));
+    /// Ticket #334 (version 0.09.0): why a raise at this place is refused for want of people, or
+    /// `None` where it has them. A Region wants `[army] population_each` units of population for
+    /// this raise and for every raise already pending there this turn; a Colony wants
+    /// `colonists_each` Colonists and one more, so the Core Module is never emptied. One door, so
+    /// the gate, the computer's count of refusals and the card's refusal all say the same thing.
+    pub fn army_people_refusal(&self, pending: &[Order], place: Place) -> Option<String> {
+        let ordered = pending.iter().filter(|o| matches!(o, Order::BuildArmy { place: p } if *p == place)).count() as f64;
+        match place {
+            Place::State(s) => {
+                let wants = self.tables.army.population_each * (ordered + 1.0);
+                (self.state(s).population < wants).then(|| format!("{} has not the people for an Army: it takes {}", self.tables.state(s).name, self.army_people_text(place)))
             }
-            if cost.fuel > left.fuel {
-                return fail(format!("needs {} Fuel, {} left", cost.fuel, left.fuel));
-            }
-            if cost.energy > left.energy {
-                return fail(format!("needs {} Energy, {} left", cost.energy, left.energy));
-            }
-            if cost.influence > influence_left {
-                return fail(format!("needs {} Influence, {} left", cost.influence, influence_left));
-            }
-            if cost.ducats > left.ducats {
-                return fail(format!("needs {} Ducats, {} left", cost.ducats, left.ducats));
+            Place::Colony(c) => {
+                let col = self.colony(c)?;
+                let each = self.tables.army.colonists_each;
+                (col.colonists < each + 1).then(|| format!("a Colony keeps at least one Colonist; an Army takes {}", self.army_people_text(place)))
             }
         }
+    }
+
+    /// Ticket #334: the people a raise at this place takes, in words for the card and the Report:
+    /// `1M people` in a Region, `one Colonist` at a Colony.
+    pub fn army_people_text(&self, place: Place) -> String {
+        match place {
+            Place::State(_) => format!("{} people", self.tables.people_text(self.tables.army.population_each)),
+            Place::Colony(_) => match self.tables.army.colonists_each {
+                1 => "one Colonist".to_string(),
+                n => format!("{n} Colonists"),
+            },
+        }
+    }
+
+    /// Ticket #339 (version 0.09.0): **the rule first, the price last.** This tested affordability
+    /// before it tested anything else, so an order that was forbidden AND unaffordable was told
+    /// what it cost and never told it was forbidden: a player saved for a Factory they were never
+    /// going to be allowed to build. The fog was carried on four wayfinder maps from #230, and this
+    /// version added three refusals of its own to get wrong.
+    ///
+    /// The legality of the order is the most specific thing that can be said about it, so it is
+    /// asked first; the price is asked only of an order that is legal. Nothing about WHICH orders
+    /// pass changes -- both questions are still asked of every order -- so the computer seats are
+    /// filtered exactly as they were; only the sentence a refusal carries moves.
+    fn check_order_inner(&self, seat: Seat, pending: &[Order], order: &Order, enforce_cost: bool) -> Result<Cost, OrderError> {
+        let cost = self.check_order_rules(seat, pending, order)?;
+        if !enforce_cost {
+            return Ok(cost);
+        }
+        let (left, influence_left) = self.remaining(seat, pending);
+        if cost.materials > left.materials {
+            return fail(format!("needs {} Materials, {} left", cost.materials, left.materials));
+        }
+        if cost.fuel > left.fuel {
+            return fail(format!("needs {} Fuel, {} left", cost.fuel, left.fuel));
+        }
+        if cost.energy > left.energy {
+            return fail(format!("needs {} Energy, {} left", cost.energy, left.energy));
+        }
+        if cost.influence > influence_left {
+            return fail(format!("needs {} Influence, {} left", cost.influence, influence_left));
+        }
+        if cost.ducats > left.ducats {
+            return fail(format!("needs {} Ducats, {} left", cost.ducats, left.ducats));
+        }
+        Ok(cost)
+    }
+
+    /// Ticket #339 (version 0.09.0): is the order legal at all, price aside? The half of the check
+    /// that names a RULE. Every arm returns the order's cost so the caller above can price it.
+    fn check_order_rules(&self, seat: Seat, pending: &[Order], order: &Order) -> Result<Cost, OrderError> {
+        let cost = self.order_cost(seat, order);
         match order {
             Order::BuyInfluence { amount } => {
                 if *amount <= 0 {
@@ -558,7 +653,9 @@ impl Game {
                 if !matches!(resource, Resource::Materials | Resource::Fuel) {
                     return fail("the window buys only Materials and Fuel");
                 }
-                // The affordability check above already refused a lot larger than what is left.
+                // Ticket #339 (version 0.09.0): a lot larger than what is left is refused by the
+                // affordability check, which runs AFTER this one now and says "needs N Materials,
+                // M left" -- the same sentence it said when it ran first.
                 Ok(cost)
             }
             Order::BuildFacilityWithDucats { state, kind } => {
@@ -568,6 +665,22 @@ impl Game {
             Order::BuildModuleWithDucats { colony, kind } => {
                 let materials_form = Order::BuildModule { colony: *colony, kind: *kind };
                 self.check_order_inner(seat, pending, &materials_form, false).map(|_| cost)
+            }
+            // Ticket #332 (version 0.09.0): legal on a place the seat directs, at a build in its
+            // queue that another seat began. One a turn at a place, so the index a second cancel
+            // names is still the build it named.
+            Order::CancelBuild { place, index } => {
+                if !self.directs(seat, *place) {
+                    return fail("you do not direct this place");
+                }
+                let Some(b) = self.queue_at(*place).get(*index) else { return fail("no such build under way here") };
+                if b.seat == seat {
+                    return fail("a build of your own is not cancelled; take back this turn's order instead");
+                }
+                if pending.iter().any(|o| matches!(o, Order::CancelBuild { place: p, .. } if p == place)) {
+                    return fail("one cancel a turn at a place");
+                }
+                Ok(cost)
             }
             Order::SetMaxStanding { target } => {
                 if pending.iter().any(|o| matches!(o, Order::SetMaxStanding { .. })) {
@@ -861,10 +974,13 @@ impl Game {
                 // Ticket #185 (version 0.08.0): and an Institute, since a station carries Observatories
                 // and the Institute is what multiplies them.
                 // Ticket #324 (version 0.08.8): and Batteries.
+                // Ticket #332 (version 0.09.0): and the Factory Module, since the designer's word was
+                // that a station has a Widget maker of its own; without it a station's Core made
+                // one Widget a turn for the whole game and a Shipyard there took eight turns.
                 if col.in_orbit
-                    && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Academy | ModuleKind::Battery)
+                    && !matches!(kind, ModuleKind::Shipyard | ModuleKind::Habitat | ModuleKind::Observatory | ModuleKind::SolarArray | ModuleKind::TradePost | ModuleKind::Institute | ModuleKind::Academy | ModuleKind::Battery | ModuleKind::Factory)
                 {
-                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays, a Trade Post, an Institute and Batteries");
+                    return fail("a station holds only a Shipyard, Habitats, Observatories, Solar Arrays, a Trade Post, an Institute, Batteries and Factories");
                 }
                 // Ticket #186 (version 0.08.0): nobody but the Custodians builds an Academy off
                 // Earth either, captured ones included.
@@ -970,6 +1086,11 @@ impl Game {
                         }
                     }
                 }
+                // Ticket #334 (version 0.09.0): an Army is raised from people, and the people are
+                // checked after everything else so the refusal a player reads is the one that binds.
+                if let Some(why) = self.army_people_refusal(pending, *place) {
+                    return fail(why);
+                }
                 Ok(cost)
             }
             Order::Repair { unit, points } => {
@@ -989,7 +1110,7 @@ impl Game {
                         if !self.has_repair_yard(seat, body) {
                             return fail("needs a Launch Site or Shipyard at this Body");
                         }
-                        if pending.iter().any(|o| matches!(o, Order::Transit { ship: s, .. } if s == id)) {
+                        if pending.iter().any(|o| matches!(o, Order::Transit { ship: s, .. } | Order::ChangeOrbit { ship: s, .. } if s == id)) {
                             return fail("a Ship cannot repair and move in one turn");
                         }
                     }
@@ -1053,7 +1174,7 @@ impl Game {
                 if s.arrived_this_turn {
                     return fail("arrived this turn; it may act next turn");
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } if x == ship)) {
+                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 // Ticket #99 (version 0.07.0): the Orbital Slot it arrives into, chosen with the leg.
@@ -1070,6 +1191,36 @@ impl Game {
                 }
                 Ok(cost)
             }
+            // Ticket #335 (version 0.09.0): an orbit change, at a Body, to an orbit of that Body
+            // that exists and is not the one the Ship is in, for the tank's `orbit_change_fuel`.
+            Order::ChangeOrbit { ship, slot } => {
+                let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
+                if s.seat != seat {
+                    return fail("not your Ship");
+                }
+                let ShipAt::Body(body) = s.at else { return fail("a Ship in transit is between orbits") };
+                let want = Orbit::of(*slot);
+                if !self.orbit_exists(body, want) {
+                    let slots = self.tables.body(body).orbital_slots;
+                    return fail(format!("{} has low orbit and {} Orbital Slots, numbered 0 to {}", self.tables.body(body).name, slots, slots.saturating_sub(1)));
+                }
+                if self.ship_orbit(s) == want {
+                    return fail(format!("already in {}", self.orbit_name(body, want)));
+                }
+                if s.arrived_this_turn {
+                    return fail("arrived this turn; it may act next turn");
+                }
+                let fuel = self.tables.orbit_change_fuel;
+                if s.fuel < fuel {
+                    return fail(format!("the tank holds {} Fuel; an orbit change needs {fuel}", s.fuel));
+                }
+                if pending.iter().any(|o| {
+                    matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::Refuel { ship: x } | Order::Bombard { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)
+                }) {
+                    return fail("this Ship already has an order");
+                }
+                Ok(cost)
+            }
             Order::Refuel { ship } => {
                 let Some(s) = self.ship(*ship) else { return fail("no such Ship") };
                 if s.seat != seat {
@@ -1080,9 +1231,13 @@ impl Game {
                 if !self.refuel_station_at(seat, body) {
                     return fail(format!("no station of yours, or of a Refuel partner's, over {} to refuel at", self.tables.body(body).name));
                 }
-                // Ticket #99 (version 0.07.0): a blockaded station fuels nothing.
-                if !self.refuelling_station(seat, body) {
-                    return fail(format!("every station over {} you could refuel at is blockaded", self.tables.body(body).name));
+                // Ticket #99 (version 0.07.0): a blockaded station fuels nothing. Ticket #335
+                // (version 0.09.0): nor does one in another orbit -- a station's own orbit is what
+                // touches that station, refuelling included, so a Ship in low orbit or at another
+                // station's ring fuels at nothing until it has changed orbit. One rule, one refusal.
+                let orbit = self.ship_orbit(s);
+                if !self.refuelling_station(seat, body, orbit) {
+                    return fail(format!("no station fuels a Ship in {}: it is in another orbit, or blockaded", self.orbit_name(body, orbit)));
                 }
                 if s.fuel >= self.tables.unit(s.kind).tank {
                     return fail("the tank is full");
@@ -1090,7 +1245,7 @@ impl Game {
                 if cost.fuel <= 0 {
                     return fail("no Fuel in the Stockpile to fill it with");
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Refuel { ship: x } if x == ship)) {
+                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Refuel { ship: x } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 Ok(cost)
@@ -1116,10 +1271,22 @@ impl Game {
                     Some(d) if d != seat => {}
                     _ => return fail("not a rival's Colony"),
                 }
-                if self.orbital_control(body) != Some(seat) {
-                    return fail(format!("you do not hold Orbital Control of {} outright", self.tables.body(body).name));
+                // Ticket #335 (version 0.09.0): **the orbit you are in is the orbit you must hold.**
+                // A Colony on the ground is broken from low orbit by a Faction holding Orbital
+                // Control there outright; a station from the station's own orbit, with no rival
+                // warship and no rival working Battery standing in it.
+                let orbit = self.colony_orbit(col);
+                if !self.ship_in_orbit(s, body, orbit) {
+                    return fail(format!("a Bombard is given from {}", self.orbit_name(body, orbit)));
                 }
-                if pending.iter().any(|o| matches!(o, Order::Bombard { ship: x, .. } | Order::Transit { ship: x, .. } if x == ship)) {
+                if orbit.is_low() {
+                    if self.orbital_control(body) != Some(seat) {
+                        return fail(format!("you do not hold Orbital Control of {} outright", self.tables.body(body).name));
+                    }
+                } else if !self.orbit_uncontested(seat, body, orbit) {
+                    return fail(format!("a rival still stands in {}", self.orbit_name(body, orbit)));
+                }
+                if pending.iter().any(|o| matches!(o, Order::Bombard { ship: x, .. } | Order::Transit { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 Ok(cost)
@@ -1132,18 +1299,20 @@ impl Game {
                 if *stance == Stance::DigIn {
                     return fail("a Ship cannot dig in");
                 }
-                // Ticket #278 (version 0.08.5): a Blockade is chosen against a slot, so it wants a
-                // warship of the seat's sitting in an Orbital Slot that is not its own station's --
-                // a rival's, or an empty one held against a builder.
+                // Ticket #278 (version 0.08.5): a Blockade is chosen against a place, so it wants a
+                // warship of the seat's sitting in an orbit it may shut. Ticket #335 (version
+                // 0.09.0): **the orbit it is given in** -- LOW ORBIT, which starves the ground
+                // under an outright Orbital Control, or an Orbital Slot that is not its own
+                // station's: a rival's, or an empty one held against a builder.
                 if *stance == Stance::Blockade
                     && !self.ships.iter().any(|s| {
                         s.seat == seat
                             && s.at == ShipAt::Body(*body)
                             && s.kind.is_warship()
-                            && s.slot.is_some_and(|sl| self.station_at(*body, sl).is_none_or(|c| c.control.director() != Some(seat)))
+                            && s.slot.is_none_or(|sl| self.station_at(*body, sl).is_none_or(|c| c.control.director() != Some(seat)))
                     })
                 {
-                    return fail("no warship of yours sits in a slot to blockade here");
+                    return fail("no warship of yours sits in an orbit to blockade here");
                 }
                 Ok(cost)
             }
@@ -1203,7 +1372,7 @@ impl Game {
                 if s.colonists + *colonists > capacity {
                     return fail(format!("this Ship carries at most {capacity} Colonists"));
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } if x == ship)) {
+                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 if *colonists > 0 {
@@ -1224,11 +1393,22 @@ impl Game {
                             if self.state(*st).emigrants < *colonists {
                                 return fail(format!("only {} Pioneers are waiting there", self.state(*st).emigrants));
                             }
+                            // Ticket #335 (version 0.09.0): low orbit is what touches the ground, a
+                            // lift from a Launch Site included; a Ship at a station's ring is out
+                            // of the Launch Site's reach.
+                            if !self.ship_in_orbit(s, body, Orbit::Low) {
+                                return fail(format!("a lift from a Launch Site reaches {} alone", self.orbit_name(body, Orbit::Low)));
+                            }
                         }
                         LoadSource::Colony(c) => {
                             let Some(col) = self.colony(*c) else { return fail("no such Colony") };
                             if col.body != body || col.control.director() != Some(seat) {
                                 return fail("that Colony is not yours at this Body");
+                            }
+                            // Ticket #335 (version 0.09.0): a place is touched from its own orbit,
+                            // taking people off it as much as putting them on.
+                            if !self.ship_may_touch(s, col) {
+                                return fail(format!("{} is reached from {}", self.place_name(Place::Colony(*c)), self.orbit_name(body, self.colony_orbit(col))));
                             }
                             if col.colonists < *colonists {
                                 return fail("not enough Colonists there");
@@ -1261,13 +1441,16 @@ impl Game {
                     if matches!(a.home, ArmyHome::Colony(_)) {
                         return fail("a Colony's Army never leaves");
                     }
+                    // Ticket #335 (version 0.09.0): and the Ship is in the orbit that touches the
+                    // Army's place -- low orbit for a Region or a Colony on the ground, a station's
+                    // own orbit for an Army aboard that station.
                     let here = match a.at {
-                        ArmyAt::Place(Place::State(_)) => body == BodyId::Earth,
-                        ArmyAt::Place(Place::Colony(c)) => self.colony(c).map(|c| c.body == body).unwrap_or(false),
+                        ArmyAt::Place(Place::State(_)) => body == BodyId::Earth && self.ship_in_orbit(s, body, Orbit::Low),
+                        ArmyAt::Place(Place::Colony(c)) => self.colony(c).map(|c| c.body == body && self.ship_may_touch(s, c)).unwrap_or(false),
                         ArmyAt::Aboard(_) => false,
                     };
                     if !here {
-                        return fail("that Army is not at this Body");
+                        return fail("that Army is not at this Body, or not in this Ship's orbit");
                     }
                 }
                 Ok(cost)
@@ -1287,13 +1470,18 @@ impl Game {
                 if *colonists == 0 && !*army {
                     return fail("nothing to unload");
                 }
-                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } if x == ship)) {
+                if pending.iter().any(|o| matches!(o, Order::Transit { ship: x, .. } | Order::Load { ship: x, .. } | Order::Unload { ship: x, .. } | Order::ChangeOrbit { ship: x, .. } if x == ship)) {
                     return fail("this Ship already has an order");
                 }
                 match into {
                     UnloadTarget::Slot(b, slot) => {
                         if *b != body {
                             return fail("that slot is not at this Body");
+                        }
+                        // Ticket #335 (version 0.09.0): founding a Colony is touching the ground,
+                        // and low orbit is what touches the ground.
+                        if !self.ship_in_orbit(s, body, Orbit::Low) {
+                            return fail(format!("a Colony is founded from {}", self.orbit_name(body, Orbit::Low)));
                         }
                         if s.kind != UnitKind::ColonyShip || *colonists == 0 {
                             return fail("only a Colony Ship with Colonists founds a Colony");
@@ -1310,6 +1498,11 @@ impl Game {
                         let Some(col) = self.colony(*c) else { return fail("no such Colony") };
                         if col.body != body {
                             return fail("that Colony is not at this Body");
+                        }
+                        // Ticket #335 (version 0.09.0): a station is unloaded into from its own
+                        // orbit, a Colony on the ground from low orbit.
+                        if !self.ship_may_touch(s, col) {
+                            return fail(format!("{} is reached from {}", self.place_name(Place::Colony(*c)), self.orbit_name(body, self.colony_orbit(col))));
                         }
                         if *colonists > 0 {
                             if col.control.director() != Some(seat) {
@@ -1633,6 +1826,13 @@ impl Game {
         Ok(())
     }
 
+    /// Ticket #332 (version 0.09.0): what a `CancelBuild` at this place and index would pay the
+    /// canceller: the item's Materials at the canceller's own price, or nought if there is no
+    /// such build. The check refuses the order in that case; this only prices it.
+    pub fn cancel_refund(&self, seat: Seat, place: Place, index: usize) -> i64 {
+        self.queue_at(place).get(index).map(|b| self.item_materials(seat, place, b.item)).unwrap_or(0)
+    }
+
     /// Pay for and record every order of a seat at End Turn (spec 7.3: costs are paid at once).
     pub fn commit_orders(&mut self, seat: Seat, orders: &[Order]) {
         for order in orders {
@@ -1653,26 +1853,32 @@ impl Game {
                     // orders the common building gets its own Unique Facility for that job at the
                     // same price; a Faction that has none for that job gets what it asked for.
                     let kind = kind.built_by(self.kind(seat));
-                    let due = turn + self.tables.facility(kind).build_turns - 1;
+                    // Ticket #332 (version 0.09.0): the build carries its Widget figure at the
+                    // seat's discount, and an outright buy in Ducats starts DONE, so it completes at
+                    // the next Resolution ahead of the queue whatever its figure.
+                    let widgets = self.build_widgets(seat, BuildItem::Facility(kind));
+                    let done = if matches!(order, Order::BuildFacilityWithDucats { .. }) { widgets } else { 0 };
                     // Ticket #56: the build reserves the slot it will stand in, coastal or inland.
                     let coastal = self.next_slot_is_coastal(*state, kind, 0, 0).unwrap_or(false);
-                    self.state_mut(*state).queue.push(Build { item: BuildItem::Facility(kind), seat, due_turn: due, coastal });
+                    self.state_mut(*state).queue.push(Build { item: BuildItem::Facility(kind), seat, widgets, done, coastal });
                 }
                 Order::RaiseIndustry { state } => {
-                    let due = turn + self.tables.industry_level.build_turns - 1;
-                    self.state_mut(*state).queue.push(Build { item: BuildItem::IndustryLevel, seat, due_turn: due, coastal: false });
+                    let widgets = self.build_widgets(seat, BuildItem::IndustryLevel);
+                    self.state_mut(*state).queue.push(Build { item: BuildItem::IndustryLevel, seat, widgets, done: 0, coastal: false });
                 }
                 Order::BuildModule { colony, kind } | Order::BuildModuleWithDucats { colony, kind } => {
                     // Ticket #186: as on Earth -- the Custodians' Institute order raises an Academy.
                     let kind = kind.built_by(self.kind(seat));
-                    let due = turn + self.tables.module(kind).build_turns - 1;
+                    // Ticket #332: as a Facility; a Ducat buy starts done.
+                    let widgets = self.build_widgets(seat, BuildItem::Module(kind));
+                    let done = if matches!(order, Order::BuildModuleWithDucats { .. }) { widgets } else { 0 };
                     if let Some(c) = self.colony_mut(*colony) {
-                        c.queue.push(Build { item: BuildItem::Module(kind), seat, due_turn: due, coastal: false });
+                        c.queue.push(Build { item: BuildItem::Module(kind), seat, widgets, done, coastal: false });
                     }
                 }
                 Order::BuildShip { site, kind } => {
-                    let due = turn + self.tables.unit(*kind).build_turns - 1;
-                    let b = Build { item: BuildItem::Unit(*kind), seat, due_turn: due, coastal: false };
+                    let widgets = self.build_widgets(seat, BuildItem::Unit(*kind));
+                    let b = Build { item: BuildItem::Unit(*kind), seat, widgets, done: 0, coastal: false };
                     match site {
                         Place::State(s) => self.state_mut(*s).queue.push(b),
                         Place::Colony(c) => {
@@ -1683,15 +1889,47 @@ impl Game {
                     }
                 }
                 Order::BuildArmy { place } => {
-                    let due = turn + self.tables.unit(UnitKind::Army).build_turns - 1;
-                    let b = Build { item: BuildItem::Unit(UnitKind::Army), seat, due_turn: due, coastal: false };
+                    let widgets = self.build_widgets(seat, BuildItem::Unit(UnitKind::Army));
+                    let b = Build { item: BuildItem::Unit(UnitKind::Army), seat, widgets, done: 0, coastal: false };
+                    // Ticket #334 (version 0.09.0): the people go under arms at the order, as a
+                    // Pioneer's population is paid at the recruit: a Region's unit of population, a
+                    // Colony's Colonist. Nobody returns when the Army dies or marches.
+                    let people = self.army_people_text(*place);
                     match place {
-                        Place::State(s) => self.state_mut(*s).queue.push(b),
+                        Place::State(s) => {
+                            let each = self.tables.army.population_each;
+                            self.state_mut(*s).population = (self.state(*s).population - each).max(0.0);
+                            self.state_mut(*s).queue.push(b)
+                        }
                         Place::Colony(c) => {
+                            let each = self.tables.army.colonists_each;
                             if let Some(c) = self.colony_mut(*c) {
+                                c.colonists = c.colonists.saturating_sub(each);
                                 c.queue.push(b)
                             }
                         }
+                    }
+                    let line = format!("An Army began at {} for the {}: {} under arms.", self.place_name(*place), self.seat_name(seat), people);
+                    self.log(line);
+                    let text = self.say("army_ordered", &[("place", self.place_name(*place)), ("people", people)]);
+                    self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some((*place).into()), text);
+                }
+                // Ticket #332 (version 0.09.0): the build goes, its Widgets done with it; the refund
+                // was credited above as this order's (negative) cost, and the Report names it.
+                Order::CancelBuild { place, index } => {
+                    let removed = match place {
+                        Place::State(s) => {
+                            let q = &mut self.state_mut(*s).queue;
+                            (*index < q.len()).then(|| q.remove(*index))
+                        }
+                        Place::Colony(c) => self.colony_mut(*c).and_then(|c| (*index < c.queue.len()).then(|| c.queue.remove(*index))),
+                    };
+                    if let Some(b) = removed {
+                        let refund = -cost.materials;
+                        let (who, name, at) = (self.seat_name(seat), b.item.name(), self.place_name(*place));
+                        self.log(format!("{who} cancelled the {name} under way at {at}: {refund} Materials to their Stockpile."));
+                        let text = self.say("build_cancelled", &[("faction", who), ("building", name), ("place", at), ("refund", refund.to_string())]);
+                        self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some((*place).into()), text);
                     }
                 }
                 Order::Repair { unit, points } => self.pending.repairs.push((seat, *unit, *points)),
@@ -1709,10 +1947,30 @@ impl Game {
                     if let Some(s) = self.ship_mut(*ship) {
                         s.at = ShipAt::Transit { from, to: *to, turns_left: turns };
                         s.fuel = (s.fuel - fuel).max(0);
-                        // Ticket #99: it arrives into the slot the leg named, or the Body at large.
+                        // Ticket #99: it arrives into the orbit the leg named. Ticket #335
+                        // (version 0.09.0): a leg that names none arrives in LOW ORBIT, which is
+                        // what `None` has always meant and is now drawn and named.
                         s.slot = *slot;
                     }
                     self.log(format!("{} launches {} toward {} ({} turns, {} Fuel from the tank).", self.seat_name(seat), ship, name, turns, fuel));
+                }
+                // Ticket #335 (version 0.09.0): the Fuel leaves the tank now, as a transit's does,
+                // and the Ship moves at the Resolution WITH the transits, before the Battles, so a
+                // Ship that changes orbit fights in its new one.
+                Order::ChangeOrbit { ship, slot } => {
+                    let fuel = self.tables.orbit_change_fuel;
+                    let body = self.ship(*ship).and_then(|s| match s.at {
+                        ShipAt::Body(b) => Some(b),
+                        _ => None,
+                    });
+                    if let Some(s) = self.ship_mut(*ship) {
+                        s.fuel = (s.fuel - fuel).max(0);
+                    }
+                    self.pending.orbit_changes.push((seat, *ship, *slot));
+                    if let Some(b) = body {
+                        let to = self.orbit_name(b, Orbit::of(*slot));
+                        self.log(format!("{} moves {} to {} ({} Fuel from the tank).", self.seat_name(seat), ship, to, fuel));
+                    }
                 }
                 // Ticket #87: the Fuel came out of the Stockpile with the order's cost; it goes into the tank.
                 Order::Refuel { ship } => {
@@ -1738,6 +1996,11 @@ impl Game {
                     }
                     if *stance == Stance::Attack {
                         self.pending.attack_sequence += 1;
+                    }
+                    // Ticket #335 (version 0.09.0): counted, so the sweep can say how often a
+                    // Blockade is given now that a human can give one at all.
+                    if *stance == Stance::Blockade {
+                        self.war.blockades_ordered[seat.index()] += 1;
                     }
                 }
                 Order::ArmyStance { place, stance } => {
@@ -1785,11 +2048,12 @@ impl Game {
                 }
                 Order::BuildStation { body, slot } => self.pending.stations.push((seat, *body, *slot)),
                 Order::BuildArchive { colony } => {
-                    // Ticket #68: the Module rises in the Colony's queue like any other build, three
-                    // turns from its own row; the Research is paid into the fund once it stands.
-                    let due = turn + self.tables.module(ModuleKind::Archive).build_turns - 1;
+                    // Ticket #68: the Module rises in the Colony's queue like any other build, from
+                    // its own row (ticket #332: twelve Widgets, its three turns times four); the
+                    // Research is paid into the fund once it stands.
+                    let widgets = self.build_widgets(seat, BuildItem::Module(ModuleKind::Archive));
                     if let Some(c) = self.colony_mut(*colony) {
-                        c.queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat, due_turn: due, coastal: false });
+                        c.queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat, widgets, done: 0, coastal: false });
                     }
                     let line = format!("The {} began the Archive at {}.", self.seat_name(seat), self.place_name(Place::Colony(*colony)));
                     self.log(line);
@@ -1920,8 +2184,9 @@ impl Game {
                     let cut = self.tables.climate.leapfrog_baseline_cut;
                     self.state_mut(*state).leapfrog += per;
                     self.state_mut(*state).baseline_cut += cut;
-                    // Ticket #143 (version 0.07.3): the rate is quoted per hundred million, twenty units.
-                    let per_hundred_million = self.population_coefficient(*state) * Game::UNITS_PER_HUNDRED_MILLION;
+                    // Ticket #143 (version 0.07.3): the rate is quoted per hundred million, twenty units
+                    // then; a hundred since ticket #333 (version 0.09.0), the same figure printed.
+                    let per_hundred_million = self.population_coefficient(*state) * self.tables.units_per_hundred_million();
                     let line = format!("The {} Leapfrogged {}: its people now emit {:.2} per hundred million.", self.seat_name(seat), self.tables.state(*state).name, per_hundred_million);
                     self.log(line);
                     let text = self.say(
@@ -2078,6 +2343,69 @@ pub fn merged_for_report(list: &[Order]) -> Vec<Order> {
 }
 
 impl Game {
+    // ------------------------------------------------------------------ ticket #339: the eye
+
+    /// Ticket #339 (version 0.09.0): **a Relay or an Embassy is an EYE.** The designer's words:
+    /// *"its holder reads a rival's building-by-building income at that Body"*, which the Faction
+    /// window withholds today. One eye a Body: off Earth a working Relay at a Colony or a station
+    /// the seat directs, on Earth a working Embassy in a Region it directs -- the two Influence
+    /// buildings, each in the half of the board it belongs to, so a Faction that has paid to be
+    /// heard at a place also gets to listen there.
+    ///
+    /// A Unique that does a Relay's or an Embassy's job counts, as it does for every other rule
+    /// that reads a job rather than a kind; a mothballed or dark one is not watching.
+    pub fn has_eye(&self, seat: Seat, body: BodyId) -> bool {
+        match body {
+            BodyId::Earth => StateId::ALL.into_iter().any(|s| {
+                self.state(s).control.director() == Some(seat)
+                    && self.state(s).facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::Embassy) && f.working())
+            }),
+            b => self.colonies.iter().any(|c| {
+                c.body == b
+                    && c.control.director() == Some(seat)
+                    && c.modules.iter().any(|m| m.kind.does_the_job_of(ModuleKind::Relay) && m.working())
+            }),
+        }
+    }
+
+    /// Ticket #339: has this seat an eye on the Body this place belongs to? The question the
+    /// interface asks of one card before it draws the rival's figures on it.
+    pub fn has_eye_at(&self, seat: Seat, place: Place) -> bool {
+        self.body_of(place).is_some_and(|b| self.has_eye(seat, b))
+    }
+
+    /// Ticket #339: which Body a place belongs to -- a Region is Earth's.
+    pub fn body_of(&self, place: Place) -> Option<BodyId> {
+        match place {
+            Place::State(_) => Some(BodyId::Earth),
+            Place::Colony(c) => self.colony(c).map(|c| c.body),
+        }
+    }
+
+    /// Ticket #339: what the eye reads at one place -- the rival director's buildings there, in the
+    /// order they stand, each with the figures that director draws from it this turn. `None` where
+    /// the seat has no eye on that Body, where the place is nobody's, or where it is the seat's
+    /// own, since a seat reads its own income on the card already.
+    ///
+    /// The yields are the Income phase's own (`facility_yield`, `module_yield_at`), read for the
+    /// DIRECTOR and not for the watcher, so the Faction multipliers, the Techs and the Custodians'
+    /// doubling are the rival's and the figure is the one the rival is actually paid.
+    pub fn eye_income(&self, seat: Seat, place: Place) -> Option<Vec<(String, crate::economy::Yield)>> {
+        let director = self.place_control(place).director()?;
+        if director == seat || !self.has_eye_at(seat, place) {
+            return None;
+        }
+        Some(match place {
+            Place::State(s) => {
+                self.state(s).facilities.iter().map(|f| (f.kind.name().to_string(), self.facility_yield(director, s, f.kind))).collect()
+            }
+            Place::Colony(c) => {
+                let col = self.colony(c)?;
+                col.modules.iter().enumerate().map(|(i, m)| (m.kind.name().to_string(), self.module_yield_at(director, c, i))).collect()
+            }
+        })
+    }
+
     /// Ticket #58: one clause saying what a rival Faction did with one order it committed. Only
     /// what the board or its cards would show: nothing the AI scored, waited for or skipped. `None`
     /// for an order that leaves no visible mark.
@@ -2094,10 +2422,12 @@ impl Game {
                 }
             }
         };
+        // Ticket #339 (version 0.09.0): an Army in a rival's paragraph is named, as a Ship is.
+        let army_of = |id: ArmyId| -> String { self.army(id).map(|a| self.army_name(a)).unwrap_or_else(|| "an Army".to_string()) };
         let unit_of = |u: UnitRef| -> String {
             match u {
                 UnitRef::Ship(id) => self.ship(id).map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into()),
-                UnitRef::Army(_) => "an Army".to_string(),
+                UnitRef::Army(id) => army_of(id),
                 UnitRef::Battery { .. } => "a Battery".to_string(),
             }
         };
@@ -2116,7 +2446,14 @@ impl Game {
                 r("build_module_ducats", &[("building", kind.name().to_string()), ("colony", place(Place::Colony(*colony)))])
             }
             Order::BuildShip { site, kind } => r("build_ship", &[("unit", kind.name().to_string()), ("place", place(*site))]),
-            Order::BuildArmy { place: p } => r("build_army", &[("place", place(*p))]),
+            // Ticket #334 (version 0.09.0): and the people it took.
+            Order::BuildArmy { place: p } => r("build_army", &[("place", place(*p)), ("people", self.army_people_text(*p))]),
+            // Ticket #332 (version 0.09.0): told before the order commits, so the index still names
+            // the build.
+            Order::CancelBuild { place: p, index } => {
+                let building = self.queue_at(*p).get(*index).map(|b| b.item.name()).unwrap_or_else(|| "build".to_string());
+                r("cancel_build", &[("building", building), ("place", place(*p))])
+            }
             Order::BuildStation { body, .. } => r("build_station", &[("body", self.tables.body(*body).name.clone())]),
             // Ticket #87.
             Order::Refuel { ship } => {
@@ -2138,6 +2475,16 @@ impl Game {
                 let unit = self.ship(*ship).map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into());
                 r("transit", &[("unit", unit), ("body", self.tables.body(*to).name.clone())])
             }
+            // Ticket #335 (version 0.09.0): the orbit change reads as the orbit it ends in.
+            Order::ChangeOrbit { ship, slot } => {
+                let s = self.ship(*ship);
+                let unit = s.map(|s| s.kind.name().to_string()).unwrap_or_else(|| "Ship".into());
+                let orbit = match s.map(|s| s.at) {
+                    Some(ShipAt::Body(b)) => self.orbit_name(b, Orbit::of(*slot)),
+                    _ => "another orbit".to_string(),
+                };
+                r("change_orbit", &[("unit", unit), ("orbit", orbit)])
+            }
             // Ticket #106 (version 0.07.0): a rival's paragraph does not report defaults. Hold is
             // what a stack does when nobody tells it otherwise, so "set its Armies at X to Hold" is
             // the computer announcing that it did nothing. Five of the nine clauses in one sampled
@@ -2149,8 +2496,9 @@ impl Game {
                 r("ship_stance", &[("body", self.tables.body(*body).name.clone()), ("stance", stance.name().to_string())])
             }
             Order::ArmyStance { place: p, stance } => r("army_stance", &[("place", place(*p)), ("stance", stance.name().to_string())]),
-            Order::MoveArmy { to, .. } => r("move_army", &[("state", self.tables.state(*to).name.clone())]),
-            Order::Load { colonists, from, .. } => {
+            // Ticket #339 (version 0.09.0): the march and the loading name the Army.
+            Order::MoveArmy { army, to } => r("move_army", &[("army", army_of(*army)), ("state", self.tables.state(*to).name.clone())]),
+            Order::Load { colonists, from, army, .. } => {
                 let where_ = match from {
                     LoadSource::State(s) => self.tables.state(*s).name.clone(),
                     LoadSource::Colony(c) => place(Place::Colony(*c)),
@@ -2158,7 +2506,7 @@ impl Game {
                 if *colonists > 0 {
                     r("load_colonists", &[("n", colonists.to_string()), ("place", where_)])
                 } else {
-                    r("load_army", &[("place", where_)])
+                    r("load_army", &[("army", army.map(army_of).unwrap_or_else(|| "an Army".to_string())), ("place", where_)])
                 }
             }
             Order::Unload { into, .. } => {

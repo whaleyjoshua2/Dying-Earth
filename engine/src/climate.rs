@@ -228,6 +228,9 @@ impl Game {
                     // the job it does, so a Reactor's Emissions are Power Plant Emissions.
                     match f.kind.common().unwrap_or(f.kind) {
                         FacilityKind::Factory => b.factories += e * fr_mult,
+                        // Ticket #332 (version 0.09.0): a Mine emits its full figure -- Clean
+                        // Manufacturing stays with the Factory -- and is counted on the industry line.
+                        FacilityKind::Mine => b.factories += e,
                         FacilityKind::Refinery => b.refineries += e * fr_mult,
                         FacilityKind::PowerPlant => b.power_plants += e * pp_mult,
                         _ => {}
@@ -244,11 +247,14 @@ impl Game {
                     let e = t.facility(f.kind).emissions * if self.facilities_at_half(st.id) { 0.5 } else { 1.0 };
                     let charged = match f.kind.common().unwrap_or(f.kind) {
                         FacilityKind::Factory | FacilityKind::Refinery => e * fr_mult * m,
+                        // Ticket #332 (version 0.09.0): the Mine's smoke is the Factory's old smoke
+                        // with no Tech to thin it; Clean Manufacturing follows the Factory.
+                        FacilityKind::Mine => e * m,
                         FacilityKind::PowerPlant => e * pp_mult * m,
                         _ => 0.0,
                     };
                     match f.kind.common().unwrap_or(f.kind) {
-                        FacilityKind::Factory => b.factories += charged,
+                        FacilityKind::Factory | FacilityKind::Mine => b.factories += charged,
                         FacilityKind::PowerPlant => b.power_plants += charged,
                         FacilityKind::Refinery => b.refineries += charged,
                         _ => {}
@@ -270,12 +276,14 @@ impl Game {
             for md in col.modules.iter().filter(|md| md.working()) {
                 let e = t.module(md.kind).earth_emissions;
                 let charged = match md.kind {
-                    ModuleKind::Mine | ModuleKind::Refinery => e * fr_mult * m,
+                    // Ticket #332 (version 0.09.0): a Factory Module in Antarctica emits as the
+                    // Facility does, Clean Manufacturing reaching it.
+                    ModuleKind::Mine | ModuleKind::Refinery | ModuleKind::Factory => e * fr_mult * m,
                     ModuleKind::Generator => e * pp_mult * m,
                     _ => 0.0,
                 };
                 match md.kind {
-                    ModuleKind::Mine => b.factories += charged,
+                    ModuleKind::Mine | ModuleKind::Factory => b.factories += charged,
                     ModuleKind::Generator => b.power_plants += charged,
                     ModuleKind::Refinery => b.refineries += charged,
                     _ => {}

@@ -123,6 +123,8 @@ fn main() {
                         let mut walls_standing = 0u32;
                         let mut walls_held = 0u32;
                         let mut no_target = 0u32;
+                        // Ticket #337 (version 0.09.0): the choice cards, by seat.
+                        let (mut took, mut refused, mut not_asked) = ([0u32; 4], [0u32; 4], [0u32; 4]);
                         let mut fund_met = 0u32;
                         let mut rel_end: Vec<i64> = Vec::new();
                         let mut rel_floored = 0u32;
@@ -141,6 +143,12 @@ fn main() {
                         let mut research_off_earth: [Vec<u32>; 4] = Default::default();
                         // Ticket #82: Module-turns doubled by an idle Facility on Earth, per seat.
                         let mut doubled_turns: [Vec<u32>; 4] = Default::default();
+                        // Ticket #332 (version 0.09.0): Widgets made, applied and lost a game, per
+                        // seat, and each game's median queue depth at Resolution.
+                        let mut widgets_made: [Vec<u32>; 4] = Default::default();
+                        let mut widgets_applied: [Vec<u32>; 4] = Default::default();
+                        let mut widgets_lost: [Vec<u32>; 4] = Default::default();
+                        let mut queue_depths: Vec<u32> = Vec::new();
                         // Ticket #84: the turn each seat's Victory gate completed, over the seeds it did.
                         let mut gate_turns: [Vec<u32>; 4] = Default::default();
                         // Ticket #86: Colonists lost in transit to crowding, per seat, over the batch.
@@ -156,6 +164,8 @@ fn main() {
                         // Ticket #241 (version 0.08.3): the figures 0.08.2 named as missing, and this
                         // version's own.
                         let (mut d_made, mut d_spent): (Vec<[i64; 4]>, Vec<[i64; 4]>) = (vec![], vec![]);
+                        let mut m_made: Vec<[i64; 4]> = vec![];
+                        let (mut mines_done, mut factories_done) = (0u32, 0u32);
                         let mut d_mean: Vec<[f64; 4]> = vec![];
                         let mut d_below = [0u32; 4];
                         let (mut ex_calls, mut ex_pioneers, mut acc_struck) = (0u32, 0u32, 0u32);
@@ -221,12 +231,16 @@ fn main() {
                                 observatories[s] += r.observatories[s];
                                 research_off_earth[s].push(r.research_off_earth[s].max(0) as u32);
                                 doubled_turns[s].push(r.doubled_module_turns[s].max(0) as u32);
+                                widgets_made[s].push(r.widgets_made[s].max(0) as u32);
+                                widgets_applied[s].push(r.widgets_applied[s].max(0) as u32);
+                                widgets_lost[s].push(r.widgets_lost[s].max(0) as u32);
                                 if let Some(t) = r.gate_turn[s] {
                                     gate_turns[s].push(t);
                                 }
                                 lost_in_transit[s] += r.lost_in_transit[s];
                                 stranded[s] += r.stranded_at_end[s];
                             }
+                            queue_depths.push(r.queue_depth_median);
                             refuels += r.refuels;
                             partner_refuels += r.partner_refuels;
                             stations_off_earth += r.stations_off_earth;
@@ -238,6 +252,9 @@ fn main() {
                             ground_colonies += r.ground_colonies;
                             solar_arrays += r.solar_arrays;
                             d_made.push(r.ducats_made);
+                            m_made.push(r.materials_made);
+                            mines_done += r.mines_completed;
+                            factories_done += r.factories_completed;
                             d_spent.push(r.ducats_spent);
                             d_mean.push(r.directive_mean);
                             ex_calls += r.exodus_calls;
@@ -275,6 +292,11 @@ fn main() {
                             walls_standing += r.sea_walls_standing;
                             walls_held += r.sea_walls_spent;
                             no_target += r.events_no_target;
+                            for i in 0..4 {
+                                took[i] += r.choice_taken[i];
+                                refused[i] += r.choice_refused[i];
+                                not_asked[i] += r.choice_not_asked[i];
+                            }
                             cards_drawn.push(r.cards_drawn);
                             war_nobody.push(r.war_ppm_nobody);
                             levies += r.levies_raised;
@@ -347,6 +369,14 @@ fn main() {
                                 "      Production Moved: median Module-turns doubled by an idle Facility a game, by seat {:?}",
                                 doubled_turns.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
                             );
+                            // Ticket #332 (version 0.09.0): Widgets, the work half of every build.
+                            println!(
+                                "      Widgets a game (median), by seat: made {:?}, applied {:?}, lost {:?}; median queue depth at Resolution {}",
+                                widgets_made.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>(),
+                                widgets_applied.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>(),
+                                widgets_lost.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>(),
+                                median_u(&mut queue_depths)
+                            );
                             println!(
                                 "      Victory gates: completed in {:?} seeds by seat, median turn {:?}",
                                 gate_turns.iter().map(|v| v.len()).collect::<Vec<_>>(),
@@ -366,6 +396,7 @@ fn main() {
                             let q_i = |v: &Vec<[i64; 4]>| [med_i(v, 0), med_i(v, 1), med_i(v, 2), med_i(v, 3)];
                             let mean_f = |v: &Vec<[f64; 4]>, seat: usize| if v.is_empty() { 0.0 } else { v.iter().map(|x| x[seat]).sum::<f64>() / v.len() as f64 };
                             println!("      Ducats over a game (median), by seat -- made {:?}, spent {:?}", q_i(&d_made), q_i(&d_spent));
+                            println!("      Materials income over a game (median), by seat {:?}; Mines completed over the batch {mines_done}, Factories {factories_done}", q_i(&m_made));
                             println!("      Research Directive: mean % KEPT BACK from the shared pot, by seat [{:.0}, {:.0}, {:.0}, {:.0}]; turns under an 85% contribution over the batch {:?}",
                                 mean_f(&d_mean, 0), mean_f(&d_mean, 1), mean_f(&d_mean, 2), mean_f(&d_mean, 3), d_below);
                             println!("      Accords STRUCK over the batch: {acc_struck} (against {accords} standing at the end)");
@@ -444,6 +475,9 @@ fn main() {
                             println!("      Neutral states: {levies} threat episodes armed for over the batch, {neutral_holds} attacks held against");
                             println!("      Sea Walls: {sea_walls} built over the batch, {walls_standing} standing at the end, {walls_held} thresholds held");
                             println!("      Events drawn with nowhere to land over the batch: {no_target}; the Fund at or past its bar in {fund_met}/{seeds} seeds");
+                            // Ticket #337 (version 0.09.0): what the eighteen cards that ask a
+                            // question were answered, by seat, over the batch.
+                            println!("      Choice cards over the batch, by seat: taken {took:?}, refused {refused:?}, not asked {not_asked:?}");
                             let floored_pct = if rel_end.is_empty() { 0.0 } else { rel_floored as f64 * 100.0 / rel_end.len() as f64 };
                             let mut sorted = rel_end.clone();
                             sorted.sort_unstable();
@@ -459,7 +493,19 @@ fn main() {
                                 accord_terms[0], accord_terms[1], accord_terms[2], accord_terms[3]
                             );
                             println!("      Trading window units, by seat: bought {bought:?}, sold {sold:?}");
+                            // Ticket #336 (version 0.09.0): the total, and under it the split the
+                            // doubling off Earth is measured by -- Regions, Colonies on the ground
+                            // and Space Stations, by the seat that took them.
                             println!("      Places taken by Influence over the batch: {takes}");
+                            println!(
+                                "      Of those, by kind and seat: Regions {:?}, ground Colonies {:?}, stations {:?} ({} Regions, {} Colonies, {} stations)",
+                                warc.takes_by_influence_states,
+                                warc.takes_by_influence_colonies,
+                                warc.takes_by_influence_stations,
+                                warc.takes_by_influence_states.iter().sum::<u32>(),
+                                warc.takes_by_influence_colonies.iter().sum::<u32>(),
+                                warc.takes_by_influence_stations.iter().sum::<u32>()
+                            );
                             // Ticket #286 (version 0.08.5): the war, over the batch, by seat; printed as the military block after the Influence line.
                             // Blockade-turns are printed above under ticket #278.
                             println!(
@@ -470,6 +516,9 @@ fn main() {
                                 "      Armies built {:?}, lost {:?}, Standing Armies lost {}; warships built {:?}, lost {:?}; Occupations begun {:?}, broken {:?}; places taken by force {:?}",
                                 warc.armies_built, warc.armies_lost, warc.standing_armies_lost, warc.warships_built, warc.warships_lost, warc.occupations_begun, warc.occupations_broken, warc.takes_by_force
                             );
+                            // Ticket #334 (version 0.09.0): Armies are raised from people, and the
+                            // computer's raises refused for want of them are counted.
+                            println!("      Army raises refused for want of people, by seat {:?}", warc.army_raises_refused_people);
                             // Ticket #295 (version 0.08.6): the escapes, never counted before the
                             // disengage figure was nudged.
                             println!(
@@ -486,6 +535,10 @@ fn main() {
                             println!("      Batteries lost over the batch, by seat {:?}", warc.batteries_lost);
                             // Ticket #328 (version 0.08.8): Bombards and what they burned, by the bombarder.
                             println!("      Bombards over the batch, by seat {:?}; Modules burned {:?}", warc.bombards, warc.modules_burned);
+                            // Ticket #335 (version 0.09.0): orbit changes, and Blockades -- every
+                            // one of which a human could now give by the same path, where before
+                            // this ticket no human player could give one at all.
+                            println!("      Orbit changes over the batch, by seat {:?}; Blockades ordered {:?}", warc.orbit_changes, warc.blockades_ordered);
                             println!("      The whole Tech Tree completed in {}/{seeds} seeds (median turn {})", tree_turns.len(), median_u(&mut tree_turns));
                             println!("      Breaks fired: {}", fired.join(", "));
                         }

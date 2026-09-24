@@ -1,10 +1,15 @@
 # Spec section 5.3. Ships and Armies share one stat line shape.
+#
+# Ticket #332 (version 0.09.0): `widgets` replaces `build_turns` on every row, at four Widgets for
+# every turn the build took (a Battleship 8, everything else 4). A Ship completes at the Resolution
+# its Shipyard's Colony has made it the Widgets, an Army at its place's; the Arkwrights' Ship
+# discount reaches the figure as it reaches the Materials.
 
 [[unit]]
 id = "colony_ship"
 name = "Colony Ship"
 materials = 30
-build_turns = 1
+widgets = 4
 energy_upkeep = 1
 strength = 0
 hit_points = 3
@@ -20,7 +25,7 @@ tank = 30
 id = "frigate"
 name = "Frigate"
 materials = 25
-build_turns = 1
+widgets = 4
 energy_upkeep = 2
 strength = 3
 hit_points = 4
@@ -33,7 +38,7 @@ tank = 30
 id = "battleship"
 name = "Battleship"
 materials = 50
-build_turns = 2
+widgets = 8
 energy_upkeep = 4
 strength = 7
 hit_points = 8
@@ -51,7 +56,7 @@ tank = 30
 id = "carrier"
 name = "Carrier"
 materials = 30
-build_turns = 1
+widgets = 4
 energy_upkeep = 2
 strength = 0
 hit_points = 4
@@ -64,13 +69,24 @@ tank = 30
 id = "army"
 name = "Army"
 materials = 25
-build_turns = 1
+widgets = 4
 energy_upkeep = 2
 strength = 4
 hit_points = 5
 pursuit = 2
 carries_colonists = 0
 carries_army = false
+
+# Ticket #334 (version 0.09.0): an Army is raised from people. In a Region a raise takes
+# `population_each` units of the Region's population -- one unit, one million people since ticket
+# #333 -- at the order, on top of its Materials and Widgets, whatever the Army's strength, and is
+# refused where the Region has not got it. At a Colony it takes `colonists_each` Colonists, refused
+# where fewer than one more than that live there, so the Core Module is never emptied; the Module
+# slot the Colonist bought goes with them. The Standing Army takes nobody. The people are gone: a
+# destroyed Army returns nobody. The designer: "armies from people too".
+[army]
+population_each = 1.0
+colonists_each = 1
 
 [repair]
 materials_per_point = 5
@@ -94,6 +110,13 @@ divisor = 3.0
 [melee]
 rounds = 3
 rolls = 3
+# Ticket #339 (version 0.09.0): the whole-battle odds are MEASURED, not derived. `odds_trials`
+# runs of the melee are fought on a copy of the board, from `odds_seed` -- the figure's own seed
+# and never the game's, so asking what the odds are cannot move a seeded game by one roll.
+# A thousand trials read a percentage to about a point and a half either way, and cost a
+# millisecond or two; raise it for a steadier figure, lower it for a cheaper one.
+odds_trials = 1000
+odds_seed = 339
 
 # Ticket #296 (version 0.08.6): a Region's defence is its people. Its Standing Army adds
 # `constabulary` while a working Constabulary stands there and `calm` while Unrest is under the

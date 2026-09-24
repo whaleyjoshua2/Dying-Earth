@@ -1,11 +1,16 @@
 # Spec section 13, amended by ticket #25 (version 0.02) and #32 (0.03): no Calm Cards. Ticket #76
-# (version 0.05.5): the deck holds FORTY cards for a thirty-six-turn game: the twenty-eight of before
-# (ten first-playable Events twice, eight later ones once), a third copy of Heatwave, Wildfire, Rich
-# Seam and Solar Storm, a second copy of Unrest, Methane Burst, Labour Dispute and Dust Storm, and
-# four new Events once each (Drought, Volcanic Eruption, Moonquake, Helium-3 Vein). Each turn a card
-# is drawn with draw_chance_base at +1.2 C, rising by draw_chance_per_step for every full
+# (version 0.05.5): the deck holds FORTY cards for a thirty-six-turn game. Each turn a card is
+# drawn with draw_chance_base at +1.2 C, rising by draw_chance_per_step for every full
 # draw_chance_step_degrees above it (50% at +1.2, 72.5% at +3.0). The deck is never reshuffled.
 # Climate cards still scale by 1 + (Temperature - 1.2) / 2.
+#
+# Ticket #337 (version 0.09.0): the deck is still FORTY cards and now every one of them is
+# DISTINCT. Fourteen kinds carried eighteen extra copies between them; every extra copy is cut
+# (`copies = 1` throughout) and eighteen CHOICE cards take their places, one copy each. A choice
+# card is drawn at the start of the turn, before orders; every seat is asked the same card; and
+# End Turn is refused until a human seat has answered. What the two answers do is composed from
+# the effect vocabulary below, so the eighteen are rows in this file and not code. Every figure
+# any of them moves is a field here.
 
 draw_chance_base = 0.5
 draw_chance_per_step = 0.025
@@ -56,7 +61,7 @@ kind = "solar"
 target = "everyone"
 effect = "No transit advances this turn"
 blunted_by = "efficient_transit"
-copies = 3
+copies = 1
 
 [[event]]
 id = "radiation_surge"
@@ -65,7 +70,7 @@ kind = "solar"
 target = "everyone"
 effect = "Every Ship in transit takes 1 damage"
 blunted_by = "hardened_hulls"
-copies = 2
+copies = 1
 
 [[event]]
 id = "comms_blackout"
@@ -74,7 +79,7 @@ kind = "solar"
 target = "everyone"
 effect = "Every stack fights as if its Stance were Hold"
 blunted_by = "public_science"
-copies = 2
+copies = 1
 
 # Version 0.03 (ticket #32): these two replaced Equipment Failure and Launch Failure, which singled
 # out a Faction. They hit a place, so whoever holds it takes the blow. Once each: the deck is 28 cards.
@@ -94,7 +99,7 @@ kind = "failure"
 target = "nation_state"
 effect = "Its Facilities make nothing at the next Income"
 blunted_by = "public_science"
-copies = 2
+copies = 1
 
 [[event]]
 id = "grid_failure"
@@ -103,7 +108,7 @@ kind = "failure"
 target = "colony"
 effect = "Its Modules are offline until the next Resolution"
 blunted_by = "closed_loop_colonies"
-copies = 2
+copies = 1
 off_earth = true
 
 [[event]]
@@ -113,7 +118,7 @@ kind = "discovery"
 target = "body"
 effect = "Its Mines produce x2 for two turns"
 blunted_by = "deep_mining"
-copies = 3
+copies = 1
 off_earth = true
 
 [[event]]
@@ -123,7 +128,7 @@ kind = "discovery"
 target = "body"
 effect = "Its Refineries produce x2 for two turns"
 blunted_by = "automated_refining"
-copies = 2
+copies = 1
 off_earth = true
 
 [[event]]
@@ -133,7 +138,7 @@ kind = "discovery"
 target = "tech"
 effect = "+15 Research to the Tech under research"
 blunted_by = "public_science"
-copies = 2
+copies = 1
 
 [[event]]
 id = "heatwave"
@@ -142,7 +147,7 @@ kind = "climate"
 target = "nation_state"
 effect = "Population -5% now"
 blunted_by = "green_consensus"
-copies = 3
+copies = 1
 
 [[event]]
 id = "wildfire"
@@ -151,7 +156,7 @@ kind = "climate"
 target = "nation_state"
 effect = "One Facility offline until next Resolution; +2.0 Emissions next turn"
 blunted_by = "clean_manufacturing"
-copies = 3
+copies = 1
 
 [[event]]
 id = "storm_surge"
@@ -159,7 +164,7 @@ name = "Storm Surge"
 kind = "climate"
 target = "exposed_nation_state"
 effect = "Its next sea-level threshold applies now"
-copies = 2
+copies = 1
 
 # Version 0.02 (ticket #25): the six new Events, once each.
 
@@ -188,7 +193,7 @@ kind = "failure"
 target = "mars"
 effect = "Every Module on Mars is offline until the next Resolution"
 blunted_by = "closed_loop_colonies"
-copies = 2
+copies = 1
 off_earth = true
 
 [[event]]
@@ -197,7 +202,7 @@ name = "Unrest"
 kind = "failure"
 target = "nation_state"
 effect = "Its Unrest rises by 3"
-copies = 2
+copies = 1
 
 [[event]]
 id = "reactor_leak"
@@ -216,7 +221,7 @@ kind = "climate"
 target = "everyone"
 effect = "+2.5 Emissions next turn, scaled by the Temperature"
 blunted_by = "green_consensus"
-copies = 2
+copies = 1
 
 # Ticket #76 (version 0.05.5): the four new Events, once each.
 
@@ -256,3 +261,398 @@ effect = "The Moon's Generators produce x2 for two turns"
 blunted_by = "efficient_grids"
 copies = 1
 off_earth = true
+
+# ---------------------------------------------------------------------------------------------
+# Ticket #337 (version 0.09.0): THE EIGHTEEN CHOICE CARDS, decided by the designer on 2026-09-23
+# and 2026-09-24. Each is an [[event]] row like any other, marked by its [event.choice] table.
+#
+# `take_does` and `refuse_does` are lists of effects from the vocabulary; an effect whose target is
+# not on a seat's board cannot land, and a side one of whose effects cannot land is a side that
+# does not reach that seat. A seat a side does not reach is not asked at all, and the Report says
+# so for it -- which is how a Faction holding no Region escapes the Hard Winter without being made
+# to refuse it for being small.
+#
+# `take_when` is the rule a COMPUTER seat answers by, read off its own board: the rule holds and
+# the seat takes the offer, it does not and the seat refuses. The figures are the card's, so they
+# live here rather than in ai.toml. None of these rules is the designer's; they are a first
+# reading of each card, named for correction.
+# ---------------------------------------------------------------------------------------------
+
+[[event]]
+id = "refugee_convoy"
+name = "Refugee Convoy"
+kind = "choice"
+target = "seat"
+effect = "Take the convoy in, or turn it away"
+copies = 1
+[event.choice]
+question = "A convoy of climate refugees asks to land. Take them in?"
+take = "Take them in"
+refuse = "Turn them away"
+# A calm Faction has room for them; a restive one does not, and pays for saying so.
+take_when = { rule = "unrest_below", unrest = 4.0 }
+[[event.choice.take_does]]
+effect = "population_to_most_populous"
+population = 0.4
+[[event.choice.take_does]]
+effect = "emissions_next"
+ppm = 2.0
+[[event.choice.refuse_does]]
+effect = "standing_all_held"
+standing = -5
+
+[[event]]
+id = "grounded_fleet"
+name = "Grounded Fleet"
+kind = "choice"
+target = "seat"
+effect = "Ground the fleet this turn, or fly through it"
+copies = 1
+[event.choice]
+question = "The flight surgeons want every hull grounded this turn. Ground the fleet?"
+take = "Ground the fleet"
+refuse = "Fly on"
+# Nothing under way costs nothing to ground; a crossing in progress is worth a point of damage.
+take_when = { rule = "no_landing_under_way" }
+[[event.choice.take_does]]
+effect = "hold_ships"
+[[event.choice.refuse_does]]
+effect = "damage_ships"
+damage = 1
+
+[[event]]
+id = "cheap_ore_offer"
+name = "Cheap Ore Offer"
+kind = "choice"
+target = "seat"
+effect = "Buy the ore, or let it go to the open market"
+copies = 1
+[event.choice]
+question = "A broker offers 30 Materials for 20 Ducats, this turn only. Buy?"
+take = "Buy the lot"
+refuse = "Let it go to market"
+take_when = { rule = "ducats_at_least", ducats = 20 }
+[[event.choice.take_does]]
+effect = "resources"
+materials = 30
+ducats = -20
+[[event.choice.refuse_does]]
+effect = "trade_price"
+resource = "materials"
+to = 1
+turns = 2
+
+[[event]]
+id = "overtime_at_the_yards"
+name = "Overtime at the Yards"
+kind = "choice"
+target = "seat"
+effect = "Work the shift, or send them home"
+copies = 1
+[event.choice]
+question = "The yards will work an extra shift for nothing. Work them?"
+take = "Work the shift"
+refuse = "Send them home"
+take_when = { rule = "unrest_below", unrest = 6.0 }
+[[event.choice.take_does]]
+effect = "widgets_now"
+widgets = 8
+[[event.choice.refuse_does]]
+effect = "unrest_at_busiest"
+unrest = -1.0
+
+[[event]]
+id = "the_auditors"
+name = "The Auditors"
+kind = "choice"
+target = "seat"
+effect = "Open the books, or turn the auditors away"
+copies = 1
+[event.choice]
+question = "The auditors of the table ask for your books. Open them?"
+take = "Open the books"
+refuse = "Turn them away"
+# Opening them costs nothing on the board, so the rule is a plain yes.
+take_when = { rule = "always" }
+[[event.choice.take_does]]
+effect = "relations_all_rivals"
+relations = 3
+[[event.choice.refuse_does]]
+effect = "blame_ppm"
+ppm = 2.0
+
+[[event]]
+id = "salvage_rights"
+name = "Salvage Rights"
+kind = "choice"
+target = "seat"
+effect = "Claim the wreck, or waive the claim"
+copies = 1
+[event.choice]
+question = "A wreck lies in your waters. Claim it, or waive the claim and publish what is in it?"
+take = "Claim the wreck"
+refuse = "Waive it"
+take_when = { rule = "always" }
+[[event.choice.take_does]]
+effect = "resources"
+materials = 20
+[[event.choice.refuse_does]]
+effect = "resources"
+research = 10
+
+[[event]]
+id = "fuel_contract"
+name = "Fuel Contract"
+kind = "choice"
+target = "seat"
+effect = "Sell the Fuel, or hold it back"
+copies = 1
+[event.choice]
+question = "A buyer offers 40 Ducats for 20 Fuel. Sell?"
+take = "Sell the Fuel"
+refuse = "Hold it back"
+take_when = { rule = "always" }
+[[event.choice.take_does]]
+effect = "resources"
+fuel = -20
+ducats = 40
+[[event.choice.refuse_does]]
+effect = "trade_price"
+resource = "fuel"
+by = 1
+turns = 2
+
+[[event]]
+id = "the_hard_winter"
+name = "The Hard Winter"
+kind = "choice"
+target = "seat"
+effect = "Take the relief, or go without"
+copies = 1
+[event.choice]
+question = "A hard winter closes in. Pay 40 Ducats in relief?"
+take = "Pay the relief"
+refuse = "Go without"
+# Ticket #337: the seat pays only where it can spare it; a Faction down to its last Ducats takes
+# the Unrest instead, which is the card.
+take_when = { rule = "ducats_at_least", ducats = 80 }
+[[event.choice.take_does]]
+effect = "resources"
+ducats = -40
+[[event.choice.refuse_does]]
+effect = "unrest_all_held"
+unrest = 2.0
+
+[[event]]
+id = "distress_call"
+name = "Distress Call"
+kind = "choice"
+target = "seat"
+effect = "Answer the call, or fly on"
+copies = 1
+[event.choice]
+question = "A crew is calling for help, and answering costs you a hull for the turn. Answer?"
+take = "Answer the call"
+refuse = "Fly on"
+take_when = { rule = "no_landing_under_way" }
+[[event.choice.take_does]]
+effect = "hold_one_ship"
+[[event.choice.take_does]]
+effect = "relations_all_rivals"
+relations = 5
+[[event.choice.refuse_does]]
+effect = "relations_all_rivals"
+relations = -3
+
+[[event]]
+id = "strike_at_the_refineries"
+name = "Strike at the Refineries"
+kind = "choice"
+target = "seat"
+effect = "Pay the refinery hands, or let them stop"
+copies = 1
+[event.choice]
+question = "The refinery hands have walked out. Pay them 15 Ducats a Refinery and they run?"
+take = "Pay them"
+refuse = "Let them stop"
+take_when = { rule = "ducats_at_least", ducats = 45 }
+[[event.choice.take_does]]
+effect = "per_unit_cost"
+per = { facility = "refinery" }
+resource = "ducats"
+amount = 15
+[[event.choice.refuse_does]]
+effect = "facility_output_multiplier"
+facility = "refinery"
+multiplier = 0.0
+
+[[event]]
+id = "deep_survey"
+name = "Deep Survey"
+kind = "choice"
+target = "seat"
+effect = "Pay for the survey, or sell the old data"
+copies = 1
+[event.choice]
+question = "A deep survey of one of your Colonies wants 20 Ducats. Pay for it, or sell the old data?"
+take = "Pay for the survey"
+refuse = "Sell the data"
+take_when = { rule = "ducats_at_least", ducats = 20 }
+[[event.choice.take_does]]
+effect = "resources"
+ducats = -20
+[[event.choice.take_does]]
+effect = "discovery_at_colony"
+module = "mine"
+multiplier = 2.0
+turns = 2
+[[event.choice.refuse_does]]
+effect = "resources"
+research = 15
+
+[[event]]
+id = "emergency_shutdown"
+name = "Emergency Shutdown"
+kind = "choice"
+target = "seat"
+effect = "Shut the plants down, or run them hot"
+copies = 1
+[event.choice]
+question = "The plants are past their tolerance. Shut them to half, or run them hot?"
+take = "Shut them down"
+refuse = "Run them hot"
+# A Faction already answerable for a lot of ppm shuts them; a clean one runs them.
+take_when = { rule = "blame_at_least", blame = 8.0 }
+[[event.choice.take_does]]
+effect = "facility_output_multiplier"
+facility = "power_plant"
+multiplier = 0.5
+[[event.choice.refuse_does]]
+effect = "emissions_next"
+ppm = 2.0
+
+[[event]]
+id = "the_recruiters"
+name = "The Recruiters"
+kind = "choice"
+target = "seat"
+effect = "Let the recruiters in, or send them away"
+copies = 1
+[event.choice]
+question = "Off-world recruiters want your people. Let them in for four Pioneers, free?"
+take = "Let them in"
+refuse = "Send them away"
+take_when = { rule = "unrest_below", unrest = 5.0 }
+[[event.choice.take_does]]
+effect = "pioneers_free"
+pioneers = 4
+[[event.choice.refuse_does]]
+effect = "standing_at_most_populous"
+standing = 5
+
+[[event]]
+id = "carbon_offset_scheme"
+name = "Carbon Offset Scheme"
+kind = "choice"
+target = "seat"
+effect = "Buy the offsets, or let the ledger stand"
+copies = 1
+[event.choice]
+question = "An offset broker will take 2 ppm off your Blame for 50 Ducats. Buy?"
+take = "Buy the offsets"
+refuse = "Let it stand"
+take_when = { rule = "blame_at_least", blame = 6.0 }
+[[event.choice.take_does]]
+effect = "resources"
+ducats = -50
+[[event.choice.take_does]]
+effect = "blame_ppm"
+ppm = -2.0
+[[event.choice.refuse_does]]
+effect = "blame_ppm"
+ppm = 1.0
+
+[[event]]
+id = "orbital_debris"
+name = "Orbital Debris"
+kind = "choice"
+target = "seat"
+effect = "Shield the hulls, or ride it out"
+copies = 1
+[event.choice]
+question = "A debris field crosses your orbits. Shield every hull at 10 Materials each?"
+take = "Shield them"
+refuse = "Ride it out"
+take_when = { rule = "always" }
+[[event.choice.take_does]]
+effect = "per_unit_cost"
+per = "ship_in_orbit"
+resource = "materials"
+amount = 10
+[[event.choice.refuse_does]]
+effect = "damage_ships"
+damage = 1
+in_orbit = true
+
+[[event]]
+id = "the_whistleblower"
+name = "The Whistleblower"
+kind = "choice"
+target = "seat"
+effect = "Settle quietly, or let it run"
+copies = 1
+[event.choice]
+question = "A whistleblower has your emissions figures. Settle quietly for 30 Ducats?"
+take = "Settle quietly"
+refuse = "Let it run"
+take_when = { rule = "blame_at_least", blame = 4.0 }
+[[event.choice.take_does]]
+effect = "resources"
+ducats = -30
+[[event.choice.refuse_does]]
+effect = "blame_ppm"
+ppm = 3.0
+[[event.choice.refuse_does]]
+effect = "relations_all_rivals"
+relations = -3
+
+[[event]]
+id = "surplus_habitats"
+name = "Surplus Habitats"
+kind = "choice"
+target = "seat"
+effect = "Take the Habitat, or sell the frames"
+copies = 1
+[event.choice]
+question = "A surplus Habitat can be flown to your smallest Colony. Take it, or sell the frames?"
+take = "Take the Habitat"
+refuse = "Sell the frames"
+take_when = { rule = "always" }
+[[event.choice.take_does]]
+effect = "free_building"
+module = "habitat"
+[[event.choice.take_does]]
+effect = "emissions_next"
+ppm = 1.0
+[[event.choice.refuse_does]]
+effect = "resources"
+materials = 20
+
+[[event]]
+id = "conscription_notice"
+name = "Conscription Notice"
+kind = "choice"
+target = "seat"
+effect = "Post the notice, or tear it up"
+copies = 1
+[event.choice]
+question = "A conscription notice is drawn up: an Army, raised free and costing no people. Post it?"
+take = "Post the notice"
+refuse = "Tear it up"
+take_when = { rule = "unrest_below", unrest = 4.0 }
+[[event.choice.take_does]]
+effect = "free_building"
+army = true
+[[event.choice.refuse_does]]
+effect = "unrest_at_most_populous"
+unrest = 1.0

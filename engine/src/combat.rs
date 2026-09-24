@@ -6,7 +6,8 @@
 //! old one: with parties a and d, the attacker's chance to land a hit is a / (a + d).
 
 use crate::orders::UnitRef;
-use rand::Rng;
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha8Rng;
 
 /// The randomness a battle needs, so a test can script it.
 pub trait Dice {
@@ -163,8 +164,50 @@ pub fn target_shares(strengths: &[i64], attacker: usize) -> Vec<f64> {
         .collect()
 }
 
+/// Ticket #339 (version 0.09.0): **the chance of winning the BATTLE**, where `first_round_odds`
+/// below is the chance of winning its first exchange. `PLAYTEST.txt` asked the testers by name
+/// whether they knew what the older number meant, and since ticket #335 put a Battle in every orbit
+/// it is on screen oftener than ever.
+///
+/// It is MEASURED rather than derived: the melee has disengage rolls, pursuit, an escort rule and
+/// hit points, so there is no closed form to write down and no small state space to enumerate. The
+/// parties are copied and fought `trials` times from `seed`, which is the figure's own seed and
+/// never the game's, so the answer is the same every time it is asked and asking it cannot move a
+/// seeded game by a single roll.
+///
+/// What counts as a win is what the board counts: `party` **holds the field** -- a unit of its
+/// neither destroyed nor escaped, and nobody else's left standing on the place. That is exactly the
+/// test `alone_at` makes when it begins an Occupation.
+pub fn whole_battle_odds(parties: &[Vec<Combatant>], party: usize, divisor: f64, rounds: u32, rolls: u32, trials: u32, seed: u64) -> f64 {
+    if trials == 0 || parties.len() < 2 || party >= parties.len() {
+        return 0.0;
+    }
+    let mut rng = ChaCha8Rng::seed_from_u64(seed);
+    let mut won = 0u32;
+    for _ in 0..trials {
+        let mut copy: Vec<Vec<Combatant>> = parties.to_vec();
+        {
+            let mut slices: Vec<&mut [Combatant]> = copy.iter_mut().map(|p| p.as_mut_slice()).collect();
+            melee(&mut slices, &mut rng as &mut dyn Dice, divisor, rounds, rolls);
+        }
+        if holds_the_field(&copy, party) {
+            won += 1;
+        }
+    }
+    won as f64 / trials as f64
+}
+
+/// Ticket #339: who is left standing ON the place when the melee ends -- a unit neither destroyed
+/// nor escaped, since a unit that ran is not there to hold anything.
+fn holds_the_field(parties: &[Vec<Combatant>], party: usize) -> bool {
+    let standing = |p: &Vec<Combatant>| p.iter().any(|c| !c.destroyed() && !c.escaped);
+    parties.get(party).is_some_and(standing) && parties.iter().enumerate().all(|(i, p)| i == party || !standing(p))
+}
+
 /// Spec 10.4: the chance the attacker wins more hit-rolls than the defender in the first round.
 /// Ticket #50: in a melee the "defender" strength is the sum of every other party present.
+/// Ticket #339 (version 0.09.0): kept, and still the computer's bar, but it is no longer what a
+/// player is shown -- see `whole_battle_odds` above.
 pub fn first_round_odds(attacker_strength: i64, defender_strength: i64) -> f64 {
     let total = attacker_strength + defender_strength;
     if total <= 0 {

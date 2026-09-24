@@ -116,7 +116,10 @@ pub struct FacilityCard {
     pub id: FacilityKind,
     pub name: String,
     pub materials: i64,
-    pub build_turns: u32,
+    /// Ticket #332 (version 0.09.0): the Widgets the build needs, four for every turn it took
+    /// under the flat count this replaces. It completes at the Resolution its place's Widgets
+    /// reach it, so a place making four a turn builds it at the old pace and a busier one slower.
+    pub widgets: u32,
     pub energy_upkeep: i64,
     pub produces: Option<Produces>,
     /// Ticket #280 (version 0.08.5): what the building does, in a sentence, where it is not a
@@ -151,6 +154,14 @@ pub struct ScrubberCard {
     pub per_population: f64,
     pub min: u32,
     pub max: u32,
+}
+
+/// Ticket #333 (version 0.09.0): what a Region's people are worth to a Research Lab, one point of
+/// bonus per this many units of population (`facilities.toml`); a code literal of 1,000 units of
+/// five million from ticket #143 (version 0.07.3) until this ticket, the same five billion people.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PopulationFactorCard {
+    pub population_per_point: f64,
 }
 
 /// Ticket #257 (version 0.08.4): what each Sea Level rise a Sea Wall has held back adds to its
@@ -216,7 +227,17 @@ pub struct MothballCard {
 pub struct IndustryLevelCard {
     pub materials: i64,
     pub materials_cheap_industry: i64,
-    pub build_turns: u32,
+    /// Ticket #332 (version 0.09.0): the Widgets a raise needs, in place of its flat turn.
+    pub widgets: u32,
+}
+
+/// Ticket #332 (version 0.09.0): the Widgets a Region makes a turn with no Factory at all: a flat
+/// `region_base` and `per_industry_level` more per point of Industry Level (`facilities.toml`), at
+/// the designer's word *"4 +1 per industry level"*. A Colony's base is its Core Module's own row.
+#[derive(Debug, Clone, Deserialize)]
+pub struct WidgetsCard {
+    pub region_base: u32,
+    pub per_industry_level: u32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -224,7 +245,8 @@ pub struct ModuleCard {
     pub id: ModuleKind,
     pub name: String,
     pub materials: i64,
-    pub build_turns: u32,
+    /// Ticket #332 (version 0.09.0): the Widgets the build needs, four for every former turn.
+    pub widgets: u32,
     pub energy_upkeep: i64,
     pub produces: Option<Produces>,
     /// Ticket #280 (version 0.08.5): what the Module does, in a sentence, where it is not a
@@ -275,7 +297,8 @@ pub struct UnitCard {
     pub id: UnitKind,
     pub name: String,
     pub materials: i64,
-    pub build_turns: u32,
+    /// Ticket #332 (version 0.09.0): the Widgets the build needs, four for every former turn.
+    pub widgets: u32,
     pub energy_upkeep: i64,
     pub strength: i64,
     pub hit_points: u32,
@@ -332,6 +355,160 @@ pub struct EventCard {
     /// start, joining it on `off_earth_join_turn`.
     #[serde(default)]
     pub off_earth: bool,
+    /// Ticket #337 (version 0.09.0): the question this card asks and the two sides it offers. A row
+    /// carrying this table is a CHOICE card; a row without it is one of the 22 ordinary cards and
+    /// behaves exactly as it always has.
+    #[serde(default)]
+    pub choice: Option<ChoiceCard>,
+}
+
+impl EventCard {
+    /// Ticket #337: whether this card asks the table a question.
+    pub fn asks(&self) -> bool {
+        self.choice.is_some()
+    }
+}
+
+/// Ticket #337 (version 0.09.0): **a choice card's two sides**, composed in data.
+///
+/// The designer's eighteen cards would have been thirty-six one-off effects written in code, each
+/// with its own figures in this table. They are rows instead: a side is a LIST of effects, an
+/// effect is a tagged entry carrying its own figures, and the engine holds one mechanism rather
+/// than eighteen. Nothing here is a code literal -- every figure the cards move is a field below.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ChoiceCard {
+    /// What the modal asks.
+    pub question: String,
+    /// What the two buttons say.
+    pub take: String,
+    pub refuse: String,
+    /// Ticket #337 R4: the rule a COMPUTER seat answers by, read off its own board. It lives here
+    /// beside the card rather than in `ai.toml` because the figures are the card's, not the
+    /// Faction's: the rule holds, the seat takes the offer; it does not, the seat refuses.
+    pub take_when: CardRule,
+    #[serde(default)]
+    pub take_does: Vec<CardEffect>,
+    #[serde(default)]
+    pub refuse_does: Vec<CardEffect>,
+}
+
+impl ChoiceCard {
+    pub fn side(&self, taken: bool) -> &[CardEffect] {
+        if taken { &self.take_does } else { &self.refuse_does }
+    }
+}
+
+/// Ticket #337 (version 0.09.0): what a computer seat asks of its own board before answering. A
+/// predicate over the seat's Unrest, its Ducats, its Blame, and whether a landing is under way,
+/// which is the list the ticket names.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "rule", rename_all = "snake_case")]
+pub enum CardRule {
+    /// The offer is always worth taking.
+    Always,
+    /// It never is.
+    Never,
+    /// The seat holds at least this many Ducats.
+    DucatsAtLeast { ducats: i64 },
+    /// Some Region it holds stands at or above this Unrest.
+    UnrestAtLeast { unrest: f64 },
+    /// Every Region it holds stands below this Unrest: the calm half of the same question.
+    UnrestBelow { unrest: f64 },
+    /// Its Blame stands at or above this many ppm.
+    BlameAtLeast { blame: f64 },
+    /// A Ship of the seat is in transit: a landing, a crossing or a supply run is under way, and
+    /// holding the fleet this turn would cost it.
+    LandingUnderWay,
+    /// No landing is under way, which is the other half of the same question.
+    NoLandingUnderWay,
+}
+
+/// Ticket #337 (version 0.09.0): **the effect vocabulary**. One side of one card is a list of
+/// these. Each carries its own figures, and an effect whose target is not on the board does
+/// nothing -- which is also how a card works out that it has no question for a seat at all.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "effect", rename_all = "snake_case")]
+pub enum CardEffect {
+    /// Signed Materials, Fuel, Energy, Ducats and Research. A negative figure is a price, and a
+    /// seat that cannot pay it is a seat this side cannot reach.
+    Resources {
+        #[serde(default)]
+        materials: i64,
+        #[serde(default)]
+        fuel: i64,
+        #[serde(default)]
+        energy: i64,
+        #[serde(default)]
+        ducats: i64,
+        #[serde(default)]
+        research: i64,
+    },
+    /// A price in one resource for every thing of a kind the seat has: a Refinery it directs, a
+    /// Ship of its own in orbit.
+    PerUnitCost { per: CardThing, resource: Resource, amount: i64 },
+    /// Units of population into the seat's most populous held Region.
+    PopulationToMostPopulous { population: f64 },
+    /// ppm added at the next Climate phase, through the same field the Methane Burst uses.
+    EmissionsNext { ppm: f64 },
+    /// A change to the seat's Standing in every Region it holds, or in its most populous one.
+    StandingAllHeld { standing: i64 },
+    StandingAtMostPopulous { standing: i64 },
+    /// A change to Unrest, the same two ways -- and at the busiest Region, which is where the
+    /// Overtime card's "there instead" points: the Region that made the Widgets.
+    UnrestAllHeld { unrest: f64 },
+    UnrestAtMostPopulous { unrest: f64 },
+    UnrestAtBusiest { unrest: f64 },
+    /// No transit of this seat's resolves this turn: the Solar Storm's shape, for one seat.
+    HoldShips,
+    /// One Ship of the seat holds this turn.
+    HoldOneShip,
+    /// So much damage to each of the seat's Ships -- every one of them, or only those in orbit
+    /// around a Body, which is what the Orbital Debris card says and the Grounded Fleet does not.
+    DamageShips {
+        damage: u32,
+        #[serde(default)]
+        in_orbit: bool,
+    },
+    /// A good's price set (`to`) or moved (`by`) for so many turns, over the band.
+    TradePrice {
+        resource: Resource,
+        #[serde(default)]
+        to: Option<i64>,
+        #[serde(default)]
+        by: i64,
+        turns: u32,
+    },
+    /// A change to what every other seat thinks of this one.
+    RelationsAllRivals { relations: i64 },
+    /// ppm onto the seat's own Blame, or off it where the figure is negative.
+    BlamePpm { ppm: f64 },
+    /// Widgets added this turn at the seat's busiest Region -- the one that makes the most.
+    WidgetsNow { widgets: i64 },
+    /// A Facility kind of the seat's makes this share of its output at the next Income, the shape
+    /// the Drought already has.
+    FacilityOutputMultiplier { facility: FacilityKind, multiplier: f64 },
+    /// A Discovery over the Body one of the seat's Colonies stands at, for so many turns.
+    DiscoveryAtColony { module: ModuleKind, multiplier: f64, turns: u32 },
+    /// Pioneers waiting in the seat's most populous held Region, at no cost to its population.
+    PioneersFree { pioneers: u32 },
+    /// A Module at the seat's smallest Colony, or an Army in its most populous held Region, free
+    /// and costing nobody.
+    FreeBuilding {
+        #[serde(default)]
+        module: Option<ModuleKind>,
+        #[serde(default)]
+        army: bool,
+    },
+}
+
+/// Ticket #337: what a `per_unit_cost` counts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CardThing {
+    /// Every Facility of this kind in a Region the seat directs.
+    Facility(FacilityKind),
+    /// Every Ship of the seat's in orbit around a Body.
+    ShipInOrbit,
 }
 
 fn one() -> u32 {
@@ -673,9 +850,15 @@ pub struct ClimateTable {
     pub collapse_line: f64,
     pub temperature_lag_fraction: f64,
     pub population_growth: f64,
+    /// Ticket #333 (version 0.09.0): the population figure's unit, in people. A Region's figure, a
+    /// Colonist and a Pioneer are all counted in it, so `Region population 380.0` is 380 million
+    /// people and one Colonist is one million. A code constant of five million from ticket #143
+    /// (version 0.07.3) until this ticket; every per-unit rate in the data is in this unit.
+    pub people_per_unit: f64,
     pub population_loss_per_tenth_degree: f64,
-    /// Ticket #54: Population Emissions per hundred million are `base + per_level x Industry Level`,
-    /// less the state's own Leapfrog adjustment, never below `base`.
+    /// Ticket #54: Population Emissions per unit are `base + per_level x Industry Level`,
+    /// less the state's own Leapfrog adjustment, never below `base`. Quoted to the player per
+    /// hundred million people (`Tables::units_per_hundred_million`).
     /// Ticket #108: what one Leapfrog takes off a Nation State's Baseline Emissions.
     pub leapfrog_baseline_cut: f64,
     pub population_emissions_base: f64,
@@ -700,6 +883,9 @@ pub struct InfluenceTable {
     pub state_threshold_base: i64,
     pub state_threshold_per_size: i64,
     pub colony_threshold_per_colonist: i64,
+    /// Ticket #336 (version 0.09.0): the base under every place off Earth, so an empty one is not
+    /// free to take. `station_threshold_base` REPLACES it on a station rather than adding to it.
+    pub colony_threshold_base: i64,
     pub decay: i64,
     /// Ticket #33: decay on a place the Faction controls.
     pub decay_controlled: i64,
@@ -713,7 +899,8 @@ pub struct InfluenceTable {
     pub constabulary_margin: i64,
     /// Ticket #201 (version 0.08.1): what a Constabulary adds instead, once Civil Defense stands.
     pub constabulary_margin_defended: i64,
-    /// Ticket #46: a station's threshold starts here.
+    /// Ticket #46: a station's threshold starts here, in place of `colony_threshold_base` since
+    /// ticket #336 (version 0.09.0) rather than on top of it.
     #[serde(default)]
     pub station_threshold_base: i64,
     pub occupation_turns: u32,
@@ -978,6 +1165,11 @@ pub struct AiMultipliers {
     /// while they have nowhere the Archive may stand. It applies to no other Faction and stops the
     /// moment they hold such a place.
     pub archive_needs_a_place: f64,
+    /// Ticket #332 (version 0.09.0): the pace of a build. A build candidate is weighed against
+    /// the same build at the seat's other places by the Resolutions until this place's Widgets
+    /// would finish it behind its queue: the soonest place at full weight, every other at
+    /// soonest / turns, never below this floor. A place that makes no Widgets is at the floor.
+    pub build_pace_floor: f64,
 }
 
 /// Ticket #50: one pace schedule per Faction. `first` is the schedule for the Faction's first
@@ -1006,6 +1198,10 @@ pub struct AiThresholds {
     pub influence_step: i64,
     /// Ticket #75: a held state's worth on the Influence target list, as a share of a neutral one's.
     pub held_state_weight: f64,
+    /// Ticket #336 (version 0.09.0): the price a rival's Colony is weighed against on the same
+    /// list -- the weight is this over what the seat would pay, so the cheapest place ranks first.
+    #[serde(default = "colony_price_pivot_default")]
+    pub colony_price_pivot: f64,
     /// Ticket #84 (version 0.06.0): as Research Lead the AI picks its Victory gate once its first
     /// part is past this fraction of its bar, or from this turn, whichever comes first.
     pub gate_pick_fraction: f64,
@@ -1015,6 +1211,18 @@ pub struct AiThresholds {
     /// which made any contribution threshold unreachable and the shared-pot rule a flat tax.
     pub directive_when_wanted: u8,
     pub directive_when_indifferent: u8,
+    /// Ticket #332 (version 0.09.0): the early Mine. Through this turn, while the seat directs
+    /// fewer Mines on Earth (standing or on order) than `early_mines`, the Mine in its most
+    /// Materials-lean Region -- the one where a Mine would make the most -- is wanted at the
+    /// Factory's weight with the victory-gap and opportunity multipliers.
+    pub early_mine_turn: u32,
+    pub early_mines: u32,
+    /// Ticket #332: a Factory Module is wanted at a Colony whose queue is this many builds deep,
+    /// or where a Ship is wanted (a Shipyard standing or on order).
+    pub factory_module_queue_depth: usize,
+    /// Ticket #335 (version 0.09.0): how many warships a seat wants holding LOW ORBIT at a Body
+    /// whose ground it wants, before the next hull's leg names a rival station's ring instead.
+    pub low_orbit_warships: u32,
 }
 
 /// Ticket #50: one pick list per Faction. `order` is tried first, then the cheapest available
@@ -1044,6 +1252,9 @@ struct BodiesFile {
     sibling_turns: u32,
     #[serde(default = "one_i64")]
     sibling_fuel: i64,
+    /// Ticket #335 (version 0.09.0): what an orbit change costs from the Ship's own tank.
+    #[serde(default = "one_i64")]
+    orbit_change_fuel: i64,
     #[serde(default = "forty")]
     station_materials: i64,
     /// Ticket #57: how far a Colony Slot's own yields may fall either side of its Body's.
@@ -1111,7 +1322,9 @@ pub struct DevelopmentTable {
 struct FacilitiesFile {
     facility: Vec<FacilityCard>,
     industry_level: IndustryLevelCard,
+    widgets: WidgetsCard,
     scrubber: ScrubberCard,
+    population_factor: PopulationFactorCard,
     sea_wall: SeaWallCard,
     mothball: MothballCard,
     school: SchoolCard,
@@ -1199,6 +1412,16 @@ pub struct DigInCard {
     pub defence: i64,
 }
 
+/// Ticket #334 (version 0.09.0): the people a raised Army takes, at the order. In a Region
+/// `population_each` units of its population (one unit, one million people since ticket #333); at
+/// a Colony `colonists_each` Colonists, refused where fewer than one more live there so the Core is
+/// never emptied. The Standing Army takes nobody, and nobody returns.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ArmyCard {
+    pub population_each: f64,
+    pub colonists_each: u32,
+}
+
 /// Ticket #327 (version 0.08.8): the melee's shape, in data: its rounds, and the hit rolls a
 /// round on the ground and the floor for a Ship melee, which rolls once for every engaged armed
 /// unit present when that is more.
@@ -1206,6 +1429,10 @@ pub struct DigInCard {
 pub struct MeleeCard {
     pub rounds: u32,
     pub rolls: u32,
+    /// Ticket #339 (version 0.09.0): the whole-battle odds' own trial count and seed. The seed is
+    /// the FIGURE's, never the game's, so reading the odds cannot move a seeded game.
+    pub odds_trials: u32,
+    pub odds_seed: u64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1217,6 +1444,7 @@ struct UnitsFile {
     melee: MeleeCard,
     standing_army: StandingArmyCard,
     dig_in: DigInCard,
+    army: ArmyCard,
 }
 
 /// Ticket #86 (version 0.06.0): a warming Earth fills the Colony Ships. `per_step` Colonists
@@ -1418,6 +1646,8 @@ pub struct Tables {
     pub bodies: Vec<BodyCard>,
     /// Ticket #45: the hop between two satellites of the same Body.
     pub sibling_transit: (u32, i64),
+    /// Ticket #335 (version 0.09.0): the Fuel an orbit change takes from a Ship's own tank.
+    pub orbit_change_fuel: i64,
     /// Ticket #46: what a station costs.
     pub station_materials: i64,
     /// Ticket #57: how far a Colony Slot's own four yields may fall either side of its Body's.
@@ -1438,8 +1668,12 @@ pub struct Tables {
     pub coastal_per_exposure: u32,
     pub facilities: Vec<FacilityCard>,
     pub industry_level: IndustryLevelCard,
+    /// Ticket #332 (version 0.09.0): a Region's base Widgets per Industry Level.
+    pub widgets: WidgetsCard,
     /// Ticket #54: the Scrubber cap and the Mothball prices (`facilities.toml`).
     pub scrubber: ScrubberCard,
+    /// Ticket #333 (version 0.09.0): the Research Lab's population factor divisor (`facilities.toml`).
+    pub population_factor: PopulationFactorCard,
     pub mothball: MothballCard,
     /// Ticket #257: the Sea Wall's keep per rise held.
     pub sea_wall: SeaWallCard,
@@ -1474,6 +1708,8 @@ pub struct Tables {
     pub standing_army: StandingArmyCard,
     /// Ticket #297 (version 0.08.6): what digging in adds to a defending Army.
     pub dig_in: DigInCard,
+    /// Ticket #334 (version 0.09.0): the people a raised Army takes.
+    pub army: ArmyCard,
     pub techs: Vec<TechCard>,
     pub events: EventsTable,
     pub factions: Vec<FactionCard>,
@@ -1558,6 +1794,7 @@ impl Tables {
         let tables = Tables {
             ship_names,
             sibling_transit: (bodies.sibling_turns, bodies.sibling_fuel),
+            orbit_change_fuel: bodies.orbit_change_fuel,
             station_materials: bodies.station_materials,
             slot_yield_spread: bodies.slot_yield_spread,
             planets: ephemeris.planet,
@@ -1571,7 +1808,9 @@ impl Tables {
             coastal_per_exposure: states.coastal_per_exposure,
             facilities: facilities.facility,
             industry_level: facilities.industry_level,
+            widgets: facilities.widgets,
             scrubber: facilities.scrubber,
+            population_factor: facilities.population_factor,
             mothball: facilities.mothball,
             sea_wall: facilities.sea_wall,
             school: facilities.school,
@@ -1590,6 +1829,7 @@ impl Tables {
             melee: units.melee,
             standing_army: units.standing_army,
             dig_in: units.dig_in,
+            army: units.army,
             techs: techs.tech,
             shortlist: techs.shortlist,
             events,
@@ -1713,6 +1953,27 @@ impl Tables {
                 return Err(err("facilities.toml", format!("row {}: a coastal-only Facility must take a build slot", f.name)));
             }
         }
+        // Ticket #332 (version 0.09.0): a build of nought Widgets would complete at a place that
+        // makes none, which is not a rule anybody wrote. Every row that can be ordered carries a
+        // figure; the Core Module alone is exempt, since nobody orders it (its Materials are nought
+        // for the same reason).
+        if let Some(f) = self.facilities.iter().find(|f| f.widgets == 0) {
+            return Err(err("facilities.toml", format!("row {}: widgets must be at least 1", f.name)));
+        }
+        if let Some(m) = self.modules.iter().find(|m| m.widgets == 0 && m.id != ModuleKind::Core) {
+            return Err(err("modules.toml", format!("row {}: widgets must be at least 1", m.name)));
+        }
+        if let Some(u) = self.units.iter().find(|u| u.widgets == 0) {
+            return Err(err("units.toml", format!("row {}: widgets must be at least 1", u.name)));
+        }
+        if self.industry_level.widgets == 0 || self.widgets.region_base + self.widgets.per_industry_level == 0 {
+            return Err(err("facilities.toml", "[industry_level] widgets must be at least 1, and [widgets] region_base or per_industry_level must be"));
+        }
+        // Ticket #334 (version 0.09.0): an Army is raised from people, so a raise that took nobody
+        // is not a rule anybody wrote; and a Colony's take must leave the Core its one Colonist.
+        if self.army.population_each <= 0.0 || !self.army.population_each.is_finite() || self.army.colonists_each == 0 {
+            return Err(err("units.toml", "[army] population_each must be positive and colonists_each at least 1"));
+        }
         for t in &self.techs {
             for n in &t.needs {
                 if *n == t.id {
@@ -1760,6 +2021,19 @@ impl Tables {
         }
         if u.neutral_max > u.max || u.refugees_per <= 0.0 || u.report_net_floor <= 0.0 {
             return Err(err("unrest.toml", "neutral_max must not exceed max, and refugees_per and report_net_floor must be positive"));
+        }
+        // Ticket #336 (version 0.09.0): the base under every place off Earth is what makes an empty
+        // one cost something; at nought or less a Colony nobody has moved into is free again.
+        if self.influence.colony_threshold_base <= 0 {
+            return Err(err("influence.toml", "colony_threshold_base must be positive: an empty Colony is not free to take"));
+        }
+        // Ticket #333 (version 0.09.0): the unit is a divisor in every people figure the interface
+        // prints, and the Research divisor is one in every Lab's yield.
+        if self.climate.people_per_unit <= 0.0 {
+            return Err(err("climate.toml", "people_per_unit must be positive"));
+        }
+        if self.population_factor.population_per_point <= 0.0 {
+            return Err(err("facilities.toml", "[population_factor] population_per_point must be positive"));
         }
         // Ticket #295 (version 0.08.6): a divisor of nought would be a certain escape at any damage.
         if self.disengage.divisor <= 0.0 {
@@ -1822,6 +2096,23 @@ impl Tables {
         }
         if !(0.0..=1.0).contains(&self.events.draw_chance_base) || self.events.draw_chance_step_degrees <= 0.0 {
             return Err(err("events.toml", "draw_chance_base must be between 0 and 1 and draw_chance_step_degrees positive"));
+        }
+        // Ticket #337 (version 0.09.0): a choice card with nothing on either side would be drawn,
+        // asked and answered to no purpose, and nobody reading the table would see it. The load
+        // refuses it rather than dealing it.
+        for e in &self.events.event {
+            match (&e.choice, e.kind) {
+                (Some(c), _) if c.take_does.is_empty() && c.refuse_does.is_empty() => {
+                    return Err(err("events.toml", format!("{}: a card that asks a question needs an effect on one of its sides; both are empty", e.name)));
+                }
+                (Some(_), k) if k != EventKind::Choice => {
+                    return Err(err("events.toml", format!("{}: a card with a [choice] table must have kind = \"choice\"", e.name)));
+                }
+                (None, EventKind::Choice) => {
+                    return Err(err("events.toml", format!("{}: kind = \"choice\" wants a [choice] table saying what it asks", e.name)));
+                }
+                _ => {}
+            }
         }
         Ok(())
     }
@@ -1942,6 +2233,30 @@ pub fn default_data_dir() -> PathBuf {
 /// Ducats formula lives HERE, in one place, so that `Game::state_ducats` and the panel can never
 /// disagree and the ticket that moves the formula moves one line.
 impl Tables {
+    /// Ticket #333 (version 0.09.0): units in a hundred million people, since the cards quote
+    /// per-person Emissions at that rate: a hundred at one million a unit, twenty at five.
+    pub fn units_per_hundred_million(&self) -> f64 {
+        100_000_000.0 / self.climate.people_per_unit
+    }
+
+    /// A population figure written as real people: `1.94B`, `380M`, `1M`. Ticket #143 (version
+    /// 0.07.3) on `Game` with the unit a code constant; ticket #333 (version 0.09.0) moved it here,
+    /// where the start screen, which has no game yet, can read it too.
+    pub fn people_text(&self, units: f64) -> String {
+        let people = units * self.climate.people_per_unit;
+        if people >= 1_000_000_000.0 {
+            format!("{:.2}B", people / 1_000_000_000.0)
+        } else {
+            format!("{:.0}M", people / 1_000_000.0)
+        }
+    }
+
+    /// The card's form: the figure in units to one decimal, and the real number beside it,
+    /// `1454.5 (1.45B)`.
+    pub fn population_text(&self, units: f64) -> String {
+        format!("{units:.1} ({})", self.people_text(units))
+    }
+
     /// The base Ducats a Region's economy pays a turn at an Industry Level. Ticket #35 set it at
     /// GDP x Industry Level / 10, rounded down, under which ten of the fourteen Regions paid nothing
     /// at the start; ticket #139 (version 0.07.3) made it **GDP x Industry Level / 5, rounded down,
@@ -1992,6 +2307,11 @@ fn resentment_default() -> f64 {
 /// Ticket #224 (version 0.08.2).
 fn relations_margin_cap_default() -> i64 {
     2
+}
+
+/// Ticket #336 (version 0.09.0): the price a starting two-Colonist place is worth, 40 + 20 x 2.
+fn colony_price_pivot_default() -> f64 {
+    80.0
 }
 
 

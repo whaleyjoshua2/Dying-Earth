@@ -1,10 +1,15 @@
 # Spec section 5.2. Built in a Colony; no slot limit; never emit.
+#
+# Ticket #332 (version 0.09.0): `widgets` replaces `build_turns` on every row, at four Widgets for
+# every turn the build took (the Archive's three turns are 12). A build completes at the Resolution
+# its Colony's Widgets reach the figure, served in queue order; a Colony or station makes one a
+# turn from its Core Module and four for every working Factory Module (the last row).
 
 [[module]]
 id = "mine"
 name = "Mine"
 materials = 20
-build_turns = 1
+widgets = 4
 energy_upkeep = 3
 produces = { resource = "materials", amount = 4 }
 # Version 0.04 (ticket #44): on Earth (Antarctica) a Module emits as its counterpart Facility does.
@@ -14,7 +19,7 @@ earth_emissions = 1.0
 id = "generator"
 name = "Generator"
 materials = 25
-build_turns = 2
+widgets = 8
 energy_upkeep = 0
 produces = { resource = "energy", amount = 5 }
 earth_emissions = 1.5
@@ -23,7 +28,7 @@ earth_emissions = 1.5
 id = "refinery"
 name = "Refinery"
 materials = 20
-build_turns = 1
+widgets = 4
 energy_upkeep = 3
 produces = { resource = "fuel", amount = 3 }
 earth_emissions = 1.5
@@ -32,7 +37,7 @@ earth_emissions = 1.5
 id = "habitat"
 name = "Habitat"
 materials = 25
-build_turns = 1
+widgets = 4
 energy_upkeep = 2
 does = "holds 4 Colonists (8 with Expanded Habitats)"
 # Ticket #80 (version 0.06.0): 8, from 4 (the Arkwrights 12; Expanded Habitats still +2).
@@ -48,7 +53,7 @@ holds_colonists = 4
 id = "shipyard"
 name = "Shipyard"
 materials = 35
-build_turns = 2
+widgets = 8
 energy_upkeep = 4
 does = "the only place a Ship can be built"
 
@@ -56,7 +61,7 @@ does = "the only place a Ship can be built"
 id = "barracks"
 name = "Barracks"
 materials = 20
-build_turns = 1
+widgets = 4
 energy_upkeep = 2
 does = "the only place a Colony Army is raised and repaired; holds one"
 
@@ -69,7 +74,7 @@ does = "the only place a Colony Army is raised and repaired; holds one"
 id = "trade_post"
 name = "Trade Post"
 materials = 25
-build_turns = 1
+widgets = 4
 energy_upkeep = 2
 produces = { resource = "ducats", amount = 2 }
 
@@ -88,21 +93,22 @@ mine_bonus = 1
 id = "relay"
 name = "Relay"
 materials = 25
-build_turns = 1
+widgets = 4
 energy_upkeep = 2
 influence_allotment = 1
 standing_per_turn = 2
 
 # Ticket #51 (version 0.05): the Archive, which only the Archivists build, at one Colony off Earth,
 # never through the ordinary Module build order. Ticket #68 (version 0.05.5): it is one Module,
-# `materials` Materials and `build_turns` turns from its own button; the four stages are retired.
+# `materials` Materials and, since ticket #332, `widgets` Widgets from its own button; the four
+# stages are retired.
 # Its Energy upkeep is charged only once it is complete: standing, with `[archive] research`
 # Research paid into the fund.
 [[module]]
 id = "archive"
 name = "The Archive"
 materials = 50
-build_turns = 3
+widgets = 12
 energy_upkeep = 12
 
 # Ticket #68: the Research the Archive requires in all, paid into the Archive fund at any pace once
@@ -155,7 +161,7 @@ colonists_to_order = 4
 id = "observatory"
 name = "Observatory"
 materials = 28
-build_turns = 2
+widgets = 8
 energy_upkeep = 3
 produces = { resource = "research", amount = 2 }
 
@@ -171,7 +177,7 @@ research_per_colonist = 0.01
 id = "solar_array"
 name = "Solar Array"
 materials = 25
-build_turns = 2
+widgets = 8
 energy_upkeep = 0
 produces = { resource = "energy", amount = 6 }
 station_only = true
@@ -186,7 +192,7 @@ sun_scaled = true
 id = "mass_driver"
 name = "Mass Driver"
 materials = 35
-build_turns = 2
+widgets = 8
 energy_upkeep = 4
 needs_tech = "efficient_transit"
 low_gravity_only = true
@@ -195,13 +201,16 @@ low_gravity_only = true
 # with one; it is never ordered, never mothballed, never decommissioned, and does not count against
 # the Module cap. It holds `holds_colonists` people flat -- Expanded Habitats and the Arkwrights'
 # capacity multiplier reach a Habitat and not this -- so a place can take its first arrivals before
-# it has built anything, and `materials` and `build_turns` are zero because nobody buys it.
+# it has built anything, and `materials` and `widgets` are zero because nobody buys it.
+# Ticket #332 (version 0.09.0): and it makes ONE Widget a turn, the base every Colony and station
+# builds on with no Factory Module; `widgets` is nought as `materials` is, since nobody orders it.
 [[module]]
 id = "core"
 name = "Core Module"
 materials = 0
-build_turns = 0
+widgets = 0
 energy_upkeep = 1
+produces = { resource = "widgets", amount = 4 }
 does = "holds 4 Colonists and never counts against the Colony's room for Modules"
 holds_colonists = 4
 
@@ -213,7 +222,7 @@ holds_colonists = 4
 id = "institute"
 name = "Institute"
 materials = 25
-build_turns = 2
+widgets = 8
 energy_upkeep = 2
 does = "raises this place's Education Level 0.20 a turn, to 2.0; it falls back at the same rate when the Institute stops"
 
@@ -226,7 +235,7 @@ does = "raises this place's Education Level 0.20 a turn, to 2.0; it falls back a
 id = "academy"
 name = "Academy"
 materials = 25
-build_turns = 2
+widgets = 8
 energy_upkeep = 2
 does = "does an Institute's work and pays 1 Ducat a turn while it is online"
 
@@ -239,7 +248,7 @@ does = "does an Institute's work and pays 1 Ducat a turn while it is online"
 id = "heliostat"
 name = "Heliostat"
 materials = 25
-build_turns = 2
+widgets = 8
 energy_upkeep = 0
 produces = { resource = "energy", amount = 6 }
 station_only = true
@@ -253,7 +262,7 @@ sun_scaled = true
 id = "exchange"
 name = "Exchange"
 materials = 25
-build_turns = 1
+widgets = 4
 energy_upkeep = 2
 does = "pays 1 Ducat more a turn than a Trade Post"
 produces = { resource = "ducats", amount = 2 }
@@ -271,26 +280,42 @@ mine_bonus = 1
 id = "chorus"
 name = "Chorus"
 materials = 25
-build_turns = 1
+widgets = 4
 energy_upkeep = 2
 influence_allotment = 1
 standing_per_turn = 2
 
 # Ticket #324 (version 0.08.8): the Battery, the one Module that fights. On a Colony or a station.
-# It is a party in the orbital Battle at its Body whenever one is fought there, on Hold, at these
-# figures; it never disengages and Hardened Hulls does not reach it. While one stands and works, no
-# rival holds Orbital Control at its Body -- no landing, no Blockade against its owner -- and the
+# Ticket #335 (version 0.09.0): it covers ONE ORBIT, its own -- a ground Colony's Battery low orbit,
+# a station's its station's orbit -- where before it reached the whole Body. It is a party in any
+# Battle fought in that orbit, on Hold, at these figures; it never disengages and Hardened Hulls
+# does not reach it. While one stands and works, no rival holds Control in the orbit it covers and
+# no Blockade shuts it, so a ground Colony's Battery is what keeps a fleet off the surface; the
 # owner gains no Control by it. Damage is repaired with Materials as a Ship's is, at the Colony
 # itself; destroyed, it is gone. Appended last, as the Core Module was.
 [[module]]
 id = "battery"
 name = "Battery"
 materials = 25
-build_turns = 1
+widgets = 4
 energy_upkeep = 3
 strength = 4
 hit_points = 6
-does = "fires at rival Ship stacks in orbit here; while it stands no rival holds Orbital Control"
+does = "fires at rival Ship stacks in the one orbit it covers; while it stands no rival holds that orbit"
+
+# Ticket #332 (version 0.09.0): the Factory Module, the one Module that makes Widgets off Earth:
+# `amount` a turn, FLAT -- no Body yield, no slot yield, no Tech -- so a Colony's queue moves at
+# more than its Core Module's one. The Faction's output multiplier applies as it does to the Earth
+# Factory; Production Moved doubles it while a Factory of the Custodians' stands mothballed on
+# Earth. On Earth (Antarctica) it emits as the Facility does. Appended last, as the Battery was.
+[[module]]
+id = "factory"
+name = "Factory"
+materials = 20
+widgets = 4
+energy_upkeep = 3
+produces = { resource = "widgets", amount = 4 }
+earth_emissions = 1.0
 
 # Ticket #88 (version 0.06.0): build it where you dig. A Module (the Archive included) built at a
 # Colony with one working Mine costs `one_mine` of its price, with two or more `two_mines`,

@@ -133,6 +133,9 @@ pub fn facility_icon(kind: dying_earth_engine::FacilityKind) -> &'static str {
         Spaceport => "facility_spaceport",
         Reactor => "facility_reactor",
         Academy => "facility_academy",
+        // Ticket #332 (version 0.09.0): the Mine Facility wears the Mine Module's picture for now,
+        // as the Refinery wears its Module's; the interface lane settles the glyphs.
+        Mine => "module_mine",
     }
 }
 
@@ -168,6 +171,9 @@ pub fn module_icon(kind: dying_earth_engine::ModuleKind) -> &'static str {
         Archive => "module_archive",
         // Ticket #324 (version 0.08.8): the Battery's glyph is the game's own drawing, in DRAWN.
         Battery => "module_battery",
+        // Ticket #332 (version 0.09.0): the Factory Module wears the Earth Factory's picture, as
+        // the Institute wears the School's; the interface lane settles the glyphs.
+        Factory => "facility_factory",
         // Ticket #164 (version 0.07.5): the Core Module wears the station glyph the game drew for
         // itself on ticket #135 -- two solar panels on a bar with a module between them, which is
         // what a core module is. It owes no credit. A ground Colony's Core Module wears it too,
@@ -209,7 +215,10 @@ pub fn faction_symbol(kind: dying_earth_engine::FactionKind) -> &'static str {
 /// kind glyph and sits on a disc in the aggressor's colour, since on this board a colour says whose.
 /// Ticket #324 (version 0.08.8): the Battery's glyph, a turret on a mount with its barrel raised,
 /// drawn by hand as the Battle mark was, so it owes no credit.
-pub const DRAWN: [&str; 4] = ["station", "facility_school", "battle", "module_battery"];
+/// Ticket #332 (version 0.09.0): the Widgets' glyph, a cog -- a ring with eight teeth and a bore
+/// -- drawn in-house at the designer's word, so it owes no credit. It is a FIGURE like the
+/// Materials' cart, and takes a fill of its own in `FIGURES` below.
+pub const DRAWN: [&str; 5] = ["station", "facility_school", "battle", "module_battery", "widgets"];
 
 impl Credit {
     /// The file stem in `assets/icons/` this credit is for: the name, lower-cased, spaces to
@@ -352,8 +361,14 @@ impl Icons {
 /// Ticket #127 (version 0.07.2): a ninth entry, **kind**, is the one fill every kind glyph wears --
 /// "keep these off white," the designer said of the five -- named here rather than left to fall
 /// through to NEUTRAL, so that retuning the fallback for some later glyph cannot move them.
-const FIGURES: [(&str, [u8; 3]); 9] = [
+///
+/// Ticket #332 (version 0.09.0): a tenth, **widgets**, a steel blue. The hue sits between the
+/// Research figure's light cyan and Influence's lavender and is well clear of the Materials' grey
+/// it stands beside on the bar, which is the pair it must never be mistaken for: the two are the
+/// two halves of every build's price.
+const FIGURES: [(&str, [u8; 3]); 10] = [
     ("materials", [168, 176, 186]),
+    ("widgets", [108, 148, 232]),
     ("fuel", [226, 88, 62]),
     ("energy", [245, 222, 92]),
     ("research", [118, 206, 232]),

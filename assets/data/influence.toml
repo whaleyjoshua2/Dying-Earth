@@ -3,7 +3,16 @@ allotment_base = 10
 # allotment_per_state (3) was retired on ticket #34: each state carries its own influence figure in nation_states.toml.
 state_threshold_base = 20
 state_threshold_per_size = 10
-colony_threshold_per_colonist = 10
+# Ticket #336 (version 0.09.0): 10 to 20, at the designer's word -- "double influence needed to
+# take a space station or colony". Beside it a base of its own under EVERY place off Earth, so a
+# place nobody has moved into still costs something to take: a ground Colony with no Colonists was
+# worth nothing at all and went for a single point of Standing. The station base below REPLACES
+# this one on a station rather than sitting on top of it, so a station and a ground Colony of the
+# same crew are worth the same figure; both bases stay separate figures so they can diverge again
+# without a rule change. The challenge margin does NOT double: it is shared with Earth, so on a
+# settled place the binding figure is still the holder's Standing plus 20.
+colony_threshold_per_colonist = 20
+colony_threshold_base = 40
 decay = 2
 # Ticket #33 (version 0.03): standings persist; a place you control decays slower. A challenger
 # needs a standing above the controller's and at least the threshold.
@@ -31,7 +40,11 @@ constabulary_margin = 5
 # it helps whoever HOLDS a garrisoned Region and hinders whoever wants one.
 constabulary_margin_defended = 10
 # Version 0.04 (ticket #46): a station's threshold starts here, plus the per-Colonist figure.
-station_threshold_base = 20
+# Ticket #336 (version 0.09.0): 20 to 40 with the doubling, and it REPLACES `colony_threshold_base`
+# rather than adding to it -- a station of N Colonists is 40 + 20N, exactly what a ground Colony of
+# N is, where it was dearer by 20 since stations existed. The designer chose that over keeping the
+# distinction.
+station_threshold_base = 40
 occupation_turns = 3
 # Spec 8.5: each building at a place rolls this to be destroyed. Ticket #298 (version 0.08.6): on
 # ONE occasion only -- a place transferring by the three-turn clock. A Battle burns nothing, a

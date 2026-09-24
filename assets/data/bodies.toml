@@ -7,6 +7,10 @@
 
 sibling_turns = 1
 sibling_fuel = 1
+# Ticket #335 (version 0.09.0): moving a Ship between two orbits of one Body -- low orbit and the
+# Orbital Slots -- is an order costing this much Fuel from the Ship's own tank, the sibling hop's
+# figure at the designer's word. Refused below it.
+orbit_change_fuel = 1
 # Version 0.04 (ticket #46): a Space Station is built for this many Materials into a free orbital
 # slot, from a Nation State with a Launch Site (over Earth) or a Colony (elsewhere); no crew needed.
 # It holds only a Shipyard and Habitats. Ships are built only at Shipyards. Each Body names its
