@@ -162,6 +162,8 @@ fn main() {
                         // Ticket #241 (version 0.08.3): the figures 0.08.2 named as missing, and this
                         // version's own.
                         let (mut d_made, mut d_spent): (Vec<[i64; 4]>, Vec<[i64; 4]>) = (vec![], vec![]);
+                        let mut m_made: Vec<[i64; 4]> = vec![];
+                        let (mut mines_done, mut factories_done) = (0u32, 0u32);
                         let mut d_mean: Vec<[f64; 4]> = vec![];
                         let mut d_below = [0u32; 4];
                         let (mut ex_calls, mut ex_pioneers, mut acc_struck) = (0u32, 0u32, 0u32);
@@ -248,6 +250,9 @@ fn main() {
                             ground_colonies += r.ground_colonies;
                             solar_arrays += r.solar_arrays;
                             d_made.push(r.ducats_made);
+                            m_made.push(r.materials_made);
+                            mines_done += r.mines_completed;
+                            factories_done += r.factories_completed;
                             d_spent.push(r.ducats_spent);
                             d_mean.push(r.directive_mean);
                             ex_calls += r.exodus_calls;
@@ -384,6 +389,7 @@ fn main() {
                             let q_i = |v: &Vec<[i64; 4]>| [med_i(v, 0), med_i(v, 1), med_i(v, 2), med_i(v, 3)];
                             let mean_f = |v: &Vec<[f64; 4]>, seat: usize| if v.is_empty() { 0.0 } else { v.iter().map(|x| x[seat]).sum::<f64>() / v.len() as f64 };
                             println!("      Ducats over a game (median), by seat -- made {:?}, spent {:?}", q_i(&d_made), q_i(&d_spent));
+                            println!("      Materials income over a game (median), by seat {:?}; Mines completed over the batch {mines_done}, Factories {factories_done}", q_i(&m_made));
                             println!("      Research Directive: mean % KEPT BACK from the shared pot, by seat [{:.0}, {:.0}, {:.0}, {:.0}]; turns under an 85% contribution over the batch {:?}",
                                 mean_f(&d_mean, 0), mean_f(&d_mean, 1), mean_f(&d_mean, 2), mean_f(&d_mean, 3), d_below);
                             println!("      Accords STRUCK over the batch: {acc_struck} (against {accords} standing at the end)");

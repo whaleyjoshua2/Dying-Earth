@@ -626,7 +626,8 @@ impl Game {
         let advances_first = |cat: Cat, item: Option<&str>| -> bool {
             match first_kind {
                 VictoryFirstKind::VentureFund => {
-                    cat == Cat::Producer && item.map(|i| i != "Power Plant" && i != "Generator").unwrap_or(false)
+                    // Ticket #332 (version 0.09.0): nor a Factory, whose Widgets fill no Fund.
+                    cat == Cat::Producer && item.map(|i| i != "Power Plant" && i != "Generator" && i != "Factory").unwrap_or(false)
                         || cat == Cat::RaiseIndustry
                         // Ticket #54: a Strip Permit is three turns of double Extraction.
                         || cat == Cat::StripPermit
@@ -664,7 +665,10 @@ impl Game {
             }
             // Likewise nothing is built without Materials: until the seat has any Materials income,
             // a Materials producer counts as advancing the part it is behind on.
-            let materials_producer = cat == Cat::Producer && matches!(item, Some("Factory") | Some("Mine"));
+            // Ticket #332 (version 0.09.0): the Mine alone. A Factory makes Widgets now, and a seat
+            // short of Materials that read it as a Materials producer built 541 Factories to 283
+            // Mines over twenty games and earned 265 Materials in a whole one.
+            let materials_producer = cat == Cat::Producer && item == Some("Mine");
             if materials_producer && needs.contains(&Resource::Materials) {
                 return gap;
             }
@@ -713,10 +717,16 @@ impl Game {
                         continue;
                     }
                     let job = fk.common().unwrap_or(fk);
+                    // Ticket #332 (version 0.09.0): a Factory is wanted where the Region's queue is
+                    // `factory_module_queue_depth` deep, as the Factory Module is at a Colony, and
+                    // nowhere else: Widgets a Region does not spend are lost, so a Factory beside an
+                    // empty queue is a slot and twenty Materials for nothing.
+                    if job == FacilityKind::Factory && self.state(sid).queue.len() < th.factory_module_queue_depth {
+                        continue;
+                    }
                     let (cat, mut base) = match job {
                         // Ticket #332 (version 0.09.0): the Mine is a producer as the Factory was;
-                        // the Factory, making Widgets now, keeps its arm. The computer seats' wants
-                        // for the two are the AI lane's.
+                        // the Factory, making Widgets now, keeps its arm behind the queue test above.
                         FacilityKind::Factory | FacilityKind::Mine | FacilityKind::PowerPlant | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                         FacilityKind::ResearchLab => (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab)),
                         // Ticket #185 (version 0.08.0): the School is a Research building in all but

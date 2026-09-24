@@ -194,6 +194,12 @@ pub struct SimResult {
     /// rise of 0.08.2 has never been shown to be what moved the collapse rate. Spending is measured
     /// rather than inferred -- held before the turn, plus the turn's income, less held after.
     pub ducats_made: [i64; SEAT_COUNT],
+    /// Ticket #332 (version 0.09.0): Materials income summed over the game, by seat, and the Mines
+    /// and Factories completed (Earth and off it together, by the log line), so a Materials-starved
+    /// column can be told from a Widgets-starved one.
+    pub materials_made: [i64; SEAT_COUNT],
+    pub mines_completed: u32,
+    pub factories_completed: u32,
     pub ducats_spent: [i64; SEAT_COUNT],
     /// Ticket #241: the **Research Directive** each seat actually ran, as the mean percentage kept
     /// back from the shared pot over the game, and the turns it sat below the 85% contribution the
@@ -279,6 +285,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     let (mut moments_earned, mut moments_shown, mut turns_with_moment, mut most_moments_in_a_turn) = (0u32, 0u32, 0u32, 0u32);
     // Ticket #241 (version 0.08.3): the figures 0.08.2 named as missing, and this version's own.
     let (mut ducats_made, mut ducats_spent) = ([0i64; SEAT_COUNT], [0i64; SEAT_COUNT]);
+    let mut materials_made = [0i64; SEAT_COUNT];
     let (mut directive_sum, mut directive_turns_below, mut directive_samples) = ([0f64; SEAT_COUNT], [0u32; SEAT_COUNT], 0u32);
     // Ticket #290 (version 0.08.6): the opening, sampled once turn three has resolved.
     let mut opening_modules = [0u32; SEAT_COUNT];
@@ -301,6 +308,7 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
             let i = s_.index();
             let income = game.seat(s_).income_last_turn.ducats;
             ducats_made[i] += income;
+            materials_made[i] += game.seat(s_).income_last_turn.materials;
             ducats_spent[i] += (held_before[i] + income - game.seat(s_).stockpile.ducats).max(0);
             // The share KEPT BACK from the shared pot, sampled every turn, and the turns spent
             // under the 85% contribution the shared-pot rule asks for.
@@ -428,6 +436,8 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
     // population the refugee flows carried (to the tenth the line prints).
     let throw_offs = game.log.iter().filter(|l| l.contains("threw off the")).count() as u32;
     let constabularies = game.log.iter().filter(|l| l.contains("completed Constabulary at")).count() as u32;
+    let mines_completed = game.log.iter().filter(|l| l.contains("completed Mine at")).count() as u32;
+    let factories_completed = game.log.iter().filter(|l| l.contains("completed Factory at")).count() as u32;
     let relief_orders = game.log.iter().filter(|l| l.trim_start().starts_with("take") && l.contains("pay Relief in")).count() as u32;
     let population_moved: f64 = game
         .log
@@ -641,6 +651,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         bought,
         sold,
         ducats_made,
+        materials_made,
+        mines_completed,
+        factories_completed,
         ducats_spent,
         directive_mean,
         directive_turns_below,

@@ -10848,6 +10848,29 @@ fn a_factory_module_may_stand_on_a_station() {
 }
 
 
+/// Ticket #332 (version 0.09.0): a Factory on Earth makes Widgets, not Materials, and Widgets a
+/// Region does not spend are lost. So the computer wants a Factory only where its queue is
+/// `factory_module_queue_depth` deep, as it wants the Factory Module, and a seat short of
+/// Materials is pulled toward the Mine and never the Factory. Measured before this held: 541
+/// Factories completed to 283 Mines over twenty games, and a Custodian seat's Materials income
+/// over a whole game was 265.
+#[test]
+fn the_computer_builds_no_factory_where_nothing_is_queued() {
+    let mut g = fresh();
+    g.seat_mut(Seat(0)).stockpile.materials = 300;
+    g.seat_mut(Seat(0)).stockpile.energy = 100;
+    for turn in 0..6 {
+        let orders = g.ai_orders(Seat(0));
+        assert!(
+            !orders.iter().any(|o| matches!(o, Order::BuildFacility { kind: FacilityKind::Factory, .. })),
+            "turn {turn}: no Region of the Custodians has a two-deep queue, so no Factory is ordered: {orders:?}"
+        );
+        pick_a_tech(&mut g);
+        g.end_turn(std::array::from_fn(|s| if s == 0 { orders.clone() } else { Vec::new() })).unwrap();
+    }
+}
+
+
 // -------------------------------------------- 0.08.7 ticket #310: the threat line
 
 /// Ticket #310 (version 0.08.7): the military threat to a held Region is the rival RAISED Army
