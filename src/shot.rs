@@ -278,10 +278,9 @@ fn build_board(session: &mut Session) {
             let slot = g.free_slots_on(BodyId::Mars).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
             let mut modules = vec![Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Habitat), Module::new(ModuleKind::Generator), Module::new(ModuleKind::Mine)];
-            let turn = g.turn;
             let mut queue = Vec::new();
             if point == 0 {
-                queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat: Seat(0), due_turn: turn + 1, coastal: false });
+                queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat: Seat(0), widgets: 12, done: 4, coastal: false });
             } else {
                 modules.push(Module::new(ModuleKind::Archive));
             }
@@ -583,11 +582,11 @@ fn build_board(session: &mut Session) {
         if std::env::args().any(|a| a == "underway:1") {
             let turn = g.turn;
             if let Some(sid) = g.directed_states(Seat(0)).first().copied() {
-                g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Factory), seat: Seat(0), due_turn: turn + 2, coastal: false });
+                g.state_mut(sid).queue.push(Build { item: BuildItem::Facility(FacilityKind::Factory), seat: Seat(0), widgets: 4, done: 0, coastal: false });
             }
             let slot = g.free_slots_on(BodyId::Moon).first().copied().unwrap_or(0);
             let id = ColonyId(g.fresh_id());
-            let queue = vec![Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), due_turn: turn, coastal: false }];
+            let queue = vec![Build { item: BuildItem::Module(ModuleKind::Mine), seat: Seat(0), widgets: 4, done: 3, coastal: false }];
             g.colonies.push(Colony { id, body: BodyId::Moon, slot, control: Control::Controlled(Seat(0)), modules: vec![Module::new(ModuleKind::Habitat)], colonists: 4, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
             let sid = ShipId(g.fresh_id());
             let name = g.next_ship_name(UnitKind::Frigate);

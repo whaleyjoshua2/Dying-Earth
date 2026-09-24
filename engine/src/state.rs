@@ -191,11 +191,20 @@ impl BuildItem {
     }
 }
 
+/// One build under way at a place. Ticket #332 (version 0.09.0): it carries a Widget figure and a
+/// count in place of a due turn. The place's Widgets fill `done` each Resolution in queue order,
+/// and the build completes at the Resolution `done` reaches `widgets`; a build never completes
+/// short of its figure, and nothing here is a turn count.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Build {
     pub item: BuildItem,
     pub seat: Seat,
-    pub due_turn: u32,
+    /// The Widgets the build needs: the row's figure times the seat's Faction discount for the
+    /// kind, floored, never below 1. Fixed at the order, as the Materials are.
+    pub widgets: u32,
+    /// The Widgets applied so far. An outright buy in Ducats starts with `done == widgets`, so it
+    /// completes at the next Resolution ahead of the queue.
+    pub done: u32,
     /// Ticket #56: the slot a Facility build in a Nation State reserved, coastal or inland. False
     /// for everything else, which has no slot of this kind to reserve.
     pub coastal: bool,
@@ -979,6 +988,20 @@ pub struct WarCounters {
     pub modules_burned: [u32; SEAT_COUNT],
 }
 
+/// Ticket #332 (version 0.09.0): Widgets, counted where they are made and spent, so the sweep can
+/// say them. A place's Widgets are counted to its director; a Region nobody directs makes its base
+/// and is counted to nobody. Every figure is a counter incremented at the event.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WidgetCounters {
+    /// Widgets made a game, by the director of the place that made them.
+    pub made: [i64; SEAT_COUNT],
+    /// Of those, applied to a build under way; and lost, which is the rest.
+    pub applied: [i64; SEAT_COUNT],
+    pub lost: [i64; SEAT_COUNT],
+    /// The depth of every directed place's queue at every Resolution, for the median.
+    pub queue_depths: Vec<u32>,
+}
+
 impl WarCounters {
     /// Sum another game's counters into this one, for the sweep.
     pub fn add(&mut self, o: &WarCounters) {
@@ -1191,6 +1214,8 @@ pub struct Game {
     pub armies: Vec<Army>,
     /// Ticket #286 (version 0.08.5): the war, counted on the game so the sweep can say it.
     pub war: WarCounters,
+    /// Ticket #332 (version 0.09.0): Widgets made, applied and lost, and the queues' depths.
+    pub widgets: WidgetCounters,
     /// Ticket #282 (version 0.08.5): Levies raised and neutral Regions that held against an attack
     /// over the game, for the sweep.
     pub levies_raised: u32,
@@ -1386,6 +1411,7 @@ impl Game {
             ships: Vec::new(),
             armies: Vec::new(),
             war: WarCounters::default(),
+            widgets: WidgetCounters::default(),
             levies_raised: 0,
             neutral_holds: 0,
             climate: Climate {
@@ -2751,16 +2777,21 @@ impl Game {
     /// turns left. The Faction window's Under way block reads this; the Report or the AI could.
     /// Builds are counted by the seat that ORDERED them (`Build.seat`), so a build begun in a Region
     /// that has since changed hands stays with whoever paid for it.
+    /// Ticket #332 (version 0.09.0): the turns are an ESTIMATE at the place's Widgets a turn behind
+    /// everything ahead of the build in its queue (`queue_estimates`), since a build has no due turn
+    /// any more; a place that makes nothing reads `u32::MAX`.
     pub fn under_way(&self, seat: Seat) -> UnderWay {
         let mut builds: Vec<(String, Place, u32)> = Vec::new();
         for sid in StateId::ALL {
-            for b in self.state(sid).queue.iter().filter(|b| b.seat == seat) {
-                builds.push((b.item.name(), Place::State(sid), b.due_turn.saturating_sub(self.turn) + 1));
+            let turns = self.queue_estimates(Place::State(sid));
+            for (b, t) in self.state(sid).queue.iter().zip(turns).filter(|(b, _)| b.seat == seat) {
+                builds.push((b.item.name(), Place::State(sid), t));
             }
         }
         for c in &self.colonies {
-            for b in c.queue.iter().filter(|b| b.seat == seat) {
-                builds.push((b.item.name(), Place::Colony(c.id), b.due_turn.saturating_sub(self.turn) + 1));
+            let turns = self.queue_estimates(Place::Colony(c.id));
+            for (b, t) in c.queue.iter().zip(turns).filter(|(b, _)| b.seat == seat) {
+                builds.push((b.item.name(), Place::Colony(c.id), t));
             }
         }
         let mut transits: Vec<(String, String, String, u32)> = Vec::new();

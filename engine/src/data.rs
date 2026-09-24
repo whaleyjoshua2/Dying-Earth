@@ -116,7 +116,10 @@ pub struct FacilityCard {
     pub id: FacilityKind,
     pub name: String,
     pub materials: i64,
-    pub build_turns: u32,
+    /// Ticket #332 (version 0.09.0): the Widgets the build needs, four for every turn it took
+    /// under the flat count this replaces. It completes at the Resolution its place's Widgets
+    /// reach it, so a place making four a turn builds it at the old pace and a busier one slower.
+    pub widgets: u32,
     pub energy_upkeep: i64,
     pub produces: Option<Produces>,
     /// Ticket #280 (version 0.08.5): what the building does, in a sentence, where it is not a
@@ -216,7 +219,15 @@ pub struct MothballCard {
 pub struct IndustryLevelCard {
     pub materials: i64,
     pub materials_cheap_industry: i64,
-    pub build_turns: u32,
+    /// Ticket #332 (version 0.09.0): the Widgets a raise needs, in place of its flat turn.
+    pub widgets: u32,
+}
+
+/// Ticket #332 (version 0.09.0): the Widgets a Region makes a turn with no Factory at all, per
+/// point of Industry Level (`facilities.toml`). A Colony's base is its Core Module's own row.
+#[derive(Debug, Clone, Deserialize)]
+pub struct WidgetsCard {
+    pub per_industry_level: u32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -224,7 +235,8 @@ pub struct ModuleCard {
     pub id: ModuleKind,
     pub name: String,
     pub materials: i64,
-    pub build_turns: u32,
+    /// Ticket #332 (version 0.09.0): the Widgets the build needs, four for every former turn.
+    pub widgets: u32,
     pub energy_upkeep: i64,
     pub produces: Option<Produces>,
     /// Ticket #280 (version 0.08.5): what the Module does, in a sentence, where it is not a
@@ -275,7 +287,8 @@ pub struct UnitCard {
     pub id: UnitKind,
     pub name: String,
     pub materials: i64,
-    pub build_turns: u32,
+    /// Ticket #332 (version 0.09.0): the Widgets the build needs, four for every former turn.
+    pub widgets: u32,
     pub energy_upkeep: i64,
     pub strength: i64,
     pub hit_points: u32,
@@ -1111,6 +1124,7 @@ pub struct DevelopmentTable {
 struct FacilitiesFile {
     facility: Vec<FacilityCard>,
     industry_level: IndustryLevelCard,
+    widgets: WidgetsCard,
     scrubber: ScrubberCard,
     sea_wall: SeaWallCard,
     mothball: MothballCard,
@@ -1438,6 +1452,8 @@ pub struct Tables {
     pub coastal_per_exposure: u32,
     pub facilities: Vec<FacilityCard>,
     pub industry_level: IndustryLevelCard,
+    /// Ticket #332 (version 0.09.0): a Region's base Widgets per Industry Level.
+    pub widgets: WidgetsCard,
     /// Ticket #54: the Scrubber cap and the Mothball prices (`facilities.toml`).
     pub scrubber: ScrubberCard,
     pub mothball: MothballCard,
@@ -1571,6 +1587,7 @@ impl Tables {
             coastal_per_exposure: states.coastal_per_exposure,
             facilities: facilities.facility,
             industry_level: facilities.industry_level,
+            widgets: facilities.widgets,
             scrubber: facilities.scrubber,
             mothball: facilities.mothball,
             sea_wall: facilities.sea_wall,
@@ -1712,6 +1729,22 @@ impl Tables {
             if f.coastal_only && f.no_slot {
                 return Err(err("facilities.toml", format!("row {}: a coastal-only Facility must take a build slot", f.name)));
             }
+        }
+        // Ticket #332 (version 0.09.0): a build of nought Widgets would complete at a place that
+        // makes none, which is not a rule anybody wrote. Every row that can be ordered carries a
+        // figure; the Core Module alone is exempt, since nobody orders it (its Materials are nought
+        // for the same reason).
+        if let Some(f) = self.facilities.iter().find(|f| f.widgets == 0) {
+            return Err(err("facilities.toml", format!("row {}: widgets must be at least 1", f.name)));
+        }
+        if let Some(m) = self.modules.iter().find(|m| m.widgets == 0 && m.id != ModuleKind::Core) {
+            return Err(err("modules.toml", format!("row {}: widgets must be at least 1", m.name)));
+        }
+        if let Some(u) = self.units.iter().find(|u| u.widgets == 0) {
+            return Err(err("units.toml", format!("row {}: widgets must be at least 1", u.name)));
+        }
+        if self.industry_level.widgets == 0 || self.widgets.per_industry_level == 0 {
+            return Err(err("facilities.toml", "[industry_level] widgets and [widgets] per_industry_level must both be at least 1"));
         }
         for t in &self.techs {
             for n in &t.needs {

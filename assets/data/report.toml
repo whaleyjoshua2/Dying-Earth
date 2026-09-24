@@ -105,7 +105,9 @@ colonists_no_room = "{n} Colonists at {colony} had nowhere to live and were lost
 # Ticket #192 (version 0.08.0): the Upload, in the Report.
 uploaded = "{n} Colonists were uploaded into the Archive at {colony}: {total} in all."
 relations_fell = "The {victim} have not forgiven the {offender}."
-launch_pad_fire = "Launch Pad Fire: the {faction} {item} at {place} completes next turn instead."
+# Ticket #332 (version 0.09.0): the fire takes the turn's Widgets from its Region, so nothing there
+# moves; before, it pushed a due Ship back a turn.
+launch_pad_fire = "Launch Pad Fire: {place} applies no Widgets this turn; {widgets} lost."
 game_over_win = "Game over on turn {turn}: the {faction} win ({note})."
 game_over_draw = "Game over on turn {turn}: a draw ({note})."
 game_over_collapse = "Game over on turn {turn}: Collapse at {temperature} C. Nobody wins."
@@ -155,6 +157,9 @@ leapfrog = "The {faction} Leapfrogged {state}: its people now emit {coefficient}
 # Your works
 tech_complete = "{tech} is complete; every Faction has it. The {faction} led ({shares}) and pick the next Tech."
 build_complete = "{faction} completed {building} at {place}."
+# Ticket #332 (version 0.09.0): a build under way at a place that changed hands, cancelled by its
+# new holder: the Materials are the holder's prize, at the holder's own price.
+build_cancelled = "{faction} cancelled the {building} under way at {place}: {refund} Materials to their Stockpile."
 energy_short = "{faction}: Energy ran short; shut down {buildings}."
 energy_zero = "{faction}: Energy fell to zero even with every producer off."
 
@@ -197,6 +202,7 @@ build_module = "began a {building} at {colony}"
 build_module_ducats = "bought a {building} at {colony}"
 build_ship = "began a {unit} at {place}"
 build_army = "began an Army at {place}"
+cancel_build = "cancelled the {building} under way at {place}"
 build_station = "began a Space Station over {body}"
 build_archive = "began the Archive at {colony}"
 # Ticket #192 (version 0.08.0): the Upload, in the rival-deeds paragraph.

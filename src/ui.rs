@@ -3797,6 +3797,11 @@ fn order_text(game: &Game, o: &Order) -> String {
             format!("Offer the {} an Accord: {}", game.seat_name(*to), names.join(", "))
         }
         Order::EndAccord { with } => format!("Declare your Accord with the {} over", game.seat_name(*with)),
+        // Ticket #332 (version 0.09.0): a rival's build cancelled at a place that changed hands.
+        Order::CancelBuild { place, index } => {
+            let building = game.queue_at(*place).get(*index).map(|b| b.item.name()).unwrap_or_else(|| "build".to_string());
+            format!("Cancel the {building} under way at {}", game.place_name(*place))
+        }
         Order::Tribute { to, materials } => format!("Pay the {} a tribute in {}", game.seat_name(*to), if *materials { "Materials" } else { "Ducats" }),
         Order::BuildFacility { state, kind } => format!("Build {} in {}", kind.name(), game.tables.state(*state).name),
         Order::RaiseIndustry { state } => format!("Raise Industry Level in {}", game.tables.state(*state).name),
@@ -4235,12 +4240,16 @@ fn priced_button(ui: &mut Ui, enabled: bool, label: &str, cost: &dying_earth_eng
 /// Ticket #121 (version 0.07.2): how long a building takes, for the hover, where the game's data
 /// says. `None` for an order that builds nothing -- a Mothball, a Relief -- which then gets no
 /// "ready" line at all.
+/// Ticket #332 (version 0.09.0): an ESTIMATE at the place's Widgets a turn behind its queue
+/// (`Game::turns_to_build`), since a build has no flat turn count any more; `u32::MAX` where the
+/// place makes nothing. A Ducat buy completes next turn whatever the queue.
 fn build_turns_for(game: &Game, order: &Order) -> Option<u32> {
     match order {
-        Order::BuildFacility { kind, .. } | Order::BuildFacilityWithDucats { kind, .. } => Some(game.tables.facility(*kind).build_turns),
-        Order::BuildModule { kind, .. } | Order::BuildModuleWithDucats { kind, .. } => Some(game.tables.module(*kind).build_turns),
-        Order::BuildShip { kind, .. } => Some(game.tables.unit(*kind).build_turns),
-        Order::BuildArchive { .. } => Some(game.tables.module(ModuleKind::Archive).build_turns),
+        Order::BuildFacility { state, kind } => Some(game.turns_to_build(Seat(0), Place::State(*state), BuildItem::Facility(*kind))),
+        Order::BuildModule { colony, kind } => Some(game.turns_to_build(Seat(0), Place::Colony(*colony), BuildItem::Module(*kind))),
+        Order::BuildFacilityWithDucats { .. } | Order::BuildModuleWithDucats { .. } => Some(1),
+        Order::BuildShip { site, kind } => Some(game.turns_to_build(Seat(0), *site, BuildItem::Unit(*kind))),
+        Order::BuildArchive { colony } => Some(game.turns_to_build(Seat(0), Place::Colony(*colony), BuildItem::Module(ModuleKind::Archive))),
         _ => None,
     }
 }
@@ -4286,7 +4295,7 @@ fn cost_button_with_hover(ui: &mut Ui, game: &Game, pending: &[Order], order: Or
     let cost = game.order_cost(Seat(0), &order);
     let check = game.check_order(Seat(0), pending, &order);
     let mut resp = priced_button(ui, check.is_ok(), label, &cost);
-    let ready = build_turns_for(game, &order).map(|t| if t <= 1 { "Ready next turn:".to_string() } else { format!("Ready in {t} turns:") });
+    let ready = build_turns_for(game, &order).map(|t| if t == u32::MAX { "Nothing here makes Widgets:".to_string() } else if t <= 1 { "Ready next turn:".to_string() } else { format!("Ready in about {t} turns:") });
     let whole = match (&ready, &hover) {
         (Some(r), Some(h)) => Some(format!("{r} {h}")),
         (None, Some(h)) => Some(h.clone()),
@@ -4790,7 +4799,7 @@ fn no_slot_section(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, mi
         if let BuildItem::Facility(k) = b.item
             && !game.takes_slot(k)
         {
-            ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
+            ui.label(format!("  {} under construction, {} of {} Widgets", b.item.name(), b.done, b.widgets));
         }
     }
     if !mine {
@@ -4852,7 +4861,8 @@ const COAST_EDGE: Color32 = Color32::from_rgb(90, 150, 230);
 /// Ticket #146 (version 0.07.3): what one slot box on a Region's card shows.
 enum SlotBoxKind {
     Standing(usize),
-    /// The kind building and the turn it is ready.
+    /// The kind building and, since ticket #332, the turns it is estimated to take at the
+    /// Region's Widgets behind its queue.
     Building(FacilityKind, u32),
     /// Ticket #291 (version 0.08.6): the kind ORDERED this turn and not yet committed, with its
     /// index in the pending list, so a right-click on the box can cancel it.
@@ -4908,12 +4918,14 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                 boxes.push((SlotBoxKind::Standing(i), coastal));
             }
         }
-        for b in &st.queue {
+        // Ticket #332 (version 0.09.0): the figure on a building box is the estimate at this
+        // Region's Widgets behind its queue, not a due turn.
+        for (b, turns) in st.queue.iter().zip(game.queue_estimates(Place::State(sid))) {
             if let BuildItem::Facility(k) = b.item
                 && b.coastal == coastal
                 && game.takes_slot(k)
             {
-                boxes.push((SlotBoxKind::Building(k, b.due_turn + 1), coastal));
+                boxes.push((SlotBoxKind::Building(k, turns), coastal));
             }
         }
         let ordered_here = ordered.iter().filter(|(_, _, c)| *c == coastal).count() as u32;
@@ -4952,17 +4964,17 @@ fn slot_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState,
                     view.slot_box = Some(SlotBox::Facility(*i));
                 }
             }
-            SlotBoxKind::Building(k, ready) => {
-                let turns = ready.saturating_sub(game.turn).max(1);
-                let tip = format!("{} ({side}): building, {turns} turn{} to go, ready turn {ready}.{}", k.name(), if turns == 1 { "" } else { "s" }, if *coastal { "\nOn the coast, the sea can take it at a threshold." } else { "" });
+            SlotBoxKind::Building(k, turns) => {
+                let turns = *turns;
+                let tip = format!("{} ({side}): building, about {turns} turn{} to go at this Region's Widgets.{}", k.name(), if turns == 1 { "" } else { "s" }, if *coastal { "\nOn the coast, the sea can take it at a threshold." } else { "" });
                 hab_tile(ui, rect, id, Some(crate::icons::facility_icon(*k)), k.name(), TileState::Building { ordered: false, turns }, false, edge, tip);
             }
             SlotBoxKind::Ordered(k, i) => {
                 // Ticket #291: ordered this turn. Right-click takes the order back, the same
                 // cancel the orders list's button does; the count is the card's build time, which
                 // starts at End Turn.
-                let turns = game.tables.facility(*k).build_turns.max(1);
-                let tip = format!("{} ({side}): ordered this turn, {turns} turn{} once the turn ends.\nRight-click to cancel the order.{}", k.name(), if turns == 1 { "" } else { "s" }, if *coastal { "\nOn the coast, the sea can take it at a threshold." } else { "" });
+                let turns = game.turns_to_build(Seat(0), Place::State(sid), BuildItem::Facility(*k));
+                let tip = format!("{} ({side}): ordered this turn, about {turns} turn{} once the turn ends.\nRight-click to cancel the order.{}", k.name(), if turns == 1 { "" } else { "s" }, if *coastal { "\nOn the coast, the sea can take it at a threshold." } else { "" });
                 if hab_tile(ui, rect, id, Some(crate::icons::facility_icon(*k)), k.name(), TileState::Building { ordered: true, turns }, false, edge, tip).secondary_clicked() {
                     actions.push(Action::Cancel(*i));
                 }
@@ -5695,12 +5707,12 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     if !col.modules.iter().any(|m| m.kind == ModuleKind::Archive)
         && let Some(b) = col.queue.iter().find(|b| b.item == BuildItem::Module(ModuleKind::Archive))
     {
-        ui.label(format!("  The Archive: building, {} turn(s) left", (b.due_turn + 1).saturating_sub(game.turn)));
+        ui.label(format!("  The Archive: building, {} of {} Widgets", b.done, b.widgets));
     }
     // Ticket #306 (version 0.08.7): a queued Module is on its hatched tile, so only what has no
     // tile is listed here, as the Region card's loop already does.
     for b in col.queue.iter().filter(|b| !matches!(b.item, BuildItem::Module(_))) {
-        ui.label(format!("  {} under construction, ready turn {}", b.item.name(), b.due_turn + 1));
+        ui.label(format!("  {} under construction, {} of {} Widgets", b.item.name(), b.done, b.widgets));
     }
     // Ticket #312 (version 0.08.7): the Colony's Armies block, as the Region card's: a heading, the
     // stance row under it, the rows, and the repairs under the player's own; a tenth larger.
@@ -5765,7 +5777,7 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
                 let label = format!("Build the Archive ({materials} Materials)");
                 let resp = ui
                     .add_enabled(check.is_ok(), egui::Button::new(label))
-                    .on_hover_text(format!("{} turns to raise; then the fund opens to the full {research} Research", game.tables.module(ModuleKind::Archive).build_turns));
+                    .on_hover_text(format!("{} Widgets to raise; then the fund opens to the full {research} Research", game.tables.module(ModuleKind::Archive).widgets));
                 if let Err(e) = &check {
                     resp.clone().on_disabled_hover_text(&e.0);
                 }
@@ -6791,7 +6803,9 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     let (used, cap) = (game.module_slots_used(col), game.module_slots(col));
     // The tiles, in the order the cap counts them: standing (the Archive apart), building, free.
     let standing: Vec<usize> = (0..col.modules.len()).filter(|i| col.modules[*i].kind != ModuleKind::Archive).collect();
-    let building: Vec<(ModuleKind, u32)> = col.queue.iter().filter_map(|b| if let BuildItem::Module(k) = b.item { if k == ModuleKind::Archive { None } else { Some((k, b.due_turn + 1)) } } else { None }).collect();
+    // Ticket #332 (version 0.09.0): the figure on a building tile is the estimate at this place's
+    // Widgets behind its queue, not a due turn.
+    let building: Vec<(ModuleKind, u32)> = col.queue.iter().zip(game.queue_estimates(Place::Colony(cid))).filter_map(|(b, turns)| if let BuildItem::Module(k) = b.item { if k == ModuleKind::Archive { None } else { Some((k, turns)) } } else { None }).collect();
     // Ticket #291 (version 0.08.6): the Modules ORDERED this turn and not yet committed, as the
     // Faction's own kind (#186), each with its index in the pending list for the right-click that
     // cancels it. They take their places from the free count, as the rule already did at the
@@ -6835,16 +6849,16 @@ fn module_boxes(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
         }
         i += 1;
     }
-    for (bi, (kind, ready)) in building.iter().enumerate() {
-        let turns = ready.saturating_sub(game.turn).max(1);
-        let tip = format!("{}: building, {turns} turn{} to go, ready turn {ready}.", kind.name(), if turns == 1 { "" } else { "s" });
+    for (bi, (kind, turns)) in building.iter().enumerate() {
+        let turns = *turns;
+        let tip = format!("{}: building, about {turns} turn{} to go at this place's Widgets.", kind.name(), if turns == 1 { "" } else { "s" });
         hab_tile(ui, tile_rect(i), ui.id().with(("hab-building", bi)), Some(crate::icons::module_icon(*kind)), kind.name(), TileState::Building { ordered: false, turns }, false, None, tip);
         i += 1;
     }
     for (oi, (kind, pi)) in ordered.iter().enumerate() {
         // Ticket #291: ordered this turn; right-click takes the order back.
-        let turns = game.tables.module(*kind).build_turns.max(1);
-        let tip = format!("{}: ordered this turn, {turns} turn{} once the turn ends.\nRight-click to cancel the order.", kind.name(), if turns == 1 { "" } else { "s" });
+        let turns = game.turns_to_build(Seat(0), Place::Colony(cid), BuildItem::Module(*kind));
+        let tip = format!("{}: ordered this turn, about {turns} turn{} once the turn ends.\nRight-click to cancel the order.", kind.name(), if turns == 1 { "" } else { "s" });
         if hab_tile(ui, tile_rect(i), ui.id().with(("hab-ordered", oi)), Some(crate::icons::module_icon(*kind)), kind.name(), TileState::Building { ordered: true, turns }, false, None, tip).secondary_clicked() {
             actions.push(Action::Cancel(*pi));
         }

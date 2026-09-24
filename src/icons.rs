@@ -133,6 +133,9 @@ pub fn facility_icon(kind: dying_earth_engine::FacilityKind) -> &'static str {
         Spaceport => "facility_spaceport",
         Reactor => "facility_reactor",
         Academy => "facility_academy",
+        // Ticket #332 (version 0.09.0): the Mine Facility wears the Mine Module's picture for now,
+        // as the Refinery wears its Module's; the interface lane settles the glyphs.
+        Mine => "module_mine",
     }
 }
 
@@ -168,6 +171,9 @@ pub fn module_icon(kind: dying_earth_engine::ModuleKind) -> &'static str {
         Archive => "module_archive",
         // Ticket #324 (version 0.08.8): the Battery's glyph is the game's own drawing, in DRAWN.
         Battery => "module_battery",
+        // Ticket #332 (version 0.09.0): the Factory Module wears the Earth Factory's picture, as
+        // the Institute wears the School's; the interface lane settles the glyphs.
+        Factory => "facility_factory",
         // Ticket #164 (version 0.07.5): the Core Module wears the station glyph the game drew for
         // itself on ticket #135 -- two solar panels on a bar with a module between them, which is
         // what a core module is. It owes no credit. A ground Colony's Core Module wears it too,

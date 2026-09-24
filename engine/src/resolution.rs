@@ -1309,10 +1309,17 @@ impl Game {
 
     // ------------------------------------------------------------------ (e)
 
+    /// Ticket #332 (version 0.09.0): a build completes at the Resolution its place's Widgets reach
+    /// its figure, the queue served in the order it was given. Each place's Widgets this turn
+    /// (`widgets_at`) fill the earliest build first and flow on to the next, nothing split; what is
+    /// left over is lost, since Widgets are a rate and never a stock. Every build whose count has
+    /// reached its figure then completes, in queue order, through `complete_build` as before. Made,
+    /// applied and lost are counted to the place's director for the sweep, and every directed
+    /// place's queue depth is sampled here for the median.
+    ///
+    /// Launch Pad Fire (ticket #32): the Region it struck applies no Widgets this turn, unless
+    /// Clean Propellant is held; before this version it pushed a due Ship back a turn.
     fn resolve_builds(&mut self) {
-        let turn = self.turn;
-        // Launch Pad Fire (ticket #32): every Ship due this turn at that state completes next turn instead,
-        // unless Clean Propellant is held.
         let mut pad_fire: Option<StateId> = self.last_event.as_ref().and_then(|ev| match (ev.card, ev.target) {
             (Card::Event(EventId::LaunchPadFire), EventTarget::State(s)) => Some(s),
             _ => None,
@@ -1320,46 +1327,52 @@ impl Game {
         if self.has_tech(TechId::CleanPropellant) {
             pad_fire = None;
         }
+        let places: Vec<Place> = StateId::ALL.iter().map(|s| Place::State(*s)).chain(self.colonies.iter().map(|c| Place::Colony(c.id))).collect();
         let mut completed: Vec<(Place, Build)> = Vec::new();
-        for sid in StateId::ALL {
-            let st = self.state_mut(sid);
-            let mut i = 0;
-            while i < st.queue.len() {
-                if st.queue[i].due_turn <= turn {
-                    let b = st.queue.remove(i);
-                    completed.push((Place::State(sid), b));
-                } else {
-                    i += 1;
-                }
+        for place in places {
+            let director = self.place_director(place);
+            let made = self.widgets_at(place);
+            if director.is_some() {
+                let depth = self.queue_at(place).len() as u32;
+                self.widgets.queue_depths.push(depth);
             }
-        }
-        let cids: Vec<ColonyId> = self.colonies.iter().map(|c| c.id).collect();
-        for cid in cids {
-            let col = self.colony_mut(cid).unwrap();
-            let mut i = 0;
-            while i < col.queue.len() {
-                if col.queue[i].due_turn <= turn {
-                    let b = col.queue.remove(i);
-                    completed.push((Place::Colony(cid), b));
-                } else {
-                    i += 1;
-                }
-            }
-        }
-        for (place, mut b) in completed {
-            let is_ship = matches!(b.item, BuildItem::Unit(k) if k != UnitKind::Army);
-            if is_ship && pad_fire.map(|s| place == Place::State(s)).unwrap_or(false) {
-                b.due_turn = turn + 1;
-                self.requeue(place, b.clone());
-                let line = format!("Launch Pad Fire: the {} {} at {} completes next turn instead.", self.seat_name(b.seat), b.item.name(), self.place_name(place));
+            let fired = matches!(place, Place::State(s) if pad_fire == Some(s));
+            if fired && made > 0 {
+                let line = format!("Launch Pad Fire: {} applies no Widgets this turn; {made} lost.", self.place_name(place));
                 self.log(line);
-                let text = self.say(
-                    "launch_pad_fire",
-                    &[("faction", self.seat_name(b.seat)), ("item", b.item.name().to_string()), ("place", self.place_name(place))],
-                );
+                let text = self.say("launch_pad_fire", &[("place", self.place_name(place)), ("widgets", made.to_string())]);
                 self.report_line(LineKind::Note, Some(place.into()), text);
-                continue;
             }
+            let mut remaining = if fired { 0 } else { made };
+            let queue: &mut Vec<Build> = match place {
+                Place::State(s) => &mut self.state_mut(s).queue,
+                Place::Colony(c) => {
+                    let Some(col) = self.colony_mut(c) else { continue };
+                    &mut col.queue
+                }
+            };
+            for b in queue.iter_mut() {
+                let take = remaining.min(b.widgets.saturating_sub(b.done) as i64);
+                b.done += take as u32;
+                remaining -= take;
+            }
+            let mut i = 0;
+            while i < queue.len() {
+                if queue[i].done >= queue[i].widgets {
+                    completed.push((place, queue.remove(i)));
+                } else {
+                    i += 1;
+                }
+            }
+            let applied = if fired { 0 } else { made - remaining };
+            if let Some(d) = director {
+                let w = &mut self.widgets;
+                w.made[d.index()] += made;
+                w.applied[d.index()] += applied;
+                w.lost[d.index()] += made - applied;
+            }
+        }
+        for (place, b) in completed {
             self.complete_build(place, b);
         }
     }
@@ -1563,17 +1576,6 @@ impl Game {
                 ],
             );
             self.report_line(LineKind::Unrest, Some(ReportPlace::State(sid)), text);
-        }
-    }
-
-    fn requeue(&mut self, place: Place, b: Build) {
-        match place {
-            Place::State(s) => self.state_mut(s).queue.push(b),
-            Place::Colony(c) => {
-                if let Some(col) = self.colony_mut(c) {
-                    col.queue.push(b)
-                }
-            }
         }
     }
 

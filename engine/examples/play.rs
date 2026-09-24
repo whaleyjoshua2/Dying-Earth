@@ -295,22 +295,23 @@ fn slot_name(g: &Game, body: BodyId, slot: u32) -> String {
 
 fn print_costs(g: &Game) {
     let me = Seat(0);
-    println!("\n--- WHAT THINGS COST YOU (Materials / build turns) ---");
+    // Ticket #332 (version 0.09.0): Materials and Widgets, at this seat's discounts.
+    println!("\n--- WHAT THINGS COST YOU (Materials / Widgets) ---");
     let f: Vec<String> = FacilityKind::ALL
         .iter()
-        .map(|k| format!("{} {}/{}t", k.name(), g.facility_materials(me, *k), g.tables.facility(*k).build_turns))
+        .map(|k| format!("{} {}/{}w", k.name(), g.facility_materials(me, *k), g.build_widgets(me, BuildItem::Facility(*k))))
         .collect();
     println!("Facilities: {}", f.join(" | "));
     let m: Vec<String> = ModuleKind::ALL
         .iter()
-        .map(|k| format!("{} {}/{}t", k.name(), g.module_materials(me, *k), g.tables.module(*k).build_turns))
+        .map(|k| format!("{} {}/{}w", k.name(), g.module_materials(me, *k), g.build_widgets(me, BuildItem::Module(*k))))
         .collect();
     println!("Modules (before the working-Mine discount): {}", m.join(" | "));
     let u: Vec<String> = UnitKind::SHIPS
         .iter()
         .map(|k| {
             let c = g.tables.unit(*k);
-            format!("{} {}M+{}F/{}t tank {} hp {}", k.name(), g.ship_materials(me, *k), c.tank, c.build_turns, c.tank, c.hit_points)
+            format!("{} {}M+{}F/{}w tank {} hp {}", k.name(), g.ship_materials(me, *k), c.tank, g.build_widgets(me, BuildItem::Unit(*k)), c.tank, c.hit_points)
         })
         .collect();
     println!("Ships: {}", u.join(" | "));
@@ -497,7 +498,7 @@ fn print_board(g: &Game) {
                 format!("{i}:{}{mark}", f.kind.name())
             })
             .collect();
-        let q: Vec<String> = st.queue.iter().map(|b| format!("{} due t{}", b.item.name(), b.due_turn)).collect();
+        let q: Vec<String> = st.queue.iter().map(|b| format!("{} {}/{}w", b.item.name(), b.done, b.widgets)).collect();
         let inf = g.seat(me).influence.get(&Place::State(st.id)).copied().unwrap_or(0);
         println!(
             "{:<16} {:<30} pop {:.1} ind {} unrest {} | free slots {}/{} (coastal {}) | your Standing {}, {} | emigrants {}",
@@ -543,7 +544,7 @@ fn print_board(g: &Game) {
                 format!("{i}:{}{mark}", m.kind.name())
             })
             .collect();
-        let q: Vec<String> = c.queue.iter().map(|b| format!("{} due t{}", b.item.name(), b.due_turn)).collect();
+        let q: Vec<String> = c.queue.iter().map(|b| format!("{} {}/{}w", b.item.name(), b.done, b.widgets)).collect();
         let name = if c.in_orbit { g.station_name(c.body, c.slot) } else { slot_name(g, c.body, c.slot) };
         println!(
             "colony {:<3} {:<22} {:<7} {:<30} colonists {} (room {}) | Modules {}/{} | yields {}",

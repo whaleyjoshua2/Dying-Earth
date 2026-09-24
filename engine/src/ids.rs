@@ -124,10 +124,15 @@ pub enum FacilityKind {
     /// the School and pays +1 Ducat a turn on top of the schooling. Off Earth it is a Unique
     /// Module of the same name, replacing the Institute.
     Academy,
+    /// Version 0.09.0 (ticket #332): the **Mine**, the Earth Facility that makes Materials now that
+    /// the Factory makes Widgets. The Region's Materials lean, Deep Mining and the Strip Permit
+    /// follow the Materials here; Clean Manufacturing stays with the Factory. Appended last:
+    /// `Tables::facility` indexes this enum by discriminant.
+    Mine,
 }
 
 impl FacilityKind {
-    pub const ALL: [FacilityKind; 15] = [
+    pub const ALL: [FacilityKind; 16] = [
         FacilityKind::Factory,
         FacilityKind::PowerPlant,
         FacilityKind::Refinery,
@@ -143,6 +148,7 @@ impl FacilityKind {
         FacilityKind::Spaceport,
         FacilityKind::Reactor,
         FacilityKind::Academy,
+        FacilityKind::Mine,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -161,6 +167,8 @@ impl FacilityKind {
             FacilityKind::Spaceport => "Spaceport",
             FacilityKind::Reactor => "Reactor",
             FacilityKind::Academy => "Academy",
+            // Ticket #332 (version 0.09.0): one name in both lists, by the Refinery precedent.
+            FacilityKind::Mine => "Mine",
         }
     }
 
@@ -270,10 +278,15 @@ pub enum ModuleKind {
     /// stands and works no rival holds Orbital Control there; its owner gains none by it. Appended
     /// last, as the Core Module was, for `Tables::module`.
     Battery,
+    /// Version 0.09.0 (ticket #332): the **Factory** Module, the one Module that makes Widgets off
+    /// Earth: four a turn, flat, reading no Body yield, so a Colony's queue moves at more than its
+    /// Core Module's one. Production Moved pairs the Earth Factory with it. Appended last, as the
+    /// Battery was, for `Tables::module`.
+    Factory,
 }
 
 impl ModuleKind {
-    pub const ALL: [ModuleKind; 19] = [
+    pub const ALL: [ModuleKind; 20] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -293,9 +306,10 @@ impl ModuleKind {
         ModuleKind::Exchange,
         ModuleKind::Chorus,
         ModuleKind::Battery,
+        ModuleKind::Factory,
     ];
     /// The Modules an ordinary build order may place (ticket #51: the Archive is not one of them).
-    pub const BUILDABLE: [ModuleKind; 17] = [
+    pub const BUILDABLE: [ModuleKind; 18] = [
         ModuleKind::Mine,
         ModuleKind::Generator,
         ModuleKind::Refinery,
@@ -313,6 +327,7 @@ impl ModuleKind {
         ModuleKind::Exchange,
         ModuleKind::Chorus,
         ModuleKind::Battery,
+        ModuleKind::Factory,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -335,6 +350,8 @@ impl ModuleKind {
             ModuleKind::SolarArray => "Solar Array",
             ModuleKind::MassDriver => "Mass Driver",
             ModuleKind::Battery => "Battery",
+            // Ticket #332 (version 0.09.0): one name in both lists, by the Refinery precedent.
+            ModuleKind::Factory => "Factory",
         }
     }
 
@@ -435,6 +452,12 @@ pub enum Resource {
     Research,
     /// Version 0.03 (ticket #35): money, which buys Influence, Restoration and repairs.
     Ducats,
+    /// Version 0.09.0 (ticket #332): **Widgets**, the work half of every build. A rate, never a
+    /// stock: made by a place's Factories, Industry Level or Core Module and applied that same
+    /// Resolution to what is under way there, in queue order; the rest is lost. Never in the
+    /// Stockpile, never traded. The variant exists so a `produces` row can name it and a `Yield`
+    /// can carry it through the same multipliers as any other output.
+    Widgets,
 }
 
 impl Resource {
@@ -445,6 +468,7 @@ impl Resource {
             Resource::Energy => "Energy",
             Resource::Research => "Research",
             Resource::Ducats => "Ducats",
+            Resource::Widgets => "Widgets",
         }
     }
 }

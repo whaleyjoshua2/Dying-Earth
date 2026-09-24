@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 /// The stamp at the head of every save. A file whose stamp is not this one is refused with a plain
 /// message; a save is never migrated between versions.
-pub const SAVE_VERSION: u32 = 2;
+pub const SAVE_VERSION: u32 = 3;
 
 /// The rules version this executable plays, named beside the file's own in a refusal.
 ///
@@ -59,6 +59,12 @@ pub const SAVE_VERSION: u32 = 2;
 /// #324, #327). Every new field has a default, so a 0.08.7 file would parse; but it would then
 /// be played under rules it was not written for, with Armies that march where they could not and
 /// a melee that rolls differently, and a refusal naming both versions is the honest answer.
+/// Ticket #332 (version 0.09.0): moved to 3. A Build carries a Widget figure and a count in place
+/// of a due turn, so a queue written by an older build has no field this one reads and nothing
+/// would ever complete; `FacilityKind` gained the Mine and `ModuleKind` the Factory, both
+/// appended last; the game carries the Widgets counters; and every table row carries `widgets`
+/// where it carried `build_turns`, so a board from before would be priced in a unit this version
+/// does not have. A refusal naming both versions is the right answer.
 pub const GAME_VERSION: &str = "0.08.8";
 
 /// The game autosaves at the start of the Report phase of every third turn.
@@ -167,6 +173,9 @@ pub struct SavedGame {
     /// Ticket #286 (version 0.08.5): the war's counters.
     #[serde(default)]
     pub war: WarCounters,
+    /// Ticket #332 (version 0.09.0): the Widgets counters.
+    #[serde(default)]
+    pub widgets: WidgetCounters,
 }
 
 impl SavedGame {
@@ -184,6 +193,7 @@ impl SavedGame {
             ships,
             armies,
             war,
+            widgets,
             levies_raised,
             neutral_holds,
             climate,
@@ -237,6 +247,7 @@ impl SavedGame {
             levies_raised: *levies_raised,
             neutral_holds: *neutral_holds,
             war: war.clone(),
+            widgets: widgets.clone(),
         }
     }
 
@@ -253,6 +264,7 @@ impl SavedGame {
             ships: self.ships,
             armies: self.armies,
             war: self.war,
+            widgets: self.widgets,
             levies_raised: self.levies_raised,
             neutral_holds: self.neutral_holds,
             climate: self.climate,

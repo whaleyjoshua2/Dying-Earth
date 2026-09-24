@@ -98,6 +98,13 @@ pub enum Order {
     Sell { resource: Resource, amount: i64 },
     BuildFacilityWithDucats { state: StateId, kind: FacilityKind },
     BuildModuleWithDucats { colony: ColonyId, kind: ModuleKind },
+    /// Ticket #332 (version 0.09.0): cancel a build under way at a place the ordering seat directs
+    /// that ANOTHER seat began -- the case of a place that changed hands, since a build keeps its
+    /// seat through a transfer. It is removed at End Turn, its Widgets done are lost, and its
+    /// item's Materials come back at the CANCELLER's own price: a conquest is a prize. A seat's
+    /// own order this turn is taken back from the pending list instead, and a build of its own
+    /// already under way is not cancelled at all. The computer seats never cancel.
+    CancelBuild { place: Place, index: usize },
     /// Version 0.04 (ticket #46): a Space Station in an orbital slot, built for Materials from a
     /// Nation State with a Launch Site (over Earth) or a Colony of the seat's (elsewhere).
     BuildStation { body: BodyId, slot: u32 },
@@ -347,6 +354,9 @@ impl Game {
                 }
             }
             Order::BuildFacilityWithDucats { kind, .. } => Cost { ducats: self.market_price(seat, self.facility_materials(seat, *kind) * t.ducats.per_building_material), ..Default::default() },
+            // Ticket #332 (version 0.09.0): the refund is a negative cost, as a purchase is, so
+            // `remaining` and `commit_orders` credit it without a special case.
+            Order::CancelBuild { place, index } => Cost { materials: -self.cancel_refund(seat, *place, *index), ..Default::default() },
             Order::BuildStation { .. } => Cost { materials: self.station_materials(seat), ..Default::default() },
             Order::BuildModuleWithDucats { colony, kind } => Cost { ducats: self.market_price(seat, self.module_materials_at(seat, *colony, *kind) * t.ducats.per_building_material), ..Default::default() },
             // Ticket #68: the Archive Module costs its row's Materials; the Research comes after.
@@ -568,6 +578,22 @@ impl Game {
             Order::BuildModuleWithDucats { colony, kind } => {
                 let materials_form = Order::BuildModule { colony: *colony, kind: *kind };
                 self.check_order_inner(seat, pending, &materials_form, false).map(|_| cost)
+            }
+            // Ticket #332 (version 0.09.0): legal on a place the seat directs, at a build in its
+            // queue that another seat began. One a turn at a place, so the index a second cancel
+            // names is still the build it named.
+            Order::CancelBuild { place, index } => {
+                if !self.directs(seat, *place) {
+                    return fail("you do not direct this place");
+                }
+                let Some(b) = self.queue_at(*place).get(*index) else { return fail("no such build under way here") };
+                if b.seat == seat {
+                    return fail("a build of your own is not cancelled; take back this turn's order instead");
+                }
+                if pending.iter().any(|o| matches!(o, Order::CancelBuild { place: p, .. } if p == place)) {
+                    return fail("one cancel a turn at a place");
+                }
+                Ok(cost)
             }
             Order::SetMaxStanding { target } => {
                 if pending.iter().any(|o| matches!(o, Order::SetMaxStanding { .. })) {
@@ -1633,6 +1659,13 @@ impl Game {
         Ok(())
     }
 
+    /// Ticket #332 (version 0.09.0): what a `CancelBuild` at this place and index would pay the
+    /// canceller: the item's Materials at the canceller's own price, or nought if there is no
+    /// such build. The check refuses the order in that case; this only prices it.
+    pub fn cancel_refund(&self, seat: Seat, place: Place, index: usize) -> i64 {
+        self.queue_at(place).get(index).map(|b| self.item_materials(seat, place, b.item)).unwrap_or(0)
+    }
+
     /// Pay for and record every order of a seat at End Turn (spec 7.3: costs are paid at once).
     pub fn commit_orders(&mut self, seat: Seat, orders: &[Order]) {
         for order in orders {
@@ -1653,26 +1686,32 @@ impl Game {
                     // orders the common building gets its own Unique Facility for that job at the
                     // same price; a Faction that has none for that job gets what it asked for.
                     let kind = kind.built_by(self.kind(seat));
-                    let due = turn + self.tables.facility(kind).build_turns - 1;
+                    // Ticket #332 (version 0.09.0): the build carries its Widget figure at the
+                    // seat's discount, and an outright buy in Ducats starts DONE, so it completes at
+                    // the next Resolution ahead of the queue whatever its figure.
+                    let widgets = self.build_widgets(seat, BuildItem::Facility(kind));
+                    let done = if matches!(order, Order::BuildFacilityWithDucats { .. }) { widgets } else { 0 };
                     // Ticket #56: the build reserves the slot it will stand in, coastal or inland.
                     let coastal = self.next_slot_is_coastal(*state, kind, 0, 0).unwrap_or(false);
-                    self.state_mut(*state).queue.push(Build { item: BuildItem::Facility(kind), seat, due_turn: due, coastal });
+                    self.state_mut(*state).queue.push(Build { item: BuildItem::Facility(kind), seat, widgets, done, coastal });
                 }
                 Order::RaiseIndustry { state } => {
-                    let due = turn + self.tables.industry_level.build_turns - 1;
-                    self.state_mut(*state).queue.push(Build { item: BuildItem::IndustryLevel, seat, due_turn: due, coastal: false });
+                    let widgets = self.build_widgets(seat, BuildItem::IndustryLevel);
+                    self.state_mut(*state).queue.push(Build { item: BuildItem::IndustryLevel, seat, widgets, done: 0, coastal: false });
                 }
                 Order::BuildModule { colony, kind } | Order::BuildModuleWithDucats { colony, kind } => {
                     // Ticket #186: as on Earth -- the Custodians' Institute order raises an Academy.
                     let kind = kind.built_by(self.kind(seat));
-                    let due = turn + self.tables.module(kind).build_turns - 1;
+                    // Ticket #332: as a Facility; a Ducat buy starts done.
+                    let widgets = self.build_widgets(seat, BuildItem::Module(kind));
+                    let done = if matches!(order, Order::BuildModuleWithDucats { .. }) { widgets } else { 0 };
                     if let Some(c) = self.colony_mut(*colony) {
-                        c.queue.push(Build { item: BuildItem::Module(kind), seat, due_turn: due, coastal: false });
+                        c.queue.push(Build { item: BuildItem::Module(kind), seat, widgets, done, coastal: false });
                     }
                 }
                 Order::BuildShip { site, kind } => {
-                    let due = turn + self.tables.unit(*kind).build_turns - 1;
-                    let b = Build { item: BuildItem::Unit(*kind), seat, due_turn: due, coastal: false };
+                    let widgets = self.build_widgets(seat, BuildItem::Unit(*kind));
+                    let b = Build { item: BuildItem::Unit(*kind), seat, widgets, done: 0, coastal: false };
                     match site {
                         Place::State(s) => self.state_mut(*s).queue.push(b),
                         Place::Colony(c) => {
@@ -1683,8 +1722,8 @@ impl Game {
                     }
                 }
                 Order::BuildArmy { place } => {
-                    let due = turn + self.tables.unit(UnitKind::Army).build_turns - 1;
-                    let b = Build { item: BuildItem::Unit(UnitKind::Army), seat, due_turn: due, coastal: false };
+                    let widgets = self.build_widgets(seat, BuildItem::Unit(UnitKind::Army));
+                    let b = Build { item: BuildItem::Unit(UnitKind::Army), seat, widgets, done: 0, coastal: false };
                     match place {
                         Place::State(s) => self.state_mut(*s).queue.push(b),
                         Place::Colony(c) => {
@@ -1692,6 +1731,24 @@ impl Game {
                                 c.queue.push(b)
                             }
                         }
+                    }
+                }
+                // Ticket #332 (version 0.09.0): the build goes, its Widgets done with it; the refund
+                // was credited above as this order's (negative) cost, and the Report names it.
+                Order::CancelBuild { place, index } => {
+                    let removed = match place {
+                        Place::State(s) => {
+                            let q = &mut self.state_mut(*s).queue;
+                            (*index < q.len()).then(|| q.remove(*index))
+                        }
+                        Place::Colony(c) => self.colony_mut(*c).and_then(|c| (*index < c.queue.len()).then(|| c.queue.remove(*index))),
+                    };
+                    if let Some(b) = removed {
+                        let refund = -cost.materials;
+                        let (who, name, at) = (self.seat_name(seat), b.item.name(), self.place_name(*place));
+                        self.log(format!("{who} cancelled the {name} under way at {at}: {refund} Materials to their Stockpile."));
+                        let text = self.say("build_cancelled", &[("faction", who), ("building", name), ("place", at), ("refund", refund.to_string())]);
+                        self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some((*place).into()), text);
                     }
                 }
                 Order::Repair { unit, points } => self.pending.repairs.push((seat, *unit, *points)),
@@ -1785,11 +1842,12 @@ impl Game {
                 }
                 Order::BuildStation { body, slot } => self.pending.stations.push((seat, *body, *slot)),
                 Order::BuildArchive { colony } => {
-                    // Ticket #68: the Module rises in the Colony's queue like any other build, three
-                    // turns from its own row; the Research is paid into the fund once it stands.
-                    let due = turn + self.tables.module(ModuleKind::Archive).build_turns - 1;
+                    // Ticket #68: the Module rises in the Colony's queue like any other build, from
+                    // its own row (ticket #332: twelve Widgets, its three turns times four); the
+                    // Research is paid into the fund once it stands.
+                    let widgets = self.build_widgets(seat, BuildItem::Module(ModuleKind::Archive));
                     if let Some(c) = self.colony_mut(*colony) {
-                        c.queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat, due_turn: due, coastal: false });
+                        c.queue.push(Build { item: BuildItem::Module(ModuleKind::Archive), seat, widgets, done: 0, coastal: false });
                     }
                     let line = format!("The {} began the Archive at {}.", self.seat_name(seat), self.place_name(Place::Colony(*colony)));
                     self.log(line);
@@ -2117,6 +2175,12 @@ impl Game {
             }
             Order::BuildShip { site, kind } => r("build_ship", &[("unit", kind.name().to_string()), ("place", place(*site))]),
             Order::BuildArmy { place: p } => r("build_army", &[("place", place(*p))]),
+            // Ticket #332 (version 0.09.0): told before the order commits, so the index still names
+            // the build.
+            Order::CancelBuild { place: p, index } => {
+                let building = self.queue_at(*p).get(*index).map(|b| b.item.name()).unwrap_or_else(|| "build".to_string());
+                r("cancel_build", &[("building", building), ("place", place(*p))])
+            }
             Order::BuildStation { body, .. } => r("build_station", &[("body", self.tables.body(*body).name.clone())]),
             // Ticket #87.
             Order::Refuel { ship } => {

@@ -538,10 +538,11 @@ impl Game {
         let tight = self.energy_tight(seat);
         let allotment = self.seat(seat).allotment;
         let materials_income = self.seat(seat).income_last_turn.materials;
+        // Ticket #332 (version 0.09.0): on Earth it is the Mine that makes Materials now.
         let no_materials_income = materials_income == 0
-            && !self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::Factory))
+            && !self.directed_states(seat).iter().any(|s| self.state(*s).facilities.iter().any(|f| f.kind == FacilityKind::Mine))
             && !self.directed_colonies(seat).iter().any(|c| self.colony(*c).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Mine))
-            && !self.states.iter().flat_map(|s| s.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Facility(FacilityKind::Factory));
+            && !self.states.iter().flat_map(|s| s.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Facility(FacilityKind::Mine));
         // Ticket #46: until the seat has a Shipyard anywhere, one counts as advancing whatever it is behind on.
         let no_shipyard = !self.directed_colonies(seat).iter().any(|c| {
             let col = self.colony(*c).unwrap();
@@ -676,7 +677,10 @@ impl Game {
                     }
                     let job = fk.common().unwrap_or(fk);
                     let (cat, mut base) = match job {
-                        FacilityKind::Factory | FacilityKind::PowerPlant | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
+                        // Ticket #332 (version 0.09.0): the Mine is a producer as the Factory was;
+                        // the Factory, making Widgets now, keeps its arm. The computer seats' wants
+                        // for the two are the AI lane's.
+                        FacilityKind::Factory | FacilityKind::Mine | FacilityKind::PowerPlant | FacilityKind::Refinery | FacilityKind::Bank => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                         FacilityKind::ResearchLab => (Cat::ResearchLab, self.base_weight(seat, Cat::ResearchLab)),
                         // Ticket #185 (version 0.08.0): the School is a Research building in all but
                         // name -- it multiplies every Lab in its state -- so it is weighed as one. It
@@ -900,6 +904,9 @@ impl Game {
                 }
                 let module_job = mk.common().unwrap_or(mk);
                 let (cat, mut base) = match module_job {
+                    // Ticket #332 (version 0.09.0): the Factory Module is a producer at the base
+                    // weight until the AI lane gives the computer seats their wants for it.
+                    ModuleKind::Factory => (Cat::Producer, self.base_weight(seat, Cat::Producer)),
                     // Ticket #89: a Solar Array is an Energy producer; the Energy-shortage bonus below
                     // is what makes the AI raise one when the Stockpile is within a turn of nothing.
                     ModuleKind::SolarArray => (Cat::Producer, self.base_weight(seat, Cat::Producer)),

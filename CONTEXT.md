@@ -189,8 +189,12 @@ _Avoid_: unit icon, type icon, category marker
 ### Resources
 
 **Materials**:
-Raw metal and ore, spent to build ships, habitats and mines.
+Raw metal and ore, spent to build ships, habitats and mines. Since version 0.09.0 it is the ore half of a build and Widgets are the work half: Materials are paid in full at the order, and only a Mine makes them, on Earth as a Facility and off it as a Module.
 _Avoid_: minerals, supplies, ore
+
+**Widgets**:
+Work, since version 0.09.0: the second cost of everything built. A Widget is one unit of it. Widgets are a rate, not a stock: a place makes so many a turn and applies them that same turn to what is under way there, in the order the builds were given, and whatever is not applied is lost. They are never carried, traded or banked and never enter the Stockpile. A Region makes its Industry Level in Widgets a turn and four more for every working Factory; a Colony or Space Station makes one from its Core Module and four for every working Factory Module. Every build carries a Widget figure, four for each turn it used to take, and completes at the Resolution its Widgets reach it. The Faction discounts on Materials reach the Widget figure too. Drawn as a cog.
+_Avoid_: production, production points, shields, hammers, work units, industry
 
 **Fuel**:
 What is burned to move between Bodies. Since version 0.06.0 a transit spends it from the Ship's own Tank, which is filled at the Shipyard and refilled only by a Refuel order at a Body with a Space Station of the Ship's Faction; the Stockpile holds what Refineries make and the Trading window sells, and only a Refuel or a build moves it into a Tank. A lift from Earth spends none.
@@ -201,7 +205,7 @@ What runs a mine, habitat or industry where it stands, drained every turn it ope
 _Avoid_: power, electricity
 
 **Stockpile**:
-The single shared pool holding all Materials, Fuel, Energy and, since version 0.03, Ducats. It is not divided by Body, so ore mined on Mars is immediately spendable on Earth. Since version 0.06.0 its Fuel reaches a Ship only through a Refuel at a Space Station of the Ship's Faction, or at the build.
+The single shared pool holding all Materials, Fuel, Energy and, since version 0.03, Ducats; never Widgets, which are made and spent where they stand. It is not divided by Body, so ore mined on Mars is immediately spendable on Earth. Since version 0.06.0 its Fuel reaches a Ship only through a Refuel at a Space Station of the Ship's Faction, or at the build.
 _Avoid_: central bank, per-world stocks, inventory
 
 **Ducats**:
@@ -239,11 +243,11 @@ The Module only a ground Colony on a small world (the Moon, Phobos, Deimos) hold
 _Avoid_: catapult, launcher, railgun, launch loop
 
 **Core Module**:
-The Module, since version 0.07.5, that every Colony and every Space Station is founded with, and the whole of what a founding gives. It holds four Colonists -- a flat four, which neither Expanded Habitats nor the Arkwrights' capacity multiplier reaches -- draws a little Energy, and is never ordered, never mothballed, never decommissioned and never shut for want of Energy: it is the walls of the place rather than a building in it. It stands outside the Module count as the Archive does, and it replaced the free Habitat a ground Colony used to be founded with. Because it holds people from the day a place stands, a station can be settled the turn it is built, which ended the deadlock whereby a bare station needed a Habitat to hold anybody and Colonists to earn the slot to build one.
+The Module, since version 0.07.5, that every Colony and every Space Station is founded with, and the whole of what a founding gives. It holds four Colonists -- a flat four, which neither Expanded Habitats nor the Arkwrights' capacity multiplier reaches -- draws a little Energy, makes one Widget a turn since version 0.09.0 so a bare place can build its first Module, and is never ordered, never mothballed, never decommissioned and never shut for want of Energy: it is the walls of the place rather than a building in it. It stands outside the Module count as the Archive does, and it replaced the free Habitat a ground Colony used to be founded with. Because it holds people from the day a place stands, a station can be settled the turn it is built, which ended the deadlock whereby a bare station needed a Habitat to hold anybody and Colonists to earn the slot to build one.
 _Avoid_: hub, base, the core, starter module, command module
 
 **Module**:
-A building placed inside a Colony. **Nineteen kinds** since version 0.08.8. Thirteen are common to everybody: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, the Institute, the Solar Array (a Space Station's alone), the Mass Driver (a small world's alone) and, since version 0.08.8, the Battery, the one Module that fights. The Core Module, which every founding gives, stands outside the count of what may be built. The Archive only the Archivists raise, one to a Faction, from its own button. The last four are the **Unique Modules**, one per Faction. (The figure read 'thirteen' from version 0.07.5 until version 0.08.3 and was wrong from the moment the Institute and the Academy were added in 0.08.0.) A Habitat holds **four** Colonists since version 0.08.1 and eight with Expanded Habitats, which raises it by four; it held eight from version 0.06.0, and since version 0.07.3 it holds the same everywhere, no world's slot making it hold more or fewer. The Core Module's flat four is reached by neither the Tech nor the Arkwrights' multiplier. Since version 0.07.5 a Colony's Modules are drawn on its own card as a grid of tiles in the same shape a Region's build slots use -- one tile per Module with its picture, dimmed while mothballed and hatched while building, a dashed tile for every free place under the cap, and the Archive on a row of its own outside the count. Since version 0.08.6 a Module ordered this turn shows in its tile at once, hatched and dimmed with *ordered* and the turns to complete on its face, and a right-click cancels the order, exactly as a Region's build slots do. Clicking a tile puts that Module's figures and its Mothball, Restart and Decommission buttons in the strip beneath; clicking a free tile puts the build buttons there, and that is the only place a Module is ordered.
+A building placed inside a Colony. **Twenty kinds** since version 0.09.0. Fourteen are common to everybody: Mine, Generator, Refinery, Habitat, Shipyard, Barracks, Trade Post, Relay, the Observatory, the Institute, the Solar Array (a Space Station's alone), the Mass Driver (a small world's alone), since version 0.08.8 the Battery, the one Module that fights, and since version 0.09.0 the Factory, which makes Widgets off Earth as the Facility of that name does on it. The Core Module, which every founding gives, stands outside the count of what may be built. The Archive only the Archivists raise, one to a Faction, from its own button. The last four are the **Unique Modules**, one per Faction. (The figure read 'thirteen' from version 0.07.5 until version 0.08.3 and was wrong from the moment the Institute and the Academy were added in 0.08.0.) A Habitat holds **four** Colonists since version 0.08.1 and eight with Expanded Habitats, which raises it by four; it held eight from version 0.06.0, and since version 0.07.3 it holds the same everywhere, no world's slot making it hold more or fewer. The Core Module's flat four is reached by neither the Tech nor the Arkwrights' multiplier. Since version 0.07.5 a Colony's Modules are drawn on its own card as a grid of tiles in the same shape a Region's build slots use -- one tile per Module with its picture, dimmed while mothballed and hatched while building, a dashed tile for every free place under the cap, and the Archive on a row of its own outside the count. Since version 0.08.6 a Module ordered this turn shows in its tile at once, hatched and dimmed with *ordered* and the turns to complete on its face, and a right-click cancels the order, exactly as a Region's build slots do. Clicking a tile puts that Module's figures and its Mothball, Restart and Decommission buttons in the strip beneath; clicking a free tile puts the build buttons there, and that is the only place a Module is ordered.
 _Avoid_: building, structure, facility, improvement
 
 **Ship**:
@@ -327,7 +331,7 @@ _Avoid_: primary power (the charting phrase; not the game's word), country, capi
 ### Earth
 
 **Facility**:
-A building placed in a Region. Fifteen kinds since version 0.08.0: Factory, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, the School, the four Unique Facilities, and the Sea Wall and the Scrubber, which take no build slot (the Sea Wall stood in a Coastal Slot until version 0.05.5). Since version 0.04 a Launch Site builds no Ship: it lifts Pioneers and Armies from its state into orbit, and each lift is a launch.
+A building placed in a Region. Sixteen kinds since version 0.09.0: Factory, Mine, Power Plant, Refinery, Launch Site, Research Lab, Bank, Embassy, Constabulary, the School, the four Unique Facilities, and the Sea Wall and the Scrubber, which take no build slot (the Sea Wall stood in a Coastal Slot until version 0.05.5). Since version 0.09.0 the Factory makes Widgets and the Mine, new that version, makes the Materials the Factory used to; the two carry the names of the Modules that do the same jobs off Earth, as the Refinery always has. Since version 0.04 a Launch Site builds no Ship: it lifts Pioneers and Armies from its state into orbit, and each lift is a launch.
 _Avoid_: item, building, module (that is the Colony word), structure
 
 **Cheap Industry**:
@@ -386,7 +390,7 @@ A standing building that is not mothballed and is not running. Four things put o
 _Avoid_: broken, damaged, disabled, unpowered, dark
 
 **Production Moved**:
-The Custodians' third signature rule, since version 0.06.0. While a Factory, Power Plant, Refinery or Research Lab of theirs on Earth is mothballed, one Mine, Generator, Refinery or Observatory of theirs off Earth makes double, one Facility for one Module, the most productive undoubled Module first, on its final figure. A Restart ends it; with no idle Facility of the pair there is no bonus.
+The Custodians' third signature rule, since version 0.06.0. While a Factory, Mine, Power Plant, Refinery or Research Lab of theirs on Earth is mothballed, one Factory, Mine, Generator, Refinery or Observatory of theirs off Earth makes double, one Facility for one Module of the same job, the most productive undoubled Module first, on its final figure. Since version 0.09.0 the Factory pairs with the Factory Module and the Mine with the Mine, so a mothballed Earth Factory doubles Widgets off Earth, which is what the name always said; before 0.09.0 the Factory paired with the Mine. A Restart ends it; with no idle Facility of the pair there is no bonus.
 _Avoid_: offshoring, relocation bonus, the mothball bonus
 
 **Decommission**:
@@ -394,7 +398,7 @@ The Orders-phase order that takes a Facility or a Module down for good: a turn l
 _Avoid_: demolish, scrap, sell, destroy
 
 **Industry Level**:
-How built-up a Region is. Together with the state's size it sets how many Facilities fit, and every slot it adds is an Inland Slot. It scales the state's emissions. Raising it is a build action.
+How built-up a Region is. Together with the state's size it sets how many Facilities fit, and every slot it adds is an Inland Slot. It scales the state's emissions. Since version 0.09.0 it is also the Widgets a Region makes a turn with no Factory, one per level, so a built-up Region builds on its own. Raising it is a build action.
 _Avoid_: development, tier, infrastructure
 
 **Neutral Development**:

@@ -53,6 +53,8 @@ impl Yield {
             Some(Resource::Fuel) => parts.push(format!("+{} Fuel", self.amount)),
             Some(Resource::Energy) => parts.push(format!("+{} Energy", self.amount)),
             Some(Resource::Ducats) => parts.push(format!("+{} Ducats", self.amount)),
+            // Ticket #332 (version 0.09.0): a Factory's Widgets, the work half of every build.
+            Some(Resource::Widgets) => parts.push(format!("+{} Widgets", self.amount)),
             Some(Resource::Research) | None => {}
         }
         if self.research > 0 {
@@ -291,6 +293,10 @@ impl Game {
                     y.resource = Some(Resource::Ducats);
                     y.amount = v.floor() as i64;
                 }
+                // Ticket #332 (version 0.09.0): a Factory's Widgets come through here too, so the
+                // Faction's output multiplier, the Strip Permit and Unrest 7 below reach them. No
+                // Region leans Widgets and no Tech lifts them, so the lean and Deep Mining stay
+                // Materials rules and reach the Mine alone.
                 res => {
                     let mut v = p.amount as f64;
                     if card.resource_lean == res {
@@ -410,7 +416,16 @@ impl Game {
                 // Ticket #89: a sun-scaled Module (the Solar Array) reads the sunlight where its
                 // Body stands instead of a Body yield, is silenced by a Solar Storm turn, and
                 // rounds to the nearest whole.
-                let yield_ = if mc.sun_scaled { self.sun_factor(col.body) } else { self.colony_yields(col).of_module(job) };
+                // Ticket #332 (version 0.09.0): a Widget-making Module (the Factory, the Core) is
+                // FLAT -- no Body yield, no slot yield -- at the designer's word; the Faction's
+                // output multiplier still applies, as it does to the Factory on Earth.
+                let yield_ = if mc.sun_scaled {
+                    self.sun_factor(col.body)
+                } else if p.resource == Resource::Widgets {
+                    1.0
+                } else {
+                    self.colony_yields(col).of_module(job)
+                };
                 let mut v = p.amount as f64 * yield_ * fac.output_multiplier * self.tech_output_multiplier_module(seat, job);
                 for d in &self.discoveries {
                     if d.body == col.body && d.kind == job {
@@ -629,7 +644,9 @@ impl Game {
         }
         match kind {
             FacilityKind::PowerPlant => m *= self.tech_multiplier(seat, TechId::EfficientGrids),
-            FacilityKind::Factory => m *= self.tech_multiplier(seat, TechId::DeepMining),
+            // Ticket #332 (version 0.09.0): Deep Mining follows the Materials to the Mine; the
+            // Factory makes Widgets now and no Tech lifts those.
+            FacilityKind::Mine => m *= self.tech_multiplier(seat, TechId::DeepMining),
             FacilityKind::Refinery => m *= self.tech_multiplier(seat, TechId::AutomatedRefining),
             _ => {}
         }
@@ -660,6 +677,126 @@ impl Game {
             _ => {}
         }
         m
+    }
+
+    /// Ticket #332 (version 0.09.0): the Widgets a place makes this turn, the work half of every
+    /// build there. A Region makes its Industry Level times `[widgets] per_industry_level` with no
+    /// Factory at all -- its own, whoever directs it, so a build in a Region that threw its holder
+    /// off still crawls on -- plus every working Factory's Widget yield through `facility_yield`,
+    /// which wants a director. A Colony or station makes every working Module's Widget yield
+    /// through `module_yield_at` (the Core Module's one, a Factory Module's four, Production Moved's
+    /// doubling applied); a starved or grid-failed Colony makes none, as it makes nothing at Income.
+    /// Never banked: what `resolve_builds` does not apply this turn is lost.
+    pub fn widgets_at(&self, place: Place) -> i64 {
+        match place {
+            Place::State(sid) => {
+                let st = self.state(sid);
+                let mut n = st.industry_level as i64 * self.tables.widgets.per_industry_level as i64;
+                if let Some(seat) = st.control.director() {
+                    for f in st.facilities.iter().filter(|f| f.working()) {
+                        let y = self.facility_yield(seat, sid, f.kind);
+                        if y.resource == Some(Resource::Widgets) {
+                            n += y.amount;
+                        }
+                    }
+                }
+                n
+            }
+            Place::Colony(cid) => {
+                let Some(col) = self.colony(cid) else { return 0 };
+                let Some(seat) = col.control.director() else { return 0 };
+                if col.grid_failed || self.starved_by(cid).is_some() {
+                    return 0;
+                }
+                let mut n = 0;
+                for (i, m) in col.modules.iter().enumerate() {
+                    if !m.working() {
+                        continue;
+                    }
+                    let y = self.module_yield_at(seat, cid, i);
+                    if y.resource == Some(Resource::Widgets) {
+                        n += y.amount;
+                    }
+                }
+                n
+            }
+        }
+    }
+
+    /// Ticket #332: the Widgets a build of `item` needs for this seat: the row's figure times the
+    /// Faction's Materials discount for the kind (a Facility's and an Industry raise's, a Module's,
+    /// a Ship's; an Army has none), rounded down, never below 1 -- a figure of nought would complete
+    /// at a place that makes nothing.
+    pub fn build_widgets(&self, seat: Seat, item: BuildItem) -> u32 {
+        let t = &self.tables;
+        let fac = t.faction(self.kind(seat));
+        let (row, m) = match item {
+            BuildItem::Facility(k) => (t.facility(k).widgets, fac.facility_materials_multiplier),
+            BuildItem::IndustryLevel => (t.industry_level.widgets, fac.facility_materials_multiplier),
+            BuildItem::Module(k) => (t.module(k).widgets, fac.module_materials_multiplier),
+            BuildItem::Unit(UnitKind::Army) => (t.unit(UnitKind::Army).widgets, 1.0),
+            BuildItem::Unit(k) => (t.unit(k).widgets, fac.ship_materials_multiplier),
+        };
+        ((row as f64 * m).floor() as u32).max(1)
+    }
+
+    /// Ticket #332: the builds under way at a place, in the order they were given.
+    pub fn queue_at(&self, place: Place) -> &[Build] {
+        match place {
+            Place::State(s) => &self.state(s).queue,
+            Place::Colony(c) => self.colony(c).map(|c| c.queue.as_slice()).unwrap_or(&[]),
+        }
+    }
+
+    /// Ticket #332: the Widgets a place's queue still owes, every build's figure less what is done.
+    pub fn widgets_owed(&self, place: Place) -> i64 {
+        self.queue_at(place).iter().map(|b| b.widgets.saturating_sub(b.done) as i64).sum()
+    }
+
+    /// Ticket #332: the Resolutions until `owed` Widgets are made at `rate` a turn: at least 1, and
+    /// `u32::MAX` for a place that makes nothing.
+    fn resolutions_for(owed: i64, rate: i64) -> u32 {
+        if rate <= 0 {
+            return u32::MAX;
+        }
+        (((owed.max(0) + rate - 1) / rate) as u32).max(1)
+    }
+
+    /// Ticket #332: for each build in a place's queue, in order, the Resolutions until it would
+    /// complete at the place's Widgets a turn behind everything ahead of it. An estimate for the
+    /// cards and the Under way block: the rate is today's and may move.
+    pub fn queue_estimates(&self, place: Place) -> Vec<u32> {
+        let rate = self.widgets_at(place);
+        let mut owed = 0i64;
+        self.queue_at(place)
+            .iter()
+            .map(|b| {
+                owed += b.widgets.saturating_sub(b.done) as i64;
+                Self::resolutions_for(owed, rate)
+            })
+            .collect()
+    }
+
+    /// Ticket #332: the Resolutions until a fresh order of `item` at `place` would complete, at
+    /// this place's Widgets a turn behind everything already in its queue; at least 1, and
+    /// `u32::MAX` if the place makes nothing. The build buttons' "8 Widgets, 2 turns here".
+    pub fn turns_to_build(&self, seat: Seat, place: Place, item: BuildItem) -> u32 {
+        let owed = self.widgets_owed(place) + self.build_widgets(seat, item) as i64;
+        Self::resolutions_for(owed, self.widgets_at(place))
+    }
+
+    /// Ticket #332: what `item` costs `seat` in Materials at `place` -- the Faction's own price, a
+    /// Module's with the Colony's working Mines taken off. The refund a cancelled build pays its
+    /// canceller, at the CANCELLER's price rather than the builder's.
+    pub fn item_materials(&self, seat: Seat, place: Place, item: BuildItem) -> i64 {
+        match (item, place) {
+            (BuildItem::Facility(k), _) => self.facility_materials(seat, k),
+            (BuildItem::IndustryLevel, _) => self.industry_cost(seat),
+            (BuildItem::Module(k), Place::Colony(c)) => self.module_materials_at(seat, c, k),
+            (BuildItem::Module(k), Place::State(_)) => self.module_materials(seat, k),
+            (BuildItem::Unit(UnitKind::Army), _) => self.tables.unit(UnitKind::Army).materials,
+            (BuildItem::Unit(k), _) => self.ship_materials(seat, k),
+        }
     }
 
     /// A controlled state's base Ducats a turn (ticket #35): gdp x Industry Level / 10, rounded down,
@@ -806,13 +943,16 @@ impl Game {
                     off_earth += p.research;
                 }
             }
-            if let Some((res, v)) = p.output {
+            // Ticket #332 (version 0.09.0): Widgets are a rate, not a stock. They are made and spent
+            // at their place at Resolution (`widgets_at`, `resolve_builds`); Income neither banks
+            // them nor lists them among the sources.
+            if let Some((res, v)) = p.output.filter(|(r, _)| *r != Resource::Widgets) {
                 match res {
                     Resource::Materials => gained.materials += v,
                     Resource::Fuel => gained.fuel += v,
                     Resource::Energy => gained.energy += v,
                     Resource::Ducats => gained.ducats += v,
-                    Resource::Research => {}
+                    Resource::Research | Resource::Widgets => {}
                 }
                 sources.push((format!("{} in {}", p.name, where_), res, v));
             }

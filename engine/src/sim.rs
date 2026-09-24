@@ -86,6 +86,12 @@ pub struct SimResult {
     pub neutral_holds: u32,
     /// Ticket #286 (version 0.08.5): the war's counters, whole.
     pub war: WarCounters,
+    /// Ticket #332 (version 0.09.0): Widgets made, applied and lost a game, by the director of the
+    /// place that made them; and the median depth of a directed place's queue at Resolution.
+    pub widgets_made: [i64; SEAT_COUNT],
+    pub widgets_applied: [i64; SEAT_COUNT],
+    pub widgets_lost: [i64; SEAT_COUNT],
+    pub queue_depth_median: u32,
     pub events_no_target: u32,
     pub coastal_slots_lost: u32,
     pub facilities_drowned: u32,
@@ -574,6 +580,14 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         levies_raised: game.levies_raised,
         neutral_holds: game.neutral_holds,
         war: game.war.clone(),
+        widgets_made: game.widgets.made,
+        widgets_applied: game.widgets.applied,
+        widgets_lost: game.widgets.lost,
+        queue_depth_median: {
+            let mut depths = game.widgets.queue_depths.clone();
+            depths.sort_unstable();
+            depths.get(depths.len() / 2).copied().unwrap_or(0)
+        },
         events_no_target,
         sea_walls_spent,
         coastal_slots_lost,

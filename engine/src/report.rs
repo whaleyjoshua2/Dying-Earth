@@ -447,11 +447,14 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("building_changed_colony", &["faction", "done", "building", "colony"]),
     ("building_decommissioned_colony", &["faction", "building", "colony", "refund"]),
     ("build_lost", &["building", "place"]),
+    // Ticket #332 (version 0.09.0): a rival's build cancelled by the place's new holder.
+    ("build_cancelled", &["faction", "building", "place", "refund"]),
     ("colonists_no_room", &["n", "colony"]),
     // Ticket #191 (version 0.08.0): Relations, said in the offender's paragraph.
     ("relations_fell", &["victim", "offender"]),
     ("uploaded", &["n", "colony", "total"]),
-    ("launch_pad_fire", &["faction", "item", "place"]),
+    // Ticket #332 (version 0.09.0): the fire takes the Region's Widgets for the turn.
+    ("launch_pad_fire", &["place", "widgets"]),
     ("game_over_win", &["turn", "faction", "note"]),
     ("game_over_draw", &["turn", "note"]),
     ("game_over_collapse", &["turn", "temperature"]),
@@ -548,6 +551,8 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     ("build_module_ducats", &["building", "colony"]),
     ("build_ship", &["unit", "place"]),
     ("build_army", &["place"]),
+    // Ticket #332 (version 0.09.0).
+    ("cancel_build", &["building", "place"]),
     ("build_station", &["body"]),
     ("build_archive", &["colony"]),
     // Ticket #192 (version 0.08.0): the Upload.

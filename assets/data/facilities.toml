@@ -1,20 +1,29 @@
 # Spec section 5.1. Built in a Nation State; each occupies one build slot.
 # `produces` is per turn before yields and multipliers; a Research Lab uses the formula in 12.1.
+#
+# Ticket #332 (version 0.09.0): `widgets` replaces `build_turns` on every row, at four Widgets for
+# every turn the build took. A build completes at the Resolution its Region's Widgets reach the
+# figure, served in queue order; a Region makes `[widgets] per_industry_level` per point of
+# Industry Level and four more for every working Factory. The Factory makes Widgets now, and the
+# Mine (the last row, appended for `Tables::facility`) makes the Materials it used to.
 
+# Ticket #332 (version 0.09.0): the Factory makes WIDGETS, the work half of every build in its
+# Region. The Prospectors' output multiplier, the Strip Permit and Unrest 7 reach the figure; the
+# Region's Materials lean and Deep Mining do not, since they are Materials rules and went to the Mine.
 [[facility]]
 id = "factory"
 name = "Factory"
 materials = 20
-build_turns = 1
+widgets = 4
 energy_upkeep = 2
-produces = { resource = "materials", amount = 4 }
+produces = { resource = "widgets", amount = 4 }
 emissions = 1.0
 
 [[facility]]
 id = "power_plant"
 name = "Power Plant"
 materials = 25
-build_turns = 2
+widgets = 8
 energy_upkeep = 0
 produces = { resource = "energy", amount = 6 }
 emissions = 1.5
@@ -23,7 +32,7 @@ emissions = 1.5
 id = "refinery"
 name = "Refinery"
 materials = 20
-build_turns = 1
+widgets = 4
 energy_upkeep = 3
 produces = { resource = "fuel", amount = 3 }
 emissions = 1.5
@@ -32,7 +41,7 @@ emissions = 1.5
 id = "research_lab"
 name = "Research Lab"
 materials = 25
-build_turns = 1
+widgets = 4
 energy_upkeep = 3
 produces = { resource = "research", amount = 2 }
 emissions = 0.0
@@ -41,7 +50,7 @@ emissions = 0.0
 id = "launch_site"
 name = "Launch Site"
 materials = 30
-build_turns = 2
+widgets = 8
 energy_upkeep = 2
 does = "lifts Pioneers and Armies from here to orbit and to a Space Station over Earth, and a station over Earth can be built from here"
 emissions = 0.0
@@ -51,7 +60,7 @@ emissions = 0.0
 id = "bank"
 name = "Bank"
 materials = 25
-build_turns = 1
+widgets = 4
 energy_upkeep = 2
 produces = { resource = "ducats", amount = 4 }
 emissions = 0.0
@@ -62,7 +71,7 @@ emissions = 0.0
 id = "embassy"
 name = "Embassy"
 materials = 30
-build_turns = 1
+widgets = 4
 energy_upkeep = 2
 emissions = 0.0
 influence_allotment = 2
@@ -75,7 +84,7 @@ standing_per_turn = 2
 id = "constabulary"
 name = "Constabulary"
 materials = 25
-build_turns = 1
+widgets = 4
 energy_upkeep = 2
 does = "takes 1 off this state's Unrest a turn, halves what the climate and an Agitate add to it, and adds 5 to what a rival must reach to take this state (10 with Civil Defense)"
 emissions = 0.0
@@ -90,7 +99,7 @@ emissions = 0.0
 id = "scrubber"
 name = "Scrubber"
 materials = 30
-build_turns = 2
+widgets = 8
 energy_upkeep = 3
 does = "+3.0 ppm on the Natural Sink and 1 off this state's Unrest a turn, counted as its holder's removal; no build slot; destroyed if this state changes hands"
 emissions = 0.0
@@ -110,7 +119,7 @@ no_slot = true
 id = "sea_wall"
 name = "Sea Wall"
 materials = 20
-build_turns = 2
+widgets = 8
 energy_upkeep = 1
 does = "holds every Sea Level threshold off this state while it works, and a Storm Surge it holds cuts its coastal Facilities' output by 30% for one turn; no build slot, one to a state; each rise held adds 0.5 Materials a turn to its keep"
 emissions = 0.0
@@ -126,7 +135,7 @@ no_slot = true
 id = "school"
 name = "School"
 materials = 25
-build_turns = 2
+widgets = 8
 energy_upkeep = 2
 does = "raises this state's Education Level 0.20 a turn, to 2.0; it falls back at the same rate when the School stops"
 emissions = 0.0
@@ -147,7 +156,7 @@ emissions = 0.0
 id = "investment_bank"
 name = "Investment Bank"
 materials = 25
-build_turns = 1
+widgets = 4
 energy_upkeep = 2
 does = "banks 1% of the Venture Capital Fund's balance back into it each turn, never less than 1 across all your Investment Banks"
 produces = { resource = "ducats", amount = 4 }
@@ -159,7 +168,7 @@ emissions = 0.0
 id = "spaceport"
 name = "Spaceport"
 materials = 30
-build_turns = 2
+widgets = 8
 energy_upkeep = 2
 does = "does a Launch Site's work, and every Pioneer it lifts off Earth adds 1 Influence to next turn's Allotment"
 emissions = 0.0
@@ -170,7 +179,7 @@ emissions = 0.0
 id = "reactor"
 name = "Reactor"
 materials = 25
-build_turns = 2
+widgets = 8
 energy_upkeep = 0
 does = "pays three quarters of your whole Energy upkeep, the Archive excepted; a second Reactor is an ordinary power station"
 produces = { resource = "energy", amount = 6 }
@@ -182,10 +191,25 @@ emissions = 1.5
 id = "academy"
 name = "Academy"
 materials = 25
-build_turns = 2
+widgets = 8
 energy_upkeep = 2
 does = "does a School's work and pays 1 Ducat a turn while it is online"
 emissions = 0.0
+
+# Ticket #332 (version 0.09.0): the Mine, the Earth Facility that makes Materials now that the
+# Factory makes Widgets. The Factory's old row with the Factory's old output: the Region's Materials
+# lean (x1.5), Deep Mining and the Strip Permit follow the Materials here; Clean Manufacturing stays
+# with the Factory, so a Mine emits its full 1.0. Every Region that starts with a Factory starts
+# with a Mine beside it (nation_states.toml), so opening Materials are as they were. Appended last:
+# `Tables::facility` indexes FacilityKind by discriminant.
+[[facility]]
+id = "mine"
+name = "Mine"
+materials = 20
+widgets = 4
+energy_upkeep = 2
+produces = { resource = "materials", amount = 4 }
+emissions = 1.0
 
 # Ticket #54: the cap on Scrubbers in one Nation State, from its population -- in units of five
 # million since ticket #143 (version 0.07.3), so 40 units is the two hundred million each Scrubber wants:
@@ -278,7 +302,14 @@ exchange_ducats = 1
 # a Habitat above its Core before a Chorus pays anything at all.
 chorus_colonists = 6
 
+# Ticket #332 (version 0.09.0): a raise is a build like any other, four Widgets for its one turn.
 [industry_level]
 materials = 30
 materials_cheap_industry = 15
-build_turns = 1
+widgets = 4
+
+# Ticket #332 (version 0.09.0): what a Region makes in Widgets a turn with no Factory at all, per
+# point of Industry Level (1 to 3), at the designer's word: "a base per place". A Colony's base is
+# its Core Module's own row in modules.toml.
+[widgets]
+per_industry_level = 1

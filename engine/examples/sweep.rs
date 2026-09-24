@@ -141,6 +141,12 @@ fn main() {
                         let mut research_off_earth: [Vec<u32>; 4] = Default::default();
                         // Ticket #82: Module-turns doubled by an idle Facility on Earth, per seat.
                         let mut doubled_turns: [Vec<u32>; 4] = Default::default();
+                        // Ticket #332 (version 0.09.0): Widgets made, applied and lost a game, per
+                        // seat, and each game's median queue depth at Resolution.
+                        let mut widgets_made: [Vec<u32>; 4] = Default::default();
+                        let mut widgets_applied: [Vec<u32>; 4] = Default::default();
+                        let mut widgets_lost: [Vec<u32>; 4] = Default::default();
+                        let mut queue_depths: Vec<u32> = Vec::new();
                         // Ticket #84: the turn each seat's Victory gate completed, over the seeds it did.
                         let mut gate_turns: [Vec<u32>; 4] = Default::default();
                         // Ticket #86: Colonists lost in transit to crowding, per seat, over the batch.
@@ -221,12 +227,16 @@ fn main() {
                                 observatories[s] += r.observatories[s];
                                 research_off_earth[s].push(r.research_off_earth[s].max(0) as u32);
                                 doubled_turns[s].push(r.doubled_module_turns[s].max(0) as u32);
+                                widgets_made[s].push(r.widgets_made[s].max(0) as u32);
+                                widgets_applied[s].push(r.widgets_applied[s].max(0) as u32);
+                                widgets_lost[s].push(r.widgets_lost[s].max(0) as u32);
                                 if let Some(t) = r.gate_turn[s] {
                                     gate_turns[s].push(t);
                                 }
                                 lost_in_transit[s] += r.lost_in_transit[s];
                                 stranded[s] += r.stranded_at_end[s];
                             }
+                            queue_depths.push(r.queue_depth_median);
                             refuels += r.refuels;
                             partner_refuels += r.partner_refuels;
                             stations_off_earth += r.stations_off_earth;
@@ -346,6 +356,14 @@ fn main() {
                             println!(
                                 "      Production Moved: median Module-turns doubled by an idle Facility a game, by seat {:?}",
                                 doubled_turns.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>()
+                            );
+                            // Ticket #332 (version 0.09.0): Widgets, the work half of every build.
+                            println!(
+                                "      Widgets a game (median), by seat: made {:?}, applied {:?}, lost {:?}; median queue depth at Resolution {}",
+                                widgets_made.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>(),
+                                widgets_applied.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>(),
+                                widgets_lost.iter_mut().map(|v| median_u(v)).collect::<Vec<_>>(),
+                                median_u(&mut queue_depths)
                             );
                             println!(
                                 "      Victory gates: completed in {:?} seeds by seat, median turn {:?}",

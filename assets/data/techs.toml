@@ -150,7 +150,7 @@ branch = "Extraction"
 rung = 1
 cost = 18
 needs = []
-effect = "Mine and Factory output x1.5; Rich Seam gives x3"
+effect = "Mine output x1.5, on Earth and off it; Rich Seam gives x3"
 value = 1.5
 
 [[tech]]

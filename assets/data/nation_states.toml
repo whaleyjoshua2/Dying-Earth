@@ -28,6 +28,8 @@
 # Population in hundreds of millions, from 2023 figures; every split shares out its parent's people
 # rather than inventing more. Education Level from UN 2023 schooling data. Neighbours are symmetric;
 # each edge is listed on both states. Rows stay in the engine's order.
+# Ticket #332 (version 0.09.0): every "factory" below has a "mine" beside it, so opening Materials
+# are as they were and the Factory's Widgets are new on top.
 # start_facilities (ticket #24): what stands when the game begins, as many as the Industry Level,
 # chosen by the Resource Lean. They come with the state whoever takes it. The Faction start states
 # get a Launch Site on top.
@@ -94,7 +96,7 @@ education_level = 0.7
 size = 3
 coastal_exposure = 1
 neighbours = ["north_africa", "arabian_peninsula"]
-start_facilities = ["factory"]
+start_facilities = ["factory", "mine"]
 influence = 1
 gdp = 2
 unrest = 0.0
@@ -139,7 +141,7 @@ education_level = 1.1
 size = 3
 coastal_exposure = 2
 neighbours = ["russia", "south_asia", "south_east_asia", "japan"]
-start_facilities = ["factory", "power_plant", "refinery"]
+start_facilities = ["factory", "mine", "power_plant", "refinery"]
 influence = 3
 gdp = 17
 unrest = 0.0
@@ -160,7 +162,7 @@ education_level = 0.75
 size = 2
 coastal_exposure = 2
 neighbours = ["east_asia", "south_east_asia", "middle_east"]
-start_facilities = ["factory", "power_plant"]
+start_facilities = ["factory", "mine", "power_plant"]
 influence = 2
 gdp = 4
 unrest = 0.0
@@ -202,7 +204,7 @@ education_level = 1.35
 size = 2
 coastal_exposure = 2
 neighbours = ["south_east_asia"]
-start_facilities = ["power_plant", "factory"]
+start_facilities = ["power_plant", "factory", "mine"]
 influence = 2
 gdp = 2
 unrest = 0.0
@@ -221,7 +223,7 @@ education_level = 1.45
 size = 2
 coastal_exposure = 1
 neighbours = ["north_america", "north_africa", "russia", "middle_east"]
-start_facilities = ["power_plant", "factory", "refinery"]
+start_facilities = ["power_plant", "factory", "mine", "refinery"]
 influence = 5
 gdp = 20
 unrest = 0.0
@@ -243,7 +245,7 @@ coastal_exposure = 1
 neighbours = ["europe", "russia", "central_america"]
 # Ticket #69 (version 0.05.5): a Research Lab added to the start Facilities (as in South-East Asia),
 # standing inland; while the state is neutral it pays half its yield into the shared Tech.
-start_facilities = ["refinery", "power_plant", "factory", "research_lab"]
+start_facilities = ["refinery", "power_plant", "factory", "mine", "research_lab"]
 influence = 7
 gdp = 23
 unrest = 0.0
@@ -264,7 +266,7 @@ education_level = 1.0
 size = 1
 coastal_exposure = 2
 neighbours = ["north_america", "south_america"]
-start_facilities = ["factory"]
+start_facilities = ["factory", "mine"]
 influence = 1
 gdp = 2
 unrest = 0.0
@@ -355,7 +357,7 @@ education_level = 1.5
 size = 1
 coastal_exposure = 2
 neighbours = ["east_asia", "russia"]
-start_facilities = ["factory", "power_plant", "factory"]
+start_facilities = ["factory", "mine", "power_plant", "factory", "mine"]
 influence = 1
 gdp = 6
 unrest = 0.0
