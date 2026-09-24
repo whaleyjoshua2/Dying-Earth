@@ -210,7 +210,7 @@ name = "Core Module"
 materials = 0
 widgets = 0
 energy_upkeep = 1
-produces = { resource = "widgets", amount = 1 }
+produces = { resource = "widgets", amount = 4 }
 does = "holds 4 Colonists and never counts against the Colony's room for Modules"
 holds_colonists = 4
 

@@ -39,15 +39,11 @@
 #     turn 1, not against the data file, after the data file said otherwise and was wrong.
 #   - **The ISS opens with two aboard** (`start_colonists` in `factions.toml`), a Colony's Module
 #     cap is one slot per Colonist, so the ISS has **two slots free** on turn 1.
-#   - A Habitat is **25 Materials** of the **80** the game starts with and **4 Widgets**, and holds
-#     4. Since ticket #332 (version 0.09.0) a build has no flat turn count: the ISS makes **one
-#     Widget a turn** from its Core Module, so a Habitat ordered on turn 2 stands on turn 6, and the
-#     ISS then holds **8**: the Core Module's 4 and the Habitat's 4, with two already aboard. (Until
-#     0.09.0 it took one turn and stood on turn 3, and the turn-4 note said all four fit; the notes
-#     now say what fits when, and the chain's timing is the designer's to revisit.)
+#   - A Habitat is **25 Materials** of the **80** the game starts with, takes one turn, and holds 4
+#     -- so a Habitat ordered on turn 2 stands on turn 3, and the ISS then holds **8**: the Core
+#     Module's 4 and the Habitat's 4, with two already aboard.
 #   - A recruit is **4** for the Custodians, and the Pioneers are on the Region's card at End Turn --
-#     so recruiting on turn 3 means they are waiting on turn 4; two fit the Core Module's berths at
-#     once and the other two once the Habitat stands.
+#     so recruiting on turn 3 means they are waiting on turn 4, and four fit with two berths to spare.
 #
 # The Reactor is NOT what a Custodian builds: it is the Archivists' Unique Facility since ticket
 # #184. Nothing here asks for one.
@@ -61,7 +57,7 @@ note = "You are the Custodians: colonise the solar system without wrecking Earth
 [[note]]
 turn = 2
 figure = "Build a Habitat on the ISS"
-text = "The ISS is yours, in orbit over Earth, with two people already aboard and room to build. Click it on the globe, click a free tile on its card, and order a Habitat: 25 Materials and 4 Widgets. The ISS makes one Widget a turn from its Core Module, so the Habitat stands in four turns, and it holds four more."
+text = "The ISS is yours, in orbit over Earth, with two people already aboard and room to build. Click it on the globe, click a free tile on its card, and order a Habitat: 25 Materials, ready next turn, and it holds four more."
 note = "A station builds one Module for every Colonist living on it. The two aboard are what let you build at all; the people you send up next will let you build more."
 
 [[note]]
@@ -73,7 +69,7 @@ note = "Every figure on a card explains itself. Rest the pointer on a number and
 [[note]]
 turn = 4
 figure = "Send them to the ISS"
-text = "The ISS holds four from its Core Module, two of them already there, and eight once the Habitat stands. Send up what fits from the Region's own card, or ask for them from the ISS's; the rest go up when the Habitat is done."
+text = "The ISS holds eight now, two of them already there, so all four fit. Send them up from the Region's own card, or ask for them from the ISS's."
 note = "That is the last of these notes that asks you for anything. Twelve people living off Earth is half your Victory Condition."
 
 [[note]]

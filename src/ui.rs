@@ -4337,6 +4337,7 @@ fn widget_makers(game: &Game, place: Place) -> Vec<(String, i64)> {
     match place {
         Place::State(sid) => {
             let st = game.state(sid);
+            parts.push(("the Region itself".to_string(), game.tables.widgets.region_base as i64));
             parts.push((format!("Industry Level {}", st.industry_level), st.industry_level as i64 * game.tables.widgets.per_industry_level as i64));
             if let Some(seat) = st.control.director() {
                 for f in st.facilities.iter().filter(|f| f.working()) {

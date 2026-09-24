@@ -680,8 +680,9 @@ impl Game {
     }
 
     /// Ticket #332 (version 0.09.0): the Widgets a place makes this turn, the work half of every
-    /// build there. A Region makes its Industry Level times `[widgets] per_industry_level` with no
-    /// Factory at all -- its own, whoever directs it, so a build in a Region that threw its holder
+    /// build there. A Region makes `[widgets] region_base` plus its Industry Level times
+    /// `per_industry_level` with no Factory at all (a flat four and one a level, the designer's
+    /// figures) -- its own, whoever directs it, so a build in a Region that threw its holder
     /// off still crawls on -- plus every working Factory's Widget yield through `facility_yield`,
     /// which wants a director. A Colony or station makes every working Module's Widget yield
     /// through `module_yield_at` (the Core Module's one, a Factory Module's four, Production Moved's
@@ -691,7 +692,7 @@ impl Game {
         match place {
             Place::State(sid) => {
                 let st = self.state(sid);
-                let mut n = st.industry_level as i64 * self.tables.widgets.per_industry_level as i64;
+                let mut n = self.tables.widgets.region_base as i64 + st.industry_level as i64 * self.tables.widgets.per_industry_level as i64;
                 if let Some(seat) = st.control.director() {
                     for f in st.facilities.iter().filter(|f| f.working()) {
                         let y = self.facility_yield(seat, sid, f.kind);

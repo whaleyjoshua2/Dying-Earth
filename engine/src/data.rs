@@ -223,10 +223,12 @@ pub struct IndustryLevelCard {
     pub widgets: u32,
 }
 
-/// Ticket #332 (version 0.09.0): the Widgets a Region makes a turn with no Factory at all, per
-/// point of Industry Level (`facilities.toml`). A Colony's base is its Core Module's own row.
+/// Ticket #332 (version 0.09.0): the Widgets a Region makes a turn with no Factory at all: a flat
+/// `region_base` and `per_industry_level` more per point of Industry Level (`facilities.toml`), at
+/// the designer's word *"4 +1 per industry level"*. A Colony's base is its Core Module's own row.
 #[derive(Debug, Clone, Deserialize)]
 pub struct WidgetsCard {
+    pub region_base: u32,
     pub per_industry_level: u32,
 }
 
@@ -1757,8 +1759,8 @@ impl Tables {
         if let Some(u) = self.units.iter().find(|u| u.widgets == 0) {
             return Err(err("units.toml", format!("row {}: widgets must be at least 1", u.name)));
         }
-        if self.industry_level.widgets == 0 || self.widgets.per_industry_level == 0 {
-            return Err(err("facilities.toml", "[industry_level] widgets and [widgets] per_industry_level must both be at least 1"));
+        if self.industry_level.widgets == 0 || self.widgets.region_base + self.widgets.per_industry_level == 0 {
+            return Err(err("facilities.toml", "[industry_level] widgets must be at least 1, and [widgets] region_base or per_industry_level must be"));
         }
         for t in &self.techs {
             for n in &t.needs {

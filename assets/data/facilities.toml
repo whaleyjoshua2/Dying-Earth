@@ -17,7 +17,7 @@ materials = 20
 widgets = 4
 energy_upkeep = 2
 produces = { resource = "widgets", amount = 4 }
-emissions = 1.0
+emissions = 0.75
 
 [[facility]]
 id = "power_plant"
@@ -209,7 +209,7 @@ materials = 20
 widgets = 4
 energy_upkeep = 2
 produces = { resource = "materials", amount = 4 }
-emissions = 1.0
+emissions = 0.75
 
 # Ticket #54: the cap on Scrubbers in one Nation State, from its population -- in units of five
 # million since ticket #143 (version 0.07.3), so 40 units is the two hundred million each Scrubber wants:
@@ -308,8 +308,12 @@ materials = 30
 materials_cheap_industry = 15
 widgets = 4
 
-# Ticket #332 (version 0.09.0): what a Region makes in Widgets a turn with no Factory at all, per
-# point of Industry Level (1 to 3), at the designer's word: "a base per place". A Colony's base is
-# its Core Module's own row in modules.toml.
+# Ticket #332 (version 0.09.0): what a Region makes in Widgets a turn with no Factory at all: a flat
+# `region_base` plus `per_industry_level` per point of Industry Level (1 to 3), at the designer's
+# word "4 +1 per industry level", so a bare Region builds a one-turn thing in a turn as it did and
+# a built-up one a little faster. A Colony's base is its Core Module's own row in modules.toml.
+# Measured before the flat four: at one a level a Scrubber or a Sea Wall in a Region taken by
+# Influence took three to eight turns where it took two.
 [widgets]
+region_base = 4
 per_industry_level = 1
