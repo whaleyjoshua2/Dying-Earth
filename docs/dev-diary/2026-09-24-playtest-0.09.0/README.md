@@ -38,9 +38,12 @@ moment a player loads a Colony Ship: 28 to 16 in one Arkwright session, 8 to 4 i
 unannounced. The cheapest way to protect the bar is never to fly, in a game about leaving Earth.
 
 **3. The computer Archivists are never told to research their own path.** `assets/data/ai.toml:398`
-lists `public_science, efficient_grids, coastal_engineering, green_consensus, civil_defense`. Not one
-is on the path to The Upload, which is their Victory Condition. Every other Faction's list names its
-own gate's parents. This is a one-line data fix and the best explanation on file for **0 wins in 80**.
+lists `public_science, efficient_grids, coastal_engineering, green_consensus, civil_defense`. Only
+**one of those, Efficient Grids, is on the path** to The Upload, which is their Victory Condition;
+the four antecedents are Efficient Grids, Clean Power, Expanded Habitats and Closed-Loop Colonies,
+and they hold one. Checked while charting 0.09.1: the Custodians' list is complete, the Prospectors
+lack one antecedent and the Arkwrights lack two, so the Archivists are the worst case of a gap every
+Faction but one has. A one-line data fix, and the best explanation on file for **0 wins in 80**.
 
 **4. Greenwash is fifty times cheaper than the card that does the same thing.** `[greenwash]` in
 `influence.toml` removes **2 ppm of Blame for 1 Influence and 1 Ducat**. The Carbon Offset Scheme
@@ -64,8 +67,10 @@ nothing said so.
 
 **The research tree is a lottery that decides the game.** Only the Research Lead picks, from three
 drawn at random. The Lead's **own gate** is protected; its **prerequisites are not**. Measured chain
-lengths: Custodians 98 Research across three Techs, Prospectors 130 across four, Arkwrights and
-Archivists **148 across five** — and those two win 1 game in 160 between them.
+lengths, traced from `techs.toml`: Custodians **98 Research across three Techs**, and the other
+**three Factions 148 across five each** — the playtester's estimate of 130 across four for the
+Prospectors was low. So only the Custodians have a short road, which makes the unprotected
+prerequisites matter more than the report implies.
 
 **The opening tells every Faction the wrong Victory Condition.** The turn-1 note says "get twelve
 Colonists off Earth" to everyone. That is the Arkwrights' condition.
