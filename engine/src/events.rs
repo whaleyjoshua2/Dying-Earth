@@ -130,6 +130,11 @@ impl Game {
             Some(_) => return Err(format!("The {} have already answered {name} this turn.", self.seat_name(seat))),
             None => {}
         }
+        // Ticket #337: the offer is closed to a seat that cannot pay it, and taking is refused at
+        // the door rather than silently turned into a refusal.
+        if taken && !self.may_take_card(seat) {
+            return Err(format!("The {} cannot pay what {name} asks; they may only refuse.", self.seat_name(seat)));
+        }
         let answer = if taken { CardAnswer::Taken } else { CardAnswer::Refused };
         if let Some(q) = self.question.as_mut() {
             q.answers[seat.index()] = Some(answer);
@@ -151,7 +156,9 @@ impl Game {
             return;
         }
         let Some(rule) = self.tables.event(q.card).choice.as_ref().map(|c| c.take_when.clone()) else { return };
-        let take = self.card_rule_holds(seat, &rule);
+        // Ticket #337: the card's rule says whether the seat WANTS the offer; it takes it only if
+        // it can also pay for it.
+        let take = self.card_rule_holds(seat, &rule) && self.may_take_card(seat);
         self.answer_card(seat, take).ok();
     }
 
@@ -185,35 +192,58 @@ impl Game {
     }
 
     /// Ticket #337: **whether this card has a question for this seat at all.** Each side reaches a
-    /// seat when every effect on it can land; a card asks a seat only when both sides reach it.
+    /// seat when every effect on it has something to land on; a card asks a seat only when both
+    /// sides reach it.
     ///
     /// This is where "a seat that cannot be touched is not asked" falls out of the vocabulary
     /// rather than being written per card: a Faction holding no Region is never asked the Hard
     /// Winter, because the refusing side raises Unrest in every Region it holds and there are
-    /// none; and a Faction with no Ship is never asked the Grounded Fleet. It also means no seat is
-    /// ever offered a side it cannot pay for, since a price it cannot meet is an effect that
-    /// cannot land.
+    /// none; and a Faction with no Ship is never asked the Grounded Fleet.
+    ///
+    /// **Being unable to PAY is not the same as having nothing to decide**, at the designer's word
+    /// after the first build skipped such a seat: it is asked all the same, the offer closed to it
+    /// (`may_take_card`) and refusing its only move, so a struggling Faction still feels the card.
+    /// Measured under the old rule: 34% of seat-card pairs over eighty games were never asked,
+    /// most of them for want of the price.
     pub fn card_reaches(&self, id: EventId, seat: Seat) -> bool {
         let Some(c) = self.tables.event(id).choice.as_ref() else { return false };
         self.side_reaches(&c.take_does, seat) && self.side_reaches(&c.refuse_does, seat)
     }
 
     fn side_reaches(&self, side: &[CardEffect], seat: Seat) -> bool {
-        !side.is_empty() && side.iter().all(|e| self.card_effect_can_land(e, seat))
+        !side.is_empty() && side.iter().all(|e| self.card_effect_has_target(e, seat))
     }
 
-    /// Ticket #337: can this one effect do anything to this seat? An effect whose target is not on
-    /// the board, and a price the seat cannot pay, both answer no.
-    fn card_effect_can_land(&self, e: &CardEffect, seat: Seat) -> bool {
+    /// Ticket #337: whether this seat could PAY for the card's offer, which is a different question
+    /// from whether the offer has anything to land on. A seat that cannot pay is asked all the same
+    /// (the designer's word when the first build skipped it): the offer is closed to it and refusing
+    /// is its only move, so a struggling Faction still feels the card.
+    pub fn may_take_card(&self, seat: Seat) -> bool {
+        let Some(q) = self.question.as_ref() else { return false };
+        let Some(c) = self.tables.event(q.card).choice.as_ref() else { return false };
+        c.take_does.iter().all(|e| self.card_effect_affordable(e, seat))
+    }
+
+    /// Ticket #337: the price half of `card_effect_can_land`. Only an effect that costs something
+    /// can answer no; everything else is free to choose whether or not it does anything.
+    fn card_effect_affordable(&self, e: &CardEffect, seat: Seat) -> bool {
         let s = self.seat(seat);
         match e {
             CardEffect::Resources { materials, fuel, energy, ducats, research: _ } => {
                 s.stockpile.materials + materials >= 0 && s.stockpile.fuel + fuel >= 0 && s.stockpile.energy + energy >= 0 && s.stockpile.ducats + ducats >= 0
             }
-            CardEffect::PerUnitCost { per, resource, amount } => {
-                let n = self.card_things(seat, *per);
-                n > 0 && self.stock_of(seat, *resource) >= n as i64 * amount
-            }
+            CardEffect::PerUnitCost { per, resource, amount } => self.stock_of(seat, *resource) >= self.card_things(seat, *per) as i64 * amount,
+            _ => true,
+        }
+    }
+
+    /// Ticket #337: has this one effect anything on this seat's board to land on? A price is not
+    /// asked about here: whether the seat can PAY is `card_effect_affordable`, and a seat that
+    /// cannot pay is still asked the card.
+    fn card_effect_has_target(&self, e: &CardEffect, seat: Seat) -> bool {
+        match e {
+            CardEffect::Resources { .. } => true,
+            CardEffect::PerUnitCost { per, .. } => self.card_things(seat, *per) > 0,
             CardEffect::PopulationToMostPopulous { .. } | CardEffect::StandingAtMostPopulous { .. } | CardEffect::UnrestAtMostPopulous { .. } | CardEffect::PioneersFree { .. } => {
                 self.card_most_populous(seat).is_some()
             }

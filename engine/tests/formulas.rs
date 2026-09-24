@@ -12664,6 +12664,30 @@ fn a_card_is_asked_before_orders_and_a_seat_it_cannot_reach_is_not_asked() {
     assert!(g.last_event.is_none(), "a choice card is not an Event that befell the table");
 }
 
+/// Ticket #337: **a seat that cannot pay a card's offer is asked anyway**, at the designer's word
+/// when the first build skipped it: *"b"* -- the offer is greyed and refusing is its only move, so
+/// a struggling Faction still feels the card. Being unable to pay is not the same as having nothing
+/// to decide: the Hard Winter's refusing side raises Unrest in every Region the seat holds, and a
+/// seat holding Regions but not the 40 Ducats must take that. Measured before the change: 34% of
+/// seat-card pairs over eighty games were never asked at all, most of them for want of the price.
+#[test]
+fn a_seat_that_cannot_pay_is_asked_anyway_and_may_only_refuse() {
+    let mut g = game();
+    let broke = Seat(1);
+    assert!(!g.controlled_states(broke).is_empty(), "the seat holds Regions, so the refusing side reaches it");
+    g.seat_mut(broke).stockpile.ducats = 0;
+    // A seat starts the game with far less than the relief costs, so the solvent one is given it.
+    g.seat_mut(Seat(0)).stockpile.ducats = 100;
+    ask_the_card(&mut g, EventId::TheHardWinter);
+    let q = g.pending_question().expect("the Hard Winter is asking");
+    assert_eq!(q.answer_of(broke), None, "a seat that cannot pay is still asked and still owes an answer");
+    assert!(!g.may_take_card(broke), "but it cannot take what it cannot pay for");
+    assert!(g.may_take_card(Seat(0)), "a solvent seat may take it");
+    assert!(g.answer_card(broke, true).is_err(), "taking is refused at the door, not silently ignored");
+    assert!(g.answer_card(broke, false).is_ok(), "refusing is its only move, and it is open");
+}
+
+
 /// Ticket #337 R2: **End Turn is refused while a human seat owes this turn's card an answer**, in
 /// the same shape and through the same door as the Tech pick of #105, naming the card. The spec is
 /// wrong if End Turn can be pressed with a question pending and unanswered.
@@ -12700,6 +12724,8 @@ fn the_two_sides_of_a_card_are_composed_in_data_and_make_different_boards() {
     let card = taken.tables.event(EventId::TheHardWinter).choice.clone().expect("the Hard Winter asks a question");
     // Both sides are lists of effects, each carrying its own figures. Nothing below is a literal:
     // the relief and the Unrest are read out of the table and the board is checked against them.
+    // Relief is PAID in this game, as the Relief order on a Region's card is paid, so the take
+    // side's figure is negative: the purse falls by it.
     let relief = match card.take_does.first().expect("the take side is a list of effects") {
         CardEffect::Resources { ducats, .. } => *ducats,
         e => panic!("the take side of the Hard Winter is relief in Ducats: {e:?}"),
@@ -12708,7 +12734,11 @@ fn the_two_sides_of_a_card_are_composed_in_data_and_make_different_boards() {
         CardEffect::UnrestAllHeld { unrest } => *unrest,
         e => panic!("the refuse side of the Hard Winter is Unrest in every held Region: {e:?}"),
     };
-    assert!(relief > 0 && rise > 0.0, "the card carries its own figures: {relief} Ducats, {rise} Unrest");
+    assert!(relief < 0 && rise > 0.0, "the card carries its own figures: {relief} Ducats paid, {rise} Unrest");
+    // A seat begins the game with far less than the relief costs, so it is given enough to choose.
+    for g in [&mut taken, &mut refused] {
+        g.seat_mut(Seat(0)).stockpile.ducats = 100;
+    }
     let purse = taken.seat(Seat(0)).stockpile.ducats;
     let held = taken.controlled_states(Seat(0));
     let quiet: Vec<f64> = held.iter().map(|s| taken.state(*s).unrest).collect();
@@ -12719,7 +12749,7 @@ fn the_two_sides_of_a_card_are_composed_in_data_and_make_different_boards() {
     refused.answer_card(Seat(0), false).unwrap();
     taken.apply_card_answers();
     refused.apply_card_answers();
-    assert_eq!(taken.seat(Seat(0)).stockpile.ducats, purse + relief, "taking it pays the relief the card names");
+    assert_eq!(taken.seat(Seat(0)).stockpile.ducats, purse + relief, "taking it pays out the relief the card names");
     assert_eq!(refused.seat(Seat(0)).stockpile.ducats, purse, "refusing it pays nothing");
     for (i, sid) in held.iter().enumerate() {
         assert_eq!(taken.state(*sid).unrest, quiet[i], "{:?}: taking it moves no Unrest", sid);
@@ -12763,6 +12793,7 @@ fn the_report_names_every_seats_answer_and_the_game_counts_them() {
     for sid in g.controlled_states(Seat(3)) {
         g.state_mut(sid).control = Control::Neutral;
     }
+    g.seat_mut(Seat(0)).stockpile.ducats = 100;
     ask_the_card(&mut g, EventId::TheHardWinter);
     g.answer_card(Seat(0), true).unwrap();
     g.answer_card(Seat(1), false).unwrap();

@@ -73,6 +73,13 @@ pub struct ShotPlan {
     /// Ticket #335 (version 0.09.0), a building aid (`scroll:transits`, `scroll:orbits`): the Ship
     /// stack card scrolls to that block, which a headless capture cannot do with a scrollbar.
     pub stack_scroll: Option<StackBlock>,
+    /// Ticket #337 (version 0.09.0), a building aid (`card:<event id>`): that Choice Card is the
+    /// turn's question, so its modal stands in every picture of the run. The deck is stacked with
+    /// the card and the real Question phase is run, so what is asked is asked the way a game asks
+    /// it. `cardshut:1` sets the modal aside -- which only a picture may do -- so the board behind
+    /// it can be photographed with End Turn greyed; the `tip:` aid forces that button hover.
+    pub card: bool,
+    pub card_shut: bool,
 }
 
 /// Ticket #58: the Moment a `moment:` aid names.
@@ -135,6 +142,13 @@ fn apply_aids(plan: &mut ShotPlan, view: &mut ViewState) {
     // Region's card is clicked, so the strip beneath the boxes can be photographed.
     view.slot_box = std::env::args().find_map(|a| a.strip_prefix("slotbox:").map(str::to_owned)).and_then(|v| if v == "free" { Some(SlotBox::Free) } else { v.parse::<usize>().ok().map(SlotBox::Facility) });
     view.force_hover = plan.hover.filter(|_| view.view == View::Solar);
+    // Ticket #337 (version 0.09.0): the turn's Choice Card stands in the picture, unless the aid
+    // has set it aside for a picture of the board behind it. Applied at every view change, since
+    // the modal is raised again by the interface the moment nothing else is up.
+    view.card_aside = plan.card_shut;
+    if plan.card && !plan.card_shut {
+        view.popup = Popup::Card;
+    }
     // Ticket #51: `archive:<stage>` opens the Archive's Colony card in that Body's picture.
     if let (Some(cid), View::Surface(_)) = (plan.archive_colony, view.view) {
         view.selection = Selection::Colony(cid);
@@ -1050,7 +1064,67 @@ fn build_board(session: &mut Session) {
             m.online = false;
         }
     }
+    // Ticket #337 (version 0.09.0): `ducats:<n>` (a building aid): seat 0 holds exactly n Ducats.
+    // A card whose offer costs more than a seat holds greys its take button, and that is the state
+    // a third of the table is in when a card is drawn; a fresh board is never poor enough to show
+    // it.
+    if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("ducats:").and_then(|v| v.parse::<i64>().ok()))
+        && let Some(g) = session.game.as_mut()
+    {
+        g.seats[0].stockpile.ducats = n;
+    }
+    // `card:<event id>` (a building aid, ticket #337): that Choice Card is the turn's question, so
+    // the modal that asks it stands in the picture. `cardanswer:take` or `cardanswer:refuse` then
+    // answers it for seat 0 and runs the turn, so the Report that follows carries all four seats'
+    // answers -- the computer seats' among them, each answered by the card's own rule.
+    if let Some(id) = std::env::args().find_map(|a| a.strip_prefix("card:").and_then(card_from_id))
+        && let Some(g) = session.game.as_mut()
+    {
+        if !ask_the_card(g, id) {
+            eprintln!("card:{id:?} never came up in two hundred rolls");
+            std::process::exit(3);
+        }
+        if let Some(taken) = std::env::args().find_map(|a| match a.strip_prefix("cardanswer:") {
+            Some("take") => Some(true),
+            Some("refuse") => Some(false),
+            _ => None,
+        }) {
+            if let Err(e) = g.answer_card(Seat(0), taken) {
+                eprintln!("cardanswer: {e}");
+                std::process::exit(3);
+            }
+            run_one_quiet_turn(g);
+        }
+    }
     session.earth_dirty = true;
+}
+
+/// Ticket #337 (version 0.09.0): the Choice Card a `card:` aid names, by the id its data row
+/// carries (`the_hard_winter`) or by the name of its variant.
+fn card_from_id(name: &str) -> Option<EventId> {
+    let want = name.replace('_', "");
+    EventId::ALL.into_iter().find(|id| format!("{id:?}").eq_ignore_ascii_case(&want))
+}
+
+/// Ticket #337, a building aid: make that card the turn's question, by stacking the deck with it
+/// and running the game's OWN Question phase until a roll brings a card -- so the question is asked
+/// exactly as a game asks one, every seat included or passed over by the rule rather than by this
+/// aid. The deck is put back as it would stand with that card drawn, so the Climate Panel's count
+/// of what is left reads a real deck.
+fn ask_the_card(g: &mut Game, id: EventId) -> bool {
+    let deck = g.deck.clone();
+    for _ in 0..200 {
+        g.deck.cards = vec![Card::Event(id)];
+        g.deck.drawn.clear();
+        g.question_phase();
+        if g.pending_question().is_some() {
+            g.deck = deck;
+            g.deck.cards.retain(|c| *c != Card::Event(id));
+            g.deck.drawn.push(Card::Event(id));
+            return true;
+        }
+    }
+    false
 }
 
 /// Ticket #59, a building aid: write the board to the saves folder, read it back, and say whether
@@ -1350,6 +1424,10 @@ pub fn shot_system(time: Res<Time>, mut plan: ResMut<ShotPlan>, mut session: Res
             Some("orbits") => Some(StackBlock::ChangeOrbit),
             _ => None,
         });
+        // Ticket #337 (version 0.09.0): the turn's Choice Card stands in every picture of the run,
+        // unless `cardshut:1` sets it aside for a picture of the board behind it.
+        plan.card = std::env::args().any(|a| a.starts_with("card:"));
+        plan.card_shut = std::env::args().any(|a| a == "cardshut:1");
         plan.hover = std::env::args().find_map(|a| a.strip_prefix("hover:").and_then(body_from_id));
         plan.look = std::env::args().find_map(|a| {
             let (lon, lat) = a.strip_prefix("look:")?.split_once(',')?;

@@ -47,6 +47,13 @@ pub enum Selection {
 pub enum Popup {
     None,
     Event,
+    /// Ticket #337 (version 0.09.0): **the turn's Choice Card, asking its question.** Its own popup
+    /// rather than the Event's, because a card that asks something is not a notice: it carries two
+    /// buttons whose faces say what each side does, neither of them a default, and NOTHING dismisses
+    /// it but an answer -- not Escape, not a click outside, not the key that ends the turn. It is
+    /// raised at the head of the turn, where the Event would be, and hands on to the Moments and
+    /// the Report once it has been answered.
+    Card,
     /// Ticket #169 (version 0.07.5): a tutorial game's note for this turn, shown before everything
     /// else, since it says what the turn is for.
     Tutorial,
@@ -382,6 +389,11 @@ pub struct ViewState {
     /// Ticket #57, a building aid (`hover:<body id>`): the Solar System Map draws that Body's launch
     /// window tooltip as though the pointer were on it, so a picture can be taken of it.
     pub force_hover: Option<BodyId>,
+    /// Ticket #337 (version 0.09.0), a building aid (`cardshut:1`): the turn's Choice Card is SET
+    /// ASIDE, so the board behind it -- the End Turn sun greyed, with the refusal on its hover --
+    /// can be photographed. Nothing in play sets it: in play the card cannot be set aside at all,
+    /// and the modal comes straight back whenever nothing else is up.
+    pub card_aside: bool,
     /// Ticket #114 (version 0.07.1), Max since ticket #134: the last turn the standing order was placed, so it is
     /// placed once a turn and not once a frame.
     pub max_placed: Option<u32>,
@@ -435,6 +447,7 @@ impl Default for ViewState {
             attack_preview: false, armed_stack: None, armed_scroll: false, stack_scroll: None,
             moments_on: None,
             force_hover: None,
+            card_aside: false,
             max_placed: None,
             hotkey: None,
             start_hover: None,

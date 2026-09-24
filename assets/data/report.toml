@@ -122,7 +122,10 @@ event_drawn = "{text}"
 # answered it. A seat neither side of the card reaches is named too, as having nothing to decide,
 # so the Report never passes a small Faction over in silence.
 card_asked = "{card}: {question}"
-card_answered = "{card}: the {faction} {answer}."
+# Ticket #337, the interface lane: the Faction opens the sentence with a capital, because the
+# Report draws the four answers together under the card's own name and takes the "{card}: " off
+# the front of each; the whole line stands unaltered in the log and anywhere else it is read.
+card_answered = "{card}: The {faction} {answer}."
 # Ticket #259 (version 0.08.4): the turn the off-Earth cards are shuffled into the deck.
 deck_joined = "The {n} Events that can only land off Earth join the deck: Grid Failure, Reactor Leak, Dust Storm, Moonquake, Helium-3 Vein, Rich Seam and Ice Deposit."
 # Ticket #261 (version 0.08.4): the rival's Moment, two steps. {part} is the part still short.

@@ -430,13 +430,15 @@ target = "seat"
 effect = "Take the relief, or go without"
 copies = 1
 [event.choice]
-question = "A hard winter closes in. Take 40 Ducats of relief from the table?"
-take = "Take the relief"
+question = "A hard winter closes in. Pay 40 Ducats in relief?"
+take = "Pay the relief"
 refuse = "Go without"
-take_when = { rule = "always" }
+# Ticket #337: the seat pays only where it can spare it; a Faction down to its last Ducats takes
+# the Unrest instead, which is the card.
+take_when = { rule = "ducats_at_least", ducats = 80 }
 [[event.choice.take_does]]
 effect = "resources"
-ducats = 40
+ducats = -40
 [[event.choice.refuse_does]]
 effect = "unrest_all_held"
 unrest = 2.0
