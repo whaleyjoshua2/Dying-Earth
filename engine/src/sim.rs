@@ -20,8 +20,14 @@ pub struct SimResult {
     pub temperature: f64,
     pub collapse_projected_turn: Option<u32>,
     pub colony_changed_hands: Vec<(u32, u32)>,
-    /// Ticket #41: places that changed hands by Influence over the game.
+    /// Ticket #41: places that changed hands by Influence over the game. Ticket #336 (version
+    /// 0.09.0): read off the war counters rather than scraped out of the log, and split by the kind
+    /// of place taken -- Regions, Colonies on the ground, Space Stations -- which the doubling off
+    /// Earth is a rule about. The total is the three added together.
     pub influence_transfers: u32,
+    pub influence_takes_states: u32,
+    pub influence_takes_colonies: u32,
+    pub influence_takes_stations: u32,
     /// Ticket #41: Banks, Trade Posts, Embassies and Relays completed by any seat.
     pub new_buildings: [u32; 4],
     /// Ticket #52: states that threw off a controller, the highest Unrest any state reached, the
@@ -431,7 +437,12 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         observatories,
         research_off_earth
     ));
-    let influence_transfers = game.log.iter().filter(|l| !l.starts_with(' ') && l.ends_with("(Influence).")).count() as u32;
+    // Ticket #336 (version 0.09.0): counted at the transfer, by the kind of place (ticket #276's
+    // lesson about log scrapers: they break whenever a sentence moves).
+    let influence_takes_states: u32 = game.war.takes_by_influence_states.iter().sum();
+    let influence_takes_colonies: u32 = game.war.takes_by_influence_colonies.iter().sum();
+    let influence_takes_stations: u32 = game.war.takes_by_influence_stations.iter().sum();
+    let influence_transfers = influence_takes_states + influence_takes_colonies + influence_takes_stations;
     // Ticket #52, read off the log the same way: throw-offs, Constabularies, Relief orders and the
     // population the refugee flows carried (to the tenth the line prints).
     let throw_offs = game.log.iter().filter(|l| l.contains("threw off the")).count() as u32;
@@ -552,6 +563,9 @@ pub fn run_from(tables: Arc<Tables>, seed: u64, player: FactionKind, start: Stat
         collapse_projected_turn: projected_collapse,
         colony_changed_hands: changed,
         influence_transfers,
+        influence_takes_states,
+        influence_takes_colonies,
+        influence_takes_stations,
         new_buildings,
         throw_offs,
         peak_unrest,

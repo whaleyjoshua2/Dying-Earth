@@ -1159,8 +1159,21 @@ impl Game {
     /// Control passes to `seat` (spec 8.3, 8.5): rivals' Influence wiped, a destruction roll, Armies follow.
     pub fn transfer_control(&mut self, place: Place, seat: Seat, why: &str) {
         // Ticket #286 (version 0.08.5): a take that was not by Influence was by force.
-        if why != "Influence" && self.place_control(place).controller() != Some(seat) {
-            self.war.takes_by_force[seat.index()] += 1;
+        // Ticket #336 (version 0.09.0): and one that WAS is counted here by the kind of place, where
+        // the sweep used to count them all together by scraping the log for lines ending
+        // `(Influence).` -- a counter that could not say whether the doubling off Earth had moved
+        // anything, since a Region and a Colony read the same.
+        if self.place_control(place).controller() != Some(seat) {
+            if why != "Influence" {
+                self.war.takes_by_force[seat.index()] += 1;
+            } else {
+                let i = seat.index();
+                match place {
+                    Place::State(_) => self.war.takes_by_influence_states[i] += 1,
+                    Place::Colony(c) if self.colony(c).map(|col| col.in_orbit).unwrap_or(false) => self.war.takes_by_influence_stations[i] += 1,
+                    Place::Colony(_) => self.war.takes_by_influence_colonies[i] += 1,
+                }
+            }
         }
         // Ticket #282 (version 0.08.5): a Levy was the neutral Region's; it stands down the moment
         // the Region is somebody's.

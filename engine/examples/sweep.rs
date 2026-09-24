@@ -483,7 +483,19 @@ fn main() {
                                 accord_terms[0], accord_terms[1], accord_terms[2], accord_terms[3]
                             );
                             println!("      Trading window units, by seat: bought {bought:?}, sold {sold:?}");
+                            // Ticket #336 (version 0.09.0): the total, and under it the split the
+                            // doubling off Earth is measured by -- Regions, Colonies on the ground
+                            // and Space Stations, by the seat that took them.
                             println!("      Places taken by Influence over the batch: {takes}");
+                            println!(
+                                "      Of those, by kind and seat: Regions {:?}, ground Colonies {:?}, stations {:?} ({} Regions, {} Colonies, {} stations)",
+                                warc.takes_by_influence_states,
+                                warc.takes_by_influence_colonies,
+                                warc.takes_by_influence_stations,
+                                warc.takes_by_influence_states.iter().sum::<u32>(),
+                                warc.takes_by_influence_colonies.iter().sum::<u32>(),
+                                warc.takes_by_influence_stations.iter().sum::<u32>()
+                            );
                             // Ticket #286 (version 0.08.5): the war, over the batch, by seat; printed as the military block after the Influence line.
                             // Blockade-turns are printed above under ticket #278.
                             println!(

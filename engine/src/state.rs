@@ -1001,6 +1001,16 @@ pub struct WarCounters {
     /// -- a Region under its unit of population, a Colony down to its last Colonist -- by seat.
     #[serde(default)]
     pub army_raises_refused_people: [u32; SEAT_COUNT],
+    /// Ticket #336 (version 0.09.0): places taken by Influence, by the seat that took them and BY
+    /// KIND -- a Region, a Colony on the ground, a Space Station. One counter reported all three
+    /// together and it was read off the log, by the lines ending `(Influence).`; the doubling off
+    /// Earth is a rule about two of the three, so it is measured here instead, at the transfer.
+    #[serde(default)]
+    pub takes_by_influence_states: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub takes_by_influence_colonies: [u32; SEAT_COUNT],
+    #[serde(default)]
+    pub takes_by_influence_stations: [u32; SEAT_COUNT],
 }
 
 /// Ticket #332 (version 0.09.0): Widgets, counted where they are made and spent, so the sweep can
@@ -1047,6 +1057,10 @@ impl WarCounters {
             // Ticket #335 (version 0.09.0).
             self.orbit_changes[i] += o.orbit_changes[i];
             self.blockades_ordered[i] += o.blockades_ordered[i];
+            // Ticket #336 (version 0.09.0).
+            self.takes_by_influence_states[i] += o.takes_by_influence_states[i];
+            self.takes_by_influence_colonies[i] += o.takes_by_influence_colonies[i];
+            self.takes_by_influence_stations[i] += o.takes_by_influence_stations[i];
         }
         self.battles_vs_neutral += o.battles_vs_neutral;
         self.standing_armies_lost += o.standing_armies_lost;
@@ -3001,9 +3015,15 @@ impl Game {
         let t = &self.tables.influence;
         let raw = match target {
             Place::State(s) => t.state_threshold_base + t.state_threshold_per_size * self.tables.state(s).size as i64,
+            // Ticket #336 (version 0.09.0): a base plus the per-Colonist figure, both doubled. The
+            // base is the STATION'S on a station and the Colony's on the ground -- one replaces the
+            // other, it does not stack -- so a station and a ground Colony of the same crew are
+            // worth the same figure, where a station was dearer by its base since stations existed.
+            // The base is also what stops an empty place being free: a Colony nobody had moved into
+            // was worth nothing at all and a single point of Standing took it.
             Place::Colony(c) => self
                 .colony(c)
-                .map(|c| t.colony_threshold_per_colonist * c.colonists as i64 + if c.in_orbit { t.station_threshold_base } else { 0 })
+                .map(|c| t.colony_threshold_per_colonist * c.colonists as i64 + if c.in_orbit { t.station_threshold_base } else { t.colony_threshold_base })
                 .unwrap_or(i64::MAX / 4),
         };
         // Ticket #53: the multiplier now runs both ways (Green Consensus down, Blame up), so it is

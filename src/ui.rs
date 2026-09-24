@@ -4946,6 +4946,10 @@ fn influence_row(ui: &mut Ui, game: &Game, session: &Session, view: &mut ViewSta
 /// Your Influence converts at 0.91
 /// ```
 ///
+/// Ticket #336 (version 0.09.0): off Earth the first line names the base the place used, since a
+/// station's replaces a Colony's rather than sitting on top of it -- `Threshold 80 - 40 for the
+/// station + 40 for 2 Colonists`, and on the ground `40 for the Colony` in its place.
+///
 /// It replaces a single sentence that named neither Blame nor Green Consensus though both already
 /// moved the figure. Blame and Green Consensus join the threshold line as further terms only while
 /// they are BITING, which keeps the common case to three lines: measured, Blame sits at exactly
@@ -4963,7 +4967,9 @@ fn threshold_breakdown(ui: &mut Ui, game: &Game, target: Place) {
         Place::Colony(c) => {
             let people = game.colony(c).map(|x| x.colonists).unwrap_or(0) as i64;
             let station = game.colony(c).map(|x| x.in_orbit).unwrap_or(false);
-            let base = if station { format!("{} for the station", t.station_threshold_base) } else { "0".to_string() };
+            // Ticket #336 (version 0.09.0): a base under every place off Earth, the station's in
+            // place of the Colony's rather than on top of it, so the line names the base it used.
+            let base = if station { format!("{} for the station", t.station_threshold_base) } else { format!("{} for the Colony", t.colony_threshold_base) };
             format!("Threshold {threshold} - {base} + {} for {people} Colonists", t.colony_threshold_per_colonist * people)
         }
     };
@@ -5142,7 +5148,14 @@ fn standings_row(ui: &mut Ui, game: &Game, session: &Session, target: Place, thr
         let t = &game.tables.influence;
         let from = match target {
             Place::State(s) => format!("{}, plus {} a size step; this state's size is {}.", t.state_threshold_base, t.state_threshold_per_size, game.tables.state(s).size),
-            Place::Colony(_) => format!("{} a Colonist living here{}.", t.colony_threshold_per_colonist, if game.colony(match target { Place::Colony(c) => c, _ => unreachable!() }).map(|c| c.in_orbit).unwrap_or(false) { format!(", and {} for the station itself", t.station_threshold_base) } else { String::new() }),
+            // Ticket #336 (version 0.09.0): the base is the station's on a station and the Colony's
+            // on the ground, and one replaces the other, so the sentence names one figure and not two.
+            Place::Colony(_) => format!(
+                "{} for the {} itself, plus {} a Colonist living here.",
+                if game.colony(match target { Place::Colony(c) => c, _ => unreachable!() }).map(|c| c.in_orbit).unwrap_or(false) { t.station_threshold_base } else { t.colony_threshold_base },
+                if game.colony(match target { Place::Colony(c) => c, _ => unreachable!() }).map(|c| c.in_orbit).unwrap_or(false) { "station" } else { "Colony" },
+                t.colony_threshold_per_colonist
+            ),
         };
         rule_tip(
             ui.label(format!("Threshold {threshold}")),

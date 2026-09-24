@@ -1354,10 +1354,17 @@ impl Game {
             let neutral_bonus = if st.control == Control::Neutral { 1.0 } else { th.held_state_weight };
             targets.push((Place::State(sid), value * neutral_bonus));
         }
-        // Ticket #50: any rival's Colony, the fewest Colonists first.
+        // Ticket #50: any rival's Colony. Ticket #336 (version 0.09.0): weighed by THE PRICE THIS
+        // SEAT WOULD PAY, cheapest first, where the rule was `3.0 - min(colonists, 2)` -- fewest
+        // Colonists first, and the threshold never read at all. With the thresholds off Earth
+        // doubled that rule would have had the seats ranking a place they cannot afford above one
+        // they can, which would read as a balance change and be a defect. The pivot is the price of
+        // a starting two-Colonist place, so the band is the one the old rule ran in and a Colony's
+        // worth against a Region's is unmoved; the ceiling is the old rule's own 3.0.
         for c in &self.colonies {
             if c.control.controller().map(|o| o != seat).unwrap_or(false) {
-                targets.push((Place::Colony(c.id), 3.0 - (c.colonists as f64).min(2.0)));
+                let price = self.influence_needed_for(seat, Place::Colony(c.id)).max(1) as f64;
+                targets.push((Place::Colony(c.id), (th.colony_price_pivot / price).min(3.0)));
             }
         }
         targets.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());

@@ -729,6 +729,9 @@ pub struct InfluenceTable {
     pub state_threshold_base: i64,
     pub state_threshold_per_size: i64,
     pub colony_threshold_per_colonist: i64,
+    /// Ticket #336 (version 0.09.0): the base under every place off Earth, so an empty one is not
+    /// free to take. `station_threshold_base` REPLACES it on a station rather than adding to it.
+    pub colony_threshold_base: i64,
     pub decay: i64,
     /// Ticket #33: decay on a place the Faction controls.
     pub decay_controlled: i64,
@@ -742,7 +745,8 @@ pub struct InfluenceTable {
     pub constabulary_margin: i64,
     /// Ticket #201 (version 0.08.1): what a Constabulary adds instead, once Civil Defense stands.
     pub constabulary_margin_defended: i64,
-    /// Ticket #46: a station's threshold starts here.
+    /// Ticket #46: a station's threshold starts here, in place of `colony_threshold_base` since
+    /// ticket #336 (version 0.09.0) rather than on top of it.
     #[serde(default)]
     pub station_threshold_base: i64,
     pub occupation_turns: u32,
@@ -1040,6 +1044,10 @@ pub struct AiThresholds {
     pub influence_step: i64,
     /// Ticket #75: a held state's worth on the Influence target list, as a share of a neutral one's.
     pub held_state_weight: f64,
+    /// Ticket #336 (version 0.09.0): the price a rival's Colony is weighed against on the same
+    /// list -- the weight is this over what the seat would pay, so the cheapest place ranks first.
+    #[serde(default = "colony_price_pivot_default")]
+    pub colony_price_pivot: f64,
     /// Ticket #84 (version 0.06.0): as Research Lead the AI picks its Victory gate once its first
     /// part is past this fraction of its bar, or from this turn, whichever comes first.
     pub gate_pick_fraction: f64,
@@ -1856,6 +1864,11 @@ impl Tables {
         if u.neutral_max > u.max || u.refugees_per <= 0.0 || u.report_net_floor <= 0.0 {
             return Err(err("unrest.toml", "neutral_max must not exceed max, and refugees_per and report_net_floor must be positive"));
         }
+        // Ticket #336 (version 0.09.0): the base under every place off Earth is what makes an empty
+        // one cost something; at nought or less a Colony nobody has moved into is free again.
+        if self.influence.colony_threshold_base <= 0 {
+            return Err(err("influence.toml", "colony_threshold_base must be positive: an empty Colony is not free to take"));
+        }
         // Ticket #333 (version 0.09.0): the unit is a divisor in every people figure the interface
         // prints, and the Research divisor is one in every Lab's yield.
         if self.climate.people_per_unit <= 0.0 {
@@ -2119,6 +2132,11 @@ fn resentment_default() -> f64 {
 /// Ticket #224 (version 0.08.2).
 fn relations_margin_cap_default() -> i64 {
     2
+}
+
+/// Ticket #336 (version 0.09.0): the price a starting two-Colonist place is worth, 40 + 20 x 2.
+fn colony_price_pivot_default() -> f64 {
+    80.0
 }
 
 

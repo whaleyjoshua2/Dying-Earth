@@ -559,10 +559,11 @@ fn a_station_is_built_for_materials_in_an_orbital_slot_and_holds_only_a_shipyard
     assert_eq!(reef.control, Control::Controlled(Seat(0)));
     assert_eq!(reef.colonists, 0);
     // Only a Shipyard and Habitats stand on a station.
-    // A station is not free to take: its threshold starts at the station base, plus 10 a Colonist
-    // -- and the ISS opens with two aboard since ticket #290 (version 0.08.6), so 40 where a bare
-    // one read 20. A consequence of the two aboard, not a rule of its own.
-    assert_eq!(g.influence_threshold(Place::Colony(iss)), 40);
+    // A station is not free to take: its threshold starts at the station base, plus the per-Colonist
+    // figure -- and the ISS opens with two aboard since ticket #290 (version 0.08.6), so 80 where a
+    // bare one reads 40. A consequence of the two aboard, not a rule of its own. Ticket #336
+    // (version 0.09.0): 40 + 20 x 2, where it was 20 + 10 x 2.
+    assert_eq!(g.influence_threshold(Place::Colony(iss)), 80);
     // Ticket #164 (version 0.07.5): a station nobody lives on has no slots, and the lines below are
     // about which kinds stand in orbit, so give it somebody first.
     g.colony_mut(iss).unwrap().colonists = 2;
@@ -1407,12 +1408,16 @@ fn a_defended_colony_changes_hands_in_about_four_turns() {
     }
 }
 
+/// Ticket #336 (version 0.09.0) moved this pin and the test's name with it. It was written as
+/// `a_zero_threshold_is_not_met_by_zero_influence`, against a Colony with no Colonists whose
+/// threshold was 10 x 0 = 0: the rule it guarded is that a seat with no Standing at all takes
+/// nothing, however low the gate. There is no zero threshold on the board any more -- every place
+/// off Earth carries `colony_threshold_base` -- so the pin reads 40 and the rule is unchanged.
 #[test]
-fn a_zero_threshold_is_not_met_by_zero_influence() {
+fn a_seat_with_no_standing_takes_nothing() {
     let mut g = game();
-    // A Colony with no Colonists has a threshold of 10 x 0 = 0; nobody has spent anything on it.
     let c = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Barracks], 0);
-    assert_eq!(g.influence_threshold(Place::Colony(c)), 0);
+    assert_eq!(g.influence_threshold(Place::Colony(c)), 40, "the Colony base, where an empty Colony read 0");
     g.resolution_phase();
     assert_eq!(g.colony(c).unwrap().control, Control::Controlled(Seat(1)), "control does not move for free");
 }
@@ -12435,4 +12440,126 @@ fn a_warship_changes_orbit_to_the_ring_it_means_to_shut_rather_than_flying_away(
     colony(&mut g, Seat(0), BodyId::Mars, &[ModuleKind::Habitat], 4);
     let orders = g.ai_orders(Seat(0));
     assert!(!orders.iter().any(|o| matches!(o, Order::ChangeOrbit { ship: id, .. } if *id == ship)), "it holds the lane: {orders:?}");
+}
+
+// ================================================================ #336 (version 0.09.0): twice the Influence off Earth
+
+/// Ticket #336 (version 0.09.0): **a place off Earth costs 40 plus 20 a Colonist**, where a ground
+/// Colony cost 10 a Colonist and a station 20 plus 10 a Colonist. The station base REPLACES the
+/// Colony base rather than sitting on top of it, so a station and a ground Colony of the same crew
+/// are worth the same figure -- which they have not been since stations existed, and which the
+/// designer chose deliberately over keeping the distinction.
+#[test]
+fn a_place_off_earth_costs_forty_plus_twenty_a_colonist() {
+    let mut g = game();
+    let ground = colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat], 0);
+    let station = station_at(&mut g, Seat(1), BodyId::Mars);
+    for people in [0u32, 1, 2, 4, 8] {
+        g.colony_mut(ground).unwrap().colonists = people;
+        g.colony_mut(station).unwrap().colonists = people;
+        let want = 40 + 20 * people as i64;
+        // The old figures: a ground Colony 10 a Colonist, a station 20 beside it.
+        assert_eq!(g.influence_threshold(Place::Colony(ground)), want, "a ground Colony of {people} Colonists, where it was {}", 10 * people as i64);
+        assert_eq!(g.influence_threshold(Place::Colony(station)), want, "a station of {people} Colonists, where it was {}", 20 + 10 * people as i64);
+    }
+}
+
+/// Ticket #336 (version 0.09.0): **an empty place is no longer free.** A station was built with no
+/// crew and was worth its station base alone; a ground Colony with nobody moved in was worth
+/// nothing at all, and a single point of Standing took it. Both now carry the Colony base.
+#[test]
+fn an_empty_place_off_earth_is_no_longer_free_to_take() {
+    let mut g = game();
+    let c = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Barracks], 0);
+    assert_eq!(g.influence_threshold(Place::Colony(c)), 40, "the Colony base under every place off Earth, where an empty Colony was worth nothing");
+    // A rival at 39 does not take it; at 40 it does. Nothing is held back by the challenge margin
+    // here: seat 1's own Standing on the place is nought, so the threshold is the whole price.
+    g.seats[0].influence.insert(Place::Colony(c), 39);
+    g.seats[0].influenced_this_turn.push(Place::Colony(c));
+    g.resolution_phase();
+    assert_eq!(g.colony(c).unwrap().control, Control::Controlled(Seat(1)), "39 is under the base");
+    g.seats[0].influence.insert(Place::Colony(c), 40);
+    g.seats[0].influenced_this_turn.push(Place::Colony(c));
+    g.resolution_phase();
+    assert_eq!(g.colony(c).unwrap().control, Control::Controlled(Seat(0)), "40 takes it");
+    // Ticket #336: and the take is counted at the transfer by the kind of place, where the sweep
+    // scraped the log for every take together and could not tell a Region from a Colony.
+    assert_eq!(g.war.takes_by_influence_colonies[0], 1, "one ground Colony taken by Influence");
+    assert_eq!(g.war.takes_by_influence_stations[0], 0);
+    assert_eq!(g.war.takes_by_influence_states[0], 0);
+    // A station with nobody aboard carries the station base, and its take is counted as a station's.
+    let st = station_at(&mut g, Seat(1), BodyId::Moon);
+    assert_eq!(g.influence_threshold(Place::Colony(st)), 40, "the station base on an empty station");
+    g.seats[0].influence.insert(Place::Colony(st), 40);
+    g.seats[0].influenced_this_turn.push(Place::Colony(st));
+    g.resolution_phase();
+    assert_eq!(g.colony(st).unwrap().control, Control::Controlled(Seat(0)), "40 takes the station too");
+    assert_eq!(g.war.takes_by_influence_stations[0], 1, "one station taken by Influence");
+    assert_eq!(g.war.takes_by_influence_colonies[0], 1, "and the ground Colony is not counted twice");
+}
+
+/// Ticket #336 (version 0.09.0): **the challenge margin is untouched.** It is shared with Earth and
+/// the designer kept it at 20, knowing what it means: on a settled place the holder's Standing plus
+/// 20 is still the binding figure, so a place whose holder stands high costs exactly what it did.
+#[test]
+fn the_challenge_margin_off_earth_is_what_it_was() {
+    let mut g = game();
+    assert_eq!(g.tables.influence.challenge_margin, 20);
+    let c = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat], 2);
+    g.seats[1].influence.insert(Place::Colony(c), 300);
+    // 300 + 20 against a threshold of 80: the margin binds, and 320 is what it was before the
+    // thresholds doubled.
+    assert_eq!(g.influence_needed_for(Seat(0), Place::Colony(c)), 320, "the holder's Standing plus the margin, as before");
+    // Both seats spend here, so neither Standing decays and the arithmetic is the one written above.
+    g.seats[0].influence.insert(Place::Colony(c), 319);
+    g.seats[0].influenced_this_turn.push(Place::Colony(c));
+    g.seats[1].influenced_this_turn.push(Place::Colony(c));
+    g.resolution_phase();
+    assert_eq!(g.colony(c).unwrap().control, Control::Controlled(Seat(1)), "319 is one short of the margin");
+    g.seats[0].influence.insert(Place::Colony(c), 320);
+    g.seats[0].influenced_this_turn.push(Place::Colony(c));
+    g.seats[1].influenced_this_turn.push(Place::Colony(c));
+    g.resolution_phase();
+    assert_eq!(g.colony(c).unwrap().control, Control::Controlled(Seat(0)), "320 takes it, the figure it always was");
+}
+
+/// Ticket #336 (version 0.09.0): **the computer seats weigh a rival Colony by the price they would
+/// pay**, where they ranked by fewest Colonists and never read the threshold at all. The board is
+/// built so the two rules disagree: the emptier Colony is held by a seat standing high on it and
+/// costs 220, the fuller one costs its threshold of 100. The old rule wanted the emptier; the new
+/// one wants the cheaper.
+#[test]
+fn the_computer_wants_the_cheaper_rival_colony_not_the_emptier() {
+    let mut g = game();
+    calm(&mut g);
+    // Every Region is seat 0's, so the Influence targets are the Colonies alone and the pick is
+    // between them; and nothing is affordable but Influence, so the turn's one step is spent here.
+    for sid in StateId::ALL {
+        g.take_control(sid, Seat(0));
+    }
+    // And no rival stands on any of them, so the seat has nothing on Earth to hold either: every
+    // Faction opens with a Standing on its own start state (ticket #75), which is a rival's here.
+    for s in Seat::ALL {
+        g.seat_mut(s).influence.retain(|p, _| !matches!(p, Place::State(_)));
+    }
+    // The three starting stations over Earth are rivals' Colonies too, and two Colonists apiece
+    // makes them the cheapest places on the board; they go to seat 0 so the pick is the planted two.
+    for c in g.colonies.iter_mut() {
+        c.control = Control::Controlled(Seat(0));
+    }
+    let empty = colony(&mut g, Seat(1), BodyId::Moon, &[ModuleKind::Habitat], 1);
+    let fuller = colony(&mut g, Seat(1), BodyId::Mars, &[ModuleKind::Habitat], 3);
+    g.seats[1].influence.insert(Place::Colony(empty), 200);
+    g.seats[0].stockpile.materials = 0;
+    g.seats[0].stockpile.energy = 0;
+    g.seats[0].stockpile.ducats = 0;
+    g.seats[0].allotment = 100;
+    assert_eq!(g.influence_needed_for(Seat(0), Place::Colony(empty)), 220, "the emptier place, held by a seat standing high on it");
+    assert_eq!(g.influence_needed_for(Seat(0), Place::Colony(fuller)), 100, "the fuller place, at its threshold");
+    let orders = g.ai_orders(Seat(0));
+    // The Allotment covers twenty steps and the top-weighted target takes every one of them, so the
+    // whole spend lands on whichever Colony the seat wants more.
+    let spent: Vec<Place> = orders.iter().filter_map(|o| match o { Order::Influence { target, .. } => Some(*target), _ => None }).collect();
+    assert!(spent.iter().all(|t| *t == Place::Colony(fuller)), "every step on the cheaper place, where the old rule put them all on the emptier: {spent:?}");
+    assert!(!spent.is_empty(), "it spends its Allotment somewhere: {orders:?}");
 }

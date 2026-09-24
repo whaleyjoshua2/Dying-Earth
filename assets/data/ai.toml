@@ -320,6 +320,14 @@ influence_step = 5
 # target list, as a share of a neutral one's worth. 0.6 until now; at 0.3 a held place is attacked
 # only when no neutral one is worth having.
 held_state_weight = 0.3
+# Ticket #336 (version 0.09.0): what a rival's Colony is worth on the same list, read as this price
+# divided by the price the seat would actually pay for it -- CHEAPEST FIRST, where the rule from
+# ticket #50 ranked by fewest Colonists and never read the threshold at all. Without this the
+# doubling would have left the seats pouring their Allotment into places they cannot afford. The
+# figure is the price of a starting two-Colonist place under the new rule (40 + 20 x 2), so a
+# Colony at that price weighs 1.0 and an empty one 2.0 -- the band the fewest-Colonists rule ran in
+# (1.0 to 3.0), which keeps a Colony's worth against a Region's where it was.
+colony_price_pivot = 80.0
 # Ticket #84 (version 0.06.0): as Research Lead the AI picks its Victory gate once its first part
 # is past this fraction of its bar, or from this turn, whichever comes first.
 gate_pick_fraction = 0.5
