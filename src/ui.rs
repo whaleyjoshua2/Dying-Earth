@@ -6374,6 +6374,13 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
     // Ticket #339 (version 0.09.0): and what an Embassy of yours on Earth reads of a rival's income
     // here, above the slot boxes the Facilities it names are drawn in.
     eye_block(ui, session, game, Place::State(sid));
+    let director = st.control.director();
+    // Ticket #64: a spectator reads every card and orders on none of them.
+    let mine = !session.spectator && st.control.director() == Some(Seat(0));
+    // Ticket #356 (version 0.09.1): the Pioneers, above the Facilities heading and out of Orders.
+    if mine {
+        pioneers_block(ui, session, game, sid, actions);
+    }
     // Ticket #146 (version 0.07.3): the slots the sea took are drawn under water among the boxes
     // below, so the sea-blue count that stood here is gone.
     // Ticket #56: the two rows of slots, with what stands in each and what the sea has taken.
@@ -6391,9 +6398,6 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             game.coastal_slots(sid)
         ),
     );
-    let director = st.control.director();
-    // Ticket #64: a spectator reads every card and orders on none of them.
-    let mine = !session.spectator && st.control.director() == Some(Seat(0));
     // Ticket #146 (version 0.07.3): the slots as boxes, with the clicked box's line beneath them.
     slot_boxes(ui, session, game, view, sid, mine, director, actions);
     no_slot_section(ui, session, game, sid, mine, director, actions);
@@ -6574,121 +6578,7 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
         cost_button(ui, game, &session.pending, Order::RaiseIndustry { state: sid }, "Raise Industry Level", actions);
         ui.label(RichText::new("Raising the Industry Level adds an inland slot.").weak());
         cost_button(ui, game, &session.pending, Order::BuildArmy { place: Place::State(sid) }, "Build Army", actions);
-        // Ticket #73: muster Emigrants here, and send them to Antarctica by sea once the ice is open.
-        ui.label(RichText::new("Pioneers").strong());
-        // Ticket #211 (version 0.08.1): the figure stands at the HEAD of this block, above the
-        // button that changes it, and is shown at every value including nought. It existed before
-        // -- in the Influence block, some way up the card, and only while it was above zero -- so a
-        // player who mustered and then looked for the result found the line had simply not been
-        // there a moment ago. At nought it now says so, which is the answer to "did that work?".
-        ui.label(format!("Pioneers waiting: {}", st.emigrants)).on_hover_text(
-            "Recruited here and not yet lifted or sent: a working Launch Site lifts them onto a Ship or straight to a station of yours over Earth, and once the ice is open the sea takes them to Antarctica.",
-        );
-        // Ticket #196 (version 0.08.0): as many as this state's people can pay for, where the button
-        // always asked for the whole batch. Coach Class costs the Arkwrights twice the population for
-        // twice the batch -- 16.0 people -- and Australia carries 10.1 to 12.6, so the button was dead
-        // there with nothing on screen to say why. Where the state cannot pay for even one, it still
-        // offers one, so the refusal a player reads is "not enough people there" rather than silence.
-        let per = game.emigrants_affordable(Seat(0), sid).max(1);
-        cost_button_with_hover(
-            ui,
-            game,
-            &session.pending,
-            Order::BuildEmigrants { state: sid, n: per },
-            &format!("Recruit {per} Pioneers"),
-            Some(format!(
-                "{} people, on the card at End Turn, and {} off this state's Unrest. A working Launch Site lifts them onto a Ship or straight to a station of yours over Earth; once the ice is open the sea takes them to Antarctica.",
-                game.tables.people_text(game.lift_population(Seat(0), per)),
-                Game::unrest_figure(game.tables.emigrants.unrest_fall)
-            )),
-            actions,
-        );
-        if game.antarctica_open && st.emigrants > 0 {
-            let n = st.emigrants;
-            for slot in game.free_slots_on(BodyId::Earth) {
-                // Ticket #283 (version 0.08.5): the third founding door wears the same face as the
-                // two Ship doors, the site's yields in glyphs, at the designer's word.
-                let order = Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) };
-                let label = format!("Send {n} to {} by sea", game.tables.body(BodyId::Earth).slots[slot as usize].name);
-                if found_button(ui, &game.slot_yields(BodyId::Earth, slot), &label).clicked() {
-                    actions.push(Action::Place(order));
-                }
-            }
-            // Ticket #204 (version 0.08.1): capped at the room there. A sea crossing checks no room
-            // at the order -- it lands `min(n, room)` a turn later and sends the surplus home with a
-            // Report line -- so this button offered to put twelve people on a round trip that costs
-            // a turn and achieves nothing, and said nothing about it first. The engine rule is
-            // unchanged; only the button stops offering it. Founding a NEW Colony from a free slot,
-            // above, still offers everyone waiting: there is no room limit where nothing stands yet.
-            for c in game.colonies.iter().filter(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(Seat(0))) {
-                let k = n.min(game.habitat_room(c).saturating_sub(c.colonists));
-                if k == 0 {
-                    continue;
-                }
-                cost_button(ui, game, &session.pending, Order::SendToAntarctica { state: sid, n: k, into: UnloadTarget::Colony(c.id) }, &format!("Send {k} to {} by sea", game.place_name(Place::Colony(c.id))), actions);
-            }
-        }
-        // Ticket #141 (version 0.07.3): waiting Emigrants lift straight to a station of yours over
-        // Earth, as many as it has room for, by the Launch Site here. A launch, no Ship.
-        if st.emigrants > 0 && st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
-            for c in game.colonies.iter().filter(|c| c.body == BodyId::Earth && c.in_orbit && c.control.director() == Some(Seat(0))) {
-                let room = game.habitat_room(c).saturating_sub(c.colonists);
-                let n = st.emigrants.min(room);
-                if n == 0 {
-                    continue;
-                }
-                cost_button_with_hover(
-                    ui,
-                    game,
-                    &session.pending,
-                    Order::LiftToStation { state: sid, n, colony: c.id },
-                    &format!("Send {n} to {} by lift", game.place_name(Place::Colony(c.id))),
-                    Some(format!("Aboard at this turn's Resolution. A launch: it emits like any lift. {} has room for {room} more.", game.place_name(Place::Colony(c.id)))),
-                    actions,
-                );
-            }
-        }
-        // Ticket #193 (version 0.08.0): and straight onto a Colony Ship of yours at Earth with room
-        // left. Ticket #335 (version 0.09.0): a Launch Site reaches LOW ORBIT alone, so the door
-        // greys out for a Ship at a station's ring, as every other door does when its order is
-        // refused; while the orbit a Ship sat in was about blockades alone the distinction did not
-        // touch loading people. A Carrier takes an Army and no Colonists, so it never appears. The rule already worked; only the door was missing, exactly as ticket #141
-        // answered for stations. Both doors write the same Load order, so either cancels the other.
-        //
-        // It never offers the CROWDED places: above +1.8 a Ship lifting at Earth may take Colonists
-        // beyond its capacity, and each of those may die on arrival. A risk that drowns people wants
-        // the sentence explaining it beside the button, and that sentence lives on the Ship's card --
-        // so a player who means to crowd a ship goes there deliberately.
-        if st.emigrants > 0 && st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
-            let capacity = game.colony_ship_capacity(Seat(0));
-            for s in game.ships.iter().filter(|s| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth)) {
-                let room = capacity.saturating_sub(s.colonists);
-                let n = st.emigrants.min(room);
-                if n == 0 {
-                    continue;
-                }
-                // Ticket #335 (version 0.09.0): the hover says WHICH ORBIT the Ship is in, and,
-                // where that is not low orbit, why the door is shut: a lift from a Launch Site
-                // arrives in low orbit and nowhere else, so a Ship at a station's ring is out of
-                // its reach until it changes orbit. The engine's own refusal is on the greyed
-                // button; this says it before the player has to hover a dead button to find out.
-                let where_it_is = orbit_phrase(game, BodyId::Earth, game.ship_orbit(s));
-                let reach = if game.ship_orbit(s).is_low() {
-                    String::new()
-                } else {
-                    format!(" This Ship is {where_it_is}; a lift from a Launch Site arrives in low orbit, so it must change orbit first.")
-                };
-                cost_button_with_hover(
-                    ui,
-                    game,
-                    &session.pending,
-                    Order::Load { ship: s.id, colonists: n, from: LoadSource::State(sid), army: None },
-                    &format!("Send {n} to {} ({})", game.ship_name(s), where_it_is),
-                    Some(format!("A launch, aboard at this turn's Resolution. This Ship carries {capacity} and has {} aboard. To crowd it past its capacity, load it from its own card.{reach}", s.colonists)),
-                    actions,
-                );
-            }
-        }
+        // Ticket #356 (version 0.09.1): the Pioneers that stood here are above the Facilities heading.
         // Ticket #52: Relief and Resettle, with their prices on the buttons.
         ui.label(RichText::new("Unrest").strong());
         ui.horizontal(|ui| {
@@ -6701,17 +6591,145 @@ fn state_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState
             )
             .weak(),
         );
-        // Ticket #46: Ships come from Shipyards; a Launch Site lifts people to orbit.
-        ui.label(
-            RichText::new(if st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
-                "Launch Site: Colonists and Armies lift to orbit from here. Ships are built at a Shipyard on a station or Colony."
-            } else {
-                "No working Launch Site: nothing lifts to orbit from here."
-            })
-            .weak(),
-        );
         // Ticket #312 (version 0.08.7): the Army orders that stood here are in the Armies block.
     }
+}
+
+/// Ticket #356 (version 0.09.1): the Pioneers block, lifted out of the Orders block and drawn above
+/// the Facilities heading, at the designer's word -- *"move up the buttons to recruit pioneers to
+/// above the building tiles"*. At the foot of the card the Recruit button stood below the fold at
+/// 1080, as the Army orders had before ticket #312. The whole block moved, the waiting figure still
+/// directly above the button that changes it (ticket #211), and the Launch Site line with it, since
+/// it is what says whether the lift doors under it will show. Drawn only on a Region the player
+/// directs, as before.
+fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, actions: &mut Vec<Action>) {
+    let st = game.state(sid);
+    ui.separator();
+    // Ticket #73: muster Emigrants here, and send them to Antarctica by sea once the ice is open.
+    ui.label(RichText::new("Pioneers").strong());
+    // Ticket #211 (version 0.08.1): the figure stands at the HEAD of this block, above the
+    // button that changes it, and is shown at every value including nought. It existed before
+    // -- in the Influence block, some way up the card, and only while it was above zero -- so a
+    // player who mustered and then looked for the result found the line had simply not been
+    // there a moment ago. At nought it now says so, which is the answer to "did that work?".
+    ui.label(format!("Pioneers waiting: {}", st.emigrants)).on_hover_text(
+        "Recruited here and not yet lifted or sent: a working Launch Site lifts them onto a Ship or straight to a station of yours over Earth, and once the ice is open the sea takes them to Antarctica.",
+    );
+    // Ticket #196 (version 0.08.0): as many as this state's people can pay for, where the button
+    // always asked for the whole batch. Coach Class costs the Arkwrights twice the population for
+    // twice the batch -- 16.0 people -- and Australia carries 10.1 to 12.6, so the button was dead
+    // there with nothing on screen to say why. Where the state cannot pay for even one, it still
+    // offers one, so the refusal a player reads is "not enough people there" rather than silence.
+    let per = game.emigrants_affordable(Seat(0), sid).max(1);
+    cost_button_with_hover(
+        ui,
+        game,
+        &session.pending,
+        Order::BuildEmigrants { state: sid, n: per },
+        &format!("Recruit {per} Pioneers"),
+        Some(format!(
+            "{} people, on the card at End Turn, and {} off this state's Unrest. A working Launch Site lifts them onto a Ship or straight to a station of yours over Earth; once the ice is open the sea takes them to Antarctica.",
+            game.tables.people_text(game.lift_population(Seat(0), per)),
+            Game::unrest_figure(game.tables.emigrants.unrest_fall)
+        )),
+        actions,
+    );
+    if game.antarctica_open && st.emigrants > 0 {
+        let n = st.emigrants;
+        for slot in game.free_slots_on(BodyId::Earth) {
+            // Ticket #283 (version 0.08.5): the third founding door wears the same face as the
+            // two Ship doors, the site's yields in glyphs, at the designer's word.
+            let order = Order::SendToAntarctica { state: sid, n, into: UnloadTarget::Slot(BodyId::Earth, slot) };
+            let label = format!("Send {n} to {} by sea", game.tables.body(BodyId::Earth).slots[slot as usize].name);
+            if found_button(ui, &game.slot_yields(BodyId::Earth, slot), &label).clicked() {
+                actions.push(Action::Place(order));
+            }
+        }
+        // Ticket #204 (version 0.08.1): capped at the room there. A sea crossing checks no room
+        // at the order -- it lands `min(n, room)` a turn later and sends the surplus home with a
+        // Report line -- so this button offered to put twelve people on a round trip that costs
+        // a turn and achieves nothing, and said nothing about it first. The engine rule is
+        // unchanged; only the button stops offering it. Founding a NEW Colony from a free slot,
+        // above, still offers everyone waiting: there is no room limit where nothing stands yet.
+        for c in game.colonies.iter().filter(|c| c.body == BodyId::Earth && !c.in_orbit && c.control.director() == Some(Seat(0))) {
+            let k = n.min(game.habitat_room(c).saturating_sub(c.colonists));
+            if k == 0 {
+                continue;
+            }
+            cost_button(ui, game, &session.pending, Order::SendToAntarctica { state: sid, n: k, into: UnloadTarget::Colony(c.id) }, &format!("Send {k} to {} by sea", game.place_name(Place::Colony(c.id))), actions);
+        }
+    }
+    // Ticket #141 (version 0.07.3): waiting Emigrants lift straight to a station of yours over
+    // Earth, as many as it has room for, by the Launch Site here. A launch, no Ship.
+    if st.emigrants > 0 && st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
+        for c in game.colonies.iter().filter(|c| c.body == BodyId::Earth && c.in_orbit && c.control.director() == Some(Seat(0))) {
+            let room = game.habitat_room(c).saturating_sub(c.colonists);
+            let n = st.emigrants.min(room);
+            if n == 0 {
+                continue;
+            }
+            cost_button_with_hover(
+                ui,
+                game,
+                &session.pending,
+                Order::LiftToStation { state: sid, n, colony: c.id },
+                &format!("Send {n} to {} by lift", game.place_name(Place::Colony(c.id))),
+                Some(format!("Aboard at this turn's Resolution. A launch: it emits like any lift. {} has room for {room} more.", game.place_name(Place::Colony(c.id)))),
+                actions,
+            );
+        }
+    }
+    // Ticket #193 (version 0.08.0): and straight onto a Colony Ship of yours at Earth with room
+    // left. Ticket #335 (version 0.09.0): a Launch Site reaches LOW ORBIT alone, so the door
+    // greys out for a Ship at a station's ring, as every other door does when its order is
+    // refused; while the orbit a Ship sat in was about blockades alone the distinction did not
+    // touch loading people. A Carrier takes an Army and no Colonists, so it never appears. The rule already worked; only the door was missing, exactly as ticket #141
+    // answered for stations. Both doors write the same Load order, so either cancels the other.
+    //
+    // It never offers the CROWDED places: above +1.8 a Ship lifting at Earth may take Colonists
+    // beyond its capacity, and each of those may die on arrival. A risk that drowns people wants
+    // the sentence explaining it beside the button, and that sentence lives on the Ship's card --
+    // so a player who means to crowd a ship goes there deliberately.
+    if st.emigrants > 0 && st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
+        let capacity = game.colony_ship_capacity(Seat(0));
+        for s in game.ships.iter().filter(|s| s.seat == Seat(0) && s.kind == UnitKind::ColonyShip && s.at == ShipAt::Body(BodyId::Earth)) {
+            let room = capacity.saturating_sub(s.colonists);
+            let n = st.emigrants.min(room);
+            if n == 0 {
+                continue;
+            }
+            // Ticket #335 (version 0.09.0): the hover says WHICH ORBIT the Ship is in, and,
+            // where that is not low orbit, why the door is shut: a lift from a Launch Site
+            // arrives in low orbit and nowhere else, so a Ship at a station's ring is out of
+            // its reach until it changes orbit. The engine's own refusal is on the greyed
+            // button; this says it before the player has to hover a dead button to find out.
+            let where_it_is = orbit_phrase(game, BodyId::Earth, game.ship_orbit(s));
+            let reach = if game.ship_orbit(s).is_low() {
+                String::new()
+            } else {
+                format!(" This Ship is {where_it_is}; a lift from a Launch Site arrives in low orbit, so it must change orbit first.")
+            };
+            cost_button_with_hover(
+                ui,
+                game,
+                &session.pending,
+                Order::Load { ship: s.id, colonists: n, from: LoadSource::State(sid), army: None },
+                &format!("Send {n} to {} ({})", game.ship_name(s), where_it_is),
+                Some(format!("A launch, aboard at this turn's Resolution. This Ship carries {capacity} and has {} aboard. To crowd it past its capacity, load it from its own card.{reach}", s.colonists)),
+                actions,
+            );
+        }
+    }
+    // Ticket #46: Ships come from Shipyards; a Launch Site lifts people to orbit.
+    ui.label(
+        RichText::new(if st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
+            "Launch Site: Colonists and Armies lift to orbit from here. Ships are built at a Shipyard on a station or Colony."
+        } else {
+            "No working Launch Site: nothing lifts to orbit from here."
+        })
+        .weak(),
+    );
+    ui.separator();
 }
 
 /// Ticket #204 (version 0.08.1): which Region a loader's dropdown opens on.
