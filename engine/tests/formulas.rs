@@ -6760,7 +6760,8 @@ fn refuel_is_an_order_at_a_station_of_your_own_and_a_station_rescues_a_stranded_
     // Ticket #335 (version 0.09.0): a station fuels only a Ship in its OWN orbit, so a Ship in low
     // orbit is refused until it has changed orbit to the ring the ISS stands on.
     let iss_slot = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot).expect("the ISS");
-    assert!(g.check_order(Seat(0), &[], &refuel).unwrap_err().0.contains("no station fuels a Ship in Earth, low orbit"), "in low orbit nothing fuels it");
+    // Ticket #357 (version 0.09.1): and the refusal says the move first.
+    assert!(g.check_order(Seat(0), &[], &refuel).unwrap_err().0.starts_with("Move this Ship to Earth, at "), "in low orbit nothing fuels it");
     g.ship_mut(ship).unwrap().slot = Some(iss_slot);
     assert!(g.check_order(Seat(0), &[], &refuel).is_ok(), "the ISS stands over Earth");
     assert_eq!(g.order_cost(Seat(0), &refuel).fuel, 10, "26 wanted, 10 held: what the Stockpile can pay");
@@ -12487,7 +12488,7 @@ fn low_orbit_touches_the_ground_and_a_stations_own_orbit_touches_the_station() {
     let tanker = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
     g.ship_mut(tanker).unwrap().fuel = 2;
     let err = g.check_order(Seat(0), &[], &Order::Refuel { ship: tanker }).unwrap_err().0;
-    assert!(err.contains("no station fuels a Ship in Earth, low orbit"), "a Ship in low orbit fuels at nothing: {err}");
+    assert!(err.starts_with("Move this Ship to Earth, at ") && err.contains("then refuel next turn"), "a Ship in low orbit fuels at nothing: {err}");
     g.ship_mut(tanker).unwrap().slot = Some(slot);
     assert!(g.check_order(Seat(0), &[], &Order::Refuel { ship: tanker }).is_ok(), "at the ISS's ring it refuels");
     // Unloading into the station: its own ring, never low orbit.
@@ -12498,11 +12499,11 @@ fn low_orbit_touches_the_ground_and_a_stations_own_orbit_touches_the_station() {
     assert!(err.contains("reached from"), "a station is not unloaded into from low orbit: {err}");
     g.ship_mut(hauler).unwrap().slot = Some(slot);
     assert!(g.check_order(Seat(0), &[], &aboard).is_ok(), "from its ring it is");
-    // A lift from a Launch Site reaches low orbit alone.
+    // Ticket #357 (version 0.09.1): a lift from a Launch Site reaches ANY orbit of Earth, at the
+    // designer's word, where ticket #335 held it to low orbit.
     g.state_mut(StateId::EastAsia).emigrants = 4;
     let lift = Order::Load { ship: hauler, colonists: 2, from: LoadSource::State(StateId::EastAsia), army: None };
-    let err = g.check_order(Seat(0), &[], &lift).unwrap_err().0;
-    assert!(err.contains("low orbit"), "a Launch Site does not reach a station's ring: {err}");
+    assert!(g.check_order(Seat(0), &[], &lift).is_ok(), "at the ISS's ring it takes the lift");
     g.ship_mut(hauler).unwrap().slot = None;
     assert!(g.check_order(Seat(0), &[], &lift).is_ok(), "in low orbit it takes the lift");
     // Founding a Colony on the ground: low orbit alone.
@@ -12514,6 +12515,64 @@ fn low_orbit_touches_the_ground_and_a_stations_own_orbit_touches_the_station() {
     assert!(err.contains("low orbit"), "a Colony is not founded from a station's ring: {err}");
     g.ship_mut(settler).unwrap().slot = None;
     assert!(g.check_order(Seat(0), &[], &found).is_ok(), "from low orbit it is");
+}
+
+/// Ticket #357 (version 0.09.1): a door the orbit shuts says the move that opens it FIRST, then the
+/// rule, at the designer's word -- *"move ship to low earth orbit to load"*. Every refusal whose cure
+/// is a change of orbit reads "Move this Ship to {orbit}, then {act} next turn: {rule}", and the two
+/// that merged a second cause -- a blockaded station, an Army at another Body -- are split, so the
+/// move is offered only where the move would open the door.
+#[test]
+fn a_door_the_orbit_shuts_says_the_move_first() {
+    let mut g = game();
+    bare_stations(&mut g);
+    let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the ISS");
+    let slot = g.colony(iss).unwrap().slot;
+    let iss_orbit = g.orbit_name(BodyId::Earth, Orbit::Slot(slot));
+    let low = g.orbit_name(BodyId::Earth, Orbit::Low);
+    let refusal = |g: &Game, o: &Order| g.check_order(Seat(0), &[], o).unwrap_err().0;
+    // Refuel, from low orbit: move to the ISS's ring.
+    let tanker = ship_in(&mut g, Seat(0), UnitKind::Frigate, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(tanker).unwrap().fuel = 2;
+    g.seats[0].stockpile.fuel = 100;
+    assert_eq!(refusal(&g, &Order::Refuel { ship: tanker }), format!("Move this Ship to {iss_orbit}, then refuel next turn: a station fuels a Ship in its own orbit alone."));
+    // Blockaded, no move helps: the refusal says so and offers none.
+    let rival = ship_in(&mut g, Seat(1), UnitKind::Frigate, BodyId::Earth, Some(slot), Stance::Blockade);
+    let err = refusal(&g, &Order::Refuel { ship: tanker });
+    assert!(!err.contains("Move") && err.contains("blockaded"), "{err}");
+    g.ship_mut(tanker).unwrap().slot = Some(slot);
+    let err = refusal(&g, &Order::Refuel { ship: tanker });
+    assert!(!err.contains("Move") && err.contains("blockaded"), "at the ring itself: {err}");
+    g.ships.retain(|s| s.id != rival);
+    // Unloading into the ISS from low orbit, and loading off it.
+    let hauler = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Earth, None, Stance::Hold);
+    g.ship_mut(hauler).unwrap().colonists = 2;
+    let iss_name = g.place_name(Place::Colony(iss));
+    assert_eq!(refusal(&g, &Order::Unload { ship: hauler, colonists: 2, army: false, into: UnloadTarget::Colony(iss) }), format!("Move this Ship to {iss_orbit}, then unload next turn: {iss_name} is reached from there alone."));
+    g.colony_mut(iss).unwrap().colonists = 2;
+    g.ship_mut(hauler).unwrap().colonists = 0;
+    assert_eq!(refusal(&g, &Order::Load { ship: hauler, colonists: 2, from: LoadSource::Colony(iss), army: None }), format!("Move this Ship to {iss_orbit}, then load next turn: {iss_name} is reached from there alone."));
+    // Founding a Colony from a station's ring: move to low orbit.
+    let settler = ship_in(&mut g, Seat(0), UnitKind::ColonyShip, BodyId::Moon, Some(0), Stance::Hold);
+    g.ship_mut(settler).unwrap().colonists = 4;
+    let ground = g.free_slots_on(BodyId::Moon)[0];
+    let moon_low = g.orbit_name(BodyId::Moon, Orbit::Low);
+    assert_eq!(refusal(&g, &Order::Unload { ship: settler, colonists: 4, army: false, into: UnloadTarget::Slot(BodyId::Moon, ground) }), format!("Move this Ship to {moon_low}, then found the Colony next turn: a Colony is founded from low orbit alone."));
+    // An Army lifts from a Region's Launch Site into ANY orbit; from a Colony, only from the orbit
+    // that touches it; and an Army at another Body is not offered a move at all.
+    let carrier = ship_in(&mut g, Seat(0), UnitKind::Carrier, BodyId::Earth, Some(slot), Stance::Hold);
+    let army = ArmyId(g.fresh_id());
+    g.armies.push(Army { id: army, name: "the 1st".to_string(), home: ArmyHome::State(StateId::EastAsia), at: ArmyAt::Place(Place::State(StateId::EastAsia)), damage: 0, standing: false, stance: Stance::Hold, escaped: false, move_to: None, levy: false, raised_strength: 2 });
+    let lift_army = Order::Load { ship: carrier, colonists: 0, from: LoadSource::State(StateId::EastAsia), army: Some(army) };
+    assert!(g.check_order(Seat(0), &[], &lift_army).is_ok(), "a Launch Site lifts an Army to a station's ring");
+    let camp = colony(&mut g, Seat(0), BodyId::Earth, &[ModuleKind::Habitat], 2);
+    let camp_name = g.place_name(Place::Colony(camp));
+    g.armies.iter_mut().find(|a| a.id == army).unwrap().at = ArmyAt::Place(Place::Colony(camp));
+    assert_eq!(refusal(&g, &lift_army), format!("Move this Ship to {low}, then load next turn: {camp_name} is reached from there alone."));
+    let far = colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 2);
+    g.armies.iter_mut().find(|a| a.id == army).unwrap().at = ArmyAt::Place(Place::Colony(far));
+    let err = refusal(&g, &lift_army);
+    assert!(!err.contains("Move") && err.contains("not at this Body"), "{err}");
 }
 
 /// Ticket #335 (R4): Orbital Control is LOW ORBIT's, and a Battery covers its OWN orbit. A warship
@@ -13466,7 +13525,7 @@ fn a_launch_wants_its_warhead_the_orbit_held_and_a_rivals_place() {
     let station = station_at(&mut g, Seat(1), BodyId::Mars);
     let slot = g.colony(station).unwrap().slot;
     let err = g.check_order(Seat(0), &[], &Order::Launch { ship, target: Place::Colony(station) }).unwrap_err().0;
-    assert!(err.contains("a Launch is given from"), "{err}");
+    assert!(err.starts_with("Move this Ship to Mars, at ") && err.contains("then Launch next turn"), "{err}");
     // Not with the orbit contested: a rival warship in low orbit takes the Control.
     let rival = ship_in(&mut g, Seat(2), UnitKind::Frigate, BodyId::Mars, None, Stance::Hold);
     let err = g.check_order(Seat(0), &[], &at_theirs).unwrap_err().0;

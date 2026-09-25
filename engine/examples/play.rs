@@ -236,9 +236,10 @@ const GRAMMAR: &str = r#"ORDER LINES (one per line; `#` starts a comment; blank 
 
   A BODY'S ORBITS (ticket #335, version 0.09.0) are LOW ORBIT and one per Orbital Slot, and every
   Ship at a Body sits in exactly one of them; there is no Body at large. LOW ORBIT is what touches
-  the ground: landing an Army at a ground Colony, unloading Colonists into one, founding one,
-  Bombarding one, and receiving a lift from a Launch Site. A STATION'S OWN ORBIT is what touches
-  that station: unloading into it, refuelling at it, blockading it, attacking it. Orbital Control is
+  the ground: landing an Army at a ground Colony, unloading Colonists into one, founding one, and
+  Bombarding one. A STATION'S OWN ORBIT is what touches that station: unloading into it, refuelling
+  at it, blockading it, attacking it. A LIFT FROM A LAUNCH SITE reaches ANY orbit of Earth (ticket
+  #357, version 0.09.1). A refusal that a change of orbit would cure names the move first. Orbital Control is
   of LOW orbit and gates the ground. A BLOCKADE IS A STANCE, chosen (`ship-stance <body> blockade`)
   and shutting the orbit the stack sits in -- never a side effect of arriving anywhere. `show` names
   the orbit every Ship sits in, and lists each Body's orbits under FREE SLOTS.

@@ -285,8 +285,8 @@ fn build_board(session: &mut Session) {
                 g.ships.push(Ship { id, name, kind, seat, damage: 0, at: ShipAt::Body(BodyId::Mars), colonists: 0, warhead: false, colonists_education: 1.0, army: None, stance, escaped: false, arrived_this_turn: false, built_turn, fuel: 30, slot });
             }
             // And, over EARTH, a Colony Ship of seat 0's at the ISS's own ring rather than in low
-            // orbit, so the Region card's lift door is shut on it and says why: a lift from a Launch
-            // Site arrives in low orbit and nowhere else.
+            // orbit. Ticket #335 photographed the Region card's lift door SHUT on it; since ticket
+            // #357 (version 0.09.1) a Launch Site reaches any orbit of Earth, so the door is open.
             if let Some(slot) = g.colonies.iter().find(|c| c.in_orbit && c.body == BodyId::Earth && c.control.director() == Some(Seat(0))).map(|c| c.slot) {
                 let id = ShipId(g.fresh_id());
                 let built_turn = g.turn;

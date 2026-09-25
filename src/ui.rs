@@ -6680,11 +6680,11 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
         }
     }
     // Ticket #193 (version 0.08.0): and straight onto a Colony Ship of yours at Earth with room
-    // left. Ticket #335 (version 0.09.0): a Launch Site reaches LOW ORBIT alone, so the door
-    // greys out for a Ship at a station's ring, as every other door does when its order is
-    // refused; while the orbit a Ship sat in was about blockades alone the distinction did not
-    // touch loading people. A Carrier takes an Army and no Colonists, so it never appears. The rule already worked; only the door was missing, exactly as ticket #141
-    // answered for stations. Both doors write the same Load order, so either cancels the other.
+    // left. Ticket #357 (version 0.09.1): a Launch Site reaches ANY orbit of Earth, where ticket
+    // #335 held it to low orbit, so a Ship at a station's ring is offered the door too. A Carrier
+    // takes an Army and no Colonists, so it never appears. The rule already worked; only the door
+    // was missing, exactly as ticket #141 answered for stations. Both doors write the same Load
+    // order, so either cancels the other.
     //
     // It never offers the CROWDED places: above +1.8 a Ship lifting at Earth may take Colonists
     // beyond its capacity, and each of those may die on arrival. A risk that drowns people wants
@@ -6698,32 +6698,21 @@ fn pioneers_block(ui: &mut Ui, session: &Session, game: &Game, sid: StateId, act
             if n == 0 {
                 continue;
             }
-            // Ticket #335 (version 0.09.0): the hover says WHICH ORBIT the Ship is in, and,
-            // where that is not low orbit, why the door is shut: a lift from a Launch Site
-            // arrives in low orbit and nowhere else, so a Ship at a station's ring is out of
-            // its reach until it changes orbit. The engine's own refusal is on the greyed
-            // button; this says it before the player has to hover a dead button to find out.
+            // Ticket #335 (version 0.09.0): the face says WHICH ORBIT the Ship is in.
             let where_it_is = orbit_phrase(game, BodyId::Earth, game.ship_orbit(s));
-            let reach = if game.ship_orbit(s).is_low() {
-                String::new()
-            } else {
-                format!(" This Ship is {where_it_is}; a lift from a Launch Site arrives in low orbit, so it must change orbit first.")
-            };
-            cost_button_with_hover(
-                ui,
-                game,
-                &session.pending,
-                Order::Load { ship: s.id, colonists: n, from: LoadSource::State(sid), army: None },
-                &format!("Send {n} to {} ({})", game.ship_name(s), where_it_is),
-                Some(format!("A launch, aboard at this turn's Resolution. This Ship carries {capacity} and has {} aboard. To crowd it past its capacity, load it from its own card.{reach}", s.colonists)),
-                actions,
-            );
+            let order = Order::Load { ship: s.id, colonists: n, from: LoadSource::State(sid), army: None };
+            // Ticket #357 (version 0.09.1): a SHUT door's hover is the engine's refusal alone, which
+            // says what to do first; the capacity and crowding advice is for an open door.
+            let hover = game.check_order(Seat(0), &session.pending, &order).is_ok().then(|| {
+                format!("A launch, aboard at this turn's Resolution. This Ship carries {capacity} and has {} aboard. To crowd it past its capacity, load it from its own card.", s.colonists)
+            });
+            cost_button_with_hover(ui, game, &session.pending, order, &format!("Send {n} to {} ({})", game.ship_name(s), where_it_is), hover, actions);
         }
     }
     // Ticket #46: Ships come from Shipyards; a Launch Site lifts people to orbit.
     ui.label(
         RichText::new(if st.facilities.iter().any(|f| f.kind.does_the_job_of(FacilityKind::LaunchSite) && f.working()) {
-            "Launch Site: Colonists and Armies lift to orbit from here. Ships are built at a Shipyard on a station or Colony."
+            "Launch Site: Colonists and Armies lift to any orbit of Earth from here. Ships are built at a Shipyard on a station or Colony."
         } else {
             "No working Launch Site: nothing lifts to orbit from here."
         })

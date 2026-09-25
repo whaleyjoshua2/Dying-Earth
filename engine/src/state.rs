@@ -3582,6 +3582,13 @@ impl Game {
         }
     }
 
+    /// Ticket #357 (version 0.09.1): a door the orbit shuts says the move that opens it FIRST and the
+    /// rule after, at the designer's word -- *"move ship to low earth orbit to load"*. "Next turn",
+    /// because a Ship takes one order a turn and the move spends it.
+    pub fn move_first(&self, body: BodyId, orbit: Orbit, act: &str, rule: &str) -> String {
+        format!("Move this Ship to {}, then {act} next turn: {rule}", self.orbit_name(body, orbit))
+    }
+
     /// Ticket #335: the same orbit as a Battle's place. Low orbit keeps the wording every Battle
     /// record has had -- "Mars orbit" -- and a station's orbit names the station.
     pub fn orbit_battle_name(&self, body: BodyId, orbit: Orbit) -> String {

@@ -2200,9 +2200,9 @@ impl Game {
                         wants.push((self.colony_orbit(c), format!("to disembark into {}", self.place_name(Place::Colony(c.id))), Cat::LoadUnload, weight));
                     }
                 }
-                let wants_the_ground = (s.colonists > 0 && !self.free_slots_on(body).is_empty())
-                    || s.army.is_some()
-                    || (body == BodyId::Earth && s.kind == UnitKind::ColonyShip && s.colonists == 0);
+                // Ticket #357 (version 0.09.1): an empty Colony Ship at Earth no longer comes down
+                // to low orbit to be loaded, since a Launch Site now lifts into any orbit of Earth.
+                let wants_the_ground = (s.colonists > 0 && !self.free_slots_on(body).is_empty()) || s.army.is_some();
                 if wants_the_ground {
                     wants.push((Orbit::Low, "to reach the ground".to_string(), Cat::LoadUnload, self.base_weight(seat, Cat::LoadUnload)));
                 }
@@ -2242,8 +2242,9 @@ impl Game {
                 // Ticket #86: behind on Off-world Presence, the AI lifts the crowded load at Earth;
                 // otherwise the safe one.
                 let capacity = if body == BodyId::Earth && presence_needed > 0 { self.colony_ship_crowded_capacity(seat) } else { self.colony_ship_capacity(seat) };
-                // Ticket #335 (version 0.09.0): a lift from a Launch Site reaches low orbit alone.
-                if body == BodyId::Earth && s.colonists < capacity && orbit.is_low() {
+                // Ticket #357 (version 0.09.1): a lift from a Launch Site reaches any orbit of
+                // Earth, where ticket #335 held it to low orbit.
+                if body == BodyId::Earth && s.colonists < capacity {
                     // Load from the directed state with the most Emigrants waiting (ticket #73).
                     // Ticket #46: only a state with a working Launch Site lifts them.
                     let from = self

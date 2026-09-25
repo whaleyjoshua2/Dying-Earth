@@ -1313,10 +1313,17 @@ impl Game {
                 // Ticket #99 (version 0.07.0): a blockaded station fuels nothing. Ticket #335
                 // (version 0.09.0): nor does one in another orbit -- a station's own orbit is what
                 // touches that station, refuelling included, so a Ship in low orbit or at another
-                // station's ring fuels at nothing until it has changed orbit. One rule, one refusal.
+                // station's ring fuels at nothing until it has changed orbit. Ticket #357 (version
+                // 0.09.1): split in two, so the move is offered only where a move would open the door
+                // -- a station that fuels this seat, open, in another orbit -- and a blockade says
+                // itself.
                 let orbit = self.ship_orbit(s);
                 if !self.refuelling_station(seat, body, orbit) {
-                    return fail(format!("no station fuels a Ship in {}: it is in another orbit, or blockaded", self.orbit_name(body, orbit)));
+                    let open = self.colonies.iter().find(|c| c.body == body && self.fuels_for(c, seat) && c.control.director().is_some_and(|d| !self.slot_blockaded_against(d, body, c.slot)));
+                    return fail(match open {
+                        Some(c) => self.move_first(body, Orbit::Slot(c.slot), "refuel", "a station fuels a Ship in its own orbit alone."),
+                        None => format!("every station that fuels you over {} is blockaded", self.tables.body(body).name),
+                    });
                 }
                 if s.fuel >= self.tables.unit(s.kind).tank {
                     return fail("the tank is full");
@@ -1356,7 +1363,7 @@ impl Game {
                 // warship and no rival working Battery standing in it.
                 let orbit = self.colony_orbit(col);
                 if !self.ship_in_orbit(s, body, orbit) {
-                    return fail(format!("a Bombard is given from {}", self.orbit_name(body, orbit)));
+                    return fail(self.move_first(body, orbit, "Bombard", "a Bombard is given from the orbit that touches its target."));
                 }
                 if orbit.is_low() {
                     if self.orbital_control(body) != Some(seat) {
@@ -1405,7 +1412,7 @@ impl Game {
                     _ => return fail("not a rival's place"),
                 }
                 if !self.ship_in_orbit(s, body, orbit) {
-                    return fail(format!("a Launch is given from {}", self.orbit_name(body, orbit)));
+                    return fail(self.move_first(body, orbit, "Launch", "a Launch is given from the orbit that touches its target."));
                 }
                 if orbit.is_low() {
                     if self.orbital_control(body) != Some(seat) {
@@ -1563,12 +1570,10 @@ impl Game {
                             if self.state(*st).emigrants < *colonists {
                                 return fail(format!("only {} Pioneers are waiting there", self.state(*st).emigrants));
                             }
-                            // Ticket #335 (version 0.09.0): low orbit is what touches the ground, a
-                            // lift from a Launch Site included; a Ship at a station's ring is out
-                            // of the Launch Site's reach.
-                            if !self.ship_in_orbit(s, body, Orbit::Low) {
-                                return fail(format!("a lift from a Launch Site reaches {} alone", self.orbit_name(body, Orbit::Low)));
-                            }
+                            // Ticket #357 (version 0.09.1): a lift from a Launch Site reaches ANY
+                            // orbit of Earth, at the designer's word, where ticket #335 held it to
+                            // low orbit. A place with no Launch Site -- a Colony on the ground --
+                            // is still reached from low orbit alone, below.
                         }
                         LoadSource::Colony(c) => {
                             let Some(col) = self.colony(*c) else { return fail("no such Colony") };
@@ -1578,7 +1583,7 @@ impl Game {
                             // Ticket #335 (version 0.09.0): a place is touched from its own orbit,
                             // taking people off it as much as putting them on.
                             if !self.ship_may_touch(s, col) {
-                                return fail(format!("{} is reached from {}", self.place_name(Place::Colony(*c)), self.orbit_name(body, self.colony_orbit(col))));
+                                return fail(self.move_first(body, self.colony_orbit(col), "load", &format!("{} is reached from there alone.", self.place_name(Place::Colony(*c)))));
                             }
                             if col.colonists < *colonists {
                                 return fail("not enough Colonists there");
@@ -1612,15 +1617,20 @@ impl Game {
                         return fail("a Colony's Army never leaves");
                     }
                     // Ticket #335 (version 0.09.0): and the Ship is in the orbit that touches the
-                    // Army's place -- low orbit for a Region or a Colony on the ground, a station's
-                    // own orbit for an Army aboard that station.
-                    let here = match a.at {
-                        ArmyAt::Place(Place::State(_)) => body == BodyId::Earth && self.ship_in_orbit(s, body, Orbit::Low),
-                        ArmyAt::Place(Place::Colony(c)) => self.colony(c).map(|c| c.body == body && self.ship_may_touch(s, c)).unwrap_or(false),
-                        ArmyAt::Aboard(_) => false,
-                    };
-                    if !here {
-                        return fail("that Army is not at this Body, or not in this Ship's orbit");
+                    // Army's place -- low orbit for a Colony on the ground, a station's own orbit
+                    // for an Army aboard that station. Ticket #357 (version 0.09.1): a Region lifts
+                    // by its Launch Site into ANY orbit of Earth; and the refusal is split, so the
+                    // move is offered only where the Army is at this Body and a move would reach it.
+                    match a.at {
+                        ArmyAt::Place(Place::State(_)) if body == BodyId::Earth => {}
+                        ArmyAt::Place(Place::Colony(c)) if self.colony(c).is_some_and(|c| c.body == body) => {
+                            let col = self.colony(c).unwrap();
+                            if !self.ship_may_touch(s, col) {
+                                return fail(self.move_first(body, self.colony_orbit(col), "load", &format!("{} is reached from there alone.", self.place_name(Place::Colony(c)))));
+                            }
+                        }
+                        ArmyAt::Aboard(_) => return fail("that Army is aboard a Ship"),
+                        _ => return fail("that Army is not at this Body"),
                     }
                 }
                 Ok(cost)
@@ -1651,7 +1661,7 @@ impl Game {
                         // Ticket #335 (version 0.09.0): founding a Colony is touching the ground,
                         // and low orbit is what touches the ground.
                         if !self.ship_in_orbit(s, body, Orbit::Low) {
-                            return fail(format!("a Colony is founded from {}", self.orbit_name(body, Orbit::Low)));
+                            return fail(self.move_first(body, Orbit::Low, "found the Colony", "a Colony is founded from low orbit alone."));
                         }
                         if s.kind != UnitKind::ColonyShip || *colonists == 0 {
                             return fail("only a Colony Ship with Colonists founds a Colony");
@@ -1672,7 +1682,7 @@ impl Game {
                         // Ticket #335 (version 0.09.0): a station is unloaded into from its own
                         // orbit, a Colony on the ground from low orbit.
                         if !self.ship_may_touch(s, col) {
-                            return fail(format!("{} is reached from {}", self.place_name(Place::Colony(*c)), self.orbit_name(body, self.colony_orbit(col))));
+                            return fail(self.move_first(body, self.colony_orbit(col), "unload", &format!("{} is reached from there alone.", self.place_name(Place::Colony(*c)))));
                         }
                         if *colonists > 0 {
                             if col.control.director() != Some(seat) {
