@@ -22,6 +22,13 @@ decay_controlled = 1
 # (version 0.05.5): 10 to 20, beside a start Standing on every Faction's home state equal to its
 # threshold, after the Custodian AI took seat 0's start state on turn 7 in every seed.
 challenge_margin = 20
+# Ticket #349 (version 0.09.1): a place you hold is PRESSED while any rival's Standing there is
+# within this of yours -- the designer's "within 10 your influence". It is measured against YOUR
+# Standing, not the rival's price, so it comes early: they still need your Standing plus the margin
+# above to take it, and a turn's Allotment can cover 10 at once. It moves no rule; it is what the
+# Command Cluster lists and what turns a card's challenger line amber. It replaced the card's old
+# reading of the computer's `influence_step` x 2, an AI tuning figure doing the interface's job.
+pressed_band = 10
 # Ticket #190 (version 0.08.0): what a Constabulary standing and online adds to the challenge margin
 # in its Region, for EVERY challenger, whoever built it -- a police force serves the government of
 # the day. Nothing on a neutral Region, which has no margin at all: the price there is the threshold.

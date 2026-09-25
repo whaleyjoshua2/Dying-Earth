@@ -3100,6 +3100,32 @@ impl Game {
             .min_by_key(|(_, standing, price)| *price - *standing)
     }
 
+    /// Ticket #349 (version 0.09.1): **Pressed** -- a held place where ANY rival's Standing is within
+    /// `pressed_band` of the holder's own. Every rival is tested, not only `nearest_challenger`'s
+    /// pick, which is nearest its own price and can be a different seat. Read against the board as
+    /// last resolved, as the card reads it: Influence ordered this turn does not clear it. A telling,
+    /// not a rule: nothing in the engine acts on it.
+    pub fn pressed(&self, place: Place) -> bool {
+        let Some(holder) = self.place_control(place).controller() else {
+            return false;
+        };
+        let standing_of = |s: Seat| self.seat(s).influence.get(&place).copied().unwrap_or(0);
+        let mine = standing_of(holder);
+        let band = self.tables.influence.pressed_band;
+        Seat::ALL.into_iter().filter(|s| *s != holder).map(standing_of).any(|theirs| theirs > 0 && theirs >= mine - band)
+    }
+
+    /// Ticket #349: every place `seat` holds that is Pressed, Regions first and then Colonies, each in
+    /// id order, so the Command Cluster's list does not reshuffle from one frame to the next.
+    pub fn pressed_places(&self, seat: Seat) -> Vec<Place> {
+        let regions = self.states.iter().map(|s| Place::State(s.id));
+        let colonies = self.colonies.iter().map(|c| Place::Colony(c.id));
+        let mut held: Vec<Place> = regions.chain(colonies).filter(|p| self.place_control(*p).controller() == Some(seat)).collect();
+        held.sort();
+        held.retain(|p| self.pressed(*p));
+        held
+    }
+
     /// Ticket #311 (version 0.08.7): the Battle of the last Resolution fought at this place, as an
     /// index into the Report, for the map's ring and the shields' outline. The Report is wiped at
     /// End Turn and filled by the Resolution, so this is last turn's Battle for exactly the one

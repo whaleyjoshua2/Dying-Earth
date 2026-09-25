@@ -3650,6 +3650,46 @@ const CLUSTER_SCALE: f32 = 1.265;
 /// styles the way the cluster applies its own.
 const ARMY_LIST_SCALE: f32 = 1.1;
 
+/// Ticket #349 (version 0.09.1): **the places you hold that are Pressed**, under the Influence rail,
+/// whatever is selected. The designer: *"put the warning under the influence spend bar in the command
+/// cluster"*, reading *"[place] is pressed by a rival"* -- the rival never named and no figure given,
+/// on the line or on a hover, so there is no hover. At most three lines and then how many more, since
+/// the strip does not scroll and End Turn must not be pushed off it. A click is a way there, as a
+/// Report line's is: it selects the place, so the rail and Spend are aimed at it at once.
+fn pressed_list(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewState) {
+    const SHOWN: usize = 3;
+    if session.spectator {
+        return;
+    }
+    let pressed = game.pressed_places(Seat(0));
+    for place in pressed.iter().take(SHOWN) {
+        let text = format!("{} is Pressed by a rival.", game.place_name(*place));
+        let line = egui::Label::new(RichText::new(text).color(Color32::from_rgb(255, 160, 60))).sense(egui::Sense::click());
+        if ui.add(line).clicked() {
+            match *place {
+                Place::State(s) => {
+                    if view.view != View::Surface(BodyId::Earth) {
+                        view.enter_surface(BodyId::Earth);
+                    }
+                    view.selection = Selection::State(s);
+                }
+                Place::Colony(c) => {
+                    if let Some(body) = game.colony(c).map(|col| col.body)
+                        && view.view != View::Surface(body)
+                    {
+                        view.enter_surface(body);
+                    }
+                    view.selection = Selection::Colony(c);
+                }
+            }
+            view.attack_preview = false;
+        }
+    }
+    if pressed.len() > SHOWN {
+        ui.label(format!("and {} more", pressed.len() - SHOWN));
+    }
+}
+
 /// Ticket #114 (version 0.07.1): **the command cluster**, a strip along the foot of the side panel
 /// that never scrolls away. The designer asked for a corner like the one CK3 and other 4X games put
 /// their standing controls in: *"add influence spend button to bottom right ... with a second button
@@ -3739,6 +3779,7 @@ fn command_cluster(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewS
             // Spend button below it is what needs the place.
             let (whole, left) = influence_this_turn(game, session);
             let amount = influence_rail(ui, &mut view.influence_amount, whole, left, None);
+            pressed_list(ui, session, game, view);
             ui.horizontal(|ui| {
                 match &target {
                     Some((place, name)) => {
@@ -5575,10 +5616,11 @@ fn threshold_breakdown(ui: &mut Ui, game: &Game, target: Place) {
                     let resistance = game.resistance(target);
                     let gap = (price - theirs).max(0);
                     let spend = ((gap as f64) * resistance).ceil() as i64;
-                    // Ticket #75's warning, folded in: within two steps of the holder's Standing the
-                    // line turns amber and says what to do about it.
-                    let step = game.tables.ai.thresholds.influence_step;
-                    let pressing = theirs + 2 * step >= standing;
+                    // Ticket #75's warning, folded in: the line turns amber and says what to do about
+                    // it. Ticket #349 (version 0.09.1): on exactly the Pressed test the Command
+                    // Cluster lists by, ANY rival within the band, so the two never disagree. It
+                    // tested only this nearest-to-price rival, against the computer's own step.
+                    let pressing = game.pressed(target);
                     let line = if pressing { format!("{line} Spend here to stay ahead.") } else { line };
                     let tip = format!(
                         "The {name}'s price here is the greater of their own threshold, {their_threshold}{}, and your Standing plus the margin they face, {standing} + {their_margin}.

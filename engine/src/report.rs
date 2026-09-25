@@ -400,7 +400,7 @@ pub fn placeholders(template: &str) -> Vec<String> {
 pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("seating", &["date", "faction", "state", "rivals"]),
     ("start_holding", &["state", "materials", "fuel", "energy"]),
-    ("start_rivals", &["rivals", "collapse"]),
+    ("start_rivals", &["rivals", "condition", "collapse"]),
     ("solar_storm", &[]),
     ("ship_arrived", &["faction", "ship", "body"]),
     // Ticket #335 (version 0.09.0): a Ship that changed orbit at the Body it stands at.

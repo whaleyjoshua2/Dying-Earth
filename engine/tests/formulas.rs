@@ -14675,3 +14675,208 @@ fn the_drivers_build_archive_entry_names_the_three_rules_the_engine_enforces() {
     assert!(entry.to_ascii_lowercase().contains("off earth"), "off Earth, which neither Antarctica nor a station over Earth is: {entry}");
     assert!(entry.to_ascii_lowercase().contains("four colonists"), "and the four Colonists who must already live there: {entry}");
 }
+
+// ---------------------------------------------------------------- Ticket #350: your own Condition
+
+/// Ticket #350 (version 0.09.1): the turn-1 Report line said "get twelve Colonists off Earth" to
+/// every Faction, which is half of the Custodians' and the Prospectors' Condition and wrong for the
+/// Arkwrights and the Archivists. It now carries the player's own, in the designer's approved words.
+fn turn_one_line(player: FactionKind) -> String {
+    let t = tables();
+    let start = t.faction(player).opens_on;
+    let mut g = Game::new(t, NewGame { seed: 7, player, player_is_ai: false, player_start: start });
+    g.start();
+    g.report
+        .lines
+        .iter()
+        .find(|l| l.text.starts_with("Your rivals are"))
+        .map(|l| l.text.clone())
+        .unwrap_or_else(|| panic!("no turn-1 rivals line: {:?}", g.report.lines))
+}
+
+#[test]
+fn ticket_350_the_turn_one_line_names_each_factions_own_condition() {
+    for (kind, words) in [
+        (
+            FactionKind::Custodians,
+            "Build, spread Influence, and reach Stabilization, three Climate phases running with Emissions under the Natural Sink, with 12 Colonists living off Earth, before the Temperature reaches +3.0 C.",
+        ),
+        (FactionKind::Prospectors, "Build, spread Influence, and put 2,500 Ducats in the Venture Capital Fund with 12 Colonists living off Earth, before the Temperature reaches +3.0 C."),
+        (FactionKind::Arkwrights, "Build, spread Influence, and get 30 Colonists living off Earth, spread over three Bodies, before the Temperature reaches +3.0 C."),
+        (FactionKind::Archivists, "Build, spread Influence, and build the Archive off Earth, pay 125 Research into it, and upload 12 Colonists, before the Temperature reaches +3.0 C."),
+    ] {
+        let line = turn_one_line(kind);
+        assert!(line.ends_with(words), "{kind:?}: {line}");
+        assert!(!line.contains("twelve Colonists off Earth"), "{kind:?} is not told the old line: {line}");
+    }
+}
+
+/// The figures are filled from the bars, never typed, so a moved bar moves the line -- which is the
+/// whole of how the old line came to lie.
+#[test]
+fn ticket_350_a_moved_bar_moves_the_line() {
+    let mut t = (*tables()).clone();
+    t.factions[FactionKind::Prospectors as usize].victory_first.bar = 3000.0;
+    t.factions[FactionKind::Prospectors as usize].victory_second.bar = 8.0;
+    assert_eq!(t.victory_short(FactionKind::Prospectors), "put 3,000 Ducats in the Venture Capital Fund with eight Colonists living off Earth,");
+    let start = t.faction(FactionKind::Prospectors).opens_on;
+    let mut g = Game::new(Arc::new(t), NewGame { seed: 7, player: FactionKind::Prospectors, player_is_ai: false, player_start: start });
+    g.start();
+    assert!(g.report.lines.iter().any(|l| l.text.contains("put 3,000 Ducats")), "{:?}", g.report.lines);
+}
+
+#[test]
+fn ticket_350_a_figure_reads_as_a_sentence_says_it() {
+    use dying_earth_engine::data::figure;
+    assert_eq!(figure(3.0), "three");
+    assert_eq!(figure(0.0), "nought");
+    assert_eq!(figure(12.0), "12");
+    assert_eq!(figure(125.0), "125");
+    assert_eq!(figure(2500.0), "2,500");
+    assert_eq!(figure(1_250_000.0), "1,250,000");
+}
+
+/// The load check: a placeholder the Faction's own Condition cannot fill is refused, rather than a
+/// brace printed to the player on turn 1.
+#[test]
+fn ticket_350_a_placeholder_the_condition_cannot_fill_refuses_the_table() {
+    let src = default_data_dir();
+    let dir = std::env::temp_dir().join(format!("dying-earth-350-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("a temporary data folder");
+    for entry in std::fs::read_dir(&src).expect("the data folder") {
+        let entry = entry.expect("a data file");
+        if entry.path().is_file() {
+            std::fs::copy(entry.path(), dir.join(entry.file_name())).expect("copy");
+        }
+    }
+    assert!(Tables::load(&dir).is_ok(), "the copy loads before anything is changed in it");
+    let factions = std::fs::read_to_string(dir.join("factions.toml")).expect("factions.toml");
+    assert!(factions.contains("spread over {bodies} Bodies"), "the Arkwrights' clause names its Bodies");
+    // The Arkwrights' second part counts Bodies, not a bar, so {second} has nothing to fill it.
+    std::fs::write(dir.join("factions.toml"), factions.replace("spread over {bodies} Bodies", "spread over {second} Bodies")).expect("write");
+    let err = Tables::load(&dir).expect_err("an unfillable placeholder is refused");
+    assert!(format!("{err:?}").contains("victory_short uses {second}"), "and the refusal names it: {err:?}");
+    // And the other way: the Prospectors' second part is a bar, so {bodies} has nothing to fill it.
+    assert!(factions.contains("put {first} Ducats"), "the Prospectors' clause names its Fund");
+    std::fs::write(dir.join("factions.toml"), factions.replace("put {first} Ducats", "put {bodies} Ducats")).expect("write");
+    let err = Tables::load(&dir).expect_err("a {bodies} with no Bodies is refused");
+    assert!(format!("{err:?}").contains("victory_short uses {bodies}"), "and the refusal names it: {err:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+// ---------------------------------------------------------------- Ticket #349: Pressed
+
+/// Ticket #349 (version 0.09.1): seat 0 holds `place` at `mine`, every rival's Standing there is
+/// cleared, and the given rivals stand where the test says.
+fn held_at(g: &mut Game, place: Place, mine: i64, rivals: &[(Seat, i64)]) {
+    for s in Seat::ALL {
+        g.seats[s.0 as usize].influence.remove(&place);
+    }
+    g.seats[0].influence.insert(place, mine);
+    for (s, v) in rivals {
+        g.seats[s.0 as usize].influence.insert(place, *v);
+    }
+    if let Place::State(id) = place {
+        g.state_mut(id).control = Control::Controlled(Seat(0));
+    }
+}
+
+#[test]
+fn ticket_349_a_rival_within_ten_of_your_standing_presses_the_place() {
+    let mut g = game();
+    let africa = Place::State(StateId::NorthAfrica);
+    held_at(&mut g, africa, 50, &[(Seat(1), 40)]);
+    assert!(g.pressed(africa), "40 is within 10 of 50");
+    held_at(&mut g, africa, 50, &[(Seat(1), 39)]);
+    assert!(!g.pressed(africa), "39 is not");
+    held_at(&mut g, africa, 50, &[(Seat(1), 60)]);
+    assert!(g.pressed(africa), "a rival above you presses it too");
+    held_at(&mut g, africa, 50, &[]);
+    assert!(!g.pressed(africa), "no rival, nothing pressing");
+}
+
+/// The case the card's old test missed: it tested only `nearest_challenger`, which is the rival
+/// nearest its OWN price. On South America (threshold 50) held at 25, the threshold is the price:
+/// seat 1 carries all the Blame, so its threshold is 75, and it stands at 16 -- within 10 of you, 59
+/// short. Seat 2 carries none, stands at 14 -- outside the band -- and is only 36 short, so it is
+/// the one `nearest_challenger` names. The old card test read seat 2 and stayed quiet.
+#[test]
+fn ticket_349_every_rival_is_tested_not_only_the_nearest_to_its_price() {
+    let mut g = game();
+    let south_america = Place::State(StateId::SouthAmerica);
+    for s in &mut g.seats {
+        s.blame_emitted = 0.0;
+    }
+    g.seats[1].blame_emitted = 100.0;
+    held_at(&mut g, south_america, 25, &[(Seat(1), 16), (Seat(2), 14)]);
+    assert!(g.blame_threshold_multiplier_on(Seat(1), south_america) > 1.4, "seat 1's Blame raises its price here");
+    let (nearest, theirs, _) = g.nearest_challenger(south_america).expect("a challenger");
+    assert_eq!((nearest, theirs), (Seat(2), 14), "the rival nearest its own price is seat 2, outside the band");
+    assert!(g.pressed(south_america), "and seat 1 presses it all the same");
+    held_at(&mut g, south_america, 25, &[(Seat(2), 14)]);
+    assert!(!g.pressed(south_america), "without seat 1, nothing presses");
+}
+
+#[test]
+fn ticket_349_a_place_nobody_holds_is_never_pressed() {
+    let mut g = game();
+    let africa = Place::State(StateId::NorthAfrica);
+    held_at(&mut g, africa, 50, &[(Seat(1), 45)]);
+    g.state_mut(StateId::NorthAfrica).control = Control::Neutral;
+    assert!(!g.pressed(africa));
+    // A holder with no Standing at all is pressed by any rival with some, but not by a zero.
+    held_at(&mut g, africa, 0, &[(Seat(1), 0)]);
+    assert!(!g.pressed(africa), "a rival at nought never presses");
+}
+
+#[test]
+fn ticket_349_the_list_is_every_pressed_place_held_in_a_fixed_order() {
+    let mut g = game();
+    for s in &mut g.states {
+        if s.control == Control::Controlled(Seat(0)) {
+            s.control = Control::Neutral;
+        }
+    }
+    let (a, b, c) = (Place::State(StateId::SouthAmerica), Place::State(StateId::NorthAfrica), Place::State(StateId::CentralAmerica));
+    held_at(&mut g, a, 50, &[(Seat(3), 45)]);
+    held_at(&mut g, b, 50, &[(Seat(1), 42)]);
+    held_at(&mut g, c, 50, &[(Seat(1), 10)]);
+    assert_eq!(g.pressed_places(Seat(0)), vec![b, a], "North Africa and South America, in id order; Central America is not pressed");
+    assert!(g.pressed_places(Seat(1)).iter().all(|p| !matches!(p, Place::State(StateId::NorthAfrica | StateId::SouthAmerica))), "a rival is not told of places it does not hold");
+}
+
+/// The band is a figure in the data, not a number in the code.
+#[test]
+fn ticket_349_the_band_is_read_from_the_data() {
+    assert_eq!(tables().influence.pressed_band, 10);
+    let mut t = (*tables()).clone();
+    t.influence.pressed_band = 12;
+    let mut g = Game::new(Arc::new(t), NewGame { seed: 7, player: FactionKind::Custodians, player_is_ai: false, player_start: StateId::EastAsia });
+    let africa = Place::State(StateId::NorthAfrica);
+    held_at(&mut g, africa, 50, &[(Seat(1), 39)]);
+    assert!(g.pressed(africa), "39 is within 12 of 50");
+}
+
+/// A Colony is a place like a Region: Pressed on the same test, and listed after the Regions.
+#[test]
+fn ticket_349_a_colony_is_pressed_on_the_same_test_and_listed_after_the_regions() {
+    let mut g = game();
+    for s in &mut g.states {
+        if s.control == Control::Controlled(Seat(0)) {
+            s.control = Control::Neutral;
+        }
+    }
+    g.colonies.retain(|c| c.control.controller() != Some(Seat(0)));
+    let moon = Place::Colony(colony(&mut g, Seat(0), BodyId::Moon, &[ModuleKind::Habitat], 4));
+    held_at(&mut g, moon, 50, &[(Seat(2), 39)]);
+    assert!(!g.pressed(moon), "39 is outside the band on a Colony too");
+    held_at(&mut g, moon, 50, &[(Seat(2), 40)]);
+    assert!(g.pressed(moon));
+    let africa = Place::State(StateId::NorthAfrica);
+    held_at(&mut g, africa, 50, &[(Seat(1), 45)]);
+    assert_eq!(g.pressed_places(Seat(0)), vec![africa, moon], "the Region first, then the Colony");
+    // A Colony a rival holds is not seat 0's to be warned of.
+    g.colonies.iter_mut().find(|c| Place::Colony(c.id) == moon).expect("the Colony").control = Control::Controlled(Seat(2));
+    assert_eq!(g.pressed_places(Seat(0)), vec![africa]);
+}

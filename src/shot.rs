@@ -713,11 +713,28 @@ fn build_board(session: &mut Session) {
         }
         // `pressed:<n>` (a building aid, ticket #75): seat 0 holds North Africa (a short card) with a
         // Standing of n there, and seat 1 stands at n too, so the card's warning line shows.
-        if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("pressed:").and_then(|v| v.parse::<i64>().ok())) {
+        // Ticket #349 (version 0.09.1): `pressed:<n>,<theirs>` puts seat 1 at `theirs` instead, so a
+        // held card NOT Pressed can be photographed beside one that is.
+        if let Some((n, theirs)) = std::env::args().find_map(|a| {
+            let v = a.strip_prefix("pressed:")?;
+            let mut it = v.split(',').map(|x| x.parse::<i64>().ok());
+            let n = it.next()??;
+            Some((n, it.next().flatten().unwrap_or(n)))
+        }) {
             let sid = StateId::NorthAfrica;
             g.take_control(sid, Seat(0));
             g.seats[0].influence.insert(Place::State(sid), n);
-            g.seats[1].influence.insert(Place::State(sid), n);
+            g.seats[1].influence.insert(Place::State(sid), theirs);
+        }
+        // `pressedat:<k>` (a building aid, ticket #349): seat 0 holds k more Regions nobody held, each
+        // at 50 with seat 1 at 45, so the Command Cluster's Pressed list runs past its three lines.
+        if let Some(k) = std::env::args().find_map(|a| a.strip_prefix("pressedat:").and_then(|v| v.parse::<usize>().ok())) {
+            let free: Vec<StateId> = g.states.iter().filter(|s| s.control == Control::Neutral).map(|s| s.id).take(k).collect();
+            for sid in free {
+                g.take_control(sid, Seat(0));
+                g.seats[0].influence.insert(Place::State(sid), 50);
+                g.seats[1].influence.insert(Place::State(sid), 45);
+            }
         }
         // `emigrants:<n>` (a building aid, ticket #73): n Emigrants wait in seat 0's start state.
         if let Some(n) = std::env::args().find_map(|a| a.strip_prefix("emigrants:").and_then(|v| v.parse::<u32>().ok())) {

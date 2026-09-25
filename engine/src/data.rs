@@ -596,6 +596,11 @@ pub struct FactionCard {
     pub unique: String,
     /// The Victory Condition in prose, for the cards and the panel.
     pub victory: String,
+    /// Ticket #350 (version 0.09.1): the Victory Condition in one clause, for the turn-1 Report line,
+    /// which told every Faction to "get twelve Colonists off Earth" -- half of two Factions'
+    /// Conditions and wrong for the other two. Its figures are placeholders filled from the bars
+    /// below (`{first}`, `{second}`, `{bodies}`), never typed, so a moved bar cannot leave it lying.
+    pub victory_short: String,
     /// Ticket #50: the first part of the Victory Condition, in figures.
     pub victory_first: VictoryFirstCard,
     /// Ticket #51: the second part, generalised the way #50 generalised the first.
@@ -904,6 +909,9 @@ pub struct InfluenceTable {
     pub decay_controlled: i64,
     /// Version 0.04 (ticket #41): a challenger needs the controller's standing plus this.
     pub challenge_margin: i64,
+    /// Ticket #349 (version 0.09.1): a held place is **Pressed** while any rival's Standing there is
+    /// within this of the holder's own. It tells the player; no rule reads it.
+    pub pressed_band: i64,
     /// Ticket #224 (version 0.08.2): the most the Relations term may add to a challenge margin. Two,
     /// which is also its true maximum: the shown score clamps at -10 and the term is `|score| / 4`.
     #[serde(default = "relations_margin_cap_default")]
@@ -1985,6 +1993,18 @@ impl Tables {
             if !second_ok {
                 return Err(err("factions.toml", format!("row {}: victory_second needs a positive bar, or bodies and colonists_each", f.name)));
             }
+            // Ticket #350: every placeholder in the short Condition must be one this Faction's own
+            // Victory kinds can fill, or the turn-1 line would print a brace to the player.
+            let fillable: &[&str] = match f.victory_second.kind {
+                VictorySecondKind::OffWorldPresence | VictorySecondKind::ColonistsUploaded => &["first", "second"],
+                VictorySecondKind::ColoniesOnBodies => &["first", "bodies"],
+            };
+            if f.victory_short.trim().is_empty() {
+                return Err(err("factions.toml", format!("row {}: victory_short is empty", f.name)));
+            }
+            if let Some(p) = crate::report::placeholders(&f.victory_short).into_iter().find(|p| !fillable.contains(&p.as_str())) {
+                return Err(err("factions.toml", format!("row {}: victory_short uses {{{p}}}, which its Victory Condition cannot fill", f.name)));
+            }
             for (what, m) in [
                 ("habitat_capacity_multiplier", f.habitat_capacity_multiplier),
                 ("transit_fuel_multiplier", f.transit_fuel_multiplier),
@@ -2291,6 +2311,20 @@ impl Tables {
     pub fn faction(&self, kind: FactionKind) -> &FactionCard {
         &self.factions[kind as usize]
     }
+    /// Ticket #350 (version 0.09.1): the Faction's Victory Condition in one clause, its figures
+    /// filled from its own bars -- a bar under ten in words and a thousand with its comma, so the
+    /// Custodians read "three Climate phases" and the Prospectors "2,500 Ducats".
+    pub fn victory_short(&self, kind: FactionKind) -> String {
+        let f = self.faction(kind);
+        crate::report::render(
+            &f.victory_short,
+            &[
+                ("first", figure(f.victory_first.bar)),
+                ("second", figure(f.victory_second.bar)),
+                ("bodies", figure(f.victory_second.bodies as f64)),
+            ],
+        )
+    }
     pub fn ai_weights(&self, kind: FactionKind) -> &AiWeights {
         &self.ai.weights[&kind]
     }
@@ -2465,4 +2499,23 @@ fn accord_kept_default() -> u32 {
 /// Ticket #227 (version 0.08.2).
 fn accord_weight_default() -> f64 {
     3.0
+}
+
+/// Ticket #350 (version 0.09.1): a Victory figure as a sentence says it -- under ten in words,
+/// a thousand or more with its comma, anything else in digits.
+pub fn figure(n: f64) -> String {
+    const WORDS: [&str; 10] = ["nought", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+    let n = n.round() as i64;
+    if (0..10).contains(&n) {
+        return WORDS[n as usize].to_string();
+    }
+    let digits = n.abs().to_string();
+    let mut out = String::new();
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    if n < 0 { format!("-{out}") } else { out }
 }

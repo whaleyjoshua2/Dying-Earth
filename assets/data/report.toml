@@ -17,7 +17,9 @@
 # Turn 1 only: the headline that explains the table.
 seating = "{date}. You play the {faction} from {state}; the computer plays {rivals}."
 start_holding = "You hold {state} with a Launch Site and its Standing Army. The Stockpile holds {materials} Materials, {fuel} Fuel and {energy} Energy."
-start_rivals = "Your rivals are {rivals}. Build, spread Influence, and get twelve Colonists off Earth before the Temperature reaches +{collapse} C."
+# Ticket #350 (version 0.09.1): {condition} is the player's own Victory Condition in one clause,
+# `victory_short` in factions.toml. It said "get twelve Colonists off Earth" to every Faction.
+start_rivals = "Your rivals are {rivals}. Build, spread Influence, and {condition} before the Temperature reaches +{collapse} C."
 
 # In space
 solar_storm = "Solar Storm: no transit advanced this turn."

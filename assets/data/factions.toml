@@ -40,6 +40,10 @@ signature = "The Scrubber, Leapfrog and Production Moved. Only they build a Scru
 # Faction window. Ticket #186 built the Academy; nothing on any card named it until now.
 unique = "Academy -- replaces the School and the Institute, and pays +1 Ducat a turn while it is online."
 victory = "Stabilization (3 consecutive Climate phases with net Emissions below the Natural Sink) plus 12 Colonists living off Earth."
+# Ticket #350 (version 0.09.1): the Condition in one clause for the turn-1 Report line, in the
+# designer's approved words. {first}, {second} and {bodies} are filled from the bars below, so a
+# moved bar moves the line; the old line told every Faction "get twelve Colonists off Earth".
+victory_short = "reach Stabilization, {first} Climate phases running with Emissions under the Natural Sink, with {second} Colonists living off Earth,"
 victory_first = { kind = "stabilization_run", bar = 3 }
 victory_second = { kind = "off_world_presence", bar = 12 }
 colour = [0.15, 0.65, 0.6]
@@ -83,6 +87,7 @@ signature = "Cheap Industry and the Strip Permit. Raising Industry Level costs t
 unique = "Investment Bank -- replaces the Bank, and banks 1% interest a turn on the Venture Capital Fund's balance, one building per Region paying, never less than 1 Material in all. Off Earth, the Exchange -- replaces the Trade Post, and pays 1 more Ducat a turn."
 # Ticket #72: the Extraction Total is retired; the first part is Materials banked in the Fund.
 victory = "2500 Ducats in the Venture Capital Fund, plus 12 Colonists living off Earth."
+victory_short = "put {first} Ducats in the Venture Capital Fund with {second} Colonists living off Earth,"
 # Ticket #182 (version 0.08.0): 750 to 1000, because the Investment Bank pays uncapped interest
 # on the Fund. Measured first: in 40 games nobody EVER reached 750 -- the highest balance ever
 # seen was 745, the median game ended around turn 28 with the Fund in the 400s, and the
@@ -148,6 +153,7 @@ signature = "Coach Class. A Colony Ship carries 8 Colonists, 12 with Expanded Ha
 # Ticket #203 (version 0.08.1). The building is ticket #183's.
 unique = "Spaceport -- replaces the Launch Site, and pays +1 Influence into next turn's Allotment for every Pioneer it lifts off Earth. Off Earth, the Chorus -- replaces the Relay, and adds +1 Influence to the Allotment for every 6 Colonists at its Colony."
 victory = "Diaspora: 30 Colonists living off Earth, on Colonies spread over at least three Bodies with at least 4 Colonists each (Antarctica and stations over Earth do not count)."
+victory_short = "get {first} Colonists living off Earth, spread over {bodies} Bodies,"
 victory_first = { kind = "colonists_off_earth", bar = 30 }
 victory_second = { kind = "colonies_on_bodies", bodies = 3, colonists_each = 4 }
 colour = [0.44, 0.275, 0.66]
@@ -188,6 +194,7 @@ unique = "Reactor -- replaces the Power Plant, and takes 75% off the Energy upke
 # This bar IS `[archive] research` in modules.toml -- one figure written in two files, the Archive's
 # cost and the Archivists' bar, and a test asserts the two are equal so they cannot drift.
 victory = "Build the Archive at a Colony off Earth (50 Materials, three turns, and four Colonists must live there to begin it), pay 125 Research into it and keep it running, then upload 12 Colonists into it from the people living where it stands."
+victory_short = "build the Archive off Earth, pay {first} Research into it, and upload {second} Colonists,"
 victory_first = { kind = "archive_research", bar = 125 }
 # Ticket #192 (version 0.08.0): twelve Colonists UPLOADED, not twelve living beside the Archive.
 victory_second = { kind = "colonists_uploaded", bar = 12 }

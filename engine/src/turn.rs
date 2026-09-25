@@ -68,7 +68,13 @@ impl Game {
             .collect();
         let text = self.say(
             "start_rivals",
-            &[("rivals", rivals.join(", ")), ("collapse", format!("{:.1}", self.tables.climate.collapse_line))],
+            // Ticket #350 (version 0.09.1): the player's own Condition, where every Faction was told
+            // the same twelve Colonists.
+            &[
+                ("rivals", rivals.join(", ")),
+                ("condition", self.tables.victory_short(self.kind(Seat(0)))),
+                ("collapse", format!("{:.1}", self.tables.climate.collapse_line)),
+            ],
         );
         self.report_line(LineKind::Note, None, text);
         if self.seat(Seat(0)).ai {
