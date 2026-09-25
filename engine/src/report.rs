@@ -69,6 +69,14 @@ pub enum LineKind {
     YourWorks,
     /// Anything with no better home.
     Note,
+    /// Ticket #353 (version 0.09.1): **the turn's card, and a rival's answer to it.** A kind with
+    /// NO headline rank, because every one of these lines has already been read: the question and
+    /// the drawn card each held the screen in a modal of their own before the Report opened, and the
+    /// four answers are drawn together in their own block inside it. The interface used to filter an
+    /// answer out of `headline()` after the fact, which turned `Some` into `None` and opened the
+    /// dispatch with nothing at all; filing the line under a kind that never headlines lets the next
+    /// line by rank fall through on its own. Added LAST so a save written before it still loads.
+    Card,
 }
 
 /// The four headings the dispatch groups its lines under, in the order they are shown.
@@ -136,7 +144,9 @@ impl LineKind {
         match self {
             LineKind::ColonyFounded | LineKind::Ship | LineKind::Archive | LineKind::Antarctica => Section::InSpace,
             LineKind::Unrest | LineKind::Refugees | LineKind::Army | LineKind::Occupation => Section::OnEarth,
-            LineKind::Break | LineKind::SeaLevel | LineKind::Event | LineKind::Development | LineKind::Climate => Section::TheClimate,
+            // Ticket #353 (version 0.09.1): the turn's card reads under The climate, where an Event
+            // line has always read; only its headline rank is gone.
+            LineKind::Break | LineKind::SeaLevel | LineKind::Event | LineKind::Development | LineKind::Climate | LineKind::Card => Section::TheClimate,
             LineKind::TechComplete | LineKind::YourBuild | LineKind::YourWorks => Section::YourWorks,
             LineKind::ControlChanged | LineKind::DecisiveBattle | LineKind::Battle | LineKind::BuildComplete | LineKind::Note | LineKind::Seating => by_place(),
         }
@@ -407,6 +417,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("slot_taken", &["faction"]),
     ("landing_contested", &["faction", "body"]),
     ("colony_founded", &["faction", "slot", "body", "n"]),
+    // Ticket #353 (version 0.09.1): who the Habitat room had no place for, at all four clamp sites.
+    ("no_habitat_room", &["n", "place"]),
     // Ticket #345 (version 0.09.1): a Body settled for the first time.
     ("first_to_body", &["faction", "body", "colony", "n"]),
     ("disembarked", &["n", "colony"]),
@@ -420,6 +432,8 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("emigrants_arrived", &["n", "state", "colony"]),
     ("emigrants_returned", &["n", "state"]),
     ("emigrants_lifted", &["n", "state", "station"]),
+    // Ticket #353 (version 0.09.1): the Pioneers a clamped lift left standing in their Region.
+    ("emigrants_stayed", &["n", "state", "station"]),
     ("claim_lot", &["place", "factions", "winner"]),
     ("archive_built", &["faction", "place", "left"]),
     ("archive_complete", &["faction", "place"]),
@@ -589,6 +603,11 @@ pub const RIVAL_ARGS: &[(&str, &[&str])] = &[
     // Ticket #192 (version 0.08.0): the Upload.
     ("upload", &["n", "colony"]),
     ("fund_archive", &[]),
+    // Ticket #353 (version 0.09.1): the Archive fund is the Archivists' clause; the other three
+    // Factions' Directives name what they themselves buy.
+    ("directive_sink_order", &[]),
+    ("directive_ducats_order", &[]),
+    ("directive_fuel_order", &[]),
     ("unfund_archive", &[]),
     ("max_on", &["place"]),
     ("max_off", &[]),

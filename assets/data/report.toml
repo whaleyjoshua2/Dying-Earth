@@ -41,7 +41,13 @@ event_damaged_ships = "{event} damaged {n} Ship(s)."
 loaded = "{faction} loaded {cargo} at {body}."
 slot_taken = "{faction}: another Faction took that Colony Slot first."
 landing_contested = "{faction} could not land at {body}: the orbit is contested."
-colony_founded = "The {faction} founded a Colony in slot {slot} on {body} with {n} Colonists."
+# Ticket #353 (version 0.09.1): the slot is NAMED. "in slot 3 on the Moon" named a place no player
+# could find on the board; {slot} now carries the slot's own name, which is the Colony's name too.
+colony_founded = "The {faction} founded a Colony at {slot} on {body} with {n} Colonists."
+# Ticket #353 (version 0.09.1): who did not land, at every place the engine clamps an arrival to the
+# Habitat room it found -- a founding by sea, a founding by Colony Ship, a join and a disembarkation.
+# One phrase for all four, because it is one rule.
+no_habitat_room = "{n} more found no Habitat room at {place} and did not land."
 # Ticket #345 (version 0.09.1): the first Colony a world has ever carried, and what it pays.
 first_to_body = "The {faction} are the first Faction ever to settle {body}. {colony} claims a windfall of {n} Influence, and its Core will pay while they hold it."
 disembarked = "{n} Colonists disembarked into {colony}."
@@ -55,6 +61,12 @@ army_ordered = "An Army began at {place}: {people} under arms."
 emigrants_arrived = "{n} Pioneers from {state} landed in Antarctica and joined {colony}."
 emigrants_returned = "{n} Pioneers from {state} found no room in Antarctica and came home."
 emigrants_lifted = "{n} Pioneers lifted from {state} to {station}."
+# Ticket #353 (version 0.09.1): and who did NOT go. A lift fills as far as the station's Habitat
+# room goes since this ticket, where it used to refuse the whole order, so a lift can now move
+# fewer people than it asked for and the ones left behind are still standing in their Region. The
+# partial-unload phrase above will not serve: that one is about people who arrived somewhere and
+# could not land, and these never left the ground.
+emigrants_stayed = "{n} more found no Habitat room at {station} and are still waiting in {state}."
 neutral_research = "The Labs of {states}, in no one's hands, added {n} Research to the Tech under research."
 archive_built = "The {faction} raised the Archive at {place}; it wants {left} more Research."
 archive_complete = "The {faction} completed the Archive at {place}: it stands, and every point of its Research is paid."
@@ -237,7 +249,15 @@ build_station = "began a Space Station over {body}"
 build_archive = "began the Archive at {colony}"
 # Ticket #192 (version 0.08.0): the Upload, in the rival-deeds paragraph.
 upload = "uploaded {n} Colonists into the Archive at {colony}"
+# Ticket #353 (version 0.09.1): `fund_archive` is the ARCHIVISTS' clause and theirs alone. It was
+# said of all four, so three Factions in four were reported as paying into a fund they cannot hold.
+# The other three name what their own Directive really buys, in the words the Report line for each
+# has used since #235: the Natural Sink, their coffers, propellant. `unfund_archive` is true of all
+# four alike, because nought sends the whole of it to the shared Tech whoever ordered it.
 fund_archive = "set its Labs to pay the Archive fund from the next Income"
+directive_sink_order = "directed its Research into the Natural Sink from the next Income"
+directive_ducats_order = "directed its Research into its coffers from the next Income"
+directive_fuel_order = "directed its Research into propellant from the next Income"
 unfund_archive = "set its Labs back to the shared Tech from the next Income"
 max_on = "set its whole Allotment to go to {place} every turn"
 max_off = "set its Influence to be placed by hand again"

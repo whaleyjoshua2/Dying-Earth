@@ -14129,3 +14129,261 @@ fn ticket_346_a_melee_without_its_fuel_figures_refuses_the_table() {
     assert!(format!("{err:?}").contains("battle_fuel"), "{err:?}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+// ---------------------------------------------------------------- ticket #353: seven untrue messages
+//
+// Version 0.09.1. Seven things the game SAYS that are not so. Nothing here is a rule: no figure
+// moves and the sweep reads the same on every line. Each test was watched red against its own
+// defect restored on purpose, because a message is exactly the kind of thing a suite does not
+// notice, and a test never seen red certifies nothing.
+
+/// Defect 1. A refusal names WHAT IS MISSING. "no Shipyard here" was said over a Shipyard standing
+/// mothballed at the Colony the player was looking at, which is the plainest kind of lie the game
+/// can tell. The three cases are three refusals, the shape `rearm_site` has used since #343.
+#[test]
+fn a_shipyard_refusal_says_whether_it_is_absent_shut_or_still_building() {
+    let mut g = game();
+    let cid = colony(&mut g, Seat(0), BodyId::Moon, &[], 4);
+    let order = Order::BuildShip { site: Place::Colony(cid), kind: UnitKind::Frigate };
+    // No Shipyard at all: the old sentence, which is true here and only here.
+    let why = g.check_order(Seat(0), &[], &order).unwrap_err().0;
+    assert_eq!(why, "no Shipyard here", "with no Shipyard the refusal names the absence");
+    // One in the queue. It is not absent, it is not finished, and the refusal says which.
+    g.colony_mut(cid).unwrap().queue.push(Build { item: BuildItem::Module(ModuleKind::Shipyard), seat: Seat(0), widgets: 6, done: 0, coastal: false });
+    let why = g.check_order(Seat(0), &[], &order).unwrap_err().0;
+    assert!(why.contains("still building"), "a Shipyard under way is not an absent one: {why}");
+    assert!(!why.contains("no Shipyard"), "and the refusal never denies what the player can see in the queue: {why}");
+    // Standing and mothballed: shut, not absent.
+    g.colony_mut(cid).unwrap().queue.clear();
+    g.colony_mut(cid).unwrap().modules.push(Module::new(ModuleKind::Shipyard));
+    let last = g.colony_mut(cid).unwrap().modules.len() - 1;
+    g.colony_mut(cid).unwrap().modules[last].mothballed = true;
+    let why = g.check_order(Seat(0), &[], &order).unwrap_err().0;
+    assert!(why.contains("shut"), "a mothballed Shipyard is shut, not absent: {why}");
+    assert!(!why.contains("no Shipyard"), "it never says there is no Shipyard while one stands: {why}");
+    // Standing and dark for want of Energy: shut too, and by the same sentence, which names both.
+    g.colony_mut(cid).unwrap().modules[last].mothballed = false;
+    g.colony_mut(cid).unwrap().modules[last].online = false;
+    let dark = g.check_order(Seat(0), &[], &order).unwrap_err().0;
+    assert_eq!(dark, why, "mothballed and dark are one refusal: the Shipyard is shut, and it names both reasons");
+    // Working: the door is open. The Ship is paid for in full at the order, tank and all.
+    g.colony_mut(cid).unwrap().modules[last].online = true;
+    g.seats[0].stockpile.materials = 500;
+    g.seats[0].stockpile.fuel = 500;
+    assert!(g.check_order(Seat(0), &[], &order).is_ok(), "{:?}", g.check_order(Seat(0), &[], &order));
+}
+
+/// Defect 2. A slot is NAMED, not numbered. A player reading "in slot 3 on the Moon" has nothing to
+/// click and no way to find the place; the slot has had a name since #45, and it is the Colony's own.
+#[test]
+fn a_founding_names_its_slot_and_never_numbers_it() {
+    let mut g = game();
+    calm(&mut g);
+    let slot = g.free_slots_on(BodyId::Moon)[0];
+    let name = g.tables.body(BodyId::Moon).slots[slot as usize].name.clone();
+    let (_, found) = colony_ship_ready(&mut g, BodyId::Moon);
+    let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+    orders[0] = vec![found];
+    pick_a_tech(&mut g);
+    answer_the_card(&mut g);
+    g.end_turn(orders).expect("the turn should end");
+    let founded: Vec<String> = g.report.lines.iter().filter(|l| l.kind == LineKind::ColonyFounded).map(|l| l.text.clone()).collect();
+    assert!(!founded.is_empty(), "a Colony was founded this turn");
+    assert!(founded.iter().any(|t| t.contains(&name)), "the founding names {name}: {founded:?}");
+    for t in &founded {
+        assert!(!t.contains("in slot "), "and never numbers the slot: {t}");
+    }
+    assert!(g.log.to_vec().iter().any(|l| l.contains(&format!("founded a Colony at {name}"))), "the log names it too");
+}
+
+/// The one phrase ticket #353 put at every clamp site, or `None` if this Report has none.
+fn no_room_line(g: &Game) -> Option<String> {
+    g.report.lines.iter().find(|l| l.text.contains("found no Habitat room")).map(|l| l.text.clone())
+}
+
+/// Defect 3. A partial unload SAYS SO. A Colony Ship carries more than the Core Module's four, the
+/// engine quietly clamps, and nothing anywhere told the player who was left. All FOUR clamp sites,
+/// one phrase: the specification named three and missed the disembarkation into a standing Colony.
+#[test]
+fn a_partial_unload_says_how_many_found_no_habitat_room() {
+    // (a) A Colony Ship founding. The Core Module holds four and seven are aboard.
+    let mut g = game();
+    calm(&mut g);
+    let slot = g.free_slots_on(BodyId::Moon)[0];
+    let (ship, _) = colony_ship_ready(&mut g, BodyId::Moon);
+    g.ship_mut(ship).unwrap().colonists = 7;
+    let found = Order::Unload { ship, colonists: 7, army: false, into: UnloadTarget::Slot(BodyId::Moon, slot) };
+    let mut orders: [Vec<Order>; SEAT_COUNT] = std::array::from_fn(|_| Vec::new());
+    orders[0] = vec![found];
+    pick_a_tech(&mut g);
+    answer_the_card(&mut g);
+    g.end_turn(orders).expect("the turn should end");
+    assert_eq!(g.ship(ship).map(|s| s.colonists), Some(3), "three of the seven stayed aboard");
+    let said = no_room_line(&g)
+        .unwrap_or_else(|| panic!("a line saying who found no Habitat room: {:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>()));
+    assert!(said.contains('3'), "it names the three who did not land: {said}");
+
+    // (b) A Colony that already stands, with room for one of the three aboard. The fourth site.
+    let mut g = game();
+    calm(&mut g);
+    let full = colony(&mut g, Seat(0), BodyId::Moon, &[], 3);
+    let ship = a_colony_ship(&mut g, Seat(0), BodyId::Moon);
+    g.ship_mut(ship).unwrap().colonists = 3;
+    g.commit_orders(Seat(0), &[Order::Unload { ship, colonists: 3, army: false, into: UnloadTarget::Colony(full) }]);
+    g.report.lines.clear();
+    g.resolution_phase();
+    let said = no_room_line(&g)
+        .unwrap_or_else(|| panic!("a disembarkation clamps too: {:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>()));
+    assert!(said.contains('2'), "one of the three landed and two did not: {said}");
+
+    // (c) A founding by sea in Antarctica, six sent into a Core Module that holds four.
+    let mut g = game();
+    calm(&mut g);
+    g.antarctica_open = true;
+    let home = g.controlled_states(Seat(0))[0];
+    let slot = g.free_slots_on(BodyId::Earth)[0];
+    g.state_mut(home).emigrants = 6;
+    g.commit_orders(Seat(0), &[Order::SendToAntarctica { state: home, n: 6, into: UnloadTarget::Slot(BodyId::Earth, slot) }]);
+    g.resolution_phase();
+    g.turn += 1;
+    g.report.lines.clear();
+    g.resolution_phase();
+    let col = g.colonies.iter().find(|c| c.body == BodyId::Earth && !c.in_orbit).map(|c| c.id).expect("a Colony in Antarctica");
+    let said = no_room_line(&g)
+        .unwrap_or_else(|| panic!("a sea founding clamps too: {:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>()));
+    assert!(said.contains('2'), "four landed and two came home: {said}");
+
+    // (d) And a join at that same Colony, once a Habitat has widened it to four berths free.
+    g.colony_mut(col).unwrap().modules.push(Module::new(ModuleKind::Habitat));
+    let free = g.habitat_room(g.colony(col).unwrap()).saturating_sub(g.colony(col).unwrap().colonists);
+    assert!(free > 0, "the Habitat made room: {free}");
+    g.state_mut(home).emigrants = free + 2;
+    g.commit_orders(Seat(0), &[Order::SendToAntarctica { state: home, n: free + 2, into: UnloadTarget::Colony(col) }]);
+    g.resolution_phase();
+    g.turn += 1;
+    g.report.lines.clear();
+    g.resolution_phase();
+    let said = no_room_line(&g)
+        .unwrap_or_else(|| panic!("a join clamps too: {:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>()));
+    assert!(said.contains('2'), "the room was filled and two came home: {said}");
+}
+
+/// Defect 4. `lift` FILLS AS FAR AS THE ROOM GOES, which is what the headless driver's own help has
+/// promised all along; it refused the whole order instead. Only a lift that would move nobody is
+/// refused, and that refusal names the room.
+#[test]
+fn a_lift_to_a_station_fills_as_far_as_the_habitat_room_goes() {
+    let mut g = game();
+    calm(&mut g);
+    bare_stations(&mut g);
+    let iss = station_of(&g, Seat(0), BodyId::Earth).expect("the Custodians start with a station");
+    let room = g.habitat_room(g.colony(iss).unwrap()).saturating_sub(g.colony(iss).unwrap().colonists);
+    assert!(room > 0, "the station has room to fill: {room}");
+    let home = g.controlled_states(Seat(0))[0];
+    g.state_mut(home).emigrants = room + 3;
+    let lift = Order::LiftToStation { state: home, n: room + 3, colony: iss };
+    assert!(g.check_order(Seat(0), &[], &lift).is_ok(), "an order it can partly fill is not refused: {:?}", g.check_order(Seat(0), &[], &lift));
+    let before = g.colony(iss).unwrap().colonists;
+    g.commit_orders(Seat(0), std::slice::from_ref(&lift));
+    assert_eq!(g.colony(iss).unwrap().colonists, before + room, "it filled the room and no more");
+    assert_eq!(g.state(home).emigrants, 3, "the three who did not fit are still waiting at home");
+    // Ticket #353, the designer's answer to "should a clamped lift say who stayed?": "yes". The
+    // three who did not fit are standing in their Region and the Report says so. A partial unload
+    // got this line in the same ticket; a partial lift is the same silence one step earlier.
+    let said: Vec<String> = g.report.lines.iter().map(|l| l.text.clone()).collect();
+    assert!(
+        said.iter().any(|t| t.contains("still waiting in") && t.starts_with("3 more")),
+        "a line names the Pioneers a clamped lift left behind: {said:?}"
+    );
+    // Room for nobody is not an order: it is refused, and the refusal names the room.
+    let why = g.check_order(Seat(0), &[], &Order::LiftToStation { state: home, n: 3, colony: iss }).unwrap_err().0;
+    assert!(why.contains("room for nobody"), "a lift that moves nobody is refused by name: {why}");
+}
+
+/// Defect 5. The Research Directive line NAMES WHAT IT BOUGHT. Three Factions in four were told to
+/// have paid an Archive fund they do not have; the wording for what each of them really buys has
+/// been in `report.toml` since #235.
+#[test]
+fn a_research_directive_deed_names_what_that_faction_bought() {
+    let g = game();
+    // Seat 0 is the Custodians, seat 1 the Prospectors, seat 2 the Arkwrights, seat 3 the Archivists.
+    let set = Order::SetResearchDirective { percent: 40 };
+    let custodians = g.rival_deed(Seat(0), &set).expect("a deed");
+    assert!(custodians.contains("Natural Sink"), "the Custodians' Directive feeds the Sink: {custodians}");
+    assert!(!custodians.contains("Archive"), "and never an Archive fund they cannot hold: {custodians}");
+    let prospectors = g.rival_deed(Seat(1), &set).expect("a deed");
+    assert!(prospectors.contains("coffers"), "the Prospectors' Directive pays Ducats: {prospectors}");
+    assert!(!prospectors.contains("Archive"), "{prospectors}");
+    let arkwrights = g.rival_deed(Seat(2), &set).expect("a deed");
+    assert!(arkwrights.contains("propellant"), "the Arkwrights' Directive makes Fuel: {arkwrights}");
+    assert!(!arkwrights.contains("Archive"), "{arkwrights}");
+    let archivists = g.rival_deed(Seat(3), &set).expect("a deed");
+    assert!(archivists.contains("Archive fund"), "and the Archivists' really does pay the Archive: {archivists}");
+    // Nought sends the whole of it to the shared Tech, which is true of all four alike.
+    for seat in Seat::ALL {
+        let off = g.rival_deed(seat, &Order::SetResearchDirective { percent: 0 }).expect("a deed");
+        assert!(off.contains("shared Tech"), "{off}");
+    }
+}
+
+/// Defect 6. A turn whose loudest line is a CARD ANSWER still opens with a headline. The interface
+/// filtered the answer out of `headline()` and got `None` for it, so the dispatch opened with
+/// nothing at all. The answer is filed under a kind with no rank instead, and the next line by rank
+/// falls through on its own.
+#[test]
+fn a_turn_whose_loudest_line_is_a_card_answer_still_opens_with_a_headline() {
+    assert_eq!(LineKind::Card.headline_rank(), None, "the turn's card and its answers never headline");
+    let mut g = game();
+    // The engine files them there itself: every seat's answer, and the question that was asked.
+    let card = EventId::ALL.into_iter().find(|id| g.tables.event(*id).asks()).expect("a card that asks");
+    g.report.lines.clear();
+    g.question = Some(Question { card, answers: [Some(CardAnswer::Refused); SEAT_COUNT] });
+    g.apply_card_answers();
+    assert_eq!(g.report.lines.len(), SEAT_COUNT, "four answers: {:?}", g.report.lines.iter().map(|l| &l.text).collect::<Vec<_>>());
+    for l in &g.report.lines {
+        assert_eq!(l.kind.headline_rank(), None, "an answer never headlines: {}", l.text);
+    }
+    assert!(g.report.headline().is_none(), "four answers and nothing else is a quiet turn");
+    // A quiet turn that also completed a build opens with the build, not with silence.
+    g.report_line(LineKind::BuildComplete, None, "A Factory was completed.".to_string());
+    let head = g.report.headline().expect("the headline falls through to the next line by rank");
+    assert_eq!(head.kind, LineKind::BuildComplete, "{}", head.text);
+    // And a card the player has already read in its own modal does not open the Report either.
+    let ordinary = EventId::ALL.into_iter().find(|id| !g.tables.event(*id).asks()).expect("a card that does not ask");
+    g.report.lines.clear();
+    g.draw = CardDraw::Ordinary(ordinary);
+    g.event_phase();
+    assert!(!g.report.lines.is_empty(), "the drawn card writes a Report line");
+    for l in &g.report.lines {
+        assert_eq!(l.kind.headline_rank(), None, "the drawn card was shown by its own modal: {}", l.text);
+    }
+    // And so does the question asked at the head of the turn, which the Card modal holds the screen
+    // with until it is answered. The roll is a roll, so the deck is stacked and it is asked again
+    // until a card comes.
+    g.question = None;
+    g.deck.off_earth_joined = true;
+    for _ in 0..500 {
+        g.report.lines.clear();
+        g.deck.cards = vec![Card::Event(card)];
+        g.question_phase();
+        if !g.report.lines.is_empty() {
+            break;
+        }
+    }
+    assert!(!g.report.lines.is_empty(), "a choice card was asked within 500 rolls");
+    for l in &g.report.lines {
+        assert_eq!(l.kind.headline_rank(), None, "the question its own modal already showed: {}", l.text);
+    }
+}
+
+/// Defect 7. The headless driver's grammar says what the engine's refusal says. `build archive`
+/// read "the Archivists only" and named none of the three rules the engine has enforced since #199.
+#[test]
+fn the_drivers_build_archive_entry_names_the_three_rules_the_engine_enforces() {
+    let driver = include_str!("../examples/play.rs");
+    let entry: String = driver.split("build archive <colony>").nth(1).expect("the driver has a `build archive` entry").lines().take(5).collect::<Vec<_>>().join(" ");
+    assert!(entry.contains("Archivists"), "{entry}");
+    assert!(entry.contains("The Upload"), "the Tech the engine's own refusal names: {entry}");
+    assert!(entry.to_ascii_lowercase().contains("off earth"), "off Earth, which neither Antarctica nor a station over Earth is: {entry}");
+    assert!(entry.to_ascii_lowercase().contains("four colonists"), "and the four Colonists who must already live there: {entry}");
+}

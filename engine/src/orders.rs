@@ -866,7 +866,10 @@ impl Game {
                 };
                 if !foothold {
                     return fail(if *body == BodyId::Earth {
-                        "needs a Nation State of yours with a Launch Site"
+                        // Ticket #353 (version 0.09.1): the gate reads `working()`, so the refusal
+                        // says WORKING. Without the word a seat whose only Launch Site stands
+                        // mothballed is told to get a Launch Site it already has.
+                        "needs a Nation State of yours with a working Launch Site"
                     } else if self.tables.body(*body).colony_slots() == 0 {
                         // Ticket #93: Venus.
                         "needs a Ship of yours in orbit here; there is no ground to build from"
@@ -1111,8 +1114,21 @@ impl Game {
                         if col.control.director() != Some(seat) {
                             return fail("you do not direct this Colony");
                         }
+                        // Ticket #353 (version 0.09.1): **a refusal names what is missing.** One
+                        // test of `working()` said "no Shipyard here" over a Shipyard the player
+                        // could see standing at the very Colony they had open, mothballed or dark.
+                        // Three cases, three refusals, the shape `rearm_site` has carried since
+                        // #343: no Shipyard at all, one still in the queue, and one standing shut.
+                        // The shut one names BOTH of its reasons, because `working()` is one bit and
+                        // the player is owed the pair of doors it stands for.
                         if !col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard && m.working()) {
-                            return fail("no Shipyard here");
+                            return fail(if col.modules.iter().any(|m| m.kind == ModuleKind::Shipyard) {
+                                "the Shipyard here is shut: mothballed, or dark for want of Energy"
+                            } else if col.queue.iter().any(|b| b.item == BuildItem::Module(ModuleKind::Shipyard)) {
+                                "the Shipyard here is still building"
+                            } else {
+                                "no Shipyard here"
+                            });
                         }
                     }
                 }
@@ -1163,7 +1179,10 @@ impl Game {
                         }
                         let ShipAt::Body(body) = ship.at else { return fail("a Ship in transit cannot be repaired") };
                         if !self.has_repair_yard(seat, body) {
-                            return fail("needs a Launch Site or Shipyard at this Body");
+                            // Ticket #353 (version 0.09.1): `has_repair_yard` reads `working()` at
+                            // both ends, so the refusal says WORKING, as the three lift refusals
+                            // above it already do.
+                            return fail("needs a working Launch Site or Shipyard at this Body");
                         }
                         if pending.iter().any(|o| matches!(o, Order::Transit { ship: s, .. } | Order::ChangeOrbit { ship: s, .. } if s == id)) {
                             return fail("a Ship cannot repair and move in one turn");
@@ -1810,9 +1829,16 @@ impl Game {
                     return fail("a rival warship blockades that station's slot");
                 }
                 let bound: u32 = pending.iter().map(|o| if let Order::LiftToStation { colony: c, n, .. } = o { if c == colony { *n } else { 0 } } else { 0 }).sum();
+                // Ticket #353 (version 0.09.1): **a lift FILLS AS FAR AS THE ROOM GOES**, which is
+                // what the headless driver's own help has promised since #141 -- "as far as its
+                // Habitat room goes". The order refused outright instead. The graphical client
+                // pre-clamps its button, so the lie was only ever reachable from the driver, which
+                // is where a playtester met it. The Resolution does the clamping; only an order that
+                // would move NOBODY is refused, since that is not an order, and the refusal names
+                // the room it found.
                 let room = self.habitat_room(col).saturating_sub(col.colonists).saturating_sub(bound);
-                if *n > room {
-                    return fail(format!("{} has Habitat room for {room} more", self.place_name(Place::Colony(*colony))));
+                if room == 0 {
+                    return fail(format!("{} has Habitat room for nobody more", self.place_name(Place::Colony(*colony))));
                 }
                 Ok(cost)
             }
@@ -2306,17 +2332,42 @@ impl Game {
                 // Ticket #141 (version 0.07.3): Emigrants lift straight to the seat's station over
                 // Earth. A launch, as a lift onto a Ship is; they are aboard at this Resolution.
                 Order::LiftToStation { state, n, colony } => {
+                    // Ticket #353 (version 0.09.1): **as far as the room goes.** The order is no
+                    // longer refused for asking for more seats than the Habitats hold; the ones who
+                    // do not fit never leave the Region and are still waiting there next turn, and
+                    // every figure below -- the launch, the Spaceport's fee, the log and the Report
+                    // line -- reads the number that actually flew.
+                    let room = self.colony(*colony).map(|c| self.habitat_room(c).saturating_sub(c.colonists)).unwrap_or(0);
+                    // Ticket #353 (version 0.09.1): what was ASKED for, kept before the clamp
+                    // shadows it, so the line below can say how many were left standing.
+                    let asked = *n;
+                    let n = asked.min(room);
+                    if n == 0 {
+                        continue;
+                    }
                     // Ticket #189 (version 0.08.0): a lift carries their schooling to the station.
-                    let taught = self.take_emigrants(*state, *n);
+                    let taught = self.take_emigrants(*state, n);
                     self.climate.launches_pending[seat.index()] += 1;
                     // Ticket #183 (version 0.08.0): a Spaceport earns for every Emigrant it lifts.
-                    self.pay_spaceport(seat, *state, *n);
-                    self.settle_people(*colony, *n, taught);
+                    self.pay_spaceport(seat, *state, n);
+                    self.settle_people(*colony, n, taught);
                     let station = self.place_name(Place::Colony(*colony));
                     let line = format!("{} Pioneers lifted from {} to {}, for the {}.", n, self.tables.state(*state).name, station, self.seat_name(seat));
                     self.log(line);
-                    let text = self.say("emigrants_lifted", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone()), ("station", station)]);
+                    let text = self.say("emigrants_lifted", &[("n", n.to_string()), ("state", self.tables.state(*state).name.clone()), ("station", station.clone())]);
                     self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::Colony(*colony)), text);
+                    // Ticket #353 (version 0.09.1): and WHO STAYED. A lift fills as far as the
+                    // station's Habitat room goes now, where it refused the whole order before, so
+                    // it can move fewer people than it asked for -- and the ones left behind are
+                    // standing in their Region with nothing anywhere saying why. That silence is
+                    // the same one this ticket set out to end for a partial unload, one step
+                    // earlier in the journey. At the designer's word, asked whether a clamped lift
+                    // should say who stayed: "yes".
+                    let left = asked.saturating_sub(n);
+                    if left > 0 {
+                        let text = self.say("emigrants_stayed", &[("n", left.to_string()), ("state", self.tables.state(*state).name.clone()), ("station", station)]);
+                        self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, Some(ReportPlace::State(*state)), text);
+                    }
                 }
                 // Ticket #72: the Fund's orders land now; the share is read at the next Income.
                 Order::SetVentureShare { share } => {
@@ -2567,7 +2618,9 @@ impl Game {
     /// Ticket #58: one clause saying what a rival Faction did with one order it committed. Only
     /// what the board or its cards would show: nothing the AI scored, waited for or skipped. `None`
     /// for an order that leaves no visible mark.
-    pub fn rival_deed(&self, _seat: Seat, order: &Order) -> Option<String> {
+    /// Ticket #353 (version 0.09.1): `seat` is read now. The Research Directive's clause depends on
+    /// which Faction gave it, because each of the four spends it somewhere else.
+    pub fn rival_deed(&self, seat: Seat, order: &Order) -> Option<String> {
         let r = |key: &str, args: &[(&str, String)]| Some(self.tables.report.rival(key, args));
         let place = |p: Place| self.place_name(p);
         let building = |b: BuildingRef| -> String {
@@ -2623,7 +2676,25 @@ impl Game {
             }
             Order::BuildArchive { colony } => r("build_archive", &[("colony", place(Place::Colony(*colony)))]),
             Order::Upload { colony, n } => r("upload", &[("n", n.to_string()), ("colony", place(Place::Colony(*colony)))]),
-            Order::SetResearchDirective { percent } => r(if *percent == 0 { "unfund_archive" } else { "fund_archive" }, &[]),
+            // Ticket #353 (version 0.09.1): the Directive NAMES WHAT IT BOUGHT. One clause said "set
+            // its Labs to pay the Archive fund" of all four Factions, and only the Archivists have an
+            // Archive fund: a Custodian's Directive feeds the Natural Sink, a Prospector's their
+            // coffers and an Arkwright's propellant, which is what `spend_research_directive` does
+            // with it and what the Report line for each has said since #235. Nought is the shared
+            // Tech for every Faction alike, so that clause stays one clause.
+            Order::SetResearchDirective { percent } => r(
+                if *percent == 0 {
+                    "unfund_archive"
+                } else {
+                    match self.kind(seat) {
+                        FactionKind::Archivists => "fund_archive",
+                        FactionKind::Custodians => "directive_sink_order",
+                        FactionKind::Prospectors => "directive_ducats_order",
+                        FactionKind::Arkwrights => "directive_fuel_order",
+                    }
+                },
+                &[],
+            ),
             Order::SetMaxStanding { target } => match target {
                 Some(p) => r("max_on", &[("place", place(*p))]),
                 None => r("max_off", &[]),

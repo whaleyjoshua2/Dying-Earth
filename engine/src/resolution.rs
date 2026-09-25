@@ -2204,9 +2204,14 @@ impl Game {
         self.log(line);
         let text = self.say(
             "colony_founded",
-            &[("faction", self.seat_name(seat)), ("slot", (slot + 1).to_string()), ("body", self.tables.body(BodyId::Earth).name.clone()), ("n", moved.to_string())],
+            // Ticket #353 (version 0.09.1): the slot's NAME, which the log beside it has used all
+            // along. A number told the player nothing they could find on the board.
+            &[("faction", self.seat_name(seat)), ("slot", slot_name.clone()), ("body", self.tables.body(BodyId::Earth).name.clone()), ("n", moved.to_string())],
         );
         self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(id)), text);
+        // Ticket #353 (version 0.09.1): and who found no room. The Core Module holds four, so a sea
+        // crossing bigger than that leaves people behind on the first founding of most games.
+        self.no_habitat_room(id, n.saturating_sub(moved));
         // Ticket #345 (version 0.09.1): the sea to Antarctica is a ground founding and so asks for
         // the Body's first, exactly as the Colony Ship's unload does. It is always refused: this is
         // Earth, and Earth is excluded. The call stands so the two founding sites do the same thing,
@@ -2251,7 +2256,23 @@ impl Game {
         self.log(line);
         let text = self.say("emigrants_arrived", &[("n", moved.to_string()), ("state", self.tables.state(from).name.clone()), ("colony", self.place_name(Place::Colony(c)))]);
         self.report_line(LineKind::Antarctica, Some(ReportPlace::Colony(c)), text);
+        // Ticket #353 (version 0.09.1): the ones the Habitats had no room for went home, and until
+        // now nothing said so -- the arrival line simply reported a smaller number than was sent.
+        self.no_habitat_room(c, n.saturating_sub(moved));
         true
+    }
+
+    /// Ticket #353 (version 0.09.1): **a partial unload says so.** Every place the engine clamps an
+    /// arrival to the Habitat room it found says how many did not land and why, in one phrase used
+    /// by all of them; `n` of nought writes nothing. Filed as a `Note` at the Colony, so it reads
+    /// under the founding or the arrival it belongs to and never competes with it for the headline.
+    fn no_habitat_room(&mut self, colony: ColonyId, left: u32) {
+        if left == 0 {
+            return;
+        }
+        let place = self.place_name(Place::Colony(colony));
+        let text = self.say("no_habitat_room", &[("n", left.to_string()), ("place", place)]);
+        self.report_line(LineKind::Note, Some(ReportPlace::Colony(colony)), text);
     }
 
     fn resolve_cargo(&mut self) {
@@ -2432,18 +2453,25 @@ impl Game {
                             if let Some(aid) = aboard_army.filter(|_| army) {
                                 self.land_army(aid, ship, Place::Colony(id));
                             }
-                            let line = format!("The {} founded a Colony in slot {} on {} with {} Colonists.", self.seat_name(seat), slot + 1, self.tables.body(b).name, moved);
+                            // Ticket #353 (version 0.09.1): the slot's NAME, in the log and in the
+                            // Report alike. "in slot 3 on the Moon" named a place a player cannot
+                            // find; the slot has carried a name of its own since #45.
+                            let slot_name = self.tables.body(b).slots[slot as usize].name.clone();
+                            let line = format!("The {} founded a Colony at {} on {} with {} Colonists.", self.seat_name(seat), slot_name, self.tables.body(b).name, moved);
                             self.log(line);
                             let text = self.say(
                                 "colony_founded",
                                 &[
                                     ("faction", self.seat_name(seat)),
-                                    ("slot", (slot + 1).to_string()),
+                                    ("slot", slot_name),
                                     ("body", self.tables.body(b).name.clone()),
                                     ("n", moved.to_string()),
                                 ],
                             );
                             self.report_line(LineKind::ColonyFounded, Some(ReportPlace::Colony(id)), text);
+                            // Ticket #353: a Colony Ship can carry more than the Core Module's four,
+                            // and the ones who did not fit are still aboard it. Said, now.
+                            self.no_habitat_room(id, n.saturating_sub(moved));
                             let off_earth =
                                 self.colonies.iter().filter(|c| c.control.director() == Some(seat) && c.body != BodyId::Earth && !c.in_orbit).count();
                             // Ticket #85: the count is an ordinal.
@@ -2484,6 +2512,13 @@ impl Game {
                                 self.log(line);
                                 let text = self.say("disembarked", &[("n", n.to_string()), ("colony", self.place_name(Place::Colony(cid)))]);
                                 self.report_line_of(seat, LineKind::YourWorks, LineKind::Ship, Some(ReportPlace::Colony(cid)), text);
+                                // Ticket #353 (version 0.09.1): the FOURTH clamp site, which the
+                                // specification did not list -- unloading into a Colony that already
+                                // stands. `n` is held down by the room and by what is aboard; only
+                                // the room's share is a Habitat refusal, so the phrase is written
+                                // against what the Ship could actually have put down.
+                                let asked = colonists.min(self.ship(ship).map(|s| s.colonists + n).unwrap_or(n));
+                                self.no_habitat_room(cid, asked.saturating_sub(n));
                             }
                             if let Some(aid) = aboard_army.filter(|_| army) {
                                 self.war.armies_landed[seat.index()] += 1;

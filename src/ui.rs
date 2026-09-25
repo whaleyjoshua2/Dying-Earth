@@ -6966,7 +6966,15 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
 }
 
 fn slot_panel(ui: &mut Ui, session: &Session, game: &Game, body: BodyId, slot: u32, actions: &mut Vec<Action>) {
-    ui.label(RichText::new(format!("{}, Colony Slot {} on {}", game.tables.body(body).slots[slot as usize].name, slot + 1, game.tables.body(body).name)).size(22.0).strong());
+    // Ticket #353 (version 0.09.1): **the slot's name alone**, where this headed
+    // "Mare Tranquillitatis, Colony Slot 3 on the Moon". The number was `slot + 1` while the
+    // headless driver numbers slots from nought, so the two surfaces disagreed about which slot
+    // this was, and a player reading one and typing the other would land somewhere else. It also
+    // earned nothing: every slot has had a real geological name since version 0.04, the founded
+    // Colony takes that name, and the name is what every other surface calls the place. At the
+    // designer's word, the slot's name everywhere a slot is shown to a player, and a number only
+    // in the driver where it is an argument you type rather than a thing you read.
+    ui.label(RichText::new(format!("{} on {}", game.tables.body(body).slots[slot as usize].name, game.tables.body(body).name)).size(22.0).strong());
     // Ticket #56: Earth's three slots are Antarctica's, and they open at +1.6 C.
     if body == BodyId::Earth && !game.antarctica_open {
         ui.colored_label(
@@ -9801,13 +9809,20 @@ fn popups(ctx: &egui::Context, session: &Session, game: &Game, view: &mut ViewSt
                 // The headline: the most severe thing that happened, in its own size.
                 //
                 // Ticket #337 (version 0.09.0): **never one seat's answer to the turn's Choice
-                // Card.** A rival's answer is filed as an Event line, and an Event line headlines a
+                // Card.** A rival's answer was filed as an Event line, and an Event line headlines a
                 // quiet turn, so the first picture of this taken had *The Hard Winter: The
                 // Prospectors refused it.* over a dispatch -- one of four answers, raised over the
                 // other three and drawn twice. The answers have their own block below, where they
-                // are read together; a turn whose loudest line was an answer is a quiet turn, and
-                // its dispatch opens with its headings instead.
-                if let Some(head) = game.report.headline().filter(|h| !is_card_answer(game, &h.text)) {
+                // are read together.
+                //
+                // Ticket #353 (version 0.09.1): the guard that did it -- a `.filter()` on the
+                // `Option` -- has been **deleted**, because filtering a headline turns `Some` into
+                // `None` and the dispatch then opened with NO headline at all rather than with the
+                // next line by rank. An answer is filed under `LineKind::Card` in the engine now,
+                // which has no headline rank, so `headline()` never offers one and falls through of
+                // its own accord. If a headline is wanted here that is not wanted there, the kind is
+                // the place to say so; a filter at the point of drawing loses the fallback.
+                if let Some(head) = game.report.headline() {
                     ui.add_space(4.0);
                     let label = ui.label(RichText::new(&head.text).size(17.0).strong().color(Color32::from_rgb(255, 220, 150)));
                     if let Some(place) = head.place
