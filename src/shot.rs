@@ -342,8 +342,12 @@ fn build_board(session: &mut Session) {
         }
         // `archive:<n>` (a building aid, ticket #51, reshaped by #68): seat 0 gets a Colony on Mars
         // with Colonists in its Habitats and the Archive at one of three points: 0, the Module on
-        // order with the fund at its quarter; 1, the Module standing and the fund half paid; 2,
-        // complete. An AI Archivist rarely has any of that in six turns.
+        // order with a quarter of the Research banked; 1, the Module standing and the fund half
+        // paid; 2, complete. An AI Archivist rarely has any of that in six turns.
+        // Ticket #347 (version 0.09.1): point 0's quarter was `banked_before_built`, the cap the
+        // fund sat at until the Module stood. The field is gone and the fund now runs to the whole
+        // figure from the first turn; a quarter of it is kept here only as a part-paid fund to
+        // photograph, and the fund line it draws no longer names a cap.
         if let Some(point) = std::env::args().find_map(|a| a.strip_prefix("archive:").and_then(|v| v.parse::<u32>().ok())) {
             let research = g.tables.archive.research;
             let slot = g.free_slots_on(BodyId::Mars).first().copied().unwrap_or(0);
@@ -357,7 +361,7 @@ fn build_board(session: &mut Session) {
             }
             g.colonies.push(Colony { id, body: BodyId::Mars, slot, control: Control::Controlled(Seat(0)), modules, colonists: 8, education: 1.0, settler_education: 1.0, queue, grid_failed: false, founded_turn: 1, in_orbit: false });
             g.seats[0].archive_fund = match point {
-                0 => (research as f64 * g.tables.archive.banked_before_built) as i64,
+                0 => research / 4,
                 1 => research / 2,
                 _ => research,
             };

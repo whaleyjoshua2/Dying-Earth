@@ -277,13 +277,15 @@ investment_bank_per_fund = 0.002
 # better there than at any figure measured so far: Custodians 43, Prospectors 13, Arkwrights 7,
 # Archivists 5, against the 58 / 18 / 3 / 0 this version started from, with no seat left on nothing.
 #
-# The lever held in reserve, if the Archivists are ever to be lifted without loosening the rule, is
-# `banked_before_built` in modules.toml. It caps the Archive fund at a quarter of the 80 the Archive
-# wants until the Module physically stands, and the sweeps show the fund sitting at exactly that cap
-# -- 20 -- in three seatings of four. So the Archivists now spend the journey with their Labs'
-# Research frozen as well as their Archive unplaceable: the rule charges them twice for one trip.
-# That cap was set when the Archive was ordered on turn 1 in Earth orbit, where there was no journey
-# to fund through, so its premise is gone even though the figure has not moved.
+# That lever has been pulled. Ticket #347 (version 0.09.1) removed `banked_before_built` from
+# modules.toml outright: it capped the Archive fund at a quarter of what the Archive wanted until the
+# Module physically stood, the sweeps showed the fund sitting at exactly that cap -- 20 -- in every
+# seating, and the Archivists' first Victory part read the fund THROUGH the cap, so their score
+# could not pass a quarter however much they banked. The Archivists spent the journey with their
+# Labs' Research frozen as well as their Archive unplaceable: the rule charged them twice for one
+# trip, and its premise was gone from the moment the Archive stopped being ordered on turn 1 in
+# Earth orbit. The fund now holds the whole figure -- 125, the Archive's cost and their Victory bar
+# in one -- from the first turn, and the seat directs its Research until the fund is full.
 archive_needs_a_place = 5.0
 # Ticket #332 (version 0.09.0): a build is ordered where the place's Widgets finish it soonest, the
 # queue's depth as the gap. Every build candidate is weighed against the SAME build at the seat's

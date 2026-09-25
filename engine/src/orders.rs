@@ -755,14 +755,19 @@ impl Game {
                     return fail("the Research Directive is already there");
                 }
                 // Ticket #68: at the cap there is nothing to declare, and the Research stays with
-                // the shared Tech; until the Module stands the cap is a quarter of the requirement.
+                // the shared Tech.
                 // Ticket #235: the Archivists alone, since they are the only Faction whose
                 // directive fills a fund that can be full.
+                // Ticket #347 (version 0.09.1): the refusal stands, and its wording changes. It said
+                // "the Archive fund holds its quarter (20) until the Archive stands at a Colony off
+                // Earth", which is false in every clause now the quarter is gone: the fund is simply
+                // full, and a full fund before the Module stands is a fund that has paid the
+                // Archive's whole Research in advance.
                 if *percent > 0 && self.kind(seat) == FactionKind::Archivists && self.seat(seat).archive_fund >= self.archive_fund_cap(seat) {
                     return if self.archive_built(seat) {
                         fail("the Archive's Research is paid in full")
                     } else {
-                        fail(format!("the Archive fund holds its quarter ({}) until the Archive stands at a Colony off Earth", self.archive_fund_cap(seat)))
+                        fail(format!("the Archive fund is full at {}", self.archive_fund_cap(seat)))
                     };
                 }
                 Ok(cost)

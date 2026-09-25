@@ -6874,19 +6874,16 @@ fn colony_panel(ui: &mut Ui, session: &Session, game: &Game, view: &mut ViewStat
     let mine = !session.spectator && col.control.director() == Some(Seat(0));
     if mine {
         // Ticket #51: the Archive has its own orders on an Archivist's card. Ticket #68: one Module
-        // from its own button, and a fund that holds a quarter of the Research until it stands.
+        // from its own button.
+        // Ticket #347 (version 0.09.1): one fund line, the fund of the Archive's figure, whether or
+        // not the Module stands. The second line said "20 of a cap of 20 (a quarter of the 80 until
+        // the Archive stands)", which a playtester read as a bug; it goes with the quarter.
         if game.kind(Seat(0)) == FactionKind::Archivists {
             let fund = game.seat(Seat(0)).archive_fund;
-            let cap = game.archive_fund_cap(Seat(0));
+            let built = game.archive_built(Seat(0));
             ui.separator();
             ui.label(RichText::new("The Archive").strong());
-            let built = game.archive_built(Seat(0));
-            let fund_line = if built {
-                format!("Archive fund {fund} of {research}")
-            } else {
-                format!("Archive fund {fund} of {cap} (a quarter of the {research} until the Archive stands)")
-            };
-            ui.label(fund_line);
+            ui.label(format!("Archive fund {fund} of {research}"));
             // Ticket #235 (version 0.08.3): the switch that stood here is a SLIDER now, and it
             // lives in the Tech Tree window with the other three Factions' -- at the designer's
             // word, *"yeah tech tree - put the archive's slider there too"*. One control, one

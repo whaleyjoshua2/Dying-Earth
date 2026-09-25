@@ -1922,11 +1922,15 @@ impl Game {
         self.colonies.iter().flat_map(|c| c.queue.iter()).any(|b| b.seat == seat && b.item == BuildItem::Module(ModuleKind::Archive))
     }
 
-    /// Ticket #68: what the Archive fund may hold. The whole requirement once the Module stands;
-    /// only `banked_before_built` of it (a quarter) until then.
-    pub fn archive_fund_cap(&self, seat: Seat) -> i64 {
-        let a = &self.tables.archive;
-        if self.archive_built(seat) { a.research } else { (a.research as f64 * a.banked_before_built).floor() as i64 }
+    /// Ticket #68: what the Archive fund may hold -- the whole requirement, so nobody banks more
+    /// Research than the Archive needs.
+    /// Ticket #347 (version 0.09.1): it is that from the first turn. Until this ticket it held only
+    /// `banked_before_built` of the figure (a quarter) until the Module physically stood, and the
+    /// Archivists' first Victory part was read THROUGH this cap, so their score could not pass 0.25
+    /// however much they banked. The Module no longer opens the fund: it was never the Module the
+    /// fund was waiting for, and the cap charged the Archivists twice for one journey.
+    pub fn archive_fund_cap(&self, _seat: Seat) -> i64 {
+        self.tables.archive.research
     }
 
     /// Ticket #68: the Archive Module stands and every point of its Research is paid.

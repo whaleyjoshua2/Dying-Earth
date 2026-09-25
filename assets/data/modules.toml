@@ -111,9 +111,15 @@ materials = 50
 widgets = 12
 energy_upkeep = 12
 
-# Ticket #68: the Research the Archive requires in all, paid into the Archive fund at any pace once
-# the Module stands; and the share of it the fund may hold BEFORE the Module stands (a quarter: 20).
-# At that cap a turn of funding is refused, and the Research stays with the shared Tech.
+# Ticket #68: the Research the Archive requires in all, paid into the Archive fund at any pace,
+# and the cap on the fund: nobody may bank more Research than the Archive needs. At that cap a turn
+# of funding is refused, and the Research stays with the shared Tech.
+# Ticket #347 (version 0.09.1): 125, and `banked_before_built` is GONE. The fund used to hold only a
+# quarter of the figure (20 of 80) until the Module physically stood, and the Archivists' first
+# Victory part read the fund THROUGH that cap -- so their score could not pass 0.25 however much
+# they banked, and eighty measured games put the fund at exactly 20 in every seating and the
+# Archivists on 0 wins. This one figure is now both the Archive's cost and their Victory bar, and it
+# must match `victory_first.bar` on their card in factions.toml; a test asserts the two are equal.
 # Ticket #97 (version 0.07.0): how many Modules a Colony or a Space Station may hold. `base` free,
 # and one more for every `per_colonist` Colonists living there. The Archive is exempt and never
 # counted, and since ticket #164 so is the Core Module. A mothballed Module keeps its slot and one
@@ -135,8 +141,7 @@ base = 0
 per_colonist = 1
 
 [archive]
-research = 80
-banked_before_built = 0.25
+research = 125
 # Ticket #192 (version 0.08.0): how many Colonists must live at the place before the Archive may be
 # ORDERED. Checked once, at the order; neither the three-turn build nor the standing Module cares
 # afterwards, and the Victory Condition does its own checking at the end.

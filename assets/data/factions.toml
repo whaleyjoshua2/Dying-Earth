@@ -183,10 +183,12 @@ influence_multiplier = 1.0
 signature = "Provisional Findings. While their Research went to the shared Tech last turn, they already have half the effect of the Tech under research: a multiplier x reads 1 + (x - 1) / 2, an addition reads half rounded down, and immunities do not carry. A turn of funding the Archive switches it off for the turn after. Their Research is x1.5 on Earth and x1.75 off it, an Observatory on a station over Earth counting as off."
 # Ticket #203 (version 0.08.1). The building is ticket #184's.
 unique = "Reactor -- replaces the Power Plant, and takes 75% off the Energy upkeep of everything its holder owns, the Archive excepted. Off Earth, the Heliostat -- replaces the Solar Array, and makes 1 more Energy wherever it stands."
-# Ticket #68 (version 0.05.5): the first part is the Research paid into the Archive, 80 in all,
-# which the fund holds only a quarter of until the Archive Module stands at a Colony off Earth.
-victory = "Build the Archive at a Colony off Earth (50 Materials, three turns, and four Colonists must live there to begin it), pay 80 Research into it and keep it running, then upload 12 Colonists into it from the people living where it stands."
-victory_first = { kind = "archive_research", bar = 80 }
+# Ticket #68 (version 0.05.5): the first part is the Research paid into the Archive.
+# Ticket #347 (version 0.09.1): 125 of it, and the fund holds the whole figure from the first turn.
+# This bar IS `[archive] research` in modules.toml -- one figure written in two files, the Archive's
+# cost and the Archivists' bar, and a test asserts the two are equal so they cannot drift.
+victory = "Build the Archive at a Colony off Earth (50 Materials, three turns, and four Colonists must live there to begin it), pay 125 Research into it and keep it running, then upload 12 Colonists into it from the people living where it stands."
+victory_first = { kind = "archive_research", bar = 125 }
 # Ticket #192 (version 0.08.0): twelve Colonists UPLOADED, not twelve living beside the Archive.
 victory_second = { kind = "colonists_uploaded", bar = 12 }
 colour = [0.871, 0.322, 0.439]

@@ -1366,8 +1366,11 @@ struct FacilitiesFile {
     unique: UniqueCard,
 }
 /// Ticket #51: the Archive. Its Materials, build turns and Energy upkeep sit on its Module row.
-/// Ticket #68 (version 0.05.5): the Research it requires in all, and the share of it the fund may
-/// hold before the Module stands.
+/// Ticket #68 (version 0.05.5): the Research it requires in all.
+/// Ticket #347 (version 0.09.1): `banked_before_built`, the share of that figure the fund could
+/// hold before the Module stood, is gone; the fund holds the whole of it from the first turn.
+/// `deny_unknown_fields` because the removed key would otherwise sit on in the data file, read by
+/// nothing and contradicting the rule beside it, with every test still green.
 /// Ticket #97 (version 0.07.0): the Modules a Colony or a Space Station may hold: `base` free, and
 /// one more for every `per_colonist` Colonists living there.
 #[derive(Debug, Clone, Deserialize)]
@@ -1377,9 +1380,9 @@ pub struct SlotsCard {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ArchiveCard {
     pub research: i64,
-    pub banked_before_built: f64,
     /// Ticket #192 (version 0.08.0): Colonists who must live at the place before it may be ORDERED.
     pub colonists_to_order: u32,
 }
@@ -2161,8 +2164,22 @@ impl Tables {
         if let Some(m) = self.modules.iter().find(|m| m.strength > 0 && m.hit_points == 0) {
             return Err(err("modules.toml", format!("[[module]] {} has strength and no hit_points", m.name)));
         }
-        if self.archive.research <= 0 || !(0.0..=1.0).contains(&self.archive.banked_before_built) {
-            return Err(err("modules.toml", "[archive] needs research above zero and banked_before_built from 0 to 1"));
+        if self.archive.research <= 0 {
+            return Err(err("modules.toml", "[archive] needs research above zero"));
+        }
+        // Ticket #347 (version 0.09.1): the Archive's cost and the Archivists' Victory bar are ONE
+        // figure written in two files. Apart, one of them is unreachable: a bar above the Archive's
+        // figure can never be met, because the fund is capped at the Archive's figure, and a bar
+        // below it is met by a fund that has not paid for the Module.
+        if self.faction(FactionKind::Archivists).victory_first.bar != self.archive.research as f64 {
+            return Err(err(
+                "factions.toml",
+                format!(
+                    "the Archivists' victory_first.bar is {} and modules.toml [archive] research is {}: they are one figure",
+                    self.faction(FactionKind::Archivists).victory_first.bar,
+                    self.archive.research
+                ),
+            ));
         }
         if !(1..=12).contains(&self.victory.months_per_turn) {
             return Err(err("victory.toml", format!("months_per_turn {} must be from 1 to 12", self.victory.months_per_turn)));

@@ -2139,34 +2139,146 @@ fn funding_the_archive_banks_this_turns_research_and_contributes_nothing_to_the_
     assert!(g.check_order(Seat(0), &[], &Order::SetResearchDirective { percent: 50 }).is_ok(), "a Custodian may direct half");
     assert_eq!(g.research_directive_cap(Seat(0)), 50);
     assert_eq!(g.research_directive_cap(Seat(3)), 100, "the Archivists alone reach all of it");
-    // Ticket #68: until the Module stands the fund holds a quarter of the 80, and what it has no
-    // room for goes on to the shared Tech rather than being wasted.
-    assert_eq!(g.archive_fund_cap(Seat(3)), 20, "a quarter of 80 before the Archive stands");
-    g.seats[3].archive_fund = 17;
+    // Ticket #68: the fund is capped at what the Archive needs, and what it has no room for goes on
+    // to the shared Tech rather than being wasted.
+    // Ticket #347 (version 0.09.1): the cap is the Archive's whole figure from the first turn. It
+    // used to be a quarter of it until the Module stood, and this test read 20 of 80 here.
+    let research = g.tables.archive.research;
+    assert_eq!(g.archive_fund_cap(Seat(3)), research, "the whole figure, with no Archive standing");
+    g.seats[3].archive_fund = research - 3;
     g.research.contributions = [0; 4];
     g.income_phase();
     let made = g.seats[3].research_last_turn;
     assert!(made > 3, "the Lab makes more than the three the fund still has room for: {made}");
-    assert_eq!(g.seats[3].archive_fund, 20, "only the room under the cap is banked");
+    assert_eq!(g.seats[3].archive_fund, research, "only the room under the cap is banked");
     assert_eq!(g.research.contributions[3], made - 3, "the rest counts toward the Lead as usual");
     // At the cap the declaration is refused outright.
     g.seats[3].research_directive = 0;
     assert_eq!(
         g.check_order(Seat(3), &[], &Order::SetResearchDirective { percent: 100 }).unwrap_err().0,
-        "the Archive fund holds its quarter (20) until the Archive stands at a Colony off Earth"
+        format!("the Archive fund is full at {research}")
     );
-    // Once the Module stands the fund opens to the whole 80, and is refused again only when full.
+    // The standing Module does not open the fund -- it was already open -- and a full fund is
+    // refused in the Module's own words.
     let mars = colony(&mut g, Seat(3), BodyId::Mars, &[ModuleKind::Habitat], 4);
     g.colony_mut(mars).unwrap().modules.push(Module::new(ModuleKind::Archive));
-    assert_eq!(g.archive_fund_cap(Seat(3)), 80);
-    assert!(g.check_order(Seat(3), &[], &Order::SetResearchDirective { percent: 100 }).is_ok());
-    g.seats[3].archive_fund = 80;
+    assert_eq!(g.archive_fund_cap(Seat(3)), research);
     assert_eq!(g.check_order(Seat(3), &[], &Order::SetResearchDirective { percent: 100 }).unwrap_err().0, "the Archive's Research is paid in full");
+    g.seats[3].archive_fund = research - 1;
+    assert!(g.check_order(Seat(3), &[], &Order::SetResearchDirective { percent: 100 }).is_ok(), "a point short and the declaration stands");
+}
+// ------------------------------------------------- ticket #347: the Archivists' Condition, at 125
+
+/// Ticket #347 (version 0.09.1), R1: **one figure, 125**. The Research the Archive wants and the
+/// bar the Archivists' first Victory part is scored against are the SAME number, written in two
+/// files -- `[archive] research` in modules.toml and `victory_first.bar` in factions.toml. They
+/// cannot be allowed to drift, because the first part reads the fund and the fund is capped at the
+/// Archive's figure: a bar above it could never be met, and a bar below it would be met by a fund
+/// that had not paid for the Module.
+#[test]
+fn the_archives_research_and_the_archivists_victory_bar_are_one_figure() {
+    let g = game();
+    assert_eq!(g.tables.archive.research, 125, "the designer's figure for ticket #347");
+    let bar = g.tables.faction(FactionKind::Archivists).victory_first.bar;
+    assert_eq!(
+        bar, g.tables.archive.research as f64,
+        "modules.toml [archive] research ({}) and the Archivists' victory_first.bar ({bar}) are one figure and have drifted",
+        g.tables.archive.research
+    );
+}
+
+/// Ticket #347, R2: **the quarter-cap goes entirely**. `archive_fund_cap` survives -- nobody may
+/// bank more Research than the Archive needs -- but it is the Archive's own figure from the first
+/// turn, whether or not the Module stands, where until this ticket it was a quarter of it (20 of
+/// 80) until the Module physically stood. The refusal at a full fund no longer speaks of a quarter.
+#[test]
+fn the_archive_fund_is_capped_at_the_archives_own_figure_and_never_at_a_quarter_of_it() {
+    let mut g = game();
+    let research = g.tables.archive.research;
+    g.state_mut(StateId::Europe).control = Control::Controlled(Seat(3));
+    g.state_mut(StateId::Europe).facilities.push(facility(FacilityKind::ResearchLab));
+    assert!(!g.archive_built(Seat(3)), "the premise: no Archive stands");
+    assert_eq!(g.archive_fund_cap(Seat(3)), research, "the whole figure before the Module stands, not a quarter of it");
+    // The banking clamp stands, now at the whole figure: what the fund has no room for still goes
+    // on to the shared Tech rather than being wasted.
+    g.seats[3].archive_fund = research - 3;
+    g.seats[3].research_directive = 100;
+    assert_eq!(g.bank_archive_research(Seat(3), 40), 3, "only the room under the cap is banked");
+    assert_eq!(g.seats[3].archive_fund, research);
+    // And at a full fund the declaration is refused, in words that are true of a fund full at 125
+    // rather than of a quarter held back until the Module stands.
+    g.seats[3].research_directive = 0;
+    let refusal = g.check_order(Seat(3), &[], &Order::SetResearchDirective { percent: 100 }).unwrap_err().0;
+    assert_eq!(refusal, format!("the Archive fund is full at {research}"), "the refusal no longer speaks of a quarter");
+    // Once the Module stands the cap has not moved: it was never the Module that opened it.
+    let mars = colony(&mut g, Seat(3), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    g.colony_mut(mars).unwrap().modules.push(Module::new(ModuleKind::Archive));
+    assert_eq!(g.archive_fund_cap(Seat(3)), research, "the standing Module changes nothing");
+    assert_eq!(g.check_order(Seat(3), &[], &Order::SetResearchDirective { percent: 100 }).unwrap_err().0, "the Archive's Research is paid in full");
+}
+
+/// Ticket #347, R3: **the Victory figure is not clamped**. This is the rule that unlocks the
+/// Archivists. Their first part used to read `archive_fund.min(archive_fund_cap(seat))`, so before
+/// the Module stood it could not pass a quarter however much they banked, and the sweeps measured
+/// the fund sitting at exactly that quarter in every seating: 0 wins of 80. It reads the fund.
+#[test]
+fn an_archivists_first_victory_part_reads_the_whole_fund_with_no_archive_standing() {
+    let mut g = game();
+    let research = g.tables.archive.research;
+    g.seats[3].archive_fund = 60;
+    assert!(!g.archive_built(Seat(3)), "the premise: no Archive stands, which is where the old clamp bit");
+    let p = g.progress(Seat(3));
+    assert_eq!((p.first_value, p.first_bar), (60.0, research as f64), "60 of {research}, not a quarter of it");
+    assert!((p.first_fraction() - 60.0 / research as f64).abs() < 1e-9, "{} should be 60/{research}", p.first_fraction());
+    // The clamp is gone from the reading and not merely made redundant by the cap. This state --
+    // a fund above the cap -- is one the banking rule cannot reach, which is exactly why the clamp
+    // looked harmless; it is pinned here so the READING stays the fund, and a future rule that lets
+    // the fund run past the Archive's figure cannot be silently truncated at the Victory panel.
+    g.seats[3].archive_fund = research + 75;
+    assert_eq!(g.progress(Seat(3)).first_value, (research + 75) as f64, "the first part is the fund, unclamped");
+}
+
+/// Ticket #347, R4: **the Module's other gates do not move.** This ticket changes the money and
+/// nothing else. The journey -- The Upload researched, a Colony off Earth, four Colonists living
+/// there at the order, 50 Materials, 12 Widgets, 12 Energy once complete -- is pinned here so it
+/// cannot be quietly moved while the figures change.
+#[test]
+fn ticket_347_moves_the_archives_money_and_none_of_its_other_gates() {
+    let mut g = game();
+    let card = g.tables.module(ModuleKind::Archive);
+    assert_eq!((card.materials, card.widgets, card.energy_upkeep), (50, 12, 12), "50 Materials, 12 Widgets, 12 Energy");
+    assert_eq!(g.tables.archive.colonists_to_order, 4, "four Colonists must live there at the order");
+    assert_eq!(g.tables.victory_gate(FactionKind::Archivists), Some(TechId::TheUpload), "The Upload is still the gate");
+    // And the three refusals the order still makes: the gate Tech, the Colonists, and Earth.
+    g.seats[3].stockpile.materials = 200;
+    let mars = colony(&mut g, Seat(3), BodyId::Mars, &[ModuleKind::Habitat], 4);
+    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: mars }).unwrap_err().0.contains("The Upload"), "the gate Tech");
+    the_upload(&mut g);
+    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: mars }).is_ok(), "four Colonists off Earth, with the Tech: allowed");
+    g.colony_mut(mars).unwrap().colonists = 3;
+    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: mars }).unwrap_err().0.contains("4 Colonists"), "three is not four");
+    let home = colony(&mut g, Seat(3), BodyId::Earth, &[ModuleKind::Habitat], 8);
+    assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: home }).unwrap_err().0.contains("at a Colony on another Body"), "not on Earth");
+}
+
+/// Ticket #347, R5: **what the game says.** The Archivists' Victory sentence on their Faction card
+/// is read out to the player whole, and it quotes the Research the Archive wants. It is written by
+/// hand beside a figure the loader reads, so it is the one line in the data that can go on saying
+/// 80 after every rule has moved to 125.
+#[test]
+fn the_archivists_victory_sentence_quotes_the_figure_the_rules_use() {
+    let g = game();
+    let card = g.tables.faction(FactionKind::Archivists);
+    let research = g.tables.archive.research;
+    assert!(card.victory.contains(&format!("pay {research} Research into it")), "the sentence must quote {research}: {:?}", card.victory);
+    assert!(!card.victory.contains("80"), "and must not still say 80: {:?}", card.victory);
 }
 
 /// Ticket #68 (version 0.05.5): the Archive is one Module of 50 Materials and three turns, built
 /// once from its own button at a Colony off Earth, with no Research banked first; standing, it
-/// draws no Energy until its 80 Research is paid, and the payment that fills the fund completes it.
+/// draws no Energy until its Research is paid, and the payment that fills the fund completes it.
+/// Ticket #347 (version 0.09.1): that figure is 125, read off the table here rather than pinned,
+/// because R1's own test is what pins it.
 #[test]
 fn the_archive_is_one_module_of_fifty_materials_and_three_turns_built_once_off_earth() {
     let mut g = game();
@@ -2212,17 +2324,18 @@ fn the_archive_is_one_module_of_fifty_materials_and_three_turns_built_once_off_e
     assert!(g.archive_built(Seat(3)), "twelve Widgets");
     assert_eq!(g.archive_colony(Seat(3)), Some(mars));
     assert!(!g.archive_complete(Seat(3)), "standing is not complete: the Research is still owed");
-    assert!(g.log.to_vec().iter().any(|l| l.contains("raised the Archive at") && l.contains("80 more Research")), "{:?}", g.log.to_vec());
+    let research = g.tables.archive.research;
+    assert!(g.log.to_vec().iter().any(|l| l.contains("raised the Archive at") && l.contains(&format!("{research} more Research"))), "{:?}", g.log.to_vec());
     // At most one per Faction.
     let deimos = colony(&mut g, Seat(3), BodyId::Deimos, &[], 0);
     assert!(g.check_order(Seat(3), &[], &Order::BuildArchive { colony: deimos }).unwrap_err().0.contains("already stands at"));
     // No upkeep until it is complete; the payment that fills the fund completes it, with its Moment.
     assert_eq!(g.module_yield(Seat(3), mars, ModuleKind::Archive).upkeep, 0);
-    g.seats[3].archive_fund = 76;
+    g.seats[3].archive_fund = research - 4;
     g.seats[3].research_directive = 100;
     let banked = g.bank_archive_research(Seat(3), 10);
     assert_eq!(banked, 4, "only the four still owed are banked");
-    assert_eq!(g.seats[3].archive_fund, 80);
+    assert_eq!(g.seats[3].archive_fund, research);
     assert!(g.archive_complete(Seat(3)));
     assert_eq!(g.module_yield(Seat(3), mars, ModuleKind::Archive).upkeep, 12);
     assert!(g.log.to_vec().iter().any(|l| l.contains("completed the Archive at")), "{:?}", g.log.to_vec());
@@ -2270,7 +2383,8 @@ fn provisional_findings_halves_the_tech_under_research_and_goes_off_the_turn_aft
 #[test]
 fn a_complete_archive_goes_offline_when_energy_runs_short_and_wins_nothing_that_end_phase() {
     let mut g = game();
-    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 80, 12);
+    let research = g.tables.archive.research;
+    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, research, 12);
     g.seats[3].stockpile.energy = 0;
     assert_eq!(g.module_yield(Seat(3), cid, ModuleKind::Archive).upkeep, 12, "a complete Archive draws 12");
     assert_eq!(g.shortfall_order(Seat(3))[0], "The Archive", "the highest upkeep goes first");
@@ -2278,7 +2392,7 @@ fn a_complete_archive_goes_offline_when_energy_runs_short_and_wins_nothing_that_
     assert!(!g.colony(cid).unwrap().modules.iter().any(|m| m.kind == ModuleKind::Archive && m.online), "shut down");
     assert!(!g.archive_online(Seat(3)));
     let p = g.progress(Seat(3));
-    assert_eq!(p.first_value, 80.0, "every point of Research is paid");
+    assert_eq!(p.first_value, research as f64, "every point of Research is paid");
     assert_eq!(p.second_value, 12.0, "and the Colonists are uploaded");
     assert!(p.first_held_back.is_some() && !p.met(), "but it is not running");
     g.end_phase();
@@ -2296,7 +2410,8 @@ fn the_archive_is_destroyed_when_its_colony_changes_hands_and_the_fund_is_kept()
     assert_eq!(g.seats[3].archive_fund, 40, "the fund is kept");
     assert!(g.report.lines.iter().any(|l| l.text.contains("Archive at") && l.text.contains("destroyed")), "{:?}", g.report.lines);
     // An Occupied Colony's Archive is dark while the Occupation lasts.
-    let again = archive_at(&mut g, Seat(3), BodyId::Moon, 80, 12);
+    let research = g.tables.archive.research;
+    let again = archive_at(&mut g, Seat(3), BodyId::Moon, research, 12);
     // Ticket #164 (version 0.07.5): every Colony now draws 1 Energy for its Core Module, and an
     // Archive is 12 on its own; this test is about Occupation, not about the Energy bill.
     g.seats[3].stockpile.energy = 400;
@@ -2310,21 +2425,23 @@ fn the_archive_is_destroyed_when_its_colony_changes_hands_and_the_fund_is_kept()
 #[test]
 fn the_archivists_win_with_the_archive_running_and_twelve_colonists_uploaded() {
     let mut g = game();
-    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 80, 12);
+    let research = g.tables.archive.research;
+    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, research, 12);
     let _ = cid;
     open_gates(&mut g);
     g.seats[3].stockpile.energy = 200;
     g.income_phase();
     assert!(g.archive_online(Seat(3)));
     let p = g.progress(Seat(3));
-    assert_eq!((p.first_value, p.first_bar), (80.0, 80.0));
+    assert_eq!((p.first_value, p.first_bar), (research as f64, research as f64));
     assert_eq!((p.second_value, p.second_bar), (12.0, 12.0));
     assert!(p.met());
     g.end_phase();
     assert!(matches!(g.outcome, Some(Outcome::Win { seat: Seat(3), .. })), "{:?}", g.outcome);
     // One Colonist short and it is no win.
     let mut g = game();
-    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, 80, 11);
+    let research = g.tables.archive.research;
+    let cid = archive_at(&mut g, Seat(3), BodyId::Mars, research, 11);
     let _ = cid;
     g.seats[3].stockpile.energy = 200;
     g.income_phase();
@@ -9409,7 +9526,8 @@ fn uploading_reads_colonists_into_the_archive_and_they_leave_the_living() {
 fn the_archivists_second_part_counts_the_uploaded_not_the_living() {
     let mut g = game();
     let arc = seat_of(&g, FactionKind::Archivists);
-    let cid = archive_at(&mut g, arc, BodyId::Mars, 80, 12);
+    let research = g.tables.archive.research;
+    let cid = archive_at(&mut g, arc, BodyId::Mars, research, 12);
     // Twelve standing beside a finished Archive, and nobody read in: no win.
     g.seats[arc.index()].uploaded = 0;
     open_gates(&mut g);
@@ -9417,7 +9535,7 @@ fn the_archivists_second_part_counts_the_uploaded_not_the_living() {
     g.income_phase();
     assert!(g.archive_online(arc), "the premise: the Archive is running");
     let p = g.progress(arc);
-    assert_eq!((p.first_value, p.second_value), (80.0, 0.0), "standing next to it is worth nothing now");
+    assert_eq!((p.first_value, p.second_value), (research as f64, 0.0), "standing next to it is worth nothing now");
     assert!(!p.met());
 
     // Read them in, and the same twelve win it -- while the Colony itself stands empty.
