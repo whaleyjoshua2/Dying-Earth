@@ -23,7 +23,7 @@ pub mod victory;
 
 pub use climate::{LastTurn, Projection};
 pub use data::{DataError, Tables, TutorialNote};
-pub use economy::Yield;
+pub use economy::{GoesDark, ShortfallForecast, Yield};
 pub use ephemeris::Position;
 pub use ids::*;
 pub use orders::{BuildingRef, Cost, LoadSource, Order, OrderError, RearmSite, UnitRef, UnloadTarget};

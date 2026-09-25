@@ -196,12 +196,16 @@ build_complete = "{faction} completed {building} at {place}."
 # Ticket #332 (version 0.09.0): a build under way at a place that changed hands, cancelled by its
 # new holder: the Materials are the holder's prize, at the holder's own price.
 build_cancelled = "{faction} cancelled the {building} under way at {place}: {refund} Materials to their Stockpile."
-energy_short = "{faction}: Energy ran short; shut down {buildings}."
+# Ticket #351 (version 0.09.1): {sink} is `energy_short_sink` below when Scrubbers were shut, and
+# empty otherwise -- a Custodian lost three Scrubbers this way in the playtest with nothing said.
+energy_short = "{faction}: Energy ran short; shut down {buildings}{sink}."
 energy_zero = "{faction}: Energy fell to zero even with every producer off."
 
 # ---------------------------------------------------------------- fragments other sentences use
 [phrase]
 attacks = " and attacks"
+# Ticket #351 (version 0.09.1): what the Natural Sink loses with the Scrubbers a Shortfall shut.
+energy_short_sink = "; the Natural Sink loses {ppm} ppm"
 cargo_aboard = " with {n} Colonists aboard"
 bombard_dead = ", {n} Colonists dead with it"
 # Ticket #343 (version 0.09.1): the people a Launch killed, counted in units of population -- one

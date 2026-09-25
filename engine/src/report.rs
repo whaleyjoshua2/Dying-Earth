@@ -535,7 +535,7 @@ pub const LINE_ARGS: &[(&str, &[&str])] = &[
     ("leapfrog", &["faction", "state", "coefficient"]),
     ("tech_complete", &["tech", "faction", "shares"]),
     ("build_complete", &["faction", "building", "place"]),
-    ("energy_short", &["faction", "buildings"]),
+    ("energy_short", &["faction", "buildings", "sink"]),
     ("energy_zero", &["faction"]),
 ];
 
@@ -558,6 +558,8 @@ pub fn ordinal(n: usize) -> String {
 /// The same for `[phrase]`.
 pub const PHRASE_ARGS: &[(&str, &[&str])] = &[
     ("attacks", &[]),
+    // Ticket #351 (version 0.09.1): the Sink's loss on the Shortfall line.
+    ("energy_short_sink", &["ppm"]),
     ("cargo_aboard", &["n"]),
     // Ticket #328 (version 0.08.8): the Colonists a burned Habitat took with it.
     ("bombard_dead", &["n"]),

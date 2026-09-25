@@ -2328,6 +2328,28 @@ fn bar_resource(ui: &mut Ui, icons: &Icons, key: &str, word: &str, value: String
     });
 }
 
+/// Ticket #351 (version 0.09.1): the red of the Energy figure while a Shortfall is forecast. Not
+/// `TURN_RED`, which is a button's fill and unreadable as text on the dark bar (seen in the first
+/// picture); this is the bright red the Break line and a hot figure already use.
+const SHORT_RED: Color32 = Color32::from_rgb(255, 90, 80);
+
+/// Ticket #351 (version 0.09.1): the Shortfall alarm's hover, in the designer's approved words and
+/// within the six-line rule: the deficit, then at most three buildings in the order they go dark,
+/// then how many more. The Natural Sink clause was cut from it at the designer's word; the Report
+/// line after the fact keeps it.
+fn shortfall_hover(f: &dying_earth_engine::ShortfallForecast) -> String {
+    const SHOWN: usize = 3;
+    let mut lines = vec![format!("Next Income is {} Energy short. These go dark, in this order:", f.short_by)];
+    for d in f.dark.iter().take(SHOWN) {
+        // The Archive's name carries its own article.
+        lines.push(format!("the {} {}", d.name.strip_prefix("The ").unwrap_or(&d.name), d.at));
+    }
+    if f.dark.len() > SHOWN {
+        lines.push(format!("and {} more", f.dark.len() - SHOWN));
+    }
+    lines.join("\n")
+}
+
 /// Ticket #153 (version 0.07.4): `bar_resource` for a figure whose hover draws something -- the
 /// Emissions figure and its history. One tooltip on the glyph and the label together, so the chart
 /// is never painted twice.
@@ -2420,7 +2442,31 @@ fn top_bar(root: &mut Ui, session: &Session, game: &Game, view: &mut ViewState, 
             }
             bar_resource(ui, icons, "fuel", "Fuel", format!("{} ({})", left.fuel, signed(inc.fuel)), sources(dying_earth_engine::Resource::Fuel));
             ui.separator();
-            bar_resource(ui, icons, "energy", "Energy", format!("{} ({})", left.energy, signed(inc.energy)), sources(dying_earth_engine::Resource::Energy));
+            // Ticket #351 (version 0.09.1): the Shortfall alarm. While the next Income would shut
+            // anything -- counting what this turn's orders do to the Energy -- the figure turns red and
+            // its hover names what goes dark, in order, in place of the Last Income breakdown.
+            let energy = format!("{} ({})", left.energy, signed(inc.energy));
+            match (!session.spectator).then(|| game.shortfall_forecast(Seat(0), &session.pending)).flatten() {
+                Some(f) => {
+                    let resp = ui
+                        .horizontal(|ui| {
+                            ui.spacing_mut().item_spacing.x = 4.0;
+                            match icons.image("energy", 16.0) {
+                                Some(image) => {
+                                    ui.add(image);
+                                    ui.label(RichText::new(energy).strong().color(SHORT_RED));
+                                }
+                                None => {
+                                    ui.label(RichText::new(format!("Energy {energy}")).strong().color(SHORT_RED));
+                                }
+                            }
+                        })
+                        .response
+                        .interact(egui::Sense::hover());
+                    rule_tip(resp, shortfall_hover(&f));
+                }
+                None => bar_resource(ui, icons, "energy", "Energy", energy, sources(dying_earth_engine::Resource::Energy)),
+            }
             ui.separator();
             bar_resource(ui, icons, "ducats", "Ducats", format!("{} ({})", left.ducats, signed(inc.ducats)), sources(dying_earth_engine::Resource::Ducats));
             // Ticket #72: the Prospectors' Fund stood beside their Materials from version 0.05.5,

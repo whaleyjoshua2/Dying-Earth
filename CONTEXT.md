@@ -216,6 +216,10 @@ _Avoid_: propellant, rocket fuel
 What runs a mine, habitat or industry where it stands, drained every turn it operates.
 _Avoid_: power, electricity
 
+**Shortfall**:
+What happens at Income when a Faction's stored Energy, plus what its buildings make, cannot pay what its buildings, Ships and Armies cost to run: buildings go **Offline** one at a time, dearest upkeep first, Module before Facility, the Core never, until the bill is met. It is decided afresh every Income, so a building shut for want of Energy comes back by itself once the Energy is there. Since version 0.09.1 it is **forecast**: while the next Income would shut anything, counting the Energy this turn's orders spend, the player's Energy figure turns red and names what goes dark, in order; and the Report line after a Shortfall names what the Natural Sink lost when Scrubbers were shut.
+_Avoid_: blackout, brownout, power cut, deficit (for the rule; a deficit is the figure it answers)
+
 **Stockpile**:
 The single shared pool holding all Materials, Fuel, Energy and, since version 0.03, Ducats; never Widgets, which are made and spent where they stand. It is not divided by Body, so ore mined on Mars is immediately spendable on Earth. Since version 0.06.0 its Fuel reaches a Ship only through a Refuel at a Space Station of the Ship's Faction, or at the build.
 _Avoid_: central bank, per-world stocks, inventory

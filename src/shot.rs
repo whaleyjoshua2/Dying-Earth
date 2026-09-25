@@ -726,6 +726,17 @@ fn build_board(session: &mut Session) {
             g.seats[0].influence.insert(Place::State(sid), n);
             g.seats[1].influence.insert(Place::State(sid), theirs);
         }
+        // `short:1` (a building aid, ticket #351): seat 0's Energy store is emptied and two Scrubbers
+        // and a Research Lab stand in its start Region, so the next Income is short and the top bar's
+        // Energy figure is red; `tip:Next` photographs its hover.
+        if std::env::args().any(|a| a == "short:1")
+            && let Some(home) = g.controlled_states(Seat(0)).first().copied()
+        {
+            g.seats[0].stockpile.energy = 0;
+            for kind in [FacilityKind::Scrubber, FacilityKind::Scrubber, FacilityKind::ResearchLab] {
+                g.state_mut(home).facilities.push(Facility::new(kind));
+            }
+        }
         // `pressedat:<k>` (a building aid, ticket #349): seat 0 holds k more Regions nobody held, each
         // at 50 with seat 1 at 45, so the Command Cluster's Pressed list runs past its three lines.
         if let Some(k) = std::env::args().find_map(|a| a.strip_prefix("pressedat:").and_then(|v| v.parse::<usize>().ok())) {

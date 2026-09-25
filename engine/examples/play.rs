@@ -964,6 +964,14 @@ fn print_board(g: &Game) {
     if !sources.is_empty() {
         println!("  from: {}", sources.join(", "));
     }
+    // Ticket #351 (version 0.09.1): the Shortfall alarm the top bar shows in red, in the same words.
+    // The playtest met the Shortfall through this driver, so it is where a tester will meet it again.
+    if let Some(f) = g.shortfall_forecast(me, &[]) {
+        println!("  ENERGY ALARM: next Income is {} Energy short. These go dark, in this order:", f.short_by);
+        for d in &f.dark {
+            println!("    the {} {}", d.name.strip_prefix("The ").unwrap_or(&d.name), d.at);
+        }
+    }
     println!("Influence allotment this turn: {}", g.influence_allotment(me));
     println!(
         "Blame: {:.2} ppm emitted, {:.2} removed; share {:.0}%, Influence thresholds x{:.2}",

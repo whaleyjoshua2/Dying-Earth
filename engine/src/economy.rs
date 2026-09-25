@@ -4,6 +4,25 @@ use crate::data::VictoryFirstKind;
 use crate::ids::*;
 use crate::state::*;
 
+/// Ticket #351 (version 0.09.1): what the next Income's Shortfall would do, for the alarm on the
+/// top bar and the driver's summary.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ShortfallForecast {
+    /// How far short of the bill the seat stands with everything running.
+    pub short_by: i64,
+    /// What goes dark, in the order the rule shuts it.
+    pub dark: Vec<GoesDark>,
+}
+
+/// One building the Shortfall would shut: its name and where it stands (*"in China"*, *"at
+/// Tiangong over Earth"*). What a Scrubber costs the Natural Sink is left to the Report line after
+/// the fact, at the designer's word: the alarm's job is what goes dark.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GoesDark {
+    pub name: String,
+    pub at: String,
+}
+
 /// One producer the shortfall rule can shut down, in the order it shuts them.
 #[derive(Debug, Clone)]
 struct Producer {
@@ -841,8 +860,37 @@ impl Game {
     /// The names of producers shut down by the shortfall rule, in the order they would be shut.
     pub fn shortfall_order(&self, seat: Seat) -> Vec<String> {
         let mut producers = self.producers_of(seat);
-        let (_, shut) = self.apply_shortfall(seat, &mut producers);
-        shut
+        let (_, shut) = self.apply_shortfall(seat, &mut producers, self.seat(seat).stockpile.energy);
+        shut.into_iter().map(|i| producers[i].name.to_string()).collect()
+    }
+
+    /// Ticket #351 (version 0.09.1): **the Shortfall forecast** -- what the next Income would shut,
+    /// run by the Income rule itself on the Energy left after this turn's `pending` orders, as the
+    /// top bar's figure reads it -- today that is a purchase of Energy, which clears or shrinks the
+    /// alarm the turn it is ordered, since no order spends Energy and it cannot be sold. None when
+    /// nothing would go dark. The designer: *"alarm when there is a
+    /// projected energy deficit and buildings will go offline next turn."*
+    pub fn shortfall_forecast(&self, seat: Seat, pending: &[crate::orders::Order]) -> Option<ShortfallForecast> {
+        let stored = self.remaining(seat, pending).0.energy;
+        let mut producers = self.producers_of(seat);
+        let (_, shut) = self.apply_shortfall(seat, &mut producers, stored);
+        if shut.is_empty() {
+            return None;
+        }
+        // The deficit is the balance with everything still running, read before a single thing is shut.
+        let short_by = -self.energy_balance(seat, &self.producers_of(seat), stored);
+        let dark = shut
+            .into_iter()
+            .map(|i| {
+                let p = &producers[i];
+                let at = match p.place {
+                    ProducerPlace::Facility(sid, _) => format!("in {}", self.tables.state(sid).name),
+                    ProducerPlace::Module(cid, _) => format!("at {}", self.place_name(Place::Colony(cid))),
+                };
+                GoesDark { name: p.name.to_string(), at }
+            })
+            .collect();
+        Some(ShortfallForecast { short_by, dark })
     }
 
     /// Runs the shortfall rule over a producer list; returns the final Energy balance and what was shut.
@@ -885,15 +933,22 @@ impl Game {
         bill - (bill as f64 * self.tables.unique.reactor_upkeep).floor() as i64
     }
 
-    fn apply_shortfall(&self, seat: Seat, producers: &mut [Producer]) -> (i64, Vec<String>) {
+    /// The Energy left after Income with these producers as they stand: `stored`, plus what the
+    /// online ones make, less their upkeep and the Ships' and Armies', plus the Reactor's relief.
+    fn energy_balance(&self, seat: Seat, ps: &[Producer], stored: i64) -> i64 {
+        let energy_in: i64 = ps.iter().filter(|p| p.online).filter_map(|p| p.output.filter(|(r, _)| *r == Resource::Energy).map(|(_, v)| v)).sum();
+        let upkeep: i64 = ps.iter().filter(|p| p.online).map(|p| p.upkeep).sum();
+        stored + energy_in - upkeep - self.unit_upkeep(seat) + self.reactor_relief(seat, ps)
+    }
+
+    /// Ticket #351 (version 0.09.1): the rule starts from `stored` rather than reading the stockpile,
+    /// so the forecast can run it on the Energy left after this turn's orders; Income passes the
+    /// stockpile itself. It returns the balance after, and the INDEX of each producer it shut, in
+    /// the order it shut them.
+    fn apply_shortfall(&self, seat: Seat, producers: &mut [Producer], stored: i64) -> (i64, Vec<usize>) {
         // Ticket #184: the balance is recomputed from scratch whenever a building goes dark, because
         // the Reactor's relief is a share of the bill and shrinks with it.
-        let balance_now = |g: &Self, ps: &[Producer]| -> i64 {
-            let energy_in: i64 = ps.iter().filter(|p| p.online).filter_map(|p| p.output.filter(|(r, _)| *r == Resource::Energy).map(|(_, v)| v)).sum();
-            let upkeep: i64 = ps.iter().filter(|p| p.online).map(|p| p.upkeep).sum();
-            g.seat(seat).stockpile.energy + energy_in - upkeep - g.unit_upkeep(seat) + g.reactor_relief(seat, ps)
-        };
-        let mut balance = balance_now(self, producers);
+        let mut balance = self.energy_balance(seat, producers, stored);
         // Ticket #164 (version 0.07.5): the Core Module is never shut for want of Energy. It is the
         // walls of the place rather than a building in it -- it cannot be mothballed either -- so
         // its upkeep is paid whatever else goes dark.
@@ -913,15 +968,29 @@ impl Game {
                 break;
             }
             producers[i].online = false;
-            shut.push(producers[i].name.to_string());
-            balance = balance_now(self, producers);
+            shut.push(i);
+            balance = self.energy_balance(seat, producers, stored);
         }
         (balance, shut)
     }
 
     fn income_for(&mut self, seat: Seat) {
         let mut producers = self.producers_of(seat);
-        let (balance, shut) = self.apply_shortfall(seat, &mut producers);
+        let (balance, shut_at) = self.apply_shortfall(seat, &mut producers, self.seat(seat).stockpile.energy);
+        let shut: Vec<String> = shut_at.iter().map(|i| producers[*i].name.to_string()).collect();
+        // Ticket #351 (version 0.09.1): what the Natural Sink loses with the Scrubbers shut, which the
+        // Report line names -- the case where a Custodian loses the game without noticing. Only where
+        // the Region has a controller, which is where `scrubber_removal_by_seat` counts it: one in a
+        // Region occupied from neutral never added to the Sink, so shutting it takes nothing off.
+        let sink_lost = self.tables.facility(FacilityKind::Scrubber).sink_per_turn
+            * shut_at
+                .iter()
+                .filter(|i| {
+                    matches!(producers[**i].place, ProducerPlace::Facility(sid, f)
+                        if self.state(sid).control.controller().is_some()
+                            && self.state(sid).facilities.get(f).map(|x| x.kind == FacilityKind::Scrubber).unwrap_or(false))
+                })
+                .count() as f64;
         let mut gained = Stockpile::default();
         let mut research = 0;
         let mut off_earth = 0;
@@ -1149,7 +1218,8 @@ impl Game {
         if !shut.is_empty() {
             let line = format!("{}: Energy ran short; shut down {}.", self.seat_name(seat), shut.join(", "));
             self.log(line);
-            let text = self.say("energy_short", &[("faction", self.seat_name(seat)), ("buildings", shut.join(", "))]);
+            let sink = if sink_lost > 0.0 { self.phrase("energy_short_sink", &[("ppm", format!("{sink_lost:.1}"))]) } else { String::new() };
+            let text = self.say("energy_short", &[("faction", self.seat_name(seat)), ("buildings", shut.join(", ")), ("sink", sink)]);
             self.report_line_of(seat, LineKind::YourWorks, LineKind::Note, None, text);
         }
         if balance < 0 {

@@ -14880,3 +14880,76 @@ fn ticket_349_a_colony_is_pressed_on_the_same_test_and_listed_after_the_regions(
     g.colonies.iter_mut().find(|c| Place::Colony(c.id) == moon).expect("the Colony").control = Control::Controlled(Seat(2));
     assert_eq!(g.pressed_places(Seat(0)), vec![africa]);
 }
+
+// ---------------------------------------------------------------- Ticket #351: the Shortfall forecast
+
+/// Ticket #351 (version 0.09.1): seat 0 in East Asia with a Factory (2), a Refinery (3) and a
+/// Research Lab (3) and nothing else that costs Energy but the station's Core, and `energy` stored.
+fn short_board(energy: i64) -> Game {
+    let mut g = game();
+    g.seats[0].stockpile.energy = energy;
+    let st = g.state_mut(StateId::EastAsia);
+    st.facilities.clear();
+    st.facilities.push(facility(FacilityKind::Factory));
+    st.facilities.push(facility(FacilityKind::Refinery));
+    st.facilities.push(facility(FacilityKind::ResearchLab));
+    g
+}
+
+#[test]
+fn ticket_351_the_forecast_names_the_deficit_and_what_goes_dark_in_order_and_where() {
+    let g = short_board(4);
+    let f = g.shortfall_forecast(Seat(0), &[]).expect("4 stored against 8 and the Core is short");
+    // 4 - 8 - 1 (the Core) = -5.
+    assert_eq!(f.short_by, 5);
+    let dark: Vec<(String, String)> = f.dark.iter().map(|d| (d.name.clone(), d.at.clone())).collect();
+    assert_eq!(dark, vec![("Refinery".to_string(), "in China".to_string()), ("Research Lab".to_string(), "in China".to_string())]);
+    assert_eq!(f.dark.iter().map(|d| d.name.as_str()).collect::<Vec<_>>(), g.shortfall_order(Seat(0)), "the same order the Income rule shuts in");
+    assert!(short_board(20).shortfall_forecast(Seat(0), &[]).is_none(), "a full store covers the bill: no alarm");
+}
+
+/// The forecast reads the Energy left after this turn's orders, as the top bar's figure does. No
+/// order spends Energy and it cannot be sold, so the order that moves it is a purchase.
+#[test]
+fn ticket_351_the_forecast_counts_this_turns_orders() {
+    let g = short_board(4);
+    let buy = |amount| Order::Buy { resource: Resource::Energy, amount };
+    let f = g.shortfall_forecast(Seat(0), &[buy(3)]).expect("7 against 9 is still short");
+    assert_eq!(f.short_by, 2, "the purchase counts");
+    assert_eq!(f.dark.len(), 1, "and one building is enough now");
+    assert!(g.shortfall_forecast(Seat(0), &[buy(10)]).is_none(), "buying 10 clears it");
+}
+
+
+/// The Report line after the fact names the Sink's loss when a Scrubber was shut.
+#[test]
+fn ticket_351_the_report_line_names_the_sinks_loss() {
+    let mut g = short_board(0);
+    let st = g.state_mut(StateId::EastAsia);
+    st.facilities.clear();
+    st.facilities.push(facility(FacilityKind::Scrubber));
+    st.facilities.push(facility(FacilityKind::Scrubber));
+    g.income_phase();
+    let line = g.report.lines.iter().find(|l| l.text.contains("Energy ran short")).map(|l| l.text.clone()).unwrap_or_else(|| panic!("{:?}", g.report.lines));
+    assert!(line.contains("the Natural Sink loses 6.0 ppm"), "two Scrubbers at 3.0 each: {line}");
+    let mut g = short_board(0);
+    g.income_phase();
+    let line = g.report.lines.iter().find(|l| l.text.contains("Energy ran short")).map(|l| l.text.clone()).expect("a shortfall");
+    assert!(!line.contains("Natural Sink"), "no Scrubber, no Sink clause: {line}");
+}
+
+/// Found in review: the Sink counts a Scrubber only where its Region has a controller, so one shut in
+/// a Region occupied from neutral costs the Sink nothing and the Report line must not say otherwise.
+#[test]
+fn ticket_351_a_scrubber_the_sink_never_counted_names_no_loss() {
+    let mut g = short_board(0);
+    let st = g.state_mut(StateId::EastAsia);
+    st.facilities.clear();
+    st.facilities.push(facility(FacilityKind::Scrubber));
+    st.control = Control::Occupied { occupier: Seat(0), previous: None, turns: 1, banked: 0 };
+    assert_eq!(g.scrubber_removal(), 0.0, "the Sink does not count it");
+    g.income_phase();
+    let line = g.report.lines.iter().find(|l| l.text.contains("Energy ran short")).map(|l| l.text.clone()).unwrap_or_else(|| panic!("{:?}", g.report.lines));
+    assert!(line.contains("Scrubber"), "it is shut: {line}");
+    assert!(!line.contains("Natural Sink"), "and costs the Sink nothing: {line}");
+}
