@@ -64,6 +64,11 @@ fn main() {
     // Indexed by the Faction's place in `FactionKind::ALL`, never by seat: seat 0 is a
     // different Faction in every seating, which is the whole point of running four.
     let mut all_wins = [0u32; 4];
+    // Ticket #348 (version 0.09.1): the turn each FACTION's Victory gate completed, gathered the
+    // same way and for the same reason -- the per-cell line reads by SEAT, and seat 0 is a
+    // different Faction in every seating, so the gate figure this ticket is judged by cannot be
+    // read off it without adding four arrays up by hand.
+    let mut all_gate_turns: [Vec<u32>; 4] = Default::default();
     // Ticket #343 (version 0.09.1): the nuke's counters across every seating, so the closing
     // review has ONE total to quote rather than four blocks to add up by hand.
     let mut all_warc = dying_earth_engine::state::WarCounters::default();
@@ -355,6 +360,7 @@ fn main() {
                             for s in Seat::ALL {
                                 let at = FactionKind::ALL.into_iter().position(|k| k == order[s.index()]).unwrap_or(0);
                                 all_wins[at] += wins[s.index()];
+                                all_gate_turns[at].extend(gate_turns[s.index()].iter().copied());
                             }
                             all_games += seeds as u32;
                             all_collapses += turns.len() as u32;
@@ -619,6 +625,10 @@ fn main() {
             println!("  {:>12}: {:2} win(s) of {all_games}", k.name(), all_wins[i]);
         }
         println!("  collapses {all_collapses} of {all_games}");
+        // Ticket #348: per FACTION, which is the figure that ticket is judged by.
+        for (i, k) in FactionKind::ALL.into_iter().enumerate() {
+            println!("  {:>12}: Victory gate completed in {:2} of {all_games} games, median turn {}", k.name(), all_gate_turns[i].len(), median_u(&mut all_gate_turns[i]));
+        }
         // Ticket #343 (version 0.09.1): summed over every seat of every seating -- a TOTAL, never
         // a per-Faction figure, since seat 0 is a different Faction in each seating.
         println!(

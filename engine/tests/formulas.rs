@@ -7364,6 +7364,176 @@ fn the_shortlist_always_carries_the_leads_own_victory_gate() {
     assert!(seen_without, "a rival's gate can be left off");
 }
 
+/// Ticket #348 (version 0.09.1), R1: every Faction's OWN gate chain is on its OWN pick list. Only
+/// the Custodians could reach their gate before this -- three Techs and 98 Research with a complete
+/// list -- while the other three needed five Techs and 148 and each was missing antecedents it
+/// would only ever have taken by the cheapest-remaining fallback.
+///
+/// The chains are COMPUTED from the tables here rather than pinned, so a change to the tree moves
+/// this test with it instead of rotting: a test that hard-coded "Beneficiation is on the
+/// Prospectors' list" would say nothing the day the Extraction Charter stopped needing it.
+#[test]
+fn every_factions_gate_chain_is_in_its_own_pick_list() {
+    let t = tables();
+    for kind in FactionKind::ALL {
+        let gate = t.victory_gate(kind).expect("every Faction has a Victory gate");
+        let order = &t.ai_tech_picks(kind).order;
+        let chain = t.gate_chain(kind);
+        for need in &chain {
+            assert!(
+                order.contains(need),
+                "the {:?} cannot reach {} without {}, and it is not on their list: {:?}",
+                kind,
+                t.tech(gate).name,
+                t.tech(*need).name,
+                order.iter().map(|x| t.tech(*x).name.clone()).collect::<Vec<_>>()
+            );
+        }
+        // A Faction never swears off a Tech its own Victory turns on.
+        assert!(!chain.contains(&t.ai_tech_picks(kind).never.unwrap_or(gate)), "the {kind:?} refuse a Tech on their own chain");
+    }
+}
+
+/// Ticket #348, R2, the first of the two witnesses it owes: the drawn shortlist carries the NEXT
+/// RUNG of the Lead's own chain while the gate itself is still out of reach.
+///
+/// Ticket #98's guarantee fired only `if available.contains(&gate)`, and a Tech is available only
+/// once its prerequisites are done -- so the promise that a Faction is never denied its own gate
+/// could not be kept until the chain had already been climbed by luck. This climbs each Faction's
+/// chain a rung at a time and asks for the rung at every step.
+#[test]
+fn the_shortlist_carries_the_next_rung_of_the_leads_chain() {
+    for seat in Seat::ALL {
+        let mut g = game();
+        let kind = g.kind(seat);
+        let gate = g.tables.victory_gate(kind).expect("every Faction has a Victory gate");
+        let chain = g.tables.gate_chain(kind);
+        assert!(!chain.is_empty(), "the {kind:?} have a chain to climb");
+        let size = g.tables.shortlist.size;
+        for step in 0..chain.len() {
+            let rung = g.next_gate_rung(seat).expect("a rung is owed while the chain stands unclimbed");
+            assert!(!g.available_techs().contains(&gate), "the {kind:?} gate is out of reach at rung {step}");
+            assert!(g.available_techs().len() > size, "more is available than the list holds");
+            // Drawn many times over: the rung is on every one of them, and the gate on none.
+            for _ in 0..25 {
+                g.draw_shortlist(seat);
+                assert!(
+                    g.research.shortlist.contains(&rung),
+                    "the {:?} were not offered {} at rung {step}: {:?}",
+                    kind,
+                    g.tables.tech(rung).name,
+                    g.research.shortlist.iter().map(|t| g.tables.tech(*t).name.clone()).collect::<Vec<_>>()
+                );
+                assert!(!g.research.shortlist.contains(&gate), "the {kind:?} gate was drawn while unreachable");
+            }
+            g.research.done.push(rung);
+        }
+        // The chain climbed, the gate is what is owed, and nothing on the chain is left to force.
+        assert_eq!(g.next_gate_rung(seat), None, "the {kind:?} chain is climbed and nothing more is owed");
+        assert!(g.available_techs().contains(&gate), "the {kind:?} gate is reachable now");
+        for _ in 0..25 {
+            g.draw_shortlist(seat);
+            assert!(g.research.shortlist.contains(&gate), "the {kind:?} gate is drawn once its chain is climbed");
+        }
+    }
+}
+
+/// Ticket #348, R2, the second witness: the gate and a forced antecedent are NEVER forced together,
+/// which is why the shortlist can reserve ONE place of its three and stay three Techs long.
+///
+/// The gate is available only when every antecedent is done; an unresearched antecedent exists only
+/// when some antecedent is not done. Walked here over every state the chain can actually be in --
+/// every subset of the chain, the gate done or not -- skipping the states Research cannot reach,
+/// which are the ones where a done Tech's own prerequisites are not done. `pick_tech` refuses
+/// anything that is not available, so that is exactly the set of states a game can be in.
+#[test]
+fn a_draw_never_forces_both_the_gate_and_its_chain() {
+    for seat in Seat::ALL {
+        let probe = game();
+        let kind = probe.kind(seat);
+        let gate = probe.tables.victory_gate(kind).expect("every Faction has a Victory gate");
+        let chain = probe.tables.gate_chain(kind);
+        let size = probe.tables.shortlist.size;
+        let mut reachable_states = 0;
+        for mask in 0..(1u32 << (chain.len() + 1)) {
+            let mut g = game();
+            for (i, t) in chain.iter().enumerate() {
+                if mask & (1 << i) != 0 {
+                    g.research.done.push(*t);
+                }
+            }
+            if mask & (1 << chain.len()) != 0 {
+                g.research.done.push(gate);
+            }
+            let closed = g.research.done.iter().all(|t| g.tables.tech(*t).needs.iter().all(|n| g.research.done.contains(n)));
+            if !closed {
+                continue;
+            }
+            reachable_states += 1;
+            let gate_forced = g.available_techs().contains(&gate);
+            let rung = g.next_gate_rung(seat);
+            assert!(
+                !(gate_forced && rung.is_some()),
+                "the {:?} force BOTH {} and {:?} with {:?} done: the reserved place would be two of {size}",
+                kind,
+                g.tables.tech(gate).name,
+                rung.map(|t| g.tables.tech(t).name.clone()),
+                g.research.done.iter().map(|t| g.tables.tech(*t).name.clone()).collect::<Vec<_>>()
+            );
+            if let Some(r) = rung {
+                assert!(g.available_techs().contains(&r), "the {kind:?} are offered a rung whose own prerequisites are unmet");
+                assert!(chain.contains(&r), "the {kind:?} are offered a rung that is not on their chain");
+            }
+            if g.available_techs().len() <= size {
+                continue;
+            }
+            g.draw_shortlist(seat);
+            assert_eq!(g.research.shortlist.len(), size, "the {kind:?} list is no longer {size} Techs long");
+            if let Some(r) = rung {
+                assert!(g.research.shortlist.contains(&r), "the {kind:?} rung was not drawn");
+                assert!(!g.research.shortlist.contains(&gate), "the {kind:?} drew both their gate and a rung of its chain");
+            }
+        }
+        assert!(reachable_states > 2, "the {kind:?} chain has states to walk: {reachable_states}");
+    }
+}
+
+/// Ticket #348, R3: no Faction leaves a Tech until last that another Faction's Victory gate needs.
+/// The tree is SHARED, so a deferral is not a private preference: the Prospectors deferred Clean
+/// Power, an antecedent of BOTH the Arkwrights' and the Archivists' gates, and so stalled two
+/// rivals' Victory Conditions every time they held the Research Lead without ever choosing to.
+#[test]
+fn no_faction_defers_a_tech_another_factions_gate_needs() {
+    let t = tables();
+    for kind in FactionKind::ALL {
+        let picks = t.ai_tech_picks(kind);
+        // Ticket #348 (version 0.09.1): BOTH levers, not `last` alone. A Faction's `last` defers a
+        // Tech while that Faction holds the Research Lead, which stalls the whole table; its
+        // `never` diverts that Faction's own Research out of the shared pot for as long as the
+        // table researches it, which starves the Tech more slowly and just as surely.
+        //
+        // The first draft of this rule checked `last` alone, on a build specification that claimed
+        // Green Consensus was nobody else's antecedent. It is the Custodians' ONLY rung-2
+        // antecedent, on the one chain they have, and they are the weakest Faction on the board.
+        // The designer, told that: drop it.
+        for (lever, tech) in [("leave", picks.last), ("refuse to fund", picks.never)] {
+            let Some(tech) = tech else { continue };
+            for other in FactionKind::ALL.into_iter().filter(|k| *k != kind) {
+                let gate = t.victory_gate(other).expect("every Faction has a Victory gate");
+                assert!(
+                    !t.gate_chain(other).contains(&tech),
+                    "the {:?} {} {}, and the {:?} cannot reach {} without it",
+                    kind,
+                    lever,
+                    t.tech(tech).name,
+                    other,
+                    t.tech(gate).name
+                );
+            }
+        }
+    }
+}
+
 /// Ticket #108 (version 0.07.0): a Leapfrog now takes a bite out of the state's Baseline Emissions
 /// as well as its people's coefficient. Leapfrog measured at about ten times a Scrubber's cost per
 /// ppm and was bought zero times in twelve playtested games; `baseline x Industry Level` was a floor

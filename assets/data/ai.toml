@@ -432,11 +432,44 @@ battle_fuel_weight = 0.2
 
 # Tech picks as Research Lead (spec 16.4): `order` first, then the cheapest available that is not
 # `never`, and `last` only when nothing else is left.
+#
+# Ticket #348 (version 0.09.1): EVERY LIST OPENS WITH ITS OWN VICTORY GATE'S CHAIN, cheapest first.
+# Before this only the Custodians could reach their own gate: theirs is three Techs and 98 Research
+# with every antecedent on their list, where the other three are five Techs and 148 and each was
+# missing antecedents from its own. Measured over eighty games at the 0.09.1 baseline: wins
+# Custodians 3, Prospectors 30, Arkwrights 1, Archivists 0.
+#
+# An antecedent a list already held is NOT repeated -- it keeps the place it had. The additions are
+# ordered by cost and not by the tree, because the list is read against what is AVAILABLE: an
+# antecedent whose own prerequisites are unmet is skipped over this turn and taken the turn they are
+# met, so Beneficiation can stand ahead of the Deep Mining it needs without ever being picked first.
 
 [tech_picks.prospectors]
-order = ["deep_mining", "efficient_grids", "automated_refining", "clean_propellant", "efficient_transit"]
-last = "clean_power"
-never = "green_consensus"
+# Ticket #348: Beneficiation joins the list. Ticket #242 made it a prerequisite of the Extraction
+# Charter and nobody put it on the list it gates, so the Prospectors reached their own gate only by
+# taking Beneficiation as the cheapest thing left.
+order = ["beneficiation", "deep_mining", "efficient_grids", "automated_refining", "clean_propellant", "efficient_transit"]
+# Ticket #348: `last = "clean_power"` is GONE. The tree is SHARED, so a Faction deferring a Tech is
+# not stating a private preference -- it is holding the whole table up. Clean Power is an antecedent
+# of BOTH the Arkwrights' and the Archivists' gates, so every turn a Prospector Lead pushed it to
+# the back it stalled two rivals' Victory Conditions without the Prospectors ever choosing to.
+#
+# `never = "green_consensus"` IS GONE TOO, and for the same reason one layer down. It was kept at
+# first on a build specification that claimed Green Consensus was nobody else's antecedent. It is
+# the CUSTODIANS' ONLY rung-2 antecedent -- Planetary Stewardship needs it and nothing else in the
+# tree does -- so the Prospectors were refusing to fund the one chain the weakest Faction on the
+# board has, in a game where they win 30 of 80 and the Custodians 3.
+#
+# `never` is the gentler of the two levers and it is worth saying what it did, since the difference
+# is why it survived one round. `last` governs what a Faction PICKS while it holds the Research
+# Lead, which stalls the whole table at once. `never` governs its RESEARCH DIRECTIVE: for as long
+# as the table researches that Tech, the Faction diverts its own Research out of the shared pot and
+# into its coffers. It starves the Tech more slowly, it costs the Prospectors their contribution to
+# everything else, and it arrives at the same place.
+#
+# The Prospectors now carry neither lever. A Faction refusing to fund a rival is a fine idea and
+# this is not a ruling against it; it is a ruling that the target must not be the only road another
+# Faction has to its Victory Condition.
 
 # Ticket #77 (version 0.05.5): Coastal Engineering second, so the Sea Wall (10 Research on rung 1
 # since ticket #69) arrives before the sea takes the coast around turn 13, not around turn 17 as
@@ -449,9 +482,18 @@ never = "green_consensus"
 order = ["public_science", "coastal_engineering", "efficient_grids", "clean_power", "green_consensus", "civil_defense", "clean_manufacturing"]
 
 # Ticket #51: the Arkwrights want room, cheap upkeep and cheap transits.
+# Ticket #348: Efficient Grids and Clean Power open the list. Generation Ships waits on Closed-Loop
+# Colonies, which waits on Expanded Habitats AND Clean Power, which waits on Efficient Grids -- and
+# the Arkwrights had the top and the bottom of that chain on their list and neither of its middle
+# two rungs. They won 1 of 80.
 [tech_picks.arkwrights]
-order = ["expanded_habitats", "closed_loop_colonies", "efficient_transit"]
+order = ["efficient_grids", "clean_power", "expanded_habitats", "closed_loop_colonies", "efficient_transit"]
 
 # Ticket #51: the Archivists want Research and a quiet world.
+# Ticket #348: Expanded Habitats, Clean Power and Closed-Loop Colonies open the list. Ticket #246
+# moved The Upload on to Closed-Loop Colonies and warned in `techs.toml` that the gate had gone from
+# one antecedent to four; nothing then put those four on the list of the Faction whose gate it is,
+# and they held Efficient Grids alone of them. They won 0 of 80 and their Archive waits on this same
+# Tech, since `orders.rs` refuses the Archive order until The Upload stands.
 [tech_picks.archivists]
-order = ["public_science", "efficient_grids", "coastal_engineering", "green_consensus", "civil_defense"]
+order = ["expanded_habitats", "clean_power", "closed_loop_colonies", "public_science", "efficient_grids", "coastal_engineering", "green_consensus", "civil_defense"]

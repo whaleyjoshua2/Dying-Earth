@@ -2288,6 +2288,28 @@ impl Tables {
     pub fn victory_gate(&self, kind: FactionKind) -> Option<TechId> {
         self.techs.iter().find(|t| t.gate_for == Some(kind)).map(|t| t.id)
     }
+
+    /// Ticket #348 (version 0.09.1): every Tech that stands between this Faction and its own
+    /// Victory gate, found by walking `needs` from the gate down to its roots. The gate itself is
+    /// not in the answer.
+    ///
+    /// Answered CHEAPEST FIRST, ties broken by the Tech's place in the tree, so two antecedents
+    /// costing the same never move a seeded game between them. An empty answer is a gate with no
+    /// antecedents at all -- a shape the tree may take, and one no rule here may assume away.
+    pub fn gate_chain(&self, kind: FactionKind) -> Vec<TechId> {
+        let Some(gate) = self.victory_gate(kind) else { return Vec::new() };
+        let mut chain: Vec<TechId> = Vec::new();
+        let mut edge: Vec<TechId> = self.tech(gate).needs.clone();
+        while let Some(t) = edge.pop() {
+            if t == gate || chain.contains(&t) {
+                continue;
+            }
+            chain.push(t);
+            edge.extend(self.tech(t).needs.iter().copied());
+        }
+        chain.sort_by_key(|t| (self.tech(*t).cost, t.index()));
+        chain
+    }
 }
 
 fn check_rows<T: Copy + PartialEq + fmt::Debug>(
